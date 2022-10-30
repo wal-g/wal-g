@@ -6,6 +6,8 @@ import (
 	"path"
 	"sync"
 
+	"github.com/wal-g/wal-g/utility"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -75,7 +77,15 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 		tracelog.DebugLogger.Printf(
 			"%s: EOF (local %d, remote %d), ModCount (local %d, remote %d), will perform an incremental upload",
 			cfi.Header.Name, aoMeta.eof, remoteFile.EOF, aoMeta.modCount, remoteFile.ModCount)
-		return u.incrementalAoUpload(remoteFile.StoragePath, cfi, aoMeta, remoteFile.EOF)
+
+		err := u.incrementalAoUpload(remoteFile.StoragePath, cfi, aoMeta, remoteFile.EOF)
+		if err == nil {
+			return nil
+		}
+
+		tracelog.WarningLogger.Printf("%s: incremental upload failed, will perform a regular upload: %v",
+			cfi.Header.Name, err)
+		return u.regularAoUpload(cfi, aoMeta, location)
 	}
 
 	if aoMeta.eof != remoteFile.EOF {
@@ -146,6 +156,7 @@ func (u *AoStorageUploader) incrementalAoUpload(
 	if err != nil {
 		return err
 	}
+	defer utility.LoggedClose(file, "")
 
 	incrementalReader, err := NewIncrementalPageReader(file, aoMeta.eof, baseFileEOF)
 	if err != nil {
