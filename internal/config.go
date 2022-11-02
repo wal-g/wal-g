@@ -69,6 +69,7 @@ const (
 	PgUserSetting                = "PGUSER"
 	PgHostSetting                = "PGHOST"
 	PgPasswordSetting            = "PGPASSWORD"
+	PgPassfileSetting            = "PGPASSFILE"
 	PgDatabaseSetting            = "PGDATABASE"
 	PgSslModeSetting             = "PGSSLMODE"
 	PgSlotName                   = "WALG_SLOTNAME"
@@ -143,11 +144,30 @@ const (
 
 	AwsAccessKeyID     = "AWS_ACCESS_KEY_ID"
 	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
+	AwsSessionToken    = "AWS_SESSION_TOKEN"
 
 	YcKmsKeyIDSetting  = "YC_CSE_KMS_KEY_ID"
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 
 	PgBackRestStanza = "PGBACKREST_STANZA"
+
+	AzureStorageAccount   = "AZURE_STORAGE_ACCOUNT"
+	AzureStorageAccessKey = "AZURE_STORAGE_ACCESS_KEY"
+	AzureStorageSasToken  = "AZURE_STORAGE_SAS_TOKEN"
+	AzureEnvironmentName  = "AZURE_ENVIRONMENT_NAME"
+
+	GoogleApplicationCredentials = "GOOGLE_APPLICATION_CREDENTIALS"
+
+	SwiftOsAuthURL    = "OS_AUTH_URL"
+	SwiftOsUsername   = "OS_USERNAME"
+	SwiftOsPassword   = "OS_PASSWORD"
+	SwiftOsTenantName = "OS_TENANT_NAME"
+	SwiftOsRegionName = "OS_REGION_NAME"
+
+	SSHPort           = "SSH_PORT"
+	SSHPassword       = "SSH_PASSWORD"
+	SSHUsername       = "SSH_USERNAME"
+	SSHPrivateKeyPath = "SSH_PRIVATE_KEY_PATH"
 )
 
 var (
@@ -266,18 +286,18 @@ var (
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
-		"OS_AUTH_URL":       true,
-		"OS_USERNAME":       true,
-		"OS_PASSWORD":       true,
-		"OS_TENANT_NAME":    true,
-		"OS_REGION_NAME":    true,
+		SwiftOsAuthURL:      true,
+		SwiftOsUsername:     true,
+		SwiftOsPassword:     true,
+		SwiftOsTenantName:   true,
+		SwiftOsRegionName:   true,
 
 		// AWS s3
 		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
 		AwsAccessKeyID:                true,
 		AwsSecretAccessKey:            true,
-		"AWS_SESSION_TOKEN":           true,
+		AwsSessionToken:               true,
 		"AWS_DEFAULT_REGION":          true,
 		"AWS_DEFAULT_OUTPUT":          true,
 		"AWS_PROFILE":                 true,
@@ -305,28 +325,28 @@ var (
 		"S3_MAX_RETRIES":              true,
 
 		// Azure
-		"WALG_AZ_PREFIX":           true,
-		"AZURE_STORAGE_ACCOUNT":    true,
-		"AZURE_STORAGE_ACCESS_KEY": true,
-		"AZURE_STORAGE_SAS_TOKEN":  true,
-		"AZURE_ENVIRONMENT_NAME":   true,
-		"WALG_AZURE_BUFFER_SIZE":   true,
-		"WALG_AZURE_MAX_BUFFERS":   true,
+		"WALG_AZ_PREFIX":         true,
+		AzureStorageAccount:      true,
+		AzureStorageAccessKey:    true,
+		AzureStorageSasToken:     true,
+		AzureEnvironmentName:     true,
+		"WALG_AZURE_BUFFER_SIZE": true,
+		"WALG_AZURE_MAX_BUFFERS": true,
 
 		// GS
-		"WALG_GS_PREFIX":                 true,
-		"GOOGLE_APPLICATION_CREDENTIALS": true,
+		"WALG_GS_PREFIX":             true,
+		GoogleApplicationCredentials: true,
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
 		YcKmsKeyIDSetting:  true,
 
 		// SH
-		"WALG_SSH_PREFIX":      true,
-		"SSH_PORT":             true,
-		"SSH_PASSWORD":         true,
-		"SSH_USERNAME":         true,
-		"SSH_PRIVATE_KEY_PATH": true,
+		"WALG_SSH_PREFIX": true,
+		SSHPort:           true,
+		SSHPassword:       true,
+		SSHUsername:       true,
+		SSHPrivateKeyPath: true,
 
 		//File
 		"WALG_FILE_PREFIX": true,
@@ -347,11 +367,11 @@ var (
 		PgHostSetting:        true,
 		PgDataSetting:        true,
 		PgPasswordSetting:    true,
+		PgPassfileSetting:    true,
 		PgDatabaseSetting:    true,
 		PgSslModeSetting:     true,
 		PgSlotName:           true,
 		PgWalSize:            true,
-		"PGPASSFILE":         true,
 		PrefetchDir:          true,
 		PgReadyRename:        true,
 		PgBackRestStanza:     true,
