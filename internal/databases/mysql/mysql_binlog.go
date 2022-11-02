@@ -141,8 +141,12 @@ func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) 
 	parser.SetFlavor(flavor)
 	parser.SetVerifyChecksum(false) // the faster, the better
 	parser.SetRawMode(true)         // choose events to parse manually
+
 	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
 		ts = event.Header.Timestamp
+		if ts == 0 {
+			return nil // keep reading until first event with timestamp is found
+		}
 		return fmt.Errorf("shallow file read finished")
 	})
 	if err != nil && ts == 0 {
