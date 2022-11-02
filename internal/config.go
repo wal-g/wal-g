@@ -729,6 +729,7 @@ func bindConfigToEnv(globalViper *viper.Viper) {
 		if !ok {
 			// note: all viper settings are currently strings, this warning will not be triggered at the moment
 			tracelog.WarningLogger.Printf("config value for %s is not a string: %T %v\n", k, v, v)
+			continue
 		}
 		k = strings.ToUpper(k)
 
