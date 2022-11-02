@@ -443,6 +443,25 @@ var (
 		OplogPushStatsExposeHTTP: nil,
 	}
 	Turbo bool
+
+	secretSettings = map[string]bool{
+		"WALE_" + GpgKeyIDSetting:    true,
+		"WALG_" + GpgKeyIDSetting:    true,
+		AwsAccessKeyID:               true,
+		AwsSecretAccessKey:           true,
+		AwsSessionToken:              true,
+		AzureStorageAccessKey:        true,
+		AzureStorageSasToken:         true,
+		GoogleApplicationCredentials: true,
+		LibsodiumKeySetting:          true,
+		PgPasswordSetting:            true,
+		PgpKeyPassphraseSetting:      true,
+		PgpKeySetting:                true,
+		RedisPassword:                true,
+		SQLServerConnectionString:    true,
+		SSHPassword:                  true,
+		SwiftOsPassword:              true,
+	}
 )
 
 func AddTurboFlag(cmd *cobra.Command) {
@@ -564,9 +583,15 @@ func Configure() {
 
 		for _, k := range keys {
 			val, ok := os.LookupEnv(k)
-			if ok {
-				fmt.Fprintf(&buff, "\t%s=%s\n", k, val)
+			if !ok {
+				continue
 			}
+
+			// for secret settings: leave them empty if they are defined but empty, otherwise hide their actual value
+			if secretSettings[k] && val != "" {
+				val = "--HIDDEN--"
+			}
+			fmt.Fprintf(&buff, "\t%s=%s\n", k, val)
 		}
 
 		tracelog.DebugLogger.Print(buff.String())
