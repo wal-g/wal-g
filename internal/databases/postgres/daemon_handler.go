@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -125,6 +126,7 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
 	}
+	go NotifyService()
 	for {
 		fd, err := l.Accept()
 		if err != nil {
@@ -164,5 +166,36 @@ func Listen(c net.Conn, uploader *WalUploader) {
 			tracelog.InfoLogger.Printf("Successful archiving for %s\n", string(messageBody))
 			return
 		}
+	}
+}
+
+const SdNotifyWatchdog = "WATCHDOG=1"
+
+func SdNotify(state string) error {
+	socketName, ok := os.LookupEnv("NOTIFY_SOCKET")
+	if !ok {
+		return fmt.Errorf("NOTIFY_SOCKET is not defined")
+	}
+	socketAddr := &net.UnixAddr{
+		Name: socketName,
+		Net:  "unixgram",
+	}
+	conn, err := net.DialUnix(socketAddr.Net, nil, socketAddr)
+	if err != nil {
+		return fmt.Errorf("failed connect to service: %w", err)
+	}
+	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
+	if _, err = conn.Write([]byte(state)); err != nil {
+		return fmt.Errorf("failed write to service: %w", err)
+	}
+	return nil
+}
+
+func NotifyService() {
+	for {
+		if err := SdNotify(SdNotifyWatchdog); err != nil {
+			tracelog.ErrorLogger.Printf("Failed to notify watchdog: %v", err)
+		}
+		time.Sleep(3 * time.Second)
 	}
 }
