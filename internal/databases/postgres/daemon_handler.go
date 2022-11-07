@@ -127,8 +127,7 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string) {
 	}
 	for {
 		err = SdNotify(SdNotifyWatchdog)
-		tracelog.ErrorLogger.FatalOnError(err)
-
+		tracelog.ErrorLogger.PrintOnError(err)
 		fd, err := l.Accept()
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
