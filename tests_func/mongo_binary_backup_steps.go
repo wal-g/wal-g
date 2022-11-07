@@ -62,6 +62,10 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		return err
 	}
 
+	if err := mc.ChownDBPath(); err != nil {
+		return err
+	}
+
 	if err := mc.StartMongod(); err != nil {
 		return err
 	}
