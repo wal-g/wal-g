@@ -126,6 +126,9 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string) {
 		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
 	}
 	for {
+		err = SdNotify(SdNotifyWatchdog)
+		tracelog.ErrorLogger.FatalOnError(err)
+
 		fd, err := l.Accept()
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
@@ -165,4 +168,26 @@ func Listen(c net.Conn, uploader *WalUploader) {
 			return
 		}
 	}
+}
+
+const SdNotifyWatchdog = "WATCHDOG=1"
+
+func SdNotify(state string) error {
+	socketName, ok := os.LookupEnv("NOTIFY_SOCKET")
+	if !ok {
+		return fmt.Errorf("NOTIFY_SOCKET is not defined")
+	}
+	socketAddr := &net.UnixAddr{
+		Name: socketName,
+		Net:  "unixgram",
+	}
+	conn, err := net.DialUnix(socketAddr.Net, nil, socketAddr)
+	if err != nil {
+		return fmt.Errorf("failed connect to service: %w", err)
+	}
+	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
+	if _, err = conn.Write([]byte(state)); err != nil {
+		return fmt.Errorf("failed write to service: %w", err)
+	}
+	return nil
 }
