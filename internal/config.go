@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/user"
@@ -530,12 +531,25 @@ func Configure() {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 
-	// Show all ENV vars in DEVEL Logging Mode
-	tracelog.DebugLogger.Println("--- COMPILED ENVIRONMENT VARS ---")
-	env := os.Environ()
-	sort.Strings(env)
-	for _, pair := range env {
-		tracelog.DebugLogger.Println(pair)
+	// Show all relevant ENV vars in DEVEL Logging Mode
+	{
+		var buff bytes.Buffer
+		buff.WriteString("--- COMPILED ENVIRONMENT VARS ---\n")
+
+		var keys []string
+		for k := range viper.AllSettings() {
+			keys = append(keys, strings.ToUpper(k))
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			val, ok := os.LookupEnv(k)
+			if ok {
+				fmt.Fprintf(&buff, "\t%s=%s\n", k, val)
+			}
+		}
+
+		tracelog.DebugLogger.Print(buff.String())
 	}
 }
 
@@ -664,13 +678,6 @@ func CheckAllowedSettings(config *viper.Viper) {
 	}
 }
 
-func bindToEnv(k string, val string) error {
-	if err := os.Setenv(strings.ToUpper(k), val); err != nil {
-		return errors.Wrap(err, "Failed to bind config to env variable")
-	}
-	return nil
-}
-
 func AssertRequiredSettingsSet() error {
 	if !isAnyStorageSet() {
 		return errors.New("Failed to find any configured storage")
@@ -725,8 +732,23 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 func bindConfigToEnv(globalViper *viper.Viper) {
 	for k, v := range globalViper.AllSettings() {
 		val, ok := v.(string)
-		if ok {
-			err := bindToEnv(k, val)
+		if !ok {
+			// note: all viper settings are currently strings, this warning will not be triggered at the moment
+			tracelog.WarningLogger.Printf("config value for %s is not a string: %T %v\n", k, v, v)
+			continue
+		}
+		k = strings.ToUpper(k)
+
+		// avoid filling environment with empty values :
+		// if val is empty, and os.Getenv(k) is also empty (<- can be because the env variable is not set),
+		// we don't create an env variable at all
+		if val == "" && os.Getenv(k) == "" {
+			continue
+		}
+
+		err := os.Setenv(k, val)
+		if err != nil {
+			err = errors.Wrap(err, "Failed to bind config to env variable")
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	}
