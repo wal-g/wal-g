@@ -147,6 +147,8 @@ const (
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
 
 	PgBackRestStanza = "PGBACKREST_STANZA"
+
+	SystemdNotifySocket = "NOTIFY_SOCKET"
 )
 
 var (

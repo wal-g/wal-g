@@ -17,6 +17,8 @@ import (
 type SocketMessageType byte
 
 const (
+	SdNotifyWatchdog = "WATCHDOG=1"
+
 	CheckType    SocketMessageType = 'C'
 	FileNameType SocketMessageType = 'F'
 	OkType       SocketMessageType = 'O'
@@ -169,12 +171,10 @@ func Listen(c net.Conn, uploader *WalUploader) {
 	}
 }
 
-const SdNotifyWatchdog = "WATCHDOG=1"
-
 func SdNotify(state string) error {
-	socketName, ok := os.LookupEnv("NOTIFY_SOCKET")
+	socketName, ok := internal.GetSetting(internal.SystemdNotifySocket)
 	if !ok {
-		return fmt.Errorf("NOTIFY_SOCKET is not defined")
+		return nil
 	}
 	socketAddr := &net.UnixAddr{
 		Name: socketName,
