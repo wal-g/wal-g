@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/user"
@@ -69,7 +68,6 @@ const (
 	PgUserSetting                = "PGUSER"
 	PgHostSetting                = "PGHOST"
 	PgPasswordSetting            = "PGPASSWORD"
-	PgPassfileSetting            = "PGPASSFILE"
 	PgDatabaseSetting            = "PGDATABASE"
 	PgSslModeSetting             = "PGSSLMODE"
 	PgSlotName                   = "WALG_SLOTNAME"
@@ -144,7 +142,6 @@ const (
 
 	AwsAccessKeyID     = "AWS_ACCESS_KEY_ID"
 	AwsSecretAccessKey = "AWS_SECRET_ACCESS_KEY"
-	AwsSessionToken    = "AWS_SESSION_TOKEN"
 
 	YcKmsKeyIDSetting  = "YC_CSE_KMS_KEY_ID"
 	YcSaKeyFileSetting = "YC_SERVICE_ACCOUNT_KEY_FILE"
@@ -168,6 +165,8 @@ const (
 	SSHPassword       = "SSH_PASSWORD"
 	SSHUsername       = "SSH_USERNAME"
 	SSHPrivateKeyPath = "SSH_PRIVATE_KEY_PATH"
+
+	SystemdNotifySocket = "NOTIFY_SOCKET"
 )
 
 var (
@@ -286,18 +285,18 @@ var (
 
 		// Swift
 		"WALG_SWIFT_PREFIX": true,
-		SwiftOsAuthURL:      true,
-		SwiftOsUsername:     true,
-		SwiftOsPassword:     true,
-		SwiftOsTenantName:   true,
-		SwiftOsRegionName:   true,
+		"OS_AUTH_URL":       true,
+		"OS_USERNAME":       true,
+		"OS_PASSWORD":       true,
+		"OS_TENANT_NAME":    true,
+		"OS_REGION_NAME":    true,
 
 		// AWS s3
 		"WALG_S3_PREFIX":              true,
 		"WALE_S3_PREFIX":              true,
 		AwsAccessKeyID:                true,
 		AwsSecretAccessKey:            true,
-		AwsSessionToken:               true,
+		"AWS_SESSION_TOKEN":           true,
 		"AWS_DEFAULT_REGION":          true,
 		"AWS_DEFAULT_OUTPUT":          true,
 		"AWS_PROFILE":                 true,
@@ -325,28 +324,28 @@ var (
 		"S3_MAX_RETRIES":              true,
 
 		// Azure
-		"WALG_AZ_PREFIX":         true,
-		AzureStorageAccount:      true,
-		AzureStorageAccessKey:    true,
-		AzureStorageSasToken:     true,
-		AzureEnvironmentName:     true,
-		"WALG_AZURE_BUFFER_SIZE": true,
-		"WALG_AZURE_MAX_BUFFERS": true,
+		"WALG_AZ_PREFIX":           true,
+		"AZURE_STORAGE_ACCOUNT":    true,
+		"AZURE_STORAGE_ACCESS_KEY": true,
+		"AZURE_STORAGE_SAS_TOKEN":  true,
+		"AZURE_ENVIRONMENT_NAME":   true,
+		"WALG_AZURE_BUFFER_SIZE":   true,
+		"WALG_AZURE_MAX_BUFFERS":   true,
 
 		// GS
-		"WALG_GS_PREFIX":             true,
-		GoogleApplicationCredentials: true,
+		"WALG_GS_PREFIX":                 true,
+		"GOOGLE_APPLICATION_CREDENTIALS": true,
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
 		YcKmsKeyIDSetting:  true,
 
 		// SH
-		"WALG_SSH_PREFIX": true,
-		SSHPort:           true,
-		SSHPassword:       true,
-		SSHUsername:       true,
-		SSHPrivateKeyPath: true,
+		"WALG_SSH_PREFIX":      true,
+		"SSH_PORT":             true,
+		"SSH_PASSWORD":         true,
+		"SSH_USERNAME":         true,
+		"SSH_PRIVATE_KEY_PATH": true,
 
 		//File
 		"WALG_FILE_PREFIX": true,
@@ -367,11 +366,11 @@ var (
 		PgHostSetting:        true,
 		PgDataSetting:        true,
 		PgPasswordSetting:    true,
-		PgPassfileSetting:    true,
 		PgDatabaseSetting:    true,
 		PgSslModeSetting:     true,
 		PgSlotName:           true,
 		PgWalSize:            true,
+		"PGPASSFILE":         true,
 		PrefetchDir:          true,
 		PgReadyRename:        true,
 		PgBackRestStanza:     true,
@@ -443,25 +442,6 @@ var (
 		OplogPushStatsExposeHTTP: nil,
 	}
 	Turbo bool
-
-	secretSettings = map[string]bool{
-		"WALE_" + GpgKeyIDSetting:    true,
-		"WALG_" + GpgKeyIDSetting:    true,
-		AwsAccessKeyID:               true,
-		AwsSecretAccessKey:           true,
-		AwsSessionToken:              true,
-		AzureStorageAccessKey:        true,
-		AzureStorageSasToken:         true,
-		GoogleApplicationCredentials: true,
-		LibsodiumKeySetting:          true,
-		PgPasswordSetting:            true,
-		PgpKeyPassphraseSetting:      true,
-		PgpKeySetting:                true,
-		RedisPassword:                true,
-		SQLServerConnectionString:    true,
-		SSHPassword:                  true,
-		SwiftOsPassword:              true,
-	}
 )
 
 func AddTurboFlag(cmd *cobra.Command) {
@@ -570,31 +550,12 @@ func Configure() {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 
-	// Show all relevant ENV vars in DEVEL Logging Mode
-	{
-		var buff bytes.Buffer
-		buff.WriteString("--- COMPILED ENVIRONMENT VARS ---\n")
-
-		var keys []string
-		for k := range viper.AllSettings() {
-			keys = append(keys, strings.ToUpper(k))
-		}
-		sort.Strings(keys)
-
-		for _, k := range keys {
-			val, ok := os.LookupEnv(k)
-			if !ok {
-				continue
-			}
-
-			// for secret settings: leave them empty if they are defined but empty, otherwise hide their actual value
-			if secretSettings[k] && val != "" {
-				val = "--HIDDEN--"
-			}
-			fmt.Fprintf(&buff, "\t%s=%s\n", k, val)
-		}
-
-		tracelog.DebugLogger.Print(buff.String())
+	// Show all ENV vars in DEVEL Logging Mode
+	tracelog.DebugLogger.Println("--- COMPILED ENVIRONMENT VARS ---")
+	env := os.Environ()
+	sort.Strings(env)
+	for _, pair := range env {
+		tracelog.DebugLogger.Println(pair)
 	}
 }
 
@@ -723,6 +684,13 @@ func CheckAllowedSettings(config *viper.Viper) {
 	}
 }
 
+func bindToEnv(k string, val string) error {
+	if err := os.Setenv(strings.ToUpper(k), val); err != nil {
+		return errors.Wrap(err, "Failed to bind config to env variable")
+	}
+	return nil
+}
+
 func AssertRequiredSettingsSet() error {
 	if !isAnyStorageSet() {
 		return errors.New("Failed to find any configured storage")
@@ -777,23 +745,8 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 func bindConfigToEnv(globalViper *viper.Viper) {
 	for k, v := range globalViper.AllSettings() {
 		val, ok := v.(string)
-		if !ok {
-			// note: all viper settings are currently strings, this warning will not be triggered at the moment
-			tracelog.WarningLogger.Printf("config value for %s is not a string: %T %v\n", k, v, v)
-			continue
-		}
-		k = strings.ToUpper(k)
-
-		// avoid filling environment with empty values :
-		// if val is empty, and os.Getenv(k) is also empty (<- can be because the env variable is not set),
-		// we don't create an env variable at all
-		if val == "" && os.Getenv(k) == "" {
-			continue
-		}
-
-		err := os.Setenv(k, val)
-		if err != nil {
-			err = errors.Wrap(err, "Failed to bind config to env variable")
+		if ok {
+			err := bindToEnv(k, val)
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	}
