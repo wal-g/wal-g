@@ -25,6 +25,7 @@ const (
 	REDIS     = "REDIS"
 	FDB       = "FDB"
 	MONGO     = "MONGO"
+	ROCKSDB   = "ROCKSDB"
 	GP        = "GP"
 
 	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
@@ -126,6 +127,8 @@ const (
 	GPAoSegSizeThreshold   = "WALG_GP_AOSEG_SIZE_THRESHOLD"
 
 	GoMaxProcs = "GOMAXPROCS"
+
+	RocksdbBackupEngineDirectory = "WALG_ROCKSDB_BACKUP_ENGINE_DIRECTORY"
 
 	HTTPListen       = "HTTP_LISTEN"
 	HTTPExposePprof  = "HTTP_EXPOSE_PPROF"
