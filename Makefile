@@ -19,7 +19,11 @@ GOLANGCI_LINT_VERSION ?= "v1.37.0"
 REDIS_VERSION ?= "5.0.8"
 TOOLS_MOD_DIR := ./internal/tools
 
-BUILD_TAGS:=brotli
+BUILD_TAGS:=
+
+ifdef USE_BROTLI
+	BUILD_TAGS:=$(BUILD_TAGS) brotli
+endif
 
 ifdef USE_LIBSODIUM
 	BUILD_TAGS:=$(BUILD_TAGS) libsodium
@@ -233,7 +237,8 @@ install:
 	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
 
 link_brotli:
-	./link_brotli.sh
+	@if [ -n "${USE_BROTLI}" ]; then ./link_brotli.sh; fi
+	@if [ -z "${USE_BROTLI}" ]; then echo "info: USE_BROTLI is not set, skipping 'link_brotli' task"; fi
 
 link_libsodium:
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
@@ -242,7 +247,7 @@ link_libsodium:
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
-	mv tmp/brotli/* vendor/github.com/google/brotli/
+	if [ -n "${USE_BROTLI}" ] ; then mv tmp/brotli/* vendor/github.com/google/brotli/; fi
 	rm -rf tmp/brotli
 
 unlink_libsodium:
