@@ -330,14 +330,20 @@ func (bh *BackupHandler) handleBackupPushRemote() {
 }
 
 func (bh *BackupHandler) handleBackupPushLocal() {
+	{
+		// The 'data' path provided on the command line must point at the same directory as the one listed by the Postgresql server.
+		// If mismatched, this means we aren't connected to the correct server. This is a fatal error.
+		fromCli := bh.Arguments.pgDataDirectory
+		fromServer := bh.PgInfo.PgDataDirectory // that value is expected to already be absolute and "unsymlinked"
+		if utility.AbsResolveSymlink(fromCli) != fromServer {
+			tracelog.ErrorLogger.Fatalf("Data directory from command line '%s' is not the same as Postgres' one '%s'", fromCli, fromServer)
+		}
+	}
+
 	folder := bh.Workers.Uploader.UploadingFolder
 	baseBackupFolder := folder.GetSubFolder(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder)
 
-	if utility.ResolveSymlink(bh.Arguments.pgDataDirectory) != bh.PgInfo.PgDataDirectory {
-		tracelog.ErrorLogger.Panicf("Data directory read from Postgres (%s) is different than as parsed (%s).",
-			bh.Arguments.pgDataDirectory, bh.PgInfo.PgDataDirectory)
-	}
 	bh.checkPgVersionAndPgControl()
 
 	if bh.Arguments.isFullBackup {
@@ -414,13 +420,6 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	pgInfo, err := getPgServerInfo()
 	if err != nil {
 		return nil, err
-	}
-	}
-
-	if arguments.pgDataDirectory != "" && arguments.pgDataDirectory != pgInfo.PgDataDirectory {
-		warning := fmt.Sprintf("Data directory for postgres '%s' is not equal to backup-push argument '%s'",
-			arguments.pgDataDirectory, pgInfo.PgDataDirectory)
-		tracelog.WarningLogger.Println(warning)
 	}
 
 	bh = &BackupHandler{

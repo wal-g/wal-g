@@ -137,6 +137,19 @@ func ResolveSymlink(path string) string {
 	return resolve
 }
 
+// AbsResolveSymlink first tries to turn 'path' to an absolute path, then calls ResolveSymlink.
+// If 'path' can't be turned to an absolute path, keep the relative path.
+func AbsResolveSymlink(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		// keep a trace of the errors, but keep going with 'path'
+		tracelog.DebugLogger.Printf("could not convert path to absolute path: %s", err)
+		abs = path
+	}
+
+	return ResolveSymlink(abs)
+}
+
 func GetFileExtension(filePath string) string {
 	ext := path.Ext(filePath)
 	if ext != "" {
