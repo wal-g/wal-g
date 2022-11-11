@@ -1,7 +1,3 @@
-//go:build !windows && !(arm64 && darwin)
-// +build !windows
-// +build !arm64 !darwin
-
 package compression
 
 import (
