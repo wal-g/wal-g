@@ -10,9 +10,18 @@ To connect to Amazon S3, WAL-G requires that this variable be set:
 * `WALG_S3_PREFIX`
 (e.g. `s3://bucket/path/to/folder`) (alternative form `WALE_S3_PREFIX`)
 
-WAL-G determines AWS credentials [like other AWS tools](http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence). You can set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (optionally with `AWS_SESSION_TOKEN`), or `~/.aws/credentials` (optionally with `AWS_PROFILE`), or you can set nothing to fetch credentials from the EC2 metadata service automatically.
+WAL-G determines AWS credentials [like other AWS tools](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). You can set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (optionally with `AWS_SESSION_TOKEN`), or `~/.aws/credentials` (optionally with `AWS_PROFILE`), or you can set nothing to fetch credentials from the EC2 metadata service automatically.
 
 **Optional variables**
+
+* `AWS_ROLE_ARN`
+(e.g. `arn:aws:iam::123123123123:role/s3_access`)
+
+Set this variable along with `AWS_ROLE_SESSION_NAME` if you are using [AWS IAM](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html#cli-configure-role-oidc) roles to access S3 buckets.
+
+* `AWS_ROLE_SESSION_NAME`
+
+Specifies the name to attach to the role session. Useful only when `AWS_ROLE_ARN` is set.
 
 * `AWS_REGION`
 (e.g. `us-west-2`)
