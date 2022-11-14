@@ -234,11 +234,6 @@ func processDoubleEncounterTheSameBackupFile(backupFileMeta *BackupFileMeta, bac
 }
 
 func (backupService *BackupService) FinalizeAndStoreMongodBackupMetadata(uncompressedSize, compressedSize int64) error {
-	err := backupService.BackupStorage.UploadMongodBackupFilesMetadata(&backupService.MongodBackupFilesMetadata)
-	if err != nil {
-		return errors.Wrap(err, "can not upload files metadata")
-	}
-
 	sentinel := &backupService.Sentinel
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uncompressedSize

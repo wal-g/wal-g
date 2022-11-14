@@ -34,11 +34,6 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 		return err
 	}
 
-	mongodBackupFilesMetadata, err := restoreService.BackupStorage.DownloadMongodBackupFilesMetadata()
-	if err != nil {
-		return err
-	}
-
 	err = EnsureCompatibilityToRestoreMongodVersions(restoreMongodVersion, sentinel.MongoMeta.Version)
 	if err != nil {
 		return err
@@ -55,7 +50,7 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 	}
 
 	tracelog.InfoLogger.Println("Download backup files to dbPath")
-	err = restoreService.downloadFilesFromBackup(mongodBackupFilesMetadata)
+	err = restoreService.downloadFilesFromBackup()
 	if err != nil {
 		return err
 	}
@@ -121,11 +116,11 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
 	return mongodProcess.Wait()
 }
 
-func (restoreService *RestoreService) downloadFilesFromBackup(backupFilesMetadata *MongodBackupFilesMetadata) error {
+func (restoreService *RestoreService) downloadFilesFromBackup() error {
 	if IsTarBackupFormat(restoreService.BackupStorage.Uploader, restoreService.BackupStorage.BackupName) {
 		return restoreService.concurrentDownloadFromTarArchives()
 	}
-	return restoreService.oldFormatDownload(backupFilesMetadata)
+	return restoreService.oldFormatDownload()
 }
 
 func (restoreService *RestoreService) concurrentDownloadFromTarArchives() error {
@@ -137,17 +132,23 @@ func (restoreService *RestoreService) concurrentDownloadFromTarArchives() error 
 	return downloader.Download(backupName, mongodDBPath)
 }
 
-func (restoreService *RestoreService) oldFormatDownload(backupFilesMetadata *MongodBackupFilesMetadata) error {
+func (restoreService *RestoreService) oldFormatDownload() error {
 	err := restoreService.LocalStorage.EnsureEmptyDBPath()
 	if err != nil {
 		return err
 	}
-	err = restoreService.LocalStorage.CreateDirectories(backupFilesMetadata.BackupDirectories)
+
+	mongodBackupFilesMetadata, err := restoreService.BackupStorage.DownloadMongodBackupFilesMetadata()
 	if err != nil {
 		return err
 	}
 
-	for _, backupFileMeta := range backupFilesMetadata.BackupFiles {
+	err = restoreService.LocalStorage.CreateDirectories(mongodBackupFilesMetadata.BackupDirectories)
+	if err != nil {
+		return err
+	}
+
+	for _, backupFileMeta := range mongodBackupFilesMetadata.BackupFiles {
 		err = restoreService.DownloadFileFromBackup(backupFileMeta)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("bad backup file %v", backupFileMeta.Path))
