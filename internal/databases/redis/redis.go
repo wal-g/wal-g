@@ -18,7 +18,7 @@ func GetSettingWithLocalDefault(key string, defaultValue string) string {
 	return defaultValue
 }
 
-//getRedisConnection
+// getRedisConnection
 func _() *redis.Client {
 	redisAddr := GetSettingWithLocalDefault("WALG_REDIS_HOST", "localhost")
 	redisPort := GetSettingWithLocalDefault("WALG_REDIS_PORT", "6379")

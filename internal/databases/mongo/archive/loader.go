@@ -100,7 +100,7 @@ func (sd *StorageDownloader) LoadBackups(names []string) ([]*models.Backup, erro
 	return backups, nil
 }
 
-//ListBackups lists backups in folder
+// ListBackups lists backups in folder
 func (sd *StorageDownloader) ListBackups() ([]internal.BackupTime, []string, error) {
 	return internal.GetBackupsAndGarbage(sd.backupsFolder)
 }

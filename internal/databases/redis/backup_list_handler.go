@@ -80,7 +80,7 @@ func writeBackupListDetails(backupDetails []archive.Backup, output io.Writer) er
 	return nil
 }
 
-//TODO : unit tests
+// TODO : unit tests
 func writePrettyBackupListDetails(backupDetails []archive.Backup, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)

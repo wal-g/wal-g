@@ -24,7 +24,7 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 	return GenericMetaFetcher{}
 }
 
-//TODO: Unit tests
+// TODO: Unit tests
 func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
 	var backup = NewBackup(backupFolder, backupName)
 	meta, err := backup.FetchMeta()
@@ -51,7 +51,7 @@ func NewGenericMetaSetter() GenericMetaSetter {
 	return GenericMetaSetter{}
 }
 
-//TODO: Unit tests
+// TODO: Unit tests
 func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
 	modifier := func(dto ExtendedMetadataDto) ExtendedMetadataDto {
 		dto.UserData = userData
@@ -60,7 +60,7 @@ func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.
 	return modifyBackupMetadata(backupName, backupFolder, modifier)
 }
 
-//TODO: Unit tests
+// TODO: Unit tests
 func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error {
 	modifier := func(dto ExtendedMetadataDto) ExtendedMetadataDto {
 		dto.IsPermanent = isPermanent
