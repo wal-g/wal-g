@@ -17,12 +17,9 @@ linters-settings:
       - experimental
       - opinionated
       - style
-    disabled-checks:
-      - hugeParam
-      - rangeValCopy
-    # settings:
-    #   hugeParam:
-    #     sizeThreshold: 170 # temporary, default is 80
+    settings:
+      hugeParam:
+        sizeThreshold: 170 # temporary, default is 80
   gocyclo:
     min-complexity: 15
   govet:
@@ -77,14 +74,11 @@ linters:
     - nakedret
     - revive
     - staticcheck
-    # - structcheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - lll
-    - deadcode
     - stylecheck
     - gosimple
     - whitespace
@@ -108,5 +102,5 @@ severity:
   rules:
     - linters:
       - godox
-      - deadcode
+      - unused
       severity: info
