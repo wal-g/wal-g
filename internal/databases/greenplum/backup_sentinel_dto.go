@@ -98,7 +98,7 @@ func (s *BackupSentinelDto) String() string {
 }
 
 // NewBackupSentinelDto returns new BackupSentinelDto instance
-func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, prevBackupInfo PrevBackupInfo, restoreLSNs map[int]string, userData interface{},
+func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, prevBackupInfo *PrevBackupInfo, restoreLSNs map[int]string, userData interface{},
 	isPermanent bool) BackupSentinelDto {
 	hostname, err := os.Hostname()
 	if err != nil {
