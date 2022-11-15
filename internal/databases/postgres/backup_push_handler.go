@@ -304,28 +304,35 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 // HandleBackupPush handles the backup being read from Postgres or filesystem and being pushed to the repository
 // TODO : unit tests
 func (bh *BackupHandler) HandleBackupPush() {
-	folder := bh.Workers.Uploader.UploadingFolder
-	baseBackupFolder := folder.GetSubFolder(bh.Arguments.backupsFolder)
-	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder)
-
 	bh.CurBackupInfo.StartTime = utility.TimeNowCrossPlatformUTC()
 
 	if bh.Arguments.pgDataDirectory == "" {
-		if bh.Arguments.forceIncremental {
-			tracelog.ErrorLogger.Println("Delta backup not available for remote backup.")
-			tracelog.ErrorLogger.Fatal("To run delta backup, supply [db_directory].")
-		}
-		// If no arg is parsed, try to run remote backup using pglogrepl's BASE_BACKUP functionality
-		tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
-		tracelog.InfoLogger.Println("Features like delta backup are disabled, there might be a performance impact.")
-		tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
-		if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
-			tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
-			bh.Arguments.verifyPageChecksums = true
-		}
-		bh.createAndPushRemoteBackup()
-		return
+		bh.handleBackupPushRemote()
+	} else {
+		bh.handleBackupPushLocal()
 	}
+}
+
+func (bh *BackupHandler) handleBackupPushRemote() {
+	if bh.Arguments.forceIncremental {
+		tracelog.ErrorLogger.Println("Delta backup not available for remote backup.")
+		tracelog.ErrorLogger.Fatal("To run delta backup, supply [db_directory].")
+	}
+	// If no arg is parsed, try to run remote backup using pglogrepl's BASE_BACKUP functionality
+	tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
+	tracelog.InfoLogger.Println("Features like delta backup are disabled, there might be a performance impact.")
+	tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
+	if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
+		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
+		bh.Arguments.verifyPageChecksums = true
+	}
+	bh.createAndPushRemoteBackup()
+}
+
+func (bh *BackupHandler) handleBackupPushLocal() {
+	folder := bh.Workers.Uploader.UploadingFolder
+	baseBackupFolder := folder.GetSubFolder(bh.Arguments.backupsFolder)
+	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder)
 
 	if utility.ResolveSymlink(bh.Arguments.pgDataDirectory) != bh.PgInfo.PgDataDirectory {
 		tracelog.ErrorLogger.Panicf("Data directory read from Postgres (%s) is different than as parsed (%s).",
@@ -402,11 +409,12 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 
 	uploader, err := ConfigureWalUploader()
 	if err != nil {
-		return bh, err
+		return nil, err
 	}
 	pgInfo, err := getPgServerInfo()
 	if err != nil {
-		return bh, err
+		return nil, err
+	}
 	}
 
 	if arguments.pgDataDirectory != "" && arguments.pgDataDirectory != pgInfo.PgDataDirectory {
@@ -423,7 +431,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 		PgInfo: pgInfo,
 	}
 
-	return bh, err
+	return bh, nil
 }
 
 func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
