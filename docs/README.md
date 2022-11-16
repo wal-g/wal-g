@@ -229,6 +229,7 @@ The following steps describe how to build WAL-G for PostgreSQL, but the process 
 
 Optional:
 
+- To build with brotli compressor and decompressor, set the `USE_BROTLI` environment variable.
 - To build with libsodium, set the `USE_LIBSODIUM` environment variable.
 - To build with lzo decompressor, set the `USE_LZO` environment variable.
 
@@ -254,6 +255,7 @@ main/pg/wal-g --version
 Users can also install WAL-G by using `make pg_install`. Specifying the `GOBIN` environment variable before installing allows the user to specify the installation location. By default, `make pg_install` puts the compiled binary in the root directory (`/`).
 
 ```sh
+export USE_BROTLI=1
 export USE_LIBSODIUM=1
 export USE_LZO=1
 make pg_clean
@@ -266,6 +268,7 @@ GOBIN=/usr/local/bin make pg_install
 ```sh
 # brew command is Homebrew for Mac OS
 brew install cmake
+export USE_BROTLI=1
 export USE_LIBSODIUM="true" # since we're linking libsodium later
 ./link_brotli.sh
 ./link_libsodium.sh
@@ -283,6 +286,7 @@ The compiled binary to run is `main/pg/wal-g`
 
 WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. Unit tests can be run using
 ```bash
+export USE_BROTLI=1
 make unittest
 ```
 For more information on testing, please consult [test](test), [testtools](testtools) and `unittest` section in [Makefile](Makefile).
@@ -291,6 +295,7 @@ WAL-G will perform a round-trip compression/decompression test that generates a 
 
 Test coverage can be obtained using:
 ```bash
+export USE_BROTLI=1
 make coverage
 ```
 This command generates `coverage.out` file and opens HTML representation of the coverage.
