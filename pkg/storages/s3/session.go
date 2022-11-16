@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 )
@@ -92,7 +93,7 @@ func getFirstSettingOf(settings map[string]string, keys []string) string {
 	return ""
 }
 
-func configWithSettings(config *aws.Config, bucket string, settings map[string]string) (*aws.Config, error) {
+func configWithSettings(s *session.Session, bucket string, settings map[string]string) (*aws.Config, error) {
 	// DefaultRetryer implements basic retry logic using exponential backoff for
 	// most services. If you want to implement custom retry logic, you can implement the
 	// request.Retryer interface.
@@ -105,11 +106,29 @@ func configWithSettings(config *aws.Config, bucket string, settings map[string]s
 
 		maxRetriesCount = maxRetriesInt
 	}
+	config := s.Config
 	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetriesCount}))
 
 	accessKeyId := getFirstSettingOf(settings, []string{AccessKeyIdSetting, AccessKeySetting})
 	secretAccessKey := getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting})
 	sessionToken := settings[SessionTokenSetting]
+
+	roleArn := settings[RoleARN]
+	sessionName := settings[SessionName]
+	if roleArn != "" {
+		stsSession := sts.New(s)
+		assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
+			RoleArn:         aws.String(roleArn),
+			RoleSessionName: aws.String(sessionName),
+		})
+		if err != nil {
+			return nil, err
+		}
+		accessKeyId = *assumedRole.Credentials.AccessKeyId
+		secretAccessKey = *assumedRole.Credentials.SecretAccessKey
+		sessionToken = *assumedRole.Credentials.SessionToken
+	}
+
 	if accessKeyId != "" && secretAccessKey != "" {
 		provider := &credentials.StaticProvider{Value: credentials.Value{
 			AccessKeyID:     accessKeyId,
@@ -166,7 +185,7 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 		return nil, err
 	}
 
-	c, err := configWithSettings(s.Config, bucket, settings)
+	c, err := configWithSettings(s, bucket, settings)
 	if err != nil {
 		return nil, err
 	}

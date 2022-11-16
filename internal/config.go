@@ -301,6 +301,7 @@ var (
 		"AWS_DEFAULT_REGION":          true,
 		"AWS_DEFAULT_OUTPUT":          true,
 		"AWS_PROFILE":                 true,
+		"AWS_ROLE_ARN":                true,
 		"AWS_ROLE_SESSION_NAME":       true,
 		"AWS_CA_BUNDLE":               true,
 		"AWS_SHARED_CREDENTIALS_FILE": true,
