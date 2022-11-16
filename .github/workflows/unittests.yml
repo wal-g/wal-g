@@ -9,6 +9,7 @@ on:
 
 env:
   GO_VERSION: 1.18
+  USE_BROTLI: 1
 
 jobs:
   unittest:
@@ -38,6 +39,7 @@ jobs:
       - name: Test
         run: make all_unittests
         env:
+          USE_BROTLI: 1
           USE_LIBSODIUM: 1
           USE_LZO: 1
           TEST_MODIFIER: -race
