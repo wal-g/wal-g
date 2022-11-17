@@ -11,8 +11,8 @@ type SplitMaxSizeFactory struct {
 }
 
 type SplitMaxSizeReader struct {
-	getter *SplitMaxSizeFactory
-	read   int
+	factory *SplitMaxSizeFactory
+	read    int
 }
 
 func NewMaxSizeFactory(source io.Reader, maxSize int) SplitMaxSizeFactory {
@@ -23,32 +23,34 @@ func NewMaxSizeFactory(source io.Reader, maxSize int) SplitMaxSizeFactory {
 	}
 }
 
-func (s *SplitMaxSizeFactory) GetNewReader() io.Reader {
-	if s.isClosed {
+func (f *SplitMaxSizeFactory) GetNewReader() io.Reader {
+	if f.isClosed {
 		return nil
 	}
 
 	return &SplitMaxSizeReader{
-		getter: s,
-		read:   0,
+		factory: f,
+		read:    0,
 	}
 }
 
 func (sr *SplitMaxSizeReader) Read(buff []byte) (n int, err error) {
-	if sr.read == sr.getter.maxSize {
+	if sr.read == sr.factory.maxSize {
 		return 0, io.EOF
 	}
 
-	sizeToRead := sr.getter.maxSize - sr.read
+	sizeToRead := sr.factory.maxSize - sr.read
 	if len(buff) < sizeToRead {
 		sizeToRead = len(buff)
 	}
 
-	bytes, err := sr.getter.source.Read(buff[:sizeToRead])
+	bytes, err := sr.factory.source.Read(buff[:sizeToRead])
 	sr.read += bytes
 
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
-		sr.getter.isClosed = true
+		sr.factory.isClosed = true
+	} else if _, err := sr.factory.source.Read(make([]byte, 0)); err == io.EOF {
+		sr.factory.isClosed = true
 	}
 
 	return bytes, err
