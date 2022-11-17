@@ -134,7 +134,7 @@ func downloadFile(backup Backup, decompressor compression.Decompressor, fileName
 
 func handleSingleFilePartition(backup Backup, decompressor compression.Decompressor, fileIdx int, writer io.WriteCloser) error {
 	fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), fileIdx)
-	tracelog.ErrorLogger.Printf("Start decompress file: %s\n", fileName)
+	tracelog.DebugLogger.Printf("Start decompress file: %s\n", fileName)
 	err := downloadFile(backup, decompressor, fileName, writer)
 	if err != nil {
 		tracelog.ErrorLogger.PrintOnError(writer.Close())
