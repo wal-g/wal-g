@@ -90,18 +90,13 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 		errorsPerWorker = append(errorsPerWorker, errCh)
 		writer := writers[i]
 
-		if limitedFileSize {
-			go func(idx int) {
-				handleMultipleFilePartition(backup, decompressor, idx, errCh, writer)
-			}(i)
-		} else {
-			go func(idx int) {
-				fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), idx)
-				tracelog.ErrorLogger.Printf("Start decompress file: %s\n", fileName)
-				errCh <- handleSingleFilePartition(backup, decompressor, fileName, writer)
-				errCh <- writer.Close()
-			}(i)
-		}
+		go func(idx int) {
+			if limitedFileSize {
+				errCh <- handleMultipleFilePartition(backup, decompressor, idx, writer)
+			} else {
+				errCh <- handleSingleFilePartition(backup, decompressor, idx, writer)
+			}
+		}(i)
 	}
 
 	var lastErr error
@@ -116,10 +111,9 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	return lastErr
 }
 
-func handleSingleFilePartition(backup Backup, decompressor compression.Decompressor, fileName string, writer io.WriteCloser) error {
+func downloadFile(backup Backup, decompressor compression.Decompressor, fileName string, writer io.WriteCloser) error {
 	archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
 	if err != nil {
-		//tracelog.ErrorLogger.PrintOnError(writer.Close())
 		return fmt.Errorf("failed to dowload file %v: %w", fileName, err)
 	}
 	if !exists {
@@ -128,39 +122,48 @@ func handleSingleFilePartition(backup Backup, decompressor compression.Decompres
 	tracelog.DebugLogger.Printf("Found file: %s", fileName)
 	decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
 	if err != nil {
-		//tracelog.ErrorLogger.PrintOnError(writer.Close())
 		return fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
 	}
 	defer utility.LoggedClose(decompressedReader, "")
 	_, err = utility.FastCopy(writer, decompressedReader)
 	if err != nil {
-		//tracelog.ErrorLogger.PrintOnError(writer.Close())
 		return fmt.Errorf("failed to decompress/decrypt/pipe file %v: %w", fileName, err)
 	}
 	return nil
 }
 
-func handleMultipleFilePartition(backup Backup, decompressor compression.Decompressor, partIdx int, errCh chan error, writer io.WriteCloser) {
+func handleSingleFilePartition(backup Backup, decompressor compression.Decompressor, fileIdx int, writer io.WriteCloser) error {
+	fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), fileIdx)
+	tracelog.ErrorLogger.Printf("Start decompress file: %s\n", fileName)
+	err := downloadFile(backup, decompressor, fileName, writer)
+	if err != nil {
+		tracelog.ErrorLogger.PrintOnError(writer.Close())
+		return err
+	} else {
+		return writer.Close()
+	}
+}
+
+func handleMultipleFilePartition(backup Backup, decompressor compression.Decompressor, partIdx int, writer io.WriteCloser) error {
+	defer utility.LoggedClose(writer, "")
 	filesCount, err := detectFilesCount(backup, decompressor, partIdx)
 	if err != nil {
-		errCh <- err
-		return
+		return err
 	}
 
 	fileNumber := 0
 	for fileNumber < filesCount {
 		fileName := GetPartitionedStreamFileNumberName(backup.Name, decompressor.FileExtension(), partIdx, fileNumber)
-		err := handleSingleFilePartition(backup, decompressor, fileName, writer)
+		err = downloadFile(backup, decompressor, fileName, writer)
 
 		if err != nil {
-			errCh <- err
-			break
+			return err
 		}
 
 		fileNumber += 1
 	}
 
-	errCh <- writer.Close()
+	return nil
 }
 
 func getBackupFiles(backup Backup) (map[string]bool, error) {

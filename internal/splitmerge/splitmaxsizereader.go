@@ -1,44 +1,55 @@
 package splitmerge
 
 import (
-	"github.com/wal-g/tracelog"
 	"io"
 )
 
-func SplitMaxSizeReader(reader io.Reader, blockSize int, maxSize int) <-chan io.ReadCloser {
-	out := make(chan io.ReadCloser)
+type SplitMaxSizeFactory struct {
+	source   io.Reader
+	maxSize  int
+	isClosed bool
+}
 
-	go func() {
-		sum := 0
-		bytesChannel := make(chan []byte)
-		out <- NewChannelReader(bytesChannel)
+type SplitMaxSizeReader struct {
+	getter *SplitMaxSizeFactory
+	read   int
+}
 
-		for {
-			buffer := make([]byte, blockSize)
-			bytes, err := io.ReadFull(reader, buffer)
+func NewMaxSizeFactory(source io.Reader, maxSize int) SplitMaxSizeFactory {
+	return SplitMaxSizeFactory{
+		source:   source,
+		maxSize:  maxSize,
+		isClosed: false,
+	}
+}
 
-			if err == io.EOF {
-				break
-			} else if err != nil && err != io.ErrUnexpectedEOF {
-				tracelog.ErrorLogger.FatalOnError(err)
-				break
-			}
+func (s *SplitMaxSizeFactory) GetNewReader() io.Reader {
+	if s.isClosed {
+		return nil
+	}
 
-			if sum+bytes > maxSize {
-				bytesChannel <- buffer[:maxSize-sum]
-				close(bytesChannel)
-				bytesChannel = make(chan []byte)
-				out <- NewChannelReader(bytesChannel)
-				bytesChannel <- buffer[maxSize-sum : bytes]
-				sum = sum + bytes - maxSize
-			} else {
-				bytesChannel <- buffer[:bytes]
-				sum += bytes
-			}
-		}
-		close(bytesChannel)
-		close(out)
-	}()
+	return &SplitMaxSizeReader{
+		getter: s,
+		read:   0,
+	}
+}
 
-	return out
+func (sr *SplitMaxSizeReader) Read(buff []byte) (n int, err error) {
+	if sr.read == sr.getter.maxSize {
+		return 0, io.EOF
+	}
+
+	sizeToRead := sr.getter.maxSize - sr.read
+	if len(buff) < sizeToRead {
+		sizeToRead = len(buff)
+	}
+
+	bytes, err := sr.getter.source.Read(buff[:sizeToRead])
+	sr.read += bytes
+
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		sr.getter.isClosed = true
+	}
+
+	return bytes, err
 }

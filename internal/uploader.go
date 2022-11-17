@@ -41,7 +41,6 @@ type Uploader struct {
 	Failed                 atomic.Value
 	tarSize                *int64
 	dataSize               *int64
-	maxBlockSize           int64
 }
 
 var _ UploaderProvider = &Uploader{}
@@ -92,9 +91,9 @@ func NewSplitStreamUploader(
 	}
 
 	return &SplitStreamUploader{
-		Uploader:   uploader,
-		partitions: partitions,
-		blockSize:  blockSize,
+		Uploader:    uploader,
+		partitions:  partitions,
+		blockSize:   blockSize,
 		maxFileSize: maxFileSize,
 	}
 }
