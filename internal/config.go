@@ -81,7 +81,7 @@ const (
 	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
 	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
-	StreamMaxFileSize            = "WALG_STREAM_MAX_FILE_SIZE"
+	StreamMaxFileSize            = "WALG_STREAM_SPLITTER_MAX_FILE_SIZE"
 	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
 	PgAliveCheckInterval         = "WALG_ALIVE_CHECK_INTERVAL"
 	PgStopBackupTimeout          = "WALG_STOP_BACKUP_TIMEOUT"
