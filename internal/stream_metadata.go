@@ -11,7 +11,6 @@ import (
 
 const (
 	SplitMergeStreamBackup   = "SPLIT_MERGE_STREAM_BACKUP"
-	LimitedFileSizeBackup    = "LIMITED_FILE_SIZE_BACKUP"
 	SingleStreamStreamBackup = "STREAM_BACKUP"
 )
 
@@ -33,23 +32,12 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 		return nil, err
 	}
 
-	limitedFileSize := false
-	if metadata.Type == LimitedFileSizeBackup {
-		limitedFileSize = true
-	}
-
 	switch metadata.Type {
-	case LimitedFileSizeBackup:
-		var blockSize = metadata.BlockSize
-		var compression = metadata.Compression
-		return func(backup Backup, writer io.WriteCloser) error {
-			return DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer, limitedFileSize)
-		}, nil
 	case SplitMergeStreamBackup:
 		var blockSize = metadata.BlockSize
 		var compression = metadata.Compression
 		return func(backup Backup, writer io.WriteCloser) error {
-			return DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer, limitedFileSize)
+			return DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer)
 		}, nil
 	case SingleStreamStreamBackup, "":
 		return DownloadAndDecompressStream, nil

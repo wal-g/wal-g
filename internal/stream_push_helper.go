@@ -44,21 +44,21 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 		if uploader.maxFileSize != 0 {
 			currentPartNumber := partNumber
 			errGroup.Go(func() error {
-				readerFactory := splitmerge.NewMaxSizeFactory(reader, uploader.maxFileSize)
 				idx := 0
 				for {
-					fileReader := readerFactory.GetNewReader()
-					if fileReader == nil {
+					fileReader, err := utility.NewEOFProtectorReader(reader)
+					if err == io.EOF {
 						return nil
 					}
+					fileReader = io.LimitReader(fileReader, int64(uploader.maxFileSize))
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
 					dstPath := GetPartitionedStreamFileNumberName(backupName, uploader.Compressor.FileExtension(), currentPartNumber, idx)
-					err := uploader.PushStreamToDestination(fileReader, dstPath)
+					err = uploader.PushStreamToDestination(fileReader, dstPath)
 					if err != nil {
 						return err
 					}
-					idx += 1
+					idx++
 				}
 			})
 		} else {
@@ -75,15 +75,9 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 		return backupName, err
 	}
 
-	var backupType string
-	if uploader.maxFileSize != 0 {
-		backupType = LimitedFileSizeBackup
-	} else {
-		backupType = SplitMergeStreamBackup
-	}
 	// Upload StreamMetadata
 	meta := BackupStreamMetadata{
-		Type:        backupType,
+		Type:        SplitMergeStreamBackup,
 		Partitions:  uint(uploader.partitions),
 		BlockSize:   uint(uploader.blockSize),
 		Compression: uploader.Compressor.FileExtension(),
@@ -98,7 +92,6 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 // TODO : unit tests
 // PushStreamToDestination compresses a stream and push it to specifyed destination
 func (uploader *Uploader) PushStreamToDestination(stream io.Reader, dstPath string) error {
-	tracelog.InfoLogger.Printf("Uploading... %v", dstPath)
 	if uploader.dataSize != nil {
 		stream = NewWithSizeReader(stream, uploader.dataSize)
 	}
