@@ -3,7 +3,6 @@ package internal
 import (
 	"fmt"
 	"io"
-	"os"
 	"path"
 
 	"golang.org/x/sync/errgroup"
@@ -31,7 +30,7 @@ func (uploader *Uploader) PushStream(stream io.Reader) (string, error) {
 
 // TODO : unit tests
 // returns backup_prefix
-// (Note: individual parition names are built by adding '_0000.br' suffix)
+// (Note: individual parition names are built by adding '_0000.br' or '_0000_0000.br' suffix)
 func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 
@@ -46,16 +45,18 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 			errGroup.Go(func() error {
 				idx := 0
 				for {
-					fileReader, err := utility.NewEOFProtectorReader(reader)
-					if err == io.EOF {
-						return nil
-					}
-					fileReader = io.LimitReader(fileReader, int64(uploader.maxFileSize))
+					fileReader := io.LimitReader(reader, int64(uploader.maxFileSize))
+					var read int64 = 0
+					fileReader = NewWithSizeReader(fileReader, &read)
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
-					dstPath := GetPartitionedStreamFileNumberName(backupName, uploader.Compressor.FileExtension(), currentPartNumber, idx)
-					err = uploader.PushStreamToDestination(fileReader, dstPath)
+					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compressor.FileExtension(), currentPartNumber, idx)
+					err := uploader.PushStreamToDestination(fileReader, dstPath)
 					if err != nil {
+						return err
+					}
+					if read == 0 {
+						err = uploader.Folder().DeleteObjects([]string{dstPath})
 						return err
 					}
 					idx++
@@ -102,12 +103,6 @@ func (uploader *Uploader) PushStreamToDestination(stream io.Reader, dstPath stri
 	return err
 }
 
-// FileIsPiped Check if file is piped
-func FileIsPiped(stream *os.File) bool {
-	stat, _ := stream.Stat()
-	return (stat.Mode() & os.ModeCharDevice) == 0
-}
-
 func GetStreamName(backupName string, extension string) string {
 	return utility.SanitizePath(path.Join(backupName, "stream.")) + extension
 }
@@ -116,7 +111,7 @@ func GetPartitionedStreamName(backupName string, extension string, partIdx int) 
 	return fmt.Sprintf("%s_%04d.%s", utility.SanitizePath(path.Join(backupName, "part")), partIdx, extension)
 }
 
-func GetPartitionedStreamFileNumberName(backupName string, extension string, partIdx int, fileNumber int) string {
+func GetPartitionedSteamMultipartName(backupName string, extension string, partIdx int, fileNumber int) string {
 	return fmt.Sprintf("%s_%04d_%04d.%s", utility.SanitizePath(path.Join(backupName, "part")),
 		partIdx, fileNumber, extension)
 }

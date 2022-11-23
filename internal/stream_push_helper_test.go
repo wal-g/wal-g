@@ -114,7 +114,6 @@ func TestSplitBackup_Synchronous(t *testing.T) {
 }
 
 func TestSplitBackup_MaxSize_Equal_BlockSize(t *testing.T) {
-	t.Skip("Broken")
 	checkPushAndFetchBackup(t, 3, 7919, 7919, 1000*1000)
 }
 
@@ -123,12 +122,10 @@ func TestSplitBackup_MaxFileSize_GreaterThan_SampleSize(t *testing.T) {
 }
 
 func TestSplitBackup_BlockSize_Equal_MaxFileSize_Equal_SampleSize(t *testing.T) {
-	t.Skip("Broken")
 	checkPushAndFetchBackup(t, 3, 1009, 1009, 1009)
 }
 
 func TestSplitBackup_BlockSize_Equal_MaxFileSize_Equal_SampleSize_Synchronous(t *testing.T) {
-	t.Skip("Broken")
 	checkPushAndFetchBackup(t, 1, 1009, 1009, 1009)
 }
 
@@ -138,5 +135,5 @@ func TestBackup_WithCommonValues(t *testing.T) {
 
 func TestBackup_BlockSize_Equal_SampleSize(t *testing.T) {
 	t.Skip("Broken")
-	checkPushAndFetchBackup(t, 2, 3, 0, 0)
+	checkPushAndFetchBackup(t, 3, 1009, 0, 1009)
 }

@@ -76,7 +76,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
 
-	files, err := detectFiles(backup, decompressor)
+	files, err := GetPartitionedBackupFileNames(backup, decompressor)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func downloadFile(backup Backup, decompressor compression.Decompressor, fileName
 	return nil
 }
 
-func detectFiles(backup Backup, decompressor compression.Decompressor) ([][]string, error) {
+func GetPartitionedBackupFileNames(backup Backup, decompressor compression.Decompressor) ([][]string, error) {
 	// list all files in backup folder:
 	files, _, err := backup.Folder.GetSubFolder(backup.Name).ListFolder()
 	if err != nil {
@@ -152,14 +152,14 @@ func detectFiles(backup Backup, decompressor compression.Decompressor) ([][]stri
 	result := make([][]string, 0)
 	partIdx := 0
 	for {
-		nextPartitionFirstFile := GetPartitionedStreamFileNumberName(backup.Name, decompressor.FileExtension(), partIdx, 0)
+		nextPartitionFirstFile := GetPartitionedSteamMultipartName(backup.Name, decompressor.FileExtension(), partIdx, 0)
 		nextPartitionWholeFile := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), partIdx)
 		if fileNames[nextPartitionFirstFile] {
 			result = append(result, make([]string, 1))
 			result[partIdx][0] = nextPartitionFirstFile
 			fileIdx := 1
 			for {
-				nextPartitionFile := GetPartitionedStreamFileNumberName(backup.Name, decompressor.FileExtension(), partIdx, fileIdx)
+				nextPartitionFile := GetPartitionedSteamMultipartName(backup.Name, decompressor.FileExtension(), partIdx, fileIdx)
 				if fileNames[nextPartitionFile] {
 					result[partIdx] = append(result[partIdx], nextPartitionFile)
 					fileIdx++
