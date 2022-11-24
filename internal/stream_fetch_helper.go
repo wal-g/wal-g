@@ -90,6 +90,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 		writer := writers[i]
 
 		go func(files []string) {
+			defer close(errCh)
 			for _, fileName := range files {
 				err := downloadFile(backup, decompressor, fileName, writer)
 				if err != nil {
