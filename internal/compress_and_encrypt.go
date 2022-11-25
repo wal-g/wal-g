@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -14,15 +13,20 @@ import (
 // CompressAndEncryptError is used to catch specific errors from CompressAndEncrypt
 // when uploading to Storage. Will not retry upload if this error occurs.
 type CompressAndEncryptError struct {
-	error
+	action string
+	inner  error
 }
 
-func newCompressingPipeWriterError(reason string) CompressAndEncryptError {
-	return CompressAndEncryptError{errors.New(reason)}
+func newCompressingPipeWriterError(action string, err error) CompressAndEncryptError {
+	return CompressAndEncryptError{action, err}
 }
 
-func (err CompressAndEncryptError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+func (e CompressAndEncryptError) Error() string {
+	return fmt.Sprintf("CompressAndEncrypt: %s: "+tracelog.GetErrorFormatter(), e.action, e.inner)
+}
+
+func (e CompressAndEncryptError) Unwrap() error {
+	return e.inner
 }
 
 // CompressAndEncrypt compresses input to a pipe reader. Output must be used or
@@ -52,12 +56,12 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 		_, err := utility.FastCopy(compressedWriter, source)
 
 		if err != nil {
-			e := newCompressingPipeWriterError("CompressAndEncrypt: compression failed")
+			e := newCompressingPipeWriterError("compress", err)
 			_ = dstWriter.CloseWithError(e)
 		}
 
 		if err := compressedWriter.Close(); err != nil {
-			e := newCompressingPipeWriterError("CompressAndEncrypt: writer close failed")
+			e := newCompressingPipeWriterError("close", err)
 			_ = dstWriter.CloseWithError(e)
 			return
 		}
@@ -65,7 +69,7 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 			err := writeCloser.Close()
 
 			if err != nil {
-				e := newCompressingPipeWriterError("CompressAndEncrypt: encryption failed")
+				e := newCompressingPipeWriterError("encrypt", err)
 				_ = dstWriter.CloseWithError(e)
 				return
 			}
