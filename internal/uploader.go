@@ -50,8 +50,9 @@ var _ UploaderProvider = &Uploader{}
 //	of blockSize bytes, then puts it in at most `partitions` streams that are compressed and pushed to storage
 type SplitStreamUploader struct {
 	*Uploader
-	partitions int
-	blockSize  int
+	partitions  int
+	blockSize   int
+	maxFileSize int
 }
 
 var _ UploaderProvider = &SplitStreamUploader{}
@@ -82,16 +83,18 @@ func NewSplitStreamUploader(
 	uploader *Uploader,
 	partitions int,
 	blockSize int,
+	maxFileSize int,
 ) UploaderProvider {
-	if partitions <= 1 {
+	if partitions <= 1 && maxFileSize == 0 {
 		// Fallback to old implementation in order to skip unneeded steps:
 		return uploader
 	}
 
 	return &SplitStreamUploader{
-		Uploader:   uploader,
-		partitions: partitions,
-		blockSize:  blockSize,
+		Uploader:    uploader,
+		partitions:  partitions,
+		blockSize:   blockSize,
+		maxFileSize: maxFileSize,
 	}
 }
 
