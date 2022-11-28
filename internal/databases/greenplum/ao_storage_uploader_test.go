@@ -305,6 +305,47 @@ func TestAoUpload_SkippedFile(t *testing.T) {
 	runSingleTest(t, baseFiles, bundleFiles, testFiles, expectedResults)
 }
 
+func TestAoUpload_NotExistFile(t *testing.T) {
+	name := "1663.1"
+	baseFiles := greenplum.BackupAOFiles{}
+	bundleFiles := &internal.RegularBundleFiles{}
+	uploader := newAoStorageUploader(baseFiles, bundleFiles, true)
+	meta := greenplum.NewAoRelFileMetadata("md5summock", greenplum.ColumnOriented, 70, 4)
+	location := walparser.BlockLocation{
+		RelationFileNode: walparser.RelFileNode{
+			SpcNode: 0,
+			DBNode:  13,
+			RelNode: 1337,
+		},
+		BlockNo: 60,
+	}
+	f, err := os.Create(name)
+	if err != nil {
+		t.Log(err)
+	}
+
+	fInfo, err := f.Stat()
+	if err != nil {
+		t.Log(err)
+	}
+
+	header, err := tar.FileInfoHeader(fInfo, f.Name())
+	if err != nil {
+		t.Log(err)
+	}
+	header.Name = name
+
+	cfi := internal.NewComposeFileInfo(f.Name(), fInfo, false, false, header)
+
+	err = os.Remove(f.Name())
+	if err != nil {
+		t.Log(err)
+	}
+
+	err = uploader.AddFile(cfi, meta, &location)
+	assert.NoError(t, err)
+}
+
 func runSingleTest(t *testing.T, baseFiles greenplum.BackupAOFiles,
 	bundleFiles *internal.RegularBundleFiles, testFiles map[string]TestFileInfo, expectedResults map[string]ExpectedResult) {
 	uploader := newAoStorageUploader(baseFiles, bundleFiles, true)
