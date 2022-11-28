@@ -1,7 +1,6 @@
 package greenplum
 
 import (
-	"errors"
 	"io"
 	"path"
 	"sync"
@@ -44,8 +43,10 @@ func NewAoStorageUploader(uploader *internal.Uploader, baseAoFiles BackupAOFiles
 
 func (u *AoStorageUploader) AddFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
 	err := u.addFile(cfi, aoMeta, location)
-	if errors.Is(err, internal.FileNotExistError{}) {
-		// File was deleted before opening. We should ignore file here as if it did not exist.
+	switch err.(type) {
+	case internal.FileNotExistError:
+		// File was deleted before opening.
+		// We should ignore file here as if it did not exist.
 		tracelog.WarningLogger.Println(err)
 		return nil
 	}
