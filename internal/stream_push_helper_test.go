@@ -6,19 +6,18 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 )
 
-func getByteSampleReader(size int) io.Reader {
+func getByteSampleArray(size int) []byte {
 	out := make([]byte, size)
 	for i := 0; i < size; i++ {
 		out[i] = byte(i + 1)
 	}
-	return bytes.NewReader(out)
+	return out
 }
 
 func setupTmpDir(t *testing.T) string {
@@ -82,8 +81,8 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, s
 		maxFileSize: maxFileSize,
 	}
 
-	sample := getByteSampleReader(sampleSize)
-	backupName, err := uploader.PushStream(sample)
+	sample := getByteSampleArray(sampleSize)
+	backupName, err := uploader.PushStream(bytes.NewReader(sample))
 	if err != nil {
 		return
 	}
@@ -101,16 +100,16 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, s
 	assert.Equal(t, sampleSize, len(result))
 
 	for i, val := range result {
-		assert.Equal(t, byte(i+1), val)
+		assert.Equal(t, sample[i], val)
 	}
 }
 
 func TestSplitBackup_WithCommonValues(t *testing.T) {
-	checkPushAndFetchBackup(t, 3, 3, 5, 19)
+	checkPushAndFetchBackup(t, 3, 3, 5, 51)
 }
 
 func TestSplitBackup_Synchronous(t *testing.T) {
-	checkPushAndFetchBackup(t, 1, 3, 5, 19)
+	checkPushAndFetchBackup(t, 1, 3, 5, 51)
 }
 
 func TestSplitBackup_MaxSize_Equal_BlockSize(t *testing.T) {
@@ -118,7 +117,7 @@ func TestSplitBackup_MaxSize_Equal_BlockSize(t *testing.T) {
 }
 
 func TestSplitBackup_MaxFileSize_GreaterThan_SampleSize(t *testing.T) {
-	checkPushAndFetchBackup(t, 3, 1009, 1000*1000*1000, 1000*1000)
+	checkPushAndFetchBackup(t, 3, 53, 10*1000, 1000)
 }
 
 func TestSplitBackup_BlockSize_Equal_MaxFileSize_Equal_SampleSize(t *testing.T) {
