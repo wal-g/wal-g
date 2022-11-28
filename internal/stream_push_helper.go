@@ -46,7 +46,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 				idx := 0
 				for {
 					fileReader := io.LimitReader(reader, int64(uploader.maxFileSize))
-					var read int64 = 0
+					read := int64(0)
 					fileReader = NewWithSizeReader(fileReader, &read)
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
