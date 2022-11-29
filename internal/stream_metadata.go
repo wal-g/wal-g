@@ -4,9 +4,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -31,13 +31,14 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	if err != nil {
 		return nil, err
 	}
+	maxDownloadRetry := viper.GetInt(MysqlBackupDownloadMaxRetry)
 
 	switch metadata.Type {
 	case SplitMergeStreamBackup:
 		var blockSize = metadata.BlockSize
 		var compression = metadata.Compression
 		return func(backup Backup, writer io.WriteCloser) error {
-			return DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer)
+			return DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer, maxDownloadRetry)
 		}, nil
 	case SingleStreamStreamBackup, "":
 		return DownloadAndDecompressStream, nil
