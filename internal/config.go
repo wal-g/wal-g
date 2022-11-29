@@ -781,12 +781,7 @@ func FolderFromConfig(configFile string) (storage.Folder, error) {
 // Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
 func bindConfigToEnv(globalViper *viper.Viper) {
 	for k, v := range globalViper.AllSettings() {
-		val, ok := v.(string)
-		if !ok {
-			// note: all viper settings are currently strings, this warning will not be triggered at the moment
-			tracelog.WarningLogger.Printf("config value for %s is not a string: %T %v\n", k, v, v)
-			continue
-		}
+		val := fmt.Sprint(v)
 		k = strings.ToUpper(k)
 
 		// avoid filling environment with empty values :
