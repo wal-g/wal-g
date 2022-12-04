@@ -61,7 +61,6 @@ func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (ar
 	return metaData, nil
 }
 
-// TODO : unit tests
 func writeBackupListDetails(backupDetails []archive.Backup, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer func() { _ = writer.Flush() }()
@@ -80,7 +79,7 @@ func writeBackupListDetails(backupDetails []archive.Backup, output io.Writer) er
 	return nil
 }
 
-//TODO : unit tests
+// TODO : unit tests
 func writePrettyBackupListDetails(backupDetails []archive.Backup, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
