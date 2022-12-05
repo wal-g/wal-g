@@ -1,12 +1,11 @@
-FROM golang:buster
+FROM golang:alpine
 
-ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm-256color
 
-RUN apt-get update && \
-    apt-get install --yes --no-install-recommends --no-install-suggests \
-    cmake && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk update && \
+    apk add musl-dev bash git gcc make cmake curl upx 
+RUN git config --global --add safe.directory /app
+WORKDIR /app
 
 COPY submodules/ tmp/
 

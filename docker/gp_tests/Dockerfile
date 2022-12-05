@@ -2,8 +2,7 @@ FROM wal-g/golang:latest as build
 
 WORKDIR /go/src/github.com/wal-g/wal-g
 
-RUN apt-get update && \
-    apt-get install --yes --no-install-recommends --no-install-suggests
+RUN apk update && apk upgrade
 
 COPY go.mod go.mod
 COPY vendor/ vendor/
