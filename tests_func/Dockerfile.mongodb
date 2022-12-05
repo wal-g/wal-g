@@ -11,6 +11,7 @@ ARG MONGO_VERSION=
 ARG MONGO_TOOLS_VERSION=100.4.0
 ENV TMP_DIR /var/tmp/wal-g
 ENV WALG_CONF_DIR /etc/wal-g/
+ENV USE_BROTLI 1
 
 RUN echo "deb http://$MONGO_REPO/apt/ubuntu bionic/${MONGO_PACKAGE}/${MONGO_MAJOR} multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
     wget -qO - https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc | apt-key add -
@@ -47,6 +48,7 @@ RUN chmod 700 /etc/mongodb/mongodb.keyfile && chown mongodb -R /etc/mongodb
 COPY staging/wal-g ${WALG_REPO}/
 
 WORKDIR ${WALG_REPO}
+
 
 RUN make link_external_deps
 RUN make BUILD_ARGS=-race mongo_build && \

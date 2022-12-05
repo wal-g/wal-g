@@ -62,6 +62,7 @@ jobs:
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: make pg_save_image
     env:
+      USE_BROTLI: 1
       USE_LZO: 1
 
   test:
@@ -174,5 +175,6 @@ jobs:
       - name: Run test
         run: ${{ matrix.command }}
     env:
+      USE_BROTLI: 1
       USE_LIBSODIUM: 1
       USE_LZO: 1

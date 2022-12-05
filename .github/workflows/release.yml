@@ -7,6 +7,7 @@ on:
 
 env:
   GO_VERSION: 1.18
+  USE_BROTLI: 1
   USE_LIBSODIUM: 1
   USE_LZO: 1
 
@@ -91,6 +92,7 @@ jobs:
           arch: ${{ matrix.arch }}
           distro: ubuntu20.04
           env: |
+            USE_BROTLI: ${{ env.USE_BROTLI }}
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
             USE_LZO: ${{ env.USE_LZO }}
           shell: /bin/bash
@@ -117,7 +119,6 @@ jobs:
             make deps
             
             make ${{ matrix.db }}_build
-
       - name: Rename WAL-G binary
         run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}
 
