@@ -12,6 +12,7 @@ ENV USER redis
 ENV GROUP redis
 ENV USERGROUP $USER:$GROUP
 ENV HOME /home/$USER
+ENV USE_BROTLI 1
 
 # add our user and group first to make sure their IDs get assigned consistently, regardless of whatever dependencies get added
 RUN groupadd -r -g 999 $USER && useradd -r -g $GROUP -u 999 $USER
