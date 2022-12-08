@@ -58,6 +58,9 @@ const (
 	StreamMetadataFileName = "stream_metadata.json"
 	PathSeparator          = string(os.PathSeparator)
 	Mebibyte               = 1024 * 1024
+
+	// utility.RestorePointSuffix is a suffix of restore point finish file
+	RestorePointSuffix = "_restore_point.json"
 )
 
 // MaxTime not really the maximal value, but high enough.
@@ -223,6 +226,16 @@ func StripLeftmostBackupName(path string) string {
 
 func stripBackupSuffix(pathValue string) string {
 	return strings.Split(pathValue, "_backup")[0]
+}
+
+func StripRightmostRestorePointName(path string) string {
+	path = strings.Trim(path, "/")
+	all := strings.SplitAfter(path, "/")
+	return stripRestorePointSuffix(all[len(all)-1])
+}
+
+func stripRestorePointSuffix(pathValue string) string {
+	return strings.Split(pathValue, "_restore_point")[0]
 }
 
 func StripPrefixName(path string) string {
