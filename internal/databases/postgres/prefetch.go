@@ -72,7 +72,7 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 	archiveDirectory := uploader.DeltaFileManager.dataFolder.(*fsutil.DiskDataFolder).Path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
-	bundle := NewBundle(archiveDirectory, nil, &prefaultStartLsn, nil,
+	bundle := NewBundle(archiveDirectory, nil, "", &prefaultStartLsn, nil,
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
@@ -131,7 +131,7 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 		return errors.Wrap(err, "addToBundle: could not grab header info")
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
+	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 
 	if !excluded && info.Mode().IsRegular() {
 		tarBall := bundle.TarBallQueue.Deque()

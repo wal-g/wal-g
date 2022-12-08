@@ -2,6 +2,7 @@ package sqlserver
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver"
 )
 
@@ -14,6 +15,7 @@ var backupPushCmd = &cobra.Command{
 	Use:   "backup-push",
 	Short: backupPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
 		sqlserver.HandleBackupPush(backupPushDatabases, backupUpdateLatest)
 	},
 }

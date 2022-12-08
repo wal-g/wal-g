@@ -2,12 +2,6 @@
 
 You can use WAL-G as a tool for making encrypted, compressed physical Greenplum backups and push/fetch them to/from the remote storage without saving it on your filesystem.
 
-Development
------------
-### Installing
-
-Installing process is the same as for [WAL-G for Postgres](PostgreSQL.md#installing). To build or install binary for Greenplum, use the `make gp_build` and `make gp_install` commands respectively.
-
 Configuration
 -------------
 WAL-G for Greenplum understands the basic configuration options that are [supported by the WAL-G for Postgres](PostgreSQL.md#Configuration), except the advanced features such as delta backups, remote backups, catchup backup, etc.
@@ -60,6 +54,28 @@ After the successful configuration, use the `backup-push` command from the coord
 
 ```bash
 wal-g backup-push --config=/path/to/config.yaml
+```
+
+#### Delta backups (work in progress)
+
+* `WALG_DELTA_MAX_STEPS`
+
+Delta-backup is the difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
+Restoration process will automatically fetch all necessary deltas and base backup and compose valid restored backup (you still need WALs after start of last backup to restore consistent cluster).
+
+Delta computation is based on ModTime of file system and LSN number of pages in datafiles for heap relations and on ModCount + EOF combination for AO/AOCS relations.
+
+##### Create delta from specific backup
+When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
+
+* `--delta-from-name` flag or `WALG_DELTA_FROM_NAME` environment variable to choose the backup with specified name as the base for the delta backup
+
+* `--delta-from-user-data` flag or `WALG_DELTA_FROM_USER_DATA` environment variable to choose the backup with specified user data as the base for the delta backup
+
+Examples:
+```bash
+wal-g backup-push --delta-from-name backup_name --config=/path/to/config.yaml
+wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/path/to/config.yaml
 ```
 
 ### ``backup-fetch``
@@ -128,3 +144,7 @@ wal-g backup-fetch LATEST --in-place --config=/path/to/config.yaml
 
 #### Delete concurrency
 During the delete execution, WAL-G can process segments in parallel mode. To control, how many segments will be processed simultaneously, use the `WALG_GP_DELETE_CONCURRENCY` setting. The default value is `1`. 
+
+
+#### AO/AOCS size threshold
+To control the minimal size of the AO/AOCS segment file to be uploaded into the shared storage, use the `WALG_GP_AOSEG_SIZE_THRESHOLD`. The higher this value, the bigger the size of a single backup and the smaller the size of the shared AO/AOCS storage folder. Default value is `1048576 (1MB)`.

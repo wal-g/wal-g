@@ -22,7 +22,7 @@ const (
 	minimalKeyLength  = 25
 )
 
-// libsodium should always be initialised
+// libsodium should always be initialized
 func init() {
 	C.sodium_init()
 }

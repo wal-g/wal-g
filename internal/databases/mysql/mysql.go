@@ -42,7 +42,7 @@ func getMySQLFlavor(db *sql.DB) (string, error) {
 	return gomysql.MySQLFlavor, nil
 }
 
-func getMySQLGTIDExecuted(db *sql.DB, flavor string) (gtid string, err error) {
+func getMySQLGTIDExecuted(db *sql.DB, flavor string) (gomysql.GTIDSet, error) {
 	query := ""
 	switch flavor {
 	case gomysql.MySQLFlavor:
@@ -50,11 +50,17 @@ func getMySQLGTIDExecuted(db *sql.DB, flavor string) (gtid string, err error) {
 	case gomysql.MariaDBFlavor:
 		query = "SELECT @@global.gtid_current_pos"
 	default:
-		return "", fmt.Errorf("unknown MySQL flavor: %s", flavor)
+		return nil, fmt.Errorf("unknown MySQL flavor: %s", flavor)
 	}
+
+	gtidStr := ""
 	row := db.QueryRow(query)
-	err = row.Scan(&gtid)
-	return gtid, err
+	err := row.Scan(&gtidStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return gomysql.ParseGTIDSet(flavor, gtidStr)
 }
 
 func getLastUploadedBinlog(folder storage.Folder) (string, error) {
@@ -76,11 +82,7 @@ func getLastUploadedBinlog(folder storage.Folder) (string, error) {
 	return name, nil
 }
 
-func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid string, flavor string) (string, error) {
-	gtidParsed, err := gomysql.ParseMysqlGTIDSet(gtid)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse server gtid: %s: %v", gtid, err)
-	}
+func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet, flavor string) (string, error) {
 	folder = folder.GetSubFolder(BinlogPath)
 	logFiles, _, err := folder.ListFolder()
 	if err != nil {
@@ -97,7 +99,7 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid string, flavor 
 		if err != nil {
 			return "", err
 		}
-		if gtidParsed.Contain(prevGtid) {
+		if gtid.Contain(prevGtid) {
 			return utility.TrimFileExtension(logFiles[i].GetName()), nil
 		}
 	}

@@ -346,7 +346,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
 	// Bundle and compress files to `compressed`.
-	bundle := postgres.NewBundle(data, nil, nil, nil, false, tarSizeThreshold)
+	bundle := postgres.NewBundle(data, nil, "", nil, nil, false, tarSizeThreshold)
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	size := int64(0)
 	tarBallMaker := &testtools.FileTarBallMaker{

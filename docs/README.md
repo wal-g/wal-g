@@ -8,7 +8,7 @@
 
 WAL-G is an archival restoration tool for PostgreSQL, MySQL/MariaDB, and MS SQL Server (beta for MongoDB and Redis).
 
-WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the original design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
+WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, ZSTD, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the original design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
 
 **Table of Contents**
 - [Installation](#installation)
@@ -55,8 +55,8 @@ To configure where WAL-G stores backups, please consult the [Storages](STORAGES.
 ### Compression
 * `WALG_COMPRESSION_METHOD`
 
-To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `brotli`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
-LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli is a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
+To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `zstd`, `brotli`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
+LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli and zstd are a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
 
 ### Encryption
 
@@ -121,6 +121,12 @@ The type of pprof profiler to use. Can be one of `cpu`, `mem`, `mutex`, `block`,
 * `PROFILE_PATH`
 
 The directory to store profiles in. Defaults to `$TMPDIR`.
+
+### Rate limiting
+* `WALG_NETWORK_RATE_LIMIT`
+
+Network traffic rate limit during the ```backup-push```/```backup-fetch``` operations in bytes per second.
+
 
 ### Database-specific options
 **More options are available for the chosen database. See it in [Databases](#databases)**
@@ -218,13 +224,69 @@ Databases
 
 Development
 -----------
-### Installing
-It is specified for your type of [database](#databases).
+
+The following steps describe how to build WAL-G for PostgreSQL, but the process is the same for other databases. For example, to build WAL-G for MySQL, use the `make mysql_build` instead of `make pg_build`.
+
+Optional:
+
+- To build with brotli compressor and decompressor, set the `USE_BROTLI` environment variable.
+- To build with libsodium, set the `USE_LIBSODIUM` environment variable.
+- To build with lzo decompressor, set the `USE_LZO` environment variable.
+
+### Ubuntu
+
+```sh
+# Install latest Go compiler
+sudo add-apt-repository ppa:longsleep/golang-backports 
+sudo apt update
+sudo apt install golang-go
+
+# Install lib dependencies
+sudo apt install libbrotli-dev liblzo2-dev libsodium-dev curl cmake
+
+# Fetch project and build
+go get github.com/wal-g/wal-g
+cd ~/go/src/github.com/wal-g/wal-g
+make deps
+make pg_build
+main/pg/wal-g --version
+```
+
+Users can also install WAL-G by using `make pg_install`. Specifying the `GOBIN` environment variable before installing allows the user to specify the installation location. By default, `make pg_install` puts the compiled binary in the root directory (`/`).
+
+```sh
+export USE_BROTLI=1
+export USE_LIBSODIUM=1
+export USE_LZO=1
+make pg_clean
+make deps
+GOBIN=/usr/local/bin make pg_install
+```
+
+### macOS
+
+```sh
+# brew command is Homebrew for Mac OS
+brew install cmake
+export USE_BROTLI=1
+export USE_LIBSODIUM="true" # since we're linking libsodium later
+./link_brotli.sh
+./link_libsodium.sh
+make install_and_build_pg
+```
+
+To build on ARM64, set the corresponding `GOOS`/`GOARCH` environment variables:
+```
+env GOOS=darwin GOARCH=arm64 make pg_build
+```
+
+The compiled binary to run is `main/pg/wal-g`
 
 ### Testing
 
 WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. Unit tests can be run using
 ```bash
+export USE_BROTLI=1
 make unittest
 ```
 For more information on testing, please consult [test](test), [testtools](testtools) and `unittest` section in [Makefile](Makefile).
@@ -233,6 +295,7 @@ WAL-G will perform a round-trip compression/decompression test that generates a 
 
 Test coverage can be obtained using:
 ```bash
+export USE_BROTLI=1
 make coverage
 ```
 This command generates `coverage.out` file and opens HTML representation of the coverage.

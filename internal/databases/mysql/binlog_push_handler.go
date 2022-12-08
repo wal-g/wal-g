@@ -75,7 +75,7 @@ func HandleBinlogPush(uploader internal.UploaderProvider, untilBinlog string, ch
 				lastGtidSeen:  nil,
 			}
 		default:
-			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable GTIDs check for current database flavor.", flavor)
+			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable WALG_MYSQL_CHECK_GTIDS for current database.", flavor)
 		}
 	}
 
@@ -257,13 +257,14 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 		return false
 	}
 	// nextPreviousGTIDs is 'GTIDs_executed at the end of current binary log file'
-	nextPreviousGTIDs, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
+	_nextPreviousGTIDs, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
 	if err != nil {
 		tracelog.InfoLogger.Printf(
 			"Cannot extract PREVIOUS_GTIDS event from current binlog %s, next %s (caused by %v). Upload it. (gtid check)\n",
 			binlog, nextBinlog, err)
 		return true
 	}
+	nextPreviousGTIDs := _nextPreviousGTIDs.(*mysql.MysqlGTIDSet)
 
 	if u.gtidArchived == nil || u.gtidArchived.String() == "" {
 		tracelog.DebugLogger.Printf("Cannot extract set of uploaded binlogs from cache\n")
@@ -283,7 +284,7 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 			return true
 		}
 		tracelog.DebugLogger.Printf("Binlog %s is the first binlog that we seen by GTID-checker in this run. (gtid check)\n", binlog)
-		u.lastGtidSeen = gtidSetBeforeCurrentBinlog
+		u.lastGtidSeen = gtidSetBeforeCurrentBinlog.(*mysql.MysqlGTIDSet)
 	}
 
 	currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)

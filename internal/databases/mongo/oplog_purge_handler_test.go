@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	BackupTimes = make([]internal.BackupTime, 4)
-	Backups     = []models.Backup{
+	Backups = []*models.Backup{
 		{
 			StartLocalTime: time.Unix(800, 0), FinishLocalTime: time.Unix(900, 0),
 			MongoMeta: models.MongoMeta{Before: models.NodeMeta{LastMajTS: models.Timestamp{TS: 800}}, After: models.NodeMeta{LastMajTS: models.Timestamp{TS: 900}}},

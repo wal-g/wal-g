@@ -9,13 +9,13 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
-func LoadBackups(downloader archive.Downloader) ([]models.Backup, error) {
+func LoadBackups(downloader archive.Downloader) ([]*models.Backup, error) {
 	backupTimes, _, err := downloader.ListBackups()
 	if err != nil {
 		return nil, err
 	}
 	if len(backupTimes) == 0 {
-		return []models.Backup{}, nil
+		return []*models.Backup{}, nil
 	}
 	return downloader.LoadBackups(archive.BackupNamesFromBackupTimes(backupTimes))
 }

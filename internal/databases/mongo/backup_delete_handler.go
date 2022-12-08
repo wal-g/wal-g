@@ -18,7 +18,7 @@ func HandleBackupDelete(backupName string, downloader archive.Downloader, purger
 		return nil
 	}
 
-	if err := purger.DeleteBackups([]models.Backup{backup}); err != nil {
+	if err := purger.DeleteBackups([]*models.Backup{backup}); err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Printf("Backup was deleted: %+v", backup)

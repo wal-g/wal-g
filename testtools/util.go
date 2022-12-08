@@ -18,7 +18,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/s3"
@@ -54,7 +53,7 @@ func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	)
 }
 
-func NewStoringMockUploader(storage *memory.Storage, deltaDataFolder fsutil.DataFolder) *internal.Uploader {
+func NewStoringMockUploader(storage *memory.Storage) *internal.Uploader {
 	return internal.NewUploader(
 		&MockCompressor{},
 		memory.NewFolder("in_memory/", storage),

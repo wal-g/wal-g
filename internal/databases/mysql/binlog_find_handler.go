@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	gomysql "github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 
@@ -13,11 +14,15 @@ func HandleBinlogFind(folder storage.Folder, gtid string) {
 	defer utility.LoggedClose(db, "")
 	flavor, err := getMySQLFlavor(db)
 	tracelog.ErrorLogger.FatalOnError(err)
+	var gtidSet gomysql.GTIDSet
 	if gtid == "" {
-		gtid, err = getMySQLGTIDExecuted(db, flavor)
+		gtidSet, err = getMySQLGTIDExecuted(db, flavor)
+		tracelog.ErrorLogger.FatalOnError(err)
+	} else {
+		gtidSet, err = gomysql.ParseGTIDSet(flavor, gtid)
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
-	name, err := getLastUploadedBinlogBeforeGTID(folder, gtid, flavor)
+	name, err := getLastUploadedBinlogBeforeGTID(folder, gtidSet, flavor)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println(name)
 }

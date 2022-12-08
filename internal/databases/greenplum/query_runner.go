@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/wal-g/wal-g/internal/walparser"
+
 	"github.com/pkg/errors"
 
 	"github.com/blang/semver"
@@ -17,7 +19,16 @@ import (
 
 // GpQueryRunner is implementation for controlling Greenplum
 type GpQueryRunner struct {
-	pgQueryRunner *postgres.PgQueryRunner
+	*postgres.PgQueryRunner
+}
+
+type aoRelPgClassInfo struct {
+	oid           uint32
+	relNameMd5    string
+	relFileNodeID uint32
+	relNAtts      int16
+	spcNode       uint32
+	storage       RelStorageType
 }
 
 // NewGpQueryRunner builds QueryRunner from available connection
@@ -26,8 +37,12 @@ func NewGpQueryRunner(conn *pgx.Conn) (*GpQueryRunner, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &GpQueryRunner{pgQueryRunner: pgQueryRunner}
+	r := &GpQueryRunner{PgQueryRunner: pgQueryRunner}
 	return r, nil
+}
+
+func ToGpQueryRunner(queryRunner *postgres.PgQueryRunner) *GpQueryRunner {
+	return &GpQueryRunner{PgQueryRunner: queryRunner}
 }
 
 // BuildCreateGreenplumRestorePoint formats a query to create a restore point
@@ -37,7 +52,7 @@ func (queryRunner *GpQueryRunner) buildCreateGreenplumRestorePoint(restorePointN
 
 // CreateGreenplumRestorePoint creates a restore point
 func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
-	conn := queryRunner.pgQueryRunner.Connection
+	conn := queryRunner.Connection
 	rows, err := conn.Query(queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
 	if err != nil {
 		return nil, err
@@ -100,7 +115,7 @@ ORDER BY content, role DESC;`
 
 // GetGreenplumSegmentsInfo returns the information about segments
 func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version) (segments []cluster.SegConfig, err error) {
-	conn := queryRunner.pgQueryRunner.Connection
+	conn := queryRunner.Connection
 	rows, err := conn.Query(queryRunner.buildGetGreenplumSegmentsInfo(semVer))
 	if err != nil {
 		return nil, err
@@ -136,7 +151,7 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version
 
 // GetGreenplumVersion returns version
 func (queryRunner *GpQueryRunner) GetGreenplumVersion() (version string, err error) {
-	conn := queryRunner.pgQueryRunner.Connection
+	conn := queryRunner.Connection
 	err = conn.QueryRow("SELECT pg_catalog.version()").Scan(&version)
 	if err != nil {
 		return "", err
@@ -165,7 +180,7 @@ func (queryRunner *GpQueryRunner) buildAbortBackupMaster() string {
 
 // IsInBackup check if there is backup running
 func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bool, err error) {
-	conn := queryRunner.pgQueryRunner.Connection
+	conn := queryRunner.Connection
 
 	rows, err := conn.Query(queryRunner.buildIsInBackup())
 	if err != nil {
@@ -193,7 +208,7 @@ func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bo
 // AbortBackup stops the backup process on all segments
 func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
 	tracelog.InfoLogger.Println("Calling pg_stop_backup() on all segments...")
-	conn := queryRunner.pgQueryRunner.Connection
+	conn := queryRunner.Connection
 
 	errs := make([]error, 0)
 	_, err = conn.Exec("SET statement_timeout=0;")
@@ -217,4 +232,173 @@ func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
 	}
 
 	return finalErr
+}
+
+// FetchAOStorageMetadata queries the storage metadata for AO & AOCS tables (GreenplumDB)
+func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatabaseInfo) (AoRelFileStorageMap, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	tracelog.InfoLogger.Printf("Querying pg_class for %s", dbInfo.Name)
+	getStatQuery, err := queryRunner.buildAORelPgClassQuery()
+	conn := queryRunner.Connection
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to build the pg_class query")
+	}
+
+	rows, err := conn.Query(getStatQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "pg_class query failed")
+	}
+
+	defer rows.Close()
+	relPgClassInfo := make(map[string]aoRelPgClassInfo)
+	for rows.Next() {
+		var oid uint32
+		var relNameMd5 string
+		var aoSegTableFqn string
+		var relFileNodeID uint32
+		var spcNode uint32
+		var storage RelStorageType
+		var relNAtts int16
+		if err := rows.Scan(&oid, &relNameMd5, &aoSegTableFqn, &relFileNodeID, &spcNode, &storage, &relNAtts); err != nil {
+			return nil, errors.Wrapf(err, "failed to parse query result")
+		}
+		row := aoRelPgClassInfo{
+			oid:           oid,
+			relNameMd5:    relNameMd5,
+			relFileNodeID: relFileNodeID,
+			relNAtts:      relNAtts,
+			spcNode:       spcNode,
+			storage:       storage,
+		}
+		relPgClassInfo[aoSegTableFqn] = row
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	relStorageMap := make(AoRelFileStorageMap)
+
+	for aoSegTableFqn, row := range relPgClassInfo {
+		var queryFunc func() (*pgx.Rows, error)
+		switch row.storage {
+		case AppendOptimized:
+			queryFunc = func() (*pgx.Rows, error) {
+				query, err := queryRunner.buildAOMetadataQuery(aoSegTableFqn)
+				if err != nil {
+					return nil, err
+				}
+
+				return conn.Query(query)
+			}
+		case ColumnOriented:
+			queryFunc = func() (*pgx.Rows, error) {
+				query, err := queryRunner.buildAOCSMetadataQuery()
+				if err != nil {
+					return nil, err
+				}
+
+				return conn.Query(query, row.oid)
+			}
+		default:
+			tracelog.WarningLogger.Printf("Unexpected relation storage type %c for relfilenode %d in database %s",
+				row.storage, row.relFileNodeID, dbInfo.Name)
+			continue
+		}
+
+		err = loadStorageMetadata(relStorageMap, dbInfo, queryFunc, aoSegTableFqn, relPgClassInfo)
+		if err != nil {
+			tracelog.WarningLogger.Printf("failed to fetch the AOCS storage metadata: %v\n", err)
+		}
+	}
+
+	return relStorageMap, nil
+}
+
+func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDatabaseInfo,
+	queryFn func() (*pgx.Rows, error), aoSegTableFqn string, relPgClassInfo map[string]aoRelPgClassInfo) error {
+	rows, err := queryFn()
+	if err != nil {
+		return errors.Wrap(err, "storage metadata query failed")
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var segNo int
+		var modCount int64
+		var eof int64
+
+		if err := rows.Scan(&segNo, &modCount, &eof); err != nil {
+			tracelog.WarningLogger.Printf("failed to parse query result: %v\n", err.Error())
+		}
+
+		cInfo := relPgClassInfo[aoSegTableFqn]
+		relFileLoc := walparser.NewBlockLocation(walparser.Oid(cInfo.spcNode), dbInfo.Oid, walparser.Oid(cInfo.relFileNodeID), uint32(segNo))
+		// if tablespace id is zero, use the default database tablespace id
+		if relFileLoc.RelationFileNode.SpcNode == walparser.Oid(0) {
+			relFileLoc.RelationFileNode.SpcNode = dbInfo.TblSpcOid
+		}
+		relStorageMap[*relFileLoc] = AoRelFileMetadata{
+			relNameMd5:  cInfo.relNameMd5,
+			storageType: cInfo.storage,
+			eof:         eof,
+			modCount:    modCount,
+		}
+	}
+	if rows.Err() != nil {
+		return rows.Err()
+	}
+	return nil
+}
+
+func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return `
+SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
+	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
+FROM pg_class aoseg_c
+JOIN (
+	SELECT pg_ao.relid AS aooid, pg_ao.segrelid, 
+			aotables.aotablefqn, aotables.relstorage, 
+			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
+	FROM pg_appendonly pg_ao
+	JOIN (
+		SELECT c.oid, quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn, 
+				c.relstorage, c.relnatts, c.relfilenode, c.reltablespace 
+		FROM pg_class c
+		JOIN pg_namespace n ON c.relnamespace = n.oid
+		WHERE relstorage IN ( 'ao', 'co' ) AND relpersistence='p'
+		) aotables ON pg_ao.relid = aotables.oid
+	) seg ON aoseg_c.oid = seg.segrelid;
+`, nil
+	case queryRunner.Version == 0:
+		return "", postgres.NewNoPostgresVersionError()
+	default:
+		return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *GpQueryRunner) buildAOCSMetadataQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return `SELECT aocs.physical_segno as segno, aocs.modcount, aocs.eof " +
+			"FROM gp_toolkit.__gp_aocsseg($1::oid) aocs;`, nil
+	case queryRunner.Version == 0:
+		return "", postgres.NewNoPostgresVersionError()
+	default:
+		return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *GpQueryRunner) buildAOMetadataQuery(aoSegTableFqn string) (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return fmt.Sprintf(`SELECT segno, modcount, eof FROM %s;`, aoSegTableFqn), nil
+	case queryRunner.Version == 0:
+		return "", postgres.NewNoPostgresVersionError()
+	default:
+		return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
 }

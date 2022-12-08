@@ -1,11 +1,8 @@
 package pg
 
 import (
-	"fmt"
-
 	"github.com/wal-g/wal-g/utility"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/spf13/cobra"
@@ -23,7 +20,6 @@ const (
 	storeAllCorruptBlocksFlag = "store-all-corrupt"
 	useRatingComposerFlag     = "rating-composer"
 	useCopyComposerFlag       = "copy-composer"
-	useGpComposerFlag         = "gp-composer"
 	deltaFromUserDataFlag     = "delta-from-user-data"
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
@@ -44,6 +40,8 @@ var (
 		Short: backupPushShortDescription, // TODO : improve description
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
+
 			var dataDirectory string
 
 			if len(args) > 0 {
@@ -72,16 +70,17 @@ var (
 						"%s option cannot be used with non-regular tar ball composer",
 						withoutFilesMetadataFlag)
 				}
-				if deltaFromName != "" || deltaFromUserData != "" || userDataRaw != "" {
+				if deltaFromName != "" || deltaFromUserData != "" {
 					tracelog.ErrorLogger.Fatalf(
-						"%s option cannot be used with %s, %s, %s options",
-						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag, addUserDataFlag)
+						"%s option cannot be used with %s, %s options",
+						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag)
 				}
 				tracelog.InfoLogger.Print("Files metadata tracking is disabled")
 				fullBackup = true
 			}
 
-			deltaBaseSelector, err := createDeltaBaseSelector(cmd, deltaFromName, deltaFromUserData)
+			deltaBaseSelector, err := internal.NewDeltaBaseSelector(
+				deltaFromName, deltaFromUserData, postgres.NewGenericMetaFetcher())
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
@@ -90,7 +89,8 @@ var (
 			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
-				tarBallComposerType, deltaBaseSelector, userData, withoutFilesMetadata)
+				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
+				userData, withoutFilesMetadata)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -103,7 +103,6 @@ var (
 	storeAllCorruptBlocks = false
 	useRatingComposer     = false
 	useCopyComposer       = false
-	useGpComposer         = false
 	deltaFromName         = ""
 	deltaFromUserData     = ""
 	userDataRaw           = ""
@@ -122,35 +121,8 @@ func chooseTarBallComposer() postgres.TarBallComposerType {
 		fullBackup = true
 		tarBallComposerType = postgres.CopyComposer
 	}
-	if useGpComposer {
-		fullBackup = true
-		tarBallComposerType = postgres.GreenplumComposer
-	}
 
 	return tarBallComposerType
-}
-
-// create the BackupSelector for delta backup base according to the provided flags
-func createDeltaBaseSelector(cmd *cobra.Command,
-	targetBackupName, targetUserData string) (internal.BackupSelector, error) {
-	switch {
-	case targetUserData != "" && targetBackupName != "":
-		fmt.Println(cmd.UsageString())
-		return nil, errors.New("only one delta target should be specified")
-
-	case targetBackupName != "":
-		tracelog.InfoLogger.Printf("Selecting the backup with name %s as the base for the current delta backup...\n",
-			targetBackupName)
-		return internal.NewBackupNameSelector(targetBackupName, true)
-
-	case targetUserData != "":
-		tracelog.InfoLogger.Println(
-			"Selecting the backup with specified user data as the base for the current delta backup...")
-		return internal.NewUserDataBackupSelector(targetUserData, postgres.NewGenericMetaFetcher())
-
-	default:
-		return internal.NewLatestBackupSelector(), nil
-	}
 }
 
 func init() {
@@ -168,8 +140,6 @@ func init() {
 		false, "Use rating tar composer (beta)")
 	backupPushCmd.Flags().BoolVarP(&useCopyComposer, useCopyComposerFlag, useCopyComposerShorthand,
 		false, "Use copy tar composer (beta)")
-	backupPushCmd.Flags().BoolVar(&useGpComposer, useGpComposerFlag, false, "Use gp tar composer (beta)")
-	_ = backupPushCmd.Flags().MarkHidden(useGpComposerFlag)
 	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,
 		"", "Select the backup specified by name as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,

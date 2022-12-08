@@ -68,22 +68,22 @@ func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 // TODO : unit tests
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapNew(
-	dbDataDirectory string, sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto, filesToUnwrap map[string]bool,
-	createIncrementalFiles, skipRedundantTars bool) (*UnwrapResult, error) {
+	dbDataDirectory string, filesToUnwrap map[string]bool,
+	createIncrementalFiles, skipRedundantTars bool, extractProv ExtractProvider) (*UnwrapResult, error) {
 	useNewUnwrapImplementation = true
-	err := checkDBDirectoryForUnwrapNew(dbDataDirectory, sentinelDto, filesMetaDto)
+	err := checkDBDirectoryForUnwrapNew(dbDataDirectory, *backup.SentinelDto, *backup.FilesMetadataDto)
 	if err != nil {
 		return nil, err
 	}
 
-	tarInterpreter := NewFileTarInterpreter(dbDataDirectory, sentinelDto, filesMetaDto, filesToUnwrap, createIncrementalFiles)
-	tarsToExtract, pgControlKey, err := backup.getTarsToExtract(filesMetaDto, filesToUnwrap, skipRedundantTars)
+	tarInterpreter, tarsToExtract, pgControlKey, err := extractProv.Get(
+		*backup, filesToUnwrap, skipRedundantTars, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
-	needPgControl := IsPgControlRequired(*backup, sentinelDto)
+	needPgControl := IsPgControlRequired(*backup)
 
 	if pgControlKey == "" && needPgControl {
 		return nil, newPgControlNotFoundError()
@@ -93,7 +93,7 @@ func (backup *Backup) unwrapNew(
 	if _, ok := err.(internal.NoFilesToExtractError); ok {
 		// in case of no tars to extract, just ignore this backup and proceed to the next
 		tracelog.InfoLogger.Println("Skipping backup: no useful files found.")
-		return tarInterpreter.UnwrapResult, nil
+		return tarInterpreter.GetUnwrapResult(), nil
 	}
 	if err != nil {
 		return nil, err
@@ -108,5 +108,5 @@ func (backup *Backup) unwrapNew(
 	}
 
 	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
-	return tarInterpreter.UnwrapResult, nil
+	return tarInterpreter.GetUnwrapResult(), nil
 }

@@ -76,7 +76,7 @@ func (relStat *RelFileStatistics) getFileUpdateCount(filePath string) uint64 {
 }
 
 func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error) {
-	databases, err := queryRunner.getDatabaseInfos()
+	databases, err := queryRunner.GetDatabaseInfos()
 	if err != nil {
 		return nil, errors.Wrap(err, "CollectStatistics: Failed to get db names.")
 	}
@@ -84,14 +84,14 @@ func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error)
 	result := make(map[walparser.RelFileNode]PgRelationStat)
 	// CollectStatistics collects statistics for each relFileNode
 	for _, db := range databases {
-		dbName := db.name
+		dbName := db.Name
 		databaseOption := func(c *pgx.ConnConfig) error {
 			c.Database = dbName
 			return nil
 		}
 		dbConn, err := Connect(databaseOption)
 		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to collect statistics for database: %s\n'%v'\n", db.name, err)
+			tracelog.WarningLogger.Printf("Failed to collect statistics for database: %s\n'%v'\n", db.Name, err)
 			continue
 		}
 

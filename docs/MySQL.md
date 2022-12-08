@@ -4,31 +4,6 @@
 
 You can use wal-g as a tool for encrypting, compressing MySQL backups and push/fetch them to/from storage without saving it on your filesystem.
 
-Development
------------
-### Installing
-To compile and build the binary for MySQL:
-
-Optional:
-
-- To build with libsodium, just set `USE_LIBSODIUM` environment variable.
-- To build with lzo decompressor, just set `USE_LZO` environment variable.
-```plaintext
-go get github.com/wal-g/wal-g
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make mysql_build
-```
-Users can also install WAL-G by using `make install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make install` puts the compiled binary in `go/bin`.
-```plaintext
-export GOBIN=/usr/local/bin
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make mysql_install
-```
-
 Configuration
 -------------
 
@@ -242,12 +217,19 @@ For the restore procedure you have to do similar things to [what the offical doc
 * clean a datadir (typically `/var/lib/mysql`)
 * fetch and prepare desired backup using `wal-g backup-fetch "backup_name"`
 * after the previous step you might have to fix file permissions: `chown -R mysql:mysql /var/lib/mysql`
-* in case of restoring for a replication slave you can follow the [official docs](https://mariadb.com/kb/en/setting-up-a-replication-slave-with-mariabackup/#gtids)
-* for PITR, replay binlogs with
-```bash
-wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z07:00"
-```
 * start mariadb
+* WAL-G doesn't support automatic PITR for MariaDB. There are 2 possible workarounds:
+  * You can configure restored database to replicate from your master, so it will be able to catch up (follow the [official docs](https://mariadb.com/kb/en/setting-up-a-replication-slave-with-mariabackup/#gtids))
+  * You can manually replay events with binlog and position:
+```bash
+wal-g binlog-fetch --since [backup name | LATEST]
+# Get binlog-name, position and GTIDs:
+tail -n 1 < /var/lib/mysql/xtrabackup_binlog_info
+# eg 'mysql-bin.000005	385	0-1-5763'
+# then replay it manually:
+mysql -e "STOP ALL SLAVES; SET GLOBAL gtid_slave_pos='$gtids';"
+mysqlbinlog --stop-datetime="some point in time" --start-position [position above] [all binlogs starting from thouse we seen above] | mysql --user XXX --host YYY [other options]
+```
 
 ### MariaDB - using with `mysqldump`
 

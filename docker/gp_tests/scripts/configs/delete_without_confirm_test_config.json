@@ -1,1 +1,2 @@
-"WALE_S3_PREFIX": "s3://gpdeletewithoutconfirm"
+"WALE_S3_PREFIX": "s3://gpdeletewithoutconfirm",
+"WALG_DELTA_MAX_STEPS": "0"

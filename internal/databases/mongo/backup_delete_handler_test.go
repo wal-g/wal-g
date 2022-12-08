@@ -29,12 +29,12 @@ func TestHandleBackupDelete(t *testing.T) {
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
 					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
-						Return(models.Backup{BackupName: "first"}, nil).Once()
+						Return(&models.Backup{BackupName: "first"}, nil).Once()
 					return dl
 				}(),
 				purger: func() *mocks.Purger {
 					pr := &mocks.Purger{}
-					pr.On("DeleteBackups", mock.MatchedBy(func(backups []models.Backup) bool { return len(backups) == 1 && backups[0].BackupName == "first" })).
+					pr.On("DeleteBackups", mock.MatchedBy(func(backups []*models.Backup) bool { return len(backups) == 1 && backups[0].BackupName == "first" })).
 						Return(nil).Once()
 					return pr
 				}(),
@@ -49,7 +49,7 @@ func TestHandleBackupDelete(t *testing.T) {
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
 					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
-						Return(models.Backup{BackupName: "first"}, nil).Once()
+						Return(&models.Backup{BackupName: "first"}, nil).Once()
 					return dl
 				}(),
 				purger: &mocks.Purger{},
@@ -64,7 +64,7 @@ func TestHandleBackupDelete(t *testing.T) {
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
 					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "nonexistent" })).
-						Return(models.Backup{}, fmt.Errorf("can not fetch stream sentinel: test")).Once()
+						Return(nil, fmt.Errorf("can not fetch stream sentinel: test")).Once()
 					return dl
 				}(),
 				purger: &mocks.Purger{},

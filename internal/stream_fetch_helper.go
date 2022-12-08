@@ -76,48 +76,31 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
 
-	// detect number of partitions. For tiny backups it may not be equal to WALG_STREAM_SPLITTER_PARTITIONS
-	partitions, err := detectPartitionsCount(backup, decompressor)
+	files, err := GetPartitionedBackupFileNames(backup, decompressor)
 	if err != nil {
 		return err
 	}
 
 	errorsPerWorker := make([]chan error, 0)
-	writers := splitmerge.MergeWriter(utility.EmptyWriteCloserIgnorer{WriteCloser: writeCloser}, partitions, blockSize)
+	writers := splitmerge.MergeWriter(utility.EmptyWriteCloserIgnorer{WriteCloser: writeCloser}, len(files), blockSize)
 
-	for i := 0; i < partitions; i++ {
-		fileName := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), i)
+	for i, partitionFiles := range files {
 		errCh := make(chan error)
 		errorsPerWorker = append(errorsPerWorker, errCh)
+		writer := writers[i]
 
-		go func(fileName string, errCh chan error, writer io.WriteCloser) {
+		go func(files []string) {
 			defer close(errCh)
-			archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
-			if err != nil {
-				tracelog.ErrorLogger.PrintOnError(writer.Close())
-				errCh <- fmt.Errorf("failed to dowload file %v: %w", fileName, err)
-				return
-			}
-			if !exists {
-				errCh <- writer.Close()
-				return
-			}
-			tracelog.DebugLogger.Printf("Found file: %s", fileName)
-			decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
-			if err != nil {
-				tracelog.ErrorLogger.PrintOnError(writer.Close())
-				errCh <- fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
-				return
-			}
-			defer utility.LoggedClose(decompressedReader, "")
-			_, err = utility.FastCopy(writer, decompressedReader)
-			if err != nil {
-				tracelog.ErrorLogger.PrintOnError(writer.Close())
-				errCh <- fmt.Errorf("failed to decompress/decrypt/pipe file %v: %w", fileName, err)
-				return
+			for _, fileName := range files {
+				err := downloadFile(backup, decompressor, fileName, writer)
+				if err != nil {
+					tracelog.ErrorLogger.PrintOnError(writer.Close())
+					errCh <- err
+					return
+				}
 			}
 			errCh <- writer.Close()
-		}(fileName, errCh, writers[i])
+		}(partitionFiles)
 	}
 
 	var lastErr error
@@ -132,11 +115,32 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	return lastErr
 }
 
-func detectPartitionsCount(backup Backup, decompressor compression.Decompressor) (int, error) {
+func downloadFile(backup Backup, decompressor compression.Decompressor, fileName string, writer io.WriteCloser) error {
+	archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
+	if err != nil {
+		return fmt.Errorf("failed to dowload file %v: %w", fileName, err)
+	}
+	if !exists {
+		return io.EOF
+	}
+	tracelog.DebugLogger.Printf("Found file: %s", fileName)
+	decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
+	if err != nil {
+		return fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
+	}
+	defer utility.LoggedClose(decompressedReader, "")
+	_, err = utility.FastCopy(writer, decompressedReader)
+	if err != nil {
+		return fmt.Errorf("failed to decompress/decrypt/pipe file %v: %w", fileName, err)
+	}
+	return nil
+}
+
+func GetPartitionedBackupFileNames(backup Backup, decompressor compression.Decompressor) ([][]string, error) {
 	// list all files in backup folder:
 	files, _, err := backup.Folder.GetSubFolder(backup.Name).ListFolder()
 	if err != nil {
-		return -1, fmt.Errorf("cannot list files in backup folder '%s' due to: %w", backup.Folder.GetPath(), err)
+		return nil, fmt.Errorf("cannot list files in backup folder '%s' due to: %w", backup.Folder.GetPath(), err)
 	}
 
 	// prepare lookup table:
@@ -146,21 +150,32 @@ func detectPartitionsCount(backup Backup, decompressor compression.Decompressor)
 		fileNames[filePath] = true
 	}
 
-	// find all backups:
-	partitions := 0
+	result := make([][]string, 0)
+	partIdx := 0
 	for {
-		nextPartition := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), partitions)
-		if fileNames[nextPartition] {
-			partitions++
-			tracelog.DebugLogger.Printf("partition %s found in backup folder", nextPartition)
+		nextPartitionFirstFile := GetPartitionedSteamMultipartName(backup.Name, decompressor.FileExtension(), partIdx, 0)
+		nextPartitionWholeFile := GetPartitionedStreamName(backup.Name, decompressor.FileExtension(), partIdx)
+		if fileNames[nextPartitionFirstFile] {
+			result = append(result, make([]string, 1))
+			result[partIdx][0] = nextPartitionFirstFile
+			fileIdx := 1
+			for {
+				nextPartitionFile := GetPartitionedSteamMultipartName(backup.Name, decompressor.FileExtension(), partIdx, fileIdx)
+				if fileNames[nextPartitionFile] {
+					result[partIdx] = append(result[partIdx], nextPartitionFile)
+					fileIdx++
+				} else {
+					break
+				}
+			}
+		} else if fileNames[nextPartitionWholeFile] {
+			result = append(result, make([]string, 1))
+			result[partIdx][0] = nextPartitionWholeFile
 		} else {
 			break
 		}
+		partIdx++
 	}
 
-	if partitions == 0 {
-		return -1, fmt.Errorf("no backup partitions found in backup folder '%s'", backup.Folder.GetPath())
-	}
-
-	return partitions, nil
+	return result, nil
 }

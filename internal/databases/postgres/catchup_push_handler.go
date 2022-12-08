@@ -25,20 +25,13 @@ func HandleCatchupPush(pgDataDirectory string, fromLSN LSN) {
 	userData, err := internal.GetSentinelUserData()
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
-	backupArguments := BackupArguments{
-		isPermanent:         false,
-		verifyPageChecksums: false,
-		pgDataDirectory:     pgDataDirectory,
-		forceIncremental:    true,
-		backupsFolder:       utility.CatchupPath,
-		tarBallComposerType: RegularComposer,
-		userData:            userData,
-	}
+	backupArguments := NewBackupArguments(
+		pgDataDirectory, utility.CatchupPath, false,
+		false, false, false,
+		RegularComposer, NewCatchupDeltaBackupConfigurator(fakePreviousBackupSentinelDto),
+		userData, false)
+
 	backupConfig, err := NewBackupHandler(backupArguments)
 	tracelog.ErrorLogger.FatalOnError(err)
-	backupConfig.checkPgVersionAndPgControl()
-	backupConfig.prevBackupInfo.sentinelDto = fakePreviousBackupSentinelDto
-	backupConfig.prevBackupInfo.filesMetadataDto = FilesMetadataDto{}
-	backupConfig.curBackupInfo.startLSN = fromLSN
-	backupConfig.createAndPushBackup()
+	backupConfig.HandleBackupPush()
 }

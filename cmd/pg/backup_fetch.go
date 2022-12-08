@@ -34,6 +34,8 @@ var backupFetchCmd = &cobra.Command{
 	Short: backupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
+
 		if fetchTargetUserData == "" {
 			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
 		}
@@ -46,10 +48,12 @@ var backupFetchCmd = &cobra.Command{
 		var pgFetcher func(folder storage.Folder, backup internal.Backup)
 		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(internal.UseReverseUnpackSetting)
 		skipRedundantTars = skipRedundantTars || viper.GetBool(internal.SkipRedundantTarsSetting)
+		extractProv := postgres.ExtractProviderImpl{}
+
 		if reverseDeltaUnpack {
-			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars)
+			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv)
 		} else {
-			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec)
+			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
 		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)

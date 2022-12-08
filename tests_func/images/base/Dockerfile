@@ -17,7 +17,7 @@ RUN cp --force --recursive --verbose \
     apt-get -qq update && \
     \
     apt-get -y install \
-    supervisor wget curl ca-certificates \
+    supervisor wget curl less vim ca-certificates \
     openssl git openssh-client openssh-server \
     build-essential cmake \
     netcat-openbsd iputils-ping \
@@ -35,7 +35,7 @@ ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
 RUN echo "root:root" | chpasswd && \
-    sed -i -e '/PermitRootLogin/ s/ .*/ yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PermitRootLogin .*/PermitRootLogin yes/g' /etc/ssh/sshd_config && \
     mkdir /var/run/sshd
 
 COPY ./config/supervisor /etc/supervisor

@@ -2,55 +2,8 @@
 
 You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups(full and incremental) and push/fetch them to/from storage without saving it on your filesystem.
 
-Development
------------
+If you prefer use Docker Image, you can directly test wal-g with this [playground](https://github.com/stephane-klein/playground-postgresql-walg).
 
-Optional:
-
-- To build with libsodium, set the `USE_LIBSODIUM` environment variable.
-- To build with lzo decompressor, set the `USE_LZO` environment variable.
-
-### Ubuntu
-
-```sh
-# Install latest Go compiler
-sudo add-apt-repository ppa:longsleep/golang-backports 
-sudo apt update
-sudo apt install golang-go
-
-# Install lib dependencies
-sudo apt install libbrotli-dev liblzo2-dev libsodium-dev
-
-# Fetch project and build
-go get github.com/wal-g/wal-g
-cd ~/go/src/github.com/wal-g/wal-g
-make deps
-make pg_build
-main/pg/wal-g --version
-```
-
-Users can also install WAL-G by using `make pg_install`. Specifying the `GOBIN` environment variable before installing allows the user to specify the installation location. By default, `make pg_install` puts the compiled binary in the root directory (`/`).
-
-```sh
-export USE_LIBSODIUM=1
-export USE_LZO=1
-make pg_clean
-make deps
-GOBIN=/usr/local/bin make pg_install
-```
-
-### macOS
-
-```sh
-# brew command is Homebrew for Mac OS
-brew install cmake
-export USE_LIBSODIUM="true" # since we're linking libsodium later
-./link_brotli.sh
-./link_libsodium.sh
-make install_and_build_pg
-```
-
-The compiled binary to run is `main/pg/wal-g`
 
 Configuration
 -------------
@@ -61,10 +14,6 @@ WAL-G uses [the usual PostgreSQL environment variables](https://www.postgresql.o
 * `WALG_DISK_RATE_LIMIT`
 
 To configure disk read rate limit during ```backup-push``` in bytes per second.
-
-* `WALG_NETWORK_RATE_LIMIT`
-To configure the network upload rate limit during ```backup-push``` in bytes per second.
-
 
 Concurrency values can be configured using:
 
@@ -285,7 +234,7 @@ If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G
 Limitations
 
 * Cannot be used with `rating-composer`, `copy-composer`
-* Cannot be used with `delta-from-user-data`, `delta-from-name`, `add-user-data`
+* Cannot be used with `WALG_DELTA_MAX_STEPS` setting or `delta-from-user-data`, `delta-from-name` flags.
 
 To activate this feature, do one of the following:
 
@@ -559,6 +508,15 @@ Remote target usage:
 wal-g wal-restore path/to/target-pgdata path/to/source-pgdata \
  --remote --host-ssh=localhost --port-ssh=22 --username-ssh=user --password-ssh=12346 \
  --private-key-path-ssh=path/to/ssh/private/key
+ ```
+
+### ``daemon``
+
+Archives all WAL segments in the background. Works with the PostgreSQL archive library `walg_archive`.
+
+Usage:
+```bash
+wal-g daemon path/to/socket-descriptor
 ```
 
 pgBackRest backups support (beta version)

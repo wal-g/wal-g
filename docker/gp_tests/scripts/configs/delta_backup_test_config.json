@@ -1,0 +1,3 @@
+"WALE_S3_PREFIX": "s3://gpdeltabackuptestbucket",
+"WALG_LOG_LEVEL": "DEVEL",
+"WALG_DELTA_MAX_STEPS": "2"

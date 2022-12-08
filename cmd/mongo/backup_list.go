@@ -5,13 +5,23 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 )
 
-const backupListShortDescription = "Prints available backups"
+const (
+	backupListShortDescription = "Prints available backups"
+	PrettyFlag                 = "pretty"
+	JSONFlag                   = "json"
+	DetailFlag                 = "detail"
+)
 
-var verbose bool
+var (
+	jsonFormat  = false
+	prettyPrint = false
+	detail      = false
+)
 
 // backupListCmd represents the backupList command
 var backupListCmd = &cobra.Command{
@@ -19,15 +29,23 @@ var backupListCmd = &cobra.Command{
 	Short: backupListShortDescription, // TODO : improve description
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+		backupFolder, err := common.GetBackupFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		listing := archive.NewDefaultTabbedBackupListing()
-		err = mongo.HandleBackupsList(downloader, listing, os.Stdout, verbose)
-		tracelog.ErrorLogger.FatalOnError(err)
+
+		if detail {
+			err := mongo.HandleDetailedBackupList(backupFolder, os.Stdout, prettyPrint, jsonFormat)
+			tracelog.ErrorLogger.FatalOnError(err)
+		} else {
+			internal.DefaultHandleBackupList(backupFolder, prettyPrint, jsonFormat)
+		}
 	},
 }
 
 func init() {
 	cmd.AddCommand(backupListCmd)
-	backupListCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose mode")
+
+	backupListCmd.Flags().BoolVar(&prettyPrint, PrettyFlag, false, "Prints more readable output")
+	backupListCmd.Flags().BoolVar(&jsonFormat, JSONFlag, false, "Prints output in json format")
+	// shorthand "v" is required for backward compatibility
+	backupListCmd.Flags().BoolVarP(&detail, DetailFlag, "v", false, "Prints extra backup details")
 }

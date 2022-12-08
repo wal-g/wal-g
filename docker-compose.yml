@@ -52,8 +52,11 @@ services:
       &&  mkdir -p /export/deletewithoutconfirm
       &&  mkdir -p /export/deleteendtoendbucket
       &&  mkdir -p /export/deletetargetbucket
+      &&  mkdir -p /export/gpdeletetargetbucket
       &&  mkdir -p /export/deletegarbagebucket
+      &&  mkdir -p /export/gpdeletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlsplitfilesizebucket
       &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
@@ -65,8 +68,11 @@ services:
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay
       &&  mkdir -p /export/mysqlpermanentbackupbucket
-      &&  mkdir -p /export/mariadbfullmysqldumpbucket
-      &&  mkdir -p /export/mariadbfullmariabackupbucket
+      &&  mkdir -p /export/mariadb_binlog_push_fetch
+      &&  mkdir -p /export/mariadb_binlog_push_with_gtids_check
+      &&  mkdir -p /export/mariadb_full_mysqldump
+      &&  mkdir -p /export/mariadb_full_maria_backup
+      &&  mkdir -p /export/mariadb_pitr_xtrabackup
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
@@ -86,9 +92,11 @@ services:
       &&  mkdir -p /export/gpdeletebeforenamebucket
       &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/gpaostoragetestbucket
+      &&  mkdir -p /export/gpdeltabackuptestbucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  mkdir -p /export/walrestorebucket
+      && mkdir -p /export/daemonbucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -562,7 +570,6 @@ services:
     links:
       - s3
 
-
   pg_wal_restore_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_wal_restore_test
@@ -574,13 +581,23 @@ services:
     links:
       - s3
 
-
   pg_wal_restore_remote_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_wal_restore_remote_test
       context: .
     image: wal-g/wal_restore_remote_test
     container_name: wal-g_pg_wal_restore_remote_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_daemon_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_daemon_test
+      context: .
+    image: wal-g/daemon_test
+    container_name: wal-g_pg_daemon_test
     depends_on:
       - s3
     links:

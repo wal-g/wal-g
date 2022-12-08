@@ -20,6 +20,8 @@ var backupFetchCmd = &cobra.Command{
 	Short: backupFetchShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()

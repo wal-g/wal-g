@@ -18,11 +18,11 @@ type BackupListing struct {
 }
 
 // Backups provides a mock function with given fields: backups, output
-func (_m *BackupListing) Backups(backups []models.Backup, output io.Writer) error {
+func (_m *BackupListing) Backups(backups []*models.Backup, output io.Writer) error {
 	ret := _m.Called(backups, output)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]models.Backup, io.Writer) error); ok {
+	if rf, ok := ret.Get(0).(func([]*models.Backup, io.Writer) error); ok {
 		r0 = rf(backups, output)
 	} else {
 		r0 = ret.Error(0)

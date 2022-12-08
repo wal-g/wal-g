@@ -10,6 +10,9 @@ import (
 var confirmed = false
 var deleteTargetUserData = ""
 
+const DeleteGarbageExamples = `  garbage           Deletes outdated WAL archives and leftover backups files from storage`
+const DeleteGarbageUse = "garbage"
+
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
@@ -45,38 +48,79 @@ var deleteTargetCmd = &cobra.Command{
 	Run:     runDeleteTarget,
 }
 
+var deleteGarbageCmd = &cobra.Command{
+	Use:     DeleteGarbageUse,
+	Example: DeleteGarbageExamples,
+	Args:    cobra.NoArgs,
+	Run:     runDeleteGarbage,
+}
+
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := greenplum.NewDeleteHandler(folder)
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteBefore(args, confirmed)
+	deleteHandler.HandleDeleteBefore(args)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := greenplum.NewDeleteHandler(folder)
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteRetain(args, confirmed)
+	deleteHandler.HandleDeleteRetain(args)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	folder, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := greenplum.NewDeleteHandler(folder)
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteEverything(args, confirmed)
+	deleteHandler.HandleDeleteEverything(args)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	tracelog.ErrorLogger.Fatalf("wal-g delete target is not supported for greenplum (yet)")
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	findFullBackup := false
+	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
+	if modifier == internal.FindFullDeleteModifier {
+		findFullBackup = true
+		// remove the extracted modifier from args
+		args = args[1:]
+	}
+
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, FindFull: findFullBackup}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(
+		cmd, args, deleteTargetUserData, greenplum.NewGenericMetaFetcher())
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	deleteHandler.HandleDeleteTarget(targetBackupSelector)
+}
+
+func runDeleteGarbage(cmd *cobra.Command, args []string) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(folder, delArgs)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	err = deleteHandler.HandleDeleteGarbage(args)
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func init() {
@@ -85,6 +129,6 @@ func init() {
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
 
-	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd)
+	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }

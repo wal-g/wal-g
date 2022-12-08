@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -27,6 +28,7 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		return nil, fmt.Errorf("until ts must be greater or equal to since ts")
 	}
 
+	var seqStart *models.Archive
 	var seqEnd *models.Archive
 	lastTSArch := make(map[models.Timestamp]*models.Archive)
 
@@ -35,10 +37,19 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		if arch.Type != models.ArchiveTypeOplog {
 			continue
 		}
-		lastTSArch[arch.End] = &arch // TODO: we can have few archives with same endTS
+		if _, ok := lastTSArch[arch.End]; ok {
+			return nil, errors.Errorf("duplicate archives with the same end %+v (archives: %+v)", arch.End, archives)
+		}
+		lastTSArch[arch.End] = &arch
+		if seqStart == nil && arch.In(since) {
+			seqStart = &arch
+		}
 		if seqEnd == nil && arch.In(until) {
 			seqEnd = &arch
 		}
+	}
+	if seqStart == nil {
+		return nil, fmt.Errorf("can not find archive with since timestamp '%s'", since)
 	}
 	if seqEnd == nil {
 		return nil, fmt.Errorf("can not find archive with until timestamp '%s'", until)
@@ -46,9 +57,8 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 
 	archPath := Sequence{}
 	ok := true
-	i := 0
 	ts := models.Timestamp{}
-	for ok && i <= len(archives) {
+	for i := 0; ok && i <= len(archives); i++ {
 		archPath = append(archPath, *seqEnd)
 		if seqEnd.In(since) {
 			archPath.Reverse()
@@ -56,7 +66,6 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		}
 		ts = seqEnd.Start
 		seqEnd, ok = lastTSArch[ts]
-		i++
 	}
 	if !ok {
 		return nil, fmt.Errorf("previous archive in sequence with last ts '%s' does not exist", ts)
@@ -74,16 +83,16 @@ func BackupNamesFromBackupTimes(backups []internal.BackupTime) []string {
 }
 
 // BackupNamesFromBackups forms list of backup names from Backups
-func BackupNamesFromBackups(backups []models.Backup) []string {
+func BackupNamesFromBackups(backups []*models.Backup) []string {
 	names := make([]string, 0, len(backups))
-	for idx := range backups {
-		names = append(names, backups[idx].BackupName)
+	for _, backup := range backups {
+		names = append(names, backup.BackupName)
 	}
 	return names
 }
 
 // LastKnownInBackupTS returns begin_ts of oldest backup
-func LastKnownInBackupTS(backups []models.Backup) (models.Timestamp, error) {
+func LastKnownInBackupTS(backups []*models.Backup) (models.Timestamp, error) {
 	if len(backups) == 0 {
 		return models.Timestamp{}, fmt.Errorf("empty backups list given")
 	}
@@ -97,9 +106,8 @@ func LastKnownInBackupTS(backups []models.Backup) (models.Timestamp, error) {
 	return minTS, nil
 }
 
-func SplitMongoBackups(backups []models.Backup, purgeBackups, retainBackups map[string]bool) (purge, retain []models.Backup) {
-	for i := range backups {
-		backup := backups[i]
+func SplitMongoBackups(backups []*models.Backup, purgeBackups, retainBackups map[string]bool) (purge, retain []*models.Backup) {
+	for _, backup := range backups {
 		if purgeBackups[backup.Name()] {
 			purge = append(purge, backup)
 			continue
@@ -111,7 +119,7 @@ func SplitMongoBackups(backups []models.Backup, purgeBackups, retainBackups map[
 	return purge, retain
 }
 
-func MongoModelToTimedBackup(backups []models.Backup) []internal.TimedBackup {
+func MongoModelToTimedBackup(backups []*models.Backup) []internal.TimedBackup {
 	if backups == nil {
 		return nil
 	}
@@ -125,9 +133,7 @@ func MongoModelToTimedBackup(backups []models.Backup) []internal.TimedBackup {
 // SplitPurgingOplogArchivesByTS returns archives with start_maj_ts < purgeBeforeTS.
 func SplitPurgingOplogArchivesByTS(archives []models.Archive, purgeBeforeTS models.Timestamp) []models.Archive {
 	purge := make([]models.Archive, 0)
-	var arch models.Archive
-	for i := range archives {
-		arch = archives[i]
+	for _, arch := range archives {
 		if models.LessTS(arch.End, purgeBeforeTS) {
 			tracelog.DebugLogger.Printf("Purging oplog archive: %s", arch.Filename())
 			purge = append(purge, arch)
@@ -139,24 +145,22 @@ func SplitPurgingOplogArchivesByTS(archives []models.Archive, purgeBeforeTS mode
 }
 
 //OldestBackupAfterTime returns last backup after given time.
-func OldestBackupAfterTime(backups []models.Backup, after time.Time) (models.Backup, error) {
+func OldestBackupAfterTime(backups []*models.Backup, after time.Time) (*models.Backup, error) {
 	if len(backups) <= 0 {
-		return models.Backup{}, fmt.Errorf("empty backup list received")
+		return nil, fmt.Errorf("empty backup list received")
 	}
 	retainAfterTS := after.Unix()
 
 	oldestBackup := backups[0]
 	fromRetain := oldestBackup.FinishLocalTime.Unix() - retainAfterTS
 	if fromRetain < 0 { // retain point is in future
-		return models.Backup{}, fmt.Errorf("no backups newer than retain point")
+		return nil, fmt.Errorf("no backups newer than retain point")
 	}
 
-	var curBackup models.Backup
-	for i := 1; i < len(backups); i++ {
-		curBackup = backups[i]
+	for _, curBackup := range backups {
 		curFromRetain := curBackup.FinishLocalTime.Unix() - retainAfterTS
 		if curFromRetain > fromRetain {
-			return models.Backup{}, fmt.Errorf("backups are not sorted by finish time")
+			return nil, fmt.Errorf("backups are not sorted by finish time")
 		}
 		if curFromRetain < 0 {
 			return oldestBackup, nil
@@ -169,11 +173,10 @@ func OldestBackupAfterTime(backups []models.Backup, after time.Time) (models.Bac
 
 // SelectPurgingOplogArchives builds archive list to be deleted.
 func SelectPurgingOplogArchives(archives []models.Archive,
-	backups []models.Backup,
+	backups []*models.Backup,
 	retainAfterTS *models.Timestamp) []models.Archive {
 	var purgeArchives []models.Archive
 	var arch models.Archive
-	var emptyBackup models.Backup
 	for i := range archives {
 		arch = archives[i]
 
@@ -185,7 +188,7 @@ func SelectPurgingOplogArchives(archives []models.Archive,
 		}
 
 		// retain if arch is part of backup
-		if backup := models.FirstOverlappingBackupForArch(arch, backups); backup != emptyBackup {
+		if backup := models.FirstOverlappingBackupForArch(arch, backups); backup != nil {
 			tracelog.DebugLogger.Printf(
 				"Keeping oplog archive due to overlapping with backup (%+v): %s", backup, arch.Filename())
 			continue

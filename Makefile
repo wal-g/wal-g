@@ -19,7 +19,11 @@ GOLANGCI_LINT_VERSION ?= "v1.37.0"
 REDIS_VERSION ?= "5.0.8"
 TOOLS_MOD_DIR := ./internal/tools
 
-BUILD_TAGS:=brotli
+BUILD_TAGS:=
+
+ifdef USE_BROTLI
+	BUILD_TAGS:=$(BUILD_TAGS) brotli
+endif
 
 ifdef USE_LIBSODIUM
 	BUILD_TAGS:=$(BUILD_TAGS) libsodium
@@ -125,11 +129,11 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1 -timeout 20m  -tf.test=true -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=mongodb
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 clean_mongo_features:
 	set -e
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=mongodb
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
@@ -161,11 +165,11 @@ redis_install: redis_build
 redis_features:
 	set -e
 	make go_deps
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  -tf.test=true -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
 
 clean_redis_features:
 	set -e
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m -tf.test=false -tf.debug=false -tf.clean=true -tf.stop=true -tf.database=redis
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
@@ -233,7 +237,8 @@ install:
 	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
 
 link_brotli:
-	./link_brotli.sh
+	@if [ -n "${USE_BROTLI}" ]; then ./link_brotli.sh; fi
+	@if [ -z "${USE_BROTLI}" ]; then echo "info: USE_BROTLI is not set, skipping 'link_brotli' task"; fi
 
 link_libsodium:
 	@if [ ! -z "${USE_LIBSODIUM}" ]; then\
@@ -242,7 +247,7 @@ link_libsodium:
 
 unlink_brotli:
 	rm -rf vendor/github.com/google/brotli/*
-	mv tmp/brotli/* vendor/github.com/google/brotli/
+	if [ -n "${USE_BROTLI}" ] ; then mv tmp/brotli/* vendor/github.com/google/brotli/; fi
 	rm -rf tmp/brotli
 
 unlink_libsodium:

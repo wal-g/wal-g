@@ -107,7 +107,7 @@ func (err UnmarshallingError) Error() string {
 }
 
 // TODO : unit tests
-func configureLimiters() {
+func ConfigureLimiters() {
 	if Turbo {
 		return
 	}
@@ -129,6 +129,10 @@ func ConfigureFolder() (storage.Folder, error) {
 	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper())
 	if err != nil {
 		return nil, err
+	}
+
+	if limiters.NetworkLimiter != nil {
+		folder = NewLimitedFolder(folder, limiters.NetworkLimiter)
 	}
 
 	return ConfigureStoragePrefix(folder), nil
@@ -235,12 +239,10 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
 func ConfigureUploader() (uploader *Uploader, err error) {
-	uploader, err = ConfigureUploaderWithoutCompressMethod()
+	folder, err := ConfigureFolder()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to configure folder")
 	}
-
-	folder := uploader.UploadingFolder
 
 	compressor, err := ConfigureCompressor()
 	if err != nil {
@@ -251,32 +253,18 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 	return uploader, err
 }
 
-func ConfigureUploaderWithoutCompressMethod() (uploader *Uploader, err error) {
-	folder, err := ConfigureFolder()
+func ConfigureSplitUploader() (UploaderProvider, error) {
+	uploader, err := ConfigureUploader()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
-	}
-
-	uploader = NewUploader(nil, folder)
-	return uploader, err
-}
-
-func ConfigureSplitUploader() (uploader UploaderProvider, err error) {
-	folder, err := ConfigureFolder()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
-	}
-
-	compressor, err := ConfigureCompressor()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure compression")
+		return nil, err
 	}
 
 	var partitions = viper.GetInt(StreamSplitterPartitions)
 	var blockSize = viper.GetSizeInBytes(StreamSplitterBlockSize)
+	var maxFileSize = viper.GetInt(StreamSplitterMaxFileSize)
 
-	uploader = NewSplitStreamUploader(compressor, folder, partitions, int(blockSize))
-	return uploader, err
+	splitStreamUploader := NewSplitStreamUploader(uploader, partitions, int(blockSize), maxFileSize)
+	return splitStreamUploader, nil
 }
 
 // ConfigureCrypter uses environment variables to create and configure a crypter.
@@ -328,6 +316,21 @@ func GetMaxUploadConcurrency() (int, error) {
 // may be in uploading state during backup-push.
 func getMaxUploadQueue() (int, error) {
 	return GetMaxConcurrency(UploadQueueSetting)
+}
+
+// TODO : unit tests
+func GetDeltaConfig() (maxDeltas int, fromFull bool) {
+	maxDeltas = viper.GetInt(DeltaMaxStepsSetting)
+	if origin, hasOrigin := GetSetting(DeltaOriginSetting); hasOrigin {
+		switch origin {
+		case LatestString:
+		case "LATEST_FULL":
+			fromFull = true
+		default:
+			tracelog.ErrorLogger.Fatalf("Unknown %s: %s\n", DeltaOriginSetting, origin)
+		}
+	}
+	return
 }
 
 func GetMaxUploadDiskConcurrency() (int, error) {

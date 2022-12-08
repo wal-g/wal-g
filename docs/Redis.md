@@ -4,31 +4,6 @@
 
 You can use wal-g as a tool for making encrypted, compressed Redis backups and push/fetch them to/from storage without saving it on your filesystem.
 
-Development
------------
-### Installing
-To compile and build the binary:
-
-Optional:
-
-- To build with libsodium, just set `USE_LIBSODIUM` environment variable.
-- To build with lzo decompressor, just set `USE_LZO` environment variable.
-```plaintext
-go get github.com/wal-g/wal-g
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make redis_build
-```
-Users can also install WAL-G by using `make redis_install`. Specifying the GOBIN environment variable before installing allows the user to specify the installation location. On default, `make redis_install` puts the compiled binary in `go/bin`.
-```plaintext
-export GOBIN=/usr/local/bin
-cd $GOPATH/src/github.com/wal-g/wal-g
-make install
-make deps
-make redis_install
-```
-
 Configuration
 -------------
 

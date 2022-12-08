@@ -37,13 +37,13 @@ type Bundle struct {
 
 func NewBundle(
 	directory string, crypter crypto.Crypter,
-	tarBallFilePacker TarBallFilePacker, tarSizeThreshold int64,
-	excludedFilenames map[string]utility.Empty) *Bundle {
+	tarSizeThreshold int64, excludedFilenames map[string]utility.Empty) *Bundle {
 	return &Bundle{
 		Directory:         directory,
 		Crypter:           crypter,
 		TarSizeThreshold:  tarSizeThreshold,
 		ExcludedFilenames: excludedFilenames,
+		FilesFilter:       &CommonFilesFilter{},
 	}
 }
 
@@ -81,16 +81,14 @@ func (bundle *Bundle) AddToBundle(path string, info os.FileInfo, err error) erro
 	if excluded && !isDir {
 		return nil
 	}
-
-	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
+	fileInfoHeader, err := bundle.createTarFileInfoHeader(path, info)
 	if err != nil {
-		return errors.Wrap(err, "addToBundle: could not grab header info")
+		return err
 	}
 
-	fileInfoHeader.Name = bundle.getFileRelPath(path)
 	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
-	if bundle.FilesFilter.ShouldUploadFile(path) {
+	if bundle.FilesFilter.ShouldUploadFile(path) && info.Mode().IsRegular() {
 		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, false, false, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
@@ -109,6 +107,16 @@ func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
 	return bundle.TarBallComposer.FinishComposing()
 }
 
-func (bundle *Bundle) getFileRelPath(fileAbsPath string) string {
+func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
 	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
+}
+
+func (bundle *Bundle) createTarFileInfoHeader(path string, info os.FileInfo) (header *tar.Header, err error) {
+	header, err = tar.FileInfoHeader(info, path)
+	if err != nil {
+		return nil, errors.Wrap(err, "addToBundle: could not grab header info")
+	}
+
+	header.Name = bundle.GetFileRelPath(path)
+	return
 }

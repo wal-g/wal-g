@@ -15,7 +15,18 @@ sleep 3
 enable_pitr_extension
 setup_wal_archiving
 
-wal-g backup-push --config=${TMP_CONFIG}
+# 1st backup (init tables heap, ao, co)
+insert_data
+run_backup_logged ${TMP_CONFIG} ${PGDATA}
+
+# 2nd backup (populate the co table)
+psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,10)i;"
+run_backup_logged ${TMP_CONFIG} ${PGDATA}
+
+# 3rd backup (populate the ao table)
+psql -p 6000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,10)i;"
+run_backup_logged ${TMP_CONFIG} ${PGDATA}
+
 stop_and_delete_cluster_dir
 
 # show the backup list

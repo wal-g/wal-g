@@ -242,8 +242,8 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	segUserData := NewSegmentUserDataFromID(backupID)
 	cmd := []string{
 		fmt.Sprintf("PGPORT=%d", segment.Port),
-		"wal-g seg",
-		fmt.Sprintf("backup-fetch %s", segment.DataDir),
+		"wal-g seg-backup-fetch",
+		fmt.Sprint(segment.DataDir),
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
 		fmt.Sprintf("--config=%s", internal.CfgFile),
