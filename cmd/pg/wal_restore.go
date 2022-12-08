@@ -60,5 +60,6 @@ func init() {
 	walRestoreCmd.Flags().StringVar(&sshPort, sshPortFlag, "22", "Port of remote target cluster to connect by SSH")
 	walRestoreCmd.Flags().StringVar(&sshUsername, sshUsernameFlag, "root", "Username for connect to remote cluster by SSH")
 	walRestoreCmd.Flags().StringVar(&sshPassword, sshPasswordFlag, "", "Password for connect to remote cluster by SSH")
-	walRestoreCmd.Flags().StringVar(&sshPrivateKeyPath, sshPrivateKeyPathFlag, "~/.ssh/id_rsa", "Path to private key for connect to remote cluster by SSH")
+	walRestoreCmd.Flags().StringVar(&sshPrivateKeyPath, sshPrivateKeyPathFlag, "~/.ssh/id_rsa",
+		"Path to private key for connect to remote cluster by SSH")
 }
