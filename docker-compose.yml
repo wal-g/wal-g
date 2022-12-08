@@ -574,6 +574,18 @@ services:
     links:
       - s3
 
+
+  pg_wal_restore_remote_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_wal_restore_remote_test
+      context: .
+    image: wal-g/wal_restore_remote_test
+    container_name: wal-g_pg_wal_restore_remote_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_pgbackrest:
     build:
       dockerfile: docker/pg_tests/Dockerfile_pgbackrest

@@ -1,0 +1,3 @@
+FROM wal-g/docker_prefix:latest
+
+CMD /tmp/scripts/start_ssh.sh ; su - postgres /tmp/tests/wal_restore_remote_test.sh
