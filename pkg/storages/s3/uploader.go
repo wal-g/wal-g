@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
@@ -38,10 +39,11 @@ type Uploader struct {
 	SSECustomerKey       string
 	SSEKMSKeyId          string
 	StorageClass         string
+	uploadOrListTimeout  int
 }
 
-func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass string) *Uploader {
-	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass}
+func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass string, uploadOrListTimeout int) *Uploader {
+	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass, uploadOrListTimeout}
 }
 
 // TODO : unit tests
@@ -73,9 +75,9 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 	return uploadInput
 }
 
-func (uploader *Uploader) upload(bucket, path string, content io.Reader) error {
+func (uploader *Uploader) upload(bucket, path string, content io.Reader, ctx context.Context) error {
 	input := uploader.createUploadInput(bucket, path, content)
-	_, err := uploader.uploaderAPI.Upload(input)
+	_, err := uploader.uploaderAPI.UploadWithContext(ctx, input)
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
 }
 
@@ -139,6 +141,14 @@ func configureUploader(s3Client *s3.S3, settings map[string]string) (*Uploader, 
 		maxPartSize = DefaultMaxPartSize
 	}
 
+	uploadOrListTimeout := 0
+	if strUploadOrListTimeout, ok := settings[UploadOrListTimeout]; ok {
+		uploadOrListTimeout, err = strconv.Atoi(strUploadOrListTimeout)
+		if err != nil {
+			return nil, NewFolderError(err, "Invalid s3 upload timeout setting")
+		}
+	}
+
 	uploaderApi := CreateUploaderAPI(s3Client, maxPartSize, concurrency)
 
 	serverSideEncryption, sseCustomerKey, sseKmsKeyId, err := configureServerSideEncryption(settings)
@@ -151,5 +161,5 @@ func configureUploader(s3Client *s3.S3, settings map[string]string) (*Uploader, 
 	if storageClass, ok = settings[StorageClassSetting]; !ok {
 		storageClass = "STANDARD"
 	}
-	return NewUploader(uploaderApi, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass), nil
+	return NewUploader(uploaderApi, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass, uploadOrListTimeout), nil
 }

@@ -42,7 +42,7 @@ func MakeDefaultInMemoryStorageFolder() *memory.Folder {
 }
 
 func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
-	return s3.NewUploader(uploaderAPI, "", "", "", "STANDARD")
+	return s3.NewUploader(uploaderAPI, "", "", "", "STANDARD", 0)
 }
 
 func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
