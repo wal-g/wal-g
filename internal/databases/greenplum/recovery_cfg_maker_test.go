@@ -15,7 +15,8 @@ func TestGenerateRecoveryConf(t *testing.T) {
 	contentID := -1
 
 	expectedCfg := `restore_command = '/usr/bin/wal-g seg wal-fetch "%f" "%p" --content-id=-1 --config /etc/wal-g/wal-g.yaml'
-recovery_target_name = 'some_backup'`
+recovery_target_name = 'some_backup'
+recovery_target_timeline = latest`
 	actualCfg := recCfgMaker.Make(contentID)
 	assert.Equal(t, expectedCfg, actualCfg, "Actual recovery.conf does not match the expected one")
 }
