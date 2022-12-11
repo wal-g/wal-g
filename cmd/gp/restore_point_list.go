@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -20,7 +21,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
-			internal.DefaultHandleRestorePointList(folder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+			greenplum.HandleRestorePointList(folder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
 		},
 	}
 )

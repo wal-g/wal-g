@@ -148,3 +148,12 @@ During the delete execution, WAL-G can process segments in parallel mode. To con
 
 #### AO/AOCS size threshold
 To control the minimal size of the AO/AOCS segment file to be uploaded into the shared storage, use the `WALG_GP_AOSEG_SIZE_THRESHOLD`. The higher this value, the bigger the size of a single backup and the smaller the size of the shared AO/AOCS storage folder. Default value is `1048576 (1MB)`.
+
+### ``restore-point-list``
+
+Lists currently available restore points in storage.
+
+Usage:
+```bash
+wal-g restore-point-list [--pretty] [--json]
+```
