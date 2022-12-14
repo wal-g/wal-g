@@ -50,6 +50,7 @@ func (err backupFromOtherBD) Error() string {
 type BackupArguments struct {
 	isPermanent           bool
 	verifyPageChecksums   bool
+	skipTablespaceMap     bool
 	storeAllCorruptBlocks bool
 	userData              interface{}
 	forceIncremental      bool
@@ -326,6 +327,9 @@ func (bh *BackupHandler) handleBackupPushRemote() {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
 		bh.Arguments.verifyPageChecksums = true
 	}
+	if bh.PgInfo.pgVersion < 90500 {
+		bh.Arguments.skipTablespaceMap = true
+	}
 	bh.createAndPushRemoteBackup()
 }
 
@@ -456,7 +460,7 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 		bundleFiles = &internal.RegularBundleFiles{}
 	}
 	tracelog.InfoLogger.Println("Starting remote backup")
-	err = baseBackup.Start(bh.Arguments.verifyPageChecksums, diskLimit)
+	err = baseBackup.Start(bh.Arguments.verifyPageChecksums, bh.Arguments.skipTablespaceMap, diskLimit)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
