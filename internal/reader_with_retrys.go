@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"github.com/wal-g/tracelog"
 	"io"
 )
 
@@ -24,12 +25,6 @@ func NewReaderWithRetry(getReader func() (io.ReadCloser, error), retryAttempts i
 }
 
 func (r *ReaderWithRetry) setupNewReader() error {
-	if r.reader != nil {
-		err := r.reader.Close()
-		if err != nil {
-			return err
-		}
-	}
 	reader, err := r.getReader()
 	if err != nil {
 		return err
@@ -41,35 +36,36 @@ func (r *ReaderWithRetry) setupNewReader() error {
 
 func (r *ReaderWithRetry) Read(p []byte) (n int, err error) {
 	n = 0
-	var lastErr error
 	for attempt := 0; attempt < r.retryAttempts; attempt++ {
 		if r.reader == nil {
-			err := r.setupNewReader()
-			if err == io.ErrUnexpectedEOF {
-				continue
+			err = r.setupNewReader()
+			if err == io.EOF {
+				return
 			} else if err != nil {
-				return n, err
+				tracelog.ErrorLogger.PrintOnError(r.reader.Close())
+				r.reader = nil
+				continue
 			}
 		}
 
-		read, err := r.reader.Read(p[n:])
+		read, readErr := r.reader.Read(p[n:])
 		n += read
 		r.alreadyRead += read
-		lastErr = err
-		if err == io.ErrUnexpectedEOF {
-			err := r.reader.Close()
-			if err != nil {
-				return n, err
-			}
+		err = readErr
+
+		if err == io.EOF {
+			return
+		} else if err != nil {
+			tracelog.ErrorLogger.Printf("Error while download file: %v. Attempt: %d\n", err, attempt)
+			tracelog.ErrorLogger.PrintOnError(r.reader.Close())
 			r.reader = nil
 			continue
-		} else if err != nil {
-			return n, err
-		} else if err == nil || len(p) == n {
+		} else if n == len(p) {
 			break
 		}
 	}
-	return n, lastErr
+
+	return
 }
 
 func (r *ReaderWithRetry) Close() error {
