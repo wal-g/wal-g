@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -11,6 +12,7 @@ const (
 	backupListShortDescription = "Prints available backups"
 	PrettyFlag                 = "pretty"
 	JSONFlag                   = "json"
+	DetailFlag                 = "detail"
 )
 
 var (
@@ -22,11 +24,16 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
-			internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+			if detail {
+				greenplum.HandleDetailedBackupList(folder, pretty, jsonOutput)
+			} else {
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+			}
 		},
 	}
 	pretty     = false
 	jsonOutput = false
+	detail     = false
 )
 
 func init() {
@@ -36,4 +43,5 @@ func init() {
 	// to avoid code duplication in command handlers
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
 	backupListCmd.Flags().BoolVar(&jsonOutput, JSONFlag, false, "Prints output in json format")
+	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
 }
