@@ -83,15 +83,15 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
 		"    }\n" +
 		"]"
-	var unmarshaledBackups []internal.BackupTime
+	var unmarshalledBackups []internal.BackupTime
 	buf := new(bytes.Buffer)
 
 	internal.SortBackupTimeSlices(backups)
 	err := internal.WriteAsJSON(backups, buf, true)
 	assert.NoError(t, err)
-	err = json.Unmarshal(buf.Bytes(), &unmarshaledBackups)
+	err = json.Unmarshal(buf.Bytes(), &unmarshalledBackups)
 
 	assert.NoError(t, err)
-	assert.Equal(t, unmarshaledBackups, backups)
+	assert.Equal(t, unmarshalledBackups, backups)
 	assert.Equal(t, buf.String(), expectedString)
 }
