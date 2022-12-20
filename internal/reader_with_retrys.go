@@ -1,8 +1,9 @@
 package internal
 
 import (
-	"github.com/wal-g/tracelog"
 	"io"
+
+	"github.com/wal-g/tracelog"
 )
 
 type ReaderWithRetry struct {
@@ -34,13 +35,13 @@ func (r *ReaderWithRetry) setupNewReader() error {
 	return err
 }
 
-func (r *ReaderWithRetry) Read(p []byte) (n int, err error) {
-	n = 0
+func (r *ReaderWithRetry) Read(p []byte) (int, error) {
+	n := 0
 	for attempt := 0; attempt < r.retryAttempts; attempt++ {
 		if r.reader == nil {
-			err = r.setupNewReader()
+			err := r.setupNewReader()
 			if err == io.EOF {
-				return
+				return n, err
 			} else if err != nil {
 				tracelog.ErrorLogger.PrintOnError(r.reader.Close())
 				r.reader = nil
@@ -51,10 +52,10 @@ func (r *ReaderWithRetry) Read(p []byte) (n int, err error) {
 		read, readErr := r.reader.Read(p[n:])
 		n += read
 		r.alreadyRead += read
-		err = readErr
+		err := readErr
 
 		if err == io.EOF {
-			return
+			return n, err
 		} else if err != nil {
 			tracelog.ErrorLogger.Printf("Error while download file: %v. Attempt: %d\n", err, attempt)
 			tracelog.ErrorLogger.PrintOnError(r.reader.Close())
@@ -65,7 +66,7 @@ func (r *ReaderWithRetry) Read(p []byte) (n int, err error) {
 		}
 	}
 
-	return
+	return n, nil
 }
 
 func (r *ReaderWithRetry) Close() error {
