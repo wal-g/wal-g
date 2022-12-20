@@ -222,7 +222,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sentinelDto := NewBackupSentinelDto(bh.currBackupInfo, bh.prevBackupInfo,
+	sentinelDto := NewBackupSentinelDto(bh.currBackupInfo, &bh.prevBackupInfo,
 		restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
 	err = bh.uploadSentinel(sentinelDto)
 	if err != nil {

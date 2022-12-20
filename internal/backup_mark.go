@@ -119,7 +119,7 @@ func (h *BackupMarkHandler) getBackupsToMarkImpermanent(backupName string) ([]st
 	return []string{meta.BackupName}, nil
 }
 
-//backup has permanent in future only when one of the next backups is permanent
+// backup has permanent in future only when one of the next backups is permanent
 func backupHasPermanentInFuture(reverseLinks *map[string][]string,
 	backupName string,
 	permanentBackups *map[string]bool) bool {
@@ -138,7 +138,7 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string,
 	return false
 }
 
-//return graph where nodes - backup names, edges - links from base backups to increment backups
+// return graph where nodes - backup names, edges - links from base backups to increment backups
 func (h *BackupMarkHandler) getGraphFromBaseToIncrement() (map[string][]string, error) {
 	backups, err := GetBackups(h.baseBackupFolder)
 	if err != nil {

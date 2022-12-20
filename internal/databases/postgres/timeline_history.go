@@ -43,7 +43,7 @@ type TimeLineHistFile struct {
 	readIndex  int
 }
 
-//NewTimeLineHistFile is a helper function to define a new TimeLineHistFile
+// NewTimeLineHistFile is a helper function to define a new TimeLineHistFile
 func NewTimeLineHistFile(timelineid uint32, filename string, body []byte) (TimeLineHistFile, error) {
 	tlh := TimeLineHistFile{TimeLineID: timelineid, Filename: filename, data: body}
 	return tlh, nil

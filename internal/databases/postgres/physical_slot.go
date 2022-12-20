@@ -21,7 +21,7 @@ type PhysicalSlot struct {
 	RestartLSN pglogrepl.LSN
 }
 
-//NewPhysicalSlot is a helper function to declare a new PhysicalSlot object and set vaues from the parsed arguments
+// NewPhysicalSlot is a helper function to declare a new PhysicalSlot object and set vaues from the parsed arguments
 func NewPhysicalSlot(name string, exists bool, active bool, restartLSN string) (slot PhysicalSlot, err error) {
 	err = ValidateSlotName(name)
 	if err != nil {

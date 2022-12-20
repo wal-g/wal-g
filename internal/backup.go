@@ -9,7 +9,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-//region errors
+// region errors
 type SentinelMarshallingError struct {
 	error
 }

@@ -90,7 +90,7 @@ func NewTarballStreamer(input io.Reader, maxTarSize int64, bundleFiles internal.
 	return streamer
 }
 
-//NextInputFile is what makes the TarballStreamer move to the next file.
+// NextInputFile is what makes the TarballStreamer move to the next file.
 func (streamer *TarballStreamer) NextInputFile() (err error) {
 	// First output tar, or switching to next
 	if streamer.outputTar == nil {
@@ -117,7 +117,7 @@ func (streamer *TarballStreamer) NextInputFile() (err error) {
 	return streamer.addFile()
 }
 
-//addFile adds the new file to the stream
+// addFile adds the new file to the stream
 func (streamer *TarballStreamer) addFile() (err error) {
 	if streamer.tarFileReadIndex+streamer.curHeader.Size > streamer.maxTarSize {
 		if streamer.tarFileReadIndex > 0 {
@@ -155,14 +155,14 @@ func (streamer *TarballStreamer) addFile() (err error) {
 	return nil
 }
 
-//remap rebuilds the name of the file according to remapping rules
+// remap rebuilds the name of the file according to remapping rules
 func (streamer *TarballStreamer) remap() {
 	for _, remap := range streamer.Remaps {
 		streamer.curHeader.Name = remap.from.ReplaceAllString(streamer.curHeader.Name, remap.to)
 	}
 }
 
-//readFileData reads the data from a tarred file
+// readFileData reads the data from a tarred file
 func (streamer *TarballStreamer) readFileData() (err error) {
 	err = streamer.NextInputFile()
 	if err != nil && err != errTarInputHeaderAlreadySet {
@@ -195,7 +195,7 @@ func (streamer *TarballStreamer) readFileData() (err error) {
 	return err
 }
 
-//pipeFileData calls readFileData to read file data from tar and then writes it to output tar writer
+// pipeFileData calls readFileData to read file data from tar and then writes it to output tar writer
 func (streamer *TarballStreamer) pipeFileData() (err error) {
 	if streamer.outputIo.Len() > 0 {
 		// There is still data in the buffer. Just stream that.
@@ -228,7 +228,7 @@ func (streamer *TarballStreamer) pipeFileData() (err error) {
 	return nil
 }
 
-//Read is what makes the TarballStreamer an io.Reader, which can be handled by WalUploader.UploadFile.
+// Read is what makes the TarballStreamer an io.Reader, which can be handled by WalUploader.UploadFile.
 func (streamer *TarballStreamer) Read(p []byte) (n int, err error) {
 	// Handle next file header if needed, read file data if needed, and write to output tar writer
 	err = streamer.pipeFileData()

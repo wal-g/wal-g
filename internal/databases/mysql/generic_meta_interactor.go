@@ -24,7 +24,7 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 	return GenericMetaFetcher{}
 }
 
-//TODO: Unit tests
+// TODO: Unit tests
 func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
 	var backup = internal.NewBackup(backupFolder, backupName)
 	var sentinel StreamSentinelDto
@@ -52,7 +52,7 @@ func NewGenericMetaSetter() GenericMetaSetter {
 	return GenericMetaSetter{}
 }
 
-//TODO: Unit tests
+// TODO: Unit tests
 func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
 	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
 		dto.UserData = userData
@@ -61,7 +61,7 @@ func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.
 	return modifyBackupSentinel(backupName, backupFolder, modifier)
 }
 
-//TODO: Unit tests
+// TODO: Unit tests
 func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error {
 	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
 		dto.IsPermanent = isPermanent

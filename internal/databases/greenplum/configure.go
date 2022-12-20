@@ -32,7 +32,7 @@ func ConfigureSegContentID(contentIDFlag string) (int, error) {
 	return contentID, nil
 }
 
-//initGpLog is required for gp-common-go library to function properly
+// initGpLog is required for gp-common-go library to function properly
 func initGpLog(logsDir string) {
 	gplog.SetLogFileNameFunc(func(program, logdir string) string {
 		return fmt.Sprintf("%s/%s-gplog.log", logdir, program)
