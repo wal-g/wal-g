@@ -23,7 +23,8 @@ func (m RecoveryConfigMaker) Make(contentID int) string {
 	restoreCmd := fmt.Sprintf(
 		"restore_command = '%s seg wal-fetch \"%%f\" \"%%p\" --content-id=%d --config %s'",
 		m.walgBinaryPath, contentID, m.cfgPath)
-	recoveryTarget := fmt.Sprintf("recovery_target_name = '%s'", m.recoveryTargetName)
+	recoveryTargetName := fmt.Sprintf("recovery_target_name = '%s'", m.recoveryTargetName)
+	recoveryTargetTli := "recovery_target_timeline = latest"
 
-	return strings.Join([]string{restoreCmd, recoveryTarget}, "\n")
+	return strings.Join([]string{restoreCmd, recoveryTargetName, recoveryTargetTli}, "\n")
 }

@@ -30,7 +30,7 @@ func makeDeltaAoFileStorageKey(baseKey string, modCount int64) string {
 	return fmt.Sprintf("%s%s%d%s", trimmedKey, AoSegDeltaDelimiter, modCount, AoSegSuffix)
 }
 
-//LoadStorageAoFiles loads the list of the AO/AOCS segment files that are referenced from previous backups
+// LoadStorageAoFiles loads the list of the AO/AOCS segment files that are referenced from previous backups
 func LoadStorageAoFiles(baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
 	aoSegments := make(map[string]struct{}, 0)
 
