@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
@@ -14,7 +15,17 @@ func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
-		return res, err
+
+		// TODO: remove this ugly hack to make current restore-point-list work
+		backupTimes := make([]internal.BackupTime, 0)
+		for _, rp := range res {
+			backupTimes = append(backupTimes, internal.BackupTime{
+				BackupName:  rp.Name,
+				Time:        rp.Time,
+				WalFileName: utility.StripWalFileName(rp.Name),
+			})
+		}
+		return backupTimes, err
 	}
 	writeRestorePointsListFunc := func(restorePoints []internal.BackupTime) {
 		internal.SortBackupTimeSlices(restorePoints)
