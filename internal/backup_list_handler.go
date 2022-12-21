@@ -25,24 +25,42 @@ type Logging struct {
 	ErrorLogger ErrorLogger
 }
 
-func DefaultHandleBackupList(folder storage.Folder, pretty, json bool) {
-	getBackupsFunc := func() ([]BackupTime, error) {
-		res, err := GetBackups(folder)
+func DefaultHandleBackupList(folder storage.Folder, metaInteractor GenericMetaInteractor, pretty, json bool) {
+	getBackupsFunc := func() ([]BackupTimeWithMetadata, error) {
+		backups, err := GetBackups(folder)
 		if _, ok := err.(NoBackupsFoundError); ok {
 			err = nil
 		}
-		return res, err
+
+		backupsWithMetadata := make([]BackupTimeWithMetadata, len(backups))
+		for i, backup := range backups {
+			meta, err := metaInteractor.Fetch(backup.BackupName, folder)
+			if err != nil {
+				backupsWithMetadata[i] = BackupTimeWithMetadata{BackupTime: backup}
+			} else {
+				backupsWithMetadata[i] = BackupTimeWithMetadata{BackupTime: backup, StartTime: meta.StartTime}
+			}
+		}
+
+		return backupsWithMetadata, err
 	}
-	writeBackupListFunc := func(backups []BackupTime) {
-		SortBackupTimeSlices(backups)
+
+	writeBackupListFunc := func(backups []BackupTimeWithMetadata) {
+		SortBackupTimeWithMetadataSlices(backups)
+
+		sortedBackups := make([]BackupTime, len(backups))
+		for i, backup := range backups {
+			sortedBackups[i] = backup.BackupTime
+		}
+
 		switch {
 		case json:
-			err := WriteAsJSON(backups, os.Stdout, pretty)
+			err := WriteAsJSON(sortedBackups, os.Stdout, pretty)
 			tracelog.ErrorLogger.FatalOnError(err)
 		case pretty:
-			WritePrettyBackupList(backups, os.Stdout)
+			WritePrettyBackupList(sortedBackups, os.Stdout)
 		default:
-			WriteBackupList(backups, os.Stdout)
+			WriteBackupList(sortedBackups, os.Stdout)
 		}
 	}
 	logging := Logging{
@@ -54,8 +72,8 @@ func DefaultHandleBackupList(folder storage.Folder, pretty, json bool) {
 }
 
 func HandleBackupList(
-	getBackupsFunc func() ([]BackupTime, error),
-	writeBackupListFunc func([]BackupTime),
+	getBackupsFunc func() ([]BackupTimeWithMetadata, error),
+	writeBackupListFunc func([]BackupTimeWithMetadata),
 	logging Logging,
 ) {
 	backups, err := getBackupsFunc()

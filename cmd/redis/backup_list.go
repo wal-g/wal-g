@@ -27,7 +27,7 @@ var (
 			if detail {
 				redis.HandleDetailedBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
 			} else {
-				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), redis.NewGenericMetaInteractor(), pretty, json)
 			}
 		},
 	}

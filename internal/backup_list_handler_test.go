@@ -56,25 +56,31 @@ var emptyColonsBackups = []internal.BackupTime{
 }
 
 func TestHandleBackupListWriteBackups(t *testing.T) {
-	backups := []internal.BackupTime{
+	backups := []internal.BackupTimeWithMetadata{
 		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup000",
+				Time:        time.Time{},
+				WalFileName: "wallName0",
+			},
+			StartTime: time.Time{},
 		},
 		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup001",
+				Time:        time.Time{},
+				WalFileName: "wallName1",
+			},
+			StartTime: time.Time{},
 		},
 	}
 
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
+	getBackupsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
 		return backups, nil
 	}
 	writeBackupListCallsCount := 0
-	var writeBackupListCallArgs []internal.BackupTime
-	writeBackupListFunc := func(backups []internal.BackupTime) {
+	var writeBackupListCallArgs []internal.BackupTimeWithMetadata
+	writeBackupListFunc := func(backups []internal.BackupTimeWithMetadata) {
 		writeBackupListCallsCount++
 		writeBackupListCallArgs = backups
 	}
@@ -91,23 +97,29 @@ func TestHandleBackupListWriteBackups(t *testing.T) {
 }
 
 func TestHandleBackupListLogError(t *testing.T) {
-	backups := []internal.BackupTime{
+	backups := []internal.BackupTimeWithMetadata{
 		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup000",
+				Time:        time.Time{},
+				WalFileName: "wallName0",
+			},
+			StartTime: time.Time{},
 		},
 		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup001",
+				Time:        time.Time{},
+				WalFileName: "wallName1",
+			},
+			StartTime: time.Time{},
 		},
 	}
 	someErrorInstance := someError{errors.New("some error")}
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
+	getBackupsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
 		return backups, someErrorInstance
 	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
+	writeBackupListFunc := func(backups []internal.BackupTimeWithMetadata) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
@@ -121,10 +133,10 @@ func TestHandleBackupListLogError(t *testing.T) {
 }
 
 func TestHandleBackupListLogNoBackups(t *testing.T) {
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
-		return []internal.BackupTime{}, nil
+	getBackupsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
+		return []internal.BackupTimeWithMetadata{}, nil
 	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
+	writeBackupListFunc := func(backups []internal.BackupTimeWithMetadata) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
