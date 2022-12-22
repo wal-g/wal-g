@@ -240,6 +240,8 @@ func FindRestorePointBeforeTS(timestampStr string, folder storage.Folder) (strin
 		return "", NewNoRestorePointsFoundError()
 	}
 
+	tracelog.InfoLogger.Printf("Found restore point %s with finish time %s, closest to the provided time %s",
+		targetPoint.Name, targetPoint.FinishTime, ts)
 	return targetPoint.Name, nil
 }
 

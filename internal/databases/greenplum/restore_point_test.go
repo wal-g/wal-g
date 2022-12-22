@@ -130,3 +130,35 @@ func TestFindRestorePointBeforeTS_NoMatches(t *testing.T) {
 	assert.IsType(t, greenplum.NoRestorePointsFoundError{}, err)
 	assert.Equal(t, "", found)
 }
+
+func TestFindRestorePointBeforeTS_ExactTime(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	baseBackupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	targetStr := "2022-12-22T14:00:02.37584Z"
+	targetTs, _ := time.Parse(time.RFC3339, targetStr)
+	restorePoints := []greenplum.RestorePointMetadata{
+		{
+			Name:       "too_old_restore_point",
+			StartTime:  targetTs.Add(-1 * time.Nanosecond),
+			FinishTime: targetTs.Add(-1 * time.Nanosecond),
+		}, {
+			Name:       "expected_restore_point",
+			StartTime:  targetTs,
+			FinishTime: targetTs,
+		}, {
+			Name:       "too_new_restore_point",
+			StartTime:  targetTs.Add(1 * time.Nanosecond),
+			FinishTime: targetTs.Add(1 * time.Nanosecond),
+		}}
+
+	for _, rp := range restorePoints {
+		rpBytes, _ := json.Marshal(rp)
+		_ = baseBackupsFolder.PutObject(rp.Name+greenplum.RestorePointSuffix, bytes.NewBuffer(rpBytes))
+		time.Sleep(time.Microsecond)
+	}
+
+	found, err := greenplum.FindRestorePointBeforeTS(targetStr, folder)
+	assert.NoError(t, err)
+	assert.Equal(t, "expected_restore_point", found)
+}
