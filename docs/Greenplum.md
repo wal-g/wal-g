@@ -119,6 +119,18 @@ WAL-G can fetch the backup with specific UserData (stored in backup metadata) us
 wal-g backup-fetch --target-user-data "{ \"x\": [3], \"y\": 4 }" --restore-config=/path/to/restore_config.json --config=/path/to/config.yaml
 ```
 
+WAL-G can fetch the backup onto the specific restore point using the `--restore-point` flag:
+```bash
+wal-g backup-fetch [OPTIONAL_BACKUP_NAME] --restore-point restore_point_name --restore-config=/path/to/restore_config.json --config=/path/to/config.yaml
+```
+- If backup name is specified, WAL-G will also check if the requested restore point is created after the backup end timestamp.
+- If backup name is not specified, WAL-G will choose the closest backup to the restore point.
+
+WAL-G can fetch the backup onto the restore point closest to the specific time using the `--restore-point-ts` flag:
+```bash
+wal-g backup-fetch [OPTIONAL_BACKUP_NAME] --restore-point-ts "2022-07-05T01:01:50Z" --restore-config=/path/to/restore_config.json --config=/path/to/config.yaml
+```
+
 #### Partial restore
 `--content-ids` flag allows to perform the fetch operations only on some specific segments. This might be useful when the backup-fetch operation is completed successfully on all segments except the few ones so the DBA or script can semi-automatically complete the failed backup fetch. For example:
 ```bash
