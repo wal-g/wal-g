@@ -164,7 +164,7 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 	}
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating pg_hba on segments",
-		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS,
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
 			if !fh.contentIDsToFetch[contentID] {
 				return newSkippedSegmentMsg(contentID)
