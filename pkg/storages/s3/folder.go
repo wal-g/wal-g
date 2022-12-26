@@ -154,7 +154,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		if isAwsNotExist(err) {
 			return false, nil
 		}
-		return false, errors.Wrapf(err, "failed to check s3 object '%s' existance", objectPath)
+		return false, errors.Wrapf(err, "failed to check s3 object '%s' existence", objectPath)
 	}
 	return true, nil
 }
