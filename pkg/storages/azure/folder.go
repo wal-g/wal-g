@@ -248,7 +248,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		//add blobs to the list of storage objects
 		for _, blob := range blobs.Segment.BlobItems {
 			objName := strings.TrimPrefix(*blob.Name, folder.path)
-			updated := time.Time(*blob.Properties.LastModified)
+			updated := *blob.Properties.LastModified
 
 			objects = append(objects, storage.NewLocalObject(objName, updated, *blob.Properties.ContentLength))
 		}
