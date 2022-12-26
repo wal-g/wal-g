@@ -143,8 +143,8 @@ func SortBackupTimeSlices(backupTimes []BackupTime) {
 func SortBackupTimeWithMetadataSlices(backupTimes []BackupTimeWithMetadata) {
 	order := ByCreationTime
 
-	for _, backupTime := range backupTimes {
-		if (backupTime.StartTime == time.Time{}) {
+	for i := 0; i < len(backupTimes); i++ {
+		if (backupTimes[i].StartTime == time.Time{}) {
 			order = ByModificationTime
 			break
 		}

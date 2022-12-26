@@ -35,8 +35,8 @@ func DefaultHandleBackupList(folder storage.Folder, metaFetcher GenericMetaFetch
 		SortBackupTimeWithMetadataSlices(backupsWithMeta)
 
 		backups := make([]BackupTime, len(backupsWithMeta))
-		for i, backupWithMeta := range backupsWithMeta {
-			backups[i] = backupWithMeta.BackupTime
+		for i := 0; i < len(backupsWithMeta); i++ {
+			backups[i] = backupsWithMeta[i].BackupTime
 		}
 
 		return backups, err
