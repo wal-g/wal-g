@@ -213,10 +213,10 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 
 type Folder struct {
 	uploadStreamOptions azblob.UploadStreamOptions
-	containerClient                azblob.ContainerClient
-	credential                     *azblob.SharedKeyCredential
-	timeout                        time.Duration
-	path                           string
+	containerClient     azblob.ContainerClient
+	credential          *azblob.SharedKeyCredential
+	timeout             time.Duration
+	path                string
 }
 
 func (folder *Folder) GetPath() string {
