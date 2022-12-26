@@ -19,6 +19,7 @@ var (
 	DebugLogBufferCounter = 0
 )
 
+// nolint: unused
 type s3Reader struct {
 	lastBody      io.ReadCloser
 	folder        *Folder

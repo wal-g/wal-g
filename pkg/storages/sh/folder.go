@@ -98,6 +98,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 }
 
 // TODO close ssh and sftp connection
+// nolint: unused
 func closeConnection(client io.Closer) {
 	err := client.Close()
 	if err != nil {
