@@ -198,7 +198,6 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			return nil, nil, NewError(err, "Unable to iterate %v", folder.path)
 		}
 		if objAttrs.Prefix != "" {
-
 			if objAttrs.Prefix != prefix+"/" {
 				// Sometimes GCS returns "//" folder - skip it
 				subFolders = append(subFolders,

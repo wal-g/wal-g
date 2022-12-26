@@ -266,7 +266,6 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				folder.timeout,
 				subFolderPath))
 		}
-
 	}
 	err = blobPager.Err()
 	if err != nil {
