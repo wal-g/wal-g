@@ -91,9 +91,9 @@ func CreateUploaderAPI(svc s3iface.S3API, partsize, concurrency int) s3managerif
 
 // TODO : unit tests
 func configureServerSideEncryption(settings map[string]string) (serverSideEncryption string, sseCustomerKey string, sseKmsKeyId string, err error) {
-	serverSideEncryption, _ = settings[SseSetting]
-	sseCustomerKey, _ = settings[SseCSetting]
-	sseKmsKeyId, _ = settings[SseKmsIdSetting]
+	serverSideEncryption = settings[SseSetting]
+	sseCustomerKey = settings[SseCSetting]
+	sseKmsKeyId = settings[SseKmsIdSetting]
 
 	// Only aws:kms implies sseKmsKeyId
 	if (serverSideEncryption == "aws:kms") == (sseKmsKeyId == "") {
