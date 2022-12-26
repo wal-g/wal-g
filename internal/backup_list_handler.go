@@ -25,42 +25,32 @@ type Logging struct {
 	ErrorLogger ErrorLogger
 }
 
-func DefaultHandleBackupList(folder storage.Folder, metaInteractor GenericMetaInteractor, pretty, json bool) {
-	getBackupsFunc := func() ([]BackupTimeWithMetadata, error) {
-		backups, err := GetBackups(folder)
+func DefaultHandleBackupList(folder storage.Folder, metaFetcher GenericMetaFetcher, pretty, json bool) {
+	getBackupsFunc := func() ([]BackupTime, error) {
+		backupsWithMeta, err := GetBackupsWithMetadata(folder, metaFetcher)
 		if _, ok := err.(NoBackupsFoundError); ok {
 			err = nil
 		}
 
-		backupsWithMetadata := make([]BackupTimeWithMetadata, len(backups))
-		for i, backup := range backups {
-			meta, err := metaInteractor.Fetch(backup.BackupName, folder)
-			if err != nil {
-				backupsWithMetadata[i] = BackupTimeWithMetadata{BackupTime: backup}
-			} else {
-				backupsWithMetadata[i] = BackupTimeWithMetadata{BackupTime: backup, StartTime: meta.StartTime}
-			}
+		SortBackupTimeWithMetadataSlices(backupsWithMeta)
+
+		backups := make([]BackupTime, len(backupsWithMeta))
+		for i, backupWithMeta := range backupsWithMeta {
+			backups[i] = backupWithMeta.BackupTime
 		}
 
-		return backupsWithMetadata, err
+		return backups, err
 	}
 
-	writeBackupListFunc := func(backups []BackupTimeWithMetadata) {
-		SortBackupTimeWithMetadataSlices(backups)
-
-		sortedBackups := make([]BackupTime, len(backups))
-		for i, backup := range backups {
-			sortedBackups[i] = backup.BackupTime
-		}
-
+	writeBackupListFunc := func(backups []BackupTime) {
 		switch {
 		case json:
-			err := WriteAsJSON(sortedBackups, os.Stdout, pretty)
+			err := WriteAsJSON(backups, os.Stdout, pretty)
 			tracelog.ErrorLogger.FatalOnError(err)
 		case pretty:
-			WritePrettyBackupList(sortedBackups, os.Stdout)
+			WritePrettyBackupList(backups, os.Stdout)
 		default:
-			WriteBackupList(sortedBackups, os.Stdout)
+			WriteBackupList(backups, os.Stdout)
 		}
 	}
 	logging := Logging{
@@ -72,8 +62,8 @@ func DefaultHandleBackupList(folder storage.Folder, metaInteractor GenericMetaIn
 }
 
 func HandleBackupList(
-	getBackupsFunc func() ([]BackupTimeWithMetadata, error),
-	writeBackupListFunc func([]BackupTimeWithMetadata),
+	getBackupsFunc func() ([]BackupTime, error),
+	writeBackupListFunc func([]BackupTime),
 	logging Logging,
 ) {
 	backups, err := getBackupsFunc()
