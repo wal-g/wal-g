@@ -141,8 +141,9 @@ func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder
 	minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
 
 	DebugLogBufferCounter++
-	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount, logDebugID: getHash(objectPath, DebugLogBufferCounter),
-		folder: folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
+	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount,
+		logDebugID: getHash(objectPath, DebugLogBufferCounter),
+		folder:     folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
 
 	reader.debugLog("Init s3reader path %s", objectPath)
 	return reader

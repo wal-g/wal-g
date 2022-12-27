@@ -339,7 +339,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if err != nil {
 		return NewFolderError(err, "Unable to init Azure Blob client for copy destination %s", dstPath)
 	}
-	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
+	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()}) // nolint: lll
 	return err
 }
 
@@ -352,7 +352,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 			return NewFolderError(err, "Unable to init Azure Blob client")
 		}
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		_, err = blobClient.Delete(context.Background(), &azblob.BlobDeleteOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
+		_, err = blobClient.Delete(context.Background(), &azblob.BlobDeleteOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()}) // nolint: lll
 		var stgErr *azblob.StorageError
 		if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 			continue

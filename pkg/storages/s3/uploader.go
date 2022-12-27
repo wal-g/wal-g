@@ -90,7 +90,7 @@ func CreateUploaderAPI(svc s3iface.S3API, partsize, concurrency int) s3managerif
 }
 
 // TODO : unit tests
-func configureServerSideEncryption(settings map[string]string) (serverSideEncryption string, sseCustomerKey string, sseKmsKeyId string, err error) {
+func configureServerSideEncryption(settings map[string]string) (serverSideEncryption string, sseCustomerKey string, sseKmsKeyId string, err error) { // nolint: lll
 	serverSideEncryption = settings[SseSetting]
 	sseCustomerKey = settings[SseCSetting]
 	sseKmsKeyId = settings[SseKmsIDSetting]

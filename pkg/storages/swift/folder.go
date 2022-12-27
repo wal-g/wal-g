@@ -85,8 +85,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	//Iterate
-	err = folder.connection.ObjectsWalk(folder.container.Name, &swift.ObjectsOpts{Delimiter: int32('/'), Prefix: folder.path}, func(opts *swift.ObjectsOpts) (interface{}, error) {
-
+	err = folder.connection.ObjectsWalk(folder.container.Name, &swift.ObjectsOpts{Delimiter: int32('/'), Prefix: folder.path}, func(opts *swift.ObjectsOpts) (interface{}, error) { // nolint: lll
 		objectNames, err := folder.connection.ObjectNames(folder.container.Name, opts)
 		if err != nil {
 			return nil, err
