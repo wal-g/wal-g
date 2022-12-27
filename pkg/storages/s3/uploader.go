@@ -90,13 +90,13 @@ func CreateUploaderAPI(svc s3iface.S3API, partsize, concurrency int) s3managerif
 }
 
 // TODO : unit tests
-func configureServerSideEncryption(settings map[string]string) (serverSideEncryption string, sseCustomerKey string, sseKmsKeyId string, err error) { // nolint: lll
+func configureServerSideEncryption(settings map[string]string) (serverSideEncryption string, sseCustomerKey string, sseKmsKeyID string, err error) { // nolint: lll
 	serverSideEncryption = settings[SseSetting]
 	sseCustomerKey = settings[SseCSetting]
-	sseKmsKeyId = settings[SseKmsIDSetting]
+	sseKmsKeyID = settings[SseKmsIDSetting]
 
-	// Only aws:kms implies sseKmsKeyId
-	if (serverSideEncryption == "aws:kms") == (sseKmsKeyId == "") {
+	// Only aws:kms implies sseKmsKeyID
+	if (serverSideEncryption == "aws:kms") == (sseKmsKeyID == "") {
 		return "", "", "", NewSseKmsIDNotSetError()
 	}
 	return

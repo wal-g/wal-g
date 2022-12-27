@@ -88,7 +88,7 @@ func (reader *s3Reader) reconnect() error {
 		reader.reconnectID++
 		object, err := reader.getObjectRange(reader.storageCursor, 0)
 		if err != nil {
-			failed += 1
+			failed++
 			reader.debugLog("reconnect failed [%d/%d]: %s", failed, reader.maxRetries, err)
 			if failed >= reader.maxRetries {
 				return errors.Wrap(err, reader.getDebugLogLine("Too much reconnecting retries"))
@@ -137,9 +137,8 @@ func (reader *s3Reader) Close() (err error) {
 	return reader.lastBody.Close()
 }
 
-func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder,
-	minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
-
+// nolint: revive, lll
+func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder, minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
 	DebugLogBufferCounter++
 	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount,
 		logDebugID: getHash(objectPath, DebugLogBufferCounter),

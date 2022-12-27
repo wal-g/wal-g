@@ -36,6 +36,7 @@ const (
 	defaultEnvName    = "AzurePublicCloud"
 )
 
+// nolint: revive
 type AzureAuthType string
 
 const (
