@@ -271,7 +271,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	if err != nil {
 		return nil, nil, NewFolderError(err, "Unable to iterate %v", folder.path)
 	}
-	return
+	return objects, subFolders, err
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {

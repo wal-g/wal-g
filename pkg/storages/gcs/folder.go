@@ -218,7 +218,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			}
 		}
 	}
-	return
+	return objects, subFolders, err
 }
 
 func (folder *Folder) createTimeoutContext() (context.Context, context.CancelFunc) {

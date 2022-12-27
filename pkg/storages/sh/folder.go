@@ -147,7 +147,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		objects = append(objects, object)
 	}
 
-	return
+	return objects, subFolders, err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
