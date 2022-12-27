@@ -54,7 +54,6 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 	}
 	for {
 		if reconnect {
-			reconnect = false
 			connErr := reader.reconnect()
 			if connErr != nil {
 				reader.debugLog("reconnect failed %s", connErr)
@@ -99,7 +98,6 @@ func (reader *s3Reader) reconnect() error {
 			time.Sleep(sleepTime)
 			continue
 		}
-		failed = 0
 		if reader.lastBody != nil {
 			err = reader.lastBody.Close()
 			if err != nil {
