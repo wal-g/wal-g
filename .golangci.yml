@@ -87,7 +87,6 @@ run:
   go: 1.18
   timeout: 5m
   skip-dirs:
-    - "internal/databases/redis"
     - "tests_func"
     - "tmp"
     - "submodules"
