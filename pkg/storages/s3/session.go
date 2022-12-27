@@ -109,7 +109,7 @@ func configWithSettings(s *session.Session, bucket string, settings map[string]s
 	config := s.Config
 	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetriesCount}))
 
-	accessKeyId := getFirstSettingOf(settings, []string{AccessKeyIdSetting, AccessKeySetting})
+	accessKeyID := getFirstSettingOf(settings, []string{AccessKeyIDSetting, AccessKeySetting})
 	secretAccessKey := getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting})
 	sessionToken := settings[SessionTokenSetting]
 
@@ -124,14 +124,14 @@ func configWithSettings(s *session.Session, bucket string, settings map[string]s
 		if err != nil {
 			return nil, err
 		}
-		accessKeyId = *assumedRole.Credentials.AccessKeyId
+		accessKeyID = *assumedRole.Credentials.AccessKeyId
 		secretAccessKey = *assumedRole.Credentials.SecretAccessKey
 		sessionToken = *assumedRole.Credentials.SessionToken
 	}
 
-	if accessKeyId != "" && secretAccessKey != "" {
+	if accessKeyID != "" && secretAccessKey != "" {
 		provider := &credentials.StaticProvider{Value: credentials.Value{
-			AccessKeyID:     accessKeyId,
+			AccessKeyID:     accessKeyID,
 			SecretAccessKey: secretAccessKey,
 			SessionToken:    sessionToken,
 		}}

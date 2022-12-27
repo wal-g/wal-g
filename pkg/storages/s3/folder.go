@@ -22,7 +22,7 @@ const (
 	EndpointSetting          = "AWS_ENDPOINT"
 	RegionSetting            = "AWS_REGION"
 	ForcePathStyleSetting    = "AWS_S3_FORCE_PATH_STYLE"
-	AccessKeyIdSetting       = "AWS_ACCESS_KEY_ID"
+	AccessKeyIDSetting       = "AWS_ACCESS_KEY_ID"
 	AccessKeySetting         = "AWS_ACCESS_KEY"
 	SecretAccessKeySetting   = "AWS_SECRET_ACCESS_KEY"
 	SecretKeySetting         = "AWS_SECRET_KEY"
@@ -32,7 +32,7 @@ const (
 	S3UseYcSessionToken      = "S3_USE_YC_SESSION_TOKEN"
 	SseSetting               = "S3_SSE"
 	SseCSetting              = "S3_SSE_C"
-	SseKmsIdSetting          = "S3_SSE_KMS_ID"
+	SseKmsIDSetting          = "S3_SSE_KMS_ID"
 	StorageClassSetting      = "S3_STORAGE_CLASS"
 	UploadConcurrencySetting = "UPLOAD_CONCURRENCY"
 	s3CertFile               = "S3_CA_CERT_FILE"
@@ -62,7 +62,7 @@ var (
 		EndpointSourceSetting,
 		RegionSetting,
 		ForcePathStyleSetting,
-		AccessKeyIdSetting,
+		AccessKeyIDSetting,
 		AccessKeySetting,
 		SecretAccessKeySetting,
 		SecretKeySetting,
@@ -72,7 +72,7 @@ var (
 		S3UseYcSessionToken,
 		SseSetting,
 		SseCSetting,
-		SseKmsIdSetting,
+		SseKmsIDSetting,
 		StorageClassSetting,
 		UploadConcurrencySetting,
 		s3CertFile,

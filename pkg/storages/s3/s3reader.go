@@ -29,8 +29,8 @@ type s3Reader struct {
 	storageCursor int64
 	maxRetryDelay time.Duration
 	minRetryDelay time.Duration
-	reconnectId   int
-	logDebugId    string // hash from filename and logDebugId - unique logDebugId used only for debug
+	reconnectID   int
+	logDebugID    string // hash from filename and logDebugID - unique logDebugID used only for debug
 }
 
 func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
@@ -73,7 +73,7 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 	}
 }
 func (reader *s3Reader) getDebugLogLine(format string, v ...interface{}) string {
-	prefix := fmt.Sprintf("s3Reader [%s] ", reader.logDebugId)
+	prefix := fmt.Sprintf("s3Reader [%s] ", reader.logDebugID)
 	message := fmt.Sprintf(format, v...)
 	return prefix + message
 }
@@ -86,7 +86,7 @@ func (reader *s3Reader) reconnect() error {
 	failed := 0
 
 	for {
-		reader.reconnectId++
+		reader.reconnectID++
 		object, err := reader.getObjectRange(reader.storageCursor, 0)
 		if err != nil {
 			failed += 1
@@ -109,7 +109,7 @@ func (reader *s3Reader) reconnect() error {
 			}
 		}
 		reader.lastBody = object.Body
-		reader.debugLog("reconnect #%d succeeded", reader.reconnectId)
+		reader.debugLog("reconnect #%d succeeded", reader.reconnectID)
 		break
 	}
 	return nil
@@ -143,7 +143,7 @@ func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder
 	minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
 
 	DebugLogBufferCounter++
-	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount, logDebugId: getHash(objectPath, DebugLogBufferCounter),
+	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount, logDebugID: getHash(objectPath, DebugLogBufferCounter),
 		folder: folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
 
 	reader.debugLog("Init s3reader path %s", objectPath)

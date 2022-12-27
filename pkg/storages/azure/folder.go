@@ -83,13 +83,13 @@ func getContainerClientWithSASToken(
 	containerName string,
 	timeout time.Duration,
 	accountToken string) (*azblob.ContainerClient, error) {
-	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
-	_, err := url.Parse(containerUrlString)
+	containerURLString := fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
+	_, err := url.Parse(containerURLString)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to parse service URL with SAS token")
 	}
 
-	containerClient, err := azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
+	containerClient, err := azblob.NewContainerClientWithNoCredential(containerURLString, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
 	return containerClient, err
@@ -101,13 +101,13 @@ func getContainerClientWithAccessKey(
 	containerName string,
 	timeout time.Duration,
 	credential *azblob.SharedKeyCredential) (*azblob.ContainerClient, error) {
-	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
-	_, err := url.Parse(containerUrlString)
+	containerURLString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+	_, err := url.Parse(containerURLString)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to parse service URL")
 	}
 
-	containerClient, err := azblob.NewContainerClientWithSharedKey(containerUrlString, credential, &azblob.ClientOptions{
+	containerClient, err := azblob.NewContainerClientWithSharedKey(containerURLString, credential, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
 	return containerClient, err
@@ -123,13 +123,13 @@ func getContainerClient(
 		return nil, NewFolderError(err, "Unable to construct default Azure credential chain")
 	}
 
-	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
-	_, err = url.Parse(containerUrlString)
+	containerURLString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+	_, err = url.Parse(containerURLString)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to parse service URL")
 	}
 
-	containerClient, err := azblob.NewContainerClient(containerUrlString, defaultCredential, &azblob.ClientOptions{
+	containerClient, err := azblob.NewContainerClient(containerURLString, defaultCredential, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
 	return containerClient, err
