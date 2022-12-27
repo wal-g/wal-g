@@ -327,9 +327,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err = folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object do not exists")
-		} else {
-			return err
 		}
+		return err
 	}
 	var srcClient, dstClient *azblob.BlockBlobClient
 	srcClient, err = folder.containerClient.NewBlockBlobClient(srcPath)
@@ -360,9 +359,8 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		}
 		if err != nil {
 			return NewFolderError(err, "Unable to delete object %v", path)
-		} else {
-			//blob is deleted
 		}
+		//blob is deleted
 	}
 	return nil
 }

@@ -90,9 +90,8 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		objectNames, err := folder.connection.ObjectNames(folder.container.Name, opts)
 		if err != nil {
 			return nil, err
-		} else {
-			// Retrieved object names successfully.
 		}
+		// Retrieved object names successfully.
 		for _, objectName := range objectNames {
 			if strings.HasSuffix(objectName, "/") {
 				//It is a subFolder name
@@ -135,9 +134,8 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	}
 	if err != nil {
 		return nil, NewError(err, "Unable to OPEN Object %v", path)
-	} else {
-		//retrieved object from  the cloud
 	}
+	//retrieved object from  the cloud
 	return io.NopCloser(readContents), nil
 }
 
@@ -148,9 +146,8 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	_, err := folder.connection.ObjectPut(folder.container.Name, path, content, false, "", "", nil)
 	if err != nil {
 		return NewError(err, "Unable to write content.")
-	} else {
-		//Object stored successfully
 	}
+	//Object stored successfully
 	return nil
 }
 
@@ -158,9 +155,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object does not exist")
-		} else {
-			return err
 		}
+		return err
 	}
 	_, err := folder.connection.ObjectCopy(folder.path, srcPath, folder.path, dstPath, nil)
 	return err
