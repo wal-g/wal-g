@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -105,6 +107,17 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 	}
 	tracelog.WarningLogger.Printf("failed to find uploaded binlog behind %s", gtid)
 	return "", nil
+}
+
+func getPositionBeforeGTID(folder storage.Folder, gtidSet gomysql.GTIDSet, flavor string) (*gomysql.Position, error) {
+	var pos gomysql.Position
+	var err error
+	pos.Name, err = getLastUploadedBinlogBeforeGTID(folder, gtidSet, flavor)
+	if err != nil {
+		return &gomysql.Position{"", 0}, err
+	}
+	pos.Pos = 4
+	return &pos, err
 }
 
 func getMySQLConnection() (*sql.DB, error) {
@@ -205,6 +218,31 @@ type binlogHandler interface {
 	handleBinlog(binlogPath string) error
 }
 
+func fetchLogsByBinlogName(folder storage.Folder, dstDir string, binlogName string, handler binlogHandler) error {
+	logFolder := folder.GetSubFolder(BinlogPath)
+	logsToFetch, err := getLogsAfterBinlog(folder, binlogName)
+	if err != nil {
+		return err
+	}
+	for _, logFile := range logsToFetch {
+		binlogName := utility.TrimFileExtension(logFile.GetName())
+		binlogPath := path.Join(dstDir, binlogName)
+		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
+		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
+			tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		err = handler.handleBinlog(binlogPath)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func fetchLogs(folder storage.Folder, dstDir string, startTS, endTS, endBinlogTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	includeStart := true
@@ -296,6 +334,29 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStar
 			continue // don't fetch binlogs from future
 		}
 		if start.Before(logFile.GetLastModified()) || includeStart && start.Equal(logFile.GetLastModified()) {
+			logsToFetch = append(logsToFetch, logFile)
+		}
+	}
+	return logsToFetch, nil
+}
+
+func getLogsAfterBinlog(folder storage.Folder, binlogName string) ([]storage.Object, error) {
+	logFiles, _, err := folder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(logFiles, func(i, j int) bool {
+		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	})
+	binlogNameID, err := strconv.Atoi(filepath.Ext(binlogName)[1:])
+	var logsToFetch []storage.Object
+	for _, logFile := range logFiles {
+		logFileID, err := strconv.Atoi(filepath.Ext(logFile.GetName())[1:])
+		if err != nil {
+			return nil, err
+		}
+
+		if logFileID >= binlogNameID {
 			logsToFetch = append(logsToFetch, logFile)
 		}
 	}
