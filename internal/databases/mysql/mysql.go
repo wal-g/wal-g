@@ -5,7 +5,9 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/spf13/afero"
 	"os"
 	"path"
 	"path/filepath"
@@ -220,7 +222,7 @@ type binlogHandler interface {
 
 func fetchLogsByBinlogName(folder storage.Folder, dstDir string, binlogName string, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
-	logsToFetch, err := getLogsAfterBinlog(folder, binlogName)
+	logsToFetch, err := getLogsAfterBinlog(logFolder, binlogName)
 	if err != nil {
 		return err
 	}
@@ -229,10 +231,11 @@ func fetchLogsByBinlogName(folder storage.Folder, dstDir string, binlogName stri
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
 		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
+			if errors.Is(err, afero.ErrFileExists) {
+				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
+				continue
+			}
 			tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
-			return err
-		}
-		if err != nil {
 			return err
 		}
 		err = handler.handleBinlog(binlogPath)
@@ -351,7 +354,8 @@ func getLogsAfterBinlog(folder storage.Folder, binlogName string) ([]storage.Obj
 	binlogNameID, err := strconv.Atoi(filepath.Ext(binlogName)[1:])
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
-		logFileID, err := strconv.Atoi(filepath.Ext(logFile.GetName())[1:])
+		logFileName := strings.TrimSuffix(logFile.GetName(), filepath.Ext(logFile.GetName()))
+		logFileID, err := strconv.Atoi(filepath.Ext(logFileName)[1:])
 		if err != nil {
 			return nil, err
 		}

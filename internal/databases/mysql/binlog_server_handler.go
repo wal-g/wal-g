@@ -1,7 +1,9 @@
 package mysql
 
 import (
-	"fmt"
+	"net"
+	"path"
+
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/go-mysql-org/go-mysql/server"
@@ -9,11 +11,10 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"net"
-	"path"
 )
 
 func prepareToSync(folder storage.Folder, pos *mysql.Position) error {
+	// download necessary binlog files
 	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	if err != nil {
 		return err
@@ -23,7 +24,8 @@ func prepareToSync(folder storage.Folder, pos *mysql.Position) error {
 	if err != nil {
 		return err
 	}
-	return nil
+	err = handler.createIndexFile()
+	return err
 }
 
 func startSync(folder storage.Folder, pos *mysql.Position, s *replication.BinlogStreamer) {
@@ -31,17 +33,17 @@ func startSync(folder storage.Folder, pos *mysql.Position, s *replication.Binlog
 
 	f := func(e *replication.BinlogEvent) error {
 		err := s.AddEventToStreamer(e)
-		fmt.Println(e.Header.EventType)
 		return err
 	}
-
-	logFiles, err := getLogsAfterBinlog(folder, pos.Name)
+	logFolder := folder.GetSubFolder(BinlogPath)
+	logFiles, err := getLogsAfterBinlog(logFolder, pos.Name)
 	if err != nil {
 		s.AddErrorToStreamer(err)
 	}
 	dstDir, _ := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
 	for _, logFile := range logFiles {
 		binlogName := utility.TrimFileExtension(logFile.GetName())
+		tracelog.InfoLogger.Printf("Synced binlog file %s", binlogName)
 		binlogPath := path.Join(dstDir, binlogName)
 		err := p.ParseFile(binlogPath, int64(pos.Pos), f)
 
@@ -50,6 +52,7 @@ func startSync(folder storage.Folder, pos *mysql.Position, s *replication.Binlog
 		}
 		pos.Pos = 4
 	}
+	tracelog.InfoLogger.Println("Binlog sync finished")
 }
 
 type Handler struct {

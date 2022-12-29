@@ -114,6 +114,10 @@ const (
 	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 	MysqlCheckGTIDs            = "WALG_MYSQL_CHECK_GTIDS"
+	MysqlBinlogServerHost      = "WALG_MYSQL_BINLOG_SERVER_HOST"
+	MysqlBinlogServerPort      = "WALG_MYSQL_BINLOG_SERVER_PORT"
+	MysqlBinlogServerUser      = "WALG_MYSQL_BINLOG_SERVER_USER"
+	MysqlBinlogServerPassword  = "WALG_MYSQL_BINLOG_SERVER_PASSWORD"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
@@ -423,6 +427,10 @@ var (
 		StreamSplitterPartitions:   true,
 		StreamSplitterBlockSize:    true,
 		StreamSplitterMaxFileSize:  true,
+		MysqlBinlogServerHost:      true,
+		MysqlBinlogServerPort:      true,
+		MysqlBinlogServerUser:      true,
+		MysqlBinlogServerPassword:  true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
