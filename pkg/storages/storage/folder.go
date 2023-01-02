@@ -51,9 +51,8 @@ func DeleteObjectsWhere(folder Folder, confirm bool, objFilter func(object1 Obje
 	}
 	if confirm {
 		return folder.DeleteObjects(filteredRelativePaths)
-	} else {
-		tracelog.InfoLogger.Println("Dry run, nothing were deleted")
 	}
+	tracelog.InfoLogger.Println("Dry run, nothing were deleted")
 	return nil
 }
 

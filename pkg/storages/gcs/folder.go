@@ -198,7 +198,6 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			return nil, nil, NewError(err, "Unable to iterate %v", folder.path)
 		}
 		if objAttrs.Prefix != "" {
-
 			if objAttrs.Prefix != prefix+"/" {
 				// Sometimes GCS returns "//" folder - skip it
 				subFolders = append(subFolders,
@@ -219,7 +218,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			}
 		}
 	}
-	return
+	return objects, subFolders, err
 }
 
 func (folder *Folder) createTimeoutContext() (context.Context, context.CancelFunc) {
@@ -352,9 +351,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object does not exist")
-		} else {
-			return err
 		}
+		return err
 	}
 	source := path.Join(folder.path, srcPath)
 	dst := path.Join(folder.path, dstPath)

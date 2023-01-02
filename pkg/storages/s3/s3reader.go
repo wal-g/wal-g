@@ -19,6 +19,7 @@ var (
 	DebugLogBufferCounter = 0
 )
 
+// nolint: unused
 type s3Reader struct {
 	lastBody      io.ReadCloser
 	folder        *Folder
@@ -28,8 +29,8 @@ type s3Reader struct {
 	storageCursor int64
 	maxRetryDelay time.Duration
 	minRetryDelay time.Duration
-	reconnectId   int
-	logDebugId    string // hash from filename and logDebugId - unique logDebugId used only for debug
+	reconnectID   int
+	logDebugID    string // hash from filename and logDebugID - unique logDebugID used only for debug
 }
 
 func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
@@ -53,7 +54,6 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 	}
 	for {
 		if reconnect {
-			reconnect = false
 			connErr := reader.reconnect()
 			if connErr != nil {
 				reader.debugLog("reconnect failed %s", connErr)
@@ -72,7 +72,7 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 	}
 }
 func (reader *s3Reader) getDebugLogLine(format string, v ...interface{}) string {
-	prefix := fmt.Sprintf("s3Reader [%s] ", reader.logDebugId)
+	prefix := fmt.Sprintf("s3Reader [%s] ", reader.logDebugID)
 	message := fmt.Sprintf(format, v...)
 	return prefix + message
 }
@@ -85,10 +85,10 @@ func (reader *s3Reader) reconnect() error {
 	failed := 0
 
 	for {
-		reader.reconnectId++
+		reader.reconnectID++
 		object, err := reader.getObjectRange(reader.storageCursor, 0)
 		if err != nil {
-			failed += 1
+			failed++
 			reader.debugLog("reconnect failed [%d/%d]: %s", failed, reader.maxRetries, err)
 			if failed >= reader.maxRetries {
 				return errors.Wrap(err, reader.getDebugLogLine("Too much reconnecting retries"))
@@ -98,7 +98,6 @@ func (reader *s3Reader) reconnect() error {
 			time.Sleep(sleepTime)
 			continue
 		}
-		failed = 0
 		if reader.lastBody != nil {
 			err = reader.lastBody.Close()
 			if err != nil {
@@ -108,7 +107,7 @@ func (reader *s3Reader) reconnect() error {
 			}
 		}
 		reader.lastBody = object.Body
-		reader.debugLog("reconnect #%d succeeded", reader.reconnectId)
+		reader.debugLog("reconnect #%d succeeded", reader.reconnectID)
 		break
 	}
 	return nil
@@ -138,12 +137,12 @@ func (reader *s3Reader) Close() (err error) {
 	return reader.lastBody.Close()
 }
 
-func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder,
-	minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
-
+// nolint: revive, lll
+func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder, minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
 	DebugLogBufferCounter++
-	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount, logDebugId: getHash(objectPath, DebugLogBufferCounter),
-		folder: folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
+	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount,
+		logDebugID: getHash(objectPath, DebugLogBufferCounter),
+		folder:     folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
 
 	reader.debugLog("Init s3reader path %s", objectPath)
 	return reader

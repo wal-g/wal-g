@@ -81,7 +81,6 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		return false, NewError(err, "Unable to stat object %v", objectRelativePath)
 	}
 	return true, nil
-
 }
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	sf := Folder{folder.rootPath, path.Join(folder.subpath, subFolderRelativePath)}
@@ -165,7 +164,6 @@ func (folder *Folder) EnsureExists() error {
 	_, err := os.Stat(dirname)
 	if os.IsNotExist(err) {
 		return os.MkdirAll(dirname, dirDefaultMode)
-
 	}
 	return err
 }

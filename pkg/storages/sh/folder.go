@@ -98,6 +98,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 }
 
 // TODO close ssh and sftp connection
+// nolint: unused
 func closeConnection(client io.Closer) {
 	err := client.Close()
 	if err != nil {
@@ -146,7 +147,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		objects = append(objects, object)
 	}
 
-	return
+	return objects, subFolders, err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
@@ -258,9 +259,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object does not exist")
-		} else {
-			return err
 		}
+		return err
 	}
 	file, err := folder.ReadObject(srcPath)
 	if err != nil {

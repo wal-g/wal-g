@@ -37,13 +37,13 @@ func GetPathFromPrefix(prefix string) (bucket, server string, err error) {
 }
 
 func ParsePrefixAsURL(prefix string) (bucket, server string, err error) {
-	storageUrl, err := url.Parse(prefix)
+	storageURL, err := url.Parse(prefix)
 	if err != nil {
 		return "", "", errors.Wrapf(err, "failed to parse url '%s'", prefix)
 	}
-	if storageUrl.Scheme == "" || storageUrl.Host == "" {
-		return "", "", errors.Errorf("missing url scheme=%q and/or host=%q", storageUrl.Scheme, storageUrl.Host)
+	if storageURL.Scheme == "" || storageURL.Host == "" {
+		return "", "", errors.Errorf("missing url scheme=%q and/or host=%q", storageURL.Scheme, storageURL.Host)
 	}
 
-	return storageUrl.Host, storageUrl.Path, nil
+	return storageURL.Host, storageURL.Path, nil
 }

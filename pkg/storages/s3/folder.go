@@ -22,7 +22,7 @@ const (
 	EndpointSetting          = "AWS_ENDPOINT"
 	RegionSetting            = "AWS_REGION"
 	ForcePathStyleSetting    = "AWS_S3_FORCE_PATH_STYLE"
-	AccessKeyIdSetting       = "AWS_ACCESS_KEY_ID"
+	AccessKeyIDSetting       = "AWS_ACCESS_KEY_ID"
 	AccessKeySetting         = "AWS_ACCESS_KEY"
 	SecretAccessKeySetting   = "AWS_SECRET_ACCESS_KEY"
 	SecretKeySetting         = "AWS_SECRET_KEY"
@@ -32,7 +32,7 @@ const (
 	S3UseYcSessionToken      = "S3_USE_YC_SESSION_TOKEN"
 	SseSetting               = "S3_SSE"
 	SseCSetting              = "S3_SSE_C"
-	SseKmsIdSetting          = "S3_SSE_KMS_ID"
+	SseKmsIDSetting          = "S3_SSE_KMS_ID"
 	StorageClassSetting      = "S3_STORAGE_CLASS"
 	UploadConcurrencySetting = "UPLOAD_CONCURRENCY"
 	s3CertFile               = "S3_CA_CERT_FILE"
@@ -62,7 +62,7 @@ var (
 		EndpointSourceSetting,
 		RegionSetting,
 		ForcePathStyleSetting,
-		AccessKeyIdSetting,
+		AccessKeyIDSetting,
 		AccessKeySetting,
 		SecretAccessKeySetting,
 		SecretKeySetting,
@@ -72,7 +72,7 @@ var (
 		S3UseYcSessionToken,
 		SseSetting,
 		SseCSetting,
-		SseKmsIdSetting,
+		SseKmsIDSetting,
 		StorageClassSetting,
 		UploadConcurrencySetting,
 		s3CertFile,
@@ -154,7 +154,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		if isAwsNotExist(err) {
 			return false, nil
 		}
-		return false, errors.Wrapf(err, "failed to check s3 object '%s' existance", objectPath)
+		return false, errors.Wrapf(err, "failed to check s3 object '%s' existence", objectPath)
 	}
 	return true, nil
 }
@@ -167,9 +167,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object does not exist")
-		} else {
-			return err
 		}
+		return err
 	}
 	source := path.Join(*folder.Bucket, folder.Path, srcPath)
 	dst := path.Join(folder.Path, dstPath)
