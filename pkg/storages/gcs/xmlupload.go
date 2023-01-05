@@ -28,7 +28,7 @@ const (
 type InitiateUploadResponse struct {
 	XMLName  xml.Name `xml:"InitiateMultipartUploadResult"`
 	Bucket   string   `xml:"Bucket"`
-	Key      string   `xmml:"Key"`
+	Key      string   `xml:"Key"`
 	UploadId string   `xml:"UploadId"`
 }
 
@@ -68,6 +68,7 @@ func getUploadId(token *oauth2.Token, bucketName string, objectName string) (str
 		tracelog.DebugLogger.Printf("request failed  : %v ", err.Error())
 		return "", err
 	}
+	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	xml.Unmarshal(body, &xmlResponse)
 	return xmlResponse.UploadId, nil
