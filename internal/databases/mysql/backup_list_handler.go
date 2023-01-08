@@ -76,7 +76,6 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-// TODO : unit tests
 func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) error {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
@@ -86,7 +85,7 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) erro
 	}
 	for i := len(backupDetails) - 1; i >= 0; i-- {
 		b := backupDetails[i]
-		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v",
+		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
 			b.BackupName, b.ModifyTime.Format(time.RFC3339), b.StartLocalTime.Format(time.RFC850), b.StopLocalTime.Format(time.RFC850), b.Hostname, b.BinLogStart, b.BinLogEnd, b.UncompressedSize, b.CompressedSize, b.IsPermanent) //nolint:lll
 		if err != nil {
 			return err
@@ -95,7 +94,6 @@ func writeBackupListDetails(backupDetails []BackupDetail, output io.Writer) erro
 	return nil
 }
 
-// TODO : unit tests
 func writePrettyBackupListDetails(backupDetails []BackupDetail, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
