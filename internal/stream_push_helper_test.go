@@ -5,9 +5,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/ioextensions"
+
+	//"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path/filepath"
 	"sync"
@@ -78,7 +80,7 @@ func GetFolder(t *testing.T, networkErrorAfterByteSize int) (storage.Folder, fun
 		return nil, nil, err
 	}
 	if networkErrorAfterByteSize != 0 {
-		return utility.NewNetworkErrorFolder(folder, networkErrorAfterByteSize),
+		return ioextensions.NewNetworkErrorFolder(folder, networkErrorAfterByteSize),
 			func() error {
 				return os.RemoveAll(tmpDir)
 			}, nil

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 	"path"
 	"time"
@@ -132,7 +133,7 @@ func downloadAndDecompressFile(backup Backup, decompressor compression.Decompres
 
 	var archiveReader io.ReadCloser
 	if maxDownloadRetry > 1 {
-		archiveReader = NewReaderWithRetry(getArchiveReader, maxDownloadRetry)
+		archiveReader = ioextensions.NewReaderWithRetry(getArchiveReader, maxDownloadRetry)
 	} else {
 		reader, err := getArchiveReader()
 		if err != nil {

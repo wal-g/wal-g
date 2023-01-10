@@ -1,4 +1,4 @@
-package internal
+package ioextensions
 
 import (
 	"io"
@@ -49,15 +49,14 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 			}
 		}
 
-		read, readErr := r.reader.Read(p[n:])
+		read, err := r.reader.Read(p[n:])
 		n += read
 		r.alreadyRead += read
-		err := readErr
 
 		if err == io.EOF {
 			return n, err
 		} else if err != nil {
-			tracelog.ErrorLogger.Printf("Error while download file: %v. Attempt: %d\n", err, attempt)
+			tracelog.ErrorLogger.Printf("error while read file: %v. Attempt: %d\n", err, attempt)
 			tracelog.ErrorLogger.PrintOnError(r.reader.Close())
 			r.reader = nil
 			continue

@@ -72,7 +72,7 @@ To configure block size into which backup stream split. Block length size data i
 To configure max file size before compressing. If partition size become more than max file size, it split on several files.
 Backup file names have a suffix `_0000_0000.bz`.
 
-* `WALG_BACKUP_DOWNLOAD_MAX_RETRY`
+* `WALG_BACKUP_DOWNLOAD_MAX_RETRIES`
 
 Configure max attempts to download backup file. Default value `1`.
 
