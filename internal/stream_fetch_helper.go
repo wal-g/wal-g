@@ -2,11 +2,11 @@ package internal
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 	"path"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 
 	"github.com/wal-g/tracelog"

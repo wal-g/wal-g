@@ -2,18 +2,19 @@ package internal
 
 import (
 	"bytes"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 
-	//"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/pkg/storages/fs"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/wal-g/wal-g/pkg/storages/fs"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (

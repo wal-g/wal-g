@@ -1,11 +1,11 @@
 package ioextensions
 
 import (
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"sync"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func NewUnexpectedEOFLimitReader(readCloser io.ReadCloser, maxRead int64) io.ReadCloser {
