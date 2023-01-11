@@ -6,7 +6,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -55,24 +54,10 @@ func (restoreService *RestoreService) DoRestore(restoreMongodVersion string) err
 		return err
 	}
 
-	needFixOplog := NeedFixOplog(restoreMongodVersion)
-
-	if err = restoreService.fixSystemData(sentinel, needFixOplog); err != nil {
-		return err
-	}
-
-	if needFixOplog {
-		if err = restoreService.recoverFromOplogAsStandalone(); err != nil {
-			return err
-		}
-	} else {
-		tracelog.InfoLogger.Printf("We are skipping recoverFromOplogAsStandalone because it is disabled")
-	}
-
-	return nil
+	return restoreService.fixSystemData()
 }
 
-func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup, needFixOplog bool) error {
+func (restoreService *RestoreService) fixSystemData() error {
 	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
@@ -83,29 +68,9 @@ func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup, nee
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	lastWriteTS := sentinel.MongoMeta.BackupLastTS
-	err = mongodService.FixSystemDataAfterRestore(lastWriteTS, needFixOplog)
+	err = mongodService.FixSystemDataAfterRestore()
 	if err != nil {
 		return err
-	}
-
-	err = mongodService.Shutdown()
-	if err != nil {
-		return err
-	}
-
-	return mongodProcess.Wait()
-}
-
-func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
-	mongodProcess, err := StartMongodWithRecoverFromOplogAsStandalone(restoreService.minimalConfigPath)
-	if err != nil {
-		return errors.Wrap(err, "unable to start mongod in special mode")
-	}
-
-	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
-	if err != nil {
-		return errors.Wrap(err, "unable to create mongod service")
 	}
 
 	err = mongodService.Shutdown()

@@ -27,16 +27,17 @@ type MongodService struct {
 func CreateMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
 	mongoClient, err := mongo.Connect(ctx,
 		options.Client().ApplyURI(mongodbURI).
+			SetConnectTimeout(10*time.Minute).
 			SetSocketTimeout(time.Minute).
 			SetAppName(appName).
 			SetDirect(true).
 			SetRetryReads(false))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unable to connect to mongod")
 	}
 	err = mongoClient.Ping(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "ping to mongod is failed")
 	}
 
 	return &MongodService{
@@ -134,41 +135,27 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupID *primitive.
 	})
 }
 
-func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primitive.Timestamp, fixOplog bool) error {
+func (mongodService *MongodService) FixSystemDataAfterRestore() error {
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
 	err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil)
 	if err != nil {
-		return err
-	}
-
-	err = replaceData(ctx, localDatabase.Collection("replset.minvalid"), true, bson.M{
-		"_id": primitive.NewObjectID(),
-		"t":   -1,
-		"ts":  primitive.Timestamp{T: 0, I: 1},
-	})
-	if err != nil {
-		return err
-	}
-
-	if fixOplog {
-		tracelog.DebugLogger.Printf("oplogTruncateAfterPoint: %v", LastWriteTS)
-		err = replaceData(ctx, localDatabase.Collection("replset.oplogTruncateAfterPoint"), true,
-			bson.M{
-				"_id":                     "oplogTruncateAfterPoint",
-				"oplogTruncateAfterPoint": LastWriteTS,
-			})
-		if err != nil {
-			return err
-		}
-	} else {
-		tracelog.InfoLogger.Printf("We are skipping fix replset.oplogTruncateAfterPoint because it is disabled")
+		return errors.Wrap(err, "unable to fix data in local.replset.election")
 	}
 
 	err = replaceData(ctx, localDatabase.Collection("system.replset"), false, nil)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to fix data in local.system.replset")
+	}
+
+	adminDatabase := mongodService.MongoClient.Database(adminDB)
+
+	_, err = adminDatabase.Collection("system.version").DeleteOne(ctx, bson.D{
+		{Key: "_id", Value: "shardIdentity"},
+	})
+	if err != nil {
+		return errors.Wrap(err, "unable to fix data in admin.system.version")
 	}
 
 	return nil
