@@ -120,7 +120,6 @@ type MongoCtl struct {
 	expPort    int
 	adminCreds AuthCreds
 	adminConn  *mongo.Client
-	binPath    string
 }
 
 type MongoCtlOpt func(*MongoCtl)
@@ -381,21 +380,7 @@ func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
 }
 
 func (mc *MongoCtl) runMongoShellEval(eval string, auth AuthPolicy, quiet bool, db string) (ExecResult, error) {
-	if mc.binPath == "" {
-		var err error
-		for _, binPath := range []string{"mongosh", "mongo"} {
-			_, err = mc.runCmd(binPath, "--version")
-			if err == nil {
-				mc.binPath = binPath
-				break
-			}
-		}
-		if err != nil {
-			return ExecResult{}, errors.New("unable to find mongo shell binary")
-		}
-	}
-
-	cmd := []string{mc.binPath, "--host", "localhost", "--port", "27018", "--norc"}
+	cmd := []string{"mongosh", "--host", "localhost", "--port", "27018", "--norc"}
 
 	if quiet {
 		cmd = append(cmd, "--quiet")
