@@ -24,6 +24,11 @@ func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) 
 	return StartMongo(minimalConfigPath, "disableLogicalSessionCacheRefresh=true")
 }
 
+func StartMongodWithRecoverFromOplogAsStandalone(minimalConfigPath string) (*MongodProcess, error) {
+	return StartMongo(minimalConfigPath,
+		"recoverFromOplogAsStandalone=true", "takeUnstableCheckpointOnShutdown=true")
+}
+
 func StartMongo(minimalConfigPath string, parameters ...string) (*MongodProcess, error) {
 	mongodProcess := &MongodProcess{
 		minimalConfigPath: minimalConfigPath,

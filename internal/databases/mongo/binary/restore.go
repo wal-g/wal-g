@@ -54,7 +54,14 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 		return err
 	}
 
-	return restoreService.fixSystemData()
+	if err = restoreService.fixSystemData(); err != nil {
+		return err
+	}
+	if err = restoreService.recoverFromOplogAsStandalone(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
@@ -76,6 +83,25 @@ func (restoreService *RestoreService) fixSystemData() error {
 	err = mongodService.FixSystemDataAfterRestore()
 	if err != nil {
 		return err
+	}
+
+	err = mongodService.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	return mongodProcess.Wait()
+}
+
+func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
+	mongodProcess, err := StartMongodWithRecoverFromOplogAsStandalone(restoreService.minimalConfigPath)
+	if err != nil {
+		return errors.Wrap(err, "unable to start mongod in special mode")
+	}
+
+	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
+	if err != nil {
+		return errors.Wrap(err, "unable to create mongod service")
 	}
 
 	err = mongodService.Shutdown()
