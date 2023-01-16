@@ -2,6 +2,9 @@ package mysql
 
 import (
 	"encoding/binary"
+	"net"
+	"path"
+
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/go-mysql-org/go-mysql/server"
@@ -9,8 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"net"
-	"path"
 )
 
 func prepareToSync(folder storage.Folder, pos *mysql.Position) error {
@@ -46,7 +47,6 @@ func addRotateEvent(s *replication.BinlogStreamer, pos *mysql.Position) error {
 	binlogEventPos += 2
 	// set data
 	binary.LittleEndian.PutUint64(rotateBinlogEvent.RawData[binlogEventPos:], uint64(pos.Pos))
-	binlogEventPos += 8
 	rotateBinlogEvent.RawData = append(rotateBinlogEvent.RawData, []byte(pos.Name)...)
 	return s.AddEventToStreamer(&rotateBinlogEvent)
 }

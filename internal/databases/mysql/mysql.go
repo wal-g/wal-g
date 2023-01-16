@@ -114,7 +114,7 @@ func getPositionBeforeGTID(folder storage.Folder, gtidSet gomysql.GTIDSet, flavo
 	var err error
 	pos.Name, err = getLastUploadedBinlogBeforeGTID(folder, gtidSet, flavor)
 	if err != nil {
-		return &gomysql.Position{"", 0}, err
+		return &gomysql.Position{}, err
 	}
 	pos.Pos = 4
 	return &pos, err
@@ -221,6 +221,9 @@ type binlogHandler interface {
 func fetchLogsByBinlogName(folder storage.Folder, dstDir string, binlogName string, handler binlogHandler) error {
 	if _, err := os.Stat(dstDir); err != nil {
 		err = os.MkdirAll(dstDir, 0700)
+		if err != nil {
+			return err
+		}
 	}
 	logFolder := folder.GetSubFolder(BinlogPath)
 	logsToFetch, err := getLogsAfterBinlog(logFolder, binlogName)
@@ -353,6 +356,9 @@ func getLogsAfterBinlog(folder storage.Folder, binlogName string) ([]storage.Obj
 		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
 	})
 	binlogNameID, err := strconv.Atoi(filepath.Ext(binlogName)[1:])
+	if err != nil {
+		return nil, fmt.Errorf("invaid binlog name %s: %v", binlogName, err)
+	}
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {
 		logFileName := strings.TrimSuffix(logFile.GetName(), filepath.Ext(logFile.GetName()))
