@@ -40,6 +40,9 @@ func NextMajorVersion(version string) string {
 	}
 
 	minorVersion := MajorMinorVersion(version)
+	//For MongoDB 4.4 and previous, MongoDB versioning used a Production / Development versioning scheme,
+	// and had the form X.Y.Z where X.Y refers to either a release series or development series.
+	// Starting with MongoDB 5.0, MongoDB is released as two different release series: Major and Rapid releases
 	if minorVersion == "v4.2" {
 		return "v4"
 	}
