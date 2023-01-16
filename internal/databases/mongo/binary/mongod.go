@@ -128,7 +128,7 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *Ba
 	})
 }
 
-func (mongodService *MongodService) FixSystemDataAfterRestore() error {
+func (mongodService *MongodService) FixSystemDataAfterRestore(rsMembers string) error {
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
@@ -137,9 +137,28 @@ func (mongodService *MongodService) FixSystemDataAfterRestore() error {
 		return errors.Wrap(err, "unable to fix data in local.replset.election")
 	}
 
-	err = replaceData(ctx, localDatabase.Collection("system.replset"), false, nil)
-	if err != nil {
-		return errors.Wrap(err, "unable to fix data in local.system.replset")
+	if rsMembers == "" {
+		err = replaceData(ctx, localDatabase.Collection("system.replset"), false, nil)
+		if err != nil {
+			return errors.Wrap(err, "unable to fix data in local.system.replset")
+		}
+	} else {
+		var rsConfig bson.M
+		err = localDatabase.Collection("system.replset").FindOne(ctx, bson.D{}).Decode(&rsConfig)
+		if err != nil {
+			return errors.Wrap(err, "unable to read rs config from system.replset")
+		}
+		rsConfig["members"] = makeBsonRsMembers(rsMembers)
+
+		updateResult, err := localDatabase.Collection("system.replset").
+			UpdateOne(ctx, bson.D{{Key: "_id", Value: rsConfig["_id"]}}, rsConfig)
+		if err != nil {
+			return errors.Wrap(err, "unable to update rs config in system.replset")
+		}
+		if updateResult.MatchedCount != 1 {
+			return errors.Errorf("MatchedCount = %v during update rs config in system.replset",
+				updateResult.MatchedCount)
+		}
 	}
 
 	adminDatabase := mongodService.MongoClient.Database(adminDB)
@@ -189,6 +208,18 @@ func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, i
 	}
 
 	return nil
+}
+
+func makeBsonRsMembers(rsMembers string) bson.A {
+	bsonMembers := bson.A{}
+
+	if rsMembers != "" {
+		for id, member := range strings.Split(rsMembers, ",") {
+			bsonMembers = append(bsonMembers, bson.M{"_id": id, "host": member})
+		}
+	}
+
+	return bsonMembers
 }
 
 func (mongodService *MongodService) Shutdown() error {
