@@ -5,9 +5,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/spf13/afero"
 	"os"
 	"path"
 	"path/filepath"
@@ -221,6 +219,9 @@ type binlogHandler interface {
 }
 
 func fetchLogsByBinlogName(folder storage.Folder, dstDir string, binlogName string, handler binlogHandler) error {
+	if _, err := os.Stat(dstDir); err != nil {
+		err = os.MkdirAll(dstDir, 0700)
+	}
 	logFolder := folder.GetSubFolder(BinlogPath)
 	logsToFetch, err := getLogsAfterBinlog(logFolder, binlogName)
 	if err != nil {
@@ -231,7 +232,7 @@ func fetchLogsByBinlogName(folder storage.Folder, dstDir string, binlogName stri
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
 		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
-			if errors.Is(err, afero.ErrFileExists) {
+			if os.IsExist(err) {
 				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
 				continue
 			}

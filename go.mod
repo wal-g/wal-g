@@ -16,12 +16,12 @@ require (
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
 	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/docker/docker v1.13.1
-	github.com/go-mysql-org/go-mysql v1.4.1-0.20220126055159-3566d1e608ea
+	github.com/go-mysql-org/go-mysql v1.6.1-0.20230116021724-c4a17aa5b49f
 	github.com/go-redis/redis v6.15.6+incompatible
-	github.com/go-sql-driver/mysql v1.5.0
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gofrs/flock v0.8.0
 	github.com/golang/mock v1.4.4
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.4
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jackc/pgconn v1.6.5-0.20200823013804-5db484908cf7
@@ -40,7 +40,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
-	github.com/stretchr/testify v1.7.1
+	github.com/stretchr/testify v1.8.0
 	github.com/ulikunitz/xz v0.5.8
 	github.com/wal-g/json v0.3.1
 	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
@@ -62,9 +62,8 @@ require (
 	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
-	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed
 	golang.org/x/mod v0.3.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -76,7 +75,6 @@ require (
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1 // indirect
-	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/Microsoft/go-winio v0.4.14 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -126,20 +124,17 @@ require (
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
-	github.com/pingcap/errors v0.11.5-0.20201126102027-b0a155152ca3 // indirect
-	github.com/pingcap/log v0.0.0-20210317133921-96f4fcab92a4 // indirect
-	github.com/pingcap/parser v0.0.0-20210415081931-48e7f467fd74 // indirect
+	github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 // indirect
 	github.com/pkg/browser v0.0.0-20210115035449-ce105d075bb4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/shopspring/decimal v0.0.0-20200227202807-02e2044944cc // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/siddontang/go-log v0.0.0-20180807004314-8d05993dda07 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.0 // indirect
-	github.com/stretchr/objx v0.2.0 // indirect
+	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/willf/bitset v1.1.10 // indirect
@@ -149,8 +144,6 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
 	go.opencensus.io v0.22.4 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
-	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c // indirect
@@ -162,6 +155,5 @@ require (
 	google.golang.org/genproto v0.0.0-20200825200019-8632dd797987 // indirect
 	google.golang.org/grpc v1.31.0 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
