@@ -8,7 +8,9 @@ import (
 
 func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*)$`, tctx.createMongoBinaryBackup)
-	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]*)`, tctx.restoreMongoBinaryBackup)
+	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]*)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
+	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]*) as initialized`,
+		tctx.restoreMongoBinaryBackupAsInitialized)
 }
 
 func (tctx *TestContext) createMongoBinaryBackup(container string) error {
@@ -29,7 +31,15 @@ func (tctx *TestContext) createMongoBinaryBackup(container string) error {
 	return nil
 }
 
-func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container string) error {
+func (tctx *TestContext) restoreMongoBinaryBackupAsNonInitialized(backupNumber int, container string) error {
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, false)
+}
+
+func (tctx *TestContext) restoreMongoBinaryBackupAsInitialized(backupNumber int, container string) error {
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, true)
+}
+
+func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container string, initialized bool) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 
 	backup, err := walg.GetBackupByNumber(backupNumber)
@@ -57,7 +67,11 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		return err
 	}
 
-	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion)
+	rsMembers := ""
+	if initialized {
+		rsMembers = container
+	}
+	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsMembers)
 	if err != nil {
 		return err
 	}
@@ -70,5 +84,11 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		return err
 	}
 
-	return tctx.initiateReplSet(container)
+	if !initialized {
+		if err := tctx.initiateReplSet(container); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

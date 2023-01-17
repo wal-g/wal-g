@@ -163,8 +163,12 @@ func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
 	return err
 }
 
-func (w *WalgUtil) FetchBinaryBackup(backup, mongodConfigPath, mongodbVersion string) error {
-	_, err := w.runCmd("binary-backup-fetch", backup, mongodConfigPath, mongodbVersion)
+func (w *WalgUtil) FetchBinaryBackup(backup, mongodConfigPath, mongodbVersion, rsMembers string) error {
+	cli := []string{"binary-backup-fetch", backup, mongodConfigPath, mongodbVersion}
+	if rsMembers != "" {
+		cli = append(cli, "--mongo-rs-members", rsMembers)
+	}
+	_, err := w.runCmd(cli...)
 	return err
 }
 
