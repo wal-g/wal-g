@@ -54,7 +54,7 @@ Feature: MongoDB binary backups
     # Restore initialized
     Given mongodb02 has no data
     And mongodb initialized on mongodb02
-    When we restore binary mongo-backup #1 to mongodb02 as initialized
+    When we restore initialized binary mongo-backup #1 to mongodb02
     Then we got same mongodb data at mongodb01 mongodb02
 
     # Fifth backup was done successfully
