@@ -22,6 +22,8 @@ const (
 	LocalDB   = "local"
 	OplogColl = "oplog.rs"
 	AdminDB   = "admin"
+
+	MongodPort = 27018
 )
 
 type DatabaseRecord struct {
@@ -126,7 +128,7 @@ func NewMongoCtl(ctx context.Context, host string, setters ...MongoCtlOpt) (*Mon
 	mc := &MongoCtl{
 		ctx:  ctx,
 		host: host,
-		port: 27018,
+		port: MongodPort,
 	}
 	for _, setter := range setters {
 		setter(mc)
@@ -139,6 +141,10 @@ func NewMongoCtl(ctx context.Context, host string, setters ...MongoCtlOpt) (*Mon
 	mc.expPort = expPort
 
 	return mc, nil
+}
+
+func (mc *MongoCtl) GetMongodPort() int {
+	return mc.port
 }
 
 func (mc *MongoCtl) Connect(creds *AuthCreds) (*mongo.Client, error) {

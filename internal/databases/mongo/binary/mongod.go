@@ -128,30 +128,62 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *Ba
 	})
 }
 
-func (mongodService *MongodService) FixSystemDataAfterRestore(rsMembers string) error {
+func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig) error {
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
-	err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil)
-	if err != nil {
+	if err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil); err != nil {
 		return errors.Wrap(err, "unable to fix data in local.replset.election")
 	}
 
-	if rsMembers == "" {
-		err = replaceData(ctx, localDatabase.Collection("system.replset"), false, nil)
-		if err != nil {
+	if rsConfig.Empty() {
+		if err := replaceData(ctx, localDatabase.Collection("system.replset"), false, nil); err != nil {
 			return errors.Wrap(err, "unable to fix data in local.system.replset")
 		}
 	} else {
-		var rsConfig bson.M
-		err = localDatabase.Collection("system.replset").FindOne(ctx, bson.D{}).Decode(&rsConfig)
-		if err != nil {
-			return errors.Wrap(err, "unable to read rs config from system.replset")
+		if err := updateRsConfig(ctx, localDatabase, rsConfig); err != nil {
+			return err
 		}
-		rsConfig["members"] = makeBsonRsMembers(rsMembers)
+	}
 
+	adminDatabase := mongodService.MongoClient.Database(adminDB)
+
+	_, err := adminDatabase.Collection("system.version").DeleteOne(ctx, bson.D{
+		{Key: "_id", Value: "shardIdentity"},
+	})
+	if err != nil {
+		return errors.Wrap(err, "unable to fix data in admin.system.version")
+	}
+
+	return nil
+}
+
+func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig RsConfig) error {
+	var systemRsConfig bson.M
+	err := localDatabase.Collection("system.replset").FindOne(ctx, bson.D{}).Decode(&systemRsConfig)
+	if err != nil {
+		return errors.Wrap(err, "unable to read rs config from system.replset")
+	}
+
+	systemRsConfig["members"] = makeBsonRsMembers(rsConfig.RsMembers)
+
+	if systemRsConfig["_id"] != rsConfig.RsName {
+		systemRsConfig["_id"] = rsConfig.RsName
+		_, err = localDatabase.Collection("system.replset").InsertOne(ctx, systemRsConfig)
+		if err != nil {
+			return errors.Wrap(err, "unable to insert updated rs config to system.replset")
+		}
+		deleteResult, err := localDatabase.Collection("system.replset").
+			DeleteMany(ctx, bson.D{{Key: "_id", Value: bson.D{{Key: "$ne", Value: rsConfig.RsName}}}})
+		if err != nil {
+			return errors.Wrap(err, "unable to delete other documents to system.replset")
+		}
+		tracelog.DebugLogger.Printf("Removed %d documents from system.replset", deleteResult.DeletedCount)
+	} else {
 		updateResult, err := localDatabase.Collection("system.replset").
-			UpdateOne(ctx, bson.D{{Key: "_id", Value: rsConfig["_id"]}}, rsConfig)
+			UpdateMany(ctx,
+				bson.D{{Key: "_id", Value: systemRsConfig["_id"]}},
+				bson.D{{Key: "$set", Value: systemRsConfig}})
 		if err != nil {
 			return errors.Wrap(err, "unable to update rs config in system.replset")
 		}
@@ -159,15 +191,7 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsMembers string) 
 			return errors.Errorf("MatchedCount = %v during update rs config in system.replset",
 				updateResult.MatchedCount)
 		}
-	}
-
-	adminDatabase := mongodService.MongoClient.Database(adminDB)
-
-	_, err = adminDatabase.Collection("system.version").DeleteOne(ctx, bson.D{
-		{Key: "_id", Value: "shardIdentity"},
-	})
-	if err != nil {
-		return errors.Wrap(err, "unable to fix data in admin.system.version")
+		tracelog.InfoLogger.Printf("Updated %d documents in system.replset", updateResult.MatchedCount)
 	}
 
 	return nil
@@ -251,4 +275,20 @@ type BackupCursorMeta struct {
 type BackupCursorFile struct {
 	FileName string `bson:"filename" json:"filename"`
 	FileSize int64  `bson:"fileSize" json:"fileSize"`
+}
+
+type RsConfig struct {
+	RsName    string
+	RsMembers string
+}
+
+func (rsConfig RsConfig) Empty() bool {
+	return rsConfig.RsName == "" && rsConfig.RsMembers == ""
+}
+
+func (rsConfig RsConfig) Validate() error {
+	if rsConfig.RsName == "" && rsConfig.RsMembers != "" || rsConfig.RsName != "" && rsConfig.RsMembers == "" {
+		return errors.Errorf("rsConfig should be all empty or full populated, but rsConfig = %+v", rsConfig)
+	}
+	return nil
 }

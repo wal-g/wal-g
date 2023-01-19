@@ -1,6 +1,8 @@
 package functests
 
 import (
+	"fmt"
+
 	"github.com/cucumber/godog"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
@@ -8,8 +10,8 @@ import (
 
 func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*)$`, tctx.createMongoBinaryBackup)
-	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]*)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
-	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]*) as initialized`,
+	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
+	ctx.Step(`^we restore initialized binary mongo-backup #(\d+) to ([^\s]+)`,
 		tctx.restoreMongoBinaryBackupAsInitialized)
 }
 
@@ -67,11 +69,13 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		return err
 	}
 
+	rsName := ""
 	rsMembers := ""
 	if initialized {
-		rsMembers = container
+		rsName = container
+		rsMembers = fmt.Sprintf("%s:%d", container, mc.GetMongodPort())
 	}
-	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsMembers)
+	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsName, rsMembers)
 	if err != nil {
 		return err
 	}
@@ -88,6 +92,8 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		if err := tctx.initiateReplSet(container); err != nil {
 			return err
 		}
+	} else {
+		tracelog.DebugLogger.Println("Skip initiateReplSet")
 	}
 
 	return nil

@@ -27,7 +27,7 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 	}, nil
 }
 
-func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion, rsMembers string) error {
+func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion string, rsConfig RsConfig) error {
 	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), backupName)
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 		return err
 	}
 
-	if err = restoreService.fixSystemData(rsMembers); err != nil {
+	if err = restoreService.fixSystemData(rsConfig); err != nil {
 		return err
 	}
 	if err = restoreService.recoverFromOplogAsStandalone(); err != nil {
@@ -69,7 +69,7 @@ func (restoreService *RestoreService) downloadFromTarArchives(backupName string)
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
 }
 
-func (restoreService *RestoreService) fixSystemData(rsMembers string) error {
+func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig) error {
 	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
@@ -80,7 +80,7 @@ func (restoreService *RestoreService) fixSystemData(rsMembers string) error {
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	err = mongodService.FixSystemDataAfterRestore(rsMembers)
+	err = mongodService.FixSystemDataAfterRestore(rsConfig)
 	if err != nil {
 		return err
 	}
