@@ -90,7 +90,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 		}
 		return tarInterpreter.unwrapRegularFileOld(fileReader, fileInfo, targetPath, fsync)
 	case tar.TypeDir:
-		err := os.MkdirAll(targetPath, 0755)
+		err := os.MkdirAll(targetPath, 0750)
 		if err != nil {
 			return errors.Wrapf(err, "Interpret: failed to create all directories in %s", targetPath)
 		}
@@ -116,6 +116,6 @@ func PrepareDirs(fileName string, targetPath string) error {
 	}
 	base := filepath.Base(fileName)
 	dir := strings.TrimSuffix(targetPath, base)
-	err := os.MkdirAll(dir, 0755)
+	err := os.MkdirAll(dir, 0750)
 	return err
 }
