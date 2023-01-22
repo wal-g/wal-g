@@ -4,13 +4,18 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/utility"
+	"time"
 
 	"github.com/spf13/cobra"
 )
 
 const (
-	binlogServerShortDescription = "Create server for backup slaves"
+	binlogServerShortDescription  = "Create server for backup slaves"
+	giveEventsUntilFlagShortDescr = "time in RFC3339 for PITR"
 )
+
+var giveEventsUntilTS string
 
 var (
 	binlogServerCmd = &cobra.Command{
@@ -26,11 +31,15 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			mysql.HandleBinlogServer()
+			mysql.HandleBinlogServer(giveEventsUntilTS)
 		},
 	}
 )
 
 func init() {
+	binlogServerCmd.PersistentFlags().StringVar(&giveEventsUntilTS,
+		"until",
+		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
+		giveEventsUntilFlagShortDescr)
 	cmd.AddCommand(binlogServerCmd)
 }

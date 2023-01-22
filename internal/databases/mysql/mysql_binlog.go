@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -148,6 +149,22 @@ func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) 
 		return time.Time{}, fmt.Errorf("failed to parse binlog %s: %w", filename, err)
 	}
 	return time.Unix(int64(ts), 0), nil
+}
+
+func GetBinlogTS(folder storage.Folder, binlogName string) (time.Time, error) {
+	logFolder := folder.GetSubFolder(BinlogPath)
+	logFiles, _, err := logFolder.ListFolder()
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	for _, logFile := range logFiles {
+		logFileName := strings.TrimSuffix(logFile.GetName(), filepath.Ext(logFile.GetName()))
+		if logFileName == binlogName {
+			return logFile.GetLastModified(), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("binlog %s not found", binlogName)
 }
 
 /*

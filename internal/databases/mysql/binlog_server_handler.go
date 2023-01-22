@@ -1,9 +1,15 @@
 package mysql
 
 import (
+	"bytes"
 	"encoding/binary"
+	"errors"
+	"github.com/google/uuid"
 	"net"
 	"path"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
@@ -14,22 +20,13 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func prepareToSync(folder storage.Folder, pos *mysql.Position) error {
-	// download necessary binlog files
-	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
-	if err != nil {
-		return err
-	}
-	handler := newIndexHandler(dstDir)
-	err = fetchLogsByBinlogName(folder, dstDir, pos.Name, handler)
-	if err != nil {
-		return err
-	}
-	err = handler.createIndexFile()
-	return err
-}
+var (
+	untilTS      time.Time
+	lastSentGTID string
+)
 
-func addRotateEvent(s *replication.BinlogStreamer, pos *mysql.Position) error {
+func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
+	// create rotate event
 	rotateBinlogEvent := replication.BinlogEvent{}
 	rotateBinlogEvent.RawData = make([]byte, 4+1+4+4+4+2+8)
 	// generate header
@@ -48,11 +45,30 @@ func addRotateEvent(s *replication.BinlogStreamer, pos *mysql.Position) error {
 	// set data
 	binary.LittleEndian.PutUint64(rotateBinlogEvent.RawData[binlogEventPos:], uint64(pos.Pos))
 	rotateBinlogEvent.RawData = append(rotateBinlogEvent.RawData, []byte(pos.Name)...)
+
 	return s.AddEventToStreamer(&rotateBinlogEvent)
 }
 
-func startSync(folder storage.Folder, pos *mysql.Position, s *replication.BinlogStreamer) {
-	// we should add rotate event to streamer, because replication protocol requires it
+func waitReplicationIsDone() error {
+	for {
+		cmd, err := internal.GetCommandSetting(internal.MysqlBinlogGetExecutedGTIDCmd)
+		if err != nil {
+			return err
+		}
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Run()
+		executedGTIDSet := out.String()
+		if strings.Contains(executedGTIDSet, lastSentGTID) {
+			tracelog.InfoLogger.Println("Replication is done")
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
+func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mysql.Position, s *replication.BinlogStreamer) {
 	err := addRotateEvent(s, pos)
 	if err != nil {
 		ok := s.AddErrorToStreamer(err)
@@ -64,23 +80,39 @@ func startSync(folder storage.Folder, pos *mysql.Position, s *replication.Binlog
 	p := replication.NewBinlogParser()
 
 	f := func(e *replication.BinlogEvent) error {
+		if int64(e.Header.Timestamp) > untilTS.Unix() {
+			return nil
+		}
+		if e.Header.EventType == replication.GTID_EVENT {
+			u, _ := uuid.FromBytes(e.Event.(*replication.GTIDEvent).SID)
+			lastSentGTID = u.String() + ":1-" + strconv.Itoa(int(e.Event.(*replication.GTIDEvent).GNO))
+		}
 		err := s.AddEventToStreamer(e)
 		return err
 	}
-	logFolder := folder.GetSubFolder(BinlogPath)
-	logFiles, err := getLogsAfterBinlog(logFolder, pos.Name)
-	if err != nil {
-		ok := s.AddErrorToStreamer(err)
-		for !ok {
-			ok = s.AddErrorToStreamer(err)
-		}
-	}
 	dstDir, _ := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
-	for _, logFile := range logFiles {
+
+	for {
+		logFile, err := logFilesProvider.GetObject()
+		if errors.Is(err, storage.ErrNoMoreObjects) {
+			err := waitReplicationIsDone()
+			if err != nil {
+				tracelog.InfoLogger.Println("Error while waiting replication is done: ", err)
+			}
+			break
+		}
+		if err != nil {
+			ok := s.AddErrorToStreamer(err)
+			for !ok {
+				ok = s.AddErrorToStreamer(err)
+			}
+			tracelog.WarningLogger.Println("Error while getting binlog file: ", err)
+			break
+		}
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		tracelog.InfoLogger.Printf("Synced binlog file %s", binlogName)
 		binlogPath := path.Join(dstDir, binlogName)
-		err := p.ParseFile(binlogPath, int64(pos.Pos), f)
+		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
 
 		if err != nil {
 			ok := s.AddErrorToStreamer(err)
@@ -90,7 +122,29 @@ func startSync(folder storage.Folder, pos *mysql.Position, s *replication.Binlog
 		}
 		pos.Pos = 4
 	}
-	tracelog.InfoLogger.Println("Binlog sync finished")
+}
+
+func syncBinlogFiles(pos mysql.Position, s *replication.BinlogStreamer) error {
+	// get necessary settings
+	folder, err := internal.ConfigureFolder()
+	if err != nil {
+		return err
+	}
+	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	if err != nil {
+		return err
+	}
+	startTS, err := GetBinlogTS(folder, pos.Name)
+	if err != nil {
+		return err
+	}
+	logFilesProvider := storage.NewObjectProvider()
+
+	// start sync
+	go sendEventsFromBinlogFiles(logFilesProvider, pos, s)
+	go provideLogs(folder, dstDir, startTS, untilTS, logFilesProvider)
+
+	return nil
 }
 
 type Handler struct {
@@ -103,13 +157,9 @@ func (h Handler) HandleRegisterSlave(data []byte) error {
 
 func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	s := replication.NewBinlogStreamer()
-	folder, _ := internal.ConfigureFolder()
-	err := prepareToSync(folder, &pos)
-	if err != nil {
-		return nil, err
-	}
-	go startSync(folder, &pos, s)
-	return s, nil
+
+	err := syncBinlogFiles(pos, s)
+	return s, err
 }
 
 func (h Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
@@ -121,12 +171,8 @@ func (h Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication
 		return nil, err
 	}
 
-	err = prepareToSync(folder, pos)
-	if err != nil {
-		return nil, err
-	}
-	go startSync(folder, pos, s)
-	return s, nil
+	err = syncBinlogFiles(pos, s)
+	return s, err
 }
 
 func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
@@ -154,7 +200,11 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 }
 
-func HandleBinlogServer() {
+func HandleBinlogServer(sendEventsUntilTS string) {
+	var err error
+	untilTS, err = utility.ParseUntilTS(sendEventsUntilTS)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	tracelog.InfoLogger.Printf("Starting binlog server")
 
 	serverAddress, err := internal.GetRequiredSetting(internal.MysqlBinlogServerHost)
@@ -179,6 +229,7 @@ func HandleBinlogServer() {
 
 	for {
 		if err := conn.HandleCommand(); err != nil {
+			tracelog.WarningLogger.Printf("Error handling command: %v", err)
 			break
 		}
 	}
