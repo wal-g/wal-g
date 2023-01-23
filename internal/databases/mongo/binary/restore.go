@@ -33,7 +33,7 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 		return err
 	}
 
-	err = EnsureCompatibilityToRestoreMongodVersions(restoreMongodVersion, sentinel.MongoMeta.Version)
+	err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, restoreMongodVersion)
 	if err != nil {
 		return err
 	}
