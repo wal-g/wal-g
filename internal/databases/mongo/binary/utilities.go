@@ -57,10 +57,10 @@ func EnsureCompatibilityToRestoreMongodVersions(backupMongodVersion, restoreMong
 	tracelog.InfoLogger.Printf("Check compatibility backup version %v and current mongod version %v",
 		backupMongodVersion, restoreMongodVersion)
 
-	var nextMajorBackup = NextMajorVersion(restoreMongodVersion)
+	var nextMajorBackup = NextMajorVersion(backupMongodVersion)
 
 	if semver.Compare(MajorMinorVersion(backupMongodVersion), MajorMinorVersion(restoreMongodVersion)) != 0 &&
-		semver.Compare(MajorVersion(backupMongodVersion), nextMajorBackup) != 0 {
+		semver.Compare(MajorVersion(restoreMongodVersion), nextMajorBackup) != 0 {
 		return errors.Errorf("Backup's Mongo version (%s) is not compatible with Mongo %s",
 			backupMongodVersion, restoreMongodVersion)
 	}
