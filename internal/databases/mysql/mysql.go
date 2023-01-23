@@ -261,7 +261,7 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 		err = os.MkdirAll(dstDir, 0700)
 		if err != nil {
 			ok := p.AddErrorToProvider(err)
-			if !ok {
+			for !ok {
 				ok = p.AddErrorToProvider(err)
 			}
 			return
@@ -280,7 +280,6 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 
 	for _, logFile := range logsToFetch {
 		// download log files
-		startTS = logFile.GetLastModified()
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)

@@ -57,7 +57,10 @@ func waitReplicationIsDone() error {
 		}
 		var out bytes.Buffer
 		cmd.Stdout = &out
-		cmd.Run()
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
 		executedGTIDSet := out.String()
 		if strings.Contains(executedGTIDSet, lastSentGTID) {
 			tracelog.InfoLogger.Println("Replication is done")
