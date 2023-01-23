@@ -25,6 +25,13 @@ type Logging struct {
 	ErrorLogger ErrorLogger
 }
 
+// BackupTimeWithMetadata is used to sort backups by
+// latest modified time or creation time.
+type BackupTimeWithMetadata struct {
+	BackupTime
+	GenericMetadata
+}
+
 func DefaultHandleBackupList(folder storage.Folder, metaFetcher GenericMetaFetcher, pretty, json bool) {
 	getBackupsFunc := func() ([]BackupTime, error) {
 		backupsWithMeta, err := GetBackupsWithMetadata(folder, metaFetcher)
