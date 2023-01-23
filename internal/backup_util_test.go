@@ -158,49 +158,6 @@ func TestSortBackupTimeWithMetadataSlices_ByCreationTimeWhenCreationTimeIsNotDef
 	assert.Equal(t, expectedBackups, backups)
 }
 
-func TestSortBackupTimeWithMetadataSlices_ByModificationTimeWhenCreationTimeIsDefault(t *testing.T) {
-	backups := []internal.BackupTimeWithMetadata{
-		{
-			BackupTime: internal.BackupTime{
-				BackupName:  "fBackup",
-				Time:        time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC),
-				WalFileName: "fWalFileName",
-			},
-			GenericMetadata: internal.GenericMetadata{},
-		},
-		{
-			BackupTime: internal.BackupTime{
-				BackupName:  "sBackup",
-				Time:        time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC),
-				WalFileName: "sWalFileName",
-			},
-			GenericMetadata: internal.GenericMetadata{},
-		},
-	}
-
-	expectedBackups := []internal.BackupTimeWithMetadata{
-		{
-			BackupTime: internal.BackupTime{
-				BackupName:  "fBackup",
-				Time:        time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC),
-				WalFileName: "fWalFileName",
-			},
-			GenericMetadata: internal.GenericMetadata{},
-		},
-		{
-			BackupTime: internal.BackupTime{
-				BackupName:  "sBackup",
-				Time:        time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC),
-				WalFileName: "sWalFileName",
-			},
-			GenericMetadata: internal.GenericMetadata{},
-		},
-	}
-
-	internal.SortBackupTimeWithMetadataSlices(backups)
-	assert.Equal(t, expectedBackups, backups)
-}
-
 func TestGetBackupsWithMetadata(t *testing.T) {
 	fBackup := internal.BackupTime{
 		BackupName:  "fSentinelBackup",
@@ -212,7 +169,7 @@ func TestGetBackupsWithMetadata(t *testing.T) {
 	}
 
 	metadata := map[string]internal.GenericMetadata{
-		fBackup.BackupName: {StartTime: time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC)},
+		fBackup.BackupName: {StartTime: time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC)},
 		sBackup.BackupName: {StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC)},
 	}
 

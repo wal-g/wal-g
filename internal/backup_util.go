@@ -13,13 +13,6 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type BackupTimeSlicesOrder int
-
-const (
-	ByCreationTime BackupTimeSlicesOrder = iota
-	ByModificationTime
-)
-
 type NoBackupsFoundError struct {
 	error
 }
@@ -141,24 +134,9 @@ func SortBackupTimeSlices(backupTimes []BackupTime) {
 }
 
 func SortBackupTimeWithMetadataSlices(backupTimes []BackupTimeWithMetadata) {
-	order := ByCreationTime
-
-	for i := 0; i < len(backupTimes); i++ {
-		if (backupTimes[i].StartTime == time.Time{}) {
-			order = ByModificationTime
-			break
-		}
-	}
-
-	if order == ByCreationTime {
-		sort.Slice(backupTimes, func(i, j int) bool {
-			return backupTimes[i].StartTime.Before(backupTimes[j].StartTime)
-		})
-	} else {
-		sort.Slice(backupTimes, func(i, j int) bool {
-			return backupTimes[i].Time.Before(backupTimes[j].Time)
-		})
-	}
+	sort.Slice(backupTimes, func(i, j int) bool {
+		return backupTimes[i].StartTime.Before(backupTimes[j].StartTime)
+	})
 }
 
 func GetGarbageFromPrefix(folders []storage.Folder, nonGarbage []BackupTime) []string {
