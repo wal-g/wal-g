@@ -94,7 +94,6 @@ func NewFetchHandler(
 	}
 }
 
-// TODO: Unit tests
 // prepareContentIDsToFetch returns a set containing the IDs of segments to be fetched
 func prepareContentIDsToFetch(fetchContentIds []int, segmentConfigs []cluster.SegConfig) map[int]bool {
 	contentIDsToFetch := make(map[int]bool)
