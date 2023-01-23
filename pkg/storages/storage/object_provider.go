@@ -30,6 +30,10 @@ func (p *ObjectProvider) GetObject() (Object, error) {
 		}
 		return o, nil
 	case p.err = <-p.ech:
+		// if chanel is closed, p.err will be nil
+		if p.err == nil {
+			return p.GetObject()
+		}
 		return nil, p.err
 	}
 }
