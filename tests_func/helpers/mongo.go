@@ -98,6 +98,14 @@ type AuthCreds struct {
 	Database string
 }
 
+type AuthPolicy int64
+
+const (
+	NoneAuth AuthPolicy = iota
+	AdminAuth
+	AutoDetectAuth
+)
+
 func AdminCredsFromEnv(env map[string]string) AuthCreds {
 	return AuthCreds{
 		Username: env["MONGO_ADMIN_USERNAME"],
@@ -377,6 +385,34 @@ func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
 	return OpTimestamp{TS: ts.T, Inc: ts.I}, nil
 }
 
+func (mc *MongoCtl) runMongoShellEval(eval string, auth AuthPolicy, quiet bool, db string) (ExecResult, error) {
+	cmd := []string{"mongosh", "--host", "localhost", "--port", "27018", "--norc"}
+
+	if quiet {
+		cmd = append(cmd, "--quiet")
+	}
+
+	adminCredCliParams := []string{"--username", mc.adminCreds.Username, "--password", mc.adminCreds.Password}
+
+	switch {
+	case auth == AdminAuth:
+		cmd = append(cmd, adminCredCliParams...)
+	case auth == AutoDetectAuth:
+		authedCmd := append(cmd, adminCredCliParams...)
+		if _, err := mc.runCmd(append(authedCmd, "--eval", "quit()", AdminDB)...); err == nil {
+			cmd = authedCmd
+		}
+	}
+
+	cmd = append(cmd, "--eval", eval)
+
+	if db != "" {
+		cmd = append(cmd, db)
+	}
+
+	return mc.runCmd(cmd...)
+}
+
 func (mc *MongoCtl) InitReplSet() error {
 	im, err := mc.runIsMaster()
 	if err != nil {
@@ -385,12 +421,7 @@ func (mc *MongoCtl) InitReplSet() error {
 	if im.SetName != "" {
 		return nil
 	}
-	cli := []string{"mongo", "--host", "localhost", "--port", "27018", "--norc"}
-	authedCli := append(cli, "--username", mc.adminCreds.Username, "--password", mc.adminCreds.Password)
-	if _, err := mc.runCmd(append(authedCli, "--eval", "quit()", AdminDB)...); err == nil {
-		cli = authedCli
-	}
-	_, err = mc.runCmd(append(cli, "--eval", "rs.initiate()")...)
+	_, err = mc.runMongoShellEval("rs.initiate()", AutoDetectAuth, false, "")
 	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
 
 	return err
@@ -399,7 +430,7 @@ func (mc *MongoCtl) InitReplSet() error {
 func (mc *MongoCtl) GetVersion() (version string, err error) {
 	for attempt := 0; attempt < 5; attempt++ {
 		var result ExecResult
-		result, err = mc.runCmd("mongo", "--host", "localhost", "--quiet", "--port", "27018", "--eval", "db.version()")
+		result, err = mc.runMongoShellEval("db.version()", NoneAuth, true, "")
 		if err != nil {
 			continue
 		}
@@ -436,12 +467,11 @@ func (mc *MongoCtl) GetConfigPath() (string, error) {
 }
 
 func (mc *MongoCtl) EnableAuth() error {
-	cmd := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018",
-		"--eval", fmt.Sprintf("db.createUser({user: '%s', pwd: '%s', roles: ['root']})",
-			mc.adminCreds.Username,
-			mc.adminCreds.Password,
-		), AdminDB}
-	response, err := RunCommand(mc.ctx, mc.host, cmd)
+	eval := fmt.Sprintf("db.createUser({user: '%s', pwd: '%s', roles: ['root']})",
+		mc.adminCreds.Username,
+		mc.adminCreds.Password,
+	)
+	response, err := mc.runMongoShellEval(eval, NoneAuth, true, AdminDB)
 	if err != nil {
 		return err
 	}
@@ -450,10 +480,6 @@ func (mc *MongoCtl) EnableAuth() error {
 		strings.Contains(response.Combined(), "couldn't add user: not authorized on admin to execute command") ||
 		strings.Contains(response.Combined(), "there are no users authenticated") {
 		return nil
-	}
-	if !strings.Contains(response.Combined(), "Successfully added user") {
-		tracelog.ErrorLogger.Printf("can not create admin user: %s", response.Combined())
-		return fmt.Errorf("can not initialize auth")
 	}
 
 	conn, err := mc.AdminConnect()
