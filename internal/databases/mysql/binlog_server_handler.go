@@ -1,13 +1,11 @@
 package mysql
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"net"
 	"path"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -25,10 +23,23 @@ var (
 	lastSentGTID string
 )
 
+func HandleEventError(err error, s *replication.BinlogStreamer) {
+	if err == nil {
+		return
+	}
+	tracelog.ErrorLogger.Println("Error during replication", err)
+	ok := s.AddErrorToStreamer(err)
+	for !ok {
+		ok = s.AddErrorToStreamer(err)
+	}
+}
+
 func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	// create rotate event
 	rotateBinlogEvent := replication.BinlogEvent{}
-	rotateBinlogEvent.RawData = make([]byte, 4+1+4+4+4+2+8)
+
+	// 8 bytes for position
+	rotateBinlogEvent.RawData = make([]byte, replication.EventHeaderSize+8, replication.EventHeaderSize+8+len(pos.Name))
 	// generate header
 	// timestamp default 4 bytes
 	binlogEventPos := 4
@@ -36,7 +47,7 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	binlogEventPos++
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], 10000)
 	binlogEventPos += 4
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(4+1+4+4+4+2+8+len(pos.Name)))
+	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(replication.EventHeaderSize+8+len(pos.Name)))
 	binlogEventPos += 4
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], 0)
 	binlogEventPos += 4
@@ -50,19 +61,23 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 }
 
 func waitReplicationIsDone() error {
+	db, err := getMySQLConnection()
+	if err != nil {
+		return err
+	}
 	for {
-		cmd, err := internal.GetCommandSetting(internal.MysqlBinlogGetExecutedGTIDCmd)
+		// get executed GTID set from replica
+		gtidSet, err := getMySQLGTIDExecuted(db, "mysql")
 		if err != nil {
 			return err
 		}
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		err = cmd.Run()
+
+		lastSentGTIDSet, err := mysql.ParseGTIDSet("mysql", lastSentGTID)
 		if err != nil {
 			return err
 		}
-		executedGTIDSet := out.String()
-		if strings.Contains(executedGTIDSet, lastSentGTID) {
+
+		if gtidSet.Contain(lastSentGTIDSet) {
 			tracelog.InfoLogger.Println("Replication is done")
 			break
 		}
@@ -73,12 +88,7 @@ func waitReplicationIsDone() error {
 
 func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mysql.Position, s *replication.BinlogStreamer) {
 	err := addRotateEvent(s, pos)
-	if err != nil {
-		ok := s.AddErrorToStreamer(err)
-		for !ok {
-			ok = s.AddErrorToStreamer(err)
-		}
-	}
+	HandleEventError(err, s)
 
 	p := replication.NewBinlogParser()
 
@@ -104,12 +114,8 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			}
 			break
 		}
+		HandleEventError(err, s)
 		if err != nil {
-			ok := s.AddErrorToStreamer(err)
-			for !ok {
-				ok = s.AddErrorToStreamer(err)
-			}
-			tracelog.WarningLogger.Println("Error while getting binlog file: ", err)
 			break
 		}
 		binlogName := utility.TrimFileExtension(logFile.GetName())
@@ -117,12 +123,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		binlogPath := path.Join(dstDir, binlogName)
 		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
 
-		if err != nil {
-			ok := s.AddErrorToStreamer(err)
-			for !ok {
-				ok = s.AddErrorToStreamer(err)
-			}
-		}
+		HandleEventError(err, s)
 		pos.Pos = 4
 	}
 }
@@ -187,7 +188,10 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"NONE"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "SELECT @@GLOBAL.SERVER_ID":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{"10000"}})
+		serverID, err := internal.GetRequiredSetting(internal.MysqlBinlogServerID)
+		tracelog.ErrorLogger.FatalOnError(err)
+		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{serverID}})
+		tracelog.ErrorLogger.FatalOnError(err)
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "SELECT @source_binlog_checksum":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"source_binlog_checksum"}, [][]interface{}{{"1"}})
@@ -196,7 +200,9 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"GTID_MODE"}, [][]interface{}{{"ON"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "SELECT @@GLOBAL.SERVER_UUID":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_UUID"}, [][]interface{}{{"123"}})
+		// the server uuid received by the query does not affect replication.
+		// during replication, the uuid is taken from events
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_UUID"}, [][]interface{}{{"0"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	default:
 		return nil, nil

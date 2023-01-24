@@ -46,7 +46,11 @@ If base and binlogs backups are taken from the same host, this variable should b
 * `WALG_MYSQL_BINLOG_SERVER_USER`
 * `WALG_MYSQL_BINLOG_SERVER_PASSWORD`
 
-To configure the data to connect the slave to the binlog server.
+To configure the data to connect the replica to the binlog server.
+
+* `WALG_MYSQL_BINLOG_SERVER_ID`
+
+To configure the server id of the binlog server. Should be unique for each replica.
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 

@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	binlogServerShortDescription  = "Create server for backup slaves"
-	giveEventsUntilFlagShortDescr = "time in RFC3339 for PITR"
+	binlogServerShortDescription = "Create server for backup slaves"
+	UntilFlagShortDescr          = "time in RFC3339 for PITR"
 )
 
-var giveEventsUntilTS string
+var UntilTS string
 
 var (
 	binlogServerCmd = &cobra.Command{
@@ -27,19 +27,20 @@ var (
 			internal.RequiredSettings[internal.MysqlBinlogServerPort] = true
 			internal.RequiredSettings[internal.MysqlBinlogServerUser] = true
 			internal.RequiredSettings[internal.MysqlBinlogServerPassword] = true
+			internal.RequiredSettings[internal.MysqlBinlogServerID] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			mysql.HandleBinlogServer(giveEventsUntilTS)
+			mysql.HandleBinlogServer(UntilTS)
 		},
 	}
 )
 
 func init() {
-	binlogServerCmd.PersistentFlags().StringVar(&giveEventsUntilTS,
+	binlogServerCmd.PersistentFlags().StringVar(&UntilTS,
 		"until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
-		giveEventsUntilFlagShortDescr)
+		UntilFlagShortDescr)
 	cmd.AddCommand(binlogServerCmd)
 }

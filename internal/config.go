@@ -107,18 +107,18 @@ const (
 	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes     = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 
-	MysqlDatasourceNameSetting    = "WALG_MYSQL_DATASOURCE_NAME"
-	MysqlSslCaSetting             = "WALG_MYSQL_SSL_CA"
-	MysqlBinlogReplayCmd          = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
-	MysqlBinlogDstSetting         = "WALG_MYSQL_BINLOG_DST"
-	MysqlBackupPrepareCmd         = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
-	MysqlTakeBinlogsFromMaster    = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
-	MysqlCheckGTIDs               = "WALG_MYSQL_CHECK_GTIDS"
-	MysqlBinlogGetExecutedGTIDCmd = "WALG_MYSQL_BINLOG_GET_EXECUTED_GTID_COMMAND"
-	MysqlBinlogServerHost         = "WALG_MYSQL_BINLOG_SERVER_HOST"
-	MysqlBinlogServerPort         = "WALG_MYSQL_BINLOG_SERVER_PORT"
-	MysqlBinlogServerUser         = "WALG_MYSQL_BINLOG_SERVER_USER"
-	MysqlBinlogServerPassword     = "WALG_MYSQL_BINLOG_SERVER_PASSWORD"
+	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
+	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"
+	MysqlBinlogReplayCmd       = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
+	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
+	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
+	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
+	MysqlCheckGTIDs            = "WALG_MYSQL_CHECK_GTIDS"
+	MysqlBinlogServerHost      = "WALG_MYSQL_BINLOG_SERVER_HOST"
+	MysqlBinlogServerPort      = "WALG_MYSQL_BINLOG_SERVER_PORT"
+	MysqlBinlogServerUser      = "WALG_MYSQL_BINLOG_SERVER_USER"
+	MysqlBinlogServerPassword  = "WALG_MYSQL_BINLOG_SERVER_PASSWORD"
+	MysqlBinlogServerID        = "WALG_MYSQL_BINLOG_SERVER_ID"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
@@ -432,6 +432,7 @@ var (
 		MysqlBinlogServerPort:      true,
 		MysqlBinlogServerUser:      true,
 		MysqlBinlogServerPassword:  true,
+		MysqlBinlogServerID:        true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
