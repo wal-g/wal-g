@@ -45,7 +45,12 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	binlogEventPos := 4
 	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
 	binlogEventPos++
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], 10000)
+
+	serverID, err := internal.GetRequiredSetting(internal.MysqlBinlogServerID)
+	tracelog.ErrorLogger.FatalOnError(err)
+	ServerIDNum, err := strconv.Atoi(serverID)
+	tracelog.ErrorLogger.FatalOnError(err)
+	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(ServerIDNum))
 	binlogEventPos += 4
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(replication.EventHeaderSize+8+len(pos.Name)))
 	binlogEventPos += 4
