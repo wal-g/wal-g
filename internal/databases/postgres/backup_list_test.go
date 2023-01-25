@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -19,18 +20,24 @@ func TestBackupListFlagsFindsBackups(t *testing.T) {
 
 func TestBackupListCorrectOutput(t *testing.T) {
 	const expected = "" +
-		"name   modified             wal_segment_backup_start\n" +
-		"base_1 2017-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_0 2018-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
-		"base_2 2020-01-01T01:01:01Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
+		"name   created              wal_segment_backup_start\n" +
+		"base_1 2017-03-21T00:00:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
+		"base_0 2018-03-21T00:00:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n" +
+		"base_2 2020-03-21T00:00:00Z ZZZZZZZZZZZZZZZZZZZZZZZZ\n"
+
+	metadata := map[string]internal.GenericMetadata{
+		"base_1": {StartTime: time.Date(2017, 3, 21, 0, 0, 0, 0, time.UTC)},
+		"base_0": {StartTime: time.Date(2018, 3, 21, 0, 0, 0, 0, time.UTC)},
+		"base_2": {StartTime: time.Date(2020, 3, 21, 0, 0, 0, 0, time.UTC)},
+	}
 
 	folder := testtools.CreatePostgresMockStorageFolderWithTimeMetadata(t, testtools.NoCreationTime)
-	backups, err := internal.GetBackups(folder)
+	backups, err := internal.GetBackupsWithMetadata(folder, &testtools.MockGenericMetaFetcher{MockMeta: metadata})
 	assert.NoError(t, err)
 	buf := new(bytes.Buffer)
-	internal.SortBackupTimeSlices(backups)
+	internal.SortBackupTimeWithMetadataSlices(backups)
 	internal.WriteBackupList(backups, buf)
-	assert.Equal(t, buf.String(), expected)
+	assert.Equal(t, expected, buf.String())
 }
 
 func TestBackupListCorrectPrettyOutput(t *testing.T) {

@@ -15,66 +15,84 @@ type someError struct {
 	error
 }
 
-var shortRestorePoints = []internal.BackupTime{
+var shortRestorePoints = []internal.BackupTimeWithMetadata{
 	{
-		BackupName:  "r0",
-		Time:        time.Time{},
-		WalFileName: "shortWallName0",
+		BackupTime: internal.BackupTime{
+			BackupName:  "r0",
+			Time:        time.Time{},
+			WalFileName: "shortWallName0",
+		},
 	},
 	{
-		BackupName:  "r1",
-		Time:        time.Time{},
-		WalFileName: "shortWallName1",
-	},
-}
-
-var longRestorePoints = []internal.BackupTime{
-	{
-		BackupName:  "restorePoint000",
-		Time:        time.Time{},
-		WalFileName: "veryVeryVeryVeryVeryLongWallName0",
-	},
-	{
-		BackupName:  "restorePoint001",
-		Time:        time.Time{},
-		WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+		BackupTime: internal.BackupTime{
+			BackupName:  "r1",
+			Time:        time.Time{},
+			WalFileName: "shortWallName1",
+		},
 	},
 }
 
-var emptyColonsRestorePoints = []internal.BackupTime{
+var longRestorePoints = []internal.BackupTimeWithMetadata{
 	{
-		Time:        time.Time{},
-		WalFileName: "shortWallName0",
+		BackupTime: internal.BackupTime{
+			BackupName:  "restorePoint000",
+			Time:        time.Time{},
+			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
+		},
 	},
 	{
-		BackupName: "r1",
-		Time:       time.Time{},
+		BackupTime: internal.BackupTime{
+			BackupName:  "restorePoint001",
+			Time:        time.Time{},
+			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+		},
+	},
+}
+
+var emptyColonsRestorePoints = []internal.BackupTimeWithMetadata{
+	{
+		BackupTime: internal.BackupTime{
+			Time:        time.Time{},
+			WalFileName: "shortWallName0",
+		},
 	},
 	{
-		Time: time.Time{},
+		BackupTime: internal.BackupTime{
+			BackupName: "r1",
+			Time:       time.Time{},
+		},
+	},
+	{
+		BackupTime: internal.BackupTime{
+			Time: time.Time{},
+		},
 	},
 }
 
 func TestHandleRestorePointListWriteBackups(t *testing.T) {
-	restorePoints := []internal.BackupTime{
+	restorePoints := []internal.BackupTimeWithMetadata{
 		{
-			BackupName:  "restorePoint000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupTime: internal.BackupTime{
+				BackupName:  "restorePoint000",
+				Time:        time.Time{},
+				WalFileName: "wallName0",
+			},
 		},
 		{
-			BackupName:  "restorePoint001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupTime: internal.BackupTime{
+				BackupName:  "restorePoint001",
+				Time:        time.Time{},
+				WalFileName: "wallName1",
+			},
 		},
 	}
 
-	getRestorePointsFunc := func() ([]internal.BackupTime, error) {
+	getRestorePointsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
 		return restorePoints, nil
 	}
 	writeRestorePointListCallsCount := 0
-	var writeBackupListCallArgs []internal.BackupTime
-	writeRestorePointListFunc := func(restorePoints []internal.BackupTime) {
+	var writeBackupListCallArgs []internal.BackupTimeWithMetadata
+	writeRestorePointListFunc := func(restorePoints []internal.BackupTimeWithMetadata) {
 		writeRestorePointListCallsCount++
 		writeBackupListCallArgs = restorePoints
 	}
@@ -91,23 +109,27 @@ func TestHandleRestorePointListWriteBackups(t *testing.T) {
 }
 
 func TestHandleRestorePointListLogError(t *testing.T) {
-	restorePoints := []internal.BackupTime{
+	restorePoints := []internal.BackupTimeWithMetadata{
 		{
-			BackupName:  "restorePoint000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupTime: internal.BackupTime{
+				BackupName:  "restorePoint000",
+				Time:        time.Time{},
+				WalFileName: "wallName0",
+			},
 		},
 		{
-			BackupName:  "restorePoint001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupTime: internal.BackupTime{
+				BackupName:  "restorePoint001",
+				Time:        time.Time{},
+				WalFileName: "wallName1",
+			},
 		},
 	}
 	someErrorInstance := someError{errors.New("some error")}
-	getRestorePointsFunc := func() ([]internal.BackupTime, error) {
+	getRestorePointsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
 		return restorePoints, someErrorInstance
 	}
-	writeRestorePointListFunc := func(restorePoints []internal.BackupTime) {}
+	writeRestorePointListFunc := func(restorePoints []internal.BackupTimeWithMetadata) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
@@ -121,10 +143,10 @@ func TestHandleRestorePointListLogError(t *testing.T) {
 }
 
 func TestHandleRestorePointListLogNoBackups(t *testing.T) {
-	getRestorePointsFunc := func() ([]internal.BackupTime, error) {
-		return []internal.BackupTime{}, nil
+	getRestorePointsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
+		return []internal.BackupTimeWithMetadata{}, nil
 	}
-	writeRestorePointListFunc := func(restorePoints []internal.BackupTime) {}
+	writeRestorePointListFunc := func(restorePoints []internal.BackupTimeWithMetadata) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
@@ -141,12 +163,12 @@ func TestHandleRestorePointListLogNoBackups(t *testing.T) {
 
 func TestWritePrettyRestorePointList_LongColumnsValues(t *testing.T) {
 	expectedRes :=
-		"+---+-----------------+----------+-----------------------------------+\n" +
-			"| # | NAME            | MODIFIED | WAL SEGMENT BACKUP START          |\n" +
-			"+---+-----------------+----------+-----------------------------------+\n" +
-			"| 0 | restorePoint000 | -        | veryVeryVeryVeryVeryLongWallName0 |\n" +
-			"| 1 | restorePoint001 | -        | veryVeryVeryVeryVeryLongWallName1 |\n" +
-			"+---+-----------------+----------+-----------------------------------+\n"
+		"+---+-----------------+---------+-----------------------------------+\n" +
+			"| # | NAME            | CREATED | WAL SEGMENT BACKUP START          |\n" +
+			"+---+-----------------+---------+-----------------------------------+\n" +
+			"| 0 | restorePoint000 | -       | veryVeryVeryVeryVeryLongWallName0 |\n" +
+			"| 1 | restorePoint001 | -       | veryVeryVeryVeryVeryLongWallName1 |\n" +
+			"+---+-----------------+---------+-----------------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(longRestorePoints, &b)
@@ -156,12 +178,12 @@ func TestWritePrettyRestorePointList_LongColumnsValues(t *testing.T) {
 
 func TestWritePrettyRestorePointList_ShortColumnsValues(t *testing.T) {
 	expectedRes :=
-		"+---+------+----------+--------------------------+\n" +
-			"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-			"+---+------+----------+--------------------------+\n" +
-			"| 0 | r0   | -        | shortWallName0           |\n" +
-			"| 1 | r1   | -        | shortWallName1           |\n" +
-			"+---+------+----------+--------------------------+\n"
+		"+---+------+---------+--------------------------+\n" +
+			"| # | NAME | CREATED | WAL SEGMENT BACKUP START |\n" +
+			"+---+------+---------+--------------------------+\n" +
+			"| 0 | r0   | -       | shortWallName0           |\n" +
+			"| 1 | r1   | -       | shortWallName1           |\n" +
+			"+---+------+---------+--------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(shortRestorePoints, &b)
@@ -171,12 +193,12 @@ func TestWritePrettyRestorePointList_ShortColumnsValues(t *testing.T) {
 
 func TestWritePrettyRestorePointList_WriteNoBackupList(t *testing.T) {
 	expectedRes :=
-		"+---+------+----------+--------------------------+\n" +
-			"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-			"+---+------+----------+--------------------------+\n" +
-			"+---+------+----------+--------------------------+\n"
+		"+---+------+---------+--------------------------+\n" +
+			"| # | NAME | CREATED | WAL SEGMENT BACKUP START |\n" +
+			"+---+------+---------+--------------------------+\n" +
+			"+---+------+---------+--------------------------+\n"
 
-	restorePoints := make([]internal.BackupTime, 0)
+	restorePoints := make([]internal.BackupTimeWithMetadata, 0)
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(restorePoints, &b)
@@ -186,13 +208,13 @@ func TestWritePrettyRestorePointList_WriteNoBackupList(t *testing.T) {
 
 func TestWritePrettyRestorePointList_EmptyColumnsValues(t *testing.T) {
 	expectedRes :=
-		"+---+------+----------+--------------------------+\n" +
-			"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-			"+---+------+----------+--------------------------+\n" +
-			"| 0 |      | -        | shortWallName0           |\n" +
-			"| 1 | r1   | -        |                          |\n" +
-			"| 2 |      | -        |                          |\n" +
-			"+---+------+----------+--------------------------+\n"
+		"+---+------+---------+--------------------------+\n" +
+			"| # | NAME | CREATED | WAL SEGMENT BACKUP START |\n" +
+			"+---+------+---------+--------------------------+\n" +
+			"| 0 |      | -       | shortWallName0           |\n" +
+			"| 1 | r1   | -       |                          |\n" +
+			"| 2 |      | -       |                          |\n" +
+			"+---+------+---------+--------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(emptyColonsRestorePoints, &b)
@@ -201,8 +223,8 @@ func TestWritePrettyRestorePointList_EmptyColumnsValues(t *testing.T) {
 }
 
 func TestWriteRestorePointList_NoBackups(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start\n"
-	restorePoints := make([]internal.BackupTime, 0)
+	expectedRes := "name created wal_segment_backup_start\n"
+	restorePoints := make([]internal.BackupTimeWithMetadata, 0)
 
 	b := bytes.Buffer{}
 	internal.WriteBackupList(restorePoints, &b)
@@ -211,10 +233,10 @@ func TestWriteRestorePointList_NoBackups(t *testing.T) {
 }
 
 func TestWriteRestorePointList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start\n" +
-		"     -        shortWallName0\n" +
-		"r1   -        \n" +
-		"     -        \n"
+	expectedRes := "name created wal_segment_backup_start\n" +
+		"     -       shortWallName0\n" +
+		"r1   -       \n" +
+		"     -       \n"
 
 	b := bytes.Buffer{}
 	internal.WriteBackupList(emptyColonsRestorePoints, &b)
@@ -223,9 +245,9 @@ func TestWriteRestorePointList_EmptyColumnsValues(t *testing.T) {
 }
 
 func TestWriteRestorePointList_ShortColumnsValues(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start\n" +
-		"r0   -        shortWallName0\n" +
-		"r1   -        shortWallName1\n"
+	expectedRes := "name created wal_segment_backup_start\n" +
+		"r0   -       shortWallName0\n" +
+		"r1   -       shortWallName1\n"
 	b := bytes.Buffer{}
 	internal.WriteBackupList(shortRestorePoints, &b)
 
@@ -233,9 +255,9 @@ func TestWriteRestorePointList_ShortColumnsValues(t *testing.T) {
 }
 
 func TestWriteRestorePointList_LongColumnsValues(t *testing.T) {
-	expectedRes := "name            modified wal_segment_backup_start\n" +
-		"restorePoint000 -        veryVeryVeryVeryVeryLongWallName0\n" +
-		"restorePoint001 -        veryVeryVeryVeryVeryLongWallName1\n"
+	expectedRes := "name            created wal_segment_backup_start\n" +
+		"restorePoint000 -       veryVeryVeryVeryVeryLongWallName0\n" +
+		"restorePoint001 -       veryVeryVeryVeryVeryLongWallName1\n"
 	b := bytes.Buffer{}
 	internal.WriteBackupList(longRestorePoints, &b)
 
