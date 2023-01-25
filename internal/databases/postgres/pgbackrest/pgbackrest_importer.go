@@ -43,6 +43,30 @@ func GetBackupList(backupsFolder storage.Folder, stanza string) ([]internal.Back
 	return backupTimes, nil
 }
 
+func GetBackupListWithMetadata(backupsFolder storage.Folder, metaFetcher internal.GenericMetaFetcher, stanza string) ([]internal.BackupTimeWithMetadata, error) {
+	backupsSettings, err := LoadBackupsSettings(backupsFolder, stanza)
+	if err != nil {
+		return nil, err
+	}
+
+	var backupTimes []internal.BackupTimeWithMetadata
+	for i := range backupsSettings {
+		metadata, err := metaFetcher.Fetch(backupsSettings[i].Name, backupsFolder)
+		if err != nil {
+			return nil, err
+		}
+		backupTimes = append(backupTimes, internal.BackupTimeWithMetadata{
+			BackupTime: internal.BackupTime{
+				BackupName:  backupsSettings[i].Name,
+				Time:        getTime(backupsSettings[i].BackupTimestampStop),
+				WalFileName: backupsSettings[i].BackupArchiveStart,
+			},
+			GenericMetadata: metadata,
+		})
+	}
+	return backupTimes, nil
+}
+
 func GetBackupDetails(backupsFolder storage.Folder, stanza string, backupName string) (*BackupDetails, error) {
 	manifest, err := LoadManifest(backupsFolder, stanza, backupName)
 	if err != nil {

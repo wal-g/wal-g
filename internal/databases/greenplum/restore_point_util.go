@@ -18,8 +18,8 @@ func NewNoRestorePointsFoundError() NoRestorePointsFoundError {
 }
 
 // GetRestorePoints receives restore points descriptions and sorts them by time
-func GetRestorePoints(folder storage.Folder) (restorePoints []internal.BackupTime, err error) {
-	restorePoints, _, err = GetRestorePointsAndGarbage(folder)
+func GetRestorePoints(folder storage.Folder, metaFetcher internal.GenericMetaFetcher) (restorePointsWithMeta []internal.BackupTimeWithMetadata, err error) {
+	restorePoints, _, err := GetRestorePointsAndGarbage(folder)
 	if err != nil {
 		return nil, err
 	}
@@ -28,6 +28,19 @@ func GetRestorePoints(folder storage.Folder) (restorePoints []internal.BackupTim
 	if count == 0 {
 		return nil, NewNoRestorePointsFoundError()
 	}
+
+	restorePointsWithMeta = make([]internal.BackupTimeWithMetadata, len(restorePoints))
+	for i := 0; i < len(restorePoints); i++ {
+		metadata, err := metaFetcher.Fetch(restorePoints[i].BackupName, folder)
+		if err != nil {
+			return nil, err
+		}
+		restorePointsWithMeta[i] = internal.BackupTimeWithMetadata{
+			BackupTime:      restorePoints[i],
+			GenericMetadata: metadata,
+		}
+	}
+
 	return
 }
 

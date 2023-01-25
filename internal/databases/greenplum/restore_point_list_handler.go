@@ -8,16 +8,16 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
-	getRestorePointsFunc := func() ([]internal.BackupTime, error) {
-		res, err := GetRestorePoints(folder)
+func HandleRestorePointList(folder storage.Folder, metaFetcher internal.GenericMetaFetcher, pretty, json bool) {
+	getRestorePointsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
+		res, err := GetRestorePoints(folder, metaFetcher)
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
 		return res, err
 	}
-	writeRestorePointsListFunc := func(restorePoints []internal.BackupTime) {
-		internal.SortBackupTimeSlices(restorePoints)
+	writeRestorePointsListFunc := func(restorePoints []internal.BackupTimeWithMetadata) {
+		internal.SortBackupTimeWithMetadataSlices(restorePoints)
 		switch {
 		case json:
 			err := internal.WriteAsJSON(restorePoints, os.Stdout, pretty)

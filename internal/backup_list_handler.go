@@ -33,7 +33,7 @@ type BackupTimeWithMetadata struct {
 }
 
 func DefaultHandleBackupList(folder storage.Folder, metaFetcher GenericMetaFetcher, pretty, json bool) {
-	getBackupsFunc := func() ([]BackupTime, error) {
+	getBackupsFunc := func() ([]BackupTimeWithMetadata, error) {
 		backupsWithMeta, err := GetBackupsWithMetadata(folder, metaFetcher)
 		if _, ok := err.(NoBackupsFoundError); ok {
 			err = nil
@@ -41,23 +41,22 @@ func DefaultHandleBackupList(folder storage.Folder, metaFetcher GenericMetaFetch
 
 		SortBackupTimeWithMetadataSlices(backupsWithMeta)
 
-		backups := make([]BackupTime, len(backupsWithMeta))
-		for i := 0; i < len(backupsWithMeta); i++ {
-			backups[i] = backupsWithMeta[i].BackupTime
-		}
-
-		return backups, err
+		return backupsWithMeta, err
 	}
 
-	writeBackupListFunc := func(backups []BackupTime) {
+	writeBackupListFunc := func(backupsWithMetadata []BackupTimeWithMetadata) {
 		switch {
 		case json:
-			err := WriteAsJSON(backups, os.Stdout, pretty)
+			backups := make([]BackupTime, len(backupsWithMetadata))
+			for i := 0; i < len(backupsWithMetadata); i++ {
+				backups[i] = backupsWithMetadata[i].BackupTime
+			}
+			err := WriteAsJSON(backupsWithMetadata, os.Stdout, pretty)
 			tracelog.ErrorLogger.FatalOnError(err)
 		case pretty:
-			WritePrettyBackupList(backups, os.Stdout)
+			WritePrettyBackupList(backupsWithMetadata, os.Stdout)
 		default:
-			WriteBackupList(backups, os.Stdout)
+			WriteBackupList(backupsWithMetadata, os.Stdout)
 		}
 	}
 	logging := Logging{
@@ -69,8 +68,8 @@ func DefaultHandleBackupList(folder storage.Folder, metaFetcher GenericMetaFetch
 }
 
 func HandleBackupList(
-	getBackupsFunc func() ([]BackupTime, error),
-	writeBackupListFunc func([]BackupTime),
+	getBackupsFunc func() ([]BackupTimeWithMetadata, error),
+	writeBackupListFunc func([]BackupTimeWithMetadata),
 	logging Logging,
 ) {
 	backups, err := getBackupsFunc()
@@ -84,22 +83,22 @@ func HandleBackupList(
 	writeBackupListFunc(backups)
 }
 
-func WriteBackupList(backups []BackupTime, output io.Writer) {
+func WriteBackupList(backups []BackupTimeWithMetadata, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
-	fmt.Fprintln(writer, "name\tmodified\twal_segment_backup_start")
+	fmt.Fprintln(writer, "name\tcreated\twal_segment_backup_start")
 	for _, b := range backups {
-		fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupName, FormatTime(b.Time), b.WalFileName)
+		fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupTime.BackupName, FormatTime(b.StartTime), b.WalFileName)
 	}
 }
 
-func WritePrettyBackupList(backups []BackupTime, output io.Writer) {
+func WritePrettyBackupList(backups []BackupTimeWithMetadata, output io.Writer) {
 	writer := table.NewWriter()
 	writer.SetOutputMirror(output)
 	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Modified", "WAL segment backup start"})
+	writer.AppendHeader(table.Row{"#", "Name", "Created", "WAL segment backup start"})
 	for i, b := range backups {
-		writer.AppendRow(table.Row{i, b.BackupName, PrettyFormatTime(b.Time), b.WalFileName})
+		writer.AppendRow(table.Row{i, b.BackupTime.BackupName, PrettyFormatTime(b.StartTime), b.WalFileName})
 	}
 }
 
