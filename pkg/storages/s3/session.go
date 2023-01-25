@@ -58,11 +58,10 @@ func getAWSRegion(s3Bucket string, config *aws.Config, settings map[string]strin
 		strings.HasSuffix(*config.Endpoint, ".amazonaws.com") {
 		region, err := findBucketRegion(s3Bucket, config)
 		return region, errors.Wrapf(err, "%s is not set and s3:GetBucketLocation failed", RegionSetting)
-	} else {
-		// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
-		// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
-		return "us-east-1", nil
 	}
+	// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
+	// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
+	return "us-east-1", nil
 }
 
 func setupReqProxy(endpointSource, port string) *string {
@@ -109,7 +108,7 @@ func configWithSettings(s *session.Session, bucket string, settings map[string]s
 	config := s.Config
 	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetriesCount}))
 
-	accessKeyId := getFirstSettingOf(settings, []string{AccessKeyIdSetting, AccessKeySetting})
+	accessKeyID := getFirstSettingOf(settings, []string{AccessKeyIDSetting, AccessKeySetting})
 	secretAccessKey := getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting})
 	sessionToken := settings[SessionTokenSetting]
 
@@ -124,14 +123,14 @@ func configWithSettings(s *session.Session, bucket string, settings map[string]s
 		if err != nil {
 			return nil, err
 		}
-		accessKeyId = *assumedRole.Credentials.AccessKeyId
+		accessKeyID = *assumedRole.Credentials.AccessKeyId
 		secretAccessKey = *assumedRole.Credentials.SecretAccessKey
 		sessionToken = *assumedRole.Credentials.SessionToken
 	}
 
-	if accessKeyId != "" && secretAccessKey != "" {
+	if accessKeyID != "" && secretAccessKey != "" {
 		provider := &credentials.StaticProvider{Value: credentials.Value{
-			AccessKeyID:     accessKeyId,
+			AccessKeyID:     accessKeyID,
 			SecretAccessKey: secretAccessKey,
 			SessionToken:    sessionToken,
 		}}
@@ -197,9 +196,8 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 			defer file.Close()
 			s, err := session.NewSessionWithOptions(session.Options{Config: *s.Config, CustomCABundle: file})
 			return s, err
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
 	if settings[S3UseYcSessionToken] != "" {

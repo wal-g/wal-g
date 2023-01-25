@@ -16,10 +16,16 @@ const (
 	binaryBackupFetchCommandName = "binary-backup-fetch"
 	MinimalConfigPathFlag        = "minimal-mongod-config-path"
 	MinimalConfigPathDescription = "Path to mongod config with minimal working configuration"
+	RsNameFlag                   = "mongo-rs-name"
+	RsNameDescription            = "Name of replicaset (like rs01)"
+	RsMembersFlag                = "mongo-rs-members"
+	RsMembersDescription         = "Comma separated host:port records from wished rs members (like rs.initiate())"
 )
 
 var (
 	minimalConfigPath = ""
+	rsName            = ""
+	rsMembers         = ""
 )
 
 var binaryBackupFetchCmd = &cobra.Command{
@@ -34,15 +40,18 @@ var binaryBackupFetchCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		backupName := args[0]
-		mongodbConfigPath := args[1]
+		mongodConfigPath := args[1]
 		mongodVersion := args[2]
 
-		err := mongo.HandleBinaryFetchPush(ctx, mongodbConfigPath, minimalConfigPath, backupName, mongodVersion)
+		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion, rsName,
+			rsMembers)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
 func init() {
 	binaryBackupFetchCmd.Flags().StringVar(&minimalConfigPath, MinimalConfigPathFlag, "", MinimalConfigPathDescription)
+	binaryBackupFetchCmd.Flags().StringVar(&rsName, RsNameFlag, "", RsNameDescription)
+	binaryBackupFetchCmd.Flags().StringVar(&rsMembers, RsMembersFlag, "", RsMembersDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }

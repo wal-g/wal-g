@@ -20,15 +20,15 @@ const (
 	DefaultMaxPartSize = 20 << 20
 )
 
-type SseKmsIdNotSetError struct {
+type SseKmsIDNotSetError struct {
 	error
 }
 
-func NewSseKmsIdNotSetError() SseKmsIdNotSetError {
-	return SseKmsIdNotSetError{errors.Errorf("%s must be set if using aws:kms encryption", SseKmsIdSetting)}
+func NewSseKmsIDNotSetError() SseKmsIDNotSetError {
+	return SseKmsIDNotSetError{errors.Errorf("%s must be set if using aws:kms encryption", SseKmsIDSetting)}
 }
 
-func (err SseKmsIdNotSetError) Error() string {
+func (err SseKmsIDNotSetError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -36,12 +36,12 @@ type Uploader struct {
 	uploaderAPI          s3manageriface.UploaderAPI
 	serverSideEncryption string
 	SSECustomerKey       string
-	SSEKMSKeyId          string
+	SSEKMSKeyID          string
 	StorageClass         string
 }
 
-func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass string) *Uploader {
-	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass}
+func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass string) *Uploader {
+	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass}
 }
 
 // TODO : unit tests
@@ -64,9 +64,9 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 			uploadInput.ServerSideEncryption = aws.String(uploader.serverSideEncryption)
 		}
 
-		if uploader.SSEKMSKeyId != "" {
+		if uploader.SSEKMSKeyID != "" {
 			// Only aws:kms implies sseKmsKeyId, checked during validation
-			uploadInput.SSEKMSKeyId = aws.String(uploader.SSEKMSKeyId)
+			uploadInput.SSEKMSKeyId = aws.String(uploader.SSEKMSKeyID)
 		}
 	}
 
@@ -90,14 +90,14 @@ func CreateUploaderAPI(svc s3iface.S3API, partsize, concurrency int) s3managerif
 }
 
 // TODO : unit tests
-func configureServerSideEncryption(settings map[string]string) (serverSideEncryption string, sseCustomerKey string, sseKmsKeyId string, err error) {
-	serverSideEncryption, _ = settings[SseSetting]
-	sseCustomerKey, _ = settings[SseCSetting]
-	sseKmsKeyId, _ = settings[SseKmsIdSetting]
+func configureServerSideEncryption(settings map[string]string) (serverSideEncryption string, sseCustomerKey string, sseKmsKeyID string, err error) { // nolint: lll
+	serverSideEncryption = settings[SseSetting]
+	sseCustomerKey = settings[SseCSetting]
+	sseKmsKeyID = settings[SseKmsIDSetting]
 
-	// Only aws:kms implies sseKmsKeyId
-	if (serverSideEncryption == "aws:kms") == (sseKmsKeyId == "") {
-		return "", "", "", NewSseKmsIdNotSetError()
+	// Only aws:kms implies sseKmsKeyID
+	if (serverSideEncryption == "aws:kms") == (sseKmsKeyID == "") {
+		return "", "", "", NewSseKmsIDNotSetError()
 	}
 	return
 }
@@ -139,9 +139,9 @@ func configureUploader(s3Client *s3.S3, settings map[string]string) (*Uploader, 
 		maxPartSize = DefaultMaxPartSize
 	}
 
-	uploaderApi := CreateUploaderAPI(s3Client, maxPartSize, concurrency)
+	uploaderAPI := CreateUploaderAPI(s3Client, maxPartSize, concurrency)
 
-	serverSideEncryption, sseCustomerKey, sseKmsKeyId, err := configureServerSideEncryption(settings)
+	serverSideEncryption, sseCustomerKey, sseKmsKeyID, err := configureServerSideEncryption(settings)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure server side encryption")
 	}
@@ -151,5 +151,5 @@ func configureUploader(s3Client *s3.S3, settings map[string]string) (*Uploader, 
 	if storageClass, ok = settings[StorageClassSetting]; !ok {
 		storageClass = "STANDARD"
 	}
-	return NewUploader(uploaderApi, serverSideEncryption, sseCustomerKey, sseKmsKeyId, storageClass), nil
+	return NewUploader(uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass), nil
 }

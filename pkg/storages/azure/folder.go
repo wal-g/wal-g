@@ -36,6 +36,7 @@ const (
 	defaultEnvName    = "AzurePublicCloud"
 )
 
+// nolint: revive
 type AzureAuthType string
 
 const (
@@ -83,13 +84,13 @@ func getContainerClientWithSASToken(
 	containerName string,
 	timeout time.Duration,
 	accountToken string) (*azblob.ContainerClient, error) {
-	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
-	_, err := url.Parse(containerUrlString)
+	containerURLString := fmt.Sprintf("https://%s.blob.%s/%s%s", accountName, storageEndpointSuffix, containerName, accountToken)
+	_, err := url.Parse(containerURLString)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to parse service URL with SAS token")
 	}
 
-	containerClient, err := azblob.NewContainerClientWithNoCredential(containerUrlString, &azblob.ClientOptions{
+	containerClient, err := azblob.NewContainerClientWithNoCredential(containerURLString, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
 	return containerClient, err
@@ -101,13 +102,13 @@ func getContainerClientWithAccessKey(
 	containerName string,
 	timeout time.Duration,
 	credential *azblob.SharedKeyCredential) (*azblob.ContainerClient, error) {
-	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
-	_, err := url.Parse(containerUrlString)
+	containerURLString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+	_, err := url.Parse(containerURLString)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to parse service URL")
 	}
 
-	containerClient, err := azblob.NewContainerClientWithSharedKey(containerUrlString, credential, &azblob.ClientOptions{
+	containerClient, err := azblob.NewContainerClientWithSharedKey(containerURLString, credential, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
 	return containerClient, err
@@ -123,13 +124,13 @@ func getContainerClient(
 		return nil, NewFolderError(err, "Unable to construct default Azure credential chain")
 	}
 
-	containerUrlString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
-	_, err = url.Parse(containerUrlString)
+	containerURLString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+	_, err = url.Parse(containerURLString)
 	if err != nil {
 		return nil, NewFolderError(err, "Unable to parse service URL")
 	}
 
-	containerClient, err := azblob.NewContainerClient(containerUrlString, defaultCredential, &azblob.ClientOptions{
+	containerClient, err := azblob.NewContainerClient(containerURLString, defaultCredential, &azblob.ClientOptions{
 		Retry: policy.RetryOptions{TryTimeout: timeout},
 	})
 	return containerClient, err
@@ -213,10 +214,10 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 
 type Folder struct {
 	uploadStreamOptions azblob.UploadStreamOptions
-	containerClient                azblob.ContainerClient
-	credential                     *azblob.SharedKeyCredential
-	timeout                        time.Duration
-	path                           string
+	containerClient     azblob.ContainerClient
+	credential          *azblob.SharedKeyCredential
+	timeout             time.Duration
+	path                string
 }
 
 func (folder *Folder) GetPath() string {
@@ -248,7 +249,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		//add blobs to the list of storage objects
 		for _, blob := range blobs.Segment.BlobItems {
 			objName := strings.TrimPrefix(*blob.Name, folder.path)
-			updated := time.Time(*blob.Properties.LastModified)
+			updated := *blob.Properties.LastModified
 
 			objects = append(objects, storage.NewLocalObject(objName, updated, *blob.Properties.ContentLength))
 		}
@@ -266,13 +267,12 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				folder.timeout,
 				subFolderPath))
 		}
-
 	}
 	err = blobPager.Err()
 	if err != nil {
 		return nil, nil, NewFolderError(err, "Unable to iterate %v", folder.path)
 	}
-	return
+	return objects, subFolders, err
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
@@ -328,9 +328,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err = folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object do not exists")
-		} else {
-			return err
 		}
+		return err
 	}
 	var srcClient, dstClient *azblob.BlockBlobClient
 	srcClient, err = folder.containerClient.NewBlockBlobClient(srcPath)
@@ -341,7 +340,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if err != nil {
 		return NewFolderError(err, "Unable to init Azure Blob client for copy destination %s", dstPath)
 	}
-	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
+	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(),
+		&azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
 	return err
 }
 
@@ -354,16 +354,16 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 			return NewFolderError(err, "Unable to init Azure Blob client")
 		}
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		_, err = blobClient.Delete(context.Background(), &azblob.BlobDeleteOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
+		_, err = blobClient.Delete(context.Background(),
+			&azblob.BlobDeleteOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
 		var stgErr *azblob.StorageError
 		if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
 			continue
 		}
 		if err != nil {
 			return NewFolderError(err, "Unable to delete object %v", path)
-		} else {
-			//blob is deleted
 		}
+		//blob is deleted
 	}
 	return nil
 }

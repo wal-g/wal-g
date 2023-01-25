@@ -94,7 +94,6 @@ func NewFetchHandler(
 	}
 }
 
-// TODO: Unit tests
 // prepareContentIDsToFetch returns a set containing the IDs of segments to be fetched
 func prepareContentIDsToFetch(fetchContentIds []int, segmentConfigs []cluster.SegConfig) map[int]bool {
 	contentIDsToFetch := make(map[int]bool)
@@ -164,7 +163,7 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 	}
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating pg_hba on segments",
-		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS,
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
 			if !fh.contentIDsToFetch[contentID] {
 				return newSkippedSegmentMsg(contentID)

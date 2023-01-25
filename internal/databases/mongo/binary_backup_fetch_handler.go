@@ -8,8 +8,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigPath, backupName,
-	restoreMongodVersion string,
+func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigPath, backupName, restoreMongodVersion,
+	rsName, rsMembers string,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
@@ -36,5 +36,10 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigP
 		return err
 	}
 
-	return restoreService.DoRestore(backupName, restoreMongodVersion)
+	rsConfig := binary.RsConfig{RsName: rsName, RsMembers: rsMembers}
+	if err = rsConfig.Validate(); err != nil {
+		return err
+	}
+
+	return restoreService.DoRestore(backupName, restoreMongodVersion, rsConfig)
 }

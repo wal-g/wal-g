@@ -91,9 +91,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object does not exist")
-		} else {
-			return err
 		}
+		return err
 	}
 	file, err := folder.ReadObject(srcPath)
 	if err != nil {

@@ -85,41 +85,40 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	//Iterate
-	err = folder.connection.ObjectsWalk(folder.container.Name, &swift.ObjectsOpts{Delimiter: int32('/'), Prefix: folder.path}, func(opts *swift.ObjectsOpts) (interface{}, error) {
-
-		objectNames, err := folder.connection.ObjectNames(folder.container.Name, opts)
-		if err != nil {
-			return nil, err
-		} else {
-			// Retrieved object names successfully.
-		}
-		for _, objectName := range objectNames {
-			if strings.HasSuffix(objectName, "/") {
-				//It is a subFolder name
-				subFolders = append(subFolders, NewFolder(folder.connection, folder.container, objectName))
-			} else {
-				//It is a storage object name
-				obj, _, err := folder.connection.Object(folder.container.Name, objectName)
-				// Some files can disappear during ListFolder execution - they can be deleted by another process
-				// for example. We can ignore that and return only files that really exist.
-				if err == swift.ObjectNotFound {
-					continue
-				}
-				if err != nil {
-					return nil, err
-				}
-				//trim prefix to get object's standalone name
-				objName := strings.TrimPrefix(obj.Name, folder.path)
-				objects = append(objects, storage.NewLocalObject(objName, obj.LastModified, obj.Bytes))
+	err = folder.connection.ObjectsWalk(folder.container.Name, &swift.ObjectsOpts{Delimiter: int32('/'), Prefix: folder.path},
+		func(opts *swift.ObjectsOpts) (interface{}, error) {
+			objectNames, err := folder.connection.ObjectNames(folder.container.Name, opts)
+			if err != nil {
+				return nil, err
 			}
-		}
-		//return objectNames if a further iteration is required.
-		return objectNames, err
-	})
+			// Retrieved object names successfully.
+			for _, objectName := range objectNames {
+				if strings.HasSuffix(objectName, "/") {
+					//It is a subFolder name
+					subFolders = append(subFolders, NewFolder(folder.connection, folder.container, objectName))
+				} else {
+					//It is a storage object name
+					obj, _, err := folder.connection.Object(folder.container.Name, objectName)
+					// Some files can disappear during ListFolder execution - they can be deleted by another process
+					// for example. We can ignore that and return only files that really exist.
+					if err == swift.ObjectNotFound {
+						continue
+					}
+					if err != nil {
+						return nil, err
+					}
+					//trim prefix to get object's standalone name
+					objName := strings.TrimPrefix(obj.Name, folder.path)
+					objects = append(objects, storage.NewLocalObject(objName, obj.LastModified, obj.Bytes))
+				}
+			}
+			//return objectNames if a further iteration is required.
+			return objectNames, err
+		})
 	if err != nil {
 		return nil, nil, NewError(err, "Unable to iterate %v", folder.path)
 	}
-	return
+	return objects, subFolders, err
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
@@ -135,9 +134,8 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	}
 	if err != nil {
 		return nil, NewError(err, "Unable to OPEN Object %v", path)
-	} else {
-		//retrieved object from  the cloud
 	}
+	//retrieved object from  the cloud
 	return io.NopCloser(readContents), nil
 }
 
@@ -148,9 +146,8 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	_, err := folder.connection.ObjectPut(folder.container.Name, path, content, false, "", "", nil)
 	if err != nil {
 		return NewError(err, "Unable to write content.")
-	} else {
-		//Object stored successfully
 	}
+	//Object stored successfully
 	return nil
 }
 
@@ -158,9 +155,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
 			return errors.New("object does not exist")
-		} else {
-			return err
 		}
+		return err
 	}
 	_, err := folder.connection.ObjectCopy(folder.path, srcPath, folder.path, dstPath, nil)
 	return err

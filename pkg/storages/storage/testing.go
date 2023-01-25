@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// nolint: funlen
 func RunFolderTest(storageFolder Folder, t *testing.T) {
 	sub1 := storageFolder.GetSubFolder("Sub1")
 

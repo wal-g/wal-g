@@ -6,15 +6,30 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleRestorePointList(folder storage.Folder, metaFetcher internal.GenericMetaFetcher, pretty, json bool) {
 	getRestorePointsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
-		res, err := GetRestorePoints(folder, metaFetcher)
+		res, err := GetRestorePoints(folder)
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
-		return res, err
+
+		// TODO: remove this ugly hack to make current restore-point-list work
+		backupTimes := make([]internal.BackupTimeWithMetadata, 0)
+		for _, rp := range res {
+			metadata, _ := metaFetcher.Fetch(rp.Name, folder)
+			backupTimes = append(backupTimes, internal.BackupTimeWithMetadata{
+				BackupTime: internal.BackupTime{
+					BackupName:  rp.Name,
+					Time:        rp.Time,
+					WalFileName: utility.StripWalFileName(rp.Name),
+				},
+				GenericMetadata: metadata,
+			})
+		}
+		return backupTimes, err
 	}
 	writeRestorePointsListFunc := func(restorePoints []internal.BackupTimeWithMetadata) {
 		internal.SortBackupTimeWithMetadataSlices(restorePoints)

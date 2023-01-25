@@ -7,7 +7,6 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
-	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
 type RestoreService struct {
@@ -28,13 +27,13 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 	}, nil
 }
 
-func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion string) error {
+func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion string, rsConfig RsConfig) error {
 	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), backupName)
 	if err != nil {
 		return err
 	}
 
-	err = EnsureCompatibilityToRestoreMongodVersions(restoreMongodVersion, sentinel.MongoMeta.Version)
+	err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, restoreMongodVersion)
 	if err != nil {
 		return err
 	}
@@ -55,18 +54,11 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 		return err
 	}
 
-	needFixOplog := NeedFixOplog(restoreMongodVersion)
-
-	if err = restoreService.fixSystemData(sentinel, needFixOplog); err != nil {
+	if err = restoreService.fixSystemData(rsConfig); err != nil {
 		return err
 	}
-
-	if needFixOplog {
-		if err = restoreService.recoverFromOplogAsStandalone(); err != nil {
-			return err
-		}
-	} else {
-		tracelog.InfoLogger.Printf("We are skipping recoverFromOplogAsStandalone because it is disabled")
+	if err = restoreService.recoverFromOplogAsStandalone(); err != nil {
+		return err
 	}
 
 	return nil
@@ -77,7 +69,7 @@ func (restoreService *RestoreService) downloadFromTarArchives(backupName string)
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
 }
 
-func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup, needFixOplog bool) error {
+func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig) error {
 	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
@@ -88,8 +80,7 @@ func (restoreService *RestoreService) fixSystemData(sentinel *models.Backup, nee
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	lastWriteTS := sentinel.MongoMeta.BackupLastTS
-	err = mongodService.FixSystemDataAfterRestore(lastWriteTS, needFixOplog)
+	err = mongodService.FixSystemDataAfterRestore(rsConfig)
 	if err != nil {
 		return err
 	}

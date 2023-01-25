@@ -27,16 +27,17 @@ type MongodService struct {
 func CreateMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
 	mongoClient, err := mongo.Connect(ctx,
 		options.Client().ApplyURI(mongodbURI).
+			SetConnectTimeout(10*time.Minute).
 			SetSocketTimeout(time.Minute).
 			SetAppName(appName).
 			SetDirect(true).
 			SetRetryReads(false))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unable to connect to mongod")
 	}
 	err = mongoClient.Ping(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "ping to mongod is failed")
 	}
 
 	return &MongodService{
@@ -127,41 +128,70 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *Ba
 	})
 }
 
-func (mongodService *MongodService) FixSystemDataAfterRestore(LastWriteTS primitive.Timestamp, fixOplog bool) error {
+func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig) error {
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
-	err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil)
-	if err != nil {
-		return err
+	if err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil); err != nil {
+		return errors.Wrap(err, "unable to fix data in local.replset.election")
 	}
 
-	err = replaceData(ctx, localDatabase.Collection("replset.minvalid"), true, bson.M{
-		"_id": primitive.NewObjectID(),
-		"t":   -1,
-		"ts":  primitive.Timestamp{T: 0, I: 1},
-	})
-	if err != nil {
-		return err
-	}
-
-	if fixOplog {
-		tracelog.DebugLogger.Printf("oplogTruncateAfterPoint: %v", LastWriteTS)
-		err = replaceData(ctx, localDatabase.Collection("replset.oplogTruncateAfterPoint"), true,
-			bson.M{
-				"_id":                     "oplogTruncateAfterPoint",
-				"oplogTruncateAfterPoint": LastWriteTS,
-			})
-		if err != nil {
-			return err
+	if rsConfig.Empty() {
+		if err := replaceData(ctx, localDatabase.Collection("system.replset"), false, nil); err != nil {
+			return errors.Wrap(err, "unable to fix data in local.system.replset")
 		}
 	} else {
-		tracelog.InfoLogger.Printf("We are skipping fix replset.oplogTruncateAfterPoint because it is disabled")
+		if err := updateRsConfig(ctx, localDatabase, rsConfig); err != nil {
+			return err
+		}
 	}
 
-	err = replaceData(ctx, localDatabase.Collection("system.replset"), false, nil)
+	adminDatabase := mongodService.MongoClient.Database(adminDB)
+
+	_, err := adminDatabase.Collection("system.version").DeleteOne(ctx, bson.D{
+		{Key: "_id", Value: "shardIdentity"},
+	})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "unable to fix data in admin.system.version")
+	}
+
+	return nil
+}
+
+func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig RsConfig) error {
+	var systemRsConfig bson.M
+	err := localDatabase.Collection("system.replset").FindOne(ctx, bson.D{}).Decode(&systemRsConfig)
+	if err != nil {
+		return errors.Wrap(err, "unable to read rs config from system.replset")
+	}
+
+	systemRsConfig["members"] = makeBsonRsMembers(rsConfig.RsMembers)
+
+	if systemRsConfig["_id"] != rsConfig.RsName {
+		systemRsConfig["_id"] = rsConfig.RsName
+		_, err = localDatabase.Collection("system.replset").InsertOne(ctx, systemRsConfig)
+		if err != nil {
+			return errors.Wrap(err, "unable to insert updated rs config to system.replset")
+		}
+		deleteResult, err := localDatabase.Collection("system.replset").
+			DeleteMany(ctx, bson.D{{Key: "_id", Value: bson.D{{Key: "$ne", Value: rsConfig.RsName}}}})
+		if err != nil {
+			return errors.Wrap(err, "unable to delete other documents to system.replset")
+		}
+		tracelog.DebugLogger.Printf("Removed %d documents from system.replset", deleteResult.DeletedCount)
+	} else {
+		updateResult, err := localDatabase.Collection("system.replset").
+			UpdateMany(ctx,
+				bson.D{{Key: "_id", Value: systemRsConfig["_id"]}},
+				bson.D{{Key: "$set", Value: systemRsConfig}})
+		if err != nil {
+			return errors.Wrap(err, "unable to update rs config in system.replset")
+		}
+		if updateResult.MatchedCount != 1 {
+			return errors.Errorf("MatchedCount = %v during update rs config in system.replset",
+				updateResult.MatchedCount)
+		}
+		tracelog.InfoLogger.Printf("Updated %d documents in system.replset", updateResult.MatchedCount)
 	}
 
 	return nil
@@ -204,6 +234,18 @@ func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, i
 	return nil
 }
 
+func makeBsonRsMembers(rsMembers string) bson.A {
+	bsonMembers := bson.A{}
+
+	if rsMembers != "" {
+		for id, member := range strings.Split(rsMembers, ",") {
+			bsonMembers = append(bsonMembers, bson.M{"_id": id, "host": member})
+		}
+	}
+
+	return bsonMembers
+}
+
 func (mongodService *MongodService) Shutdown() error {
 	err := mongodService.MongoClient.Database(adminDB).RunCommand(context.Background(),
 		bson.D{{Key: "shutdown", Value: 1}},
@@ -233,4 +275,20 @@ type BackupCursorMeta struct {
 type BackupCursorFile struct {
 	FileName string `bson:"filename" json:"filename"`
 	FileSize int64  `bson:"fileSize" json:"fileSize"`
+}
+
+type RsConfig struct {
+	RsName    string
+	RsMembers string
+}
+
+func (rsConfig RsConfig) Empty() bool {
+	return rsConfig.RsName == "" && rsConfig.RsMembers == ""
+}
+
+func (rsConfig RsConfig) Validate() error {
+	if rsConfig.RsName == "" && rsConfig.RsMembers != "" || rsConfig.RsName != "" && rsConfig.RsMembers == "" {
+		return errors.Errorf("rsConfig should be all empty or full populated, but rsConfig = %+v", rsConfig)
+	}
+	return nil
 }

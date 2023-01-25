@@ -15,6 +15,7 @@ const (
 	backupFetchShortDescription  = "Fetches a backup from storage"
 	targetUserDataDescription    = "Fetch storage backup which has the specified user data"
 	restorePointDescription      = "Fetch storage backup w/ restore point specified by name"
+	restorePointTSDescription    = "Fetch storage backup w/ restore point time less or equal to the provided timestamp"
 	restoreConfigPathDescription = "Path to the cluster restore configuration"
 	fetchContentIdsDescription   = "If set, WAL-G will fetch only the specified segments"
 	fetchModeDescription         = "Backup fetch mode. default: do the backup unpacking " +
@@ -23,6 +24,7 @@ const (
 )
 
 var fetchTargetUserData string
+var restorePointTS string
 var restorePoint string
 var restoreConfigPath string
 var fetchContentIds *[]int
@@ -44,10 +46,20 @@ var backupFetchCmd = &cobra.Command{
 		if fetchTargetUserData == "" {
 			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
 		}
-		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData, restorePoint)
-		tracelog.ErrorLogger.FatalOnError(err)
 
 		folder, err := internal.ConfigureFolder()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		if restorePoint != "" && restorePointTS != "" {
+			tracelog.ErrorLogger.Fatalf("can't use both --restore-point and --restore-point-ts")
+		}
+
+		if restorePointTS != "" {
+			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, folder)
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+
+		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData, restorePoint)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		logsDir := viper.GetString(internal.GPLogsDirectory)
@@ -91,6 +103,7 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 func init() {
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
+	backupFetchCmd.Flags().StringVar(&restorePointTS, "restore-point-ts", "", restorePointTSDescription)
 	backupFetchCmd.Flags().StringVar(&restorePoint, "restore-point", "", restorePointDescription)
 	backupFetchCmd.Flags().StringVar(&restoreConfigPath, "restore-config",
 		"", restoreConfigPathDescription)
