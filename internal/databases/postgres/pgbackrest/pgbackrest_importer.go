@@ -43,7 +43,8 @@ func GetBackupList(backupsFolder storage.Folder, stanza string) ([]internal.Back
 	return backupTimes, nil
 }
 
-func GetBackupListWithMetadata(backupsFolder storage.Folder, metaFetcher internal.GenericMetaFetcher, stanza string) ([]internal.BackupTimeWithMetadata, error) {
+func GetBackupListWithMetadata(backupsFolder storage.Folder, metaFetcher internal.GenericMetaFetcher,
+	stanza string) ([]internal.BackupTimeWithMetadata, error) {
 	backupsSettings, err := LoadBackupsSettings(backupsFolder, stanza)
 	if err != nil {
 		return nil, err

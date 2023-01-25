@@ -31,8 +31,8 @@ func HandleBackupList(folder storage.Folder, metaFetcher internal.GenericMetaFet
 
 	if detailed {
 		var backupDetails []BackupDetails
-		for _, backupTime := range backupTimes {
-			details, err := GetBackupDetails(folder, stanza, backupTime.BackupTime.BackupName)
+		for i := 0; i < len(backupTimes); i++ {
+			details, err := GetBackupDetails(folder, stanza, backupTimes[i].BackupTime.BackupName)
 			if err != nil {
 				return err
 			}

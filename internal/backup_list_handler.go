@@ -87,8 +87,8 @@ func WriteBackupList(backups []BackupTimeWithMetadata, output io.Writer) {
 	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
 	defer writer.Flush()
 	fmt.Fprintln(writer, "name\tcreated\twal_segment_backup_start")
-	for _, b := range backups {
-		fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupTime.BackupName, FormatTime(b.StartTime), b.WalFileName)
+	for i := 0; i < len(backups); i++ {
+		fmt.Fprintf(writer, "%v\t%v\t%v\n", backups[i].BackupTime.BackupName, FormatTime(backups[i].StartTime), backups[i].WalFileName)
 	}
 }
 
@@ -97,8 +97,8 @@ func WritePrettyBackupList(backups []BackupTimeWithMetadata, output io.Writer) {
 	writer.SetOutputMirror(output)
 	defer writer.Render()
 	writer.AppendHeader(table.Row{"#", "Name", "Created", "WAL segment backup start"})
-	for i, b := range backups {
-		writer.AppendRow(table.Row{i, b.BackupTime.BackupName, PrettyFormatTime(b.StartTime), b.WalFileName})
+	for i := 0; i < len(backups); i++ {
+		writer.AppendRow(table.Row{i, backups[i].BackupTime.BackupName, PrettyFormatTime(backups[i].StartTime), backups[i].WalFileName})
 	}
 }
 
