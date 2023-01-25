@@ -2,12 +2,10 @@ package internal
 
 import (
 	"bytes"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/ioextensions"
-
+	functests "github.com/wal-g/wal-g/internal/testutils"
 	"os"
 	"path/filepath"
 	"sync"
@@ -61,19 +59,19 @@ func (t *TestWriter) Close() error {
 	return nil
 }
 
-func GetFolder(t *testing.T, networkErrorAfterByteSize int) (storage.Folder, func() error, error) {
+func GetFolder(networkErrorAfterByteSize int) (storage.Folder, func() error, error) {
 	cwd, err := filepath.Abs("./")
 	if err != nil {
-		t.Log(err)
+		return nil, nil, err
 	}
 	// Create temp directory.
 	tmpDir, err := os.MkdirTemp(cwd, "data")
 	if err != nil {
-		t.Log(err)
+		return nil, nil, err
 	}
 	err = os.Chmod(tmpDir, 0755)
 	if err != nil {
-		t.Log(err)
+		return nil, nil, err
 	}
 
 	folder, err := fs.ConfigureFolder(tmpDir, nil)
@@ -81,7 +79,7 @@ func GetFolder(t *testing.T, networkErrorAfterByteSize int) (storage.Folder, fun
 		return nil, nil, err
 	}
 	if networkErrorAfterByteSize != 0 {
-		return ioextensions.NewNetworkErrorFolder(folder, networkErrorAfterByteSize),
+		return functests.NewNetworkErrorFolder(folder, networkErrorAfterByteSize),
 			func() error {
 				return os.RemoveAll(tmpDir)
 			}, nil
@@ -93,7 +91,7 @@ func GetFolder(t *testing.T, networkErrorAfterByteSize int) (storage.Folder, fun
 }
 
 func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, networkErrorAfterByteSize, retryAttempts, sampleSize int) {
-	storageFolder, clear, err := GetFolder(t, networkErrorAfterByteSize)
+	storageFolder, clear, err := GetFolder(networkErrorAfterByteSize)
 	defer clear()
 	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
 
@@ -117,6 +115,7 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, n
 	}
 
 	err = DownloadAndDecompressSplittedStream(backup, blockSize, compression.Decompressors[0].FileExtension(), writer, retryAttempts)
+	assert.NoError(t, err)
 	<-writer.CloseNotify
 
 	result := writer.Result

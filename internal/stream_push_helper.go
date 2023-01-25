@@ -47,7 +47,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 				for {
 					fileReader := io.LimitReader(reader, int64(uploader.maxFileSize))
 					read := int64(0)
-					fileReader = utility.NewWithSizeReader(fileReader, &read)
+					fileReader = NewWithSizeReader(fileReader, &read)
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
 					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compressor.FileExtension(), currentPartNumber, idx)
@@ -94,7 +94,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 // PushStreamToDestination compresses a stream and push it to specifyed destination
 func (uploader *Uploader) PushStreamToDestination(stream io.Reader, dstPath string) error {
 	if uploader.dataSize != nil {
-		stream = utility.NewWithSizeReader(stream, uploader.dataSize)
+		stream = NewWithSizeReader(stream, uploader.dataSize)
 	}
 	compressed := CompressAndEncrypt(stream, uploader.Compressor, ConfigureCrypter())
 	err := uploader.Upload(dstPath, compressed)

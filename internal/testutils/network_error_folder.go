@@ -1,11 +1,11 @@
-package ioextensions
+package testutils
 
 import (
+	"github.com/wal-g/wal-g/internal"
 	"io"
 	"sync"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/utility"
 )
 
 func NewUnexpectedEOFLimitReader(readCloser io.ReadCloser, maxRead int64) io.ReadCloser {
@@ -64,7 +64,7 @@ func (tf *TestFolder) ReadObject(path string) (io.ReadCloser, error) {
 		if _, ok := tf.readFromFile[path]; !ok {
 			tf.readFromFile[path] = new(int64)
 		}
-		reader = utility.NewWithSizeReadCloser(reader, tf.readFromFile[path])
+		reader = internal.NewWithSizeReadCloser(reader, tf.readFromFile[path])
 		reader = NewUnexpectedEOFLimitReader(reader, *tf.readFromFile[path]+tf.maxReadSize)
 	}
 	return reader, err

@@ -11,6 +11,7 @@ type ReaderWithRetry struct {
 	getReader     func() (io.ReadCloser, error)
 	retryAttempts int
 	alreadyRead   int
+	attempt       int
 }
 
 func NewReaderWithRetry(getReader func() (io.ReadCloser, error), retryAttempts int) io.ReadCloser {
@@ -22,6 +23,7 @@ func NewReaderWithRetry(getReader func() (io.ReadCloser, error), retryAttempts i
 		getReader:     getReader,
 		retryAttempts: retryAttempts,
 		alreadyRead:   0,
+		attempt:       0,
 	}
 }
 
@@ -37,12 +39,14 @@ func (r *ReaderWithRetry) setupNewReader() error {
 
 func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 	n := 0
-	for attempt := 0; attempt < r.retryAttempts; attempt++ {
+	var lastErr error
+	for ; r.attempt < r.retryAttempts; r.attempt++ {
 		if r.reader == nil {
 			err := r.setupNewReader()
 			if err == io.EOF {
 				return n, err
 			} else if err != nil {
+				tracelog.ErrorLogger.Printf("error while initializing reader: %v", err)
 				tracelog.ErrorLogger.PrintOnError(r.reader.Close())
 				r.reader = nil
 				continue
@@ -50,22 +54,23 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 		}
 
 		read, err := r.reader.Read(p[n:])
+		lastErr = err
 		n += read
 		r.alreadyRead += read
 
 		if err == io.EOF {
 			return n, err
 		} else if err != nil {
-			tracelog.ErrorLogger.Printf("error while read file: %v. Attempt: %d\n", err, attempt)
+			tracelog.ErrorLogger.Printf("error while read file: %v. Attempt: %d\n", err, r.attempt)
 			tracelog.ErrorLogger.PrintOnError(r.reader.Close())
 			r.reader = nil
 			continue
 		} else if n == len(p) {
-			break
+			return n, nil
 		}
 	}
 
-	return n, nil
+	return n, lastErr
 }
 
 func (r *ReaderWithRetry) Close() error {
