@@ -107,18 +107,19 @@ const (
 	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes     = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 
-	MysqlDatasourceNameSetting = "WALG_MYSQL_DATASOURCE_NAME"
-	MysqlSslCaSetting          = "WALG_MYSQL_SSL_CA"
-	MysqlBinlogReplayCmd       = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
-	MysqlBinlogDstSetting      = "WALG_MYSQL_BINLOG_DST"
-	MysqlBackupPrepareCmd      = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
-	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
-	MysqlCheckGTIDs            = "WALG_MYSQL_CHECK_GTIDS"
-	MysqlBinlogServerHost      = "WALG_MYSQL_BINLOG_SERVER_HOST"
-	MysqlBinlogServerPort      = "WALG_MYSQL_BINLOG_SERVER_PORT"
-	MysqlBinlogServerUser      = "WALG_MYSQL_BINLOG_SERVER_USER"
-	MysqlBinlogServerPassword  = "WALG_MYSQL_BINLOG_SERVER_PASSWORD"
-	MysqlBinlogServerID        = "WALG_MYSQL_BINLOG_SERVER_ID"
+	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
+	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
+	MysqlBinlogReplayCmd           = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
+	MysqlBinlogDstSetting          = "WALG_MYSQL_BINLOG_DST"
+	MysqlBackupPrepareCmd          = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
+	MysqlTakeBinlogsFromMaster     = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
+	MysqlCheckGTIDs                = "WALG_MYSQL_CHECK_GTIDS"
+	MysqlBinlogServerHost          = "WALG_MYSQL_BINLOG_SERVER_HOST"
+	MysqlBinlogServerPort          = "WALG_MYSQL_BINLOG_SERVER_PORT"
+	MysqlBinlogServerUser          = "WALG_MYSQL_BINLOG_SERVER_USER"
+	MysqlBinlogServerPassword      = "WALG_MYSQL_BINLOG_SERVER_PASSWORD"
+	MysqlBinlogServerID            = "WALG_MYSQL_BINLOG_SERVER_ID"
+	MysqlBinlogServerReplicaSource = "WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
@@ -418,21 +419,22 @@ var (
 
 	MysqlAllowedSettings = map[string]bool{
 		// MySQL
-		MysqlDatasourceNameSetting: true,
-		MysqlSslCaSetting:          true,
-		MysqlBinlogReplayCmd:       true,
-		MysqlBinlogDstSetting:      true,
-		MysqlBackupPrepareCmd:      true,
-		MysqlTakeBinlogsFromMaster: true,
-		MysqlCheckGTIDs:            true,
-		StreamSplitterPartitions:   true,
-		StreamSplitterBlockSize:    true,
-		StreamSplitterMaxFileSize:  true,
-		MysqlBinlogServerHost:      true,
-		MysqlBinlogServerPort:      true,
-		MysqlBinlogServerUser:      true,
-		MysqlBinlogServerPassword:  true,
-		MysqlBinlogServerID:        true,
+		MysqlDatasourceNameSetting:     true,
+		MysqlSslCaSetting:              true,
+		MysqlBinlogReplayCmd:           true,
+		MysqlBinlogDstSetting:          true,
+		MysqlBackupPrepareCmd:          true,
+		MysqlTakeBinlogsFromMaster:     true,
+		MysqlCheckGTIDs:                true,
+		StreamSplitterPartitions:       true,
+		StreamSplitterBlockSize:        true,
+		StreamSplitterMaxFileSize:      true,
+		MysqlBinlogServerHost:          true,
+		MysqlBinlogServerPort:          true,
+		MysqlBinlogServerUser:          true,
+		MysqlBinlogServerPassword:      true,
+		MysqlBinlogServerID:            true,
+		MysqlBinlogServerReplicaSource: true,
 	}
 
 	RedisAllowedSettings = map[string]bool{

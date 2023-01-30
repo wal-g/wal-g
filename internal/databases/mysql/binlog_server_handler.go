@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"database/sql"
 	"encoding/binary"
 	"errors"
 	"net"
@@ -68,7 +69,11 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 }
 
 func waitReplicationIsDone() error {
-	db, err := getMySQLConnection()
+	replicaSource, err := internal.GetRequiredSetting(internal.MysqlBinlogServerReplicaSource)
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("mysql", replicaSource)
 	if err != nil {
 		return err
 	}
