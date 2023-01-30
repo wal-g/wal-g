@@ -58,8 +58,11 @@ func (mongodProcess *MongodProcess) Wait() error {
 	} else {
 		tracelog.InfoLogger.Printf("Mongod %v stopped successfully!", mongodProcess.GetURI())
 	}
-	mongodProcess.cancel()
 	return err
+}
+
+func (mongodProcess *MongodProcess) Close() {
+	mongodProcess.cancel()
 }
 
 func (mongodProcess *MongodProcess) start() (err error) {

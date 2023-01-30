@@ -75,6 +75,8 @@ func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig) error {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
 
+	defer mongodProcess.Close()
+
 	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")
@@ -98,6 +100,8 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
+
+	defer mongodProcess.Close()
 
 	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
 	if err != nil {
