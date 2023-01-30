@@ -270,11 +270,17 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(dstDir, 0777)
 		handleObjectProviderError(err, p)
+		if err != nil {
+			return
+		}
 	}
 
 	logFolder := folder.GetSubFolder(BinlogPath)
 	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, utility.MaxTime)
 	handleObjectProviderError(err, p)
+	if err != nil {
+		return
+	}
 
 	for _, logFile := range logsToFetch {
 		// download log files
@@ -294,9 +300,15 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 		// add file to provider
 		err = p.AddObjectToProvider(logFile)
 		handleObjectProviderError(err, p)
+		if err != nil {
+			return
+		}
 
 		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
 		handleObjectProviderError(err, p)
+		if err != nil {
+			return
+		}
 		if timestamp.After(endTS) {
 			return
 		}
