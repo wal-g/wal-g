@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"os"
 	"path"
 	"strconv"
 	"time"
@@ -23,7 +24,7 @@ var (
 	lastSentGTID string
 )
 
-func HandleEventError(err error, s *replication.BinlogStreamer) {
+func handleEventError(err error, s *replication.BinlogStreamer) {
 	if err == nil {
 		return
 	}
@@ -34,6 +35,7 @@ func HandleEventError(err error, s *replication.BinlogStreamer) {
 	}
 }
 
+// see: https://dev.mysql.com/doc/dev/mysql-server/latest/classbinary__log_1_1Rotate__event.html
 func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	// create rotate event
 	rotateBinlogEvent := replication.BinlogEvent{}
@@ -84,16 +86,15 @@ func waitReplicationIsDone() error {
 
 		if gtidSet.Contain(lastSentGTIDSet) {
 			tracelog.InfoLogger.Println("Replication is done")
-			break
+			return nil
 		}
 		time.Sleep(1 * time.Second)
 	}
-	return nil
 }
 
 func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mysql.Position, s *replication.BinlogStreamer) {
 	err := addRotateEvent(s, pos)
-	HandleEventError(err, s)
+	handleEventError(err, s)
 
 	p := replication.NewBinlogParser()
 
@@ -117,9 +118,9 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			if err != nil {
 				tracelog.InfoLogger.Println("Error while waiting replication is done: ", err)
 			}
-			break
+			os.Exit(0)
 		}
-		HandleEventError(err, s)
+		handleEventError(err, s)
 		if err != nil {
 			break
 		}
@@ -128,7 +129,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		binlogPath := path.Join(dstDir, binlogName)
 		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
 
-		HandleEventError(err, s)
+		handleEventError(err, s)
 		pos.Pos = 4
 	}
 }

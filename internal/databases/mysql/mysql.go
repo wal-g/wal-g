@@ -254,29 +254,27 @@ outer:
 	return nil
 }
 
+func handleObjectProviderError(err error, p *storage.ObjectProvider) {
+	if err == nil {
+		return
+	}
+	ok := p.AddErrorToProvider(err)
+	for !ok {
+		ok = p.AddErrorToProvider(err)
+	}
+}
+
 func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time, p *storage.ObjectProvider) {
 	defer p.Close()
 	_, err := os.Stat(dstDir)
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(dstDir, 0700)
-		if err != nil {
-			ok := p.AddErrorToProvider(err)
-			for !ok {
-				ok = p.AddErrorToProvider(err)
-			}
-			return
-		}
+		err = os.MkdirAll(dstDir, 0777)
+		handleObjectProviderError(err, p)
 	}
 
 	logFolder := folder.GetSubFolder(BinlogPath)
 	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, utility.MaxTime)
-	if err != nil {
-		ok := p.AddErrorToProvider(err)
-		for !ok {
-			ok = p.AddErrorToProvider(err)
-		}
-		return
-	}
+	handleObjectProviderError(err, p)
 
 	for _, logFile := range logsToFetch {
 		// download log files
@@ -288,31 +286,17 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
 			} else {
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
-				ok := p.AddErrorToProvider(err)
-				for !ok {
-					ok = p.AddErrorToProvider(err)
-				}
+				handleObjectProviderError(err, p)
 				return
 			}
 		}
 
 		// add file to provider
 		err = p.AddObjectToProvider(logFile)
-		if err != nil {
-			ok := p.AddErrorToProvider(err)
-			for !ok {
-				ok = p.AddErrorToProvider(err)
-			}
-			return
-		}
+		handleObjectProviderError(err, p)
 
 		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
-		if err != nil {
-			ok := p.AddErrorToProvider(err)
-			for !ok {
-				ok = p.AddErrorToProvider(err)
-			}
-		}
+		handleObjectProviderError(err, p)
 		if timestamp.After(endTS) {
 			return
 		}

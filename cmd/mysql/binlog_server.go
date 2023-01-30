@@ -15,7 +15,7 @@ const (
 	UntilFlagShortDescr          = "time in RFC3339 for PITR"
 )
 
-var UntilTS string
+var utilTS string
 
 var (
 	binlogServerCmd = &cobra.Command{
@@ -32,13 +32,13 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			mysql.HandleBinlogServer(UntilTS)
+			mysql.HandleBinlogServer(utilTS)
 		},
 	}
 )
 
 func init() {
-	binlogServerCmd.PersistentFlags().StringVar(&UntilTS,
+	binlogServerCmd.PersistentFlags().StringVar(&utilTS,
 		"until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
 		UntilFlagShortDescr)
