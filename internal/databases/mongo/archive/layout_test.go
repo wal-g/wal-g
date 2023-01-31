@@ -440,10 +440,10 @@ func TestSplitPurgingBackups(t *testing.T) {
 		err        error
 	}{
 		{
-			name: "Purge_all,count=nil,after=nil",
+			name: "Purge_all,count=0,after=nil",
 			args: args{
 				backups:     SplitBackups,
-				retainCount: nil,
+				retainCount: IntPtr(0),
 				retainAfter: nil,
 			},
 			wantPurge:  SplitBackups,
