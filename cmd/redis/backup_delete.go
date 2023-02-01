@@ -56,7 +56,7 @@ func runDelete(cmd *cobra.Command, args []string) {
 
 func init() {
 	cmd.AddCommand(deleteCmd)
-	deleteCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+	deleteCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup and garbage deletion")
 	deleteCmd.Flags().BoolVar(&purgeGarbage, purgeGarbageFlag, false, "Delete garbage in backup folder")
 	deleteCmd.Flags().StringVar(&retainAfter, retainAfterFlag, "", "Keep backups newer")
 	deleteCmd.Flags().UintVar(&retainCount, retainCountFlag, 0, "Keep minimum count, except permanent backups")
