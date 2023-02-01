@@ -16,7 +16,7 @@ require (
 	github.com/cyberdelia/lzo v0.0.0-20171006181345-d85071271a6f
 	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/docker/docker v1.13.1
-	github.com/go-mysql-org/go-mysql v1.6.1-0.20230116021724-c4a17aa5b49f
+	github.com/go-mysql-org/go-mysql v1.7.0
 	github.com/go-redis/redis v6.15.6+incompatible
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gofrs/flock v0.8.0

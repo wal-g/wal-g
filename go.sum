@@ -171,6 +171,8 @@ github.com/go-logfmt/logfmt v0.4.0/go.mod h1:3RMwSq7FuexP4Kalkev3ejPJsZTpXXBr9+V
 github.com/go-logfmt/logfmt v0.5.0/go.mod h1:wCYkCAKZfumFQihp8CzCvQ3paCTfi41vtzG1KdI/P7A=
 github.com/go-mysql-org/go-mysql v1.6.1-0.20230116021724-c4a17aa5b49f h1:VfKtnjUp2EUBAv6acJhcIdg2H2ZqvpyDWCk3KRQi+PI=
 github.com/go-mysql-org/go-mysql v1.6.1-0.20230116021724-c4a17aa5b49f/go.mod h1:9cRWLtuXNKhamUPMkrDVzBhaomGvqLRLtBiyjvjc4pk=
+github.com/go-mysql-org/go-mysql v1.7.0 h1:qE5FTRb3ZeTQmlk3pjE+/m2ravGxxRDrVDTyDe9tvqI=
+github.com/go-mysql-org/go-mysql v1.7.0/go.mod h1:9cRWLtuXNKhamUPMkrDVzBhaomGvqLRLtBiyjvjc4pk=
 github.com/go-openapi/errors v0.19.2/go.mod h1:qX0BLWsyaKfvhluLejVpVNwNRdXZhEbTA4kxxpKBC94=
 github.com/go-openapi/errors v0.19.3 h1:7MGZI1ibQDLasvAz8HuhvYk9eNJbJkCOXWsSjjMS+Zc=
 github.com/go-openapi/errors v0.19.3/go.mod h1:qX0BLWsyaKfvhluLejVpVNwNRdXZhEbTA4kxxpKBC94=
