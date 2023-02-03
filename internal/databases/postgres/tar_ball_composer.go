@@ -14,6 +14,7 @@ const (
 	RegularComposer TarBallComposerType = iota + 1
 	RatingComposer
 	CopyComposer
+	DatabaseComposer
 )
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
@@ -64,6 +65,8 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 			}
 		}
 		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
+	case DatabaseComposer:
+		return NewDirDatabaseTarBallComposerMaker(&internal.RegularBundleFiles{}, filePackOptions, internal.NewRegularTarFileSets()), nil
 	default:
 		return nil, errors.New("NewTarBallComposerMaker: Unknown TarBallComposerType")
 	}

@@ -341,6 +341,10 @@ func TestWalk_CopyComposer(t *testing.T) {
 	testWalk(t, postgres.CopyComposer, false)
 }
 
+func TestWalk_DatabaseComposer(t *testing.T) {
+	testWalk(t, postgres.DatabaseComposer, false)
+}
+
 func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesMetadata bool) {
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
@@ -451,6 +455,9 @@ func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, withou
 	case postgres.CopyComposer:
 		mockBackup := getMockBackupFromFiles(nil)
 		return postgres.NewCopyTarBallComposerMaker(mockBackup, "mockName", filePackOptions)
+	case postgres.DatabaseComposer:
+		return postgres.NewDirDatabaseTarBallComposerMaker(&internal.RegularBundleFiles{}, filePackOptions, internal.NewRegularTarFileSets())
+
 	default:
 		return nil
 	}
