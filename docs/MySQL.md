@@ -41,6 +41,21 @@ To place binlogs in the specified directory during binlog-fetch or binlog-replay
 Set this variable to True if you are planning to take base backup from replica and binlog backup from master.
 If base and binlogs backups are taken from the same host, this variable should be left False (default).
 
+* `WALG_MYSQL_BINLOG_SERVER_HOST`
+* `WALG_MYSQL_BINLOG_SERVER_PORT`
+* `WALG_MYSQL_BINLOG_SERVER_USER`
+* `WALG_MYSQL_BINLOG_SERVER_PASSWORD`
+
+To configure the data to connect the replica to for binlog server.
+
+* `WALG_MYSQL_BINLOG_SERVER_ID`
+
+To configure the server id of the binlog server. Should be unique for each replica.
+
+* `WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE`
+
+To configure the connection string for the replica that connects to the binlog server. Format ```user:password@host/dbname```
+
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
 
@@ -88,7 +103,6 @@ Sends (not yet archived) binlogs to storage. Typically run in CRON.
 ```bash
 wal-g binlog-push
 ```
-
 
 When `WALG_MYSQL_CHECK_GTIDS` is set wal-g will try to be upload only binlogs which GTID sets contains events that
 wasn't seen before. This is done by parsing binlogs and peeking first PREVIOUS_GTIDS_EVENT that holds GTID set of
@@ -148,6 +162,14 @@ This may be useful to achieve exact clones of the same database in scenarios whe
 
 ```bash
 wal-g binlog-replay --since LATEST --until "2006-01-02T15:04:05Z07:00" --until-binlog-last-modified-time "2006-01-02T15:04:05Z07:00"
+```
+
+### ``binlog-server``
+
+Runs mysql server implementation which can be used to fetch binlogs from storage and send them to MySQL slave by replication protocol.
+
+```bash
+wal-g binlog-server
 ```
 
 Typical configurations
