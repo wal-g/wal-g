@@ -27,8 +27,8 @@ done
 # remember the backup-list output
 # later in the test we create new backups which should be deleted so lists should be identical
 wal-g --config=${TMP_CONFIG} backup-list
-lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 2 > /tmp/list_before_delete
+lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list 2>&1 | wc -l`
+wal-g --config=${TMP_CONFIG} backup-list 2>&1 | tail -n 2 > /tmp/list_before_delete
 
 # create one full and two increments
 for i in 1 2 3
@@ -43,7 +43,7 @@ do
 done
 
 # get the name of the second incremental backup
-SECOND_INCREMENT=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==5 {print $1}')
+SECOND_INCREMENT=$(wal-g --config=${TMP_CONFIG} backup-list 2>&1 | awk 'NR==5 {print $1}')
 
 # make two increments from the SECOND_INCREMENT
 insert_data
@@ -57,8 +57,8 @@ wal-g --config=${TMP_CONFIG} delete target FIND_FULL ${SECOND_INCREMENT} --confi
 
 wal-g --config=${TMP_CONFIG} backup-list
 
-lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 2 > /tmp/list_after_delete
+lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list 2>&1 | wc -l`
+wal-g --config=${TMP_CONFIG} backup-list 2>&1 | tail -n 2 > /tmp/list_after_delete
 
 if [ $(($lines_before_delete)) -ne $lines_after_delete ];
 then

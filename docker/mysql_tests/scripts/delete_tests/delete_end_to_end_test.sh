@@ -21,8 +21,8 @@ sleep 1
 
 mysqldump sbtest > /tmp/dump_1.sql
 wal-g backup-list
-test "2" -eq "$(wal-g backup-list | wc -l)"
-FIRST_BACKUP=$(wal-g backup-list | awk 'NR==2{print $1}')
+test "2" -eq "$(wal-g backup-list 2>&1 | wc -l)"
+FIRST_BACKUP=$(wal-g backup-list 2>&1 | awk 'NR==2{print $1}')
 DT1=$(date3339)
 
 # second backup
@@ -34,8 +34,8 @@ wal-g binlog-push
 sleep 1
 
 mysqldump sbtest > /tmp/dump_2.sql
-test "3" -eq "$(wal-g backup-list | wc -l)"
-SECOND_BACKUP=$(wal-g backup-list | awk 'NR==3{print $1}')
+test "3" -eq "$(wal-g backup-list 2>&1 | wc -l)"
+SECOND_BACKUP=$(wal-g backup-list 2>&1 | awk 'NR==3{print $1}')
 DT2=$(date3339)
 
 
@@ -48,8 +48,8 @@ wal-g binlog-push
 sleep 1
 
 mysqldump sbtest > /tmp/dump_3.sql
-test "4" -eq "$(wal-g backup-list | wc -l)"
-THIRD_BACKUP=$(wal-g backup-list | awk 'NR==4{print $1}')
+test "4" -eq "$(wal-g backup-list 2>&1 | wc -l)"
+THIRD_BACKUP=$(wal-g backup-list 2>&1 | awk 'NR==4{print $1}')
 DT3=$(date3339)
 
 
@@ -62,15 +62,15 @@ wal-g binlog-push
 sleep 1
 
 mysqldump sbtest > /tmp/dump_4.sql
-test "5" -eq "$(wal-g backup-list | wc -l)"
-FOURTH_BACKUP=$(wal-g backup-list | awk 'NR==5{print $1}')
+test "5" -eq "$(wal-g backup-list 2>&1 | wc -l)"
+FOURTH_BACKUP=$(wal-g backup-list 2>&1 | awk 'NR==5{print $1}')
 DT4=$(date3339)
 
 
 
 # delete first backup
 wal-g delete before FIND_FULL "$SECOND_BACKUP" --confirm
-test "4" -eq "$(wal-g backup-list | wc -l)"
+test "4" -eq "$(wal-g backup-list 2>&1 | wc -l)"
 
 
 # test restore second
@@ -86,7 +86,7 @@ diff -u /tmp/dump_2.sql /tmp/dump_2_restored.sql
 
 # delete second backup
 wal-g delete retain 2 --confirm
-test "3" -eq "$(wal-g backup-list | wc -l)"
+test "3" -eq "$(wal-g backup-list 2>&1 | wc -l)"
 
 
 # test restore third backup
@@ -102,7 +102,7 @@ diff -u /tmp/dump_3.sql /tmp/dump_3_restored.sql
 # delete third backup using target backup delete
 wal-g delete target "$THIRD_BACKUP" --confirm
 wal-g backup-list
-test "2" -eq "$(wal-g backup-list | wc -l)"
+test "2" -eq "$(wal-g backup-list 2>&1 | wc -l)"
 
 # test restore fourth backup
 mysql_kill_and_clean_data

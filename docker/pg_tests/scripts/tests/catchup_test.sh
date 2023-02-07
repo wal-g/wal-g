@@ -68,7 +68,7 @@ pgbench -i -s 10 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 wal-g --config=${TMP_CONFIG} catchup-push ${PGDATA_ALPHA} --from-lsn ${LSN} 2>/tmp/stderr 1>/tmp/stdout
 cat /tmp/stderr /tmp/stdout
 
-BACKUP_NAME=`grep -oE 'base_[0-9A-Z]*' /tmp/stderr | sort -u`
+BACKUP_NAME=`grep -oE 'base_[0-9A-Z]*' /tmp/stdout | sort -u`
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w stop
 sleep 5

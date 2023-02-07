@@ -27,7 +27,7 @@ mysql -e "FLUSH LOGS"
 wal-g binlog-push
 sleep 1
 
-test "3" -eq "$(wal-g backup-list | wc -l)"
+test "3" -eq "$(wal-g backup-list 2>&1 | wc -l)"
 
 # assert that WAL-G can't delete permanent backups without the FORCE flag
 if wal-g delete everything --confirm; then
@@ -41,4 +41,4 @@ fi
 wal-g delete everything FORCE --confirm
 
 # check that we don't have any backups left after delete
-test "0" -eq "$(wal-g backup-list | wc -l)"
+test "0" -eq "$(wal-g backup-list 2>&1 | wc -l)"
