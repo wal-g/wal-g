@@ -40,7 +40,7 @@ func (r *ReaderWithRetry) setupNewReader() error {
 func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 	n := 0
 	var lastErr error
-	for ; r.attempt < r.retryAttempts; r.attempt++ {
+	for r.attempt < r.retryAttempts {
 		if r.reader == nil {
 			err := r.setupNewReader()
 			if err == io.EOF {
@@ -49,6 +49,7 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 				tracelog.ErrorLogger.Printf("error while initializing reader: %v", err)
 				tracelog.ErrorLogger.PrintOnError(r.reader.Close())
 				r.reader = nil
+				r.attempt++
 				continue
 			}
 		}
@@ -64,6 +65,7 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 			tracelog.ErrorLogger.Printf("error while read file: %v. Attempt: %d\n", err, r.attempt)
 			tracelog.ErrorLogger.PrintOnError(r.reader.Close())
 			r.reader = nil
+			r.attempt++
 			continue
 		} else if n == len(p) {
 			return n, nil
