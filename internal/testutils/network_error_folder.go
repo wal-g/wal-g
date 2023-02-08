@@ -1,9 +1,10 @@
 package testutils
 
 import (
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"sync"
+
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
