@@ -21,8 +21,10 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
-	skipDirectoryCheckDescription = `Skip check that directory to restore backup is empty (requires reverse delta unpack).
-Use with --skip-redundant-tars option. Unsafe if tablespaces specified`
+	skipDirectoryCheckDescription = `Skip emptiness check & skip download of all existed files. Requires reverse delta unpack!
+Use with --skip-redundant-tars option. Unsafe if tablespaces specified.`
+	onlyDatabasesDescription = `Downloads databases specified by passed db ids from default tablespace. Requires reverse delta unpack!
+Use with --skip-redundant-tars option for partial backup`
 )
 
 var fileMask string
@@ -31,6 +33,7 @@ var reverseDeltaUnpack bool
 var skipRedundantTars bool
 var fetchTargetUserData string
 var skipDirectoryCheck bool
+var onlyDatabases []int
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
@@ -54,7 +57,8 @@ var backupFetchCmd = &cobra.Command{
 		extractProv := postgres.ExtractProviderImpl{}
 
 		if reverseDeltaUnpack {
-			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv, skipDirectoryCheck)
+			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars,
+				extractProv, skipDirectoryCheck, onlyDatabases)
 		} else {
 			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
@@ -88,8 +92,10 @@ func init() {
 		false, skipRedundantTarsDescription)
 	backupFetchCmd.Flags().BoolVar(&skipDirectoryCheck, "skip-directory-check",
 		false, skipDirectoryCheckDescription)
-
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
+	backupFetchCmd.Flags().IntSliceVar(&onlyDatabases, "only-databases",
+		nil, onlyDatabasesDescription)
+
 	Cmd.AddCommand(backupFetchCmd)
 }
