@@ -65,7 +65,7 @@ func newDirDatabaseTarBallComposer(
 }
 
 func (d DirDatabaseTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
-	if strings.Contains(info.Path, "base") {
+	if strings.Contains(info.Path, DefaultTablespace) {
 		d.fileDirCollection[path.Dir(info.Path)] = append(d.fileDirCollection[path.Dir(info.Path)], info)
 	} else {
 		d.fileDirCollection[""] = append(d.fileDirCollection[""], info)
@@ -86,10 +86,21 @@ func (d DirDatabaseTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.
 }
 
 func (d DirDatabaseTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
+	// Push Headers in first part
+	err := d.addListToTar(make([]*internal.ComposeFileInfo, 0))
+	if err != nil {
+		return nil, err
+	}
+
 	eg := errgroup.Group{}
 	for _, fileInfos := range d.fileDirCollection {
 		thisInfos := fileInfos
-		eg.Go(func() error { return d.addListToTar(thisInfos) })
+		eg.Go(func() error {
+			if len(thisInfos) == 0 {
+				return nil
+			}
+			return d.addListToTar(thisInfos)
+		})
 	}
 
 	if err := eg.Wait(); err != nil {

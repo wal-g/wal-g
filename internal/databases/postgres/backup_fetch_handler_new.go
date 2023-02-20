@@ -2,15 +2,16 @@ package postgres
 
 import (
 	"fmt"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"io/fs"
+	"path/filepath"
 )
 
 func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool,
-	extractProv ExtractProvider,
+	extractProv ExtractProvider, skipDirectoryCheck bool,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
@@ -25,19 +26,42 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 		}
 
-		// directory must be empty before starting a deltaFetch
-		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-
-		if !isEmpty {
-			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
-				NewNonEmptyDBDataDirectoryError(dbDataDirectory))
+		// directory must be empty before starting a deltaFetch if flag is not set
+		if skipDirectoryCheck {
+			err := removeExistedFilesFromUnwrap(dbDataDirectory, filesToUnwrap)
+			tracelog.ErrorLogger.FatalfOnError("Failed to skip directory check: %v\n", err)
+		} else {
+			isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
+			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+			if !isEmpty {
+				tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
+					NewNonEmptyDBDataDirectoryError(dbDataDirectory))
+			}
 		}
+
 		config := NewFetchConfig(pgBackup.Name,
 			utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap, skipRedundantTars, extractProv)
 		err = deltaFetchRecursionNew(config)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
+}
+
+func removeExistedFilesFromUnwrap(dbDataDirectory string, filesToUnwrap map[string]bool) error {
+	return filepath.Walk(dbDataDirectory, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		path, err = filepath.Rel(dbDataDirectory, path)
+		if err != nil {
+			return nil
+		}
+
+		path = filepath.Clean("/" + path)
+		delete(filesToUnwrap, path)
+
+		return nil
+	})
 }
 
 // TODO : unit tests
