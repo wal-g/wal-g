@@ -3,12 +3,11 @@ package pg
 import (
 	"fmt"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -21,10 +20,10 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
-	skipDirectoryCheckDescription = `Skip emptiness check & skip download of all existed files. Requires reverse delta unpack!
-Use with --skip-redundant-tars option. Unsafe if tablespaces specified.`
-	onlyDatabasesDescription = `Downloads databases specified by passed db ids from default tablespace. Requires reverse delta unpack!
-Use with --skip-redundant-tars option for partial backup`
+	skipDirectoryCheckDescription = `Skip emptiness check & skip download of all existed files.
+Requires reverse delta unpack! Use with --skip-redundant-tars option. Unsafe if tablespaces specified.`
+	onlyDatabasesDescription = `Downloads databases specified by passed db ids from default tablespace. 
+Requires reverse delta unpack! Use with --skip-redundant-tars option for partial backup`
 )
 
 var fileMask string

@@ -2,12 +2,13 @@ package postgres
 
 import (
 	"archive/tar"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/crypto"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"golang.org/x/sync/errgroup"
 )
 
 type DirDatabaseTarBallComposerMaker struct {
@@ -16,7 +17,8 @@ type DirDatabaseTarBallComposerMaker struct {
 	tarFileSets       internal.TarFileSets
 }
 
-func NewDirDatabaseTarBallComposerMaker(files internal.BundleFiles, filePackerOptions TarBallFilePackerOptions, tarFileSets internal.TarFileSets) *DirDatabaseTarBallComposerMaker {
+func NewDirDatabaseTarBallComposerMaker(files internal.BundleFiles, filePackerOptions TarBallFilePackerOptions,
+	tarFileSets internal.TarFileSets) *DirDatabaseTarBallComposerMaker {
 	return &DirDatabaseTarBallComposerMaker{
 		files:             files,
 		filePackerOptions: filePackerOptions,
@@ -53,7 +55,6 @@ func newDirDatabaseTarBallComposer(
 	sets internal.TarFileSets,
 	crypter crypto.Crypter,
 ) *DirDatabaseTarBallComposer {
-
 	return &DirDatabaseTarBallComposer{
 		files:             files,
 		tarBallQueue:      tarBallQueue,
@@ -118,7 +119,6 @@ func (d DirDatabaseTarBallComposer) addListToTar(files []*internal.ComposeFileIn
 	tarBall.SetUp(d.crypter)
 
 	for _, file := range files {
-
 		d.tarFileSets.AddFile(tarBall.Name(), file.Header.Name)
 		err := d.tarFilePacker.PackFileIntoTar(file, tarBall)
 		if err != nil {
