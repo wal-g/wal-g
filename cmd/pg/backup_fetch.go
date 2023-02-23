@@ -20,10 +20,11 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
-	skipDirectoryCheckDescription = `Skip emptiness check & skip download of all existed files.
-Requires reverse delta unpack! Use with --skip-redundant-tars option. Unsafe if tablespaces specified.`
-	onlyDatabasesDescription = `Downloads databases specified by passed db ids from default tablespace. 
+	onlyDatabasesDescription      = `Downloads databases specified by passed db ids from default tablespace. 
 Requires reverse delta unpack! Use with --skip-redundant-tars option for partial backup`
+	partialBackupDescription = `only-databases alias, sets reverse delta unpack & skip redundant tars automatically`
+
+	partialBackupCommandName = "partial"
 )
 
 var fileMask string
@@ -31,8 +32,8 @@ var restoreSpec string
 var reverseDeltaUnpack bool
 var skipRedundantTars bool
 var fetchTargetUserData string
-var skipDirectoryCheck bool
 var onlyDatabases []int
+var partialDatabases []int
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
@@ -57,12 +58,21 @@ var backupFetchCmd = &cobra.Command{
 
 		if reverseDeltaUnpack {
 			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars,
-				extractProv, skipDirectoryCheck, onlyDatabases)
+				extractProv, onlyDatabases)
 		} else {
 			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
 		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		partial := cmd.Flags().Lookup(partialBackupCommandName)
+
+		if partial.Changed {
+			onlyDatabases = partialDatabases
+			skipRedundantTars = true
+			reverseDeltaUnpack = true
+		}
 	},
 }
 
@@ -89,12 +99,12 @@ func init() {
 		false, reverseDeltaUnpackDescription)
 	backupFetchCmd.Flags().BoolVar(&skipRedundantTars, "skip-redundant-tars",
 		false, skipRedundantTarsDescription)
-	backupFetchCmd.Flags().BoolVar(&skipDirectoryCheck, "skip-directory-check",
-		false, skipDirectoryCheckDescription)
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
 	backupFetchCmd.Flags().IntSliceVar(&onlyDatabases, "only-databases",
 		nil, onlyDatabasesDescription)
+	backupFetchCmd.Flags().IntSliceVar(&partialDatabases, partialBackupCommandName,
+		nil, partialBackupDescription)
 
 	Cmd.AddCommand(backupFetchCmd)
 }

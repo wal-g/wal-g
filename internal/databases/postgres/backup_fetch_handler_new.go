@@ -2,9 +2,7 @@ package postgres
 
 import (
 	"fmt"
-	"io/fs"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -15,7 +13,7 @@ import (
 )
 
 func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool,
-	extractProv ExtractProvider, skipDirectoryCheck bool, onlyDatabases []int,
+	extractProv ExtractProvider, onlyDatabases []int,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
@@ -35,17 +33,12 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 			tracelog.ErrorLogger.FatalfOnError("Failed to specify databases: %v\n", err)
 		}
 
-		// directory must be empty before starting a deltaFetch if flag is not set
-		if skipDirectoryCheck {
-			err := removeExistedFilesFromUnwrap(dbDataDirectory, filesToUnwrap)
-			tracelog.ErrorLogger.FatalfOnError("Failed to skip directory check: %v\n", err)
-		} else {
-			isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
-			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
-			if !isEmpty {
-				tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
-					NewNonEmptyDBDataDirectoryError(dbDataDirectory))
-			}
+		// directory must be empty before starting
+		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		if !isEmpty {
+			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
+				NewNonEmptyDBDataDirectoryError(dbDataDirectory))
 		}
 
 		config := NewFetchConfig(pgBackup.Name,
@@ -85,24 +78,6 @@ func getFilteredBySpecifiedDatabases(filesToUnwrap map[string]bool, databases []
 	}
 
 	return nil
-}
-
-func removeExistedFilesFromUnwrap(dbDataDirectory string, filesToUnwrap map[string]bool) error {
-	return filepath.Walk(dbDataDirectory, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-
-		path, err = filepath.Rel(dbDataDirectory, path)
-		if err != nil {
-			return nil
-		}
-
-		path = filepath.Clean("/" + path)
-		delete(filesToUnwrap, path)
-
-		return nil
-	})
 }
 
 // TODO : unit tests
