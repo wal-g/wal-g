@@ -26,6 +26,7 @@ const (
 	EncryptionKey   = "GCS_ENCRYPTION_KEY"
 	MaxChunkSize    = "GCS_MAX_CHUNK_SIZE"
 	MaxRetries      = "GCS_MAX_RETRIES"
+	ProtectedBucket = "GCS_PROTECTED_BUCKET"
 
 	defaultContextTimeout = 60 * 60 // 1 hour
 	maxRetryDelay         = 5 * time.Minute
@@ -45,6 +46,7 @@ var (
 		EncryptionKey,
 		MaxChunkSize,
 		MaxRetries,
+		ProtectedBucket,
 	}
 )
 
@@ -56,7 +58,7 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 	return storage.NewError(err, "GCS", format, args...)
 }
 
-func NewFolder(bucket *gcs.BucketHandle, path string, contextTimeout int, normalizePrefix bool, encryptionKey []byte,
+func NewFolder(bucket *gcs.BucketHandle, path string, contextTimeout int, normalizePrefix bool, protectedBucket bool, encryptionKey []byte,
 	options []UploaderOption) *Folder {
 	encryptionKeyCopy := make([]byte, len(encryptionKey))
 	copy(encryptionKeyCopy, encryptionKey)
@@ -67,13 +69,14 @@ func NewFolder(bucket *gcs.BucketHandle, path string, contextTimeout int, normal
 		contextTimeout:  contextTimeout,
 		normalizePrefix: normalizePrefix,
 		encryptionKey:   encryptionKeyCopy,
+		protectedBucket: protectedBucket,
 		uploaderOptions: options,
 	}
 }
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
 	normalizePrefix := true
-
+	protectedBucket := false
 	if normalizePrefixStr, ok := settings[NormalizePrefix]; ok {
 		var err error
 		normalizePrefix, err = strconv.ParseBool(normalizePrefixStr)
@@ -82,6 +85,13 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		}
 	}
 
+	if protectedBucketStr, ok := settings[ProtectedBucket]; ok {
+		var err error
+		protectedBucket, err = strconv.ParseBool(protectedBucketStr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse %s", ProtectedBucket)
+		}
+	}
 	ctx := context.Background()
 
 	client, err := gcs.NewClient(ctx)
@@ -135,7 +145,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		return nil, NewError(err, "Unable to parse GCS uploader options")
 	}
 
-	return NewFolder(bucket, path, contextTimeout, normalizePrefix, encryptionKey, uploaderOptions), nil
+	return NewFolder(bucket, path, contextTimeout, normalizePrefix, protectedBucket, encryptionKey, uploaderOptions), nil
 }
 
 func getUploaderOptions(settings map[string]string) ([]UploaderOption, error) {
@@ -166,6 +176,7 @@ type Folder struct {
 	path            string
 	contextTimeout  int
 	normalizePrefix bool
+	protectedBucket bool
 	encryptionKey   []byte
 	uploaderOptions []UploaderOption
 }
@@ -208,6 +219,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 						objAttrs.Prefix,
 						folder.contextTimeout,
 						folder.normalizePrefix,
+						folder.protectedBucket,
 						folder.encryptionKey,
 						folder.uploaderOptions,
 					))
@@ -263,6 +275,7 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 		folder.joinPath(folder.path, subFolderRelativePath),
 		folder.contextTimeout,
 		folder.normalizePrefix,
+		folder.protectedBucket,
 		folder.encryptionKey,
 		folder.uploaderOptions,
 	)
@@ -282,15 +295,9 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	object := folder.BuildObjectHandle(folder.joinPath(folder.path, name))
 
-	//TODO: no need to check for each put, retention is at the bucket level
-	// if there is retention policy use xml upload
-	ctx := context.Background()
-	attrs, err := folder.bucket.Attrs(ctx)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Unable to read bucket attributes of %s, err: %v", name, err)
-		return NewError(err, "Unable to read GCS  Bucket attributes")
-	}
-	if attrs.RetentionPolicy != nil {
+	// if bucket is protected use xml upload
+	tracelog.DebugLogger.Printf("GCS_PROTECTED_BUCKET is %v", folder.protectedBucket)
+	if folder.protectedBucket {
 		tracelog.DebugLogger.Println("Switching to XML Multipart Upload")
 		UploadToBucket(fmt.Sprintf("%s/%s", folder.GetPath(), name), content)
 	} else {
