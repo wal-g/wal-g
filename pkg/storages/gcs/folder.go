@@ -68,8 +68,8 @@ func NewFolder(bucket *gcs.BucketHandle, path string, contextTimeout int, normal
 		path:            path,
 		contextTimeout:  contextTimeout,
 		normalizePrefix: normalizePrefix,
-		encryptionKey:   encryptionKeyCopy,
 		protectedBucket: protectedBucket,
+		encryptionKey:   encryptionKeyCopy,
 		uploaderOptions: options,
 	}
 }

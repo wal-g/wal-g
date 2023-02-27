@@ -186,16 +186,18 @@ func UploadToBucket(objectName string, objectContent io.Reader) {
 	var err error
 
 	defaultMaxChunkSize := 16 << 20
-	gcs_max_chunk_size, ok := os.LookupEnv("GCS_MAX_CHUNK_SIZE")
+	maxChunkSizeSetting, ok := os.LookupEnv("WALG_GCS_MAX_CHUNK_SIZE")
 	if ok {
-		chunkSize = int64(defaultMaxChunkSize)
-	} else {
-		chunkSize, err = strconv.ParseInt(gcs_max_chunk_size, 10, 64)
+		tracelog.DebugLogger.Printf("WALG_GCS_MAX_CHUNK_SIZE DEFINED, chunk_size will be : %v\n", maxChunkSizeSetting)
+		chunkSize, err = strconv.ParseInt(maxChunkSizeSetting, 10, 64)
 		if err != nil {
-			log.Fatalf("unable to convert gcs_max_chunk_size : %v ", err)
+			log.Fatalf("invalid maximum chunk size setting")
 		}
+	} else {
+		tracelog.DebugLogger.Printf("WALG_GCS_MAX_CHUNK_SIZE UNDEFINED, chunk size will be: %v \n", defaultMaxChunkSize)
+		chunkSize = int64(defaultMaxChunkSize)
 	}
-
+	tracelog.DebugLogger.Printf("GCS Bucket chunk size: %v\n", chunkSize)
 	partNumber := 0
 	parts := []*Part{}
 
