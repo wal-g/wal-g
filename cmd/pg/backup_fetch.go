@@ -56,11 +56,16 @@ var backupFetchCmd = &cobra.Command{
 		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(internal.UseReverseUnpackSetting)
 		skipRedundantTars = skipRedundantTars || viper.GetBool(internal.SkipRedundantTarsSetting)
 
-		extractProv := postgres.ExtractProviderImpl{}
+		var extractProv postgres.ExtractProvider
+
+		if onlyDatabases != nil {
+			extractProv = postgres.NewExtractProviderDBSpec(onlyDatabases)
+		} else {
+			extractProv = postgres.ExtractProviderImpl{}
+		}
 
 		if reverseDeltaUnpack {
-			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars,
-				extractProv, onlyDatabases)
+			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv)
 		} else {
 			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}

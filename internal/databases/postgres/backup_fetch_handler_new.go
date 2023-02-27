@@ -2,10 +2,6 @@ package postgres
 
 import (
 	"fmt"
-	"path"
-	"strconv"
-	"strings"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -13,7 +9,7 @@ import (
 )
 
 func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool,
-	extractProv ExtractProvider, onlyDatabases []int,
+	extractProv ExtractProvider,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
@@ -26,11 +22,6 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 			err := readRestoreSpec(restoreSpecPath, spec)
 			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
 			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
-		}
-
-		if onlyDatabases != nil {
-			err := getFilteredBySpecifiedDatabases(filesToUnwrap, onlyDatabases)
-			tracelog.ErrorLogger.FatalfOnError("Failed to specify databases: %v\n", err)
 		}
 
 		// directory must be empty before starting
@@ -46,38 +37,6 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 		err = deltaFetchRecursionNew(config)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
-}
-
-func getFilteredBySpecifiedDatabases(filesToUnwrap map[string]bool, databases []int) error {
-	patterns := make([]string, 0)
-	defaultTbspPrefix := "/" + DefaultTablespace + "/"
-
-	for _, id := range databases {
-		patterns = append(patterns, defaultTbspPrefix+strconv.Itoa(id)+"/*")
-	}
-
-	for file := range filesToUnwrap {
-		if !strings.HasPrefix(file, defaultTbspPrefix) {
-			continue
-		}
-
-		shouldDelete := true
-		for _, pattern := range patterns {
-			res, err := path.Match(pattern, file)
-			if err != nil {
-				return err
-			}
-			if res {
-				shouldDelete = false
-				break
-			}
-		}
-		if shouldDelete {
-			delete(filesToUnwrap, file)
-		}
-	}
-
-	return nil
 }
 
 // TODO : unit tests
