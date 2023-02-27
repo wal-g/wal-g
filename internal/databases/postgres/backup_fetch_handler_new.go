@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -24,14 +25,14 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
 		}
 
-		// directory must be empty before starting
+		// directory must be empty before starting a deltaFetch
 		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+
 		if !isEmpty {
 			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
 				NewNonEmptyDBDataDirectoryError(dbDataDirectory))
 		}
-
 		config := NewFetchConfig(pgBackup.Name,
 			utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap, skipRedundantTars, extractProv)
 		err = deltaFetchRecursionNew(config)

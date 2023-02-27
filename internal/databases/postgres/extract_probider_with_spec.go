@@ -28,7 +28,6 @@ func (t ExtractProviderDBSpec) Get(
 	dbDataDir string,
 	createNewIncrementalFiles bool,
 ) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
-
 	err := t.filterFilesToUnwrap(filesToUnwrap, t.makeRestorePatterns(t.onlyDatabases))
 	if err != nil {
 		return nil, nil, "", err
@@ -48,7 +47,6 @@ func (t ExtractProviderDBSpec) makeRestorePatterns(databases []int) []string {
 }
 
 func (t ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, restorePatterns []string) error {
-
 	for file := range filesToUnwrap {
 		if !strings.HasPrefix(file, defaultTbspPrefix) {
 			continue
