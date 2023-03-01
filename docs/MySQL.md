@@ -58,6 +58,23 @@ To configure the connection string for the replica that connects to the binlog s
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
+* `WALG_STREAM_SPLITTER_PARTITIONS`
+
+To configure split backup stream into several parts and upload them in parallel.
+Backup file names have a suffix `_0000.bz`.
+
+* `WALG_STREAM_SPLITTER_BLOCK_SIZE`
+
+To configure block size into which backup stream split. Block length size data is put into each partition in turn.
+
+* `WALG_STREAM_SPLITTER_MAX_FILE_SIZE`
+
+To configure max file size before compressing. If partition size become more than max file size, it split on several files.
+Backup file names have a suffix `_0000_0000.bz`.
+
+* `WALG_BACKUP_DOWNLOAD_MAX_RETRIES`
+
+Configure max attempts to download backup file. Default value `1`.
 
 Usage
 -----

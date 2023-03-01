@@ -6,6 +6,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 
 	"github.com/wal-g/tracelog"
@@ -68,7 +69,8 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 
 // TODO : unit tests
 // DownloadAndDecompressSplittedStream downloads, decompresses and writes stream to stdout
-func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension string, writeCloser io.WriteCloser) error {
+func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension string,
+	writeCloser io.WriteCloser, maxDownloadRetry int) error {
 	defer utility.LoggedClose(writeCloser, "")
 
 	decompressor := compression.FindDecompressor(extension)
@@ -92,7 +94,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 		go func(files []string) {
 			defer close(errCh)
 			for _, fileName := range files {
-				err := downloadFile(backup, decompressor, fileName, writer)
+				err := downloadAndDecompressFile(backup, decompressor, fileName, writer, maxDownloadRetry)
 				if err != nil {
 					tracelog.ErrorLogger.PrintOnError(writer.Close())
 					errCh <- err
@@ -115,15 +117,30 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	return lastErr
 }
 
-func downloadFile(backup Backup, decompressor compression.Decompressor, fileName string, writer io.WriteCloser) error {
-	archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
-	if err != nil {
-		return fmt.Errorf("failed to dowload file %v: %w", fileName, err)
+func downloadAndDecompressFile(backup Backup, decompressor compression.Decompressor,
+	fileName string, writer io.WriteCloser, maxDownloadRetry int) error {
+	getArchiveReader := func() (io.ReadCloser, error) {
+		archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to dowload file %v: %w", fileName, err)
+		} else if !exists {
+			return nil, io.EOF
+		} else {
+			tracelog.DebugLogger.Printf("Found file: %s", fileName)
+			return archiveReader, nil
+		}
 	}
-	if !exists {
-		return io.EOF
+
+	var archiveReader io.ReadCloser
+	if maxDownloadRetry > 1 {
+		archiveReader = ioextensions.NewReaderWithRetry(getArchiveReader, maxDownloadRetry)
+	} else {
+		reader, err := getArchiveReader()
+		if err != nil {
+			return err
+		}
+		archiveReader = reader
 	}
-	tracelog.DebugLogger.Printf("Found file: %s", fileName)
 	decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
 	if err != nil {
 		return fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)

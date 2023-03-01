@@ -120,6 +120,7 @@ const (
 	MysqlBinlogServerPassword      = "WALG_MYSQL_BINLOG_SERVER_PASSWORD"
 	MysqlBinlogServerID            = "WALG_MYSQL_BINLOG_SERVER_ID"
 	MysqlBinlogServerReplicaSource = "WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE"
+	MysqlBackupDownloadMaxRetry    = "WALG_BACKUP_DOWNLOAD_MAX_RETRY"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
@@ -220,7 +221,8 @@ var (
 	}
 
 	MysqlDefaultSettings = map[string]string{
-		StreamSplitterBlockSize: "1048576",
+		StreamSplitterBlockSize:     "1048576",
+		MysqlBackupDownloadMaxRetry: "1",
 	}
 
 	SQLServerDefaultSettings = map[string]string{
@@ -435,6 +437,7 @@ var (
 		MysqlBinlogServerPassword:      true,
 		MysqlBinlogServerID:            true,
 		MysqlBinlogServerReplicaSource: true,
+		MysqlBackupDownloadMaxRetry:    true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
