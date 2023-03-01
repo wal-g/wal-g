@@ -33,7 +33,7 @@ T0_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'template0';" -
 T1_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'template1';" -d postgres -A;)
 PG_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'postgres';" -d postgres -A;)
 psql -c "SELECT pg_switch_wal();" postgres
-sleep 2
+sleep 10
 
 /tmp/scripts/drop_pg.sh
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --restore-only=${T1_OID},${T0_OID},${PG_OID},${FIRST_OID}
