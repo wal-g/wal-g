@@ -166,6 +166,8 @@ func (uploader *Uploader) Compression() compression.Compressor {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
+	defer PushMetrics()
+
 	WalgMetrics.uploadedFilesTotal.Inc()
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
