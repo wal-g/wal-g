@@ -196,3 +196,64 @@ func TestGetBackupsWithMetadata(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 }
+
+func TestDeleteGarbage_emptyFolder(t *testing.T) {
+
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	objects, folders, _ := folder.ListFolder()
+	assert.Equal(t, 0, len(objects))
+	assert.Equal(t, 0, len(folders))
+
+	err := internal.DeleteGarbage(folder, []string{"backup1", "backup2", "backup3"})
+	assert.Equal(t, nil, err)
+
+	objects, folders, _ = folder.ListFolder()
+	assert.Equal(t, 0, len(objects))
+	assert.Equal(t, 0, len(folders))
+}
+
+func TestDeleteGarbage_nonRecursive(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	_ = folder.PutObject("backup1/file.json", &bytes.Buffer{})
+	_ = folder.PutObject("backup2/file.json", &bytes.Buffer{})
+
+	objects, folders, _ := folder.ListFolder()
+	assert.Equal(t, 0, len(objects))
+	assert.Equal(t, 2, len(folders))
+
+	err := internal.DeleteGarbage(folder, []string{"backup1"})
+	assert.Equal(t, nil, err)
+
+	objects, folders, _ = folder.ListFolder()
+	assert.Equal(t, 0, len(objects))
+	assert.Equal(t, 1, len(folders))
+	assert.Equal(t, folders[0].GetPath(), "in_memory/backup2/")
+}
+
+func TestDeleteGarbage_recursive(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	_ = folder.PutObject("backup1/folder1/obj1.tar", &bytes.Buffer{})
+	_ = folder.PutObject("backup1/folder2/obj2.zip", &bytes.Buffer{})
+	_ = folder.PutObject("backup1/meta.json", &bytes.Buffer{})
+	_ = folder.PutObject("backup2/meta_b2.json", &bytes.Buffer{})
+	_ = folder.PutObject("backup2/folder1/obj1.tar", &bytes.Buffer{})
+
+	objects, folders, _ := folder.ListFolder()
+	assert.Equal(t, 0, len(objects))
+	assert.Equal(t, 2, len(folders))
+
+	err := internal.DeleteGarbage(folder, []string{"backup1"})
+	assert.Equal(t, nil, err)
+
+	objects, folders, _ = folder.ListFolder()
+	assert.Equal(t, 0, len(objects))
+	assert.Equal(t, 1, len(folders))
+	backup2 := folders[0]
+	assert.Equal(t, backup2.GetPath(), "in_memory/backup2/")
+	objects, folders, _ = backup2.ListFolder()
+	assert.Equal(t, 1, len(objects))
+	assert.Equal(t, 1, len(folders))
+	assert.Equal(t, objects[0].GetName(), "meta_b2.json")
+	assert.Equal(t, folders[0].GetPath(), "in_memory/backup2/folder1/")
+}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,6 +19,7 @@ import (
 const adminDB = "admin"
 
 const cursorCreateRetries = 10
+const mongoConnectRetries = 3
 
 type MongodService struct {
 	Context     context.Context
@@ -25,19 +27,39 @@ type MongodService struct {
 }
 
 func CreateMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
-	mongoClient, err := mongo.Connect(ctx,
-		options.Client().ApplyURI(mongodbURI).
-			SetConnectTimeout(10*time.Minute).
-			SetSocketTimeout(time.Minute).
-			SetAppName(appName).
-			SetDirect(true).
-			SetRetryReads(false))
+	var repeatOptions backoff.BackOff
+	repeatOptions = backoff.NewExponentialBackOff()
+	repeatOptions = backoff.WithMaxRetries(repeatOptions, mongoConnectRetries)
+	repeatOptions = backoff.WithContext(repeatOptions, ctx)
+
+	var mongoClient *mongo.Client
+	var err error
+	err = backoff.RetryNotify(
+		func() error {
+			mongoClient, err = mongo.Connect(ctx,
+				options.Client().ApplyURI(mongodbURI).
+					SetServerSelectionTimeout(10*time.Minute).
+					SetConnectTimeout(10*time.Minute).
+					SetSocketTimeout(time.Minute).
+					SetAppName(appName).
+					SetDirect(true).
+					SetRetryReads(false))
+			if err != nil {
+				return errors.Wrap(err, "unable to connect to mongod")
+			}
+			err = mongoClient.Ping(ctx, nil)
+			if err != nil {
+				return errors.Wrap(err, "ping to mongod is failed")
+			}
+			return nil
+		},
+		repeatOptions,
+		func(err error, duration time.Duration) {
+			tracelog.InfoLogger.Printf("Unable to connect due '%+v', next retry: %v", err, duration)
+		},
+	)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to connect to mongod")
-	}
-	err = mongoClient.Ping(ctx, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "ping to mongod is failed")
+		return nil, err
 	}
 
 	return &MongodService{

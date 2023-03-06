@@ -46,9 +46,6 @@ func runPurge(cmd *cobra.Command, args []string) {
 	}
 
 	if cmd.Flags().Changed(retainCountFlag) {
-		if retainCount == 0 { // TODO: provide folder cleanup
-			tracelog.ErrorLogger.Fatalln("Retain count can not be 0")
-		}
 		opts = append(opts, mongo.PurgeRetainCount(int(retainCount)))
 	}
 
@@ -66,7 +63,9 @@ func runPurge(cmd *cobra.Command, args []string) {
 
 func init() {
 	cmd.AddCommand(deleteCmd)
-	deleteCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
+	deleteCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup, garbage and oplog deletion."+
+		" If `retainAfterFlag` and `retainCountFlag` are not specified then all backups will be retained.")
+
 	deleteCmd.Flags().BoolVar(&purgeOplog, purgeOplogFlag, false, "Purge oplog archives")
 	deleteCmd.Flags().BoolVar(&purgeGarbage, purgeGarbageFlag, false, "Purge garbage in backup folder")
 	deleteCmd.Flags().StringVar(&retainAfter, retainAfterFlag, "", "Keep backups newer")

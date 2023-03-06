@@ -143,7 +143,7 @@ func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 
 	fileReader := file.(io.Reader)
 	if uploader.dataSize != nil {
-		fileReader = NewWithSizeReader(fileReader, uploader.dataSize)
+		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
@@ -166,9 +166,11 @@ func (uploader *Uploader) Compression() compression.Compressor {
 
 // TODO : unit tests
 func (uploader *Uploader) Upload(path string, content io.Reader) error {
+	defer PushMetrics()
+
 	WalgMetrics.uploadedFilesTotal.Inc()
 	if uploader.tarSize != nil {
-		content = NewWithSizeReader(content, uploader.tarSize)
+		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err != nil {

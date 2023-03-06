@@ -194,18 +194,24 @@ func FolderSize(folder storage.Folder, path string) (int64, error) {
 	return size, nil
 }
 
-// SplitPurgingBackups partitions backups to delete and retain
+// SplitPurgingBackups partitions backups to delete and retain, if no retains policy than retain all backups
 func SplitPurgingBackups(backups []TimedBackup,
 	retainCount *int,
 	retainAfter *time.Time) (purge, retain map[string]bool, err error) {
 	retain = make(map[string]bool)
 	purge = make(map[string]bool)
-
+	retainAll := retainCount == nil && retainAfter == nil
 	retainedCount := 0
 	for i := range backups {
 		backup := backups[i]
 		if backup.IsPermanent() {
 			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.Name())
+			retain[backup.Name()] = true
+			continue
+		}
+
+		if retainAll {
+			tracelog.DebugLogger.Printf("Preserving backup due to an unspecified policy: %s", backup.Name())
 			retain[backup.Name()] = true
 			continue
 		}
@@ -232,7 +238,7 @@ func SplitPurgingBackups(backups []TimedBackup,
 func DeleteGarbage(folder storage.Folder, garbage []string) error {
 	var keys []string
 	for _, prefix := range garbage {
-		garbageObjects, _, err := folder.GetSubFolder(prefix).ListFolder()
+		garbageObjects, err := storage.ListFolderRecursively(folder.GetSubFolder(prefix))
 		if err != nil {
 			return err
 		}
@@ -252,7 +258,7 @@ func DeleteBackups(folder storage.Folder, backups []string) error {
 		backupName := backups[i]
 		keys = append(keys, SentinelNameFromBackup(backupName))
 
-		dataObjects, _, err := folder.GetSubFolder(backupName).ListFolder()
+		dataObjects, err := storage.ListFolderRecursively(folder.GetSubFolder(backupName))
 		if err != nil {
 			return err
 		}
