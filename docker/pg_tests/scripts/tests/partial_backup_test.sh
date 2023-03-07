@@ -42,9 +42,16 @@ echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-if psql -t -c "select data from tbl1;" -d first -A | grep -q "$(printf '1\n2\n5\n6')"; then
+if [ "$(psql -t -c "select data from tbl1;" -d first -A)" = "$(printf '1\n2\n5\n6')" ]; then
   echo "Partial backup success!!!!!!"
 else
   echo "Partial backup doesn't work :("
+  exit 1
+fi
+
+if psql -t -c "select data from tbl2;" -d second -A 2>&1 | grep -q "is not a valid data directory"; then
+  echo "Skipped database raises error, as it should be!"
+else
+  echo "Skipped database responses unexpectedly"
   exit 1
 fi
