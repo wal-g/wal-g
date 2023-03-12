@@ -26,7 +26,7 @@ type BackupCursor struct {
 func CreateBackupCursor(mongodService *MongodService) (*BackupCursor, error) {
 	mongoBackupCursor, err := mongodService.GetBackupCursor()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unable to open backup cursor")
 	}
 
 	backupCursor := &BackupCursor{
@@ -37,7 +37,7 @@ func CreateBackupCursor(mongodService *MongodService) (*BackupCursor, error) {
 
 	err = backupCursor.loadMetadata()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unable to load metadata")
 	}
 
 	return backupCursor, nil
