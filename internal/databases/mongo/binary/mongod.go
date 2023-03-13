@@ -136,7 +136,8 @@ func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err
 }
 
 func backupCursorErrorIsRetried(err error) bool {
-	return strings.Contains(err.Error(), "(BackupCursorOpenConflictWithCheckpoint)") // mongodb take checkpoint
+	return strings.Contains(err.Error(), "(Location50915)") ||
+		strings.Contains(err.Error(), "(BackupCursorOpenConflictWithCheckpoint)") // mongodb take checkpoint
 }
 
 func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *BackupCursorMeta) (*mongo.Cursor, error) {
