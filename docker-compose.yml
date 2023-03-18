@@ -31,9 +31,11 @@ services:
     command: >
       -c 'mkdir -p /export/fullbucket
       &&  mkdir -p /export/fullratingcomposerbucket
+      &&  mkdir -p /export/fulldatabasecomposerbucket
       &&  mkdir -p /export/fullcopycomposerbucket
       &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
+      &&  mkdir -p /export/partialbucket
       &&  mkdir -p /export/remotebucket
       &&  mkdir -p /export/remotewithoutfilesmetadatabucket
       &&  mkdir -p /export/cryptobucket
@@ -278,6 +280,17 @@ services:
     links:
       - s3
 
+  pg_partial_backup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_partial_backup_test
+      context: .
+    image: wal-g/partial_backup_test
+    container_name: wal-g_pg_partial_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_remote_backup_test:
     build:
       dockerfile: docker/pg_tests/Dockerfile_remote_backup_test
@@ -339,6 +352,17 @@ services:
       context: .
     image: wal-g/full_backup_rating_composer_test
     container_name: wal-g_pg_full_backup_rating_composer_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_database_composer_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_database_composer_test
+      context: .
+    image: wal-g/full_backup_database_composer_test
+    container_name: wal-g_pg_full_backup_database_composer_test
     depends_on:
       - s3
     links:

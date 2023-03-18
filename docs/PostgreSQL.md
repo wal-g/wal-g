@@ -153,6 +153,20 @@ Since this feature involves both backup creation and restore process, in order t
 wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 ```
 
+#### Partial backup (experimental)
+
+During partial backup wal-g restores only specified databases' files in default tablespace directory (`/base`). 
+
+```bash  
+wal-g backup-fetch /path LATEST --restore-only=1,4,5,16384
+```
+
+If `--restore-only` specified, `--skip-redundant-tars` and `--reverse-unpack` are set automatically.
+
+PostgreSQL works fine with restored databases if `template0`, `template1` and `postgres` are restored. Because of others' remains are still in system tables, it is recommended to drop all unrestored databases.
+
+Currently, only database oids can be specified.
+
 ### ``backup-push``
 
 When uploading backups to storage, the user should pass the Postgres data directory as an argument.
@@ -224,6 +238,20 @@ To activate this feature, do one of the following:
 ```bash
 wal-g backup-push /path --copy-composer
 ```
+
+#### Database composer mode
+
+In the database composer mode, WAL-G separated files from different directories inside default tablespace and packs them in different tars. Designed to increase partial backup performance.
+
+To activate this feature, do one of the following:
+
+* set the `WALG_USE_DATABASE_COMPOSER` environment variable
+* add the --database-composer flag
+
+```bash
+wal-g backup-push /path --database-composer
+```
+
 
 #### Backup without metadata
 

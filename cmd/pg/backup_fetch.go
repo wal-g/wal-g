@@ -3,12 +3,11 @@ package pg
 import (
 	"fmt"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -21,6 +20,8 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
+	restoreOnlyDescription        = `[Experimental] Downloads only databases specified by passed db ids from default tablespace.
+Sets reverse delta unpack & skip redundant tars options automatically`
 )
 
 var fileMask string
@@ -28,6 +29,7 @@ var restoreSpec string
 var reverseDeltaUnpack bool
 var skipRedundantTars bool
 var fetchTargetUserData string
+var onlyDatabases []int
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
@@ -46,9 +48,21 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		var pgFetcher func(folder storage.Folder, backup internal.Backup)
+
+		if onlyDatabases != nil {
+			skipRedundantTars = true
+			reverseDeltaUnpack = true
+		}
 		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(internal.UseReverseUnpackSetting)
 		skipRedundantTars = skipRedundantTars || viper.GetBool(internal.SkipRedundantTarsSetting)
-		extractProv := postgres.ExtractProviderImpl{}
+
+		var extractProv postgres.ExtractProvider
+
+		if onlyDatabases != nil {
+			extractProv = postgres.NewExtractProviderDBSpec(onlyDatabases)
+		} else {
+			extractProv = postgres.ExtractProviderImpl{}
+		}
 
 		if reverseDeltaUnpack {
 			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv)
@@ -85,5 +99,8 @@ func init() {
 		false, skipRedundantTarsDescription)
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
+	backupFetchCmd.Flags().IntSliceVar(&onlyDatabases, "restore-only",
+		nil, restoreOnlyDescription)
+
 	Cmd.AddCommand(backupFetchCmd)
 }
