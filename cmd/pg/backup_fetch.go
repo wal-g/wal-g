@@ -29,7 +29,7 @@ var restoreSpec string
 var reverseDeltaUnpack bool
 var skipRedundantTars bool
 var fetchTargetUserData string
-var onlyDatabases []int
+var onlyDatabases []string
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
@@ -99,7 +99,7 @@ func init() {
 		false, skipRedundantTarsDescription)
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
-	backupFetchCmd.Flags().IntSliceVar(&onlyDatabases, "restore-only",
+	backupFetchCmd.Flags().StringSliceVar(&onlyDatabases, "restore-only",
 		nil, restoreOnlyDescription)
 
 	Cmd.AddCommand(backupFetchCmd)

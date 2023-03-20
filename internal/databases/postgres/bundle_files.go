@@ -76,7 +76,7 @@ func (relStat *RelFileStatistics) getFileUpdateCount(filePath string) uint64 {
 }
 
 func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error) {
-	databases, err := queryRunner.GetDatabaseInfos()
+	databases, err := queryRunner.GetAllowConDatabaseInfos()
 	if err != nil {
 		return nil, errors.Wrap(err, "CollectStatistics: Failed to get db names.")
 	}

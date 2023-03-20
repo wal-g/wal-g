@@ -60,7 +60,7 @@ func (storageMap *AoRelFileStorageMap) getAOStorageMetadata(filePath string) (bo
 }
 
 func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, error) {
-	databases, err := queryRunner.GetDatabaseInfos()
+	databases, err := queryRunner.GetAllowConDatabaseInfos()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get database names")
 	}
