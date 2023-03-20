@@ -150,6 +150,7 @@ func (bh *BackupHandler) createAndPushBackup() {
 	bh.handleDeltaBackup(folder)
 	tarFileSets := bh.uploadBackup()
 	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
+	tracelog.ErrorLogger.FatalOnError(err)
 	bh.markBackups(folder, sentinelDto)
 	bh.uploadMetadata(sentinelDto, filesMetaDto)
 
