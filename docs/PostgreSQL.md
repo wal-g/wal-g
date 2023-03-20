@@ -155,17 +155,15 @@ wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 
 #### Partial backup (experimental)
 
-During partial backup wal-g restores only specified databases' files in default tablespace directory (`/base`). 
+During partial backup wal-g restores only specified databases' files in default tablespace directory (`/base`). Restores system databases automatically.
 
 ```bash  
-wal-g backup-fetch /path LATEST --restore-only=1,4,5,16384
+wal-g backup-fetch /path LATEST --restore-only=my_database
 ```
 
 If `--restore-only` specified, `--skip-redundant-tars` and `--reverse-unpack` are set automatically.
 
-PostgreSQL works fine with restored databases if `template0`, `template1` and `postgres` are restored. Because of others' remains are still in system tables, it is recommended to drop all unrestored databases.
-
-Currently, only database oids can be specified.
+Because of unrestored databases' remains are still in system tables, it is recommended to drop them.
 
 ### ``backup-push``
 

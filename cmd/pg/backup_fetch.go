@@ -20,8 +20,8 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
-	restoreOnlyDescription        = `[Experimental] Downloads only databases specified by passed db ids from default tablespace.
-Sets reverse delta unpack & skip redundant tars options automatically`
+	restoreOnlyDescription        = `[Experimental] Downloads only databases specified by passed db ids or names from default tablespace.
+Sets reverse delta unpack & skip redundant tars options automatically. Always downloads system databases.`
 )
 
 var fileMask string
