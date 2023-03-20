@@ -149,7 +149,7 @@ func (bh *BackupHandler) createAndPushBackup() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.handleDeltaBackup(folder)
 	tarFileSets := bh.uploadBackup()
-	sentinelDto, filesMetaDto := bh.setupDTO(tarFileSets)
+	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
 	bh.markBackups(folder, sentinelDto)
 	bh.uploadMetadata(sentinelDto, filesMetaDto)
 
@@ -210,7 +210,8 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 	}
 }
 
-func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) {
+func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto,
+	filesMeta FilesMetadataDto, err error) {
 	var tablespaceSpec *TablespaceSpec
 	if !bh.Workers.Bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bh.Workers.Bundle.TablespaceSpec
@@ -218,7 +219,8 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
 	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
-	return sentinelDto, filesMeta
+	filesMeta.NamesMetadata, err = bh.collectNamesMetadata()
+	return sentinelDto, filesMeta, err
 }
 
 func (bh *BackupHandler) markBackups(folder storage.Folder, sentinelDto BackupSentinelDto) {
@@ -381,6 +383,8 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
+	filesMetadataDto.NamesMetadata, err = bh.collectNamesMetadata()
+	tracelog.ErrorLogger.FatalOnError(err)
 	bh.CurBackupInfo.Name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto, filesMetadataDto)
@@ -405,6 +409,16 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
 	}
+}
+
+func (bh *BackupHandler) collectNamesMetadata() (PathsByNamesMetadata, error) {
+	metadata := make(PathsByNamesMetadata)
+	databaseInfos, err := bh.Workers.QueryRunner.GetDatabaseInfos()
+	if err != nil {
+		return nil, err
+	}
+	metadata.processDatabaseInfos(databaseInfos)
+	return metadata, nil
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
