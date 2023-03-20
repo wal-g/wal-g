@@ -40,7 +40,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
-		return errors.Wrap(err, "unable to open backup cursor")
+		return err
 	}
 	defer backupCursor.Close()
 
