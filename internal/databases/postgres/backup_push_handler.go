@@ -371,6 +371,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	if bh.Arguments.withoutFilesMetadata {
 		tarFileSets = internal.NewNopTarFileSets()
 	} else {
+		tracelog.InfoLogger.Println("Names metadata is disabled for remote backup")
 		tarFileSets = internal.NewRegularTarFileSets()
 	}
 
@@ -384,8 +385,6 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
-	filesMetadataDto.NamesMetadata, err = bh.collectNamesMetadata()
-	tracelog.ErrorLogger.FatalOnError(err)
 	bh.CurBackupInfo.Name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
 	bh.uploadMetadata(sentinelDto, filesMetadataDto)
