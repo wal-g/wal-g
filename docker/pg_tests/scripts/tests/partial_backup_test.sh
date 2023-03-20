@@ -28,15 +28,11 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
 psql -c "INSERT INTO tbl1 VALUES (5), (6);" first
 psql -c "INSERT INTO tbl2 VALUES (7), (8);" second
-FIRST_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'first';" -d postgres -A;)
-T0_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'template0';" -d postgres -A;)
-T1_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'template1';" -d postgres -A;)
-PG_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'postgres';" -d postgres -A;)
 psql -c "SELECT pg_switch_wal();" postgres
 sleep 10
 
 /tmp/scripts/drop_pg.sh
-wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --restore-only=${T1_OID},${T0_OID},${PG_OID},${FIRST_OID}
+wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --restore-only=first
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start

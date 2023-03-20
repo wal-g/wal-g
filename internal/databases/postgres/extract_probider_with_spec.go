@@ -1,10 +1,13 @@
 package postgres
 
 import (
+	"fmt"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -12,13 +15,31 @@ const (
 	defaultTbspPrefix = "/" + DefaultTablespace + "/"
 )
 
-type ExtractProviderDBSpec struct {
-	ExtractProviderImpl
-	onlyDatabases []int
+type IncorrectNameError struct {
+	error
 }
 
-func NewExtractProviderDBSpec(onlyDatabases []int) *ExtractProviderDBSpec {
+func NewIncorrectNameError(name string) IncorrectNameError {
+	return IncorrectNameError{errors.Errorf("Can't make directory by oid or find database in meta with name: '%s'", name)}
+}
+
+func (err IncorrectNameError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type ExtractProviderDBSpec struct {
+	ExtractProviderImpl
+	onlyDatabases []string
+}
+
+func NewExtractProviderDBSpec(onlyDatabases []string) *ExtractProviderDBSpec {
 	return &ExtractProviderDBSpec{onlyDatabases: onlyDatabases}
+}
+
+func addHardcodedNames(onlyDatabases []string) []string {
+	return append(onlyDatabases, []string{
+		"template0", "template1", "postgres",
+	}...)
 }
 
 func (t ExtractProviderDBSpec) Get(
@@ -28,7 +49,14 @@ func (t ExtractProviderDBSpec) Get(
 	dbDataDir string,
 	createNewIncrementalFiles bool,
 ) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
-	err := t.filterFilesToUnwrap(filesToUnwrap, t.makeRestorePatterns(t.onlyDatabases))
+	_, filesMeta, _ := backup.GetSentinelAndFilesMetadata()
+
+	databases := addHardcodedNames(t.onlyDatabases)
+	patterns, err := t.makeRestorePatterns(databases, filesMeta.NamesMetadata)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	err = t.filterFilesToUnwrap(filesToUnwrap, patterns)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -36,14 +64,21 @@ func (t ExtractProviderDBSpec) Get(
 	return t.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
 
-func (t ExtractProviderDBSpec) makeRestorePatterns(databases []int) []string {
+func (t ExtractProviderDBSpec) makeRestorePatterns(databases []string, metadata PathsByNamesMetadata) ([]string, error) {
 	restorePatterns := make([]string, 0)
 
-	for _, id := range databases {
-		restorePatterns = append(restorePatterns, defaultTbspPrefix+strconv.Itoa(id)+"/*")
+	for _, key := range databases {
+		oid, err := strconv.Atoi(key)
+		if err == nil {
+			restorePatterns = append(restorePatterns, fmt.Sprintf("/%s/%d/*", defaultTbspPrefix, oid))
+		} else if value, ok := metadata[key]; ok {
+			restorePatterns = append(restorePatterns, value...)
+		} else {
+			return nil, NewIncorrectNameError(key)
+		}
 	}
 
-	return restorePatterns
+	return restorePatterns, nil
 }
 
 func (t ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, restorePatterns []string) error {
