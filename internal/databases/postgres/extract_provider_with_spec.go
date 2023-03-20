@@ -70,7 +70,7 @@ func (t ExtractProviderDBSpec) makeRestorePatterns(databases []string, metadata 
 	for _, key := range databases {
 		oid, err := strconv.Atoi(key)
 		if err == nil {
-			restorePatterns = append(restorePatterns, fmt.Sprintf("/%s/%d/*", defaultTbspPrefix, oid))
+			restorePatterns = append(restorePatterns, fmt.Sprintf("/%s/%d/*", DefaultTablespace, oid))
 		} else if value, ok := metadata[key]; ok {
 			restorePatterns = append(restorePatterns, value...)
 		} else {
