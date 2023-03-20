@@ -121,8 +121,9 @@ func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
 // FilesMetadataDto contains the information about the backup files.
 // It can be pretty large on some databases, sometimes more than 1GB
 type FilesMetadataDto struct {
-	Files       internal.BackupFileList `json:"Files,omitempty"`
-	TarFileSets map[string][]string     `json:"TarFileSets,omitempty"`
+	Files         internal.BackupFileList `json:"Files,omitempty"`
+	TarFileSets   map[string][]string     `json:"TarFileSets,omitempty"`
+	NamesMetadata PathsByNamesMetadata    `json:"NamesMetadata,omitempty"`
 }
 
 func NewFilesMetadataDto(files internal.BackupFileList, tarFileSets internal.TarFileSets) FilesMetadataDto {
