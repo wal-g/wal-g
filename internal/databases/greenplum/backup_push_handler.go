@@ -3,6 +3,7 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -219,6 +220,9 @@ func (bh *BackupHandler) HandleBackupPush() {
 	restoreLSNs, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	err = bh.uploadRestorePointMetadata(restoreLSNs)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -231,6 +235,33 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 	bh.disconnect()
+}
+
+func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) (err error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
+	}
+
+	meta := RestorePointMetadata{
+		Name:             bh.currBackupInfo.backupName,
+		StartTime:        bh.currBackupInfo.startTime,
+		FinishTime:       utility.TimeNowCrossPlatformUTC(),
+		Hostname:         hostname,
+		GpVersion:        bh.currBackupInfo.gpVersion.String(),
+		SystemIdentifier: bh.currBackupInfo.systemIdentifier,
+		LsnBySegment:     restoreLSNs,
+	}
+
+	metaFileName := RestorePointMetadataFileName(meta.Name)
+	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
+	tracelog.InfoLogger.Println(meta.String())
+
+	rpFolder := bh.workers.Uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+	if err := internal.UploadDto(rpFolder, meta, metaFileName); err != nil {
+		return fmt.Errorf("upload metadata file for restore point %s: %w", meta.Name, err)
+	}
+	return nil
 }
 
 func (bh *BackupHandler) waitSegmentBackups() error {
