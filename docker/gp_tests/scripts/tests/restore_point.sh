@@ -56,7 +56,7 @@ if [ "$EXIT_STATUS" -eq 0 ] ; then
 fi
 
 # should pick backup restore point
-RESTORE_TIME=$(wal-g backup-list | awk '{ if (NR == 2) { print $2 } }')
+RESTORE_TIME=$(wal-g backup-list --config=${TMP_CONFIG} | awk '{ if (NR == 2) { print $2 } }')
 # should not fail
 wal-g backup-fetch LATEST --restore-point-ts=${RESTORE_TIME} --in-place --config=${TMP_CONFIG}
 delete_cluster_dirs
