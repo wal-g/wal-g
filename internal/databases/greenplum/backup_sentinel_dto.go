@@ -7,10 +7,8 @@ import (
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/wal-g/tracelog"
 )
 
 type SegmentRole string
@@ -98,7 +96,7 @@ func (s *BackupSentinelDto) String() string {
 }
 
 // NewBackupSentinelDto returns new BackupSentinelDto instance
-func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, prevBackupInfo *PrevBackupInfo, restoreLSNs map[int]string, userData interface{},
+func NewBackupSentinelDto(currBackupInfo *CurrBackupInfo, prevBackupInfo *PrevBackupInfo, restoreLSNs map[int]string, userData interface{},
 	isPermanent bool) BackupSentinelDto {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -110,7 +108,7 @@ func NewBackupSentinelDto(currBackupInfo CurrBackupInfo, prevBackupInfo *PrevBac
 		Segments:         make([]SegmentMetadata, 0, len(currBackupInfo.segmentBackups)),
 		UserData:         userData,
 		StartTime:        currBackupInfo.startTime,
-		FinishTime:       utility.TimeNowCrossPlatformUTC(),
+		FinishTime:       currBackupInfo.finishTime,
 		DatetimeFormat:   MetadataDatetimeFormat,
 		Hostname:         hostname,
 		GpVersion:        currBackupInfo.gpVersion.String(),

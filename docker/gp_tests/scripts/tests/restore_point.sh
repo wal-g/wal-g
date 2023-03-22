@@ -39,6 +39,7 @@ if [ "$EXIT_STATUS" -eq 0 ] ; then
 fi
 
 wal-g backup-push --config=${TMP_CONFIG}
+TIME_AFTER_BACKUP=$(date +'%Y-%m-%dT%H:%M:%S.%NZ')
 
 wal-g create-restore-point after_backup --config=${TMP_CONFIG}
 stop_and_delete_cluster_dir
@@ -55,10 +56,9 @@ if [ "$EXIT_STATUS" -eq 0 ] ; then
     exit 1
 fi
 
+wal-g restore-point-list --config=${TMP_CONFIG}
 # should pick backup restore point
-RESTORE_TIME=$(wal-g backup-list --config=${TMP_CONFIG} | awk '{ if (NR == 2) { print $2 } }')
-# should not fail
-wal-g backup-fetch LATEST --restore-point-ts=${RESTORE_TIME} --in-place --config=${TMP_CONFIG}
+wal-g backup-fetch LATEST --restore-point-ts=${TIME_AFTER_BACKUP} --in-place --config=${TMP_CONFIG}
 delete_cluster_dirs
 
 # should not fail

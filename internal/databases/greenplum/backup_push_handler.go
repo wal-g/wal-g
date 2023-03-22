@@ -86,6 +86,7 @@ type CurrBackupInfo struct {
 	backupName           string
 	segmentBackups       map[string]*cluster.SegConfig
 	startTime            time.Time
+	finishTime           time.Time
 	systemIdentifier     *uint64
 	gpVersion            semver.Version
 	segmentsMetadata     map[string]PgSegmentSentinelDto
@@ -220,19 +221,22 @@ func (bh *BackupHandler) HandleBackupPush() {
 	restoreLSNs, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = bh.uploadRestorePointMetadata(restoreLSNs)
-	tracelog.ErrorLogger.FatalOnError(err)
-
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sentinelDto := NewBackupSentinelDto(bh.currBackupInfo, &bh.prevBackupInfo,
+	bh.currBackupInfo.finishTime = utility.TimeNowCrossPlatformUTC()
+
+	sentinelDto := NewBackupSentinelDto(&bh.currBackupInfo, &bh.prevBackupInfo,
 		restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
 	err = bh.uploadSentinel(sentinelDto)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.currBackupInfo.backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
+
+	err = bh.uploadRestorePointMetadata(restoreLSNs)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 	bh.disconnect()
 }
@@ -246,7 +250,7 @@ func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) 
 	meta := RestorePointMetadata{
 		Name:             bh.currBackupInfo.backupName,
 		StartTime:        bh.currBackupInfo.startTime,
-		FinishTime:       utility.TimeNowCrossPlatformUTC(),
+		FinishTime:       bh.currBackupInfo.finishTime,
 		Hostname:         hostname,
 		GpVersion:        bh.currBackupInfo.gpVersion.String(),
 		SystemIdentifier: bh.currBackupInfo.systemIdentifier,
@@ -257,8 +261,7 @@ func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) 
 	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
 	tracelog.InfoLogger.Println(meta.String())
 
-	rpFolder := bh.workers.Uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	if err := internal.UploadDto(rpFolder, meta, metaFileName); err != nil {
+	if err := internal.UploadDto(bh.workers.Uploader.UploadingFolder, meta, metaFileName); err != nil {
 		return fmt.Errorf("upload metadata file for restore point %s: %w", meta.Name, err)
 	}
 	return nil
