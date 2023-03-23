@@ -3,7 +3,6 @@ package postgres
 import (
 	"fmt"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -52,7 +51,7 @@ func (t ExtractProviderDBSpec) Get(
 	_, filesMeta, _ := backup.GetSentinelAndFilesMetadata()
 
 	databases := addHardcodedNames(t.onlyDatabases)
-	patterns, err := t.makeRestorePatterns(databases, filesMeta.NamesMetadata)
+	patterns, err := t.makeRestorePatterns(databases, filesMeta.DatabasesByNames)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -64,21 +63,26 @@ func (t ExtractProviderDBSpec) Get(
 	return t.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
 
-func (t ExtractProviderDBSpec) makeRestorePatterns(databases []string, metadata PathsByNamesMetadata) ([]string, error) {
+func (t ExtractProviderDBSpec) makeRestorePatterns(databases []string, meta DatabasesByNames) ([]string, error) {
 	restorePatterns := make([]string, 0)
 
 	for _, key := range databases {
-		oid, err := strconv.Atoi(key)
-		if err == nil {
-			restorePatterns = append(restorePatterns, fmt.Sprintf("/%s/%d/*", DefaultTablespace, oid))
-		} else if value, ok := metadata[key]; ok {
-			restorePatterns = append(restorePatterns, value...)
-		} else {
-			return nil, NewIncorrectNameError(key)
+		pattern, err := getPatternByKey(meta, key)
+		if err != nil {
+			return nil, err
 		}
+		restorePatterns = append(restorePatterns, pattern)
 	}
 
 	return restorePatterns, nil
+}
+
+func getPatternByKey(meta DatabasesByNames, key string) (string, error) {
+	if data, ok := meta[key]; ok {
+		return fmt.Sprintf("/%s/%d/*", DefaultTablespace, data.Oid), nil
+	} else {
+		return "", NewIncorrectNameError(key)
+	}
 }
 
 func (t ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, restorePatterns []string) error {

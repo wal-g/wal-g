@@ -1,15 +1,16 @@
 package postgres
 
-import (
-	"fmt"
-)
+type DatabasesByNames map[string]DatabaseObjectsInfo
 
-type PathsByNamesMetadata map[string][]string
+// TODO : add tables to info
+type DatabaseObjectsInfo struct {
+	Oid int `json:"oid"`
+}
 
 // TODO : improve that
-func (meta PathsByNamesMetadata) processDatabaseInfos(infos []PgDatabaseInfo) {
+func (meta DatabasesByNames) appendDatabaseInfos(infos []PgDatabaseInfo) {
 	for _, info := range infos {
 		// TODO : check that it is in default tablespace
-		meta[info.Name] = append(meta[info.Name], fmt.Sprintf("/%s/%d/*", DefaultTablespace, info.Oid))
+		meta[info.Name] = DatabaseObjectsInfo{int(info.Oid)}
 	}
 }

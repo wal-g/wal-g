@@ -220,7 +220,7 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
 	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
-	filesMeta.NamesMetadata, err = bh.collectNamesMetadata()
+	filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata()
 	return sentinelDto, filesMeta, err
 }
 
@@ -323,7 +323,7 @@ func (bh *BackupHandler) handleBackupPushRemote() {
 	}
 	// If no arg is parsed, try to run remote backup using pglogrepl's BASE_BACKUP functionality
 	tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
-	tracelog.InfoLogger.Println("Features like delta backup are disabled, there might be a performance impact.")
+	tracelog.InfoLogger.Println("Features like delta backup and collecting database names are disabled, there might be a performance impact.")
 	tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
 	if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
@@ -371,7 +371,6 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	if bh.Arguments.withoutFilesMetadata {
 		tarFileSets = internal.NewNopTarFileSets()
 	} else {
-		tracelog.InfoLogger.Println("Names metadata is disabled for remote backup")
 		tarFileSets = internal.NewRegularTarFileSets()
 	}
 
@@ -411,14 +410,14 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 	}
 }
 
-func (bh *BackupHandler) collectNamesMetadata() (PathsByNamesMetadata, error) {
-	metadata := make(PathsByNamesMetadata)
+func (bh *BackupHandler) collectDatabaseNamesMetadata() (DatabasesByNames, error) {
+	paths := make(DatabasesByNames)
 	databaseInfos, err := bh.Workers.QueryRunner.GetEachDatabaseInfos()
 	if err != nil {
 		return nil, err
 	}
-	metadata.processDatabaseInfos(databaseInfos)
-	return metadata, nil
+	paths.appendDatabaseInfos(databaseInfos)
+	return paths, nil
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
