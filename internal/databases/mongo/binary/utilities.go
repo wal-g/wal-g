@@ -1,7 +1,9 @@
 package binary
 
 import (
+	"math"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -65,4 +67,11 @@ func EnsureCompatibilityToRestoreMongodVersions(backupMongodVersion, restoreMong
 			backupMongodVersion, restoreMongodVersion)
 	}
 	return nil
+}
+
+// ComputeMongoStartTimeout compute timeout with formula max(10min, UncompressedSizeTb * 40min)
+func ComputeMongoStartTimeout(backupUncompressedSize int64) time.Duration {
+	var tb float64 = 1 << (10 * 4)
+	coef := float64(backupUncompressedSize) / tb
+	return time.Duration(math.Max(10, coef*40) * float64(time.Minute))
 }

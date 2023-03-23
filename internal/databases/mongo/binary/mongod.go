@@ -26,7 +26,7 @@ type MongodService struct {
 	MongoClient *mongo.Client
 }
 
-func CreateMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
+func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeout time.Duration) (*MongodService, error) {
 	var repeatOptions backoff.BackOff
 	repeatOptions = backoff.NewExponentialBackOff()
 	repeatOptions = backoff.WithMaxRetries(repeatOptions, mongoConnectRetries)
@@ -38,8 +38,8 @@ func CreateMongodService(ctx context.Context, appName, mongodbURI string) (*Mong
 		func() error {
 			mongoClient, err = mongo.Connect(ctx,
 				options.Client().ApplyURI(mongodbURI).
-					SetServerSelectionTimeout(10*time.Minute).
-					SetConnectTimeout(10*time.Minute).
+					SetServerSelectionTimeout(timeout).
+					SetConnectTimeout(timeout).
 					SetSocketTimeout(time.Minute).
 					SetAppName(appName).
 					SetDirect(true).
