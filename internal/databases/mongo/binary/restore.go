@@ -2,11 +2,13 @@ package binary
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
 type RestoreService struct {
@@ -57,7 +59,7 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 	if err = restoreService.fixSystemData(rsConfig); err != nil {
 		return err
 	}
-	if err = restoreService.recoverFromOplogAsStandalone(); err != nil {
+	if err = restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
 		return err
 	}
 
@@ -77,7 +79,12 @@ func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig) error {
 
 	defer mongodProcess.Close()
 
-	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
+	mongodService, err := CreateMongodService(
+		restoreService.Context,
+		"wal-g restore",
+		mongodProcess.GetURI(),
+		10*time.Minute,
+	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")
 	}
@@ -95,7 +102,7 @@ func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig) error {
 	return mongodProcess.Wait()
 }
 
-func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
+func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *models.Backup) error {
 	mongodProcess, err := StartMongodWithRecoverFromOplogAsStandalone(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
@@ -103,7 +110,12 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone() error {
 
 	defer mongodProcess.Close()
 
-	mongodService, err := CreateMongodService(restoreService.Context, "wal-g restore", mongodProcess.GetURI())
+	mongodService, err := CreateMongodService(
+		restoreService.Context,
+		"wal-g restore",
+		mongodProcess.GetURI(),
+		ComputeMongoStartTimeout(sentinel.UncompressedSize),
+	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")
 	}

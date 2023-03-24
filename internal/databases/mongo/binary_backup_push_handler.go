@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"time"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
@@ -15,7 +16,7 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 	if err != nil {
 		return err
 	}
-	mongodService, err := binary.CreateMongodService(ctx, appName, mongodbURI)
+	mongodService, err := binary.CreateMongodService(ctx, appName, mongodbURI, 10*time.Minute)
 	if err != nil {
 		return err
 	}
