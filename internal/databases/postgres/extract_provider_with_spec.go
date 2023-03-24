@@ -11,7 +11,7 @@ import (
 const (
 	defaultTbspPrefix = "/" + DefaultTablespace + "/"
 	customTbspPrefix  = "/" + TablespaceFolder + "/"
-	systemIdLimit     = 16384
+	systemIDLimit     = 16384
 )
 
 type ExtractProviderDBSpec struct {
@@ -42,9 +42,9 @@ func (p ExtractProviderDBSpec) makeFullRestoreDatabaseMap(databases []string, na
 	restoredDatabases := p.makeSystemDatabasesMap()
 
 	for _, db := range databases {
-		dbId, err := names.Resolve(db)
+		dbID, err := names.Resolve(db)
 		if err == nil {
-			restoredDatabases[dbId] = true
+			restoredDatabases[dbID] = true
 		}
 	}
 
@@ -53,7 +53,7 @@ func (p ExtractProviderDBSpec) makeFullRestoreDatabaseMap(databases []string, na
 
 func (p ExtractProviderDBSpec) makeSystemDatabasesMap() map[int]bool {
 	restoredDatabases := make(map[int]bool)
-	for i := 1; i < systemIdLimit; i++ {
+	for i := 1; i < systemIDLimit; i++ {
 		restoredDatabases[i] = true
 	}
 	return restoredDatabases
@@ -61,9 +61,9 @@ func (p ExtractProviderDBSpec) makeSystemDatabasesMap() map[int]bool {
 
 func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, databases map[int]bool) {
 	for file := range filesToUnwrap {
-		isDb, dbId, _ := p.tryGetOidPair(file)
+		isDB, dbID, _ := p.tryGetOidPair(file)
 
-		if isDb && !databases[dbId] {
+		if isDB && !databases[dbID] {
 			delete(filesToUnwrap, file)
 		}
 	}
@@ -73,12 +73,12 @@ func (p ExtractProviderDBSpec) tryGetOidPair(file string) (bool, int, int) {
 	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
 		return false, 0, 0
 	}
-	var tableId, dbId int
+	var tableID, dbID int
 
-	file, tableId = p.cutIntegerBase(file)
-	file, dbId = p.cutIntegerBase(file)
+	file, tableID = p.cutIntegerBase(file)
+	_, dbID = p.cutIntegerBase(file)
 
-	return true, dbId, tableId
+	return true, dbID, tableID
 }
 
 func (p ExtractProviderDBSpec) cutIntegerBase(file string) (string, int) {
