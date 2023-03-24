@@ -1,30 +1,18 @@
 package postgres
 
 import (
-	"fmt"
 	"path"
+	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
 const (
 	defaultTbspPrefix = "/" + DefaultTablespace + "/"
+	customTbspPrefix  = "/" + TablespaceFolder + "/"
+	systemIdLimit     = 16384
 )
-
-type IncorrectNameError struct {
-	error
-}
-
-func NewIncorrectNameError(name string) IncorrectNameError {
-	return IncorrectNameError{errors.Errorf("Can't make directory by oid or find database in meta with name: '%s'", name)}
-}
-
-func (err IncorrectNameError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
 
 type ExtractProviderDBSpec struct {
 	ExtractProviderImpl
@@ -35,13 +23,7 @@ func NewExtractProviderDBSpec(onlyDatabases []string) *ExtractProviderDBSpec {
 	return &ExtractProviderDBSpec{onlyDatabases: onlyDatabases}
 }
 
-func addHardcodedNames(onlyDatabases []string) []string {
-	return append(onlyDatabases, []string{
-		"template0", "template1", "postgres",
-	}...)
-}
-
-func (t ExtractProviderDBSpec) Get(
+func (p ExtractProviderDBSpec) Get(
 	backup Backup,
 	filesToUnwrap map[string]bool,
 	skipRedundantTars bool,
@@ -50,70 +32,59 @@ func (t ExtractProviderDBSpec) Get(
 ) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
 	_, filesMeta, _ := backup.GetSentinelAndFilesMetadata()
 
-	databases := addHardcodedNames(t.onlyDatabases)
-	patterns, err := t.makeRestorePatterns(databases, filesMeta.DatabasesByNames)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	err = t.filterFilesToUnwrap(filesToUnwrap, patterns)
-	if err != nil {
-		return nil, nil, "", err
-	}
+	fullRestoreDatabases := p.makeFullRestoreDatabaseMap(p.onlyDatabases, filesMeta.DatabasesByNames)
+	p.filterFilesToUnwrap(filesToUnwrap, fullRestoreDatabases)
 
-	return t.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
+	return p.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
 
-func (t ExtractProviderDBSpec) makeRestorePatterns(databases []string, meta DatabasesByNames) ([]string, error) {
-	restorePatterns := make([]string, 0)
+func (p ExtractProviderDBSpec) makeFullRestoreDatabaseMap(databases []string, names DatabasesByNames) map[int]bool {
+	restoredDatabases := p.makeSystemDatabasesMap()
 
-	for _, key := range databases {
-		pattern, err := getPatternByKey(meta, key)
-		if err != nil {
-			return nil, err
+	for _, db := range databases {
+		dbId, err := names.Resolve(db)
+		if err == nil {
+			restoredDatabases[dbId] = true
 		}
-		restorePatterns = append(restorePatterns, pattern)
 	}
 
-	return restorePatterns, nil
+	return restoredDatabases
 }
 
-func getPatternByKey(meta DatabasesByNames, key string) (string, error) {
-	if data, ok := meta[key]; ok {
-		return fmt.Sprintf("/%s/%d/*", DefaultTablespace, data.Oid), nil
-	} else {
-		return "", NewIncorrectNameError(key)
+func (p ExtractProviderDBSpec) makeSystemDatabasesMap() map[int]bool {
+	restoredDatabases := make(map[int]bool)
+	for i := 1; i < systemIdLimit; i++ {
+		restoredDatabases[i] = true
 	}
+	return restoredDatabases
 }
 
-func (t ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, restorePatterns []string) error {
+func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, databases map[int]bool) {
 	for file := range filesToUnwrap {
-		if !strings.HasPrefix(file, defaultTbspPrefix) {
-			continue
-		}
+		isDb, dbId, _ := p.tryGetOidPair(file)
 
-		inPatterns, err := t.isFileInPatterns(restorePatterns, file)
-		if err != nil {
-			return err
-		}
-		if !inPatterns {
+		if isDb && !databases[dbId] {
 			delete(filesToUnwrap, file)
 		}
 	}
-
-	return nil
 }
 
-func (t ExtractProviderDBSpec) isFileInPatterns(restorePatterns []string, file string) (bool, error) {
-	inPatterns := false
-	for _, pattern := range restorePatterns {
-		res, err := path.Match(pattern, file)
-		if err != nil {
-			return false, err
-		}
-		if res {
-			inPatterns = true
-			break
-		}
+func (p ExtractProviderDBSpec) tryGetOidPair(file string) (bool, int, int) {
+	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
+		return false, 0, 0
 	}
-	return inPatterns, nil
+	var tableId, dbId int
+
+	file, tableId = p.cutIntegerBase(file)
+	file, dbId = p.cutIntegerBase(file)
+
+	return true, dbId, tableId
+}
+
+func (p ExtractProviderDBSpec) cutIntegerBase(file string) (string, int) {
+	parent, base := path.Dir(file), path.Base(file)
+	base, _, _ = strings.Cut(base, ".")
+	base, _, _ = strings.Cut(base, "_")
+	integerResult, _ := strconv.Atoi(base)
+	return parent, integerResult
 }

@@ -330,14 +330,11 @@ func (queryRunner *PgQueryRunner) getStatistics(
 	return relationsStats, nil
 }
 
-// buildGetDatabasesQuery formats a query to get all databases in cluster which are allowed to connect
-func (queryRunner *PgQueryRunner) buildGetDatabasesQuery(allowConnectionFilter bool) (string, error) {
+// BuildGetDatabasesQuery formats a query to get all databases in cluster which are allowed to connect
+func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
-		if allowConnectionFilter {
-			return "SELECT Oid, datname, dattablespace FROM pg_database WHERE datallowconn", nil
-		}
-		return "SELECT Oid, datname, dattablespace FROM pg_database", nil
+		return "SELECT Oid, datname, dattablespace FROM pg_database WHERE datallowconn", nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
 	default:
@@ -345,12 +342,17 @@ func (queryRunner *PgQueryRunner) buildGetDatabasesQuery(allowConnectionFilter b
 	}
 }
 
-func (queryRunner *PgQueryRunner) getDatabaseInfos(getDBInfoQuery string) ([]PgDatabaseInfo, error) {
+// GetDatabaseInfos fetches a list of all databases in cluster which are allowed to connect
+func (queryRunner *PgQueryRunner) GetDatabaseInfos() ([]PgDatabaseInfo, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
 	tracelog.InfoLogger.Println("Querying pg_database")
+	getDBInfoQuery, err := queryRunner.BuildGetDatabasesQuery()
 	conn := queryRunner.Connection
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
+	}
 
 	rows, err := conn.Query(getDBInfoQuery)
 	if err != nil {
@@ -376,24 +378,6 @@ func (queryRunner *PgQueryRunner) getDatabaseInfos(getDBInfoQuery string) ([]PgD
 	}
 
 	return databases, nil
-}
-
-// GetAllowConDatabaseInfos fetches a list of all databases in cluster which are allowed to connect
-func (queryRunner *PgQueryRunner) GetAllowConDatabaseInfos() ([]PgDatabaseInfo, error) {
-	getDBInfoQuery, err := queryRunner.buildGetDatabasesQuery(true)
-	if err != nil {
-		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
-	}
-	return queryRunner.getDatabaseInfos(getDBInfoQuery)
-}
-
-// GetAllowConDatabaseInfos fetches a list of all databases in cluster which are allowed to connect
-func (queryRunner *PgQueryRunner) GetEachDatabaseInfos() ([]PgDatabaseInfo, error) {
-	getDBInfoQuery, err := queryRunner.buildGetDatabasesQuery(false)
-	if err != nil {
-		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
-	}
-	return queryRunner.getDatabaseInfos(getDBInfoQuery)
 }
 
 // GetParameter reads a Postgres setting

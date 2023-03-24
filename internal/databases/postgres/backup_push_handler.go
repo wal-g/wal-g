@@ -412,7 +412,7 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 
 func (bh *BackupHandler) collectDatabaseNamesMetadata() (DatabasesByNames, error) {
 	paths := make(DatabasesByNames)
-	databaseInfos, err := bh.Workers.QueryRunner.GetEachDatabaseInfos()
+	databaseInfos, err := bh.Workers.QueryRunner.GetDatabaseInfos()
 	if err != nil {
 		return nil, err
 	}
