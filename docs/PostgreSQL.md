@@ -131,6 +131,7 @@ Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch e
  
 To activate this feature, do one of the following:
 
+
 * set the `WALG_USE_REVERSE_UNPACK`environment variable
 * add the --reverse-unpack flag
 ```bash
@@ -161,7 +162,7 @@ During partial backup wal-g restores only specified databases' files in default 
 wal-g backup-fetch /path LATEST --restore-only=my_database
 ```
 
-Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work. is not remote.   
+Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
 
 Restores system databases automatically.
 
@@ -186,7 +187,7 @@ If a backup is started from a standby sever, WAL-G will monitor the timeline of 
 
 WAL-G backup-push allows for two data streaming options:
 
-1. Running directly on the database server as the postgres user, wal-g can read the database files from the filesystem. This option allows for high performance, and extra capabilities, like collecting names metadata or Delta backups.
+1. Running directly on the database server as the postgres user, wal-g can read the database files from the filesystem. This option allows for high performance, and extra capabilities, like partial restore or Delta backups.
 
 For uploading backups to S3 in streaming option 1, the user should pass in the path containing the backup started by Postgres as in:
 

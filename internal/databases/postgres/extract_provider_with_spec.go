@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"github.com/wal-g/tracelog"
 	"path"
 	"strconv"
 	"strings"
@@ -30,7 +31,8 @@ func (p ExtractProviderDBSpec) Get(
 	dbDataDir string,
 	createNewIncrementalFiles bool,
 ) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
-	_, filesMeta, _ := backup.GetSentinelAndFilesMetadata()
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	fullRestoreDatabases := p.makeFullRestoreDatabaseMap(p.onlyDatabases, filesMeta.DatabasesByNames)
 	p.filterFilesToUnwrap(filesToUnwrap, fullRestoreDatabases)

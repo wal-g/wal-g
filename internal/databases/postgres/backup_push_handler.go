@@ -323,7 +323,7 @@ func (bh *BackupHandler) handleBackupPushRemote() {
 	}
 	// If no arg is parsed, try to run remote backup using pglogrepl's BASE_BACKUP functionality
 	tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
-	tracelog.InfoLogger.Println("Features like delta backup and collecting database names are disabled, there might be a performance impact.")
+	tracelog.InfoLogger.Println("Features like delta backup and partial restore are disabled, there might be a performance impact.")
 	tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
 	if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
