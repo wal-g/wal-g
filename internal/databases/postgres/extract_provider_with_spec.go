@@ -1,11 +1,11 @@
 package postgres
 
 import (
-	"github.com/wal-g/tracelog"
 	"path"
 	"strconv"
 	"strings"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -34,23 +34,25 @@ func (p ExtractProviderDBSpec) Get(
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	fullRestoreDatabases := p.makeFullRestoreDatabaseMap(p.onlyDatabases, filesMeta.DatabasesByNames)
+	fullRestoreDatabases, err := p.makeFullRestoreDatabaseMap(p.onlyDatabases, filesMeta.DatabasesByNames)
+	tracelog.ErrorLogger.FatalOnError(err)
 	p.filterFilesToUnwrap(filesToUnwrap, fullRestoreDatabases)
 
 	return p.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
 
-func (p ExtractProviderDBSpec) makeFullRestoreDatabaseMap(databases []string, names DatabasesByNames) map[int]bool {
+func (p ExtractProviderDBSpec) makeFullRestoreDatabaseMap(databases []string, names DatabasesByNames) (map[int]bool, error) {
 	restoredDatabases := p.makeSystemDatabasesMap()
 
 	for _, db := range databases {
 		dbID, err := names.Resolve(db)
-		if err == nil {
-			restoredDatabases[dbID] = true
+		if err != nil {
+			return nil, err
 		}
+		restoredDatabases[dbID] = true
 	}
 
-	return restoredDatabases
+	return restoredDatabases, nil
 }
 
 func (p ExtractProviderDBSpec) makeSystemDatabasesMap() map[int]bool {

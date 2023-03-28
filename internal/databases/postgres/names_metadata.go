@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -26,9 +25,6 @@ func (meta DatabasesByNames) Resolve(key string) (int, error) {
 	if data, ok := meta[key]; ok {
 		return data.Oid, nil
 	}
-	if res, err := strconv.Atoi(key); err == nil {
-		return res, nil
-	}
 	return 0, NewIncorrectNameError(key)
 }
 
@@ -37,7 +33,7 @@ type IncorrectNameError struct {
 }
 
 func NewIncorrectNameError(name string) IncorrectNameError {
-	return IncorrectNameError{errors.Errorf("Can't make directory by oid or find database in meta with name: '%s'", name)}
+	return IncorrectNameError{errors.Errorf("Can't find database in meta with name: '%s'", name)}
 }
 
 func (err IncorrectNameError) Error() string {

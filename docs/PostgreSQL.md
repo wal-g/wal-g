@@ -159,7 +159,7 @@ wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 During partial backup wal-g restores only specified databases' files in default tablespace directory (`/base`).
 
 ```bash  
-wal-g backup-fetch /path LATEST --restore-only=my_database
+wal-g backup-fetch /path LATEST --restore-only=my_database,"another database"
 ```
 
 Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
