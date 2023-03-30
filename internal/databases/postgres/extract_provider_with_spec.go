@@ -65,7 +65,7 @@ func (p ExtractProviderDBSpec) makeSystemDatabasesMap() map[int]bool {
 
 func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, databases map[int]bool) {
 	for file := range filesToUnwrap {
-		isDB, dbID, _ := p.tryGetOidPair(file)
+		isDB, dbID, _ := p.TryGetOidPair(file)
 
 		if isDB && !databases[dbID] {
 			delete(filesToUnwrap, file)
@@ -73,7 +73,7 @@ func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool
 	}
 }
 
-func (p ExtractProviderDBSpec) tryGetOidPair(file string) (bool, int, int) {
+func (p ExtractProviderDBSpec) TryGetOidPair(file string) (bool, int, int) {
 	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
 		return false, 0, 0
 	}
