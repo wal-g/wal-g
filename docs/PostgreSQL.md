@@ -156,19 +156,19 @@ wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 
 #### Partial restore (experimental)
 
-During partial restore wal-g restores only specified databases' files in default tablespace directory (`/base`).
+During partial restore wal-g restores only specified databases' files.
 
 ```bash  
-wal-g backup-fetch /path LATEST --restore-only=my_database,"another database"
+wal-g backup-fetch /path LATEST --restore-only=my_database,"another database",database/my_table
 ```
 
 Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
 
-Restores system databases automatically.
+Restores system databases and tables automatically.
 
 Options `--skip-redundant-tars` and `--reverse-unpack` are set automatically.
 
-Because of unrestored databases' remains are still in system tables, it is recommended to drop them.
+Because of unrestored databases' or tables remains are still in system tables, it is recommended to drop them.
 
 ### ``backup-push``
 

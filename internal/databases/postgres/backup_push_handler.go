@@ -415,7 +415,7 @@ func (bh *BackupHandler) collectDatabaseNamesMetadata() (DatabasesByNames, error
 	err := bh.Workers.QueryRunner.ForEachDatabase(
 		func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
 			var err error
-			info := NewDatabaseObjectsInfo(int(db.Oid))
+			info := NewDatabaseObjectsInfo(uint32(db.Oid))
 
 			info.Tables, err = currentRunner.getTables()
 			if err != nil {
