@@ -469,3 +469,38 @@ func (queryRunner *PgQueryRunner) Ping() error {
 	ctx := context.Background()
 	return queryRunner.Connection.Ping(ctx)
 }
+
+func (queryRunner *PgQueryRunner) ForEachDatabase(
+	function func(runner *PgQueryRunner, database PgDatabaseInfo) error) error {
+	databases, err := queryRunner.GetDatabaseInfos()
+	if err != nil {
+		return errors.Wrap(err, "Failed to get db names.")
+	}
+
+	for _, db := range databases {
+		dbName := db.Name
+		databaseOption := func(c *pgx.ConnConfig) error {
+			c.Database = dbName
+			return nil
+		}
+		dbConn, err := Connect(databaseOption)
+
+		if err != nil {
+			tracelog.WarningLogger.Printf("Failed to collect statistics for database: %s\n'%v'\n", db.Name, err)
+			continue
+		}
+		runner, err := NewPgQueryRunner(dbConn)
+		if err != nil {
+			return errors.Wrap(err, "Failed to build query runner.")
+		}
+
+		err = function(runner, db)
+		if err != nil {
+			return err
+		}
+
+		err = dbConn.Close()
+		tracelog.WarningLogger.PrintOnError(err)
+	}
+	return nil
+}
