@@ -411,13 +411,22 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 }
 
 func (bh *BackupHandler) collectDatabaseNamesMetadata() (DatabasesByNames, error) {
-	paths := make(DatabasesByNames)
-	databaseInfos, err := bh.Workers.QueryRunner.GetDatabaseInfos()
-	if err != nil {
-		return nil, err
-	}
-	paths.appendDatabaseInfos(databaseInfos)
-	return paths, nil
+	databases := make(DatabasesByNames)
+	err := bh.Workers.QueryRunner.ForEachDatabase(
+		func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
+			var err error
+			info := NewDatabaseObjectsInfo(int(db.Oid))
+
+			info.Tables, err = currentRunner.getTables()
+			if err != nil {
+				return err
+			}
+
+			databases[db.Name] = *info
+			return nil
+		})
+
+	return databases, err
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup

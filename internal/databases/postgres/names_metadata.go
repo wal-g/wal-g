@@ -9,16 +9,13 @@ import (
 
 type DatabasesByNames map[string]DatabaseObjectsInfo
 
-// TODO : add tables to info
 type DatabaseObjectsInfo struct {
-	Oid int `json:"oid"`
+	Oid    int               `json:"oid"`
+	Tables map[string]uint32 `json:"tables,omitempty"`
 }
 
-// TODO : make other query for this job
-func (meta DatabasesByNames) appendDatabaseInfos(infos []PgDatabaseInfo) {
-	for _, info := range infos {
-		meta[info.Name] = DatabaseObjectsInfo{int(info.Oid)}
-	}
+func NewDatabaseObjectsInfo(oid int) *DatabaseObjectsInfo {
+	return &DatabaseObjectsInfo{Oid: oid, Tables: make(map[string]uint32)}
 }
 
 func (meta DatabasesByNames) Resolve(key string) (int, error) {

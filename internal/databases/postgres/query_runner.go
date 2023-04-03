@@ -471,7 +471,7 @@ func (queryRunner *PgQueryRunner) Ping() error {
 }
 
 func (queryRunner *PgQueryRunner) ForEachDatabase(
-	function func(runner *PgQueryRunner, database PgDatabaseInfo) error) error {
+	function func(runner *PgQueryRunner, db PgDatabaseInfo) error) error {
 	databases, err := queryRunner.GetDatabaseInfos()
 	if err != nil {
 		return errors.Wrap(err, "Failed to get db names.")
@@ -486,7 +486,7 @@ func (queryRunner *PgQueryRunner) ForEachDatabase(
 		dbConn, err := Connect(databaseOption)
 
 		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to collect statistics for database: %s\n'%v'\n", db.Name, err)
+			tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
 			continue
 		}
 		runner, err := NewPgQueryRunner(dbConn)
@@ -503,4 +503,50 @@ func (queryRunner *PgQueryRunner) ForEachDatabase(
 		tracelog.WarningLogger.PrintOnError(err)
 	}
 	return nil
+}
+
+func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return fmt.Sprintf("SELECT pg_class.relfilenode, pg_class.relname, pg_namespace.nspname FROM pg_class "+
+			"JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid WHERE pg_class.oid >= %d", systemIDLimit), nil
+	case queryRunner.Version == 0:
+		return "", NewNoPostgresVersionError()
+	default:
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	getTablesQuery, err := queryRunner.BuildGetTablesQuery()
+	conn := queryRunner.Connection
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+	}
+
+	rows, err := conn.Query(getTablesQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
+	}
+	defer rows.Close()
+
+	tables := make(map[string]uint32)
+	for rows.Next() {
+		var relFileNode uint32
+		var tableName string
+		var namespaceName string
+		if err := rows.Scan(&relFileNode, &tableName, &namespaceName); err != nil {
+			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
+		}
+		tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = relFileNode
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return tables, nil
 }
