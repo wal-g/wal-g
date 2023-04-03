@@ -154,9 +154,9 @@ Since this feature involves both backup creation and restore process, in order t
 wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 ```
 
-#### Partial backup (experimental)
+#### Partial restore (experimental)
 
-During partial backup wal-g restores only specified databases' files in default tablespace directory (`/base`).
+During partial restore wal-g restores only specified databases' files in default tablespace directory (`/base`).
 
 ```bash  
 wal-g backup-fetch /path LATEST --restore-only=my_database,"another database"
@@ -244,7 +244,7 @@ wal-g backup-push /path --copy-composer
 
 #### Database composer mode
 
-In the database composer mode, WAL-G separated files from different directories inside default tablespace and packs them in different tars. Designed to increase partial backup performance.
+In the database composer mode, WAL-G separated files from different directories inside default tablespace and packs them in different tars. Designed to increase partial restore performance.
 
 To activate this feature, do one of the following:
 

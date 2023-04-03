@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e -x
-CONFIG_FILE="/tmp/configs/partial_backup_test_config.json"
+CONFIG_FILE="/tmp/configs/partial_restore_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
@@ -40,13 +40,13 @@ echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 if [ "$(psql -t -c "select data from tbl1;" -d first -A)" = "$(printf '1\n2\n5\n6')" ]; then
-  echo "First database partial backup backup success!!!!!!"
+  echo "First database partial restore success!!!!!!"
 else
-  echo "Partial backup doesn't work :("
+  echo "Partial restore doesn't work :("
   exit 1
 fi
 
-if psql -t -c "select data from tbl3;" -d second -A 2>&1 | grep -q "is not a valid data directory"; then
+if psql -t -c "select data from tbl2;" -d second -A 2>&1 | grep -q "is not a valid data directory"; then
   echo "Skipped database raises error, as it should be!!!!!"
 else
   echo "Skipped database responses unexpectedly"

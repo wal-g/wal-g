@@ -57,7 +57,7 @@ func (p ExtractProviderDBSpec) makeFullRestoreDatabaseMap(databases []string, na
 
 func (p ExtractProviderDBSpec) makeSystemDatabasesMap() map[int]bool {
 	restoredDatabases := make(map[int]bool)
-	for i := 1; i < systemIDLimit; i++ {
+	for i := 0; i < systemIDLimit; i++ {
 		restoredDatabases[i] = true
 	}
 	return restoredDatabases
