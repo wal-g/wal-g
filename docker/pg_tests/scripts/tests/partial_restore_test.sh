@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e -x
-CONFIG_FILE="/tmp/configs/partial_backup_test_config.json"
+CONFIG_FILE="/tmp/configs/partial_restore_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
@@ -28,29 +28,26 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
 psql -c "INSERT INTO tbl1 VALUES (5), (6);" first
 psql -c "INSERT INTO tbl2 VALUES (7), (8);" second
-FIRST_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'first';" -d postgres -A;)
-T0_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'template0';" -d postgres -A;)
-T1_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'template1';" -d postgres -A;)
-PG_OID=$(psql -t -c "SELECT oid FROM pg_database WHERE datname = 'postgres';" -d postgres -A;)
 psql -c "SELECT pg_switch_wal();" postgres
 sleep 10
 
+
 /tmp/scripts/drop_pg.sh
-wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --restore-only=${T1_OID},${T0_OID},${PG_OID},${FIRST_OID}
+wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --restore-only=first
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 if [ "$(psql -t -c "select data from tbl1;" -d first -A)" = "$(printf '1\n2\n5\n6')" ]; then
-  echo "Partial backup success!!!!!!"
+  echo "First database partial restore success!!!!!!"
 else
-  echo "Partial backup doesn't work :("
+  echo "Partial restore doesn't work :("
   exit 1
 fi
 
 if psql -t -c "select data from tbl2;" -d second -A 2>&1 | grep -q "is not a valid data directory"; then
-  echo "Skipped database raises error, as it should be!"
+  echo "Skipped database raises error, as it should be!!!!!"
 else
   echo "Skipped database responses unexpectedly"
   exit 1

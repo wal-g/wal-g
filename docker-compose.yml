@@ -280,12 +280,12 @@ services:
     links:
       - s3
 
-  pg_partial_backup_test:
+  pg_partial_restore_test:
     build:
-      dockerfile: docker/pg_tests/Dockerfile_partial_backup_test
+      dockerfile: docker/pg_tests/Dockerfile_partial_restore_test
       context: .
-    image: wal-g/partial_backup_test
-    container_name: wal-g_pg_partial_backup_test
+    image: wal-g/partial_restore_test
+    container_name: wal-g_pg_partial_restore_test
     depends_on:
       - s3
     links:

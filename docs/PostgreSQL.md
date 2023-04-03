@@ -131,6 +131,7 @@ Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch e
  
 To activate this feature, do one of the following:
 
+
 * set the `WALG_USE_REVERSE_UNPACK`environment variable
 * add the --reverse-unpack flag
 ```bash
@@ -153,19 +154,21 @@ Since this feature involves both backup creation and restore process, in order t
 wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 ```
 
-#### Partial backup (experimental)
+#### Partial restore (experimental)
 
-During partial backup wal-g restores only specified databases' files in default tablespace directory (`/base`). 
+During partial restore wal-g restores only specified databases' files in default tablespace directory (`/base`).
 
 ```bash  
-wal-g backup-fetch /path LATEST --restore-only=1,4,5,16384
+wal-g backup-fetch /path LATEST --restore-only=my_database,"another database"
 ```
 
-If `--restore-only` specified, `--skip-redundant-tars` and `--reverse-unpack` are set automatically.
+Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
 
-PostgreSQL works fine with restored databases if `template0`, `template1` and `postgres` are restored. Because of others' remains are still in system tables, it is recommended to drop all unrestored databases.
+Restores system databases automatically.
 
-Currently, only database oids can be specified.
+Options `--skip-redundant-tars` and `--reverse-unpack` are set automatically.
+
+Because of unrestored databases' remains are still in system tables, it is recommended to drop them.
 
 ### ``backup-push``
 
@@ -184,7 +187,7 @@ If a backup is started from a standby sever, WAL-G will monitor the timeline of 
 
 WAL-G backup-push allows for two data streaming options:
 
-1. Running directly on the database server as the postgres user, wal-g can read the database files from the filesystem. This option allows for high performance, and extra capabilities, like Delta backups.
+1. Running directly on the database server as the postgres user, wal-g can read the database files from the filesystem. This option allows for high performance, and extra capabilities, like partial restore or Delta backups.
 
 For uploading backups to S3 in streaming option 1, the user should pass in the path containing the backup started by Postgres as in:
 
@@ -241,7 +244,7 @@ wal-g backup-push /path --copy-composer
 
 #### Database composer mode
 
-In the database composer mode, WAL-G separated files from different directories inside default tablespace and packs them in different tars. Designed to increase partial backup performance.
+In the database composer mode, WAL-G separated files from different directories inside default tablespace and packs them in different tars. Designed to increase partial restore performance.
 
 To activate this feature, do one of the following:
 

@@ -20,8 +20,8 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
-	restoreOnlyDescription        = `[Experimental] Downloads only databases specified by passed db ids from default tablespace.
-Sets reverse delta unpack & skip redundant tars options automatically`
+	restoreOnlyDescription        = `[Experimental] Downloads only databases specified by passed names from default tablespace.
+Sets reverse delta unpack & skip redundant tars options automatically. Always downloads system databases.`
 )
 
 var fileMask string
@@ -29,7 +29,7 @@ var restoreSpec string
 var reverseDeltaUnpack bool
 var skipRedundantTars bool
 var fetchTargetUserData string
-var onlyDatabases []int
+var onlyDatabases []string
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
@@ -99,7 +99,7 @@ func init() {
 		false, skipRedundantTarsDescription)
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
-	backupFetchCmd.Flags().IntSliceVar(&onlyDatabases, "restore-only",
+	backupFetchCmd.Flags().StringSliceVar(&onlyDatabases, "restore-only",
 		nil, restoreOnlyDescription)
 
 	Cmd.AddCommand(backupFetchCmd)

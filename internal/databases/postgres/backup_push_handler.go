@@ -149,7 +149,8 @@ func (bh *BackupHandler) createAndPushBackup() {
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.handleDeltaBackup(folder)
 	tarFileSets := bh.uploadBackup()
-	sentinelDto, filesMetaDto := bh.setupDTO(tarFileSets)
+	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
+	tracelog.ErrorLogger.FatalOnError(err)
 	bh.markBackups(folder, sentinelDto)
 	bh.uploadMetadata(sentinelDto, filesMetaDto)
 
@@ -210,7 +211,8 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 	}
 }
 
-func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) {
+func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto,
+	filesMeta FilesMetadataDto, err error) {
 	var tablespaceSpec *TablespaceSpec
 	if !bh.Workers.Bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bh.Workers.Bundle.TablespaceSpec
@@ -218,7 +220,8 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
 	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
-	return sentinelDto, filesMeta
+	filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata()
+	return sentinelDto, filesMeta, err
 }
 
 func (bh *BackupHandler) markBackups(folder storage.Folder, sentinelDto BackupSentinelDto) {
@@ -320,7 +323,7 @@ func (bh *BackupHandler) handleBackupPushRemote() {
 	}
 	// If no arg is parsed, try to run remote backup using pglogrepl's BASE_BACKUP functionality
 	tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
-	tracelog.InfoLogger.Println("Features like delta backup are disabled, there might be a performance impact.")
+	tracelog.InfoLogger.Println("Features like delta backup and partial restore are disabled, there might be a performance impact.")
 	tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
 	if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
@@ -405,6 +408,16 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
 	}
+}
+
+func (bh *BackupHandler) collectDatabaseNamesMetadata() (DatabasesByNames, error) {
+	paths := make(DatabasesByNames)
+	databaseInfos, err := bh.Workers.QueryRunner.GetDatabaseInfos()
+	if err != nil {
+		return nil, err
+	}
+	paths.appendDatabaseInfos(databaseInfos)
+	return paths, nil
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
