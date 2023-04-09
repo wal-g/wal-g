@@ -105,7 +105,6 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	return meta
 }
 
-// TODO : unit tests
 // TODO : get rid of panic here
 // IsIncremental checks that sentinel represents delta backup
 func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
