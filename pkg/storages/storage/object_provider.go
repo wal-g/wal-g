@@ -1,6 +1,8 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	ErrNoMoreObjects  = errors.New("no more objects")
@@ -22,6 +24,15 @@ func NewObjectProvider() *ObjectProvider {
 	return s
 }
 
+func NewLowMemoryObjectProvider() *ObjectProvider {
+	s := new(ObjectProvider)
+
+	s.ch = make(chan Object)
+	s.ech = make(chan error, 4)
+
+	return s
+}
+
 func (p *ObjectProvider) GetObject() (Object, error) {
 	select {
 	case o, ok := <-p.ch:
@@ -38,7 +49,7 @@ func (p *ObjectProvider) GetObject() (Object, error) {
 	}
 }
 
-func (p *ObjectProvider) AddObjectToProvider(o Object) error {
+func (p *ObjectProvider) AddObject(o Object) error {
 	select {
 	case p.ch <- o:
 		return nil
@@ -49,7 +60,7 @@ func (p *ObjectProvider) AddObjectToProvider(o Object) error {
 	}
 }
 
-func (p *ObjectProvider) AddErrorToProvider(err error) bool {
+func (p *ObjectProvider) AddError(err error) bool {
 	if p.err != nil {
 		return false
 	}
@@ -61,6 +72,16 @@ func (p *ObjectProvider) AddErrorToProvider(err error) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (p *ObjectProvider) HandleError(err error) {
+	if err == nil {
+		return
+	}
+	ok := p.AddError(err)
+	for !ok {
+		ok = p.AddError(err)
 	}
 }
 

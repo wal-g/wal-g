@@ -133,7 +133,9 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		tracelog.InfoLogger.Printf("Synced binlog file %s", binlogName)
 		binlogPath := path.Join(dstDir, binlogName)
 		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
+		handleEventError(err, s)
 
+		err = os.Remove(binlogPath)
 		handleEventError(err, s)
 		pos.Pos = 4
 	}
@@ -153,7 +155,7 @@ func syncBinlogFiles(pos mysql.Position, s *replication.BinlogStreamer) error {
 	if err != nil {
 		return err
 	}
-	logFilesProvider := storage.NewObjectProvider()
+	logFilesProvider := storage.NewLowMemoryObjectProvider()
 
 	// start sync
 	go sendEventsFromBinlogFiles(logFilesProvider, pos, s)
