@@ -77,7 +77,7 @@ type SegmentFwdArg struct {
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
-	Uploader *internal.Uploader
+	Uploader *internal.RegularUploader
 	Conn     *pgx.Conn
 }
 

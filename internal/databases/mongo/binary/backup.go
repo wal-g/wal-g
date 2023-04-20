@@ -14,7 +14,7 @@ import (
 type BackupService struct {
 	Context       context.Context
 	MongodService *MongodService
-	Uploader      *internal.Uploader
+	Uploader      *internal.RegularUploader
 
 	Sentinel models.Backup
 }
@@ -23,7 +23,7 @@ func GenerateNewBackupName() string {
 	return common.BinaryBackupType + "_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-func CreateBackupService(ctx context.Context, mongodService *MongodService, uploader *internal.Uploader,
+func CreateBackupService(ctx context.Context, mongodService *MongodService, uploader *internal.RegularUploader,
 ) (*BackupService, error) {
 	return &BackupService{
 		Context:       ctx,

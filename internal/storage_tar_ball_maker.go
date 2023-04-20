@@ -4,10 +4,10 @@ package internal
 type StorageTarBallMaker struct {
 	partCount  int
 	backupName string
-	uploader   *Uploader
+	uploader   *RegularUploader
 }
 
-func NewStorageTarBallMaker(backupName string, uploader *Uploader) *StorageTarBallMaker {
+func NewStorageTarBallMaker(backupName string, uploader *RegularUploader) *StorageTarBallMaker {
 	return &StorageTarBallMaker{0, backupName, uploader}
 }
 
@@ -16,7 +16,7 @@ func (tarBallMaker *StorageTarBallMaker) Make(dedicatedUploader bool) TarBall {
 	tarBallMaker.partCount++
 	uploader := tarBallMaker.uploader
 	if dedicatedUploader {
-		uploader = uploader.Clone()
+		uploader = uploader.CloneRegularUploader()
 	}
 	size := int64(0)
 	return &StorageTarBall{

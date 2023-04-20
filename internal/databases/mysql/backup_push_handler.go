@@ -12,7 +12,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(folder storage.Folder, uploader internal.UploaderProvider,
+func HandleBackupPush(folder storage.Folder, uploader internal.Uploader,
 	backupCmd *exec.Cmd, isPermanent bool, userDataRaw string) {
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)

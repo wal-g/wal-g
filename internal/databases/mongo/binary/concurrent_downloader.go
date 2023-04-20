@@ -14,7 +14,7 @@ type ConcurrentDownloader struct {
 	folder storage.Folder
 }
 
-func CreateConcurrentDownloader(uploader *internal.Uploader) *ConcurrentDownloader {
+func CreateConcurrentDownloader(uploader *internal.RegularUploader) *ConcurrentDownloader {
 	return &ConcurrentDownloader{
 		folder: uploader.Folder(),
 	}

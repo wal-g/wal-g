@@ -17,7 +17,10 @@ var daemonCmd = &cobra.Command{
 	Short: DaemonShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := postgres.ConfigureWalUploader()
+		baseUploader, err := internal.ConfigureUploader()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		uploader, err := postgres.ConfigureWalUploader(baseUploader)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()
@@ -35,7 +38,7 @@ var daemonCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.PGArchiveStatusManager = asm.NewNopASM()
 		}
-		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+		uploader.ChangeDirectory(utility.WalPath)
 		postgres.HandleDaemon(uploader, args[0])
 	},
 }

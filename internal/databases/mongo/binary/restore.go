@@ -14,12 +14,12 @@ import (
 type RestoreService struct {
 	Context      context.Context
 	LocalStorage *LocalStorage
-	Uploader     *internal.Uploader
+	Uploader     *internal.RegularUploader
 
 	minimalConfigPath string
 }
 
-func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploader *internal.Uploader,
+func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploader *internal.RegularUploader,
 	minimalConfigPath string) (*RestoreService, error) {
 	return &RestoreService{
 		Context:           ctx,

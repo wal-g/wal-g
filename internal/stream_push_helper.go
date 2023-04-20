@@ -20,7 +20,7 @@ const (
 
 // TODO : unit tests
 // PushStream compresses a stream and push it
-func (uploader *Uploader) PushStream(stream io.Reader) (string, error) {
+func (uploader *RegularUploader) PushStream(stream io.Reader) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 	dstPath := GetStreamName(backupName, uploader.Compressor.FileExtension())
 	err := uploader.PushStreamToDestination(stream, dstPath)
@@ -50,7 +50,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 					fileReader = utility.NewWithSizeReader(fileReader, &read)
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
-					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compressor.FileExtension(), currentPartNumber, idx)
+					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compression().FileExtension(), currentPartNumber, idx)
 					err := uploader.PushStreamToDestination(fileReader, dstPath)
 					if err != nil {
 						return err
@@ -63,7 +63,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 				}
 			})
 		} else {
-			dstPath := GetPartitionedStreamName(backupName, uploader.Compressor.FileExtension(), partNumber)
+			dstPath := GetPartitionedStreamName(backupName, uploader.Compression().FileExtension(), partNumber)
 			errGroup.Go(func() error {
 				return uploader.PushStreamToDestination(reader, dstPath)
 			})
@@ -81,7 +81,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 		Type:        SplitMergeStreamBackup,
 		Partitions:  uint(uploader.partitions),
 		BlockSize:   uint(uploader.blockSize),
-		Compression: uploader.Compressor.FileExtension(),
+		Compression: uploader.Compression().FileExtension(),
 	}
 	uploaderClone := uploader.Clone()
 	uploaderClone.DisableSizeTracking() // don't count metadata.json in backup size
@@ -92,7 +92,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 
 // TODO : unit tests
 // PushStreamToDestination compresses a stream and push it to specifyed destination
-func (uploader *Uploader) PushStreamToDestination(stream io.Reader, dstPath string) error {
+func (uploader *RegularUploader) PushStreamToDestination(stream io.Reader, dstPath string) error {
 	if uploader.dataSize != nil {
 		stream = utility.NewWithSizeReader(stream, uploader.dataSize)
 	}

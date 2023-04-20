@@ -45,7 +45,7 @@ func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
 	return s3.NewUploader(uploaderAPI, "", "", "", "STANDARD")
 }
 
-func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
+func NewMockUploader(apiMultiErr, apiErr bool) *internal.RegularUploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
 	return internal.NewUploader(
 		&MockCompressor{},
@@ -53,7 +53,7 @@ func NewMockUploader(apiMultiErr, apiErr bool) *internal.Uploader {
 	)
 }
 
-func NewStoringMockUploader(storage *memory.Storage) *internal.Uploader {
+func NewStoringMockUploader(storage *memory.Storage) *internal.RegularUploader {
 	return internal.NewUploader(
 		&MockCompressor{},
 		memory.NewFolder("in_memory/", storage),
@@ -62,22 +62,22 @@ func NewStoringMockUploader(storage *memory.Storage) *internal.Uploader {
 
 func NewMockWalUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
 	s3Uploader := MakeDefaultUploader(NewMockS3Uploader(apiMultiErr, apiErr, nil))
+	upl := internal.NewUploader(&MockCompressor{},
+		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{}, "bucket/", "server/", false))
 	return postgres.NewWalUploader(
-		&MockCompressor{},
-		s3.NewFolder(*s3Uploader, NewMockS3Client(false, true), map[string]string{}, "bucket/", "server/", false),
+		upl,
 		nil,
 	)
 }
 
-func CreateMockStorageWalFolder() storage.Folder {
+func CreateMockStorageWalUploader() *internal.RegularUploader {
 	var folder = MakeDefaultInMemoryStorageFolder()
-	return folder.GetSubFolder(utility.WalPath)
+	return internal.NewUploader(&MockCompressor{}, folder.GetSubFolder(utility.WalPath))
 }
 
 func NewMockWalDirUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
 	return postgres.NewWalUploader(
-		&MockCompressor{},
-		CreateMockStorageWalFolder(),
+		CreateMockStorageWalUploader(),
 		nil,
 	)
 }

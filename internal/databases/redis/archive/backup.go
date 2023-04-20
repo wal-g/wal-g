@@ -109,11 +109,11 @@ func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, p
 }
 
 type StorageUploader struct {
-	internal.UploaderProvider
+	internal.Uploader
 }
 
 // NewRedisStorageUploader builds redis uploader, that also push metadata
-func NewRedisStorageUploader(upl *internal.Uploader) *StorageUploader {
+func NewRedisStorageUploader(upl *internal.RegularUploader) *StorageUploader {
 	return &StorageUploader{upl}
 }
 

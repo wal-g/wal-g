@@ -4,17 +4,19 @@ import (
 	"io"
 	"path"
 
+	"github.com/wal-g/wal-g/internal/asm"
+
 	"github.com/wal-g/wal-g/internal"
 
-	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
 // WalUploader extends uploader with wal specific functionality.
 type WalUploader struct {
-	*internal.Uploader
+	internal.Uploader
+	ArchiveStatusManager   asm.ArchiveStatusManager
+	PGArchiveStatusManager asm.ArchiveStatusManager
 	*DeltaFileManager
 }
 
@@ -23,23 +25,22 @@ func (walUploader *WalUploader) getUseWalDelta() (useWalDelta bool) {
 }
 
 func NewWalUploader(
-	compressor compression.Compressor,
-	uploadingLocation storage.Folder,
+	baseUploader internal.Uploader,
 	deltaFileManager *DeltaFileManager,
 ) *WalUploader {
-	uploader := internal.NewUploader(compressor, uploadingLocation)
-
 	return &WalUploader{
-		uploader,
-		deltaFileManager,
+		Uploader:         baseUploader,
+		DeltaFileManager: deltaFileManager,
 	}
 }
 
 // Clone creates similar WalUploader with new WaitGroup
 func (walUploader *WalUploader) clone() *WalUploader {
 	return &WalUploader{
-		walUploader.Uploader.Clone(),
-		walUploader.DeltaFileManager,
+		Uploader:               walUploader.Uploader.Clone(),
+		ArchiveStatusManager:   walUploader.ArchiveStatusManager,
+		PGArchiveStatusManager: walUploader.PGArchiveStatusManager,
+		DeltaFileManager:       walUploader.DeltaFileManager,
 	}
 }
 
@@ -64,5 +65,5 @@ func (walUploader *WalUploader) UploadWalFile(file ioextensions.NamedReader) err
 }
 
 func (walUploader *WalUploader) FlushFiles() {
-	walUploader.DeltaFileManager.FlushFiles(walUploader.Uploader)
+	walUploader.DeltaFileManager.FlushFiles(walUploader)
 }

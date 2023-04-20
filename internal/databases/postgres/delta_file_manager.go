@@ -148,7 +148,7 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 	return
 }
 
-func (manager *DeltaFileManager) FlushDeltaFiles(uploader *internal.Uploader, completedPartFiles map[string]bool) {
+func (manager *DeltaFileManager) FlushDeltaFiles(uploader internal.Uploader, completedPartFiles map[string]bool) {
 	manager.DeltaFileWriters.Range(func(key string, deltaFileWriter *DeltaFileChanWriter) bool {
 		deltaFileWriter.close()
 		return true
@@ -184,7 +184,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader *internal.Uploader, co
 	})
 }
 
-func (manager *DeltaFileManager) FlushFiles(uploader *internal.Uploader) {
+func (manager *DeltaFileManager) FlushFiles(uploader internal.Uploader) {
 	err := manager.dataFolder.CleanFolder()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to clean delta folder because of error: '%v'\n", err)

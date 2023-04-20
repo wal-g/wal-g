@@ -43,7 +43,7 @@ type StreamingBaseBackup struct {
 	maxTarSize       int64
 	dataDir          string
 	Files            internal.BackupFileList
-	uploader         *WalUploader
+	uploader         *internal.RegularUploader
 	streamer         *TarballStreamer
 	fileNo           int
 }
@@ -124,7 +124,7 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 }
 
 // Upload will read all tar files from Postgres, and use the uploader to upload to the backup location
-func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles internal.BundleFiles) (err error) {
+func (bb *StreamingBaseBackup) Upload(uploader *internal.RegularUploader, bundleFiles internal.BundleFiles) (err error) {
 	// Upload the tar
 	bb.uploader = uploader
 	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)

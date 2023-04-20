@@ -38,7 +38,7 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) error {
 		if err != nil {
 			tracelog.ErrorLogger.Printf("unmark wal-g status for %s file failed due following error %+v", walFilePath, err)
 		}
-		return uploadLocalWalMetadata(walFilePath, uploader.Uploader)
+		return uploadLocalWalMetadata(walFilePath, uploader)
 	}
 
 	concurrency, err := internal.GetMaxUploadConcurrency()
@@ -96,7 +96,7 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 
 // TODO : unit tests
 func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAttempt bool, err error) {
-	walFileReader, err := internal.DownloadAndDecompressStorageFile(uploader.UploadingFolder, filepath.Base(walFilePath))
+	walFileReader, err := internal.DownloadAndDecompressStorageFile(uploader.Folder(), filepath.Base(walFilePath))
 	if err != nil {
 		if _, ok := err.(internal.ArchiveNonExistenceError); ok {
 			err = nil

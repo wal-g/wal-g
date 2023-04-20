@@ -88,6 +88,7 @@ const (
 	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
 	PgAliveCheckInterval         = "WALG_ALIVE_CHECK_INTERVAL"
 	PgStopBackupTimeout          = "WALG_STOP_BACKUP_TIMEOUT"
+	PgFailoverStorages           = "WALG_FAILOVER_STORAGES"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -392,6 +393,7 @@ var (
 		PgBackRestStanza:     true,
 		PgAliveCheckInterval: true,
 		PgStopBackupTimeout:  true,
+		PgFailoverStorages:   true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -815,4 +817,24 @@ func bindConfigToEnv(globalViper *viper.Viper) {
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	}
+}
+
+func InitFailoverStorages() (map[string]storage.Folder, error) {
+	storages := viper.GetStringMap(PgFailoverStorages)
+	if len(storages) == 0 {
+		return nil, nil
+	}
+
+	res := make(map[string]storage.Folder)
+	for name := range storages {
+		// Get storage prefix
+		cfg := viper.Sub(PgFailoverStorages + "." + name)
+		folder, err := ConfigureFolderForSpecificConfig(cfg)
+		if err != nil {
+			return nil, err
+		}
+		res[name] = folder
+	}
+
+	return res, nil
 }

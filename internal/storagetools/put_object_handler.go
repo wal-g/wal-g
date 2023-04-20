@@ -14,7 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, overwrite, encrypt, compress bool) {
+func HandlePutObject(localPath, dstPath string, uploader *internal.RegularUploader, overwrite, encrypt, compress bool) {
 	checkOverwrite(dstPath, uploader, overwrite)
 
 	fileReadCloser := openLocalFile(localPath)
@@ -31,7 +31,7 @@ func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, ove
 	tracelog.ErrorLogger.FatalfOnError("Failed to upload: %v", err)
 }
 
-func checkOverwrite(dstPath string, uploader *internal.Uploader, overwrite bool) {
+func checkOverwrite(dstPath string, uploader *internal.RegularUploader, overwrite bool) {
 	fullPath := dstPath + "." + uploader.Compressor.FileExtension()
 	exists, err := uploader.UploadingFolder.Exists(fullPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to check object existence: %v", err)
@@ -52,7 +52,7 @@ func openLocalFile(localPath string) io.ReadCloser {
 	return localFile
 }
 
-func uploadFile(name string, content io.Reader, uploader *internal.Uploader, encrypt, compress bool) error {
+func uploadFile(name string, content io.Reader, uploader *internal.RegularUploader, encrypt, compress bool) error {
 	var crypter crypto.Crypter
 	if encrypt {
 		crypter = internal.ConfigureCrypter()

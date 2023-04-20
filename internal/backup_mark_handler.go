@@ -4,7 +4,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupMark(uploader *Uploader, backupName string, toPermanent bool, metaInteractor GenericMetaInteractor) {
+func HandleBackupMark(uploader *RegularUploader, backupName string, toPermanent bool, metaInteractor GenericMetaInteractor) {
 	folder := uploader.UploadingFolder
 	baseBackupFolder := uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
 	uploader.UploadingFolder = baseBackupFolder

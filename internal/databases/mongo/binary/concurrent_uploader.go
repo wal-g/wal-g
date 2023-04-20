@@ -8,14 +8,14 @@ import (
 )
 
 type ConcurrentUploader struct {
-	uploader *internal.Uploader
+	uploader *internal.RegularUploader
 	bundle   *internal.Bundle
 
 	UncompressedSize int64
 	CompressedSize   int64
 }
 
-func CreateConcurrentUploader(uploader *internal.Uploader, backupName, directory string) (*ConcurrentUploader, error) {
+func CreateConcurrentUploader(uploader *internal.RegularUploader, backupName, directory string) (*ConcurrentUploader, error) {
 	crypter := internal.ConfigureCrypter()
 	tarSizeThreshold := viper.GetInt64(internal.TarSizeThresholdSetting)
 	bundle := internal.NewBundle(directory, crypter, tarSizeThreshold, map[string]utility.Empty{})

@@ -22,7 +22,7 @@ type StorageTarBall struct {
 	partSize    *int64
 	writeCloser io.Closer
 	tarWriter   *tar.Writer
-	uploader    *Uploader
+	uploader    *RegularUploader
 	name        string
 }
 

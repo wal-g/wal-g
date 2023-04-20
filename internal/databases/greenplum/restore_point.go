@@ -84,7 +84,7 @@ type RestorePointCreator struct {
 	systemIdentifier *uint64
 	gpVersion        semver.Version
 
-	Uploader *internal.Uploader
+	Uploader *internal.RegularUploader
 	Conn     *pgx.Conn
 
 	logsDir string

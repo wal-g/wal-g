@@ -1,9 +1,10 @@
 package postgres
 
 import (
-	"github.com/stretchr/testify/assert"
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBackupSentinelDto_IsIncremental(t *testing.T) {

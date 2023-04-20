@@ -22,14 +22,14 @@ type CommonDirectoryUploader struct {
 
 	excludedFiles map[string]utility.Empty
 	backupName    string
-	uploader      *Uploader
+	uploader      *RegularUploader
 }
 
 func NewCommonDirectoryUploader(
 	crypter crypto.Crypter, packer TarBallFilePacker,
 	tarBallComposerMaker TarBallComposerMaker, tarSizeThreshold int64,
 	excludedFiles map[string]utility.Empty, backupName string,
-	uploader *Uploader) *CommonDirectoryUploader {
+	uploader *RegularUploader) *CommonDirectoryUploader {
 	return &CommonDirectoryUploader{
 		crypter:              crypter,
 		tarBallFilePacker:    packer,

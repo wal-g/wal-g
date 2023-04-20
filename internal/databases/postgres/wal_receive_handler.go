@@ -54,7 +54,7 @@ func HandleWALReceive(uploader *WalUploader) {
 	var XLogPos pglogrepl.LSN
 	var segment *WalSegment
 
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+	uploader.ChangeDirectory(utility.WalPath)
 
 	slot, walSegmentBytes, err := getCurrentWalInfo()
 	tracelog.ErrorLogger.FatalOnError(err)

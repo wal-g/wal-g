@@ -24,7 +24,7 @@ import (
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
 func HandleWALPrefetch(uploader *WalUploader, walFileName string, location string) {
-	folder := uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+	folder := uploader.Folder().GetSubFolder(utility.WalPath)
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
@@ -76,7 +76,7 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), startLsn)
+	err := bundle.DownloadDeltaMap(uploader.Folder().GetSubFolder(utility.WalPath), startLsn)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return

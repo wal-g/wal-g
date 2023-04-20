@@ -90,7 +90,7 @@ type PrevBackupInfo struct {
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
-	Uploader    *WalUploader
+	Uploader    *internal.RegularUploader
 	Bundle      *Bundle
 	QueryRunner *PgQueryRunner
 }
@@ -196,7 +196,11 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 			*bh.PgInfo.systemIdentifier != *bh.prevBackupInfo.sentinelDto.SystemIdentifier {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
 		}
-		if bh.Workers.Uploader.getUseWalDelta() {
+
+		useWalDelta, _, err := configureWalDeltaUsage()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		if useWalDelta {
 			err := bh.Workers.Bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), bh.CurBackupInfo.startLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided " +
@@ -239,7 +243,7 @@ func (bh *BackupHandler) SetComposerInitFunc(initFunc func(handler *BackupHandle
 
 func configureTarBallComposer(bh *BackupHandler, tarBallComposerType TarBallComposerType) error {
 	maker, err := NewTarBallComposerMaker(tarBallComposerType, bh.Workers.QueryRunner,
-		bh.Workers.Uploader.Uploader, bh.CurBackupInfo.Name,
+		bh.Workers.Uploader, bh.CurBackupInfo.Name,
 		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks),
 		bh.Arguments.withoutFilesMetadata)
 	if err != nil {
@@ -253,7 +257,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	bundle := bh.Workers.Bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
-	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Workers.Uploader.Uploader))
+	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Workers.Uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = bh.Arguments.composerInitFunc(bh)
@@ -426,7 +430,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	// and version cannot be read easily using replication connection.
 	// Retrieve both with this helper function which uses a temp connection to postgres.
 
-	uploader, err := ConfigureWalUploader()
+	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return nil, err
 	}

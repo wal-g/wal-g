@@ -23,11 +23,11 @@ type GpTarBallComposerMaker struct {
 	relStorageMap AoRelFileStorageMap
 	bundleFiles   internal.BundleFiles
 	TarFileSets   internal.TarFileSets
-	uploader      *internal.Uploader
+	uploader      *internal.RegularUploader
 	backupName    string
 }
 
-func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader *internal.Uploader, backupName string,
+func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader *internal.RegularUploader, backupName string,
 ) (*GpTarBallComposerMaker, error) {
 	return &GpTarBallComposerMaker{
 		relStorageMap: relStorageMap,
@@ -106,7 +106,7 @@ type GpTarBallComposer struct {
 	addFileQueue     chan *internal.ComposeFileInfo
 	addFileWaitGroup sync.WaitGroup
 
-	uploader *internal.Uploader
+	uploader *internal.RegularUploader
 
 	files            internal.BundleFiles
 	tarFileSets      internal.TarFileSets
@@ -123,7 +123,7 @@ type GpTarBallComposer struct {
 func NewGpTarBallComposer(
 	tarBallQueue *internal.TarBallQueue, crypter crypto.Crypter, relStorageMap AoRelFileStorageMap,
 	bundleFiles internal.BundleFiles, packer *postgres.TarBallFilePackerImpl, aoStorageUploader *AoStorageUploader,
-	tarFileSets internal.TarFileSets, uploader *internal.Uploader, backupName string,
+	tarFileSets internal.TarFileSets, uploader *internal.RegularUploader, backupName string,
 ) (*GpTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 
@@ -136,7 +136,7 @@ func NewGpTarBallComposer(
 		files:              bundleFiles,
 		aoStorageUploader:  aoStorageUploader,
 		aoSegSizeThreshold: viper.GetInt64(internal.GPAoSegSizeThreshold),
-		uploader:           uploader.Clone(),
+		uploader:           uploader.CloneRegularUploader(),
 		tarFileSets:        tarFileSets,
 		errorGroup:         errorGroup,
 		ctx:                ctx,
