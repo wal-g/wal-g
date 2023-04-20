@@ -478,30 +478,41 @@ func (queryRunner *PgQueryRunner) ForEachDatabase(
 	}
 
 	for _, db := range databases {
-		dbName := db.Name
-		databaseOption := func(c *pgx.ConnConfig) error {
-			c.Database = dbName
-			return nil
-		}
-		dbConn, err := Connect(databaseOption)
-
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
-			continue
-		}
-		runner, err := NewPgQueryRunner(dbConn)
-		if err != nil {
-			return errors.Wrap(err, "Failed to build query runner.")
-		}
-
-		err = function(runner, db)
+		err := queryRunner.executeForDatabase(function, db)
 		if err != nil {
 			return err
 		}
-
-		err = dbConn.Close()
-		tracelog.WarningLogger.PrintOnError(err)
 	}
+	return nil
+}
+
+func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQueryRunner, db PgDatabaseInfo) error,
+	db PgDatabaseInfo) error {
+	dbName := db.Name
+	databaseOption := func(c *pgx.ConnConfig) error {
+		c.Database = dbName
+		return nil
+	}
+	dbConn, err := Connect(databaseOption)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
+		return nil
+	}
+	defer func() {
+		err := dbConn.Close()
+		tracelog.WarningLogger.PrintOnError(err)
+	}()
+
+	runner, err := NewPgQueryRunner(dbConn)
+	if err != nil {
+		return errors.Wrap(err, "Failed to build query runner")
+	}
+
+	err = function(runner, db)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
