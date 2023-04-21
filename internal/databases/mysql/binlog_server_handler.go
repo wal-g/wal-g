@@ -21,6 +21,7 @@ import (
 )
 
 var (
+	startTS      time.Time
 	untilTS      time.Time
 	lastSentGTID string
 )
@@ -151,12 +152,7 @@ func syncBinlogFiles(pos mysql.Position, s *replication.BinlogStreamer) error {
 	if err != nil {
 		return err
 	}
-	startTS, err := GetBinlogTS(folder, pos.Name)
-	if err != nil {
-		return err
-	}
 	logFilesProvider := storage.NewLowMemoryObjectProvider()
-
 	// start sync
 	go sendEventsFromBinlogFiles(logFilesProvider, pos, s)
 	go provideLogs(folder, dstDir, startTS, untilTS, logFilesProvider)
@@ -217,14 +213,18 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 		// during replication, the uuid is taken from events
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_UUID"}, [][]interface{}{{"0"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+	case "SELECT @@global.rpl_semi_sync_master_enabled":
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_master_enabled"}, [][]interface{}{{"0"}})
+		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	default:
 		return nil, nil
 	}
 }
 
-func HandleBinlogServer(sendEventsUntilTS string) {
-	var err error
-	untilTS, err = utility.ParseUntilTS(sendEventsUntilTS)
+func HandleBinlogServer(since string, until string) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+	startTS, untilTS, _, err = getTimestamps(folder, since, until, "")
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Starting binlog server")

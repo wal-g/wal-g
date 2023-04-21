@@ -15,15 +15,6 @@ type ObjectProvider struct {
 	err error
 }
 
-func NewObjectProvider() *ObjectProvider {
-	s := new(ObjectProvider)
-
-	s.ch = make(chan Object, 80)
-	s.ech = make(chan error, 4)
-
-	return s
-}
-
 func NewLowMemoryObjectProvider() *ObjectProvider {
 	s := new(ObjectProvider)
 
@@ -41,8 +32,7 @@ func (p *ObjectProvider) GetObject() (Object, error) {
 		}
 		return o, nil
 	case p.err = <-p.ech:
-		// if chanel is closed, p.err will be nil
-		if p.err == nil {
+		if p.err == nil || p.err == ErrProviderClosed {
 			return p.GetObject()
 		}
 		return nil, p.err
@@ -55,8 +45,6 @@ func (p *ObjectProvider) AddObject(o Object) error {
 		return nil
 	case err := <-p.ech:
 		return err
-	default:
-		return ErrProviderClosed
 	}
 }
 
@@ -91,6 +79,9 @@ func (p *ObjectProvider) ObjectsCount() int {
 
 func (p *ObjectProvider) Close() {
 	close(p.ch)
+	select {
+	case p.ech <- ErrProviderClosed:
+	default:
+	}
 	close(p.ech)
-	p.err = ErrProviderClosed
 }

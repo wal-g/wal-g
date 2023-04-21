@@ -12,10 +12,12 @@ import (
 
 const (
 	binlogServerShortDescription = "Create server for backup slaves"
+	binlogSinceFlagShortDescr    = "backup name starting from which you want to use binlogs"
 	untilFlagShortDescr          = "time in RFC3339 for PITR"
 )
 
 var untilTS string
+var BinlogBackupName string
 
 var (
 	binlogServerCmd = &cobra.Command{
@@ -33,13 +35,14 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			mysql.HandleBinlogServer(untilTS)
+			mysql.HandleBinlogServer(BinlogBackupName, untilTS)
 		},
 	}
 )
 
 func init() {
-	binlogServerCmd.PersistentFlags().StringVar(&untilTS,
+	binlogFetchCmd.Flags().StringVar(&BinlogBackupName, "since", "LATEST", binlogSinceFlagShortDescr)
+	binlogServerCmd.Flags().StringVar(&untilTS,
 		"until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
 		untilFlagShortDescr)
