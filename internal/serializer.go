@@ -35,7 +35,6 @@ type DtoSerializer interface {
 	Unmarshal(reader io.Reader, dto interface{}) error
 }
 
-// TODO: unit test
 func NewDtoSerializer() (DtoSerializer, error) {
 	switch t := DtoSerializerType(viper.GetString(SerializerTypeSetting)); t {
 	case RegularJSONSerializer:
