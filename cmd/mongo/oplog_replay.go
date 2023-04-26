@@ -18,6 +18,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const LatestBackupString = "LATEST_BACKUP"
+
 // oplogReplayCmd represents oplog replay procedure
 var oplogReplayCmd = &cobra.Command{
 	Use:   "oplog-replay <since ts.inc> <until ts.inc>",
@@ -53,11 +55,15 @@ type oplogReplayRunArgs struct {
 
 func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err error) {
 	// resolve archiving settings
-	args.since, err = models.TimestampFromStr(cmdargs[0])
+	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	if err != nil {
+		return args, err
+	}
+	args.since, err = processArg(cmdargs[0], downloader)
 	if err != nil {
 		return
 	}
-	args.until, err = models.TimestampFromStr(cmdargs[1])
+	args.until, err = processArg(cmdargs[1], downloader)
 	if err != nil {
 		return
 	}
@@ -88,6 +94,25 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 	}
 
 	return args, nil
+}
+
+func processArg(arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
+	switch arg {
+	case internal.LatestString:
+		return downloader.LastKnownArchiveTS()
+	case LatestBackupString:
+		lastBackupName, err := downloader.LastBackupName()
+		if err != nil {
+			return models.Timestamp{}, err
+		}
+		backupMeta, err := downloader.BackupMeta(lastBackupName)
+		if err != nil {
+			return models.Timestamp{}, err
+		}
+		return models.TimestampFromBson(backupMeta.MongoMeta.BackupLastTS), nil
+	default:
+		return models.TimestampFromStr(arg)
+	}
 }
 
 func runOplogReplay(ctx context.Context, replayArgs oplogReplayRunArgs) error {
