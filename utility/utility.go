@@ -232,13 +232,12 @@ func StripPrefixName(path string) string {
 	return name
 }
 
-// TODO : unit tests
 var patternLSN = "[0-9A-F]{24}"
-var regexpLSN = regexp.MustCompile(patternLSN)
+var RegexpLSN = regexp.MustCompile(patternLSN)
 
 // Strips the backup WAL file name.
 func StripWalFileName(path string) string {
-	foundLsn := regexpLSN.FindAllString(path, 2)
+	foundLsn := RegexpLSN.FindAllString(path, 2)
 	if len(foundLsn) > 0 {
 		return foundLsn[0]
 	}

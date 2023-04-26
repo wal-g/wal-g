@@ -2,6 +2,7 @@ package utility_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"math/rand"
 	"os"
@@ -415,6 +416,61 @@ func TestStripWalFileName_ValidLsn(t *testing.T) {
 	assert.Equal(t, path, result)
 }
 
+func TestRegex(t *testing.T) {
+	lsns := []string{RandomLsn(), RandomLsn()}
+	tests := []struct {
+		name        string
+		lsn         string
+		expected    []string
+		expectedLen int
+	}{
+		{
+			name:        "LsnRegex_ReturnLsnFromString",
+			lsn:         lsns[0],
+			expected:    []string{lsns[0]},
+			expectedLen: 1,
+		},
+
+		{
+			name:        "LsnRegex_ReturnLsnFromStringWithAnotherText",
+			lsn:         fmt.Sprintf("some text %s or 43567", lsns[0]),
+			expected:    []string{lsns[0]},
+			expectedLen: 1,
+		},
+
+		{
+			name:        "LsnRegex_ReturnEmptyArrayWhenLsnIsIncorrect",
+			lsn:         GetRandomizedString(23),
+			expected:    nil,
+			expectedLen: 0,
+		},
+
+		{
+			name:        "LsnRegex_ReturnLsnWhenItIsAllF",
+			lsn:         strings.Repeat("F", 24),
+			expected:    []string{strings.Repeat("F", 24)},
+			expectedLen: 1,
+		},
+
+		{
+			name:        "LsnRegex_ReturnAllLsnWhenHasSeparator",
+			lsn:         strings.Join(lsns[:], "-"),
+			expected:    lsns,
+			expectedLen: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			result := utility.RegexpLSN.FindAllString(tt.lsn, -1)
+
+			assert.Equalf(t, tt.expectedLen, len(result), "Expected different array length")
+			assert.Equalf(t, tt.expected, result, "Expected different result")
+		})
+	}
+}
+
 func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 	var paths = [3]string{RandomLsn(), RandomLsn(), RandomLsn()}
 	var path = strings.Join(paths[:], "-")
@@ -425,10 +481,13 @@ func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 }
 
 func RandomLsn() string {
-	var letter = []rune("ABCDEF0123456789")
 	const LSNLength = 24
+	return GetRandomizedString(LSNLength)
+}
 
-	b := make([]rune, LSNLength)
+func GetRandomizedString(length int) string {
+	var letter = []rune("ABCDEF0123456789")
+	b := make([]rune, length)
 	for i := range b {
 		b[i] = letter[rand.Intn(len(letter))]
 	}
