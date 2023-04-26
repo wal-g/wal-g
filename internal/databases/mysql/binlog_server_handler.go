@@ -220,6 +220,9 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 	case "select @@global.rpl_semi_sync_master_enabled":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_master_enabled"}, [][]interface{}{{"0"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+	case "select @@global.rpl_semi_sync_source_enabled":
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_source_enabled"}, [][]interface{}{{"0"}})
+		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	default:
 		return nil, nil
 	}
