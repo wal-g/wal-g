@@ -107,17 +107,6 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 	return "", nil
 }
 
-func getPositionBeforeGTID(folder storage.Folder, gtidSet gomysql.GTIDSet, flavor string) (gomysql.Position, error) {
-	var pos gomysql.Position
-	var err error
-	pos.Name, err = getLastUploadedBinlogBeforeGTID(folder, gtidSet, flavor)
-	if err != nil {
-		return gomysql.Position{}, err
-	}
-	pos.Pos = 4
-	return pos, err
-}
-
 func getMySQLConnection() (*sql.DB, error) {
 	datasourceName, err := internal.GetRequiredSetting(internal.MysqlDatasourceNameSetting)
 	if err != nil {
