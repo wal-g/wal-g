@@ -416,7 +416,7 @@ func TestStripWalFileName_ValidLsn(t *testing.T) {
 	assert.Equal(t, path, result)
 }
 
-func TestRegex(t *testing.T) {
+func TestLsnRegex(t *testing.T) {
 	lsns := []string{RandomLsn(), RandomLsn()}
 	tests := []struct {
 		name        string
@@ -425,38 +425,29 @@ func TestRegex(t *testing.T) {
 		expectedLen int
 	}{
 		{
-			name:        "LsnRegex_ReturnLsnFromString",
-			lsn:         lsns[0],
-			expected:    []string{lsns[0]},
-			expectedLen: 1,
+			name:     "LsnRegex_ReturnLsnFromString",
+			lsn:      lsns[0],
+			expected: []string{lsns[0]},
 		},
-
 		{
-			name:        "LsnRegex_ReturnLsnFromStringWithAnotherText",
-			lsn:         fmt.Sprintf("some text %s or 43567", lsns[0]),
-			expected:    []string{lsns[0]},
-			expectedLen: 1,
+			name:     "LsnRegex_ReturnLsnFromStringWithAnotherText",
+			lsn:      fmt.Sprintf("some text %s or 43567", lsns[0]),
+			expected: []string{lsns[0]},
 		},
-
 		{
-			name:        "LsnRegex_ReturnEmptyArrayWhenLsnIsIncorrect",
-			lsn:         GetRandomizedString(23),
-			expected:    nil,
-			expectedLen: 0,
+			name:     "LsnRegex_ReturnEmptyArrayWhenLsnIsIncorrect",
+			lsn:      GetRandomizedString(23),
+			expected: nil,
 		},
-
 		{
-			name:        "LsnRegex_ReturnLsnWhenItIsAllF",
-			lsn:         strings.Repeat("F", 24),
-			expected:    []string{strings.Repeat("F", 24)},
-			expectedLen: 1,
+			name:     "LsnRegex_ReturnLsnWhenItIsAllF",
+			lsn:      strings.Repeat("F", 24),
+			expected: []string{strings.Repeat("F", 24)},
 		},
-
 		{
-			name:        "LsnRegex_ReturnAllLsnWhenHasSeparator",
-			lsn:         strings.Join(lsns[:], "-"),
-			expected:    lsns,
-			expectedLen: 2,
+			name:     "LsnRegex_ReturnAllLsnWhenHasSeparator",
+			lsn:      strings.Join(lsns[:], "-"),
+			expected: lsns,
 		},
 	}
 
@@ -465,7 +456,7 @@ func TestRegex(t *testing.T) {
 
 			result := utility.RegexpLSN.FindAllString(tt.lsn, -1)
 
-			assert.Equalf(t, tt.expectedLen, len(result), "Expected different array length")
+			assert.Equalf(t, len(tt.expected), len(result), "Expected different array length")
 			assert.Equalf(t, tt.expected, result, "Expected different result")
 		})
 	}
