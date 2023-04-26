@@ -3,9 +3,10 @@ package internal_test
 import (
 	"github.com/stretchr/testify/assert"
 
+	"testing"
+
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal"
-	"testing"
 )
 
 func TestDtoSerializer_NewDtoSerializer(t *testing.T) {

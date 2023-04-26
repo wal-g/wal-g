@@ -3,11 +3,12 @@ package helpers
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis"
-	"github.com/wal-g/tracelog"
 	"math/rand"
 	"strconv"
 	"time"
+
+	"github.com/go-redis/redis"
+	"github.com/wal-g/tracelog"
 )
 
 type RedisCtl struct {
