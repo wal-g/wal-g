@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -21,6 +22,7 @@ import (
 )
 
 var (
+	startTS      time.Time
 	untilTS      time.Time
 	lastSentGTID string
 )
@@ -133,13 +135,15 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		tracelog.InfoLogger.Printf("Synced binlog file %s", binlogName)
 		binlogPath := path.Join(dstDir, binlogName)
 		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
+		handleEventError(err, s)
 
+		err = os.Remove(binlogPath)
 		handleEventError(err, s)
 		pos.Pos = 4
 	}
 }
 
-func syncBinlogFiles(pos mysql.Position, s *replication.BinlogStreamer) error {
+func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.BinlogStreamer) error {
 	// get necessary settings
 	folder, err := internal.ConfigureFolder()
 	if err != nil {
@@ -149,12 +153,7 @@ func syncBinlogFiles(pos mysql.Position, s *replication.BinlogStreamer) error {
 	if err != nil {
 		return err
 	}
-	startTS, err := GetBinlogTS(folder, pos.Name)
-	if err != nil {
-		return err
-	}
-	logFilesProvider := storage.NewObjectProvider()
-
+	logFilesProvider := storage.NewLowMemoryObjectProvider()
 	// start sync
 	go sendEventsFromBinlogFiles(logFilesProvider, pos, s)
 	go provideLogs(folder, dstDir, startTS, untilTS, logFilesProvider)
@@ -173,56 +172,66 @@ func (h Handler) HandleRegisterSlave(data []byte) error {
 func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	s := replication.NewBinlogStreamer()
 
-	err := syncBinlogFiles(pos, s)
+	folder, err := internal.ConfigureFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	startTime, err := GetBinlogTS(folder, pos.Name)
+	if err != nil {
+		return nil, err
+	}
+	err = syncBinlogFiles(pos, startTime, s)
 	return s, err
 }
 
 func (h Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
 	s := replication.NewBinlogStreamer()
-	folder, _ := internal.ConfigureFolder()
 
-	pos, err := getPositionBeforeGTID(folder, gtidSet, "mysql")
-	if err != nil {
-		return nil, err
-	}
-
-	err = syncBinlogFiles(pos, s)
+	err := syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, s)
 	return s, err
 }
 
 func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
-	switch query {
-	case "SELECT @master_binlog_checksum":
+	switch strings.ToLower(query) {
+	case "select @master_binlog_checksum":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"master_binlog_checksum"}, [][]interface{}{{"NONE"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
-	case "SHOW GLOBAL VARIABLES LIKE 'BINLOG_CHECKSUM'":
+	case "show global variables like 'binlog_checksum'":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"NONE"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
-	case "SELECT @@GLOBAL.SERVER_ID":
+	case "select @@global.server_id":
 		serverID, err := internal.GetRequiredSetting(internal.MysqlBinlogServerID)
 		tracelog.ErrorLogger.FatalOnError(err)
 		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{serverID}})
 		tracelog.ErrorLogger.FatalOnError(err)
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
-	case "SELECT @source_binlog_checksum":
+	case "select @source_binlog_checksum":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"source_binlog_checksum"}, [][]interface{}{{"1"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
-	case "SELECT @@GLOBAL.GTID_MODE":
+	case "select @@global.gtid_mode":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"GTID_MODE"}, [][]interface{}{{"ON"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
-	case "SELECT @@GLOBAL.SERVER_UUID":
+	case "select @@global.server_uuid":
 		// the server uuid received by the query does not affect replication.
 		// during replication, the uuid is taken from events
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_UUID"}, [][]interface{}{{"0"}})
+		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+	case "select @@global.rpl_semi_sync_master_enabled":
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_master_enabled"}, [][]interface{}{{"0"}})
+		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+	case "select @@global.rpl_semi_sync_source_enabled":
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_source_enabled"}, [][]interface{}{{"0"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	default:
 		return nil, nil
 	}
 }
 
-func HandleBinlogServer(sendEventsUntilTS string) {
-	var err error
-	untilTS, err = utility.ParseUntilTS(sendEventsUntilTS)
+func HandleBinlogServer(since string, until string) {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+	startTS, untilTS, _, err = getTimestamps(folder, since, until, "")
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Starting binlog server")

@@ -107,17 +107,6 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 	return "", nil
 }
 
-func getPositionBeforeGTID(folder storage.Folder, gtidSet gomysql.GTIDSet, flavor string) (gomysql.Position, error) {
-	var pos gomysql.Position
-	var err error
-	pos.Name, err = getLastUploadedBinlogBeforeGTID(folder, gtidSet, flavor)
-	if err != nil {
-		return gomysql.Position{}, err
-	}
-	pos.Pos = 4
-	return pos, err
-}
-
 func getMySQLConnection() (*sql.DB, error) {
 	datasourceName, err := internal.GetRequiredSetting(internal.MysqlDatasourceNameSetting)
 	if err != nil {
@@ -254,22 +243,12 @@ outer:
 	return nil
 }
 
-func handleObjectProviderError(err error, p *storage.ObjectProvider) {
-	if err == nil {
-		return
-	}
-	ok := p.AddErrorToProvider(err)
-	for !ok {
-		ok = p.AddErrorToProvider(err)
-	}
-}
-
 func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time, p *storage.ObjectProvider) {
 	defer p.Close()
 	_, err := os.Stat(dstDir)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(dstDir, 0777)
-		handleObjectProviderError(err, p)
+		p.HandleError(err)
 		if err != nil {
 			return
 		}
@@ -277,7 +256,7 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 
 	logFolder := folder.GetSubFolder(BinlogPath)
 	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, utility.MaxTime)
-	handleObjectProviderError(err, p)
+	p.HandleError(err)
 	if err != nil {
 		return
 	}
@@ -292,20 +271,20 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
 			} else {
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
-				handleObjectProviderError(err, p)
+				p.HandleError(err)
 				return
 			}
 		}
 
 		// add file to provider
-		err = p.AddObjectToProvider(logFile)
-		handleObjectProviderError(err, p)
+		err = p.AddObject(logFile)
+		p.HandleError(err)
 		if err != nil {
 			return
 		}
 
 		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
-		handleObjectProviderError(err, p)
+		p.HandleError(err)
 		if err != nil {
 			return
 		}
