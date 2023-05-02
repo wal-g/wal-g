@@ -84,7 +84,7 @@ type RestorePointCreator struct {
 	systemIdentifier *uint64
 	gpVersion        semver.Version
 
-	Uploader *internal.Uploader
+	Uploader internal.Uploader
 	Conn     *pgx.Conn
 
 	logsDir string
@@ -115,7 +115,7 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 		gpVersion:        version,
 		logsDir:          viper.GetString(internal.GPLogsDirectory),
 	}
-	rpc.Uploader.UploadingFolder = rpc.Uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+	rpc.Uploader.ChangeDirectory(utility.BaseBackupPath)
 
 	return rpc, nil
 }
@@ -153,7 +153,7 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 }
 
 func (rpc *RestorePointCreator) checkExists() error {
-	exists, err := rpc.Uploader.UploadingFolder.Exists(RestorePointMetadataFileName(rpc.pointName))
+	exists, err := rpc.Uploader.Folder().Exists(RestorePointMetadataFileName(rpc.pointName))
 	if err != nil {
 		return fmt.Errorf("failed to check restore point existence: %v", err)
 	}
@@ -183,7 +183,7 @@ func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string) (err 
 	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
 	tracelog.InfoLogger.Println(meta.String())
 
-	return internal.UploadDto(rpc.Uploader.UploadingFolder, meta, metaFileName)
+	return internal.UploadDto(rpc.Uploader.Folder(), meta, metaFileName)
 }
 
 type RestorePointTime struct {

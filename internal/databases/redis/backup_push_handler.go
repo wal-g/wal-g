@@ -9,7 +9,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(uploader *internal.Uploader, backupCmd *exec.Cmd, metaConstructor internal.MetaConstructor) error {
+func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd, metaConstructor internal.MetaConstructor) error {
 	stdout, err := utility.StartCommandWithStdoutPipe(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 

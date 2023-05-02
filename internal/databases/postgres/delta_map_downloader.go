@@ -3,10 +3,10 @@ package postgres
 import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/internal"
 )
 
-func getDeltaMap(folder storage.Folder,
+func getDeltaMap(folder internal.StorageFolderReader,
 	timeline uint32,
 	firstUsedLSN,
 	firstNotUsedLSN LSN) (PagedFileDeltaMap, error) {

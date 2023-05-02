@@ -13,7 +13,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -34,9 +33,9 @@ func (err InvalidWalFileMagicError) Error() string {
 
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(folder storage.Folder, walFileName string, location string, triggerPrefetch bool) {
+func HandleWALFetch(folder internal.StorageFolderReader, walFileName string, location string, triggerPrefetch bool) {
 	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
-	folder = folder.GetSubFolder(utility.WalPath)
+	folder = folder.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
 	if triggerPrefetch {
 		prefetchLocation := location

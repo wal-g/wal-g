@@ -17,14 +17,13 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/fsutil"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(uploader *WalUploader, walFileName string, location string) {
-	folder := uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+func HandleWALPrefetch(reader internal.StorageFolderReader, walFileName string, location string) {
+	folder := reader.SubFolder(utility.WalPath)
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
@@ -45,7 +44,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 		}
 		if shouldPrefault {
 			waitGroup.Add(1)
-			go prefaultData(prefaultStartLsn, timelineID, waitGroup, uploader)
+			go prefaultData(prefaultStartLsn, timelineID, waitGroup, reader)
 		}
 
 		time.Sleep(10 * time.Millisecond) // ramp up in order
@@ -57,7 +56,7 @@ func HandleWALPrefetch(uploader *WalUploader, walFileName string, location strin
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitGroup, uploader *WalUploader) {
+func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitGroup, uploader internal.StorageFolderReader) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
@@ -65,18 +64,20 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 		waitGroup.Done()
 	}()
 
-	if !uploader.getUseWalDelta() {
+	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
+	if err != nil || !useWalDelta {
+		tracelog.DebugLogger.Printf("configure WAL Delta usage: %v", err)
 		return
 	}
 
-	archiveDirectory := uploader.DeltaFileManager.dataFolder.(*fsutil.DiskDataFolder).Path
+	archiveDirectory := deltaDataFolder.(*fsutil.DiskDataFolder).Path
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, nil, "", &prefaultStartLsn, nil,
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
-	err := bundle.DownloadDeltaMap(uploader.UploadingFolder.GetSubFolder(utility.WalPath), startLsn)
+	err = bundle.DownloadDeltaMap(uploader.SubFolder(utility.WalPath), startLsn)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -187,7 +188,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 }
 
 // TODO : unit tests
-func prefetchFile(location string, folder storage.Folder, walFileName string, waitGroup *sync.WaitGroup) {
+func prefetchFile(location string, folder internal.StorageFolderReader, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefetch unsuccessful ", walFileName, r)

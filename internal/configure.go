@@ -58,10 +58,10 @@ type UnknownCompressionMethodError struct {
 	error
 }
 
-func newUnknownCompressionMethodError() UnknownCompressionMethodError {
+func newUnknownCompressionMethodError(method string) UnknownCompressionMethodError {
 	return UnknownCompressionMethodError{
-		errors.Errorf("Unknown compression method, supported methods are: %v",
-			compression.CompressingAlgorithms)}
+		errors.Errorf("Unknown compression method: '%s', supported methods are: %v",
+			method, compression.CompressingAlgorithms)}
 }
 
 func (err UnknownCompressionMethodError) Error() string {
@@ -202,7 +202,7 @@ func GetPgSlotName() (pgSlotName string) {
 func ConfigureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
-		return nil, newUnknownCompressionMethodError()
+		return nil, newUnknownCompressionMethodError(compressionMethod)
 	}
 	return compression.Compressors[compressionMethod], nil
 }
@@ -238,7 +238,7 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
-func ConfigureUploader() (uploader *Uploader, err error) {
+func ConfigureUploader() (uploader Uploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
@@ -253,7 +253,17 @@ func ConfigureUploader() (uploader *Uploader, err error) {
 	return uploader, err
 }
 
-func ConfigureSplitUploader() (UploaderProvider, error) {
+func ConfigureUploaderWithoutCompressor() (uploader Uploader, err error) {
+	folder, err := ConfigureFolder()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to configure folder")
+	}
+
+	uploader = NewUploader(nil, folder)
+	return uploader, err
+}
+
+func ConfigureSplitUploader() (Uploader, error) {
 	uploader, err := ConfigureUploader()
 	if err != nil {
 		return nil, err

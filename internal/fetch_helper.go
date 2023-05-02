@@ -29,7 +29,7 @@ func (err ArchiveNonExistenceError) Error() string {
 }
 
 // DownloadFile downloads, decompresses and decrypts
-func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.WriteCloser) error {
+func DownloadFile(folder StorageFolderReader, filename, ext string, writeCloser io.WriteCloser) error {
 	utility.LoggedClose(writeCloser, "")
 
 	decompressor := compression.FindDecompressor(ext)
@@ -57,7 +57,7 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	return err
 }
 
-func TryDownloadFile(folder storage.Folder, path string) (fileReader io.ReadCloser, exists bool, err error) {
+func TryDownloadFile(folder StorageFolderReader, path string) (fileReader io.ReadCloser, exists bool, err error) {
 	fileReader, err = folder.ReadObject(path)
 	if err == nil {
 		exists = true
@@ -167,7 +167,7 @@ func putCachedDecompressorInFirstPlace(decompressors []compression.Decompressor)
 }
 
 // TODO : unit tests
-func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (io.ReadCloser, error) {
+func DownloadAndDecompressStorageFile(folder StorageFolderReader, fileName string) (io.ReadCloser, error) {
 	archiveReader, decompressor, err := findDecompressorAndDownload(folder, fileName)
 	if err != nil {
 		return nil, err
@@ -185,7 +185,7 @@ func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (i
 	}, nil
 }
 
-func findDecompressorAndDownload(folder storage.Folder, fileName string) (io.ReadCloser, compression.Decompressor, error) {
+func findDecompressorAndDownload(folder StorageFolderReader, fileName string) (io.ReadCloser, compression.Decompressor, error) {
 	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
 		archiveReader, exists, err := TryDownloadFile(folder, fileName+"."+decompressor.FileExtension())
 		if err != nil {
@@ -212,7 +212,7 @@ func findDecompressorAndDownload(folder storage.Folder, fileName string) (io.Rea
 
 // TODO : unit tests
 // DownloadFileTo downloads a file and writes it to local file
-func DownloadFileTo(folder storage.Folder, fileName string, dstPath string) error {
+func DownloadFileTo(folder StorageFolderReader, fileName string, dstPath string) error {
 	// Create file as soon as possible. It may be important due to race condition in wal-prefetch for PG.
 	file, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {

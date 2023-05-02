@@ -2,9 +2,10 @@ package redis
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
-	"testing"
 )
 
 var emptyColumnsBackups = []archive.Backup{

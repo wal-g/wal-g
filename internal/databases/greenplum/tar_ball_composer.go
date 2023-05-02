@@ -23,11 +23,11 @@ type GpTarBallComposerMaker struct {
 	relStorageMap AoRelFileStorageMap
 	bundleFiles   internal.BundleFiles
 	TarFileSets   internal.TarFileSets
-	uploader      *internal.Uploader
+	uploader      internal.Uploader
 	backupName    string
 }
 
-func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader *internal.Uploader, backupName string,
+func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader internal.Uploader, backupName string,
 ) (*GpTarBallComposerMaker, error) {
 	return &GpTarBallComposerMaker{
 		relStorageMap: relStorageMap,
@@ -69,9 +69,9 @@ func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (Ba
 	var base SegBackup
 	// In case of delta backup, use the provided backup name as the base. Otherwise, use the latest backup.
 	if incrementFromName != "" {
-		base = NewSegBackup(maker.uploader.UploadingFolder, incrementFromName)
+		base = NewSegBackup(maker.uploader.Folder(), incrementFromName)
 	} else {
-		backupName, err := internal.GetLatestBackupName(maker.uploader.UploadingFolder)
+		backupName, err := internal.GetLatestBackupName(maker.uploader.Folder())
 		if err != nil {
 			if _, ok := err.(internal.NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup, leaving the base files empty.")
@@ -80,7 +80,7 @@ func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (Ba
 
 			return nil, err
 		}
-		base = NewSegBackup(maker.uploader.UploadingFolder, backupName)
+		base = NewSegBackup(maker.uploader.Folder(), backupName)
 	}
 
 	baseFilesMetadata, err := base.LoadAoFilesMetadata()
@@ -106,7 +106,7 @@ type GpTarBallComposer struct {
 	addFileQueue     chan *internal.ComposeFileInfo
 	addFileWaitGroup sync.WaitGroup
 
-	uploader *internal.Uploader
+	uploader internal.Uploader
 
 	files            internal.BundleFiles
 	tarFileSets      internal.TarFileSets
@@ -123,7 +123,7 @@ type GpTarBallComposer struct {
 func NewGpTarBallComposer(
 	tarBallQueue *internal.TarBallQueue, crypter crypto.Crypter, relStorageMap AoRelFileStorageMap,
 	bundleFiles internal.BundleFiles, packer *postgres.TarBallFilePackerImpl, aoStorageUploader *AoStorageUploader,
-	tarFileSets internal.TarFileSets, uploader *internal.Uploader, backupName string,
+	tarFileSets internal.TarFileSets, uploader internal.Uploader, backupName string,
 ) (*GpTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 
@@ -194,7 +194,7 @@ func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 
 	c.addFileWaitGroup.Wait()
 
-	err = internal.UploadDto(c.uploader.UploadingFolder, c.aoStorageUploader.GetFiles(), getAOFilesMetadataPath(c.backupName))
+	err = internal.UploadDto(c.uploader.Folder(), c.aoStorageUploader.GetFiles(), getAOFilesMetadataPath(c.backupName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload AO files metadata: %v", err)
 	}

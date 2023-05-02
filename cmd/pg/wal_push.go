@@ -17,7 +17,10 @@ var walPushCmd = &cobra.Command{
 	Short: WalPushShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := postgres.ConfigureWalUploader()
+		baseUploader, err := internal.ConfigureUploader()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		uploader, err := postgres.ConfigureWalUploader(baseUploader)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()
@@ -36,7 +39,7 @@ var walPushCmd = &cobra.Command{
 			uploader.PGArchiveStatusManager = asm.NewNopASM()
 		}
 
-		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.WalPath)
+		uploader.ChangeDirectory(utility.WalPath)
 		err = postgres.HandleWALPush(uploader, args[0])
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

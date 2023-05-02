@@ -59,7 +59,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	os.Setenv("WALE_S3_PREFIX", bucketPath)
 	uploader, err = internal.ConfigureUploader()
 	assert.NoError(t, err)
-	assert.Equal(t, expectedServer, strings.TrimSuffix(uploader.UploadingFolder.GetPath(), "/"))
+	assert.Equal(t, expectedServer, strings.TrimSuffix(uploader.Folder().GetPath(), "/"))
 	assert.NotNil(t, uploader)
 	assert.NoError(t, err)
 	// Test STANDARD_IA storage class

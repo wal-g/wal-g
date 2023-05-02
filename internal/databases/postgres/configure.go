@@ -13,30 +13,7 @@ import (
 // ConfigureWalUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
-func ConfigureWalUploader() (uploader *WalUploader, err error) {
-	uploader, err = ConfigureWalUploaderWithoutCompressMethod()
-	if err != nil {
-		return nil, err
-	}
-
-	folder := uploader.UploadingFolder
-	deltaFileManager := uploader.DeltaFileManager
-
-	compressor, err := internal.ConfigureCompressor()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure compression")
-	}
-
-	uploader = NewWalUploader(compressor, folder, deltaFileManager)
-	return uploader, err
-}
-
-func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err error) {
-	folder, err := internal.ConfigureFolder()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
-	}
-
+func ConfigureWalUploader(baseUploader internal.Uploader) (uploader *WalUploader, err error) {
 	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure WAL Delta usage")
@@ -47,7 +24,7 @@ func ConfigureWalUploaderWithoutCompressMethod() (uploader *WalUploader, err err
 		deltaFileManager = NewDeltaFileManager(deltaDataFolder)
 	}
 
-	uploader = NewWalUploader(nil, folder, deltaFileManager)
+	uploader = NewWalUploader(baseUploader, deltaFileManager)
 	return uploader, err
 }
 

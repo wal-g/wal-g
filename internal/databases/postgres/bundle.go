@@ -16,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -402,7 +401,7 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(folder storage.Folder, backupStartLSN LSN) error {
+func (bundle *Bundle) DownloadDeltaMap(folder internal.StorageFolderReader, backupStartLSN LSN) error {
 	deltaMap, err := getDeltaMap(folder, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
 	if err != nil {
 		return err

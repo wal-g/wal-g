@@ -22,14 +22,14 @@ type CommonDirectoryUploader struct {
 
 	excludedFiles map[string]utility.Empty
 	backupName    string
-	uploader      *Uploader
+	uploader      Uploader
 }
 
 func NewCommonDirectoryUploader(
 	crypter crypto.Crypter, packer TarBallFilePacker,
 	tarBallComposerMaker TarBallComposerMaker, tarSizeThreshold int64,
 	excludedFiles map[string]utility.Empty, backupName string,
-	uploader *Uploader) *CommonDirectoryUploader {
+	uploader Uploader) *CommonDirectoryUploader {
 	return &CommonDirectoryUploader{
 		crypter:              crypter,
 		tarBallFilePacker:    packer,
@@ -73,7 +73,7 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 	// Wait for all uploads to finish.
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
 	u.uploader.Finish()
-	if u.uploader.Failed.Load().(bool) {
+	if u.uploader.Failed() {
 		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", path)
 	}
 	return tarFileSets

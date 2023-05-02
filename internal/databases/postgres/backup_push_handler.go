@@ -90,7 +90,7 @@ type PrevBackupInfo struct {
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
-	Uploader    *WalUploader
+	Uploader    internal.Uploader
 	Bundle      *Bundle
 	QueryRunner *PgQueryRunner
 }
@@ -133,11 +133,11 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 
 func (bh *BackupHandler) createAndPushBackup() {
 	var err error
-	folder := bh.Workers.Uploader.UploadingFolder
+	folder := bh.Workers.Uploader.Folder()
 	// TODO: AB: this subfolder switch look ugly.
 	// I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
-	bh.Workers.Uploader.UploadingFolder = folder.GetSubFolder(bh.Arguments.backupsFolder)
-	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Workers.Uploader.UploadingFolder)
+	bh.Workers.Uploader.ChangeDirectory(bh.Arguments.backupsFolder)
+	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Workers.Uploader.Folder())
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
@@ -196,8 +196,12 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 			*bh.PgInfo.systemIdentifier != *bh.prevBackupInfo.sentinelDto.SystemIdentifier {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
 		}
-		if bh.Workers.Uploader.getUseWalDelta() {
-			err := bh.Workers.Bundle.DownloadDeltaMap(folder.GetSubFolder(utility.WalPath), bh.CurBackupInfo.startLSN)
+
+		useWalDelta, _, err := configureWalDeltaUsage()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		if useWalDelta {
+			err := bh.Workers.Bundle.DownloadDeltaMap(internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)), bh.CurBackupInfo.startLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided " +
 					"delta map")
@@ -239,7 +243,7 @@ func (bh *BackupHandler) SetComposerInitFunc(initFunc func(handler *BackupHandle
 
 func configureTarBallComposer(bh *BackupHandler, tarBallComposerType TarBallComposerType) error {
 	maker, err := NewTarBallComposerMaker(tarBallComposerType, bh.Workers.QueryRunner,
-		bh.Workers.Uploader.Uploader, bh.CurBackupInfo.Name,
+		bh.Workers.Uploader, bh.CurBackupInfo.Name,
 		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks),
 		bh.Arguments.withoutFilesMetadata)
 	if err != nil {
@@ -253,7 +257,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	bundle := bh.Workers.Bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
-	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Workers.Uploader.Uploader))
+	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Workers.Uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = bh.Arguments.composerInitFunc(bh)
@@ -272,7 +276,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Uploading pg_control ...")
-	err = bundle.UploadPgControl(bh.Workers.Uploader.Compressor.FileExtension())
+	err = bundle.UploadPgControl(bh.Workers.Uploader.Compression().FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
@@ -295,7 +299,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	// Wait for all uploads to finish.
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
 	bh.Workers.Uploader.Finish()
-	if bh.Workers.Uploader.Failed.Load().(bool) {
+	if bh.Workers.Uploader.Failed() {
 		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", bh.CurBackupInfo.Name)
 	}
 	if timelineChanged {
@@ -343,7 +347,7 @@ func (bh *BackupHandler) handleBackupPushLocal() {
 		}
 	}
 
-	folder := bh.Workers.Uploader.UploadingFolder
+	folder := bh.Workers.Uploader.Folder()
 	baseBackupFolder := folder.GetSubFolder(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder)
 
@@ -363,9 +367,9 @@ func (bh *BackupHandler) handleBackupPushLocal() {
 
 func (bh *BackupHandler) createAndPushRemoteBackup() {
 	var err error
-	uploader := *bh.Workers.Uploader
-	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.UploadingFolder)
+	uploader := bh.Workers.Uploader
+	uploader.ChangeDirectory(utility.BaseBackupPath)
+	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.Folder())
 
 	var tarFileSets internal.TarFileSets
 	if bh.Arguments.withoutFilesMetadata {
@@ -426,7 +430,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	// and version cannot be read easily using replication connection.
 	// Retrieve both with this helper function which uses a temp connection to postgres.
 
-	uploader, err := ConfigureWalUploader()
+	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return nil, err
 	}

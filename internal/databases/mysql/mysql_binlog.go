@@ -114,7 +114,7 @@ func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, erro
 
 func GetBinlogPreviousGTIDsRemote(folder storage.Folder, filename string, flavor string) (mysql.GTIDSet, error) {
 	binlogName := utility.TrimFileExtension(filename)
-	fh, err := internal.DownloadAndDecompressStorageFile(folder, binlogName)
+	fh, err := internal.DownloadAndDecompressStorageFile(internal.NewFolderReader(folder), binlogName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read binlog %s: %w", binlogName, err)
 	}

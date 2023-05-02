@@ -17,13 +17,13 @@ func HandleWalFetch(folder storage.Folder, stanza string, walFileName string, lo
 
 	archiveFolder := folder.GetSubFolder(WalArchivePath).GetSubFolder(stanza).GetSubFolder(*archiveName)
 	if strings.HasSuffix(walFileName, ".history") {
-		return internal.DownloadFileTo(archiveFolder, walFileName, location)
+		return internal.DownloadFileTo(internal.NewFolderReader(archiveFolder), walFileName, location)
 	}
 
 	subdirectoryName := walFileName[0:16]
 	walFolder := archiveFolder.GetSubFolder(subdirectoryName)
 	if strings.HasSuffix(walFileName, ".backup") {
-		return internal.DownloadFileTo(walFolder, walFileName, location)
+		return internal.DownloadFileTo(internal.NewFolderReader(walFolder), walFileName, location)
 	}
 	fileList, _, err := walFolder.ListFolder()
 	if err != nil {
@@ -33,7 +33,7 @@ func HandleWalFetch(folder storage.Folder, stanza string, walFileName string, lo
 	for _, file := range fileList {
 		fileName := file.GetName()
 		if strings.HasPrefix(fileName, walFileName) {
-			return internal.DownloadFileTo(walFolder, strings.TrimSuffix(fileName, filepath.Ext(fileName)), location)
+			return internal.DownloadFileTo(internal.NewFolderReader(walFolder), strings.TrimSuffix(fileName, filepath.Ext(fileName)), location)
 		}
 	}
 

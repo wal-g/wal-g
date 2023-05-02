@@ -1,14 +1,6 @@
 package internal
 
-import (
-	"github.com/wal-g/wal-g/utility"
-)
-
-func HandleBackupMark(uploader *Uploader, backupName string, toPermanent bool, metaInteractor GenericMetaInteractor) {
-	folder := uploader.UploadingFolder
-	baseBackupFolder := uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
-	uploader.UploadingFolder = baseBackupFolder
-
-	markHandler := NewBackupMarkHandler(metaInteractor, folder)
+func HandleBackupMark(uploader Uploader, backupName string, toPermanent bool, metaInteractor GenericMetaInteractor) {
+	markHandler := NewBackupMarkHandler(metaInteractor, uploader.Folder())
 	markHandler.MarkBackup(backupName, toPermanent)
 }

@@ -77,7 +77,7 @@ type SegmentFwdArg struct {
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
-	Uploader *internal.Uploader
+	Uploader internal.Uploader
 	Conn     *pgx.Conn
 }
 
@@ -261,7 +261,7 @@ func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) 
 	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
 	tracelog.InfoLogger.Println(meta.String())
 
-	if err := internal.UploadDto(bh.workers.Uploader.UploadingFolder, meta, metaFileName); err != nil {
+	if err := internal.UploadDto(bh.workers.Uploader.Folder(), meta, metaFileName); err != nil {
 		return fmt.Errorf("upload metadata file for restore point %s: %w", meta.Name, err)
 	}
 	return nil
@@ -426,7 +426,7 @@ func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err erro
 	tracelog.InfoLogger.Println(sentinelDto.String())
 
 	sentinelUploader := bh.workers.Uploader
-	sentinelUploader.UploadingFolder = sentinelUploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+	sentinelUploader.ChangeDirectory(utility.BaseBackupPath)
 	return internal.UploadSentinel(sentinelUploader, sentinelDto, bh.currBackupInfo.backupName)
 }
 
@@ -561,7 +561,7 @@ func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentSent
 
 func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*PgSegmentSentinelDto, error) {
 	// Actually, this is not a real completed backup. It is only used to fetch the segment metadata
-	currentBackup := NewBackup(bh.workers.Uploader.UploadingFolder, bh.currBackupInfo.backupName)
+	currentBackup := NewBackup(bh.workers.Uploader.Folder(), bh.currBackupInfo.backupName)
 
 	pgBackup, err := currentBackup.GetSegmentBackup(backupID, segCfg.ContentID)
 	if err != nil {
@@ -658,7 +658,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 		return nil
 	}
 
-	folder := bh.workers.Uploader.UploadingFolder
+	folder := bh.workers.Uploader.Folder()
 	previousBackupName, err := bh.arguments.deltaBaseSelector.Select(folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {

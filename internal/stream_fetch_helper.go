@@ -42,7 +42,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 	defer utility.LoggedClose(writeCloser, "")
 
 	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := TryDownloadFile(backup.Folder, GetStreamName(backup.Name, decompressor.FileExtension()))
+		archiveReader, exists, err := TryDownloadFile(NewFolderReader(backup.Folder), GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
 			return fmt.Errorf("failed to dowload file: %w", err)
 		}
@@ -120,7 +120,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 func downloadAndDecompressFile(backup Backup, decompressor compression.Decompressor,
 	fileName string, writer io.WriteCloser, maxDownloadRetry int) error {
 	getArchiveReader := func() (io.ReadCloser, error) {
-		archiveReader, exists, err := TryDownloadFile(backup.Folder, fileName)
+		archiveReader, exists, err := TryDownloadFile(NewFolderReader(backup.Folder), fileName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to dowload file %v: %w", fileName, err)
 		} else if !exists {
