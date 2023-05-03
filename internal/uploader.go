@@ -7,8 +7,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/wal-g/wal-g/internal/abool"
+
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -17,7 +18,7 @@ import (
 
 var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")
 
-type UploaderProvider interface {
+type Uploader interface {
 	Upload(path string, content io.Reader) error
 	UploadFile(file ioextensions.NamedReader) error
 	PushStream(stream io.Reader) (string, error)
@@ -28,34 +29,35 @@ type UploaderProvider interface {
 	RawDataSize() (int64, error)
 	ChangeDirectory(relativePath string)
 	Folder() storage.Folder
+	Clone() Uploader
+	Failed() bool
+	Finish()
 }
 
-// Uploader contains fields associated with uploading tarballs.
+// RegularUploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
-type Uploader struct {
-	UploadingFolder        storage.Folder
-	Compressor             compression.Compressor
-	waitGroup              *sync.WaitGroup
-	ArchiveStatusManager   asm.ArchiveStatusManager
-	PGArchiveStatusManager asm.ArchiveStatusManager
-	Failed                 atomic.Value
-	tarSize                *int64
-	dataSize               *int64
+type RegularUploader struct {
+	UploadingFolder storage.Folder
+	Compressor      compression.Compressor
+	waitGroup       *sync.WaitGroup
+	failed          *abool.AtomicBool
+	tarSize         *int64
+	dataSize        *int64
 }
 
-var _ UploaderProvider = &Uploader{}
+var _ Uploader = &RegularUploader{}
 
-// SplitStreamUploader - new UploaderProvider implementation that enable us to split upload streams into blocks
+// SplitStreamUploader - new Uploader implementation that enable us to split upload streams into blocks
 //
 //	of blockSize bytes, then puts it in at most `partitions` streams that are compressed and pushed to storage
 type SplitStreamUploader struct {
-	*Uploader
+	Uploader
 	partitions  int
 	blockSize   int
 	maxFileSize int
 }
 
-var _ UploaderProvider = &SplitStreamUploader{}
+var _ Uploader = &SplitStreamUploader{}
 
 // UploadObject
 type UploadObject struct {
@@ -63,28 +65,27 @@ type UploadObject struct {
 	Content io.Reader
 }
 
-// FIXME: return UploaderProvider
 func NewUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-) *Uploader {
-	uploader := &Uploader{
+) Uploader {
+	uploader := &RegularUploader{
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
 		tarSize:         new(int64),
 		dataSize:        new(int64),
+		failed:          abool.New(),
 	}
-	uploader.Failed.Store(false)
 	return uploader
 }
 
 func NewSplitStreamUploader(
-	uploader *Uploader,
+	uploader Uploader,
 	partitions int,
 	blockSize int,
 	maxFileSize int,
-) UploaderProvider {
+) Uploader {
 	if partitions <= 1 && maxFileSize == 0 {
 		// Fallback to old implementation in order to skip unneeded steps:
 		return uploader
@@ -99,7 +100,7 @@ func NewSplitStreamUploader(
 }
 
 // UploadedDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
-func (uploader *Uploader) UploadedDataSize() (int64, error) {
+func (uploader *RegularUploader) UploadedDataSize() (int64, error) {
 	if uploader.tarSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
@@ -107,7 +108,7 @@ func (uploader *Uploader) UploadedDataSize() (int64, error) {
 }
 
 // RawDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
-func (uploader *Uploader) RawDataSize() (int64, error) {
+func (uploader *RegularUploader) RawDataSize() (int64, error) {
 	if uploader.dataSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
@@ -116,29 +117,28 @@ func (uploader *Uploader) RawDataSize() (int64, error) {
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
-func (uploader *Uploader) Finish() {
+func (uploader *RegularUploader) Finish() {
 	uploader.waitGroup.Wait()
-	if uploader.Failed.Load().(bool) {
+	if uploader.failed.IsSet() {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
 	}
 }
 
 // Clone creates similar Uploader with new WaitGroup
-func (uploader *Uploader) Clone() *Uploader {
-	return &Uploader{
-		UploadingFolder:      uploader.UploadingFolder,
-		Compressor:           uploader.Compressor,
-		waitGroup:            &sync.WaitGroup{},
-		ArchiveStatusManager: uploader.ArchiveStatusManager,
-		Failed:               uploader.Failed,
-		tarSize:              uploader.tarSize,
-		dataSize:             uploader.dataSize,
+func (uploader *RegularUploader) Clone() Uploader {
+	return &RegularUploader{
+		UploadingFolder: uploader.UploadingFolder,
+		Compressor:      uploader.Compressor,
+		waitGroup:       &sync.WaitGroup{},
+		failed:          abool.NewBool(uploader.Failed()),
+		tarSize:         uploader.tarSize,
+		dataSize:        uploader.dataSize,
 	}
 }
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
-func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
+func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error {
 	filename := file.Name()
 
 	fileReader := file.(io.Reader)
@@ -154,18 +154,21 @@ func (uploader *Uploader) UploadFile(file ioextensions.NamedReader) error {
 }
 
 // DisableSizeTracking stops bandwidth tracking
-func (uploader *Uploader) DisableSizeTracking() {
+func (uploader *RegularUploader) DisableSizeTracking() {
 	uploader.tarSize = nil
 	uploader.dataSize = nil
 }
 
 // Compression returns configured compressor
-func (uploader *Uploader) Compression() compression.Compressor {
+func (uploader *RegularUploader) Compression() compression.Compressor {
 	return uploader.Compressor
 }
 
 // TODO : unit tests
-func (uploader *Uploader) Upload(path string, content io.Reader) error {
+func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
+	uploader.waitGroup.Add(1)
+	defer uploader.waitGroup.Done()
+
 	WalgMetrics.uploadedFilesTotal.Inc()
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
@@ -173,7 +176,7 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 	err := uploader.UploadingFolder.PutObject(path, content)
 	if err != nil {
 		WalgMetrics.uploadedFilesFailedTotal.Inc()
-		uploader.Failed.Store(true)
+		uploader.failed.Set()
 		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 		return err
 	}
@@ -183,7 +186,7 @@ func (uploader *Uploader) Upload(path string, content io.Reader) error {
 // UploadMultiple uploads multiple objects from the start of the slice,
 // returning the first error if any. Note that this operation is not atomic
 // TODO : unit tests
-func (uploader *Uploader) UploadMultiple(objects []UploadObject) error {
+func (uploader *RegularUploader) UploadMultiple(objects []UploadObject) error {
 	for _, object := range objects {
 		err := uploader.Upload(object.Path, object.Content)
 		if err != nil {
@@ -194,15 +197,19 @@ func (uploader *Uploader) UploadMultiple(objects []UploadObject) error {
 	return nil
 }
 
-func (uploader *Uploader) ChangeDirectory(relativePath string) {
+func (uploader *RegularUploader) ChangeDirectory(relativePath string) {
 	uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(relativePath)
 }
 
-func (uploader *Uploader) Folder() storage.Folder {
+func (uploader *RegularUploader) Folder() storage.Folder {
 	return uploader.UploadingFolder
 }
 
-func (uploader *SplitStreamUploader) Clone() *SplitStreamUploader {
+func (uploader *RegularUploader) Failed() bool {
+	return uploader.failed.IsSet()
+}
+
+func (uploader *SplitStreamUploader) Clone() Uploader {
 	return &SplitStreamUploader{
 		Uploader:   uploader.Uploader.Clone(),
 		partitions: uploader.partitions,

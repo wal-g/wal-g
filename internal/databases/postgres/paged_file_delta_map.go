@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -141,13 +140,13 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 	}
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder,
+func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(reader internal.StorageFolderReader,
 	timeline uint32,
 	first,
 	last DeltaNo) error {
 	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.next() {
 		filename := deltaNo.getFilename(timeline)
-		deltaFile, err := getDeltaFile(folder, filename)
+		deltaFile, err := getDeltaFile(reader, filename)
 		if err != nil {
 			return err
 		}
@@ -157,14 +156,14 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder storage.Folder,
 	return nil
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder,
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(reader internal.StorageFolderReader,
 	timeline uint32,
 	first,
 	last WalSegmentNo,
 	walParser *walparser.WalParser) error {
 	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.next() {
 		filename := walSegmentNo.getFilename(timeline)
-		err := deltaMap.getLocationsFromWal(folder, filename, walParser)
+		err := deltaMap.getLocationsFromWal(reader, filename, walParser)
 		if err != nil {
 			return err
 		}
@@ -173,8 +172,9 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder storage.Folder,
 	return nil
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(folder storage.Folder, filename string, walParser *walparser.WalParser) error {
-	reader, err := internal.DownloadAndDecompressStorageFile(folder, filename)
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(
+	folderReader internal.StorageFolderReader, filename string, walParser *walparser.WalParser) error {
+	reader, err := internal.DownloadAndDecompressStorageFile(folderReader, filename)
 	if err != nil {
 		return errors.Wrapf(err, "Error during wal segment'%s' downloading.", filename)
 	}
@@ -190,8 +190,8 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(folder storage.Folder, fi
 	return nil
 }
 
-func getDeltaFile(folder storage.Folder, filename string) (*DeltaFile, error) {
-	reader, err := internal.DownloadAndDecompressStorageFile(folder, filename)
+func getDeltaFile(folderReader internal.StorageFolderReader, filename string) (*DeltaFile, error) {
+	reader, err := internal.DownloadAndDecompressStorageFile(folderReader, filename)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error during delta file '%s' downloading.", filename)
 	}

@@ -152,7 +152,7 @@ func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backu
 }
 
 // TODO : unit tests
-func UploadSentinel(uploader UploaderProvider, sentinelDto interface{}, backupName string) error {
+func UploadSentinel(uploader Uploader, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 	return UploadDto(uploader.Folder(), sentinelDto, sentinelName)
 }

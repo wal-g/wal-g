@@ -124,7 +124,7 @@ func parseHistoryFile(historyReader io.Reader) ([]*TimelineHistoryRecord, error)
 
 func getHistoryFileFromStorage(timeline uint32, walFolder storage.Folder) (io.ReadCloser, error) {
 	historyFileName := fmt.Sprintf(walHistoryFileFormat, timeline)
-	reader, err := internal.DownloadAndDecompressStorageFile(walFolder, historyFileName)
+	reader, err := internal.DownloadAndDecompressStorageFile(internal.NewFolderReader(walFolder), historyFileName)
 	if _, ok := err.(internal.ArchiveNonExistenceError); ok {
 		return nil, newHistoryFileNotFoundError(historyFileName)
 	}

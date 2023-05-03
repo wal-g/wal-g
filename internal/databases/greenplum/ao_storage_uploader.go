@@ -15,7 +15,7 @@ import (
 )
 
 type AoStorageUploader struct {
-	uploader      *internal.Uploader
+	uploader      internal.Uploader
 	baseAoFiles   BackupAOFiles
 	meta          *AOFilesMetadataDTO
 	metaMutex     sync.Mutex
@@ -24,7 +24,7 @@ type AoStorageUploader struct {
 	isIncremental bool
 }
 
-func NewAoStorageUploader(uploader *internal.Uploader, baseAoFiles BackupAOFiles,
+func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
 	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool) *AoStorageUploader {
 	// Separate uploader for AO/AOCS relfiles with disabled file size tracking since
 	// WAL-G does not count them

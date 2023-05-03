@@ -220,7 +220,7 @@ outer:
 			binlogName := utility.TrimFileExtension(logFile.GetName())
 			binlogPath := path.Join(dstDir, binlogName)
 			tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-			if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
+			if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 				return err
 			}
@@ -266,7 +266,7 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-		if err = internal.DownloadFileTo(logFolder, binlogName, binlogPath); err != nil {
+		if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
 			if os.IsExist(err) {
 				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
 			} else {

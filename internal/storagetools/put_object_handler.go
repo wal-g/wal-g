@@ -14,7 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, overwrite, encrypt, compress bool) {
+func HandlePutObject(localPath, dstPath string, uploader internal.Uploader, overwrite, encrypt, compress bool) {
 	checkOverwrite(dstPath, uploader, overwrite)
 
 	fileReadCloser := openLocalFile(localPath)
@@ -22,8 +22,7 @@ func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, ove
 
 	storageFolderPath := utility.SanitizePath(filepath.Dir(dstPath))
 	if storageFolderPath != "" {
-		folder := uploader.UploadingFolder
-		uploader.UploadingFolder = folder.GetSubFolder(storageFolderPath)
+		uploader.ChangeDirectory(storageFolderPath)
 	}
 
 	fileName := utility.SanitizePath(filepath.Base(dstPath))
@@ -31,9 +30,9 @@ func HandlePutObject(localPath, dstPath string, uploader *internal.Uploader, ove
 	tracelog.ErrorLogger.FatalfOnError("Failed to upload: %v", err)
 }
 
-func checkOverwrite(dstPath string, uploader *internal.Uploader, overwrite bool) {
-	fullPath := dstPath + "." + uploader.Compressor.FileExtension()
-	exists, err := uploader.UploadingFolder.Exists(fullPath)
+func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) {
+	fullPath := dstPath + "." + uploader.Compression().FileExtension()
+	exists, err := uploader.Folder().Exists(fullPath)
 	tracelog.ErrorLogger.FatalfOnError("Failed to check object existence: %v", err)
 	if exists && !overwrite {
 		tracelog.ErrorLogger.Fatalf("Object %s already exists. To overwrite it, add the -f flag.", fullPath)
@@ -52,16 +51,16 @@ func openLocalFile(localPath string) io.ReadCloser {
 	return localFile
 }
 
-func uploadFile(name string, content io.Reader, uploader *internal.Uploader, encrypt, compress bool) error {
+func uploadFile(name string, content io.Reader, uploader internal.Uploader, encrypt, compress bool) error {
 	var crypter crypto.Crypter
 	if encrypt {
 		crypter = internal.ConfigureCrypter()
 	}
 
 	var compressor compression.Compressor
-	if compress && uploader.Compressor != nil {
-		compressor = uploader.Compressor
-		name += "." + uploader.Compressor.FileExtension()
+	if compress && uploader.Compression() != nil {
+		compressor = uploader.Compression()
+		name += "." + uploader.Compression().FileExtension()
 	}
 
 	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter)

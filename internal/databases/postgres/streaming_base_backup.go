@@ -43,7 +43,7 @@ type StreamingBaseBackup struct {
 	maxTarSize       int64
 	dataDir          string
 	Files            internal.BackupFileList
-	uploader         *WalUploader
+	uploader         internal.Uploader
 	streamer         *TarballStreamer
 	fileNo           int
 }
@@ -124,14 +124,14 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 }
 
 // Upload will read all tar files from Postgres, and use the uploader to upload to the backup location
-func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles internal.BundleFiles) (err error) {
+func (bb *StreamingBaseBackup) Upload(uploader internal.Uploader, bundleFiles internal.BundleFiles) (err error) {
 	// Upload the tar
 	bb.uploader = uploader
 	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)
 	for {
 		tbsTar := ioextensions.NewNamedReaderImpl(bb.streamer, bb.FileName())
-		compressedFile := internal.CompressAndEncrypt(tbsTar, bb.uploader.Compressor, internal.ConfigureCrypter())
-		dstPath := fmt.Sprintf("%s.%s", bb.Path(), bb.uploader.Compressor.FileExtension())
+		compressedFile := internal.CompressAndEncrypt(tbsTar, bb.uploader.Compression(), internal.ConfigureCrypter())
+		dstPath := fmt.Sprintf("%s.%s", bb.Path(), bb.uploader.Compression().FileExtension())
 		err = bb.uploader.Upload(dstPath, compressedFile)
 		if err != nil {
 			return err
@@ -154,8 +154,8 @@ func (bb *StreamingBaseBackup) Upload(uploader *WalUploader, bundleFiles interna
 	// Upload the extra tar
 	if len(bb.streamer.Tee) > 0 {
 		teeTar := ioextensions.NewNamedReaderImpl(bb.streamer.TeeIo, bb.FileName())
-		teeCompressedFile := internal.CompressAndEncrypt(teeTar, bb.uploader.Compressor, internal.ConfigureCrypter())
-		teeFileName := fmt.Sprintf("pg_control.tar.%s", bb.uploader.Compressor.FileExtension())
+		teeCompressedFile := internal.CompressAndEncrypt(teeTar, bb.uploader.Compression(), internal.ConfigureCrypter())
+		teeFileName := fmt.Sprintf("pg_control.tar.%s", bb.uploader.Compression().FileExtension())
 		teeFilePath := storage.JoinPath(bb.BackupName(), internal.TarPartitionFolderName, teeFileName)
 		err = bb.uploader.Upload(teeFilePath, teeCompressedFile)
 		if err != nil {

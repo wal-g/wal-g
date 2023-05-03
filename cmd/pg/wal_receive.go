@@ -16,7 +16,10 @@ var walReceiveCmd = &cobra.Command{
 	Short: walReceiveShortDescription,
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := postgres.ConfigureWalUploader()
+		baseUploader, err := internal.ConfigureUploader()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		uploader, err := postgres.ConfigureWalUploader(baseUploader)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		archiveStatusManager, err := internal.ConfigureArchiveStatusManager()

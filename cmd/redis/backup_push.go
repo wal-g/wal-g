@@ -40,7 +40,7 @@ var backupPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// Configure folder
-		uploader.UploadingFolder = uploader.UploadingFolder.GetSubFolder(utility.BaseBackupPath)
+		uploader.ChangeDirectory(utility.BaseBackupPath)
 
 		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -50,7 +50,7 @@ var backupPushCmd = &cobra.Command{
 			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
 		}
 		backupCmd.Stderr = os.Stderr
-		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.UploadingFolder, permanent)
+		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent)
 
 		err = redis.HandleBackupPush(uploader, backupCmd, metaConstructor)
 		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)

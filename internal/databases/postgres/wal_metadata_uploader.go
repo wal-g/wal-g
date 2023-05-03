@@ -49,7 +49,7 @@ func NewWalMetadataUploader(walMetadataSetting string) (*WalMetadataUploader, er
 	return walMetadataUploader, nil
 }
 
-func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime time.Time, uploader *internal.Uploader) error {
+func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime time.Time, uploader internal.Uploader) error {
 	var walMetadata WalMetadataDescription
 	walMetadataMap := make(map[string]WalMetadataDescription)
 	walMetadataName := walFileName + ".json"
@@ -73,7 +73,7 @@ func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime 
 	return errors.Wrapf(err, "upload: could not Upload metadata'%s'\n", walFileName)
 }
 
-func (u *WalMetadataUploader) uploadBulkMetadataFile(walFileName string, uploader *internal.Uploader) error {
+func (u *WalMetadataUploader) uploadBulkMetadataFile(walFileName string, uploader internal.Uploader) error {
 	// Creating consolidated wal metadata only for bulk option
 	// Checking if the walfile name ends with "F" (last file in the series) and consolidating all
 	// the metadata together.
@@ -137,7 +137,7 @@ func checkWalMetadataLevel(walMetadataLevel string) error {
 	return nil
 }
 
-func uploadLocalWalMetadata(walFilePath string, uploader *internal.Uploader) error {
+func uploadLocalWalMetadata(walFilePath string, uploader internal.Uploader) error {
 	walMetadataSetting := viper.GetString(internal.UploadWalMetadata)
 	if walMetadataSetting == WalNoMetadataLevel {
 		return nil
@@ -158,7 +158,7 @@ func uploadLocalWalMetadata(walFilePath string, uploader *internal.Uploader) err
 	return walMetadataUploader.UploadWalMetadata(walFileName, createdTime, uploader)
 }
 
-func uploadRemoteWalMetadata(walFileName string, uploader *internal.Uploader) error {
+func uploadRemoteWalMetadata(walFileName string, uploader internal.Uploader) error {
 	walMetadataSetting := viper.GetString(internal.UploadWalMetadata)
 	if walMetadataSetting == WalNoMetadataLevel {
 		return nil

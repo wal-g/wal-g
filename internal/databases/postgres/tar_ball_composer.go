@@ -22,10 +22,10 @@ type TarBallComposerMaker interface {
 	Make(bundle *Bundle) (internal.TarBallComposer, error)
 }
 
-func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQueryRunner, uploader *internal.Uploader,
+func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQueryRunner, uploader internal.Uploader,
 	newBackupName string, filePackOptions TarBallFilePackerOptions,
 	withoutFilesMetadata bool) (TarBallComposerMaker, error) {
-	folder := uploader.UploadingFolder
+	folder := uploader.Folder()
 
 	if withoutFilesMetadata {
 		if composerType != RegularComposer {

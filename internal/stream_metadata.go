@@ -47,7 +47,7 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	return nil, nil // unreachable
 }
 
-func UploadBackupStreamMetadata(uploader UploaderProvider, metadata interface{}, backupName string) error {
+func UploadBackupStreamMetadata(uploader Uploader, metadata interface{}, backupName string) error {
 	sentinelName := StreamMetadataNameFromBackup(backupName)
 	return UploadDto(uploader.Folder(), metadata, sentinelName)
 }

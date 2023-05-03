@@ -112,7 +112,7 @@ func (sd *StorageDownloader) LastBackupName() (string, error) {
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
 func (sd *StorageDownloader) DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error {
-	return internal.DownloadFile(sd.oplogsFolder, arch.Filename(), arch.Extension(), writeCloser)
+	return internal.DownloadFile(internal.NewFolderReader(sd.oplogsFolder), arch.Filename(), arch.Extension(), writeCloser)
 }
 
 // ListOplogArchives fetches all oplog archives existed in storage.
@@ -190,13 +190,13 @@ func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter,
 // StorageUploader extends base uploader with mongodb specific.
 // is NOT thread-safe
 type StorageUploader struct {
-	internal.UploaderProvider
+	internal.Uploader
 	crypter crypto.Crypter // usages only in UploadOplogArchive
 	buf     *bytes.Buffer
 }
 
 // NewStorageUploader builds mongodb uploader.
-func NewStorageUploader(upl internal.UploaderProvider) *StorageUploader {
+func NewStorageUploader(upl internal.Uploader) *StorageUploader {
 	upl.DisableSizeTracking() // providing io.ReaderAt+io.ReadSeeker to s3 upload enables buffer pool usage
 	return &StorageUploader{upl, internal.ConfigureCrypter(), &bytes.Buffer{}}
 }
@@ -208,7 +208,7 @@ func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS 
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.UploaderProvider.Compression(), su.crypter))
+	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Uploader.Compression(), su.crypter))
 	// TODO: warn if read > 2 * models.MaxDocumentSize and shrink buf capacity if it's too high
 	defer su.buf.Reset()
 	if err != nil {
@@ -256,7 +256,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter
 	}
 
 	backupSentinel := metaConstructor.MetaInfo()
-	if err := internal.UploadSentinel(su.UploaderProvider, backupSentinel, backupName); err != nil {
+	if err := internal.UploadSentinel(su.Uploader, backupSentinel, backupName); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}
 	return nil

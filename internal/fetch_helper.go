@@ -29,7 +29,7 @@ func (err ArchiveNonExistenceError) Error() string {
 }
 
 // DownloadFile downloads, decompresses and decrypts
-func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.WriteCloser) error {
+func DownloadFile(reader StorageFolderReader, filename, ext string, writeCloser io.WriteCloser) error {
 	utility.LoggedClose(writeCloser, "")
 
 	decompressor := compression.FindDecompressor(ext)
@@ -38,7 +38,7 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	}
 	tracelog.DebugLogger.Printf("Found decompressor for %s", decompressor.FileExtension())
 
-	archiveReader, exists, err := TryDownloadFile(folder, filename)
+	archiveReader, exists, err := TryDownloadFile(reader, filename)
 	if err != nil {
 		return err
 	}
@@ -57,8 +57,8 @@ func DownloadFile(folder storage.Folder, filename, ext string, writeCloser io.Wr
 	return err
 }
 
-func TryDownloadFile(folder storage.Folder, path string) (fileReader io.ReadCloser, exists bool, err error) {
-	fileReader, err = folder.ReadObject(path)
+func TryDownloadFile(reader StorageFolderReader, path string) (fileReader io.ReadCloser, exists bool, err error) {
+	fileReader, err = reader.ReadObject(path)
 	if err == nil {
 		exists = true
 		return
@@ -167,8 +167,8 @@ func putCachedDecompressorInFirstPlace(decompressors []compression.Decompressor)
 }
 
 // TODO : unit tests
-func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (io.ReadCloser, error) {
-	archiveReader, decompressor, err := findDecompressorAndDownload(folder, fileName)
+func DownloadAndDecompressStorageFile(reader StorageFolderReader, fileName string) (io.ReadCloser, error) {
+	archiveReader, decompressor, err := findDecompressorAndDownload(reader, fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -185,9 +185,9 @@ func DownloadAndDecompressStorageFile(folder storage.Folder, fileName string) (i
 	}, nil
 }
 
-func findDecompressorAndDownload(folder storage.Folder, fileName string) (io.ReadCloser, compression.Decompressor, error) {
+func findDecompressorAndDownload(reader StorageFolderReader, fileName string) (io.ReadCloser, compression.Decompressor, error) {
 	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
-		archiveReader, exists, err := TryDownloadFile(folder, fileName+"."+decompressor.FileExtension())
+		archiveReader, exists, err := TryDownloadFile(reader, fileName+"."+decompressor.FileExtension())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -199,12 +199,12 @@ func findDecompressorAndDownload(folder storage.Folder, fileName string) (io.Rea
 		return archiveReader, decompressor, nil
 	}
 
-	reader, exists, err := TryDownloadFile(folder, fileName)
+	fileReader, exists, err := TryDownloadFile(reader, fileName)
 	if err != nil {
 		return nil, nil, err
 	}
 	if exists {
-		return reader, nil, nil
+		return fileReader, nil, nil
 	}
 
 	return nil, nil, newArchiveNonExistenceError(fileName)
@@ -212,7 +212,7 @@ func findDecompressorAndDownload(folder storage.Folder, fileName string) (io.Rea
 
 // TODO : unit tests
 // DownloadFileTo downloads a file and writes it to local file
-func DownloadFileTo(folder storage.Folder, fileName string, dstPath string) error {
+func DownloadFileTo(folderReader StorageFolderReader, fileName string, dstPath string) error {
 	// Create file as soon as possible. It may be important due to race condition in wal-prefetch for PG.
 	file, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {
@@ -220,7 +220,7 @@ func DownloadFileTo(folder storage.Folder, fileName string, dstPath string) erro
 	}
 	defer utility.LoggedClose(file, "")
 
-	reader, err := DownloadAndDecompressStorageFile(folder, fileName)
+	reader, err := DownloadAndDecompressStorageFile(folderReader, fileName)
 	if err != nil {
 		// We could not start upload - remove the file totally.
 		_ = os.Remove(dstPath)
