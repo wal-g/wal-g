@@ -11,6 +11,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/sftp"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -29,14 +30,24 @@ func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegm
 }
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
-func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
+func HandleWALRestore(
+	targetPath, sourcePath string,
+	cloudFolder storage.Folder,
+	isTargetRemote bool,
+	requisites sftp.SSHRequisites,
+) {
 	cloudFolder = cloudFolder.GetSubFolder(utility.WalPath)
 
-	targetPgData, err := ExtractPgControl(targetPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %v\n", err)
-
+	var targetPgData *PgControlData
+	var err error
+	if isTargetRemote {
+		targetPgData, err = ExtractRemotePgControl(targetPath, requisites)
+	} else {
+		targetPgData, err = ExtractPgControl(targetPath)
+	}
+	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on target cluster: %s\n", err)
 	sourcePgData, err := ExtractPgControl(sourcePath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on source cluster: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get pg data on source cluster: %s\n", err)
 
 	if targetPgData.GetSystemIdentifier() != sourcePgData.GetSystemIdentifier() {
 		tracelog.ErrorLogger.Fatal("System identifiers of target and source clusters are not equal\n")
@@ -45,31 +56,41 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 		tracelog.ErrorLogger.Fatal("Latest checkpoint timelines of target and source clusters are equal\n")
 	}
 
-	targetWalDir, err := getWalDirName(targetPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
-	sourceWalDir, err := getWalDirName(sourcePath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %v\n", err)
+	var targetWalDir string
+	if isTargetRemote {
+		targetWalDir, err = getRemoteWalDirName(targetPath, requisites)
+	} else {
+		targetWalDir, err = getLocalWalDirName(targetPath)
+	}
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %s\n", err)
+	sourceWalDir, err := getLocalWalDirName(sourcePath)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL directory name: %s\n", err)
 
-	tgtHistoryRecords, err := getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %v\n", err)
+	var tgtHistoryRecords []*TimelineHistoryRecord
+	if isTargetRemote {
+		tgtHistoryRecords, err = getRemoteTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir, requisites)
+	} else {
+		tgtHistoryRecords, err = getLocalTimelineHistoryRecords(targetPgData.GetCurrentTimeline(), targetWalDir)
+	}
+	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on target cluster: %s\n", err)
 	srcHistoryRecords, err := getLocalTimelineHistoryRecords(sourcePgData.GetCurrentTimeline(), sourceWalDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get history data on source cluster: %s\n", err)
 
 	lastCommonLsn, lastCommonTl, err := FindLastCommonPoint(tgtHistoryRecords, srcHistoryRecords)
-	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to find last common point: %s\n", err)
 
 	srcTimelineWithSegNo := transformTimelineHistoryRecords(srcHistoryRecords)
 	mapOfSrcTimelineWithSegNo := timelineWithSegmentNoSliceToMap(srcTimelineWithSegNo)
 
 	folderFilenames, err := getDirectoryFilenames(sourceWalDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get WAL filenames: %s\n", err)
 
 	walsByTimelines := groupSegmentsByTimelines(getSegmentsFromFiles(folderFilenames))
 
 	filenamesToRestore, err := GetMissingWals(
 		getSegmentNoFromLsn(lastCommonLsn), lastCommonTl,
 		sourcePgData.GetCurrentTimeline(), mapOfSrcTimelineWithSegNo, walsByTimelines)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %s\n", err)
 
 	if len(filenamesToRestore) == 0 {
 		tracelog.InfoLogger.Println("No WAL files to restore")
@@ -79,9 +100,9 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 	for _, walFilename := range filenamesToRestore {
 		location := utility.ResolveSymlink(path.Join(sourceWalDir, walFilename))
 		if err = internal.DownloadFileTo(cloudFolder, walFilename, location); err != nil {
-			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
+			tracelog.ErrorLogger.Printf("Failed to download WAL file %s: %s\n", walFilename, err)
 		} else {
-			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)
+			tracelog.InfoLogger.Printf("Successfully download WAL file %s\n", walFilename)
 		}
 	}
 }
@@ -158,15 +179,34 @@ func getLocalTimelineHistoryRecords(startTimeline uint32, pathToWal string) ([]*
 	if err != nil {
 		return nil, err
 	}
-	historyRecords, err := parseHistoryFile(historyReadCloser)
-	if err != nil {
-		return nil, err
+	defer historyReadCloser.Close()
+
+	return parseHistoryFile(historyReadCloser)
+}
+
+// getRemoteTimelineHistoryRecords gets timeline history records from remote wal history files
+func getRemoteTimelineHistoryRecords(
+	startTimeline uint32,
+	pathToWal string,
+	requisites sftp.SSHRequisites,
+) ([]*TimelineHistoryRecord, error) {
+	if startTimeline == 1 {
+		return make([]*TimelineHistoryRecord, 0), nil
 	}
-	err = historyReadCloser.Close()
+	sftpClient, err := sftp.NewSftpClient(requisites)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create sftp client: %s", err)
 	}
-	return historyRecords, nil
+	defer sftpClient.Close()
+
+	historyFileName := fmt.Sprintf(walHistoryFileFormat, startTimeline)
+	historyReadCloser, err := sftpClient.Open(filepath.Join(pathToWal, historyFileName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open pg_control file: %s", err)
+	}
+	defer historyReadCloser.Close()
+
+	return parseHistoryFile(historyReadCloser)
 }
 
 // transformTimelineHistoryRecords transforms slice of TimelineHistoryRecord to TimelineWithSegmentNo for
@@ -214,7 +254,7 @@ func getLocalHistoryFile(timeline uint32, pathToWal string) (io.ReadCloser, erro
 	return readCloser, nil
 }
 
-func getWalDirName(pgData string) (string, error) {
+func getLocalWalDirName(pgData string) (string, error) {
 	dataFolderPath := filepath.Join(pgData, "pg_wal")
 	if _, err := os.Stat(dataFolderPath); err == nil {
 		return dataFolderPath, nil
@@ -222,6 +262,25 @@ func getWalDirName(pgData string) (string, error) {
 
 	dataFolderPath = filepath.Join(pgData, "pg_xlog")
 	if _, err := os.Stat(dataFolderPath); err == nil {
+		return dataFolderPath, nil
+	}
+	return "", errors.New("directory for WAL files doesn't exist in " + pgData)
+}
+
+func getRemoteWalDirName(pgData string, requisites sftp.SSHRequisites) (string, error) {
+	sftpClient, err := sftp.NewSftpClient(requisites)
+	if err != nil {
+		return "", fmt.Errorf("failed to create sftp client: %s", err)
+	}
+	defer sftpClient.Close()
+
+	dataFolderPath := filepath.Join(pgData, "pg_wal")
+	if _, err := sftpClient.Stat(dataFolderPath); err == nil {
+		return dataFolderPath, nil
+	}
+
+	dataFolderPath = filepath.Join(pgData, "pg_xlog")
+	if _, err := sftpClient.Stat(dataFolderPath); err == nil {
 		return dataFolderPath, nil
 	}
 	return "", errors.New("directory for WAL files doesn't exist in " + pgData)

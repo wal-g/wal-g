@@ -31,3 +31,4 @@ RUN mkdir -p /tmp/logs/
 
 RUN chmod 777 /tmp/configs/
 RUN chmod 777 /tmp/logs/
+RUN chmod 777 /tmp/scripts/start_ssh.sh
