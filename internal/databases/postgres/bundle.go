@@ -401,8 +401,8 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(folder internal.StorageFolderReader, backupStartLSN LSN) error {
-	deltaMap, err := getDeltaMap(folder, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
+func (bundle *Bundle) DownloadDeltaMap(reader internal.StorageFolderReader, backupStartLSN LSN) error {
+	deltaMap, err := getDeltaMap(reader, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
 	if err != nil {
 		return err
 	}

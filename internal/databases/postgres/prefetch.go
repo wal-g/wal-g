@@ -22,8 +22,7 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(reader internal.StorageFolderReader, walFileName string, location string) {
-	folder := reader.SubFolder(utility.WalPath)
+func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName string, location string) {
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
@@ -36,7 +35,7 @@ func HandleWALPrefetch(reader internal.StorageFolderReader, walFileName string, 
 			tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err, " file: ", fileName)
 		}
 		waitGroup.Add(1)
-		go prefetchFile(location, folder, fileName, waitGroup)
+		go prefetchFile(location, folderReader.SubFolder(utility.WalPath), fileName, waitGroup)
 
 		prefaultStartLsn, shouldPrefault, timelineID, err := shouldPrefault(fileName)
 		if err != nil {
@@ -44,7 +43,7 @@ func HandleWALPrefetch(reader internal.StorageFolderReader, walFileName string, 
 		}
 		if shouldPrefault {
 			waitGroup.Add(1)
-			go prefaultData(prefaultStartLsn, timelineID, waitGroup, reader)
+			go prefaultData(prefaultStartLsn, timelineID, waitGroup, folderReader)
 		}
 
 		time.Sleep(10 * time.Millisecond) // ramp up in order
@@ -56,7 +55,7 @@ func HandleWALPrefetch(reader internal.StorageFolderReader, walFileName string, 
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitGroup, uploader internal.StorageFolderReader) {
+func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitGroup, folderReader internal.StorageFolderReader) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
@@ -77,7 +76,7 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 		false, viper.GetInt64(internal.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
-	err = bundle.DownloadDeltaMap(uploader.SubFolder(utility.WalPath), startLsn)
+	err = bundle.DownloadDeltaMap(folderReader.SubFolder(utility.WalPath), startLsn)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -188,7 +187,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 }
 
 // TODO : unit tests
-func prefetchFile(location string, folder internal.StorageFolderReader, walFileName string, waitGroup *sync.WaitGroup) {
+func prefetchFile(location string, reader internal.StorageFolderReader, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefetch unsuccessful ", walFileName, r)
@@ -209,7 +208,7 @@ func prefetchFile(location string, folder internal.StorageFolderReader, walFileN
 	err := os.MkdirAll(runningLocation, 0755)
 	tracelog.ErrorLogger.PrintOnError(err)
 
-	err = internal.DownloadFileTo(folder, walFileName, oldPath)
+	err = internal.DownloadFileTo(reader, walFileName, oldPath)
 	tracelog.ErrorLogger.PrintOnError(err)
 
 	_, errO = os.Stat(oldPath)

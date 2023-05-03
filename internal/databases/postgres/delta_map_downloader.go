@@ -6,7 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-func getDeltaMap(folder internal.StorageFolderReader,
+func getDeltaMap(reader internal.StorageFolderReader,
 	timeline uint32,
 	firstUsedLSN,
 	firstNotUsedLSN LSN) (PagedFileDeltaMap, error) {
@@ -19,13 +19,13 @@ func getDeltaMap(folder internal.StorageFolderReader,
 	deltaMap := NewPagedFileDeltaMap()
 	firstUsedDeltaNo, firstNotUsedDeltaNo := getDeltaRange(firstUsedLSN, firstNotUsedLSN)
 	// Get locations from [firstUsedDeltaNo, lastUsedDeltaNo). We use lastUsedDeltaNo in next step
-	err := deltaMap.getLocationsFromDeltas(folder, timeline, firstUsedDeltaNo, firstNotUsedDeltaNo.previous())
+	err := deltaMap.getLocationsFromDeltas(reader, timeline, firstUsedDeltaNo, firstNotUsedDeltaNo.previous())
 	if err != nil {
 		return deltaMap, errors.Wrapf(err, "Error during fetch locations from delta files.\n")
 	}
 
 	// Handle last delta file separately for fetch locations and walParser from it
-	lastDeltaFile, err := getDeltaFile(folder, firstNotUsedDeltaNo.previous().getFilename(timeline))
+	lastDeltaFile, err := getDeltaFile(reader, firstNotUsedDeltaNo.previous().getFilename(timeline))
 	if err != nil {
 		return deltaMap, errors.Wrapf(err, "Error during downloading last delta file.\n")
 	}
@@ -33,7 +33,7 @@ func getDeltaMap(folder internal.StorageFolderReader,
 
 	firstUsedWalSegmentNo, firstNotUsedWalSegmentNo := getWalSegmentRange(firstNotUsedDeltaNo, firstNotUsedLSN)
 	// we handle WAL files from [firstUsedWalSegmentNo, lastUsedWalSegmentNo]
-	err = deltaMap.getLocationsFromWals(folder, timeline, firstUsedWalSegmentNo,
+	err = deltaMap.getLocationsFromWals(reader, timeline, firstUsedWalSegmentNo,
 		firstNotUsedWalSegmentNo, lastDeltaFile.WalParser)
 	if err != nil {
 		return deltaMap, errors.Wrapf(err, "Error during fetch locations from wal segments.\n")

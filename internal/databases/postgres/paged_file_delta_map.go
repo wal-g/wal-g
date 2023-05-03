@@ -140,13 +140,13 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 	}
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder internal.StorageFolderReader,
+func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(reader internal.StorageFolderReader,
 	timeline uint32,
 	first,
 	last DeltaNo) error {
 	for deltaNo := first; deltaNo < last; deltaNo = deltaNo.next() {
 		filename := deltaNo.getFilename(timeline)
-		deltaFile, err := getDeltaFile(folder, filename)
+		deltaFile, err := getDeltaFile(reader, filename)
 		if err != nil {
 			return err
 		}
@@ -156,14 +156,14 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(folder internal.Storag
 	return nil
 }
 
-func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder internal.StorageFolderReader,
+func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(reader internal.StorageFolderReader,
 	timeline uint32,
 	first,
 	last WalSegmentNo,
 	walParser *walparser.WalParser) error {
 	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.next() {
 		filename := walSegmentNo.getFilename(timeline)
-		err := deltaMap.getLocationsFromWal(folder, filename, walParser)
+		err := deltaMap.getLocationsFromWal(reader, filename, walParser)
 		if err != nil {
 			return err
 		}
@@ -173,8 +173,8 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(folder internal.StorageF
 }
 
 func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(
-	folder internal.StorageFolderReader, filename string, walParser *walparser.WalParser) error {
-	reader, err := internal.DownloadAndDecompressStorageFile(folder, filename)
+	folderReader internal.StorageFolderReader, filename string, walParser *walparser.WalParser) error {
+	reader, err := internal.DownloadAndDecompressStorageFile(folderReader, filename)
 	if err != nil {
 		return errors.Wrapf(err, "Error during wal segment'%s' downloading.", filename)
 	}
@@ -190,8 +190,8 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWal(
 	return nil
 }
 
-func getDeltaFile(folder internal.StorageFolderReader, filename string) (*DeltaFile, error) {
-	reader, err := internal.DownloadAndDecompressStorageFile(folder, filename)
+func getDeltaFile(folderReader internal.StorageFolderReader, filename string) (*DeltaFile, error) {
+	reader, err := internal.DownloadAndDecompressStorageFile(folderReader, filename)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Error during delta file '%s' downloading.", filename)
 	}
