@@ -40,6 +40,11 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigP
 	if err = rsConfig.Validate(); err != nil {
 		return err
 	}
+	// check backup existence and resolve flag LATEST
+	backup, err := internal.GetBackupByName(backupName, "", uploader.Folder())
+	if err != nil {
+		return err
+	}
 
-	return restoreService.DoRestore(backupName, restoreMongodVersion, rsConfig)
+	return restoreService.DoRestore(backup.Name, restoreMongodVersion, rsConfig)
 }

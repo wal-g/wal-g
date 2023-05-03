@@ -105,6 +105,11 @@ func (sd *StorageDownloader) ListBackups() ([]internal.BackupTime, []string, err
 	return internal.GetBackupsAndGarbage(sd.backupsFolder)
 }
 
+// LastBackupName get last backup
+func (sd *StorageDownloader) LastBackupName() (string, error) {
+	return internal.GetLatestBackupName(sd.backupsFolder)
+}
+
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
 func (sd *StorageDownloader) DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error {
 	return internal.DownloadFile(sd.oplogsFolder, arch.Filename(), arch.Extension(), writeCloser)
