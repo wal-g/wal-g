@@ -436,7 +436,7 @@ func TestLsnRegex(t *testing.T) {
 		},
 		{
 			name:     "LsnRegex_ReturnEmptyArrayWhenLsnIsIncorrect",
-			lsn:      GetRandomizedString(23),
+			lsn:      GetRandomizedHexString(23),
 			expected: nil,
 		},
 		{
@@ -473,10 +473,10 @@ func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 
 func RandomLsn() string {
 	const LSNLength = 24
-	return GetRandomizedString(LSNLength)
+	return GetRandomizedHexString(LSNLength)
 }
 
-func GetRandomizedString(length int) string {
+func GetRandomizedHexString(length int) string {
 	var letter = []rune("ABCDEF0123456789")
 	b := make([]rune, length)
 	for i := range b {
