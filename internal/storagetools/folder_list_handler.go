@@ -8,7 +8,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -60,7 +59,7 @@ func (ld *ListDirectory) Type() ListElementType {
 	return Directory
 }
 
-func HandleFolderList(folder storage.Folder, recursive bool) {
+func HandleFolderList(folder storage.Folder, recursive bool) error {
 	var list []ListElement
 	var folderObjects []storage.Object
 	var err error
@@ -74,14 +73,20 @@ func HandleFolderList(folder storage.Folder, recursive bool) {
 			list = append(list, NewListDirectory(subFolders[i], folder))
 		}
 	}
+	if err != nil {
+		return fmt.Errorf("list folder: %v", err)
+	}
 
 	for i := range folderObjects {
 		list = append(list, NewListObject(folderObjects[i]))
 	}
-	tracelog.ErrorLogger.FatalfOnError("Failed to list the folder: %v", err)
 
 	err = WriteObjectsList(list, os.Stdout)
-	tracelog.ErrorLogger.FatalfOnError("Failed to write the folder listing: %v", err)
+	if err != nil {
+		return fmt.Errorf("write folder listing: %v", err)
+	}
+
+	return nil
 }
 
 func WriteObjectsList(objects []ListElement, output io.Writer) error {

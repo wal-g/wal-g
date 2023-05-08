@@ -1,6 +1,7 @@
 package storagetools
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -10,14 +11,20 @@ import (
 
 	"github.com/wal-g/wal-g/utility"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
-func HandlePutObject(localPath, dstPath string, uploader internal.Uploader, overwrite, encrypt, compress bool) {
-	checkOverwrite(dstPath, uploader, overwrite)
+func HandlePutObject(localPath, dstPath string, uploader internal.Uploader, overwrite, encrypt, compress bool) error {
+	err := checkOverwrite(dstPath, uploader, overwrite)
+	if err != nil {
+		return fmt.Errorf("check file overwrite: %v", err)
+	}
 
-	fileReadCloser := openLocalFile(localPath)
+	fileReadCloser, err := openLocalFile(localPath)
+	if err != nil {
+		return fmt.Errorf("open local file: %v", err)
+	}
+
 	defer fileReadCloser.Close()
 
 	storageFolderPath := utility.SanitizePath(filepath.Dir(dstPath))
@@ -26,29 +33,41 @@ func HandlePutObject(localPath, dstPath string, uploader internal.Uploader, over
 	}
 
 	fileName := utility.SanitizePath(filepath.Base(dstPath))
-	err := uploadFile(fileName, fileReadCloser, uploader, encrypt, compress)
-	tracelog.ErrorLogger.FatalfOnError("Failed to upload: %v", err)
+	err = uploadFile(fileName, fileReadCloser, uploader, encrypt, compress)
+	if err != nil {
+		return fmt.Errorf("upload: %v", err)
+	}
+	return nil
 }
 
-func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) {
+func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) error {
 	fullPath := dstPath + "." + uploader.Compression().FileExtension()
 	exists, err := uploader.Folder().Exists(fullPath)
-	tracelog.ErrorLogger.FatalfOnError("Failed to check object existence: %v", err)
-	if exists && !overwrite {
-		tracelog.ErrorLogger.Fatalf("Object %s already exists. To overwrite it, add the -f flag.", fullPath)
+	if err != nil {
+		return fmt.Errorf("check object existence: %v", err)
 	}
+	if exists && !overwrite {
+		return fmt.Errorf("object %s already exists. To overwrite it, add the -f flag", fullPath)
+	}
+	return nil
 }
 
-func openLocalFile(localPath string) io.ReadCloser {
+func openLocalFile(localPath string) (io.ReadCloser, error) {
 	localFile, err := os.Open(localPath)
-	tracelog.ErrorLogger.FatalfOnError("Could not open the local file: %v", err)
-	fileInfo, err := localFile.Stat()
-	tracelog.ErrorLogger.FatalfOnError("Could not Stat() the local file: %v", err)
-	if fileInfo.IsDir() {
-		tracelog.ErrorLogger.Fatalf("Provided local path (%s) points to a directory, exiting", localPath)
+	if err != nil {
+		return nil, fmt.Errorf("open the local file: %v", err)
 	}
 
-	return localFile
+	fileInfo, err := localFile.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat() the local file: %v", err)
+	}
+
+	if fileInfo.IsDir() {
+		return nil, fmt.Errorf("provided local path (%s) points to a directory, exiting", localPath)
+	}
+
+	return localFile, nil
 }
 
 func uploadFile(name string, content io.Reader, uploader internal.Uploader, encrypt, compress bool) error {
