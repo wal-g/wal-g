@@ -95,7 +95,7 @@ func HandleBackupImport(externalConfig string, importDatabases map[string]string
 	tracelog.ErrorLogger.FatalfOnError("overall import failed: %v", err)
 
 	sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
-	uploader := internal.NewUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
+	uploader := internal.NewRegularUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
 	err = internal.UploadSentinel(uploader, sentinel, backupName)
 	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)

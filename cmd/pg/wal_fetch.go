@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
 )
 
 const WalFetchShortDescription = "Fetches a WAL file from storage"
@@ -17,7 +18,14 @@ var walFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
-		postgres.HandleWALFetch(internal.NewFolderReader(folder), args[0], args[1], true)
+
+		failover, err := internal.InitFailoverStorages()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		folderReader, err := multistorage.NewStorageFolderReader(folder, failover)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		postgres.HandleWALFetch(folderReader, args[0], args[1], true)
 	},
 }
 

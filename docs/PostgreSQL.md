@@ -579,3 +579,31 @@ Usage:
 ```bash
 wal-g pgbackrest wal-show
 ```
+
+Failover archive storages (experimental)
+-----------
+
+Switch to a failover storage for `wal-push` if primary storage becomes unavailable. This might be useful when the archiving fails during the cloud storage service unavailability to avoid out-of-disk-space issues.
+WAL-G will also take the failover storages into account during the `wal-fetch/wal-prefetch`.
+
+```bash
+WALG_FAILOVER_STORAGES:
+    TEST_STORAGE:
+        AWS_SECRET_ACCESS_KEY: "S3_STORAGE_KEY_1"
+        AWS_ACCESS_KEY_ID: "S3_STORAGE_KEY_ID_1"
+        WALE_S3_PREFIX: "s3://some-s3-storage-1/"
+    STORAGE2:
+        AWS_SECRET_ACCESS_KEY: "S3_STORAGE_KEY_2"
+        AWS_ACCESS_KEY_ID: "S3_STORAGE_KEY_ID_2"
+        WALE_S3_PREFIX: "s3://some-s3-storage-2/"
+    FILE_STORAGE:
+        WALG_FILE_PREFIX: "/some/prefix"
+```
+
+* `WALG_FAILOVER_STORAGES_CHECK_TIMEOUT`
+
+WAL-G will use no more than seconds to check for available alive storages. Default value is `30s`.
+
+* `WALG_FAILOVER_STORAGES_CACHE_LIFETIME`
+
+WAL-G saves information about last used alive storage to disk to avoid excessive storage calls. This setting controls lifetime of this cache. Default value is `15m`.

@@ -238,7 +238,7 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 // ConfigureUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
 // and `<nil>` values.
-func ConfigureUploader() (uploader Uploader, err error) {
+func ConfigureUploader() (uploader *RegularUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
@@ -249,7 +249,7 @@ func ConfigureUploader() (uploader Uploader, err error) {
 		return nil, errors.Wrap(err, "failed to configure compression")
 	}
 
-	uploader = NewUploader(compressor, folder)
+	uploader = NewRegularUploader(compressor, folder)
 	return uploader, err
 }
 
@@ -259,7 +259,7 @@ func ConfigureUploaderWithoutCompressor() (uploader Uploader, err error) {
 		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
-	uploader = NewUploader(nil, folder)
+	uploader = NewRegularUploader(nil, folder)
 	return uploader, err
 }
 
