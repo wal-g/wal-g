@@ -54,6 +54,9 @@ remote_backup_and_restore_test() {
   rm -rf "${PGTBS}"/*
   rm -rf "${PGDATA}"
 
+  echo Debug
+  wal-g --config=${TMP_CONFIG} st ls -r
+
   echo Restore destination
   BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | sed -n '2{s/ .*//;p}')
   wal-g --config=${TMP_CONFIG} backup-fetch "$PGDATA" "$BACKUP"

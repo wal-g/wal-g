@@ -86,6 +86,7 @@ jobs:
                    'make TEST="pg_full_backup_copy_composer_test" pg_integration_test',
                    'make TEST="pg_full_backup_rating_composer_test" pg_integration_test',
                    'make TEST="pg_full_backup_database_composer_test" pg_integration_test',
+                   'make TEST="pg_full_backup_failover_storage_test" pg_integration_test',
                    'make TEST="pg_delete_before_name_find_full_test" pg_integration_test',
                    'make TEST="pg_delete_retain_full_test" pg_integration_test',
                    'make TEST="pg_delete_before_time_find_full_test" pg_integration_test',
