@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -13,6 +14,17 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sys/unix"
+)
+
+var deprecatedFileSyncMessage = fmt.Sprintf(
+	`You are using deprecated functionality that uses an inefficient fsync-for-every-file logic.
+It will be removed in next major version.
+Please use file sync mode using environment variable %s instead of using %s.
+`, internal.TarFsyncMode, internal.TarDisableFsyncSetting)
+var fallingBackFileSyncMessage = fmt.Sprintf(
+	`Falling back to %s file sync mode.`,
+	internal.DISABLED,
 )
 
 type IncrementalTarInterpreter interface {
@@ -81,14 +93,14 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileInfo *tar.Header) error {
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
 	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
-	fsync := !viper.GetBool(internal.TarDisableFsyncSetting)
+
 	switch fileInfo.Typeflag {
 	case tar.TypeReg, tar.TypeRegA:
 		// temporary switch to determine if new unwrap logic should be used
 		if useNewUnwrapImplementation {
-			return tarInterpreter.unwrapRegularFileNew(fileReader, fileInfo, targetPath, fsync)
+			return tarInterpreter.unwrapRegularFileNew(fileReader, fileInfo, targetPath, false)
 		}
-		return tarInterpreter.unwrapRegularFileOld(fileReader, fileInfo, targetPath, fsync)
+		return tarInterpreter.unwrapRegularFileOld(fileReader, fileInfo, targetPath, false)
 	case tar.TypeDir:
 		err := os.MkdirAll(targetPath, 0750)
 		if err != nil {
@@ -109,6 +121,17 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 	return nil
 }
 
+func (tarInterpreter *FileTarInterpreter) OnInterpretFinish() error {
+	fileSyncMode := getFileSyncMode()
+	if fileSyncMode == internal.GLOBAL || fileSyncMode == internal.DEFAULT {
+		_, _, err := unix.Syscall(unix.SYS_SYNC, 0, 0, 0)
+		if err != 0 {
+			return errors.Errorf("FileTarInterpreter: global fsync failed with error code %d", err)
+		}
+	}
+	return nil
+}
+
 // PrepareDirs makes sure all dirs exist
 func PrepareDirs(fileName string, targetPath string) error {
 	if fileName == targetPath {
@@ -118,4 +141,18 @@ func PrepareDirs(fileName string, targetPath string) error {
 	dir := strings.TrimSuffix(targetPath, base)
 	err := os.MkdirAll(dir, 0750)
 	return err
+}
+
+func getFileSyncMode() string {
+	fsyncMode := viper.GetString(internal.TarFsyncMode)
+
+	if viper.IsSet(internal.TarDisableFsyncSetting) {
+		tracelog.WarningLogger.Printf(deprecatedFileSyncMessage)
+		if fsyncMode == internal.DEFAULT && viper.GetBool(internal.TarDisableFsyncSetting) {
+			tracelog.WarningLogger.Printf(fallingBackFileSyncMessage)
+			fsyncMode = internal.DISABLED
+		}
+	}
+
+	return fsyncMode
 }

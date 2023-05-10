@@ -50,6 +50,7 @@ func (err UnsupportedFileTypeError) Error() string {
 // for different file types.
 type TarInterpreter interface {
 	Interpret(reader io.Reader, header *tar.Header) error
+	OnInterpretFinish() error
 }
 
 type DevNullWriter struct {
@@ -92,7 +93,7 @@ func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 			return errors.Wrap(err, "extractOne: Interpret failed")
 		}
 	}
-	return nil
+	return tarInterpreter.OnInterpretFinish()
 }
 
 func extractNonTar(tarInterpreter TarInterpreter, source io.Reader, path string, fileType FileType, mode int64) error {
@@ -211,7 +212,6 @@ func tryExtractFiles(files []ReaderMaker,
 
 		go func() {
 			defer downloadingSemaphore.Release(1)
-
 			readCloser, err := fileClosure.Reader()
 			if err == nil {
 				defer utility.LoggedClose(readCloser, "")
@@ -221,6 +221,7 @@ func tryExtractFiles(files []ReaderMaker,
 				extractingReader, err = DecryptAndDecompressTar(readCloser, filePath, crypter)
 				if err == nil {
 					defer extractingReader.Close()
+
 					err = extractFile(tarInterpreter, extractingReader, fileClosure)
 					err = errors.Wrapf(err, "Extraction error in %s", filePath)
 					tracelog.InfoLogger.Printf("Finished extraction of %s", filePath)

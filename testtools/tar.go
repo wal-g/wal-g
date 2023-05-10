@@ -26,6 +26,10 @@ func (tarInterpreter *BufferTarInterpreter) Interpret(reader io.Reader, header *
 	return nil
 }
 
+func (tarInterpreter *BufferTarInterpreter) OnInterpretFinish() error {
+	return nil
+}
+
 // Extracts data (possibly from multiple sources concurrently) and stores it in dictionary.
 // Used for testing purposes only.
 type ConcurrentConcatBufferTarInterpreter struct {
@@ -54,6 +58,10 @@ func (tarInterpreter *ConcurrentConcatBufferTarInterpreter) Interpret(reader io.
 	return nil
 }
 
+func (tarInterpreter *ConcurrentConcatBufferTarInterpreter) OnInterpretFinish() error {
+	return nil
+}
+
 // NOPTarInterpreter mocks a tar extractor.
 type NOPTarInterpreter struct{}
 
@@ -61,5 +69,9 @@ type NOPTarInterpreter struct{}
 // 'tar member' name.
 func (tarInterpreter *NOPTarInterpreter) Interpret(tr io.Reader, header *tar.Header) error {
 	fmt.Println(header.Name)
+	return nil
+}
+
+func (tarInterpreter *NOPTarInterpreter) OnInterpretFinish() error {
 	return nil
 }

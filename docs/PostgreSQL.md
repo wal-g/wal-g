@@ -59,9 +59,18 @@ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not e
 
 To configure the size of one backup bundle (in bytes). Smaller size causes granularity and more optimal, faster recovering. It also increases the number of storage requests, so it can costs you much money. Default size is 1 GB (`1 << 30 - 1` bytes).
 
-* `WALG_TAR_DISABLE_FSYNC`
+* `WALG_TAR_DISABLE_FSYNC` ⚠️ **DEPRECATED** 
 
+(Use `WALG_TAR_FSYNC_MODE` instead)
 Disable calling fsync after writing files when extracting tar files.
+
+* `WALG_TAR_FSYNC_MODE`
+
+Configures how WAL-G applies file sync when extracting tar files.
+There are three options:
+- DEFAULT (falls back to GLOBAL)
+- DISABLED (completely disables file sync)
+- GLOBAL (explicitly forces WAL-G to use global file sync after tar extraction)
 
 * `WALG_PG_WAL_SIZE`
 
