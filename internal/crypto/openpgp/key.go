@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"golang.org/x/crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp"
 )
 
 func readKey(path string) (io.Reader, error) {
