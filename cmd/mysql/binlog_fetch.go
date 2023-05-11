@@ -22,7 +22,7 @@ var fetchUntilBinlogLastModifiedTS string
 // binlogPushCmd represents the cron command
 var binlogFetchCmd = &cobra.Command{
 	Use:   "binlog-fetch",
-	Short: "fetches binlog from storage and save to the disk",
+	Short: "Fetch binlog from storage and save it to the disk",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()

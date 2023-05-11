@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
-const binlogPushShortDescription = ""
+const binlogPushShortDescription = "Upload binlogs to the storage"
 
 var untilBinlog string
 

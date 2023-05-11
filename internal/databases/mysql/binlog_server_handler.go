@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"net"
 	"os"
 	"path"
@@ -40,32 +41,52 @@ func handleEventError(err error, s *replication.BinlogStreamer) {
 
 // see: https://dev.mysql.com/doc/dev/mysql-server/latest/classbinary__log_1_1Rotate__event.html
 func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
-	// create rotate event
-	rotateBinlogEvent := replication.BinlogEvent{}
-
-	// 8 bytes for position
-	rotateBinlogEvent.RawData = make([]byte, replication.EventHeaderSize+8, replication.EventHeaderSize+8+len(pos.Name))
-	// generate header
-	// timestamp default 4 bytes
-	binlogEventPos := 4
-	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
-	binlogEventPos++
-
 	serverID, err := internal.GetRequiredSetting(internal.MysqlBinlogServerID)
 	tracelog.ErrorLogger.FatalOnError(err)
 	ServerIDNum, err := strconv.Atoi(serverID)
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	// create rotate event
+	rotateBinlogEvent := replication.BinlogEvent{}
+
+	messageBodySize := 8 + len(pos.Name) + 1
+	eventLength := replication.EventHeaderSize + messageBodySize + replication.BinlogChecksumLength
+
+	rotateBinlogEvent.RawData = make([]byte, eventLength)
+	// generate header:
+	// timestamp default 4 bytes
+	binlogEventPos := 4
+	// type - 1 byte
+	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
+	binlogEventPos++
+	// server_id- 4 bytes
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(ServerIDNum))
 	binlogEventPos += 4
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(replication.EventHeaderSize+8+len(pos.Name)))
+	// event_length - 4 bytes
+	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(eventLength))
 	binlogEventPos += 4
+	// end_log_pos - 4 bytes
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], 0)
 	binlogEventPos += 4
+	// flags - 2 bytes
 	binary.LittleEndian.PutUint16(rotateBinlogEvent.RawData[binlogEventPos:], 0)
 	binlogEventPos += 2
-	// set data
+
+	// set binlog event data:
+	// position - 8 bytes
 	binary.LittleEndian.PutUint64(rotateBinlogEvent.RawData[binlogEventPos:], uint64(pos.Pos))
-	rotateBinlogEvent.RawData = append(rotateBinlogEvent.RawData, []byte(pos.Name)...)
+	binlogEventPos += 8
+	// new binlog name - zero-terminated string
+	copy(rotateBinlogEvent.RawData[binlogEventPos:], pos.Name)
+	binlogEventPos += len(pos.Name)
+	rotateBinlogEvent.RawData[binlogEventPos] = 0
+	binlogEventPos++
+
+	// mysql use zlib's CRC32 implementation, which uses polynomial 0xedb88320UL.
+	// reference: https://github.com/madler/zlib/blob/master/crc32.c
+	// https://github.com/madler/zlib/blob/master/doc/rfc1952.txt#L419
+	checksum := crc32.ChecksumIEEE(rotateBinlogEvent.RawData[0 : replication.EventHeaderSize+messageBodySize])
+	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], checksum)
 
 	return s.AddEventToStreamer(&rotateBinlogEvent)
 }
@@ -104,14 +125,21 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	handleEventError(err, s)
 
 	p := replication.NewBinlogParser()
+	p.SetRawMode(true)
+	p.SetFlavor(mysql.MySQLFlavor)
+	// check checksum on our side - we should exit with error here rather than stuck waiting for MySQL apply all binlogs till `lastSentGTID`.
+	p.SetVerifyChecksum(true)
 
 	f := func(e *replication.BinlogEvent) error {
 		if int64(e.Header.Timestamp) > untilTS.Unix() {
 			return nil
 		}
 		if e.Header.EventType == replication.GTID_EVENT {
-			u, _ := uuid.FromBytes(e.Event.(*replication.GTIDEvent).SID)
-			lastSentGTID = u.String() + ":1-" + strconv.Itoa(int(e.Event.(*replication.GTIDEvent).GNO))
+			gtidEvent := &replication.GTIDEvent{}
+			err = gtidEvent.Decode(e.RawData[replication.EventHeaderSize:])
+			tracelog.ErrorLogger.FatalOnError(err)
+			u, _ := uuid.FromBytes(gtidEvent.SID)
+			lastSentGTID = u.String() + ":1-" + strconv.Itoa(int(gtidEvent.GNO))
 		}
 		err := s.AddEventToStreamer(e)
 		return err
@@ -123,7 +151,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		if errors.Is(err, storage.ErrNoMoreObjects) {
 			err := waitReplicationIsDone()
 			if err != nil {
-				tracelog.InfoLogger.Println("Error while waiting replication is done: ", err)
+				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
 			}
 			os.Exit(0)
 		}
@@ -207,6 +235,7 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 		tracelog.ErrorLogger.FatalOnError(err)
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @source_binlog_checksum":
+		// "1" - CRC algorithm from zlib
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"source_binlog_checksum"}, [][]interface{}{{"1"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.gtid_mode":
@@ -224,6 +253,7 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_source_enabled"}, [][]interface{}{{"0"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	default:
+		tracelog.DebugLogger.Printf("Unhandled query: %s", query)
 		return nil, nil
 	}
 }

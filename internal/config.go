@@ -118,7 +118,6 @@ const (
 	MysqlBinlogReplayCmd           = "WALG_MYSQL_BINLOG_REPLAY_COMMAND"
 	MysqlBinlogDstSetting          = "WALG_MYSQL_BINLOG_DST"
 	MysqlBackupPrepareCmd          = "WALG_MYSQL_BACKUP_PREPARE_COMMAND"
-	MysqlTakeBinlogsFromMaster     = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 	MysqlCheckGTIDs                = "WALG_MYSQL_CHECK_GTIDS"
 	MysqlBinlogServerHost          = "WALG_MYSQL_BINLOG_SERVER_HOST"
 	MysqlBinlogServerPort          = "WALG_MYSQL_BINLOG_SERVER_PORT"
@@ -127,6 +126,8 @@ const (
 	MysqlBinlogServerID            = "WALG_MYSQL_BINLOG_SERVER_ID"
 	MysqlBinlogServerReplicaSource = "WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE"
 	MysqlBackupDownloadMaxRetry    = "WALG_BACKUP_DOWNLOAD_MAX_RETRY"
+	// Deprecated: unused
+	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
