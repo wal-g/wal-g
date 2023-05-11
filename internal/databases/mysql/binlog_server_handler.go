@@ -112,6 +112,8 @@ func waitReplicationIsDone() error {
 			return err
 		}
 
+		tracelog.DebugLogger.Printf("Expected GTID set: %v; MySQL GTID set: %v", lastSentGTIDSet.String(), gtidSet.String())
+
 		if gtidSet.Contain(lastSentGTIDSet) {
 			tracelog.InfoLogger.Println("Replication is done")
 			return nil
