@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
-	"golang.org/x/crypto/openpgp"
 )
 
 // Crypter incapsulates specific of cypher method
