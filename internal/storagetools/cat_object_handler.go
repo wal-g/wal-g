@@ -1,14 +1,17 @@
 package storagetools
 
 import (
+	"fmt"
 	"os"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleCatObject(objectPath string, folder storage.Folder, decrypt, decompress bool) {
+func HandleCatObject(objectPath string, folder storage.Folder, decrypt, decompress bool) error {
 	dstFile := os.Stdout
 	err := downloadObject(objectPath, folder, dstFile, decrypt, decompress)
-	tracelog.ErrorLogger.FatalfOnError("Failed to download the file: %v", err)
+	if err != nil {
+		return fmt.Errorf("download the file: %v", err)
+	}
+	return nil
 }

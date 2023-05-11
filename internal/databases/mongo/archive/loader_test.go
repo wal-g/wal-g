@@ -31,7 +31,7 @@ func TestStorageUploader_UploadOplogArchive_ProperInterfaces(t *testing.T) {
 		return nil
 	})
 
-	uploaderProv := internal.NewUploader(compression.Compressors[lz4.AlgorithmName], storageProv)
+	uploaderProv := internal.NewRegularUploader(compression.Compressors[lz4.AlgorithmName], storageProv)
 	su := NewStorageUploader(uploaderProv)
 	r, w := io.Pipe()
 	go func() {

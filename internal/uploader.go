@@ -65,10 +65,10 @@ type UploadObject struct {
 	Content io.Reader
 }
 
-func NewUploader(
+func NewRegularUploader(
 	compressor compression.Compressor,
 	uploadingLocation storage.Folder,
-) Uploader {
+) *RegularUploader {
 	uploader := &RegularUploader{
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,

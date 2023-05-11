@@ -12,10 +12,10 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-func HandleCheckRead(folder storage.Folder, filenames []string) {
+func HandleCheckRead(folder storage.Folder, filenames []string) error {
 	_, _, err := folder.ListFolder()
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("failed to list the storage: %v", err)
+		return fmt.Errorf("failed to list the storage: %v", err)
 	}
 	missing := make([]string, 0)
 	for _, name := range filenames {
@@ -25,9 +25,10 @@ func HandleCheckRead(folder storage.Folder, filenames []string) {
 		}
 	}
 	if len(missing) > 0 {
-		tracelog.ErrorLogger.Fatalf("files are missing: %s", strings.Join(missing, ", "))
+		return fmt.Errorf("files are missing: %s", strings.Join(missing, ", "))
 	}
 	tracelog.InfoLogger.Println("Read check OK")
+	return nil
 }
 
 func randomName(length int) string {
@@ -37,13 +38,13 @@ func randomName(length int) string {
 	return fmt.Sprintf("%x", b)[:length]
 }
 
-func HandleCheckWrite(folder storage.Folder) {
+func HandleCheckWrite(folder storage.Folder) error {
 	var filename string
 	for {
 		filename = randomName(32)
 		ok, err := folder.Exists(filename)
 		if err != nil {
-			tracelog.ErrorLogger.Fatalf("failed to read from the storage: %v", err)
+			return fmt.Errorf("failed to read from the storage: %v", err)
 		}
 		if !ok {
 			break
@@ -54,7 +55,8 @@ func HandleCheckWrite(folder storage.Folder) {
 		tracelog.WarningLogger.Printf("failed to clean temp files, %s left in storage", filename)
 	}
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("failed to write to the storage: %v", err)
+		return fmt.Errorf("failed to write to the storage: %v", err)
 	}
 	tracelog.InfoLogger.Println("Write check OK")
+	return nil
 }

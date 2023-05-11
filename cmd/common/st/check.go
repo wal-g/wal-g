@@ -3,8 +3,9 @@ package st
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/storagetools"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 var checkCmd = &cobra.Command{
@@ -17,9 +18,10 @@ var checkReadCmd = &cobra.Command{
 	Short: "check read access to the storage",
 	Args:  cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
+		err := multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
+			return storagetools.HandleCheckRead(folder, args)
+		})
 		tracelog.ErrorLogger.FatalOnError(err)
-		storagetools.HandleCheckRead(folder, args)
 	},
 }
 
@@ -28,9 +30,10 @@ var checkWriteCmd = &cobra.Command{
 	Short: "check write access to the storage",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
+		err := multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
+			return storagetools.HandleCheckWrite(folder)
+		})
 		tracelog.ErrorLogger.FatalOnError(err)
-		storagetools.HandleCheckWrite(folder)
 	},
 }
 

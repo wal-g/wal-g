@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/wal-g/wal-g/internal/limiters"
+
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -27,67 +29,70 @@ const (
 	MONGO     = "MONGO"
 	GP        = "GP"
 
-	DownloadConcurrencySetting   = "WALG_DOWNLOAD_CONCURRENCY"
-	UploadConcurrencySetting     = "WALG_UPLOAD_CONCURRENCY"
-	UploadDiskConcurrencySetting = "WALG_UPLOAD_DISK_CONCURRENCY"
-	UploadQueueSetting           = "WALG_UPLOAD_QUEUE"
-	SentinelUserDataSetting      = "WALG_SENTINEL_USER_DATA"
-	PreventWalOverwriteSetting   = "WALG_PREVENT_WAL_OVERWRITE"
-	UploadWalMetadata            = "WALG_UPLOAD_WAL_METADATA"
-	DeltaMaxStepsSetting         = "WALG_DELTA_MAX_STEPS"
-	DeltaOriginSetting           = "WALG_DELTA_ORIGIN"
-	CompressionMethodSetting     = "WALG_COMPRESSION_METHOD"
-	StoragePrefixSetting         = "WALG_STORAGE_PREFIX"
-	DiskRateLimitSetting         = "WALG_DISK_RATE_LIMIT"
-	NetworkRateLimitSetting      = "WALG_NETWORK_RATE_LIMIT"
-	UseWalDeltaSetting           = "WALG_USE_WAL_DELTA"
-	UseReverseUnpackSetting      = "WALG_USE_REVERSE_UNPACK"
-	SkipRedundantTarsSetting     = "WALG_SKIP_REDUNDANT_TARS"
-	VerifyPageChecksumsSetting   = "WALG_VERIFY_PAGE_CHECKSUMS"
-	StoreAllCorruptBlocksSetting = "WALG_STORE_ALL_CORRUPT_BLOCKS"
-	UseRatingComposerSetting     = "WALG_USE_RATING_COMPOSER"
-	UseCopyComposerSetting       = "WALG_USE_COPY_COMPOSER"
-	UseDatabaseComposerSetting   = "WALG_USE_DATABASE_COMPOSER"
-	WithoutFilesMetadataSetting  = "WALG_WITHOUT_FILES_METADATA"
-	DeltaFromNameSetting         = "WALG_DELTA_FROM_NAME"
-	DeltaFromUserDataSetting     = "WALG_DELTA_FROM_USER_DATA"
-	FetchTargetUserDataSetting   = "WALG_FETCH_TARGET_USER_DATA"
-	LogLevelSetting              = "WALG_LOG_LEVEL"
-	TarSizeThresholdSetting      = "WALG_TAR_SIZE_THRESHOLD"
-	TarDisableFsyncSetting       = "WALG_TAR_DISABLE_FSYNC"
-	CseKmsIDSetting              = "WALG_CSE_KMS_ID"
-	CseKmsRegionSetting          = "WALG_CSE_KMS_REGION"
-	LibsodiumKeySetting          = "WALG_LIBSODIUM_KEY"
-	LibsodiumKeyPathSetting      = "WALG_LIBSODIUM_KEY_PATH"
-	LibsodiumKeyTransform        = "WALG_LIBSODIUM_KEY_TRANSFORM"
-	GpgKeyIDSetting              = "GPG_KEY_ID"
-	PgpKeySetting                = "WALG_PGP_KEY"
-	PgpKeyPathSetting            = "WALG_PGP_KEY_PATH"
-	PgpKeyPassphraseSetting      = "WALG_PGP_KEY_PASSPHRASE"
-	PgDataSetting                = "PGDATA"
-	UserSetting                  = "USER" // TODO : do something with it
-	PgPortSetting                = "PGPORT"
-	PgUserSetting                = "PGUSER"
-	PgHostSetting                = "PGHOST"
-	PgPasswordSetting            = "PGPASSWORD"
-	PgPassfileSetting            = "PGPASSFILE"
-	PgDatabaseSetting            = "PGDATABASE"
-	PgSslModeSetting             = "PGSSLMODE"
-	PgSlotName                   = "WALG_SLOTNAME"
-	PgWalSize                    = "WALG_PG_WAL_SIZE"
-	TotalBgUploadedLimit         = "TOTAL_BG_UPLOADED_LIMIT"
-	NameStreamCreateCmd          = "WALG_STREAM_CREATE_COMMAND"
-	NameStreamRestoreCmd         = "WALG_STREAM_RESTORE_COMMAND"
-	MaxDelayedSegmentsCount      = "WALG_INTEGRITY_MAX_DELAYED_WALS"
-	PrefetchDir                  = "WALG_PREFETCH_DIR"
-	PgReadyRename                = "PG_READY_RENAME"
-	SerializerTypeSetting        = "WALG_SERIALIZER_TYPE"
-	StreamSplitterPartitions     = "WALG_STREAM_SPLITTER_PARTITIONS"
-	StreamSplitterBlockSize      = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
-	StreamSplitterMaxFileSize    = "WALG_STREAM_SPLITTER_MAX_FILE_SIZE"
-	StatsdAddressSetting         = "WALG_STATSD_ADDRESS"
-	PgAliveCheckInterval         = "WALG_ALIVE_CHECK_INTERVAL"
-	PgStopBackupTimeout          = "WALG_STOP_BACKUP_TIMEOUT"
+	DownloadConcurrencySetting     = "WALG_DOWNLOAD_CONCURRENCY"
+	UploadConcurrencySetting       = "WALG_UPLOAD_CONCURRENCY"
+	UploadDiskConcurrencySetting   = "WALG_UPLOAD_DISK_CONCURRENCY"
+	UploadQueueSetting             = "WALG_UPLOAD_QUEUE"
+	SentinelUserDataSetting        = "WALG_SENTINEL_USER_DATA"
+	PreventWalOverwriteSetting     = "WALG_PREVENT_WAL_OVERWRITE"
+	UploadWalMetadata              = "WALG_UPLOAD_WAL_METADATA"
+	DeltaMaxStepsSetting           = "WALG_DELTA_MAX_STEPS"
+	DeltaOriginSetting             = "WALG_DELTA_ORIGIN"
+	CompressionMethodSetting       = "WALG_COMPRESSION_METHOD"
+	StoragePrefixSetting           = "WALG_STORAGE_PREFIX"
+	DiskRateLimitSetting           = "WALG_DISK_RATE_LIMIT"
+	NetworkRateLimitSetting        = "WALG_NETWORK_RATE_LIMIT"
+	UseWalDeltaSetting             = "WALG_USE_WAL_DELTA"
+	UseReverseUnpackSetting        = "WALG_USE_REVERSE_UNPACK"
+	SkipRedundantTarsSetting       = "WALG_SKIP_REDUNDANT_TARS"
+	VerifyPageChecksumsSetting     = "WALG_VERIFY_PAGE_CHECKSUMS"
+	StoreAllCorruptBlocksSetting   = "WALG_STORE_ALL_CORRUPT_BLOCKS"
+	UseRatingComposerSetting       = "WALG_USE_RATING_COMPOSER"
+	UseCopyComposerSetting         = "WALG_USE_COPY_COMPOSER"
+	UseDatabaseComposerSetting     = "WALG_USE_DATABASE_COMPOSER"
+	WithoutFilesMetadataSetting    = "WALG_WITHOUT_FILES_METADATA"
+	DeltaFromNameSetting           = "WALG_DELTA_FROM_NAME"
+	DeltaFromUserDataSetting       = "WALG_DELTA_FROM_USER_DATA"
+	FetchTargetUserDataSetting     = "WALG_FETCH_TARGET_USER_DATA"
+	LogLevelSetting                = "WALG_LOG_LEVEL"
+	TarSizeThresholdSetting        = "WALG_TAR_SIZE_THRESHOLD"
+	TarDisableFsyncSetting         = "WALG_TAR_DISABLE_FSYNC"
+	CseKmsIDSetting                = "WALG_CSE_KMS_ID"
+	CseKmsRegionSetting            = "WALG_CSE_KMS_REGION"
+	LibsodiumKeySetting            = "WALG_LIBSODIUM_KEY"
+	LibsodiumKeyPathSetting        = "WALG_LIBSODIUM_KEY_PATH"
+	LibsodiumKeyTransform          = "WALG_LIBSODIUM_KEY_TRANSFORM"
+	GpgKeyIDSetting                = "GPG_KEY_ID"
+	PgpKeySetting                  = "WALG_PGP_KEY"
+	PgpKeyPathSetting              = "WALG_PGP_KEY_PATH"
+	PgpKeyPassphraseSetting        = "WALG_PGP_KEY_PASSPHRASE"
+	PgDataSetting                  = "PGDATA"
+	UserSetting                    = "USER" // TODO : do something with it
+	PgPortSetting                  = "PGPORT"
+	PgUserSetting                  = "PGUSER"
+	PgHostSetting                  = "PGHOST"
+	PgPasswordSetting              = "PGPASSWORD"
+	PgPassfileSetting              = "PGPASSFILE"
+	PgDatabaseSetting              = "PGDATABASE"
+	PgSslModeSetting               = "PGSSLMODE"
+	PgSlotName                     = "WALG_SLOTNAME"
+	PgWalSize                      = "WALG_PG_WAL_SIZE"
+	TotalBgUploadedLimit           = "TOTAL_BG_UPLOADED_LIMIT"
+	NameStreamCreateCmd            = "WALG_STREAM_CREATE_COMMAND"
+	NameStreamRestoreCmd           = "WALG_STREAM_RESTORE_COMMAND"
+	MaxDelayedSegmentsCount        = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir                    = "WALG_PREFETCH_DIR"
+	PgReadyRename                  = "PG_READY_RENAME"
+	SerializerTypeSetting          = "WALG_SERIALIZER_TYPE"
+	StreamSplitterPartitions       = "WALG_STREAM_SPLITTER_PARTITIONS"
+	StreamSplitterBlockSize        = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
+	StreamSplitterMaxFileSize      = "WALG_STREAM_SPLITTER_MAX_FILE_SIZE"
+	StatsdAddressSetting           = "WALG_STATSD_ADDRESS"
+	PgAliveCheckInterval           = "WALG_ALIVE_CHECK_INTERVAL"
+	PgStopBackupTimeout            = "WALG_STOP_BACKUP_TIMEOUT"
+	PgFailoverStorages             = "WALG_FAILOVER_STORAGES"
+	PgFailoverStoragesCheckTimeout = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
+	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -186,29 +191,31 @@ var (
 	defaultConfigValues map[string]string
 
 	commonDefaultConfigValues = map[string]string{
-		DownloadConcurrencySetting:   "10",
-		UploadConcurrencySetting:     "16",
-		UploadDiskConcurrencySetting: "1",
-		UploadQueueSetting:           "2",
-		PreventWalOverwriteSetting:   "false",
-		UploadWalMetadata:            "NOMETADATA",
-		DeltaMaxStepsSetting:         "0",
-		CompressionMethodSetting:     "lz4",
-		UseWalDeltaSetting:           "false",
-		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
-		TarDisableFsyncSetting:       "false",
-		TotalBgUploadedLimit:         "32",
-		UseReverseUnpackSetting:      "false",
-		SkipRedundantTarsSetting:     "false",
-		VerifyPageChecksumsSetting:   "false",
-		StoreAllCorruptBlocksSetting: "false",
-		UseRatingComposerSetting:     "false",
-		UseCopyComposerSetting:       "false",
-		UseDatabaseComposerSetting:   "false",
-		WithoutFilesMetadataSetting:  "false",
-		MaxDelayedSegmentsCount:      "0",
-		SerializerTypeSetting:        "json_default",
-		LibsodiumKeyTransform:        "none",
+		DownloadConcurrencySetting:     "10",
+		UploadConcurrencySetting:       "16",
+		UploadDiskConcurrencySetting:   "1",
+		UploadQueueSetting:             "2",
+		PreventWalOverwriteSetting:     "false",
+		UploadWalMetadata:              "NOMETADATA",
+		DeltaMaxStepsSetting:           "0",
+		CompressionMethodSetting:       "lz4",
+		UseWalDeltaSetting:             "false",
+		TarSizeThresholdSetting:        "1073741823", // (1 << 30) - 1
+		TarDisableFsyncSetting:         "false",
+		TotalBgUploadedLimit:           "32",
+		UseReverseUnpackSetting:        "false",
+		SkipRedundantTarsSetting:       "false",
+		VerifyPageChecksumsSetting:     "false",
+		StoreAllCorruptBlocksSetting:   "false",
+		UseRatingComposerSetting:       "false",
+		UseCopyComposerSetting:         "false",
+		UseDatabaseComposerSetting:     "false",
+		WithoutFilesMetadataSetting:    "false",
+		MaxDelayedSegmentsCount:        "0",
+		SerializerTypeSetting:          "json_default",
+		LibsodiumKeyTransform:          "none",
+		PgFailoverStoragesCheckTimeout: "30s",
+		PgFailoverStorageCacheLifetime: "15m",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -377,21 +384,24 @@ var (
 
 	PGAllowedSettings = map[string]bool{
 		// Postgres
-		PgPortSetting:        true,
-		PgUserSetting:        true,
-		PgHostSetting:        true,
-		PgDataSetting:        true,
-		PgPasswordSetting:    true,
-		PgPassfileSetting:    true,
-		PgDatabaseSetting:    true,
-		PgSslModeSetting:     true,
-		PgSlotName:           true,
-		PgWalSize:            true,
-		PrefetchDir:          true,
-		PgReadyRename:        true,
-		PgBackRestStanza:     true,
-		PgAliveCheckInterval: true,
-		PgStopBackupTimeout:  true,
+		PgPortSetting:                  true,
+		PgUserSetting:                  true,
+		PgHostSetting:                  true,
+		PgDataSetting:                  true,
+		PgPasswordSetting:              true,
+		PgPassfileSetting:              true,
+		PgDatabaseSetting:              true,
+		PgSslModeSetting:               true,
+		PgSlotName:                     true,
+		PgWalSize:                      true,
+		PrefetchDir:                    true,
+		PgReadyRename:                  true,
+		PgBackRestStanza:               true,
+		PgAliveCheckInterval:           true,
+		PgStopBackupTimeout:            true,
+		PgFailoverStorages:             true,
+		PgFailoverStoragesCheckTimeout: true,
+		PgFailoverStorageCacheLifetime: true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -484,6 +494,10 @@ var (
 		SQLServerConnectionString:    true,
 		SSHPassword:                  true,
 		SwiftOsPassword:              true,
+	}
+
+	complexSettings = map[string]bool{
+		PgFailoverStorages: true,
 	}
 )
 
@@ -809,10 +823,42 @@ func bindConfigToEnv(globalViper *viper.Viper) {
 			continue
 		}
 
+		if complexSettings[k] {
+			continue
+		}
+
 		err := os.Setenv(k, val)
 		if err != nil {
 			err = errors.Wrap(err, "Failed to bind config to env variable")
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	}
+}
+
+func InitFailoverStorages() (res map[string]storage.Folder, err error) {
+	storages := viper.GetStringMap(PgFailoverStorages)
+
+	if len(storages) == 0 {
+		return nil, nil
+	}
+
+	res = make(map[string]storage.Folder, 0)
+	for name := range storages {
+		if name == "default" {
+			return nil, fmt.Errorf("'%s' storage name is reserved", name)
+		}
+		cfg := viper.Sub(PgFailoverStorages + "." + name)
+		folder, err := ConfigureFolderForSpecificConfig(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failover storage %s: %v", name, err)
+		}
+		if limiters.NetworkLimiter != nil {
+			folder = NewLimitedFolder(folder, limiters.NetworkLimiter)
+		}
+
+		folder = ConfigureStoragePrefix(folder)
+		res[name] = folder
+	}
+
+	return res, nil
 }

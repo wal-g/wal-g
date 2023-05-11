@@ -97,7 +97,7 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, n
 	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
 
 	uploader := &SplitStreamUploader{
-		Uploader:    NewUploader(compressor, storageFolder),
+		Uploader:    NewRegularUploader(compressor, storageFolder),
 		partitions:  partitions,
 		blockSize:   blockSize,
 		maxFileSize: maxFileSize,
