@@ -2,6 +2,8 @@ package functests
 
 import (
 	"fmt"
+	"time"
+	"strings"
 
 	"github.com/cucumber/godog"
 	"github.com/wal-g/tracelog"
@@ -13,6 +15,8 @@ func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext
 	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
 	ctx.Step(`^we restore initialized binary mongo-backup #(\d+) to ([^\s]+)`,
 		tctx.restoreMongoBinaryBackupAsInitialized)
+	ctx.Step(`^we restore rs from binary mongo-backup #(\d+) to ([^\s]+)$`,
+		tctx.restoreMongoReplSetBinaryBackupAsNonInitialized)
 }
 
 func (tctx *TestContext) createMongoBinaryBackup(container string) error {
@@ -69,13 +73,11 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		return err
 	}
 
-	rsName := ""
 	rsMembers := ""
 	if initialized {
-		rsName = container
 		rsMembers = fmt.Sprintf("%s:%d", container, mc.GetMongodPort())
 	}
-	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsName, rsMembers)
+	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, "rs01", rsMembers)
 	if err != nil {
 		return err
 	}
@@ -95,6 +97,90 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 	} else {
 		tracelog.DebugLogger.Println("Skip initiateReplSet")
 	}
+
+	return nil
+}
+
+
+func (tctx *TestContext) restoreMongoReplSetBinaryBackupAsNonInitialized(backupNumber int, containers string) error {
+	containerNames := strings.Split(containers, ",")
+	return tctx.restoreMongoReplSetBinaryBackup(backupNumber, containerNames)
+}
+
+func (tctx *TestContext) restoreMongoReplSetBinaryBackup(backupNumber int, containerNames []string) error {
+	var walgList []*helpers.WalgUtil
+	var mongoCtlList []*helpers.MongoCtl
+
+	if len(containerNames) == 0 {
+		return fmt.Errorf("invalid count containers")
+	}
+
+	for _, container := range containerNames {
+		walg := WalgUtilFromTestContext(tctx, container)
+		walgList = append(walgList, walg)
+
+		mongoCtl, err := MongoCtlFromTestContext(tctx, container)
+		if err != nil {
+			return err
+		}
+		mongoCtlList = append(mongoCtlList, mongoCtl)
+	}
+
+	backupName, err := walgList[0].GetBackupByNumber(backupNumber)
+	if err != nil {
+		return err
+	}
+
+	configPath, err := mongoCtlList[0].GetConfigPath()
+	if err != nil {
+		return err
+	}
+
+	mongodbVersion, err := mongoCtlList[0].GetVersion()
+	if err != nil {
+		return err
+	}
+
+	for _, mongoCtl := range mongoCtlList {
+		err := mongoCtl.StopMongod()
+		if err != nil {
+			return err
+		}
+	}
+
+	var rsMemberList []string
+	for i, mongoCtl := range mongoCtlList {
+		rsMember := fmt.Sprintf("%s:%d", containerNames[i], mongoCtl.GetMongodPort())
+		rsMemberList = append(rsMemberList, rsMember)
+	}
+
+	rsMembers := strings.Join(rsMemberList, ",")
+
+	for _, walg := range walgList {
+		err := walg.FetchBinaryBackup(backupName, configPath, mongodbVersion, "rs01", rsMembers)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, mongoCtl := range mongoCtlList {
+		if err := mongoCtl.ChownDBPath(); err != nil {
+			return err
+		}
+
+		if err := mongoCtl.StartMongod(); err != nil {
+			return err
+		}
+	}
+
+	for _, container := range containerNames {
+		if err := tctx.initiateReplSet(container); err != nil {
+			return err
+		}
+	}
+
+	// time for sync
+	time.Sleep(time.Second * 20)
 
 	return nil
 }

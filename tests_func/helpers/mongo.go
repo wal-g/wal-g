@@ -534,12 +534,34 @@ func (mc *MongoCtl) StartMongod() error {
 	return err
 }
 
+
+func (mc *MongoCtl) FetchLogs(text string) (string, error) {
+	exc, err := mc.runCmd("grep", fmt.Sprintf("\"%s\"", text), "/var/log/mongodb/mongod.log")
+	tracelog.ErrorLogger.Printf("Command failed %s", exc.Stderr())
+
+	if err != nil{
+		if exc.ExitCode == 1 {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return exc.Stdout(), err
+}
+
+
 func (mc *MongoCtl) PurgeDatadir() error {
+	_, err := mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
+	return err
+}
+
+
+func (mc *MongoCtl) ResetMongod() error {
 	err := mc.StopMongod()
 	if err != nil {
 		return err
 	}
-	_, err = mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
+	err = mc.PurgeDatadir()
 	if err != nil {
 		return err
 	}
