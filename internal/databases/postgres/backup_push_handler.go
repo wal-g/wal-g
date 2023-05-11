@@ -22,6 +22,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const (
+	// TODO find a suitable place
+	DeltaBackupDelimiter = "_D_"
+)
+
 type backupFromFuture struct {
 	error
 }
@@ -210,7 +215,7 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 					"Fallback to full scan delta backup\n", err)
 			}
 		}
-		bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + "_D_" + utility.StripWalFileName(bh.prevBackupInfo.name)
+		bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + DeltaBackupDelimiter + utility.StripWalFileName(bh.prevBackupInfo.name)
 		tracelog.DebugLogger.Printf("Suffixing Backup name with Delta info: %s", bh.CurBackupInfo.Name)
 	}
 }
