@@ -41,7 +41,7 @@ var (
 )
 
 func init() {
-	binlogFetchCmd.Flags().StringVar(&BinlogBackupName, "since", "LATEST", binlogSinceFlagShortDescr)
+	binlogServerCmd.Flags().StringVar(&BinlogBackupName, "since", "LATEST", binlogSinceFlagShortDescr)
 	binlogServerCmd.Flags().StringVar(&untilTS,
 		"until",
 		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
