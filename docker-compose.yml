@@ -35,6 +35,7 @@ services:
       &&  mkdir -p /export/fullcopycomposerbucket
       &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
+      &&  mkdir -p /export/failoverstoragebucket
       &&  mkdir -p /export/partialbucket
       &&  mkdir -p /export/remotebucket
       &&  mkdir -p /export/remotewithoutfilesmetadatabucket
@@ -264,6 +265,17 @@ services:
       context: .
     image: wal-g/full_backup_test
     container_name: wal-g_pg_full_backup_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_full_backup_failover_storage_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_full_backup_failover_storages_test
+      context: .
+    image: wal-g/full_backup_failover_storage_test
+    container_name: wal-g_pg_full_backup_failover_storage_test
     depends_on:
       - s3
     links:

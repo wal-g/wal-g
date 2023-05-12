@@ -2,6 +2,7 @@ package storagetools
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -13,20 +14,28 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleGetObject(objectPath, dstPath string, folder storage.Folder, decrypt, decompress bool) {
+func HandleGetObject(objectPath, dstPath string, folder storage.Folder, decrypt, decompress bool) error {
 	fileName := path.Base(objectPath)
 	targetPath, err := getTargetFilePath(dstPath, fileName)
-	tracelog.ErrorLogger.FatalfOnError("Failed to determine the destination path: %v", err)
+	if err != nil {
+		return fmt.Errorf("determine the destination path: %v", err)
+	}
 
 	dstFile, err := os.OpenFile(targetPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0640)
-	tracelog.ErrorLogger.FatalfOnError("Failed to open the destination file: %v", err)
+	if err != nil {
+		return fmt.Errorf("open the destination file: %v", err)
+	}
 
 	err = downloadObject(objectPath, folder, dstFile, decrypt, decompress)
 	dstFile.Close()
 	if err != nil {
 		os.Remove(targetPath)
-		tracelog.ErrorLogger.Fatalf("Failed to download the file: %v", err)
+		if err != nil {
+			return fmt.Errorf("download the file: %v", err)
+		}
 	}
+
+	return nil
 }
 
 func getTargetFilePath(dstPath string, fileName string) (string, error) {

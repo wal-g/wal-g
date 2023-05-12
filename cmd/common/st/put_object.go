@@ -4,7 +4,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/storagetools"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -28,7 +30,10 @@ var putObjectCmd = &cobra.Command{
 		localPath := args[0]
 		dstPath := args[1]
 
-		storagetools.HandlePutObject(localPath, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
+		err = multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
+			return storagetools.HandlePutObject(localPath, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
+		})
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
