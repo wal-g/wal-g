@@ -82,9 +82,6 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	rotateBinlogEvent.RawData[binlogEventPos] = 0
 	binlogEventPos++
 
-	// mysql use zlib's CRC32 implementation, which uses polynomial 0xedb88320UL.
-	// reference: https://github.com/madler/zlib/blob/master/crc32.c
-	// https://github.com/madler/zlib/blob/master/doc/rfc1952.txt#L419
 	checksum := crc32.ChecksumIEEE(rotateBinlogEvent.RawData[0 : replication.EventHeaderSize+messageBodySize])
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], checksum)
 
@@ -225,20 +222,20 @@ func (h Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication
 func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 	switch strings.ToLower(query) {
 	case "select @master_binlog_checksum":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"master_binlog_checksum"}, [][]interface{}{{"NONE"}})
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"master_binlog_checksum"}, [][]interface{}{{"CRC32"}})
+		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+	case "select @source_binlog_checksum":
+		// "1" - CRC algorithm from zlib
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"source_binlog_checksum"}, [][]interface{}{{"1"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "show global variables like 'binlog_checksum'":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"NONE"}})
+		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"CRC32"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.server_id":
 		serverID, err := internal.GetRequiredSetting(internal.MysqlBinlogServerID)
 		tracelog.ErrorLogger.FatalOnError(err)
 		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{serverID}})
 		tracelog.ErrorLogger.FatalOnError(err)
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
-	case "select @source_binlog_checksum":
-		// "1" - CRC algorithm from zlib
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"source_binlog_checksum"}, [][]interface{}{{"1"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.gtid_mode":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"GTID_MODE"}, [][]interface{}{{"ON"}})
