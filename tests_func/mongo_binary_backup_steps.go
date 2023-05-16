@@ -2,13 +2,21 @@ package functests
 
 import (
 	"fmt"
-	"time"
 	"strings"
 
 	"github.com/cucumber/godog"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 )
+
+type FetchBinaryBackupArgs struct {
+	backupName string
+	configPath string
+	mongodbVersion string
+	rsName string
+	rsMembers string
+}
+
 
 func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*)$`, tctx.createMongoBinaryBackup)
@@ -107,6 +115,36 @@ func (tctx *TestContext) restoreMongoReplSetBinaryBackupAsNonInitialized(backupN
 	return tctx.restoreMongoReplSetBinaryBackup(backupNumber, containerNames)
 }
 
+
+func buildFetchBinaryBackupArgs(walgList []*helpers.WalgUtil, mongoCtlList []*helpers.MongoCtl, backupNumber int, containerNames []string) (args FetchBinaryBackupArgs, err error) {	
+	args.backupName, err = walgList[0].GetBackupByNumber(backupNumber)
+	if err != nil {
+		return
+	}
+
+	args.configPath, err = mongoCtlList[0].GetConfigPath()
+	if err != nil {
+		return
+	}
+
+	args.mongodbVersion, err = mongoCtlList[0].GetVersion()
+	if err != nil {
+		return
+	}
+
+	var rsMemberList []string
+	for i, mongoCtl := range mongoCtlList {
+		rsMember := fmt.Sprintf("%s:%d", containerNames[i], mongoCtl.GetMongodPort())
+		rsMemberList = append(rsMemberList, rsMember)
+	}
+
+	args.rsMembers = strings.Join(rsMemberList, ",")
+
+	args.rsName = "rs01"
+
+	return
+}
+
 func (tctx *TestContext) restoreMongoReplSetBinaryBackup(backupNumber int, containerNames []string) error {
 	var walgList []*helpers.WalgUtil
 	var mongoCtlList []*helpers.MongoCtl
@@ -126,17 +164,7 @@ func (tctx *TestContext) restoreMongoReplSetBinaryBackup(backupNumber int, conta
 		mongoCtlList = append(mongoCtlList, mongoCtl)
 	}
 
-	backupName, err := walgList[0].GetBackupByNumber(backupNumber)
-	if err != nil {
-		return err
-	}
-
-	configPath, err := mongoCtlList[0].GetConfigPath()
-	if err != nil {
-		return err
-	}
-
-	mongodbVersion, err := mongoCtlList[0].GetVersion()
+	args, err := buildFetchBinaryBackupArgs(walgList, mongoCtlList, backupNumber, containerNames)
 	if err != nil {
 		return err
 	}
@@ -148,16 +176,8 @@ func (tctx *TestContext) restoreMongoReplSetBinaryBackup(backupNumber int, conta
 		}
 	}
 
-	var rsMemberList []string
-	for i, mongoCtl := range mongoCtlList {
-		rsMember := fmt.Sprintf("%s:%d", containerNames[i], mongoCtl.GetMongodPort())
-		rsMemberList = append(rsMemberList, rsMember)
-	}
-
-	rsMembers := strings.Join(rsMemberList, ",")
-
 	for _, walg := range walgList {
-		err := walg.FetchBinaryBackup(backupName, configPath, mongodbVersion, "rs01", rsMembers)
+		err := walg.FetchBinaryBackup(args.backupName, args.configPath, args.mongodbVersion, args.rsName, args.rsMembers)
 		if err != nil {
 			return err
 		}
@@ -172,15 +192,6 @@ func (tctx *TestContext) restoreMongoReplSetBinaryBackup(backupNumber int, conta
 			return err
 		}
 	}
-
-	for _, container := range containerNames {
-		if err := tctx.initiateReplSet(container); err != nil {
-			return err
-		}
-	}
-
-	// time for sync
-	time.Sleep(time.Second * 20)
 
 	return nil
 }

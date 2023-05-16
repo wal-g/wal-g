@@ -78,6 +78,17 @@ type OpTime struct {
 	Term int64               `bson:"t" json:"t"`
 }
 
+type Member struct {
+	Optime OpTime `bson:"optime"`
+}
+
+type RsStatus struct {
+	Optimes struct {
+		LastCommittedOpTime OpTime `bson:"lastCommittedOpTime"`
+	} `bson:"optimes"`
+	Members []Member `bson:"members"`
+}
+
 // IsMasterLastWrite ...
 type IsMasterLastWrite struct {
 	OpTime         OpTime `bson:"opTime"`
@@ -466,6 +477,19 @@ func (mc *MongoCtl) GetConfigPath() (string, error) {
 	return getCmdLineOpts.Parsed.Config, nil
 }
 
+func (mc *MongoCtl) GetRsStatus() (rsStatus RsStatus, err error) {
+	adminConnect, err := mc.AdminConnect()
+	if err != nil {
+		return
+	}
+	err = adminConnect.Database("admin").RunCommand(mc.ctx, bson.M{"replSetGetStatus": 1}).Decode(&rsStatus)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (mc *MongoCtl) EnableAuth() error {
 	eval := fmt.Sprintf("db.createUser({user: '%s', pwd: '%s', roles: ['root']})",
 		mc.adminCreds.Username,
@@ -535,11 +559,13 @@ func (mc *MongoCtl) StartMongod() error {
 }
 
 
-func (mc *MongoCtl) FetchLogs(text string) (string, error) {
+func (mc *MongoCtl) GrepLogs(text string) (string, error) {
 	exc, err := mc.runCmd("grep", fmt.Sprintf("\"%s\"", text), "/var/log/mongodb/mongod.log")
-	tracelog.ErrorLogger.Printf("Command failed %s", exc.Stderr())
 
 	if err != nil{
+		tracelog.ErrorLogger.Printf("Command failed %s", exc.Stderr())
+
+		// grep return exit code 1 for empty result
 		if exc.ExitCode == 1 {
 			return "", nil
 		}

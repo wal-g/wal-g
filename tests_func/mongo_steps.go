@@ -19,6 +19,7 @@ import (
 func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^a working mongodb on ([^\s]*)$`, tctx.testMongoConnect)
 	ctx.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
+	ctx.Step(`^mongodb replset is synchronized on ([^\s]*)$`, tctx.waitSecondariesSync)
 	ctx.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isMongoPrimary)
 	ctx.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.mongoEnableAuth)
 	ctx.Step(`^mongodb initialized on ([^\s]*)$`, tctx.mongoInit)
@@ -56,7 +57,7 @@ func SetupMongodbLogicalSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
 
-	ctx.Step(`^mongodb not has initial sync on ([^\s]+)$`, tctx.checkInitialSync)
+	ctx.Step(`^mongodb doesn't have initial sync on ([^\s]+)$`, tctx.checkInitialSync)
 }
 
 func (tctx *TestContext) createMongoBackup(container string) error {
@@ -455,7 +456,7 @@ func (tctx *TestContext) checkInitialSync(container string) error {
 	markersOfInitialSync := []string {"Initial sync required", "Initial sync started"}
 
 	for _, text := range markersOfInitialSync {
-		logs, err := mongoCtl.FetchLogs(text)
+		logs, err := mongoCtl.GrepLogs(text)
 		if err != nil {
 			return err
 		}
@@ -465,4 +466,48 @@ func (tctx *TestContext) checkInitialSync(container string) error {
 	}
 
 	return nil
+}
+
+
+func (tctx *TestContext) waitSecondariesSync(containers string) error {
+	containerNames := strings.Split(containers, ",")
+	var mongoCtlList []*helpers.MongoCtl
+	var masterId int
+
+	if len(containerNames) < 2 {
+		return fmt.Errorf("invalid count containers")
+	}
+
+	for _, container := range containerNames {
+		mongoCtl, err := MongoCtlFromTestContext(tctx, container)
+		if err != nil {
+			return err
+		}
+		mongoCtlList = append(mongoCtlList, mongoCtl)
+	}
+
+	for i, mongoCtl := range mongoCtlList {
+		isMaster, err := mongoCtl.IsMaster()
+		if err != nil {
+			return err
+		}
+		if isMaster {
+			masterId = i
+		}
+	}
+
+	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+		rsStatus, err := mongoCtlList[masterId].GetRsStatus()
+
+		if err != nil {
+			return err
+		}
+
+		for _, member := range rsStatus.Members {
+			if rsStatus.Optimes.LastCommittedOpTime != member.Optime {
+				return fmt.Errorf("mongos is not synchronized")
+			}
+		}
+		return nil
+	})
 }

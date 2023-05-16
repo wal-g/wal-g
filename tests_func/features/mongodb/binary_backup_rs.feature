@@ -17,8 +17,9 @@ Feature: MongoDB binary restore replSet
     And mongodb initialized on mongodb02
     And mongodb initialized on mongodb01
     When we restore rs from binary mongo-backup #0 to mongodb01,mongodb02
-    Then mongodb not has initial sync on mongodb01
-    And mongodb not has initial sync on mongodb02
+    And mongodb replset is synchronized on mongodb01,mongodb02
+    Then mongodb doesn't have initial sync on mongodb01
+    And mongodb doesn't have initial sync on mongodb02
 
     # Create backup for checking
     When we create binary mongo-backup on mongodb01
