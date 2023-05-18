@@ -177,7 +177,7 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 		tracelog.DebugLogger.Printf("Previous backup: %s\nBackup start LSN: %d", bh.prevBackupInfo.name,
 			bh.prevBackupInfo.sentinelDto.BackupStartLSN)
 		if *bh.prevBackupInfo.sentinelDto.BackupFinishLSN > bh.CurBackupInfo.startLSN {
-			tracelog.InfoLogger.Printf("Finish LSN of backup %v greater than current LSN", bh.prevBackupInfo.name)
+			tracelog.InfoLogger.Printf("Backup not completed: finish LSN of backup %v greater than current LSN", bh.prevBackupInfo.name)
 			tracelog.InfoLogger.Println("There may have been no changes since the previous backup")
 			os.Exit(0)
 		}
