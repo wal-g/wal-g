@@ -22,18 +22,6 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type backupFromFuture struct {
-	error
-}
-
-func newBackupFromFuture(backupName string) backupFromFuture {
-	return backupFromFuture{errors.Errorf("Finish LSN of backup %v greater than current LSN", backupName)}
-}
-
-func (err backupFromFuture) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 type backupFromOtherBD struct {
 	error
 }
@@ -189,7 +177,9 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 		tracelog.DebugLogger.Printf("Previous backup: %s\nBackup start LSN: %d", bh.prevBackupInfo.name,
 			bh.prevBackupInfo.sentinelDto.BackupStartLSN)
 		if *bh.prevBackupInfo.sentinelDto.BackupFinishLSN > bh.CurBackupInfo.startLSN {
-			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(bh.prevBackupInfo.name))
+			tracelog.InfoLogger.Printf("Finish LSN of backup %v greater than current LSN", bh.prevBackupInfo.name)
+			tracelog.InfoLogger.Println("There may have been no changes since the previous backup")
+			os.Exit(0)
 		}
 		if bh.prevBackupInfo.sentinelDto.SystemIdentifier != nil &&
 			bh.PgInfo.systemIdentifier != nil &&
