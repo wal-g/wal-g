@@ -7,7 +7,7 @@ import (
 
 const (
 	copyName             = "backup-copy"
-	copyShortDescription = "copy specific or all backups"
+	copyShortDescription = "Copy specific or all backups"
 
 	copyAllFlag         = "all"
 	copyAllSDescription = "copy all backups"
