@@ -7,6 +7,7 @@ Configuration
 WAL-G for Greenplum understands the basic configuration options that are [supported by the WAL-G for Postgres](PostgreSQL.md#Configuration), except the advanced features such as delta backups, remote backups, catchup backup, etc.
 
 To configure the backups, the user needs to do two things on each segment host:
+
 1. Create the [configuration file](Greenplum.md#configuration-file)
 2. Configure the [WAL archiving](Greenplum.md#wal-archiving)
 

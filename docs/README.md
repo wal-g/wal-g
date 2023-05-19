@@ -49,6 +49,15 @@ WAL-G supports bash and zsh autocompletion. Run `wal-g help completion` for more
 
 Configuration
 -------------
+
+There are two ways how you can configure WAL-G:
+
+1. Using environment variables
+2. Using a YAML config file
+   `--config /path` flag can be used to specify the path where the config file is located.
+
+Every configuration variable mentioned in the following documentation can be specified either as an environment variable or a field in the config file.
+
 ### Storage
 To configure where WAL-G stores backups, please consult the [Storages](STORAGES.md) section.
 
@@ -233,7 +242,9 @@ Optional:
 - To build with libsodium, set the `USE_LIBSODIUM` environment variable.
 - To build with lzo decompressor, set the `USE_LZO` environment variable.
 
-### Ubuntu
+### Installing
+
+#### Ubuntu
 
 ```sh
 # Install latest Go compiler
@@ -263,7 +274,7 @@ make deps
 GOBIN=/usr/local/bin make pg_install
 ```
 
-### macOS
+#### macOS
 
 ```sh
 # brew command is Homebrew for Mac OS
@@ -277,7 +288,7 @@ make install_and_build_pg
 
 To build on ARM64, set the corresponding `GOOS`/`GOARCH` environment variables:
 ```
-env GOOS=darwin GOARCH=arm64 make pg_build
+env GOOS=darwin GOARCH=arm64 make install_and_build_pg
 ```
 
 The compiled binary to run is `main/pg/wal-g`
@@ -299,6 +310,7 @@ export USE_BROTLI=1
 make coverage
 ```
 This command generates `coverage.out` file and opens HTML representation of the coverage.
+
 ### Development on Windows
 
 [Information about installing and usage](Windows.md)

@@ -2,10 +2,13 @@ site_name: WAL-G
 nav:
     - Overview: README.md
     - Storages: STORAGES.md
+    - Storage Tools: StorageTools.md
     - Foundation DB: FoundationDB.md
+    - Greenplum: Greenplum.md
     - Mongo DB: MongoDB.md
     - MySQL: MySQL.md
     - PostgreSQL: PostgreSQL.md
+    - Redis: Redis.md
     - SQLServer: SQLServer.md
     - Windows: Windows.md
     - Contributors: CONTRIBUTORS.md

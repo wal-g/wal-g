@@ -1,8 +1,6 @@
 # WAL-G for PostgreSQL
 
-You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups(full and incremental) and push/fetch them to/from storage without saving it on your filesystem.
-
-If you prefer use Docker Image, you can directly test wal-g with this [playground](https://github.com/stephane-klein/playground-postgresql-walg).
+You can use wal-g as a tool for making encrypted, compressed PostgreSQL backups (full and incremental) and push/fetch them to/from remote storages without saving it on your filesystem.
 
 
 Configuration
@@ -35,6 +33,7 @@ To configure how many concurrency streams to use during backup uploading, use `W
 To configure how many concurrency streams are reading disk during ```backup-push```. By default, WAL-G uses 1 stream.
 
 * `TOTAL_BG_UPLOADED_LIMIT` (e.g. `1024`)
+
 Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
 
 * `WALG_SENTINEL_USER_DATA`
@@ -106,7 +105,7 @@ Usage
 
 ### ``backup-fetch``
 
-When fetching base backups, the user should pass in the name of the backup and a path to a directory to extract to. If this directory does not exist, WAL-G will create it and any dependent subdirectories.
+When fetching base backups, the user should pass in the name of the backup and a path to a directory to extract to. If this directory does not exist, WAL-G will create it and any intermediate subdirectories.
 
 ```bash
 wal-g backup-fetch ~/extract/to/here example-backup
@@ -118,7 +117,7 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch ~/extract/to/here LATEST
 ```
 
-WAL-G can fetch the backup with specific UserData (stored in backup metadata) using the `--target-user-data` flag or `WALG_FETCH_TARGET_USER_DATA` variable:
+WAL-G can fetch the backup that has the specific UserData (stored in backup metadata) using the `--target-user-data` flag or `WALG_FETCH_TARGET_USER_DATA` variable:
 ```bash
 wal-g backup-fetch /path --target-user-data "{ \"x\": [3], \"y\": 4 }"
 ```
@@ -127,8 +126,6 @@ wal-g backup-fetch /path --target-user-data "{ \"x\": [3], \"y\": 4 }"
 
 Beta feature: WAL-G can unpack delta backups in reverse order to improve fetch efficiency.
 
-[Reverse delta unpack benchmark results](benchmarks/reverse-delta-unpack-26-03-2020.md)
- 
 To activate this feature, do one of the following:
 
 
@@ -146,9 +143,9 @@ Since this feature involves both backup creation and restore process, in order t
 1. Optional. Increases the chance of archive skipping, but may result in slower backup creation. [Enable rating tar ball composer](#rating-composer-mode) for `backup-push`.
 
 2. Enable redundant backup archives skipping during backup-fetch. Do one of the following:
-  
-* set the `WALG_USE_REVERSE_UNPACK` and `WALG_SKIP_REDUNDANT_TARS` environment variables
-* add the `--reverse-unpack` and `--skip-redundant-tars` flags
+
+   * set the `WALG_USE_REVERSE_UNPACK` and `WALG_SKIP_REDUNDANT_TARS` environment variables
+   * add the `--reverse-unpack` and `--skip-redundant-tars` flags
 
 ```bash  
 wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
@@ -187,32 +184,33 @@ If a backup is started from a standby sever, WAL-G will monitor the timeline of 
 
 WAL-G backup-push allows for two data streaming options:
 
-1. Running directly on the database server as the postgres user, wal-g can read the database files from the filesystem. This option allows for high performance, and extra capabilities, like partial restore or Delta backups.
+1. Running directly on the database server as the postgres user, wal-g can read the database files from the filesystem. This option allows for high performance, and extra capabilities, such as partial restore or Delta backups.
 
-For uploading backups to S3 in streaming option 1, the user should pass in the path containing the backup started by Postgres as in:
+   For uploading backups to S3 using streaming option 1, the user should pass in the path containing the backup started by Postgres as in:
 
-```bash
-wal-g backup-push /backup/directory/path
-```
+   ```bash
+   wal-g backup-push /backup/directory/path
+   ```
 
-2. Alternatively, WAL-G can stream the backup data through the postgres BASE_BACKUP protocol. This allows WAL-G to stream the backup data through the tcp layer, allows to run remote, and allows WAL-G to run as a separate linux user. WAL-G does require a database connection with replication privilleges. Do note that the BASE_BACKUP protocol does not allow for multithreaded streaming, and that Delta backup currently is not implemented.
+2. Alternatively, WAL-G can stream the backup data through the postgres [BASE_BACKUP protocol](https://www.postgresql.org/docs/current/app-pgbasebackup.html). This allows WAL-G to stream the backup data through the tcp layer, allows to run remote, and allows WAL-G to run as a separate linux user. WAL-G does require a database connection with replication privileges. Do note that the BASE_BACKUP protocol does not allow for multithreaded streaming, and that Delta backup currently is not implemented.
 
-To stream the backup data, leave out the data directory. And to set the hostname for the postgres server, you can use the environment variable PGHOST, or the WAL-G argument --pghost.
+   To stream the backup data, leave out the data directory. And to set the hostname of the postgres server, you can use the environment variable PGHOST, or the WAL-G argument --pghost.
 
-```bash
-# Inline
-PGHOST=srv1 wal-g backup-push
+   ```bash
+   # Inline
+   PGHOST=srv1 wal-g backup-push
 
-# Export
-export PGHOST=srv1
-wal-g backup-push
+   # Export
+   export PGHOST=srv1
+   wal-g backup-push
 
-# Use commandline option
-wal-g backup-push --pghost srv1
-```
+   # Use commandline option
+   wal-g backup-push --pghost srv1
+   ```
 
 The remote backup option can also be used to:
-* Run Postgres on mutiple hosts (streaming replication), and backup with WAL-G using multihost configuration: ``wal-g backup-push --pghost srv1,srv2``
+
+* Run Postgres on multiple hosts (streaming replication), and backup with WAL-G using multihost configuration: ``wal-g backup-push --pghost srv1,srv2``
 * Run Postgres on a windows host and backup with WAL-G on a linux host: ``PGHOST=winsrv1 wal-g backup-push``
 * Schedule WAL-G as a Kubernetes CronJob
 
@@ -231,7 +229,7 @@ wal-g backup-push /path --rating-composer
 
 #### Copy composer mode
 
-In the copy composer mode, WAL-G does full backup and copies unchanged tar files from previous full backup. In case when there are no previous full backup, `regular` composer is used.
+In the copy composer mode, WAL-G makes a full backup and copies unchanged tar files from previous full backup. In case when there are no previous full backup, `regular` composer is used.
 
 To activate this feature, do one of the following:
 
@@ -258,7 +256,7 @@ wal-g backup-push /path --database-composer
 
 #### Backup without metadata
 
-By default, WAL-G tracks metadata of the files backed up. If millions of files are backed up (typically in case of hundreds of databases and thousands of tables in each database), tracking this metadata alone would require GBs of memory.
+By default, WAL-G tracks metadata of the backed up files. If millions of files are backed up (typically in case of hundreds of databases and thousands of tables in each database), tracking this metadata alone would require GBs of memory.
 
 If `--without-files-metadata` or `WALG_WITHOUT_FILES_METADATA` is enabled, WAL-G does not track metadata of the files backed up. This significantly reduces the memory usage on instances with `> 100k` files.
 
@@ -276,7 +274,7 @@ To activate this feature, do one of the following:
 wal-g backup-push /path --without-files-metadata
 ```
 
-#### Create delta from specific backup
+#### Create delta backup from specific backup
 When creating delta backup (`WALG_DELTA_MAX_STEPS` > 0), WAL-G uses the latest backup as the base by default. This behaviour can be changed via following flags:
 
 * `--delta-from-name` flag or `WALG_DELTA_FROM_NAME` environment variable to choose the backup with specified name as the base for the delta backup
@@ -306,7 +304,7 @@ INFO: Delta will be made from full backup.
 INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
 ```
 
-#### Pages checksum verification
+#### Page checksums verification
 To enable verification of the page checksums during the backup-push, use the `--verify` flag or set the `WALG_VERIFY_PAGE_CHECKSUMS` env variable. If found any, corrupted block numbers (currently no more than 10 of them) will be recorded to the backup sentinel json, for example:
 ```json
 ...
@@ -330,13 +328,15 @@ To enable verification of the page checksums during the backup-push, use the `--
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.
 
-WAL-G will also prefetch WAL files ahead of asked WAL file. These files will be cached in `./.wal-g/prefetch` directory. Cache files older than recently asked WAL file will be deleted from the cache, to prevent cache bloat. If the file is requested with `wal-fetch` this will also remove it from cache, but trigger fulfilment of cache with new file.
+WAL-G will also prefetch WAL files ahead of the asked WAL file. These files will be cached in `./.wal-g/prefetch` directory. Cached files older than the recently asked WAL file will be deleted from the cache, to prevent cache bloating. If a cached file is requested with `wal-fetch`, this will also remove it from the cache, but trigger caching of the new file.
 
 ```bash
 wal-g wal-fetch example-archive new-file-name
 ```
 
-Note: ``wal-fetch`` will exit with errorcode 74 (EX_IOERR: input/output error, see sysexits.h for more info) if the WAL-file is not available in the repository.
+This command is intended to be executed from the Postgres [restore_command](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RESTORE-COMMAND) parameter.
+
+Note: ``wal-fetch`` will exit with errorcode 74 (`EX_IOERR: input/output error, see sysexits.h for more info`) if the WAL-file is not available in the repository.
 All other errors end in exit code 1, and should stop PostgreSQL rather than ending PostgreSQL recovery.
 For PostgreSQL that should be any error code between 126 and 255, which can be achieved with a simple wrapper script.
 Please see https://github.com/wal-g/wal-g/pull/1195 for more information.
@@ -348,6 +348,8 @@ When uploading WAL archives to S3, the user should pass in the absolute path to 
 ```bash
 wal-g wal-push /path/to/archive
 ```
+
+This command is intended to be executed from the Postgres [archive_command](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-COMMAND) parameter.
 
 ### ``wal-show``
 
@@ -368,7 +370,8 @@ By default, `wal-show` output is plaintext table. For detailed JSON output, add 
 
 Run series of checks to ensure that WAL segment storage is healthy. Available checks:
 
-`integrity` - ensure that there is a consistent WAL segment history for the cluster so WAL-G can perform a PITR for the backup. Essentially, it checks that all of the WAL segments in the range `[oldest backup start segment, current cluster segment)` are available in storage. If no backups found, `[1, current cluster segment)` range will be scanned.
+#### `integrity`
+Ensure that there is a consistent WAL segment history for the cluster so WAL-G can perform a PITR for the backup. Essentially, it checks that all the WAL segments in the range `[oldest backup start segment, current cluster segment)` are available in storage. If no backups found, `[1, current cluster segment)` range will be scanned.
 
 ![SegmentStatusIllustration](resources/wal_verify_segment_statuses.png)
 
@@ -384,15 +387,18 @@ In `integrity` check output, there are four statuses of WAL segments:
 `ProbablyDelayed` segments range size is controlled via `WALG_INTEGRITY_MAX_DELAYED_WALS` setting.  
 
 Output consists of:
+
 1. Status of `integrity` check:
     * `OK` if there are no missing segments 
     * `WARNING` if there are some missing segments, but they are not `MISSING_LOST` 
     * `FAILURE` if there are some `MISSING_LOST` segments
 2. A list that shows WAL segments in chronological order grouped by timeline and status.
 
-`timeline` - check if the current cluster timeline is greater than or equal to any of the storage WAL segments timelines. This check is useful to detect split-brain conflicts. Please note that this check works correctly only if new storage created, or the existing one cleaned when restoring from the backup or performing `pg_upgrade`.
+#### `timeline`
+Check if the current cluster timeline is greater than or equal to any of the storage WAL segments timelines. This check is useful to detect split-brain conflicts. Please note that this check works correctly only if new storage created, or the existing one cleaned when restoring from the backup or performing `pg_upgrade`.
 
 Output consists of:
+
 1. Status of `timeline` check:
     * `OK` if current timeline id matches the highest timeline id found in storage
     * `WARNING` if could not determine if current timeline matches the highest in storage
@@ -460,7 +466,9 @@ Example of the JSON output:
 
 ### ``wal-receive``
 
-Set environment variabe WALG_SLOTNAME to define the slot to be used (defaults to walg). The slot name can only consist of the following characters: [0-9A-Za-z_].
+Receive WAL stream using PostgreSQL [streaming replication](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION) and push to the storage.
+
+You can set `WALG_SLOTNAME` variable to define the [replication slot](https://www.postgresql.org/docs/current/warm-standby.html#STREAMING-REPLICATION-SLOTS) name to be used (defaults to `walg`). The slot name can only consist of the following characters: [0-9A-Za-z_].
 When uploading WAL archives to S3, the user should pass in the absolute path to where the archive is located.
 
 ```bash
@@ -479,7 +487,7 @@ wal-g backup-mark example-backup -i
 
 ### ``catchup-push``
 
-To create an catchup incremental backup, the user should pass the path to the master Postgres directory and the LSN of the replica
+To create a catchup incremental backup, the user should pass the path to the master Postgres directory and the LSN of the replica
 for which the backup is created.
 
 Steps:
@@ -523,6 +531,8 @@ wal-g delete garbage           # Deletes outdated WAL archives and leftover back
 wal-g delete garbage ARCHIVES      # Deletes only outdated WAL archives from storage
 wal-g delete garbage BACKUPS       # Deletes only leftover (partially deleted or unsuccessful) backups files from storage
 ```
+
+The `garbage` target can be used in addition to the other targets, which are common for all storages.
 
 ### ``wal-restore``
 
@@ -584,7 +594,7 @@ Failover archive storages (experimental)
 -----------
 
 Switch to a failover storage for `wal-push` if primary storage becomes unavailable. This might be useful when the archiving fails during the cloud storage service unavailability to avoid out-of-disk-space issues.
-WAL-G will also take the failover storages into account during the `wal-fetch/wal-prefetch`.
+WAL-G will also take the failover storages into account during the `wal-fetch` / `wal-prefetch`.
 
 ```bash
 WALG_FAILOVER_STORAGES:
@@ -600,6 +610,8 @@ WALG_FAILOVER_STORAGES:
         WALG_FILE_PREFIX: "/some/prefix"
 ```
 
+Please note that to use this feature WAL-G must be configured using a config file as it is impossible to put this nested structure to an environment variable.
+
 * `WALG_FAILOVER_STORAGES_CHECK_TIMEOUT`
 
 WAL-G will use no more than seconds to check for available alive storages. Default value is `30s`.
@@ -607,3 +619,9 @@ WAL-G will use no more than seconds to check for available alive storages. Defau
 * `WALG_FAILOVER_STORAGES_CACHE_LIFETIME`
 
 WAL-G saves information about last used alive storage to disk to avoid excessive storage calls. This setting controls lifetime of this cache. Default value is `15m`.
+
+Playground
+-----------
+If you prefer to use a Docker image, you can directly test WAL-G with this [playground](https://github.com/stephane-klein/playground-postgresql-walg).
+
+Please note, that is a third-party repository, and we are not responsible for it to always work correctly.
