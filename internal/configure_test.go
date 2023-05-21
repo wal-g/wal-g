@@ -2,6 +2,8 @@ package internal_test
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
+	"github.com/wal-g/wal-g/internal/compression/lzma"
 	"os"
 	"path/filepath"
 	"testing"
@@ -150,6 +152,35 @@ func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 
 	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
 	resetToDefaults()
+}
+
+func TestConfigureCompressor_Lz4Method(t *testing.T) {
+	viper.Set(internal.CompressionMethodSetting, "lz4")
+	compressor, err := internal.ConfigureCompressor()
+	assert.NoError(t, err)
+	assert.Equal(t, compressor, lz4.Compressor{})
+	resetToDefaults()
+}
+
+func TestConfigureCompressor_LzmaMethod(t *testing.T) {
+	viper.Set(internal.CompressionMethodSetting, "lzma")
+	compressor, err := internal.ConfigureCompressor()
+	assert.NoError(t, err)
+	assert.Equal(t, compressor, lzma.Compressor{})
+	resetToDefaults()
+}
+
+func TestConfigureCompressor_NoMethodSet(t *testing.T) {
+	compressor, err := internal.ConfigureCompressor()
+	assert.NoError(t, err)
+	assert.Equal(t, compressor, lz4.Compressor{})
+}
+
+func TestConfigureCompressor_ViperClear(t *testing.T) {
+	viper.Reset()
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
 }
 
 func prepareDataFolder(t *testing.T, name string) string {

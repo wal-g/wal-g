@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	endTSEnvVar = "someTSEnvVar"
+	endTSEnvVar                 = "someTSEnvVar"
+	operationLogsDstEnvVariable = "someOperationLogsDstEnv"
 )
 
 func TestParseTs_shouldParseRFC3339(t *testing.T) {
@@ -42,4 +43,18 @@ func TestParseTs_shouldReturnNilOnNoTime(t *testing.T) {
 	parsedTime, err := ParseTS(endTSEnvVar)
 	assert.NoError(t, err)
 	assert.Nil(t, parsedTime)
+}
+
+func TestGetLogsDstSettings_simpleCase(t *testing.T) {
+	directoryMock := "some_kek_dir"
+	viper.Set(operationLogsDstEnvVariable, directoryMock)
+	parsedDirectory, err := GetLogsDstSettings(operationLogsDstEnvVariable)
+	assert.NoError(t, err)
+	assert.Equal(t, directoryMock, parsedDirectory)
+}
+
+func TestGetLogsDstSettings_shouldReturnNilOnNoDirectory(t *testing.T) {
+	parsedDirectory, err := GetLogsDstSettings(operationLogsDstEnvVariable)
+	assert.Error(t, err)
+	assert.Equal(t, "", parsedDirectory)
 }
