@@ -198,7 +198,6 @@ func GetPgSlotName() (pgSlotName string) {
 	return
 }
 
-// TODO : unit tests
 func ConfigureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
