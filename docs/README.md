@@ -53,8 +53,12 @@ Configuration
 There are two ways how you can configure WAL-G:
 
 1. Using environment variables
-2. Using a YAML config file
+
+2. Using a config file
+
    `--config /path` flag can be used to specify the path where the config file is located.
+
+    We support every format that the [viper package](https://github.com/spf13/viper) supports: JSON, YAML, envfile and [others](https://github.com/spf13/viper#reading-config-files).
 
 Every configuration variable mentioned in the following documentation can be specified either as an environment variable or a field in the config file.
 
