@@ -170,17 +170,27 @@ func TestConfigureCompressor_LzmaMethod(t *testing.T) {
 	resetToDefaults()
 }
 
-func TestConfigureCompressor_NoMethodSet(t *testing.T) {
+func TestConfigureCompressor_UseDefaultOnNoMethodSet(t *testing.T) {
 	compressor, err := internal.ConfigureCompressor()
 	assert.NoError(t, err)
 	assert.Equal(t, compressor, lz4.Compressor{})
+	resetToDefaults()
 }
 
-func TestConfigureCompressor_ViperClear(t *testing.T) {
+func TestConfigureCompressor_ErrorWhenViperClear(t *testing.T) {
 	viper.Reset()
 	compressor, err := internal.ConfigureCompressor()
 	assert.Error(t, err)
 	assert.Equal(t, compressor, nil)
+	resetToDefaults()
+}
+
+func TestConfigureCompressor_FailsOnInvalidCompressorString(t *testing.T) {
+	viper.Set(internal.CompressionMethodSetting, "kek123kek")
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
+	resetToDefaults()
 }
 
 func prepareDataFolder(t *testing.T, name string) string {
