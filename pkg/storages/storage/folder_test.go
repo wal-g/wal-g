@@ -98,6 +98,8 @@ func TestListFolderRecursivelyWithFilter(t *testing.T) {
 		"base_321/nop",
 		"folder123/nop",
 		"base_456/some_folder/2",
+		"base_456/tar_partitions",
+		"base_456/tar_partitions_file",
 	}
 
 	for _, name := range includedObjNames {
@@ -108,6 +110,7 @@ func TestListFolderRecursivelyWithFilter(t *testing.T) {
 		"base_456/tar_partitions/1",
 		"base_456/tar_partitions/2",
 		"base_456/tar_partitions/3",
+		"base_456/tar_partitions/1/1",
 	}
 
 	for _, name := range excludedObjNames {

@@ -2,7 +2,6 @@ package multistorage
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -39,34 +38,41 @@ func executeOnAllStorages(fn func(folder storage.Folder) error) error {
 }
 
 func ExecuteOnStorage(target string, fn func(folder storage.Folder) error) error {
-	if target == DefaultStorage {
-		folder, err := internal.ConfigureFolder()
-		if err != nil {
-			return err
-		}
-
-		return fn(folder)
-	}
-
 	if target == "all" {
 		return executeOnAllStorages(fn)
 	}
 
-	failover, err := internal.InitFailoverStorages()
+	folder, err := ConfigureStorageFolder(target)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to init folder for storage %q: %w", target, err)
 	}
 
-	for name := range failover {
-		if target != name {
-			continue
+	return fn(folder)
+}
+
+func ConfigureStorageFolder(storageName string) (storage.Folder, error) {
+	switch storageName {
+	case "all":
+		return nil, fmt.Errorf("a specific storage name was expected instead of 'all'")
+	case DefaultStorage:
+		return internal.ConfigureFolder()
+	default:
+		failover, err := internal.InitFailoverStorages()
+		if err != nil {
+			return nil, err
 		}
-		return fn(failover[name])
-	}
 
-	available := []string{DefaultStorage}
-	for name := range failover {
-		available = append(available, name)
+		for name, folder := range failover {
+			if storageName != name {
+				continue
+			}
+			return folder, nil
+		}
+
+		available := []string{DefaultStorage}
+		for name := range failover {
+			available = append(available, name)
+		}
+		return nil, fmt.Errorf("storage with name %q is not found, available storages: %v", storageName, available)
 	}
-	return fmt.Errorf("target storage '%s' not found, available storages: %v", target, strings.Join(available, ", "))
 }
