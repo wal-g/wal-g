@@ -80,6 +80,26 @@ func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	return
 }
 
+// GetBackupsWithMetadata receives backup descriptions with meta information
+func GetBackupsWithMetadata(folder storage.Folder, metaFetcher GenericMetaFetcher) (backupsWithMeta []BackupTimeWithMetadata, err error) {
+	backups, err := GetBackups(folder)
+
+	if err != nil {
+		return nil, err
+	}
+
+	backupsWithMeta = make([]BackupTimeWithMetadata, len(backups))
+	for i, backup := range backups {
+		meta, err := metaFetcher.Fetch(backup.BackupName, folder)
+		if err != nil {
+			return nil, err
+		}
+
+		backupsWithMeta[i] = BackupTimeWithMetadata{backup, meta}
+	}
+	return
+}
+
 // TODO : unit tests
 func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.ListFolder()
@@ -110,6 +130,12 @@ func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 func SortBackupTimeSlices(backupTimes []BackupTime) {
 	sort.Slice(backupTimes, func(i, j int) bool {
 		return backupTimes[i].Time.Before(backupTimes[j].Time)
+	})
+}
+
+func SortBackupTimeWithMetadataSlices(backupTimes []BackupTimeWithMetadata) {
+	sort.Slice(backupTimes, func(i, j int) bool {
+		return backupTimes[i].StartTime.Before(backupTimes[j].StartTime)
 	})
 }
 

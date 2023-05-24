@@ -1,4 +1,4 @@
-package mysql
+package fdb
 
 import (
 	"github.com/pkg/errors"
@@ -34,14 +34,10 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 
 	return internal.GenericMetadata{
 		BackupName:       backupName,
-		UncompressedSize: sentinel.UncompressedSize,
-		CompressedSize:   sentinel.CompressedSize,
-		Hostname:         sentinel.Hostname,
 		StartTime:        sentinel.StartLocalTime,
-		FinishTime:       sentinel.StopLocalTime,
-		IsPermanent:      sentinel.IsPermanent,
 		IncrementDetails: &internal.NopIncrementDetailsFetcher{},
 		UserData:         sentinel.UserData,
+		IsPermanent:      sentinel.IsPermanent,
 	}, nil
 }
 

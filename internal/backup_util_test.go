@@ -107,6 +107,96 @@ func TestGetGarbageFromPrefix_emptyFolders(t *testing.T) {
 	assert.Equal(t, garbage, make([]string, 0))
 }
 
+func TestSortBackupTimeWithMetadataSlices_ByCreationTimeWhenCreationTimeIsNotDefault(t *testing.T) {
+	backups := []internal.BackupTimeWithMetadata{
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "fBackup",
+				Time:        time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "fWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2020, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "sBackup",
+				Time:        time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "sWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	expectedBackups := []internal.BackupTimeWithMetadata{
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "sBackup",
+				Time:        time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "sWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "fBackup",
+				Time:        time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "fWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2020, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	internal.SortBackupTimeWithMetadataSlices(backups)
+	assert.Equal(t, expectedBackups, backups)
+}
+
+func TestGetBackupsWithMetadata(t *testing.T) {
+	fBackup := internal.BackupTime{
+		BackupName:  "fSentinelBackup",
+		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+	}
+	sBackup := internal.BackupTime{
+		BackupName:  "sSentinelBackup",
+		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+	}
+
+	metadata := map[string]internal.GenericMetadata{
+		fBackup.BackupName: {StartTime: time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC)},
+		sBackup.BackupName: {StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC)},
+	}
+
+	expected := []internal.BackupTimeWithMetadata{
+		{fBackup, metadata[fBackup.BackupName]},
+		{sBackup, metadata[sBackup.BackupName]},
+	}
+
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	marshaller, _ := internal.NewDtoSerializer()
+	fFile, _ := marshaller.Marshal(fBackup)
+	sFile, _ := marshaller.Marshal(sBackup)
+
+	_ = folder.PutObject(internal.SentinelNameFromBackup(fBackup.BackupName), fFile)
+	_ = folder.PutObject(internal.SentinelNameFromBackup(sBackup.BackupName), sFile)
+
+	actual, _ := internal.GetBackupsWithMetadata(folder, &testtools.MockGenericMetaFetcher{MockMeta: metadata})
+
+	// ignore time difference
+	for i, _ := range expected {
+		expected[i].Time = actual[i].Time
+	}
+
+	assert.Equal(t, expected, actual)
+}
+
 func TestDeleteGarbage_emptyFolder(t *testing.T) {
 
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
@@ -166,5 +256,4 @@ func TestDeleteGarbage_recursive(t *testing.T) {
 	assert.Equal(t, 1, len(folders))
 	assert.Equal(t, objects[0].GetName(), "meta_b2.json")
 	assert.Equal(t, folders[0].GetPath(), "in_memory/backup2/folder1/")
-
 }

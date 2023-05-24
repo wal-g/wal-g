@@ -50,8 +50,11 @@ var SystemDbnames = []string{
 type SentinelDto struct {
 	Server         string
 	Databases      []string
+	IsPermanent    bool
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
+
+	UserData interface{}
 }
 
 func (s *SentinelDto) String() string {

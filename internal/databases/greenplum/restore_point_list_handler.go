@@ -9,26 +9,30 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
-	getRestorePointsFunc := func() ([]internal.BackupTime, error) {
+func HandleRestorePointList(folder storage.Folder, metaFetcher internal.GenericMetaFetcher, pretty, json bool) {
+	getRestorePointsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
 		res, err := GetRestorePoints(folder)
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
 
 		// TODO: remove this ugly hack to make current restore-point-list work
-		backupTimes := make([]internal.BackupTime, 0)
+		backupTimes := make([]internal.BackupTimeWithMetadata, 0)
 		for _, rp := range res {
-			backupTimes = append(backupTimes, internal.BackupTime{
-				BackupName:  rp.Name,
-				Time:        rp.Time,
-				WalFileName: utility.StripWalFileName(rp.Name),
+			metadata, _ := metaFetcher.Fetch(rp.Name, folder)
+			backupTimes = append(backupTimes, internal.BackupTimeWithMetadata{
+				BackupTime: internal.BackupTime{
+					BackupName:  rp.Name,
+					Time:        rp.Time,
+					WalFileName: utility.StripWalFileName(rp.Name),
+				},
+				GenericMetadata: metadata,
 			})
 		}
 		return backupTimes, err
 	}
-	writeRestorePointsListFunc := func(restorePoints []internal.BackupTime) {
-		internal.SortBackupTimeSlices(restorePoints)
+	writeRestorePointsListFunc := func(restorePoints []internal.BackupTimeWithMetadata) {
+		internal.SortBackupTimeWithMetadataSlices(restorePoints)
 		switch {
 		case json:
 			err := internal.WriteAsJSON(restorePoints, os.Stdout, pretty)

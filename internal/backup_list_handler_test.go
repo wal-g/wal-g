@@ -15,66 +15,104 @@ type someError struct {
 	error
 }
 
-var shortBackups = []internal.BackupTime{
+var shortBackups = []internal.BackupTimeWithMetadata{
 	{
-		BackupName:  "b0",
-		Time:        time.Time{},
-		WalFileName: "shortWallName0",
+		BackupTime: internal.BackupTime{
+			BackupName:  "b0",
+			Time:        time.Time{},
+			WalFileName: "shortWallName0",
+		},
+		GenericMetadata: internal.GenericMetadata{
+			StartTime: time.Time{},
+		},
 	},
 	{
-		BackupName:  "b1",
-		Time:        time.Time{},
-		WalFileName: "shortWallName1",
-	},
-}
-
-var longBackups = []internal.BackupTime{
-	{
-		BackupName:  "backup000",
-		Time:        time.Time{},
-		WalFileName: "veryVeryVeryVeryVeryLongWallName0",
-	},
-	{
-		BackupName:  "backup001",
-		Time:        time.Time{},
-		WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+		BackupTime: internal.BackupTime{
+			BackupName:  "b1",
+			Time:        time.Time{},
+			WalFileName: "shortWallName1",
+		},
+		GenericMetadata: internal.GenericMetadata{
+			StartTime: time.Time{},
+		},
 	},
 }
 
-var emptyColonsBackups = []internal.BackupTime{
+var longBackups = []internal.BackupTimeWithMetadata{
 	{
-		Time:        time.Time{},
-		WalFileName: "shortWallName0",
+		BackupTime: internal.BackupTime{
+			BackupName:  "backup000",
+			Time:        time.Time{},
+			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
+		},
+		GenericMetadata: internal.GenericMetadata{
+			StartTime: time.Time{},
+		},
 	},
 	{
-		BackupName: "b1",
-		Time:       time.Time{},
+		BackupTime: internal.BackupTime{
+			BackupName:  "backup001",
+			Time:        time.Time{},
+			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
+		},
+		GenericMetadata: internal.GenericMetadata{
+			StartTime: time.Time{},
+		},
+	},
+}
+
+var emptyColonsBackups = []internal.BackupTimeWithMetadata{
+	{
+		BackupTime: internal.BackupTime{
+			Time:        time.Time{},
+			WalFileName: "shortWallName0",
+		},
+		GenericMetadata: internal.GenericMetadata{
+			StartTime: time.Time{},
+		},
 	},
 	{
-		Time: time.Time{},
+		BackupTime: internal.BackupTime{
+			BackupName: "b1",
+			Time:       time.Time{},
+		},
+		GenericMetadata: internal.GenericMetadata{
+			StartTime: time.Time{},
+		},
 	},
+	{},
 }
 
 func TestHandleBackupListWriteBackups(t *testing.T) {
-	backups := []internal.BackupTime{
+	backups := []internal.BackupTimeWithMetadata{
 		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup000",
+				Time:        time.Time{},
+				WalFileName: "wallName0",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
 		},
 		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup001",
+				Time:        time.Time{},
+				WalFileName: "wallName1",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2017, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
 		},
 	}
 
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
+	getBackupsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
 		return backups, nil
 	}
 	writeBackupListCallsCount := 0
-	var writeBackupListCallArgs []internal.BackupTime
-	writeBackupListFunc := func(backups []internal.BackupTime) {
+	var writeBackupListCallArgs []internal.BackupTimeWithMetadata
+	writeBackupListFunc := func(backups []internal.BackupTimeWithMetadata) {
 		writeBackupListCallsCount++
 		writeBackupListCallArgs = backups
 	}
@@ -91,23 +129,33 @@ func TestHandleBackupListWriteBackups(t *testing.T) {
 }
 
 func TestHandleBackupListLogError(t *testing.T) {
-	backups := []internal.BackupTime{
+	backups := []internal.BackupTimeWithMetadata{
 		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup000",
+				Time:        time.Time{},
+				WalFileName: "wallName0",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
 		},
 		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
+			BackupTime: internal.BackupTime{
+				BackupName:  "backup001",
+				Time:        time.Time{},
+				WalFileName: "wallName1",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2017, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
 		},
 	}
 	someErrorInstance := someError{errors.New("some error")}
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
+	getBackupsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
 		return backups, someErrorInstance
 	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
+	writeBackupListFunc := func(backups []internal.BackupTimeWithMetadata) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
@@ -121,10 +169,10 @@ func TestHandleBackupListLogError(t *testing.T) {
 }
 
 func TestHandleBackupListLogNoBackups(t *testing.T) {
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
-		return []internal.BackupTime{}, nil
+	getBackupsFunc := func() ([]internal.BackupTimeWithMetadata, error) {
+		return []internal.BackupTimeWithMetadata{}, nil
 	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
+	writeBackupListFunc := func(backups []internal.BackupTimeWithMetadata) {}
 	infoLogger, errorLogger := testtools.MockLoggers()
 
 	internal.HandleBackupList(
@@ -140,12 +188,12 @@ func TestHandleBackupListLogNoBackups(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
-	expectedRes := "+---+-----------+----------+-----------------------------------+\n" +
-		"| # | NAME      | MODIFIED | WAL SEGMENT BACKUP START          |\n" +
-		"+---+-----------+----------+-----------------------------------+\n" +
-		"| 0 | backup000 | -        | veryVeryVeryVeryVeryLongWallName0 |\n" +
-		"| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 |\n" +
-		"+---+-----------+----------+-----------------------------------+\n"
+	expectedRes := "+---+-----------+---------+-----------------------------------+\n" +
+		"| # | NAME      | CREATED | WAL SEGMENT BACKUP START          |\n" +
+		"+---+-----------+---------+-----------------------------------+\n" +
+		"| 0 | backup000 | -       | veryVeryVeryVeryVeryLongWallName0 |\n" +
+		"| 1 | backup001 | -       | veryVeryVeryVeryVeryLongWallName1 |\n" +
+		"+---+-----------+---------+-----------------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(longBackups, &b)
@@ -154,12 +202,12 @@ func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
-	expectedRes := "+---+------+----------+--------------------------+\n" +
-		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-		"+---+------+----------+--------------------------+\n" +
-		"| 0 | b0   | -        | shortWallName0           |\n" +
-		"| 1 | b1   | -        | shortWallName1           |\n" +
-		"+---+------+----------+--------------------------+\n"
+	expectedRes := "+---+------+---------+--------------------------+\n" +
+		"| # | NAME | CREATED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+---------+--------------------------+\n" +
+		"| 0 | b0   | -       | shortWallName0           |\n" +
+		"| 1 | b1   | -       | shortWallName1           |\n" +
+		"+---+------+---------+--------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(shortBackups, &b)
@@ -168,12 +216,12 @@ func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
-	expectedRes := "+---+------+----------+--------------------------+\n" +
-		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-		"+---+------+----------+--------------------------+\n" +
-		"+---+------+----------+--------------------------+\n"
+	expectedRes := "+---+------+---------+--------------------------+\n" +
+		"| # | NAME | CREATED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+---------+--------------------------+\n" +
+		"+---+------+---------+--------------------------+\n"
 
-	backups := make([]internal.BackupTime, 0)
+	backups := make([]internal.BackupTimeWithMetadata, 0)
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(backups, &b)
@@ -182,13 +230,13 @@ func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
 }
 
 func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := "+---+------+----------+--------------------------+\n" +
-		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START |\n" +
-		"+---+------+----------+--------------------------+\n" +
-		"| 0 |      | -        | shortWallName0           |\n" +
-		"| 1 | b1   | -        |                          |\n" +
-		"| 2 |      | -        |                          |\n" +
-		"+---+------+----------+--------------------------+\n"
+	expectedRes := "+---+------+---------+--------------------------+\n" +
+		"| # | NAME | CREATED | WAL SEGMENT BACKUP START |\n" +
+		"+---+------+---------+--------------------------+\n" +
+		"| 0 |      | -       | shortWallName0           |\n" +
+		"| 1 | b1   | -       |                          |\n" +
+		"| 2 |      | -       |                          |\n" +
+		"+---+------+---------+--------------------------+\n"
 
 	b := bytes.Buffer{}
 	internal.WritePrettyBackupList(emptyColonsBackups, &b)
@@ -197,8 +245,8 @@ func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
 }
 
 func TestWriteBackupList_NoBackups(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start\n"
-	backups := make([]internal.BackupTime, 0)
+	expectedRes := "name created wal_segment_backup_start\n"
+	backups := make([]internal.BackupTimeWithMetadata, 0)
 
 	b := bytes.Buffer{}
 	internal.WriteBackupList(backups, &b)
@@ -207,10 +255,10 @@ func TestWriteBackupList_NoBackups(t *testing.T) {
 }
 
 func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start\n" +
-		"     -        shortWallName0\n" +
-		"b1   -        \n" +
-		"     -        \n"
+	expectedRes := "name created wal_segment_backup_start\n" +
+		"     -       shortWallName0\n" +
+		"b1   -       \n" +
+		"     -       \n"
 
 	b := bytes.Buffer{}
 	internal.WriteBackupList(emptyColonsBackups, &b)
@@ -219,9 +267,9 @@ func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
 }
 
 func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start\n" +
-		"b0   -        shortWallName0\n" +
-		"b1   -        shortWallName1\n"
+	expectedRes := "name created wal_segment_backup_start\n" +
+		"b0   -       shortWallName0\n" +
+		"b1   -       shortWallName1\n"
 	b := bytes.Buffer{}
 	internal.WriteBackupList(shortBackups, &b)
 
@@ -229,9 +277,9 @@ func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
 }
 
 func TestWriteBackupList_LongColumnsValues(t *testing.T) {
-	expectedRes := "name      modified wal_segment_backup_start\n" +
-		"backup000 -        veryVeryVeryVeryVeryLongWallName0\n" +
-		"backup001 -        veryVeryVeryVeryVeryLongWallName1\n"
+	expectedRes := "name      created wal_segment_backup_start\n" +
+		"backup000 -       veryVeryVeryVeryVeryLongWallName0\n" +
+		"backup001 -       veryVeryVeryVeryVeryLongWallName1\n"
 	b := bytes.Buffer{}
 	internal.WriteBackupList(longBackups, &b)
 

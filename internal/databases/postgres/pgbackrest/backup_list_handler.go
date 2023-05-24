@@ -12,8 +12,9 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleBackupList(folder storage.Folder, stanza string, detailed bool, pretty bool, json bool) error {
-	backupTimes, err := GetBackupList(folder, stanza)
+func HandleBackupList(folder storage.Folder, metaFetcher internal.GenericMetaFetcher, stanza string, detailed bool,
+	pretty bool, json bool) error {
+	backupTimes, err := GetBackupListWithMetadata(folder, metaFetcher, stanza)
 
 	if len(backupTimes) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
@@ -30,8 +31,8 @@ func HandleBackupList(folder storage.Folder, stanza string, detailed bool, prett
 
 	if detailed {
 		var backupDetails []BackupDetails
-		for _, backupTime := range backupTimes {
-			details, err := GetBackupDetails(folder, stanza, backupTime.BackupName)
+		for i := 0; i < len(backupTimes); i++ {
+			details, err := GetBackupDetails(folder, stanza, backupTimes[i].BackupTime.BackupName)
 			if err != nil {
 				return err
 			}
@@ -43,7 +44,7 @@ func HandleBackupList(folder storage.Folder, stanza string, detailed bool, prett
 	return printBackupList(backupTimes, pretty, json)
 }
 
-func printBackupList(backups []internal.BackupTime, pretty bool, json bool) error {
+func printBackupList(backups []internal.BackupTimeWithMetadata, pretty bool, json bool) error {
 	switch {
 	case json:
 		return internal.WriteAsJSON(backups, os.Stdout, pretty)

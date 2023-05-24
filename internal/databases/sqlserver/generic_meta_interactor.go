@@ -1,4 +1,4 @@
-package mysql
+package sqlserver
 
 import (
 	"github.com/pkg/errors"
@@ -26,7 +26,7 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 
 func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
 	var backup = internal.NewBackup(backupFolder, backupName)
-	var sentinel StreamSentinelDto
+	var sentinel SentinelDto
 	err := backup.FetchSentinel(&sentinel)
 	if err != nil {
 		return internal.GenericMetadata{}, err
@@ -34,13 +34,10 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 
 	return internal.GenericMetadata{
 		BackupName:       backupName,
-		UncompressedSize: sentinel.UncompressedSize,
-		CompressedSize:   sentinel.CompressedSize,
-		Hostname:         sentinel.Hostname,
 		StartTime:        sentinel.StartLocalTime,
 		FinishTime:       sentinel.StopLocalTime,
-		IsPermanent:      sentinel.IsPermanent,
 		IncrementDetails: &internal.NopIncrementDetailsFetcher{},
+		IsPermanent:      sentinel.IsPermanent,
 		UserData:         sentinel.UserData,
 	}, nil
 }
@@ -52,7 +49,7 @@ func NewGenericMetaSetter() GenericMetaSetter {
 }
 
 func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
-	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
+	modifier := func(dto SentinelDto) SentinelDto {
 		dto.UserData = userData
 		return dto
 	}
@@ -60,16 +57,16 @@ func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.
 }
 
 func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error {
-	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
+	modifier := func(dto SentinelDto) SentinelDto {
 		dto.IsPermanent = isPermanent
 		return dto
 	}
 	return modifyBackupSentinel(backupName, backupFolder, modifier)
 }
 
-func modifyBackupSentinel(backupName string, backupFolder storage.Folder, modifier func(StreamSentinelDto) StreamSentinelDto) error {
+func modifyBackupSentinel(backupName string, backupFolder storage.Folder, modifier func(SentinelDto) SentinelDto) error {
 	backup := internal.NewBackup(backupFolder, backupName)
-	var sentinel StreamSentinelDto
+	var sentinel SentinelDto
 	err := backup.FetchSentinel(&sentinel)
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch the existing backup metadata for modifying")
