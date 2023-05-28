@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/wal-g/wal-g/internal"
 
@@ -144,9 +145,11 @@ func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
 func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
-	backup string) (backupName string, lsn LSN, err error) {
-	var name, lsnStr string
-	name, lsnStr, bundle.Replica, err = queryRunner.startBackup(backup)
+	backupTime time.Time) (backupName string, lsn LSN, err error) {
+	var lsnStr string
+
+	backupName = "backup_" + utility.TimeCrossPlatformUTC(backupTime).Format(utility.BackupTimeFormat)
+	lsnStr, bundle.Replica, err = queryRunner.startBackup(utility.CeilTimeUpToMicroseconds(backupTime).String())
 
 	if err != nil {
 		return "", 0, err
@@ -157,7 +160,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 	}
 
 	if bundle.Replica {
-		name, bundle.Timeline, err = getWalFilename(lsn, queryRunner)
+		bundle.Timeline, err = queryRunner.readTimeline()
 		if err != nil {
 			return "", 0, err
 		}
@@ -167,7 +170,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
 	}
-	return "base_" + name, lsn, nil
+	return backupName, lsn, nil
 }
 
 // TODO : unit tests

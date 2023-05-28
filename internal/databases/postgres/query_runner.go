@@ -95,19 +95,19 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	switch {
 	case queryRunner.Version >= 150000:
 		return "SELECT case when pg_is_in_recovery()" +
-			" then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			" then '' else lsn::text, pg_is_in_recovery()" +
 			" FROM pg_backup_start($1, true) lsn", nil
 	case queryRunner.Version >= 100000:
 		return "SELECT case when pg_is_in_recovery()" +
-			" then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			" then '' else lsn::text, pg_is_in_recovery()" +
 			" FROM pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90600:
 		return "SELECT case when pg_is_in_recovery() " +
-			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			"then '' else lsn::text, pg_is_in_recovery()" +
 			" FROM pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90000:
 		return "SELECT case when pg_is_in_recovery() " +
-			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			"then '' else lsn::text, pg_is_in_recovery()" +
 			" FROM pg_start_backup($1, true) lsn", nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
@@ -210,8 +210,8 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 }
 
 // StartBackup informs the database that we are starting copy of cluster contents
-func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
-	lsnString string, inRecovery bool, err error) {
+func (queryRunner *PgQueryRunner) startBackup(backup string) (lsnString string,
+	inRecovery bool, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
@@ -219,14 +219,14 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 	startBackupQuery, err := queryRunner.BuildStartBackup()
 	conn := queryRunner.Connection
 	if err != nil {
-		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
+		return "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
 	}
 
-	if err = conn.QueryRow(startBackupQuery, backup).Scan(&backupName, &lsnString, &inRecovery); err != nil {
-		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
+	if err = conn.QueryRow(startBackupQuery, backup).Scan(&lsnString, &inRecovery); err != nil {
+		return "", false, errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
 	}
 
-	return backupName, lsnString, inRecovery, nil
+	return lsnString, inRecovery, nil
 }
 
 // StopBackup informs the database that copy is over

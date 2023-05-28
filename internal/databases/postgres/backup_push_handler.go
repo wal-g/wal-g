@@ -171,8 +171,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 	}
 
 	tracelog.DebugLogger.Println("Running StartBackup.")
-	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(
-		bh.Workers.QueryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
+	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(bh.Workers.QueryRunner, time.Now())
 	if err != nil {
 		return
 	}
