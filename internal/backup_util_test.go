@@ -20,6 +20,51 @@ var (
 	}
 )
 
+func TestGetBackups_emptyFolder(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	_ = folder.PutObject("base_123312", &bytes.Buffer{})
+
+	backups, err := internal.GetBackups(folder)
+
+	assert.Empty(t, backups)
+	assert.Error(t, err, internal.NoBackupsFoundError{})
+}
+
+func TestGetBackups(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	_ = folder.PutObject("base_123312", &bytes.Buffer{})
+	_ = folder.PutObject(testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
+
+	backups, _ := internal.GetBackups(folder)
+
+	assert.Equal(t, 1, len(backups))
+	assert.Equal(t, testStreamBackup.BackupName, backups[0].BackupName)
+}
+
+func TestGetBackupsAndGarbage_emptyList(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	_ = folder.PutObject("base_123312", &bytes.Buffer{})
+
+	backups, garbage, _ := internal.GetBackupsAndGarbage(folder)
+
+	assert.Empty(t, backups)
+	assert.Empty(t, garbage)
+}
+
+func TestGetBackupsAndGarbage(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	_ = folder.PutObject("base_123312", &bytes.Buffer{})
+	_ = folder.PutObject("base_321/nop", &bytes.Buffer{})
+	_ = folder.PutObject(testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
+
+	backups, garbage, _ := internal.GetBackupsAndGarbage(folder)
+
+	assert.Equal(t, 1, len(backups))
+	assert.Equal(t, 1, len(garbage))
+	assert.Equal(t, testStreamBackup.BackupName, backups[0].BackupName)
+	assert.Equal(t, "base_321", garbage[0])
+}
+
 func TestGetBackupTimeSlices_emptyList(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	_ = folder.PutObject("base_123312", &bytes.Buffer{})
