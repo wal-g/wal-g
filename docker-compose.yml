@@ -67,6 +67,7 @@ services:
       &&  mkdir -p /export/mysqldeleteeverythingpermanent
       &&  mkdir -p /export/mysqlmarkbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
+      &&  mkdir -p /export/mysql_pitr_binlogserver_bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay

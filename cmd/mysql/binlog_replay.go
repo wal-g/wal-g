@@ -21,7 +21,7 @@ var replayUntilBinlogLastModifiedTS string
 
 var binlogReplayCmd = &cobra.Command{
 	Use:   "binlog-replay",
-	Short: "fetches binlogs from storage and replays them to mysql",
+	Short: "Fetch binlogs from storage and replays them to MySQL",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, err := internal.ConfigureFolder()

@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	backupFetchShortDescription = "Fetches desired backup from storage"
+	backupFetchShortDescription = "Fetch desired backup from storage"
 	targetUserDataDescription   = "Fetch storage backup which has the specified user data"
 )
 

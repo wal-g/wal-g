@@ -14,6 +14,7 @@ Prints listing of the objects in the provided storage folder.
 Download the specified storage object. By default, the command will try to apply the decompression and decryption (if configured).
 
 Flags:
+
 1. Add `--no-decompress` to download the remote object without decompression
 2. Add `--no-decrypt` to download the remote object without decryption
 
@@ -29,6 +30,7 @@ By default, the command will NOT try to decompress and decrypt it.
 Useful for getting sentinels and other meta-information files.
 
 Flags:
+
 1. Add `--decompress` to decompress source file
 2. Add `--decrypt` to decrypt source file
 
@@ -47,6 +49,7 @@ Example:
 Upload the specified file to the storage. By default, the command will try to apply the compression and encryption (if configured).
 
 Flags:
+
 1. Add `--no-compress` to upload the object without compression
 2. Add `--no-encrypt` to upload the object without encryption
 

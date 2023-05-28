@@ -30,16 +30,11 @@ Command to prepare MySQL backup after restoring. Optional. Needed for xtrabackup
 
 * `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
 
-Command to replay binlog on runing MySQL. Required for binlog-fetch command.
+Command to replay binlog on running MySQL. Required for binlog-replay command.
 
 * `WALG_MYSQL_BINLOG_DST`
 
-To place binlogs in the specified directory during binlog-fetch or binlog-replay
-
-* `WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER`
-
-Set this variable to True if you are planning to take base backup from replica and binlog backup from master.
-If base and binlogs backups are taken from the same host, this variable should be left False (default).
+To place binlogs in the specified directory during binlog-fetch, binlog-replay or binlog-server
 
 * `WALG_MYSQL_BINLOG_SERVER_HOST`
 * `WALG_MYSQL_BINLOG_SERVER_PORT`
@@ -54,7 +49,7 @@ To configure the server id of the binlog server. Should be unique for each repli
 
 * `WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE`
 
-To configure the connection string for the replica that connects to the binlog server. Format ```user:password@host/dbname```
+To configure the connection string that will be used by `binlog-server` to connect to your MySQL. [DSN format](https://github.com/go-sql-driver/mysql#dsn-data-source-name): ```user:password@host/dbname```
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
@@ -65,11 +60,11 @@ Backup file names have a suffix `_0000.bz`.
 
 * `WALG_STREAM_SPLITTER_BLOCK_SIZE`
 
-To configure block size into which backup stream split. Block length size data is put into each partition in turn.
+To configure block size (bytes) into which backup stream split. Blocks of this length size is put into each partition in turn.
 
 * `WALG_STREAM_SPLITTER_MAX_FILE_SIZE`
 
-To configure max file size before compressing. If partition size become more than max file size, it split on several files.
+To configure max file size (bytes) before compressing. If partition size become more than max file size, it split on several files.
 Backup file names have a suffix `_0000_0000.bz`.
 
 * `WALG_BACKUP_DOWNLOAD_MAX_RETRIES`
@@ -217,14 +212,14 @@ mysql -e "RESET MASTER; SET @@GLOBAL.GTID_PURGED='$gtids';"
 ```
 * for PITR, replay binlogs with
 ```bash
-wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z07:00"
+wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z"
 ```
 
 ### MySQL - using with `mysqldump`
 
 
 It's possible to use wal-g with standard mysqldump/mysql tools.
-In that case MySQL mysql backup is a plain SQL script.
+In that case MySQL backup is a plain SQL script.
 Here's typical wal-g configuration for that case:
 
 ```bash
@@ -238,6 +233,34 @@ Restore procedure is straightforward:
 * start mysql (it's recommended to create new mysql instance)
 * fetch and apply desired backup using `wal-g backup-fetch "backup_name"`
 
+### MySQL - PiTR with `wal-g binlog-server`
+
+wal-g can work as replication source to do fast PiTR. In this case it will serve binlogs from storage directly to MySQL. It is expected that PiTR in this mode will be much faster than in classic approach because there won't be additional transformations from binlog to SQL, also you can benefit from multi-threaded replication.
+
+```bash
+ WALG_MYSQL_BINLOG_SERVER_HOST="127.0.0.1"
+ WALG_MYSQL_BINLOG_SERVER_PORT=9306
+ WALG_MYSQL_BINLOG_SERVER_USER="walg"
+ WALG_MYSQL_BINLOG_SERVER_PASSWORD="walgpwd"
+ WALG_MYSQL_BINLOG_SERVER_ID=99
+
+ WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="user:password@127.0.0.1:3306/db"
+```
+
+Restore procedure is straightforward:
+* restore backup
+* disable replication threads in MySQL: `skip-slave-start`
+* start MySQL, purge GTIDs (see above)
+* in second terminal start binlog-server: `wal-g binlog-server --until "1985-10-26T01:21:00Z"`
+* in MySQL:
+  ```SQL
+    SET GLOBAL SERVER_ID=999
+    CHANGE MASTER TO MASTER_HOST="127.0.0.1", MASTER_PORT=9306, MASTER_USER="walg", MASTER_PASSWORD="walgpwd", MASTER_AUTO_POSITION=1;
+    SHOW SLAVE STATUS \G
+    START SLAVE;
+  ```
+* wait until wal-g exit (it will wait until binlogs will be applied)
+* in case of errors use classic approach
 
 ### MariaDB - using with `mariabackup`
 
