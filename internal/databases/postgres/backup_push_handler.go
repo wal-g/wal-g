@@ -430,7 +430,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	// and version cannot be read easily using replication connection.
 	// Retrieve both with this helper function which uses a temp connection to postgres.
 
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureDefaultUploader()
 	if err != nil {
 		return nil, err
 	}

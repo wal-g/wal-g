@@ -18,7 +18,7 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigP
 
 	localStorage := binary.CreateLocalStorage(config.GetDBPath())
 
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureDefaultUploader()
 	if err != nil {
 		return err
 	}

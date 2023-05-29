@@ -23,7 +23,7 @@ var (
 		Long:  BackupMarkLongDescription,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			uploader, err := internal.ConfigureUploader()
+			uploader, err := internal.ConfigureDefaultUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
 			internal.HandleBackupMark(uploader, args[0], !toImpermanent, postgres.NewGenericMetaInteractor())
 		},

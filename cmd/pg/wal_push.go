@@ -18,7 +18,7 @@ var walPushCmd = &cobra.Command{
 	Short: WalPushShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		baseUploader, err := internal.ConfigureUploader()
+		baseUploader, err := internal.ConfigureDefaultUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		failover, err := internal.InitFailoverStorages()

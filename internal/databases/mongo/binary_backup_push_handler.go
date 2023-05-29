@@ -21,7 +21,7 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureDefaultUploader()
 	if err != nil {
 		return err
 	}

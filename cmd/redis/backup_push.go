@@ -36,7 +36,7 @@ var backupPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureDefaultUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// Configure folder
