@@ -99,6 +99,8 @@ services:
       &&  mkdir -p /export/gpdeltabackuptestbucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
+      &&  mkdir -p /export/sttransferbucket
+      &&  mkdir -p /export/sttransferfailoverbucket
       &&  mkdir -p /export/walrestorebucket
       && mkdir -p /export/daemonbucket
       &&  /usr/bin/minio server /export'
