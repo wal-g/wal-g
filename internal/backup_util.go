@@ -65,7 +65,6 @@ func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
 	return sentinelObjects, nil
 }
 
-// TODO : unit tests
 // GetBackups receives backup descriptions and sorts them by time
 func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	backups, _, err = GetBackupsAndGarbage(folder)
@@ -80,7 +79,6 @@ func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	return
 }
 
-// TODO : unit tests
 func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage []string, err error) {
 	backupObjects, subFolders, err := folder.ListFolder()
 	if err != nil {
