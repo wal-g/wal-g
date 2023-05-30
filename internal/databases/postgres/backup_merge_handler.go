@@ -24,9 +24,9 @@ type BackupMergeHandler struct {
 	resultBackupName      string
 }
 
-func NewBackupMergeHandler(targetBackupName string, storageFolder storage.Folder,
+func NewBackupMergeHandler(targetBackupName string,
+	storageFolder storage.Folder,
 	tarBallComposerType TarBallComposerType) (*BackupMergeHandler, error) {
-
 	baseBackupPath := storageFolder.GetSubFolder(utility.BaseBackupPath)
 	targetDeltaBackup := NewBackup(baseBackupPath, targetBackupName)
 	deltaBackupSentinel, err := targetDeltaBackup.GetSentinel()
@@ -56,7 +56,6 @@ func (bm *BackupMergeHandler) fetchBackup(targetDir string) {
 }
 
 func (bm *BackupMergeHandler) sendMergedBackup(tempDir string) {
-
 	sentinel, err := bm.targetDeltaBackup.GetSentinel()
 	tracelog.ErrorLogger.FatalOnError(err)
 	//baseBackupName := sentinel.IncrementFullName
@@ -86,7 +85,6 @@ func (bm *BackupMergeHandler) sendMergedBackup(tempDir string) {
 }
 
 func (bm *BackupMergeHandler) uploadMergedBackupToStorage(tempDir string, workers *BackupWorkers) (*internal.TarFileSets, *Bundle) {
-
 	uploader := workers.Uploader
 
 	crypter := internal.ConfigureCrypter()
@@ -153,7 +151,6 @@ func getMainBackupSentinel(backup *Backup, sentinel *BackupSentinelDto) (BackupS
 // baseBackup base backup from which delta backups were collected
 // return archive name with label files
 func (bm *BackupMergeHandler) uploadLabelFiles(uploader *internal.Uploader) (string, error) {
-
 	_, metadataDto, err := bm.baseBackup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return "", err
@@ -185,9 +182,10 @@ func (bm *BackupMergeHandler) uploadLabelFiles(uploader *internal.Uploader) (str
 	return targetArchiveFileName, nil
 }
 
-func (bm *BackupMergeHandler) uploadMetadata(tarFilesSets *internal.TarFileSets, bundle *Bundle,
-	uploader *internal.RegularUploader) error {
-
+func (bm *BackupMergeHandler) uploadMetadata(tarFilesSets *internal.TarFileSets,
+	bundle *Bundle,
+	uploader *internal.RegularUploader,
+) error {
 	err := bm.uploadFilesMetadata(tarFilesSets, bundle, uploader)
 	if err != nil {
 		return err

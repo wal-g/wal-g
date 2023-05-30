@@ -2,7 +2,6 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -25,7 +24,8 @@ var backupMergeCmd = &cobra.Command{
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		composer := chooseTarBallComposer2()
+		// TODO move function chooseTarBallComposer() to some tarBalComposerProvider.go (create it)
+		composer := chooseTarBallComposer()
 
 		mergeHandler, err := postgres.NewBackupMergeHandler(targetBackupName, folder, composer)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -33,29 +33,6 @@ var backupMergeCmd = &cobra.Command{
 		mergeHandler.HandleBackupMerge()
 		tracelog.InfoLogger.Println("DONE")
 	},
-}
-
-// copy from backup_push
-func chooseTarBallComposer2() postgres.TarBallComposerType {
-	tarBallComposerType := postgres.RegularComposer
-
-	useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
-	if useRatingComposer {
-		tarBallComposerType = postgres.RatingComposer
-	}
-
-	useDatabaseComposer = useDatabaseComposer || viper.GetBool(internal.UseDatabaseComposerSetting)
-	if useDatabaseComposer {
-		tarBallComposerType = postgres.DatabaseComposer
-	}
-
-	useCopyComposer = useCopyComposer || viper.GetBool(internal.UseCopyComposerSetting)
-	if useCopyComposer {
-		fullBackup = true
-		tarBallComposerType = postgres.CopyComposer
-	}
-
-	return tarBallComposerType
 }
 
 func init() {
