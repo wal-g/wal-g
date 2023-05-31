@@ -235,19 +235,19 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 	return fsutil.ExistingDiskDataFolder(getPGArchiveStatusFolderPath())
 }
 
-// ConfigureDefaultUploader is like ConfigureUploader, but configures the default storage.
-func ConfigureDefaultUploader() (uploader *RegularUploader, err error) {
+// ConfigureUploader is like ConfigureUploaderToFolder, but configures the default storage.
+func ConfigureUploader() (uploader *RegularUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
-	return ConfigureUploader(folder)
+	return ConfigureUploaderToFolder(folder)
 }
 
-// ConfigureUploader connects to storage with the specified folder and creates an uploader.
+// ConfigureUploaderToFolder connects to storage with the specified folder and creates an uploader.
 // It makes sure that a valid session has started; if invalid, returns AWS error and `<nil>` value.
-func ConfigureUploader(folder storage.Folder) (uploader *RegularUploader, err error) {
+func ConfigureUploaderToFolder(folder storage.Folder) (uploader *RegularUploader, err error) {
 	compressor, err := ConfigureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
@@ -268,7 +268,7 @@ func ConfigureUploaderWithoutCompressor() (uploader Uploader, err error) {
 }
 
 func ConfigureSplitUploader() (Uploader, error) {
-	uploader, err := ConfigureDefaultUploader()
+	uploader, err := ConfigureUploader()
 	if err != nil {
 		return nil, err
 	}

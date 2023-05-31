@@ -54,7 +54,7 @@ func init() {
 func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplogPushStatsArgs) error {
 	// set up storage client
 	tracelog.DebugLogger.Printf("starting oplog archiving with arguments: %+v", pushArgs)
-	uplProvider, err := internal.ConfigureDefaultUploader()
+	uplProvider, err := internal.ConfigureUploader()
 	if err != nil {
 		return err
 	}

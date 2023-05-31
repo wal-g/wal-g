@@ -28,7 +28,7 @@ var putObjectCmd = &cobra.Command{
 		dstPath := args[1]
 
 		err := multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
-			uploader, err := internal.ConfigureUploader(folder)
+			uploader, err := internal.ConfigureUploaderToFolder(folder)
 			if err != nil {
 				return err
 			}

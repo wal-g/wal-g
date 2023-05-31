@@ -476,7 +476,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version s
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
 func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) {
-	uploader, err := internal.ConfigureDefaultUploader()
+	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return nil, err
 	}

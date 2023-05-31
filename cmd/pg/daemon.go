@@ -17,7 +17,7 @@ var daemonCmd = &cobra.Command{
 	Short: DaemonShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		baseUploader, err := internal.ConfigureDefaultUploader()
+		baseUploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		uploader, err := postgres.ConfigureWalUploader(baseUploader)

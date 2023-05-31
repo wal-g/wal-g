@@ -92,7 +92,7 @@ type RestorePointCreator struct {
 
 // NewRestorePointCreator returns a restore point creator
 func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err error) {
-	uploader, err := internal.ConfigureDefaultUploader()
+	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return nil, err
 	}
