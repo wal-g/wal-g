@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/wal-g/wal-g/internal/abool"
 
+	"github.com/VividCortex/ewma"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -118,6 +120,9 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
 func (uploader *RegularUploader) Finish() {
+	uploader.waitGroup.Add(1)
+	go uploader.ShowRemainingTime()
+
 	uploader.waitGroup.Wait()
 	if uploader.failed.IsSet() {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
@@ -214,5 +219,42 @@ func (uploader *SplitStreamUploader) Clone() Uploader {
 		Uploader:   uploader.Uploader.Clone(),
 		partitions: uploader.partitions,
 		blockSize:  uploader.blockSize,
+	}
+}
+
+func (uploader *RegularUploader) ShowRemainingTime() {
+	defer uploader.waitGroup.Done()
+	startTime := time.Now()
+	e := ewma.SimpleEWMA{}
+	e.Add(0)
+	for {
+		totalSizeInt, err := uploader.RawDataSize()
+		if err != nil {
+			return
+		}
+		uploadedSizeInt, err := uploader.UploadedDataSize()
+		if err != nil {
+			return
+		}
+
+		totalSize := float64(totalSizeInt) / 1000000
+		uploadedSize := float64(uploadedSizeInt) / 1000000
+
+		remainingSize := totalSize - uploadedSize
+
+		timeElapsed := time.Since(startTime).Seconds()
+		uploadSpeed := uploadedSize / timeElapsed // Mb/sec
+		e.Add(uploadSpeed)
+
+		remainingTime := time.Duration(remainingSize/uploadSpeed) * time.Second // sec
+		tracelog.InfoLogger.Println("Uploaded: %v Mb", uploadedSize)
+		tracelog.InfoLogger.Println("%v Mb left to Upload", remainingSize)
+		tracelog.InfoLogger.Println("Average upload speed: %v Mb/s", e.Value())
+		tracelog.InfoLogger.Println("Remaining time: %v\n", remainingTime)
+
+		if uploadedSize >= totalSize {
+			break
+		}
+		time.Sleep(5 * time.Minute)
 	}
 }
