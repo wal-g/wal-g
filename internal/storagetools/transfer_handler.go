@@ -3,6 +3,8 @@ package storagetools
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
 	"time"
 
@@ -131,6 +133,7 @@ func (h *TransferHandler) transferConcurrently(workers int, files []storage.Obje
 	errs := make(chan error, len(files))
 
 	workersCtx, cancelWorkers := context.WithCancel(context.Background())
+	cancelOnSignal(cancelWorkers)
 	workersWG := new(sync.WaitGroup)
 	workersWG.Add(workers)
 	for i := 0; i < workers; i++ {
@@ -159,6 +162,15 @@ func (h *TransferHandler) transferConcurrently(workers int, files []storage.Obje
 	errsWG.Wait()
 
 	return finErr
+}
+
+func cancelOnSignal(cancel context.CancelFunc) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt)
+	go func() {
+		<-sigs
+		cancel()
+	}()
 }
 
 func (h *TransferHandler) transferFilesWorker(
@@ -218,9 +230,7 @@ func (h *TransferHandler) copyFile(job transferJob) (newJob *transferJob, err er
 	if err != nil {
 		return nil, fmt.Errorf("can't read file from the source storage: %w", err)
 	}
-	defer func() {
-		_ = content.Close()
-	}()
+	defer utility.LoggedClose(content, "can't close object content read from the source storage")
 
 	err = h.target.PutObject(job.filePath, content)
 	if err != nil {
