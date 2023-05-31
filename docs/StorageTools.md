@@ -96,4 +96,6 @@ Examples:
 
 ``wal-g st transfer / --source='my_failover_ssh'``
 
-``wal-g st transfer basebackups_005/ --source='my_failover_s3' --target='default' --overwrite --fail-fast -c=50 -m=10000 --appearance-checks=5 --appearance-checks-interval=1s``
+``wal-g st transfer folder/single_file.json --source='default' --target='my_failover_ssh' --overwrite``
+
+``wal-g st transfer basebackups_005/ --source='my_failover_s3' --target='default' --fail-fast -c=50 -m=10000 --appearance-checks=5 --appearance-checks-interval=1s``
