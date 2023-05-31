@@ -244,14 +244,14 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 		remainingSize := totalSize - uploadedSize
 
 		timeElapsed := time.Since(startTime).Seconds()
-		uploadSpeed := uploadedSize / timeElapsed // Mb/sec
+		uploadSpeed := uploadedSize / timeElapsed
 		e.Add(uploadSpeed)
 
-		remainingTime := time.Duration(remainingSize/uploadSpeed) * time.Second // sec
-		tracelog.InfoLogger.Println("Uploaded: %v Mb", uploadedSize)
-		tracelog.InfoLogger.Println("%v Mb left to Upload", remainingSize)
-		tracelog.InfoLogger.Println("Average upload speed: %v Mb/s", e.Value())
-		tracelog.InfoLogger.Println("Remaining time: %v\n", remainingTime)
+		remainingTime := time.Duration(remainingSize/uploadSpeed) * time.Second
+		tracelog.InfoLogger.Printf("Uploaded: %v Mb\n", uploadedSize)
+		tracelog.InfoLogger.Printf("%v Mb left to Upload\n", remainingSize)
+		tracelog.InfoLogger.Printf("Average upload speed: %v Mb/s\n", e.Value())
+		tracelog.InfoLogger.Printf("Remaining time: %v\n", remainingTime)
 
 		if uploadedSize >= totalSize {
 			break
