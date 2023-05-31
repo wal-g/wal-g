@@ -34,6 +34,7 @@ type Uploader interface {
 	Clone() Uploader
 	Failed() bool
 	Finish()
+	ShowRemainingTime()
 }
 
 // RegularUploader contains fields associated with uploading tarballs.
