@@ -31,4 +31,4 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 
 COPY docker/st_tests/scripts/ /tmp
 
-CMD /tmp/tests/storage_tool_tests.sh
+CMD /tmp/run_integration_tests.sh
