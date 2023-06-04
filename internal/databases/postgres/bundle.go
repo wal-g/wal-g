@@ -145,24 +145,23 @@ func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
 func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
-	backupTime time.Time) (backupName string, lsn LSN, err error) {
+	backupTime time.Time) (lsn LSN, err error) {
 	var lsnStr string
 
-	backupName = "backup_" + utility.TimeCrossPlatformUTC(backupTime).Format(utility.BackupTimeFormat)
 	lsnStr, bundle.Replica, err = queryRunner.startBackup(utility.CeilTimeUpToMicroseconds(backupTime).String())
 
 	if err != nil {
-		return "", 0, err
+		return 0, err
 	}
 	lsn, err = ParseLSN(lsnStr)
 	if err != nil {
-		return "", 0, err
+		return 0, err
 	}
 
 	if bundle.Replica {
 		bundle.Timeline, err = queryRunner.readTimeline()
 		if err != nil {
-			return "", 0, err
+			return 0, err
 		}
 	} else {
 		bundle.Timeline, err = queryRunner.readTimeline()
@@ -170,7 +169,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
 	}
-	return backupName, lsn, nil
+	return lsn, nil
 }
 
 // TODO : unit tests

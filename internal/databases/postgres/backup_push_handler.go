@@ -22,6 +22,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const (
+	BackupNamePrefix = "backup_"
+	BackupNameLength = len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+)
+
 type backupFromFuture struct {
 	error
 }
@@ -171,10 +176,13 @@ func (bh *BackupHandler) startBackup() (err error) {
 	}
 
 	tracelog.DebugLogger.Println("Running StartBackup.")
-	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(bh.Workers.QueryRunner, time.Now())
+	backupTime := time.Now()
+	backupStartLSN, err := bh.Workers.Bundle.StartBackup(bh.Workers.QueryRunner, backupTime)
 	if err != nil {
 		return
 	}
+
+	backupName := BackupNamePrefix + utility.TimeCrossPlatformUTC(backupTime).Format(utility.BackupTimeFormat)
 	bh.CurBackupInfo.startLSN = backupStartLSN
 	bh.CurBackupInfo.Name = backupName
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
@@ -209,7 +217,9 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 					"Fallback to full scan delta backup\n", err)
 			}
 		}
-		bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + "_D_" + utility.StripWalFileName(bh.prevBackupInfo.name)
+
+		baseName := bh.prevBackupInfo.name[len(BackupNamePrefix):BackupNameLength]
+		bh.CurBackupInfo.Name += "_D_" + baseName
 		tracelog.DebugLogger.Printf("Suffixing Backup name with Delta info: %s", bh.CurBackupInfo.Name)
 	}
 }
