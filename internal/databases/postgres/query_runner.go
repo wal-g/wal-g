@@ -103,11 +103,11 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 			" FROM pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90600:
 		return "SELECT case when pg_is_in_recovery() " +
-			"then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
 			" FROM pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90000:
 		return "SELECT case when pg_is_in_recovery() " +
-			"then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
+			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
 			" FROM pg_start_backup($1, true) lsn", nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
