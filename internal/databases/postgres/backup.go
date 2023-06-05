@@ -28,6 +28,7 @@ var UtilityFilePaths = map[string]bool{
 }
 
 var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?", PatternTimelineAndLogSegNo, PatternLSN)
+var patternPgBackupName = fmt.Sprintf("backup_%[1]s(_D_%[1]s)?(_%[2]s)?", PatternTimestamp, PatternLSN)
 var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
 
 // Backup contains information about a valid Postgres backup

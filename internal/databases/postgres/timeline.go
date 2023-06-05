@@ -11,6 +11,7 @@ import (
 )
 
 const PatternTimelineAndLogSegNo = "[0-9A-F]{24}"
+const PatternTimestamp = "[0-9A-Z]{16}"
 const PatternLSN = "[0-9A-F]{8}"
 
 var regexpTimelineAndLogSegNo = regexp.MustCompile(PatternTimelineAndLogSegNo)
