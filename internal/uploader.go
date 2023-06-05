@@ -165,9 +165,9 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 	}
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
 	buf := &bytes.Buffer{}
-	nRead, io_err := io.Copy(buf, compressedFile)
-	if io_err != nil {
-		return io_err
+	nRead, ioErr := io.Copy(buf, compressedFile)
+	if ioErr != nil {
+		return ioErr
 	}
 
 	uploader.compressedSize = &nRead
