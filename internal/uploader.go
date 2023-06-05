@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -163,14 +162,11 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 	if uploader.dataSize != nil {
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
-	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
-	buf := &bytes.Buffer{}
-	nRead, ioErr := io.Copy(buf, compressedFile)
-	if ioErr != nil {
-		return ioErr
+	compressedFile, sizeChannel := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
+	if sizeChannel != nil {
+		compressedSize := <-sizeChannel
+		uploader.compressedSize = &(compressedSize)
 	}
-
-	uploader.compressedSize = &nRead
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)

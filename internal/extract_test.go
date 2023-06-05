@@ -152,7 +152,7 @@ func TestDecryptAndDecompressTar_unencrypted(t *testing.T) {
 	copy(bCopy, b)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, nil)
+	compressed, _ := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, nil)
 
 	compressedBuffer := &bytes.Buffer{}
 	_, _ = compressedBuffer.ReadFrom(compressed)
@@ -180,7 +180,7 @@ func TestDecryptAndDecompressTar_encrypted(t *testing.T) {
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+	compressed, _ := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
 	reader, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lz4", crypter)
 	if err != nil {
@@ -205,7 +205,7 @@ func TestDecryptAndDecompressTar_noCrypter(t *testing.T) {
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+	compressed, _ := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
 	reader, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lz4", nil)
 	if err != nil {
@@ -230,7 +230,7 @@ func TestDecryptAndDecompressTar_wrongCrypter(t *testing.T) {
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+	compressed, _ := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
 
 	_, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lzma", crypter)
 	if err != nil {
@@ -261,7 +261,7 @@ func TestDecryptAndDecompressTar_uncompressed(t *testing.T) {
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
 
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), nil, nil)
+	compressed, _ := internal.CompressAndEncrypt(bytes.NewReader(b), nil, nil)
 
 	compressedBuffer := &bytes.Buffer{}
 	_, _ = compressedBuffer.ReadFrom(compressed)

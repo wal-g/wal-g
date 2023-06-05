@@ -135,7 +135,7 @@ func (u *AoStorageUploader) regularAoUpload(
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
 	var compressor compression.Compressor
 
-	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
+	uploadContents, _ := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
 	err = u.uploader.Upload(uploadPath, uploadContents)
 	if err != nil {
@@ -179,7 +179,7 @@ func (u *AoStorageUploader) upload(reader io.Reader, storageKey string) error {
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
 	var compressor compression.Compressor
 
-	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
+	uploadContents, _ := internal.CompressAndEncrypt(reader, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
 	return u.uploader.Upload(uploadPath, uploadContents)
 }
