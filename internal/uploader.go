@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -29,6 +30,7 @@ type Uploader interface {
 	DisableSizeTracking()
 	UploadedDataSize() (int64, error)
 	RawDataSize() (int64, error)
+	CompressedDataSize() (int64, error)
 	ChangeDirectory(relativePath string)
 	Folder() storage.Folder
 	Clone() Uploader
@@ -46,7 +48,15 @@ type RegularUploader struct {
 	failed          *abool.AtomicBool
 	tarSize         *int64
 	dataSize        *int64
+	compressedSize  *int64
 	uploadSpeeds    ewma.SimpleEWMA
+}
+
+func (uploader *RegularUploader) CompressedDataSize() (int64, error) {
+	if uploader.compressedSize == nil {
+		return 0, ErrorSizeTrackingDisabled
+	}
+	return atomic.LoadInt64(uploader.compressedSize), nil
 }
 
 var _ Uploader = &RegularUploader{}
@@ -154,6 +164,13 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
+	buf := &bytes.Buffer{}
+	nRead, io_err := io.Copy(buf, compressedFile)
+	if io_err != nil {
+		return io_err
+	}
+
+	uploader.compressedSize = &nRead
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)
@@ -229,7 +246,7 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 	defer uploader.waitGroup.Done()
 	startTime := time.Now()
 	for {
-		totalSizeInt, err := uploader.RawDataSize()
+		totalSizeInt, err := uploader.CompressedDataSize()
 		if err != nil {
 			return
 		}
