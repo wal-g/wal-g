@@ -46,6 +46,7 @@ type RegularUploader struct {
 	failed          *abool.AtomicBool
 	tarSize         *int64
 	dataSize        *int64
+	uploadSpeeds    ewma.SimpleEWMA
 }
 
 var _ Uploader = &RegularUploader{}
@@ -139,6 +140,7 @@ func (uploader *RegularUploader) Clone() Uploader {
 		failed:          abool.NewBool(uploader.Failed()),
 		tarSize:         uploader.tarSize,
 		dataSize:        uploader.dataSize,
+		uploadSpeeds:    uploader.uploadSpeeds,
 	}
 }
 
@@ -226,8 +228,6 @@ func (uploader *SplitStreamUploader) Clone() Uploader {
 func (uploader *RegularUploader) ShowRemainingTime() {
 	defer uploader.waitGroup.Done()
 	startTime := time.Now()
-	e := ewma.SimpleEWMA{}
-	e.Add(0)
 	for {
 		totalSizeInt, err := uploader.RawDataSize()
 		if err != nil {
@@ -244,8 +244,8 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 		remainingSize := totalSize - uploadedSize
 
 		timeElapsed := time.Since(startTime).Seconds()
-		e.Add(uploadedSize / timeElapsed)
-		meanSpeed := e.Value()
+		uploader.uploadSpeeds.Add(uploadedSize / timeElapsed)
+		meanSpeed := uploader.uploadSpeeds.Value()
 
 		remainingTime := time.Duration(remainingSize/meanSpeed) * time.Second
 		tracelog.InfoLogger.Printf("Uploaded: %v Mb\n", uploadedSize)
