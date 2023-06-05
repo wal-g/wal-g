@@ -130,7 +130,7 @@ func (bb *StreamingBaseBackup) Upload(uploader internal.Uploader, bundleFiles in
 	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)
 	for {
 		tbsTar := ioextensions.NewNamedReaderImpl(bb.streamer, bb.FileName())
-		compressedFile, _ := internal.CompressAndEncrypt(tbsTar, bb.uploader.Compression(), internal.ConfigureCrypter())
+		compressedFile := internal.CompressAndEncrypt(tbsTar, bb.uploader.Compression(), internal.ConfigureCrypter())
 		dstPath := fmt.Sprintf("%s.%s", bb.Path(), bb.uploader.Compression().FileExtension())
 		err = bb.uploader.Upload(dstPath, compressedFile)
 		if err != nil {
@@ -154,7 +154,7 @@ func (bb *StreamingBaseBackup) Upload(uploader internal.Uploader, bundleFiles in
 	// Upload the extra tar
 	if len(bb.streamer.Tee) > 0 {
 		teeTar := ioextensions.NewNamedReaderImpl(bb.streamer.TeeIo, bb.FileName())
-		teeCompressedFile, _ := internal.CompressAndEncrypt(teeTar, bb.uploader.Compression(), internal.ConfigureCrypter())
+		teeCompressedFile := internal.CompressAndEncrypt(teeTar, bb.uploader.Compression(), internal.ConfigureCrypter())
 		teeFileName := fmt.Sprintf("pg_control.tar.%s", bb.uploader.Compression().FileExtension())
 		teeFilePath := storage.JoinPath(bb.BackupName(), internal.TarPartitionFolderName, teeFileName)
 		err = bb.uploader.Upload(teeFilePath, teeCompressedFile)

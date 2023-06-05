@@ -75,7 +75,7 @@ func TestCompressAndEncrypt(t *testing.T) {
 	for _, testCase := range tests {
 		in := &testtools.BufCloser{Buffer: bytes.NewBufferString(testCase.testString), Err: false}
 		compressor := GetLz4Compressor()
-		compressed, _ := internal.CompressAndEncrypt(in, compressor, nil)
+		compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
 		decompressor := compression.GetDecompressorByCompressor(compressor)
 		decompressed, err := decompressor.Decompress(compressed)
@@ -101,7 +101,7 @@ func TestCompressAndEncryptBigChunk(t *testing.T) {
 	in := &testtools.BufCloser{Buffer: bytes.NewBuffer(b), Err: false}
 
 	compressor := GetLz4Compressor()
-	compressed, _ := internal.CompressAndEncrypt(in, compressor, nil)
+	compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
 	decompressor := compression.GetDecompressorByCompressor(compressor)
 	decompressed, err := decompressor.Decompress(compressed)
@@ -141,7 +141,7 @@ func testCompressAndEncryptErrorPropagation(compressor compression.Compressor, t
 	rand.Read(b)
 	in := &testtools.BufCloser{Buffer: bytes.NewBuffer(b), Err: false}
 
-	compressed, _ := internal.CompressAndEncrypt(in, compressor, nil)
+	compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
 	decompressor := compression.GetDecompressorByCompressor(compressor)
 	decompressed, err := decompressor.Decompress(&DelayedErrorReader{compressed, L})
@@ -158,7 +158,7 @@ func TestCompressAndEncryptErrorPropagation(t *testing.T) {
 
 func TestCompressAndEncryptError(t *testing.T) {
 	compressor := GetLz4Compressor()
-	compressed, _ := internal.CompressAndEncrypt(&testtools.ErrorReader{}, compressor, nil)
+	compressed := internal.CompressAndEncrypt(&testtools.ErrorReader{}, compressor, nil)
 
 	_, err := io.ReadAll(compressed)
 	assert.Errorf(t, err, "compress: CompressingPipeWriter expected error but got `<nil>`")
@@ -170,7 +170,7 @@ func TestCompressAndEncryptError(t *testing.T) {
 func TestCompressAndEncryptWithNoCompression(t *testing.T) {
 	for _, testCase := range tests {
 		in := &testtools.BufCloser{Buffer: bytes.NewBufferString(testCase.testString), Err: false}
-		compressed, _ := internal.CompressAndEncrypt(in, nil, nil)
+		compressed := internal.CompressAndEncrypt(in, nil, nil)
 
 		decompressed := &testtools.BufCloser{Buffer: &bytes.Buffer{}, Err: false}
 		_, err := decompressed.ReadFrom(compressed)

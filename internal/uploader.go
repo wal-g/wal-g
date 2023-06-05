@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -51,13 +52,6 @@ type RegularUploader struct {
 	uploadSpeeds    ewma.SimpleEWMA
 }
 
-func (uploader *RegularUploader) CompressedDataSize() (int64, error) {
-	if uploader.compressedSize == nil {
-		return 0, ErrorSizeTrackingDisabled
-	}
-	return atomic.LoadInt64(uploader.compressedSize), nil
-}
-
 var _ Uploader = &RegularUploader{}
 
 // SplitStreamUploader - new Uploader implementation that enable us to split upload streams into blocks
@@ -88,6 +82,7 @@ func NewRegularUploader(
 		waitGroup:       &sync.WaitGroup{},
 		tarSize:         new(int64),
 		dataSize:        new(int64),
+		compressedSize:  new(int64),
 		failed:          abool.New(),
 	}
 	return uploader
@@ -128,6 +123,13 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 	return atomic.LoadInt64(uploader.dataSize), nil
 }
 
+func (uploader *RegularUploader) CompressedDataSize() (int64, error) {
+	if uploader.compressedSize == nil {
+		return 0, ErrorSizeTrackingDisabled
+	}
+	return atomic.LoadInt64(uploader.compressedSize), nil
+}
+
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
 func (uploader *RegularUploader) Finish() {
@@ -162,11 +164,7 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 	if uploader.dataSize != nil {
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
-	compressedFile, sizeChannel := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
-	if sizeChannel != nil {
-		compressedSize := <-sizeChannel
-		uploader.compressedSize = &(compressedSize)
-	}
+	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)
@@ -178,6 +176,7 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 func (uploader *RegularUploader) DisableSizeTracking() {
 	uploader.tarSize = nil
 	uploader.dataSize = nil
+	uploader.compressedSize = nil
 }
 
 // Compression returns configured compressor
@@ -194,7 +193,16 @@ func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
+	compressedFileBytes, ioErr := io.ReadAll(content)
+	if ioErr != nil {
+		return ioErr
+	}
+	compressedSize := int64(len(compressedFileBytes))
+	uploader.compressedSize = &(compressedSize)
+	content = bytes.NewReader(compressedFileBytes)
+
 	err := uploader.UploadingFolder.PutObject(path, content)
+
 	if err != nil {
 		WalgMetrics.uploadedFilesFailedTotal.Inc()
 		uploader.failed.Set()
