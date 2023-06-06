@@ -73,8 +73,11 @@ func (h *TransferHandler) listFilesToMove() ([]storage.Object, error) {
 		missingFiles[sourceFile.GetName()] = sourceFile
 	}
 	for _, targetFile := range targetFiles {
+		sourceFile, presentInBothStorages := missingFiles[targetFile.GetName()]
+		if !presentInBothStorages {
+			continue
+		}
 		if h.cfg.Overwrite {
-			sourceFile := missingFiles[targetFile.GetName()]
 			logSizesDifference(sourceFile, targetFile)
 		} else {
 			delete(missingFiles, targetFile.GetName())

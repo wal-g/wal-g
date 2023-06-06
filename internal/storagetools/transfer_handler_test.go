@@ -199,6 +199,21 @@ func TestTransferHandler_listFilesToMove(t *testing.T) {
 		require.Len(t, files, 2)
 	})
 
+	t.Run("dont include nonexistent files even when overwrite allowed", func(t *testing.T) {
+		h := defaultHandler()
+		h.cfg.Overwrite = true
+
+		_ = h.source.PutObject("2", &bytes.Buffer{})
+
+		_ = h.target.PutObject("1", &bytes.Buffer{})
+
+		files, err := h.listFilesToMove()
+		assert.NoError(t, err)
+
+		require.Len(t, files, 1)
+		assert.Equal(t, "2", files[0].GetName())
+	})
+
 	t.Run("limit number of files", func(t *testing.T) {
 		h := defaultHandler()
 		h.cfg.MaxFiles = 1
