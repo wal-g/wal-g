@@ -149,6 +149,15 @@ wal-g backup-fetch LATEST --content-ids=3,5,7 --restore-config=restore-config.js
 wal-g backup-fetch LATEST --mode=unpack --restore-config=restore-config.json --config=/etc/wal-g/wal-g.yaml
 ```
 
+#### Restore only specific databases
+`--restore-only` restores only specified databases' files in default tablespace directory (`/base`). Also restore all system databases. This can reduce the amount of files needed to download from storage. 
+
+Because of unrestored databases' remains are still in system tables, it is recommended to drop them.
+
+```bash
+wal-g backup-fetch LATEST --restore-only=db, "db with spaces" --restore-config=restore-config.json --config=/etc/wal-g/wal-g.yaml
+```
+
 #### In-place restore
 WAL-G can also do in-place backup restoration without the restore config. It might be useful when restoring to the same hosts that were used to make a backup:
 ```bash

@@ -21,6 +21,8 @@ const (
 	fetchModeDescription         = "Backup fetch mode. default: do the backup unpacking " +
 		"and prepare the configs [unpack+prepare], unpack: backup unpacking only, prepare: config preparation only."
 	inPlaceFlagDescription = "Perform the backup fetch in-place (without the restore config)"
+	restoreOnlyDescription = `[Experimental] Downloads only databases specified by passed names from default tablespace.
+Always downloads system databases.`
 )
 
 var fetchTargetUserData string
@@ -30,6 +32,7 @@ var restoreConfigPath string
 var fetchContentIds *[]int
 var fetchModeStr string
 var inPlaceRestore bool
+var onlyDatabases []string
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch [backup_name | --target-user-data <data> | --restore-point <name>]",
@@ -72,7 +75,7 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		internal.HandleBackupFetch(folder, targetBackupSelector,
-			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint))
+			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint, onlyDatabases))
 	},
 }
 
@@ -109,6 +112,7 @@ func init() {
 		"", restoreConfigPathDescription)
 	backupFetchCmd.Flags().BoolVar(&inPlaceRestore, "in-place", false, inPlaceFlagDescription)
 	fetchContentIds = backupFetchCmd.Flags().IntSlice("content-ids", []int{}, fetchContentIdsDescription)
+	backupFetchCmd.Flags().StringSliceVar(&onlyDatabases, "restore-only", nil, restoreOnlyDescription)
 
 	backupFetchCmd.Flags().StringVar(&fetchModeStr, "mode", "default", fetchModeDescription)
 	cmd.AddCommand(backupFetchCmd)

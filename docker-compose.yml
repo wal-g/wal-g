@@ -97,6 +97,7 @@ services:
       &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/gpaostoragetestbucket
       &&  mkdir -p /export/gpdeltabackuptestbucket
+      &&  mkdir -p /export/gppartialbucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  mkdir -p /export/sttransferbucket

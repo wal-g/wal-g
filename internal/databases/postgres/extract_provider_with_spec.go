@@ -43,8 +43,8 @@ func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
 }
 
 type ExtractProviderDBSpec struct {
-	ExtractProviderImpl
-	restoreParameters []string
+	ExtractProviderImpl ExtractProvider
+	restoreParameters   []string
 }
 
 func NewExtractProviderDBSpec(partialRestoreParameters []string) *ExtractProviderDBSpec {
