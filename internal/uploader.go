@@ -198,8 +198,11 @@ func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
 	if ioErr != nil {
 		return ioErr
 	}
-	compressedSize := int64(len(compressedFileBytes))
-	uploader.compressedSize = &(compressedSize)
+	compressedSizeBytes := int64(len(compressedFileBytes))
+	if uploader.compressedSize != nil && *uploader.compressedSize != compressedSizeBytes {
+		uploader.compressedSize = &compressedSizeBytes
+	}
+
 	content = bytes.NewReader(compressedFileBytes)
 
 	err := uploader.UploadingFolder.PutObject(path, content)
