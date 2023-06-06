@@ -199,7 +199,8 @@ func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
 		return ioErr
 	}
 	compressedSizeBytes := int64(len(compressedFileBytes))
-	if uploader.compressedSize != nil && *uploader.compressedSize != compressedSizeBytes {
+	setSize, compressionErr := uploader.CompressedDataSize()
+	if compressionErr == nil && setSize != compressedSizeBytes {
 		atomic.StoreInt64(uploader.compressedSize, compressedSizeBytes)
 	}
 
