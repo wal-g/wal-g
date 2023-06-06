@@ -82,6 +82,8 @@ Flags:
 
    Regardless of the flag, the command will end with zero error code only if all the files have moved successfully.
 
+   Keep in mind that files aren't transferred atomically. This means that when this flag is set, an error occured with one file may interrupt transferring other files in the middle, so they may already be copied to the target storage, but not yet deleted from the source. 
+
 5. Add `-c (--concurrency)` to set the max number of concurrent workers that will move files.
 
 6. Add `-m (--max)` to set the max number of files to move in a single command run.
