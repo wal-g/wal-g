@@ -151,6 +151,7 @@ func (uploader *RegularUploader) Clone() Uploader {
 		failed:          abool.NewBool(uploader.Failed()),
 		tarSize:         uploader.tarSize,
 		dataSize:        uploader.dataSize,
+		compressedSize:  uploader.compressedSize,
 		uploadSpeeds:    uploader.uploadSpeeds,
 	}
 }

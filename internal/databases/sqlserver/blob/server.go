@@ -428,8 +428,8 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 	}
 	filename := idx.PutBlock(blockID, blockSize)
 	bs.uploadSem <- struct{}{}
-	compressed := internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter)
-	err = folder.PutObject(filename, compressed)
+
+	err = folder.PutObject(filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter))
 	<-bs.uploadSem
 	req.Body.Close()
 	if err != nil {
