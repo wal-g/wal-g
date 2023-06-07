@@ -240,8 +240,9 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize:        "16",
-		PgBackRestStanza: "main",
+		PgWalSize:            "16",
+		PgBackRestStanza:     "main",
+		PgAliveCheckInterval: "1m",
 	}
 
 	GPDefaultSettings = map[string]string{
