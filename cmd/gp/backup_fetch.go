@@ -75,7 +75,8 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		internal.HandleBackupFetch(folder, targetBackupSelector,
-			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint, onlyDatabases))
+			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint,
+				onlyDatabases))
 	},
 }
 
