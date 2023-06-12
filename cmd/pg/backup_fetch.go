@@ -20,8 +20,9 @@ For information about pattern syntax view: https://golang.org/pkg/path/filepath/
 	reverseDeltaUnpackDescription = "Unpack delta backups in reverse order (beta feature)"
 	skipRedundantTarsDescription  = "Skip tars with no useful data (requires reverse delta unpack)"
 	targetUserDataDescription     = "Fetch storage backup which has the specified user data"
-	restoreOnlyDescription        = `[Experimental] Downloads only databases specified by passed names from default tablespace.
-Sets reverse delta unpack & skip redundant tars options automatically. Always downloads system databases.`
+	restoreOnlyDescription        = `[Experimental] Downloads only databases or tables specified by passed names.
+Separate parameters with comma. Use 'database' or 'database/namespace.table' as a parameter ('public' namespace can be omitted).  
+Sets reverse delta unpack & skip redundant tars options automatically. Always downloads system databases and tables.`
 )
 
 var fileMask string
@@ -29,7 +30,7 @@ var restoreSpec string
 var reverseDeltaUnpack bool
 var skipRedundantTars bool
 var fetchTargetUserData string
-var onlyDatabases []string
+var partialRestoreArgs []string
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch destination_directory [backup_name | --target-user-data <data>]",
@@ -49,7 +50,7 @@ var backupFetchCmd = &cobra.Command{
 
 		var pgFetcher func(folder storage.Folder, backup internal.Backup)
 
-		if onlyDatabases != nil {
+		if partialRestoreArgs != nil {
 			skipRedundantTars = true
 			reverseDeltaUnpack = true
 		}
@@ -58,8 +59,8 @@ var backupFetchCmd = &cobra.Command{
 
 		var extractProv postgres.ExtractProvider
 
-		if onlyDatabases != nil {
-			extractProv = postgres.NewExtractProviderDBSpec(onlyDatabases)
+		if partialRestoreArgs != nil {
+			extractProv = postgres.NewExtractProviderDBSpec(partialRestoreArgs)
 		} else {
 			extractProv = postgres.ExtractProviderImpl{}
 		}
@@ -99,7 +100,7 @@ func init() {
 		false, skipRedundantTarsDescription)
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
-	backupFetchCmd.Flags().StringSliceVar(&onlyDatabases, "restore-only",
+	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only",
 		nil, restoreOnlyDescription)
 
 	Cmd.AddCommand(backupFetchCmd)

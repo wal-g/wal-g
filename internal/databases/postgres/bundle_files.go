@@ -7,9 +7,6 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 
-	"github.com/jackc/pgx"
-	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
@@ -76,38 +73,18 @@ func (relStat *RelFileStatistics) getFileUpdateCount(filePath string) uint64 {
 }
 
 func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error) {
-	databases, err := queryRunner.GetDatabaseInfos()
-	if err != nil {
-		return nil, errors.Wrap(err, "CollectStatistics: Failed to get db names.")
-	}
-
 	result := make(map[walparser.RelFileNode]PgRelationStat)
-	// CollectStatistics collects statistics for each relFileNode
-	for _, db := range databases {
-		dbName := db.Name
-		databaseOption := func(c *pgx.ConnConfig) error {
-			c.Database = dbName
-			return nil
-		}
-		dbConn, err := Connect(databaseOption)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to collect statistics for database: %s\n'%v'\n", db.Name, err)
-			continue
-		}
 
-		queryRunner, err := NewPgQueryRunner(dbConn)
+	err := queryRunner.ForEachDatabase(func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
+		pgStatRows, err := currentRunner.getStatistics(db)
 		if err != nil {
-			return nil, errors.Wrap(err, "CollectStatistics: Failed to build query runner.")
-		}
-		pgStatRows, err := queryRunner.getStatistics(db)
-		if err != nil {
-			return nil, errors.Wrap(err, "CollectStatistics: Failed to collect statistics.")
+			return err
 		}
 		for relFileNode, statRow := range pgStatRows {
 			result[relFileNode] = statRow
 		}
-		err = dbConn.Close()
-		tracelog.WarningLogger.PrintOnError(err)
-	}
-	return result, nil
+		return nil
+	})
+
+	return result, err
 }

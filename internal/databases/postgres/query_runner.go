@@ -469,3 +469,95 @@ func (queryRunner *PgQueryRunner) Ping() error {
 	ctx := context.Background()
 	return queryRunner.Connection.Ping(ctx)
 }
+
+func (queryRunner *PgQueryRunner) ForEachDatabase(
+	function func(runner *PgQueryRunner, db PgDatabaseInfo) error) error {
+	databases, err := queryRunner.GetDatabaseInfos()
+	if err != nil {
+		return errors.Wrap(err, "Failed to get db names.")
+	}
+
+	for _, db := range databases {
+		err := queryRunner.executeForDatabase(function, db)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQueryRunner, db PgDatabaseInfo) error,
+	db PgDatabaseInfo) error {
+	dbName := db.Name
+	databaseOption := func(c *pgx.ConnConfig) error {
+		c.Database = dbName
+		return nil
+	}
+	dbConn, err := Connect(databaseOption)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
+		return nil
+	}
+	defer func() {
+		err := dbConn.Close()
+		tracelog.WarningLogger.PrintOnError(err)
+	}()
+
+	runner, err := NewPgQueryRunner(dbConn)
+	if err != nil {
+		return errors.Wrap(err, "Failed to build query runner")
+	}
+
+	err = function(runner, db)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return fmt.Sprintf("SELECT pg_class.relfilenode, pg_class.relname, pg_namespace.nspname FROM pg_class "+
+			"JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid WHERE pg_class.oid >= %d", systemIDLimit), nil
+	case queryRunner.Version == 0:
+		return "", NewNoPostgresVersionError()
+	default:
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	getTablesQuery, err := queryRunner.BuildGetTablesQuery()
+	conn := queryRunner.Connection
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+	}
+
+	rows, err := conn.Query(getTablesQuery)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
+	}
+	defer rows.Close()
+
+	tables := make(map[string]uint32)
+	for rows.Next() {
+		var relFileNode uint32
+		var tableName string
+		var namespaceName string
+		if err := rows.Scan(&relFileNode, &tableName, &namespaceName); err != nil {
+			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
+		}
+		tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = relFileNode
+	}
+
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return tables, nil
+}
