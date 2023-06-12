@@ -20,6 +20,10 @@ to STDIN and push it to MongoDB instance. Required for restore procedure.
 
 URI used to connect to a MongoDB instance. Required for backup and oplog archiving procedure.
 
+* `MONGODB_RESTORE_DISABLE_HOST_RESETUP`
+
+Do not perform any MongoDB reconfiguration steps during `binary-backup-fetch`. Usefull when one might want just to restore original host state.
+
 * `OPLOG_ARCHIVE_AFTER_SIZE`
 
 Oplog archive batch in bytes which triggers upload to storage.

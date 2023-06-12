@@ -234,15 +234,19 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 	return fsutil.ExistingDiskDataFolder(getPGArchiveStatusFolderPath())
 }
 
-// ConfigureUploader connects to storage and creates an uploader. It makes sure
-// that a valid session has started; if invalid, returns AWS error
-// and `<nil>` values.
+// ConfigureUploader is like ConfigureUploaderToFolder, but configures the default storage.
 func ConfigureUploader() (uploader *RegularUploader, err error) {
 	folder, err := ConfigureFolder()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
 	}
 
+	return ConfigureUploaderToFolder(folder)
+}
+
+// ConfigureUploaderToFolder connects to storage with the specified folder and creates an uploader.
+// It makes sure that a valid session has started; if invalid, returns AWS error and `<nil>` value.
+func ConfigureUploaderToFolder(folder storage.Folder) (uploader *RegularUploader, err error) {
 	compressor, err := ConfigureCompressor()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure compression")
