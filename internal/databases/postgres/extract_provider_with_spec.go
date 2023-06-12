@@ -48,7 +48,7 @@ type ExtractProviderDBSpec struct {
 }
 
 func NewExtractProviderDBSpec(partialRestoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{restoreParameters: partialRestoreParameters}
+	return &ExtractProviderDBSpec{ExtractProviderImpl: ExtractProviderImpl{}, restoreParameters: partialRestoreParameters}
 }
 
 func (p ExtractProviderDBSpec) Get(
