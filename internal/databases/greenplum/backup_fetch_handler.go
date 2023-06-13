@@ -52,7 +52,7 @@ type FetchHandler struct {
 	contentIDsToFetch   map[int]bool
 	fetchMode           BackupFetchMode
 	restorePoint        string
-	onlyDatabases       []string
+	partialRestoreArgs  []string
 }
 
 // nolint:gocritic
@@ -60,7 +60,7 @@ func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIds []int, mode BackupFetchMode,
-	restorePoint string, onlyDatabases []string,
+	restorePoint string, partialRestoreArgs []string,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
@@ -92,7 +92,7 @@ func NewFetchHandler(
 		contentIDsToFetch:   prepareContentIDsToFetch(fetchContentIds, segmentConfigs),
 		fetchMode:           mode,
 		restorePoint:        restorePoint,
-		onlyDatabases:       onlyDatabases,
+		partialRestoreArgs:  partialRestoreArgs,
 	}
 }
 
@@ -249,8 +249,8 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
 		fmt.Sprintf("--config=%s", internal.CfgFile),
 	}
-	if fh.onlyDatabases != nil {
-		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.onlyDatabases[:], ",")))
+	if fh.partialRestoreArgs != nil {
+		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))
 	}
 	// forward STDOUT& STDERR to log file
 	cmd = append(cmd, ">>", formatSegmentLogPath(contentID), "2>&1")
@@ -261,7 +261,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 }
 
 func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
-	fetchContentIds []int, mode BackupFetchMode, restorePoint string, onlyDatabases []string,
+	fetchContentIds []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
@@ -275,7 +275,7 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIds, mode, restorePoint, onlyDatabases).Fetch()
+		err = NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIds, mode, restorePoint, partialRestoreArgs).Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }

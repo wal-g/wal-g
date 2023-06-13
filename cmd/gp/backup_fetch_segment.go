@@ -54,8 +54,8 @@ var segBackupFetchCmd = &cobra.Command{
 
 		var extractProv postgres.ExtractProvider
 
-		if onlyDatabases != nil {
-			extractProv = greenplum.NewExtractProviderDBSpec(onlyDatabases)
+		if partialRestoreArgs != nil {
+			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs)
 		} else {
 			extractProv = greenplum.ExtractProviderImpl{}
 		}
@@ -88,7 +88,7 @@ func init() {
 		"", targetUserDataDescription)
 	segBackupFetchCmd.PersistentFlags().IntVar(&contentID, "content-id", 0, "segment content ID")
 	_ = segBackupFetchCmd.MarkFlagRequired("content-id")
-	segBackupFetchCmd.Flags().StringSliceVar(&onlyDatabases, "restore-only", nil, restoreOnlyDescription)
+	segBackupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 	// Since this is a utility command called by backup-fetch, it should not be exposed to the end user.
 	segBackupFetchCmd.Hidden = true
 	cmd.AddCommand(segBackupFetchCmd)

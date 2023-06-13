@@ -32,7 +32,7 @@ var restoreConfigPath string
 var fetchContentIds *[]int
 var fetchModeStr string
 var inPlaceRestore bool
-var onlyDatabases []string
+var partialRestoreArgs []string
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch [backup_name | --target-user-data <data> | --restore-point <name>]",
@@ -76,7 +76,7 @@ var backupFetchCmd = &cobra.Command{
 
 		internal.HandleBackupFetch(folder, targetBackupSelector,
 			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint,
-				onlyDatabases))
+				partialRestoreArgs))
 	},
 }
 
@@ -113,7 +113,7 @@ func init() {
 		"", restoreConfigPathDescription)
 	backupFetchCmd.Flags().BoolVar(&inPlaceRestore, "in-place", false, inPlaceFlagDescription)
 	fetchContentIds = backupFetchCmd.Flags().IntSlice("content-ids", []int{}, fetchContentIdsDescription)
-	backupFetchCmd.Flags().StringSliceVar(&onlyDatabases, "restore-only", nil, restoreOnlyDescription)
+	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 
 	backupFetchCmd.Flags().StringVar(&fetchModeStr, "mode", "default", fetchModeDescription)
 	cmd.AddCommand(backupFetchCmd)
