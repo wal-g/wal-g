@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -11,12 +12,10 @@ import (
 )
 
 const PatternTimelineAndLogSegNo = "[0-9A-F]{24}"
-const PatternTimestamp = "[0-9A-Z]{16}"
+const PatternTimestamp = "[0-9]{8}T[0-9]{6}Z"
 const PatternLSN = "[0-9A-F]{8}"
 
-var regexpTimelineAndLogSegNo = regexp.MustCompile(PatternTimelineAndLogSegNo)
-
-const maxCountOfLSN = 2
+var regexpTimeline = regexp.MustCompile(PatternTimestamp)
 
 type BytesPerWalSegmentError struct {
 	error
@@ -129,16 +128,12 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 	return
 }
 
-func TryFetchTimelineAndLogSegNo(objectName string) (uint32, uint64, bool) {
-	foundLsn := regexpTimelineAndLogSegNo.FindAllString(objectName, maxCountOfLSN)
-	if len(foundLsn) > 0 {
-		timelineID, logSegNo, err := ParseWALFilename(foundLsn[0])
-
-		if err == nil {
-			return timelineID, logSegNo, true
-		}
+func TryFetchTimeline(objectName string) (time.Time, error) {
+	foundTime := regexpTimeline.FindAllString(objectName, 1)
+	if len(foundTime) > 0 {
+		return time.Parse(utility.BackupTimeFormat, foundTime[0])
 	}
-	return 0, 0, false
+	return time.Time{}, ErrorBasePrefixMissing
 }
 
 func isWalFilename(filename string) bool {

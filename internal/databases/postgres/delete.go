@@ -28,7 +28,7 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 		return nil, err
 	}
 
-	lessFunc := timelineAndSegmentNoLess
+	lessFunc := segmentNoLess
 	var startTimeByBackupName map[string]time.Time
 	if useSentinelTime {
 		// If all backups in storage have metadata, we will use backup start time from sentinel.
@@ -169,28 +169,32 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 }
 
 func segmentNoLess(object1 storage.Object, object2 storage.Object) bool {
-	_, segmentNumber1, ok := TryFetchTimelineAndLogSegNo(object1.GetName())
-	if !ok {
+	time1, err := TryFetchTimeline(object1.GetName())
+	if err != nil {
+		tracelog.ErrorLogger.Printf("%s", err)
 		return false
 	}
-	_, segmentNumber2, ok := TryFetchTimelineAndLogSegNo(object2.GetName())
-	if !ok {
+	time2, err := TryFetchTimeline(object2.GetName())
+	if err != nil {
+		tracelog.ErrorLogger.Printf("%s", err)
 		return false
 	}
-	return segmentNumber1 < segmentNumber2
+	return time1.Before(time2)
 }
 
-func timelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bool {
-	tl1, segNo1, ok := TryFetchTimelineAndLogSegNo(object1.GetName())
-	if !ok {
-		return false
-	}
-	tl2, segNo2, ok := TryFetchTimelineAndLogSegNo(object2.GetName())
-	if !ok {
-		return false
-	}
-	return tl1 < tl2 || tl1 == tl2 && segNo1 < segNo2
-}
+//func timelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bool {
+//	time1, err := TryFetchTimeline(object1.GetName())
+//	if err != nil {
+//		tracelog.ErrorLogger.Printf("%s", err)
+//		return false
+//	}
+//	time2, err := TryFetchTimeline(object2.GetName())
+//	if err != nil {
+//		tracelog.ErrorLogger.Printf("%s", err)
+//		return false
+//	}
+//	return tl1 < tl2 || tl1 == tl2 && segNo1 < segNo2
+//}
 
 func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
 	backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object))
