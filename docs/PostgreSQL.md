@@ -156,11 +156,27 @@ wal-g backup-fetch /path LATEST --reverse-unpack --skip-redundant-tars
 
 #### Partial restore (experimental)
 
-During partial restore wal-g restores only specified databases' files.
+During partial restore wal-g restores only specified databases' files. Use 'database' or 'database/namespace.table' as a parameter ('public' namespace can be omitted).  
 
 ```bash  
 wal-g backup-fetch /path LATEST --restore-only=my_database,"another database",database/my_table
 ```
+
+Note: Double quotes are only needed to insert spaces and will be ignored
+
+Example:
+
+`--restore-only=my_db,"another db"`
+
+is equivalent to
+
+`--restore-only=my_db,another" "db`
+
+or even
+
+`--restore-only=my_db,anoth"e"r" "d"b"`
+
+
 
 Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
 

@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type NoPostgresVersionError struct {
@@ -498,22 +499,14 @@ func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQue
 		tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
 		return nil
 	}
-	defer func() {
-		err := dbConn.Close()
-		tracelog.WarningLogger.PrintOnError(err)
-	}()
+	defer utility.LoggedClose(dbConn, "")
 
 	runner, err := NewPgQueryRunner(dbConn)
 	if err != nil {
 		return errors.Wrap(err, "Failed to build query runner")
 	}
 
-	err = function(runner, db)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return function(runner, db)
 }
 
 func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
