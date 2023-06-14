@@ -27,6 +27,7 @@ func (err CompressAndEncryptError) Error() string {
 
 // CompressAndEncrypt compresses input to a pipe reader. Output must be used or
 // pipe will block.
+// nolint: lll
 func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter, compressSize *int64) io.Reader {
 	compressedReader, dstWriter := io.Pipe()
 
