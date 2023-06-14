@@ -30,6 +30,11 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 }
 
 func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion string, rsConfig RsConfig) error {
+	disableHostResetup, err := internal.GetBoolSettingDefault(internal.MongoDBRestoreDisableHostResetup, false)
+	if err != nil {
+		return err
+	}
+
 	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), backupName)
 	if err != nil {
 		return err
@@ -56,11 +61,13 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 		return err
 	}
 
-	if err = restoreService.fixSystemData(rsConfig); err != nil {
-		return err
-	}
-	if err = restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
-		return err
+	if !disableHostResetup {
+		if err = restoreService.fixSystemData(rsConfig); err != nil {
+			return err
+		}
+		if err = restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
+			return err
+		}
 	}
 
 	return nil
