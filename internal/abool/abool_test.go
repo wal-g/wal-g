@@ -149,7 +149,7 @@ func TestToogleAfterOverflow(t *testing.T) {
 	}
 
 	// make sure overflow happened
-	var valueAfterToggle = *(*int32)(v)
+	var valueAfterToggle int32 = *(*int32)(v)
 	if valueAfterToggle >= valueBeforeToggle {
 		t.Fatalf("Overflow does not happen as expected, before %d, after: %d", valueBeforeToggle, valueAfterToggle)
 	}
