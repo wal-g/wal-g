@@ -42,33 +42,13 @@ func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
 	return true
 }
 
-type ExtractProviderDBSpec struct {
-	ExtractProviderImpl ExtractProvider
-	restoreParameters   []string
+type RestoreDescMaker interface {
+	Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error)
 }
 
-func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{ExtractProviderImpl: ExtractProviderImpl{}, restoreParameters: restoreParameters}
-}
+type DefaultRestoreDescMaker struct{}
 
-func (p ExtractProviderDBSpec) Get(
-	backup Backup,
-	filesToUnwrap map[string]bool,
-	skipRedundantTars bool,
-	dbDataDir string,
-	createNewIncrementalFiles bool,
-) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
-	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	desc, err := p.makeRestoreDesc(p.restoreParameters, filesMeta.DatabasesByNames)
-	tracelog.ErrorLogger.FatalOnError(err)
-	p.filterFilesToUnwrap(filesToUnwrap, desc)
-
-	return p.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
-}
-
-func (p ExtractProviderDBSpec) makeRestoreDesc(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
+func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
 	restoredDatabases := make(RestoreDesc)
 
 	for _, parameter := range restoreParameters {
@@ -81,6 +61,34 @@ func (p ExtractProviderDBSpec) makeRestoreDesc(restoreParameters []string, names
 	}
 
 	return restoredDatabases, nil
+}
+
+type ExtractProviderDBSpec struct {
+	ExtractProviderImpl ExtractProvider
+	restoreParameters   []string
+	RestoreDescMaker
+}
+
+func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
+	return &ExtractProviderDBSpec{ExtractProviderImpl: ExtractProviderImpl{}, restoreParameters: restoreParameters,
+		RestoreDescMaker: DefaultRestoreDescMaker{}}
+}
+
+func (p ExtractProviderDBSpec) Get(
+	backup Backup,
+	filesToUnwrap map[string]bool,
+	skipRedundantTars bool,
+	dbDataDir string,
+	createNewIncrementalFiles bool,
+) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	desc, err := p.RestoreDescMaker.Make(p.restoreParameters, filesMeta.DatabasesByNames)
+	tracelog.ErrorLogger.FatalOnError(err)
+	p.filterFilesToUnwrap(filesToUnwrap, desc)
+
+	return p.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
 
 func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, desc RestoreDesc) {
