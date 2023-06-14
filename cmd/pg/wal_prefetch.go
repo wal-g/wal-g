@@ -7,8 +7,8 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"io"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"io"
 )
 
 const WalPrefetchShortDescription = `Used for prefetching process forking
