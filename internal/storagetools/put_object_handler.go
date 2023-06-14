@@ -82,6 +82,6 @@ func uploadFile(name string, content io.Reader, uploader internal.Uploader, encr
 		name += "." + uploader.Compression().FileExtension()
 	}
 
-	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter)
+	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter, uploader.CompressedSizePtr())
 	return uploader.Upload(name, uploadContents)
 }

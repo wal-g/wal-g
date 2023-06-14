@@ -166,7 +166,7 @@ func NewDiscardUploader(compressor compression.Compressor, readerFrom io.ReaderF
 // UploadOplogArchive reads all data into memory, stream is compressed and encrypted if required
 func (d *DiscardUploader) UploadOplogArchive(archReader io.Reader, firstTS, lastTS models.Timestamp) error {
 	if d.compressor != nil {
-		archReader = internal.CompressAndEncrypt(archReader, d.compressor, internal.ConfigureCrypter())
+		archReader = internal.CompressAndEncrypt(archReader, d.compressor, internal.ConfigureCrypter(), nil)
 	}
 	if d.readerFrom != nil {
 		if _, err := d.readerFrom.ReadFrom(archReader); err != nil {
@@ -208,7 +208,7 @@ func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS 
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Uploader.Compression(), su.crypter))
+	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Uploader.Compression(), su.crypter, su.CompressedSizePtr()))
 	// TODO: warn if read > 2 * models.MaxDocumentSize and shrink buf capacity if it's too high
 	defer su.buf.Reset()
 	if err != nil {

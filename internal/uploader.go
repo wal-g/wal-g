@@ -30,6 +30,7 @@ type Uploader interface {
 	DisableSizeTracking()
 	UploadedDataSize() (int64, error)
 	RawDataSize() (int64, error)
+	CompressedSizePtr() *int64
 	CompressedDataSize() (int64, error)
 	ChangeDirectory(relativePath string)
 	Folder() storage.Folder
@@ -115,6 +116,10 @@ func (uploader *RegularUploader) UploadedDataSize() (int64, error) {
 	return atomic.LoadInt64(uploader.tarSize), nil
 }
 
+func (uploader *RegularUploader) CompressedSizePtr() *int64 {
+	return uploader.compressedSize
+}
+
 // RawDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
 func (uploader *RegularUploader) RawDataSize() (int64, error) {
 	if uploader.dataSize == nil {
@@ -165,7 +170,7 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 	if uploader.dataSize != nil {
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
-	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
+	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter(), uploader.compressedSize)
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)
@@ -256,6 +261,9 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 	startTime := time.Now()
 	for {
 		totalSizeInt, err := uploader.CompressedDataSize()
+		if totalSizeInt == 0 {
+			totalSizeInt, err = uploader.RawDataSize()
+		}
 		if err != nil {
 			return
 		}
