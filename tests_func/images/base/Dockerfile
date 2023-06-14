@@ -25,7 +25,7 @@ RUN cp --force --recursive --verbose \
     nginx nginx-full nginx-common \
 	&& rm -rf /var/lib/apt/lists/*
 
-RUN wget -O - "https://golang.org/dl/go1.18.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
+RUN wget -O - "https://golang.org/dl/go1.20.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
 	export PATH="/usr/local/go/bin:$PATH" && \
 	go version
 
