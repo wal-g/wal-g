@@ -85,8 +85,7 @@ If the parameter value is NOMETADATA or not specified, it will fallback to defau
 To control how frequently WAL-G will check if Postgres is alive during the backup-push. If the check fails, backup-push terminates.
 
 Examples:
-- `0` - disable the alive checks
-- `1m` - check every 1 minute (default value)
+- `0` - disable the alive checks (default value)
 - `10s` - check every 10 seconds
 - `10m` - check every 10 minutes
 

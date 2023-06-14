@@ -98,21 +98,20 @@ const (
 	ProfileMode          = "PROFILE_MODE"
 	ProfilePath          = "PROFILE_PATH"
 
-	MongoDBUriSetting                = "MONGODB_URI"
-	MongoDBLastWriteUpdateInterval   = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
-	MongoDBRestoreDisableHostResetup = "MONGODB_RESTORE_DISABLE_HOST_RESETUP"
-	OplogArchiveAfterSize            = "OPLOG_ARCHIVE_AFTER_SIZE"
-	OplogArchiveTimeoutInterval      = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
-	OplogPITRDiscoveryInterval       = "OPLOG_PITR_DISCOVERY_INTERVAL"
-	OplogPushStatsEnabled            = "OPLOG_PUSH_STATS_ENABLED"
-	OplogPushStatsLoggingInterval    = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
-	OplogPushStatsUpdateInterval     = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHTTP         = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
-	OplogPushWaitForBecomePrimary    = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
-	OplogPushPrimaryCheckInterval    = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
-	OplogReplayOplogAlwaysUpsert     = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
-	OplogReplayOplogApplicationMode  = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
-	OplogReplayIgnoreErrorCodes      = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	MongoDBUriSetting               = "MONGODB_URI"
+	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
+	OplogArchiveAfterSize           = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutInterval     = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
+	OplogPITRDiscoveryInterval      = "OPLOG_PITR_DISCOVERY_INTERVAL"
+	OplogPushStatsEnabled           = "OPLOG_PUSH_STATS_ENABLED"
+	OplogPushStatsLoggingInterval   = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
+	OplogPushStatsUpdateInterval    = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
+	OplogPushStatsExposeHTTP        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushWaitForBecomePrimary   = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
+	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
+	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
+	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
+	OplogReplayIgnoreErrorCodes     = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -241,9 +240,8 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize:            "16",
-		PgBackRestStanza:     "main",
-		PgAliveCheckInterval: "1m",
+		PgWalSize:        "16",
+		PgBackRestStanza: "main",
 	}
 
 	GPDefaultSettings = map[string]string{

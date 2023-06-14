@@ -24,14 +24,13 @@ var putObjectCmd = &cobra.Command{
 	Short: putObjectShortDescription,
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		uploader, err := internal.ConfigureUploader()
+		tracelog.ErrorLogger.FatalOnError(err)
+
 		localPath := args[0]
 		dstPath := args[1]
 
-		err := multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
-			uploader, err := internal.ConfigureUploaderToFolder(folder)
-			if err != nil {
-				return err
-			}
+		err = multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
 			return storagetools.HandlePutObject(localPath, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)

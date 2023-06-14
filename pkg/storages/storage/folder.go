@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -61,7 +60,7 @@ func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err err
 	return ListFolderRecursivelyWithFilter(folder, func(string) bool { return true })
 }
 
-func ListFolderRecursivelyWithFilter(folder Folder, folderSelector func(path string) bool) (relativePathObjects []Object, err error) {
+func ListFolderRecursivelyWithFilter(folder Folder, selector func(path string) bool) (relativePathObjects []Object, err error) {
 	queue := make([]Folder, 0)
 	queue = append(queue, folder)
 	for len(queue) > 0 {
@@ -74,7 +73,7 @@ func ListFolderRecursivelyWithFilter(folder Folder, folderSelector func(path str
 			return nil, err
 		}
 
-		queue = append(queue, filterSubfolders(folder.GetPath(), subFolders, folderSelector)...)
+		queue = append(queue, filterSubfolders(folder.GetPath(), subFolders, selector)...)
 	}
 	return relativePathObjects, nil
 }
@@ -98,30 +97,4 @@ func filterSubfolders(rootFolderPath string, folders []Folder, selector func(pat
 		}
 	}
 	return result
-}
-
-func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePathObjects []Object, err error) {
-	checkFile := len(prefix) > 0 && !strings.HasSuffix(prefix, "/")
-	prefix = strings.Trim(prefix, "/")
-
-	if checkFile {
-		dirName, fileName := path.Split(prefix)
-		parentFolder := folder.GetSubFolder(dirName)
-		objects, _, err := parentFolder.ListFolder()
-		if err != nil {
-			return nil, fmt.Errorf("can't list folder %q: %w", dirName, err)
-		}
-		for _, obj := range objects {
-			if obj.GetName() == fileName {
-				return addPrefixToNames([]Object{obj}, dirName), nil
-			}
-		}
-	}
-
-	parentFolder := folder.GetSubFolder(prefix)
-	objects, err := ListFolderRecursively(parentFolder)
-	if err != nil {
-		return nil, fmt.Errorf("can't list folder %q: %w", prefix, err)
-	}
-	return addPrefixToNames(objects, prefix), nil
 }
