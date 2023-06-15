@@ -3,6 +3,7 @@ package greenplum
 import (
 	"strings"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -36,9 +37,23 @@ func (m RestoreDescMaker) FromAoSegNamespace(tableName string) bool {
 	return strings.HasPrefix(tableName, aoSegNamespace)
 }
 
-func NewExtractProviderDBSpec(restoreParameters []string) *postgres.ExtractProviderDBSpec {
+type ExtractProviderDBSpec struct {
+	*postgres.ExtractProviderDBSpec
+}
+
+func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
 	extractor := postgres.NewExtractProviderDBSpec(restoreParameters)
 	extractor.ExtractProviderImpl = ExtractProviderImpl{}
 	extractor.RestoreDescMaker = RestoreDescMaker{}
-	return extractor
+	return &ExtractProviderDBSpec{ExtractProviderDBSpec: extractor}
+}
+
+func (p ExtractProviderDBSpec) Get(
+	backup postgres.Backup,
+	filesToUnwrap map[string]bool,
+	skipRedundantTars bool,
+	dbDataDir string,
+	createNewIncrementalFiles bool,
+) (postgres.IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
+	return p.ExtractProviderDBSpec.Get(backup, filesToUnwrap, true, dbDataDir, createNewIncrementalFiles)
 }
