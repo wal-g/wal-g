@@ -19,6 +19,9 @@ func (m RestoreDescMaker) Make(restoreParameters []string, names postgres.Databa
 	}
 
 	for _, dbInfo := range names {
+		if _, dbNotSkipped := restoredDatabases[dbInfo.Oid]; !dbNotSkipped {
+			continue
+		}
 		for table, tableID := range dbInfo.Tables {
 			if m.FromAoSegNamespace(table) {
 				restoredDatabases.Add(dbInfo.Oid, tableID)

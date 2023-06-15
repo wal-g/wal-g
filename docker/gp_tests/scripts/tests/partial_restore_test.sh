@@ -10,6 +10,8 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/pg_scripts/wrap_config_file.sh ${TMP_CONFIG}
 source /tmp/tests/test_functions/util.sh
 
+wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
+
 bootstrap_gp_cluster
 sleep 3
 enable_pitr_extension
