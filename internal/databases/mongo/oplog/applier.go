@@ -77,6 +77,7 @@ type DBApplier struct {
 	txnBuffer             *txn.Buffer
 	preserveUUID          bool
 	applyIgnoreErrorCodes map[string][]int32
+	until                 models.Timestamp
 }
 
 // NewDBApplier builds DBApplier with given args.
@@ -88,6 +89,12 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	op := db.Oplog{}
 	if err := bson.Unmarshal(opr.Data, &op); err != nil {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
+	}
+	tracelog.InfoLogger.Printf("op %+v: op time %v, until time %v", op, op.Timestamp.T, ap.until.TS)
+
+	if op.Timestamp.T > ap.until.TS {
+		tracelog.InfoLogger.Printf("skipping op %+v due to: op time %v, until time %v", op, op.Timestamp.T, ap.until.TS)
+		return nil
 	}
 
 	if err := ap.shouldSkip(op.Operation, op.Namespace); err != nil {
@@ -111,6 +118,10 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	}
 
 	return nil
+}
+
+func (ap *DBApplier) SetUntilTime(until models.Timestamp) {
+	ap.until = until
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {

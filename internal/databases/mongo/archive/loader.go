@@ -7,6 +7,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -16,6 +17,10 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kmc "kmodules.xyz/client-go/client"
+	storageapi "kubestash.dev/apimachinery/apis/storage/v1alpha1"
+	controllerruntime "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -200,16 +205,74 @@ type StorageUploader struct {
 	internal.Uploader
 	crypter crypto.Crypter // usages only in UploadOplogArchive
 	buf     *bytes.Buffer
+
+	kubeClient        controllerruntime.Client
+	snapshotName      string
+	snapshotNamespace string
 }
 
 // NewStorageUploader builds mongodb uploader.
 func NewStorageUploader(upl internal.Uploader) *StorageUploader {
 	upl.DisableSizeTracking() // providing io.ReaderAt+io.ReadSeeker to s3 upload enables buffer pool usage
-	return &StorageUploader{upl, internal.ConfigureCrypter(), &bytes.Buffer{}}
+	return &StorageUploader{UploaderProvider: upl, crypter: internal.ConfigureCrypter(), buf: &bytes.Buffer{}}
+}
+
+func (su *StorageUploader) SetKubeClient(client controllerruntime.Client) {
+	su.kubeClient = client
+}
+
+func (su *StorageUploader) SetSnapshot(name, namespace string) {
+	su.snapshotName = name
+	su.snapshotNamespace = namespace
+}
+
+func (su *StorageUploader) updateSnapshot(firstTS, lastTS models.Timestamp) error {
+	var snapshot storageapi.Snapshot
+	err := su.kubeClient.Get(context.TODO(), controllerruntime.ObjectKey{
+		Namespace: su.snapshotNamespace,
+		Name:      su.snapshotName,
+	}, &snapshot)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = kmc.PatchStatus(
+		context.TODO(),
+		su.kubeClient,
+		snapshot.DeepCopy(),
+		func(obj controllerruntime.Object) controllerruntime.Object {
+			in := obj.(*storageapi.Snapshot)
+			if len(in.Status.Components) == 0 {
+				in.Status.Components = make(map[string]storageapi.Component)
+
+				walSegments := make([]storageapi.WalSegment, 1)
+				walSegments[0].Start = &metav1.Time{Time: time.Unix(int64(firstTS.ToBsonTS().T), 0)}
+				in.Status.Components["wal"] = storageapi.Component{
+					WalSegments: walSegments,
+				}
+			}
+
+			component := in.Status.Components["wal"]
+			component.WalSegments[0].End = &metav1.Time{Time: time.Unix(int64(lastTS.ToBsonTS().T), 0)}
+			in.Status.Components["wal"] = component
+
+			return in
+		},
+	)
+	return err
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
+<<<<<<< HEAD
 func (su *StorageUploader) UploadOplogArchive(ctx context.Context, stream io.Reader, firstTS, lastTS models.Timestamp) error {
+=======
+func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
+	err := su.updateSnapshot(firstTS, lastTS)
+	if err != nil {
+		return fmt.Errorf("failed to update snapshot: %w", err)
+	}
+
+>>>>>>> 23bb0dcb (Update for mongodb archiver)
 	arch, err := models.NewArchive(firstTS, lastTS, su.Compression().FileExtension(), models.ArchiveTypeOplog)
 	if err != nil {
 		return fmt.Errorf("can not build archive: %w", err)

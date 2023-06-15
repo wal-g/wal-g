@@ -73,6 +73,22 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 	return nil, fmt.Errorf("cycles in archive sequence detected")
 }
 
+func GetUpdatedBackupTimes(archives []models.Archive, since, until models.Timestamp) (models.Timestamp, models.Timestamp) {
+	var updatedSince models.Timestamp
+	for i := range archives {
+		arch := archives[i]
+		if arch.Type != models.ArchiveTypeOplog {
+			continue
+		}
+
+		if arch.In(since) {
+			updatedSince = arch.Start
+		}
+	}
+
+	return updatedSince, until
+}
+
 // BackupNamesFromBackupTimes forms list of backup names from BackupTime
 func BackupNamesFromBackupTimes(backups []internal.BackupTime) []string {
 	names := make([]string, 0, len(backups))
