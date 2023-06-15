@@ -56,21 +56,33 @@ var (
 			// currently, these features are not supported
 			verifyPageChecksums := false
 			storeAllCorruptBlocks := false
-			tarBallComposerType := postgres.RegularComposer
+
+			dummyComposerType := postgres.RegularComposer
+			tarBallComposerType := chooseTarBallComposer()
 			withoutFilesMetadata := false
 
 			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums,
 				fullBackup, storeAllCorruptBlocks,
-				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),
+				dummyComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata)
 
-			backupHandler, err := greenplum.NewSegBackupHandler(arguments)
+			backupHandler, err := greenplum.NewSegBackupHandler(arguments, tarBallComposerType)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush()
 		},
 	}
 )
+
+func chooseTarBallComposer() greenplum.TarBallComposerType {
+	tarBallComposerType := greenplum.RegularComposer
+
+	if useDatabaseComposer || viper.GetBool(internal.UseDatabaseComposerSetting) {
+		tarBallComposerType = greenplum.DatabaseComposer
+	}
+
+	return tarBallComposerType
+}
 
 func init() {
 	// Since this is a utility command, it should not be exposed to the end user.
@@ -79,6 +91,8 @@ func init() {
 		false, "Pushes permanent backup")
 	segBackupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
 		false, "Make full backup-push")
+	segBackupPushCmd.Flags().BoolVarP(&useDatabaseComposer, useDatabaseComposerFlag, useDatabaseComposerShorthand,
+		false, "Use database tar composer (experimental)")
 	segBackupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,
 		"", "Select the backup specified by name as the target for the delta backup")
 	segBackupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,
