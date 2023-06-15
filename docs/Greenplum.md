@@ -79,6 +79,20 @@ wal-g backup-push --delta-from-name backup_name --config=/path/to/config.yaml
 wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/path/to/config.yaml
 ```
 
+#### Database composer mode
+
+In the database composer mode, WAL-G separated non-ao files from different directories inside default tablespace and packs them in different tars. Designed to increase partial restore performance.
+
+To activate this feature, do one of the following:
+
+* set the `WALG_USE_DATABASE_COMPOSER` environment variable
+* add the --database-composer flag
+
+```bash
+wal-g backup-push /path --database-composer
+```
+
+
 ### ``backup-fetch``
 
 When fetching base backups, the user should pass in the cluster restore configuration and the name of the backup.
