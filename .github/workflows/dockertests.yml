@@ -15,7 +15,7 @@ env:
   IMAGE_UBUNTU: wal-g/ubuntu
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: 1.20
+  GO_VERSION: "1.20"
 
 jobs:
   buildimages:
@@ -45,7 +45,7 @@ jobs:
         if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/setup-go@v4
         with:
-          go-version: "${{ env.GO_VERSION }}"
+          go-version: ${{ env.GO_VERSION }}
         id: go
 
       - name: Get dependencies
@@ -144,7 +144,7 @@ jobs:
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
         with:
-          go-version: "${{ env.GO_VERSION }}"
+          go-version: ${{ env.GO_VERSION }}
         id: go
 
       - name: Check out code into the Go module directory
