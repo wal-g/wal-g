@@ -33,6 +33,14 @@ ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
+# docker global variable definitions
+DOCKER:=DOCKER_BUILDKIT=1 docker
+DOCKER_BUILD_ARGS := --build-arg BUILD_DATE=$(shell date -u +%Y.%m.%d_%H:%M:%S) \
+  --build-arg GIT_COMMIT_ID=$(shell git rev-parse --short HEAD) \
+  --build-arg GIT_TAG_VERSION=$(shell git tag -l --points-at HEAD) \
+  --build-arg BUILD_TAGS="$(BUILD_TAGS)"
+
+
 .PHONY: unittest fmt lint clean install_tools
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test
@@ -90,6 +98,12 @@ mysql_build: $(CMD_FILES) $(PKG_FILES)
 
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=`git tag -l --points-at HEAD`")
+
+build_mongo_image: $(CMD_FILES) $(PKG_FILES)
+	$(DOCKER) build . --platform linux/arm64  --tag docker.io/apecloud/wal-g:mongo-latest --file docker/mongo/Dockerfile $(DOCKER_BUILD_ARGS)
+
+push_mongo_image: $(CMD_FILES) $(PKG_FILES)
+	$(DOCKER) buildx build . --push --sbom=false --provenance=false --platform linux/arm64,linux/amd64  --tag docker.io/apecloud/wal-g:mongo-latest --file docker/mongo/Dockerfile $(DOCKER_BUILD_ARGS)
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\

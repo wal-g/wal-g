@@ -192,31 +192,29 @@ var (
 	defaultConfigValues map[string]string
 
 	commonDefaultConfigValues = map[string]string{
-		DownloadConcurrencySetting:     "10",
-		UploadConcurrencySetting:       "16",
-		UploadDiskConcurrencySetting:   "1",
-		UploadQueueSetting:             "2",
-		PreventWalOverwriteSetting:     "false",
-		UploadWalMetadata:              "NOMETADATA",
-		DeltaMaxStepsSetting:           "0",
-		CompressionMethodSetting:       "lz4",
-		UseWalDeltaSetting:             "false",
-		TarSizeThresholdSetting:        "1073741823", // (1 << 30) - 1
-		TarDisableFsyncSetting:         "false",
-		TotalBgUploadedLimit:           "32",
-		UseReverseUnpackSetting:        "false",
-		SkipRedundantTarsSetting:       "false",
-		VerifyPageChecksumsSetting:     "false",
-		StoreAllCorruptBlocksSetting:   "false",
-		UseRatingComposerSetting:       "false",
-		UseCopyComposerSetting:         "false",
-		UseDatabaseComposerSetting:     "false",
-		WithoutFilesMetadataSetting:    "false",
-		MaxDelayedSegmentsCount:        "0",
-		SerializerTypeSetting:          "json_default",
-		LibsodiumKeyTransform:          "none",
-		PgFailoverStoragesCheckTimeout: "30s",
-		PgFailoverStorageCacheLifetime: "15m",
+		DownloadConcurrencySetting:   "10",
+		UploadConcurrencySetting:     "16",
+		UploadDiskConcurrencySetting: "1",
+		UploadQueueSetting:           "2",
+		PreventWalOverwriteSetting:   "false",
+		UploadWalMetadata:            "NOMETADATA",
+		DeltaMaxStepsSetting:         "0",
+		CompressionMethodSetting:     "lz4",
+		UseWalDeltaSetting:           "false",
+		TarSizeThresholdSetting:      "1073741823", // (1 << 30) - 1
+		TarDisableFsyncSetting:       "false",
+		TotalBgUploadedLimit:         "32",
+		UseReverseUnpackSetting:      "false",
+		SkipRedundantTarsSetting:     "false",
+		VerifyPageChecksumsSetting:   "false",
+		StoreAllCorruptBlocksSetting: "false",
+		UseRatingComposerSetting:     "false",
+		UseCopyComposerSetting:       "false",
+		UseDatabaseComposerSetting:   "false",
+		WithoutFilesMetadataSetting:  "false",
+		MaxDelayedSegmentsCount:      "0",
+		SerializerTypeSetting:        "json_default",
+		LibsodiumKeyTransform:        "none",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -240,8 +238,10 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize:        "16",
-		PgBackRestStanza: "main",
+		PgWalSize:                      "16",
+		PgBackRestStanza:               "main",
+		PgFailoverStoragesCheckTimeout: "30s",
+		PgFailoverStorageCacheLifetime: "15m",
 	}
 
 	GPDefaultSettings = map[string]string{
