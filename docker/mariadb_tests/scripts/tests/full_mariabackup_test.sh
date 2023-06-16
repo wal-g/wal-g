@@ -6,8 +6,8 @@ set -e -x
 export WALE_S3_PREFIX=s3://mariadb_full_maria_backup
 
 
-mysql_install_db > /dev/null
-service mysql start
+mariadb_installdb
+service mariadb start
 
 sysbench --table-size=10 prepare
 
@@ -25,8 +25,8 @@ wal-g backup-fetch LATEST
 
 chown -R mysql:mysql $MYSQLDATA
 
-mysql_install_db > /dev/null
-service mysql start || (cat /var/log/mysql/error.log && false)
+mariadb_installdb
+service mariadb start || (cat /var/log/mysql/error.log && false)
 
 mysqldump sbtest > /tmp/dump_after_restore
 
