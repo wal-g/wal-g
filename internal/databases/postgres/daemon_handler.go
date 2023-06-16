@@ -11,36 +11,26 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/daemon"
 	"github.com/wal-g/wal-g/utility"
 )
 
-type SocketMessageType byte
-
 const (
 	SdNotifyWatchdog = "WATCHDOG=1"
-
-	CheckType    SocketMessageType = 'C'
-	FileNameType SocketMessageType = 'F'
-	OkType       SocketMessageType = 'O'
-	ErrorType    SocketMessageType = 'E'
 )
-
-func (msg SocketMessageType) ToBytes() []byte {
-	return []byte{byte(msg)}
-}
 
 type SocketMessageHandler interface {
 	Handle(messageBody []byte) error
 }
 
 type CheckMessageHandler struct {
-	messageType SocketMessageType
+	messageType daemon.SocketMessageType
 	fd          net.Conn
 	uploader    *WalUploader
 }
 
 func (h *CheckMessageHandler) Handle(messageBody []byte) error {
-	_, err := h.fd.Write(OkType.ToBytes())
+	_, err := h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
 		return fmt.Errorf("failed to write in socket: %w", err)
 	}
@@ -49,7 +39,7 @@ func (h *CheckMessageHandler) Handle(messageBody []byte) error {
 }
 
 type ArchiveMessageHandler struct {
-	messageType SocketMessageType
+	messageType daemon.SocketMessageType
 	fd          net.Conn
 	uploader    *WalUploader
 }
@@ -67,19 +57,19 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 	if err != nil {
 		return fmt.Errorf("file archiving failed: %w", err)
 	}
-	_, err = h.fd.Write(OkType.ToBytes())
+	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
 		return fmt.Errorf("socket write failed: %w", err)
 	}
 	return nil
 }
 
-func NewMessageHandler(messageType SocketMessageType, c net.Conn, uploader *WalUploader) SocketMessageHandler {
+func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn, uploader *WalUploader) SocketMessageHandler {
 	switch messageType {
-	case CheckType:
-		return &CheckMessageHandler{CheckType, c, uploader}
-	case FileNameType:
-		return &ArchiveMessageHandler{FileNameType, c, uploader}
+	case daemon.CheckType:
+		return &CheckMessageHandler{daemon.CheckType, c, uploader}
+	case daemon.FileNameType:
+		return &ArchiveMessageHandler{daemon.FileNameType, c, uploader}
 	default:
 		return nil
 	}
@@ -94,23 +84,23 @@ func NewMessageReader(c net.Conn) *SocketMessageReader {
 }
 
 // Next method reads messages sequentially from the Reader
-func (r SocketMessageReader) Next() (messageType SocketMessageType, messageBody []byte, err error) {
+func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messageBody []byte, err error) {
 	messageParameters := make([]byte, 3)
 	_, err = io.ReadFull(r.c, messageParameters)
 	if err != nil {
-		return ErrorType, nil, fmt.Errorf("failed to read params: %w", err)
+		return daemon.ErrorType, nil, fmt.Errorf("failed to read params: %w", err)
 	}
-	messageType = SocketMessageType(messageParameters[0])
+	messageType = daemon.SocketMessageType(messageParameters[0])
 	var messageLength uint16
 	l := bytes.NewReader(messageParameters[1:3])
 	err = binary.Read(l, binary.BigEndian, &messageLength)
 	if err != nil {
-		return ErrorType, nil, fmt.Errorf("fail to read message len: %w", err)
+		return daemon.ErrorType, nil, fmt.Errorf("fail to read message len: %w", err)
 	}
 	messageBody = make([]byte, messageLength-3)
 	_, err = io.ReadFull(r.c, messageBody)
 	if err != nil {
-		return ErrorType, nil, fmt.Errorf("failed to read msg body: %w", err)
+		return daemon.ErrorType, nil, fmt.Errorf("failed to read msg body: %w", err)
 	}
 	return messageType, messageBody, err
 }
@@ -146,25 +136,25 @@ func Listen(c net.Conn, uploader *WalUploader) {
 		messageType, messageBody, err := messageReader.Next()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to read message from %s, err: %v\n", c.RemoteAddr(), err)
-			_, err = c.Write(ErrorType.ToBytes())
+			_, err = c.Write(daemon.ErrorType.ToBytes())
 			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
 		messageHandler := NewMessageHandler(messageType, c, uploader)
 		if messageHandler == nil {
 			tracelog.ErrorLogger.Printf("Unexpected message type: %s", string(messageType))
-			_, err = c.Write(ErrorType.ToBytes())
+			_, err = c.Write(daemon.ErrorType.ToBytes())
 			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
 		err = messageHandler.Handle(messageBody)
 		if err != nil {
 			tracelog.ErrorLogger.Println("Failed to handle message:", err)
-			_, err = c.Write(ErrorType.ToBytes())
+			_, err = c.Write(daemon.ErrorType.ToBytes())
 			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
-		if messageType == FileNameType {
+		if messageType == daemon.FileNameType {
 			tracelog.InfoLogger.Printf("Successful archiving for %s\n", string(messageBody))
 			return
 		}
