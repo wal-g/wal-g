@@ -15,13 +15,40 @@ const (
 	systemIDLimit     = 16384
 )
 
-type ExtractProviderDBSpec struct {
-	ExtractProviderImpl
-	onlyDatabases []string
+type RestoreDesc map[uint32]map[uint32]bool
+
+func (desc RestoreDesc) Add(database, table uint32) {
+	if _, ok := desc[database]; !ok {
+		desc[database] = make(map[uint32]bool)
+	}
+	desc[database][table] = true
 }
 
-func NewExtractProviderDBSpec(onlyDatabases []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{onlyDatabases: onlyDatabases}
+func (desc RestoreDesc) IsFull(database uint32) bool {
+	if _, ok := desc[database]; ok {
+		return desc[database][0]
+	}
+	return false
+}
+
+func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
+	if database < systemIDLimit || desc.IsFull(database) {
+		return false
+	}
+	if _, ok := desc[database]; ok {
+		_, found := desc[database][table]
+		return table >= systemIDLimit && !found
+	}
+	return true
+}
+
+type ExtractProviderDBSpec struct {
+	ExtractProviderImpl
+	restoreParameters []string
+}
+
+func NewExtractProviderDBSpec(partialRestoreParameters []string) *ExtractProviderDBSpec {
+	return &ExtractProviderDBSpec{restoreParameters: partialRestoreParameters}
 }
 
 func (p ExtractProviderDBSpec) Get(
@@ -34,50 +61,43 @@ func (p ExtractProviderDBSpec) Get(
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	fullRestoreDatabases, err := p.makeFullRestoreDatabaseMap(p.onlyDatabases, filesMeta.DatabasesByNames)
+	desc, err := p.makeRestoreDesc(p.restoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
-	p.filterFilesToUnwrap(filesToUnwrap, fullRestoreDatabases)
+	p.filterFilesToUnwrap(filesToUnwrap, desc)
 
 	return p.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
 
-func (p ExtractProviderDBSpec) makeFullRestoreDatabaseMap(databases []string, names DatabasesByNames) (map[int]bool, error) {
-	restoredDatabases := p.makeSystemDatabasesMap()
+func (p ExtractProviderDBSpec) makeRestoreDesc(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
+	restoredDatabases := make(RestoreDesc)
 
-	for _, db := range databases {
-		dbID, err := names.Resolve(db)
+	for _, parameter := range restoreParameters {
+		dbID, tableID, err := names.Resolve(parameter)
 		if err != nil {
 			return nil, err
 		}
-		restoredDatabases[dbID] = true
+
+		restoredDatabases.Add(dbID, tableID)
 	}
 
 	return restoredDatabases, nil
 }
 
-func (p ExtractProviderDBSpec) makeSystemDatabasesMap() map[int]bool {
-	restoredDatabases := make(map[int]bool)
-	for i := 0; i < systemIDLimit; i++ {
-		restoredDatabases[i] = true
-	}
-	return restoredDatabases
-}
-
-func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, databases map[int]bool) {
+func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, desc RestoreDesc) {
 	for file := range filesToUnwrap {
-		isDB, dbID, _ := p.TryGetOidPair(file)
+		isDB, dbID, tableID := p.TryGetOidPair(file)
 
-		if isDB && !databases[dbID] {
+		if isDB && desc.IsSkipped(dbID, tableID) {
 			delete(filesToUnwrap, file)
 		}
 	}
 }
 
-func (p ExtractProviderDBSpec) TryGetOidPair(file string) (bool, int, int) {
+func (p ExtractProviderDBSpec) TryGetOidPair(file string) (bool, uint32, uint32) {
 	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
 		return false, 0, 0
 	}
-	var tableID, dbID int
+	var tableID, dbID uint32
 
 	file, tableID = p.cutIntegerBase(file)
 	_, dbID = p.cutIntegerBase(file)
@@ -85,10 +105,11 @@ func (p ExtractProviderDBSpec) TryGetOidPair(file string) (bool, int, int) {
 	return true, dbID, tableID
 }
 
-func (p ExtractProviderDBSpec) cutIntegerBase(file string) (string, int) {
+func (p ExtractProviderDBSpec) cutIntegerBase(file string) (string, uint32) {
 	parent, base := path.Dir(file), path.Base(file)
 	base, _, _ = strings.Cut(base, ".")
 	base, _, _ = strings.Cut(base, "_")
-	integerResult, _ := strconv.Atoi(base)
-	return parent, integerResult
+	integerResult, _ := strconv.ParseUint(base, 10, 0)
+
+	return parent, uint32(integerResult)
 }
