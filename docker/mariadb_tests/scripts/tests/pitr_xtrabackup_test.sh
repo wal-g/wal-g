@@ -7,8 +7,8 @@ export WALE_S3_PREFIX=s3://mariadb_pitr_xtrabackup
 export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 export WALG_MYSQL_BINLOG_DST=/tmp
 
-mysql_install_db > /dev/null
-service mysql start
+mariadb_installdb
+service mariadb start
 
 # add some data to database, so
 sysbench --table-size=10 prepare
@@ -46,7 +46,7 @@ wal-g backup-fetch LATEST
 cat /var/lib/mysql/xtrabackup_binlog_info
 
 chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
+service mariadb start || (cat /var/log/mysql/error.log && false)
 # For backups made from replicas we should update GTIDs. Test our reset logic here.
 # https://mariadb.com/kb/en/gtid/#setting-up-a-new-replica-from-a-backup
 mysql_set_gtid_from_backup
@@ -75,7 +75,7 @@ mysql_set_gtid_from_backup
 #mariadb_kill_and_clean_data
 #wal-g backup-fetch $FIRST_BACKUP
 #chown -R mysql:mysql $MYSQLDATA
-#service mysql start || (cat /var/log/mysql/error.log && false)
+#service mariadb start || (cat /var/log/mysql/error.log && false)
 #mysql_set_gtid_from_backup
 #wal-g binlog-replay --since $FIRST_BACKUP --until "$DT1"
 #mysqldump sbtest > /tmp/dump_after_pitr

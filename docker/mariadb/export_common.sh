@@ -11,7 +11,7 @@ export WALG_MYSQL_CHECK_GTIDS=False
 # test tools
 mariadb_kill_and_clean_data() {
     # MariaDB service is weired - it returns error on service stop. Repeat it until success
-    while ! service mysql stop
+    while ! service mariadb stop
     do
       echo "Stopping MariaDB... Try again"
       sleep 1
@@ -20,6 +20,10 @@ mariadb_kill_and_clean_data() {
     rm -rf "${MYSQLDATA}"/*
     rm -rf "${MYSQLDATA}"/.tmp
     rm -rf /root/.walg_mysql_binlogs_cache
+}
+
+mariadb_installdb() {
+    mysql_install_db > /dev/null && chown -R mysql:mysql $MYSQLDATA
 }
 
 sysbench() {

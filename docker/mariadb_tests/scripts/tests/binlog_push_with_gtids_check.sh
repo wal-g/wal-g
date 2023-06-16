@@ -7,8 +7,8 @@ export WALE_S3_PREFIX=s3://mariadb_binlog_push_with_gtids_check
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 export WALG_MYSQL_CHECK_GTIDS=True
 
-mysql_install_db > /dev/null
-service mysql start
+mariadb_installdb
+service mariadb start
 
 sysbench --table-size=10 prepare
 sysbench --time=3 run

@@ -9,8 +9,8 @@ export WALG_STREAM_RESTORE_COMMAND="mysql"
 export WALG_MYSQL_BACKUP_PREPARE_COMMAND=
 
 
-mysql_install_db > /dev/null
-service mysql start
+mariadb_installdb
+service mariadb start
 
 sysbench --table-size=10 prepare
 sysbench --time=5 run
@@ -24,8 +24,8 @@ wal-g backup-push
 
 mariadb_kill_and_clean_data
 
-mysql_install_db > /dev/null
-service mysql start
+mariadb_installdb
+service mariadb start
 
 wal-g backup-fetch LATEST
 
