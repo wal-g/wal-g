@@ -38,7 +38,7 @@ const (
 	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
   target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
   target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups 
-  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup`  //nolint:lll
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup` //nolint:lll
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
@@ -365,9 +365,23 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed b
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
-	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
-		return objSelector(object) && h.less(object, target) && !h.isPermanent(object)
-	}, folderFilter)
+	backupsShouldToDelete := make([]string, 0)
+	for _, backupObject := range h.backups {
+		if objSelector(backupObject) && h.less(backupObject, target) && !h.isPermanent(backupObject) {
+			backupsShouldToDelete = append(backupsShouldToDelete, backupObject.GetName())
+		}
+	}
+
+	selectorFunc := func(object storage.Object) bool {
+		for _, backup := range backupsShouldToDelete {
+			if backup == object.GetName() {
+				return true
+			}
+		}
+		return false
+	}
+
+	return storage.DeleteObjectsWhere(h.Folder, confirmed, selectorFunc, folderFilter)
 }
 
 func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bool,

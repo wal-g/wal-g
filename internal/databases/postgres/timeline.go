@@ -2,20 +2,18 @@ package postgres
 
 import (
 	"fmt"
-	"regexp"
-	"strconv"
-	"time"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"regexp"
+	"strconv"
 )
 
 const PatternTimelineAndLogSegNo = "[0-9A-F]{24}"
 const PatternTimestamp = "[0-9]{8}T[0-9]{6}Z"
 const PatternLSN = "[0-9A-F]{8}"
 
-var regexpTimeline = regexp.MustCompile(PatternTimestamp)
+var regexpTimelineAndLogSegNo = regexp.MustCompile(PatternTimelineAndLogSegNo)
 
 type BytesPerWalSegmentError struct {
 	error
@@ -101,26 +99,26 @@ func formatWALFileName(timeline uint32, logSegNo uint64) string {
 }
 
 // ParseWALFilename extracts numeric parts from WAL file name
-func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err error) {
-	if len(name) != 24 {
-		err = newNotWalFilenameError(name)
+func ParseWALFilename(strLSN string) (timelineID uint32, logSegNo uint64, err error) {
+	if len(strLSN) != 24 {
+		err = newNotWalFilenameError(strLSN)
 		return
 	}
-	timelineID64, err := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
+	timelineID64, err := strconv.ParseUint(strLSN[0:8], 0x10, sizeofInt32bits)
 	timelineID = uint32(timelineID64)
 	if err != nil {
 		return
 	}
-	logSegNoHi, err := strconv.ParseUint(name[8:16], 0x10, sizeofInt32bits)
+	logSegNoHi, err := strconv.ParseUint(strLSN[8:16], 0x10, sizeofInt32bits)
 	if err != nil {
 		return
 	}
-	logSegNoLo, err := strconv.ParseUint(name[16:24], 0x10, sizeofInt32bits)
+	logSegNoLo, err := strconv.ParseUint(strLSN[16:24], 0x10, sizeofInt32bits)
 	if err != nil {
 		return
 	}
 	if logSegNoLo >= xLogSegmentsPerXLogID {
-		err = newIncorrectLogSegNoError(name)
+		err = newIncorrectLogSegNoError(strLSN)
 		return
 	}
 
@@ -128,12 +126,13 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 	return
 }
 
-func TryFetchTimeline(objectName string) (time.Time, error) {
-	foundTime := regexpTimeline.FindAllString(objectName, 1)
-	if len(foundTime) > 0 {
-		return time.Parse(utility.BackupTimeFormat, foundTime[0])
+func TryFetchTimelineAndLogSegNo(lsn LSN) (uint32, uint64, bool) {
+	timelineID, logSegNo, err := ParseWALFilename(lsn.String())
+
+	if err == nil {
+		return timelineID, logSegNo, true
 	}
-	return time.Time{}, ErrorBasePrefixMissing
+	return 0, 0, false
 }
 
 func isWalFilename(filename string) bool {

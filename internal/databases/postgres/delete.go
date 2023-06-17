@@ -28,21 +28,8 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 		return nil, err
 	}
 
-	lessFunc := segmentNoLess
-	var startTimeByBackupName map[string]time.Time
-	if useSentinelTime {
-		// If all backups in storage have metadata, we will use backup start time from sentinel.
-		// Otherwise, for example in case when we are dealing with some ancient backup without
-		// metadata included, fall back to the default timeline and segment number comparator.
-		startTimeByBackupName, err = getBackupStartTimeMap(folder, backups)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to get sentinel backup start times: %v,"+
-				" will fall back to timeline and segment number for ordering...\n", err)
-		} else {
-			lessFunc = makeLessFunc(startTimeByBackupName)
-		}
-	}
-	postgresBackups, err := makeBackupObjects(folder, backups, startTimeByBackupName)
+	lessFunc := makeLessFunc()
+	postgresBackups, err := makeBackupObjects(folder, backups)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +48,7 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 }
 
 func newBackupObject(incrementBase, incrementFrom string,
-	isFullBackup bool, creationTime time.Time, object storage.Object) BackupObject {
+	isFullBackup bool, creationTime time.Time, object storage.Object, lsn LSN) BackupObject {
 	return BackupObject{
 		Object:            object,
 		isFullBackup:      isFullBackup,
@@ -79,6 +66,7 @@ type BackupObject struct {
 	baseBackupName    string
 	incrementFromName string
 	creationTime      time.Time
+	lsn               LSN
 }
 
 func (o BackupObject) IsFullBackup() bool {
@@ -102,20 +90,17 @@ func (o BackupObject) GetIncrementFromName() string {
 }
 
 func makeBackupObjects(
-	folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time,
-) ([]internal.BackupObject, error) {
+	folder storage.Folder, objects []storage.Object) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
-		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(folder, object)
+		incrementBase, incrementFrom, isFullBackup, lsn, err := getIncrementInfo(folder, object)
 		if err != nil {
 			return nil, err
 		}
-		postgresBackup := newBackupObject(
-			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object)
 
-		if startTimeByBackupName != nil {
-			postgresBackup.creationTime = startTimeByBackupName[postgresBackup.BackupName]
-		}
+		postgresBackup := newBackupObject(
+			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object, lsn)
+
 		backupObjects = append(backupObjects, postgresBackup)
 	}
 	return backupObjects, nil
@@ -127,28 +112,17 @@ func makePermanentFunc(permanentBackups, permanentWals map[string]bool) func(obj
 	}
 }
 
-func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Object, storage.Object) bool {
-	return func(object1 storage.Object, object2 storage.Object) bool {
-		backupName1 := DeduceBackupName(object1)
-		if backupName1 == "" {
-			// we can't compare non-backup storage objects (probably WAL segments) by start time,
-			// so use the segment number comparator instead
-			return segmentNoLess(object1, object2)
-		}
-		backupName2 := DeduceBackupName(object2)
-		if backupName2 == "" {
-			return segmentNoLess(object1, object2)
-		}
-
-		startTime1, ok := startTimeByBackupName[backupName1]
+func makeLessFunc() func(object1, object2 storage.Object) bool {
+	return func(object1, object2 storage.Object) bool {
+		time1, ok := utility.TryFetchTimeRFC3999(object1.GetName())
 		if !ok {
-			return false
+			time1 = object1.GetLastModified().Format(utility.BackupTimeFormat)
 		}
-		startTime2, ok := startTimeByBackupName[backupName2]
+		time2, ok := utility.TryFetchTimeRFC3999(object2.GetName())
 		if !ok {
-			return false
+			time2 = object2.GetLastModified().Format(utility.BackupTimeFormat)
 		}
-		return startTime1.Before(startTime2)
+		return time1 < time2
 	}
 }
 
@@ -168,45 +142,17 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 	return startTimeByBackupName, nil
 }
 
-func segmentNoLess(object1 storage.Object, object2 storage.Object) bool {
-	time1, err := TryFetchTimeline(object1.GetName())
-	if err != nil {
-		tracelog.ErrorLogger.Printf("%s", err)
-		return false
-	}
-	time2, err := TryFetchTimeline(object2.GetName())
-	if err != nil {
-		tracelog.ErrorLogger.Printf("%s", err)
-		return false
-	}
-	return time1.Before(time2)
-}
-
-//func timelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bool {
-//	time1, err := TryFetchTimeline(object1.GetName())
-//	if err != nil {
-//		tracelog.ErrorLogger.Printf("%s", err)
-//		return false
-//	}
-//	time2, err := TryFetchTimeline(object2.GetName())
-//	if err != nil {
-//		tracelog.ErrorLogger.Printf("%s", err)
-//		return false
-//	}
-//	return tl1 < tl2 || tl1 == tl2 && segNo1 < segNo2
-//}
-
-func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
+func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, LSN, error) {
 	backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object))
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
-		return "", "", true, err
+		return "", "", true, LSN(0), err
 	}
 	if !sentinel.IsIncremental() {
-		return "", "", true, nil
+		return "", "", true, LSN(0), nil
 	}
 
-	return *sentinel.IncrementFullName, *sentinel.IncrementFrom, false, nil
+	return *sentinel.IncrementFullName, *sentinel.IncrementFrom, false, *sentinel.BackupStartLSN, nil
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
