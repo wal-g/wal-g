@@ -6,7 +6,7 @@ on:
       - 'v*' # Push events to matching v*, i.e. v0.2.19, v0.2.14a
 
 env:
-  GO_VERSION: 1.18
+  GO_VERSION: "1.20"
   USE_BROTLI: 1
   USE_LIBSODIUM: 1
   USE_LZO: 1
@@ -100,8 +100,8 @@ jobs:
             apt-get update
             apt-get install -y build-essential curl git cmake liblzo2-dev brotli libsodium-dev
             
-            curl -LO https://go.dev/dl/go1.18.3.linux-arm64.tar.gz
-            tar -C /usr/local -xzf go1.18.3.linux-arm64.tar.gz
+            curl -LO https://go.dev/dl/go1.20.5.linux-arm64.tar.gz
+            tar -C /usr/local -xzf go1.20.5.linux-arm64.tar.gz
             export GOROOT=/usr/local/go
             export GOPATH=$HOME/go          
             export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
