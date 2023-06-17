@@ -365,23 +365,9 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed b
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
-	backupsShouldToDelete := make([]string, 0)
-	for _, backupObject := range h.backups {
-		if objSelector(backupObject) && h.less(backupObject, target) && !h.isPermanent(backupObject) {
-			backupsShouldToDelete = append(backupsShouldToDelete, backupObject.GetName())
-		}
-	}
-
-	selectorFunc := func(object storage.Object) bool {
-		for _, backup := range backupsShouldToDelete {
-			if backup == object.GetName() {
-				return true
-			}
-		}
-		return false
-	}
-
-	return storage.DeleteObjectsWhere(h.Folder, confirmed, selectorFunc, folderFilter)
+	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
+		return objSelector(object) && h.less(object, target) && !h.isPermanent(object)
+	}, folderFilter)
 }
 
 func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bool,

@@ -48,7 +48,7 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 }
 
 func newBackupObject(incrementBase, incrementFrom string,
-	isFullBackup bool, creationTime time.Time, object storage.Object, lsn LSN) BackupObject {
+	isFullBackup bool, creationTime time.Time, object storage.Object) BackupObject {
 	return BackupObject{
 		Object:            object,
 		isFullBackup:      isFullBackup,
@@ -66,7 +66,6 @@ type BackupObject struct {
 	baseBackupName    string
 	incrementFromName string
 	creationTime      time.Time
-	lsn               LSN
 }
 
 func (o BackupObject) IsFullBackup() bool {
@@ -93,13 +92,13 @@ func makeBackupObjects(
 	folder storage.Folder, objects []storage.Object) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
-		incrementBase, incrementFrom, isFullBackup, lsn, err := getIncrementInfo(folder, object)
+		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(folder, object)
 		if err != nil {
 			return nil, err
 		}
 
 		postgresBackup := newBackupObject(
-			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object, lsn)
+			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object)
 
 		backupObjects = append(backupObjects, postgresBackup)
 	}
@@ -142,17 +141,17 @@ func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map
 	return startTimeByBackupName, nil
 }
 
-func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, LSN, error) {
+func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
 	backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object))
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
-		return "", "", true, LSN(0), err
+		return "", "", true, err
 	}
 	if !sentinel.IsIncremental() {
-		return "", "", true, LSN(0), nil
+		return "", "", true, nil
 	}
 
-	return *sentinel.IncrementFullName, *sentinel.IncrementFrom, false, *sentinel.BackupStartLSN, nil
+	return *sentinel.IncrementFullName, *sentinel.IncrementFrom, false, nil
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
