@@ -170,6 +170,7 @@ func putCachedDecompressorInFirstPlace(decompressors []compression.Decompressor)
 func DownloadAndDecompressStorageFile(reader StorageFolderReader, fileName string) (io.ReadCloser, error) {
 	archiveReader, decompressor, err := findDecompressorAndDownload(reader, fileName)
 	if err != nil {
+		tracelog.InfoLogger.Printf("ошибка 4 %s %s", fileName, reader)
 		return nil, err
 	}
 
@@ -207,6 +208,7 @@ func findDecompressorAndDownload(reader StorageFolderReader, fileName string) (i
 		return fileReader, nil, nil
 	}
 
+	tracelog.InfoLogger.Println("ошибка главная")
 	return nil, nil, newArchiveNonExistenceError(fileName)
 }
 
@@ -216,6 +218,7 @@ func DownloadFileTo(folderReader StorageFolderReader, fileName string, dstPath s
 	// Create file as soon as possible. It may be important due to race condition in wal-prefetch for PG.
 	file, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_EXCL, 0666)
 	if err != nil {
+		tracelog.InfoLogger.Println("ошибка 1")
 		return err
 	}
 	defer utility.LoggedClose(file, "")
@@ -224,11 +227,13 @@ func DownloadFileTo(folderReader StorageFolderReader, fileName string, dstPath s
 	if err != nil {
 		// We could not start upload - remove the file totally.
 		_ = os.Remove(dstPath)
+		tracelog.InfoLogger.Println("ошибка 2")
 		return err
 	}
 	defer utility.LoggedClose(reader, "")
 
 	_, err = utility.FastCopy(file, reader)
 	// In case of error we may have some content within file. Leave it alone.
+	tracelog.InfoLogger.Println("ошибка 3 возможно")
 	return err
 }
