@@ -291,7 +291,7 @@ PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_S3_PREFIX=s3://deletebeforepermanentdeltabucket \
 WALG_USE_WAL_DELTA=true \
-wal-g backup-list | egrep -o "[0-9A-F]{24}"`
+wal-g backup-list | egrep -o "[0-9]{8}T[0-9]{6}Z"`
 
 # make permanent base backup
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
