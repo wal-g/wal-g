@@ -429,7 +429,7 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 	filename := idx.PutBlock(blockID, blockSize)
 	bs.uploadSem <- struct{}{}
 
-	err = folder.PutObject(filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter, nil))
+	err = folder.PutObject(filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter))
 	<-bs.uploadSem
 	req.Body.Close()
 	if err != nil {
@@ -618,7 +618,7 @@ func (bs *Server) blobPut(r io.Reader, idx *Index) ([]string, error) {
 		}
 		id := fmt.Sprintf("data_%05d", i)
 		name := idx.PutBlock(id, uint64(n))
-		encryptedReader := internal.CompressAndEncrypt(bytes.NewReader(buf[:n]), bs.compressor, bs.crypter, nil)
+		encryptedReader := internal.CompressAndEncrypt(bytes.NewReader(buf[:n]), bs.compressor, bs.crypter)
 		err = idx.folder.PutObject(name, encryptedReader)
 		if err != nil {
 			return nil, err

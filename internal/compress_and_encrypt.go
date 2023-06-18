@@ -28,7 +28,7 @@ func (err CompressAndEncryptError) Error() string {
 // CompressAndEncrypt compresses input to a pipe reader. Output must be used or
 // pipe will block.
 // nolint: lll
-func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter, compressSize *int64) io.Reader {
+func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter) io.Reader {
 	compressedReader, dstWriter := io.Pipe()
 
 	var writeCloser io.WriteCloser = dstWriter
@@ -40,17 +40,13 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 			panic(err)
 		}
 	}
-	var withSizeWriter = writeCloser
-	if compressSize != nil {
-		withSizeWriter = utility.NewWithSizeWriteCloser(writeCloser, compressSize)
-	}
 
 	var compressedWriter io.WriteCloser
 	if compressor != nil {
-		writeIgnorer := &utility.EmptyWriteIgnorer{Writer: withSizeWriter}
+		writeIgnorer := &utility.EmptyWriteIgnorer{Writer: writeCloser}
 		compressedWriter = compressor.NewWriter(writeIgnorer)
 	} else {
-		compressedWriter = withSizeWriter
+		compressedWriter = writeCloser
 	}
 
 	go func() {

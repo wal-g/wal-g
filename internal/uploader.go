@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -30,8 +29,6 @@ type Uploader interface {
 	DisableSizeTracking()
 	UploadedDataSize() (int64, error)
 	RawDataSize() (int64, error)
-	CompressedSizePtr() *int64
-	CompressedDataSize() (int64, error)
 	ChangeDirectory(relativePath string)
 	Folder() storage.Folder
 	Clone() Uploader
@@ -43,14 +40,14 @@ type Uploader interface {
 // RegularUploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type RegularUploader struct {
-	UploadingFolder storage.Folder
-	Compressor      compression.Compressor
-	waitGroup       *sync.WaitGroup
-	failed          *abool.AtomicBool
-	tarSize         *int64
-	dataSize        *int64
-	compressedSize  *int64
-	uploadSpeeds    ewma.SimpleEWMA
+	UploadingFolder          storage.Folder
+	Compressor               compression.Compressor
+	waitGroup                *sync.WaitGroup
+	failed                   *abool.AtomicBool
+	tarSize                  *int64
+	dataSize                 *int64
+	compressedUploadSpeeds   ewma.SimpleEWMA
+	uncompressedUploadSpeeds ewma.SimpleEWMA
 }
 
 var _ Uploader = &RegularUploader{}
@@ -83,7 +80,6 @@ func NewRegularUploader(
 		waitGroup:       &sync.WaitGroup{},
 		tarSize:         new(int64),
 		dataSize:        new(int64),
-		compressedSize:  new(int64),
 		failed:          abool.New(),
 	}
 	return uploader
@@ -116,23 +112,12 @@ func (uploader *RegularUploader) UploadedDataSize() (int64, error) {
 	return atomic.LoadInt64(uploader.tarSize), nil
 }
 
-func (uploader *RegularUploader) CompressedSizePtr() *int64 {
-	return uploader.compressedSize
-}
-
 // RawDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
 func (uploader *RegularUploader) RawDataSize() (int64, error) {
 	if uploader.dataSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
 	return atomic.LoadInt64(uploader.dataSize), nil
-}
-
-func (uploader *RegularUploader) CompressedDataSize() (int64, error) {
-	if uploader.compressedSize == nil {
-		return 0, ErrorSizeTrackingDisabled
-	}
-	return atomic.LoadInt64(uploader.compressedSize), nil
 }
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
@@ -150,14 +135,14 @@ func (uploader *RegularUploader) Finish() {
 // Clone creates similar Uploader with new WaitGroup
 func (uploader *RegularUploader) Clone() Uploader {
 	return &RegularUploader{
-		UploadingFolder: uploader.UploadingFolder,
-		Compressor:      uploader.Compressor,
-		waitGroup:       &sync.WaitGroup{},
-		failed:          abool.NewBool(uploader.Failed()),
-		tarSize:         uploader.tarSize,
-		dataSize:        uploader.dataSize,
-		compressedSize:  uploader.compressedSize,
-		uploadSpeeds:    uploader.uploadSpeeds,
+		UploadingFolder:          uploader.UploadingFolder,
+		Compressor:               uploader.Compressor,
+		waitGroup:                &sync.WaitGroup{},
+		failed:                   abool.NewBool(uploader.Failed()),
+		tarSize:                  uploader.tarSize,
+		dataSize:                 uploader.dataSize,
+		compressedUploadSpeeds:   uploader.compressedUploadSpeeds,
+		uncompressedUploadSpeeds: uploader.uncompressedUploadSpeeds,
 	}
 }
 
@@ -170,7 +155,7 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 	if uploader.dataSize != nil {
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
-	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter(), uploader.compressedSize)
+	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
 	err := uploader.Upload(dstPath, compressedFile)
@@ -182,7 +167,6 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 func (uploader *RegularUploader) DisableSizeTracking() {
 	uploader.tarSize = nil
 	uploader.dataSize = nil
-	uploader.compressedSize = nil
 }
 
 // Compression returns configured compressor
@@ -199,18 +183,6 @@ func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
-	compressedFileBytes, ioErr := io.ReadAll(content)
-	if ioErr != nil {
-		return ioErr
-	}
-	compressedSizeBytes := int64(len(compressedFileBytes))
-	setSize, compressionErr := uploader.CompressedDataSize()
-	if compressionErr == nil && setSize != compressedSizeBytes {
-		atomic.StoreInt64(uploader.compressedSize, compressedSizeBytes)
-	}
-
-	content = bytes.NewReader(compressedFileBytes)
-
 	err := uploader.UploadingFolder.PutObject(path, content)
 
 	if err != nil {
@@ -260,36 +232,27 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 	defer uploader.waitGroup.Done()
 	startTime := time.Now()
 	for {
-		totalSizeInt, err := uploader.CompressedDataSize()
-		if totalSizeInt == 0 {
-			totalSizeInt, err = uploader.RawDataSize()
-		}
+		compressedSizeInt, err := uploader.UploadedDataSize()
 		if err != nil {
 			return
 		}
-		uploadedSizeInt, err := uploader.UploadedDataSize()
+		uncompressedSizeInt, err := uploader.RawDataSize()
 		if err != nil {
 			return
 		}
 
-		totalSize := float64(totalSizeInt) / 1000000
-		uploadedSize := float64(uploadedSizeInt) / 1000000
-
-		remainingSize := totalSize - uploadedSize
+		compressedSize := float64(compressedSizeInt) / 1000000
+		uncompressedSize := float64(uncompressedSizeInt) / 1000000
 
 		timeElapsed := time.Since(startTime).Seconds()
-		uploader.uploadSpeeds.Add(uploadedSize / timeElapsed)
-		meanSpeed := uploader.uploadSpeeds.Value()
+		uploader.compressedUploadSpeeds.Add(compressedSize / timeElapsed)
+		uploader.uncompressedUploadSpeeds.Add(uncompressedSize / timeElapsed)
 
-		remainingTime := time.Duration(remainingSize/meanSpeed) * time.Second
-		tracelog.InfoLogger.Printf("Uploaded: %v Mb\n", uploadedSize)
-		tracelog.InfoLogger.Printf("%v Mb left to Upload\n", remainingSize)
-		tracelog.InfoLogger.Printf("Average upload speed: %v Mb/s\n", meanSpeed)
-		tracelog.InfoLogger.Printf("Remaining time: %v\n", remainingTime)
+		tracelog.InfoLogger.Printf("Uploaded compressed: %v Mb\n", compressedSize)
+		tracelog.InfoLogger.Printf("Uploaded uncompressed: %v Mb\n", uncompressedSize)
+		tracelog.InfoLogger.Printf("Average upload speed compressed: %v Mb/s\n", uploader.compressedUploadSpeeds.Value())
+		tracelog.InfoLogger.Printf("Average upload speed uncompressed: %v Mb/s\n", uploader.uncompressedUploadSpeeds.Value())
 
-		if uploadedSize >= totalSize {
-			break
-		}
 		time.Sleep(5 * time.Minute)
 	}
 }
