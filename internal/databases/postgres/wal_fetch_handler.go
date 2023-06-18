@@ -34,10 +34,11 @@ func (err InvalidWalFileMagicError) Error() string {
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
 func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, location string, triggerPrefetch bool) {
-	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
+	tracelog.InfoLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
 	reader = reader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
 	if triggerPrefetch {
+		tracelog.InfoLogger.Println("мы зашли в prefetch")
 		prefetchLocation := location
 		if viper.IsSet(internal.PrefetchDir) {
 			prefetchLocation = viper.GetString(internal.PrefetchDir)
@@ -45,13 +46,15 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 		defer forkPrefetch(walFileName, prefetchLocation)
 	}
 
+	tracelog.InfoLogger.Println("дошли до сюда")
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
 	seenSize := int64(-1)
-
+	tracelog.InfoLogger.Println("дошли до сюда2")
 	sizeStallInterations := 0
 	maxSizeStallTerations := 100
 	for {
 		if stat, err := os.Stat(prefetched); err == nil {
+			tracelog.InfoLogger.Println("зашли в первое условие")
 			if stat.Size() != int64(WalSegmentSize) {
 				tracelog.ErrorLogger.Println("WAL-G: Prefetch error: wrong file size of prefetched file ", stat.Size())
 				break
@@ -69,9 +72,10 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 
 			return
 		} else if !os.IsNotExist(err) {
+			tracelog.InfoLogger.Println("зашли в ошибку")
 			tracelog.ErrorLogger.FatalError(err)
 		}
-
+		tracelog.InfoLogger.Println("прошли условия")
 		// We have race condition here, if running is renamed here, but it's OK
 
 		if runStat, err := os.Stat(running); err == nil {
@@ -97,8 +101,11 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 		time.Sleep(2 * time.Millisecond)
 	}
 
+	tracelog.InfoLogger.Println("прошли for")
 	err := internal.DownloadFileTo(reader, walFileName, location)
+	tracelog.InfoLogger.Println("после скачивания файла")
 	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
+		tracelog.InfoLogger.Println("зашли в ошибку2")
 		tracelog.ErrorLogger.Print(err.Error())
 		os.Exit(exIoError)
 	} else {
