@@ -230,7 +230,7 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 	if !bh.Workers.Bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bh.Workers.Bundle.TablespaceSpec
 	}
-	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
+	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec, &bh.Workers.Bundle.Timeline)
 	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
 	filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata()
@@ -395,7 +395,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	bh.CurBackupInfo.uncompressedSize = baseBackup.UncompressedSize
 	bh.CurBackupInfo.compressedSize, err = bh.Workers.Uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
-	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
+	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec(), &baseBackup.TimeLine)
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
 	bh.CurBackupInfo.Name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")

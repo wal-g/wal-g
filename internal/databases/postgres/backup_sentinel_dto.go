@@ -36,7 +36,7 @@ type BackupSentinelDto struct {
 	FilesMetadataDisabled bool `json:"FilesMetadataDisabled,omitempty"`
 }
 
-func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {
+func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec, timeline *uint32) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
 		BackupStartLSN:   &bh.CurBackupInfo.startLSN,
 		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
@@ -53,7 +53,7 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSent
 		sentinel.IncrementCount = &bh.CurBackupInfo.incrementCount
 	}
 
-	sentinel.Timeline = &bh.Workers.Bundle.Timeline
+	sentinel.Timeline = timeline
 	sentinel.BackupFinishLSN = &bh.CurBackupInfo.endLSN
 	sentinel.UserData = bh.Arguments.userData
 	sentinel.SystemIdentifier = bh.PgInfo.systemIdentifier
