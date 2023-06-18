@@ -26,12 +26,7 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 			continue
 		}
 		if meta.IsPermanent {
-			timelineID, err := ParseTimelineFromString(meta.StartLsn.String()[0:8])
-			if err != nil {
-				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...",
-					backupTime.BackupName, err.Error())
-				continue
-			}
+			timelineID := meta.Timeline
 
 			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
 			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)

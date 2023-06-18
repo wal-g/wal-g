@@ -74,6 +74,7 @@ type ExtendedMetadataDto struct {
 	FinishLsn        LSN       `json:"finish_lsn"`
 	IsPermanent      bool      `json:"is_permanent"`
 	SystemIdentifier *uint64   `json:"system_identifier"`
+	Timeline         uint32    `json:"timeline"`
 
 	UncompressedSize int64 `json:"uncompressed_size"`
 	CompressedSize   int64 `json:"compressed_size"`
@@ -81,7 +82,7 @@ type ExtendedMetadataDto struct {
 	UserData interface{} `json:"user_data,omitempty"`
 }
 
-func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time,
+func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time, timeline uint32,
 	sentinelDto BackupSentinelDto) (meta ExtendedMetadataDto) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -93,6 +94,7 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	meta.Hostname = hostname
 	meta.IsPermanent = isPermanent
 	meta.DataDir = dataDir
+	meta.Timeline = timeline
 
 	// set the matching fields from sentinel
 	meta.StartLsn = *sentinelDto.BackupStartLSN
