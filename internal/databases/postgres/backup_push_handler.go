@@ -407,7 +407,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) {
 	curBackupName := bh.CurBackupInfo.Name
 	meta := NewExtendedMetadataDto(bh.Arguments.isPermanent, bh.PgInfo.PgDataDirectory,
-		bh.CurBackupInfo.StartTime, bh.Workers.Bundle.Timeline, sentinelDto)
+		bh.CurBackupInfo.StartTime, sentinelDto)
 
 	err := bh.uploadExtendedMetadata(meta)
 	if err != nil {

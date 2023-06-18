@@ -16,6 +16,7 @@ const MetadataDatetimeFormat = "%Y-%m-%dT%H:%M:%S.%fZ"
 // BackupSentinelDto describes file structure of json sentinel
 type BackupSentinelDto struct {
 	BackupStartLSN    *LSN    `json:"LSN"`
+	Timeline          *uint32 `json:"Timeline"`
 	IncrementFromLSN  *LSN    `json:"DeltaLSN,omitempty"`
 	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
 	IncrementFullName *string `json:"DeltaFullName,omitempty"`
@@ -52,6 +53,7 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSent
 		sentinel.IncrementCount = &bh.CurBackupInfo.incrementCount
 	}
 
+	sentinel.Timeline = &bh.Workers.Bundle.Timeline
 	sentinel.BackupFinishLSN = &bh.CurBackupInfo.endLSN
 	sentinel.UserData = bh.Arguments.userData
 	sentinel.SystemIdentifier = bh.PgInfo.systemIdentifier
@@ -82,7 +84,7 @@ type ExtendedMetadataDto struct {
 	UserData interface{} `json:"user_data,omitempty"`
 }
 
-func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time, timeline uint32,
+func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Time,
 	sentinelDto BackupSentinelDto) (meta ExtendedMetadataDto) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -94,9 +96,9 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	meta.Hostname = hostname
 	meta.IsPermanent = isPermanent
 	meta.DataDir = dataDir
-	meta.Timeline = timeline
 
 	// set the matching fields from sentinel
+	meta.Timeline = *sentinelDto.Timeline
 	meta.StartLsn = *sentinelDto.BackupStartLSN
 	meta.FinishLsn = *sentinelDto.BackupFinishLSN
 	meta.PgVersion = sentinelDto.PgVersion
