@@ -99,40 +99,31 @@ func formatWALFileName(timeline uint32, logSegNo uint64) string {
 }
 
 // ParseWALFilename extracts numeric parts from WAL file name
-func ParseWALFilename(strLSN string) (timelineID uint32, logSegNo uint64, err error) {
-	if len(strLSN) != 24 {
-		err = newNotWalFilenameError(strLSN)
+func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err error) {
+	if len(name) != 24 {
+		err = newNotWalFilenameError(name)
 		return
 	}
-	timelineID64, err := strconv.ParseUint(strLSN[0:8], 0x10, sizeofInt32bits)
+	timelineID64, err := strconv.ParseUint(name[0:8], 0x10, sizeofInt32bits)
 	timelineID = uint32(timelineID64)
 	if err != nil {
 		return
 	}
-	logSegNoHi, err := strconv.ParseUint(strLSN[8:16], 0x10, sizeofInt32bits)
+	logSegNoHi, err := strconv.ParseUint(name[8:16], 0x10, sizeofInt32bits)
 	if err != nil {
 		return
 	}
-	logSegNoLo, err := strconv.ParseUint(strLSN[16:24], 0x10, sizeofInt32bits)
+	logSegNoLo, err := strconv.ParseUint(name[16:24], 0x10, sizeofInt32bits)
 	if err != nil {
 		return
 	}
 	if logSegNoLo >= xLogSegmentsPerXLogID {
-		err = newIncorrectLogSegNoError(strLSN)
+		err = newIncorrectLogSegNoError(name)
 		return
 	}
 
 	logSegNo = logSegNoHi*xLogSegmentsPerXLogID + logSegNoLo
 	return
-}
-
-func TryFetchTimelineAndLogSegNo(lsn LSN) (uint32, uint64, bool) {
-	timelineID, logSegNo, err := ParseWALFilename(lsn.String())
-
-	if err == nil {
-		return timelineID, logSegNo, true
-	}
-	return 0, 0, false
 }
 
 func isWalFilename(filename string) bool {

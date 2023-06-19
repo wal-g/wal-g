@@ -96,7 +96,6 @@ func makeBackupObjects(
 		if err != nil {
 			return nil, err
 		}
-
 		postgresBackup := newBackupObject(
 			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object)
 

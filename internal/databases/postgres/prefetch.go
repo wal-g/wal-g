@@ -235,10 +235,9 @@ func getPrefetchLocations(location string,
 
 // TODO : unit tests
 func forkPrefetch(walFileName string, location string) {
-	tracelog.InfoLogger.Println("а теперь мы в forkPrefetch")
 	concurrency, err := internal.GetMaxDownloadConcurrency()
 	if err != nil {
-		tracelog.InfoLogger.Println("WAL-prefetch failed, oh eeee: ", err)
+		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
 	}
 	if strings.Contains(walFileName, "history") ||
 		strings.Contains(walFileName, "partial") ||
@@ -260,6 +259,6 @@ func forkPrefetch(walFileName string, location string) {
 	err = cmd.Start()
 
 	if err != nil {
-		tracelog.ErrorLogger.Println("WAL-prefetch failed, oh eeee 2: ", err)
+		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
 	}
 }
