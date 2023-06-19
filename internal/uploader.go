@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"io"
+	"math"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -232,26 +233,26 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 	defer uploader.waitGroup.Done()
 	startTime := time.Now()
 	for {
-		compressedSizeInt, err := uploader.UploadedDataSize()
+		compressedSize, err := uploader.UploadedDataSize()
 		if err != nil {
 			return
 		}
-		uncompressedSizeInt, err := uploader.RawDataSize()
+		uncompressedSize, err := uploader.RawDataSize()
 		if err != nil {
 			return
 		}
-
-		compressedSize := float64(compressedSizeInt) / 1000000
-		uncompressedSize := float64(uncompressedSizeInt) / 1000000
 
 		timeElapsed := time.Since(startTime).Seconds()
-		uploader.compressedUploadSpeeds.Add(compressedSize / timeElapsed)
-		uploader.uncompressedUploadSpeeds.Add(uncompressedSize / timeElapsed)
-
-		tracelog.InfoLogger.Printf("Uploaded compressed: %v Mb\n", compressedSize)
-		tracelog.InfoLogger.Printf("Uploaded uncompressed: %v Mb\n", uncompressedSize)
-		tracelog.InfoLogger.Printf("Average upload speed compressed: %v Mb/s\n", uploader.compressedUploadSpeeds.Value())
-		tracelog.InfoLogger.Printf("Average upload speed uncompressed: %v Mb/s\n", uploader.uncompressedUploadSpeeds.Value())
+		uploader.compressedUploadSpeeds.Add(float64(compressedSize) / timeElapsed)
+		uploader.uncompressedUploadSpeeds.Add(float64(uncompressedSize) / timeElapsed)
+		compressedSpeed := int64(math.Round(uploader.compressedUploadSpeeds.Value()))
+		uncompressedSpeed := int64(math.Round(uploader.uncompressedUploadSpeeds.Value()))
+		tracelog.InfoLogger.Printf(
+			"Uploaded: %s, average %s/s. Raw data read: %s, average %s/s",
+			utility.ByteCountSI(compressedSize),
+			utility.ByteCountSI(compressedSpeed),
+			utility.ByteCountSI(uncompressedSize),
+			utility.ByteCountSI(uncompressedSpeed))
 
 		time.Sleep(5 * time.Minute)
 	}
