@@ -1,0 +1,2 @@
+"WALE_S3_PREFIX": "s3://gppartialdatabasebucket",
+"WALG_DELTA_MAX_STEPS": "2"

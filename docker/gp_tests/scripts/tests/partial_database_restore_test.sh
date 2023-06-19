@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -x
 
-CONFIG_FILE="/tmp/configs/partial_restore_test_config.json"
+CONFIG_FILE="/tmp/configs/partial_database_restore_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}

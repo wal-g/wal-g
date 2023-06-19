@@ -64,14 +64,11 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 }
 
 type ExtractProviderDBSpec struct {
-	ExtractProviderImpl ExtractProvider
-	restoreParameters   []string
-	RestoreDescMaker
+	RestoreParameters []string
 }
 
 func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{ExtractProviderImpl: ExtractProviderImpl{}, restoreParameters: restoreParameters,
-		RestoreDescMaker: DefaultRestoreDescMaker{}}
+	return &ExtractProviderDBSpec{restoreParameters}
 }
 
 func (p ExtractProviderDBSpec) Get(
@@ -84,14 +81,14 @@ func (p ExtractProviderDBSpec) Get(
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	desc, err := p.RestoreDescMaker.Make(p.restoreParameters, filesMeta.DatabasesByNames)
+	desc, err := DefaultRestoreDescMaker{}.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
-	p.filterFilesToUnwrap(filesToUnwrap, desc)
+	p.FilterFilesToUnwrap(filesToUnwrap, desc)
 
-	return p.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
+	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
 
-func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, desc RestoreDesc) {
+func (p ExtractProviderDBSpec) FilterFilesToUnwrap(filesToUnwrap map[string]bool, desc RestoreDesc) {
 	for file := range filesToUnwrap {
 		isDB, dbID, tableID := p.TryGetOidPair(file)
 
