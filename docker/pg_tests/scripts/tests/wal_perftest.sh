@@ -26,7 +26,7 @@ wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 pgbench -i -s 50 postgres
 du -hs ${PGDATA}
 sleep 1
-WAL=$(ls -l ${PGDATA}/pg_wal | head -n2 | tail -n1 | egrep -o "[0-9]{8}T[0-9]{6}Z")
+WAL=$(ls -l ${PGDATA}/pg_wal | head -n2 | tail -n1 | egrep -o "[0-9A-F]{24}")
 
 du -hs "${PGDATA}"
 /usr/bin/time -v -a --output ${WAL_PUSH_LOGS} wal-g --config=${TMP_CONFIG} wal-push "${PGDATA}"/pg_wal/"${WAL}"
