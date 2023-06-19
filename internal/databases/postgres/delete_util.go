@@ -20,8 +20,10 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 	permanentWals := map[string]bool{}
 	for _, backupTime := range backupTimes {
 		backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupTime.BackupName)
+		tracelog.InfoLogger.Printf("Backup name 123: %s", backup.Name)
 		meta, err := backup.FetchMeta()
 		if err != nil {
+			tracelog.InfoLogger.Println("Зашли в ошибку при попытке достать met-у")
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
 		}
