@@ -232,6 +232,8 @@ func (uploader *SplitStreamUploader) Clone() Uploader {
 func (uploader *RegularUploader) ShowRemainingTime() {
 	defer uploader.waitGroup.Done()
 	startTime := time.Now()
+	var prevCompressedSize int64 = 0
+	var prevUncompressedSize int64 = 0
 	for {
 		compressedSize, err := uploader.UploadedDataSize()
 		if err != nil {
@@ -239,6 +241,10 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 		}
 		uncompressedSize, err := uploader.RawDataSize()
 		if err != nil {
+			return
+		}
+
+		if compressedSize == prevCompressedSize || uncompressedSize == prevUncompressedSize {
 			return
 		}
 
@@ -254,6 +260,8 @@ func (uploader *RegularUploader) ShowRemainingTime() {
 			utility.ByteCountSI(uncompressedSize),
 			utility.ByteCountSI(uncompressedSpeed))
 
+		prevUncompressedSize = uncompressedSize
+		prevCompressedSize = compressedSize
 		time.Sleep(5 * time.Minute)
 	}
 }
