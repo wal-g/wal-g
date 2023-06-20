@@ -26,7 +26,7 @@ test_full_backup()
 
   /tmp/scripts/wait_while_pg_not_ready.sh
 
-  wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
+  wal-g --config=${TMP_CONFIG} st rm / --target=all || true
 
   pgbench -i -s 5 postgres
   pg_dumpall -f /tmp/dump1
