@@ -49,6 +49,7 @@ type RegularUploader struct {
 	dataSize                 *int64
 	compressedUploadSpeeds   ewma.SimpleEWMA
 	uncompressedUploadSpeeds ewma.SimpleEWMA
+	done                     chan bool
 }
 
 var _ Uploader = &RegularUploader{}
@@ -124,9 +125,12 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
 func (uploader *RegularUploader) Finish() {
+	uploader.done = make(chan bool)
+
 	go uploader.ShowRemainingTime()
 
 	uploader.waitGroup.Wait()
+	close(uploader.done)
 	if uploader.failed.IsSet() {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
 	}
@@ -143,6 +147,7 @@ func (uploader *RegularUploader) Clone() Uploader {
 		dataSize:                 uploader.dataSize,
 		compressedUploadSpeeds:   uploader.compressedUploadSpeeds,
 		uncompressedUploadSpeeds: uploader.uncompressedUploadSpeeds,
+		done:                     uploader.done,
 	}
 }
 
@@ -229,38 +234,52 @@ func (uploader *SplitStreamUploader) Clone() Uploader {
 }
 
 func (uploader *RegularUploader) ShowRemainingTime() {
-
 	startTime := time.Now()
 	var prevCompressedSize int64
 	var prevUncompressedSize int64
-	for {
-		compressedSize, err := uploader.UploadedDataSize()
-		if err != nil {
-			return
-		}
-		uncompressedSize, err := uploader.RawDataSize()
-		if err != nil {
-			return
-		}
+	ticker := time.NewTicker(5 * time.Minute)
+	done := make(chan bool)
 
-		if compressedSize == prevCompressedSize || uncompressedSize == prevUncompressedSize {
-			return
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				compressedSize, err := uploader.UploadedDataSize()
+				if err != nil {
+					done <- true
+					return
+				}
+				uncompressedSize, err := uploader.RawDataSize()
+				if err != nil {
+					done <- true
+					return
+				}
+
+				if compressedSize == prevCompressedSize || uncompressedSize == prevUncompressedSize {
+					done <- true
+					return
+				}
+
+				timeElapsed := time.Since(startTime).Seconds()
+				uploader.compressedUploadSpeeds.Add(float64(compressedSize) / timeElapsed)
+				uploader.uncompressedUploadSpeeds.Add(float64(uncompressedSize) / timeElapsed)
+				compressedSpeed := int64(math.Round(uploader.compressedUploadSpeeds.Value()))
+				uncompressedSpeed := int64(math.Round(uploader.uncompressedUploadSpeeds.Value()))
+				tracelog.InfoLogger.Printf(
+					"Uploaded: %s, average %s/s. Raw data read: %s, average %s/s",
+					utility.ByteCountSI(compressedSize),
+					utility.ByteCountSI(compressedSpeed),
+					utility.ByteCountSI(uncompressedSize),
+					utility.ByteCountSI(uncompressedSpeed))
+
+				prevUncompressedSize = uncompressedSize
+				prevCompressedSize = compressedSize
+			case <-done:
+				ticker.Stop()
+				return
+			}
 		}
+	}()
 
-		timeElapsed := time.Since(startTime).Seconds()
-		uploader.compressedUploadSpeeds.Add(float64(compressedSize) / timeElapsed)
-		uploader.uncompressedUploadSpeeds.Add(float64(uncompressedSize) / timeElapsed)
-		compressedSpeed := int64(math.Round(uploader.compressedUploadSpeeds.Value()))
-		uncompressedSpeed := int64(math.Round(uploader.uncompressedUploadSpeeds.Value()))
-		tracelog.InfoLogger.Printf(
-			"Uploaded: %s, average %s/s. Raw data read: %s, average %s/s",
-			utility.ByteCountSI(compressedSize),
-			utility.ByteCountSI(compressedSpeed),
-			utility.ByteCountSI(uncompressedSize),
-			utility.ByteCountSI(uncompressedSpeed))
-
-		prevUncompressedSize = uncompressedSize
-		prevCompressedSize = compressedSize
-		time.Sleep(5 * time.Minute)
-	}
+	<-uploader.done // wait for done signal
 }
