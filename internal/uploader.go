@@ -229,8 +229,6 @@ func (uploader *SplitStreamUploader) Clone() Uploader {
 }
 
 func (uploader *RegularUploader) ShowRemainingTime() {
-	uploader.waitGroup.Add(1)
-	defer uploader.waitGroup.Done()
 
 	startTime := time.Now()
 	var prevCompressedSize int64
