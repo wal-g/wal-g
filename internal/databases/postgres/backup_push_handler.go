@@ -48,6 +48,7 @@ func (err backupFromOtherBD) Error() string {
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
+	Uploader              internal.Uploader
 	isPermanent           bool
 	verifyPageChecksums   bool
 	storeAllCorruptBlocks bool
@@ -90,7 +91,6 @@ type PrevBackupInfo struct {
 
 // BackupWorkers holds the external objects that the handler uses to get the backup data / write the backup data
 type BackupWorkers struct {
-	Uploader    internal.Uploader
 	Bundle      *Bundle
 	QueryRunner *PgQueryRunner
 }
@@ -112,10 +112,11 @@ type BackupHandler struct {
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanent bool, verifyPageChecksums bool,
-	isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
+func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
+	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
 	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool) BackupArguments {
 	return BackupArguments{
+		Uploader:              uploader,
 		pgDataDirectory:       pgDataDirectory,
 		backupsFolder:         backupsFolder,
 		isPermanent:           isPermanent,
@@ -133,11 +134,11 @@ func NewBackupArguments(pgDataDirectory string, backupsFolder string, isPermanen
 
 func (bh *BackupHandler) createAndPushBackup() {
 	var err error
-	folder := bh.Workers.Uploader.Folder()
+	folder := bh.Arguments.Uploader.Folder()
 	// TODO: AB: this subfolder switch look ugly.
 	// I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
-	bh.Workers.Uploader.ChangeDirectory(bh.Arguments.backupsFolder)
-	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Workers.Uploader.Folder())
+	bh.Arguments.Uploader.ChangeDirectory(bh.Arguments.backupsFolder)
+	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Arguments.Uploader.Folder())
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
@@ -243,7 +244,7 @@ func (bh *BackupHandler) SetComposerInitFunc(initFunc func(handler *BackupHandle
 
 func configureTarBallComposer(bh *BackupHandler, tarBallComposerType TarBallComposerType) error {
 	maker, err := NewTarBallComposerMaker(tarBallComposerType, bh.Workers.QueryRunner,
-		bh.Workers.Uploader, bh.CurBackupInfo.Name,
+		bh.Arguments.Uploader, bh.CurBackupInfo.Name,
 		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks),
 		bh.Arguments.withoutFilesMetadata)
 	if err != nil {
@@ -257,7 +258,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	bundle := bh.Workers.Bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
-	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Workers.Uploader))
+	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Arguments.Uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = bh.Arguments.composerInitFunc(bh)
@@ -276,7 +277,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Uploading pg_control ...")
-	err = bundle.UploadPgControl(bh.Workers.Uploader.Compression().FileExtension())
+	err = bundle.UploadPgControl(bh.Arguments.Uploader.Compression().FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
@@ -285,7 +286,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.CurBackupInfo.endLSN = finishLsn
 	bh.CurBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
-	bh.CurBackupInfo.compressedSize, err = bh.Workers.Uploader.UploadedDataSize()
+	bh.CurBackupInfo.compressedSize, err = bh.Arguments.Uploader.UploadedDataSize()
 	bh.CurBackupInfo.dataCatalogSize = atomic.LoadInt64(bundle.DataCatalogSize)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
@@ -298,8 +299,8 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 
 	// Wait for all uploads to finish.
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
-	bh.Workers.Uploader.Finish()
-	if bh.Workers.Uploader.Failed() {
+	bh.Arguments.Uploader.Finish()
+	if bh.Arguments.Uploader.Failed() {
 		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", bh.CurBackupInfo.Name)
 	}
 	if timelineChanged {
@@ -347,7 +348,7 @@ func (bh *BackupHandler) handleBackupPushLocal() {
 		}
 	}
 
-	folder := bh.Workers.Uploader.Folder()
+	folder := bh.Arguments.Uploader.Folder()
 	baseBackupFolder := folder.GetSubFolder(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder)
 
@@ -367,7 +368,7 @@ func (bh *BackupHandler) handleBackupPushLocal() {
 
 func (bh *BackupHandler) createAndPushRemoteBackup() {
 	var err error
-	uploader := bh.Workers.Uploader
+	uploader := bh.Arguments.Uploader
 	uploader.ChangeDirectory(utility.BaseBackupPath)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", uploader.Folder())
 
@@ -384,7 +385,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	bh.CurBackupInfo.endLSN = LSN(baseBackup.EndLSN)
 
 	bh.CurBackupInfo.uncompressedSize = baseBackup.UncompressedSize
-	bh.CurBackupInfo.compressedSize, err = bh.Workers.Uploader.UploadedDataSize()
+	bh.CurBackupInfo.compressedSize, err = bh.Arguments.Uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
@@ -408,7 +409,7 @@ func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMeta
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload files metadata for backup %s: %v", curBackupName, err)
 	}
-	err = internal.UploadSentinel(bh.Workers.Uploader, NewBackupSentinelDtoV2(sentinelDto, meta), bh.CurBackupInfo.Name)
+	err = internal.UploadSentinel(bh.Arguments.Uploader, NewBackupSentinelDtoV2(sentinelDto, meta), bh.CurBackupInfo.Name)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
 	}
@@ -439,10 +440,6 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	// and version cannot be read easily using replication connection.
 	// Retrieve both with this helper function which uses a temp connection to postgres.
 
-	uploader, err := internal.ConfigureUploader()
-	if err != nil {
-		return nil, err
-	}
 	pgInfo, err := getPgServerInfo()
 	if err != nil {
 		return nil, err
@@ -450,10 +447,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 
 	bh = &BackupHandler{
 		Arguments: arguments,
-		Workers: BackupWorkers{
-			Uploader: uploader,
-		},
-		PgInfo: pgInfo,
+		PgInfo:    pgInfo,
 	}
 
 	return bh, nil
@@ -486,7 +480,7 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
-	err = baseBackup.Upload(bh.Workers.Uploader, bundleFiles)
+	err = baseBackup.Upload(bh.Arguments.Uploader, bundleFiles)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Finishing backup")
@@ -550,7 +544,7 @@ func (bh *BackupHandler) uploadExtendedMetadata(meta ExtendedMetadataDto) (err e
 		return internal.NewSentinelMarshallingError(metaFile, err)
 	}
 	tracelog.DebugLogger.Printf("Uploading metadata file (%s):\n%s", metaFile, dtoBody)
-	return bh.Workers.Uploader.Upload(metaFile, bytes.NewReader(dtoBody))
+	return bh.Arguments.Uploader.Upload(metaFile, bytes.NewReader(dtoBody))
 }
 
 func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err error) {
@@ -563,7 +557,7 @@ func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err
 	if err != nil {
 		return err
 	}
-	return bh.Workers.Uploader.Upload(getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
+	return bh.Arguments.Uploader.Upload(getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {

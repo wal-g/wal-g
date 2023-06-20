@@ -25,13 +25,13 @@ echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
+wal-g --config=${ARCHIVE_TMP_CONFIG} st rm / --target=all || true
 
 pgbench -i -s 5 postgres
 pg_dumpall -f /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
-wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+wal-g --config=${ARCHIVE_TMP_CONFIG} backup-push ${PGDATA}
 /tmp/scripts/drop_pg.sh
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST

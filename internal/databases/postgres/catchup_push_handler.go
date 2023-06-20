@@ -14,6 +14,9 @@ func extendExcludedFiles() {
 
 // HandleCatchupPush is invoked to perform a wal-g catchup-push
 func HandleCatchupPush(pgDataDirectory string, fromLSN LSN) {
+	uploader, err := internal.ConfigureUploader()
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 
 	fakePreviousBackupSentinelDto := BackupSentinelDto{
@@ -26,7 +29,7 @@ func HandleCatchupPush(pgDataDirectory string, fromLSN LSN) {
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 	backupArguments := NewBackupArguments(
-		pgDataDirectory, utility.CatchupPath, false,
+		uploader, pgDataDirectory, utility.CatchupPath, false,
 		false, false, false,
 		RegularComposer, NewCatchupDeltaBackupConfigurator(fakePreviousBackupSentinelDto),
 		userData, false)

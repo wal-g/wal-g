@@ -26,6 +26,9 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
+			uploader, err := internal.ConfigureUploader()
+			tracelog.ErrorLogger.FatalOnError(err)
+
 			greenplum.SetSegmentStoragePrefix(contentID)
 
 			dataDirectory := args[0]
@@ -56,7 +59,7 @@ var (
 			tarBallComposerType := postgres.RegularComposer
 			withoutFilesMetadata := false
 
-			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
+			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums,
 				fullBackup, storeAllCorruptBlocks,
 				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),

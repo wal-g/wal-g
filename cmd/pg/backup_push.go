@@ -1,6 +1,7 @@
 package pg
 
 import (
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -43,6 +44,15 @@ var (
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
+
+			baseUploader, err := internal.ConfigureUploader()
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			failover, err := internal.InitFailoverStorages()
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			uploader, err := multistorage.NewUploader(baseUploader, failover)
+			tracelog.ErrorLogger.FatalOnError(err)
 
 			var dataDirectory string
 
@@ -88,7 +98,7 @@ var (
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
-			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
+			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
