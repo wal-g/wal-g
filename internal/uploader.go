@@ -124,7 +124,6 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
 func (uploader *RegularUploader) Finish() {
-	uploader.waitGroup.Add(1)
 	go uploader.ShowRemainingTime()
 
 	uploader.waitGroup.Wait()
@@ -230,10 +229,12 @@ func (uploader *SplitStreamUploader) Clone() Uploader {
 }
 
 func (uploader *RegularUploader) ShowRemainingTime() {
+	uploader.waitGroup.Add(1)
 	defer uploader.waitGroup.Done()
+
 	startTime := time.Now()
-	var prevCompressedSize int64 = 0
-	var prevUncompressedSize int64 = 0
+	var prevCompressedSize int64
+	var prevUncompressedSize int64
 	for {
 		compressedSize, err := uploader.UploadedDataSize()
 		if err != nil {
