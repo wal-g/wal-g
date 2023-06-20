@@ -14,17 +14,20 @@ TO_CONFIG_FILE="/tmp/configs/copy_backup_to_test_config.json"
 TO_TMP_CONFIG="/tmp/configs/to_tmp_config.json"
 cat ${TO_CONFIG_FILE} > ${TO_TMP_CONFIG}
 echo "," >> ${TO_TMP_CONFIG}
+cat ${COMMON_CONFIG} >> ${TO_TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TO_TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
-echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 wal-g --config=${TMP_CONFIG} wal-push %p'" >> ${PGDATA}/postgresql.conf
+echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
 /tmp/scripts/wait_while_pg_not_ready.sh
+
+wal-g --config=${TMP_CONFIG} st rm / --target=all || true
 
 sleep 1
 echo $WALG_DELTA_MAX_STEPS
@@ -38,7 +41,7 @@ wal-g --config=${TMP_CONFIG} backup-list
 # copy backup with backup-name
 backup_name=$(wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
 wal-g copy --backup-name=${backup_name} --from=${TMP_CONFIG} --to=${TO_TMP_CONFIG} --without-history
-copied_backup_name=`wal-g --config=${TO_TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
+copied_backup_name=$(wal-g --config=${TO_TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
 
 if [ $backup_name != $copied_backup_name ];
 then
@@ -70,12 +73,10 @@ wal-g copy --backup-name=${backup_name} --from=${TMP_CONFIG} --to=${TO_TMP_CONFI
 copied_backup_name=$(wal-g --config=${TO_TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
 
 # check if backup copied
-if [ "$last_backup_name" != "$copied_last_backup_name" ];
+if [ "$backup_name" != "$copied_backup_name" ];
 then
     echo "Copying backup failed"
     exit 2
 fi
 
 /tmp/scripts/drop_pg.sh
-
-echo "Copying backup test success!!!!!!"

@@ -48,3 +48,5 @@ diff /tmp/dump1 /tmp/dump2
 pkill -9 postgres
 rm -rf "${PGDATA}"
 rm ${TMP_CONFIG}
+
+/tmp/scripts/drop_pg.sh

@@ -1,4 +1,4 @@
-"WALE_S3_PREFIX": "s3://fullbucket",
+"WALE_S3_PREFIX": "s3://receivewalbucket",
 "WALG_DELTA_MAX_STEPS": "6",
 "WALG_PGP_KEY_PATH": "/tmp/PGP_KEY",
 "WALG_RECEIVE_BULKMETADATA_PATH": "metadata_folder",

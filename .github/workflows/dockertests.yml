@@ -76,6 +76,8 @@ jobs:
                    'make TEST="pg_backup_mark_permanent_test" pg_integration_test',
                    'make TEST="pg_config_test" pg_integration_test',
                    'make TEST="pg_crypto_test" pg_integration_test',
+                   'make TEST="pg_copy_all_test" pg_integration_test',
+                   'make TEST="pg_copy_backup_test" pg_integration_test',
                    'make TEST="pg_delta_backup_wal_delta_test" pg_integration_test',
                    'make TEST="pg_full_backup_test" pg_integration_test',
                    'make TEST="pg_full_backup_streamed_test" pg_integration_test',

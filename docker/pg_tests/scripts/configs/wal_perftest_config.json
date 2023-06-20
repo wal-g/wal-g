@@ -1,5 +1,5 @@
 "WALG_DELTA_MAX_STEPS": "0",
-"WALE_S3_PREFIX": "s3://deletebeforepermanentfullbucket",
+"WALE_S3_PREFIX": "s3://walperftestbucket",
 "WALG_USE_WAL_DELTA": "true",
 "WALG_UPLOAD_CONCURRENCY": "1",
 "WALG_UPLOAD_QUEUE": "1",

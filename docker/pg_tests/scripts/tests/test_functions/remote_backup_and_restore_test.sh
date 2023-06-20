@@ -83,6 +83,9 @@ remote_backup_and_restore_test() {
 
   echo Comparing source and destination
   if diff "${TMPDIR}"/*dump.sql; then
+    /tmp/scripts/drop_pg.sh
+    rm ${TMP_CONFIG}
+    rm -rf ${PGTBS}
     echo OK
   else
     echo Ouch

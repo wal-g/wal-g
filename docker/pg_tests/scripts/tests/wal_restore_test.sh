@@ -101,3 +101,5 @@ timeout 30 wal-g --config=${TMP_CONFIG} wal-restore ${PGDATA_ALPHA} ${PGDATA_BET
 sleep 10
 
 /usr/lib/postgresql/10/bin/pg_rewind -D ${PGDATA_ALPHA} --source-pgdata=${PGDATA_BETA}
+
+/tmp/scripts/drop_pg.sh

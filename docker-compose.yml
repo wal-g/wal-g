@@ -102,7 +102,18 @@ services:
       &&  mkdir -p /export/sttransferbucket
       &&  mkdir -p /export/sttransferfailoverbucket
       &&  mkdir -p /export/walrestorebucket
-      && mkdir -p /export/daemonbucket
+      &&  mkdir -p /export/daemonbucket
+      &&  mkdir -p /export/backupmarkimpermanentbucket
+      &&  mkdir -p /export/backupmarkpermanentnoerrorbucket
+      &&  mkdir -p /export/backupmarkpermanentbucket
+      &&  mkdir -p /export/backupperftestbucket
+      &&  mkdir -p /export/catchupbucket
+      &&  mkdir -p /export/deletetargetdeltafindfullbucket
+      &&  mkdir -p /export/deletetargetdeltabucket
+      &&  mkdir -p /export/fullstreamedbucket
+      &&  mkdir -p /export/receivewalbucket
+      &&  mkdir -p /export/severaldeltabackupsbucket
+      &&  mkdir -p /export/walperftestbucket
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -139,6 +150,10 @@ services:
       context: .
     image: wal-g/pg_tests
     container_name: wal-g_pg_tests
+    depends_on:
+      - s3
+    links:
+      - s3
 
   pg_build_docker_prefix:
     build:
@@ -477,6 +492,28 @@ services:
       context: .
     image: wal-g/config_test
     container_name: wal-g_pg_config_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_copy_all_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_copy_all_test
+      context: .
+    image: wal-g/copy_all_test
+    container_name: wal-g_pg_copy_all_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
+  pg_copy_backup_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_copy_backup_test
+      context: .
+    image: wal-g/copy_backup_test
+    container_name: wal-g_pg_copy_backup_test
     depends_on:
       - s3
     links:
