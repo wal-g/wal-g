@@ -8,72 +8,63 @@ import (
 )
 
 func TestTryGetOidPair_DefaultFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/base/1234/5678")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/base/1234/5678")
 	assert.Equal(t, true, isDB)
 	assert.Equal(t, uint32(1234), dbID)
 	assert.Equal(t, uint32(5678), tableID)
 }
 
 func TestTryGetOidPair_VMFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/base/1234/5678_vm")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/base/1234/5678_vm")
 	assert.Equal(t, true, isDB)
 	assert.Equal(t, uint32(1234), dbID)
 	assert.Equal(t, uint32(5678), tableID)
 }
 
 func TestTryGetOidPair_PartFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/base/1234/5678.1")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/base/1234/5678.1")
 	assert.Equal(t, true, isDB)
 	assert.Equal(t, uint32(1234), dbID)
 	assert.Equal(t, uint32(5678), tableID)
 }
 
 func TestTryGetOidPair_PartFSMFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/base/1234/5678_fsm.1")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/base/1234/5678_fsm.1")
 	assert.Equal(t, true, isDB)
 	assert.Equal(t, uint32(1234), dbID)
 	assert.Equal(t, uint32(5678), tableID)
 }
 
 func TestTryGetOidPair_TablespaceFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/pg_tblspc/path/in/tablespace/1234/5678")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/pg_tblspc/path/in/tablespace/1234/5678")
 	assert.Equal(t, true, isDB)
 	assert.Equal(t, uint32(1234), dbID)
 	assert.Equal(t, uint32(5678), tableID)
 }
 
 func TestTryGetOidPair_SpecialFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/base/4/pg_filenode.map")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/base/4/pg_filenode.map")
 	assert.Equal(t, true, isDB)
 	assert.Equal(t, uint32(4), dbID)
 	assert.Equal(t, uint32(0), tableID)
 }
 
 func TestTryGetOidPair_RandomFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/path/to/files/1/2")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/path/to/files/1/2")
 	assert.Equal(t, false, isDB)
 	assert.Equal(t, uint32(0), dbID)
 	assert.Equal(t, uint32(0), tableID)
 }
 
 func TestTryGetOidPair_DirBetweenFile(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/base/somedir/1/2")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/base/somedir/1/2")
 	assert.Equal(t, true, isDB)
 	assert.Equal(t, uint32(1), dbID)
 	assert.Equal(t, uint32(2), tableID)
 }
 
 func TestTryGetOidPair_BaseRoot(t *testing.T) {
-	p := postgres.ExtractProviderDBSpec{}
-	isDB, dbID, tableID := p.TryGetOidPair("/base")
+	isDB, dbID, tableID := postgres.TryGetOidPair("/base")
 	assert.Equal(t, false, isDB)
 	assert.Equal(t, uint32(0), dbID)
 	assert.Equal(t, uint32(0), tableID)

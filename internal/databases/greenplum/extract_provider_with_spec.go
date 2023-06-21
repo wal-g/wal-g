@@ -39,12 +39,11 @@ func (m RestoreDescMaker) FromAoSegNamespace(tableName string) bool {
 }
 
 type ExtractProviderDBSpec struct {
-	*postgres.ExtractProviderDBSpec
+	restoreParameters []string
 }
 
 func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
-	extractor := postgres.NewExtractProviderDBSpec(restoreParameters)
-	return &ExtractProviderDBSpec{ExtractProviderDBSpec: extractor}
+	return &ExtractProviderDBSpec{restoreParameters}
 }
 
 func (p ExtractProviderDBSpec) Get(
@@ -57,9 +56,9 @@ func (p ExtractProviderDBSpec) Get(
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	desc, err := RestoreDescMaker{}.Make(p.ExtractProviderDBSpec.RestoreParameters, filesMeta.DatabasesByNames)
+	desc, err := RestoreDescMaker{}.Make(p.restoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
-	p.ExtractProviderDBSpec.FilterFilesToUnwrap(filesToUnwrap, desc)
+	desc.FilterFilesToUnwrap(filesToUnwrap)
 
 	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }

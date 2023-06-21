@@ -42,6 +42,37 @@ func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
 	return true
 }
 
+func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
+	for file := range filesToUnwrap {
+		isDB, dbID, tableID := TryGetOidPair(file)
+
+		if isDB && desc.IsSkipped(dbID, tableID) {
+			delete(filesToUnwrap, file)
+		}
+	}
+}
+
+func TryGetOidPair(file string) (bool, uint32, uint32) {
+	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
+		return false, 0, 0
+	}
+	var tableID, dbID uint32
+
+	file, tableID = cutIntegerBase(file)
+	_, dbID = cutIntegerBase(file)
+
+	return true, dbID, tableID
+}
+
+func cutIntegerBase(file string) (string, uint32) {
+	parent, base := path.Dir(file), path.Base(file)
+	base, _, _ = strings.Cut(base, ".")
+	base, _, _ = strings.Cut(base, "_")
+	integerResult, _ := strconv.ParseUint(base, 10, 0)
+
+	return parent, uint32(integerResult)
+}
+
 type RestoreDescMaker interface {
 	Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error)
 }
@@ -83,38 +114,7 @@ func (p ExtractProviderDBSpec) Get(
 
 	desc, err := DefaultRestoreDescMaker{}.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
-	p.FilterFilesToUnwrap(filesToUnwrap, desc)
+	desc.FilterFilesToUnwrap(filesToUnwrap)
 
 	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
-}
-
-func (p ExtractProviderDBSpec) FilterFilesToUnwrap(filesToUnwrap map[string]bool, desc RestoreDesc) {
-	for file := range filesToUnwrap {
-		isDB, dbID, tableID := p.TryGetOidPair(file)
-
-		if isDB && desc.IsSkipped(dbID, tableID) {
-			delete(filesToUnwrap, file)
-		}
-	}
-}
-
-func (p ExtractProviderDBSpec) TryGetOidPair(file string) (bool, uint32, uint32) {
-	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
-		return false, 0, 0
-	}
-	var tableID, dbID uint32
-
-	file, tableID = p.cutIntegerBase(file)
-	_, dbID = p.cutIntegerBase(file)
-
-	return true, dbID, tableID
-}
-
-func (p ExtractProviderDBSpec) cutIntegerBase(file string) (string, uint32) {
-	parent, base := path.Dir(file), path.Base(file)
-	base, _, _ = strings.Cut(base, ".")
-	base, _, _ = strings.Cut(base, "_")
-	integerResult, _ := strconv.ParseUint(base, 10, 0)
-
-	return parent, uint32(integerResult)
 }
