@@ -40,10 +40,11 @@ func (m RestoreDescMaker) FromAoSegNamespace(tableName string) bool {
 
 type ExtractProviderDBSpec struct {
 	restoreParameters []string
+	restoreDescMaker  RestoreDescMaker
 }
 
 func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{restoreParameters}
+	return &ExtractProviderDBSpec{restoreParameters, RestoreDescMaker{}}
 }
 
 func (p ExtractProviderDBSpec) Get(
@@ -56,7 +57,7 @@ func (p ExtractProviderDBSpec) Get(
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	desc, err := RestoreDescMaker{}.Make(p.restoreParameters, filesMeta.DatabasesByNames)
+	desc, err := p.restoreDescMaker.Make(p.restoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 

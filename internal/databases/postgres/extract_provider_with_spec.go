@@ -96,10 +96,11 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 
 type ExtractProviderDBSpec struct {
 	RestoreParameters []string
+	restoreDescMaker  RestoreDescMaker
 }
 
 func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{restoreParameters}
+	return &ExtractProviderDBSpec{restoreParameters, DefaultRestoreDescMaker{}}
 }
 
 func (p ExtractProviderDBSpec) Get(
@@ -112,7 +113,7 @@ func (p ExtractProviderDBSpec) Get(
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	desc, err := DefaultRestoreDescMaker{}.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
+	desc, err := p.restoreDescMaker.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
