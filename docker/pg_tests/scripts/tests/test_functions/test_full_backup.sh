@@ -111,6 +111,7 @@ test_full_backup()
 
   if [ -z "${SKIP_TEST_WAL_OVERWRITES}" ]; then
     test_wal_overwrites
+    echo "Prevent WAL overwrite success!!!!!!"
   else
     echo "test_wal_overwrites skipped"
   fi
@@ -118,5 +119,5 @@ test_full_backup()
   drop_pg
   rm ${TMP_CONFIG}
 
-  echo "Prevent WAL overwrite success!!!!!!"
+  echo "all test_full_backup tests completed"
 }
