@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e -x
 
-CONFIG="/tmp/configs/transfer_test_config.json"
-TESTDATA="transfer"
+CONFIG="/tmp/configs/transfer_files_test_config.json"
+TESTDATA="transfer_files"
 
 echo "Upload 50 random files to the failover storage"
-mkdir transfer
+mkdir $TESTDATA
 for i in {1..50}
 do
   head -c 1M </dev/urandom >"$TESTDATA/$i"
@@ -32,7 +32,7 @@ do
 done
 
 echo "Call the command to transfer files from the failover storage to the primary one"
-wal-g --config=$CONFIG st transfer "a/" --source=failover --target=default
+wal-g --config=$CONFIG st transfer files "a/" --source=failover --target=default
 
 echo "Check that all the target files are moved to the primary storage"
 wal-g --config=$CONFIG st ls -r "a/b/"

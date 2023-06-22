@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_validateFlags(t *testing.T) {
+func Test_validateCommonFlags(t *testing.T) {
 	tests := []struct {
 		name           string
 		source, target string
@@ -26,15 +26,15 @@ func Test_validateFlags(t *testing.T) {
 			transferSourceStorage = tt.source
 			targetStorage = tt.target
 			transferConcurrency = tt.concurrency
-			if err := validateFlags(); (err != nil) != tt.wantErr {
-				t.Errorf("validateFlags() error = %v, wantErr %v", err, tt.wantErr)
+			if err := validateCommonFlags(); (err != nil) != tt.wantErr {
+				t.Errorf("validateCommonFlags() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
 }
 
-func Test_adjustMaxFiles(t *testing.T) {
-	assert.Equal(t, math.MaxInt, adjustMaxFiles(-1))
-	assert.Equal(t, 0, adjustMaxFiles(0))
-	assert.Equal(t, 123, adjustMaxFiles(123))
+func Test_adjustMax(t *testing.T) {
+	assert.Equal(t, math.MaxInt, adjustMax(-1))
+	assert.Equal(t, 0, adjustMax(0))
+	assert.Equal(t, 123, adjustMax(123))
 }

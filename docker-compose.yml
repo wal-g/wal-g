@@ -99,8 +99,9 @@ services:
       &&  mkdir -p /export/gpdeltabackuptestbucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
-      &&  mkdir -p /export/sttransferbucket
-      &&  mkdir -p /export/sttransferfailoverbucket
+      &&  mkdir -p /export/sttransferfilesbucket
+      &&  mkdir -p /export/sttransferfilesfailoverbucket
+      &&  mkdir -p /export/transferbackupbucket
       &&  mkdir -p /export/walrestorebucket
       &&  mkdir -p /export/daemonbucket
       &&  mkdir -p /export/backupmarkimpermanentbucket
@@ -634,6 +635,17 @@ services:
       - s3
     links:
       - s3
+
+  pg_transfer_backup_test:
+      build:
+        dockerfile: docker/pg_tests/Dockerfile_transfer_backup_test
+        context: .
+      image: wal-g/transfer_backup_test
+      container_name: wal-g_pg_transfer_backup_test
+      depends_on:
+        - s3
+      links:
+        - s3
 
   pg_catchup_test:
     build:
