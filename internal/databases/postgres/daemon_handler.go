@@ -37,7 +37,7 @@ func (h *CheckMessageHandler) Handle(_ []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to write in socket: %w", err)
 	}
-	tracelog.InfoLogger.Println("Successful configuration check")
+	tracelog.DebugLogger.Println("configuration successfully checked")
 	return nil
 }
 
@@ -47,13 +47,13 @@ type ArchiveMessageHandler struct {
 }
 
 func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
-	tracelog.InfoLogger.Printf("wal file name: %s\n", string(messageBody))
+	tracelog.DebugLogger.Printf("wal file name: %s\n", string(messageBody))
 
 	fullPath, err := getFullPath(path.Join("pg_wal", string(messageBody)))
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("starting wal-push for %s\n", fullPath)
+	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
 	err = HandleWALPush(h.uploader, fullPath)
 	if err != nil {
 		return fmt.Errorf("file archiving failed: %w", err)
@@ -82,7 +82,7 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
+	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
 
 	err = HandleWALFetch(h.reader, args[0], fullPath, true)
 	if err != nil {
@@ -92,7 +92,7 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 	if err != nil {
 		return fmt.Errorf("socket write failed: %w", err)
 	}
-	tracelog.InfoLogger.Printf("successful fetched: %v -> %v\n", args[0], fullPath)
+	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
 	return nil
 }
 
@@ -189,7 +189,7 @@ func Listen(c net.Conn, opts DaemonOptions) {
 			return
 		}
 		if messageType == daemon.WalPushType {
-			tracelog.InfoLogger.Printf("Successful archiving for %s\n", string(messageBody))
+			tracelog.DebugLogger.Printf("successfully archived: %s\n", string(messageBody))
 			return
 		}
 		if messageType == daemon.WalFetchType {
