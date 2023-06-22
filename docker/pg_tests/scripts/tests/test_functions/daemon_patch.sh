@@ -2,8 +2,8 @@
 set -e
 
 recovery_conf() {
-  echo "recovery_target_action=promote"
-  echo "restore_command='/tmp/tests/external_commands/daemon_nc_send_wal_fetch.sh %f %p'"
+  echo "recovery_target_action = promote"
+  echo "restore_command = '/tmp/tests/external_commands/daemon_nc_send_wal_fetch.sh %f %p'"
 }
 
 archive_conf() {

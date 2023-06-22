@@ -19,13 +19,16 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
     sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
         vendor/github.com/cyberdelia/lzo/lzo.go && \
     cd main/pg && \
-    go build -mod vendor -race -o wal-g -tags "brotli lzo" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    go build -mod vendor -race -o wal-g -tags "brotli lzo" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`" && \
+    cd ../../cmd/walg-daemon-client && \
+    go build -mod vendor -o walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/pg:latest
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y netcat-openbsd && apt-get clean
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
+COPY --from=build /go/src/github.com/wal-g/wal-g/cmd/walg-daemon-client/walg-daemon-client /usr/bin
 
 COPY docker/pg_tests/scripts/ /tmp
 
