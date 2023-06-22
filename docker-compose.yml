@@ -632,6 +632,16 @@ services:
     links:
       - s3
 
+  pg_daemon_backup_and_restore_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_daemon_backup_and_restore_test
+      context: .
+    image: wal-g/daemon_backup_and_restore_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_pgbackrest:
     build:
       dockerfile: docker/pg_tests/Dockerfile_pgbackrest

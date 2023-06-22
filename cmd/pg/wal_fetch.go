@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"os"
 )
 
 const WalFetchShortDescription = "Fetches a WAL file from storage"
@@ -16,17 +17,27 @@ var walFetchCmd = &cobra.Command{
 	Short: WalFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
+		folderReader := GetFolderReader()
+		err := postgres.HandleWALFetch(folderReader, args[0], args[1], true)
+		if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
+			tracelog.ErrorLogger.Print(err.Error())
+			os.Exit(postgres.ExIoError)
+		}
 		tracelog.ErrorLogger.FatalOnError(err)
-
-		failover, err := internal.InitFailoverStorages()
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		folderReader, err := multistorage.NewStorageFolderReader(folder, failover)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		postgres.HandleWALFetch(folderReader, args[0], args[1], true)
 	},
+}
+
+func GetFolderReader() internal.StorageFolderReader {
+	folder, err := internal.ConfigureFolder()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	failover, err := internal.InitFailoverStorages()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	folderReader, err := multistorage.NewStorageFolderReader(folder, failover)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	return folderReader
 }
 
 func init() {

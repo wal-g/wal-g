@@ -1,12 +1,26 @@
 #!/bin/sh
+
+archive_conf() {
+  echo "archive_mode = on"
+  echo "archive_command = '/usr/bin/timeout 600 wal-g --config=${TMP_CONFIG} wal-push %p'"
+  echo "archive_timeout = 600"
+}
+
+recovery_conf() {
+  echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'"
+}
+
+drop_pg() {
+  /tmp/scripts/drop_pg.sh
+}
+
 test_full_backup()
 {
   TMP_CONFIG=$1
   /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
-  echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
-  echo "archive_command = '/usr/bin/timeout 600 wal-g --config=${TMP_CONFIG} wal-push %p'" >> ${PGDATA}/postgresql.conf
-  echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
+  PG_VERSION=$(cat "${PGDATA}/PG_VERSION")
+  archive_conf >> ${PGDATA}/postgresql.conf
 
   /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
@@ -19,11 +33,31 @@ test_full_backup()
   pgbench -c 2 -T 100000000 -S &
   sleep 1
   wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
-  /tmp/scripts/drop_pg.sh
+
+  if [ -n "${FORCE_NEW_WAL}" ]; then
+    echo force creating new WAL files
+    pgbench -i -s 5 postgres
+
+    echo transporting last wal files
+    if awk 'BEGIN {exit !('"$PG_VERSION"' >= 10)}'; then
+      echo 'select pg_switch_wal();' | psql
+    else
+      echo 'select pg_switch_xlog();' | psql
+    fi
+    sleep 2
+  fi
+
+  drop_pg
 
   wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
-  echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+  # https://www.postgresql.org/docs/current/recovery-config.html
+  if awk 'BEGIN {exit !('"$PG_VERSION"' >= 12)}'; then
+    touch "$PGDATA/recovery.signal"
+    recovery_conf >> "$PGDATA/postgresql.conf"
+  else
+    recovery_conf > "$PGDATA/recovery.conf"
+  fi
 
   /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
   /tmp/scripts/wait_while_pg_not_ready.sh

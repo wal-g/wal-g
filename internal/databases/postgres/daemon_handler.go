@@ -19,41 +19,42 @@ const (
 	SdNotifyWatchdog = "WATCHDOG=1"
 )
 
+type DaemonOptions struct {
+	Uploader *WalUploader
+	Reader   internal.StorageFolderReader
+}
+
 type SocketMessageHandler interface {
 	Handle(messageBody []byte) error
 }
 
 type CheckMessageHandler struct {
-	messageType daemon.SocketMessageType
-	fd          net.Conn
-	uploader    *WalUploader
+	fd net.Conn
 }
 
-func (h *CheckMessageHandler) Handle(messageBody []byte) error {
+func (h *CheckMessageHandler) Handle(_ []byte) error {
 	_, err := h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
 		return fmt.Errorf("failed to write in socket: %w", err)
 	}
-	tracelog.InfoLogger.Println("Successful configuration check")
+	tracelog.DebugLogger.Println("configuration successfully checked")
 	return nil
 }
 
 type ArchiveMessageHandler struct {
-	messageType daemon.SocketMessageType
-	fd          net.Conn
-	uploader    *WalUploader
+	fd       net.Conn
+	uploader *WalUploader
 }
 
 func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
-	tracelog.InfoLogger.Printf("wal file name: %s\n", string(messageBody))
-	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
-	if !ok {
-		return fmt.Errorf("PGDATA is not set in the conf")
+	tracelog.DebugLogger.Printf("wal file name: %s\n", string(messageBody))
+
+	fullPath, err := getFullPath(path.Join("pg_wal", string(messageBody)))
+	if err != nil {
+		return err
 	}
-	pathToWal := path.Join(PgDataSettingString, "pg_wal")
-	fullPath := path.Join(pathToWal, string(messageBody))
-	tracelog.InfoLogger.Printf("starting wal-push for %s\n", fullPath)
-	err := HandleWALPush(h.uploader, fullPath)
+	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
+	err = HandleWALPush(h.uploader, fullPath)
 	if err != nil {
 		return fmt.Errorf("file archiving failed: %w", err)
 	}
@@ -64,12 +65,45 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 	return nil
 }
 
-func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn, uploader *WalUploader) SocketMessageHandler {
+type WalFetchMessageHandler struct {
+	fd     net.Conn
+	reader internal.StorageFolderReader
+}
+
+func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
+	args, err := daemon.BytesToArgs(messageBody)
+	if err != nil {
+		return err
+	}
+	if len(args) != 2 {
+		return fmt.Errorf("wal-fetch incorrect arguments count")
+	}
+	fullPath, err := getFullPath(args[1])
+	if err != nil {
+		return err
+	}
+	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
+
+	err = HandleWALFetch(h.reader, args[0], fullPath, true)
+	if err != nil {
+		return fmt.Errorf("WAL fetch failed: %w", err)
+	}
+	_, err = h.fd.Write(daemon.OkType.ToBytes())
+	if err != nil {
+		return fmt.Errorf("socket write failed: %w", err)
+	}
+	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
+	return nil
+}
+
+func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn, opts DaemonOptions) SocketMessageHandler {
 	switch messageType {
 	case daemon.CheckType:
-		return &CheckMessageHandler{daemon.CheckType, c, uploader}
-	case daemon.FileNameType:
-		return &ArchiveMessageHandler{daemon.FileNameType, c, uploader}
+		return &CheckMessageHandler{c}
+	case daemon.WalPushType:
+		return &ArchiveMessageHandler{c, opts.Uploader}
+	case daemon.WalFetchType:
+		return &WalFetchMessageHandler{c, opts.Reader}
 	default:
 		return nil
 	}
@@ -106,7 +140,7 @@ func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messa
 }
 
 // HandleDaemon is invoked to perform daemon mode
-func HandleDaemon(uploader *WalUploader, pathToSocket string) {
+func HandleDaemon(options DaemonOptions, pathToSocket string) {
 	if _, err := os.Stat(pathToSocket); err == nil {
 		err = os.Remove(pathToSocket)
 		if err != nil {
@@ -124,12 +158,12 @@ func HandleDaemon(uploader *WalUploader, pathToSocket string) {
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go Listen(fd, uploader)
+		go Listen(fd, options)
 	}
 }
 
 // Listen is used for listening connection and processing messages
-func Listen(c net.Conn, uploader *WalUploader) {
+func Listen(c net.Conn, opts DaemonOptions) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
 	messageReader := NewMessageReader(c)
 	for {
@@ -140,7 +174,7 @@ func Listen(c net.Conn, uploader *WalUploader) {
 			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
-		messageHandler := NewMessageHandler(messageType, c, uploader)
+		messageHandler := NewMessageHandler(messageType, c, opts)
 		if messageHandler == nil {
 			tracelog.ErrorLogger.Printf("Unexpected message type: %s", string(messageType))
 			_, err = c.Write(daemon.ErrorType.ToBytes())
@@ -154,8 +188,11 @@ func Listen(c net.Conn, uploader *WalUploader) {
 			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
-		if messageType == daemon.FileNameType {
-			tracelog.InfoLogger.Printf("Successful archiving for %s\n", string(messageBody))
+		if messageType == daemon.WalPushType {
+			tracelog.DebugLogger.Printf("successfully archived: %s\n", string(messageBody))
+			return
+		}
+		if messageType == daemon.WalFetchType {
 			return
 		}
 	}
@@ -179,4 +216,12 @@ func SdNotify(state string) error {
 		return fmt.Errorf("failed write to service: %w", err)
 	}
 	return nil
+}
+
+func getFullPath(relativePath string) (string, error) {
+	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
+	if !ok {
+		return "", fmt.Errorf("PGDATA is not set in the conf")
+	}
+	return path.Join(PgDataSettingString, relativePath), nil
 }
