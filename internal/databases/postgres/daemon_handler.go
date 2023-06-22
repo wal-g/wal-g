@@ -21,7 +21,7 @@ const (
 
 type DaemonOptions struct {
 	Uploader *WalUploader
-	Reader   *internal.StorageFolderReader
+	Reader   internal.StorageFolderReader
 }
 
 type SocketMessageHandler interface {
@@ -67,7 +67,7 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 
 type WalFetchMessageHandler struct {
 	fd     net.Conn
-	reader *internal.StorageFolderReader
+	reader internal.StorageFolderReader
 }
 
 func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
@@ -84,7 +84,7 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 	}
 	tracelog.InfoLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
 
-	err = HandleWALFetch(*h.reader, args[0], fullPath, true)
+	err = HandleWALFetch(h.reader, args[0], fullPath, true)
 	if err != nil {
 		return fmt.Errorf("WAL fetch failed: %w", err)
 	}
