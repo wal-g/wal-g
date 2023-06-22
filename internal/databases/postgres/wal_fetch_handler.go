@@ -17,7 +17,7 @@ import (
 )
 
 // Looking at sysexits.h, EX_IOERR (74) is defined as a generic exit code for input/output errors
-const exIoError = 74
+const ExIoError = 74
 
 type InvalidWalFileMagicError struct {
 	error
@@ -33,7 +33,7 @@ func (err InvalidWalFileMagicError) Error() string {
 
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, location string, triggerPrefetch bool) {
+func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, location string, triggerPrefetch bool) error {
 	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
 	reader = reader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
@@ -58,7 +58,9 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 			}
 
 			err = os.Rename(prefetched, location)
-			tracelog.ErrorLogger.FatalOnError(err)
+			if err != nil {
+				return err
+			}
 
 			err := checkWALFileMagic(location)
 			if err != nil {
@@ -67,9 +69,9 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 				break
 			}
 
-			return
+			return nil
 		} else if !os.IsNotExist(err) {
-			tracelog.ErrorLogger.FatalError(err)
+			return err
 		}
 
 		// We have race condition here, if running is renamed here, but it's OK
@@ -97,13 +99,7 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 		time.Sleep(2 * time.Millisecond)
 	}
 
-	err := internal.DownloadFileTo(reader, walFileName, location)
-	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
-		tracelog.ErrorLogger.Print(err.Error())
-		os.Exit(exIoError)
-	} else {
-		tracelog.ErrorLogger.FatalOnError(err)
-	}
+	return internal.DownloadFileTo(reader, walFileName, location)
 }
 
 // TODO : unit tests
