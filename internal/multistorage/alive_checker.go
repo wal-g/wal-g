@@ -3,10 +3,14 @@ package multistorage
 import (
 	"context"
 	"fmt"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
+
+type aliveStorageCheckRes struct {
+	err error
+	idx int
+}
 
 // TODO: Unit tests
 func FindAliveStorages(toCheck []FailoverFolder, stopOnDefaultOk bool) (ok []FailoverFolder, err error) {
@@ -18,15 +22,16 @@ func FindAliveStorages(toCheck []FailoverFolder, stopOnDefaultOk bool) (ok []Fai
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
 
-	okFolderCh := make(chan FailoverFolder, len(toCheck))
-	errCh := make(chan error, len(toCheck))
-
+	resCh := make(chan aliveStorageCheckRes, len(toCheck))
 	for idx := range toCheck {
 		i := idx
 		go func() {
 			err := checkStorageAlive(ctx, toCheck[i])
 			if err != nil {
-				errCh <- fmt.Errorf("storage '%s' read check: %v", toCheck[i].Name, err)
+				resCh <- aliveStorageCheckRes{
+					err: fmt.Errorf("storage '%s' read check: %v", toCheck[i].Name, err),
+					idx: i,
+				}
 				return
 			}
 
@@ -35,25 +40,34 @@ func FindAliveStorages(toCheck []FailoverFolder, stopOnDefaultOk bool) (ok []Fai
 				cancel()
 			}
 
-			okFolderCh <- toCheck[i]
+			resCh <- aliveStorageCheckRes{
+				err: nil,
+				idx: i,
+			}
 		}()
 	}
 
-	checkedCount := 0
-	for checkedCount < len(toCheck) {
-		select {
-		case okFolder := <-okFolderCh:
-			ok = append(ok, okFolder)
-		case err := <-errCh:
-			tracelog.ErrorLogger.Print(err)
+	okIndexes := make(map[int]bool)
+	for range toCheck {
+		res := <-resCh
+		if res.err == nil {
+			okIndexes[res.idx] = true
+			continue
 		}
-		checkedCount++
+		tracelog.ErrorLogger.Print(err)
 	}
 
-	if len(ok) == 0 {
-		return nil, fmt.Errorf("no readable storages found, all %d failed", checkedCount)
+	if len(okIndexes) == 0 {
+		return nil, fmt.Errorf("no readable storages found, all %d failed", len(toCheck))
 	}
 
+	for idx := range toCheck {
+		if okIndexes[idx] {
+			ok = append(ok, toCheck[idx])
+		}
+	}
+
+	tracelog.DebugLogger.Printf("Found %d alive storages: %v", len(ok), ok)
 	return ok, nil
 }
 
