@@ -92,7 +92,6 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 	if err != nil {
 		return fmt.Errorf("socket write failed: %w", err)
 	}
-	tracelog.InfoLogger.Printf("successful fetched: %v -> %v\n", args[0], fullPath)
 	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
 	return nil
 }
