@@ -11,7 +11,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/pkg/daemon"
+	"github.com/wal-g/wal-g/internal/daemon"
 	"github.com/wal-g/wal-g/utility"
 )
 

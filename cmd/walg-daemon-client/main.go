@@ -9,8 +9,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/daemon_client"
-	"github.com/wal-g/wal-g/pkg/daemon"
+	"github.com/wal-g/wal-g/internal/daemon"
 )
 
 const (
@@ -35,7 +34,7 @@ type commandOpts struct {
 	msgType daemon.SocketMessageType
 	args    []string
 
-	options *daemon_client.RunOptions
+	options *daemon.RunOptions
 }
 
 type templateData struct {
@@ -64,7 +63,7 @@ var (
 )
 
 func parseArgs(args []string) (*commandOpts, *flag.FlagSet, error) {
-	opts := &daemon_client.RunOptions{}
+	opts := &daemon.RunOptions{}
 	fs := flag.NewFlagSet("", flag.ContinueOnError)
 	fs.DurationVar(&opts.DaemonOperationTimeout, "timeout", 60*time.Second, "daemon operation execution timeout")
 	fs.DurationVar(&opts.DaemonSocketConnectionTimeout, "connection-timeout", 5*time.Second, "daemon socket connection timeout")
@@ -125,7 +124,7 @@ func main() {
 		log.Fatalf("daemon socket '%v' doesn't exist or is unavailable:\n\t%v", cmd.options.SocketName, err)
 	}
 
-	err = daemon_client.SendCommand(cmd.options)
+	err = daemon.SendCommand(cmd.options)
 	if err != nil {
 		log.Fatal(err)
 	}

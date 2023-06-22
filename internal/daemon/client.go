@@ -1,16 +1,15 @@
-package daemon_client
+package daemon
 
 import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/wal-g/wal-g/pkg/daemon"
 	"net"
 	"time"
 )
 
 type RunOptions struct {
-	MessageType daemon.SocketMessageType
+	MessageType SocketMessageType
 	SocketName  string
 	MessageArgs []string
 
@@ -18,7 +17,7 @@ type RunOptions struct {
 	DaemonSocketConnectionTimeout time.Duration
 }
 
-func getMessage(messageType daemon.SocketMessageType, messageArgs []string) ([]byte, error) {
+func getMessage(messageType SocketMessageType, messageArgs []string) ([]byte, error) {
 	switch len(messageArgs) {
 	case 0:
 		return binary.BigEndian.AppendUint16(messageType.ToBytes(), uint16(3)), nil
@@ -27,7 +26,7 @@ func getMessage(messageType daemon.SocketMessageType, messageArgs []string) ([]b
 		return append(res, []byte(messageArgs[0])...), nil
 	}
 
-	messageBody, err := daemon.ArgsToBytes(messageArgs...)
+	messageBody, err := ArgsToBytes(messageArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func SendCommand(opts *RunOptions) error {
 	if err != nil {
 		return fmt.Errorf("unix socket read error: %w", err)
 	}
-	if n < 1 || !daemon.OkType.IsEqual(resp[0]) {
+	if n < 1 || !OkType.IsEqual(resp[0]) {
 		return fmt.Errorf("daemon command run error")
 	}
 	return nil
