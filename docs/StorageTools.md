@@ -39,11 +39,16 @@ Examples:
 ``wal-g st cat path/to/remote_file.json`` show `remote_file.json`
 
 ### ``rm``
-Remove the specified storage object.
+Remove the specified storage object(s). 
+Any prefix may be specified as the argument. If there's a file with this path, it is removed. If not, but there's a directory with this path - all files from it and its subdirectories are removed.
 
-Example:
+Examples:
 
 ``wal-g st rm path/to/remote_file`` remove the file from storage.
+
+``wal-g st rm path/to/remote_file_or_directory`` remove a file or all files in the directory.
+
+``wal-g st rm path/to/remote_directory/`` explicitly specify that the path points to a directory, not a file.
 
 ### ``put``
 Upload the specified file to the storage. By default, the command will try to apply the compression and encryption (if configured).
@@ -58,13 +63,22 @@ Example:
 ``wal-g st put path/to/local_file path/to/remote_file`` upload the local file to the storage.
 
 ### `transfer`
-Transfer all files from one configured storage to another. Is usually used to move files from a failover storage to the primary one when it becomes alive.
+Transfer files from one configured storage to another. Is usually used to move files from a failover storage to the primary one when it becomes alive.
 
-Args:
+Subcommands:
+1. `transfer files prefix` - moves arbitrary files without any special treatment.
+   
+   Argument `prefix` is path to a directory in both storages, where files should be moved to/from. Files from all subdirectories are also moved.
 
-1. Path to the directory in both storages, where files should be moved to/from. Files from all subdirectories are also moved.
+2. `transfer pg-wals` - moves PostgreSQL WAL files only (just an alias for `transfer files "wal_005/"`).
 
-Flags:
+3. `transfer backups [--max-backups=N]` - consistently moves backups.
+
+   To prevent any problems with restoring from a partially uploaded/removed backup, the signal file `*_backup_stop_sentinel.json` is moved to the source storage last, and deleted from the target storage first.
+
+   An additional flag is supported: `--max-backups` specifies max number of backups to move in this run.
+
+Flags (supported in every subcommand):
 
 1. Add `-s (--source)` to specify the source storage name to take files from. To specify the primary storage, use `default`. This flag is required.
 
@@ -86,7 +100,7 @@ Flags:
 
 5. Add `-c (--concurrency)` to set the max number of concurrent workers that will move files.
 
-6. Add `-m (--max)` to set the max number of files to move in a single command run.
+6. Add `-m (--max-files)` to set the max number of files to move in a single command run.
 
 7. Add `--appearance-checks` to set the max number of checks for files to appear in the target storage, which will be performed after moving the file and before deleting it.
 
@@ -99,8 +113,10 @@ Flags:
 
 Examples:
 
-``wal-g st transfer / --source='my_failover_ssh'``
+``wal-g st transfer pg-wals --source='my_failover_ssh'``
 
-``wal-g st transfer folder/single_file.json --source='default' --target='my_failover_ssh' --overwrite``
+``wal-g st transfer files folder/single_file.json --source='default' --target='my_failover_ssh' --overwrite``
 
-``wal-g st transfer basebackups_005/ --source='my_failover_s3' --target='default' --fail-fast -c=50 -m=10000 --appearance-checks=5 --appearance-checks-interval=1s``
+``wal-g st transfer files basebackups_005/ --source='my_failover_s3' --target='default' --fail-fast -c=50 -m=10000 --appearance-checks=5 --appearance-checks-interval=1s``
+
+``wal-g st transfer backups --source='my_failover_s3' --target='default' --fail-fast -c=50 --max-files=10000 --max-backups=10 --appearance-checks=5 --appearance-checks-interval=1s``
