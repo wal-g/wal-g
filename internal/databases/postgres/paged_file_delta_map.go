@@ -123,7 +123,7 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "GetRelFileNodeFrom: can't get dbNode from: '%s'", filePath)
 	}
-	if strings.Contains(filePath, DefaultTablespace) { // base
+	if folderPathParts[len(folderPathParts)-2] == DefaultTablespace { // base
 		return &walparser.RelFileNode{SpcNode: DefaultSpcNode,
 			DBNode:  walparser.Oid(dbNode),
 			RelNode: walparser.Oid(relNode)}, nil
