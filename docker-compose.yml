@@ -642,6 +642,16 @@ services:
     links:
       - s3
 
+  pg_daemon_client_test:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_daemon_client_test
+      context: .
+    image: wal-g/daemon_client_test
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_pgbackrest:
     build:
       dockerfile: docker/pg_tests/Dockerfile_pgbackrest
