@@ -28,6 +28,21 @@ func TestGetRelFileNodeFrom_DefaultTableSpace(t *testing.T) {
 	assert.Equal(t, walparser.RelFileNode{SpcNode: postgres.DefaultSpcNode, DBNode: 123, RelNode: 100500}, *relFileNode)
 }
 
+func TestGetRelFileNodeFrom_IncorrectDefaultTableSpace_v1(t *testing.T) {
+	_, err := postgres.GetRelFileNodeFrom("~/DemoDb/base.old/123/100500")
+	assert.Error(t, err)
+}
+
+func TestGetRelFileNodeFrom_IncorrectDefaultTableSpace_v2(t *testing.T) {
+	_, err := postgres.GetRelFileNodeFrom("~/DemoDb/base/some_garbage/123/100500")
+	assert.Error(t, err)
+}
+
+func TestGetRelFileNodeFrom_IncorrectDefaultTableSpace_v3(t *testing.T) {
+	_, err := postgres.GetRelFileNodeFrom("~/DemoDb/garbage/123/100500")
+	assert.Error(t, err)
+}
+
 func TestGetRelFileNodeFrom_NonDefaultTableSpace(t *testing.T) {
 	relFileNode, err := postgres.GetRelFileNodeFrom("~/DemoDb/pg_tblspc/16709/PG_9.3_201306121/16499/19401")
 	assert.NoError(t, err)
