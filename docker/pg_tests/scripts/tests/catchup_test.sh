@@ -69,6 +69,7 @@ wal-g --config=${TMP_CONFIG} catchup-push ${PGDATA_ALPHA} --from-lsn ${LSN} 2>/t
 cat /tmp/stderr /tmp/stdout
 
 BACKUP_NAME=`grep -oE 'backup_[0-9A-Z]*' /tmp/stderr | sort -u`
+cat /tmp/stderr /tmp/stdout
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w stop
 sleep 5
