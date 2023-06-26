@@ -104,7 +104,7 @@ func main() {
 	}
 
 	if len(os.Args) > 1 && strings.ToLower(os.Args[1]) == "--version" {
-		fmt.Println(strings.Join([]string{version, gitRevision, buildDate}, "\t"))
+		fmt.Println(strings.Join([]string{"walg-daemon-client", version, gitRevision, buildDate}, "\t"))
 		return
 	}
 
