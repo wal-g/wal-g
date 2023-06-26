@@ -26,10 +26,10 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
+			greenplum.SetSegmentStoragePrefix(contentID)
+
 			uploader, err := internal.ConfigureUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
-
-			greenplum.SetSegmentStoragePrefix(contentID)
 
 			dataDirectory := args[0]
 
