@@ -52,8 +52,15 @@ var segBackupFetchCmd = &cobra.Command{
 				internal.UseReverseUnpackSetting, internal.SkipRedundantTarsSetting)
 		}
 
-		pgFetcher := postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec,
-			&greenplum.ExtractProviderImpl{})
+		var extractProv postgres.ExtractProvider
+
+		if partialRestoreArgs != nil {
+			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs)
+		} else {
+			extractProv = greenplum.ExtractProviderImpl{}
+		}
+
+		pgFetcher := postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
 	},
 }
@@ -81,6 +88,7 @@ func init() {
 		"", targetUserDataDescription)
 	segBackupFetchCmd.PersistentFlags().IntVar(&contentID, "content-id", 0, "segment content ID")
 	_ = segBackupFetchCmd.MarkFlagRequired("content-id")
+	segBackupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 	// Since this is a utility command called by backup-fetch, it should not be exposed to the end user.
 	segBackupFetchCmd.Hidden = true
 	cmd.AddCommand(segBackupFetchCmd)

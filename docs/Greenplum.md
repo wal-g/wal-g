@@ -149,6 +149,34 @@ wal-g backup-fetch LATEST --content-ids=3,5,7 --restore-config=restore-config.js
 wal-g backup-fetch LATEST --mode=unpack --restore-config=restore-config.json --config=/etc/wal-g/wal-g.yaml
 ```
 
+#### Restore only specific databases
+During partial restore wal-g restores only specified databases' files. Use 'database' or 'database/namespace.table' as a parameter ('public' namespace can be omitted).
+
+Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
+
+Restores system databases, tables and aoseg tables automatically.
+
+```bash
+wal-g backup-fetch LATEST --restore-only=db, "db with spaces" --restore-config=restore-config.json --config=/etc/wal-g/wal-g.yaml
+```
+
+Note: Double quotes are only needed to insert spaces and will be ignored
+
+Example:
+
+`--restore-only=my_db,"another db"`
+
+is equivalent to
+
+`--restore-only=my_db,another" "db`
+
+or even
+
+`--restore-only=my_db,anoth"e"r" "d"b"`
+
+Because of unrestored databases' remains are still in system tables, it is recommended to drop them.
+
+
 #### In-place restore
 WAL-G can also do in-place backup restoration without the restore config. It might be useful when restoring to the same hosts that were used to make a backup:
 ```bash

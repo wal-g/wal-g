@@ -42,33 +42,44 @@ func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
 	return true
 }
 
-type ExtractProviderDBSpec struct {
-	ExtractProviderImpl
-	restoreParameters []string
+func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
+	for file := range filesToUnwrap {
+		isDB, dbID, tableID := TryGetOidPair(file)
+
+		if isDB && desc.IsSkipped(dbID, tableID) {
+			delete(filesToUnwrap, file)
+		}
+	}
 }
 
-func NewExtractProviderDBSpec(partialRestoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{restoreParameters: partialRestoreParameters}
+func TryGetOidPair(file string) (bool, uint32, uint32) {
+	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
+		return false, 0, 0
+	}
+	var tableID, dbID uint32
+
+	file, tableID = cutIntegerBase(file)
+	_, dbID = cutIntegerBase(file)
+
+	return true, dbID, tableID
 }
 
-func (p ExtractProviderDBSpec) Get(
-	backup Backup,
-	filesToUnwrap map[string]bool,
-	skipRedundantTars bool,
-	dbDataDir string,
-	createNewIncrementalFiles bool,
-) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
-	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
-	tracelog.ErrorLogger.FatalOnError(err)
+func cutIntegerBase(file string) (string, uint32) {
+	parent, base := path.Dir(file), path.Base(file)
+	base, _, _ = strings.Cut(base, ".")
+	base, _, _ = strings.Cut(base, "_")
+	integerResult, _ := strconv.ParseUint(base, 10, 0)
 
-	desc, err := p.makeRestoreDesc(p.restoreParameters, filesMeta.DatabasesByNames)
-	tracelog.ErrorLogger.FatalOnError(err)
-	p.filterFilesToUnwrap(filesToUnwrap, desc)
-
-	return p.ExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
+	return parent, uint32(integerResult)
 }
 
-func (p ExtractProviderDBSpec) makeRestoreDesc(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
+type RestoreDescMaker interface {
+	Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error)
+}
+
+type DefaultRestoreDescMaker struct{}
+
+func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
 	restoredDatabases := make(RestoreDesc)
 
 	for _, parameter := range restoreParameters {
@@ -83,33 +94,28 @@ func (p ExtractProviderDBSpec) makeRestoreDesc(restoreParameters []string, names
 	return restoredDatabases, nil
 }
 
-func (p ExtractProviderDBSpec) filterFilesToUnwrap(filesToUnwrap map[string]bool, desc RestoreDesc) {
-	for file := range filesToUnwrap {
-		isDB, dbID, tableID := p.TryGetOidPair(file)
-
-		if isDB && desc.IsSkipped(dbID, tableID) {
-			delete(filesToUnwrap, file)
-		}
-	}
+type ExtractProviderDBSpec struct {
+	RestoreParameters []string
+	restoreDescMaker  RestoreDescMaker
 }
 
-func (p ExtractProviderDBSpec) TryGetOidPair(file string) (bool, uint32, uint32) {
-	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
-		return false, 0, 0
-	}
-	var tableID, dbID uint32
-
-	file, tableID = p.cutIntegerBase(file)
-	_, dbID = p.cutIntegerBase(file)
-
-	return true, dbID, tableID
+func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
+	return &ExtractProviderDBSpec{restoreParameters, DefaultRestoreDescMaker{}}
 }
 
-func (p ExtractProviderDBSpec) cutIntegerBase(file string) (string, uint32) {
-	parent, base := path.Dir(file), path.Base(file)
-	base, _, _ = strings.Cut(base, ".")
-	base, _, _ = strings.Cut(base, "_")
-	integerResult, _ := strconv.ParseUint(base, 10, 0)
+func (p ExtractProviderDBSpec) Get(
+	backup Backup,
+	filesToUnwrap map[string]bool,
+	skipRedundantTars bool,
+	dbDataDir string,
+	createNewIncrementalFiles bool,
+) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
+	tracelog.ErrorLogger.FatalOnError(err)
 
-	return parent, uint32(integerResult)
+	desc, err := p.restoreDescMaker.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
+	tracelog.ErrorLogger.FatalOnError(err)
+	desc.FilterFilesToUnwrap(filesToUnwrap)
+
+	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }
