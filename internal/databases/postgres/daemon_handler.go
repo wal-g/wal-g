@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/daemon"
@@ -19,9 +20,17 @@ const (
 	SdNotifyWatchdog = "WATCHDOG=1"
 )
 
-var (
-	SocketWriteFailed = "socket write failed: %w"
-)
+type SocketWriteFailedError struct {
+	error
+}
+
+func newSocketWriteFailedError(socketError error) SocketWriteFailedError {
+	return SocketWriteFailedError{errors.Errorf("socket write failed: %w", socketError)}
+}
+
+func (err SocketWriteFailedError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
 
 type DaemonOptions struct {
 	Uploader *WalUploader
@@ -39,7 +48,7 @@ type CheckMessageHandler struct {
 func (h *CheckMessageHandler) Handle(_ []byte) error {
 	_, err := h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return fmt.Errorf(SocketWriteFailed, err)
+		return newSocketWriteFailedError(err)
 	}
 	tracelog.DebugLogger.Println("configuration successfully checked")
 	return nil
@@ -64,7 +73,7 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return fmt.Errorf(SocketWriteFailed, err)
+		return newSocketWriteFailedError(err)
 	}
 	return nil
 }
@@ -93,7 +102,7 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
 		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
 		if err != nil {
-			return fmt.Errorf(SocketWriteFailed, err)
+			return newSocketWriteFailedError(err)
 		}
 		return nil
 	}
@@ -102,7 +111,7 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return fmt.Errorf(SocketWriteFailed, err)
+		return newSocketWriteFailedError(err)
 	}
 	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
 	return nil
@@ -225,7 +234,7 @@ func SdNotify(state string) error {
 	}
 	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
 	if _, err = conn.Write([]byte(state)); err != nil {
-		return fmt.Errorf(SocketWriteFailed, err)
+		return newSocketWriteFailedError(err)
 	}
 	return nil
 }
