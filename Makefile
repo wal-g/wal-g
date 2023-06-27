@@ -255,4 +255,4 @@ unlink_libsodium:
 
 build_client:
 	cd cmd/daemonclient && \
-	go build -o ../../bin/walg-daemon-client -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/walg-daemon-client.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/walg-daemon-client.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/walg-daemon-client.version=`git tag -l --points-at HEAD`"
+	go build -o ../../bin/walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=`git rev-parse --short HEAD` -X main.version=`git tag -l --points-at HEAD`"

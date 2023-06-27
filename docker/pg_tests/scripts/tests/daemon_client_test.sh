@@ -12,6 +12,9 @@ export SKIP_TEST_WAL_OVERWRITES="1"
 . /tmp/tests/test_functions/daemon_patch.sh
 . /tmp/tests/test_functions/daemon_client_patch.sh
 
+# show client version
+walg-daemon-client --version
+
 prepare_config "/tmp/configs/full_backup_test_config.json"
 start_daemon
 test_full_backup "${TMP_CONFIG}"
