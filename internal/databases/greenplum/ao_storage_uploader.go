@@ -26,11 +26,11 @@ type AoStorageUploader struct {
 	// minimal age to use the AO/AOCS file deduplication
 	deduplicationMinAge time.Time
 	// unique identifier of the new AO/AOCS segments created by this uploader
-	newAoSegFilesId string
+	newAoSegFilesID string
 }
 
 func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
-	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration, newAoSegFilesId string) *AoStorageUploader {
+	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration, newAoSegFilesID string) *AoStorageUploader {
 	// Separate uploader for AO/AOCS relfiles with disabled file size tracking since
 	// WAL-G does not count them
 	aoSegUploader := uploader.Clone()
@@ -44,7 +44,7 @@ func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
 		bundleFiles:         files,
 		isIncremental:       isIncremental,
 		deduplicationMinAge: time.Now().Add(-deduplicationAgeLimit),
-		newAoSegFilesId:     newAoSegFilesId,
+		newAoSegFilesID:     newAoSegFilesID,
 	}
 }
 
@@ -134,7 +134,7 @@ func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta A
 
 func (u *AoStorageUploader) regularAoUpload(
 	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
-	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location, u.newAoSegFilesId)
+	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location, u.newAoSegFilesID)
 	tracelog.DebugLogger.Printf("Uploading %s AO relfile to %s", cfi.Path, storageKey)
 	fileReadCloser, err := internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
