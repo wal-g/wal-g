@@ -30,7 +30,8 @@ type AoStorageUploader struct {
 }
 
 func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
-	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration, newAoSegFilesID string) *AoStorageUploader {
+	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration,
+	newAoSegFilesID string) *AoStorageUploader {
 	// Separate uploader for AO/AOCS relfiles with disabled file size tracking since
 	// WAL-G does not count them
 	aoSegUploader := uploader.Clone()
@@ -69,7 +70,8 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 	}
 
 	if remoteFile.InitialUploadTS.Before(u.deduplicationMinAge) {
-		tracelog.DebugLogger.Printf("%s: deduplication age limit passed (initial upload time: %s), will perform a regular upload", cfi.Header.Name, remoteFile.InitialUploadTS)
+		tracelog.DebugLogger.Printf("%s: deduplication age limit passed (initial upload time: %s), will perform a regular upload",
+			cfi.Header.Name, remoteFile.InitialUploadTS)
 		return u.regularAoUpload(cfi, aoMeta, location)
 	}
 
@@ -115,9 +117,11 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 }
 
 func (u *AoStorageUploader) addAoFileMetadata(
-	cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped, isIncremented bool, initialUplTS time.Time) {
+	cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped, isIncremented bool,
+	initialUplTS time.Time) {
 	u.metaMutex.Lock()
-	u.meta.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(), initialUplTS, aoMeta, cfi.Header.Mode, isSkipped, isIncremented)
+	u.meta.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(),
+		initialUplTS, aoMeta, cfi.Header.Mode, isSkipped, isIncremented)
 	u.metaMutex.Unlock()
 }
 
@@ -125,7 +129,8 @@ func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
 	return u.meta
 }
 
-func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string, initialUploadTS time.Time) error {
+func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string,
+	initialUploadTS time.Time) error {
 	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, false, initialUploadTS)
 	u.bundleFiles.AddSkippedFile(cfi.Header, cfi.FileInfo)
 	tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey)
