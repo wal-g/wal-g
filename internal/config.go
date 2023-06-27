@@ -132,14 +132,15 @@ const (
 
 	RedisPassword = "WALG_REDIS_PASSWORD"
 
-	GPLogsDirectory        = "WALG_GP_LOGS_DIR"
-	GPSegContentID         = "WALG_GP_SEG_CONTENT_ID"
-	GPSegmentsPollInterval = "WALG_GP_SEG_POLL_INTERVAL"
-	GPSegmentsPollRetries  = "WALG_GP_SEG_POLL_RETRIES"
-	GPSegmentsUpdInterval  = "WALG_GP_SEG_UPD_INTERVAL"
-	GPSegmentStatesDir     = "WALG_GP_SEG_STATES_DIR"
-	GPDeleteConcurrency    = "WALG_GP_DELETE_CONCURRENCY"
-	GPAoSegSizeThreshold   = "WALG_GP_AOSEG_SIZE_THRESHOLD"
+	GPLogsDirectory           = "WALG_GP_LOGS_DIR"
+	GPSegContentID            = "WALG_GP_SEG_CONTENT_ID"
+	GPSegmentsPollInterval    = "WALG_GP_SEG_POLL_INTERVAL"
+	GPSegmentsPollRetries     = "WALG_GP_SEG_POLL_RETRIES"
+	GPSegmentsUpdInterval     = "WALG_GP_SEG_UPD_INTERVAL"
+	GPSegmentStatesDir        = "WALG_GP_SEG_STATES_DIR"
+	GPDeleteConcurrency       = "WALG_GP_DELETE_CONCURRENCY"
+	GPAoSegSizeThreshold      = "WALG_GP_AOSEG_SIZE_THRESHOLD"
+	GPAoDeduplicationAgeLimit = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -247,14 +248,15 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory:        "/var/log",
-		PgWalSize:              "64",
-		GPSegmentsPollInterval: "5m",
-		GPSegmentsUpdInterval:  "10s",
-		GPSegmentsPollRetries:  "5",
-		GPSegmentStatesDir:     "/tmp",
-		GPDeleteConcurrency:    "1",
-		GPAoSegSizeThreshold:   "1048576", // (1 << 20)
+		GPLogsDirectory:           "/var/log",
+		PgWalSize:                 "64",
+		GPSegmentsPollInterval:    "5m",
+		GPSegmentsUpdInterval:     "10s",
+		GPSegmentsPollRetries:     "5",
+		GPSegmentStatesDir:        "/tmp",
+		GPDeleteConcurrency:       "1",
+		GPAoSegSizeThreshold:      "1048576", // (1 << 20)
+		GPAoDeduplicationAgeLimit: "720h",    // 30 days
 	}
 
 	AllowedSettings map[string]bool
@@ -462,14 +464,15 @@ var (
 	}
 
 	GPAllowedSettings = map[string]bool{
-		GPLogsDirectory:        true,
-		GPSegContentID:         true,
-		GPSegmentsPollRetries:  true,
-		GPSegmentsPollInterval: true,
-		GPSegmentsUpdInterval:  true,
-		GPSegmentStatesDir:     true,
-		GPDeleteConcurrency:    true,
-		GPAoSegSizeThreshold:   true,
+		GPLogsDirectory:           true,
+		GPSegContentID:            true,
+		GPSegmentsPollRetries:     true,
+		GPSegmentsPollInterval:    true,
+		GPSegmentsUpdInterval:     true,
+		GPSegmentStatesDir:        true,
+		GPDeleteConcurrency:       true,
+		GPAoSegSizeThreshold:      true,
+		GPAoDeduplicationAgeLimit: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)

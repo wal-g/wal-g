@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -49,8 +51,14 @@ func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.Tar
 	}
 
 	filePacker := postgres.NewTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, filePackerOptions)
+	deduplicationAgeLimit, err := internal.GetDurationSetting(internal.GPAoDeduplicationAgeLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	newAoSegFilesID := strconv.FormatInt(time.Now().UnixNano(), 10)
 	aoStorageUploader := NewAoStorageUploader(
-		maker.uploader, baseFiles, bundle.Crypter, maker.bundleFiles, bundle.IncrementFromName != "")
+		maker.uploader, baseFiles, bundle.Crypter, maker.bundleFiles, bundle.IncrementFromName != "", deduplicationAgeLimit, newAoSegFilesID)
 
 	return NewGpTarBallComposer(
 		bundle.TarBallQueue,

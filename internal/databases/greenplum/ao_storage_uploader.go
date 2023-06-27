@@ -4,6 +4,7 @@ import (
 	"io"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/wal-g/wal-g/utility"
 
@@ -22,22 +23,28 @@ type AoStorageUploader struct {
 	crypter       crypto.Crypter
 	bundleFiles   internal.BundleFiles
 	isIncremental bool
+	// minimal age to use the AO/AOCS file deduplication
+	deduplicationMinAge time.Time
+	// unique identifier of the new AO/AOCS segments created by this uploader
+	newAoSegFilesId string
 }
 
 func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
-	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool) *AoStorageUploader {
+	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration, newAoSegFilesId string) *AoStorageUploader {
 	// Separate uploader for AO/AOCS relfiles with disabled file size tracking since
 	// WAL-G does not count them
 	aoSegUploader := uploader.Clone()
 	aoSegUploader.DisableSizeTracking()
 
 	return &AoStorageUploader{
-		uploader:      aoSegUploader,
-		baseAoFiles:   baseAoFiles,
-		meta:          NewAOFilesMetadataDTO(),
-		crypter:       crypter,
-		bundleFiles:   files,
-		isIncremental: isIncremental,
+		uploader:            aoSegUploader,
+		baseAoFiles:         baseAoFiles,
+		meta:                NewAOFilesMetadataDTO(),
+		crypter:             crypter,
+		bundleFiles:         files,
+		isIncremental:       isIncremental,
+		deduplicationMinAge: time.Now().Add(-deduplicationAgeLimit),
+		newAoSegFilesId:     newAoSegFilesId,
 	}
 }
 
@@ -61,6 +68,11 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 		return u.regularAoUpload(cfi, aoMeta, location)
 	}
 
+	if remoteFile.InitialUploadTS.Before(u.deduplicationMinAge) {
+		tracelog.DebugLogger.Printf("%s: deduplication age limit passed (initial upload time: %s), will perform a regular upload", cfi.Header.Name, remoteFile.InitialUploadTS)
+		return u.regularAoUpload(cfi, aoMeta, location)
+	}
+
 	if aoMeta.modCount != remoteFile.ModCount {
 		if !u.isIncremental || aoMeta.modCount == 0 {
 			tracelog.DebugLogger.Printf("%s: isIncremental: %t, modCount: %d, will perform a regular upload",
@@ -79,7 +91,7 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 			"%s: EOF (local %d, remote %d), ModCount (local %d, remote %d), will perform an incremental upload",
 			cfi.Header.Name, aoMeta.eof, remoteFile.EOF, aoMeta.modCount, remoteFile.ModCount)
 
-		err := u.incrementalAoUpload(remoteFile.StoragePath, cfi, aoMeta, remoteFile.EOF)
+		err := u.incrementalAoUpload(remoteFile.StoragePath, cfi, aoMeta, remoteFile.EOF, remoteFile.InitialUploadTS)
 		if err == nil {
 			return nil
 		}
@@ -99,13 +111,13 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 	tracelog.DebugLogger.Printf(
 		"%s: ModCount %d, EOF %d matches the remote file %s, will skip this file",
 		cfi.Header.Name, remoteFile.ModCount, remoteFile.EOF, remoteFile.StoragePath)
-	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath)
+	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS)
 }
 
 func (u *AoStorageUploader) addAoFileMetadata(
-	cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped, isIncremented bool) {
+	cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped, isIncremented bool, initialUplTS time.Time) {
 	u.metaMutex.Lock()
-	u.meta.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(), aoMeta, cfi.Header.Mode, isSkipped, isIncremented)
+	u.meta.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(), initialUplTS, aoMeta, cfi.Header.Mode, isSkipped, isIncremented)
 	u.metaMutex.Unlock()
 }
 
@@ -113,8 +125,8 @@ func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
 	return u.meta
 }
 
-func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string) error {
-	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, false)
+func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string, initialUploadTS time.Time) error {
+	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, false, initialUploadTS)
 	u.bundleFiles.AddSkippedFile(cfi.Header, cfi.FileInfo)
 	tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey)
 	return nil
@@ -122,7 +134,7 @@ func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta A
 
 func (u *AoStorageUploader) regularAoUpload(
 	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
-	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location)
+	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location, u.newAoSegFilesId)
 	tracelog.DebugLogger.Printf("Uploading %s AO relfile to %s", cfi.Path, storageKey)
 	fileReadCloser, err := internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
@@ -142,14 +154,14 @@ func (u *AoStorageUploader) regularAoUpload(
 		return err
 	}
 
-	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, false)
+	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, false, time.Now())
 	u.bundleFiles.AddFile(cfi.Header, cfi.FileInfo, false)
 	return nil
 }
 
 func (u *AoStorageUploader) incrementalAoUpload(
 	baseFileStorageKey string,
-	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, baseFileEOF int64) error {
+	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, baseFileEOF int64, initialUploadTS time.Time) error {
 	storageKey := makeDeltaAoFileStorageKey(baseFileStorageKey, aoMeta.modCount)
 	tracelog.DebugLogger.Printf("Uploading %s AO relfile delta to %s", cfi.Path, storageKey)
 
@@ -169,7 +181,7 @@ func (u *AoStorageUploader) incrementalAoUpload(
 		return err
 	}
 
-	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, true)
+	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, true, initialUploadTS)
 	u.bundleFiles.AddFile(cfi.Header, cfi.FileInfo, true)
 	return nil
 }
