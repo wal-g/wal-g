@@ -19,6 +19,10 @@ const (
 	SdNotifyWatchdog = "WATCHDOG=1"
 )
 
+var (
+	SocketWriteFailed = "socket write failed: %w"
+)
+
 type DaemonOptions struct {
 	Uploader *WalUploader
 	Reader   internal.StorageFolderReader
@@ -35,7 +39,7 @@ type CheckMessageHandler struct {
 func (h *CheckMessageHandler) Handle(_ []byte) error {
 	_, err := h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return fmt.Errorf("failed to write in socket: %w", err)
+		return fmt.Errorf(SocketWriteFailed, err)
 	}
 	tracelog.DebugLogger.Println("configuration successfully checked")
 	return nil
@@ -60,7 +64,7 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return fmt.Errorf("socket write failed: %w", err)
+		return fmt.Errorf(SocketWriteFailed, err)
 	}
 	return nil
 }
@@ -85,12 +89,20 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
 
 	err = HandleWALFetch(h.reader, args[0], fullPath, true)
+	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
+		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
+		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
+		if err != nil {
+			return fmt.Errorf(SocketWriteFailed, err)
+		}
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("WAL fetch failed: %w", err)
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return fmt.Errorf("socket write failed: %w", err)
+		return fmt.Errorf(SocketWriteFailed, err)
 	}
 	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
 	return nil
@@ -213,7 +225,7 @@ func SdNotify(state string) error {
 	}
 	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
 	if _, err = conn.Write([]byte(state)); err != nil {
-		return fmt.Errorf("failed write to service: %w", err)
+		return fmt.Errorf(SocketWriteFailed, err)
 	}
 	return nil
 }
