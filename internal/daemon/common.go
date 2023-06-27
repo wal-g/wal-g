@@ -9,9 +9,10 @@ import (
 type SocketMessageType byte
 
 const (
-	CheckType SocketMessageType = 'C'
-	OkType    SocketMessageType = 'O'
-	ErrorType SocketMessageType = 'E'
+	CheckType               SocketMessageType = 'C'
+	OkType                  SocketMessageType = 'O'
+	ErrorType               SocketMessageType = 'E'
+	ArchiveNonExistenceType SocketMessageType = 'N'
 
 	WalPushType  SocketMessageType = 'F'
 	WalFetchType SocketMessageType = 'f'

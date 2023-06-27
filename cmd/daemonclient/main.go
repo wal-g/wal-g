@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal/daemon"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (
@@ -124,8 +125,12 @@ func main() {
 		log.Fatalf("daemon socket '%v' doesn't exist or is unavailable:\n\t%v", cmd.options.SocketName, err)
 	}
 
-	err = daemon.SendCommand(cmd.options)
+	response, err := daemon.SendCommand(cmd.options)
 	if err != nil {
+		if response == daemon.ArchiveNonExistenceType {
+			fmt.Println(err.Error())
+			os.Exit(postgres.ExIoError)
+		}
 		log.Fatal(err)
 	}
 }
