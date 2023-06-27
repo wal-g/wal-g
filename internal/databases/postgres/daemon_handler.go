@@ -25,7 +25,7 @@ type SocketWriteFailedError struct {
 }
 
 func newSocketWriteFailedError(socketError error) SocketWriteFailedError {
-	return SocketWriteFailedError{errors.Errorf("socket write failed: %w", socketError)}
+	return SocketWriteFailedError{errors.Errorf("socket write failed: %v", socketError)}
 }
 
 func (err SocketWriteFailedError) Error() string {
