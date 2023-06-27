@@ -34,7 +34,7 @@ func getMessage(messageType SocketMessageType, messageArgs []string) ([]byte, er
 	return append(res, messageBody...), nil
 }
 
-func SendCommand(opts *RunOptions) (error, SocketMessageType) {
+func SendCommand(opts *RunOptions) (SocketMessageType, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), opts.DaemonSocketConnectionTimeout)
 	defer cancel()
 
@@ -42,31 +42,34 @@ func SendCommand(opts *RunOptions) (error, SocketMessageType) {
 	daemonAddr := net.UnixAddr{Name: opts.SocketName, Net: "unix"}
 	socketConnection, err := dialer.DialContext(ctx, "unix", daemonAddr.String())
 	if err != nil {
-		return fmt.Errorf("unix socket dial error: %w", err), ErrorType
+		return ErrorType, fmt.Errorf("unix socket dial error: %w", err)
 	}
 	defer socketConnection.Close()
 	err = socketConnection.SetDeadline(time.Now().Add(opts.DaemonOperationTimeout))
 	if err != nil {
-		return fmt.Errorf("unix socket set deadline error: %w", err), ErrorType
+		return ErrorType, fmt.Errorf("unix socket set deadline error: %w", err)
 	}
 
 	msg, err := getMessage(opts.MessageType, opts.MessageArgs)
 	if err != nil {
-		return err, ErrorType
+		return ErrorType, err
 	}
 	_, err = socketConnection.Write(msg)
 	if err != nil {
-		return fmt.Errorf("unix socket write error: %w", err), ErrorType
+		return ErrorType, fmt.Errorf("unix socket write error: %w", err)
 	}
 
 	resp := make([]byte, 512)
 	n, err := socketConnection.Read(resp)
 	if err != nil {
-		return fmt.Errorf("unix socket read error: %w", err), ErrorType
+		return ErrorType, fmt.Errorf("unix socket read error: %w", err)
 	}
-	if n < 1 || !OkType.IsEqual(resp[0]) {
-		return fmt.Errorf("daemon command run error [message type: %v, args: %v, daemon response: %v]",
-			string(opts.MessageType), opts.MessageArgs, string(resp[0])), SocketMessageType(resp[0])
+	if n < 1 {
+		return ErrorType, fmt.Errorf("daemon response error [message type: %v, args: %v]", string(opts.MessageType), opts.MessageArgs)
 	}
-	return nil, OkType
+	if !OkType.IsEqual(resp[0]) {
+		return SocketMessageType(resp[0]), fmt.Errorf("daemon command run error [message type: %v, args: %v, daemon response: %v]",
+			string(opts.MessageType), opts.MessageArgs, string(resp[0]))
+	}
+	return OkType, nil
 }

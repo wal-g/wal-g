@@ -125,7 +125,7 @@ func main() {
 		log.Fatalf("daemon socket '%v' doesn't exist or is unavailable:\n\t%v", cmd.options.SocketName, err)
 	}
 
-	err, response := daemon.SendCommand(cmd.options)
+	response, err := daemon.SendCommand(cmd.options)
 	if err != nil {
 		if response == daemon.ArchiveNonExistenceType {
 			fmt.Println(err.Error())
