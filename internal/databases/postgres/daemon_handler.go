@@ -175,6 +175,7 @@ func HandleDaemon(options DaemonOptions, pathToSocket string) {
 	}
 
 	sdNotifyTicker := time.NewTicker(30 * time.Second)
+	defer sdNotifyTicker.Stop()
 	go SendSdNotify(sdNotifyTicker.C)
 
 	for {
