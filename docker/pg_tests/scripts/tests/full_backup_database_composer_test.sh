@@ -10,3 +10,5 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 . /tmp/tests/test_functions/test_full_backup.sh
 test_full_backup ${TMP_CONFIG}
+
+/tmp/scripts/drop_pg.sh

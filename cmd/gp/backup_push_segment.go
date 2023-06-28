@@ -28,6 +28,9 @@ var (
 
 			greenplum.SetSegmentStoragePrefix(contentID)
 
+			uploader, err := internal.ConfigureUploader()
+			tracelog.ErrorLogger.FatalOnError(err)
+
 			dataDirectory := args[0]
 
 			if deltaFromName == "" {
@@ -56,7 +59,7 @@ var (
 			tarBallComposerType := postgres.RegularComposer
 			withoutFilesMetadata := false
 
-			arguments := postgres.NewBackupArguments(dataDirectory, utility.BaseBackupPath,
+			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums,
 				fullBackup, storeAllCorruptBlocks,
 				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),

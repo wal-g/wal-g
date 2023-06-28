@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e -x
 
 PGDATA="/var/lib/postgresql/10/main"
@@ -96,3 +96,4 @@ popd
 
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 
+/tmp/scripts/drop_pg.sh

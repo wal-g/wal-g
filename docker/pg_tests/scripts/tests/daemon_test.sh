@@ -50,3 +50,5 @@ else
   echo "Error in WAL-G response."
   exit 1
 fi
+
+/tmp/scripts/drop_pg.sh

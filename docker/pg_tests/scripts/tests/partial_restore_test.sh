@@ -66,6 +66,7 @@ else
 fi
 
 if psql -t -c "SELECT COUNT(*) FROM tbl;" -d third -A 2>&1 | grep -q "is not a valid data directory"; then
+  /tmp/scripts/drop_pg.sh
   echo "Skipped database raises error, as it should be!!!!!"
 else
   echo "Skipped database responses unexpectedly"

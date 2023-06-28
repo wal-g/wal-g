@@ -17,7 +17,7 @@ func NewSegBackupHandler(arguments postgres.BackupArguments) (*postgres.BackupHa
 			return err
 		}
 
-		maker, err := NewGpTarBallComposerMaker(relStorageMap, bh.Workers.Uploader, handler.CurBackupInfo.Name)
+		maker, err := NewGpTarBallComposerMaker(relStorageMap, bh.Arguments.Uploader, handler.CurBackupInfo.Name)
 		if err != nil {
 			return err
 		}

@@ -27,6 +27,8 @@ test_receive_wal()
 
   # check verify results to end with 'OK'
   if echo "$VERIFY_RESULT" | grep -qP "\bOK$"; then
+    /tmp/scripts/drop_pg.sh
+    rm ${TMP_CONFIG}
     echo "WAL receive success!!!!!!"
     return 0
   fi

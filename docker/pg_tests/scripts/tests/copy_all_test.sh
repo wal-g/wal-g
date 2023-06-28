@@ -14,15 +14,20 @@ TO_CONFIG_FILE="/tmp/configs/copy_all_to_test_config.json"
 TO_TMP_CONFIG="/tmp/configs/to_tmp_config.json"
 cat ${TO_CONFIG_FILE} > ${TO_TMP_CONFIG}
 echo "," >> ${TO_TMP_CONFIG}
+cat ${COMMON_CONFIG} >> ${TO_TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TO_TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb "${PGDATA}"
 
-echo "archive_mode = on"; echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p'"; echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 wal-g --config=${TMP_CONFIG} wal-push %p'" >> ${PGDATA}/postgresql.conf
+echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D "${PGDATA}" -w start
 
 /tmp/scripts/wait_while_pg_not_ready.sh
+
+wal-g --config=${TMP_CONFIG} st rm / --target=all || true
 
 sleep 1
 echo "$WALG_DELTA_MAX_STEPS"
@@ -62,7 +67,7 @@ wal-g --config=${TO_TMP_CONFIG} backup-list | cut -f 1 -d " " | sort > /tmp/copi
 # and count lines in diff
 lines_count=$(diff /tmp/actual_backup_list /tmp/copied_backup_list | wc -l)
 
-if [ lines_count > 0 ];
+if [ $lines_count -gt 0 ];
 then
     echo "Copying all backups failed"
     exit 2

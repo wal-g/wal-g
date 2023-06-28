@@ -1,8 +1,8 @@
 {
-  "WALE_S3_PREFIX": "s3://sttransferbucket",
+  "WALE_S3_PREFIX": "s3://sttransferfilesbucket",
   "WALG_FAILOVER_STORAGES": {
     "failover": {
-      "WALE_S3_PREFIX": "s3://sttransferfailoverbucket",
+      "WALE_S3_PREFIX": "s3://sttransferfilesfailoverbucket",
       "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
       "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
     }

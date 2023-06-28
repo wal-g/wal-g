@@ -10,3 +10,5 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 . /tmp/tests/test_functions/test_copy_composer.sh
 test_copy_composer ${TMP_CONFIG}
+
+/tmp/scripts/drop_pg.sh
