@@ -224,7 +224,7 @@ func Listen(c net.Conn, opts DaemonOptions) {
 
 func SendSdNotify(c <-chan time.Time) {
 	for {
-		_ = <-c
+		<-c
 		tracelog.ErrorLogger.PrintOnError(SdNotify(SdNotifyWatchdog))
 	}
 }
