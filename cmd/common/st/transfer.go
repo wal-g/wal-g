@@ -22,7 +22,6 @@ var transferCmd = &cobra.Command{
 		if err != nil {
 			tracelog.ErrorLogger.FatalError(fmt.Errorf("invalid flags: %w", err))
 		}
-		transferMaxFiles = adjustMax(transferMaxFiles)
 		return nil
 	},
 }
@@ -32,7 +31,7 @@ var (
 	transferOverwrite                bool
 	transferFailFast                 bool
 	transferConcurrency              int
-	transferMaxFiles                 int
+	transferMaxFiles                 uint
 	transferAppearanceChecks         uint
 	transferAppearanceChecksInterval time.Duration
 )
@@ -46,8 +45,8 @@ func init() {
 		"if this flag is set, any error occurred with transferring a separate file will lead the whole command to stop immediately")
 	transferCmd.PersistentFlags().IntVarP(&transferConcurrency, "concurrency", "c", 10,
 		"number of concurrent workers to move files. Value 1 turns concurrency off")
-	transferCmd.PersistentFlags().IntVarP(&transferMaxFiles, "max-files", "m", -1,
-		"max number of files to move in this run. Negative numbers turn the limit off")
+	transferCmd.PersistentFlags().UintVarP(&transferMaxFiles, "max-files", "m", math.MaxInt,
+		"max number of files to move in this run")
 	transferCmd.PersistentFlags().UintVar(&transferAppearanceChecks, "appearance-checks", 3,
 		"number of times to check if a file is appeared for reading in the target storage after writing it. Value 0 turns checking off")
 	transferCmd.PersistentFlags().DurationVar(&transferAppearanceChecksInterval, "appearance-checks-interval", time.Second,
@@ -73,11 +72,4 @@ func validateCommonFlags() error {
 		return fmt.Errorf("concurrency level must be >= 1 (which turns it off)")
 	}
 	return nil
-}
-
-func adjustMax(max int) int {
-	if max < 0 {
-		return math.MaxInt
-	}
-	return max
 }

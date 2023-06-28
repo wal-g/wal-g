@@ -1,6 +1,8 @@
 package st
 
 import (
+	"math"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/storagetools/transfer"
@@ -16,9 +18,9 @@ var backupsCmd = &cobra.Command{
 	Run: func(_ *cobra.Command, args []string) {
 		var fileLister transfer.FileLister
 		if len(args) == 0 {
-			fileLister = transfer.NewAllBackupsFileLister(transferOverwrite, transferMaxFiles, adjustMax(transferMaxBackups))
+			fileLister = transfer.NewAllBackupsFileLister(transferOverwrite, int(transferMaxFiles), int(transferMaxBackups))
 		} else {
-			fileLister = transfer.NewSingleBackupFileLister(args[0], transferOverwrite, transferMaxFiles)
+			fileLister = transfer.NewSingleBackupFileLister(args[0], transferOverwrite, int(transferMaxFiles))
 		}
 
 		cfg := &transfer.HandlerConfig{
@@ -36,11 +38,11 @@ var backupsCmd = &cobra.Command{
 	},
 }
 
-var transferMaxBackups int
+var transferMaxBackups uint
 
 func init() {
-	backupsCmd.Flags().IntVar(&transferMaxBackups, "max-backups", -1,
-		"max number of backups to move in this run. Is ignored if backup_name is specified. Negative numbers turn the limit off")
+	backupsCmd.Flags().UintVar(&transferMaxBackups, "max-backups", math.MaxInt,
+		"max number of backups to move in this run. Is ignored if backup_name is specified")
 
 	transferCmd.AddCommand(backupsCmd)
 }

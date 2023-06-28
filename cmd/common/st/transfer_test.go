@@ -1,10 +1,7 @@
 package st
 
 import (
-	"math"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_validateCommonFlags(t *testing.T) {
@@ -31,10 +28,4 @@ func Test_validateCommonFlags(t *testing.T) {
 			}
 		})
 	}
-}
-
-func Test_adjustMax(t *testing.T) {
-	assert.Equal(t, math.MaxInt, adjustMax(-1))
-	assert.Equal(t, 0, adjustMax(0))
-	assert.Equal(t, 123, adjustMax(123))
 }

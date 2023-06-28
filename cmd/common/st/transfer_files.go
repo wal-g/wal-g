@@ -19,7 +19,7 @@ var filesCmd = &cobra.Command{
 }
 
 func transferFiles(prefix string) {
-	separateFileLister := transfer.NewRegularFileLister(prefix, transferOverwrite, transferMaxFiles)
+	separateFileLister := transfer.NewRegularFileLister(prefix, transferOverwrite, int(transferMaxFiles))
 
 	cfg := &transfer.HandlerConfig{
 		FailOnFirstErr:           transferFailFast,
