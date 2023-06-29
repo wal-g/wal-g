@@ -17,12 +17,12 @@ const (
 	AoSegDeltaDelimiter = "_D_"
 )
 
-func makeAoFileStorageKey(relNameMd5 string, modCount int64, location *walparser.BlockLocation) string {
-	return fmt.Sprintf("%d_%d_%s_%d_%d_%d%s",
+func makeAoFileStorageKey(relNameMd5 string, modCount int64, location *walparser.BlockLocation, newAoSegFilesID string) string {
+	return fmt.Sprintf("%d_%d_%s_%d_%d_%d_%s%s",
 		location.RelationFileNode.SpcNode, location.RelationFileNode.DBNode,
 		relNameMd5,
 		location.RelationFileNode.RelNode, location.BlockNo,
-		modCount, AoSegSuffix)
+		modCount, newAoSegFilesID, AoSegSuffix)
 }
 
 func makeDeltaAoFileStorageKey(baseKey string, modCount int64) string {

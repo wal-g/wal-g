@@ -190,6 +190,9 @@ During the delete execution, WAL-G can process segments in parallel mode. To con
 #### AO/AOCS size threshold
 To control the minimal size of the AO/AOCS segment file to be uploaded into the shared storage, use the `WALG_GP_AOSEG_SIZE_THRESHOLD`. The higher this value, the bigger the size of a single backup and the smaller the size of the shared AO/AOCS storage folder. Default value is `1048576 (1MB)`.
 
+#### AO/AOCS deduplication age limit
+To control the maximum possible time starting from the initial upload of the AO/AOCS segment files for their reuse in the following backups, use the `WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT`. Smaller values will result in AO/AOCS files being reuploaded more frequently, leading to larger backups, and vice versa. Default value is `720h` (30 days).
+
 ### ``restore-point-list``
 
 Lists currently available restore points in storage.
