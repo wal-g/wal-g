@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -172,9 +173,12 @@ func HandleDaemon(options DaemonOptions, pathToSocket string) {
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
 	}
+
+	sdNotifyTicker := time.NewTicker(30 * time.Second)
+	defer sdNotifyTicker.Stop()
+	go SendSdNotify(sdNotifyTicker.C)
+
 	for {
-		err = SdNotify(SdNotifyWatchdog)
-		tracelog.ErrorLogger.PrintOnError(err)
 		fd, err := l.Accept()
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
@@ -216,6 +220,13 @@ func Listen(c net.Conn, opts DaemonOptions) {
 		if messageType == daemon.WalFetchType {
 			return
 		}
+	}
+}
+
+func SendSdNotify(c <-chan time.Time) {
+	for {
+		<-c
+		tracelog.ErrorLogger.PrintOnError(SdNotify(SdNotifyWatchdog))
 	}
 }
 
