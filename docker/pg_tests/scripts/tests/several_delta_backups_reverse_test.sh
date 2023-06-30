@@ -26,7 +26,7 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
-psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
+psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
@@ -51,7 +51,7 @@ sleep 10
 
 pg_dumpall -f /tmp/dump2
 
-psql -f scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
+psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
 diff /tmp/dump1 /tmp/dump2
 /tmp/scripts/drop_pg.sh
