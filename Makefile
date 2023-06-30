@@ -100,7 +100,7 @@ sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=`git tag -l --points-at HEAD`")
 
 build_mongo_image: $(CMD_FILES) $(PKG_FILES)
-	$(DOCKER) build . --platform linux/arm64  --tag docker.io/apecloud/wal-g:mongo-latest --file docker/mongo/Dockerfile --sbom=false --provenance=false $(DOCKER_BUILD_ARGS)
+	$(DOCKER) build . --platform linux/arm64  --tag docker.io/apecloud/wal-g:mongo-latest --file docker/mongo/Dockerfile $(DOCKER_BUILD_ARGS)
 
 push_mongo_image: $(CMD_FILES) $(PKG_FILES)
 	$(DOCKER) buildx build . --push --sbom=false --provenance=false --platform linux/arm64,linux/amd64  --tag docker.io/apecloud/wal-g:mongo-latest --file docker/mongo/Dockerfile $(DOCKER_BUILD_ARGS)

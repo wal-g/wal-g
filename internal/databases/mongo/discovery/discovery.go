@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -14,6 +15,11 @@ import (
 func ResolveStartingTS(ctx context.Context,
 	downloader archive.Downloader,
 	mongoClient client.MongoDriver) (models.Timestamp, error) {
+	im, err := mongoClient.IsMaster(ctx)
+	if err != nil {
+		return models.Timestamp{}, fmt.Errorf("can not fetch LastWrite.MajorityOpTime: %+v", err)
+	}
+
 	since, err := downloader.LastKnownArchiveTS()
 	if err != nil {
 		return models.Timestamp{}, fmt.Errorf("can not fetch last-known storage timestamp: %+v", err)
@@ -23,12 +29,7 @@ func ResolveStartingTS(ctx context.Context,
 		tracelog.InfoLogger.Printf("Newest timestamp at storage folder: %v", since)
 		return since, nil
 	}
-
 	tracelog.InfoLogger.Printf("Initiating archiving first run")
-	im, err := mongoClient.IsMaster(ctx)
-	if err != nil {
-		return models.Timestamp{}, fmt.Errorf("can not fetch LastWrite.MajorityOpTime: %+v", err)
-	}
 	return im.LastWrite.MajorityOpTime.TS, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
@@ -79,12 +80,15 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) 
 	batchSize := 0
 	errc := make(chan error)
 	go func() {
+		// wait for upload succeed, close(errc) and will exit main process
 		defer close(errc)
 		defer archiveTimer.Stop()
 		for oplogc != nil {
 			select {
 			case op, ok := <-oplogc:
 				if !ok {
+					// wait for oplogc close (ctx.Done() or error occurs in fetcher function)
+					// then will break this select block, and dump the data in memory.
 					oplogc = nil
 					break
 				}

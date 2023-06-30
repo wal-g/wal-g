@@ -8,11 +8,14 @@ import (
 	"strings"
 
 	"github.com/wal-g/tracelog"
+	"go.mongodb.org/mongo-driver/bson"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages/buffer"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -141,15 +144,54 @@ func (sd *StorageDownloader) LastKnownArchiveTS() (models.Timestamp, error) {
 	if err != nil {
 		return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
 	}
+	var latestArch *models.Archive
 	for _, key := range keys {
 		filename := key.GetName()
 		arch, err := models.ArchFromFilename(filename)
 		if err != nil {
 			return models.Timestamp{}, fmt.Errorf("can not build archive since filename '%s': %w", filename, err)
 		}
-		maxTS = models.MaxTS(maxTS, arch.End)
+		if models.LessTS(maxTS, arch.End) {
+			maxTS = arch.End
+			latestArch = &arch
+		}
+	}
+	if latestArch != nil {
+		// checks if the latest file is completed, if exit process is abnormal, the file maybe is not completed
+		ts, err := sd.getLatestOpTimeWIthArch(*latestArch)
+		fmt.Printf("the latest opTime of the latest file is %v, %s \n", ts, maxTS)
+		// ignore error
+		if err == nil && models.LessTS(ts, maxTS) {
+			fmt.Printf("reset the last opTime to %v\n", ts)
+			maxTS = ts
+		}
 	}
 	return maxTS, nil
+}
+func (sd *StorageDownloader) getLatestOpTimeWIthArch(arch models.Archive) (ts models.Timestamp, err error) {
+	buf := buffer.NewCloserBuffer()
+	if err = sd.DownloadOplogArchive(arch, buf); err != nil {
+		err = fmt.Errorf("failed to download archive %s: %w", arch.Filename(), err)
+		return
+	}
+	var raw bson.Raw
+	var op *models.Oplog
+	for {
+		raw, err = bson.NewFromIOReader(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return
+		}
+
+		op, err = models.OplogFromRaw(raw)
+		if err != nil {
+			return
+		}
+		ts = op.TS
+	}
+	return
 }
 
 // DiscardUploader reads provided data and returns success
