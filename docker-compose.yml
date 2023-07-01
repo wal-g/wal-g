@@ -147,16 +147,19 @@ services:
     image: wal-g/pg
     container_name: wal-g_pg
 
+  s3_common_depends: &s3_common_depends
+    depends_on:
+      - s3
+    links:
+      - s3
+
   pg_tests:
     build:
       dockerfile: docker/pg_tests/Dockerfile
       context: .
     image: wal-g/pg_tests
     container_name: wal-g_pg_tests
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
 
   pg_build_docker_prefix:
     build:
@@ -164,18 +167,12 @@ services:
       context: .
     image: wal-g/docker_prefix
     container_name: wal-g_pg_docker_prefix
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
 
   pg_test_common: &pg_test_common
     image: wal-g/docker_prefix
     user: postgres
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
 
   pg_ready_rename_test:
     <<: *pg_test_common
@@ -431,18 +428,13 @@ services:
       dockerfile: docker/pg_tests/Dockerfile_pgbackrest
       context: .
     image: wal-g/docker_pgbackrest
-    container_name: wal-g_docker_pgbackrest
 
   pg_pgbackrest_backup_fetch_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_pgbackrest_backup_fetch_test
-      context: .
-    image: wal-g/pgbackrest_backup_fetch_test
+    image: wal-g/docker_pgbackrest
+    user: postgres
     container_name: wal-g_pgbackrest_backup_fetch_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/pgbackrest_backup_fetch_test.sh
+    <<: *s3_common_depends
 
   mysql:
     build:
@@ -461,10 +453,7 @@ services:
     container_name: wal-g_mysql_base_tests
     env_file:
       - docker/common/common_walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
   
   mysql_delete_tests:
     build:
@@ -476,10 +465,7 @@ services:
     container_name: wal-g_mysql_delete_tests
     env_file:
       - docker/common/common_walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
 
   mysql_copy_tests:
     build:
@@ -515,10 +501,7 @@ services:
     container_name: wal-g_mariadb_tests
     env_file:
       - docker/common/common_walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
 
   fdb:
     image: foundationdb/foundationdb
@@ -552,10 +535,7 @@ services:
     container_name: wal-g_redis_tests
     env_file:
       - docker/common/common_walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
 
   gp:
     build:
@@ -584,7 +564,4 @@ services:
     container_name: wal-g_st_tests
     env_file:
       - docker/common/common_walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
