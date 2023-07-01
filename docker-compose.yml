@@ -3,6 +3,12 @@ version: '3'
 volumes:
   fdb_volume:
 
+x-s3_common_depends: &s3_common_depends
+  depends_on:
+    - s3
+  links:
+    - s3
+
 services:
   golang:
     build:
@@ -146,12 +152,6 @@ services:
       context: .
     image: wal-g/pg
     container_name: wal-g_pg
-
-  s3_common_depends: &s3_common_depends
-    depends_on:
-      - s3
-    links:
-      - s3
 
   pg_tests:
     build:
