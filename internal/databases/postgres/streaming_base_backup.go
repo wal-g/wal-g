@@ -59,11 +59,11 @@ func NewStreamingBaseBackup(pgDataDir string, maxTarSize int64, pgConn *pgconn.P
 }
 
 // Start will start a base_backup read the backup info, and prepare for uploading tar files
-func (bb *StreamingBaseBackup) Start(verifyChecksum bool, diskLimit int32) (err error) {
+func (bb *StreamingBaseBackup) Start(verifyChecksum bool, skipTablespaceMap bool, diskLimit int32) (err error) {
 	options := pglogrepl.BaseBackupOptions{
 		// Following implementation for local backup.
 		Fast:              true,
-		TablespaceMap:     true,
+		TablespaceMap:     !skipTablespaceMap,
 		Label:             "wal-g",
 		NoVerifyChecksums: !verifyChecksum,
 		MaxRate:           diskLimit,
