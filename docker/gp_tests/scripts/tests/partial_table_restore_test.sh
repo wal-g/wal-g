@@ -1,5 +1,4 @@
-#!/bin/bash
-set -e -x
+set -e -x -m
 
 CONFIG_FILE="/tmp/configs/partial_table_restore_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
@@ -20,7 +19,8 @@ setup_wal_archiving
 # insert_data
 n=10000
 it=10
-expected_count=$(($n + $it * 5))
+during_backup=10
+expected_count=$(($n + $it * 5 + $during_backup))
 
 psql -p 6000 -c "DROP DATABASE IF EXISTS db"
 psql -p 6000 -c "CREATE DATABASE db"
@@ -56,14 +56,45 @@ do
   insert_10_delete_5 $(($n + 1 + 10*($i-1)))
 done
 
-run_backup_logged ${TMP_CONFIG} ${PGDATA}
+run_backup_logged ${TMP_CONFIG} ${PGDATA} &
+
+# check ignore_invalid_pages
+for elem in "${SEGMENTS_DIRS[@]}"; do
+  read -a arr <<< "$elem"
+
+  while ! test -f "${arr[1]}/.semaphore"; do
+    sleep 1
+    echo "Still waiting ${arr[1]}/.semaphore"
+  done
+
+done
+
+
+start_val=$(($expected_count * 2))
+stop_val=$(($start_val + $during_backup - 1))
+psql -p 6000 -d db -c "INSERT INTO heap_to_skip SELECT i FROM generate_series($start_val,$stop_val)i;"
+psql -p 6000 -d db -c "INSERT INTO ao_to_skip SELECT i, i FROM generate_series($start_val,$stop_val)i;"
+psql -p 6000 -d db -c "INSERT INTO co_to_skip SELECT i, i FROM generate_series($start_val,$stop_val)i;"
+psql -p 6000 -d db -c "INSERT INTO heap_to_restore SELECT i FROM generate_series($start_val,$stop_val)i;"
+psql -p 6000 -d db -c "INSERT INTO ao_to_restore SELECT i, i FROM generate_series($start_val,$stop_val)i;"
+psql -p 6000 -d db -c "INSERT INTO co_to_restore SELECT i, i FROM generate_series($start_val,$stop_val)i;"
+
+
+for elem in "${SEGMENTS_DIRS[@]}"; do
+  read -a arr <<< "$elem"
+
+  rm -f "${arr[1]}/.semaphore"
+done
+
+wait %1 ||  echo 'backup done no need to wait'
+
 stop_and_delete_cluster_dir
 
 wal-g --config=${TMP_CONFIG} backup-fetch LATEST --in-place --restore-only=db/heap_to_restore,db/ao_to_restore,db/co_to_restore
 
 start_cluster
 
-if [ "$(psql -p 6000 -t -c "SELECT count(*) FROM heap_to_restore;" -d db -A)" != $n ]; then
+if [ "$(psql -p 6000 -t -c "SELECT count(*) FROM heap_to_restore;" -d db -A)" != $(($n + $during_backup)) ]; then
   echo "Error: Heap table in db database must be restored after partial fetch"
   exit 1
 elif [ "$(psql -p 6000 -t -c "SELECT count(*) FROM ao_to_restore;" -d db -A)" != $expected_count ]; then

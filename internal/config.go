@@ -93,6 +93,7 @@ const (
 	PgFailoverStorages             = "WALG_FAILOVER_STORAGES"
 	PgFailoverStoragesCheckTimeout = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
 	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
+	WaitSemaphoreDeletion          = "WALG_WAIT_SEMAPHORE_DELETION"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -219,6 +220,7 @@ var (
 		LibsodiumKeyTransform:          "none",
 		PgFailoverStoragesCheckTimeout: "30s",
 		PgFailoverStorageCacheLifetime: "15m",
+		WaitSemaphoreDeletion:          "false",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -407,6 +409,7 @@ var (
 		PgFailoverStorages:             true,
 		PgFailoverStoragesCheckTimeout: true,
 		PgFailoverStorageCacheLifetime: true,
+		WaitSemaphoreDeletion:          true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
