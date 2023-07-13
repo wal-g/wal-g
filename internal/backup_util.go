@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -39,10 +40,10 @@ func (err NoBackupsFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func GetLatestBackupName(folder storage.Folder) (string, error) {
+func GetLatestBackupName(folder storage.Folder) (backup string, storage string, err error) {
 	backupTimes, err := GetBackups(folder)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	SortBackupTimeSlices(backupTimes)
 
@@ -99,9 +100,10 @@ func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
+		storageName := multistorage.GetStorage(object)
 		time := object.GetLastModified()
 		backupTimes = append(backupTimes, BackupTime{utility.StripRightmostBackupName(key), time,
-			utility.StripWalFileName(key)})
+			utility.StripWalFileName(key), storageName})
 	}
 	return backupTimes
 }
@@ -147,7 +149,7 @@ func UnwrapLatestModifier(backupName string, folder storage.Folder) (string, err
 		return backupName, nil
 	}
 
-	latest, err := GetLatestBackupName(folder)
+	latest, _, err := GetLatestBackupName(folder)
 	if err != nil {
 		return "", err
 	}

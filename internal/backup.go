@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -58,8 +59,8 @@ func (backup *Backup) getMetadataPath() string {
 }
 
 // SentinelExists checks that the sentinel file of the specified backup exists.
-func (backup *Backup) SentinelExists() (bool, error) {
-	return backup.Folder.Exists(backup.getStopSentinelPath())
+func (backup *Backup) SentinelExists() (exists bool, storageName string, err error) {
+	return multistorage.Exists(backup.Folder, backup.getStopSentinelPath())
 }
 
 // TODO : unit tests
@@ -107,48 +108,49 @@ func UploadDto(folder storage.Folder, dto interface{}, path string) error {
 	return folder.PutObject(path, r)
 }
 
-func (backup *Backup) CheckExistence() (bool, error) {
-	exists, err := backup.SentinelExists()
+func (backup *Backup) CheckExistence() (exists bool, storage string, err error) {
+	exists, storage, err = backup.SentinelExists()
 	if err != nil {
-		return false, errors.Wrap(err, "failed to check if backup sentinel exists")
+		return false, "", errors.Wrap(err, "failed to check if backup sentinel exists")
 	}
-	return exists, nil
+	return exists, storage, nil
 }
 
 // AssureExists is similar to CheckExistence, but returns
 // an error in two cases:
 // 1. Backup does not exist
 // 2. Failed to check if backup exist
-func (backup *Backup) AssureExists() error {
-	exists, err := backup.CheckExistence()
+func (backup *Backup) AssureExists() (storageName string, err error) {
+	exists, storageName, err := backup.CheckExistence()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !exists {
-		return NewBackupNonExistenceError(backup.Name)
+		return "", NewBackupNonExistenceError(backup.Name)
 	}
-	return nil
+	return storageName, nil
 }
 
-func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backup, error) {
+func GetBackupByName(backupName, subfolder string, folder storage.Folder) (backup Backup, storageName string, err error) {
 	baseBackupFolder := folder.GetSubFolder(subfolder)
 
-	var backup Backup
 	if backupName == LatestString {
-		latest, err := GetLatestBackupName(baseBackupFolder)
+		var latest string
+		latest, storageName, err = GetLatestBackupName(baseBackupFolder)
 		if err != nil {
-			return Backup{}, err
+			return Backup{}, "", err
 		}
 		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
 
 		backup = NewBackup(baseBackupFolder, latest)
 	} else {
 		backup = NewBackup(baseBackupFolder, backupName)
-		if err := backup.AssureExists(); err != nil {
-			return Backup{}, err
+		storageName, err = backup.AssureExists()
+		if err != nil {
+			return Backup{}, "", err
 		}
 	}
-	return backup, nil
+	return backup, storageName, nil
 }
 
 // TODO : unit tests

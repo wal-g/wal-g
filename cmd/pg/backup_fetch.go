@@ -2,13 +2,16 @@ package pg
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
 const (
@@ -45,7 +48,15 @@ var backupFetchCmd = &cobra.Command{
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder, err := internal.ConfigureFolder()
+		primaryStorage, err := internal.ConfigureFolder()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		failoverStorages, err := internal.InitFailoverStorages()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		folder := multistorage.NewFolder(cache.NewStatusCache(primaryStorage, failoverStorages, 5*time.Minute))
+		multistorage.SetPolicies(folder, policies.UniteAllStorages)
+		err = multistorage.UseAllAliveStorages(folder)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if partialRestoreArgs != nil {

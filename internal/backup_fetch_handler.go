@@ -7,6 +7,8 @@ import (
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 
@@ -89,7 +91,12 @@ func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelecto
 	backupName, storageName, err := targetBackupSelector.Select(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backupName)
-	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
+
+	multistorage.SetPolicies(folder, policies.TakeFirstStorage)
+	err = multistorage.UseSpecificStorage(storageName, folder)
+	tracelog.ErrorLogger.FatalfOnError("Failed to fix the storage where the backup is from: %v\n", err)
+
+	backup, _, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 	fetcher(folder, backup)

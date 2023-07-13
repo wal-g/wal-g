@@ -8,4 +8,6 @@ type BackupTime struct {
 	BackupName  string    `json:"backup_name"`
 	Time        time.Time `json:"time"`
 	WalFileName string    `json:"wal_file_name"`
+
+	storageName string
 }

@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
@@ -17,7 +18,10 @@ const LatestString = "LATEST"
 // BackupSelector returns the name of storage backup chosen according to the internal rules.
 // Returns NoBackupsFoundError in case there are no backups matching the criteria.
 type BackupSelector interface {
-	Select(folder storage.Folder) (string, error)
+	// TODO (rodrijjke): Fix other usages
+	// Select(folder storage.Folder) (string, error)
+
+	Select(folder storage.Folder) (backup, storage string, err error)
 }
 
 // LatestBackupSelector selects the latest backup from storage
@@ -29,12 +33,12 @@ func NewLatestBackupSelector() LatestBackupSelector {
 }
 
 // TODO: unit tests
-func (s LatestBackupSelector) Select(folder storage.Folder) (string, error) {
-	backupName, err := GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
+func (s LatestBackupSelector) Select(folder storage.Folder) (backup, storage string, err error) {
+	backupName, storageName, err := GetLatestBackupName(folder.GetSubFolder(utility.BaseBackupPath))
 	if err == nil {
 		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", backupName)
 	}
-	return backupName, err
+	return backupName, storageName, err
 }
 
 // UserDataBackupSelector selects a backup which has the provided user data
@@ -55,38 +59,46 @@ func NewUserDataBackupSelector(userDataRaw string, metaFetcher GenericMetaFetche
 }
 
 // TODO: unit tests
-func (s UserDataBackupSelector) Select(folder storage.Folder) (string, error) {
-	backupName, err := s.findBackupByUserData(s.userData, folder)
+func (s UserDataBackupSelector) Select(folder storage.Folder) (backup, storage string, err error) {
+	backupName, storageName, err := s.findBackupByUserData(s.userData, folder)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return backupName, nil
+	return backupName, storageName, nil
 }
 
-// Find backup with UserData exactly matching the provided one
-func (s UserDataBackupSelector) findBackupByUserData(userData interface{}, folder storage.Folder) (string, error) {
-	foundBackups, err := searchInMetadata(
+// Exists backup with UserData exactly matching the provided one
+func (s UserDataBackupSelector) findBackupByUserData(userData interface{}, folder storage.Folder) (backup, storage string, err error) {
+	foundMetas, err := searchInMetadata(
 		func(d GenericMetadata) bool {
 			return reflect.DeepEqual(userData, d.UserData)
 		}, folder, s.metaFetcher)
 	if err != nil {
-		return "", errors.Wrapf(err, "UserData search failed")
+		return "", "", errors.Wrapf(err, "UserData search failed")
 	}
 
-	if len(foundBackups) == 0 {
-		return "", NewNoBackupsFoundError()
+	if len(foundMetas) == 0 {
+		return "", "", NewNoBackupsFoundError()
 	}
 
-	if len(foundBackups) > 1 {
+	var foundMeta GenericMetadata
+	var foundStorage string
+	uniqueNames := map[string]bool{}
+	for _, meta := range foundMetas {
+		foundMeta = meta
+		uniqueNames[meta.BackupName] = true
+	}
+
+	if len(uniqueNames) > 1 {
 		var backupNames []string
-		for idx := range foundBackups {
-			backupNames = append(backupNames, foundBackups[idx].BackupName)
+		for _, meta := range foundMetas {
+			backupNames = append(backupNames, meta.BackupName)
 		}
-		return "", fmt.Errorf("too many backups (%d) found with specified user data: %s",
-			len(backupNames), strings.Join(backupNames, " "))
+		return "", "", fmt.Errorf("too many backups (%d) found with specified user data: %s",
+			len(uniqueNames), strings.Join(backupNames, " "))
 	}
 
-	return foundBackups[0].BackupName, nil
+	return foundMeta.BackupName, foundStorage, nil
 }
 
 // Search backups in storage using specified criteria
@@ -94,14 +106,14 @@ func searchInMetadata(
 	criteria func(GenericMetadata) bool,
 	folder storage.Folder,
 	metaFetcher GenericMetaFetcher,
-) ([]GenericMetadata, error) {
+) (meta map[string]GenericMetadata, err error) {
 	backups, err := GetBackupSentinelObjects(folder)
 	if err != nil {
 		return nil, err
 	}
 
 	backupTimes := GetBackupTimeSlices(backups)
-	foundMeta := make([]GenericMetadata, 0)
+	foundMeta := make(map[string]GenericMetadata, 0)
 
 	for _, backupTime := range backupTimes {
 		meta, err := metaFetcher.Fetch(backupTime.BackupName, folder.GetSubFolder(utility.BaseBackupPath))
@@ -109,7 +121,7 @@ func searchInMetadata(
 			tracelog.WarningLogger.Printf("Failed to get metadata of backup %s, error: %s\n",
 				backupTime.BackupName, err.Error())
 		} else if criteria(meta) {
-			foundMeta = append(foundMeta, meta)
+			foundMeta[backupTime.storageName] = meta
 		}
 	}
 	return foundMeta, nil
@@ -126,16 +138,16 @@ func NewBackupNameSelector(backupName string, checkExistence bool) (BackupNameSe
 }
 
 // TODO: unit tests
-func (s BackupNameSelector) Select(folder storage.Folder) (string, error) {
+func (s BackupNameSelector) Select(folder storage.Folder) (backup, storage string, err error) {
 	if !s.checkExistence {
-		return s.backupName, nil
+		return s.backupName, multistorage.DefaultStorage, nil
 	}
 
-	_, err := GetBackupByName(s.backupName, utility.BaseBackupPath, folder)
+	_, storageName, err := GetBackupByName(s.backupName, utility.BaseBackupPath, folder)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return s.backupName, nil
+	return s.backupName, storageName, nil
 }
 
 func NewTargetBackupSelector(targetUserData, targetName string, metaFetcher GenericMetaFetcher) (BackupSelector, error) {
@@ -194,7 +206,7 @@ func NewOldestNonPermanentSelector(metaFetcher GenericMetaFetcher) *OldestNonPer
 }
 
 // TODO: unit tests
-func (s *OldestNonPermanentSelector) Select(folder storage.Folder) (string, error) {
+func (s *OldestNonPermanentSelector) Select(folder storage.Folder) (backup, storage string, err error) {
 	searchFn := func(d GenericMetadata) bool {
 		if !d.IsPermanent {
 			return true
@@ -206,21 +218,23 @@ func (s *OldestNonPermanentSelector) Select(folder storage.Folder) (string, erro
 		return false
 	}
 
-	foundBackups, err := searchInMetadata(searchFn, folder, s.metaFetcher)
+	foundMetas, err := searchInMetadata(searchFn, folder, s.metaFetcher)
 	if err != nil {
-		return "", errors.Wrapf(err, "backups lookup failed")
+		return "", "", errors.Wrapf(err, "backups lookup failed")
 	}
 
-	if len(foundBackups) == 0 {
-		return "", NewNoBackupsFoundError()
+	if len(foundMetas) == 0 {
+		return "", "", NewNoBackupsFoundError()
 	}
 
-	oldest := foundBackups[0]
-	for i := range foundBackups {
-		if foundBackups[i].StartTime.Before(oldest.StartTime) {
-			oldest = foundBackups[i]
+	var oldest GenericMetadata
+	var oldestStorage string
+	for storageName, meta := range foundMetas {
+		if meta.StartTime.Before(oldest.StartTime) {
+			oldest = meta
+			oldestStorage = storageName
 		}
 	}
 
-	return oldest.BackupName, nil
+	return oldest.BackupName, oldestStorage, nil
 }
