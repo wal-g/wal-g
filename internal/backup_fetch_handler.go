@@ -81,12 +81,12 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	return nil
 }
 
+type Fetcher func(folder storage.Folder, backup Backup)
+
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder,
-	targetBackupSelector BackupSelector,
-	fetcher func(folder storage.Folder, backup Backup)) {
-	backupName, err := targetBackupSelector.Select(folder)
+func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher Fetcher) {
+	backupName, storageName, err := targetBackupSelector.Select(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backupName)
 	backup, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)

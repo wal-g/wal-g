@@ -9,9 +9,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool,
+func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool,
 	extractProv ExtractProvider,
-) func(folder storage.Folder, backup internal.Backup) {
+) internal.Fetcher {
 	return func(folder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(fileMask)

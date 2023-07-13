@@ -20,7 +20,7 @@ type BackupSelector interface {
 	Select(folder storage.Folder) (string, error)
 }
 
-// Select the latest backup from storage
+// LatestBackupSelector selects the latest backup from storage
 type LatestBackupSelector struct {
 }
 
@@ -37,7 +37,7 @@ func (s LatestBackupSelector) Select(folder storage.Folder) (string, error) {
 	return backupName, err
 }
 
-// Select backup which has the provided user data
+// UserDataBackupSelector selects a backup which has the provided user data
 type UserDataBackupSelector struct {
 	userData    interface{}
 	metaFetcher GenericMetaFetcher

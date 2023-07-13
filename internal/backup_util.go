@@ -41,12 +41,13 @@ func (err NoBackupsFoundError) Error() string {
 
 func GetLatestBackupName(folder storage.Folder) (string, error) {
 	backupTimes, err := GetBackups(folder)
-	SortBackupTimeSlices(backupTimes)
 	if err != nil {
 		return "", err
 	}
+	SortBackupTimeSlices(backupTimes)
 
-	return backupTimes[len(backupTimes)-1].BackupName, nil
+	latest := backupTimes[len(backupTimes)-1]
+	return latest.BackupName, latest.storageName, nil
 }
 
 func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {

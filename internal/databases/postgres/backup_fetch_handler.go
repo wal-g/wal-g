@@ -92,9 +92,7 @@ func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirector
 	return backup.unwrapToEmptyDirectory(dbDataDirectory, filesToUnwrap, false, extractProv)
 }
 
-func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string,
-	extractProv ExtractProvider,
-) func(rootFolder storage.Folder, backup internal.Backup) {
+func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractProv ExtractProvider) internal.Fetcher {
 	return func(rootFolder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(fileMask)
@@ -104,8 +102,8 @@ func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string,
 		if restoreSpecPath != "" {
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
-			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
+			errMessage := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
+			tracelog.ErrorLogger.FatalfOnError(errMessage, err)
 		}
 
 		err = deltaFetchRecursionOld(pgBackup, rootFolder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap, extractProv)

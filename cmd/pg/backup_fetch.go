@@ -48,8 +48,6 @@ var backupFetchCmd = &cobra.Command{
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		var pgFetcher func(folder storage.Folder, backup internal.Backup)
-
 		if partialRestoreArgs != nil {
 			skipRedundantTars = true
 			reverseDeltaUnpack = true
@@ -65,10 +63,11 @@ var backupFetchCmd = &cobra.Command{
 			extractProv = postgres.ExtractProviderImpl{}
 		}
 
+		var pgFetcher internal.Fetcher
 		if reverseDeltaUnpack {
-			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv)
+			pgFetcher = postgres.GetFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv)
 		} else {
-			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
+			pgFetcher = postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
 		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
