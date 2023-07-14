@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -197,12 +196,12 @@ func extract(t *testing.T, dir string) string {
 // initial bytes are the same.
 func compare(t *testing.T, dir1, dir2 string) bool {
 	// ReadDir returns directory by filename.
-	files1, err := ioutil.ReadDir(dir1)
+	files1, err := os.ReadDir(dir1)
 	if err != nil {
 		t.Log(err)
 	}
 
-	files2, err := ioutil.ReadDir(dir2)
+	files2, err := os.ReadDir(dir2)
 	if err != nil {
 		t.Log(err)
 	}
