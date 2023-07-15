@@ -3,7 +3,6 @@ package fs
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 
@@ -43,7 +42,7 @@ func (folder *Folder) GetPath() string {
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	files, err := ioutil.ReadDir(path.Join(folder.rootPath, folder.subpath))
+	files, err := os.ReadDir(path.Join(folder.rootPath, folder.subpath))
 	if err != nil {
 		return nil, nil, NewError(err, "Unable to read folder")
 	}
@@ -53,7 +52,8 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			subPath := path.Join(folder.subpath, fileInfo.Name()) + "/"
 			subFolders = append(subFolders, NewFolder(folder.rootPath, subPath))
 		} else {
-			objects = append(objects, storage.NewLocalObject(fileInfo.Name(), fileInfo.ModTime(), fileInfo.Size()))
+			info, _ := fileInfo.Info()
+			objects = append(objects, storage.NewLocalObject(fileInfo.Name(), info.ModTime(), info.Size()))
 		}
 	}
 	return

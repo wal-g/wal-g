@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -197,12 +196,12 @@ func extract(t *testing.T, dir string) string {
 // initial bytes are the same.
 func compare(t *testing.T, dir1, dir2 string) bool {
 	// ReadDir returns directory by filename.
-	files1, err := ioutil.ReadDir(dir1)
+	files1, err := os.ReadDir(dir1)
 	if err != nil {
 		t.Log(err)
 	}
 
-	files2, err := ioutil.ReadDir(dir2)
+	files2, err := os.ReadDir(dir2)
 	if err != nil {
 		t.Log(err)
 	}
@@ -212,9 +211,11 @@ func compare(t *testing.T, dir1, dir2 string) bool {
 	var deepEqual bool
 	for i, f2 := range files2 {
 		f1 := files1[i]
+		info1, _ := f1.Info()
+		info2, _ := f2.Info()
 		name := f1.Name() == f2.Name()
-		size := f1.Size() == f2.Size()
-		mode := f1.Mode() == f2.Mode()
+		size := info1.Size() == info2.Size()
+		mode := info1.Mode() == info2.Mode()
 		isDir := f1.IsDir() == f2.IsDir()
 
 		// If directory is in ExcludedFilenames list, make sure it exists but is empty.
@@ -243,8 +244,8 @@ func compare(t *testing.T, dir1, dir2 string) bool {
 
 			}
 		} else {
-			t.Logf("walk: Original: \t%s\t %d\t %d\t %v", f1.Name(), f1.Size(), f1.Mode(), f1.IsDir())
-			t.Logf("walk: Extracted: \t%s\t %d\t %d\t %v", f2.Name(), f2.Size(), f2.Mode(), f2.IsDir())
+			t.Logf("walk: Original: \t%s\t %d\t %d\t %v", f1.Name(), info1.Size(), info1.Mode(), f1.IsDir())
+			t.Logf("walk: Extracted: \t%s\t %d\t %d\t %v", f2.Name(), info2.Size(), info2.Mode(), f2.IsDir())
 		}
 
 	}

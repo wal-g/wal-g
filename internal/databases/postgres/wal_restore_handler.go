@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -195,7 +194,7 @@ func timelineWithSegmentNoSliceToMap(slice []*TimelineWithSegmentNo) map[uint32]
 // getDirectoryFilenames returns slice of filenames in directory by path
 func getDirectoryFilenames(path string) ([]string, error) {
 	result := make([]string, 0)
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
