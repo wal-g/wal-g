@@ -14,14 +14,16 @@ import (
 const (
 	backupPushShortDescription = "Makes backup and uploads it to storage"
 
-	permanentFlag         = "permanent"
-	fullBackupFlag        = "full"
-	addUserDataFlag       = "add-user-data"
-	deltaFromUserDataFlag = "delta-from-user-data"
-	deltaFromNameFlag     = "delta-from-name"
+	permanentFlag           = "permanent"
+	fullBackupFlag          = "full"
+	addUserDataFlag         = "add-user-data"
+	deltaFromUserDataFlag   = "delta-from-user-data"
+	deltaFromNameFlag       = "delta-from-name"
+	useDatabaseComposerFlag = "database-composer"
 
-	permanentShorthand  = "p"
-	fullBackupShorthand = "f"
+	permanentShorthand           = "p"
+	fullBackupShorthand          = "f"
+	useDatabaseComposerShorthand = "b"
 )
 
 var (
@@ -63,18 +65,19 @@ var (
 			backupHandler.HandleBackupPush()
 		},
 	}
-	permanent   = false
-	userDataRaw = ""
-
-	deltaFromName     = ""
-	deltaFromUserData = ""
-	fullBackup        = false
+	permanent           = false
+	userDataRaw         = ""
+	useDatabaseComposer = false
+	deltaFromName       = ""
+	deltaFromUserData   = ""
+	fullBackup          = false
 )
 
 // prepare arguments that are going to be forwarded to segments
 func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
 	return []greenplum.SegmentFwdArg{
 		{Name: permanentFlag, Value: strconv.FormatBool(permanent)},
+		{Name: useDatabaseComposerFlag, Value: strconv.FormatBool(useDatabaseComposer)},
 	}
 }
 
@@ -85,6 +88,8 @@ func init() {
 		false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
 		false, "Make full backup-push")
+	backupPushCmd.Flags().BoolVarP(&useDatabaseComposer, useDatabaseComposerFlag, useDatabaseComposerShorthand,
+		false, "Use database tar composer (experimental)")
 	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,

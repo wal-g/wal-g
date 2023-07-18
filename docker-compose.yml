@@ -89,6 +89,7 @@ services:
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
       &&  mkdir -p /export/gpfullserializedbucket
+      &&  mkdir -p /export/gpfulldatabasecomposerbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
       &&  mkdir -p /export/gpdeleteretainbucket
       &&  mkdir -p /export/gpdeleteendtoendbucket
