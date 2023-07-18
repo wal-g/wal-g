@@ -42,12 +42,18 @@ func NewGpTarBallComposerMaker(composerType TarBallComposerType, relStorageMap A
 	}
 }
 
+type ComposerConstructor func(tarBallQueue *internal.TarBallQueue, crypter crypto.Crypter,
+	relStorageMap AoRelFileStorageMap, bundleFiles internal.BundleFiles, packer *postgres.TarBallFilePackerImpl,
+	aoStorageUploader *AoStorageUploader, tarFileSets internal.TarFileSets, uploader internal.Uploader,
+	backupName string) (internal.TarBallComposer, error)
+
 type RegularTarBallComposerMaker struct {
 	relStorageMap AoRelFileStorageMap
 	bundleFiles   internal.BundleFiles
 	TarFileSets   internal.TarFileSets
 	uploader      internal.Uploader
 	backupName    string
+	Constructor   ComposerConstructor
 }
 
 func NewRegularTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader internal.Uploader, backupName string,
@@ -58,6 +64,7 @@ func NewRegularTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader 
 		TarFileSets:   internal.NewRegularTarFileSets(),
 		uploader:      uploader,
 		backupName:    backupName,
+		Constructor:   NewRegularTarBallComposer,
 	}, nil
 }
 
@@ -81,7 +88,7 @@ func (maker *RegularTarBallComposerMaker) Make(bundle *postgres.Bundle) (interna
 	aoStorageUploader := NewAoStorageUploader(
 		maker.uploader, baseFiles, bundle.Crypter, maker.bundleFiles, bundle.IncrementFromName != "", deduplicationAgeLimit, newAoSegFilesID)
 
-	return NewGpTarBallComposer(
+	return maker.Constructor(
 		bundle.TarBallQueue,
 		bundle.Crypter,
 		maker.relStorageMap,
@@ -126,7 +133,7 @@ func (maker *RegularTarBallComposerMaker) loadBaseFiles(incrementFromName string
 	return baseFilesMetadata.Files, nil
 }
 
-type GpTarBallComposer struct {
+type RegularTarBallComposer struct {
 	backupName    string
 	tarBallQueue  *internal.TarBallQueue
 	tarFilePacker *postgres.TarBallFilePackerImpl
@@ -149,14 +156,14 @@ type GpTarBallComposer struct {
 	aoSegSizeThreshold int64
 }
 
-func NewGpTarBallComposer(
+func NewRegularTarBallComposer(
 	tarBallQueue *internal.TarBallQueue, crypter crypto.Crypter, relStorageMap AoRelFileStorageMap,
 	bundleFiles internal.BundleFiles, packer *postgres.TarBallFilePackerImpl, aoStorageUploader *AoStorageUploader,
 	tarFileSets internal.TarFileSets, uploader internal.Uploader, backupName string,
-) (*GpTarBallComposer, error) {
+) (internal.TarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 
-	composer := &GpTarBallComposer{
+	composer := &RegularTarBallComposer{
 		backupName:         backupName,
 		tarBallQueue:       tarBallQueue,
 		tarFilePacker:      packer,
@@ -185,7 +192,7 @@ func NewGpTarBallComposer(
 	return composer, nil
 }
 
-func (c *GpTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
+func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	select {
 	case c.addFileQueue <- info:
 		return
@@ -195,7 +202,7 @@ func (c *GpTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 	}
 }
 
-func (c *GpTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
+func (c *RegularTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
 		return c.errorGroup.Wait()
@@ -209,11 +216,11 @@ func (c *GpTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileIn
 	return tarBall.TarWriter().WriteHeader(fileInfoHeader)
 }
 
-func (c *GpTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo) {
+func (c *RegularTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo) {
 	c.files.AddSkippedFile(tarHeader, fileInfo)
 }
 
-func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
+func (c *RegularTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	close(c.addFileQueue)
 
 	err := c.errorGroup.Wait()
@@ -230,11 +237,11 @@ func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	return c.tarFileSets, nil
 }
 
-func (c *GpTarBallComposer) GetFiles() internal.BundleFiles {
+func (c *RegularTarBallComposer) GetFiles() internal.BundleFiles {
 	return c.files
 }
 
-func (c *GpTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo) error {
+func (c *RegularTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo) error {
 	for task := range tasks {
 		err := c.addFile(task)
 		if err != nil {
@@ -247,13 +254,14 @@ func (c *GpTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo
 	return nil
 }
 
-func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
+func (c *RegularTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 	// WAL-G uploads AO/AOCS relfiles to a different location
-	isAo, meta, location := c.relStorageMap.getAOStorageMetadata(cfi.Path)
-	if isAo && cfi.FileInfo.Size() >= c.aoSegSizeThreshold {
-		tracelog.DebugLogger.Printf("%s is an AO/AOCS file, will process it through an AO storage manager",
-			cfi.Path)
-		return c.aoStorageUploader.AddFile(cfi, meta, location)
+	added, err := c.tryAddWithAoStorageManager(cfi)
+	if err != nil {
+		return err
+	}
+	if added {
+		return nil
 	}
 
 	tracelog.DebugLogger.Printf("%s is not an AO/AOCS file, will process it through a regular tar file packer",
@@ -274,4 +282,14 @@ func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 		return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
 	})
 	return nil
+}
+
+func (c *RegularTarBallComposer) tryAddWithAoStorageManager(cfi *internal.ComposeFileInfo) (bool, error) {
+	isAo, meta, location := c.relStorageMap.getAOStorageMetadata(cfi.Path)
+	if isAo && cfi.FileInfo.Size() >= c.aoSegSizeThreshold {
+		tracelog.DebugLogger.Printf("%s is an AO/AOCS file, will process it through an AO storage manager",
+			cfi.Path)
+		return true, c.aoStorageUploader.AddFile(cfi, meta, location)
+	}
+	return false, nil
 }

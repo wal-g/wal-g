@@ -10,15 +10,15 @@ test_full_backup()
   setup_wal_archiving
 
   # 1st backup (init tables heap, ao, co)
-  insert_data
+  insert_a_lot_of_data
   run_backup_logged ${TMP_CONFIG} ${PGDATA}
 
   # 2nd backup (populate the co table)
-  psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,1000000)i;"
+  psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,100000)i;"
   run_backup_logged ${TMP_CONFIG} ${PGDATA}
 
   # 3rd backup (populate the ao table)
-  psql -p 6000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,1000000)i;"
+  psql -p 6000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,100000)i;"
   run_backup_logged ${TMP_CONFIG} ${PGDATA}
 
   stop_and_delete_cluster_dir
@@ -32,6 +32,9 @@ test_full_backup()
   wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
 
   start_cluster
+
+  assert_count 100000 200000 200000
+  
   cleanup
 
   echo "Greenplum backup-push test was successful"

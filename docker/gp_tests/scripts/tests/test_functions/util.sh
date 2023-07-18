@@ -29,6 +29,24 @@ insert_a_lot_of_data() {
 	psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,100000)i;"
 }
 
+assert_count() {
+  heap=$1
+  ao=$2
+  co=$3
+  
+  if [ "$(psql -p 6000 -t -c "SELECT count(*) FROM heap;" -d test -A)" != $heap ]; then
+    echo "Error: Heap table in db database must be restored"
+    exit 1
+  elif [ "$(psql -p 6000 -t -c "SELECT count(*) FROM ao;" -d test -A)" != $ao ]; then
+    echo "Error: Heap table in db database must be restored"
+    exit 1
+  elif [ "$(psql -p 6000 -t -c "SELECT count(*) FROM co;" -d test -A)" != $co ]; then
+    echo "Error: Heap table in db database must be restored"
+    exit 1
+  fi
+
+}
+
 enable_pitr_extension() {
   echo "Enabling gp_pitr extension..."
   psql -p 6000 -d postgres -c "create extension gp_pitr"
