@@ -35,6 +35,6 @@ var decompress bool
 
 func init() {
 	StorageToolsCmd.AddCommand(catObjectCmd)
-	getObjectCmd.Flags().BoolVar(&decrypt, decryptFlag, false, "decrypt the object")
-	getObjectCmd.Flags().BoolVar(&decompress, decompressFlag, false, "decompress the object")
+	catObjectCmd.Flags().BoolVar(&decrypt, decryptFlag, false, "decrypt the object")
+	catObjectCmd.Flags().BoolVar(&decompress, decompressFlag, false, "decompress the object")
 }
