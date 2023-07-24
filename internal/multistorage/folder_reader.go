@@ -29,7 +29,7 @@ func NewStorageFolderReader(mainFolder storage.Folder, failover map[string]stora
 
 	if !ok {
 		// if no cached, use default
-		folder = NewDefaultFailoverFolder(folder)
+		folder = NewDefaultFailoverFolder(mainFolder)
 	}
 
 	leftover := make([]FailoverFolder, 0)
