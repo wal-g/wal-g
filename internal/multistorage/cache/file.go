@@ -47,7 +47,7 @@ func readFile() (storageStatuses, error) {
 	}
 	defer func() { _ = file.Close() }()
 
-	err = unix.Flock(int(file.Fd()), unix.LOCK_SH)
+	err = lockFile(file, false)
 	if err != nil {
 		return nil, fmt.Errorf("acquire shared lock for the cache file: %w", err)
 	}
@@ -81,7 +81,7 @@ func writeFile(content storageStatuses) error {
 	}
 	defer func() { _ = file.Close() }()
 
-	err = unix.Flock(int(file.Fd()), unix.LOCK_EX)
+	err = lockFile(file, true)
 	if err != nil {
 		return fmt.Errorf("acquire exclusive lock for the cache file: %w", err)
 	}
@@ -92,4 +92,20 @@ func writeFile(content storageStatuses) error {
 	}
 
 	return nil
+}
+
+func lockFile(file *os.File, exclusive bool) (err error) {
+	how := unix.LOCK_SH
+	if exclusive {
+		how = unix.LOCK_EX
+	}
+
+	for {
+		err = unix.Flock(int(file.Fd()), how)
+		// When calling syscalls directly, we need to retry EINTR errors. They mean the call was interrupted by a signal.
+		if err != unix.EINTR {
+			break
+		}
+	}
+	return err
 }
