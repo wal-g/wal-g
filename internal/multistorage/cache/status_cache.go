@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -36,7 +37,7 @@ func (c *StatusCache) AllAliveStorages() ([]NamedFolder, error) {
 
 	oldFile, err := readFile()
 	if err != nil {
-		return nil, fmt.Errorf("read cache file: %w", err)
+		tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
 	}
 	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 	if len(outdated) == 0 {
@@ -70,7 +71,7 @@ func (c *StatusCache) FirstAliveStorage() (*NamedFolder, error) {
 
 	oldFile, err := readFile()
 	if err != nil {
-		return nil, fmt.Errorf("read cache file: %w", err)
+		tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
 	}
 	fileFirstAlive := oldFile.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
 	if fileFirstAlive != nil {
@@ -123,7 +124,7 @@ func (c *StatusCache) SpecificStorage(name string) (specificStorage NamedFolder,
 
 	oldFile, err := readFile()
 	if err != nil {
-		return NamedFolder{}, fmt.Errorf("read cache file: %w", err)
+		tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
 	}
 	if oldFile.isRelevant(c.ttl, specificStorage) {
 		memCache[specificStorage.Name] = oldFile[specificStorage.Name]
