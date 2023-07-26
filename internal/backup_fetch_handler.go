@@ -94,7 +94,7 @@ func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelecto
 
 	multistorage.SetPolicies(folder, policies.TakeFirstStorage)
 	err = multistorage.UseSpecificStorage(storageName, folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fix the storage where the backup is from: %v\n", err)
+	tracelog.ErrorLogger.FatalfOnError("Failed to set the backup storage origin: %v\n", err)
 
 	backup, _, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)

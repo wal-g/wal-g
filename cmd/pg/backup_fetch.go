@@ -2,7 +2,6 @@ package pg
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -54,7 +53,9 @@ var backupFetchCmd = &cobra.Command{
 		failoverStorages, err := internal.InitFailoverStorages()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder := multistorage.NewFolder(cache.NewStatusCache(primaryStorage, failoverStorages, 5*time.Minute))
+		cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+		tracelog.ErrorLogger.FatalOnError(err)
+		folder := multistorage.NewFolder(cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime))
 		multistorage.SetPolicies(folder, policies.UniteAllStorages)
 		err = multistorage.UseAllAliveStorages(folder)
 		tracelog.ErrorLogger.FatalOnError(err)
