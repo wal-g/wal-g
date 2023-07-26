@@ -2,20 +2,21 @@ package cache
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type StatusCache struct {
-	storages []NamedFolder
-	ttl      time.Duration
+	storagesInOrder []NamedFolder
+	ttl             time.Duration
 }
 
 func NewStatusCache(primary storage.Folder, failover map[string]storage.Folder, ttl time.Duration) *StatusCache {
 	return &StatusCache{
-		storages: nameFolders(primary, failover),
-		ttl:      ttl,
+		storagesInOrder: nameAndOrderFolders(primary, failover),
+		ttl:             ttl,
 	}
 }
 
@@ -23,18 +24,18 @@ func (c *StatusCache) AllAliveStorages() ([]NamedFolder, error) {
 	memCacheMu.Lock()
 	defer memCacheMu.Unlock()
 
-	if memCache.isRelevant(c.ttl, c.storages...) {
-		return memCache.getAllAlive(c.storages), nil
+	if memCache.isRelevant(c.ttl, c.storagesInOrder...) {
+		return memCache.getAllAlive(c.storagesInOrder), nil
 	}
 
 	oldFile, err := readFile()
 	if err != nil {
 		return nil, fmt.Errorf("read cache file: %w", err)
 	}
-	_, outdated := oldFile.splitByRelevance(c.ttl, c.storages)
+	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 	if len(outdated) == 0 {
 		memCache = oldFile
-		return memCache.getAllAlive(c.storages), nil
+		return memCache.getAllAlive(c.storagesInOrder), nil
 	}
 
 	checkResult, err := checkForAlive(outdated...)
@@ -49,14 +50,14 @@ func (c *StatusCache) AllAliveStorages() ([]NamedFolder, error) {
 	}
 
 	memCache = newFile
-	return memCache.getAllAlive(c.storages), nil
+	return memCache.getAllAlive(c.storagesInOrder), nil
 }
 
 func (c *StatusCache) FirstAliveStorage() (*NamedFolder, error) {
 	memCacheMu.Lock()
 	defer memCacheMu.Unlock()
 
-	memFirstAlive := memCache.getRelevantFirstAlive(c.ttl, c.storages)
+	memFirstAlive := memCache.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
 	if memFirstAlive != nil {
 		return memFirstAlive, nil
 	}
@@ -65,13 +66,13 @@ func (c *StatusCache) FirstAliveStorage() (*NamedFolder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read cache file: %w", err)
 	}
-	fileFirstAlive := oldFile.getRelevantFirstAlive(c.ttl, c.storages)
+	fileFirstAlive := oldFile.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
 	if fileFirstAlive != nil {
 		memCache[fileFirstAlive.Name] = oldFile[fileFirstAlive.Name]
 		return fileFirstAlive, nil
 	}
 
-	_, outdated := oldFile.splitByRelevance(c.ttl, c.storages)
+	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 
 	checkResult, err := checkForAlive(outdated...)
 	if err != nil {
@@ -85,7 +86,7 @@ func (c *StatusCache) FirstAliveStorage() (*NamedFolder, error) {
 	}
 
 	memCache = newFile
-	return memCache.getRelevantFirstAlive(c.ttl, c.storages), nil
+	return memCache.getRelevantFirstAlive(c.ttl, c.storagesInOrder), nil
 }
 
 func (c *StatusCache) SpecificStorage(name string) (specificStorage NamedFolder, err error) {
@@ -93,7 +94,7 @@ func (c *StatusCache) SpecificStorage(name string) (specificStorage NamedFolder,
 	defer memCacheMu.Unlock()
 
 	var found bool
-	for _, s := range c.storages {
+	for _, s := range c.storagesInOrder {
 		if s.Name == name {
 			specificStorage = s
 			found = true
@@ -143,18 +144,23 @@ type NamedFolder struct {
 	storage.Folder
 }
 
-func nameFolders(primary storage.Folder, failover map[string]storage.Folder) []NamedFolder {
-	namedFoldersInOrder := []NamedFolder{
-		{
-			Name:   "default",
-			Folder: primary,
-		},
-	}
+func nameAndOrderFolders(primary storage.Folder, failover map[string]storage.Folder) []NamedFolder {
+	var failoverFolders []NamedFolder
 	for name, folder := range failover {
-		namedFoldersInOrder = append(namedFoldersInOrder, NamedFolder{
+		failoverFolders = append(failoverFolders, NamedFolder{
 			Name:   name,
 			Folder: folder,
 		})
 	}
-	return namedFoldersInOrder
+	sort.Slice(failoverFolders, func(i, j int) bool { return failoverFolders[i].Name < failoverFolders[j].Name })
+
+	return append(
+		[]NamedFolder{
+			{
+				Name:   "default",
+				Folder: primary,
+			},
+		},
+		failoverFolders...,
+	)
 }
