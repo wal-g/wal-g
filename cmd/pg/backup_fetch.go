@@ -55,7 +55,11 @@ var backupFetchCmd = &cobra.Command{
 
 		cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
 		tracelog.ErrorLogger.FatalOnError(err)
-		folder := multistorage.NewFolder(cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime))
+		aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+		tracelog.ErrorLogger.FatalOnError(err)
+		cache := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+
+		folder := multistorage.NewFolder(cache)
 		multistorage.SetPolicies(folder, policies.UniteAllStorages)
 		err = multistorage.UseAllAliveStorages(folder)
 		tracelog.ErrorLogger.FatalOnError(err)

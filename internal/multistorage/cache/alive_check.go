@@ -3,9 +3,9 @@ package cache
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 )
 
 type checkRes struct {
@@ -13,13 +13,8 @@ type checkRes struct {
 	err  error
 }
 
-func checkForAlive(storages ...NamedFolder) (map[string]bool, error) {
-	checkTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("get check timeout setting: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
+func checkForAlive(timeout time.Duration, storages ...NamedFolder) (map[string]bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	resCh := make(chan checkRes, len(storages))

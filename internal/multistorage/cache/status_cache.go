@@ -11,12 +11,18 @@ import (
 type StatusCache struct {
 	storagesInOrder []NamedFolder
 	ttl             time.Duration
+	checkTimeout    time.Duration
 }
 
-func NewStatusCache(primary storage.Folder, failover map[string]storage.Folder, ttl time.Duration) *StatusCache {
+func NewStatusCache(
+	primary storage.Folder,
+	failover map[string]storage.Folder,
+	ttl, checkTimeout time.Duration,
+) *StatusCache {
 	return &StatusCache{
 		storagesInOrder: nameAndOrderFolders(primary, failover),
 		ttl:             ttl,
+		checkTimeout:    checkTimeout,
 	}
 }
 
@@ -38,7 +44,7 @@ func (c *StatusCache) AllAliveStorages() ([]NamedFolder, error) {
 		return memCache.getAllAlive(c.storagesInOrder), nil
 	}
 
-	checkResult, err := checkForAlive(outdated...)
+	checkResult, err := checkForAlive(c.checkTimeout, outdated...)
 	if err != nil {
 		return nil, fmt.Errorf("find alive storages: %w", err)
 	}
@@ -74,7 +80,7 @@ func (c *StatusCache) FirstAliveStorage() (*NamedFolder, error) {
 
 	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 
-	checkResult, err := checkForAlive(outdated...)
+	checkResult, err := checkForAlive(c.checkTimeout, outdated...)
 	if err != nil {
 		return nil, fmt.Errorf("find alive storages: %w", err)
 	}
@@ -124,7 +130,7 @@ func (c *StatusCache) SpecificStorage(name string) (specificStorage NamedFolder,
 		return ensureStorageIsAlive(oldFile)
 	}
 
-	checkResult, err := checkForAlive(specificStorage)
+	checkResult, err := checkForAlive(c.checkTimeout, specificStorage)
 	if err != nil {
 		return NamedFolder{}, fmt.Errorf("check if storage %q is alive", specificStorage.Name)
 	}
