@@ -11,7 +11,7 @@ import (
 )
 
 func UseAllAliveStorages(folder storage.Folder) error {
-	mf, ok := folder.(*multiFolder)
+	mf, ok := folder.(*Folder)
 	if !ok {
 		return nil
 	}
@@ -28,7 +28,7 @@ func UseAllAliveStorages(folder storage.Folder) error {
 }
 
 func UseFirstAliveStorage(folder storage.Folder) error {
-	mf, ok := folder.(*multiFolder)
+	mf, ok := folder.(*Folder)
 	if !ok {
 		return nil
 	}
@@ -45,7 +45,7 @@ func UseFirstAliveStorage(folder storage.Folder) error {
 }
 
 func UseSpecificStorage(name string, folder storage.Folder) error {
-	mf, ok := folder.(*multiFolder)
+	mf, ok := folder.(*Folder)
 	if !ok {
 		return nil
 	}
@@ -58,12 +58,6 @@ func UseSpecificStorage(name string, folder storage.Folder) error {
 	return nil
 }
 
-func SetPolicies(folder storage.Folder, policies policies.Policies) {
-	if mf, ok := folder.(*multiFolder); ok {
-		mf.policies = policies
-	}
-}
-
 func changeDirectory(path string, storages ...cache.NamedFolder) []cache.NamedFolder {
 	for _, s := range storages {
 		s.Folder = s.Folder.GetSubFolder(path)
@@ -71,40 +65,20 @@ func changeDirectory(path string, storages ...cache.NamedFolder) []cache.NamedFo
 	return storages
 }
 
-type Folder interface {
-	storage.Folder
-
-	ExistsInFirst(objectRelativePath string) (bool, string, error)
-	ExistsInAny(objectRelativePath string) (bool, string, error)
-	ExistsInAll(objectRelativePath string) (bool, string, error)
-
-	ReadObjectFromFirst(objectRelativePath string) (io.ReadCloser, string, error)
-	ReadObjectFoundFirst(objectRelativePath string) (io.ReadCloser, string, error)
-
-	ListFolderInFirst() (objects []storage.Object, subFolders []storage.Folder, err error)
-	ListFolderWhereFoundFirst() (objects []storage.Object, subFolders []storage.Folder, err error)
-	ListFolderAll() (objects []storage.Object, subFolders []storage.Folder, err error)
-
-	PutObjectToFirst(name string, content io.Reader) error
-	PutObjectOrUpdateFirstFound(name string, content io.Reader) error
-	PutObjectToAll(name string, content io.Reader) error
-	PutObjectOrUpdateAllFound(name string, content io.Reader) error
-
-	DeleteObjectsFromFirst(objectRelativePaths []string) error
-	DeleteObjectsFromAll(objectRelativePaths []string) error
-
-	CopyObjectInFirst(srcPath string, dstPath string) error
-	CopyObjectInAll(srcPath string, dstPath string) error
+func SetPolicies(folder storage.Folder, policies policies.Policies) {
+	if mf, ok := folder.(*Folder); ok {
+		mf.policies = policies
+	}
 }
 
-func NewFolder(cache *cache.StatusCache) Folder {
-	return &multiFolder{
+func NewFolder(cache *cache.StatusCache) *Folder {
+	return &Folder{
 		cache:    cache,
 		policies: policies.Default,
 	}
 }
 
-type multiFolder struct {
+type Folder struct {
 	cache    *cache.StatusCache
 	storages []cache.NamedFolder
 	path     string
@@ -112,13 +86,13 @@ type multiFolder struct {
 }
 
 // GetPath provides the base path that is common for all the storages.
-func (mf *multiFolder) GetPath() string {
+func (mf *Folder) GetPath() string {
 	return mf.storages[0].GetPath()
 }
 
 // GetSubFolder provides a multi-storage subfolder, which includes subfolders of all used storages.
-func (mf *multiFolder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	subfolder := &multiFolder{
+func (mf *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
+	subfolder := &Folder{
 		cache:    mf.cache,
 		storages: mf.storages,
 		path:     path.Join(mf.path, subFolderRelativePath),
@@ -130,7 +104,7 @@ func (mf *multiFolder) GetSubFolder(subFolderRelativePath string) storage.Folder
 
 // Exists checks if the object exists in multiple storages. A specific implementation is selected using
 // FolderPolicies.Exists.
-func (mf *multiFolder) Exists(objectRelativePath string) (bool, error) {
+func (mf *Folder) Exists(objectRelativePath string) (bool, error) {
 	exists, _, err := Exists(mf, objectRelativePath)
 	return exists, err
 }
@@ -138,7 +112,7 @@ func (mf *multiFolder) Exists(objectRelativePath string) (bool, error) {
 // Exists is like storage.Folder.Exists, but it also provides the name of the storage where the file is found. If it's
 // not found, storage name is empty. If it's found in all storages, provides "all" as the storage name.
 func Exists(folder storage.Folder, objectRelativePath string) (found bool, storage string, err error) {
-	mf, ok := folder.(*multiFolder)
+	mf, ok := folder.(*Folder)
 	if !ok {
 		exists, err := folder.Exists(objectRelativePath)
 		return exists, DefaultStorage, err
@@ -157,7 +131,7 @@ func Exists(folder storage.Folder, objectRelativePath string) (found bool, stora
 }
 
 // ExistsInFirst checks if the object exists in the first storage.
-func (mf *multiFolder) ExistsInFirst(objectRelativePath string) (bool, string, error) {
+func (mf *Folder) ExistsInFirst(objectRelativePath string) (bool, string, error) {
 	if len(mf.storages) == 0 {
 		return false, "", fmt.Errorf("no storages are used")
 	}
@@ -167,7 +141,7 @@ func (mf *multiFolder) ExistsInFirst(objectRelativePath string) (bool, string, e
 }
 
 // ExistsInAny checks if the object exists in any storage.
-func (mf *multiFolder) ExistsInAny(objectRelativePath string) (bool, string, error) {
+func (mf *Folder) ExistsInAny(objectRelativePath string) (bool, string, error) {
 	for _, s := range mf.storages {
 		exists, err := s.Exists(objectRelativePath)
 		if err != nil {
@@ -181,7 +155,7 @@ func (mf *multiFolder) ExistsInAny(objectRelativePath string) (bool, string, err
 }
 
 // ExistsInAll checks if the object exists in all used storages.
-func (mf *multiFolder) ExistsInAll(objectRelativePath string) (bool, string, error) {
+func (mf *Folder) ExistsInAll(objectRelativePath string) (bool, string, error) {
 	for _, s := range mf.storages {
 		exists, err := s.Exists(objectRelativePath)
 		if err != nil {
@@ -195,14 +169,14 @@ func (mf *multiFolder) ExistsInAll(objectRelativePath string) (bool, string, err
 }
 
 // ReadObject reads the object from multiple storages. A specific implementation is selected using FolderPolicies.Read.
-func (mf *multiFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (mf *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	file, _, err := ReadObject(mf, objectRelativePath)
 	return file, err
 }
 
 // ReadObject is like storage.Folder.ReadObject, but it also provides the name of storage where the file is read from.
 func ReadObject(folder storage.Folder, objectRelativePath string) (io.ReadCloser, string, error) {
-	mf, ok := folder.(*multiFolder)
+	mf, ok := folder.(*Folder)
 	if !ok {
 		file, err := folder.ReadObject(objectRelativePath)
 		return file, DefaultStorage, err
@@ -219,7 +193,7 @@ func ReadObject(folder storage.Folder, objectRelativePath string) (io.ReadCloser
 }
 
 // ReadObjectFromFirst reads the object from the first storage.
-func (mf *multiFolder) ReadObjectFromFirst(objectRelativePath string) (io.ReadCloser, string, error) {
+func (mf *Folder) ReadObjectFromFirst(objectRelativePath string) (io.ReadCloser, string, error) {
 	if len(mf.storages) == 0 {
 		return nil, "", fmt.Errorf("no storages are used")
 	}
@@ -229,7 +203,7 @@ func (mf *multiFolder) ReadObjectFromFirst(objectRelativePath string) (io.ReadCl
 }
 
 // ReadObjectFoundFirst reads the object from all used storages in order and returns the first one found.
-func (mf *multiFolder) ReadObjectFoundFirst(objectRelativePath string) (io.ReadCloser, string, error) {
+func (mf *Folder) ReadObjectFoundFirst(objectRelativePath string) (io.ReadCloser, string, error) {
 	for _, s := range mf.storages {
 		exists, err := s.Exists(objectRelativePath)
 		if err != nil {
@@ -244,7 +218,7 @@ func (mf *multiFolder) ReadObjectFoundFirst(objectRelativePath string) (io.ReadC
 }
 
 // ListFolder lists the folder in multiple storages. A specific implementation is selected using FolderPolicies.List.
-func (mf *multiFolder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	switch mf.policies.List {
 	case policies.ListPolicyFirst:
 		return mf.ListFolderInFirst()
@@ -258,7 +232,7 @@ func (mf *multiFolder) ListFolder() (objects []storage.Object, subFolders []stor
 }
 
 // ListFolderInFirst lists the folder in the first storage.
-func (mf *multiFolder) ListFolderInFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf *Folder) ListFolderInFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	if len(mf.storages) == 0 {
 		return nil, nil, fmt.Errorf("no storages are used")
 	}
@@ -267,7 +241,7 @@ func (mf *multiFolder) ListFolderInFirst() (objects []storage.Object, subFolders
 		return nil, nil, err
 	}
 	for i := range subFolders {
-		subFolders[i] = &multiFolder{
+		subFolders[i] = &Folder{
 			cache:    mf.cache,
 			storages: mf.storages,
 			path:     subFolders[i].GetPath(),
@@ -279,13 +253,13 @@ func (mf *multiFolder) ListFolderInFirst() (objects []storage.Object, subFolders
 
 // ListFolderWhereFoundFirst lists the folder in all used storages and provides a result where each file is taken from
 // the first storage in which it was found.
-func (mf *multiFolder) ListFolderWhereFoundFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf *Folder) ListFolderWhereFoundFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	objects, subFolders, err = mf.storages[0].ListFolder()
 	if err != nil {
 		return nil, nil, err
 	}
 	for i := range subFolders {
-		subFolders[i] = &multiFolder{
+		subFolders[i] = &Folder{
 			cache:    mf.cache,
 			storages: mf.storages,
 			path:     subFolders[i].GetPath(),
@@ -296,7 +270,7 @@ func (mf *multiFolder) ListFolderWhereFoundFirst() (objects []storage.Object, su
 }
 
 // ListFolderAll lists every used storage and provides the union of all found files.
-func (mf *multiFolder) ListFolderAll() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf *Folder) ListFolderAll() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	for _, s := range mf.storages {
 		curObjects, curSubFolders, err := s.ListFolder()
 		if err != nil {
@@ -304,7 +278,7 @@ func (mf *multiFolder) ListFolderAll() (objects []storage.Object, subFolders []s
 		}
 		objects = append(objects, curObjects...)
 		for _, sf := range curSubFolders {
-			subFolders = append(subFolders, &multiFolder{
+			subFolders = append(subFolders, &Folder{
 				cache:    mf.cache,
 				storages: mf.storages,
 				path:     sf.GetPath(),
@@ -316,7 +290,7 @@ func (mf *multiFolder) ListFolderAll() (objects []storage.Object, subFolders []s
 }
 
 // PutObject puts the object to multiple storages. A specific implementation is selected using FolderPolicies.Put.
-func (mf *multiFolder) PutObject(name string, content io.Reader) error {
+func (mf *Folder) PutObject(name string, content io.Reader) error {
 	switch mf.policies.Put {
 	case policies.PutPolicyFirst:
 		return mf.PutObjectToFirst(name, content)
@@ -332,7 +306,7 @@ func (mf *multiFolder) PutObject(name string, content io.Reader) error {
 }
 
 // PutObjectToFirst puts the object to the first storage.
-func (mf *multiFolder) PutObjectToFirst(name string, content io.Reader) error {
+func (mf *Folder) PutObjectToFirst(name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
 		return fmt.Errorf("no storages are used")
 	}
@@ -341,7 +315,7 @@ func (mf *multiFolder) PutObjectToFirst(name string, content io.Reader) error {
 
 // PutObjectOrUpdateFirstFound updates the object in the first storage where it is found. If it's not found anywhere,
 // uploads a new object to the first storage.
-func (mf *multiFolder) PutObjectOrUpdateFirstFound(name string, content io.Reader) error {
+func (mf *Folder) PutObjectOrUpdateFirstFound(name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
 		return fmt.Errorf("no storages are used")
 	}
@@ -358,7 +332,7 @@ func (mf *multiFolder) PutObjectOrUpdateFirstFound(name string, content io.Reade
 }
 
 // PutObjectToAll puts the object to all used storages.
-func (mf *multiFolder) PutObjectToAll(name string, content io.Reader) error {
+func (mf *Folder) PutObjectToAll(name string, content io.Reader) error {
 	for _, s := range mf.storages {
 		err := s.PutObject(name, content)
 		if err != nil {
@@ -370,7 +344,7 @@ func (mf *multiFolder) PutObjectToAll(name string, content io.Reader) error {
 
 // PutObjectOrUpdateAllFound updates the object in all storages where it is found. If it's not found anywhere, uploads a
 // new object to the first storage.
-func (mf *multiFolder) PutObjectOrUpdateAllFound(name string, content io.Reader) error {
+func (mf *Folder) PutObjectOrUpdateAllFound(name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
 		return fmt.Errorf("no storages are used")
 	}
@@ -396,7 +370,7 @@ func (mf *multiFolder) PutObjectOrUpdateAllFound(name string, content io.Reader)
 
 // DeleteObjects deletes the objects from multiple storages. A specific implementation is selected using
 // FolderPolicies.Delete.
-func (mf *multiFolder) DeleteObjects(objectRelativePaths []string) error {
+func (mf *Folder) DeleteObjects(objectRelativePaths []string) error {
 	switch mf.policies.Delete {
 	case policies.DeletePolicyFirst:
 		return mf.DeleteObjectsFromFirst(objectRelativePaths)
@@ -408,7 +382,7 @@ func (mf *multiFolder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 // DeleteObjectsFromFirst deletes the objects from the first storage.
-func (mf *multiFolder) DeleteObjectsFromFirst(objectRelativePaths []string) error {
+func (mf *Folder) DeleteObjectsFromFirst(objectRelativePaths []string) error {
 	if len(mf.storages) == 0 {
 		return fmt.Errorf("no storages are used")
 	}
@@ -416,7 +390,7 @@ func (mf *multiFolder) DeleteObjectsFromFirst(objectRelativePaths []string) erro
 }
 
 // DeleteObjectsFromAll deletes the objects from all used storages.
-func (mf *multiFolder) DeleteObjectsFromAll(objectRelativePaths []string) error {
+func (mf *Folder) DeleteObjectsFromAll(objectRelativePaths []string) error {
 	for _, s := range mf.storages {
 		err := s.DeleteObjects(objectRelativePaths)
 		if err != nil {
@@ -427,7 +401,7 @@ func (mf *multiFolder) DeleteObjectsFromAll(objectRelativePaths []string) error 
 }
 
 // CopyObject copies the object in multiple storages. A specific implementation is selected using FolderPolicies.Copy.
-func (mf *multiFolder) CopyObject(srcPath string, dstPath string) error {
+func (mf *Folder) CopyObject(srcPath string, dstPath string) error {
 	switch mf.policies.Copy {
 	case policies.CopyPolicyFirst:
 		return mf.CopyObjectInFirst(srcPath, dstPath)
@@ -439,7 +413,7 @@ func (mf *multiFolder) CopyObject(srcPath string, dstPath string) error {
 }
 
 // CopyObjectInFirst copies the object in the first storage.
-func (mf *multiFolder) CopyObjectInFirst(srcPath string, dstPath string) error {
+func (mf *Folder) CopyObjectInFirst(srcPath string, dstPath string) error {
 	if len(mf.storages) == 0 {
 		return fmt.Errorf("no storages are used")
 	}
@@ -447,7 +421,7 @@ func (mf *multiFolder) CopyObjectInFirst(srcPath string, dstPath string) error {
 }
 
 // CopyObjectInAll copies the object in all used storages.
-func (mf *multiFolder) CopyObjectInAll(srcPath string, dstPath string) error {
+func (mf *Folder) CopyObjectInAll(srcPath string, dstPath string) error {
 	for _, s := range mf.storages {
 		err := s.CopyObject(srcPath, dstPath)
 		if err != nil {
