@@ -61,7 +61,7 @@ var backupFetchCmd = &cobra.Command{
 
 		folder := multistorage.NewFolder(cache)
 		multistorage.SetPolicies(folder, policies.UniteAllStorages)
-		err = multistorage.UseAllAliveStorages(folder)
+		folder, err = multistorage.UseAllAliveStorages(folder)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if partialRestoreArgs != nil {
