@@ -10,6 +10,8 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+const DefaultStorage = "default"
+
 // UseAllAliveStorages makes a copy of the Folder that uses all currently alive storages.
 func UseAllAliveStorages(folder storage.Folder) (storage.Folder, error) {
 	mf, ok := folder.(Folder)

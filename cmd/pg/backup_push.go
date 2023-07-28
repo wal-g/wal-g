@@ -2,6 +2,7 @@ package pg
 
 import (
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -45,13 +46,12 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
-			baseUploader, err := internal.ConfigureUploader()
+			folder := GetFolder()
+			folder = multistorage.SetPolicies(folder, policies.TakeFirstStorage)
+			folder, err := multistorage.UseFirstAliveStorage(folder)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			failover, err := internal.InitFailoverStorages()
-			tracelog.ErrorLogger.FatalOnError(err)
-
-			uploader, err := multistorage.NewUploader(baseUploader, failover)
+			uploader, err := internal.ConfigureUploaderToFolder(folder)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			var dataDirectory string

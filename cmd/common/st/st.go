@@ -2,7 +2,7 @@ package st
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/cmd/common/st/multistorage"
 )
 
 // Storage tools allows to interact with the configured storage, e.g.:

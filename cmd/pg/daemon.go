@@ -15,7 +15,7 @@ var daemonCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		daemonOpts := postgres.DaemonOptions{
 			Uploader: GetWalUploader(),
-			Reader:   GetFolderReader(),
+			Reader:   GetWalFolderReader(),
 		}
 		postgres.HandleDaemon(daemonOpts, args[0])
 	},
