@@ -67,6 +67,9 @@ func (ss storageStatuses) getRelevantFirstAlive(ttl time.Duration, storagesInOrd
 	var firstAlive *NamedFolder
 	relevant, _ := ss.splitByRelevance(ttl, storagesInOrder)
 	for i := range storagesInOrder {
+		if i >= len(relevant) {
+			break
+		}
 		if storagesInOrder[i].Name != relevant[i].Name {
 			break
 		}

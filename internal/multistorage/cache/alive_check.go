@@ -45,7 +45,7 @@ func checkForAlive(timeout time.Duration, storages ...NamedFolder) (map[string]b
 			continue
 		}
 		results[res.name] = false
-		tracelog.ErrorLogger.Print(err)
+		tracelog.ErrorLogger.Print(res.err)
 	}
 
 	tracelog.DebugLogger.Printf("Found %d alive storages: %v", aliveCount, results)

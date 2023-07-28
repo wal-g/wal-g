@@ -67,7 +67,7 @@ func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
 	return sentinelObjects, nil
 }
 
-// GetBackups receives backup descriptions and sorts them by time
+// GetBackups receives all backup descriptions from the folder.
 func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	backups, _, err = GetBackupsAndGarbage(folder)
 	if err != nil {
@@ -87,10 +87,10 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 		return nil, nil, err
 	}
 
-	sortTimes := GetBackupTimeSlices(backupObjects)
-	garbage = GetGarbageFromPrefix(subFolders, sortTimes)
+	backupTimes := GetBackupTimeSlices(backupObjects)
+	garbage = GetGarbageFromPrefix(subFolders, backupTimes)
 
-	return sortTimes, garbage, nil
+	return backupTimes, garbage, nil
 }
 
 func GetBackupTimeSlices(backups []storage.Object) []BackupTime {

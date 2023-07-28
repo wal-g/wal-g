@@ -55,6 +55,11 @@ func UseSpecificStorage(name string, folder storage.Folder) (storage.Folder, err
 		return folder, nil
 	}
 
+	alreadyUsed := len(mf.storages) == 1 && mf.storages[0].Name == name
+	if alreadyUsed {
+		return mf, nil
+	}
+
 	specificStorage, err := mf.cache.SpecificStorage(name)
 	if err != nil {
 		return nil, fmt.Errorf("select storage %q in multistorage folder: %w", name, err)
@@ -95,8 +100,11 @@ type Folder struct {
 	policies policies.Policies
 }
 
-// GetPath provides the base path that is common for all the storages.
+// GetPath provides the base path that is common for all the storages. If no storages are used, provides "".
 func (mf Folder) GetPath() string {
+	if len(mf.storages) == 0 {
+		return ""
+	}
 	return mf.storages[0].GetPath()
 }
 
