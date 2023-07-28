@@ -44,10 +44,20 @@ func ToPgBackup(source internal.Backup) (output Backup) {
 	}
 }
 
-func NewBackup(baseBackupFolder storage.Folder, name string) Backup {
-	return Backup{
-		Backup: internal.NewBackup(baseBackupFolder, name),
+func NewBackup(baseBackupFolder storage.Folder, name string) (Backup, error) {
+	backup, err := internal.NewBackup(baseBackupFolder, name)
+	if err != nil {
+		return Backup{}, err
 	}
+	return Backup{Backup: backup}, nil
+}
+
+func NewBackupInStorage(baseBackupFolder storage.Folder, name, storage string) (Backup, error) {
+	backup, err := internal.NewBackupInStorage(baseBackupFolder, name, storage)
+	if err != nil {
+		return Backup{}, err
+	}
+	return Backup{Backup: backup}, nil
 }
 
 func (backup *Backup) getTarPartitionFolder() storage.Folder {

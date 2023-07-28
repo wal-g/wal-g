@@ -70,6 +70,27 @@ func UseSpecificStorage(name string, folder storage.Folder) (storage.Folder, err
 	return mf, nil
 }
 
+func UsedStorages(folder storage.Folder) []string {
+	mf, ok := folder.(Folder)
+	if !ok {
+		return []string{DefaultStorage}
+	}
+
+	var storageNames []string
+	for _, s := range mf.storages {
+		storageNames = append(storageNames, s.Name)
+	}
+	return storageNames
+}
+
+func EnsureSingleStorageIsUsed(folder storage.Folder) error {
+	storages := UsedStorages(folder)
+	if len(storages) != 1 {
+		return fmt.Errorf("multi-storage folder must use a single storage, but it uses %d", len(storages))
+	}
+	return nil
+}
+
 func changeDirectory(path string, storages ...cache.NamedFolder) []cache.NamedFolder {
 	for _, s := range storages {
 		s.Folder = s.Folder.GetSubFolder(path)

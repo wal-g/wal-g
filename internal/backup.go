@@ -25,8 +25,7 @@ func (err SentinelMarshallingError) Error() string {
 
 //endregion
 
-// Backup provides basic functionality
-// to fetch backup-related information from storage
+// Backup provides basic functionality to fetch backup-related information from storages.
 //
 // WAL-G stores information about single backup in the following files:
 //
@@ -36,17 +35,34 @@ func (err SentinelMarshallingError) Error() string {
 // Metadata file (only in Postgres) - Postgres sentinel files can be quite large (> 1GB),
 // so the metadata file is useful for the quick fetch of backup-related information.
 // see FetchMetadata, UploadMetadata
+//
+// All files of the backup must be stored in a single storage.
 type Backup struct {
 	Name string
 	// base backup folder or catchup backup folder
 	Folder storage.Folder
 }
 
-func NewBackup(folder storage.Folder, name string) Backup {
+func NewBackup(folder storage.Folder, name string) (Backup, error) {
+	err := multistorage.EnsureSingleStorageIsUsed(folder)
+	if err != nil {
+		return Backup{}, fmt.Errorf("create backup %s: %w", name, err)
+	}
 	return Backup{
 		Name:   name,
 		Folder: folder,
+	}, nil
+}
+
+func NewBackupInStorage(folder storage.Folder, name, storage string) (Backup, error) {
+	folder, err := multistorage.UseSpecificStorage(name, folder)
+	if err != nil {
+		return Backup{}, fmt.Errorf("create backup %s in storage %s", name, storage)
 	}
+	return Backup{
+		Name:   name,
+		Folder: folder,
+	}, nil
 }
 
 // getStopSentinelPath returns sentinel path.
@@ -59,8 +75,8 @@ func (backup *Backup) getMetadataPath() string {
 }
 
 // SentinelExists checks that the sentinel file of the specified backup exists.
-func (backup *Backup) SentinelExists() (exists bool, storageName string, err error) {
-	return multistorage.Exists(backup.Folder, backup.getStopSentinelPath())
+func (backup *Backup) SentinelExists() (bool, error) {
+	return backup.Folder.Exists(backup.getStopSentinelPath())
 }
 
 // TODO : unit tests
@@ -108,49 +124,31 @@ func UploadDto(folder storage.Folder, dto interface{}, path string) error {
 	return folder.PutObject(path, r)
 }
 
-func (backup *Backup) CheckExistence() (exists bool, storage string, err error) {
-	exists, storage, err = backup.SentinelExists()
+func (backup *Backup) CheckExistence() (bool, error) {
+	exists, err := backup.SentinelExists()
 	if err != nil {
-		return false, "", errors.Wrap(err, "failed to check if backup sentinel exists")
+		return false, errors.Wrap(err, "failed to check if backup sentinel exists")
 	}
-	return exists, storage, nil
+	return exists, nil
 }
 
 // AssureExists is similar to CheckExistence, but returns
 // an error in two cases:
 // 1. Backup does not exist
 // 2. Failed to check if backup exist
-func (backup *Backup) AssureExists() (storageName string, err error) {
-	exists, storageName, err := backup.CheckExistence()
+func (backup *Backup) AssureExists() error {
+	exists, err := backup.CheckExistence()
 	if err != nil {
-		return "", err
+		return err
 	}
 	if !exists {
-		return "", NewBackupNonExistenceError(backup.Name)
+		return NewBackupNonExistenceError(backup.Name)
 	}
-	return storageName, nil
+	return nil
 }
 
-func GetBackupByName(backupName, subfolder string, folder storage.Folder) (backup Backup, storageName string, err error) {
-	baseBackupFolder := folder.GetSubFolder(subfolder)
-
-	if backupName == LatestString {
-		var latest string
-		latest, storageName, err = GetLatestBackupName(baseBackupFolder)
-		if err != nil {
-			return Backup{}, "", err
-		}
-		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
-
-		backup = NewBackup(baseBackupFolder, latest)
-	} else {
-		backup = NewBackup(baseBackupFolder, backupName)
-		storageName, err = backup.AssureExists()
-		if err != nil {
-			return Backup{}, "", err
-		}
-	}
-	return backup, storageName, nil
+func (backup *Backup) GetStorageName() string {
+	return multistorage.UsedStorages(backup.Folder)[0]
 }
 
 // TODO : unit tests

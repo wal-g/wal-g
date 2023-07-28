@@ -62,7 +62,7 @@ func chooseTablespaceSpecification(sentinelDtoSpec, spec *TablespaceSpec) *Table
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirectory string,
+func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool, extractProv ExtractProvider) error {
 	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata()
 	if err != nil {
@@ -78,8 +78,15 @@ func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirector
 		if err != nil {
 			return err
 		}
-		incrementFrom := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), *sentinelDto.IncrementFrom)
-		err = deltaFetchRecursionOld(incrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap, extractProv)
+		incrementFrom, err := NewBackupInStorage(
+			rootFolder.GetSubFolder(utility.BaseBackupPath),
+			*sentinelDto.IncrementFrom,
+			backup.GetStorageName(),
+		)
+		if err != nil {
+			return err
+		}
+		err = deltaFetchRecursionOld(incrementFrom, rootFolder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap, extractProv)
 		if err != nil {
 			return err
 		}

@@ -17,29 +17,31 @@ type NamedBackupSelector struct {
 	Stanza     string
 }
 
-func (selector LatestBackupSelector) Select(folder storage.Folder) (string, error) {
+func (selector LatestBackupSelector) Select(folder storage.Folder) (internal.Backup, error) {
 	backupList, err := GetBackupList(folder, selector.Stanza)
 	if err != nil {
-		return "", err
+		return internal.Backup{}, err
 	}
 	sort.Slice(backupList, func(i, j int) bool {
 		return backupList[i].Time.Before(backupList[j].Time)
 	})
 
-	return backupList[len(backupList)-1].BackupName, nil
+	latest := backupList[len(backupList)-1]
+
+	return internal.NewBackupInStorage(folder, latest.BackupName, latest.StorageName)
 }
 
-func (selector NamedBackupSelector) Select(folder storage.Folder) (string, error) {
+func (selector NamedBackupSelector) Select(folder storage.Folder) (internal.Backup, error) {
 	backupList, err := GetBackupList(folder, selector.Stanza)
 	if err != nil {
-		return "", err
+		return internal.Backup{}, err
 	}
 	for _, backup := range backupList {
 		if backup.BackupName == selector.BackupName {
-			return backup.BackupName, nil
+			return internal.NewBackup(folder, backup.BackupName)
 		}
 	}
-	return "", err
+	return internal.Backup{}, err
 }
 
 func NewBackupSelector(backupName string, stanza string) internal.BackupSelector {

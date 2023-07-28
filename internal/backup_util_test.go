@@ -108,20 +108,20 @@ func TestGetLastBackupName(t *testing.T) {
 	b1 := testStreamBackup.BackupName + ".1" + utility.SentinelSuffix
 	b2 := testStreamBackup.BackupName + ".2" + utility.SentinelSuffix
 	_, _ = folder.PutObject(b1, &bytes.Buffer{}), folder.PutObject(b2, &bytes.Buffer{})
-	lastB, _ := internal.GetLatestBackupName(folder)
-	assert.Equalf(t, lastB+utility.SentinelSuffix, b2, "Last Backup is not b2")
+	lastB, _ := internal.GetLatestBackup(folder)
+	assert.Equalf(t, lastB.Name+utility.SentinelSuffix, b2, "Last Backup is not b2")
 }
 
 func TestGetLatestBackupName_EmptyWhenNoBackups(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	lastB, _ := internal.GetLatestBackupName(folder)
+	lastB, _ := internal.GetLatestBackup(folder)
 	assert.Equal(t, "", lastB)
 }
 
 func TestGetGarbageFromPrefix(t *testing.T) {
 	backupNames := []string{"backup", "garbage", "garbage_0"}
 	folders := make([]storage.Folder, 0)
-	nonGarbage := []internal.BackupTime{{"backup", time.Now(), "ZZZZZZZZZZZZZZZZZZZZZZZZ"}}
+	nonGarbage := []internal.BackupTime{{BackupName: "backup", Time: time.Now(), WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ"}}
 
 	for _, prefix := range backupNames {
 		folders = append(folders, memory.NewFolder(prefix, memory.NewStorage()))

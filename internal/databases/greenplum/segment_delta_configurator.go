@@ -21,14 +21,15 @@ type SegDeltaBackupConfigurator struct {
 func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent bool,
 ) (prevBackupInfo postgres.PrevBackupInfo, incrementCount int, err error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	previousBackupName, err := c.deltaBaseSelector.Select(folder)
+	previousBackup, err := c.deltaBaseSelector.Select(folder)
 	if err != nil {
 		return postgres.PrevBackupInfo{}, 0,
 			fmt.Errorf("couldn't find the requested base backup: %w", err)
 	}
 
-	previousBackup := NewSegBackup(baseBackupFolder, previousBackupName)
-	prevBackupSentinelDto, err := previousBackup.GetSentinel()
+	previousSegBackup, err := NewSegBackup(baseBackupFolder, previousBackup.Name)
+	tracelog.ErrorLogger.FatalOnError(err)
+	prevBackupSentinelDto, err := previousSegBackup.GetSentinel()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
@@ -37,7 +38,7 @@ func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent
 		incrementCount = 1
 	}
 
-	previousBackupMeta, err := previousBackup.FetchMeta()
+	previousBackupMeta, err := previousSegBackup.FetchMeta()
 	if err != nil {
 		return postgres.PrevBackupInfo{}, 0,
 			fmt.Errorf("failed to get previous backup metadata: %w", err)
@@ -48,14 +49,14 @@ func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent
 			fmt.Errorf("can't do a delta backup from permanent backup")
 	}
 
-	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousBackupName,
+	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousSegBackup.Name,
 		*prevBackupSentinelDto.BackupStartLSN)
 
-	sentinelDto, filesMetadataDto, err := previousBackup.GetSentinelAndFilesMetadata()
+	sentinelDto, filesMetadataDto, err := previousSegBackup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return postgres.PrevBackupInfo{}, 0, err
 	}
 
-	prevBackupInfo = postgres.NewPrevBackupInfo(previousBackupName, sentinelDto, filesMetadataDto)
+	prevBackupInfo = postgres.NewPrevBackupInfo(previousSegBackup.Name, sentinelDto, filesMetadataDto)
 	return prevBackupInfo, incrementCount, err
 }

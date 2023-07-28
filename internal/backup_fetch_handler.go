@@ -6,13 +6,9 @@ import (
 	"io"
 	"os/exec"
 
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/multistorage"
-	"github.com/wal-g/wal-g/internal/multistorage/policies"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type BackupNonExistenceError struct {
@@ -83,21 +79,14 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	return nil
 }
 
-type Fetcher func(folder storage.Folder, backup Backup)
+type Fetcher func(rootFolder storage.Folder, backup Backup)
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher Fetcher) {
-	backupName, storageName, err := targetBackupSelector.Select(folder)
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backupName)
-
-	multistorage.SetPolicies(folder, policies.TakeFirstStorage)
-	folder, err = multistorage.UseSpecificStorage(storageName, folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to set the backup storage origin: %v\n", err)
-
-	backup, _, err := GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+	backup, err := targetBackupSelector.Select(folder)
+	tracelog.ErrorLogger.FatalfOnError("Failed to select backup: %v\n", err)
+	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backup.Name)
 
 	fetcher(folder, backup)
 }

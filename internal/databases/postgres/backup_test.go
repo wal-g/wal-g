@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/stretchr/testify/assert"
@@ -70,7 +71,8 @@ func TestGetFilesToUnwrap_NoMoreFiles(t *testing.T) {
 
 func TestCheckExistenceWhenBackupExists(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
+	backup, err := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000")
+	require.NoError(t, err)
 	exists, err := backup.CheckExistence()
 	assert.NoError(t, err)
 	assert.True(t, exists)
@@ -78,7 +80,8 @@ func TestCheckExistenceWhenBackupExists(t *testing.T) {
 
 func TestCheckExistenceWhenBackupNotExists(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_321")
+	backup, err := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_321")
+	require.NoError(t, err)
 	exists, err := backup.CheckExistence()
 	assert.NoError(t, err)
 	assert.False(t, exists)
@@ -86,7 +89,8 @@ func TestCheckExistenceWhenBackupNotExists(t *testing.T) {
 
 func TestGetTarNames(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
+	backup, err := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
+	require.NoError(t, err)
 	tarNames, err := backup.GetTarNames()
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"1", "2", "3"}, tarNames)
@@ -94,15 +98,17 @@ func TestGetTarNames(t *testing.T) {
 
 func TestIsPgControlRequired(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
-	_, err := backup.GetSentinel()
+	backup, err := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_456")
+	require.NoError(t, err)
+	_, err = backup.GetSentinel()
 	assert.NoError(t, err)
 	assert.True(t, postgres.IsPgControlRequired(backup))
 }
 
 func TestIsPgControlNotRequiredForWALEBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000000010000DD170000000C_00743784")
+	backup, err := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_000000010000DD170000000C_00743784")
+	require.NoError(t, err)
 	backup.SentinelDto = &postgres.BackupSentinelDto{}
 	assert.False(t, postgres.IsPgControlRequired(backup))
 }
@@ -112,7 +118,8 @@ func TestFetchSentinel(t *testing.T) {
 	expectedSentinel := postgres.BackupSentinelDto{}
 	expectedSentinelJson, _ := json.Marshal(expectedSentinel)
 	_ = folder.PutObject("base_789454598_backup_stop_sentinel.json", bytes.NewReader(expectedSentinelJson))
-	backup := postgres.NewBackup(folder, "base_789454598")
+	backup, err := postgres.NewBackup(folder, "base_789454598")
+	require.NoError(t, err)
 
 	actualSentinel, err := backup.GetSentinel()
 
@@ -122,9 +129,9 @@ func TestFetchSentinel(t *testing.T) {
 
 func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_78934085033849")
-
-	_, err := backup.GetSentinel()
+	backup, err := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), "base_78934085033849")
+	require.NoError(t, err)
+	_, err = backup.GetSentinel()
 
 	assert.Error(t, err)
 }
@@ -132,10 +139,11 @@ func TestFetchSentinelReturnErrorWhenSentinelNotExist(t *testing.T) {
 func TestFetchSentinelReturnErrorWhenSentinelUnmarshallable(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backupName := "base_000"
-	backup := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupName)
+	backup, err := postgres.NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupName)
+	require.NoError(t, err)
 	errorMessage := fmt.Sprintf("failed to fetch dto from %s", backupName+utility.SentinelSuffix)
 
-	_, err := backup.GetSentinel()
+	_, err = backup.GetSentinel()
 
 	assert.Error(t, err)
 	assert.Equal(t, errorMessage, err.Error()[:len(errorMessage)])
@@ -146,9 +154,9 @@ func TestGetLatestBackupName(t *testing.T) {
 	backupNames := []string{"base_123", "base_456", "base000"}
 	for _, nameBackupPrefix := range backupNames {
 		nameBackup := nameBackupPrefix + utility.SentinelSuffix
-		folder.PutObject(nameBackup, &bytes.Buffer{})
+		_ = folder.PutObject(nameBackup, &bytes.Buffer{})
 
-		latestBackup, err := internal.GetLatestBackupName(folder)
+		latestBackup, err := internal.GetLatestBackup(folder)
 		assert.NoError(t, err)
 		assert.Equal(t, nameBackupPrefix, latestBackup)
 	}
@@ -157,7 +165,7 @@ func TestGetLatestBackupName(t *testing.T) {
 func TestGetLatestBackupNameNoBackupsInFolder(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backupName, err := internal.GetLatestBackupName(baseBackupFolder)
+	backupName, err := internal.GetLatestBackup(baseBackupFolder)
 
 	assert.Error(t, err, internal.NoBackupsFoundError{})
 	assert.Equal(t, backupName, "")
@@ -166,7 +174,7 @@ func TestGetLatestBackupNameNoBackupsInFolder(t *testing.T) {
 func TestGetLastBackupNameWithGarbage(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	latestBackup, err := internal.GetLatestBackupName(subFolder)
+	latestBackup, err := internal.GetLatestBackup(subFolder)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "base_000", latestBackup)

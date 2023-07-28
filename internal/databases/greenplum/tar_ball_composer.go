@@ -73,13 +73,16 @@ func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.Tar
 	)
 }
 
-func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (BackupAOFiles, error) {
+func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (files BackupAOFiles, err error) {
 	var base SegBackup
 	// In case of delta backup, use the provided backup name as the base. Otherwise, use the latest backup.
 	if incrementFromName != "" {
-		base = NewSegBackup(maker.uploader.Folder(), incrementFromName)
+		base, err = NewSegBackup(maker.uploader.Folder(), incrementFromName)
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		backupName, err := internal.GetLatestBackupName(maker.uploader.Folder())
+		backup, err := internal.GetLatestBackup(maker.uploader.Folder())
 		if err != nil {
 			if _, ok := err.(internal.NoBackupsFoundError); ok {
 				tracelog.InfoLogger.Println("Couldn't find previous backup, leaving the base files empty.")
@@ -88,7 +91,10 @@ func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (Ba
 
 			return nil, err
 		}
-		base = NewSegBackup(maker.uploader.Folder(), backupName)
+		base, err = NewSegBackup(maker.uploader.Folder(), backup.Name)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	baseFilesMetadata, err := base.LoadAoFilesMetadata()

@@ -15,19 +15,19 @@ import (
 
 func HandlePgbackrestBackupFetch(folder storage.Folder, stanza string, destinationDirectory string,
 	backupSelector internal.BackupSelector) error {
-	backupName, err := backupSelector.Select(folder)
+	backup, err := backupSelector.Select(folder)
 	if err != nil {
 		return err
 	}
 
-	backupDetails, err := GetBackupDetails(folder, stanza, backupName)
+	backupDetails, err := GetBackupDetails(folder, stanza, backup.Name)
 	if err != nil {
 		return err
 	}
 
 	switch backupDetails.Type {
 	case "full":
-		return fullBackupFetch(folder, stanza, backupName, destinationDirectory, backupDetails)
+		return fullBackupFetch(folder, stanza, backup.Name, destinationDirectory, backupDetails)
 	default:
 		return errors.New("Unsupported backup type: " + backupDetails.Type)
 	}

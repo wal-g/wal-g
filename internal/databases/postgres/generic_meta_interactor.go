@@ -26,7 +26,10 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 
 // TODO: Unit tests
 func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
-	var backup = NewBackup(backupFolder, backupName)
+	backup, err := NewBackup(backupFolder, backupName)
+	if err != nil {
+		return internal.GenericMetadata{}, err
+	}
 	meta, err := backup.FetchMeta()
 	if err != nil {
 		return internal.GenericMetadata{}, err
@@ -70,9 +73,12 @@ func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder stora
 }
 
 func modifyBackupMetadata(backupName string, backupFolder storage.Folder, modifier func(ExtendedMetadataDto) ExtendedMetadataDto) error {
-	backup := internal.NewBackup(backupFolder, backupName)
+	backup, err := internal.NewBackup(backupFolder, backupName)
+	if err != nil {
+		return errors.Wrap(err, "failed to modify metadata")
+	}
 	var meta ExtendedMetadataDto
-	err := backup.FetchMetadata(&meta)
+	err = backup.FetchMetadata(&meta)
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch the existing backup metadata for modifying")
 	}
