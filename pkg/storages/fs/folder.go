@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -129,6 +130,9 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	src := path.Join(folder.rootPath, srcPath)
 	srcStat, err := os.Stat(src)
+	if errors.Is(err, os.ErrNotExist) {
+		return storage.NewObjectNotFoundError(srcPath)
+	}
 	if err != nil {
 		return err
 	}

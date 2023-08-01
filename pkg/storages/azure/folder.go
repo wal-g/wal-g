@@ -327,7 +327,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	var err error
 	if exists, err = folder.Exists(srcPath); !exists {
 		if err == nil {
-			return errors.New("object do not exists")
+			return storage.NewObjectNotFoundError(srcPath)
 		}
 		return err
 	}
