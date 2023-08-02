@@ -55,9 +55,9 @@ func NewBackup(folder storage.Folder, name string) (Backup, error) {
 }
 
 func NewBackupInStorage(folder storage.Folder, name, storage string) (Backup, error) {
-	folder, err := multistorage.UseSpecificStorage(name, folder)
+	folder, err := multistorage.UseSpecificStorage(storage, folder)
 	if err != nil {
-		return Backup{}, fmt.Errorf("create backup %s in storage %s", name, storage)
+		return Backup{}, fmt.Errorf("create backup %s in storage %s: %w", name, storage, err)
 	}
 	return Backup{
 		Name:   name,

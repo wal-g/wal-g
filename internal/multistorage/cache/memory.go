@@ -10,11 +10,12 @@ var memCache storageStatuses
 var memCacheMu *sync.Mutex
 
 func init() {
+	memCache = map[string]status{}
 	memCacheMu = new(sync.Mutex)
 }
 
 func (ss storageStatuses) isRelevant(ttl time.Duration, storages ...NamedFolder) bool {
-	if ss == nil {
+	if len(ss) == 0 {
 		return false
 	}
 	for _, s := range storages {
@@ -73,7 +74,7 @@ func (ss storageStatuses) getRelevantFirstAlive(ttl time.Duration, storagesInOrd
 		if storagesInOrder[i].Name != relevant[i].Name {
 			break
 		}
-		if memCache[relevant[i].Name].Alive {
+		if ss[relevant[i].Name].Alive {
 			firstAlive = &relevant[i]
 			break
 		}

@@ -9,7 +9,14 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-type StatusCache struct {
+//go:generate mockgen -source status_cache.go -destination status_cache_mock.go -package cache
+type StatusCache interface {
+	AllAliveStorages() ([]NamedFolder, error)
+	FirstAliveStorage() (*NamedFolder, error)
+	SpecificStorage(name string) (*NamedFolder, error)
+}
+
+type statusCache struct {
 	storagesInOrder []NamedFolder
 	ttl             time.Duration
 	checkTimeout    time.Duration
@@ -19,15 +26,15 @@ func NewStatusCache(
 	primary storage.Folder,
 	failover map[string]storage.Folder,
 	ttl, checkTimeout time.Duration,
-) *StatusCache {
-	return &StatusCache{
+) StatusCache {
+	return &statusCache{
 		storagesInOrder: nameAndOrderFolders(primary, failover),
 		ttl:             ttl,
 		checkTimeout:    checkTimeout,
 	}
 }
 
-func (c *StatusCache) AllAliveStorages() ([]NamedFolder, error) {
+func (c *statusCache) AllAliveStorages() ([]NamedFolder, error) {
 	memCacheMu.Lock()
 	defer memCacheMu.Unlock()
 
@@ -60,7 +67,7 @@ func (c *StatusCache) AllAliveStorages() ([]NamedFolder, error) {
 	return memCache.getAllAlive(c.storagesInOrder), nil
 }
 
-func (c *StatusCache) FirstAliveStorage() (*NamedFolder, error) {
+func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 	memCacheMu.Lock()
 	defer memCacheMu.Unlock()
 
@@ -96,54 +103,54 @@ func (c *StatusCache) FirstAliveStorage() (*NamedFolder, error) {
 	return memCache.getRelevantFirstAlive(c.ttl, c.storagesInOrder), nil
 }
 
-func (c *StatusCache) SpecificStorage(name string) (specificStorage NamedFolder, err error) {
+func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 	memCacheMu.Lock()
 	defer memCacheMu.Unlock()
 
-	var found bool
+	var specificStorage *NamedFolder
 	for _, s := range c.storagesInOrder {
 		if s.Name == name {
-			specificStorage = s
-			found = true
+			specificStorage = &s
+			break
 		}
 	}
-	if !found {
-		return NamedFolder{}, fmt.Errorf("unknown storage %q", name)
+	if specificStorage == nil {
+		return nil, fmt.Errorf("unknown storage %q", name)
 	}
 
-	ensureStorageIsAlive := func(statuses storageStatuses) (NamedFolder, error) {
+	getStorageIfAlive := func(statuses storageStatuses) (*NamedFolder, error) {
 		if statuses[specificStorage.Name].Alive {
 			return specificStorage, nil
 		}
-		return NamedFolder{}, fmt.Errorf("storage %q is dead", name)
+		return nil, nil
 	}
 
-	if memCache.isRelevant(c.ttl, specificStorage) {
-		return ensureStorageIsAlive(memCache)
+	if memCache.isRelevant(c.ttl, *specificStorage) {
+		return getStorageIfAlive(memCache)
 	}
 
 	oldFile, err := readFile()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
 	}
-	if oldFile.isRelevant(c.ttl, specificStorage) {
+	if oldFile.isRelevant(c.ttl, *specificStorage) {
 		memCache[specificStorage.Name] = oldFile[specificStorage.Name]
-		return ensureStorageIsAlive(oldFile)
+		return getStorageIfAlive(oldFile)
 	}
 
-	checkResult, err := checkForAlive(c.checkTimeout, specificStorage)
+	checkResult, err := checkForAlive(c.checkTimeout, *specificStorage)
 	if err != nil {
-		return NamedFolder{}, fmt.Errorf("check if storage %q is alive", specificStorage.Name)
+		return nil, fmt.Errorf("check if storage %q is alive", specificStorage.Name)
 	}
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
 	if err != nil {
-		return NamedFolder{}, fmt.Errorf("write cache file: %w", err)
+		return nil, fmt.Errorf("write cache file: %w", err)
 	}
 
 	memCache = newFile
-	return ensureStorageIsAlive(memCache)
+	return getStorageIfAlive(memCache)
 }
 
 type NamedFolder struct {

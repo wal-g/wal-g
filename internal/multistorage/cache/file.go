@@ -11,7 +11,7 @@ import (
 )
 
 // StatusFile is stored on a disk and therefore shared between all WAL-G processes and commands.
-const StatusFile = ".walg_storage_status_cache"
+const StatusFile = "/tmp/.walg_storage_status_cache"
 
 type storageStatuses map[string]status
 
@@ -72,10 +72,7 @@ func writeFile(content storageStatuses) error {
 		return fmt.Errorf("marshal cache file content: %w", err)
 	}
 
-	file, err := os.OpenFile(StatusFile, os.O_RDWR, 0666)
-	if os.IsNotExist(err) {
-		return nil
-	}
+	file, err := os.OpenFile(StatusFile, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return fmt.Errorf("open cache file: %w", err)
 	}
@@ -84,6 +81,11 @@ func writeFile(content storageStatuses) error {
 	err = lockFile(file, true)
 	if err != nil {
 		return fmt.Errorf("acquire exclusive lock for the cache file: %w", err)
+	}
+
+	err = file.Truncate(int64(len(bytes)))
+	if err != nil {
+		return fmt.Errorf("truncate cache file: %w", err)
 	}
 
 	_, err = file.Write(bytes)

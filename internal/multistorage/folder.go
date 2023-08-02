@@ -1,6 +1,7 @@
 package multistorage
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path"
@@ -24,7 +25,7 @@ func UseAllAliveStorages(folder storage.Folder) (storage.Folder, error) {
 		return nil, fmt.Errorf("select all alive storages in multistorage folder: %w", err)
 	}
 	if len(storages) == 0 {
-		return nil, fmt.Errorf("no alive storages")
+		return nil, ErrNoAliveStorages
 	}
 	mf.storages = changeDirectory(mf.path, storages...)
 	return mf, nil
@@ -43,7 +44,7 @@ func UseFirstAliveStorage(folder storage.Folder) (storage.Folder, error) {
 		return nil, fmt.Errorf("select first alive storage in multistorage folder: %w", err)
 	}
 	if firstStorage == nil {
-		return nil, fmt.Errorf("no alive storages")
+		return nil, ErrNoAliveStorages
 	}
 	mf.storages = changeDirectory(mf.path, *firstStorage)
 	return mf, nil
@@ -66,7 +67,10 @@ func UseSpecificStorage(name string, folder storage.Folder) (storage.Folder, err
 	if err != nil {
 		return nil, fmt.Errorf("select storage %q in multistorage folder: %w", name, err)
 	}
-	mf.storages = changeDirectory(mf.path, specificStorage)
+	if specificStorage == nil {
+		return nil, ErrNoAliveStorages
+	}
+	mf.storages = changeDirectory(mf.path, *specificStorage)
 	return mf, nil
 }
 
@@ -92,10 +96,14 @@ func EnsureSingleStorageIsUsed(folder storage.Folder) error {
 }
 
 func changeDirectory(path string, storages ...cache.NamedFolder) []cache.NamedFolder {
-	for _, s := range storages {
-		s.Folder = s.Folder.GetSubFolder(path)
+	newStorages := make([]cache.NamedFolder, len(storages))
+	for i := range storages {
+		newStorages[i] = cache.NamedFolder{
+			Name:   storages[i].Name,
+			Folder: storages[i].Folder.GetSubFolder(path),
+		}
 	}
-	return storages
+	return newStorages
 }
 
 // SetPolicies makes a copy of the Folder that uses new policies.Policies.
@@ -107,7 +115,7 @@ func SetPolicies(folder storage.Folder, policies policies.Policies) storage.Fold
 	return folder
 }
 
-func NewFolder(cache *cache.StatusCache) storage.Folder {
+func NewFolder(cache cache.StatusCache) storage.Folder {
 	return Folder{
 		cache:    cache,
 		policies: policies.Default,
@@ -117,29 +125,25 @@ func NewFolder(cache *cache.StatusCache) storage.Folder {
 // Folder represents a multi-storage folder that aggregates several folders from different storages with the same path.
 // A specific behaviour (should the folders be united, merged, etc.) is selected by policies.Policies.
 type Folder struct {
-	cache    *cache.StatusCache
+	cache    cache.StatusCache
 	storages []cache.NamedFolder
 	path     string
 	policies policies.Policies
 }
 
-// GetPath provides the base path that is common for all the storages. If no storages are used, provides "".
+// GetPath provides the base path that is common for all the storages.
 func (mf Folder) GetPath() string {
-	if len(mf.storages) == 0 {
-		return ""
-	}
-	return mf.storages[0].GetPath()
+	return mf.path
 }
 
 // GetSubFolder provides a multi-storage subfolder, which includes subfolders of all used storages.
 func (mf Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	subfolder := &Folder{
+	subfolder := Folder{
 		cache:    mf.cache,
-		storages: mf.storages,
-		path:     path.Join(mf.path, subFolderRelativePath),
+		path:     path.Join(mf.path, subFolderRelativePath) + "/",
 		policies: mf.policies,
 	}
-	mf.storages = changeDirectory(subFolderRelativePath, mf.storages...)
+	subfolder.storages = changeDirectory(subFolderRelativePath, mf.storages...)
 	return subfolder
 }
 
@@ -174,7 +178,7 @@ func Exists(folder storage.Folder, objectRelativePath string) (found bool, stora
 // ExistsInFirst checks if the object exists in the first storage.
 func (mf Folder) ExistsInFirst(objectRelativePath string) (bool, string, error) {
 	if len(mf.storages) == 0 {
-		return false, "", fmt.Errorf("no storages are used")
+		return false, "", ErrNoUsedStorages
 	}
 	first := mf.storages[0]
 	exists, err := first.Exists(objectRelativePath)
@@ -236,7 +240,7 @@ func ReadObject(folder storage.Folder, objectRelativePath string) (io.ReadCloser
 // ReadObjectFromFirst reads the object from the first storage.
 func (mf Folder) ReadObjectFromFirst(objectRelativePath string) (io.ReadCloser, string, error) {
 	if len(mf.storages) == 0 {
-		return nil, "", fmt.Errorf("no storages are used")
+		return nil, "", ErrNoUsedStorages
 	}
 	first := mf.storages[0]
 	file, err := first.ReadObject(objectRelativePath)
@@ -275,58 +279,96 @@ func (mf Folder) ListFolder() (objects []storage.Object, subFolders []storage.Fo
 // ListFolderInFirst lists the folder in the first storage.
 func (mf Folder) ListFolderInFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	if len(mf.storages) == 0 {
-		return nil, nil, fmt.Errorf("no storages are used")
+		return nil, nil, ErrNoUsedStorages
 	}
-	objects, subFolders, err = mf.storages[0].ListFolder()
-	if err != nil {
-		return nil, nil, err
-	}
-	for i := range subFolders {
-		subFolders[i] = &Folder{
-			cache:    mf.cache,
-			storages: mf.storages,
-			path:     subFolders[i].GetPath(),
-			policies: mf.policies,
-		}
-	}
-	return objects, subFolders, nil
+	return mf.listStorageFolder(mf.storages[0])
 }
 
 // ListFolderWhereFoundFirst lists the folder in all used storages and provides a result where each file is taken from
 // the first storage in which it was found.
 func (mf Folder) ListFolderWhereFoundFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	objects, subFolders, err = mf.storages[0].ListFolder()
-	if err != nil {
-		return nil, nil, err
-	}
-	for i := range subFolders {
-		subFolders[i] = &Folder{
-			cache:    mf.cache,
-			storages: mf.storages,
-			path:     subFolders[i].GetPath(),
-			policies: mf.policies,
+	metObjects := map[string]bool{}
+	metSubFolders := map[string]bool{}
+
+	for _, st := range mf.storages {
+		curObjects, curSubFolders, err := mf.listStorageFolder(st)
+		if err != nil {
+			return nil, nil, fmt.Errorf("list storage %q folder %q: %w", st.Name, mf.path, err)
+		}
+		for _, obj := range curObjects {
+			name := obj.GetName()
+			if metObjects[name] {
+				continue
+			}
+			objects = append(objects, obj)
+			metObjects[name] = true
+		}
+		for _, subf := range curSubFolders {
+			name := subf.GetPath()
+			if metSubFolders[name] {
+				continue
+			}
+			subFolders = append(subFolders, subf)
+			metSubFolders[name] = true
 		}
 	}
+
 	return objects, subFolders, nil
 }
 
-// ListFolderAll lists every used storage and provides the union of all found files.
+// ListFolderAll lists every used storage and provides the union of all found files. Subfolders aren't listed twice.
 func (mf Folder) ListFolderAll() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	for _, s := range mf.storages {
-		curObjects, curSubFolders, err := s.ListFolder()
+	metSubFolders := map[string]bool{}
+
+	for _, st := range mf.storages {
+		curObjects, curSubFolders, err := mf.listStorageFolder(st)
 		if err != nil {
-			return nil, nil, fmt.Errorf("list folder: %w", err)
+			return nil, nil, fmt.Errorf("list storage %q folder %q: %w", st.Name, mf.path, err)
 		}
 		objects = append(objects, curObjects...)
-		for _, sf := range curSubFolders {
-			subFolders = append(subFolders, &Folder{
-				cache:    mf.cache,
-				storages: mf.storages,
-				path:     sf.GetPath(),
-				policies: mf.policies,
-			})
+		for _, subf := range curSubFolders {
+			name := subf.GetPath()
+			if metSubFolders[name] {
+				continue
+			}
+			subFolders = append(subFolders, subf)
+			metSubFolders[name] = true
 		}
 	}
+
+	return objects, subFolders, nil
+}
+
+func (mf Folder) listStorageFolder(storage cache.NamedFolder) ([]storage.Object, []storage.Folder, error) {
+	objects, subFolders, err := storage.ListFolder()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for i, obj := range objects {
+		objects[i] = multiObject{
+			Object:      obj,
+			storageName: storage.Name,
+		}
+	}
+
+	for i, subFolder := range subFolders {
+		newStorages := make([]cache.NamedFolder, len(mf.storages))
+		for j, st := range mf.storages {
+			newStorages[j] = cache.NamedFolder{
+				Name:   st.Name,
+				Folder: st.GetSubFolder(path.Base(subFolder.GetPath())),
+			}
+		}
+
+		subFolders[i] = Folder{
+			cache:    mf.cache,
+			storages: newStorages,
+			path:     subFolder.GetPath(),
+			policies: mf.policies,
+		}
+	}
+
 	return objects, subFolders, nil
 }
 
@@ -349,7 +391,7 @@ func (mf Folder) PutObject(name string, content io.Reader) error {
 // PutObjectToFirst puts the object to the first storage.
 func (mf Folder) PutObjectToFirst(name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
-		return fmt.Errorf("no storages are used")
+		return ErrNoUsedStorages
 	}
 	return mf.storages[0].PutObject(name, content)
 }
@@ -358,7 +400,7 @@ func (mf Folder) PutObjectToFirst(name string, content io.Reader) error {
 // uploads a new object to the first storage.
 func (mf Folder) PutObjectOrUpdateFirstFound(name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
-		return fmt.Errorf("no storages are used")
+		return ErrNoUsedStorages
 	}
 	for _, s := range mf.storages {
 		exists, err := s.Exists(name)
@@ -374,7 +416,18 @@ func (mf Folder) PutObjectOrUpdateFirstFound(name string, content io.Reader) err
 
 // PutObjectToAll puts the object to all used storages.
 func (mf Folder) PutObjectToAll(name string, content io.Reader) error {
+	var buffer []byte
+	if len(mf.storages) > 1 {
+		var err error
+		buffer, err = io.ReadAll(content)
+		if err != nil {
+			return fmt.Errorf("read file content to save in a temporary buffer: %w", err)
+		}
+	}
 	for _, s := range mf.storages {
+		if buffer != nil {
+			content = bytes.NewReader(buffer)
+		}
 		err := s.PutObject(name, content)
 		if err != nil {
 			return fmt.Errorf("put object to storage %q: %w", s.Name, err)
@@ -387,8 +440,18 @@ func (mf Folder) PutObjectToAll(name string, content io.Reader) error {
 // new object to the first storage.
 func (mf Folder) PutObjectOrUpdateAllFound(name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
-		return fmt.Errorf("no storages are used")
+		return ErrNoUsedStorages
 	}
+
+	var buffer []byte
+	if len(mf.storages) > 1 {
+		var err error
+		buffer, err = io.ReadAll(content)
+		if err != nil {
+			return fmt.Errorf("read file content to save in a temporary buffer: %w", err)
+		}
+	}
+
 	var found bool
 	for _, s := range mf.storages {
 		exists, err := s.Exists(name)
@@ -396,6 +459,9 @@ func (mf Folder) PutObjectOrUpdateAllFound(name string, content io.Reader) error
 			return fmt.Errorf("check for existence: %w", err)
 		}
 		if exists {
+			if buffer != nil {
+				content = bytes.NewReader(buffer)
+			}
 			err = s.PutObject(name, content)
 			if err != nil {
 				return fmt.Errorf("put object to storage %q: %w", s.Name, err)
@@ -404,8 +470,12 @@ func (mf Folder) PutObjectOrUpdateAllFound(name string, content io.Reader) error
 		}
 	}
 	if !found {
+		if buffer != nil {
+			content = bytes.NewReader(buffer)
+		}
 		return mf.storages[0].PutObject(name, content)
 	}
+
 	return nil
 }
 
@@ -425,7 +495,7 @@ func (mf Folder) DeleteObjects(objectRelativePaths []string) error {
 // DeleteObjectsFromFirst deletes the objects from the first storage.
 func (mf Folder) DeleteObjectsFromFirst(objectRelativePaths []string) error {
 	if len(mf.storages) == 0 {
-		return fmt.Errorf("no storages are used")
+		return ErrNoUsedStorages
 	}
 	return mf.storages[0].DeleteObjects(objectRelativePaths)
 }
@@ -456,18 +526,31 @@ func (mf Folder) CopyObject(srcPath string, dstPath string) error {
 // CopyObjectInFirst copies the object in the first storage.
 func (mf Folder) CopyObjectInFirst(srcPath string, dstPath string) error {
 	if len(mf.storages) == 0 {
-		return fmt.Errorf("no storages are used")
+		return ErrNoUsedStorages
 	}
 	return mf.storages[0].CopyObject(srcPath, dstPath)
 }
 
-// CopyObjectInAll copies the object in all used storages.
+// CopyObjectInAll copies the object in all used storages. If no storages have the object, an error is returned.
 func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
+	found := false
 	for _, s := range mf.storages {
 		err := s.CopyObject(srcPath, dstPath)
+		if _, ok := err.(storage.ObjectNotFoundError); ok {
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("copy object in storage %q: %w", s.Name, err)
 		}
+		found = true
+	}
+	if !found {
+		return storage.NewObjectNotFoundError(srcPath)
 	}
 	return nil
 }
+
+var (
+	ErrNoUsedStorages  = fmt.Errorf("no storages are used")
+	ErrNoAliveStorages = fmt.Errorf("no alive storages")
+)
