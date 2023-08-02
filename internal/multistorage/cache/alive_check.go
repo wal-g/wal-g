@@ -13,7 +13,7 @@ type checkRes struct {
 	err  error
 }
 
-func checkForAlive(timeout time.Duration, storages ...NamedFolder) (map[string]bool, error) {
+func checkForAlive(timeout time.Duration, storages ...NamedFolder) map[string]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -49,7 +49,7 @@ func checkForAlive(timeout time.Duration, storages ...NamedFolder) (map[string]b
 	}
 
 	tracelog.DebugLogger.Printf("Found %d alive storages: %v", aliveCount, results)
-	return results, nil
+	return results
 }
 
 func checkStorage(ctx context.Context, folder NamedFolder) error {

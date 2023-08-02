@@ -52,10 +52,7 @@ func (c *statusCache) AllAliveStorages() ([]NamedFolder, error) {
 		return memCache.getAllAlive(c.storagesInOrder), nil
 	}
 
-	checkResult, err := checkForAlive(c.checkTimeout, outdated...)
-	if err != nil {
-		return nil, fmt.Errorf("find alive storages: %w", err)
-	}
+	checkResult := checkForAlive(c.checkTimeout, outdated...)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
@@ -88,10 +85,7 @@ func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 
 	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 
-	checkResult, err := checkForAlive(c.checkTimeout, outdated...)
-	if err != nil {
-		return nil, fmt.Errorf("find alive storages: %w", err)
-	}
+	checkResult := checkForAlive(c.checkTimeout, outdated...)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
@@ -110,7 +104,8 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 	var specificStorage *NamedFolder
 	for _, s := range c.storagesInOrder {
 		if s.Name == name {
-			specificStorage = &s
+			sCpy := s
+			specificStorage = &sCpy
 			break
 		}
 	}
@@ -138,10 +133,7 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 		return getStorageIfAlive(oldFile)
 	}
 
-	checkResult, err := checkForAlive(c.checkTimeout, *specificStorage)
-	if err != nil {
-		return nil, fmt.Errorf("check if storage %q is alive", specificStorage.Name)
-	}
+	checkResult := checkForAlive(c.checkTimeout, *specificStorage)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)

@@ -123,7 +123,7 @@ func NewFolder(cache cache.StatusCache) storage.Folder {
 }
 
 // Folder represents a multi-storage folder that aggregates several folders from different storages with the same path.
-// A specific behaviour (should the folders be united, merged, etc.) is selected by policies.Policies.
+// A specific behavior (should the folders be united, merged, etc.) is selected by policies.Policies.
 type Folder struct {
 	cache    cache.StatusCache
 	storages []cache.NamedFolder

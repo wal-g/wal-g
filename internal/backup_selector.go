@@ -70,25 +70,25 @@ func (s UserDataBackupSelector) findBackupByUserData(userData interface{}, folde
 		return Backup{}, NewNoBackupsFoundError()
 	}
 
-	var foundMeta GenericMetadata
+	var foundBackupName string
 	var foundStorage string
 	uniqueNames := map[string]bool{}
-	for storageName, meta := range foundMetas {
-		foundMeta = meta
+	for storageName := range foundMetas {
+		foundBackupName = foundMetas[storageName].BackupName
 		foundStorage = storageName
-		uniqueNames[meta.BackupName] = true
+		uniqueNames[foundBackupName] = true
 	}
 
 	if len(uniqueNames) > 1 {
 		var backupNames []string
-		for _, meta := range foundMetas {
-			backupNames = append(backupNames, meta.BackupName)
+		for st := range foundMetas {
+			backupNames = append(backupNames, foundMetas[st].BackupName)
 		}
 		return Backup{}, fmt.Errorf("too many backups (%d) found with specified user data: %s",
 			len(uniqueNames), strings.Join(backupNames, " "))
 	}
 
-	return NewBackupInStorage(folder, foundMeta.BackupName, foundStorage)
+	return NewBackupInStorage(folder, foundBackupName, foundStorage)
 }
 
 // Search backups in storage using specified criteria
@@ -222,9 +222,9 @@ func (s *OldestNonPermanentSelector) Select(folder storage.Folder) (Backup, erro
 
 	var oldestMeta GenericMetadata
 	var oldestStorage string
-	for storageName, meta := range foundMetas {
-		if meta.StartTime.Before(oldestMeta.StartTime) {
-			oldestMeta = meta
+	for storageName := range foundMetas {
+		if foundMetas[storageName].StartTime.Before(oldestMeta.StartTime) {
+			oldestMeta = foundMetas[storageName]
 			oldestStorage = storageName
 		}
 	}
