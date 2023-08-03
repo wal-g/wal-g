@@ -111,17 +111,15 @@ type GpTarBallComposer struct {
 	tarFilePacker *postgres.TarBallFilePackerImpl
 	crypter       crypto.Crypter
 
-	addFileQueue     chan *internal.ComposeFileInfo
-	addFileWaitGroup sync.WaitGroup
+	addFileQueue chan *internal.ComposeFileInfo
+	errorGroup   *errgroup.Group
+	ctx          context.Context
 
 	uploader internal.Uploader
 
 	files            internal.BundleFiles
 	tarFileSets      internal.TarFileSets
 	tarFileSetsMutex sync.Mutex
-
-	errorGroup *errgroup.Group
-	ctx        context.Context
 
 	relStorageMap      AoRelFileStorageMap
 	aoStorageUploader  *AoStorageUploader
@@ -156,7 +154,6 @@ func NewGpTarBallComposer(
 	}
 	composer.addFileQueue = make(chan *internal.ComposeFileInfo, maxUploadDiskConcurrency)
 	for i := 0; i < maxUploadDiskConcurrency; i++ {
-		composer.addFileWaitGroup.Add(1)
 		composer.errorGroup.Go(func() error {
 			return composer.addFileWorker(composer.addFileQueue)
 		})
@@ -200,8 +197,6 @@ func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 		return nil, err
 	}
 
-	c.addFileWaitGroup.Wait()
-
 	err = internal.UploadDto(c.uploader.Folder(), c.aoStorageUploader.GetFiles(), getAOFilesMetadataPath(c.backupName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload AO files metadata: %v", err)
@@ -214,16 +209,22 @@ func (c *GpTarBallComposer) GetFiles() internal.BundleFiles {
 }
 
 func (c *GpTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo) error {
-	for task := range tasks {
-		err := c.addFile(task)
-		if err != nil {
-			tracelog.ErrorLogger.Printf(
-				"Received an error while adding the file %s: %v", task.Path, err)
-			return err
+	for {
+		select {
+		case <-c.ctx.Done():
+			return nil
+		case task, ok := <-tasks:
+			if !ok {
+				return nil
+			}
+			err := c.addFile(task)
+			if err != nil {
+				tracelog.ErrorLogger.Printf(
+					"Received an error while adding the file %s: %v", task.Path, err)
+				return err
+			}
 		}
 	}
-	c.addFileWaitGroup.Done()
-	return nil
 }
 
 func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {

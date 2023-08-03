@@ -85,8 +85,9 @@ type RatingTarBallComposer struct {
 	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
 
-	addFileQueue     chan *internal.ComposeFileInfo
-	addFileWaitGroup sync.WaitGroup
+	addFileQueue chan *internal.ComposeFileInfo
+	errorGroup   *errgroup.Group
+	ctx          context.Context
 
 	fileStats   RelFileStatistics
 	bundleFiles internal.BundleFiles
@@ -97,9 +98,6 @@ type RatingTarBallComposer struct {
 	deltaMap         PagedFileDeltaMap
 	deltaMapMutex    sync.RWMutex
 	deltaMapComplete bool
-
-	errorGroup *errgroup.Group
-	ctx        context.Context
 }
 
 func NewRatingTarBallComposer(
@@ -137,7 +135,6 @@ func NewRatingTarBallComposer(
 	}
 	composer.addFileQueue = make(chan *internal.ComposeFileInfo, maxUploadDiskConcurrency)
 	for i := 0; i < maxUploadDiskConcurrency; i++ {
-		composer.addFileWaitGroup.Add(1)
 		composer.errorGroup.Go(func() error {
 			return composer.addFileWorker(composer.addFileQueue)
 		})
@@ -171,7 +168,6 @@ func (c *RatingTarBallComposer) FinishComposing() (internal.TarFileSets, error) 
 	if err != nil {
 		return nil, err
 	}
-	c.addFileWaitGroup.Wait()
 
 	c.tarFilePacker.UpdateDeltaMap(c.deltaMap)
 	headers, tarFilesCollections := c.composeFiles()
@@ -213,14 +209,22 @@ func (c *RatingTarBallComposer) GetFiles() internal.BundleFiles {
 }
 
 func (c *RatingTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo) error {
-	for task := range tasks {
-		err := c.addFile(task)
-		if err != nil {
-			return err
+	for {
+		select {
+		case <-c.ctx.Done():
+			return nil
+		case task, ok := <-tasks:
+			if !ok {
+				return nil
+			}
+			err := c.addFile(task)
+			if err != nil {
+				tracelog.ErrorLogger.Printf(
+					"Received an error while adding the file %s: %v", task.Path, err)
+				return err
+			}
 		}
 	}
-	c.addFileWaitGroup.Done()
-	return nil
 }
 
 func (c *RatingTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
