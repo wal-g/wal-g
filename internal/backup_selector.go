@@ -88,7 +88,8 @@ func (s UserDataBackupSelector) findBackupByUserData(userData interface{}, folde
 			len(uniqueNames), strings.Join(backupNames, " "))
 	}
 
-	return NewBackupInStorage(folder, foundBackupName, foundStorage)
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+	return NewBackupInStorage(baseBackupFolder, foundBackupName, foundStorage)
 }
 
 // Search backups in storage using specified criteria
