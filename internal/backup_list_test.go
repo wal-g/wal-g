@@ -23,11 +23,13 @@ var backups = []internal.BackupTime{
 		BackupName:  "base_123",
 		Time:        time.Date(2019, 4, 25, 14, 48, 0, 0, time.UTC),
 		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+		StorageName: "default",
 	},
 	{
 		BackupName:  "base_456",
 		Time:        time.Date(2018, 7, 5, 1, 1, 50, 0, time.UTC),
 		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+		StorageName: "default",
 	},
 }
 
@@ -75,12 +77,14 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 		"    {\n" +
 		"        \"backup_name\": \"base_456\",\n" +
 		"        \"time\": \"2018-07-05T01:01:50Z\",\n" +
-		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
+		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\",\n" +
+		"        \"storage_name\": \"default\"\n" +
 		"    },\n" +
 		"    {\n" +
 		"        \"backup_name\": \"base_123\",\n" +
 		"        \"time\": \"2019-04-25T14:48:00Z\",\n" +
-		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\"\n" +
+		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\",\n" +
+		"        \"storage_name\": \"default\"\n" +
 		"    }\n" +
 		"]"
 	var unmarshalledBackups []internal.BackupTime

@@ -115,7 +115,7 @@ func TestGetLastBackupName(t *testing.T) {
 func TestGetLatestBackupName_EmptyWhenNoBackups(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	lastB, _ := internal.GetLatestBackup(folder)
-	assert.Equal(t, "", lastB)
+	assert.Equal(t, "", lastB.Name)
 }
 
 func TestGetGarbageFromPrefix(t *testing.T) {

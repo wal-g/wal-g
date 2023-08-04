@@ -151,6 +151,7 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 		"        \"backup_name\": \"base_1\",\n" +
 		"        \"time\": \"2017-01-01T01:01:01.000000001Z\",\n" +
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\",\n" +
+		"        \"storage_name\": \"default\",\n" +
 		"        \"start_time\": \"0001-01-01T00:00:00Z\",\n" +
 		"        \"finish_time\": \"0001-01-01T00:00:00Z\",\n" +
 		"        \"date_fmt\": \"\",\n" +
@@ -168,6 +169,7 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 		"        \"backup_name\": \"base_0\",\n" +
 		"        \"time\": \"2018-01-01T01:01:01.000000001Z\",\n" +
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\",\n" +
+		"        \"storage_name\": \"default\",\n" +
 		"        \"start_time\": \"0001-01-01T00:00:00Z\",\n" +
 		"        \"finish_time\": \"0001-01-01T00:00:00Z\",\n" +
 		"        \"date_fmt\": \"\",\n" +
@@ -185,6 +187,7 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 		"        \"backup_name\": \"base_2\",\n" +
 		"        \"time\": \"2020-01-01T01:01:01.000000001Z\",\n" +
 		"        \"wal_file_name\": \"ZZZZZZZZZZZZZZZZZZZZZZZZ\",\n" +
+		"        \"storage_name\": \"default\",\n" +
 		"        \"start_time\": \"0001-01-01T00:00:00Z\",\n" +
 		"        \"finish_time\": \"0001-01-01T00:00:00Z\",\n" +
 		"        \"date_fmt\": \"\",\n" +

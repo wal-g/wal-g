@@ -158,17 +158,17 @@ func TestGetLatestBackupName(t *testing.T) {
 
 		latestBackup, err := internal.GetLatestBackup(folder)
 		assert.NoError(t, err)
-		assert.Equal(t, nameBackupPrefix, latestBackup)
+		assert.Equal(t, nameBackupPrefix, latestBackup.Name)
 	}
 }
 
 func TestGetLatestBackupNameNoBackupsInFolder(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backupName, err := internal.GetLatestBackup(baseBackupFolder)
+	backup, err := internal.GetLatestBackup(baseBackupFolder)
 
 	assert.Error(t, err, internal.NoBackupsFoundError{})
-	assert.Equal(t, backupName, "")
+	assert.Equal(t, backup.Name, "")
 }
 
 func TestGetLastBackupNameWithGarbage(t *testing.T) {
@@ -177,5 +177,5 @@ func TestGetLastBackupNameWithGarbage(t *testing.T) {
 	latestBackup, err := internal.GetLatestBackup(subFolder)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "base_000", latestBackup)
+	assert.Equal(t, "base_000", latestBackup.Name)
 }
