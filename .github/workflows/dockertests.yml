@@ -15,7 +15,7 @@ env:
   IMAGE_UBUNTU: wal-g/ubuntu
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: "1.20"
+  GO_VERSION: "1.20.5" # until this will be resolved https://github.com/golang/go/issues/61431
 
 jobs:
   buildimages:
