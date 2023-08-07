@@ -280,21 +280,34 @@ func ConfigureSplitUploader() (Uploader, error) {
 	return splitStreamUploader, nil
 }
 
+func ConfigureCrypter() crypto.Crypter {
+	return ConfigureCrypterForSpecificConfig(viper.GetViper())
+}
+
+func CrypterFromConfig(configFile string) crypto.Crypter {
+	var config = viper.New()
+	SetDefaultValues(config)
+	ReadConfigFromFile(config, configFile)
+	CheckAllowedSettings(config)
+
+	return ConfigureCrypterForSpecificConfig(config)
+}
+
 // ConfigureCrypter uses environment variables to create and configure a crypter.
 // In case no configuration in environment variables found, return `<nil>` value.
-func ConfigureCrypter() crypto.Crypter {
+func ConfigureCrypterForSpecificConfig(config *viper.Viper) crypto.Crypter {
 	loadPassphrase := func() (string, bool) {
 		return GetSetting(PgpKeyPassphraseSetting)
 	}
 
 	// key can be either private (for download) or public (for upload)
-	if viper.IsSet(PgpKeySetting) {
-		return openpgp.CrypterFromKey(viper.GetString(PgpKeySetting), loadPassphrase)
+	if config.IsSet(PgpKeySetting) {
+		return openpgp.CrypterFromKey(config.GetString(PgpKeySetting), loadPassphrase)
 	}
 
 	// key can be either private (for download) or public (for upload)
-	if viper.IsSet(PgpKeyPathSetting) {
-		return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
+	if config.IsSet(PgpKeyPathSetting) {
+		return openpgp.CrypterFromKeyPath(config.GetString(PgpKeyPathSetting), loadPassphrase)
 	}
 
 	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
@@ -302,12 +315,12 @@ func ConfigureCrypter() crypto.Crypter {
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
 	}
 
-	if viper.IsSet(CseKmsIDSetting) {
-		return awskms.CrypterFromKeyID(viper.GetString(CseKmsIDSetting), viper.GetString(CseKmsRegionSetting))
+	if config.IsSet(CseKmsIDSetting) {
+		return awskms.CrypterFromKeyID(config.GetString(CseKmsIDSetting), config.GetString(CseKmsRegionSetting))
 	}
 
-	if viper.IsSet(YcKmsKeyIDSetting) {
-		return yckms.YcCrypterFromKeyIDAndCredential(viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting))
+	if config.IsSet(YcKmsKeyIDSetting) {
+		return yckms.YcCrypterFromKeyIDAndCredential(config.GetString(YcKmsKeyIDSetting), config.GetString(YcSaKeyFileSetting))
 	}
 
 	if crypter := configureLibsodiumCrypter(); crypter != nil {
