@@ -2,12 +2,11 @@ package postgres
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,17 +21,19 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName string, location string) {
+func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName string, location string) error {
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
 	concurrency, err := internal.GetMaxDownloadConcurrency()
-	tracelog.ErrorLogger.FatalOnError(err)
+	if err != nil {
+		return fmt.Errorf("get max concurrency: %v", err)
+	}
 
 	for i := 0; i < concurrency; i++ {
 		fileName, err = GetNextWalFilename(fileName)
 		if err != nil {
-			tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err, " file: ", fileName)
+			return fmt.Errorf("get next filename: %v", err)
 		}
 		waitGroup.Add(1)
 		go prefetchFile(location, folderReader.SubFolder(utility.WalPath), fileName, waitGroup)
@@ -52,6 +53,7 @@ func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName st
 	go CleanupPrefetchDirectories(walFileName, location, fsutil.FileSystemCleaner{})
 
 	waitGroup.Wait()
+	return nil
 }
 
 // TODO : unit tests
@@ -190,7 +192,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 func prefetchFile(location string, reader internal.StorageFolderReader, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
-			tracelog.ErrorLogger.Println("Prefetch unsuccessful ", walFileName, r)
+			tracelog.ErrorLogger.Println("WAL-prefetch unsuccessful ", walFileName, r)
 		}
 		waitGroup.Done()
 	}()
@@ -204,18 +206,25 @@ func prefetchFile(location string, reader internal.StorageFolderReader, walFileN
 		return
 	}
 
-	tracelog.InfoLogger.Println("WAL-prefetch file: ", walFileName)
 	err := os.MkdirAll(runningLocation, 0755)
-	tracelog.ErrorLogger.PrintOnError(err)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("WAL-prefetch %s, make dirs: %v", walFileName, err)
+	}
 
 	err = internal.DownloadFileTo(reader, walFileName, oldPath)
-	tracelog.ErrorLogger.PrintOnError(err)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("WAL-prefetch %s, download: %v", walFileName, err)
+	} else {
+		tracelog.DebugLogger.Printf("WAL-prefetch %s, download OK", walFileName)
+	}
 
 	_, errO = os.Stat(oldPath)
 	_, errN = os.Stat(newPath)
 	if errO == nil && os.IsNotExist(errN) {
 		err = os.Rename(oldPath, newPath)
-		tracelog.ErrorLogger.PrintOnError(err)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("WAL-prefetch %s, rename %s -> %s: %v", walFileName, oldPath, newPath, err)
+		}
 	} else {
 		_ = os.Remove(oldPath) // error is ignored
 	}
@@ -231,34 +240,4 @@ func getPrefetchLocations(location string,
 	oldPath := path.Join(runningLocation, walFileName)
 	newPath := path.Join(prefetchLocation, walFileName)
 	return prefetchLocation, runningLocation, oldPath, newPath
-}
-
-// TODO : unit tests
-func forkPrefetch(walFileName string, location string) {
-	concurrency, err := internal.GetMaxDownloadConcurrency()
-	if err != nil {
-		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
-	}
-	if strings.Contains(walFileName, "history") ||
-		strings.Contains(walFileName, "partial") ||
-		concurrency == 1 {
-		return // There will be nothing ot prefetch anyway
-	}
-	prefetchArgs := []string{"wal-prefetch", walFileName, location}
-	if internal.CfgFile != "" {
-		prefetchArgs = append(prefetchArgs, "--config", internal.CfgFile)
-	}
-	storagePrefix := viper.GetString(internal.StoragePrefixSetting)
-	if storagePrefix != "" {
-		prefetchArgs = append(prefetchArgs, "--walg-storage-prefix", storagePrefix)
-	}
-	cmd := exec.Command(os.Args[0], prefetchArgs...)
-	cmd.Env = os.Environ()
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Start()
-
-	if err != nil {
-		tracelog.ErrorLogger.Println("WAL-prefetch failed: ", err)
-	}
 }

@@ -2,12 +2,13 @@ package pg
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"io"
 	"github.com/wal-g/wal-g/internal/multistorage"
 )
 
@@ -32,7 +33,8 @@ var WalPrefetchCmd = &cobra.Command{
 		folderReader, err := multistorage.NewStorageFolderReader(folder, failover)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		postgres.HandleWALPrefetch(folderReader, args[0], args[1])
+		err = postgres.HandleWALPrefetch(folderReader, args[0], args[1])
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
