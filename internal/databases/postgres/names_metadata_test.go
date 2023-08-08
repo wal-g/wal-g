@@ -1,8 +1,9 @@
 package postgres_test
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )

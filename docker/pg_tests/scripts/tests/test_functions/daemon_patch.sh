@@ -27,7 +27,7 @@ start_daemon() {
     exit 1
   fi
 
-  wal-g --config="${TMP_CONFIG}" daemon "${WALG_SOCKET}" &
+  wal-g --config="${TMP_CONFIG}" daemon "${WALG_SOCKET}" &>> /tmp/daemon.log &
   until [ -S "${WALG_SOCKET}" ]
   do
     sleep 1

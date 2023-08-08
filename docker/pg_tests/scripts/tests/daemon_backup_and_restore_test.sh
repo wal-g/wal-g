@@ -11,6 +11,8 @@ export SKIP_TEST_WAL_OVERWRITES="1"
 . /tmp/tests/test_functions/test_full_backup.sh
 . /tmp/tests/test_functions/daemon_patch.sh
 
-prepare_config "/tmp/configs/full_backup_test_config.json"
+prepare_config "/tmp/configs/daemon_full_backup_test_config.json"
 start_daemon
 test_full_backup "${TMP_CONFIG}"
+echo "WAL-G daemon logs:"
+cat /tmp/daemon.log

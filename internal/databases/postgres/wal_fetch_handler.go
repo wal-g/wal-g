@@ -7,9 +7,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/spf13/viper"
+	"github.com/wal-g/wal-g/internal"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -33,17 +32,15 @@ func (err InvalidWalFileMagicError) Error() string {
 
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, location string, triggerPrefetch bool) error {
-	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s, %v)\n", walFileName, location, triggerPrefetch)
-	reader = reader.SubFolder(utility.WalPath)
+func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string, location string, prefetcher WalPrefetcher) error {
+	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s)\n", walFileName, location)
+	reader := baseReader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
-	if triggerPrefetch {
-		prefetchLocation := location
-		if viper.IsSet(internal.PrefetchDir) {
-			prefetchLocation = viper.GetString(internal.PrefetchDir)
-		}
-		defer forkPrefetch(walFileName, prefetchLocation)
+	prefetchLocation := location
+	if viper.IsSet(internal.PrefetchDir) {
+		prefetchLocation = viper.GetString(internal.PrefetchDir)
 	}
+	defer prefetcher.Prefetch(baseReader, walFileName, prefetchLocation)
 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
 	seenSize := int64(-1)
@@ -53,7 +50,7 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 	for {
 		if stat, err := os.Stat(prefetched); err == nil {
 			if stat.Size() != int64(WalSegmentSize) {
-				tracelog.ErrorLogger.Println("WAL-G: Prefetch error: wrong file size of prefetched file ", stat.Size())
+				tracelog.ErrorLogger.Printf("Prefetch error: wrong file size of prefetched file %s: %d", prefetched, stat.Size())
 				break
 			}
 
@@ -64,11 +61,12 @@ func HandleWALFetch(reader internal.StorageFolderReader, walFileName string, loc
 
 			err := checkWALFileMagic(location)
 			if err != nil {
-				tracelog.ErrorLogger.Println("Prefetched file contain errors", err)
+				tracelog.ErrorLogger.Printf("Prefetched file %s contain errors: %v", location, err)
 				_ = os.Remove(location)
 				break
 			}
 
+			tracelog.DebugLogger.Printf("Successful prefetch for file %s", walFileName)
 			return nil
 		} else if !os.IsNotExist(err) {
 			return err

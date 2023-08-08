@@ -98,7 +98,7 @@ func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
 	}
 	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
 
-	err = HandleWALFetch(h.reader, args[0], fullPath, true)
+	err = HandleWALFetch(h.reader, args[0], fullPath, DaemonPrefetcher{})
 	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
 		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
