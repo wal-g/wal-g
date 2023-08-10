@@ -10,7 +10,7 @@ var memCache storageStatuses
 var memCacheMu *sync.Mutex
 
 func init() {
-	memCache = map[string]status{}
+	memCache = map[key]status{}
 	memCacheMu = new(sync.Mutex)
 }
 
@@ -19,7 +19,7 @@ func (ss storageStatuses) isRelevant(ttl time.Duration, storages ...NamedFolder)
 		return false
 	}
 	for _, s := range storages {
-		status, cached := ss[s.Name]
+		status, cached := ss[s.Key]
 		if !cached {
 			return false
 		}
@@ -34,14 +34,14 @@ func (ss storageStatuses) splitByRelevance(ttl time.Duration, storages []NamedFo
 	relevant []NamedFolder,
 	outdated []NamedFolder,
 ) {
-	relevantMap := make(map[string]bool, len(ss))
-	for name, status := range ss {
+	relevanceMap := make(map[key]bool, len(ss))
+	for key, status := range ss {
 		checkedRecently := time.Since(status.Checked) <= ttl
-		relevantMap[name] = checkedRecently
+		relevanceMap[key] = checkedRecently
 	}
 
 	for _, s := range storages {
-		if relevantMap[s.Name] {
+		if relevanceMap[s.Key] {
 			relevant = append(relevant, s)
 		} else {
 			outdated = append(outdated, s)
@@ -53,7 +53,7 @@ func (ss storageStatuses) splitByRelevance(ttl time.Duration, storages []NamedFo
 func (ss storageStatuses) getAllAlive(storagesInOrder []NamedFolder) []NamedFolder {
 	var alive []NamedFolder
 	for _, s := range storagesInOrder {
-		status, cached := ss[s.Name]
+		status, cached := ss[s.Key]
 		if !cached {
 			continue
 		}
@@ -64,20 +64,26 @@ func (ss storageStatuses) getAllAlive(storagesInOrder []NamedFolder) []NamedFold
 	return alive
 }
 
-func (ss storageStatuses) getRelevantFirstAlive(ttl time.Duration, storagesInOrder []NamedFolder) *NamedFolder {
-	var firstAlive *NamedFolder
+// getRelevantFirstAlive provides
+func (ss storageStatuses) getRelevantFirstAlive(ttl time.Duration, storagesInOrder []NamedFolder) (
+	firstAlive *NamedFolder,
+	allRelevant bool,
+) {
 	relevant, _ := ss.splitByRelevance(ttl, storagesInOrder)
+	if len(relevant) == len(storagesInOrder) {
+		allRelevant = true
+	}
 	for i := range storagesInOrder {
 		if i >= len(relevant) {
 			break
 		}
-		if storagesInOrder[i].Name != relevant[i].Name {
+		if storagesInOrder[i].Key != relevant[i].Key {
 			break
 		}
-		if ss[relevant[i].Name].Alive {
+		if ss[relevant[i].Key].Alive {
 			firstAlive = &relevant[i]
 			break
 		}
 	}
-	return firstAlive
+	return firstAlive, allRelevant
 }

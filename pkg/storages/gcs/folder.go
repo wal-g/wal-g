@@ -3,6 +3,7 @@ package gcs
 import (
 	"context"
 	"encoding/base64"
+	"hash/fnv"
 	"io"
 	"math/rand"
 	"path"
@@ -55,13 +56,14 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 	return storage.NewError(err, "GCS", format, args...)
 }
 
-func NewFolder(bucket *gcs.BucketHandle, path string, contextTimeout int, normalizePrefix bool, encryptionKey []byte,
-	options []UploaderOption) *Folder {
+func NewFolder(bucket *gcs.BucketHandle, bucketName, path string, contextTimeout int, normalizePrefix bool,
+	encryptionKey []byte, options []UploaderOption) *Folder {
 	encryptionKeyCopy := make([]byte, len(encryptionKey))
 	copy(encryptionKeyCopy, encryptionKey)
 
 	return &Folder{
 		bucket:          bucket,
+		bucketName:      bucketName,
 		path:            path,
 		contextTimeout:  contextTimeout,
 		normalizePrefix: normalizePrefix,
@@ -70,7 +72,7 @@ func NewFolder(bucket *gcs.BucketHandle, path string, contextTimeout int, normal
 	}
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
 	normalizePrefix := true
 
 	if normalizePrefixStr, ok := settings[NormalizePrefix]; ok {
@@ -134,7 +136,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		return nil, NewError(err, "Unable to parse GCS uploader options")
 	}
 
-	return NewFolder(bucket, path, contextTimeout, normalizePrefix, encryptionKey, uploaderOptions), nil
+	return NewFolder(bucket, bucketName, path, contextTimeout, normalizePrefix, encryptionKey, uploaderOptions), nil
 }
 
 func getUploaderOptions(settings map[string]string) ([]UploaderOption, error) {
@@ -162,6 +164,7 @@ func getUploaderOptions(settings map[string]string) ([]UploaderOption, error) {
 // Folder represents folder in GCP
 type Folder struct {
 	bucket          *gcs.BucketHandle
+	bucketName      string
 	path            string
 	contextTimeout  int
 	normalizePrefix bool
@@ -203,6 +206,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				subFolders = append(subFolders,
 					NewFolder(
 						folder.bucket,
+						folder.bucketName,
 						objAttrs.Prefix,
 						folder.contextTimeout,
 						folder.normalizePrefix,
@@ -258,6 +262,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
 		folder.bucket,
+		folder.bucketName,
 		folder.joinPath(folder.path, subFolderRelativePath),
 		folder.contextTimeout,
 		folder.normalizePrefix,
@@ -373,6 +378,24 @@ func (folder *Folder) joinPath(one string, another string) string {
 		another = another[1:]
 	}
 	return one + "/" + another
+}
+
+func (folder *Folder) Hash() storage.Hash {
+	hash := fnv.New64a()
+
+	addToHash := func(data []byte) {
+		_, err := hash.Write(data)
+		if err != nil {
+			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
+			panic(err)
+		}
+	}
+
+	addToHash([]byte("gcs"))
+	addToHash([]byte(folder.bucketName))
+	addToHash([]byte(folder.path))
+
+	return storage.Hash(hash.Sum64())
 }
 
 // composeChunks merges uploaded chunks into a new one and cleans up temporary objects.

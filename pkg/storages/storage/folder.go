@@ -37,6 +37,13 @@ type Folder interface {
 	CopyObject(srcPath string, dstPath string) error
 }
 
+type HashableFolder interface {
+	Folder
+	Hash() Hash
+}
+
+type Hash uint64
+
 func DeleteObjectsWhere(folder Folder, confirm bool, objFilter func(object1 Object) bool, folderFilter func(name string) bool) error {
 	relativePathObjects, err := ListFolderRecursivelyWithFilter(folder, folderFilter)
 	if err != nil {

@@ -1,6 +1,7 @@
 package swift
 
 import (
+	"hash/fnv"
 	"io"
 	"os"
 	"strings"
@@ -31,7 +32,7 @@ func NewFolder(connection *swift.Connection, container swift.Container, path str
 	return &Folder{connection, container, path}
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
 	connection := new(swift.Connection)
 	//Set settings as env variables
 	for prop, value := range settings {
@@ -174,4 +175,23 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		}
 	}
 	return nil
+}
+
+func (folder *Folder) Hash() storage.Hash {
+	hash := fnv.New64a()
+
+	addToHash := func(data []byte) {
+		_, err := hash.Write(data)
+		if err != nil {
+			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
+			panic(err)
+		}
+	}
+
+	addToHash([]byte("swift"))
+	addToHash([]byte(folder.container.Name))
+	addToHash([]byte(folder.path))
+	addToHash([]byte(folder.connection.UserName))
+
+	return storage.Hash(hash.Sum64())
 }

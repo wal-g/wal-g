@@ -9,42 +9,42 @@ import (
 )
 
 type checkRes struct {
-	name string
-	err  error
+	key key
+	err error
 }
 
-func checkForAlive(timeout time.Duration, storages ...NamedFolder) map[string]bool {
+func checkForAlive(timeout time.Duration, storages ...NamedFolder) map[key]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	resCh := make(chan checkRes, len(storages))
-	for _, storage := range storages {
+	for _, stor := range storages {
 		go func(s NamedFolder) {
 			err := checkStorage(ctx, s)
 			if err != nil {
 				resCh <- checkRes{
-					name: s.Name,
-					err:  fmt.Errorf("storage '%s' read check: %v", s.Name, err),
+					key: s.Key,
+					err: fmt.Errorf("storage '%s' read check: %v", s.Name, err),
 				}
 				return
 			}
 			resCh <- checkRes{
-				name: s.Name,
-				err:  nil,
+				key: s.Key,
+				err: nil,
 			}
-		}(storage)
+		}(stor)
 	}
 
 	aliveCount := 0
-	results := make(map[string]bool, len(storages))
+	results := make(map[key]bool, len(storages))
 	for range storages {
 		res := <-resCh
 		if res.err == nil {
-			results[res.name] = true
+			results[res.key] = true
 			aliveCount++
 			continue
 		}
-		results[res.name] = false
+		results[res.key] = false
 		tracelog.ErrorLogger.Print(res.err)
 	}
 

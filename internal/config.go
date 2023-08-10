@@ -862,7 +862,7 @@ func InitFailoverStorages() (res map[string]storage.Folder, err error) {
 			folder = NewLimitedFolder(folder, limiters.NetworkLimiter)
 		}
 
-		folder = ConfigureStoragePrefix(folder)
+		folder = ConfigureStoragePrefix(folder).(storage.HashableFolder)
 		res[name] = folder
 	}
 

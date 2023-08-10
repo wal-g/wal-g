@@ -97,4 +97,9 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 
 	_, err = sub1.ReadObject("Tumba Yumba")
 	assert.Error(t, err.(ObjectNotFoundError))
+
+	identity, ok := storageFolder.(HashableFolder)
+	if ok {
+		assert.NotZero(t, identity.Hash())
+	}
 }

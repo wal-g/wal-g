@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"hash/fnv"
 	"io"
 	"path"
 	"strconv"
@@ -95,27 +96,38 @@ func NewConfiguringError(settingName string) storage.Error {
 }
 
 type Folder struct {
-	uploader Uploader
-	S3API    s3iface.S3API
-	Bucket   *string
-	Path     string
-	settings map[string]string
+	uploader    Uploader
+	S3API       s3iface.S3API
+	Bucket      *string
+	Path        string
+	region      *string
+	accessKeyID *string
+	settings    map[string]string
 
 	useListObjectsV1 bool
 }
 
-func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]string, bucket, path string, useListObjectsV1 bool) *Folder {
+func NewFolder(
+	uploader Uploader,
+	s3API s3iface.S3API,
+	settings map[string]string,
+	bucket, path string,
+	region, accessKeyID *string,
+	useListObjectsV1 bool,
+) *Folder {
 	return &Folder{
 		uploader:         uploader,
 		S3API:            s3API,
 		settings:         settings,
 		Bucket:           aws.String(bucket),
 		Path:             storage.AddDelimiterToPath(path),
+		region:           region,
+		accessKeyID:      accessKeyID,
 		useListObjectsV1: useListObjectsV1,
 	}
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
 	bucket, storagePath, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure S3 path")
@@ -125,6 +137,15 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		return nil, errors.Wrap(err, "failed to create new session")
 	}
 	client := s3.New(sess)
+	region := client.Config.Region
+	var accessKeyID *string
+	cred := client.Config.Credentials
+	if cred != nil {
+		credVal, err := cred.Get()
+		if err == nil {
+			accessKeyID = &credVal.AccessKeyID
+		}
+	}
 	uploader, err := configureUploader(client, settings)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure S3 uploader")
@@ -137,7 +158,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		}
 	}
 
-	folder := NewFolder(*uploader, client, settings, bucket, storagePath, useListObjectsV1)
+	folder := NewFolder(*uploader, client, settings, bucket, storagePath, region, accessKeyID, useListObjectsV1)
 
 	return folder, nil
 }
@@ -232,8 +253,16 @@ func (folder *Folder) getReaderSettings() (rangeEnabled bool, retriesCount int, 
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	subFolder := NewFolder(folder.uploader, folder.S3API, folder.settings, *folder.Bucket,
-		storage.JoinPath(folder.Path, subFolderRelativePath)+"/", folder.useListObjectsV1)
+	subFolder := NewFolder(
+		folder.uploader,
+		folder.S3API,
+		folder.settings,
+		*folder.Bucket,
+		storage.JoinPath(folder.Path, subFolderRelativePath)+"/",
+		folder.region,
+		folder.accessKeyID,
+		folder.useListObjectsV1,
+	)
 	return subFolder
 }
 
@@ -245,7 +274,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
 		for _, prefix := range commonPrefixes {
 			subFolder := NewFolder(folder.uploader, folder.S3API, folder.settings, *folder.Bucket,
-				*prefix.Prefix, folder.useListObjectsV1)
+				*prefix.Prefix, folder.region, folder.accessKeyID, folder.useListObjectsV1)
 			subFolders = append(subFolders, subFolder)
 		}
 		for _, object := range contents {
@@ -320,6 +349,34 @@ func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
 		objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.Path + key)}
 	}
 	return objects
+}
+
+func (folder *Folder) Hash() storage.Hash {
+	hash := fnv.New64a()
+
+	addToHash := func(data []byte) {
+		_, err := hash.Write(data)
+		if err != nil {
+			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
+			panic(err)
+		}
+	}
+
+	addToHash([]byte("s3"))
+
+	addToHash([]byte(*folder.Bucket))
+
+	addToHash([]byte(folder.Path))
+
+	if folder.region != nil {
+		addToHash([]byte(*folder.region))
+	}
+
+	if folder.accessKeyID != nil {
+		addToHash([]byte(*folder.accessKeyID))
+	}
+
+	return storage.Hash(hash.Sum64())
 }
 
 func isAwsNotExist(err error) bool {

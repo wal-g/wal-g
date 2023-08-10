@@ -5,30 +5,47 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/sys/unix"
 )
 
 // StatusFile is stored on a disk and therefore shared between all WAL-G processes and commands.
-const StatusFile = "/tmp/.walg_storage_status_cache"
+var StatusFile string
 
-type storageStatuses map[string]status
+func init() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic(fmt.Errorf("failed to get current user's home dir: %w", err))
+	}
+
+	StatusFile = filepath.Join(homeDir, ".walg_storage_status_cache")
+}
+
+type storageStatuses map[key]status
+
+type key string
+
+func formatKey(name string, hash storage.Hash) key {
+	return key(fmt.Sprintf("%s#%d", name, hash))
+}
 
 type status struct {
 	Alive   bool      `json:"alive"`
 	Checked time.Time `json:"checked"`
 }
 
-func updateFileContent(oldContent storageStatuses, checkResult map[string]bool) (newContent storageStatuses) {
+func updateFileContent(oldContent storageStatuses, checkResult map[key]bool) (newContent storageStatuses) {
 	newContent = make(storageStatuses, len(oldContent))
-	for storage, status := range oldContent {
-		newContent[storage] = status
+	for key, status := range oldContent {
+		newContent[key] = status
 	}
 
 	checkTime := time.Now()
-	for s, alive := range checkResult {
-		newContent[s] = status{
+	for key, alive := range checkResult {
+		newContent[key] = status{
 			Alive:   alive,
 			Checked: checkTime,
 		}

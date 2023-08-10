@@ -52,7 +52,8 @@ func GetFolder() storage.Folder {
 	tracelog.ErrorLogger.FatalOnError(err)
 	aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
 	tracelog.ErrorLogger.FatalOnError(err)
-	statusCache := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+	statusCache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	return multistorage.NewFolder(statusCache)
 }

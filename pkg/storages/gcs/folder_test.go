@@ -16,6 +16,7 @@ import (
 func TestNewFolder(t *testing.T) {
 	testCases := []struct {
 		bucketHandle    *gcs.BucketHandle
+		bucketName      string
 		path            string
 		timeout         int
 		normalizePrefix bool
@@ -24,21 +25,42 @@ func TestNewFolder(t *testing.T) {
 		uploaderOptions []UploaderOption
 	}{
 		{
-			path:    "path",
-			timeout: 10,
-			folder:  &Folder{path: "path", contextTimeout: 10, encryptionKey: []byte{}},
+			bucketName: "bucket",
+			path:       "path",
+			timeout:    10,
+			folder: &Folder{
+				bucketName:     "bucket",
+				path:           "path",
+				contextTimeout: 10,
+				encryptionKey:  []byte{},
+			},
 		},
 		{
+			bucketName:      "bucket",
 			path:            "path",
 			timeout:         10,
 			normalizePrefix: true,
 			encryptionKey:   []byte("test"),
-			folder:          &Folder{path: "path", contextTimeout: 10, normalizePrefix: true, encryptionKey: []byte("test")},
+			folder: &Folder{
+				bucketName:      "bucket",
+				path:            "path",
+				contextTimeout:  10,
+				normalizePrefix: true,
+				encryptionKey:   []byte("test"),
+			},
 		},
 	}
 
 	for _, tc := range testCases {
-		newFolder := NewFolder(tc.bucketHandle, tc.path, tc.timeout, tc.normalizePrefix, tc.encryptionKey, tc.uploaderOptions)
+		newFolder := NewFolder(
+			tc.bucketHandle,
+			tc.bucketName,
+			tc.path,
+			tc.timeout,
+			tc.normalizePrefix,
+			tc.encryptionKey,
+			tc.uploaderOptions,
+		)
 		assert.Equal(t, tc.folder, newFolder)
 	}
 }

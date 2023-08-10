@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net/url"
 	"strconv"
@@ -154,7 +155,7 @@ func configureAuthType(settings map[string]string) (AzureAuthType, string, strin
 	return authType, accountToken, accessKey
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
 	var accountName, storageEndpointSuffix string
 	var ok bool
 	if accountName, ok = settings[AccountSetting]; !ok {
@@ -366,6 +367,25 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		//blob is deleted
 	}
 	return nil
+}
+
+func (folder *Folder) Hash() storage.Hash {
+	hash := fnv.New64a()
+
+	addToHash := func(data []byte) {
+		_, err := hash.Write(data)
+		if err != nil {
+			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
+			panic(err)
+		}
+	}
+
+	// Ignore errors, because writing to the hash function is always successful
+	addToHash([]byte("azure"))
+	addToHash([]byte(folder.containerClient.URL()))
+	addToHash([]byte(folder.path))
+
+	return storage.Hash(hash.Sum64())
 }
 
 func getUploadStreamOptions(settings map[string]string) azblob.UploadStreamOptions {

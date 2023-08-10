@@ -3,6 +3,7 @@ package cache
 import (
 	"fmt"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func TestStatusCache(t *testing.T) {
 func testAllAliveStorages(t *testing.T) {
 	initTest(t)
 
-	cache := newTestCache(2)
+	cache := newTestCache(t, 2)
 
 	t.Run("check for alive if not cached", func(_ *testing.T) {
 		alive, err := cache.AllAliveStorages()
@@ -38,7 +39,7 @@ func testAllAliveStorages(t *testing.T) {
 		require.Len(t, statuses, 3)
 	})
 
-	updateInMem("failover_2", false)
+	updateInMem(cache.storageKey(t, "failover_2"), false)
 
 	t.Run("take statuses from memory if relevant", func(_ *testing.T) {
 		alive, err := cache.AllAliveStorages()
@@ -48,8 +49,8 @@ func testAllAliveStorages(t *testing.T) {
 		require.Equal(t, "failover_1", alive[1].Name)
 	})
 
-	invalidateInMem("default")
-	updateInFile(t, "failover_1", false)
+	invalidateInMem(cache.storageKey(t, "default"))
+	updateInFile(t, cache.storageKey(t, "failover_1"), false)
 
 	t.Run("take statuses from file if it exists and memory is outdated", func(_ *testing.T) {
 		alive, err := cache.AllAliveStorages()
@@ -59,8 +60,8 @@ func testAllAliveStorages(t *testing.T) {
 		require.Equal(t, "failover_2", alive[1].Name)
 	})
 
-	invalidateInMem("default")
-	invalidateInFile(t, "failover_2")
+	invalidateInMem(cache.storageKey(t, "default"))
+	invalidateInFile(t, cache.storageKey(t, "failover_2"))
 
 	t.Run("check missing storages for alive and take others from file", func(_ *testing.T) {
 		alive, err := cache.AllAliveStorages()
@@ -76,21 +77,37 @@ func testAllAliveStorages(t *testing.T) {
 		require.True(t, statuses.isRelevant(time.Hour, cache.storagesInOrder[2]))
 	})
 
-	invalidateInMem("default")
+	invalidateInMem(cache.storageKey(t, "default"))
 	err := os.WriteFile(StatusFile, []byte("malformed content"), 0666)
 	require.NoError(t, err)
 
-	t.Run("rewrite file if malformed", func(_ *testing.T) {
+	t.Run("check for alive if file is malformed", func(_ *testing.T) {
 		alive, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 		require.Len(t, alive, 3)
+	})
+
+	t.Run("rewrite file if malformed", func(_ *testing.T) {
+		statuses, err := readFile()
+		require.NoError(t, err)
+		require.True(t, statuses.isRelevant(time.Hour, cache.storagesInOrder[0]))
+	})
+
+	updateInMem(cache.storageKey(t, "default"), false)
+	updateInMem(cache.storageKey(t, "failover_1"), false)
+	updateInMem(cache.storageKey(t, "failover_2"), false)
+
+	t.Run("return zero storages if all are dead", func(_ *testing.T) {
+		alive, err := cache.AllAliveStorages()
+		require.NoError(t, err)
+		require.Empty(t, alive)
 	})
 }
 
 func testFirstAliveStorage(t *testing.T) {
 	initTest(t)
 
-	cache := newTestCache(2)
+	cache := newTestCache(t, 2)
 
 	t.Run("check for alive if not cached", func(_ *testing.T) {
 		alive, err := cache.FirstAliveStorage()
@@ -104,7 +121,7 @@ func testFirstAliveStorage(t *testing.T) {
 		require.Len(t, statuses, 3)
 	})
 
-	updateInMem("default", false)
+	updateInMem(cache.storageKey(t, "default"), false)
 
 	t.Run("take statuses from memory if relevant", func(_ *testing.T) {
 		alive, err := cache.FirstAliveStorage()
@@ -112,9 +129,9 @@ func testFirstAliveStorage(t *testing.T) {
 		require.Equal(t, "failover_1", alive.Name)
 	})
 
-	invalidateInMem("default")
-	updateInFile(t, "default", false)
-	updateInFile(t, "failover_1", false)
+	invalidateInMem(cache.storageKey(t, "default"))
+	updateInFile(t, cache.storageKey(t, "default"), false)
+	updateInFile(t, cache.storageKey(t, "failover_1"), false)
 
 	t.Run("take statuses from file if it exists and memory is outdated", func(_ *testing.T) {
 		alive, err := cache.FirstAliveStorage()
@@ -122,9 +139,9 @@ func testFirstAliveStorage(t *testing.T) {
 		require.Equal(t, "failover_2", alive.Name)
 	})
 
-	invalidateInMem("default")
-	updateInFile(t, "failover_2", false)
-	invalidateInFile(t, "failover_1")
+	invalidateInMem(cache.storageKey(t, "default"))
+	updateInFile(t, cache.storageKey(t, "failover_2"), false)
+	invalidateInFile(t, cache.storageKey(t, "failover_1"))
 
 	t.Run("check outdated storages for alive if all are dead", func(_ *testing.T) {
 		alive, err := cache.FirstAliveStorage()
@@ -138,21 +155,37 @@ func testFirstAliveStorage(t *testing.T) {
 		require.True(t, statuses.isRelevant(time.Hour, cache.storagesInOrder[1]))
 	})
 
-	invalidateInMem("default")
+	invalidateInMem(cache.storageKey(t, "default"))
 	err := os.WriteFile(StatusFile, []byte("malformed content"), 0666)
 	require.NoError(t, err)
 
-	t.Run("rewrite file if malformed", func(_ *testing.T) {
+	t.Run("check for alive if file is malformed", func(_ *testing.T) {
 		alive, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 		require.NotNil(t, alive)
+	})
+
+	t.Run("rewrite file if malformed", func(_ *testing.T) {
+		statuses, err := readFile()
+		require.NoError(t, err)
+		require.True(t, statuses.isRelevant(time.Hour, cache.storagesInOrder[0]))
+	})
+
+	updateInMem(cache.storageKey(t, "default"), false)
+	updateInMem(cache.storageKey(t, "failover_1"), false)
+	updateInMem(cache.storageKey(t, "failover_2"), false)
+
+	t.Run("return nil if all are dead", func(_ *testing.T) {
+		alive, err := cache.FirstAliveStorage()
+		require.NoError(t, err)
+		require.Nil(t, alive)
 	})
 }
 
 func testSpecificStorage(t *testing.T) {
 	initTest(t)
 
-	cache := newTestCache(2)
+	cache := newTestCache(t, 2)
 
 	t.Run("throws error if storage is unknown", func(_ *testing.T) {
 		_, err := cache.SpecificStorage("unknown_storage")
@@ -173,7 +206,7 @@ func testSpecificStorage(t *testing.T) {
 		require.Len(t, statuses, 1)
 	})
 
-	updateInMem("failover_2", false)
+	updateInMem(cache.storageKey(t, "failover_2"), false)
 
 	t.Run("take statuses from memory if relevant", func(_ *testing.T) {
 		alive, err := cache.SpecificStorage("failover_2")
@@ -181,10 +214,10 @@ func testSpecificStorage(t *testing.T) {
 		require.Nil(t, alive)
 	})
 
-	invalidateInMem("failover_1")
-	invalidateInMem("failover_2")
-	updateInFile(t, "failover_1", false)
-	updateInFile(t, "failover_2", true)
+	invalidateInMem(cache.storageKey(t, "failover_1"))
+	invalidateInMem(cache.storageKey(t, "failover_2"))
+	updateInFile(t, cache.storageKey(t, "failover_1"), false)
+	updateInFile(t, cache.storageKey(t, "failover_2"), true)
 
 	t.Run("take status from file if it exists and memory is outdated", func(_ *testing.T) {
 		alive, err := cache.SpecificStorage("failover_1")
@@ -196,8 +229,8 @@ func testSpecificStorage(t *testing.T) {
 		require.Equal(t, "failover_2", alive.Name)
 	})
 
-	invalidateInMem("failover_1")
-	invalidateInFile(t, "failover_1")
+	invalidateInMem(cache.storageKey(t, "failover_1"))
+	invalidateInFile(t, cache.storageKey(t, "failover_1"))
 
 	t.Run("check storage for alive if it is outdated in memory and file", func(_ *testing.T) {
 		alive, err := cache.SpecificStorage("failover_1")
@@ -212,42 +245,58 @@ func testSpecificStorage(t *testing.T) {
 		require.True(t, statuses.isRelevant(time.Hour, cache.storagesInOrder[1]))
 	})
 
-	invalidateInMem("default")
+	invalidateInMem(cache.storageKey(t, "default"))
 	err := os.WriteFile(StatusFile, []byte("malformed content"), 0666)
 	require.NoError(t, err)
 
-	t.Run("rewrite file if malformed", func(_ *testing.T) {
+	t.Run("check for alive if file is malformed", func(_ *testing.T) {
 		alive, err := cache.SpecificStorage("default")
 		require.NoError(t, err)
 		require.NotNil(t, alive)
 	})
+
+	t.Run("rewrite file if malformed", func(_ *testing.T) {
+		statuses, err := readFile()
+		require.NoError(t, err)
+		require.True(t, statuses.isRelevant(time.Hour, cache.storagesInOrder[0]))
+	})
+
+	updateInMem(cache.storageKey(t, "failover_2"), false)
+
+	t.Run("return nil if the storage is dead", func(_ *testing.T) {
+		alive, err := cache.SpecificStorage("failover_2")
+		require.NoError(t, err)
+		require.Nil(t, alive)
+	})
 }
 
 func initTest(t *testing.T) {
+	tmpFile := path.Join(t.TempDir(), "status_cache.yaml")
 	t.Cleanup(func() {
-		_ = os.Remove(StatusFile)
+		_ = os.Remove(tmpFile)
 	})
+	StatusFile = tmpFile
 	memCache = storageStatuses{}
 }
 
-func invalidateInMem(storage string) {
-	memCache[storage] = status{
+func invalidateInMem(key key) {
+	memCache[key] = status{
 		Alive:   true,
 		Checked: time.Unix(0, 0),
 	}
 }
 
-func updateInMem(storage string, alive bool) {
-	memCache[storage] = status{
+func updateInMem(key key, alive bool) {
+	memCache[key] = status{
 		Alive:   alive,
 		Checked: time.Now(),
 	}
 }
 
-func invalidateInFile(t *testing.T, storage string) {
+func invalidateInFile(t *testing.T, key key) {
 	statuses, err := readFile()
 	require.NoError(t, err)
-	statuses[storage] = status{
+	statuses[key] = status{
 		Alive:   true,
 		Checked: time.Unix(0, 0),
 	}
@@ -255,10 +304,10 @@ func invalidateInFile(t *testing.T, storage string) {
 	require.NoError(t, err)
 }
 
-func updateInFile(t *testing.T, storage string, alive bool) {
+func updateInFile(t *testing.T, key key, alive bool) {
 	statuses, err := readFile()
 	require.NoError(t, err)
-	statuses[storage] = status{
+	statuses[key] = status{
 		Alive:   alive,
 		Checked: time.Now(),
 	}
@@ -266,15 +315,28 @@ func updateInFile(t *testing.T, storage string, alive bool) {
 	require.NoError(t, err)
 }
 
-func newTestCache(failoverStorages int) *statusCache {
+func newTestCache(t *testing.T, failoverStorages int) *statusCache {
 	failover := map[string]storage.Folder{}
 	for i := 0; i < failoverStorages; i++ {
-		failover[fmt.Sprintf("failover_%d", i+1)] = memory.NewFolder("", memory.NewStorage())
+		name := fmt.Sprintf("failover_%d", i+1)
+		failover[name] = memory.NewFolder(name+"/", memory.NewStorage())
 	}
-	return NewStatusCache(
-		memory.NewFolder("", memory.NewStorage()),
+	c, err := NewStatusCache(
+		memory.NewFolder("default/", memory.NewStorage()),
 		failover,
 		time.Hour,
 		time.Hour,
-	).(*statusCache)
+	)
+	require.NoError(t, err)
+	return c.(*statusCache)
+}
+
+func (c *statusCache) storageKey(t *testing.T, name string) key {
+	for _, s := range c.storagesInOrder {
+		if s.Name == name {
+			return s.Key
+		}
+	}
+	t.Errorf("no storage with name %q", name)
+	return ""
 }
