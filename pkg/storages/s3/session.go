@@ -242,18 +242,13 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 
 		headers, ok := data.(map[string]interface{})
 		if !ok {
-			headers = map[string]interface{}{}
 			headerList, ok := data.([]interface{})
 			if !ok {
 				return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
 			}
 
-			for _, header := range headerList {
-				ma := header.(map[string]interface{})
-				for k, v := range ma {
-					headers[k] = v
-				}
-			}
+			headers = refomHeaderListToMap(headerList)
+
 		}
 
 		s.Handlers.Validate.PushBack(func(request *request.Request) {
@@ -263,6 +258,17 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 		})
 	}
 	return s, err
+}
+
+func refomHeaderListToMap(headerList []interface{}) map[string]interface{} {
+	headers := map[string]interface{}{}
+	for _, header := range headerList {
+		ma := header.(map[string]interface{})
+		for k, v := range ma {
+			headers[k] = v
+		}
+	}
+	return headers
 }
 
 func getEndpointPort(settings map[string]string) string {
