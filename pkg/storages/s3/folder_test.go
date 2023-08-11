@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func TestS3FolderCreatesWithAdditionalHeaders(t *testing.T) {
+func TestS3FolderCreatesWithAdditionalHeadersJSON(t *testing.T) {
 	assert := assert.New(t)
 
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
@@ -16,6 +16,22 @@ func TestS3FolderCreatesWithAdditionalHeaders(t *testing.T) {
 			EndpointSetting:          "HTTP://s3.kek.lol.net/",
 			UploadConcurrencySetting: "1",
 			RequestAdditionalHeaders: `{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}`,
+		})
+
+	assert.NoError(err)
+}
+
+func TestS3FolderCreatesWithAdditionalHeadersYAML(t *testing.T) {
+	assert := assert.New(t)
+
+	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
+	_, err := ConfigureFolder(waleS3Prefix,
+		map[string]string{
+			EndpointSetting:          "HTTP://s3.kek.lol.net/",
+			UploadConcurrencySetting: "1",
+			RequestAdditionalHeaders: `- X-Yandex-Prioritypass: "ok"
+- MyHeader: "32"
+- DROP_TABLE: "true"`,
 		})
 
 	assert.NoError(err)

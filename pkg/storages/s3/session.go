@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"gopkg.in/yaml.v3"
 )
 
 const DefaultPort = "443"
@@ -234,14 +234,30 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 	}
 
 	if headerJSON, ok := settings[RequestAdditionalHeaders]; ok {
-		var f interface{}
-		err := json.Unmarshal([]byte(headerJSON), &f)
+		var data interface{}
+		err := yaml.Unmarshal([]byte(headerJSON), &data)
 		if err != nil {
 			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
 		}
-		m := f.(map[string]interface{})
+
+		headers, ok := data.(map[string]interface{})
+		if !ok {
+			headers = map[string]interface{}{}
+			headerList, ok := data.([]interface{})
+			if !ok {
+				return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+			}
+
+			for _, header := range headerList {
+				ma := header.(map[string]interface{})
+				for k, v := range ma {
+					headers[k] = v
+				}
+			}
+		}
+
 		s.Handlers.Validate.PushBack(func(request *request.Request) {
-			for k, v := range m {
+			for k, v := range headers {
 				request.HTTPRequest.Header.Add(k, v.(string))
 			}
 		})
