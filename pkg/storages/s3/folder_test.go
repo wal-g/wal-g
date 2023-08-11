@@ -15,7 +15,7 @@ func TestS3FolderCreatesWithAdditionalHeaders(t *testing.T) {
 		map[string]string{
 			EndpointSetting:          "HTTP://s3.kek.lol.net/",
 			UploadConcurrencySetting: "1",
-			RequestAdditionalHeaders: `{"X-Yandex-Prioritypass":"ok"}`,
+			RequestAdditionalHeaders: `{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}`,
 		})
 
 	assert.NoError(err)
