@@ -239,10 +239,10 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 		if err != nil {
 			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
 		}
-		m := f.(map[string]string)
+		m := f.(map[string]interface{})
 		s.Handlers.Validate.PushBack(func(request *request.Request) {
 			for k, v := range m {
-				request.HTTPRequest.Header.Add(k, v)
+				request.HTTPRequest.Header.Add(k, v.(string))
 			}
 		})
 	}
