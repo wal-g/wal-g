@@ -43,6 +43,7 @@ const (
 	UseListObjectsV1         = "S3_USE_LIST_OBJECTS_V1"
 	RangeBatchEnabled        = "S3_RANGE_BATCH_ENABLED"
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
+	RequestAdditionalHeaders = "S3_REQUEST_ADDITIONAL_HEADERS"
 	// MaxRetriesSetting limits retries during interaction with S3
 	MaxRetriesSetting = "S3_MAX_RETRIES"
 
@@ -82,6 +83,7 @@ var (
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
 		MaxRetriesSetting,
+		RequestAdditionalHeaders,
 	}
 )
 

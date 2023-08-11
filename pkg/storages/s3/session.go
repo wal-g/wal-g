@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -228,6 +229,20 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 				request.HTTPRequest.URL.Scheme = HTTP
 			} else {
 				tracelog.DebugLogger.Printf("using endpoint %s", *s.Config.Endpoint)
+			}
+		})
+	}
+
+	if headerJSON, ok := settings[RequestAdditionalHeaders]; ok {
+		var f interface{}
+		err := json.Unmarshal([]byte(headerJSON), &f)
+		if err != nil {
+			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+		}
+		m := f.(map[string]string)
+		s.Handlers.Validate.PushBack(func(request *request.Request) {
+			for k, v := range m {
+				request.HTTPRequest.Header.Add(k, v)
 			}
 		})
 	}
