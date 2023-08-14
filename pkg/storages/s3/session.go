@@ -179,7 +179,7 @@ func configWithSettings(s *session.Session, bucket string, settings map[string]s
 }
 
 // TODO : unit tests
-func createSession(bucket string, settings map[string]string) (*session.Session, error) {
+func createSession(bucket string, settings map[string]string, method ...string) (*session.Session, error) {
 	s, err := session.NewSession()
 	if err != nil {
 		return nil, err
@@ -233,16 +233,25 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 		})
 	}
 
-	if headerJSON, ok := settings[RequestAdditionalHeaders]; ok {
+	if encodedHeaders, ok := settings[RequestAdditionalHeaders]; ok && len(method) > 0 && method[0] != "" {
 		var data interface{}
-		err := yaml.Unmarshal([]byte(headerJSON), &data)
+		err := yaml.Unmarshal([]byte(encodedHeaders), &data)
 		if err != nil {
 			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
 		}
-
-		headers, ok := data.(map[string]interface{})
+		methods, ok := data.(map[string]interface{})
 		if !ok {
-			headerList, ok := data.([]interface{})
+			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+		}
+
+		methodHeaders, ok := methods[method[0]]
+		if !ok {
+			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+		}
+
+		headers, ok := methodHeaders.(map[string]interface{})
+		if !ok {
+			headerList, ok := methodHeaders.([]interface{})
 			if !ok {
 				return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
 			}

@@ -25,7 +25,7 @@ var walPushCmd = &cobra.Command{
 }
 
 func GetWalUploader() *postgres.WalUploader {
-	baseUploader, err := internal.ConfigureUploader()
+	baseUploader, err := internal.ConfigureUploader("wal_push")
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	failover, err := internal.InitFailoverStorages()

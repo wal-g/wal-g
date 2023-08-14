@@ -20,7 +20,7 @@ var Env = map[string]string{
 	"S3_BUCKET":                     "dbaas",
 	"S3_ACCESS_KEY":                 "S3_ACCESS_KEY",
 	"S3_SECRET_KEY":                 "S3_SECRET_KEY",
-	"S3_REQUEST_ADDITIONAL_HEADERS": `{"X-Yandex-Prioritypass":"ok"}`,
+	"S3_REQUEST_ADDITIONAL_HEADERS": `"wal_push":{"X-Yandex-Prioritypass":"ok"}`,
 
 	"EXPOSE_SSH_PORT": "22",
 

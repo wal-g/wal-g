@@ -117,12 +117,16 @@ func NewFolder(uploader Uploader, s3API s3iface.S3API, settings map[string]strin
 	}
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string, method ...string) (storage.Folder, error) {
 	bucket, storagePath, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure S3 path")
 	}
-	sess, err := createSession(bucket, settings)
+	defaultMethod := ""
+	if len(method) > 0 {
+		defaultMethod = method[0]
+	}
+	sess, err := createSession(bucket, settings, defaultMethod)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create new session")
 	}

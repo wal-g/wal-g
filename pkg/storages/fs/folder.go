@@ -30,7 +30,7 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 	return storage.NewError(err, "GCS", format, args...)
 }
 
-func ConfigureFolder(path string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(path string, settings map[string]string, method ...string) (storage.Folder, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, NewError(err, "Folder not exists or is inaccessible")
 	}

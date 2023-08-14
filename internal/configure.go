@@ -125,8 +125,12 @@ func ConfigureLimiters() {
 }
 
 // TODO : unit tests
-func ConfigureFolder() (storage.Folder, error) {
-	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper())
+func ConfigureFolder(method ...string) (storage.Folder, error) {
+	defaultMethod := ""
+	if len(method) > 0 {
+		defaultMethod = method[0]
+	}
+	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper(), defaultMethod)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +154,7 @@ func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
 // when provided multiple 'keys' in the config,
 // this function will always return only one concrete 'folder'.
 // Chosen folder depends only on 'StorageAdapters' order
-func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, error) {
+func ConfigureFolderForSpecificConfig(config *viper.Viper, method ...string) (storage.Folder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
 		prefix, ok := getWaleCompatibleSettingFrom(adapter.prefixName, config)
@@ -162,8 +166,12 @@ func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, erro
 			prefix = adapter.prefixPreprocessor(prefix)
 		}
 
+		defaultMethod := ""
+		if len(method) > 0 {
+			defaultMethod = method[0]
+		}
 		settings := adapter.loadSettings(config)
-		return adapter.configureFolder(prefix, settings)
+		return adapter.configureFolder(prefix, settings, defaultMethod)
 	}
 	return nil, newUnconfiguredStorageError(skippedPrefixes)
 }
@@ -235,8 +243,12 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 }
 
 // ConfigureUploader is like ConfigureUploaderToFolder, but configures the default storage.
-func ConfigureUploader() (uploader *RegularUploader, err error) {
-	folder, err := ConfigureFolder()
+func ConfigureUploader(method ...string) (uploader *RegularUploader, err error) {
+	defaultMethod := ""
+	if len(method) > 0 {
+		defaultMethod = method[0]
+	}
+	folder, err := ConfigureFolder(defaultMethod)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure folder")
 	}

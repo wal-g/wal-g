@@ -32,7 +32,7 @@ func NewFolder(connection *swift.Connection, container swift.Container, path str
 	return &Folder{connection, container, path}
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string, method ...string) (storage.Folder, error) {
 	connection := new(swift.Connection)
 	//Set settings as env variables
 	for prop, value := range settings {

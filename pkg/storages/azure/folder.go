@@ -154,7 +154,7 @@ func configureAuthType(settings map[string]string) (AzureAuthType, string, strin
 	return authType, accountToken, accessKey
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string, methos ...string) (storage.Folder, error) {
 	var accountName, storageEndpointSuffix string
 	var ok bool
 	if accountName, ok = settings[AccountSetting]; !ok {

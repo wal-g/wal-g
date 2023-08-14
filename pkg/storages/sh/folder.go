@@ -38,7 +38,7 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 	return storage.NewError(err, "SSH", format, args...)
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string, method ...string) (storage.Folder, error) {
 	host, path, err := storage.ParsePrefixAsURL(prefix)
 
 	if err != nil {

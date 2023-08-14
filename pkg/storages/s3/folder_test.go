@@ -15,10 +15,38 @@ func TestS3FolderCreatesWithAdditionalHeadersJSON(t *testing.T) {
 		map[string]string{
 			EndpointSetting:          "HTTP://s3.kek.lol.net/",
 			UploadConcurrencySetting: "1",
-			RequestAdditionalHeaders: `{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}`,
+			RequestAdditionalHeaders: `{"method1":{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}}`,
 		})
 
 	assert.NoError(err)
+}
+
+func TestS3FolderCreatesWithAdditionalHeadersJSONForMethod(t *testing.T) {
+	assert := assert.New(t)
+
+	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
+	_, err := ConfigureFolder(waleS3Prefix,
+		map[string]string{
+			EndpointSetting:          "HTTP://s3.kek.lol.net/",
+			UploadConcurrencySetting: "1",
+			RequestAdditionalHeaders: `{"method1":{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}}`,
+		}, "method1")
+
+	assert.NoError(err)
+}
+
+func TestS3FolderCreatesWithAdditionalHeadersJSONForUnexistingMethod(t *testing.T) {
+	assert := assert.New(t)
+
+	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
+	_, err := ConfigureFolder(waleS3Prefix,
+		map[string]string{
+			EndpointSetting:          "HTTP://s3.kek.lol.net/",
+			UploadConcurrencySetting: "1",
+			RequestAdditionalHeaders: `{"method1":{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}}`,
+		}, "method2")
+
+	assert.Error(err)
 }
 
 func TestS3FolderCreatesWithAdditionalHeadersYAML(t *testing.T) {
@@ -29,12 +57,47 @@ func TestS3FolderCreatesWithAdditionalHeadersYAML(t *testing.T) {
 		map[string]string{
 			EndpointSetting:          "HTTP://s3.kek.lol.net/",
 			UploadConcurrencySetting: "1",
-			RequestAdditionalHeaders: `- X-Yandex-Prioritypass: "ok"
+			RequestAdditionalHeaders: `method1:
+- X-Yandex-Prioritypass: "ok"
 - MyHeader: "32"
 - DROP_TABLE: "true"`,
 		})
 
 	assert.NoError(err)
+}
+
+func TestS3FolderCreatesWithAdditionalHeadersYAMLForMethod(t *testing.T) {
+	assert := assert.New(t)
+
+	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
+	_, err := ConfigureFolder(waleS3Prefix,
+		map[string]string{
+			EndpointSetting:          "HTTP://s3.kek.lol.net/",
+			UploadConcurrencySetting: "1",
+			RequestAdditionalHeaders: `method1:
+- X-Yandex-Prioritypass: "ok"
+- MyHeader: "32"
+- DROP_TABLE: "true"`,
+		}, "method1")
+
+	assert.NoError(err)
+}
+
+func TestS3FolderCreatesWithAdditionalHeadersYAMLForUnexistingMethod(t *testing.T) {
+	assert := assert.New(t)
+
+	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
+	_, err := ConfigureFolder(waleS3Prefix,
+		map[string]string{
+			EndpointSetting:          "HTTP://s3.kek.lol.net/",
+			UploadConcurrencySetting: "1",
+			RequestAdditionalHeaders: `method1:
+- X-Yandex-Prioritypass: "ok"
+- MyHeader: "32"
+- DROP_TABLE: "true"`,
+		}, "method2")
+
+	assert.Error(err)
 }
 
 func TestS3Folder(t *testing.T) {

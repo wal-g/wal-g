@@ -70,7 +70,7 @@ func NewFolder(bucket *gcs.BucketHandle, path string, contextTimeout int, normal
 	}
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string, method ...string) (storage.Folder, error) {
 	normalizePrefix := true
 
 	if normalizePrefixStr, ok := settings[NormalizePrefix]; ok {
