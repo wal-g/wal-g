@@ -1,15 +1,15 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path"
 
+	"github.com/wal-g/tracelog"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/wal-g/internal/splitmerge"
-
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -34,8 +34,10 @@ func (uploader *RegularUploader) PushStream(stream io.Reader) (string, error) {
 func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Upload Stream:
-	var readers = splitmerge.SplitReader(stream, uploader.partitions, uploader.blockSize)
+	readers := splitmerge.SplitReader(stream, uploader.partitions, uploader.blockSize, ctx)
 
 	errGroup := new(errgroup.Group)
 	for partNumber := 0; partNumber < uploader.partitions; partNumber++ {
@@ -53,6 +55,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compression().FileExtension(), currentPartNumber, idx)
 					err := uploader.PushStreamToDestination(fileReader, dstPath)
 					if err != nil {
+						cancel()
 						return err
 					}
 					if read == 0 {
