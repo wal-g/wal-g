@@ -234,19 +234,10 @@ func createSession(bucket string, settings map[string]string, method ...string) 
 	}
 
 	if encodedHeaders, ok := settings[RequestAdditionalHeaders]; ok && len(method) > 0 && method[0] != "" {
-		var data interface{}
-		err := yaml.Unmarshal([]byte(encodedHeaders), &data)
-		if err != nil {
-			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
-		}
-		methods, ok := data.(map[string]interface{})
-		if !ok {
-			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
-		}
 
-		methodHeaders, ok := methods[method[0]]
-		if !ok {
-			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+		methodHeaders, err := getHeadersForMethod(encodedHeaders, method[0])
+		if err != nil {
+			return nil, err
 		}
 
 		headers, ok := methodHeaders.(map[string]interface{})
@@ -255,9 +246,7 @@ func createSession(bucket string, settings map[string]string, method ...string) 
 			if !ok {
 				return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
 			}
-
 			headers = refomHeaderListToMap(headerList)
-
 		}
 
 		s.Handlers.Validate.PushBack(func(request *request.Request) {
@@ -267,6 +256,25 @@ func createSession(bucket string, settings map[string]string, method ...string) 
 		})
 	}
 	return s, err
+}
+
+func getHeadersForMethod(encodedHeaders string, method string) (interface{}, error) {
+	var data interface{}
+	err := yaml.Unmarshal([]byte(encodedHeaders), &data)
+	if err != nil {
+		return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+	}
+	methods, ok := data.(map[string]interface{})
+	if !ok {
+		return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+	}
+
+	methodHeaders, ok := methods[method]
+	if !ok {
+		return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+	}
+
+	return methodHeaders, nil
 }
 
 func refomHeaderListToMap(headerList []interface{}) map[string]interface{} {
