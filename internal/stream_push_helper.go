@@ -37,7 +37,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// Upload Stream:
-	readers := splitmerge.SplitReader(stream, uploader.partitions, uploader.blockSize, ctx)
+	readers := splitmerge.SplitReader(ctx, stream, uploader.partitions, uploader.blockSize)
 
 	errGroup := new(errgroup.Group)
 	for partNumber := 0; partNumber < uploader.partitions; partNumber++ {

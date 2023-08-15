@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-func SplitReader(reader io.Reader, parts int, blockSize int, ctx context.Context) []io.Reader {
+func SplitReader(ctx context.Context, reader io.Reader, parts int, blockSize int) []io.Reader {
 	result := make([]io.Reader, 0)
 	channels := make([]chan []byte, 0)
 

@@ -50,7 +50,7 @@ func TestSplitMerge(t *testing.T) {
 	// in:
 	inputData := generateDataset(dataSize)
 	dataReader := bytes.NewReader(inputData)
-	readers := SplitReader(dataReader, partitions, blockSize, context.Background())
+	readers := SplitReader(context.Background(), dataReader, partitions, blockSize)
 
 	// out:
 	var sink BufferCloser
