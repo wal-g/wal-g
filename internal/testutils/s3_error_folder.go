@@ -3,8 +3,10 @@ package testutils
 import (
 	"bytes"
 	"errors"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"io"
+	"sync"
+
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func NewS3ErrorFolder(sourceFolder storage.Folder, S3ErrorAfterByteSize int) storage.Folder {
@@ -21,6 +23,8 @@ type S3TestFolder struct {
 	maxWriteSize    int64
 	writeSize       int64
 	wasSkippedBlock bool
+
+	mutex sync.Mutex
 }
 
 func (tf *S3TestFolder) PutObject(name string, content io.Reader) error {
@@ -29,6 +33,8 @@ func (tf *S3TestFolder) PutObject(name string, content io.Reader) error {
 	if err != nil {
 		return err
 	}
+	tf.mutex.Lock()
+	defer tf.mutex.Unlock()
 	if count >= tf.writeSize && !tf.wasSkippedBlock {
 		tf.wasSkippedBlock = true
 		tf.writeSize = tf.maxWriteSize
@@ -36,6 +42,8 @@ func (tf *S3TestFolder) PutObject(name string, content io.Reader) error {
 	}
 	tf.wasSkippedBlock = false
 	tf.writeSize -= count
+
 	err = tf.Folder.PutObject(name, content)
+
 	return err
 }
