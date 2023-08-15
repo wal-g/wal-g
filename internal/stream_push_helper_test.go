@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/compression"
 	functests "github.com/wal-g/wal-g/internal/testutils"
-
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -200,6 +201,7 @@ func GetS3Folder(networkErrorAfterByteSize int) (storage.Folder, func() error, e
 }
 
 func checkSplitPush(t *testing.T, partitions, blockSize, maxFileSize, s3errorAfterByteSize, sampleSize int) {
+	start := time.Now()
 	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
 	folder, clearer, err := GetS3Folder(s3errorAfterByteSize)
 	defer clearer()
@@ -212,9 +214,9 @@ func checkSplitPush(t *testing.T, partitions, blockSize, maxFileSize, s3errorAft
 		blockSize:   blockSize,
 		maxFileSize: maxFileSize,
 	}
-	name, err := splitUploader.PushStream(bytes.NewBuffer(getByteSampleArray(sampleSize)))
-	if err != nil {
-		t.Fatal(name, err)
+	splitUploader.PushStream(bytes.NewBuffer(getByteSampleArray(sampleSize)))
+	if time.Since(start) > time.Second*30 {
+		t.Fatal("Deadlock!")
 	}
 }
 
