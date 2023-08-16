@@ -9,7 +9,7 @@ import (
 )
 
 func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigPath, backupName, restoreMongodVersion,
-	rsName, rsMembers string,
+	rsName string, rsMembers []string, rsMemberIds []int,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
@@ -36,7 +36,7 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigP
 		return err
 	}
 
-	rsConfig := binary.RsConfig{RsName: rsName, RsMembers: rsMembers}
+	rsConfig := binary.NewRsConfig(rsName, rsMembers, rsMemberIds)
 	if err = rsConfig.Validate(); err != nil {
 		return err
 	}

@@ -20,12 +20,15 @@ const (
 	RsNameDescription            = "Name of replicaset (like rs01)"
 	RsMembersFlag                = "mongo-rs-members"
 	RsMembersDescription         = "Comma separated host:port records from wished rs members (like rs.initiate())"
+	RsMemberIdsFlag              = "mongo-rs-member-ids"
+	RsMemberIdsDescription       = "Comma separated integers for replica IDs of corresponding --mongo-rs-members"
 )
 
 var (
 	minimalConfigPath = ""
 	rsName            = ""
-	rsMembers         = ""
+	rsMembers         []string
+	rsMemberIds       []int
 )
 
 var binaryBackupFetchCmd = &cobra.Command{
@@ -44,7 +47,7 @@ var binaryBackupFetchCmd = &cobra.Command{
 		mongodVersion := args[2]
 
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion, rsName,
-			rsMembers)
+			rsMembers, rsMemberIds)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -52,6 +55,7 @@ var binaryBackupFetchCmd = &cobra.Command{
 func init() {
 	binaryBackupFetchCmd.Flags().StringVar(&minimalConfigPath, MinimalConfigPathFlag, "", MinimalConfigPathDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&rsName, RsNameFlag, "", RsNameDescription)
-	binaryBackupFetchCmd.Flags().StringVar(&rsMembers, RsMembersFlag, "", RsMembersDescription)
+	binaryBackupFetchCmd.Flags().StringSliceVar(&rsMembers, RsMembersFlag, []string{}, RsMembersDescription)
+	binaryBackupFetchCmd.Flags().IntSliceVar(&rsMemberIds, RsMemberIdsFlag, []int{}, RsMemberIdsDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }

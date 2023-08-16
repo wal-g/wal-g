@@ -188,7 +188,7 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 		return errors.Wrap(err, "unable to read rs config from system.replset")
 	}
 
-	systemRsConfig["members"] = makeBsonRsMembers(rsConfig.RsMembers)
+	systemRsConfig["members"] = makeBsonRsMembers(rsConfig)
 
 	if systemRsConfig["_id"] != rsConfig.RsName {
 		systemRsConfig["_id"] = rsConfig.RsName
@@ -257,13 +257,11 @@ func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, i
 	return nil
 }
 
-func makeBsonRsMembers(rsMembers string) bson.A {
+func makeBsonRsMembers(rsConfig RsConfig) bson.A {
 	bsonMembers := bson.A{}
 
-	if rsMembers != "" {
-		for id, member := range strings.Split(rsMembers, ",") {
-			bsonMembers = append(bsonMembers, bson.M{"_id": id, "host": member})
-		}
+	for i := 0; i != len(rsConfig.RsMembers); i++ {
+		bsonMembers = append(bsonMembers, bson.M{"_id": rsConfig.RsMemberIds[i], "host": rsConfig.RsMembers[i]})
 	}
 
 	return bsonMembers
@@ -301,17 +299,38 @@ type BackupCursorFile struct {
 }
 
 type RsConfig struct {
-	RsName    string
-	RsMembers string
+	RsName      string
+	RsMembers   []string
+	RsMemberIds []int
+}
+
+func NewRsConfig(rsName string, rsMembers []string, rsMemberIds []int) RsConfig {
+	if len(rsMemberIds) == 0 {
+		rsMemberIds = make([]int, len(rsMembers))
+		for i := 0; i < len(rsMembers); i++ {
+			rsMemberIds[i] = i
+		}
+	}
+	return RsConfig{
+		RsName:      rsName,
+		RsMembers:   rsMembers,
+		RsMemberIds: rsMemberIds,
+	}
 }
 
 func (rsConfig RsConfig) Empty() bool {
-	return rsConfig.RsName == "" && rsConfig.RsMembers == ""
+	return rsConfig.RsName == "" && len(rsConfig.RsMembers) == 0
 }
 
 func (rsConfig RsConfig) Validate() error {
-	if rsConfig.RsName == "" && rsConfig.RsMembers != "" || rsConfig.RsName != "" && rsConfig.RsMembers == "" {
+	if rsConfig.RsName == "" && len(rsConfig.RsMembers) > 0 || rsConfig.RsName != "" && len(rsConfig.RsMembers) == 0 {
 		return errors.Errorf("rsConfig should be all empty or full populated, but rsConfig = %+v", rsConfig)
+	}
+	if len(rsConfig.RsMembers) > len(rsConfig.RsMemberIds) {
+		return errors.Errorf("not all replica set members have corresponding ID")
+	}
+	if len(rsConfig.RsMembers) < len(rsConfig.RsMemberIds) {
+		return errors.Errorf("excessive number of replica set IDs")
 	}
 	return nil
 }
