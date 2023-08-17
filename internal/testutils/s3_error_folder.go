@@ -12,16 +12,16 @@ import (
 func NewS3ErrorFolder(sourceFolder storage.Folder, S3ErrorAfterByteSize int) storage.Folder {
 	return &S3TestFolder{
 		Folder:          sourceFolder,
-		maxWriteSize:    int64(S3ErrorAfterByteSize),
-		writeSize:       int64(S3ErrorAfterByteSize),
+		errorEachBytes:  int64(S3ErrorAfterByteSize),
+		bytesLeft:       int64(S3ErrorAfterByteSize),
 		wasSkippedBlock: true,
 	}
 }
 
 type S3TestFolder struct {
 	storage.Folder
-	maxWriteSize    int64
-	writeSize       int64
+	errorEachBytes  int64
+	bytesLeft       int64
 	wasSkippedBlock bool
 
 	mutex sync.Mutex
@@ -35,13 +35,13 @@ func (tf *S3TestFolder) PutObject(name string, content io.Reader) error {
 	}
 	tf.mutex.Lock()
 	defer tf.mutex.Unlock()
-	if count >= tf.writeSize && !tf.wasSkippedBlock {
+	if count >= tf.bytesLeft && !tf.wasSkippedBlock {
 		tf.wasSkippedBlock = true
-		tf.writeSize = tf.maxWriteSize
+		tf.bytesLeft = tf.errorEachBytes
 		return errors.New("S3 error")
 	}
 	tf.wasSkippedBlock = false
-	tf.writeSize -= count
+	tf.bytesLeft -= count
 
 	err = tf.Folder.PutObject(name, content)
 
