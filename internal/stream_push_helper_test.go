@@ -1,8 +1,7 @@
-package internal
+package internal_test
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,10 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 
+	. "github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	functests "github.com/wal-g/wal-g/internal/testutils"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 const (
@@ -96,13 +97,12 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, n
 	storageFolder, clear, err := GetFolder(networkErrorAfterByteSize)
 	defer clear()
 	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
-
-	uploader := &SplitStreamUploader{
-		Uploader:    NewRegularUploader(compressor, storageFolder),
-		partitions:  partitions,
-		blockSize:   blockSize,
-		maxFileSize: maxFileSize,
-	}
+	uploader := NewSplitStreamUploader(
+		NewRegularUploader(compressor, storageFolder),
+		partitions,
+		blockSize,
+		maxFileSize,
+	)
 
 	sample := getByteSampleArray(sampleSize)
 	backupName, err := uploader.PushStream(bytes.NewReader(sample))
@@ -200,40 +200,19 @@ func GetS3Folder(networkErrorAfterByteSize int) (storage.Folder, func() error, e
 	}
 }
 
-// We have to repeat testtools code to evade import cycle
-type NopCloserWriter struct {
-	io.Writer
-}
-
-func (NopCloserWriter) Close() error {
-	return nil
-}
-
-type MockCompressor struct{}
-
-func (compressor *MockCompressor) NewWriter(writer io.Writer) io.WriteCloser {
-	return &NopCloserWriter{
-		writer,
-	}
-}
-
-func (compressor *MockCompressor) FileExtension() string {
-	return "mock"
-}
-
 func checkSplitPush(t *testing.T, partitions, blockSize, maxFileSize, s3errorAfterByteSize, sampleSize int) {
-	compressor := &MockCompressor{}
+	compressor := &testtools.MockCompressor{}
 	folder, clearer, err := GetS3Folder(s3errorAfterByteSize)
 	defer clearer()
 	if err != nil {
 		t.Fatal(err)
 	}
-	splitUploader := &SplitStreamUploader{
-		Uploader:    NewRegularUploader(compressor, folder),
-		partitions:  partitions,
-		blockSize:   blockSize,
-		maxFileSize: maxFileSize,
-	}
+	splitUploader := NewSplitStreamUploader(
+		NewRegularUploader(compressor, folder),
+		partitions,
+		blockSize,
+		maxFileSize,
+	)
 	splitUploader.PushStream(bytes.NewBuffer(getByteSampleArray(sampleSize)))
 }
 
