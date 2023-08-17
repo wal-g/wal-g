@@ -36,7 +36,7 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 
 	// Upload Stream:
 	errGroup, ctx := errgroup.WithContext(context.Background())
-	readers := splitmerge.SplitReader(ctx, stream, uploader.partitions, uploader.blockSize)
+	var readers = splitmerge.SplitReader(ctx, stream, uploader.partitions, uploader.blockSize)
 	for partNumber := 0; partNumber < uploader.partitions; partNumber++ {
 		reader := readers[partNumber]
 		if uploader.maxFileSize != 0 {
