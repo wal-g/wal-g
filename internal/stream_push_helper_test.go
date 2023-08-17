@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -199,8 +200,29 @@ func GetS3Folder(networkErrorAfterByteSize int) (storage.Folder, func() error, e
 	}
 }
 
+// We have to repeat testtools code to evade import cycle
+type NopCloserWriter struct {
+	io.Writer
+}
+
+func (NopCloserWriter) Close() error {
+	return nil
+}
+
+type MockCompressor struct{}
+
+func (compressor *MockCompressor) NewWriter(writer io.Writer) io.WriteCloser {
+	return &NopCloserWriter{
+		writer,
+	}
+}
+
+func (compressor *MockCompressor) FileExtension() string {
+	return "mock"
+}
+
 func checkSplitPush(t *testing.T, partitions, blockSize, maxFileSize, s3errorAfterByteSize, sampleSize int) {
-	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	compressor := &MockCompressor{}
 	folder, clearer, err := GetS3Folder(s3errorAfterByteSize)
 	defer clearer()
 	if err != nil {
@@ -241,6 +263,10 @@ func TestSplitPush_WithCommonValues(t *testing.T) {
 
 func TestSplitPush_WithCommonValues_2(t *testing.T) {
 	checkSplitPush(t, 3, 3, 5, 50, 51)
+}
+
+func TestSplitPush_WithCommonValues_3(t *testing.T) {
+	checkSplitPush(t, 3, 3, 5, 52, 51)
 }
 
 func TestSplitPush_With_Much_Partitions(t *testing.T) {
