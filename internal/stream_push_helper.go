@@ -34,12 +34,9 @@ func (uploader *RegularUploader) PushStream(stream io.Reader) (string, error) {
 func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	// Upload Stream:
+	errGroup, ctx := errgroup.WithContext(context.Background())
 	readers := splitmerge.SplitReader(ctx, stream, uploader.partitions, uploader.blockSize)
-
-	errGroup := new(errgroup.Group)
 	for partNumber := 0; partNumber < uploader.partitions; partNumber++ {
 		reader := readers[partNumber]
 		if uploader.maxFileSize != 0 {
@@ -55,7 +52,6 @@ func (uploader *SplitStreamUploader) PushStream(stream io.Reader) (string, error
 					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compression().FileExtension(), currentPartNumber, idx)
 					err := uploader.PushStreamToDestination(fileReader, dstPath)
 					if err != nil {
-						cancel()
 						return err
 					}
 					if read == 0 {
