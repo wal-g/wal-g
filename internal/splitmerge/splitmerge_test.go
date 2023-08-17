@@ -2,14 +2,16 @@ package splitmerge
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/abool"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/wal-g/wal-g/internal/abool"
 )
 
 type BufferCloser struct {
@@ -34,19 +36,21 @@ func (b *BufferCloser) Close() error {
 	return nil
 }
 
-//               ┌─> copy data per 1 byte    ─>┐
+//	┌─> copy data per 1 byte    ─>┐
+//
 // data ─> split ├─> copy data per ... bytes ─>├─> merge
-//               └─> copy data per 42 bytes  ─>┘
+//
+//	└─> copy data per 42 bytes  ─>┘
 func TestSplitMerge(t *testing.T) {
 	const blockSize = 128
 	const dataSize = 115249 // some prime number
-	var bufSizes = []int{1, blockSize + 1, blockSize - 1, 2*blockSize + 1, 4, 8, 15, 16, 23, 42}
-	var partitions = len(bufSizes)
+	bufSizes := []int{1, blockSize + 1, blockSize - 1, 2*blockSize + 1, 4, 8, 15, 16, 23, 42}
+	partitions := len(bufSizes)
 
 	// in:
 	inputData := generateDataset(dataSize)
 	dataReader := bytes.NewReader(inputData)
-	var readers = SplitReader(dataReader, partitions, blockSize)
+	readers := SplitReader(context.Background(), dataReader, partitions, blockSize)
 
 	// out:
 	var sink BufferCloser
@@ -54,7 +58,7 @@ func TestSplitMerge(t *testing.T) {
 
 	errGroup := new(errgroup.Group)
 	for i := 0; i < partitions; i++ {
-		//idx := i
+		// idx := i
 		reader := readers[i]
 		writer := writers[i]
 		buffSize := bufSizes[i%len(bufSizes)]
@@ -72,7 +76,7 @@ func TestSplitMerge(t *testing.T) {
 				data := make([]byte, buffSize, buffSize)
 				rbytes := copy(data, allData[offset:])
 				offset += rbytes
-				//tracelog.InfoLogger.Printf("goroutine #%d: %d bytes fetched, err=%v", idx, rbytes, rerr)
+				// tracelog.InfoLogger.Printf("goroutine #%d: %d bytes fetched, err=%v", idx, rbytes, rerr)
 				if rbytes == 0 {
 					return nil
 				}
@@ -80,7 +84,7 @@ func TestSplitMerge(t *testing.T) {
 				if werr != nil {
 					return werr
 				} else {
-					//tracelog.InfoLogger.Printf("goroutine #%d: %d bytes copied", idx, rbytes)
+					// tracelog.InfoLogger.Printf("goroutine #%d: %d bytes copied", idx, rbytes)
 				}
 			}
 		})

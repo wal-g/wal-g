@@ -1,12 +1,13 @@
 package splitmerge
 
 import (
+	"context"
 	"io"
 
 	"github.com/wal-g/tracelog"
 )
 
-func SplitReader(reader io.Reader, parts int, blockSize int) []io.Reader {
+func SplitReader(ctx context.Context, reader io.Reader, parts int, blockSize int) []io.Reader {
 	result := make([]io.Reader, 0)
 	channels := make([]chan []byte, 0)
 
@@ -22,7 +23,16 @@ func SplitReader(reader io.Reader, parts int, blockSize int) []io.Reader {
 			block := make([]byte, blockSize)
 			bytes, err := io.ReadFull(reader, block)
 			if bytes != 0 {
-				channels[idx] <- block[0:bytes]
+				select {
+				case channels[idx] <- block[0:bytes]:
+				case <-ctx.Done():
+					for i := 0; i < parts; i++ {
+						close(channels[i])
+					}
+					tracelog.InfoLogger.Println("SplitReader closed until the end of the work")
+					return
+				}
+
 				if bytes != blockSize {
 					tracelog.InfoLogger.Printf("SplitReader. #%d send: %d / %d bytes", idx, bytes, blockSize)
 				}
