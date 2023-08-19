@@ -13,8 +13,6 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 
-RUN cp -r /go/tmp/brotli/* vendor/github.com/google/brotli
-
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
     cd main/mysql && \
