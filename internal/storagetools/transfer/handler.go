@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/cmd/common/st/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -37,11 +37,11 @@ func NewHandler(
 	fileLister FileLister,
 	cfg *HandlerConfig,
 ) (*Handler, error) {
-	sourceFolder, err := multistorage.ConfigureStorageFolder(sourceStorage)
+	sourceFolder, err := exec.ConfigureStorage(sourceStorage)
 	if err != nil {
 		return nil, fmt.Errorf("configure source storage folder: %w", err)
 	}
-	targetFolder, err := multistorage.ConfigureStorageFolder(targetStorage)
+	targetFolder, err := exec.ConfigureStorage(targetStorage)
 	if err != nil {
 		return nil, fmt.Errorf("configure target storage folder: %w", err)
 	}

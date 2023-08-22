@@ -130,7 +130,7 @@ func TestUsedStorages(t *testing.T) {
 	t.Run("provide default name if folder is not multistorage", func(t *testing.T) {
 		folder := memory.NewFolder("test/", memory.NewStorage())
 		used := UsedStorages(folder)
-		assert.Equal(t, []string{DefaultStorage}, used)
+		assert.Equal(t, []string{"default"}, used)
 	})
 }
 

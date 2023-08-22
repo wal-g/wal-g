@@ -2,7 +2,7 @@ package st
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/cmd/common/st/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 )
 
 // Storage tools allows to interact with the configured storage, e.g.:
@@ -25,6 +25,6 @@ var (
 )
 
 func init() {
-	StorageToolsCmd.PersistentFlags().StringVarP(&targetStorage, "target", "t", multistorage.DefaultStorage,
+	StorageToolsCmd.PersistentFlags().StringVarP(&targetStorage, "target", "t", consts.DefaultStorage,
 		"execute for specific failover storage (Postgres only)")
 }

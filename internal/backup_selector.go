@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
@@ -139,7 +140,7 @@ func NewBackupNameSelector(backupName string, checkExistence bool) (BackupNameSe
 // TODO: unit tests
 func (s BackupNameSelector) Select(folder storage.Folder) (Backup, error) {
 	if !s.checkExistence {
-		return NewBackupInStorage(folder, s.backupName, multistorage.DefaultStorage)
+		return NewBackupInStorage(folder, s.backupName, consts.DefaultStorage)
 	}
 	return GetBackupByName(s.backupName, utility.BaseBackupPath, folder)
 }

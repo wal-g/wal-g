@@ -19,13 +19,13 @@ func TestReadObject(t *testing.T) {
 
 		reader, storageName, err := ReadObject(singleStorageFolder, "a/b/c")
 		require.NoError(t, err)
-		assert.Equal(t, DefaultStorage, storageName)
+		assert.Equal(t, "default", storageName)
 		content, _ := io.ReadAll(reader)
 		assert.Equal(t, "abc", string(content))
 
 		reader, storageName, err = ReadObject(singleStorageFolder, "1/2/3")
 		require.Error(t, err)
-		assert.Equal(t, DefaultStorage, storageName)
+		assert.Equal(t, "default", storageName)
 	})
 
 	t.Run("require at least one storage for first storage policy", func(t *testing.T) {

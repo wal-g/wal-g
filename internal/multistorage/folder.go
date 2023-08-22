@@ -7,11 +7,10 @@ import (
 	"path"
 
 	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
-
-const DefaultStorage = "default"
 
 // UseAllAliveStorages makes a copy of the Folder that uses all currently alive storages.
 func UseAllAliveStorages(folder storage.Folder) (storage.Folder, error) {
@@ -77,7 +76,7 @@ func UseSpecificStorage(name string, folder storage.Folder) (storage.Folder, err
 func UsedStorages(folder storage.Folder) []string {
 	mf, ok := folder.(Folder)
 	if !ok {
-		return []string{DefaultStorage}
+		return []string{consts.DefaultStorage}
 	}
 
 	var storageNames []string
@@ -160,7 +159,7 @@ func Exists(folder storage.Folder, objectRelativePath string) (found bool, stora
 	mf, ok := folder.(Folder)
 	if !ok {
 		exists, err := folder.Exists(objectRelativePath)
-		return exists, DefaultStorage, err
+		return exists, consts.DefaultStorage, err
 	}
 
 	switch mf.policies.Exists {
@@ -196,7 +195,7 @@ func (mf Folder) ExistsInAny(objectRelativePath string) (bool, string, error) {
 			return true, s.Name, nil
 		}
 	}
-	return false, "all", nil
+	return false, consts.AllStorages, nil
 }
 
 // ExistsInAll checks if the object exists in all used storages.
@@ -210,7 +209,7 @@ func (mf Folder) ExistsInAll(objectRelativePath string) (bool, string, error) {
 			return false, s.Name, nil
 		}
 	}
-	return true, "all", nil
+	return true, consts.AllStorages, nil
 }
 
 // ReadObject reads the object from multiple storages. A specific implementation is selected using FolderPolicies.Read.
@@ -224,7 +223,7 @@ func ReadObject(folder storage.Folder, objectRelativePath string) (io.ReadCloser
 	mf, ok := folder.(Folder)
 	if !ok {
 		file, err := folder.ReadObject(objectRelativePath)
-		return file, DefaultStorage, err
+		return file, consts.DefaultStorage, err
 	}
 
 	switch mf.policies.Read {
@@ -259,7 +258,7 @@ func (mf Folder) ReadObjectFoundFirst(objectRelativePath string) (io.ReadCloser,
 			return file, s.Name, err
 		}
 	}
-	return nil, "all", storage.NewObjectNotFoundError(objectRelativePath)
+	return nil, consts.AllStorages, storage.NewObjectNotFoundError(objectRelativePath)
 }
 
 // ListFolder lists the folder in multiple storages. A specific implementation is selected using FolderPolicies.List.

@@ -3,7 +3,7 @@ package st
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/cmd/common/st/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/internal/storagetools"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -23,7 +23,7 @@ var catObjectCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		objectPath := args[0]
 
-		err := multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
+		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
 			return storagetools.HandleCatObject(objectPath, folder, decrypt, decompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)

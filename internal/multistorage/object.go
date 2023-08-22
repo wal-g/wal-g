@@ -1,6 +1,7 @@
 package multistorage
 
 import (
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -15,5 +16,5 @@ func GetStorage(obj storage.Object) string {
 	if mo, ok := obj.(multiObject); ok {
 		return mo.storageName
 	}
-	return DefaultStorage
+	return consts.DefaultStorage
 }

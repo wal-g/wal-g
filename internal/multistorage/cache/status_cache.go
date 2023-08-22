@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -27,7 +28,7 @@ func NewStatusCache(
 	failover map[string]storage.Folder,
 	ttl, checkTimeout time.Duration,
 ) (StatusCache, error) {
-	storagesInOrder, err := nameAndOrderFolders(primary, failover)
+	storagesInOrder, err := NameAndOrderFolders(primary, failover)
 	if err != nil {
 		return &statusCache{}, err
 	}
@@ -162,7 +163,7 @@ type NamedFolder struct {
 	storage.Folder
 }
 
-func nameAndOrderFolders(primary storage.Folder, failover map[string]storage.Folder) ([]NamedFolder, error) {
+func NameAndOrderFolders(primary storage.Folder, failover map[string]storage.Folder) ([]NamedFolder, error) {
 	hashablePrimary, ok := primary.(storage.HashableFolder)
 	if !ok {
 		return nil, fmt.Errorf("storage \"default\" must be hashabe to be used in multi-storage folder")
@@ -185,8 +186,8 @@ func nameAndOrderFolders(primary storage.Folder, failover map[string]storage.Fol
 	return append(
 		[]NamedFolder{
 			{
-				Key:    formatKey("default", hashablePrimary.Hash()),
-				Name:   "default",
+				Key:    formatKey(consts.DefaultStorage, hashablePrimary.Hash()),
+				Name:   consts.DefaultStorage,
 				Folder: primary,
 			},
 		},

@@ -17,12 +17,12 @@ func TestExists(t *testing.T) {
 
 		exists, storage, err := Exists(singleStorageFolder, "a/b/c")
 		require.NoError(t, err)
-		assert.Equal(t, DefaultStorage, storage)
+		assert.Equal(t, "default", storage)
 		assert.True(t, exists)
 
 		exists, storage, err = Exists(singleStorageFolder, "1/2/3")
 		require.NoError(t, err)
-		assert.Equal(t, DefaultStorage, storage)
+		assert.Equal(t, "default", storage)
 		assert.False(t, exists)
 	})
 
