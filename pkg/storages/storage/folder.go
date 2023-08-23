@@ -10,27 +10,39 @@ import (
 )
 
 type Folder interface {
-	// Path should always ends with '/'
+	// GetPath provides a relative path from the root of the storage. It must always end with '/'.
 	GetPath() string
 
-	// Should return objects with relative paths
+	// ListFolder lists the folder and provides nested objects and folders. Objects must be with relative paths.
 	ListFolder() (objects []Object, subFolders []Folder, err error)
 
-	// Delete object, if exists
+	// DeleteObjects deletes objects from the storage if they exist.
 	DeleteObjects(objectRelativePaths []string) error
 
+	// Exists checks if an object exists in the folder.
 	Exists(objectRelativePath string) (bool, error)
 
-	// Returns handle to subfolder. Does not have to instantiate subfolder in any material form
+	// GetSubFolder returns a handle to the subfolder. Does not have to instantiate the subfolder in any material form.
 	GetSubFolder(subFolderRelativePath string) Folder
 
-	// Should return ObjectNotFoundError in case, there is no such object
+	// ReadObject reads an object from the folder. Must return ObjectNotFoundError in case the object doesn't exist.
 	ReadObject(objectRelativePath string) (io.ReadCloser, error)
 
+	// PutObject uploads a new object into the folder by a relative path. If an object with the same name already
+	// exists, it is overwritten.
 	PutObject(name string, content io.Reader) error
 
+	// CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
+	// an error if the source object doesn't exist.
 	CopyObject(srcPath string, dstPath string) error
 }
+
+type HashableFolder interface {
+	Folder
+	Hash() Hash
+}
+
+type Hash uint64
 
 func DeleteObjectsWhere(folder Folder, confirm bool, objFilter func(object1 Object) bool, folderFilter func(name string) bool) error {
 	relativePathObjects, err := ListFolderRecursivelyWithFilter(folder, folderFilter)

@@ -150,7 +150,7 @@ func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
 // when provided multiple 'keys' in the config,
 // this function will always return only one concrete 'folder'.
 // Chosen folder depends only on 'StorageAdapters' order
-func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.Folder, error) {
+func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.HashableFolder, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
 		prefix, ok := getWaleCompatibleSettingFrom(adapter.prefixName, config)

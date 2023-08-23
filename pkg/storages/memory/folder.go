@@ -2,6 +2,7 @@ package memory
 
 import (
 	"bytes"
+	"hash/fnv"
 	"io"
 	"path"
 	"path/filepath"
@@ -90,7 +91,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
-			return errors.New("object does not exist")
+			return storage.NewObjectNotFoundError(srcPath)
 		}
 		return err
 	}
@@ -103,4 +104,21 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		return err
 	}
 	return nil
+}
+
+func (folder *Folder) Hash() storage.Hash {
+	hash := fnv.New64a()
+
+	addToHash := func(data []byte) {
+		_, err := hash.Write(data)
+		if err != nil {
+			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
+			panic(err)
+		}
+	}
+
+	addToHash([]byte("memory"))
+	addToHash([]byte(folder.path))
+
+	return storage.Hash(hash.Sum64())
 }

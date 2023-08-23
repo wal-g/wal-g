@@ -28,7 +28,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	}
 
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	previousBackupName, err := c.deltaBaseSelector.Select(folder)
+	previousBackup, err := c.deltaBaseSelector.Select(folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -37,8 +37,8 @@ func (c RegularDeltaBackupConfigurator) Configure(
 		return PrevBackupInfo{}, 0, err
 	}
 
-	previousBackup := NewBackup(baseBackupFolder, previousBackupName)
-	prevBackupSentinelDto, err := previousBackup.GetSentinel()
+	previousPgBackup := ToPgBackup(previousBackup)
+	prevBackupSentinelDto, err := previousPgBackup.GetSentinel()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
@@ -58,7 +58,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 		return PrevBackupInfo{}, 0, nil
 	}
 
-	previousBackupMeta, err := previousBackup.FetchMeta()
+	previousBackupMeta, err := previousPgBackup.FetchMeta()
 	if err != nil {
 		tracelog.InfoLogger.Printf(
 			"Failed to get previous backup metadata: %s. Doing full backup.\n", err.Error())
@@ -73,20 +73,24 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	if fromFull {
 		tracelog.InfoLogger.Println("Delta will be made from full backup.")
 
+		prevName := previousPgBackup.Name
 		if prevBackupSentinelDto.IncrementFullName != nil {
-			previousBackupName = *prevBackupSentinelDto.IncrementFullName
+			prevName = *prevBackupSentinelDto.IncrementFullName
 		}
 
-		previousBackup := NewBackup(baseBackupFolder, previousBackupName)
-		prevBackupSentinelDto, err = previousBackup.GetSentinel()
+		previousPgBackup, err = NewBackup(baseBackupFolder, prevName)
+		if err != nil {
+			return PrevBackupInfo{}, 0, err
+		}
+		prevBackupSentinelDto, err = previousPgBackup.GetSentinel()
 		if err != nil {
 			return PrevBackupInfo{}, 0, err
 		}
 	}
-	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousBackupName,
+	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousPgBackup.Name,
 		*prevBackupSentinelDto.BackupStartLSN)
-	prevBackupInfo.name = previousBackupName
-	prevBackupInfo.sentinelDto, prevBackupInfo.filesMetadataDto, err = previousBackup.GetSentinelAndFilesMetadata()
+	prevBackupInfo.name = previousPgBackup.Name
+	prevBackupInfo.sentinelDto, prevBackupInfo.filesMetadataDto, err = previousPgBackup.GetSentinelAndFilesMetadata()
 	return prevBackupInfo, incrementCount, err
 }
 

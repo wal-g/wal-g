@@ -51,10 +51,13 @@ func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]
 }
 
 func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (archive.Backup, error) {
-	backup := internal.NewBackup(folder, backupTime.BackupName)
+	backup, err := internal.NewBackup(folder, backupTime.BackupName)
+	if err != nil {
+		return archive.Backup{}, err
+	}
 
 	metaData := archive.Backup{}
-	err := backup.FetchSentinel(&metaData)
+	err = backup.FetchSentinel(&metaData)
 	if err != nil {
 		return archive.Backup{}, err
 	}

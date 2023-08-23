@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/asm"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -25,16 +26,15 @@ var walPushCmd = &cobra.Command{
 }
 
 func GetWalUploader() *postgres.WalUploader {
-	baseUploader, err := internal.ConfigureUploader()
+	folder := GetFolder()
+	folder = multistorage.SetPolicies(folder, policies.TakeFirstStorage)
+	folder, err := multistorage.UseFirstAliveStorage(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	failover, err := internal.InitFailoverStorages()
+	baseUploader, err := internal.ConfigureUploaderToFolder(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	uploader, err := multistorage.NewUploader(baseUploader, failover)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	walUploader, err := postgres.ConfigureWalUploader(uploader)
+	walUploader, err := postgres.ConfigureWalUploader(baseUploader)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	archiveStatusManager, err := internal.ConfigureArchiveStatusManager()

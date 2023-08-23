@@ -8,6 +8,9 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const WalFetchShortDescription = "Fetches a WAL file from storage"
@@ -18,7 +21,8 @@ var walFetchCmd = &cobra.Command{
 	Short: WalFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		folderReader := GetFolderReader()
+		folderReader := GetWalFolderReader()
+
 		err := postgres.HandleWALFetch(folderReader, args[0], args[1], postgres.RegularPrefetcher{})
 		if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 			tracelog.ErrorLogger.Print(err.Error())
@@ -28,17 +32,30 @@ var walFetchCmd = &cobra.Command{
 	},
 }
 
-func GetFolderReader() internal.StorageFolderReader {
-	folder, err := internal.ConfigureFolder()
+func GetWalFolderReader() internal.StorageFolderReader {
+	folder := GetFolder()
+	folder = multistorage.SetPolicies(folder, policies.MergeAllStorages)
+	folder, err := multistorage.UseAllAliveStorages(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	failover, err := internal.InitFailoverStorages()
+	return internal.NewFolderReader(folder)
+}
+
+func GetFolder() storage.Folder {
+	primaryStorage, err := internal.ConfigureFolder()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	folderReader, err := multistorage.NewStorageFolderReader(folder, failover)
+	failoverStorages, err := internal.InitFailoverStorages()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	return folderReader
+	cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+	tracelog.ErrorLogger.FatalOnError(err)
+	aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+	tracelog.ErrorLogger.FatalOnError(err)
+	statusCache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	return multistorage.NewFolder(statusCache)
 }
 
 func init() {

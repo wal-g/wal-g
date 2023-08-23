@@ -12,10 +12,14 @@ type SegBackup struct {
 	AoFilesMetadataDto *AOFilesMetadataDTO
 }
 
-func NewSegBackup(baseBackupFolder storage.Folder, name string) SegBackup {
-	return SegBackup{
-		Backup: postgres.NewBackup(baseBackupFolder, name),
+func NewSegBackup(baseBackupFolder storage.Folder, name string) (SegBackup, error) {
+	pgBackup, err := postgres.NewBackup(baseBackupFolder, name)
+	if err != nil {
+		return SegBackup{}, err
 	}
+	return SegBackup{
+		Backup: pgBackup,
+	}, nil
 }
 
 func ToGpSegBackup(source postgres.Backup) (output SegBackup) {

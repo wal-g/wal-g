@@ -2,8 +2,8 @@ package sh
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,7 +16,9 @@ import (
 
 type Folder struct {
 	client SftpClient
+	host   string
 	path   string
+	user   string
 }
 
 const (
@@ -38,7 +40,7 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 	return storage.NewError(err, "SSH", format, args...)
 }
 
-func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
 	host, path, err := storage.ParsePrefixAsURL(prefix)
 
 	if err != nil {
@@ -92,9 +94,21 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 
 	path = storage.AddDelimiterToPath(path)
 
+	return NewFolder(
+		extend(sftpClient),
+		host,
+		path,
+		user,
+	), nil
+}
+
+func NewFolder(client SftpClient, host, path, user string) *Folder {
 	return &Folder{
-		extend(sftpClient), path,
-	}, nil
+		client: client,
+		host:   host,
+		path:   path,
+		user:   user,
+	}
 }
 
 // TODO close ssh and sftp connection
@@ -130,10 +144,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 	for _, fileInfo := range filesInfo {
 		if fileInfo.IsDir() {
-			folder := &Folder{
-				folder.client,
-				client.Join(path, fileInfo.Name()),
-			}
+			folder := NewFolder(folder.client, folder.host, client.Join(path, fileInfo.Name()), folder.user)
 			subFolders = append(subFolders, folder)
 			// Folder is not object, just skip it
 			continue
@@ -193,10 +204,12 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	return &Folder{
+	return NewFolder(
 		folder.client,
+		folder.host,
 		folder.client.Join(folder.path, subFolderRelativePath),
-	}
+		folder.user,
+	)
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
@@ -258,7 +271,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if exists, err := folder.Exists(srcPath); !exists {
 		if err == nil {
-			return errors.New("object does not exist")
+			return storage.NewObjectNotFoundError(srcPath)
 		}
 		return err
 	}
@@ -271,4 +284,23 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		return err
 	}
 	return nil
+}
+
+func (folder *Folder) Hash() storage.Hash {
+	hash := fnv.New64a()
+
+	addToHash := func(data []byte) {
+		_, err := hash.Write(data)
+		if err != nil {
+			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
+			panic(err)
+		}
+	}
+
+	addToHash([]byte("sh"))
+	addToHash([]byte(folder.host))
+	addToHash([]byte(folder.path))
+	addToHash([]byte(folder.user))
+
+	return storage.Hash(hash.Sum64())
 }

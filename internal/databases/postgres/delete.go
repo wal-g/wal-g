@@ -193,7 +193,10 @@ func timelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bo
 }
 
 func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
-	backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object))
+	backup, err := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object))
+	if err != nil {
+		return "", "", true, err
+	}
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
 		return "", "", true, err
@@ -218,7 +221,7 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error 
 		return err
 	}
 
-	target, err := dh.FindTargetByName(oldestBackup)
+	target, err := dh.FindTargetByName(oldestBackup.Name)
 	if err != nil {
 		return err
 	}

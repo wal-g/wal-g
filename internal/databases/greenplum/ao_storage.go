@@ -57,7 +57,10 @@ func iterateStorageAoFilesWithFunc(baseBackupsFolder storage.Folder, iterateFunc
 	}
 
 	for _, b := range backupTimes {
-		backup := NewSegBackup(baseBackupsFolder, b.BackupName)
+		backup, err := NewSegBackup(baseBackupsFolder, b.BackupName)
+		if err != nil {
+			return err
+		}
 		aoMeta, err := backup.LoadAoFilesMetadata()
 		if err != nil {
 			if _, ok := err.(storage.ObjectNotFoundError); ok {

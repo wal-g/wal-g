@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -39,14 +40,39 @@ func (err NoBackupsFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-func GetLatestBackupName(folder storage.Folder) (string, error) {
-	backupTimes, err := GetBackups(folder)
-	SortBackupTimeSlices(backupTimes)
-	if err != nil {
-		return "", err
+func GetBackupByName(backupName, subfolder string, folder storage.Folder) (backup Backup, err error) {
+	baseBackupFolder := folder.GetSubFolder(subfolder)
+
+	if backupName == LatestString {
+		return GetLatestBackup(baseBackupFolder)
 	}
 
-	return backupTimes[len(backupTimes)-1].BackupName, nil
+	return GetSpecificBackup(baseBackupFolder, backupName)
+}
+
+func GetLatestBackup(folder storage.Folder) (backup Backup, err error) {
+	backupTimes, err := GetBackups(folder)
+	if err != nil {
+		return Backup{}, err
+	}
+	SortBackupTimeSlices(backupTimes)
+
+	latest := backupTimes[len(backupTimes)-1]
+	tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest.BackupName)
+
+	return NewBackupInStorage(folder, latest.BackupName, latest.StorageName)
+}
+
+func GetSpecificBackup(folder storage.Folder, name string) (Backup, error) {
+	sentinelName := SentinelNameFromBackup(name)
+	exists, storageName, err := multistorage.Exists(folder, sentinelName)
+	if err != nil {
+		return Backup{}, fmt.Errorf("checking sentinel file %q for existence: %w", sentinelName, err)
+	}
+	if !exists {
+		return Backup{}, NewBackupNonExistenceError(name)
+	}
+	return NewBackupInStorage(folder, name, storageName)
 }
 
 func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
@@ -65,9 +91,14 @@ func GetBackupSentinelObjects(folder storage.Folder) ([]storage.Object, error) {
 	return sentinelObjects, nil
 }
 
-// GetBackups receives backup descriptions and sorts them by time
+// GetBackups receives all backup descriptions from the folder.
 func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
-	backups, _, err = GetBackupsAndGarbage(folder)
+	backupObjects, _, err := folder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	backups = GetBackupTimeSlices(backupObjects)
 	if err != nil {
 		return nil, err
 	}
@@ -85,22 +116,23 @@ func GetBackupsAndGarbage(folder storage.Folder) (backups []BackupTime, garbage 
 		return nil, nil, err
 	}
 
-	sortTimes := GetBackupTimeSlices(backupObjects)
-	garbage = GetGarbageFromPrefix(subFolders, sortTimes)
+	backupTimes := GetBackupTimeSlices(backupObjects)
+	garbage = GetGarbageFromPrefix(subFolders, backupTimes)
 
-	return sortTimes, garbage, nil
+	return backupTimes, garbage, nil
 }
 
-func GetBackupTimeSlices(backups []storage.Object) []BackupTime {
+func GetBackupTimeSlices(backupObjects []storage.Object) []BackupTime {
 	backupTimes := make([]BackupTime, 0)
-	for _, object := range backups {
+	for _, object := range backupObjects {
 		key := object.GetName()
 		if !strings.HasSuffix(key, utility.SentinelSuffix) {
 			continue
 		}
-		time := object.GetLastModified()
-		backupTimes = append(backupTimes, BackupTime{utility.StripRightmostBackupName(key), time,
-			utility.StripWalFileName(key)})
+		storageName := multistorage.GetStorage(object)
+		modTime := object.GetLastModified()
+		backupTimes = append(backupTimes, BackupTime{utility.StripRightmostBackupName(key), modTime,
+			utility.StripWalFileName(key), storageName})
 	}
 	return backupTimes
 }
@@ -146,12 +178,12 @@ func UnwrapLatestModifier(backupName string, folder storage.Folder) (string, err
 		return backupName, nil
 	}
 
-	latest, err := GetLatestBackupName(folder)
+	latest, err := GetLatestBackup(folder)
 	if err != nil {
 		return "", err
 	}
 	tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
-	return latest, nil
+	return latest.Name, nil
 }
 
 func FolderSize(folder storage.Folder, path string) (int64, error) {

@@ -60,7 +60,7 @@ var segBackupFetchCmd = &cobra.Command{
 			extractProv = greenplum.ExtractProviderImpl{}
 		}
 
-		pgFetcher := postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
+		pgFetcher := postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
 	},
 }

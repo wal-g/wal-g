@@ -140,9 +140,12 @@ func LoadBackups(folder storage.Folder, names []string) ([]archive.Backup, error
 }
 
 func BackupMeta(folder storage.Folder, name string) (archive.Backup, error) {
-	backup := internal.NewBackup(folder, name)
+	backup, err := internal.NewBackup(folder, name)
+	if err != nil {
+		return archive.Backup{}, err
+	}
 	var sentinel archive.Backup
-	err := backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(&sentinel)
 	if err != nil {
 		return archive.Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
 	}

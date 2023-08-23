@@ -561,7 +561,10 @@ func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentSent
 
 func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*PgSegmentSentinelDto, error) {
 	// Actually, this is not a real completed backup. It is only used to fetch the segment metadata
-	currentBackup := NewBackup(bh.workers.Uploader.Folder(), bh.currBackupInfo.backupName)
+	currentBackup, err := NewBackup(bh.workers.Uploader.Folder(), bh.currBackupInfo.backupName)
+	if err != nil {
+		return nil, err
+	}
 
 	pgBackup, err := currentBackup.GetSegmentBackup(backupID, segCfg.ContentID)
 	if err != nil {
@@ -659,7 +662,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 	}
 
 	folder := bh.workers.Uploader.Folder()
-	previousBackupName, err := bh.arguments.deltaBaseSelector.Select(folder)
+	previousBackup, err := bh.arguments.deltaBaseSelector.Select(folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -668,8 +671,9 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 		return err
 	}
 
-	previousBackup := NewBackup(folder, previousBackupName)
-	prevBackupSentinelDto, err := previousBackup.GetSentinel()
+	previousGpBackup, err := NewBackup(folder, previousBackup.Name)
+	tracelog.ErrorLogger.FatalOnError(err)
+	prevBackupSentinelDto, err := previousGpBackup.GetSentinel()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bh.currBackupInfo.incrementCount = 1
@@ -690,20 +694,22 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 	if fromFull {
 		tracelog.InfoLogger.Println("Delta will be made from full backup.")
 
+		prevName := previousGpBackup.Name
 		if prevBackupSentinelDto.IncrementFullName != nil {
-			previousBackupName = *prevBackupSentinelDto.IncrementFullName
+			prevName = *prevBackupSentinelDto.IncrementFullName
 		}
 
-		previousBackup := NewBackup(folder, previousBackupName)
-		prevBackupSentinelDto, err = previousBackup.GetSentinel()
+		previousGpBackup, err = NewBackup(folder, prevName)
+		tracelog.ErrorLogger.FatalOnError(err)
+		prevBackupSentinelDto, err = previousGpBackup.GetSentinel()
 		if err != nil {
 			return err
 		}
 	}
 
-	tracelog.InfoLogger.Printf("Delta backup from %v.\n", previousBackupName)
-	bh.prevBackupInfo.name = previousBackupName
-	bh.prevBackupInfo.sentinelDto, err = previousBackup.GetSentinel()
+	tracelog.InfoLogger.Printf("Delta backup from %v.\n", previousGpBackup.Name)
+	bh.prevBackupInfo.name = previousGpBackup.Name
+	bh.prevBackupInfo.sentinelDto, err = previousGpBackup.GetSentinel()
 	if err != nil {
 		return err
 	}

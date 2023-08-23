@@ -19,7 +19,11 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 	permanentBackups := map[string]bool{}
 	permanentWals := map[string]bool{}
 	for _, backupTime := range backupTimes {
-		backup := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupTime.BackupName)
+		backup, err := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupTime.BackupName)
+		if err != nil {
+			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
+			continue
+		}
 		meta, err := backup.FetchMeta()
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)

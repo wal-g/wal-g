@@ -50,7 +50,10 @@ func makeBackupObjects(folder storage.Folder, objects []storage.Object) ([]inter
 }
 
 func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
-	backup := NewBackup(folder, utility.StripRightmostBackupName(object.GetName()))
+	backup, err := NewBackup(folder, utility.StripRightmostBackupName(object.GetName()))
+	if err != nil {
+		return "", "", true, err
+	}
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
 		return "", "", true, err

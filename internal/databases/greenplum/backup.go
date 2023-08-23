@@ -17,11 +17,15 @@ type Backup struct {
 	rootFolder  storage.Folder
 }
 
-func NewBackup(rootFolder storage.Folder, name string) Backup {
-	return Backup{
-		Backup:     internal.NewBackup(rootFolder.GetSubFolder(utility.BaseBackupPath), name),
-		rootFolder: rootFolder,
+func NewBackup(rootFolder storage.Folder, name string) (Backup, error) {
+	backup, err := internal.NewBackup(rootFolder.GetSubFolder(utility.BaseBackupPath), name)
+	if err != nil {
+		return Backup{}, err
 	}
+	return Backup{
+		Backup:     backup,
+		rootFolder: rootFolder,
+	}, nil
 }
 
 func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
@@ -45,13 +49,16 @@ func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (SegBacku
 	}
 	segBackupsFolder := backup.rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 
-	backupName, err := selector.Select(segBackupsFolder)
+	segBackup, err := selector.Select(segBackupsFolder)
 	if err != nil {
 		return SegBackup{}, fmt.Errorf(
 			"failed to select matching backup for id %s from subfolder %s: %w",
 			backupID, segBackupsFolder.GetPath(), err)
 	}
 
-	pgBackup := postgres.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), backupName)
+	pgBackup, err := postgres.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), segBackup.Name)
+	if err != nil {
+		return SegBackup{}, err
+	}
 	return ToGpSegBackup(pgBackup), nil
 }
