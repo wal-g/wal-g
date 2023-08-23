@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -24,8 +25,7 @@ func (err SentinelMarshallingError) Error() string {
 
 //endregion
 
-// Backup provides basic functionality
-// to fetch backup-related information from storage
+// Backup provides basic functionality to fetch backup-related information from storages.
 //
 // WAL-G stores information about single backup in the following files:
 //
@@ -35,17 +35,34 @@ func (err SentinelMarshallingError) Error() string {
 // Metadata file (only in Postgres) - Postgres sentinel files can be quite large (> 1GB),
 // so the metadata file is useful for the quick fetch of backup-related information.
 // see FetchMetadata, UploadMetadata
+//
+// All files of the backup must be stored in a single storage.
 type Backup struct {
 	Name string
 	// base backup folder or catchup backup folder
 	Folder storage.Folder
 }
 
-func NewBackup(folder storage.Folder, name string) Backup {
+func NewBackup(folder storage.Folder, name string) (Backup, error) {
+	err := multistorage.EnsureSingleStorageIsUsed(folder)
+	if err != nil {
+		return Backup{}, fmt.Errorf("create backup %s: %w", name, err)
+	}
 	return Backup{
 		Name:   name,
 		Folder: folder,
+	}, nil
+}
+
+func NewBackupInStorage(folder storage.Folder, name, storage string) (Backup, error) {
+	folder, err := multistorage.UseSpecificStorage(storage, folder)
+	if err != nil {
+		return Backup{}, fmt.Errorf("create backup %s in storage %s: %w", name, storage, err)
 	}
+	return Backup{
+		Name:   name,
+		Folder: folder,
+	}, nil
 }
 
 // getStopSentinelPath returns sentinel path.
@@ -130,25 +147,8 @@ func (backup *Backup) AssureExists() error {
 	return nil
 }
 
-func GetBackupByName(backupName, subfolder string, folder storage.Folder) (Backup, error) {
-	baseBackupFolder := folder.GetSubFolder(subfolder)
-
-	var backup Backup
-	if backupName == LatestString {
-		latest, err := GetLatestBackupName(baseBackupFolder)
-		if err != nil {
-			return Backup{}, err
-		}
-		tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
-
-		backup = NewBackup(baseBackupFolder, latest)
-	} else {
-		backup = NewBackup(baseBackupFolder, backupName)
-		if err := backup.AssureExists(); err != nil {
-			return Backup{}, err
-		}
-	}
-	return backup, nil
+func (backup *Backup) GetStorageName() string {
+	return multistorage.UsedStorages(backup.Folder)[0]
 }
 
 // TODO : unit tests

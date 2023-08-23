@@ -57,7 +57,10 @@ func FetchRestorePointMetadata(folder storage.Folder, pointName string) (Restore
 
 // ValidateMatch checks that restore point is reachable from the provided backup
 func ValidateMatch(folder storage.Folder, backupName string, restorePoint string) error {
-	backup := NewBackup(folder, backupName)
+	backup, err := NewBackup(folder, backupName)
+	if err != nil {
+		return err
+	}
 	bSentinel, err := backup.GetSentinel()
 	if err != nil {
 		return fmt.Errorf("failed to fetch %s sentinel: %w", backupName, err)

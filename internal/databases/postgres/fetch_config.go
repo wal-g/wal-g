@@ -5,14 +5,14 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func NewFetchConfig(backupName, dbDataDirectory string, folder storage.Folder, spec *TablespaceSpec,
+func NewFetchConfig(dbDataDirectory string, backup Backup, rootFolder storage.Folder, spec *TablespaceSpec,
 	filesToUnwrap map[string]bool, skipRedundantTars bool, manager ExtractProvider) *FetchConfig {
 	fetchConfig := &FetchConfig{
 		filesToUnwrap:     filesToUnwrap,
 		missingBlocks:     make(map[string]int64),
 		tablespaceSpec:    spec,
-		backupName:        backupName,
-		folder:            folder,
+		backup:            backup,
+		rootFolder:        rootFolder,
 		dbDataDirectory:   dbDataDirectory,
 		skipRedundantTars: skipRedundantTars,
 		extractProv:       manager,
@@ -25,8 +25,8 @@ type FetchConfig struct {
 	// missingBlocks stores count of blocks missing for file path
 	missingBlocks     map[string]int64
 	tablespaceSpec    *TablespaceSpec
-	backupName        string
-	folder            storage.Folder
+	backup            Backup
+	rootFolder        storage.Folder
 	dbDataDirectory   string
 	skipRedundantTars bool
 	extractProv       ExtractProvider

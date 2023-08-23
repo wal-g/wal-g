@@ -9,10 +9,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool,
+func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedundantTars bool,
 	extractProv ExtractProvider,
-) func(folder storage.Folder, backup internal.Backup) {
-	return func(folder storage.Folder, backup internal.Backup) {
+) internal.Fetcher {
+	return func(rootFolder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
@@ -33,8 +33,15 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
 				NewNonEmptyDBDataDirectoryError(dbDataDirectory))
 		}
-		config := NewFetchConfig(pgBackup.Name,
-			utility.ResolveSymlink(dbDataDirectory), folder, spec, filesToUnwrap, skipRedundantTars, extractProv)
+		config := NewFetchConfig(
+			utility.ResolveSymlink(dbDataDirectory),
+			pgBackup,
+			rootFolder,
+			spec,
+			filesToUnwrap,
+			skipRedundantTars,
+			extractProv,
+		)
 		err = deltaFetchRecursionNew(config)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
@@ -43,7 +50,14 @@ func GetPgFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedu
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
 func deltaFetchRecursionNew(cfg *FetchConfig) error {
-	backup := NewBackup(cfg.folder.GetSubFolder(utility.BaseBackupPath), cfg.backupName)
+	backup, err := NewBackupInStorage(
+		cfg.rootFolder.GetSubFolder(utility.BaseBackupPath),
+		cfg.backup.Name,
+		cfg.backup.GetStorageName(),
+	)
+	if err != nil {
+		return err
+	}
 	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return err
@@ -53,7 +67,7 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 
 	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta %v at LSN %s \n",
-			cfg.backupName,
+			cfg.backup.Name,
 			*(sentinelDto.BackupStartLSN))
 		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(filesMetaDto.Files, cfg.filesToUnwrap)
 		if err != nil {
@@ -65,14 +79,14 @@ func deltaFetchRecursionNew(cfg *FetchConfig) error {
 			return err
 		}
 		cfg.filesToUnwrap = baseFilesToUnwrap
-		cfg.backupName = *sentinelDto.IncrementFrom
+		cfg.backup.Name = *sentinelDto.IncrementFrom
 		if cfg.skipRedundantTars {
 			// if we skip redundant tars we should exclude files that
 			// no longer need any additional information (completed ones)
 			cfg.SkipRedundantFiles(unwrapResult)
 		}
 		tracelog.InfoLogger.Printf("%v fetched. Downgrading from LSN %s to LSN %s \n",
-			cfg.backupName,
+			cfg.backup.Name,
 			*(sentinelDto.BackupStartLSN),
 			*(sentinelDto.IncrementFromLSN))
 		err = deltaFetchRecursionNew(cfg)

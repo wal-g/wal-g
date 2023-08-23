@@ -149,7 +149,10 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelecto
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {
-	backup := NewBackup(h.Folder, target.GetBackupName())
+	backup, err := NewBackup(h.Folder, target.GetBackupName())
+	if err != nil {
+		return err
+	}
 	sentinel, err := backup.GetSentinel()
 	if err != nil {
 		return fmt.Errorf("failed to load backup %s sentinel: %v", backup.Name, err)
@@ -203,7 +206,7 @@ func (h *DeleteHandler) HandleDeleteGarbage(args []string) error {
 		return err
 	}
 
-	target, err := h.FindTargetByName(oldestBackup)
+	target, err := h.FindTargetByName(oldestBackup.Name)
 	if err != nil {
 		return err
 	}

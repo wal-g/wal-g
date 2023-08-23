@@ -10,21 +10,21 @@ import (
 )
 
 type LimitedFolder struct {
-	storage.Folder
+	storage.HashableFolder
 	limiter *rate.Limiter
 }
 
-func NewLimitedFolder(folder storage.Folder, limiter *rate.Limiter) *LimitedFolder {
-	return &LimitedFolder{Folder: folder, limiter: limiter}
+func NewLimitedFolder(folder storage.HashableFolder, limiter *rate.Limiter) *LimitedFolder {
+	return &LimitedFolder{HashableFolder: folder, limiter: limiter}
 }
 
 func (lf *LimitedFolder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	folder := lf.Folder.GetSubFolder(subFolderRelativePath)
+	folder := lf.HashableFolder.GetSubFolder(subFolderRelativePath).(storage.HashableFolder)
 	return NewLimitedFolder(folder, lf.limiter)
 }
 
 func (lf *LimitedFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	readCloser, err := lf.Folder.ReadObject(objectRelativePath)
+	readCloser, err := lf.HashableFolder.ReadObject(objectRelativePath)
 	if err != nil {
 		return nil, err
 	}
@@ -36,5 +36,5 @@ func (lf *LimitedFolder) ReadObject(objectRelativePath string) (io.ReadCloser, e
 
 func (lf *LimitedFolder) PutObject(name string, content io.Reader) error {
 	limitedReader := limiters.NewReader(content, lf.limiter)
-	return lf.Folder.PutObject(name, limitedReader)
+	return lf.HashableFolder.PutObject(name, limitedReader)
 }

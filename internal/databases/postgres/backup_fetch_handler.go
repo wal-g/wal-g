@@ -62,7 +62,7 @@ func chooseTablespaceSpecification(sentinelDtoSpec, spec *TablespaceSpec) *Table
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirectory string,
+func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool, extractProv ExtractProvider) error {
 	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata()
 	if err != nil {
@@ -78,8 +78,15 @@ func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirector
 		if err != nil {
 			return err
 		}
-		incrementFrom := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), *sentinelDto.IncrementFrom)
-		err = deltaFetchRecursionOld(incrementFrom, folder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap, extractProv)
+		incrementFrom, err := NewBackupInStorage(
+			rootFolder.GetSubFolder(utility.BaseBackupPath),
+			*sentinelDto.IncrementFrom,
+			backup.GetStorageName(),
+		)
+		if err != nil {
+			return err
+		}
+		err = deltaFetchRecursionOld(incrementFrom, rootFolder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap, extractProv)
 		if err != nil {
 			return err
 		}
@@ -92,9 +99,7 @@ func deltaFetchRecursionOld(backup Backup, folder storage.Folder, dbDataDirector
 	return backup.unwrapToEmptyDirectory(dbDataDirectory, filesToUnwrap, false, extractProv)
 }
 
-func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string,
-	extractProv ExtractProvider,
-) func(rootFolder storage.Folder, backup internal.Backup) {
+func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractProv ExtractProvider) internal.Fetcher {
 	return func(rootFolder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(fileMask)
@@ -104,8 +109,8 @@ func GetPgFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string,
 		if restoreSpecPath != "" {
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
-			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
+			errMessage := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
+			tracelog.ErrorLogger.FatalfOnError(errMessage, err)
 		}
 
 		err = deltaFetchRecursionOld(pgBackup, rootFolder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap, extractProv)

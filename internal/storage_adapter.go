@@ -16,7 +16,7 @@ import (
 type StorageAdapter struct {
 	prefixName         string // actually this is an env key suffix, but all names contains '_PREFIX' word at the end, see StorageAdapters
 	settingNames       []string
-	configureFolder    func(string, map[string]string) (storage.Folder, error)
+	configureFolder    func(string, map[string]string) (storage.HashableFolder, error)
 	prefixPreprocessor func(string) string
 }
 

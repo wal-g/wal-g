@@ -350,7 +350,7 @@ func (bh *BackupHandler) handleBackupPushLocal() {
 
 	folder := bh.Arguments.Uploader.Folder()
 	baseBackupFolder := folder.GetSubFolder(bh.Arguments.backupsFolder)
-	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder)
+	tracelog.DebugLogger.Printf("Base backup folder: %s", baseBackupFolder.GetPath())
 
 	bh.checkPgVersionAndPgControl()
 

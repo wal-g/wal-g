@@ -1,11 +1,14 @@
 package fs
 
 import (
+	"encoding/binary"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"os"
 	"path"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -30,7 +33,7 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 	return storage.NewError(err, "GCS", format, args...)
 }
 
-func ConfigureFolder(path string, settings map[string]string) (storage.Folder, error) {
+func ConfigureFolder(path string, settings map[string]string) (storage.HashableFolder, error) {
 	if _, err := os.Stat(path); err != nil {
 		return nil, NewError(err, "Folder not exists or is inaccessible")
 	}
@@ -129,6 +132,9 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	src := path.Join(folder.rootPath, srcPath)
 	srcStat, err := os.Stat(src)
+	if errors.Is(err, os.ErrNotExist) {
+		return storage.NewObjectNotFoundError(srcPath)
+	}
 	if err != nil {
 		return err
 	}
@@ -166,4 +172,29 @@ func (folder *Folder) EnsureExists() error {
 		return os.MkdirAll(dirname, dirDefaultMode)
 	}
 	return err
+}
+
+func (folder *Folder) Hash() storage.Hash {
+	hash := fnv.New64a()
+
+	addToHash := func(data []byte) {
+		_, err := hash.Write(data)
+		if err != nil {
+			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
+			panic(err)
+		}
+	}
+
+	addToHash([]byte("fs"))
+
+	addToHash([]byte(folder.rootPath))
+
+	addToHash([]byte(folder.subpath))
+
+	userID := os.Getuid()
+	userIDBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(userIDBytes, uint64(userID))
+	addToHash(userIDBytes)
+
+	return storage.Hash(hash.Sum64())
 }

@@ -44,27 +44,30 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 		}
 		return NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
 	case CopyComposer:
-		previousBackupName, err := internal.GetLatestBackupName(folder)
+		previousBackup, err := internal.GetLatestBackup(folder)
 		if err != nil {
 			tracelog.InfoLogger.Printf(
 				"Failed to init the CopyComposer, will use the RegularComposer instead:"+
 					" couldn't get the previous backup name: %v", err)
 			return NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets()), nil
 		}
-		previousBackup := NewBackup(folder, previousBackupName)
-		prevBackupSentinelDto, _, err := previousBackup.GetSentinelAndFilesMetadata()
+		previousPGBackup := ToPgBackup(previousBackup)
+		prevBackupSentinelDto, _, err := previousPGBackup.GetSentinelAndFilesMetadata()
 		if err != nil {
 			return nil, err
 		}
 		if prevBackupSentinelDto.IncrementFullName != nil {
-			previousBackupName = *prevBackupSentinelDto.IncrementFullName
-			previousBackup = NewBackup(folder, previousBackupName)
-			_, _, err = previousBackup.GetSentinelAndFilesMetadata()
+			previousName := *prevBackupSentinelDto.IncrementFullName
+			previousPGBackup, err = NewBackup(folder, previousName)
+			if err != nil {
+				return nil, err
+			}
+			_, _, err = previousPGBackup.GetSentinelAndFilesMetadata()
 			if err != nil {
 				return nil, err
 			}
 		}
-		return NewCopyTarBallComposerMaker(previousBackup, newBackupName, filePackOptions), nil
+		return NewCopyTarBallComposerMaker(previousPGBackup, newBackupName, filePackOptions), nil
 	case DatabaseComposer:
 		return NewDirDatabaseTarBallComposerMaker(&internal.RegularBundleFiles{}, filePackOptions, internal.NewRegularTarFileSets()), nil
 	default:

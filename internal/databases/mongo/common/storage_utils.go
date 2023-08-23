@@ -12,7 +12,10 @@ const BinaryBackupType = "binary"
 
 func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup, error) {
 	var sentinel models.Backup
-	backup := internal.NewBackup(folder, backupName)
+	backup, err := internal.NewBackup(folder, backupName)
+	if err != nil {
+		return nil, err
+	}
 	if err := backup.FetchSentinel(&sentinel); err != nil {
 		return nil, err
 	}

@@ -3,7 +3,7 @@ package st
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/internal/storagetools"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -28,7 +28,7 @@ var getObjectCmd = &cobra.Command{
 			tracelog.ErrorLogger.Fatalf("'all' target is not supported for st get command")
 		}
 
-		err := multistorage.ExecuteOnStorage(targetStorage, func(folder storage.Folder) error {
+		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
 			return storagetools.HandleGetObject(objectPath, dstPath, folder, !noDecrypt, !noDecompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)

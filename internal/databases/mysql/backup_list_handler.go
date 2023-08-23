@@ -56,7 +56,8 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 
 	backupDetails := make([]BackupDetail, 0, len(backupTimes))
 	for _, backupTime := range backupTimes {
-		backup := internal.NewBackup(folder, backupTime.BackupName)
+		backup, err := internal.NewBackup(folder, backupTime.BackupName)
+		tracelog.ErrorLogger.FatalOnError(err)
 
 		var sentinel StreamSentinelDto
 		err = backup.FetchSentinel(&sentinel)

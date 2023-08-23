@@ -38,7 +38,7 @@ const (
 	DeleteTargetExamples = `  target base_0000000100000000000000C4	delete base backup by name
   target --target-user-data "{ \"x\": [3], \"y\": 4 }"	delete backup specified by user data
   target base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all dependant delta backups 
-  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup`  //nolint:lll
+  target FIND_FULL base_0000000100000000000000C9_D_0000000100000000000000C4	delete delta backup and all delta backups with the same base backup` //nolint:lll
 
 	DeleteEverythingUsageExample = "everything [FORCE]"
 	DeleteRetainUsageExample     = "retain [FULL|FIND_FULL] backup_count"
@@ -242,7 +242,7 @@ func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 
 // TODO: unit tests
 func (h *DeleteHandler) FindTargetBySelector(targetSelector BackupSelector) (BackupObject, error) {
-	targetName, err := targetSelector.Select(h.Folder)
+	targetBackup, err := targetSelector.Select(h.Folder)
 	if err != nil {
 		if _, ok := err.(NoBackupsFoundError); ok {
 			// it is OK to have no backups found for the provided selector,
@@ -254,7 +254,7 @@ func (h *DeleteHandler) FindTargetBySelector(targetSelector BackupSelector) (Bac
 
 	var target BackupObject
 	for idx := range h.backups {
-		if h.backups[idx].GetBackupName() == targetName {
+		if h.backups[idx].GetBackupName() == targetBackup.Name {
 			target = h.backups[idx]
 			break
 		}

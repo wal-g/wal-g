@@ -8,7 +8,9 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
 const (
@@ -45,10 +47,23 @@ var backupFetchCmd = &cobra.Command{
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder, err := internal.ConfigureFolder()
+		primaryStorage, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		var pgFetcher func(folder storage.Folder, backup internal.Backup)
+		failoverStorages, err := internal.InitFailoverStorages()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+		tracelog.ErrorLogger.FatalOnError(err)
+		aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+		tracelog.ErrorLogger.FatalOnError(err)
+		cache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		folder := multistorage.NewFolder(cache)
+		multistorage.SetPolicies(folder, policies.UniteAllStorages)
+		folder, err = multistorage.UseAllAliveStorages(folder)
+		tracelog.ErrorLogger.FatalOnError(err)
 
 		if partialRestoreArgs != nil {
 			skipRedundantTars = true
@@ -65,10 +80,11 @@ var backupFetchCmd = &cobra.Command{
 			extractProv = postgres.ExtractProviderImpl{}
 		}
 
+		var pgFetcher internal.Fetcher
 		if reverseDeltaUnpack {
-			pgFetcher = postgres.GetPgFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv)
+			pgFetcher = postgres.GetFetcherNew(args[0], fileMask, restoreSpec, skipRedundantTars, extractProv)
 		} else {
-			pgFetcher = postgres.GetPgFetcherOld(args[0], fileMask, restoreSpec, extractProv)
+			pgFetcher = postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
 		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
