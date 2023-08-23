@@ -79,7 +79,7 @@ func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
 		"| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
 		"+---+-----------+----------+-----------------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
 	b := bytes.Buffer{}
-	postgres.WritePrettyBackupListDetails(longBackups, &b)
+	postgres.WritePrettyBackupList(longBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -92,7 +92,7 @@ func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
 		"| 1 | b1   | -        | shortWallName1           | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
 		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
 	b := bytes.Buffer{}
-	postgres.WritePrettyBackupListDetails(shortBackups, &b)
+	postgres.WritePrettyBackupList(shortBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -105,7 +105,7 @@ func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
 	backups := make([]postgres.BackupDetail, 0)
 
 	b := bytes.Buffer{}
-	postgres.WritePrettyBackupListDetails(backups, &b)
+	postgres.WritePrettyBackupList(backups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -119,7 +119,7 @@ func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
 		"| 2 |      | -        |                          | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
 		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
 	b := bytes.Buffer{}
-	postgres.WritePrettyBackupListDetails(emptyColonsBackups, &b)
+	postgres.WritePrettyBackupList(emptyColonsBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -129,7 +129,7 @@ func TestWriteBackupList_NoBackups(t *testing.T) {
 	backups := make([]postgres.BackupDetail, 0)
 
 	b := bytes.Buffer{}
-	postgres.WriteBackupListDetails(backups, &b)
+	postgres.WriteBackupList(backups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -140,7 +140,7 @@ func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
 		"b1   -                                 -          -                             0          0/0       0/0        false\n" +
 		"     -                                 -          -                             0          0/0       0/0        false\n"
 	b := bytes.Buffer{}
-	postgres.WriteBackupListDetails(emptyColonsBackups, &b)
+	postgres.WriteBackupList(emptyColonsBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -151,7 +151,7 @@ func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
 		"b1   -        shortWallName1           -          -                             0          0/0       0/0        false\n"
 
 	b := bytes.Buffer{}
-	postgres.WriteBackupListDetails(shortBackups, &b)
+	postgres.WriteBackupList(shortBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }
@@ -162,7 +162,7 @@ func TestWriteBackupList_LongColumnsValues(t *testing.T) {
 		"backup001 -        veryVeryVeryVeryVeryLongWallName1 -          -                             0          0/0       0/0        false\n"
 
 	b := bytes.Buffer{}
-	postgres.WriteBackupListDetails(longBackups, &b)
+	postgres.WriteBackupList(longBackups, &b)
 
 	assert.Equal(t, expectedRes, b.String())
 }

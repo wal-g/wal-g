@@ -15,7 +15,7 @@ import (
 
 func TestBackupListFindsBackups(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
-	internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
+	internal.HandleDefaultBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
 }
 
 var backups = []internal.BackupTime{

@@ -2,8 +2,7 @@ package internal
 
 import "time"
 
-// BackupTime is used to sort backups by
-// latest modified time.
+// BackupTime is used to sort backups by latest modified time.
 type BackupTime struct {
 	BackupName  string    `json:"backup_name"`
 	Time        time.Time `json:"time"`

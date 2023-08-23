@@ -12,20 +12,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-type InfoLogger interface {
-	Println(v ...interface{})
-}
-
-type ErrorLogger interface {
-	FatalOnError(err error)
-}
-
-type Logging struct {
-	InfoLogger  InfoLogger
-	ErrorLogger ErrorLogger
-}
-
-func DefaultHandleBackupList(folder storage.Folder, pretty, json bool) {
+func HandleDefaultBackupList(folder storage.Folder, pretty, json bool) {
 	getBackupsFunc := func() ([]BackupTime, error) {
 		res, err := GetBackups(folder)
 		if _, ok := err.(NoBackupsFoundError); ok {
@@ -45,24 +32,19 @@ func DefaultHandleBackupList(folder storage.Folder, pretty, json bool) {
 			WriteBackupList(backups, os.Stdout)
 		}
 	}
-	logging := Logging{
-		InfoLogger:  tracelog.InfoLogger,
-		ErrorLogger: tracelog.ErrorLogger,
-	}
 
-	HandleBackupList(getBackupsFunc, writeBackupListFunc, logging)
+	HandleBackupList(getBackupsFunc, writeBackupListFunc)
 }
 
 func HandleBackupList(
 	getBackupsFunc func() ([]BackupTime, error),
 	writeBackupListFunc func([]BackupTime),
-	logging Logging,
 ) {
 	backups, err := getBackupsFunc()
-	logging.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	if len(backups) == 0 {
-		logging.InfoLogger.Println("No backups found")
+		tracelog.InfoLogger.Println("No backups found")
 		return
 	}
 

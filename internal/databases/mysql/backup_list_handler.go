@@ -22,9 +22,9 @@ type BackupDetail struct {
 	StartLocalTime time.Time `json:"start_local_time"`
 	StopLocalTime  time.Time `json:"stop_local_time"`
 
-	// these fields were introduced recently in
+	// these fields were introduced in
 	// https://github.com/wal-g/wal-g/pull/930
-	// so it is not guaranteed that sentinel contains them
+	// so some old sentinels may not contain them
 	UncompressedSize int64  `json:"uncompressed_size,omitempty"`
 	CompressedSize   int64  `json:"compressed_size,omitempty"`
 	Hostname         string `json:"hostname,omitempty"`

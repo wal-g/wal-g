@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	backupListShortDescription = "Prints available backups"
+	backupListShortDescription = "Prints full list of backups from which recovery is available"
 	PrettyFlag                 = "pretty"
 	JSONFlag                   = "json"
 	DetailFlag                 = "detail"
@@ -19,7 +19,7 @@ var (
 	// backupListCmd represents the backupList command
 	backupListCmd = &cobra.Command{
 		Use:   "backup-list",
-		Short: backupListShortDescription, // TODO : improve description
+		Short: backupListShortDescription,
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			folder, err := internal.ConfigureFolder()
@@ -41,7 +41,10 @@ func init() {
 
 	// TODO: Merge similar backup-list functionality
 	// to avoid code duplication in command handlers
-	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
-	backupListCmd.Flags().BoolVar(&json, JSONFlag, false, "Prints output in json format")
-	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
+	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false,
+		"Prints more readable output in table format")
+	backupListCmd.Flags().BoolVar(&json, JSONFlag, false,
+		"Prints output in JSON format, multiline and indented if combined with --pretty flag")
+	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false,
+		"Prints extra DB-specific backup details")
 }

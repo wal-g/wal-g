@@ -49,7 +49,7 @@ func TestBackupListCorrectPrettyOutput(t *testing.T) {
 	assert.NoError(t, err)
 	postgres.SortBackupDetails(details)
 	buf := new(bytes.Buffer)
-	postgres.WritePrettyBackupListDetails(details, buf)
+	postgres.WritePrettyBackupList(details, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 
@@ -67,7 +67,7 @@ func TestBackupListCorrectOrderingCreationTimeGaps(t *testing.T) {
 	postgres.SortBackupDetails(details)
 
 	buf := new(bytes.Buffer)
-	postgres.WriteBackupListDetails(details, buf)
+	postgres.WriteBackupList(details, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 
@@ -85,7 +85,7 @@ func TestBackupListCorrectOrderingModificationTimeGaps(t *testing.T) {
 	postgres.SortBackupDetails(details)
 
 	buf := new(bytes.Buffer)
-	postgres.WriteBackupListDetails(details, buf)
+	postgres.WriteBackupList(details, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 
@@ -103,7 +103,7 @@ func TestBackupListCorrectOrderingNoTimeGaps(t *testing.T) {
 	postgres.SortBackupDetails(details)
 
 	buf := new(bytes.Buffer)
-	postgres.WriteBackupListDetails(details, buf)
+	postgres.WriteBackupList(details, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 
@@ -121,8 +121,8 @@ func TestBackupListCorrectOrderingTimeGaps(t *testing.T) {
 	postgres.SortBackupDetails(details)
 
 	buf := new(bytes.Buffer)
-	postgres.WriteBackupListDetails(details, os.Stdout)
-	postgres.WriteBackupListDetails(details, buf)
+	postgres.WriteBackupList(details, os.Stdout)
+	postgres.WriteBackupList(details, buf)
 	assert.Equal(t, buf.String(), expected)
 }
 

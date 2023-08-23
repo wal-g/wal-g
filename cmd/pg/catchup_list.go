@@ -24,7 +24,7 @@ var (
 			if detail {
 				postgres.HandleDetailedBackupList(folder.GetSubFolder(utility.CatchupPath), pretty, json)
 			} else {
-				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.CatchupPath), pretty, json)
+				internal.HandleDefaultBackupList(folder.GetSubFolder(utility.CatchupPath), pretty, json)
 			}
 		},
 	}

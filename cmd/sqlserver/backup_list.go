@@ -18,7 +18,7 @@ var backupListCmd = &cobra.Command{
 		folder, err := internal.ConfigureFolder()
 		tracelog.ErrorLogger.FatalOnError(err)
 		// todo: implement pretty and json logic
-		internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
+		internal.HandleDefaultBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
 	},
 }
 
