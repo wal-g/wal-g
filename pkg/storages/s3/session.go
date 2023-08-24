@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"gopkg.in/yaml.v2"
 )
 
 const DefaultPort = "443"
@@ -231,7 +232,51 @@ func createSession(bucket string, settings map[string]string) (*session.Session,
 			}
 		})
 	}
+
+	if encodedHeaders, ok := settings[RequestAdditionalHeaders]; ok {
+		headers, err := getHeaders(encodedHeaders)
+		if err != nil {
+			return nil, err
+		}
+
+		s.Handlers.Validate.PushBack(func(request *request.Request) {
+			for k, v := range headers {
+				request.HTTPRequest.Header.Add(k.(string), v.(string))
+			}
+		})
+	}
+
 	return s, err
+}
+
+func getHeaders(encodedHeaders string) (map[interface{}]interface{}, error) {
+	var data interface{}
+	err := yaml.Unmarshal([]byte(encodedHeaders), &data)
+	if err != nil {
+		return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+	}
+
+	headers, ok := data.(map[interface{}]interface{})
+	if !ok {
+		headerList, ok := data.([]interface{})
+		if !ok {
+			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+		}
+		headers = refomHeaderListToMap(headerList)
+	}
+
+	return headers, nil
+}
+
+func refomHeaderListToMap(headerList []interface{}) map[interface{}]interface{} {
+	headers := map[interface{}]interface{}{}
+	for _, header := range headerList {
+		ma := header.(map[interface{}]interface{})
+		for k, v := range ma {
+			headers[k] = v
+		}
+	}
+	return headers
 }
 
 func getEndpointPort(settings map[string]string) string {
