@@ -15,11 +15,12 @@ var Env = map[string]string{
 	"WALG_CONF_DIR":    "/etc/wal-g",
 	"WALG_CONF_PATH":   "/etc/wal-g/wal-g.json",
 
-	"S3_HOST":       "minio01",
-	"S3_PORT":       "9000",
-	"S3_BUCKET":     "dbaas",
-	"S3_ACCESS_KEY": "S3_ACCESS_KEY",
-	"S3_SECRET_KEY": "S3_SECRET_KEY",
+	"S3_HOST":                       "minio01",
+	"S3_PORT":                       "9000",
+	"S3_BUCKET":                     "dbaas",
+	"S3_ACCESS_KEY":                 "S3_ACCESS_KEY",
+	"S3_SECRET_KEY":                 "S3_SECRET_KEY",
+	"S3_REQUEST_ADDITIONAL_HEADERS": `{"X-Yandex-Prioritypass":"ok"}`,
 
 	"EXPOSE_SSH_PORT": "22",
 
