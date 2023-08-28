@@ -1,6 +1,10 @@
 package st
 
 import (
+	"io"
+	"os"
+	"fmt"
+	
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -16,23 +20,66 @@ const (
 	noCompressFlag     = "no-compress"
 	overwriteFlag      = "force"
 	overwriteShorthand = "f"
+	readStdinFlag 	   = "read-stdin"
+	readStdinShorthand = "s"
 )
+
+
+func openLocalFile(localPath string) (io.ReadCloser, error) {
+	localFile, err := os.Open(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("open the local file: %v", err)
+	}
+
+	fileInfo, err := localFile.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat() the local file: %v", err)
+	}
+
+	if fileInfo.IsDir() {
+		return nil, fmt.Errorf("provided local path (%s) points to a directory, exiting", localPath)
+	}
+
+	return localFile, nil
+}
+
 
 // putObjectCmd represents the putObject command
 var putObjectCmd = &cobra.Command{
 	Use:   "put local_path destination_path",
 	Short: putObjectShortDescription,
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
-		localPath := args[0]
-		dstPath := args[1]
+
+		if len(args) == 1 && !readStdin {
+			tracelog.ErrorLogger.Fatal("should specify localPath on read-from stdin flag")
+		}
+
+		var dstPath string
+		var reader io.Reader
+
+		if !readStdin {
+			localPath := args[0]
+			dstPath = args[1]
+			fileReadCloser, err := openLocalFile(localPath)
+			if err != nil {
+				tracelog.ErrorLogger.FatalOnError(err)
+			}
+
+			reader = fileReadCloser
+
+			defer fileReadCloser.Close()
+		} else {
+			dstPath = args[0]
+			reader = os.Stdin
+		}
 
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
 			uploader, err := internal.ConfigureUploaderToFolder(folder)
 			if err != nil {
 				return err
 			}
-			return storagetools.HandlePutObject(localPath, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
+			return storagetools.HandlePutObject(reader, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -41,6 +88,7 @@ var putObjectCmd = &cobra.Command{
 var noEncrypt bool
 var noCompress bool
 var overwrite bool
+var readStdin bool
 
 func init() {
 	StorageToolsCmd.AddCommand(putObjectCmd)
@@ -48,4 +96,6 @@ func init() {
 	putObjectCmd.Flags().BoolVar(&noCompress, noCompressFlag, false, "Do not compress the object")
 	putObjectCmd.Flags().BoolVarP(&overwrite, overwriteFlag, overwriteShorthand,
 		false, "Overwrite the existing object")
+	putObjectCmd.Flags().BoolVarP(&readStdin, readStdinFlag, readStdinShorthand,
+			false, "Read file content from STDIN")
 }

@@ -3,7 +3,6 @@ package storagetools
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal/compression"
@@ -14,18 +13,11 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-func HandlePutObject(localPath, dstPath string, uploader internal.Uploader, overwrite, encrypt, compress bool) error {
+func HandlePutObject(source io.Reader, dstPath string, uploader internal.Uploader, overwrite, encrypt, compress bool) error {
 	err := checkOverwrite(dstPath, uploader, overwrite)
 	if err != nil {
 		return fmt.Errorf("check file overwrite: %v", err)
 	}
-
-	fileReadCloser, err := openLocalFile(localPath)
-	if err != nil {
-		return fmt.Errorf("open local file: %v", err)
-	}
-
-	defer fileReadCloser.Close()
 
 	storageFolderPath := utility.SanitizePath(filepath.Dir(dstPath))
 	if storageFolderPath != "" {
@@ -33,7 +25,7 @@ func HandlePutObject(localPath, dstPath string, uploader internal.Uploader, over
 	}
 
 	fileName := utility.SanitizePath(filepath.Base(dstPath))
-	err = uploadFile(fileName, fileReadCloser, uploader, encrypt, compress)
+	err = uploadFile(fileName, source, uploader, encrypt, compress)
 	if err != nil {
 		return fmt.Errorf("upload: %v", err)
 	}
@@ -50,24 +42,6 @@ func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) 
 		return fmt.Errorf("object %s already exists. To overwrite it, add the -f flag", fullPath)
 	}
 	return nil
-}
-
-func openLocalFile(localPath string) (io.ReadCloser, error) {
-	localFile, err := os.Open(localPath)
-	if err != nil {
-		return nil, fmt.Errorf("open the local file: %v", err)
-	}
-
-	fileInfo, err := localFile.Stat()
-	if err != nil {
-		return nil, fmt.Errorf("stat() the local file: %v", err)
-	}
-
-	if fileInfo.IsDir() {
-		return nil, fmt.Errorf("provided local path (%s) points to a directory, exiting", localPath)
-	}
-
-	return localFile, nil
 }
 
 func uploadFile(name string, content io.Reader, uploader internal.Uploader, encrypt, compress bool) error {
