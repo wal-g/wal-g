@@ -1,8 +1,13 @@
 package models
 
 import (
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/printlist"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -31,6 +36,83 @@ func (b *Backup) StartTime() time.Time {
 
 func (b *Backup) IsPermanent() bool {
 	return b.Permanent
+}
+
+func (b *Backup) PrintableFields() []printlist.TableField {
+	prettyStartTime := internal.PrettyFormatTime(b.StartLocalTime)
+	prettyFinishTime := internal.PrettyFormatTime(b.FinishLocalTime)
+	return []printlist.TableField{
+		{
+			Name:       "name",
+			PrettyName: "Name",
+			Value:      b.BackupName,
+		},
+		{
+			Name:       "type",
+			PrettyName: "Type",
+			Value:      b.BackupType,
+		},
+		{
+			Name:       "version",
+			PrettyName: "Version",
+			Value:      b.MongoMeta.Version,
+		},
+		{
+			Name:        "start_time",
+			PrettyName:  "Start time",
+			Value:       internal.FormatTime(b.StartLocalTime),
+			PrettyValue: &prettyStartTime,
+		},
+		{
+			Name:        "finish_time",
+			PrettyName:  "Finish time",
+			Value:       internal.FormatTime(b.FinishLocalTime),
+			PrettyValue: &prettyFinishTime,
+		},
+		{
+			Name:       "hostname",
+			PrettyName: "Hostname",
+			Value:      b.Hostname,
+		},
+		{
+			Name:       "start_ts",
+			PrettyName: "Start Ts",
+			Value:      b.MongoMeta.Before.LastMajTS.String(),
+		},
+		{
+			Name:       "end_ts",
+			PrettyName: "End Ts",
+			Value:      b.MongoMeta.After.LastMajTS.String(),
+		},
+		{
+			Name:       "uncompressed_size",
+			PrettyName: "Uncompressed size",
+			Value:      strconv.FormatInt(b.UncompressedSize, 10),
+		},
+		{
+			Name:       "compressed_size",
+			PrettyName: "Compressed size",
+			Value:      strconv.FormatInt(b.CompressedSize, 10),
+		},
+		{
+			Name:       "permanent",
+			PrettyName: "Permanent",
+			Value:      fmt.Sprintf("%v", b.Permanent),
+		},
+		{
+			Name:       "user_data",
+			PrettyName: "User data",
+			Value:      marshalUserData(b.UserData),
+		},
+	}
+}
+
+func marshalUserData(userData interface{}) string {
+	rawUserData, err := json.Marshal(userData)
+	if err != nil {
+		rawUserData = []byte(fmt.Sprintf("{\"error\": \"unable to marshal %+v\"}", userData))
+	}
+	return string(rawUserData)
 }
 
 // NodeMeta represents MongoDB node metadata

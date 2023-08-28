@@ -2,11 +2,14 @@ package archive
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -32,6 +35,58 @@ func (b Backup) StartTime() time.Time {
 
 func (b Backup) IsPermanent() bool {
 	return b.Permanent
+}
+
+func (b Backup) PrintableFields() []printlist.TableField {
+	prettyStartTime := internal.PrettyFormatTime(b.StartLocalTime)
+	prettyFinishTime := internal.PrettyFormatTime(b.FinishLocalTime)
+	return []printlist.TableField{
+		{
+			Name:       "name",
+			PrettyName: "Name",
+			Value:      b.BackupName,
+		},
+		{
+			Name:        "start_time",
+			PrettyName:  "Start time",
+			Value:       internal.FormatTime(b.StartLocalTime),
+			PrettyValue: &prettyStartTime,
+		},
+		{
+			Name:        "finish_time",
+			PrettyName:  "Finish time",
+			Value:       internal.FormatTime(b.FinishLocalTime),
+			PrettyValue: &prettyFinishTime,
+		},
+		{
+			Name:       "user_data",
+			PrettyName: "User data",
+			Value:      marshalUserData(b.UserData),
+		},
+		{
+			Name:       "data_size",
+			PrettyName: "Data size",
+			Value:      strconv.FormatInt(b.DataSize, 10),
+		},
+		{
+			Name:       "backup_size",
+			PrettyName: "Backup size",
+			Value:      strconv.FormatInt(b.BackupSize, 10),
+		},
+		{
+			Name:       "permanent",
+			PrettyName: "Permanent",
+			Value:      fmt.Sprintf("%v", b.Permanent),
+		},
+	}
+}
+
+func marshalUserData(userData interface{}) string {
+	rawUserData, err := json.Marshal(userData)
+	if err != nil {
+		rawUserData = []byte(fmt.Sprintf("{\"error\": \"unable to marshal %+v\"}", userData))
+	}
+	return string(rawUserData)
 }
 
 func SplitRedisBackups(backups []Backup, purgeBackups, retainBackups map[string]bool) (purge, retain []Backup) {

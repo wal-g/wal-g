@@ -5,6 +5,9 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -21,13 +24,30 @@ var (
 		Use:   "backup-list",
 		Short: backupListShortDescription,
 		Args:  cobra.NoArgs,
-		Run: func(cmd *cobra.Command, args []string) {
-			folder, err := internal.ConfigureFolder()
+		Run: func(cmd *cobra.Command, _ []string) {
+			primaryStorage, err := internal.ConfigureFolder()
 			tracelog.ErrorLogger.FatalOnError(err)
+
+			failoverStorages, err := internal.InitFailoverStorages()
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+			tracelog.ErrorLogger.FatalOnError(err)
+			aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+			tracelog.ErrorLogger.FatalOnError(err)
+			cache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			folder := multistorage.NewFolder(cache)
+			folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
+			folder, err = multistorage.UseAllAliveStorages(folder)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			backupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
 			if detail {
-				postgres.HandleDetailedBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+				postgres.HandleDetailedBackupList(backupsFolder, pretty, json)
 			} else {
-				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+				internal.HandleDefaultBackupList(backupsFolder, pretty, json)
 			}
 		},
 	}

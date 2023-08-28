@@ -21,8 +21,10 @@ type TimeStampedData struct {
 	Size      int
 }
 
+var NewObjectTime = time.Now
+
 func TimeStampData(data bytes.Buffer) TimeStampedData {
-	return TimeStampedData{data, CeilTimeUpToMicroseconds(time.Now()), data.Len()}
+	return TimeStampedData{data, CeilTimeUpToMicroseconds(NewObjectTime()), data.Len()}
 }
 
 // Storage is supposed to be used for tests. It doesn't guarantee data safety!

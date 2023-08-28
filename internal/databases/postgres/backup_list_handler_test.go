@@ -1,168 +1,217 @@
-package postgres_test
+package postgres
 
 import (
 	"bytes"
+	"io"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-var shortBackups = []postgres.BackupDetail{
-	{
-		internal.BackupTime{
-			BackupName:  "b0",
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		postgres.ExtendedMetadataDto{},
-	},
-	{
-		internal.BackupTime{
-			BackupName:  "b1",
-			Time:        time.Time{},
-			WalFileName: "shortWallName1",
-		},
-		postgres.ExtendedMetadataDto{},
-	},
-}
+func TestHandleDetailedBackupList(t *testing.T) {
+	rescueNewObjectTime := memory.NewObjectTime
+	curTime := time.Time{}
+	memory.NewObjectTime = func() time.Time {
+		return curTime.UTC()
+	}
+	defer func() {
+		memory.NewObjectTime = rescueNewObjectTime
+	}()
 
-var longBackups = []postgres.BackupDetail{
-	{
-		internal.BackupTime{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
-		},
-		postgres.ExtendedMetadataDto{},
-	},
-	{
-		internal.BackupTime{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
-		},
-		postgres.ExtendedMetadataDto{},
-	},
-}
+	t.Run("print correct backup details in correct order", func(t *testing.T) {
+		folder := memory.NewFolder("", memory.NewStorage())
+		curTime = time.Unix(1690000000, 0)
+		_ = folder.PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
+		curTime = curTime.Add(time.Second)
+		_ = folder.PutObject("base_222_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject("base_222/metadata.json", bytes.NewBufferString("{}"))
+		curTime = curTime.Add(time.Second)
+		_ = folder.PutObject("base_333_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject("base_333/metadata.json", bytes.NewBufferString("{}"))
 
-var emptyColonsBackups = []postgres.BackupDetail{
-	{
-		internal.BackupTime{
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		postgres.ExtendedMetadataDto{},
-	},
-	{
-		internal.BackupTime{
-			BackupName: "b1",
-			Time:       time.Time{},
-		},
-		postgres.ExtendedMetadataDto{},
-	},
-	{
-		internal.BackupTime{
-			Time: time.Time{},
-		},
-		postgres.ExtendedMetadataDto{},
-	},
-}
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		defer func() { os.Stdout = rescueStdout }()
 
-func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
-	expectedRes := "+---+-----------+----------+-----------------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| # | NAME      | MODIFIED | WAL SEGMENT BACKUP START          | START TIME | FINISH TIME | HOSTNAME | DATADIR | PG VERSION | START LSN | FINISH LSN | PERMANENT |\n" +
-		"+---+-----------+----------+-----------------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| 0 | backup000 | -        | veryVeryVeryVeryVeryLongWallName0 | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
-		"| 1 | backup001 | -        | veryVeryVeryVeryVeryLongWallName1 | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
-		"+---+-----------+----------+-----------------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
-	b := bytes.Buffer{}
-	postgres.WritePrettyBackupList(longBackups, &b)
+		HandleDetailedBackupList(folder, true, true)
 
-	assert.Equal(t, expectedRes, b.String())
-}
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
 
-func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
-	expectedRes := "+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START | START TIME | FINISH TIME | HOSTNAME | DATADIR | PG VERSION | START LSN | FINISH LSN | PERMANENT |\n" +
-		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| 0 | b0   | -        | shortWallName0           | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
-		"| 1 | b1   | -        | shortWallName1           | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
-		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
-	b := bytes.Buffer{}
-	postgres.WritePrettyBackupList(shortBackups, &b)
+		want := `[
+    {
+        "backup_name": "base_111",
+        "time": "2023-07-22T04:26:40Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "default",
+        "start_time": "0001-01-01T00:00:00Z",
+        "finish_time": "0001-01-01T00:00:00Z",
+        "date_fmt": "",
+        "hostname": "",
+        "data_dir": "",
+        "pg_version": 0,
+        "start_lsn": 0,
+        "finish_lsn": 0,
+        "is_permanent": false,
+        "system_identifier": null,
+        "uncompressed_size": 0,
+        "compressed_size": 0
+    },
+    {
+        "backup_name": "base_222",
+        "time": "2023-07-22T04:26:41Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "default",
+        "start_time": "0001-01-01T00:00:00Z",
+        "finish_time": "0001-01-01T00:00:00Z",
+        "date_fmt": "",
+        "hostname": "",
+        "data_dir": "",
+        "pg_version": 0,
+        "start_lsn": 0,
+        "finish_lsn": 0,
+        "is_permanent": false,
+        "system_identifier": null,
+        "uncompressed_size": 0,
+        "compressed_size": 0
+    },
+    {
+        "backup_name": "base_333",
+        "time": "2023-07-22T04:26:42Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "default",
+        "start_time": "0001-01-01T00:00:00Z",
+        "finish_time": "0001-01-01T00:00:00Z",
+        "date_fmt": "",
+        "hostname": "",
+        "data_dir": "",
+        "pg_version": 0,
+        "start_lsn": 0,
+        "finish_lsn": 0,
+        "is_permanent": false,
+        "system_identifier": null,
+        "uncompressed_size": 0,
+        "compressed_size": 0
+    }
+]
+`
+		assert.Equal(t, want, string(captured))
+	})
 
-	assert.Equal(t, expectedRes, b.String())
-}
+	t.Run("print backups from different storages", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		t.Cleanup(mockCtrl.Finish)
+		cacheMock := cache.NewMockStatusCache(mockCtrl)
 
-func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
-	expectedRes := "+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START | START TIME | FINISH TIME | HOSTNAME | DATADIR | PG VERSION | START LSN | FINISH LSN | PERMANENT |\n" +
-		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
-	backups := make([]postgres.BackupDetail, 0)
+		memStorages := []cache.NamedFolder{
+			{
+				Name:   "storage_1",
+				Folder: memory.NewFolder("", memory.NewStorage()),
+			},
+			{
+				Name:   "storage_2",
+				Folder: memory.NewFolder("", memory.NewStorage()),
+			},
+		}
+		cacheMock.EXPECT().AllAliveStorages().Return(memStorages, nil)
+		cacheMock.EXPECT().SpecificStorage("storage_1").Return(&memStorages[0], nil)
+		cacheMock.EXPECT().SpecificStorage("storage_2").Return(&memStorages[1], nil)
 
-	b := bytes.Buffer{}
-	postgres.WritePrettyBackupList(backups, &b)
+		multiFolder := multistorage.NewFolder(cacheMock).(storage.Folder)
+		multiFolder = multistorage.SetPolicies(multiFolder, policies.UniteAllStorages)
+		multiFolder, err := multistorage.UseAllAliveStorages(multiFolder)
+		require.NoError(t, err)
 
-	assert.Equal(t, expectedRes, b.String())
-}
+		curTime = time.Unix(1690000000, 0)
+		_ = memStorages[0].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memStorages[0].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
+		curTime = curTime.Add(time.Second)
+		_ = memStorages[1].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memStorages[1].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
 
-func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := "+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| # | NAME | MODIFIED | WAL SEGMENT BACKUP START | START TIME | FINISH TIME | HOSTNAME | DATADIR | PG VERSION | START LSN | FINISH LSN | PERMANENT |\n" +
-		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n" +
-		"| 0 |      | -        | shortWallName0           | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
-		"| 1 | b1   | -        |                          | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
-		"| 2 |      | -        |                          | -          | -           |          |         |          0 |       0/0 |        0/0 | false     |\n" +
-		"+---+------+----------+--------------------------+------------+-------------+----------+---------+------------+-----------+------------+-----------+\n"
-	b := bytes.Buffer{}
-	postgres.WritePrettyBackupList(emptyColonsBackups, &b)
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		defer func() { os.Stdout = rescueStdout }()
 
-	assert.Equal(t, expectedRes, b.String())
-}
+		HandleDetailedBackupList(multiFolder, true, true)
 
-func TestWriteBackupList_NoBackups(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start start_time finish_time hostname data_dir pg_version start_lsn finish_lsn is_permanent\n"
-	backups := make([]postgres.BackupDetail, 0)
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
 
-	b := bytes.Buffer{}
-	postgres.WriteBackupList(backups, &b)
+		want := `[
+    {
+        "backup_name": "base_111",
+        "time": "2023-07-22T04:26:40Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "storage_1",
+        "start_time": "0001-01-01T00:00:00Z",
+        "finish_time": "0001-01-01T00:00:00Z",
+        "date_fmt": "",
+        "hostname": "",
+        "data_dir": "",
+        "pg_version": 0,
+        "start_lsn": 0,
+        "finish_lsn": 0,
+        "is_permanent": false,
+        "system_identifier": null,
+        "uncompressed_size": 0,
+        "compressed_size": 0
+    },
+    {
+        "backup_name": "base_111",
+        "time": "2023-07-22T04:26:41Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "storage_2",
+        "start_time": "0001-01-01T00:00:00Z",
+        "finish_time": "0001-01-01T00:00:00Z",
+        "date_fmt": "",
+        "hostname": "",
+        "data_dir": "",
+        "pg_version": 0,
+        "start_lsn": 0,
+        "finish_lsn": 0,
+        "is_permanent": false,
+        "system_identifier": null,
+        "uncompressed_size": 0,
+        "compressed_size": 0
+    }
+]
+`
+		assert.Equal(t, want, string(captured))
+	})
 
-	assert.Equal(t, expectedRes, b.String())
-}
+	t.Run("handle error with no backups", func(t *testing.T) {
+		folder := memory.NewFolder("", memory.NewStorage())
 
-func TestWriteBackupList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start start_time finish_time hostname data_dir pg_version start_lsn finish_lsn is_permanent\n" +
-		"     -        shortWallName0           -          -                             0          0/0       0/0        false\n" +
-		"b1   -                                 -          -                             0          0/0       0/0        false\n" +
-		"     -                                 -          -                             0          0/0       0/0        false\n"
-	b := bytes.Buffer{}
-	postgres.WriteBackupList(emptyColonsBackups, &b)
+		infoOutput := new(bytes.Buffer)
+		rescueInfoOutput := tracelog.InfoLogger.Writer()
+		tracelog.InfoLogger.SetOutput(infoOutput)
+		defer func() { tracelog.InfoLogger.SetOutput(rescueInfoOutput) }()
 
-	assert.Equal(t, expectedRes, b.String())
-}
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		defer func() { os.Stdout = rescueStdout }()
 
-func TestWriteBackupList_ShortColumnsValues(t *testing.T) {
-	expectedRes := "name modified wal_segment_backup_start start_time finish_time hostname data_dir pg_version start_lsn finish_lsn is_permanent\n" +
-		"b0   -        shortWallName0           -          -                             0          0/0       0/0        false\n" +
-		"b1   -        shortWallName1           -          -                             0          0/0       0/0        false\n"
+		HandleDetailedBackupList(folder, true, false)
 
-	b := bytes.Buffer{}
-	postgres.WriteBackupList(shortBackups, &b)
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
 
-	assert.Equal(t, expectedRes, b.String())
-}
-
-func TestWriteBackupList_LongColumnsValues(t *testing.T) {
-	expectedRes := "name      modified wal_segment_backup_start          start_time finish_time hostname data_dir pg_version start_lsn finish_lsn is_permanent\n" +
-		"backup000 -        veryVeryVeryVeryVeryLongWallName0 -          -                             0          0/0       0/0        false\n" +
-		"backup001 -        veryVeryVeryVeryVeryLongWallName1 -          -                             0          0/0       0/0        false\n"
-
-	b := bytes.Buffer{}
-	postgres.WriteBackupList(longBackups, &b)
-
-	assert.Equal(t, expectedRes, b.String())
+		assert.Empty(t, string(captured))
+		assert.Contains(t, infoOutput.String(), "No backups found")
+	})
 }
