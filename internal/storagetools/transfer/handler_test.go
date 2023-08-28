@@ -286,19 +286,19 @@ func TestTransferHandler_saveRequirements(t *testing.T) {
 func TestTransferHandler_checkRequirements(t *testing.T) {
 	h := &Handler{
 		jobRequirements: map[jobKey][]jobRequirement{
-			jobKey{filePath: "1", jobType: jobTypeDelete}: {
+			{filePath: "1", jobType: jobTypeDelete}: {
 				{
 					filePath:  "2",
 					minStatus: transferStatusCopied,
 				},
 			},
-			jobKey{filePath: "2", jobType: jobTypeDelete}: {
+			{filePath: "2", jobType: jobTypeDelete}: {
 				{
 					filePath:  "3",
 					minStatus: transferStatusAppeared,
 				},
 			},
-			jobKey{filePath: "3", jobType: jobTypeDelete}: {
+			{filePath: "3", jobType: jobTypeDelete}: {
 				{
 					filePath:  "4",
 					minStatus: transferStatusAppeared,

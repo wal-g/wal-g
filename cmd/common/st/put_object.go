@@ -3,7 +3,6 @@ package st
 import (
 	"io"
 	"os"
-	"fmt"
 	
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -25,25 +24,6 @@ const (
 )
 
 
-func openLocalFile(localPath string) (io.ReadCloser, error) {
-	localFile, err := os.Open(localPath)
-	if err != nil {
-		return nil, fmt.Errorf("open the local file: %v", err)
-	}
-
-	fileInfo, err := localFile.Stat()
-	if err != nil {
-		return nil, fmt.Errorf("stat() the local file: %v", err)
-	}
-
-	if fileInfo.IsDir() {
-		return nil, fmt.Errorf("provided local path (%s) points to a directory, exiting", localPath)
-	}
-
-	return localFile, nil
-}
-
-
 // putObjectCmd represents the putObject command
 var putObjectCmd = &cobra.Command{
 	Use:   "put local_path destination_path",
@@ -61,7 +41,7 @@ var putObjectCmd = &cobra.Command{
 		if !readStdin {
 			localPath := args[0]
 			dstPath = args[1]
-			fileReadCloser, err := openLocalFile(localPath)
+			fileReadCloser, err := storagetools.OpenLocalFile(localPath)
 			if err != nil {
 				tracelog.ErrorLogger.FatalOnError(err)
 			}

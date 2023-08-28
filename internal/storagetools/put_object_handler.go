@@ -3,6 +3,7 @@ package storagetools
 import (
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal/compression"
@@ -42,6 +43,24 @@ func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) 
 		return fmt.Errorf("object %s already exists. To overwrite it, add the -f flag", fullPath)
 	}
 	return nil
+}
+
+func OpenLocalFile(localPath string) (io.ReadCloser, error) {
+	localFile, err := os.Open(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("open the local file: %v", err)
+	}
+
+	fileInfo, err := localFile.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("stat() the local file: %v", err)
+	}
+
+	if fileInfo.IsDir() {
+		return nil, fmt.Errorf("provided local path (%s) points to a directory, exiting", localPath)
+	}
+
+	return localFile, nil
 }
 
 func uploadFile(name string, content io.Reader, uploader internal.Uploader, encrypt, compress bool) error {
