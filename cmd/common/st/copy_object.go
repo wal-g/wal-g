@@ -8,7 +8,6 @@ import (
 const (
 	copyObjectShortDescription = "Copy objects from one storage to another"
 
-
 	fromFlag        = "from"
 	fromShorthand   = ""
 	fromDescription = "Storage config from where should copy objects"
@@ -17,11 +16,9 @@ const (
 	toShorthand   = ""
 	toDescription = "Storage config to where should copy objects"
 
-
 	prefixFlag        = "prefix"
 	prefixShorthand   = "p"
 	prefixDescription = "Prefix-filter path in `from` storage."
-
 
 	decryptSourceFlag        = "decrypt-source"
 	decryptSourceShorthand   = "d"

@@ -101,7 +101,6 @@ func collectCopyingInfo(
 func HandleCopyObjects(
 	fromConfigFile, toConfigFile, prefix string,
 	decryptSource, encryptTarget bool) {
-
 	infos, err := collectCopyingInfo(prefix, fromConfigFile, toConfigFile, decryptSource,
 		encryptTarget)
 	tracelog.ErrorLogger.FatalOnError(err)
