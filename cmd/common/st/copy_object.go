@@ -10,11 +10,11 @@ const (
 
 
 	fromFlag        = "from"
-	fromShorthand   = "f"
+	fromShorthand   = ""
 	fromDescription = "Storage config from where should copy objects"
 
 	toFlag        = "to"
-	toShorthand   = "t"
+	toShorthand   = ""
 	toDescription = "Storage config to where should copy objects"
 
 
