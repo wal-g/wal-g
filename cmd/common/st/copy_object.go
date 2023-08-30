@@ -38,9 +38,16 @@ var (
 	encryptTarget bool
 )
 
-// catObjectCmd represents the catObject command
+// copyObjectCmd represents the catObject command
+// Storage tool that provides cross-storage objects copying.
+// Additional argument --prefix allow to filter only objects 
+// with names having specific prefix in them. 
+// This comes in handy when only some folders need to be copied.
+// Copy command has feature to decrypt files from source storage and encrypt files 
+// before putting them into target folder, 
+// because source and target config may contain different encryption settings.
 var copyObjectCmd = &cobra.Command{
-	Use:   "copy objects_path_prefix",
+	Use:   "copy",
 	Short: copyObjectShortDescription,
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {

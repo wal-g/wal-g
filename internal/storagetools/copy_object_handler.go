@@ -117,5 +117,5 @@ func HandleCopyObjects(
 
 	tracelog.ErrorLogger.FatalOnError(copy.Infos(infos))
 
-	tracelog.InfoLogger.Printf("Success copyed objects.\n")
+	tracelog.InfoLogger.Printf("Successfully copied %d objects", len(infos))
 }
