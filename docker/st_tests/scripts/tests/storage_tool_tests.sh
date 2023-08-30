@@ -46,18 +46,12 @@ wal-g st rm testfolder/testfile.br
 test "1" -eq "$(wal-g st ls | wc -l)"
 
 # Should upload the file uncompressed without error
-wal-g st put testfile testfolder/testfile --no-compress
+wal-g st put testfile testfolder/testfile --no-compress 
 
 # Should download the file uncompressed without error
 wal-g st get testfolder/testfile uncompressed_file --no-decompress
 
 diff testfile uncompressed_file
-
-AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
-AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-
-WALG_DISK_RATE_LIMIT=41943040
-WALG_NETWORK_RATE_LIMIT=10485760
 
 cat > conf1.yaml <<EOH
 WALG_COMPRESSION_METHOD: brotli
