@@ -89,5 +89,5 @@ EOH
 
 wal-g --config ./conf1.yaml st copy --from ./conf1.yaml --to ./conf2.yaml
 
-# Should get empty storage after file copy
+# Should not have an empty storage after the file copy
 test "2" -eq "$(wal-g --config ./conf2.yaml st ls | wc -l)"
