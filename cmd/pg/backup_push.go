@@ -46,9 +46,14 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
-			folder := GetFolder()
+			folder, err := postgres.ConfigureMultiStorageFolder()
+			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
 			folder = multistorage.SetPolicies(folder, policies.TakeFirstStorage)
-			folder, err := multistorage.UseFirstAliveStorage(folder)
+			if targetStorage == "" {
+				folder, err = multistorage.UseFirstAliveStorage(folder)
+			} else {
+				folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+			}
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			uploader, err := internal.ConfigureUploaderToFolder(folder)
@@ -169,4 +174,6 @@ func init() {
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().BoolVar(&withoutFilesMetadata, withoutFilesMetadataFlag,
 		false, "Do not track files metadata, significantly reducing memory usage")
+	backupPushCmd.Flags().StringVar(&targetStorage, "target-storage", "",
+		targetStorageDescription)
 }

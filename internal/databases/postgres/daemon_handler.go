@@ -62,9 +62,11 @@ type ArchiveMessageHandler struct {
 }
 
 func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
-	tracelog.DebugLogger.Printf("wal file name: %s\n", string(messageBody))
+	walFileName := string(messageBody)
 
-	fullPath, err := getFullPath(path.Join("pg_wal", string(messageBody)))
+	tracelog.DebugLogger.Printf("wal file name: %s\n", walFileName)
+
+	fullPath, err := getFullPath(path.Join("pg_wal", walFileName))
 	if err != nil {
 		return err
 	}
@@ -99,13 +101,17 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	if len(args) != 2 {
 		return fmt.Errorf("wal-fetch incorrect arguments count")
 	}
-	fullPath, err := getFullPath(args[1])
+	var (
+		walFileName = args[0]
+		location    = args[1]
+	)
+	fullPath, err := getFullPath(location)
 	if err != nil {
 		return err
 	}
 	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
 
-	err = HandleWALFetch(h.reader, args[0], fullPath, DaemonPrefetcher{})
+	err = HandleWALFetch(h.reader, walFileName, fullPath, DaemonPrefetcher{})
 	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
 		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
