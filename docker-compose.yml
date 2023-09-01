@@ -101,6 +101,7 @@ services:
       &&  mkdir -p /export/gppartialtablebucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
+      &&  mkdir -p /export/storagetoolsbucket_target
       &&  mkdir -p /export/sttransferfilesbucket
       &&  mkdir -p /export/sttransferfilesfailoverbucket
       &&  mkdir -p /export/transferbackupbucket
