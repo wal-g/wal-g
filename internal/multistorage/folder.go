@@ -137,7 +137,7 @@ func (mf Folder) GetPath() string {
 
 // GetSubFolder provides a multi-storage subfolder, which includes subfolders of all used storages.
 func (mf Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	newPath := path.Join(mf.path, subFolderRelativePath) + "/"
+	newPath := storage.AddDelimiterToPath(storage.JoinPath(mf.path, subFolderRelativePath))
 	if newPath == "/" {
 		newPath = ""
 	}

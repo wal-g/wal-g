@@ -379,13 +379,13 @@ func TestBackup_PrintableFields(t *testing.T) {
 		{
 			Name:        "start_ts",
 			PrettyName:  "Start Ts",
-			Value:       "800.0",
+			Value:       "{800 0}",
 			PrettyValue: nil,
 		},
 		{
 			Name:        "end_ts",
 			PrettyName:  "End Ts",
-			Value:       "900.0",
+			Value:       "{900 0}",
 			PrettyValue: nil,
 		},
 		{

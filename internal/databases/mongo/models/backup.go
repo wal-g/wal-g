@@ -77,12 +77,12 @@ func (b *Backup) PrintableFields() []printlist.TableField {
 		{
 			Name:       "start_ts",
 			PrettyName: "Start Ts",
-			Value:      b.MongoMeta.Before.LastMajTS.String(),
+			Value:      fmt.Sprintf("%v", b.MongoMeta.Before.LastMajTS.ToBsonTS()),
 		},
 		{
 			Name:       "end_ts",
 			PrettyName: "End Ts",
-			Value:      b.MongoMeta.After.LastMajTS.String(),
+			Value:      fmt.Sprintf("%v", b.MongoMeta.After.LastMajTS.ToBsonTS()),
 		},
 		{
 			Name:       "uncompressed_size",
