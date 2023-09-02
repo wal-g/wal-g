@@ -3,12 +3,15 @@ package internal
 import (
 	"fmt"
 	"io"
+	"math"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/wal-g/wal-g/internal/abool"
 
+	"github.com/VividCortex/ewma"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -32,17 +35,21 @@ type Uploader interface {
 	Clone() Uploader
 	Failed() bool
 	Finish()
+	ShowRemainingTime()
 }
 
 // RegularUploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one uploader.
 type RegularUploader struct {
-	UploadingFolder storage.Folder
-	Compressor      compression.Compressor
-	waitGroup       *sync.WaitGroup
-	failed          *abool.AtomicBool
-	tarSize         *int64
-	dataSize        *int64
+	UploadingFolder          storage.Folder
+	Compressor               compression.Compressor
+	waitGroup                *sync.WaitGroup
+	failed                   *abool.AtomicBool
+	tarSize                  *int64
+	dataSize                 *int64
+	compressedUploadSpeeds   ewma.SimpleEWMA
+	uncompressedUploadSpeeds ewma.SimpleEWMA
+	done                     chan bool
 }
 
 var _ Uploader = &RegularUploader{}
@@ -118,7 +125,12 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
 func (uploader *RegularUploader) Finish() {
+	uploader.done = make(chan bool)
+
+	go uploader.ShowRemainingTime()
+
 	uploader.waitGroup.Wait()
+	close(uploader.done)
 	if uploader.failed.IsSet() {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
 	}
@@ -127,12 +139,15 @@ func (uploader *RegularUploader) Finish() {
 // Clone creates similar Uploader with new WaitGroup
 func (uploader *RegularUploader) Clone() Uploader {
 	return &RegularUploader{
-		UploadingFolder: uploader.UploadingFolder,
-		Compressor:      uploader.Compressor,
-		waitGroup:       &sync.WaitGroup{},
-		failed:          abool.NewBool(uploader.Failed()),
-		tarSize:         uploader.tarSize,
-		dataSize:        uploader.dataSize,
+		UploadingFolder:          uploader.UploadingFolder,
+		Compressor:               uploader.Compressor,
+		waitGroup:                &sync.WaitGroup{},
+		failed:                   abool.NewBool(uploader.Failed()),
+		tarSize:                  uploader.tarSize,
+		dataSize:                 uploader.dataSize,
+		compressedUploadSpeeds:   uploader.compressedUploadSpeeds,
+		uncompressedUploadSpeeds: uploader.uncompressedUploadSpeeds,
+		done:                     uploader.done,
 	}
 }
 
@@ -174,6 +189,7 @@ func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObject(path, content)
+
 	if err != nil {
 		WalgMetrics.uploadedFilesFailedTotal.Inc()
 		uploader.failed.Set()
@@ -215,4 +231,55 @@ func (uploader *SplitStreamUploader) Clone() Uploader {
 		partitions: uploader.partitions,
 		blockSize:  uploader.blockSize,
 	}
+}
+
+func (uploader *RegularUploader) ShowRemainingTime() {
+	startTime := time.Now()
+	var prevCompressedSize int64
+	var prevUncompressedSize int64
+	ticker := time.NewTicker(5 * time.Minute)
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				compressedSize, err := uploader.UploadedDataSize()
+				if err != nil {
+					done <- true
+					return
+				}
+				uncompressedSize, err := uploader.RawDataSize()
+				if err != nil {
+					done <- true
+					return
+				}
+
+				if compressedSize == prevCompressedSize || uncompressedSize == prevUncompressedSize {
+					done <- true
+					return
+				}
+
+				timeElapsed := time.Since(startTime).Seconds()
+				uploader.compressedUploadSpeeds.Add(float64(compressedSize) / timeElapsed)
+				uploader.uncompressedUploadSpeeds.Add(float64(uncompressedSize) / timeElapsed)
+				compressedSpeed := int64(math.Round(uploader.compressedUploadSpeeds.Value()))
+				uncompressedSpeed := int64(math.Round(uploader.uncompressedUploadSpeeds.Value()))
+				tracelog.InfoLogger.Printf(
+					"Uploaded: %s, average %s/s. Raw data read: %s, average %s/s",
+					utility.ByteCountSI(compressedSize),
+					utility.ByteCountSI(compressedSpeed),
+					utility.ByteCountSI(uncompressedSize),
+					utility.ByteCountSI(uncompressedSpeed))
+
+				prevUncompressedSize = uncompressedSize
+				prevCompressedSize = compressedSize
+			case <-done:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	<-uploader.done // wait for done signal
 }
