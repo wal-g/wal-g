@@ -21,19 +21,28 @@ type TimeStampedData struct {
 	Size      int
 }
 
-var NewObjectTime = time.Now
-
-func TimeStampData(data bytes.Buffer) TimeStampedData {
-	return TimeStampedData{data, CeilTimeUpToMicroseconds(NewObjectTime()), data.Len()}
+func TimeStampData(data bytes.Buffer, timeNow func() time.Time) TimeStampedData {
+	return TimeStampedData{data, CeilTimeUpToMicroseconds(timeNow()), data.Len()}
 }
 
 // Storage is supposed to be used for tests. It doesn't guarantee data safety!
 type Storage struct {
 	underlying *sync.Map
+	timeNow    func() time.Time
 }
 
-func NewStorage() *Storage {
-	return &Storage{&sync.Map{}}
+func NewStorage(opts ...func(*Storage)) *Storage {
+	s := &Storage{underlying: &sync.Map{}, timeNow: time.Now}
+	for _, o := range opts {
+		o(s)
+	}
+	return s
+}
+
+func WithCustomTime(timeNow func() time.Time) func(*Storage) {
+	return func(s *Storage) {
+		s.timeNow = timeNow
+	}
 }
 
 func (storage *Storage) Load(key string) (value TimeStampedData, exists bool) {
@@ -45,7 +54,7 @@ func (storage *Storage) Load(key string) (value TimeStampedData, exists bool) {
 }
 
 func (storage *Storage) Store(key string, value bytes.Buffer) {
-	storage.underlying.Store(key, TimeStampData(value))
+	storage.underlying.Store(key, TimeStampData(value, storage.timeNow))
 }
 
 func (storage *Storage) Delete(key string) {

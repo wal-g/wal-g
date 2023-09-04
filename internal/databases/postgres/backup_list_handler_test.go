@@ -19,17 +19,13 @@ import (
 )
 
 func TestHandleDetailedBackupList(t *testing.T) {
-	rescueNewObjectTime := memory.NewObjectTime
 	curTime := time.Time{}
-	memory.NewObjectTime = func() time.Time {
+	curTimeFunc := func() time.Time {
 		return curTime.UTC()
 	}
-	defer func() {
-		memory.NewObjectTime = rescueNewObjectTime
-	}()
 
 	t.Run("print correct backup details in correct order", func(t *testing.T) {
-		folder := memory.NewFolder("", memory.NewStorage())
+		folder := memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc)))
 		curTime = time.Unix(1690000000, 0)
 		_ = folder.PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
 		_ = folder.PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
@@ -118,11 +114,11 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		memStorages := []cache.NamedFolder{
 			{
 				Name:   "storage_1",
-				Folder: memory.NewFolder("", memory.NewStorage()),
+				Folder: memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc))),
 			},
 			{
 				Name:   "storage_2",
-				Folder: memory.NewFolder("", memory.NewStorage()),
+				Folder: memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc))),
 			},
 		}
 		cacheMock.EXPECT().AllAliveStorages().Return(memStorages, nil)
@@ -194,7 +190,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 	})
 
 	t.Run("handle error with no backups", func(t *testing.T) {
-		folder := memory.NewFolder("", memory.NewStorage())
+		folder := memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc)))
 
 		infoOutput := new(bytes.Buffer)
 		rescueInfoOutput := tracelog.InfoLogger.Writer()
