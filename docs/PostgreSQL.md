@@ -193,7 +193,7 @@ wal-g backup-push $PGDATA
 ```
 WAL-G will check that command argument, environment variable PGDATA and config setting PGDATA are the same, if set.
 
-If a backup is started from a standby sever, WAL-G will monitor the timeline of the server. If a promotion or timeline change occurs during the backup, the data will be uploaded but not finalized, and WAL-G will exit with an error. The logs will contain the necessary information to finalize the backup, which can then be used if you clearly understand the risks.
+If a backup is started from a standby server, WAL-G will monitor the timeline of the server. If a promotion or timeline change occurs during the backup, the data will be uploaded but not finalized, and WAL-G will exit with an error. The logs will contain the necessary information to finalize the backup, which can then be used if you clearly understand the risks.
 
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
 

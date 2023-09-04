@@ -46,9 +46,48 @@ wal-g st rm testfolder/testfile.br
 test "1" -eq "$(wal-g st ls | wc -l)"
 
 # Should upload the file uncompressed without error
-wal-g st put testfile testfolder/testfile --no-compress
+wal-g st put testfile testfolder/testfile --no-compress 
 
 # Should download the file uncompressed without error
 wal-g st get testfolder/testfile uncompressed_file --no-decompress
 
 diff testfile uncompressed_file
+
+cat > conf1.yaml <<EOH
+WALG_COMPRESSION_METHOD: brotli
+WALG_DELTA_MAX_STEPS: 6
+WALE_GPG_KEY_ID: "5697E1083B8509B8"
+WALG_DISK_RATE_LIMIT: 67108864
+WALG_NETWORK_RATE_LIMIT: 67108864
+WALG_DOWNLOAD_CONCURRENCY: 1
+WALG_UPLOAD_CONCURRENCY: $WALG_UPLOAD_CONCURRENCY
+WALG_UPLOAD_DISK_CONCURRENCY: 1
+GOMAXPROCS: 1
+AWS_ENDPOINT: "$AWS_ENDPOINT"
+WALE_S3_PREFIX: "$WALE_S3_PREFIX"
+AWS_S3_FORCE_PATH_STYLE: $AWS_S3_FORCE_PATH_STYLE
+AWS_ACCESS_KEY_ID: "$AWS_ACCESS_KEY_ID"
+AWS_SECRET_ACCESS_KEY: "$AWS_SECRET_ACCESS_KEY"
+EOH
+
+cat > conf2.yaml <<EOH
+WALG_COMPRESSION_METHOD: brotli
+WALG_DELTA_MAX_STEPS: 6
+WALE_GPG_KEY_ID: "5697E1083B8509B8"
+WALG_DISK_RATE_LIMIT: 67108864
+WALG_NETWORK_RATE_LIMIT: 67108864
+WALG_DOWNLOAD_CONCURRENCY: 1
+WALG_UPLOAD_CONCURRENCY: $WALG_UPLOAD_CONCURRENCY
+WALG_UPLOAD_DISK_CONCURRENCY: 1
+GOMAXPROCS: 1
+AWS_ENDPOINT: "$AWS_ENDPOINT"
+WALE_S3_PREFIX: "s3://storagetoolsbucket_target"
+AWS_S3_FORCE_PATH_STYLE: $AWS_S3_FORCE_PATH_STYLE
+AWS_ACCESS_KEY_ID: "$AWS_ACCESS_KEY_ID"
+AWS_SECRET_ACCESS_KEY: "$AWS_SECRET_ACCESS_KEY"
+EOH
+
+wal-g --config ./conf1.yaml st copy --from ./conf1.yaml --to ./conf2.yaml
+
+# Should not have an empty storage after the file copy
+test "2" -eq "$(wal-g --config ./conf2.yaml st ls | wc -l)"

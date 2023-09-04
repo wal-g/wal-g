@@ -102,7 +102,15 @@ func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
 func TestBuildCopyingInfos_WhenThereNoObjectsInFolder(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos = copy.BuildCopyingInfos(from, to, make([]storage.Object, 0), func(object storage.Object) bool { return true }, copy.NoopRenameFunc)
+
+	var infos = copy.BuildCopyingInfos(
+		from,
+		to,
+		make([]storage.Object, 0),
+		func(object storage.Object) bool { return true },
+		copy.NoopRenameFunc,
+		copy.NoopSourceTransformer,
+	)
 	assert.Empty(t, infos)
 }
 
@@ -111,7 +119,14 @@ func TestBuildCopyingInfos_WhenConditionIsJustFalse(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	objects, err := storage.ListFolderRecursively(from)
 	assert.NoError(t, err)
-	var infos = copy.BuildCopyingInfos(from, to, objects, func(object storage.Object) bool { return false }, copy.NoopRenameFunc)
+	var infos = copy.BuildCopyingInfos(
+		from,
+		to,
+		objects,
+		func(object storage.Object) bool { return false },
+		copy.NoopRenameFunc,
+		copy.NoopSourceTransformer,
+	)
 	assert.Empty(t, infos)
 }
 
@@ -131,7 +146,7 @@ func TestBuildCopyingInfos_WhenComplexCondition(t *testing.T) {
 
 	assert.NotZero(t, expectedCount)
 
-	var infos = copy.BuildCopyingInfos(from, to, objects, condition, copy.NoopRenameFunc)
+	var infos = copy.BuildCopyingInfos(from, to, objects, condition, copy.NoopRenameFunc, copy.NoopSourceTransformer)
 	assert.Equal(t, expectedCount, len(infos))
 	for _, info := range infos {
 		assert.True(t, condition(info.SrcObj))

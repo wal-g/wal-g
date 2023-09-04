@@ -35,7 +35,14 @@ func BackupCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) ([
 	}
 
 	var hasBackupPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), backupPrefix) }
-	return copy.BuildCopyingInfos(from, to, objects, hasBackupPrefix, copy.NoopRenameFunc), nil
+	return copy.BuildCopyingInfos(
+		from,
+		to,
+		objects,
+		hasBackupPrefix,
+		copy.NoopRenameFunc,
+		copy.NoopSourceTransformer,
+	), nil
 }
 
 func getCopyingInfos(backupName string,
@@ -85,7 +92,14 @@ func HistoryCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) (
 	}
 
 	var older = func(object storage.Object) bool { return lastWalFilename <= object.GetName() }
-	return copy.BuildCopyingInfos(fromWalFolder, to, objects, older, copy.NoopRenameFunc), nil
+	return copy.BuildCopyingInfos(
+		fromWalFolder,
+		to,
+		objects,
+		older,
+		copy.NoopRenameFunc,
+		copy.NoopSourceTransformer,
+	), nil
 }
 
 func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
@@ -94,10 +108,12 @@ func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, 
 		return nil, err
 	}
 
-	return copy.BuildCopyingInfos(from,
-			to,
-			objects,
-			func(object storage.Object) bool { return true },
-			copy.NoopRenameFunc),
-		nil
+	return copy.BuildCopyingInfos(
+		from,
+		to,
+		objects,
+		func(object storage.Object) bool { return true },
+		copy.NoopRenameFunc,
+		copy.NoopSourceTransformer,
+	), nil
 }
