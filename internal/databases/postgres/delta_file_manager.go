@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sync"
 
@@ -148,7 +149,7 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 	return
 }
 
-func (manager *DeltaFileManager) FlushDeltaFiles(uploader internal.Uploader, completedPartFiles map[string]bool) {
+func (manager *DeltaFileManager) FlushDeltaFiles(ctx context.Context, uploader internal.Uploader, completedPartFiles map[string]bool) {
 	manager.DeltaFileWriters.Range(func(key string, deltaFileWriter *DeltaFileChanWriter) bool {
 		deltaFileWriter.close()
 		return true
@@ -167,7 +168,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader internal.Uploader, com
 					"Failed to upload delta file: '%s' because of saving error: '%v'\n",
 					deltaFilename, err)
 			} else {
-				err = uploader.UploadFile(ioextensions.NewNamedReaderImpl(&deltaFileData, deltaFilename))
+				err = uploader.UploadFile(ctx, ioextensions.NewNamedReaderImpl(&deltaFileData, deltaFilename))
 				if err != nil {
 					tracelog.WarningLogger.Printf(
 						"Failed to upload delta file: '%s' because of uploading error: '%v'\n",
@@ -184,13 +185,13 @@ func (manager *DeltaFileManager) FlushDeltaFiles(uploader internal.Uploader, com
 	})
 }
 
-func (manager *DeltaFileManager) FlushFiles(uploader internal.Uploader) {
+func (manager *DeltaFileManager) FlushFiles(ctx context.Context, uploader internal.Uploader) {
 	err := manager.dataFolder.CleanFolder()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to clean delta folder because of error: '%v'\n", err)
 	}
 	completedPartFiles := manager.FlushPartFiles()
-	manager.FlushDeltaFiles(uploader, completedPartFiles)
+	manager.FlushDeltaFiles(ctx, uploader, completedPartFiles)
 }
 
 func (manager *DeltaFileManager) CancelRecording(walFilename string) {

@@ -19,7 +19,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
-			postgres.HandleCatchupPush(args[0], postgres.LSN(fromLSN))
+			postgres.HandleCatchupPush(cmd.Context(), args[0], postgres.LSN(fromLSN))
 		},
 	}
 	fromLSN uint64

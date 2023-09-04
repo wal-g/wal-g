@@ -32,7 +32,7 @@ var putObjectCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			return storagetools.HandlePutObject(localPath, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
+			return storagetools.HandlePutObject(cmd.Context(), localPath, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

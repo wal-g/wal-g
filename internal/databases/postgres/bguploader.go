@@ -189,7 +189,8 @@ func (b *BgUploader) processFiles(fileChan <-chan string) {
 		b.started[name] = struct{}{}
 		if err := b.workerCountSem.Acquire(b.ctx, 1); err == nil {
 			go func() {
-				uploadedFile := b.upload(name)
+				// todo Should it use b.ctx? It will interrupt last file upload and change behavior.
+				uploadedFile := b.upload(context.Background(), name)
 				b.workerCountSem.Release(1)
 				if uploadedFile {
 					if atomic.AddInt32(&numUploaded, 1) >= b.maxNumUploaded {
@@ -209,9 +210,9 @@ func (b *BgUploader) shouldSkipFile(filename string) bool {
 
 // upload one WAL file. Returns true if the file was uploaded and false if the
 // upload failed.
-func (b *BgUploader) upload(walStatusFilename string) bool {
+func (b *BgUploader) upload(ctx context.Context, walStatusFilename string) bool {
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
-	err := uploadWALFile(b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite)
+	err := uploadWALFile(ctx, b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite)
 	if err != nil {
 		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
 		return false

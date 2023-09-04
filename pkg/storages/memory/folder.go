@@ -2,6 +2,7 @@ package memory
 
 import (
 	"bytes"
+	"context"
 	"hash/fnv"
 	"io"
 	"path"
@@ -86,6 +87,14 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	}
 	folder.Storage.Store(objectPath, *bytes.NewBuffer(data))
 	return nil
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	// Assume memory folder is fast and initial context validity check is enough
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return folder.PutObject(name, content)
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {

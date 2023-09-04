@@ -1,12 +1,14 @@
 package swift
 
 import (
+	"context"
 	"hash/fnv"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/contextio"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/ncw/swift"
@@ -149,6 +151,11 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	}
 	//Object stored successfully
 	return nil
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	ctxReader := contextio.NewReader(ctx, content)
+	return folder.PutObject(name, ctxReader)
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {

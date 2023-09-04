@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"io"
 
 	"github.com/wal-g/wal-g/pkg/storages/memory"
@@ -73,6 +74,13 @@ func (f *Folder) PutObject(name string, content io.Reader) error {
 		return f.PutObjectMock(name, content)
 	}
 	return f.MemFolder.PutObject(name, content)
+}
+
+func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return f.PutObject(name, content)
 }
 
 func (f *Folder) CopyObject(srcPath string, dstPath string) error {

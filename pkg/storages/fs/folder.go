@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"hash/fnv"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/contextio"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -127,6 +129,11 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		return NewError(err, "Unable to close %v", filePath)
 	}
 	return nil
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	ctxReader := contextio.NewReader(ctx, content)
+	return folder.PutObject(name, ctxReader)
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {

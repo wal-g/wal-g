@@ -282,11 +282,15 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
-	object := folder.BuildObjectHandle(folder.joinPath(folder.path, name))
-
 	ctx, cancel := folder.createTimeoutContext()
 	defer cancel()
+
+	return folder.PutObjectWithContext(ctx, name, content)
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
+	object := folder.BuildObjectHandle(folder.joinPath(folder.path, name))
 
 	chunkNum := 0
 	tmpChunks := make([]*gcs.ObjectHandle, 0)

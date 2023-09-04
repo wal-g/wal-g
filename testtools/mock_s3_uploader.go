@@ -2,6 +2,7 @@ package testtools
 
 import (
 	"bytes"
+	"context"
 	"io"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -23,8 +24,7 @@ func (err mockMultiFailureError) Error() string {
 	return err.err.Error()
 }
 
-// Mock out uploader client for S3. Includes these methods:
-// Upload(*UploadInput, ...func(*s3manager.Uploader))
+// MockS3Uploader client for S3. Must implement UploadWithContext method.
 type MockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multiErr bool
@@ -36,8 +36,8 @@ func NewMockS3Uploader(multiErr, err bool, storage *memory.Storage) *MockS3Uploa
 	return &MockS3Uploader{multiErr: multiErr, err: err, storage: storage}
 }
 
-func (uploader *MockS3Uploader) Upload(input *s3manager.UploadInput,
-	f ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
+func (uploader *MockS3Uploader) UploadWithContext(_ context.Context, input *s3manager.UploadInput,
+	_ ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
 	if uploader.err {
 		return nil, awserr.New("UploadFailed", "mock Upload error", nil)
 	}

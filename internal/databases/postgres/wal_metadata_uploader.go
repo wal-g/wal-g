@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path"
@@ -49,7 +50,12 @@ func NewWalMetadataUploader(walMetadataSetting string) (*WalMetadataUploader, er
 	return walMetadataUploader, nil
 }
 
-func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime time.Time, uploader internal.Uploader) error {
+func (u *WalMetadataUploader) UploadWalMetadata(
+	ctx context.Context,
+	walFileName string,
+	createdTime time.Time,
+	uploader internal.Uploader,
+) error {
 	var walMetadata WalMetadataDescription
 	walMetadataMap := make(map[string]WalMetadataDescription)
 	walMetadataName := walFileName + ".json"
@@ -66,14 +72,14 @@ func (u *WalMetadataUploader) UploadWalMetadata(walFileName string, createdTime 
 		if err != nil {
 			return errors.Wrapf(err, "upload: could not Upload metadata'%s'\n", walFileName)
 		}
-		err = u.uploadBulkMetadataFile(walFileName, uploader)
+		err = u.uploadBulkMetadataFile(ctx, walFileName, uploader)
 	} else {
-		err = uploader.Upload(walMetadataName, bytes.NewReader(dtoBody))
+		err = uploader.Upload(ctx, walMetadataName, bytes.NewReader(dtoBody))
 	}
 	return errors.Wrapf(err, "upload: could not Upload metadata'%s'\n", walFileName)
 }
 
-func (u *WalMetadataUploader) uploadBulkMetadataFile(walFileName string, uploader internal.Uploader) error {
+func (u *WalMetadataUploader) uploadBulkMetadataFile(ctx context.Context, walFileName string, uploader internal.Uploader) error {
 	// Creating consolidated wal metadata only for bulk option
 	// Checking if the walfile name ends with "F" (last file in the series) and consolidating all
 	// the metadata together.
@@ -111,7 +117,7 @@ func (u *WalMetadataUploader) uploadBulkMetadataFile(walFileName string, uploade
 	if err != nil {
 		return err
 	}
-	if err = uploader.Upload(walSearchString+".json", bytes.NewReader(dtoBody)); err != nil {
+	if err = uploader.Upload(ctx, walSearchString+".json", bytes.NewReader(dtoBody)); err != nil {
 		return err
 	}
 	//Deleting the temporary metadata files created
@@ -137,7 +143,7 @@ func checkWalMetadataLevel(walMetadataLevel string) error {
 	return nil
 }
 
-func uploadLocalWalMetadata(walFilePath string, uploader internal.Uploader) error {
+func uploadLocalWalMetadata(ctx context.Context, walFilePath string, uploader internal.Uploader) error {
 	walMetadataSetting := viper.GetString(internal.UploadWalMetadata)
 	if walMetadataSetting == WalNoMetadataLevel {
 		return nil
@@ -155,10 +161,10 @@ func uploadLocalWalMetadata(walFilePath string, uploader internal.Uploader) erro
 	createdTime := fileStat.ModTime().UTC()
 	walFileName := path.Base(walFilePath)
 
-	return walMetadataUploader.UploadWalMetadata(walFileName, createdTime, uploader)
+	return walMetadataUploader.UploadWalMetadata(ctx, walFileName, createdTime, uploader)
 }
 
-func uploadRemoteWalMetadata(walFileName string, uploader internal.Uploader) error {
+func uploadRemoteWalMetadata(ctx context.Context, walFileName string, uploader internal.Uploader) error {
 	walMetadataSetting := viper.GetString(internal.UploadWalMetadata)
 	if walMetadataSetting == WalNoMetadataLevel {
 		return nil
@@ -173,5 +179,5 @@ func uploadRemoteWalMetadata(walFileName string, uploader internal.Uploader) err
 	//machine and may not have access to the pg_wal/pg_xlog folder on the postgres cluster machine.
 	createdTime := time.Now().UTC()
 
-	return walMetadataUploader.UploadWalMetadata(walFileName, createdTime, uploader)
+	return walMetadataUploader.UploadWalMetadata(ctx, walFileName, createdTime, uploader)
 }
