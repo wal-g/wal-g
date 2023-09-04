@@ -62,7 +62,7 @@ func (c *statusCache) AllAliveStorages() ([]NamedFolder, error) {
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
 	if err != nil {
-		return nil, fmt.Errorf("write cache file: %w", err)
+		tracelog.WarningLogger.Printf("Failed to write cache file, each subsequent command will check the storages again: %v", err)
 	}
 
 	memCache = newFile
@@ -101,7 +101,7 @@ func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
 	if err != nil {
-		return nil, fmt.Errorf("write cache file: %w", err)
+		tracelog.WarningLogger.Printf("Failed to write cache file, each subsequent command will check the storages again: %v", err)
 	}
 
 	memCache = newFile
@@ -150,7 +150,7 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
 	if err != nil {
-		return nil, fmt.Errorf("write cache file: %w", err)
+		tracelog.WarningLogger.Printf("Failed to write cache file, each subsequent command will check the storages again: %v", err)
 	}
 
 	memCache = newFile
