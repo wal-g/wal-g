@@ -151,6 +151,12 @@ func (fh *FetchHandler) Prepare() error {
 	if err != nil {
 		return err
 	}
+
+	if fh.partialRestoreArgs != nil {
+		tracelog.InfoLogger.Println("[Prepare] Set ignore_invalid_pages=on...")
+		fh.ignoreInvalidPages()
+	}
+
 	tracelog.InfoLogger.Println("[Prepare] Creating recovery.conf files...")
 	return fh.createRecoveryConfigs()
 }
@@ -225,6 +231,21 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	return nil
 }
 
+func (fh *FetchHandler) ignoreInvalidPages() {
+	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Update conf wal-g",
+		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+		func(contentID int) string {
+			return fh.buildInsertIntoConfigCommand(contentID, "ignore_invalid_pages", "on")
+		})
+	fh.cluster.CheckClusterError(remoteOutput, "Unable to update postgresql.conf", func(contentID int) string {
+		return fmt.Sprintf("Unable to update postgresql.conf on segment %d", contentID)
+	})
+
+	for _, command := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf("Update postgresql.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
+	}
+}
+
 // TODO: Unit tests
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
@@ -258,6 +279,11 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	cmdLine := strings.Join(cmd, " ")
 	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
 	return cmdLine
+}
+
+func (fh *FetchHandler) buildInsertIntoConfigCommand(contentID int, key, value string) string {
+	segment := fh.cluster.ByContent[contentID][0]
+	return fmt.Sprintf("echo '%s=%s' >> %s", key, value, path.Join(segment.DataDir, "postgresql.conf"))
 }
 
 func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,

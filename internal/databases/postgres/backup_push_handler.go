@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
 	"sync/atomic"
 	"syscall"
@@ -279,6 +280,19 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	tracelog.DebugLogger.Println("Uploading pg_control ...")
 	err = bundle.UploadPgControl(bh.Arguments.Uploader.Compression().FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	tracelog.InfoLogger.Printf("setting_val: %t", viper.GetBool(internal.WaitSemaphoreDeletion))
+	if viper.GetBool(internal.WaitSemaphoreDeletion) {
+		tracelog.InfoLogger.Printf("start sleep: waiting to delete .semaphore file")
+		lockFile := path.Join(bh.PgInfo.PgDataDirectory, ".semaphore")
+		f, _ := os.Create(lockFile)
+		f.Close()
+
+		for ; err == nil; _, err = os.Stat("/path/to/whatever") {
+			time.Sleep(1 * time.Second)
+		}
+		tracelog.InfoLogger.Printf("stop sleep: .semaphore file was deleted")
+	}
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	tracelog.DebugLogger.Println("Stop backup and upload backup_label and tablespace_map")

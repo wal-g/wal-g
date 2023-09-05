@@ -1,3 +1,4 @@
 "WALE_S3_PREFIX": "s3://gppartialtablebucket",
 "WALG_DELTA_MAX_STEPS": "2",
-"WALG_LOG_LEVEL": "DEVEL"
+"WALG_LOG_LEVEL": "DEVEL",
+"WALG_WAIT_SEMAPHORE_DELETION": "true"

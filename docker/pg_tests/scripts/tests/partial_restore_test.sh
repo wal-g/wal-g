@@ -27,15 +27,23 @@ psql -c "CREATE TABLE tbl (data integer); INSERT INTO tbl SELECT * FROM generate
 psql -c "CREATE TABLE tbl (data integer); INSERT INTO tbl SELECT * FROM generate_series(1, 10000)" third
 sleep 1
 
-wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} &
+
+while ! test -f "${PGDATA}/.semaphore"; do
+    sleep 1
+    echo "Still waiting ${PGDATA}/.semaphore"
+done
 
 psql -c "INSERT INTO tbl1 SELECT * FROM generate_series(1, 10000)" first
 psql -c "INSERT INTO tbl2 SELECT * FROM generate_series(1, 10000)" first
 psql -c "INSERT INTO tbl SELECT * FROM generate_series(1, 10000)" second
 psql -c "INSERT INTO tbl SELECT * FROM generate_series(1, 10000)" third
-psql -c "SELECT pg_switch_wal();" postgres
-sleep 10
 
+rm -f "${PGDATA}/.semaphore"
+
+wait %1 ||  echo 'backup done no need to wait'
+
+sleep 10
 
 /tmp/scripts/drop_pg.sh
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --restore-only=first/tbl1,second
