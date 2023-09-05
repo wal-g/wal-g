@@ -93,6 +93,7 @@ const (
 	PgFailoverStorages             = "WALG_FAILOVER_STORAGES"
 	PgFailoverStoragesCheckTimeout = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
 	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
+	PgFailoverStoragesCheckSize    = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -242,9 +243,10 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize:            "16",
-		PgBackRestStanza:     "main",
-		PgAliveCheckInterval: "1m",
+		PgWalSize:                   "16",
+		PgBackRestStanza:            "main",
+		PgAliveCheckInterval:        "1m",
+		PgFailoverStoragesCheckSize: "1mb",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -407,6 +409,7 @@ var (
 		PgFailoverStorages:             true,
 		PgFailoverStoragesCheckTimeout: true,
 		PgFailoverStorageCacheLifetime: true,
+		PgFailoverStoragesCheckSize:    true,
 	}
 
 	MongoAllowedSettings = map[string]bool{

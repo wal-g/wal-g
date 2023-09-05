@@ -326,6 +326,7 @@ func newTestCache(t *testing.T, failoverStorages int) *statusCache {
 		failover,
 		time.Hour,
 		time.Hour,
+		1024,
 	)
 	require.NoError(t, err)
 	return c.(*statusCache)

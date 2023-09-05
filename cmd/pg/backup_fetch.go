@@ -57,7 +57,14 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
 		tracelog.ErrorLogger.FatalOnError(err)
-		cache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+		aliveCheckSize := viper.GetSizeInBytes(internal.PgFailoverStoragesCheckSize)
+		cache, err := cache.NewStatusCache(
+			primaryStorage,
+			failoverStorages,
+			cacheLifetime,
+			aliveCheckTimeout,
+			aliveCheckSize,
+		)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		folder := multistorage.NewFolder(cache)

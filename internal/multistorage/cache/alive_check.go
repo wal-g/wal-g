@@ -3,24 +3,28 @@ package cache
 import (
 	"context"
 	"fmt"
+	"io"
+	"math/rand"
 	"time"
 
 	"github.com/wal-g/tracelog"
 )
+
+const checkObjectName = "wal-g_storage_check"
 
 type checkRes struct {
 	key key
 	err error
 }
 
-func checkForAlive(timeout time.Duration, storages ...NamedFolder) map[key]bool {
+func checkForAlive(timeout time.Duration, size uint, storages ...NamedFolder) map[key]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	resCh := make(chan checkRes, len(storages))
 	for _, stor := range storages {
 		go func(s NamedFolder) {
-			err := checkStorage(ctx, s)
+			err := checkStorage(ctx, size, s)
 			if err != nil {
 				resCh <- checkRes{
 					key: s.Key,
@@ -52,11 +56,13 @@ func checkForAlive(timeout time.Duration, storages ...NamedFolder) map[key]bool 
 	return results
 }
 
-func checkStorage(ctx context.Context, folder NamedFolder) error {
-	// Currently, we use the simple ListFolder() call to check if the storage is up and reachable
+func checkStorage(ctx context.Context, size uint, folder NamedFolder) error {
 	errCh := make(chan error, 1)
+	// todo simplify code using PutObjectWithContext after merge https://github.com/wal-g/wal-g/pull/1546
 	go func() {
-		_, _, err := folder.ListFolder()
+		r := rand.New(rand.NewSource(1))
+		lr := io.LimitReader(r, int64(size))
+		err := folder.PutObject(checkObjectName, lr)
 		errCh <- err
 	}()
 

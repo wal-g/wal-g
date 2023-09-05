@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -52,7 +53,14 @@ func GetFolder() storage.Folder {
 	tracelog.ErrorLogger.FatalOnError(err)
 	aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
 	tracelog.ErrorLogger.FatalOnError(err)
-	statusCache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+	aliveCheckSize := viper.GetSizeInBytes(internal.PgFailoverStoragesCheckSize)
+	statusCache, err := cache.NewStatusCache(
+		primaryStorage,
+		failoverStorages,
+		cacheLifetime,
+		aliveCheckTimeout,
+		aliveCheckSize,
+	)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	return multistorage.NewFolder(statusCache)
