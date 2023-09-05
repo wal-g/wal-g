@@ -19,8 +19,8 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
-	enveloperYckms "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/yckms"
-	envelopeOpenpgp "github.com/wal-g/wal-g/internal/crypto/envelope/openpgp"
+	yckmsenveloper "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/yckms"
+	openpgpenvelope "github.com/wal-g/wal-g/internal/crypto/envelope/openpgp"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/crypto/yckms"
 	"github.com/wal-g/wal-g/internal/fsutil"
@@ -301,9 +301,11 @@ func ConfigureCrypter() crypto.Crypter {
 	}
 	// TODO: check only one passed: simple or envelope
 	if viper.IsSet(PgpEncryptedKeyPathSetting) && viper.IsSet(YcKmsKeyIDSetting) {
-		yckmsEnveloper := enveloperYckms.YcKmsEnveloperFromKeyIDAndCredential(viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting))
+		yckmsEnveloper := yckmsenveloper.YcKmsEnveloperFromKeyIDAndCredential(
+			viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting),
+		)
 		enveloper := cached.EnveloperWithCache(yckmsEnveloper)
-		return envelopeOpenpgp.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper)
+		return openpgpenvelope.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper)
 	}
 
 	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
