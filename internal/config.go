@@ -290,6 +290,7 @@ var (
 		PgpKeyPassphraseSetting:      true,
 		PgpEncryptedKeySetting:       true,
 		PgpEncryptedKeyPathSetting:   true,
+		PgpEncryptedCacheExpiration:  true,
 		LibsodiumKeySetting:          true,
 		LibsodiumKeyPathSetting:      true,
 		LibsodiumKeyTransform:        true,
