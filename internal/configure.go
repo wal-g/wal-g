@@ -18,6 +18,9 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
+	cachenvlpr "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/cached"
+	yckmsenvlpr "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/yckms"
+	envopenpgp "github.com/wal-g/wal-g/internal/crypto/envelope/openpgp"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/limiters"
@@ -300,19 +303,56 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) crypto.Crypter {
 		return GetSetting(PgpKeyPassphraseSetting)
 	}
 
-	// key can be either private (for download) or public (for upload)
-	if config.IsSet(PgpKeySetting) {
-		return openpgp.CrypterFromKey(config.GetString(PgpKeySetting), loadPassphrase)
+	pgpKey := viper.IsSet(PgpKeySetting)
+	pgpKeyPath := viper.IsSet(PgpKeyPathSetting)
+	legacyGpg := viper.IsSet(GpgKeyIDSetting)
+	encryptedPgpKey := viper.IsSet(PgpEncryptedKeyPathSetting)
+	encryptedPgpKeyPath := viper.IsSet(PgpEncryptedKeySetting)
+
+	isPgpKey := pgpKey || pgpKeyPath || legacyGpg
+	isEncryptedPgpKey := encryptedPgpKey || encryptedPgpKeyPath
+
+	if isPgpKey && isEncryptedPgpKey {
+		tracelog.ErrorLogger.Fatalf("There is no way to configure plain gpg and encrypted gpg at the same time, please choose one")
+
 	}
 
-	// key can be either private (for download) or public (for upload)
-	if config.IsSet(PgpKeyPathSetting) {
-		return openpgp.CrypterFromKeyPath(config.GetString(PgpKeyPathSetting), loadPassphrase)
+	if isPgpKey {
+		// key can be either private (for download) or public (for upload)
+		if config.IsSet(PgpKeySetting) {
+			return openpgp.CrypterFromKey(config.GetString(PgpKeySetting), loadPassphrase)
+		}
+
+		// key can be either private (for download) or public (for upload)
+		if config.IsSet(PgpKeyPathSetting) {
+			return openpgp.CrypterFromKeyPath(config.GetString(PgpKeyPathSetting), loadPassphrase)
+		}
+
+		if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
+			tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
+			return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
+		}
 	}
 
-	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
-		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
-		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
+	if isEncryptedPgpKey {
+		if !viper.IsSet(YcKmsKeyIDSetting) {
+			tracelog.ErrorLogger.Fatalf("Yandex Cloud KMS key for client-side encryption and decryption must be configured")
+		}
+
+		yckmsEnveloper := yckmsenvlpr.YcKmsEnveloperFromKeyIDAndCredential(
+			viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting),
+		)
+		expiration, err := GetDurationSettingDefault(PgpEncryptedCacheExpiration, 0)
+		tracelog.ErrorLogger.FatalfOnError("Can't initialize cached enveloper: %v", err)
+		enveloper := cachenvlpr.EnveloperWithCache(yckmsEnveloper, expiration)
+
+		if config.IsSet(PgpEncryptedKeyPathSetting) {
+			return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper)
+		}
+		if config.IsSet(PgpEncryptedKeySetting) {
+			return envopenpgp.CrypterFromKey(viper.GetString(PgpEncryptedKeySetting), enveloper)
+		}
+
 	}
 
 	if config.IsSet(CseKmsIDSetting) {
@@ -435,6 +475,18 @@ func GetDurationSetting(setting string) (time.Duration, error) {
 	intervalStr, ok := GetSetting(setting)
 	if !ok {
 		return 0, NewUnsetRequiredSettingError(setting)
+	}
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
+}
+
+func GetDurationSettingDefault(setting string, def time.Duration) (time.Duration, error) {
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
 	}
 	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {
