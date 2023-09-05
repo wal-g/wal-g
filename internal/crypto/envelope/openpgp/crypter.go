@@ -25,7 +25,7 @@ const (
 // Crypter incapsulates specific of cypher method
 // Includes keys, infrastructure information etc
 type Crypter struct {
-	enveloper    envelope.EnveloperInterface
+	enveloper    envelope.Enveloper
 	encryptedKey []byte
 
 	ArmoredKey      string
@@ -126,7 +126,7 @@ func (crypter *Crypter) setupEncryptedKey() error {
 }
 
 // CrypterFromKey creates Crypter from encrypted armored key.
-func CrypterFromKey(armoredKey string, enveloper envelope.EnveloperInterface) crypto.Crypter {
+func CrypterFromKey(armoredKey string, enveloper envelope.Enveloper) crypto.Crypter {
 	return &Crypter{
 		ArmoredKey:      armoredKey,
 		IsUseArmoredKey: true,
@@ -135,7 +135,7 @@ func CrypterFromKey(armoredKey string, enveloper envelope.EnveloperInterface) cr
 }
 
 // CrypterFromKeyPath creates Crypter from encrypted armored key path.
-func CrypterFromKeyPath(armoredKeyPath string, enveloper envelope.EnveloperInterface) crypto.Crypter {
+func CrypterFromKeyPath(armoredKeyPath string, enveloper envelope.Enveloper) crypto.Crypter {
 	return &Crypter{
 		ArmoredKeyPath:      armoredKeyPath,
 		IsUseArmoredKeyPath: true,

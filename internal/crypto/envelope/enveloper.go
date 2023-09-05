@@ -2,7 +2,8 @@ package envelope
 
 import "io"
 
-type EnveloperInterface interface {
+//go:generate mockery --name Enveloper --with-expecter=true
+type Enveloper interface {
 	GetName() string
 	GetEncryptedKey(r io.Reader) ([]byte, error)
 	DecryptKey([]byte) ([]byte, error)

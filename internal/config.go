@@ -68,6 +68,7 @@ const (
 	PgpKeyPassphraseSetting        = "WALG_PGP_KEY_PASSPHRASE"
 	PgpEncryptedKeySetting         = "WALG_ENCRYPTED_PGP_KEY"
 	PgpEncryptedKeyPathSetting     = "WALG_ENCRYPTED_PGP_KEY_PATH"
+	PgpEncryptedCacheExpiration    = "WALG_ENCRYPTED_CACHE_EXPIRATION"
 	PgDataSetting                  = "PGDATA"
 	UserSetting                    = "USER" // TODO : do something with it
 	PgPortSetting                  = "PGPORT"

@@ -2,6 +2,8 @@ package openpgp
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/mock"
+	"github.com/wal-g/wal-g/internal/crypto/envelope/mocks"
 	"io"
 	"os"
 	"testing"
@@ -17,37 +19,20 @@ const (
 	PrivateEncryptedKeyEnvFilePath = "./testdata/pgpTestEncryptedPrivateKeyEnv"
 )
 
-type mockedEnveloper struct {
-	key []byte
-}
-
-func (enveloper *mockedEnveloper) GetName() string {
-	return "mocked"
-}
-
-func (enveloper *mockedEnveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
-	return []byte(""), nil
-}
-
-func (enveloper *mockedEnveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
-	return enveloper.key, nil
-}
-
-func (enveloper *mockedEnveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
-	return []byte("")
-}
-
-func MockedEnveloper() envelope.EnveloperInterface {
+func MockedEnveloper(t *testing.T) *mocks.Enveloper {
 	key, err := os.ReadFile(PrivateKeyFilePath)
 	if err != nil {
 		panic(err)
 	}
-	return &mockedEnveloper{
-		key: key,
-	}
+	enveloper := mocks.NewEnveloper(t)
+	enveloper.EXPECT().GetName().Return("mocked").Maybe()
+	enveloper.EXPECT().GetEncryptedKey(mock.Anything).Return([]byte(""), nil).Maybe()
+	enveloper.EXPECT().DecryptKey(mock.Anything).Return(key, nil).Maybe()
+	enveloper.EXPECT().SerializeEncryptedKey(mock.Anything).Return([]byte("")).Maybe()
+	return enveloper
 }
 
-func MockArmedCrypterFromEnv(enveloper envelope.EnveloperInterface) crypto.Crypter {
+func MockArmedCrypterFromEnv(enveloper envelope.Enveloper) crypto.Crypter {
 	rawEnv, err := os.ReadFile(PrivateEncryptedKeyEnvFilePath)
 	if err != nil {
 		panic(err)
@@ -56,29 +41,31 @@ func MockArmedCrypterFromEnv(enveloper envelope.EnveloperInterface) crypto.Crypt
 	return CrypterFromKey(string(env), enveloper)
 }
 
-func MockArmedCrypterFromKeyPath(enveloper envelope.EnveloperInterface) crypto.Crypter {
+func MockArmedCrypterFromKeyPath(enveloper envelope.Enveloper) crypto.Crypter {
 	return CrypterFromKeyPath(PrivateEncryptedKeyFilePath, enveloper)
 }
 
 func TestMockCrypterFromEnv(t *testing.T) {
-	enveloper := MockedEnveloper()
+	enveloper := MockedEnveloper(t)
 	MockArmedCrypterFromEnv(enveloper)
 }
 
 func TestMockCrypterFromKeyPath(t *testing.T) {
-	enveloper := MockedEnveloper()
+	enveloper := MockedEnveloper(t)
 	MockArmedCrypterFromKeyPath(enveloper)
 }
 
 func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
-	const someSecret = "so very secret thingy"
+	const someSecret = "so very secret thing"
 
 	buf := new(bytes.Buffer)
 	encrypt, err := crypter.Encrypt(buf)
 	assert.NoErrorf(t, err, "Encryption error: %v", err)
 
-	encrypt.Write([]byte(someSecret))
-	encrypt.Close()
+	_, err = encrypt.Write([]byte(someSecret))
+	assert.NoError(t, err)
+	err = encrypt.Close()
+	assert.NoError(t, err)
 
 	decrypt, err := crypter.Decrypt(buf)
 	assert.NoErrorf(t, err, "Decryption error: %v", err)
@@ -90,11 +77,11 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 }
 
 func TestEncryptionCycleFromEnv(t *testing.T) {
-	enveloper := MockedEnveloper()
+	enveloper := MockedEnveloper(t)
 	EncryptionCycle(t, MockArmedCrypterFromEnv(enveloper))
 }
 
 func TestEncryptionCycleFromKeyPath(t *testing.T) {
-	enveloper := MockedEnveloper()
+	enveloper := MockedEnveloper(t)
 	EncryptionCycle(t, MockArmedCrypterFromKeyPath(enveloper))
 }

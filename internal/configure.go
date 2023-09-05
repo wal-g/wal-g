@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/cached"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +18,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
+	cachedenveloper "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/cached"
 	yckmsenveloper "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/yckms"
 	openpgpenvelope "github.com/wal-g/wal-g/internal/crypto/envelope/openpgp"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
@@ -290,21 +290,41 @@ func ConfigureCrypter() crypto.Crypter {
 		return GetSetting(PgpKeyPassphraseSetting)
 	}
 
-	// key can be either private (for download) or public (for upload)
-	if viper.IsSet(PgpKeySetting) {
-		return openpgp.CrypterFromKey(viper.GetString(PgpKeySetting), loadPassphrase)
-	}
+	pgpKey := viper.IsSet(PgpKeySetting)
+	pgpKeyPath := viper.IsSet(PgpKeyPathSetting)
+	encryptedPgpKey := viper.IsSet(PgpEncryptedKeyPathSetting)
+	encryptedPgpKeyPath := viper.IsSet(PgpEncryptedKeySetting)
 
-	// key can be either private (for download) or public (for upload)
-	if viper.IsSet(PgpKeyPathSetting) {
-		return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
+	isPgpKey := pgpKey || pgpKeyPath
+	isEncryptedPgpKey := encryptedPgpKey || encryptedPgpKeyPath
+
+	if isPgpKey && isEncryptedPgpKey {
+		tracelog.ErrorLogger.Fatalf("There is no way to configure plain gpg and encrypted gpg at the same time, please choose one")
+
 	}
-	// TODO: check only one passed: simple or envelope
-	if viper.IsSet(PgpEncryptedKeyPathSetting) && viper.IsSet(YcKmsKeyIDSetting) {
+	if isPgpKey {
+		// key can be either private (for download) or public (for upload)
+		if viper.IsSet(PgpKeySetting) {
+			return openpgp.CrypterFromKey(viper.GetString(PgpKeySetting), loadPassphrase)
+		}
+
+		// key can be either private (for download) or public (for upload)
+		if viper.IsSet(PgpKeyPathSetting) {
+			return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
+		}
+	}
+	if isEncryptedPgpKey {
+		if !viper.IsSet(YcKmsKeyIDSetting) {
+			tracelog.ErrorLogger.Fatalf("Yandex Cloud KMS key for client-side encryption and decryption must be configured")
+		}
+
 		yckmsEnveloper := yckmsenveloper.YcKmsEnveloperFromKeyIDAndCredential(
 			viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting),
 		)
-		enveloper := cached.EnveloperWithCache(yckmsEnveloper)
+		expiration, err := GetDurationSettingDefault(PgpEncryptedCacheExpiration, 0)
+		tracelog.ErrorLogger.FatalfOnError("Can't initialize cached enveloper: %v", err)
+		enveloper := cachedenveloper.EnveloperWithCache(yckmsEnveloper, expiration)
+
 		return openpgpenvelope.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper)
 	}
 
@@ -433,6 +453,18 @@ func GetDurationSetting(setting string) (time.Duration, error) {
 	intervalStr, ok := GetSetting(setting)
 	if !ok {
 		return 0, NewUnsetRequiredSettingError(setting)
+	}
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
+}
+
+func GetDurationSettingDefault(setting string, def time.Duration) (time.Duration, error) {
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
 	}
 	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {

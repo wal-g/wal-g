@@ -103,7 +103,7 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 	return encryptedKey, nil
 }
 
-func YcKmsEnveloperFromKeyIDAndCredential(keyID string, saFilePath string) envelope.EnveloperInterface {
+func YcKmsEnveloperFromKeyIDAndCredential(keyID string, saFilePath string) envelope.Enveloper {
 	authorizedKey, err := iamkey.ReadFromJSONFile(saFilePath)
 	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
 	credentials, err := ycsdk.ServiceAccountKey(authorizedKey)
