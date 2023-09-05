@@ -20,15 +20,18 @@ type BackupDetail struct {
 }
 
 func (bd *BackupDetail) PrintableFields() []printlist.TableField {
-	prettyModifyTime := internal.PrettyFormatTime(bd.ModifyTime)
-	return append(bd.Backup.PrintableFields(),
-		printlist.TableField{
-			Name:        "modify_time",
-			PrettyName:  "Modify time",
-			Value:       internal.FormatTime(bd.ModifyTime),
-			PrettyValue: &prettyModifyTime,
-		},
-	)
+	lastModifiedField := printlist.TableField{
+		Name:       "last_modified",
+		PrettyName: "Last modified",
+		Value:      internal.FormatTime(bd.ModifyTime),
+	}
+	insertAfterColumn := 3
+
+	baseFields := bd.Backup.PrintableFields()
+	fields := baseFields[:insertAfterColumn]
+	fields = append(fields, lastModifiedField)
+	fields = append(fields, baseFields[insertAfterColumn:]...)
+	return fields
 }
 
 func NewBackupDetail(backupTime internal.BackupTime, sentinel *models.Backup) *BackupDetail {

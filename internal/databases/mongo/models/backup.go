@@ -39,8 +39,6 @@ func (b *Backup) IsPermanent() bool {
 }
 
 func (b *Backup) PrintableFields() []printlist.TableField {
-	prettyStartTime := internal.PrettyFormatTime(b.StartLocalTime)
-	prettyFinishTime := internal.PrettyFormatTime(b.FinishLocalTime)
 	return []printlist.TableField{
 		{
 			Name:       "name",
@@ -58,16 +56,14 @@ func (b *Backup) PrintableFields() []printlist.TableField {
 			Value:      b.MongoMeta.Version,
 		},
 		{
-			Name:        "start_time",
-			PrettyName:  "Start time",
-			Value:       internal.FormatTime(b.StartLocalTime),
-			PrettyValue: &prettyStartTime,
+			Name:       "start_time",
+			PrettyName: "Start time",
+			Value:      internal.FormatTime(b.StartLocalTime),
 		},
 		{
-			Name:        "finish_time",
-			PrettyName:  "Finish time",
-			Value:       internal.FormatTime(b.FinishLocalTime),
-			PrettyValue: &prettyFinishTime,
+			Name:       "finish_time",
+			PrettyName: "Finish time",
+			Value:      internal.FormatTime(b.FinishLocalTime),
 		},
 		{
 			Name:       "hostname",

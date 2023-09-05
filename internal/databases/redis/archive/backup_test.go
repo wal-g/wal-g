@@ -42,7 +42,7 @@ func TestBackup_PrintableFields(t *testing.T) {
 		},
 		{
 			Name:        "user_data",
-			PrettyName:  "User data",
+			PrettyName:  "UserData",
 			Value:       "[\"a\",\"b\",\"c\"]",
 			PrettyValue: nil,
 		},

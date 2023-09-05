@@ -60,7 +60,7 @@ func (b Backup) PrintableFields() []printlist.TableField {
 		},
 		{
 			Name:       "user_data",
-			PrettyName: "User data",
+			PrettyName: "UserData",
 			Value:      marshalUserData(b.UserData),
 		},
 		{
