@@ -20,8 +20,6 @@ import (
 
 const (
 	SdNotifyWatchdog = "WATCHDOG=1"
-
-	WALPushTimeout = 60 * time.Second
 )
 
 type SocketWriteFailedError struct {
@@ -71,7 +69,11 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 		return err
 	}
 	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
-	ctx, cancel := context.WithTimeout(ctx, WALPushTimeout)
+	pushTimeout, err := internal.GetDurationSetting(internal.PgDaemonWALUploadTimeout)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, pushTimeout)
 	defer cancel()
 	err = HandleWALPush(ctx, h.uploader, fullPath)
 	if err != nil {
