@@ -15,7 +15,13 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-func HandlePutObject(ctx context.Context, source io.Reader, dstPath string, uploader internal.Uploader, overwrite, encrypt, compress bool) error {
+func HandlePutObject(
+	ctx context.Context,
+	source io.Reader,
+	dstPath string,
+	uploader internal.Uploader,
+	overwrite, encrypt, compress bool,
+) error {
 	err := checkOverwrite(dstPath, uploader, overwrite)
 	if err != nil {
 		return fmt.Errorf("check file overwrite: %v", err)
