@@ -12,7 +12,6 @@ import (
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/pkg/errors"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -58,12 +57,17 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	}
 	_, err = bufferedWriter.Write(header)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Can't write encryption key to buffer: %v", err)
-		return nil, err
+		return nil, errors.Wrapf(err, "can't write encryption key to buffer")
 	}
-	key, err := crypter.enveloper.DecryptKey(crypter.encryptedKey)
+	var key []byte
+	key, err = crypter.enveloper.DecryptKey(crypter.encryptedKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't decrypt encryption key")
+	}
 	pubKey, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
-
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't read decrypyed gpg key")
+	}
 	encryptedWriter, err := openpgp.Encrypt(bufferedWriter, pubKey, nil, nil, nil)
 
 	if err != nil {
@@ -75,20 +79,26 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 
 // Decrypt creates decrypted reader from ordinary reader
 func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
-
 	// need read header at first, with length less than maxHeaderLenAllowed
 	bufferedReader := bufio.NewReaderSize(reader, maxHeaderLenAllowed)
 	encryptedKey, err := crypter.enveloper.GetEncryptedKey(bufferedReader)
 	if err != nil {
 		return nil, err
 	}
-	key, err := crypter.enveloper.DecryptKey(encryptedKey)
+	var key []byte
+	key, err = crypter.enveloper.DecryptKey(encryptedKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't decrypt encryption key")
+	}
 	secretKey, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't read decrypyed gpg key")
+	}
 
 	md, err := openpgp.ReadMessage(bufferedReader, secretKey, nil, nil)
 
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, errors.Wrapf(err, "opengpg decryption error")
 	}
 
 	return md.UnverifiedBody, nil

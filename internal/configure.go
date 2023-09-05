@@ -314,7 +314,6 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) crypto.Crypter {
 
 	if isPgpKey && isEncryptedPgpKey {
 		tracelog.ErrorLogger.Fatalf("There is no way to configure plain gpg and encrypted gpg at the same time, please choose one")
-
 	}
 
 	if isPgpKey {
@@ -339,7 +338,7 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) crypto.Crypter {
 			tracelog.ErrorLogger.Fatalf("Yandex Cloud KMS key for client-side encryption and decryption must be configured")
 		}
 
-		yckmsEnveloper := yckmsenvlpr.YcKmsEnveloperFromKeyIDAndCredential(
+		yckmsEnveloper := yckmsenvlpr.EnveloperFromKeyIDAndCredential(
 			viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting),
 		)
 		expiration, err := GetDurationSettingDefault(PgpEncryptedCacheExpiration, 0)
@@ -352,7 +351,6 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) crypto.Crypter {
 		if config.IsSet(PgpEncryptedKeySetting) {
 			return envopenpgp.CrypterFromKey(viper.GetString(PgpEncryptedKeySetting), enveloper)
 		}
-
 	}
 
 	if config.IsSet(CseKmsIDSetting) {

@@ -20,7 +20,7 @@ func (item *Item) isFresh() bool {
 	return item.ExpiredAt == 0 || item.ExpiredAt > time.Now().UnixNano()
 }
 
-type CachedEnveloper struct {
+type Enveloper struct {
 	wrapped    envelope.Enveloper
 	locker     sync.RWMutex
 	items      map[string]Item
@@ -29,16 +29,16 @@ type CachedEnveloper struct {
 
 func createKey(s []byte) string { return fmt.Sprintf("%x", sha1.Sum(s)) }
 
-func (enveloper *CachedEnveloper) GetName() string {
+func (enveloper *Enveloper) GetName() string {
 	return enveloper.wrapped.GetName()
 }
 
-func (enveloper *CachedEnveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
+func (enveloper *Enveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
 	tracelog.DebugLogger.Println("Exctract encrypted key")
 	return enveloper.wrapped.GetEncryptedKey(r)
 }
 
-func (enveloper *CachedEnveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
+func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	key := createKey(encryptedKey)
 	tracelog.DebugLogger.Printf("Decrypt encrypted key %s\n", key)
 
@@ -71,15 +71,14 @@ func (enveloper *CachedEnveloper) DecryptKey(encryptedKey []byte) ([]byte, error
 		ExpiredAt: expiredAt,
 	}
 	return decryptedKey, nil
-
 }
 
-func (enveloper *CachedEnveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
+func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
 	return enveloper.wrapped.SerializeEncryptedKey(encryptedKey)
 }
 
 func EnveloperWithCache(enveloper envelope.Enveloper, expiration time.Duration) envelope.Enveloper {
-	return &CachedEnveloper{
+	return &Enveloper{
 		wrapped:    enveloper,
 		items:      make(map[string]Item),
 		expiration: expiration,

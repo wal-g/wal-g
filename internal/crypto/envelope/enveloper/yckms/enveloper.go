@@ -19,17 +19,16 @@ const (
 	schemeVersion byte = 1
 )
 
-type YcKmsEnveloper struct {
+type Enveloper struct {
 	keyID string
 	sdk   *ycsdk.SDK
 }
 
-func (enveloper *YcKmsEnveloper) GetName() string {
+func (enveloper *Enveloper) GetName() string {
 	return "yckms"
 }
 
-func (enveloper *YcKmsEnveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
-
+func (enveloper *Enveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
 	encryptedKey, err := readEncryptedKey(r)
 	if err != nil {
 		return nil, err
@@ -37,7 +36,7 @@ func (enveloper *YcKmsEnveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
 	return encryptedKey, nil
 }
 
-func (enveloper *YcKmsEnveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
+func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	ctx := context.Background()
 	rsp, err := enveloper.sdk.KMSCrypto().SymmetricCrypto().Decrypt(ctx, &kms.SymmetricDecryptRequest{
 		KeyId:      enveloper.keyID,
@@ -52,7 +51,7 @@ func (enveloper *YcKmsEnveloper) DecryptKey(encryptedKey []byte) ([]byte, error)
 	return rsp.Plaintext, nil
 }
 
-func (enveloper *YcKmsEnveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
+func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
 	return serializeEncryptedKey(encryptedKey)
 }
 
@@ -103,7 +102,7 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 	return encryptedKey, nil
 }
 
-func YcKmsEnveloperFromKeyIDAndCredential(keyID string, saFilePath string) envelope.Enveloper {
+func EnveloperFromKeyIDAndCredential(keyID string, saFilePath string) envelope.Enveloper {
 	authorizedKey, err := iamkey.ReadFromJSONFile(saFilePath)
 	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
 	credentials, err := ycsdk.ServiceAccountKey(authorizedKey)
@@ -113,7 +112,7 @@ func YcKmsEnveloperFromKeyIDAndCredential(keyID string, saFilePath string) envel
 		Credentials: credentials,
 	})
 	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
-	return &YcKmsEnveloper{
+	return &Enveloper{
 		keyID: keyID,
 		sdk:   sdk,
 	}
