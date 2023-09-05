@@ -66,6 +66,8 @@ const (
 	PgpKeySetting                  = "WALG_PGP_KEY"
 	PgpKeyPathSetting              = "WALG_PGP_KEY_PATH"
 	PgpKeyPassphraseSetting        = "WALG_PGP_KEY_PASSPHRASE"
+	PgpEncryptedKeySetting         = "WALG_ENCRYPTED_PGP_KEY"
+	PgpEncryptedKeyPathSetting     = "WALG_ENCRYPTED_PGP_KEY_PATH"
 	PgDataSetting                  = "PGDATA"
 	UserSetting                    = "USER" // TODO : do something with it
 	PgPortSetting                  = "PGPORT"
@@ -285,6 +287,8 @@ var (
 		PgpKeySetting:                true,
 		PgpKeyPathSetting:            true,
 		PgpKeyPassphraseSetting:      true,
+		PgpEncryptedKeySetting:       true,
+		PgpEncryptedKeyPathSetting:   true,
 		LibsodiumKeySetting:          true,
 		LibsodiumKeyPathSetting:      true,
 		LibsodiumKeyTransform:        true,
@@ -496,6 +500,7 @@ var (
 		PgPasswordSetting:            true,
 		PgpKeyPassphraseSetting:      true,
 		PgpKeySetting:                true,
+		PgpEncryptedKeySetting:       true,
 		RedisPassword:                true,
 		SQLServerConnectionString:    true,
 		SSHPassword:                  true,

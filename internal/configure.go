@@ -4,25 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/cached"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/crypto/yckms"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	"golang.org/x/time/rate"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
+	enveloperYckms "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/yckms"
+	envelopeOpenpgp "github.com/wal-g/wal-g/internal/crypto/envelope/openpgp"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
+	"github.com/wal-g/wal-g/internal/crypto/yckms"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"golang.org/x/time/rate"
 )
 
 const (
@@ -295,6 +298,12 @@ func ConfigureCrypter() crypto.Crypter {
 	// key can be either private (for download) or public (for upload)
 	if viper.IsSet(PgpKeyPathSetting) {
 		return openpgp.CrypterFromKeyPath(viper.GetString(PgpKeyPathSetting), loadPassphrase)
+	}
+	// TODO: check only one passed: simple or envelope
+	if viper.IsSet(PgpEncryptedKeyPathSetting) && viper.IsSet(YcKmsKeyIDSetting) {
+		yckmsEnveloper := enveloperYckms.YcKmsEnveloperFromKeyIDAndCredential(viper.GetString(YcKmsKeyIDSetting), viper.GetString(YcSaKeyFileSetting))
+		enveloper := cached.EnveloperWithCache(yckmsEnveloper)
+		return envelopeOpenpgp.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper)
 	}
 
 	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
