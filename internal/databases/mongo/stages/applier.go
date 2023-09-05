@@ -83,6 +83,10 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) 
 		defer archiveTimer.Stop()
 		for oplogc != nil {
 			select {
+			case <-ctx.Done():
+				errc <- fmt.Errorf("stop applying oplog: %w", ctx.Err())
+				return
+
 			case op, ok := <-oplogc:
 				if !ok {
 					oplogc = nil
@@ -124,7 +128,7 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) 
 			// or switch to PushStreamToDestination (async api):
 			// we don't know archive name beforehand, so upload stream and rename key (it leads to failures and require gc)
 			// but consumes less memory
-			if err := sa.uploader.UploadOplogArchive(bufReader, batchStartTS, lastKnownTS); err != nil {
+			if err := sa.uploader.UploadOplogArchive(ctx, bufReader, batchStartTS, lastKnownTS); err != nil {
 				errc <- fmt.Errorf("can not upload oplog archive: %w", err)
 				return
 			}

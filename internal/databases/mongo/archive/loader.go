@@ -25,8 +25,10 @@ var (
 )
 
 // Uploader defines interface to store mongodb backups and oplog archives
+//
+//go:generate mockery --dir=./ --name=Uploader --filename=Uploader.go --output=mocks/ --outpkg=archivemocks
 type Uploader interface {
-	UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
+	UploadOplogArchive(ctx context.Context, stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
 	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
 	UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error
 }
@@ -169,7 +171,7 @@ func NewDiscardUploader(compressor compression.Compressor, readerFrom io.ReaderF
 }
 
 // UploadOplogArchive reads all data into memory, stream is compressed and encrypted if required
-func (d *DiscardUploader) UploadOplogArchive(archReader io.Reader, firstTS, lastTS models.Timestamp) error {
+func (d *DiscardUploader) UploadOplogArchive(_ context.Context, archReader io.Reader, firstTS, lastTS models.Timestamp) error {
 	if d.compressor != nil {
 		archReader = internal.CompressAndEncrypt(archReader, d.compressor, internal.ConfigureCrypter())
 	}
@@ -207,7 +209,7 @@ func NewStorageUploader(upl internal.Uploader) *StorageUploader {
 }
 
 // UploadOplogArchive compresses a stream and uploads it with given archive name.
-func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS models.Timestamp) error {
+func (su *StorageUploader) UploadOplogArchive(ctx context.Context, stream io.Reader, firstTS, lastTS models.Timestamp) error {
 	arch, err := models.NewArchive(firstTS, lastTS, su.Compression().FileExtension(), models.ArchiveTypeOplog)
 	if err != nil {
 		return fmt.Errorf("can not build archive: %w", err)
@@ -221,7 +223,7 @@ func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS 
 	}
 
 	// providing io.ReaderAt+io.ReadSeeker to s3 upload enables buffer pool usage
-	return su.Upload(context.Background(), arch.Filename(), bytes.NewReader(su.buf.Bytes()))
+	return su.Upload(ctx, arch.Filename(), bytes.NewReader(su.buf.Bytes()))
 }
 
 // UploadGap uploads mark indicating archiving gap.
