@@ -68,7 +68,7 @@ pg_integration_test:
 	fi
 	@if [ "$(TEST)" == "pg_tests" ]; then\
 		docker-compose build pg_tests;\
-    fi
+	fi
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
 all_unittests: deps unittest
