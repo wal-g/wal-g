@@ -1,15 +1,23 @@
 package copy
 
 import (
+	"io"
 	"sync"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+
+	"github.com/wal-g/wal-g/internal"
 )
+
+type SourceTransformerFunc func(r io.Reader) (io.Reader, error)
 
 type InfoProvider struct {
 	From storage.Folder
-	To   storage.Folder
+
+	SourceTransformer SourceTransformerFunc
+
+	To storage.Folder
 
 	SrcObj     storage.Object
 	targetName string
@@ -60,15 +68,31 @@ func Infos(chs []InfoProvider) error {
 }
 
 func (ch *InfoProvider) copyObject() error {
-	readCloser, err := ch.From.ReadObject(ch.SrcObj.GetName())
+	objReadCloser, err := ch.From.ReadObject(ch.SrcObj.GetName())
 	if err != nil {
 		return err
 	}
 
+	var r io.Reader
+
+	if ch.SourceTransformer != nil {
+		r, err = ch.SourceTransformer(objReadCloser)
+		if err != nil {
+			return err
+		}
+	} else {
+		r = objReadCloser
+	}
+	defer objReadCloser.Close()
+
 	tracelog.DebugLogger.Printf("fetched object %s reader\n", ch.SrcObj.GetName())
 
-	err = ch.To.PutObject(ch.targetName, readCloser)
+	uploader, err := internal.ConfigureUploaderToFolder(ch.To)
 	if err != nil {
+		return err
+	}
+
+	if err := uploader.Upload(ch.targetName, r); err != nil {
 		return err
 	}
 
@@ -85,17 +109,27 @@ var NoopRenameFunc = func(o storage.Object) string {
 	return o.GetName()
 }
 
-func BuildCopyingInfos(from storage.Folder, to storage.Folder, objects []storage.Object,
-	filter func(storage.Object) bool, renameFunc func(object storage.Object) string) (infos []InfoProvider) {
+var NoopSourceTransformer = func(r io.Reader) (io.Reader, error) {
+	return r, nil
+}
+
+func BuildCopyingInfos(
+	from storage.Folder,
+	to storage.Folder,
+	objects []storage.Object,
+	filter func(storage.Object) bool,
+	renameFunc func(object storage.Object) string,
+	sourceTransformer SourceTransformerFunc) (infos []InfoProvider) {
 	tracelog.DebugLogger.Println("processing copy infos filtering")
 
 	for _, object := range objects {
 		if filter(object) {
 			infos = append(infos, InfoProvider{
-				From:       from,
-				To:         to,
-				SrcObj:     object,
-				targetName: renameFunc(object),
+				From:              from,
+				To:                to,
+				SrcObj:            object,
+				targetName:        renameFunc(object),
+				SourceTransformer: sourceTransformer,
 			})
 			tracelog.DebugLogger.Printf("add copy info %s-%s \n", object.GetName(), renameFunc(object))
 		}
