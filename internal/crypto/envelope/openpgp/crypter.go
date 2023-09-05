@@ -49,7 +49,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 		return nil, err
 	}
 
-	// need write header at first, with lenth less than maxHeaderLenAllowed
+	// need write header at first, with length less than maxHeaderLenAllowed
 	bufferedWriter := bufio.NewWriterSize(writer, maxHeaderLenAllowed)
 	header := crypter.enveloper.SerializeEncryptedKey(crypter.encryptedKey)
 
@@ -76,7 +76,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 // Decrypt creates decrypted reader from ordinary reader
 func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 
-	// need read header at first, with lenth less than maxHeaderLenAllowed
+	// need read header at first, with length less than maxHeaderLenAllowed
 	bufferedReader := bufio.NewReaderSize(reader, maxHeaderLenAllowed)
 	encryptedKey, err := crypter.enveloper.GetEncryptedKey(bufferedReader)
 	if err != nil {
