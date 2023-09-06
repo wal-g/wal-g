@@ -3,7 +3,7 @@ package openpgp
 import (
 	"bufio"
 	"bytes"
-	"encoding/hex"
+	"encoding/base64"
 	"io"
 	"os"
 	"strings"
@@ -120,13 +120,18 @@ func (crypter *Crypter) setupEncryptedKey() error {
 
 	switch {
 	case crypter.IsUseArmoredKey:
-		encryptedKey, err := hex.DecodeString(strings.TrimSuffix(crypter.ArmoredKey, "\n"))
+		encryptedKey, err := base64.StdEncoding.DecodeString(crypter.ArmoredKey)
 		if err != nil {
 			return err
 		}
 		crypter.encryptedKey = encryptedKey
 	case crypter.IsUseArmoredKeyPath:
-		encryptedKey, err := os.ReadFile(crypter.ArmoredKeyPath)
+		content, err := os.ReadFile(crypter.ArmoredKeyPath)
+		if err != nil {
+			return err
+		}
+		encryptedKey := make([]byte, base64.StdEncoding.DecodedLen(len(content)))
+		_, err = base64.StdEncoding.Decode(encryptedKey, content)
 		if err != nil {
 			return err
 		}
