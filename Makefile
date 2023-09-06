@@ -15,7 +15,7 @@ TEST := "pg_tests"
 MYSQL_TEST := "mysql_base_tests"
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
-GOLANGCI_LINT_VERSION ?= "v1.37.0"
+GOLANGCI_LINT_VERSION ?= "v1.52.2"
 REDIS_VERSION ?= "5.0.8"
 TOOLS_MOD_DIR := ./internal/tools
 
@@ -45,7 +45,12 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 install_and_build_pg: deps pg_build
 
 pg_build_image:
-	docker-compose build $(DOCKER_COMMON) pg pg_build_docker_prefix
+	# There are dependencies between container images.
+	# Running in one command leads to using outdated images and fails on clean system.
+	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
+	docker-compose build $(DOCKER_COMMON)
+	docker-compose build pg
+	docker-compose build pg_build_docker_prefix
 
 pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
@@ -55,7 +60,7 @@ pg_save_image: install_and_build_pg pg_build_image
 	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
-pg_integration_test:
+pg_integration_test: clean_compose
 	@if [ "x" = "${CACHE_FILE_DOCKER_PREFIX}x" ]; then\
 		echo "Rebuild";\
 		make install_and_build_pg;\
@@ -66,11 +71,26 @@ pg_integration_test:
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker-compose build pg_pgbackrest;\
 	fi
+
 	docker-compose build $(TEST)
 	docker-compose up --exit-code-from $(TEST) $(TEST)
+	# Run tests with dependencies if we run all tests
+	@if [ "$(TEST)" = "pg_tests" ]; then\
+		docker-compose build pg_pgbackrest ssh ;\
+		docker-compose build pg_pgbackrest_backup_fetch_test pg_ssh_backup_test ;\
+		docker-compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test ;\
+		docker-compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test ;\
+	fi
+	make clean_compose
+
+.PHONY: clean_compose
+clean_compose:
+	services=$$(docker-compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -w -f 2); \
+		if [ "$$services" ]; then docker-compose down $$services; fi
 
 all_unittests: deps unittest
 
+# todo Should we remove this target as a duplicate of pg_integration_test?
 pg_int_tests_only:
 	docker-compose build pg_tests
 	docker-compose up --exit-code-from pg_tests pg_tests
@@ -206,6 +226,8 @@ coverage:
 
 install_tools:
 	cd $(TOOLS_MOD_DIR) && go install golang.org/x/tools/cmd/goimports
+	$(warning Please run make docker_lint for lint. It is unreliable to use self-compiled golangci-lint. \
+		https://golangci-lint.run/usage/install/#install-from-source)
 	cd $(TOOLS_MOD_DIR) && go install github.com/golangci/golangci-lint/cmd/golangci-lint
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
@@ -218,8 +240,11 @@ lint: install_tools
 	golangci-lint run --allow-parallel-runners ./...
 
 docker_lint:
-	docker build -t wal-g/lint - < docker/lint/Dockerfile
-	docker run --rm -v `pwd`:/app wal-g/lint golangci-lint run -v
+	docker build -t wal-g/lint --build-arg TAG=$(GOLANGCI_LINT_VERSION) - < docker/lint/Dockerfile
+	docker run --rm -v `pwd`:/app \
+		-v wal-g_lint_cache:/cache -e GOLANGCI_LINT_CACHE=/cache/lint \
+		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod \
+		wal-g/lint golangci-lint run -v
 
 deps: go_deps link_external_deps
 

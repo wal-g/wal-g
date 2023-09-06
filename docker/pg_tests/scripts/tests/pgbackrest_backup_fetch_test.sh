@@ -24,7 +24,7 @@ mkdir -m 770 /tmp/pgbackrest-backups
 pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups stanza-create
 
 pgbench -i -s 5 postgres
-pgbench -c 2 -T 1000 &
+pgbench -c 2 -T 60 &
 pgbench_pid=$!
 
 sleep 1
