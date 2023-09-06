@@ -27,7 +27,7 @@ var (
 			if detail {
 				greenplum.HandleDetailedBackupList(folder, pretty, jsonOutput)
 			} else {
-				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+				internal.HandleDefaultBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
 			}
 		},
 	}
