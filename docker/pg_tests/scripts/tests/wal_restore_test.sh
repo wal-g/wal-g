@@ -1,4 +1,6 @@
 #!/bin/sh
+echo '\e[0;31m This test require some memory available to docker! \e[0m'
+echo 'It runs smooth on Colima with \e[0;31m 2 CPU / 8 GB Mem \e[0m and fails on 4 GB Mem.'
 set -e -x
 
 PGDATA="/var/lib/postgresql/10/main"
@@ -103,3 +105,4 @@ sleep 10
 /usr/lib/postgresql/10/bin/pg_rewind -D ${PGDATA_ALPHA} --source-pgdata=${PGDATA_BETA}
 
 /tmp/scripts/drop_pg.sh
+rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA}

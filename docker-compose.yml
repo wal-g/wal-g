@@ -154,14 +154,6 @@ services:
     image: wal-g/pg
     container_name: wal-g_pg
 
-  pg_tests:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile
-      context: .
-    image: wal-g/pg_tests
-    container_name: wal-g_pg_tests
-    <<: *s3_common_depends
-
   pg_build_docker_prefix:
     build:
       dockerfile: docker/pg_tests/Dockerfile_prefix
@@ -174,6 +166,11 @@ services:
     image: wal-g/docker_prefix
     user: postgres
     <<: *s3_common_depends
+
+  pg_tests:
+    <<: *pg_test_common
+    container_name: wal-g_pg_tests
+    command: /tmp/run_integration_tests.sh
 
   pg_ready_rename_test:
     <<: *pg_test_common

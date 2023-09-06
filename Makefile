@@ -71,13 +71,15 @@ pg_integration_test: clean_compose
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker-compose build pg_pgbackrest;\
 	fi
+	@if echo "$(TEST)" | grep -Fqe "pg_ssh_"; then\
+		docker-compose build ssh;\
+	fi
 
-	docker-compose build pg_tests
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
 	@if [ "$(TEST)" = "pg_tests" ]; then\
-		docker-compose build pg_pgbackrest ssh ;\
-		docker-compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test ;\
+		docker-compose build pg_pgbackrest ssh &&\
+		docker-compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
 		docker-compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test ;\
 	fi
 	make clean_compose
