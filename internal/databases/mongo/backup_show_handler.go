@@ -1,9 +1,9 @@
 package mongo
 
 import (
+	"encoding/json"
 	"io"
 
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -15,5 +15,9 @@ func HandleBackupShow(backupFolder storage.Folder, backupName string, output io.
 		return err
 	}
 
-	return internal.WriteAsJSON(sentinel, output, pretty)
+	encoder := json.NewEncoder(output)
+	if pretty {
+		encoder.SetIndent("", "    ")
+	}
+	return encoder.Encode(sentinel)
 }

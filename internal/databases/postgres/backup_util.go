@@ -28,7 +28,7 @@ func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]
 }
 
 func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (BackupDetail, error) {
-	backup, err := NewBackup(folder, backupTime.BackupName)
+	backup, err := NewBackupInStorage(folder, backupTime.BackupName, backupTime.StorageName)
 	if err != nil {
 		return BackupDetail{}, err
 	}

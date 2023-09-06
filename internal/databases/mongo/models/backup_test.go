@@ -2,8 +2,10 @@ package models
 
 import (
 	"testing"
+	"time"
 
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/printlist"
 )
 
 func TestTimestampInInterval(t *testing.T) {
@@ -315,4 +317,97 @@ func TestFirstOverlappingBackupForArch(t *testing.T) {
 			assert.Equal(t, got, tt.want)
 		})
 	}
+}
+
+func TestBackup_PrintableFields(t *testing.T) {
+	b := Backup{
+		BackupName:      "my first backup",
+		BackupType:      "type1",
+		StartLocalTime:  time.Unix(1692811111, 0).UTC(),
+		FinishLocalTime: time.Unix(1692822222, 0).UTC(),
+		Hostname:        "my-favourite-host",
+		MongoMeta: MongoMeta{
+			Version: "123",
+			Before:  NodeMeta{LastMajTS: Timestamp{TS: 800}},
+			After:   NodeMeta{LastMajTS: Timestamp{TS: 900}},
+		},
+		UncompressedSize: 200000,
+		CompressedSize:   100000,
+		Permanent:        true,
+		UserData:         []string{"a", "b", "c"},
+	}
+	got := b.PrintableFields()
+	want := []printlist.TableField{
+		{
+			Name:        "name",
+			PrettyName:  "Name",
+			Value:       "my first backup",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "type",
+			PrettyName:  "Type",
+			Value:       "type1",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "version",
+			PrettyName:  "Version",
+			Value:       "123",
+			PrettyValue: nil,
+		},
+		{
+			Name:       "start_time",
+			PrettyName: "Start time",
+			Value:      "2023-08-23T17:18:31Z",
+		},
+		{
+			Name:       "finish_time",
+			PrettyName: "Finish time",
+			Value:      "2023-08-23T20:23:42Z",
+		},
+		{
+			Name:        "hostname",
+			PrettyName:  "Hostname",
+			Value:       "my-favourite-host",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "start_ts",
+			PrettyName:  "Start Ts",
+			Value:       "{800 0}",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "end_ts",
+			PrettyName:  "End Ts",
+			Value:       "{900 0}",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "uncompressed_size",
+			PrettyName:  "Uncompressed size",
+			Value:       "200000",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "compressed_size",
+			PrettyName:  "Compressed size",
+			Value:       "100000",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "permanent",
+			PrettyName:  "Permanent",
+			Value:       "true",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "user_data",
+			PrettyName:  "User data",
+			Value:       "[\"a\",\"b\",\"c\"]",
+			PrettyValue: nil,
+		},
+	}
+	assert.Equal(t, want, got)
 }
