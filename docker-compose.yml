@@ -196,6 +196,17 @@ services:
       - "OS_PASSWORD=testing"
       - "OS_AUTH_URL=http://swift:8080/auth/v1.0"
 
+  pg_storage_ssh_test:
+    image: wal-g/docker_prefix
+    container_name: wal-g_pg_storage_ssh_test
+    command: /tmp/test_bins/sh.test -test.v
+    depends_on:
+      - ssh
+    links:
+      - ssh
+    environment:
+      - "PG_TEST_STORAGE=ssh"
+
   pg_ready_rename_test:
     <<: *pg_test_common
     container_name: archiving_ready_rename_test

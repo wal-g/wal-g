@@ -99,6 +99,7 @@ jobs:
                    'make TEST="pg_several_delta_backups_test" pg_integration_test',
                    'make TEST="pg_several_delta_backups_reverse_test" pg_integration_test',
                    'make TEST="pg_storage_swift_test" pg_integration_test',
+                   'make TEST="pg_storage_ssh_test" pg_integration_test',
                    'make TEST="pg_delete_retain_find_full_test" pg_integration_test',
                    'make TEST="pg_wale_compatibility_test" pg_integration_test',
                    'make TEST="pg_delete_before_permanent_full_test" pg_integration_test',
