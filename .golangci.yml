@@ -83,7 +83,7 @@ linters:
 run:
   go: "1.20"
   timeout: 5m
-  modules-download-mode: vendor
+  modules-download-mode: readonly
   skip-dirs:
     - "tests_func"
     - "tmp"
