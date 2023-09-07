@@ -222,6 +222,7 @@ var (
 		LibsodiumKeyTransform:          "none",
 		PgFailoverStoragesCheckTimeout: "30s",
 		PgFailoverStorageCacheLifetime: "15m",
+		PgpEncryptedCacheExpiration:    "0",
 	}
 
 	MongoDefaultSettings = map[string]string{

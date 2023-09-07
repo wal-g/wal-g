@@ -373,7 +373,7 @@ func configureEncryptedPgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	if err != nil {
 		return nil, err
 	}
-	expiration, err := GetDurationSettingDefault(PgpEncryptedCacheExpiration, 0)
+	expiration, err := GetDurationSetting(PgpEncryptedCacheExpiration)
 	if err != nil {
 		return nil, err
 	}
@@ -493,18 +493,6 @@ func GetDurationSetting(setting string) (time.Duration, error) {
 	intervalStr, ok := GetSetting(setting)
 	if !ok {
 		return 0, NewUnsetRequiredSettingError(setting)
-	}
-	interval, err := time.ParseDuration(intervalStr)
-	if err != nil {
-		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
-	}
-	return interval, nil
-}
-
-func GetDurationSettingDefault(setting string, def time.Duration) (time.Duration, error) {
-	intervalStr, ok := GetSetting(setting)
-	if !ok {
-		return def, nil
 	}
 	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {
