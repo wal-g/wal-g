@@ -28,11 +28,7 @@ func (enveloper *Enveloper) Name() string {
 }
 
 func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
-	encryptedKey, err := readEncryptedKey(r)
-	if err != nil {
-		return nil, err
-	}
-	return encryptedKey, nil
+	return readEncryptedKey(r)
 }
 
 func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {

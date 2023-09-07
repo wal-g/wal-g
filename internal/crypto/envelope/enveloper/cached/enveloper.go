@@ -13,11 +13,11 @@ import (
 
 type Item struct {
 	Object    []byte
-	ExpiredAt int64
+	ExpiredAt time.Time
 }
 
 func (item *Item) isFresh() bool {
-	return item.ExpiredAt == 0 || item.ExpiredAt > time.Now().UnixNano()
+	return item.ExpiredAt == time.Time{} || item.ExpiredAt.After(time.Now())
 }
 
 type Enveloper struct {
@@ -62,9 +62,9 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	enveloper.locker.Lock()
 	defer enveloper.locker.Unlock()
 
-	var expiredAt int64
+	var expiredAt time.Time
 	if enveloper.expiration > 0 {
-		expiredAt = time.Now().Add(enveloper.expiration).UnixNano()
+		expiredAt = time.Now().Add(enveloper.expiration)
 	}
 	enveloper.items[key] = Item{
 		Object:    decryptedKey,

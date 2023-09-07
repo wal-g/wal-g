@@ -311,8 +311,8 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, err
 	pgpKeyPath := config.IsSet(PgpKeyPathSetting)
 	legacyGpg := config.IsSet(GpgKeyIDSetting)
 
-	encryptedPgpKey := config.IsSet(PgpEncryptedKeyPathSetting)
-	encryptedPgpKeyPath := config.IsSet(PgpEncryptedKeySetting)
+	encryptedPgpKey := config.IsSet(PgpEnvelopKeyPathSetting)
+	encryptedPgpKeyPath := config.IsSet(PgpEnvelopeKeySetting)
 
 	libsodiumKey := config.IsSet(LibsodiumKeySetting)
 	libsodiumKeyPath := config.IsSet(LibsodiumKeySetting)
@@ -329,7 +329,7 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, err
 	case isPgpKey:
 		return configurePgpCrypter(config)
 	case isEncryptedPgpKey:
-		return configureEncryptedPgpCrypter(config)
+		return configureEnvelopePgpCrypter(config)
 	case config.IsSet(CseKmsIDSetting):
 		return awskms.CrypterFromKeyID(config.GetString(CseKmsIDSetting), config.GetString(CseKmsRegionSetting)), nil
 	case config.IsSet(YcKmsKeyIDSetting):
@@ -362,30 +362,30 @@ func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	return nil, errors.New("there is no any supported gpg crypter configuration")
 }
 
-func configureEncryptedPgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
-	if !config.IsSet(PgpEncryptedYcKmsKeyIDSetting) {
+func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
+	if !config.IsSet(PgpEnvelopeYcKmsKeyIDSetting) {
 		return nil, errors.New("yandex cloud KMS key for client-side encryption and decryption must be configured")
 	}
 
 	yckmsEnveloper, err := yckmsenvlpr.EnveloperFromKeyIDAndCredential(
-		config.GetString(PgpEncryptedYcKmsKeyIDSetting), config.GetString(PgpEncryptedYcSaKeyFileSetting),
+		config.GetString(PgpEnvelopeYcKmsKeyIDSetting), config.GetString(PgpEnvelopeYcSaKeyFileSetting),
 	)
 	if err != nil {
 		return nil, err
 	}
-	expiration, err := GetDurationSetting(PgpEncryptedCacheExpiration)
+	expiration, err := GetDurationSetting(PgpEnvelopeCacheExpiration)
 	if err != nil {
 		return nil, err
 	}
 	enveloper := cachenvlpr.EnveloperWithCache(yckmsEnveloper, expiration)
 
-	if config.IsSet(PgpEncryptedKeyPathSetting) {
-		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper), nil
+	if config.IsSet(PgpEnvelopKeyPathSetting) {
+		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEnvelopKeyPathSetting), enveloper), nil
 	}
-	if config.IsSet(PgpEncryptedKeySetting) {
-		return envopenpgp.CrypterFromKey(viper.GetString(PgpEncryptedKeySetting), enveloper), nil
+	if config.IsSet(PgpEnvelopeKeySetting) {
+		return envopenpgp.CrypterFromKey(viper.GetString(PgpEnvelopeKeySetting), enveloper), nil
 	}
-	return nil, errors.New("there is no any supported encrypted gpg crypter configuration")
+	return nil, errors.New("there is no any supported envelope gpg crypter configuration")
 }
 
 func GetMaxDownloadConcurrency() (int, error) {
