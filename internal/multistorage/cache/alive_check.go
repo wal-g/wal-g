@@ -59,11 +59,23 @@ func checkForAlive(timeout time.Duration, size uint, storages ...NamedFolder) ma
 func checkStorage(ctx context.Context, size uint, folder NamedFolder) error {
 	errCh := make(chan error, 1)
 	// todo simplify code using PutObjectWithContext after merge https://github.com/wal-g/wal-g/pull/1546
+	// todo what about ListFolderWithContext?
 	go func() {
-		r := rand.New(rand.NewSource(1))
-		lr := io.LimitReader(r, int64(size))
-		err := folder.PutObject(checkObjectName, lr)
-		errCh <- err
+		_, _, err := folder.ListFolder()
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if size > 0 {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			lr := io.LimitReader(r, int64(size))
+			err = folder.PutObject(checkObjectName, lr)
+			if err != nil {
+				errCh <- err
+				return
+			}
+		}
+		errCh <- nil
 	}()
 
 	select {
