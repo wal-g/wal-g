@@ -189,7 +189,6 @@ func (b *BgUploader) processFiles(fileChan <-chan string) {
 		b.started[name] = struct{}{}
 		if err := b.workerCountSem.Acquire(b.ctx, 1); err == nil {
 			go func() {
-				// todo Should it use b.ctx? It will interrupt last file upload and change behavior.
 				uploadedFile := b.upload(context.Background(), name)
 				b.workerCountSem.Release(1)
 				if uploadedFile {
