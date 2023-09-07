@@ -36,7 +36,7 @@ var backupListCmd = &cobra.Command{
 			err := mongo.HandleDetailedBackupList(backupFolder, os.Stdout, prettyPrint, jsonFormat)
 			tracelog.ErrorLogger.FatalOnError(err)
 		} else {
-			internal.DefaultHandleBackupList(backupFolder, prettyPrint, jsonFormat)
+			internal.HandleDefaultBackupList(backupFolder, prettyPrint, jsonFormat)
 		}
 	},
 }

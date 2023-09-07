@@ -19,6 +19,7 @@ type Folder struct {
 }
 
 func NewFolder(path string, storage *Storage) *Folder {
+	path = strings.TrimPrefix(path, "/")
 	return &Folder{path, storage}
 }
 

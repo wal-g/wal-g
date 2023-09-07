@@ -7,8 +7,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
@@ -32,7 +33,11 @@ func TestBackupListCorrectDetailedJsonOutput(t *testing.T) {
 
 	var actual []greenplum.BackupDetail
 	buf := new(bytes.Buffer)
-	err = internal.WriteAsJSON(details, buf, false)
+	printableEntities := make([]printlist.Entity, len(details))
+	for i := range details {
+		printableEntities[i] = &details[i]
+	}
+	err = printlist.List(printableEntities, buf, false, true)
 	assert.NoError(t, err)
 
 	err = json.Unmarshal(buf.Bytes(), &actual)
@@ -78,7 +83,8 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
         "increment_full_name": "backup_20221212T151258Z",
         "increment_count": 1
     }
-]`
+]
+`
 
 	folder := CreateMockStorageFolder(t)
 
@@ -88,9 +94,13 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	details := greenplum.MakeBackupDetails(backups)
 
 	buf := new(bytes.Buffer)
-	err = internal.WriteAsJSON(details, buf, true)
+	printableEntities := make([]printlist.Entity, len(details))
+	for i := range backups {
+		printableEntities[i] = &details[i]
+	}
+	err = printlist.List(printableEntities, buf, true, true)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedString, buf.String())
+	require.Equal(t, expectedString, buf.String())
 
 	var unmarshaledDetails []greenplum.BackupDetail
 	err = json.Unmarshal(buf.Bytes(), &unmarshaledDetails)

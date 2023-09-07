@@ -1,3 +1,4 @@
+#!/bin/bash
 set -e -x
 CONFIG_FILE="/tmp/configs/pgbackrest_backup_fetch_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
