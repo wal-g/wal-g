@@ -23,11 +23,11 @@ type Enveloper struct {
 	sdk   *ycsdk.SDK
 }
 
-func (enveloper *Enveloper) GetName() string {
+func (enveloper *Enveloper) Name() string {
 	return "yckms"
 }
 
-func (enveloper *Enveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
+func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
 	encryptedKey, err := readEncryptedKey(r)
 	if err != nil {
 		return nil, err
@@ -102,21 +102,20 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 }
 
 func EnveloperFromKeyIDAndCredential(keyID string, saFilePath string) (envelope.Enveloper, error) {
-	var err error
-	authorizedKey, err := iamkey.ReadFromJSONFile(saFilePath)
-	if err != nil {
-		return nil, errors.Wrap(err, "Can't initialize yc sdk")
+	var authorizedKey, authErr = iamkey.ReadFromJSONFile(saFilePath)
+	if authErr != nil {
+		return nil, errors.Wrap(authErr, "Can't initialize yc sdk")
 	}
-	credentials, err := ycsdk.ServiceAccountKey(authorizedKey)
-	if err != nil {
-		return nil, errors.Wrap(err, "Can't initialize yc sdk")
+	var credentials, credErr = ycsdk.ServiceAccountKey(authorizedKey)
+	if credErr != nil {
+		return nil, errors.Wrap(credErr, "Can't initialize yc sdk")
 	}
 
-	sdk, err := ycsdk.Build(context.Background(), ycsdk.Config{
+	var sdk, sdkErr = ycsdk.Build(context.Background(), ycsdk.Config{
 		Credentials: credentials,
 	})
-	if err != nil {
-		return nil, errors.Wrap(err, "Can't initialize yc sdk")
+	if sdkErr != nil {
+		return nil, errors.Wrap(sdkErr, "Can't initialize yc sdk")
 	}
 	return &Enveloper{
 		keyID: keyID,

@@ -37,7 +37,7 @@ type Crypter struct {
 }
 
 func (crypter *Crypter) Name() string {
-	parts := []string{"Enveloped", crypter.enveloper.GetName(), "Opengpg", "Crypter"}
+	parts := []string{"Enveloped", crypter.enveloper.Name(), "Opengpg", "Crypter"}
 	return strings.Join(parts, "/")
 }
 
@@ -81,7 +81,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	// need read header at first, with length less than maxHeaderLenAllowed
 	bufferedReader := bufio.NewReaderSize(reader, maxHeaderLenAllowed)
-	encryptedKey, err := crypter.enveloper.GetEncryptedKey(bufferedReader)
+	encryptedKey, err := crypter.enveloper.ReadEncryptedKey(bufferedReader)
 	if err != nil {
 		return nil, err
 	}

@@ -29,13 +29,13 @@ type Enveloper struct {
 
 func createKey(s []byte) string { return fmt.Sprintf("%x", sha1.Sum(s)) }
 
-func (enveloper *Enveloper) GetName() string {
-	return enveloper.wrapped.GetName()
+func (enveloper *Enveloper) Name() string {
+	return enveloper.wrapped.Name()
 }
 
-func (enveloper *Enveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
+func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
 	tracelog.DebugLogger.Println("Exctract encrypted key")
-	return enveloper.wrapped.GetEncryptedKey(r)
+	return enveloper.wrapped.ReadEncryptedKey(r)
 }
 
 func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {

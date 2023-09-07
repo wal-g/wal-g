@@ -25,8 +25,8 @@ func MockedEnveloper(t *testing.T) *mocks.Enveloper {
 		panic(err)
 	}
 	enveloper := mocks.NewEnveloper(t)
-	enveloper.EXPECT().GetName().Return("mocked").Maybe()
-	enveloper.EXPECT().GetEncryptedKey(mock.Anything).Return([]byte(""), nil).Maybe()
+	enveloper.EXPECT().Name().Return("mocked").Maybe()
+	enveloper.EXPECT().ReadEncryptedKey(mock.Anything).Return([]byte(""), nil).Maybe()
 	enveloper.EXPECT().DecryptKey(mock.Anything).Return(key, nil).Maybe()
 	enveloper.EXPECT().SerializeEncryptedKey(mock.Anything).Return([]byte("")).Maybe()
 	return enveloper

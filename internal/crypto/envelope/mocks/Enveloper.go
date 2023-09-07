@@ -75,8 +75,49 @@ func (_c *Enveloper_DecryptKey_Call) RunAndReturn(run func([]byte) ([]byte, erro
 	return _c
 }
 
-// GetEncryptedKey provides a mock function with given fields: r
-func (_m *Enveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
+// Name provides a mock function with given fields:
+func (_m *Enveloper) Name() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// Enveloper_Name_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Name'
+type Enveloper_Name_Call struct {
+	*mock.Call
+}
+
+// Name is a helper method to define mock.On call
+func (_e *Enveloper_Expecter) Name() *Enveloper_Name_Call {
+	return &Enveloper_Name_Call{Call: _e.mock.On("Name")}
+}
+
+func (_c *Enveloper_Name_Call) Run(run func()) *Enveloper_Name_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *Enveloper_Name_Call) Return(_a0 string) *Enveloper_Name_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Enveloper_Name_Call) RunAndReturn(run func() string) *Enveloper_Name_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ReadEncryptedKey provides a mock function with given fields: r
+func (_m *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
 	ret := _m.Called(r)
 
 	var r0 []byte
@@ -101,71 +142,30 @@ func (_m *Enveloper) GetEncryptedKey(r io.Reader) ([]byte, error) {
 	return r0, r1
 }
 
-// Enveloper_GetEncryptedKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEncryptedKey'
-type Enveloper_GetEncryptedKey_Call struct {
+// Enveloper_ReadEncryptedKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ReadEncryptedKey'
+type Enveloper_ReadEncryptedKey_Call struct {
 	*mock.Call
 }
 
-// GetEncryptedKey is a helper method to define mock.On call
+// ReadEncryptedKey is a helper method to define mock.On call
 //   - r io.Reader
-func (_e *Enveloper_Expecter) GetEncryptedKey(r interface{}) *Enveloper_GetEncryptedKey_Call {
-	return &Enveloper_GetEncryptedKey_Call{Call: _e.mock.On("GetEncryptedKey", r)}
+func (_e *Enveloper_Expecter) ReadEncryptedKey(r interface{}) *Enveloper_ReadEncryptedKey_Call {
+	return &Enveloper_ReadEncryptedKey_Call{Call: _e.mock.On("ReadEncryptedKey", r)}
 }
 
-func (_c *Enveloper_GetEncryptedKey_Call) Run(run func(r io.Reader)) *Enveloper_GetEncryptedKey_Call {
+func (_c *Enveloper_ReadEncryptedKey_Call) Run(run func(r io.Reader)) *Enveloper_ReadEncryptedKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(io.Reader))
 	})
 	return _c
 }
 
-func (_c *Enveloper_GetEncryptedKey_Call) Return(_a0 []byte, _a1 error) *Enveloper_GetEncryptedKey_Call {
+func (_c *Enveloper_ReadEncryptedKey_Call) Return(_a0 []byte, _a1 error) *Enveloper_ReadEncryptedKey_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *Enveloper_GetEncryptedKey_Call) RunAndReturn(run func(io.Reader) ([]byte, error)) *Enveloper_GetEncryptedKey_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetName provides a mock function with given fields:
-func (_m *Enveloper) GetName() string {
-	ret := _m.Called()
-
-	var r0 string
-	if rf, ok := ret.Get(0).(func() string); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-
-	return r0
-}
-
-// Enveloper_GetName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetName'
-type Enveloper_GetName_Call struct {
-	*mock.Call
-}
-
-// GetName is a helper method to define mock.On call
-func (_e *Enveloper_Expecter) GetName() *Enveloper_GetName_Call {
-	return &Enveloper_GetName_Call{Call: _e.mock.On("GetName")}
-}
-
-func (_c *Enveloper_GetName_Call) Run(run func()) *Enveloper_GetName_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *Enveloper_GetName_Call) Return(_a0 string) *Enveloper_GetName_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *Enveloper_GetName_Call) RunAndReturn(run func() string) *Enveloper_GetName_Call {
+func (_c *Enveloper_ReadEncryptedKey_Call) RunAndReturn(run func(io.Reader) ([]byte, error)) *Enveloper_ReadEncryptedKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
