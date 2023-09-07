@@ -3,15 +3,14 @@ package yckms
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"io"
 
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/crypto/envelope"
-
+	"github.com/pkg/errors"
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/kms/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
+
+	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 
 const (
@@ -102,18 +101,25 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 	return encryptedKey, nil
 }
 
-func EnveloperFromKeyIDAndCredential(keyID string, saFilePath string) envelope.Enveloper {
+func EnveloperFromKeyIDAndCredential(keyID string, saFilePath string) (envelope.Enveloper, error) {
+	var err error
 	authorizedKey, err := iamkey.ReadFromJSONFile(saFilePath)
-	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't initialize yc sdk")
+	}
 	credentials, err := ycsdk.ServiceAccountKey(authorizedKey)
-	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't initialize yc sdk")
+	}
 
 	sdk, err := ycsdk.Build(context.Background(), ycsdk.Config{
 		Credentials: credentials,
 	})
-	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
+	if err != nil {
+		return nil, errors.Wrap(err, "Can't initialize yc sdk")
+	}
 	return &Enveloper{
 		keyID: keyID,
 		sdk:   sdk,
-	}
+	}, nil
 }

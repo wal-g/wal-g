@@ -15,19 +15,20 @@ package internal
 // If there is a tag, we can configure the correct implementation of crypter.
 
 import (
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/crypto"
 )
 
-func configureLibsodiumCrypter() crypto.Crypter {
-	if viper.IsSet(LibsodiumKeySetting) {
-		tracelog.ErrorLogger.Fatalf("non-empty WALG_LIBSODIUM_KEY but wal-g was not compiled with libsodium")
+func configureLibsodiumCrypter(config *viper.Viper) (crypto.Crypter, error) {
+	if config.IsSet(LibsodiumKeySetting) {
+		return nil, errors.New("non-empty WALG_LIBSODIUM_KEY but wal-g was not compiled with libsodium")
 	}
 
-	if viper.IsSet(LibsodiumKeyPathSetting) {
-		tracelog.ErrorLogger.Fatalf("non-empty WALG_LIBSODIUM_KEY_PATH but wal-g was not compiled with libsodium")
+	if config.IsSet(LibsodiumKeyPathSetting) {
+		return nil, errors.New("non-empty WALG_LIBSODIUM_KEY_PATH but wal-g was not compiled with libsodium")
 	}
 
-	return nil
+	return nil, errors.New("there are no any supported libsodium crypter configuration")
 }

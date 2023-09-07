@@ -284,7 +284,11 @@ func ConfigureSplitUploader() (Uploader, error) {
 }
 
 func ConfigureCrypter() crypto.Crypter {
-	return ConfigureCrypterForSpecificConfig(viper.GetViper())
+	crypter, err := ConfigureCrypterForSpecificConfig(viper.GetViper())
+	if err != nil {
+		tracelog.ErrorLogger.FatalfOnError("can't configure crypter: %v", err)
+	}
+	return crypter
 }
 
 func CrypterFromConfig(configFile string) crypto.Crypter {
@@ -293,93 +297,95 @@ func CrypterFromConfig(configFile string) crypto.Crypter {
 	ReadConfigFromFile(config, configFile)
 	CheckAllowedSettings(config)
 
-	return ConfigureCrypterForSpecificConfig(config)
+	crypter, err := ConfigureCrypterForSpecificConfig(config)
+	if err != nil {
+		tracelog.ErrorLogger.FatalfOnError("can't configure crypter: %v", err)
+	}
+	return crypter
 }
 
 // ConfigureCrypter uses environment variables to create and configure a crypter.
-// In case no configuration in environment variables found, return `<nil>` value.
-func ConfigureCrypterForSpecificConfig(config *viper.Viper) crypto.Crypter {
-	var crypter crypto.Crypter
+// In case no configuration in environment variables found, return `<nil>` crypter.
+func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, error) {
 	pgpKey := config.IsSet(PgpKeySetting)
 	pgpKeyPath := config.IsSet(PgpKeyPathSetting)
 	legacyGpg := config.IsSet(GpgKeyIDSetting)
+
 	encryptedPgpKey := config.IsSet(PgpEncryptedKeyPathSetting)
 	encryptedPgpKeyPath := config.IsSet(PgpEncryptedKeySetting)
 
+	libsodiumKey := config.IsSet(LibsodiumKeySetting)
+	libsodiumKeyPath := config.IsSet(LibsodiumKeySetting)
+
 	isPgpKey := pgpKey || pgpKeyPath || legacyGpg
 	isEncryptedPgpKey := encryptedPgpKey || encryptedPgpKeyPath
+	isLibsodium := libsodiumKey || libsodiumKeyPath
 
 	if isPgpKey && isEncryptedPgpKey {
-		tracelog.ErrorLogger.Fatalf("There is no way to configure plain gpg and encrypted gpg at the same time, please choose one")
+		return nil, errors.New("there is no way to configure plain gpg and encrypted gpg at the same time, please choose one")
 	}
 
-	if isPgpKey {
-		if crypter = configurePgpCrypter(config); crypter != nil {
-			return crypter
-		}
+	switch {
+	case isPgpKey:
+		return configurePgpCrypter(config)
+	case isEncryptedPgpKey:
+		return configureEncryptedPgpCrypter(config)
+	case config.IsSet(CseKmsIDSetting):
+		return awskms.CrypterFromKeyID(config.GetString(CseKmsIDSetting), config.GetString(CseKmsRegionSetting)), nil
+	case config.IsSet(YcKmsKeyIDSetting):
+		return yckms.YcCrypterFromKeyIDAndCredential(config.GetString(YcKmsKeyIDSetting), config.GetString(YcSaKeyFileSetting)), nil
+	case isLibsodium:
+		return configureLibsodiumCrypter(config)
+	default:
+		return nil, nil
 	}
-
-	if isEncryptedPgpKey {
-		if crypter = configureEncryptedPgpCrypter(config); crypter != nil {
-			return crypter
-		}
-	}
-
-	if config.IsSet(CseKmsIDSetting) {
-		return awskms.CrypterFromKeyID(config.GetString(CseKmsIDSetting), config.GetString(CseKmsRegionSetting))
-	}
-
-	if config.IsSet(YcKmsKeyIDSetting) {
-		return yckms.YcCrypterFromKeyIDAndCredential(config.GetString(YcKmsKeyIDSetting), config.GetString(YcSaKeyFileSetting))
-	}
-
-	if crypter = configureLibsodiumCrypter(); crypter != nil {
-		return crypter
-	}
-
-	return nil
 }
 
-func configurePgpCrypter(config *viper.Viper) crypto.Crypter {
+func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	loadPassphrase := func() (string, bool) {
 		return GetSetting(PgpKeyPassphraseSetting)
 	}
 	// key can be either private (for download) or public (for upload)
 	if config.IsSet(PgpKeySetting) {
-		return openpgp.CrypterFromKey(config.GetString(PgpKeySetting), loadPassphrase)
+		return openpgp.CrypterFromKey(config.GetString(PgpKeySetting), loadPassphrase), nil
 	}
 
 	// key can be either private (for download) or public (for upload)
 	if config.IsSet(PgpKeyPathSetting) {
-		return openpgp.CrypterFromKeyPath(config.GetString(PgpKeyPathSetting), loadPassphrase)
+		return openpgp.CrypterFromKeyPath(config.GetString(PgpKeyPathSetting), loadPassphrase), nil
 	}
 
 	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
-		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase)
+		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase), nil
 	}
-	return nil
+	return nil, errors.New("there are no any supported gpg crypter configuration")
 }
 
-func configureEncryptedPgpCrypter(config *viper.Viper) crypto.Crypter {
+func configureEncryptedPgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	if !config.IsSet(YcKmsKeyIDSetting) {
-		tracelog.ErrorLogger.Fatalf("Yandex Cloud KMS key for client-side encryption and decryption must be configured")
+		return nil, errors.New("yandex Cloud KMS key for client-side encryption and decryption must be configured")
 	}
 
-	yckmsEnveloper := yckmsenvlpr.EnveloperFromKeyIDAndCredential(
+	yckmsEnveloper, err := yckmsenvlpr.EnveloperFromKeyIDAndCredential(
 		config.GetString(YcKmsKeyIDSetting), config.GetString(YcSaKeyFileSetting),
 	)
+	if err != nil {
+		return nil, err
+	}
 	expiration, err := GetDurationSettingDefault(PgpEncryptedCacheExpiration, 0)
-	tracelog.ErrorLogger.FatalfOnError("Can't initialize cached enveloper: %v", err)
+	if err != nil {
+		return nil, err
+	}
 	enveloper := cachenvlpr.EnveloperWithCache(yckmsEnveloper, expiration)
 
 	if config.IsSet(PgpEncryptedKeyPathSetting) {
-		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper)
+		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEncryptedKeyPathSetting), enveloper), nil
 	}
 	if config.IsSet(PgpEncryptedKeySetting) {
-		return envopenpgp.CrypterFromKey(viper.GetString(PgpEncryptedKeySetting), enveloper)
+		return envopenpgp.CrypterFromKey(viper.GetString(PgpEncryptedKeySetting), enveloper), nil
 	}
-	return nil
+	return nil, errors.New("there are no any supported encrypted gpg crypter configuration")
 }
 
 func GetMaxDownloadConcurrency() (int, error) {
