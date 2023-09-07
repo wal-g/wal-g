@@ -113,6 +113,33 @@ Similar to `WALG_PGP_KEY`, but value is the path to the key on file system.
 
 If your *private key* is encrypted with a *passphrase*, you should set *passphrase* for decrypt.
 
+* `WALG_ENVELOPE_PGP_KEY`
+To configure encryption and decryption with the envelope PGP key stored in key management system.
+This option allows you to securely manage your PGP keys by storing them in the KMS.
+It is crucial to ensure that the key passed is encrypted using kms and encoded with *base64*.
+Also both *private* and *publlic* parts should be presents in key because envelope key will be injected in metadata and used later in `wal/backup-fetch`.
+
+Please note that currently, only Yandex Cloud Key Management Service (KMS) is supported for configuring.
+Ensure that you have set up and configured Yandex Cloud KMS mentioned below before attempting to use this feature.
+
+* `WALG_ENVELOPE_CACHE_EXPIRATION`
+
+This setting controls kms response expiration. Default value is `0` to store keys permanent in memory.
+Please note that if the system will not be able to redecrypt the key in kms after expiration, the previous response will be used.
+
+* `WALG_ENVELOPE_PGP_YC_CSE_KMS_KEY_ID`
+
+Similar to `YC_CSE_KMS_KEY_ID`, but only used for envelope pgp keys.
+
+* `WALG_ENVELOPE_PGP_YC_SERVICE_ACCOUNT_KEY_FILE`
+
+Similar to `YC_SERVICE_ACCOUNT_KEY_FILE`, but only used for envelope pgp keys.
+
+* `WALG_ENVELOPE_PGP_KEY_PATH`
+
+Similar to `WALG_ENVELOPE_PGP_KEY`, but value is the path to the key on file system.
+
+
 ### Monitoring
 
 * `WALG_STATSD_ADDRESS`
