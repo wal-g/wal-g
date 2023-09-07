@@ -17,7 +17,7 @@ type Item struct {
 }
 
 func (item *Item) isFresh() bool {
-	return item.ExpiredAt == time.Time{} || item.ExpiredAt.After(time.Now())
+	return item.ExpiredAt.IsZero() || item.ExpiredAt.After(time.Now())
 }
 
 type Enveloper struct {
