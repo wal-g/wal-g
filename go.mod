@@ -29,10 +29,9 @@ require (
 	github.com/jackc/pgproto3/v2 v2.0.7
 	github.com/jackc/pgx v3.6.0+incompatible
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/magiconair/properties v1.8.1
+	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/minio/sio v0.2.0
 	github.com/mongodb/mongo-tools-common v2.0.1+incompatible
-	github.com/ncw/swift v1.0.49
 	github.com/pierrec/lz4/v4 v4.1.11
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
@@ -56,13 +55,16 @@ require (
 )
 
 require (
+	github.com/ProtonMail/go-crypto v0.0.0-20230426101702-58e86b294756
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v0.0.0-20220110100810-f4153a09f87c
 	github.com/klauspost/compress v1.15.12
+	github.com/ncw/swift/v2 v2.0.2
 	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	golang.org/x/mod v0.8.0
+	golang.org/x/sys v0.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -76,7 +78,6 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.5.1 // indirect
 	github.com/Microsoft/go-winio v0.4.14 // indirect
-	github.com/ProtonMail/go-crypto v0.0.0-20230426101702-58e86b294756 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
@@ -149,7 +150,6 @@ require (
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c // indirect
-	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect

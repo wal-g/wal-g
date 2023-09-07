@@ -13,6 +13,7 @@ import (
 
 // TestSwiftFolderUsingEnvVariables requires some OS_* env vars like OS_AUTH_URL or OS_PASSWORD.
 // Different vars are required for various auth schemes. Please consult your provider.
+// v1 and v2 example: https://github.com/ncw/swift/blob/b37a86bc3491c732a2b5ea198bc7cb307e239992/integration_test.sh
 func TestSwiftFolderUsingEnvVariables(t *testing.T) {
 	if os.Getenv("PG_TEST_STORAGE") != "swift" {
 		t.Skip("Credentials needed to run Swift Storage tests")
