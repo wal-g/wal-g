@@ -363,12 +363,12 @@ func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 }
 
 func configureEncryptedPgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
-	if !config.IsSet(YcKmsKeyIDSetting) {
-		return nil, errors.New("yandex Cloud KMS key for client-side encryption and decryption must be configured")
+	if !config.IsSet(PgpEncryptedYcKmsKeyIDSetting) {
+		return nil, errors.New("yandex cloud KMS key for client-side encryption and decryption must be configured")
 	}
 
 	yckmsEnveloper, err := yckmsenvlpr.EnveloperFromKeyIDAndCredential(
-		config.GetString(YcKmsKeyIDSetting), config.GetString(YcSaKeyFileSetting),
+		config.GetString(PgpEncryptedYcKmsKeyIDSetting), config.GetString(PgpEncryptedYcSaKeyFileSetting),
 	)
 	if err != nil {
 		return nil, err

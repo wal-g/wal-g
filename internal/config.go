@@ -68,7 +68,10 @@ const (
 	PgpKeyPassphraseSetting        = "WALG_PGP_KEY_PASSPHRASE"
 	PgpEncryptedKeySetting         = "WALG_ENCRYPTED_PGP_KEY"
 	PgpEncryptedKeyPathSetting     = "WALG_ENCRYPTED_PGP_KEY_PATH"
+	PgpEncryptedYcKmsKeyIDSetting  = "WALG_ENCRYPTED_PGP_YC_CSE_KMS_KEY_ID"
+	PgpEncryptedYcSaKeyFileSetting = "WALG_ENCRYPTED_PGP_YC_SERVICE_ACCOUNT_KEY_FILE"
 	PgpEncryptedCacheExpiration    = "WALG_ENCRYPTED_CACHE_EXPIRATION"
+
 	PgDataSetting                  = "PGDATA"
 	UserSetting                    = "USER" // TODO : do something with it
 	PgPortSetting                  = "PGPORT"
