@@ -2,15 +2,16 @@ package openpgp
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/mock"
-	"github.com/wal-g/wal-g/internal/crypto/envelope/mocks"
 	"io"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
+	"github.com/wal-g/wal-g/internal/crypto/envelope/mocks"
 )
 
 const (
