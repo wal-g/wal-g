@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/printlist"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -24,6 +25,63 @@ type BackupDetails struct {
 	DirectoryPaths       []string
 	DefaultFileMode      int
 	DefaultDirectoryMode int
+}
+
+func (bd *BackupDetails) PrintableFields() []printlist.TableField {
+	prettyModifiedTime := internal.PrettyFormatTime(bd.ModifiedTime)
+	prettyStartTime := internal.PrettyFormatTime(bd.StartTime)
+	prettyFinishTime := internal.PrettyFormatTime(bd.FinishTime)
+	return []printlist.TableField{
+		{
+			Name:       "name",
+			PrettyName: "Name",
+			Value:      bd.BackupName,
+		},
+		{
+			Name:        "modified",
+			PrettyName:  "Modified",
+			Value:       internal.FormatTime(bd.ModifiedTime),
+			PrettyValue: &prettyModifiedTime,
+		},
+		{
+			Name:       "wal_file_name",
+			PrettyName: "WAL file name",
+			Value:      bd.WalFileName,
+		},
+		{
+			Name:        "type",
+			PrettyName:  "Type",
+			Value:       bd.Type,
+			PrettyValue: nil,
+		},
+		{
+			Name:        "start_time",
+			PrettyName:  "Start time",
+			Value:       internal.FormatTime(bd.StartTime),
+			PrettyValue: &prettyStartTime,
+		},
+		{
+			Name:        "finish_time",
+			PrettyName:  "Finish time",
+			Value:       internal.FormatTime(bd.FinishTime),
+			PrettyValue: &prettyFinishTime,
+		},
+		{
+			Name:       "pg_version",
+			PrettyName: "PG version",
+			Value:      bd.PgVersion,
+		},
+		{
+			Name:       "start_lsn",
+			PrettyName: "Start LSN",
+			Value:      bd.StartLsn.String(),
+		},
+		{
+			Name:       "finish_lsn",
+			PrettyName: "Finish LSN",
+			Value:      bd.FinishLsn.String(),
+		},
+	}
 }
 
 func GetBackupList(backupsFolder storage.Folder, stanza string) ([]internal.BackupTime, error) {

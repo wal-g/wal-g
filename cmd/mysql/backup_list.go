@@ -27,7 +27,7 @@ var (
 			if detail {
 				mysql.HandleDetailedBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
 			} else {
-				internal.DefaultHandleBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+				internal.HandleDefaultBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
 			}
 		},
 	}

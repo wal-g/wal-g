@@ -66,7 +66,9 @@ pg_integration_test:
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker-compose build pg_pgbackrest;\
 	fi
-	docker-compose build $(TEST)
+	@if [ "$(TEST)" == "pg_tests" ]; then\
+		docker-compose build pg_tests;\
+	fi
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 
 all_unittests: deps unittest

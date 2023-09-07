@@ -1,16 +1,12 @@
 package redis
 
 import (
-	"fmt"
-	"io"
 	"os"
-	"text/tabwriter"
-	"time"
 
-	"github.com/jedib0t/go-pretty/table"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -22,20 +18,16 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 		return
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
-	// if details are requested we append content of metadata.json to each line
 
 	backupDetails, err := GetBackupsDetails(folder, backups)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	switch {
-	case json:
-		err = internal.WriteAsJSON(backupDetails, os.Stdout, pretty)
-	case pretty:
-		writePrettyBackupListDetails(backupDetails, os.Stdout)
-	default:
-		err = writeBackupListDetails(backupDetails, os.Stdout)
+	printableEntities := make([]printlist.Entity, len(backupDetails))
+	for i := range backupDetails {
+		printableEntities[i] = backupDetails[i]
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
+	err = printlist.List(printableEntities, os.Stdout, pretty, json)
+	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
 }
 
 func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]archive.Backup, error) {
@@ -62,34 +54,4 @@ func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (ar
 		return archive.Backup{}, err
 	}
 	return metaData, nil
-}
-
-func writeBackupListDetails(backupDetails []archive.Backup, output io.Writer) error {
-	writer := tabwriter.NewWriter(output, 0, 0, 1, ' ', 0)
-	defer func() { _ = writer.Flush() }()
-	_, err := fmt.Fprintln(writer, "name\tstart_time\tfinish_time\tuser_data\tdata_size\tbackup_size\tpermanent") //nolint:lll
-	if err != nil {
-		return err
-	}
-	for i, count := 0, len(backupDetails); i < count; i++ {
-		b := backupDetails[i]
-		_, err = fmt.Fprintf(writer, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-			b.BackupName, b.StartLocalTime.Format(time.RFC3339), b.FinishLocalTime.Format(time.RFC3339), b.UserData, b.DataSize, b.BackupSize, b.Permanent) //nolint:lll
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// TODO : unit tests
-func writePrettyBackupListDetails(backupDetails []archive.Backup, output io.Writer) {
-	writer := table.NewWriter()
-	writer.SetOutputMirror(output)
-	defer writer.Render()
-	writer.AppendHeader(table.Row{"#", "Name", "Start time", "Finish time", "UserData", "Data size", "Backup size", "Permanent"}) //nolint:lll
-	for idx := range backupDetails {
-		b := &backupDetails[idx]
-		writer.AppendRow(table.Row{idx + 1, b.BackupName, b.StartLocalTime.Format(time.RFC850), b.FinishLocalTime.Format(time.RFC850), b.UserData, b.DataSize, b.BackupSize, b.Permanent}) //nolint:lll
-	}
 }

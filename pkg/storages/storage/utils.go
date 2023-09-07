@@ -7,6 +7,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// JoinPath is like path.Join but it removes "/" from the beginning and adds it to the end:
+// JoinPath("/a", "b", "c") -> "a/b/c/"
 func JoinPath(elem ...string) string {
 	var res []string
 	for _, e := range elem {
