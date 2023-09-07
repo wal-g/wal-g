@@ -24,5 +24,5 @@ func configureLibsodiumCrypter(config *viper.Viper) (crypto.Crypter, error) {
 		return nil, errors.New("non-empty WALG_LIBSODIUM_KEY_PATH but wal-g was not compiled with libsodium")
 	}
 
-	return nil, errors.New("there are no any supported libsodium crypter configuration")
+	return nil, errors.New("there is no any supported libsodium crypter configuration")
 }

@@ -359,7 +359,7 @@ func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase), nil
 	}
-	return nil, errors.New("there are no any supported gpg crypter configuration")
+	return nil, errors.New("there is no any supported gpg crypter configuration")
 }
 
 func configureEncryptedPgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
@@ -385,7 +385,7 @@ func configureEncryptedPgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	if config.IsSet(PgpEncryptedKeySetting) {
 		return envopenpgp.CrypterFromKey(viper.GetString(PgpEncryptedKeySetting), enveloper), nil
 	}
-	return nil, errors.New("there are no any supported encrypted gpg crypter configuration")
+	return nil, errors.New("there is no any supported encrypted gpg crypter configuration")
 }
 
 func GetMaxDownloadConcurrency() (int, error) {

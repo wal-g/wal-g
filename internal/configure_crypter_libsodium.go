@@ -20,5 +20,5 @@ func configureLibsodiumCrypter(config *viper.Viper) (crypto.Crypter, error) {
 		return libsodium.CrypterFromKeyPath(viper.GetString(LibsodiumKeyPathSetting), viper.GetString(LibsodiumKeyTransform)), nil
 	}
 
-	return nil, errors.New("there are no any supported libsodium crypter configuration")
+	return nil, errors.New("there is no any supported libsodium crypter configuration")
 }
