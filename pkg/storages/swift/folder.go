@@ -165,7 +165,9 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		}
 		return err
 	}
-	_, err := folder.connection.ObjectCopy(folder.path, srcPath, folder.path, dstPath, nil)
+	srcPath = storage.JoinPath(folder.path, srcPath)
+	dstPath = storage.JoinPath(folder.path, dstPath)
+	_, err := folder.connection.ObjectCopy(folder.container.Name, srcPath, folder.container.Name, dstPath, nil)
 	return err
 }
 

@@ -24,6 +24,13 @@ services:
     image: wal-g/ubuntu
     container_name: wal-g_ubuntu
 
+  swift:
+    image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"
+    container_name: wal-g_swift
+    hostname: swift
+    ports:
+      - "8010:8080"
+
   s3:
     image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
@@ -174,6 +181,20 @@ services:
     image: wal-g/docker_prefix
     user: postgres
     <<: *s3_common_depends
+
+  pg_storage_swift_test:
+    image: wal-g/docker_prefix
+    container_name: wal-g_pg_storage_swift_test
+    command: /tmp/test_bins/swift.test -test.v
+    depends_on:
+      - swift
+    links:
+      - swift
+    environment:
+      - "PG_TEST_STORAGE=swift"
+      - "OS_USERNAME=test:tester"
+      - "OS_PASSWORD=testing"
+      - "OS_AUTH_URL=http://swift:8080/auth/v1.0"
 
   pg_ready_rename_test:
     <<: *pg_test_common
