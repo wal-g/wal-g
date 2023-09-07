@@ -311,24 +311,24 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, err
 	pgpKeyPath := config.IsSet(PgpKeyPathSetting)
 	legacyGpg := config.IsSet(GpgKeyIDSetting)
 
-	encryptedPgpKey := config.IsSet(PgpEnvelopKeyPathSetting)
-	encryptedPgpKeyPath := config.IsSet(PgpEnvelopeKeySetting)
+	envelopePgpKey := config.IsSet(PgpEnvelopKeyPathSetting)
+	envelopePgpKeyPath := config.IsSet(PgpEnvelopeKeySetting)
 
 	libsodiumKey := config.IsSet(LibsodiumKeySetting)
 	libsodiumKeyPath := config.IsSet(LibsodiumKeySetting)
 
 	isPgpKey := pgpKey || pgpKeyPath || legacyGpg
-	isEncryptedPgpKey := encryptedPgpKey || encryptedPgpKeyPath
+	isEnvelopePgpKey := envelopePgpKey || envelopePgpKeyPath
 	isLibsodium := libsodiumKey || libsodiumKeyPath
 
-	if isPgpKey && isEncryptedPgpKey {
-		return nil, errors.New("there is no way to configure plain gpg and encrypted gpg at the same time, please choose one")
+	if isPgpKey && isEnvelopePgpKey {
+		return nil, errors.New("there is no way to configure plain gpg and envelope gpg at the same time, please choose one")
 	}
 
 	switch {
 	case isPgpKey:
 		return configurePgpCrypter(config)
-	case isEncryptedPgpKey:
+	case isEnvelopePgpKey:
 		return configureEnvelopePgpCrypter(config)
 	case config.IsSet(CseKmsIDSetting):
 		return awskms.CrypterFromKeyID(config.GetString(CseKmsIDSetting), config.GetString(CseKmsRegionSetting)), nil
