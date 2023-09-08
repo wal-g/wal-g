@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/postgres/constants"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -26,7 +27,7 @@ var walFetchCmd = &cobra.Command{
 		err := postgres.HandleWALFetch(folderReader, args[0], args[1], postgres.RegularPrefetcher{})
 		if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 			tracelog.ErrorLogger.Print(err.Error())
-			os.Exit(postgres.ExIoError)
+			os.Exit(constants.ExIoError)
 		}
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
