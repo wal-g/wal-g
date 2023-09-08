@@ -368,7 +368,9 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	}
 
 	yckmsEnveloper, err := yckmsenvlpr.EnveloperFromKeyIDAndCredential(
-		config.GetString(PgpEnvelopeYcKmsKeyIDSetting), config.GetString(PgpEnvelopeYcSaKeyFileSetting),
+		config.GetString(PgpEnvelopeYcKmsKeyIDSetting),
+		config.GetString(PgpEnvelopeYcSaKeyFileSetting),
+		config.GetString(PgpEnvelopeYcEndpointSetting),
 	)
 	if err != nil {
 		return nil, err
