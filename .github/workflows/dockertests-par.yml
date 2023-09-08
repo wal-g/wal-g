@@ -1,3 +1,5 @@
+name: Docker tests
+
 on:
   push:
     branches: [ master ]
@@ -5,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  test:
+  parallel:
     uses: ./.github/workflows/dockertests.yml
     with:
       command-json-array: >
