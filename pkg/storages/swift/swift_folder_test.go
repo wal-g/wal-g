@@ -1,11 +1,13 @@
 package swift
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -19,6 +21,9 @@ func TestSwiftFolderUsingEnvVariables(t *testing.T) {
 		t.Skip("Credentials needed to run Swift Storage tests")
 	}
 
+	st := time.Now()
+	waitSwiftStartup()
+	t.Logf("Waited %s for Swift container startup", time.Now().Sub(st).String())
 	container := createTestContainerMust()
 	t.Logf("Swift created test container: '%s'", container)
 
@@ -43,8 +48,10 @@ func createTestContainerMust() string {
 		panic("Please provide OS_* env to work with OpenStack Swift")
 	}
 	name := fmt.Sprintf("test-container-%x", rand.Int63())
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 	// curl -D- "$URL/auth/v1.0" -H "X-Auth-User: test:tester" -H "X-Auth-Key: testing"
-	req, err := http.NewRequest(http.MethodGet, os.Getenv("OS_AUTH_URL"), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, os.Getenv("OS_AUTH_URL"), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -62,7 +69,7 @@ func createTestContainerMust() string {
 	_ = resp.Body.Close()
 
 	// curl -X PUT -i -H "X-Auth-Token: $TOKEN" $STORAGE_URL/test-container
-	req, err = http.NewRequest(http.MethodPut, fmt.Sprintf("%s/%s", storageURL, name), nil)
+	req, err = http.NewRequestWithContext(ctx, http.MethodPut, fmt.Sprintf("%s/%s", storageURL, name), nil)
 	if err != nil {
 		panic(err)
 	}
@@ -77,4 +84,22 @@ func createTestContainerMust() string {
 	_ = resp.Body.Close()
 
 	return name
+}
+
+// waitSwiftStartup wait for valid HTTP answer from Swift. Container needs about 10 second to become ready after start.
+func waitSwiftStartup() {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	for i := 0; i < 15; i++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, os.Getenv("OS_AUTH_URL"), nil)
+		if err != nil {
+			panic(err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil {
+			_ = resp.Body.Close()
+			return
+		}
+		time.Sleep(time.Duration(i) * time.Second)
+	}
 }
