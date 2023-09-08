@@ -114,7 +114,7 @@ func getCredentials(saFilePath string) (ycsdk.Credentials, error) {
 	return credentials, nil
 }
 
-func EnveloperFromKeyIDAndCredential(keyID string, saFilePath string, endpoint string) (envelope.Enveloper, error) {
+func EnveloperFromKeyIDAndCredential(keyID, saFilePath, endpoint string) (envelope.Enveloper, error) {
 	credentials, credErr := getCredentials(saFilePath)
 	if credErr != nil {
 		return nil, errors.Wrap(credErr, "Can't initialize yc sdk")
