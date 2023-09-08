@@ -97,18 +97,32 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 	return encryptedKey, nil
 }
 
-func EnveloperFromKeyIDAndCredential(keyID string, saFilePath string) (envelope.Enveloper, error) {
-	var authorizedKey, authErr = iamkey.ReadFromJSONFile(saFilePath)
-	if authErr != nil {
-		return nil, errors.Wrap(authErr, "Can't initialize yc sdk")
+func getCredentials(saFilePath string) (ycsdk.Credentials, error) {
+	var credentials ycsdk.Credentials
+	credentials = ycsdk.InstanceServiceAccount()
+	if len(saFilePath) > 0 {
+		var authorizedKey, keyErr = iamkey.ReadFromJSONFile(saFilePath)
+		if keyErr != nil {
+			return nil, errors.Wrap(keyErr, "Can't initialize yc sdk")
+		}
+		var accountCredentials, credErr = ycsdk.ServiceAccountKey(authorizedKey)
+		if credErr != nil {
+			return nil, errors.Wrap(credErr, "Can't initialize yc sdk")
+		}
+		credentials = accountCredentials
 	}
-	var credentials, credErr = ycsdk.ServiceAccountKey(authorizedKey)
+	return credentials, nil
+}
+
+func EnveloperFromKeyIDAndCredential(keyID, saFilePath, endpoint string) (envelope.Enveloper, error) {
+	credentials, credErr := getCredentials(saFilePath)
 	if credErr != nil {
 		return nil, errors.Wrap(credErr, "Can't initialize yc sdk")
 	}
 
 	var sdk, sdkErr = ycsdk.Build(context.Background(), ycsdk.Config{
 		Credentials: credentials,
+		Endpoint:    endpoint,
 	})
 	if sdkErr != nil {
 		return nil, errors.Wrap(sdkErr, "Can't initialize yc sdk")

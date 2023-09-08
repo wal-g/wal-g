@@ -70,6 +70,7 @@ const (
 	PgpEnvelopKeyPathSetting      = "WALG_ENVELOPE_PGP_KEY_PATH"
 	PgpEnvelopeYcKmsKeyIDSetting  = "WALG_ENVELOPE_PGP_YC_CSE_KMS_KEY_ID"
 	PgpEnvelopeYcSaKeyFileSetting = "WALG_ENVELOPE_PGP_YC_SERVICE_ACCOUNT_KEY_FILE"
+	PgpEnvelopeYcEndpointSetting  = "WALG_ENVELOPE_PGP_YC_ENDPOINT"
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
 
 	PgDataSetting                  = "PGDATA"
@@ -297,6 +298,7 @@ var (
 		PgpEnvelopeCacheExpiration:    true,
 		PgpEnvelopeYcKmsKeyIDSetting:  true,
 		PgpEnvelopeYcSaKeyFileSetting: true,
+		PgpEnvelopeYcEndpointSetting:  true,
 		LibsodiumKeySetting:           true,
 		LibsodiumKeyPathSetting:       true,
 		LibsodiumKeyTransform:         true,
