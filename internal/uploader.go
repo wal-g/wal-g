@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -19,10 +20,10 @@ import (
 var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")
 
 type Uploader interface {
-	Upload(path string, content io.Reader) error
-	UploadFile(file ioextensions.NamedReader) error
-	PushStream(stream io.Reader) (string, error)
-	PushStreamToDestination(stream io.Reader, dstPath string) error
+	Upload(ctx context.Context, path string, content io.Reader) error
+	UploadFile(ctx context.Context, file ioextensions.NamedReader) error
+	PushStream(ctx context.Context, stream io.Reader) (string, error)
+	PushStreamToDestination(ctx context.Context, stream io.Reader, dstPath string) error
 	Compression() compression.Compressor
 	DisableSizeTracking()
 	UploadedDataSize() (int64, error)
@@ -138,7 +139,7 @@ func (uploader *RegularUploader) Clone() Uploader {
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
-func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error {
+func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
 	filename := file.Name()
 
 	fileReader := file.(io.Reader)
@@ -148,7 +149,7 @@ func (uploader *RegularUploader) UploadFile(file ioextensions.NamedReader) error
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
 	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 
-	err := uploader.Upload(dstPath, compressedFile)
+	err := uploader.Upload(ctx, dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
 }
@@ -165,7 +166,7 @@ func (uploader *RegularUploader) Compression() compression.Compressor {
 }
 
 // TODO : unit tests
-func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
+func (uploader *RegularUploader) Upload(ctx context.Context, path string, content io.Reader) error {
 	uploader.waitGroup.Add(1)
 	defer uploader.waitGroup.Done()
 
@@ -173,7 +174,7 @@ func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
-	err := uploader.UploadingFolder.PutObject(path, content)
+	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
 	if err != nil {
 		WalgMetrics.uploadedFilesFailedTotal.Inc()
 		uploader.failed.Set()
@@ -185,10 +186,10 @@ func (uploader *RegularUploader) Upload(path string, content io.Reader) error {
 
 // UploadMultiple uploads multiple objects from the start of the slice,
 // returning the first error if any. Note that this operation is not atomic
-// TODO : unit tests
-func (uploader *RegularUploader) UploadMultiple(objects []UploadObject) error {
+// TODO : unit tests / is it used?
+func (uploader *RegularUploader) UploadMultiple(ctx context.Context, objects []UploadObject) error {
 	for _, object := range objects {
-		err := uploader.Upload(object.Path, object.Content)
+		err := uploader.Upload(ctx, object.Path, object.Content)
 		if err != nil {
 			// possibly do a retry here
 			return err

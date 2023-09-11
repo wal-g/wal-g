@@ -2,6 +2,7 @@ package memory
 
 import (
 	"bytes"
+	"context"
 	"hash/fnv"
 	"io"
 	"path"
@@ -10,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/internal/contextio"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -87,6 +89,11 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	}
 	folder.Storage.Store(objectPath, *bytes.NewBuffer(data))
 	return nil
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	ctxReader := contextio.NewReader(ctx, content)
+	return folder.PutObject(name, ctxReader)
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {

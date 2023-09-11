@@ -3,7 +3,7 @@ package st
 import (
 	"io"
 	"os"
-	
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -59,7 +59,7 @@ var putObjectCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			return storagetools.HandlePutObject(reader, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
+			return storagetools.HandlePutObject(cmd.Context(), reader, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"io"
 	"path"
 	"sync"
@@ -154,7 +155,7 @@ func (u *AoStorageUploader) regularAoUpload(
 
 	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
-	err = u.uploader.Upload(uploadPath, uploadContents)
+	err = u.uploader.Upload(context.Background(), uploadPath, uploadContents)
 	if err != nil {
 		return err
 	}
@@ -198,5 +199,5 @@ func (u *AoStorageUploader) upload(reader io.Reader, storageKey string) error {
 
 	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
-	return u.uploader.Upload(uploadPath, uploadContents)
+	return u.uploader.Upload(context.Background(), uploadPath, uploadContents)
 }

@@ -1,6 +1,7 @@
 package copy
 
 import (
+	"context"
 	"io"
 	"sync"
 
@@ -92,7 +93,7 @@ func (ch *InfoProvider) copyObject() error {
 		return err
 	}
 
-	if err := uploader.Upload(ch.targetName, r); err != nil {
+	if err := uploader.Upload(context.Background(), ch.targetName, r); err != nil {
 		return err
 	}
 

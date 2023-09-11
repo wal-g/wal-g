@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"sync/atomic"
@@ -83,7 +84,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 	tracelog.InfoLogger.Printf("Starting part %d ...\n", tarBall.partNumber)
 
 	go func() {
-		err := uploader.Upload(path, pipeReader)
+		err := uploader.Upload(context.Background(), path, pipeReader)
 		if compressingError, ok := err.(CompressAndEncryptError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}

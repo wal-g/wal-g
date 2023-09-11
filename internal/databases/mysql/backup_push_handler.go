@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"os"
 	"os/exec"
 
@@ -31,7 +32,7 @@ func HandleBackupPush(folder storage.Folder, uploader internal.Uploader,
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	fileName, err := uploader.PushStream(limiters.NewDiskLimitReader(stdout))
+	fileName, err := uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()

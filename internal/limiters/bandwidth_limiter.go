@@ -1,6 +1,7 @@
 package limiters
 
 import (
+	"context"
 	"io"
 
 	"golang.org/x/time/rate"
@@ -14,7 +15,7 @@ func NewNetworkLimitReader(r io.Reader) io.Reader {
 	if NetworkLimiter == nil {
 		return r
 	}
-	return NewReader(r, NetworkLimiter)
+	return NewReader(context.Background(), r, NetworkLimiter)
 }
 
 // NewDiskLimitReader returns a reader that is rate limited by disk limiter
@@ -22,5 +23,5 @@ func NewDiskLimitReader(r io.Reader) io.Reader {
 	if DiskLimiter == nil {
 		return r
 	}
-	return NewReader(r, DiskLimiter)
+	return NewReader(context.Background(), r, DiskLimiter)
 }

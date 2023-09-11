@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"context"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
@@ -13,7 +15,7 @@ func extendExcludedFiles() {
 }
 
 // HandleCatchupPush is invoked to perform a wal-g catchup-push
-func HandleCatchupPush(pgDataDirectory string, fromLSN LSN) {
+func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN) {
 	uploader, err := internal.ConfigureUploader()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -36,5 +38,5 @@ func HandleCatchupPush(pgDataDirectory string, fromLSN LSN) {
 
 	backupConfig, err := NewBackupHandler(backupArguments)
 	tracelog.ErrorLogger.FatalOnError(err)
-	backupConfig.HandleBackupPush()
+	backupConfig.HandleBackupPush(ctx)
 }

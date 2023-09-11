@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"io"
 
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -29,12 +30,16 @@ func (lf *LimitedFolder) ReadObject(objectRelativePath string) (io.ReadCloser, e
 		return nil, err
 	}
 	return ioextensions.ReadCascadeCloser{
-		Reader: limiters.NewReader(readCloser, lf.limiter),
+		Reader: limiters.NewReader(context.Background(), readCloser, lf.limiter),
 		Closer: readCloser,
 	}, nil
 }
 
 func (lf *LimitedFolder) PutObject(name string, content io.Reader) error {
-	limitedReader := limiters.NewReader(content, lf.limiter)
-	return lf.HashableFolder.PutObject(name, limitedReader)
+	return lf.PutObjectWithContext(context.Background(), name, content)
+}
+
+func (lf *LimitedFolder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	limitedReader := limiters.NewReader(ctx, content, lf.limiter)
+	return lf.HashableFolder.PutObjectWithContext(ctx, name, limitedReader)
 }

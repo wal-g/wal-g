@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -31,14 +32,14 @@ func (err CantOverwriteWalFileError) Error() string {
 
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(uploader *WalUploader, walFilePath string) error {
+func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath string) error {
 	if uploader.ArchiveStatusManager.IsWalAlreadyUploaded(walFilePath) {
 		err := uploader.ArchiveStatusManager.UnmarkWalFile(walFilePath)
 
 		if err != nil {
 			tracelog.ErrorLogger.Printf("unmark wal-g status for %s file failed due following error %+v", walFilePath, err)
 		}
-		return uploadLocalWalMetadata(walFilePath, uploader)
+		return uploadLocalWalMetadata(ctx, walFilePath, uploader)
 	}
 
 	concurrency, err := internal.GetMaxUploadConcurrency()
@@ -55,11 +56,11 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) error {
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
 
-	err = uploadWALFile(uploader, walFilePath, bgUploader.preventWalOverwrite)
+	err = uploadWALFile(ctx, uploader, walFilePath, preventWalOverwrite)
 	if err != nil {
 		return err
 	}
-	err = uploadLocalWalMetadata(walFilePath, uploader.Uploader)
+	err = uploadLocalWalMetadata(ctx, walFilePath, uploader.Uploader)
 	if err != nil {
 		return err
 	}
@@ -70,14 +71,14 @@ func HandleWALPush(uploader *WalUploader, walFilePath string) error {
 	}
 
 	if uploader.getUseWalDelta() {
-		uploader.FlushFiles()
+		uploader.FlushFiles(ctx)
 	}
 	return nil
 }
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrite bool) error {
+func uploadWALFile(ctx context.Context, uploader *WalUploader, walFilePath string, preventWalOverwrite bool) error {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
 		if overwriteAttempt {
@@ -90,7 +91,7 @@ func uploadWALFile(uploader *WalUploader, walFilePath string, preventWalOverwrit
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
-	err = uploader.UploadWalFile(walFile)
+	err = uploader.UploadWalFile(ctx, walFile)
 	return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
 }
 

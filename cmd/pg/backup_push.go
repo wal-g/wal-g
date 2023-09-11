@@ -106,7 +106,7 @@ var (
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
-			backupHandler.HandleBackupPush()
+			backupHandler.HandleBackupPush(cmd.Context())
 		},
 	}
 	permanent             = false

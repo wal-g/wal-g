@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"io"
 	"path"
 
@@ -45,7 +46,7 @@ func (walUploader *WalUploader) clone() *WalUploader {
 }
 
 // TODO : unit tests
-func (walUploader *WalUploader) UploadWalFile(file ioextensions.NamedReader) error {
+func (walUploader *WalUploader) UploadWalFile(ctx context.Context, file ioextensions.NamedReader) error {
 	var walFileReader io.Reader
 
 	filename := path.Base(file.Name())
@@ -61,9 +62,9 @@ func (walUploader *WalUploader) UploadWalFile(file ioextensions.NamedReader) err
 		walFileReader = file
 	}
 
-	return walUploader.UploadFile(ioextensions.NewNamedReaderImpl(walFileReader, file.Name()))
+	return walUploader.UploadFile(ctx, ioextensions.NewNamedReaderImpl(walFileReader, file.Name()))
 }
 
-func (walUploader *WalUploader) FlushFiles() {
-	walUploader.DeltaFileManager.FlushFiles(walUploader)
+func (walUploader *WalUploader) FlushFiles(ctx context.Context) {
+	walUploader.DeltaFileManager.FlushFiles(ctx, walUploader)
 }

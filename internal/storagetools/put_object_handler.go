@@ -1,6 +1,7 @@
 package storagetools
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -14,7 +15,13 @@ import (
 	"github.com/wal-g/wal-g/internal"
 )
 
-func HandlePutObject(source io.Reader, dstPath string, uploader internal.Uploader, overwrite, encrypt, compress bool) error {
+func HandlePutObject(
+	ctx context.Context,
+	source io.Reader,
+	dstPath string,
+	uploader internal.Uploader,
+	overwrite, encrypt, compress bool,
+) error {
 	err := checkOverwrite(dstPath, uploader, overwrite)
 	if err != nil {
 		return fmt.Errorf("check file overwrite: %v", err)
@@ -26,7 +33,7 @@ func HandlePutObject(source io.Reader, dstPath string, uploader internal.Uploade
 	}
 
 	fileName := utility.SanitizePath(filepath.Base(dstPath))
-	err = uploadFile(fileName, source, uploader, encrypt, compress)
+	err = uploadFile(ctx, fileName, source, uploader, encrypt, compress)
 	if err != nil {
 		return fmt.Errorf("upload: %v", err)
 	}
@@ -63,7 +70,7 @@ func OpenLocalFile(localPath string) (io.ReadCloser, error) {
 	return localFile, nil
 }
 
-func uploadFile(name string, content io.Reader, uploader internal.Uploader, encrypt, compress bool) error {
+func uploadFile(ctx context.Context, name string, content io.Reader, uploader internal.Uploader, encrypt, compress bool) error {
 	var crypter crypto.Crypter
 	if encrypt {
 		crypter = internal.ConfigureCrypter()
@@ -76,5 +83,5 @@ func uploadFile(name string, content io.Reader, uploader internal.Uploader, encr
 	}
 
 	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter)
-	return uploader.Upload(name, uploadContents)
+	return uploader.Upload(ctx, name, uploadContents)
 }
