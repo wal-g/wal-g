@@ -124,7 +124,7 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 }
 
 // Upload will read all tar files from Postgres, and use the uploader to upload to the backup location
-func (bb *StreamingBaseBackup) Upload(uploader internal.Uploader, bundleFiles internal.BundleFiles) (err error) {
+func (bb *StreamingBaseBackup) Upload(ctx context.Context, uploader internal.Uploader, bundleFiles internal.BundleFiles) (err error) {
 	// Upload the tar
 	bb.uploader = uploader
 	bb.streamer = NewTarballStreamer(bb, bb.maxTarSize, bundleFiles)
@@ -132,7 +132,7 @@ func (bb *StreamingBaseBackup) Upload(uploader internal.Uploader, bundleFiles in
 		tbsTar := ioextensions.NewNamedReaderImpl(bb.streamer, bb.FileName())
 		compressedFile := internal.CompressAndEncrypt(tbsTar, bb.uploader.Compression(), internal.ConfigureCrypter())
 		dstPath := fmt.Sprintf("%s.%s", bb.Path(), bb.uploader.Compression().FileExtension())
-		err = bb.uploader.Upload(dstPath, compressedFile)
+		err = bb.uploader.Upload(ctx, dstPath, compressedFile)
 		if err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func (bb *StreamingBaseBackup) Upload(uploader internal.Uploader, bundleFiles in
 		teeCompressedFile := internal.CompressAndEncrypt(teeTar, bb.uploader.Compression(), internal.ConfigureCrypter())
 		teeFileName := fmt.Sprintf("pg_control.tar.%s", bb.uploader.Compression().FileExtension())
 		teeFilePath := storage.JoinPath(bb.BackupName(), internal.TarPartitionFolderName, teeFileName)
-		err = bb.uploader.Upload(teeFilePath, teeCompressedFile)
+		err = bb.uploader.Upload(ctx, teeFilePath, teeCompressedFile)
 		if err != nil {
 			return err
 		}

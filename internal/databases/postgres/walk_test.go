@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -432,7 +433,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
 	assert.NoError(t, err)
-	err = uploader.UploadFile(walFile)
+	err = uploader.UploadFile(context.Background(), walFile)
 
 	if err != nil {
 		// t.Errorf("upload: expected no error to occur but got %+v", err)

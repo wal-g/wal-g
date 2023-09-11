@@ -2,6 +2,7 @@ package archive
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -220,7 +221,7 @@ func (su *StorageUploader) UploadOplogArchive(stream io.Reader, firstTS, lastTS 
 	}
 
 	// providing io.ReaderAt+io.ReadSeeker to s3 upload enables buffer pool usage
-	return su.Upload(arch.Filename(), bytes.NewReader(su.buf.Bytes()))
+	return su.Upload(context.Background(), arch.Filename(), bytes.NewReader(su.buf.Bytes()))
 }
 
 // UploadGap uploads mark indicating archiving gap.
@@ -234,7 +235,7 @@ func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS model
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	if err := su.PushStreamToDestination(strings.NewReader(archErr.Error()), arch.Filename()); err != nil {
+	if err := su.PushStreamToDestination(context.Background(), strings.NewReader(archErr.Error()), arch.Filename()); err != nil {
 		return fmt.Errorf("error while uploading stream: %w", err)
 	}
 	return nil
@@ -246,7 +247,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter
 	if err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
-	backupName, err := su.PushStream(stream)
+	backupName, err := su.PushStream(context.Background(), stream)
 	if err != nil {
 		return fmt.Errorf("can not push stream: %+v", err)
 	}

@@ -569,6 +569,12 @@ Usage:
 wal-g daemon path/to/socket-descriptor
 ```
 
+Configuration:
+
+* `WALG_DAEMON_WAL_UPLOAD_TIMEOUT`
+
+To configure time limit for every WAL archive in daemon. Hanging for a longer time operations will be interrupted. Default value is 60s. 
+
 pgBackRest backups support (beta version)
 -----------
 ### ``pgbackrest backup-list``

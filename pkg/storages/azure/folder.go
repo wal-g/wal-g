@@ -306,6 +306,10 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
+	return folder.PutObjectWithContext(context.Background(), name, content)
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
@@ -314,7 +318,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		return NewFolderError(err, "Unable to init Azure Blob client")
 	}
 
-	_, err = blobClient.UploadStream(context.Background(), content, folder.uploadStreamOptions)
+	_, err = blobClient.UploadStream(ctx, content, folder.uploadStreamOptions)
 	if err != nil {
 		return NewFolderError(err, "Unable to upload blob %v", name)
 	}

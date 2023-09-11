@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"path"
@@ -78,7 +79,7 @@ func TestRead_CorrectRecording(t *testing.T) {
 
 	_, err = io.ReadAll(recordingReader)
 	assert.NoError(t, err)
-	manager.FlushFiles(nil)
+	manager.FlushFiles(context.Background(), nil)
 
 	locations, err := walparser.ReadLocationsFrom((*dataFolder)[DeltaFilename])
 	assert.NoError(t, err)
@@ -99,7 +100,7 @@ func TestRead_RecordingFail(t *testing.T) {
 
 	actualData, err := io.ReadAll(recordingReader)
 	assert.NoError(t, err)
-	manager.FlushFiles(nil)
+	manager.FlushFiles(context.Background(), nil)
 
 	assert.Equal(t, walData, actualData)
 	assert.True(t, dataFolder.IsEmpty())

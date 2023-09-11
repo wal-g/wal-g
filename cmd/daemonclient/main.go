@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal/daemon"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/postgres/constants"
 )
 
 const (
@@ -129,7 +129,7 @@ func main() {
 	if err != nil {
 		if response == daemon.ArchiveNonExistenceType {
 			fmt.Println(err.Error())
-			os.Exit(postgres.ExIoError)
+			os.Exit(constants.ExIoError)
 		}
 		log.Fatal(err)
 	}

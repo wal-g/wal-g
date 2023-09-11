@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"sync"
@@ -28,6 +29,10 @@ type S3TestFolder struct {
 }
 
 func (tf *S3TestFolder) PutObject(name string, content io.Reader) error {
+	return tf.PutObjectWithContext(context.Background(), name, content)
+}
+
+func (tf *S3TestFolder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	buf := &bytes.Buffer{}
 	count, err := io.Copy(buf, content)
 	if err != nil {
@@ -43,7 +48,7 @@ func (tf *S3TestFolder) PutObject(name string, content io.Reader) error {
 	tf.wasSkippedBlock = false
 	tf.bytesLeft -= count
 
-	err = tf.Folder.PutObject(name, content)
+	err = tf.Folder.PutObjectWithContext(ctx, name, content)
 
 	return err
 }

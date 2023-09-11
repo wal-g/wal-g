@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -88,7 +89,7 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 			sentinelDeleted = false
 		)
 
-		targetMock.PutObjectMock = func(name string, content io.Reader) error {
+		targetMock.PutObjectMock = func(_ context.Context, name string, content io.Reader) error {
 			if strings.HasSuffix(name, "_backup_stop_sentinel.json") {
 				if atomic.LoadInt32(&dataFilesCopied) < 99 {
 					t.Fatalf("sentinel file must be copied to target storage only after all other files")
@@ -179,7 +180,7 @@ func TestTransferHandler_Handle(t *testing.T) {
 
 		putCalls := 0
 		putCallsMux := new(sync.Mutex)
-		targetMock.PutObjectMock = func(name string, content io.Reader) error {
+		targetMock.PutObjectMock = func(_ context.Context, name string, content io.Reader) error {
 			putCallsMux.Lock()
 			defer putCallsMux.Unlock()
 			putCalls++

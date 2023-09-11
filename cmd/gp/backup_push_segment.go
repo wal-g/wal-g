@@ -67,7 +67,7 @@ var (
 
 			backupHandler, err := greenplum.NewSegBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
-			backupHandler.HandleBackupPush()
+			backupHandler.HandleBackupPush(cmd.Context())
 		},
 	}
 )

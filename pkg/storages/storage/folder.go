@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/wal-g/tracelog"
 )
+
+//go:generate mockery --name Folder
+//go:generate mockgen -destination=../../../test/mocks/mock_folder.go -package mocks -build_flags -mod=readonly github.com/wal-g/wal-g/pkg/storages/storage Folder
 
 type Folder interface {
 	// GetPath provides a relative path from the root of the storage. It must always end with '/'.
@@ -29,8 +33,12 @@ type Folder interface {
 	ReadObject(objectRelativePath string) (io.ReadCloser, error)
 
 	// PutObject uploads a new object into the folder by a relative path. If an object with the same name already
-	// exists, it is overwritten.
+	// exists, it is overwritten. Please prefer using PutObjectWithContext.
 	PutObject(name string, content io.Reader) error
+
+	// PutObjectWithContext uploads a new object into the folder by a relative path. If an object with the same name
+	// already exists, it is overwritten. Operation can be terminated using Context.
+	PutObjectWithContext(ctx context.Context, name string, content io.Reader) error
 
 	// CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
 	// an error if the source object doesn't exist.

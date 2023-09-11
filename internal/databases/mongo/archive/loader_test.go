@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"context"
 	"io"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestStorageUploader_UploadOplogArchive_ProperInterfaces(t *testing.T) {
 	defer mockCtl.Finish()
 
 	storageProv := mocks.NewMockFolder(mockCtl)
-	storageProv.EXPECT().PutObject(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(_ string, content io.Reader) error {
+	storageProv.EXPECT().PutObjectWithContext(gomock.Any(), gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(_ context.Context, _ string, content io.Reader) error {
 		if _, ok := content.(io.ReaderAt); !ok {
 			t.Errorf("can not cast PutObject content to io.ReaderAt")
 		}

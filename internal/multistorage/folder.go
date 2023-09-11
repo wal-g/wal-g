@@ -2,6 +2,7 @@ package multistorage
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"path"
@@ -375,33 +376,38 @@ func (mf Folder) listStorageFolder(storage cache.NamedFolder) ([]storage.Object,
 	return objects, subFolders, nil
 }
 
-// PutObject puts the object to multiple storages. A specific implementation is selected using FolderPolicies.Put.
 func (mf Folder) PutObject(name string, content io.Reader) error {
+	return mf.PutObjectWithContext(context.Background(), name, content)
+}
+
+// PutObjectWithContext puts the object to multiple storages.
+// A specific implementation is selected using FolderPolicies.Put.
+func (mf Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	switch mf.policies.Put {
 	case policies.PutPolicyFirst:
-		return mf.PutObjectToFirst(name, content)
+		return mf.PutObjectToFirst(ctx, name, content)
 	case policies.PutPolicyUpdateFirstFound:
-		return mf.PutObjectOrUpdateFirstFound(name, content)
+		return mf.PutObjectOrUpdateFirstFound(ctx, name, content)
 	case policies.PutPolicyAll:
-		return mf.PutObjectToAll(name, content)
+		return mf.PutObjectToAll(ctx, name, content)
 	case policies.PutPolicyUpdateAllFound:
-		return mf.PutObjectOrUpdateAllFound(name, content)
+		return mf.PutObjectOrUpdateAllFound(ctx, name, content)
 	default:
 		panic(fmt.Sprintf("unknown put policy %d", mf.policies.Put))
 	}
 }
 
 // PutObjectToFirst puts the object to the first storage.
-func (mf Folder) PutObjectToFirst(name string, content io.Reader) error {
+func (mf Folder) PutObjectToFirst(ctx context.Context, name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
 		return ErrNoUsedStorages
 	}
-	return mf.storages[0].PutObject(name, content)
+	return mf.storages[0].PutObjectWithContext(ctx, name, content)
 }
 
 // PutObjectOrUpdateFirstFound updates the object in the first storage where it is found. If it's not found anywhere,
 // uploads a new object to the first storage.
-func (mf Folder) PutObjectOrUpdateFirstFound(name string, content io.Reader) error {
+func (mf Folder) PutObjectOrUpdateFirstFound(ctx context.Context, name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
 		return ErrNoUsedStorages
 	}
@@ -411,14 +417,14 @@ func (mf Folder) PutObjectOrUpdateFirstFound(name string, content io.Reader) err
 			return fmt.Errorf("check for existence: %w", err)
 		}
 		if exists {
-			return s.PutObject(name, content)
+			return s.PutObjectWithContext(ctx, name, content)
 		}
 	}
-	return mf.storages[0].PutObject(name, content)
+	return mf.storages[0].PutObjectWithContext(ctx, name, content)
 }
 
 // PutObjectToAll puts the object to all used storages.
-func (mf Folder) PutObjectToAll(name string, content io.Reader) error {
+func (mf Folder) PutObjectToAll(ctx context.Context, name string, content io.Reader) error {
 	var buffer []byte
 	if len(mf.storages) > 1 {
 		var err error
@@ -431,7 +437,7 @@ func (mf Folder) PutObjectToAll(name string, content io.Reader) error {
 		if buffer != nil {
 			content = bytes.NewReader(buffer)
 		}
-		err := s.PutObject(name, content)
+		err := s.PutObjectWithContext(ctx, name, content)
 		if err != nil {
 			return fmt.Errorf("put object to storage %q: %w", s.Name, err)
 		}
@@ -441,7 +447,7 @@ func (mf Folder) PutObjectToAll(name string, content io.Reader) error {
 
 // PutObjectOrUpdateAllFound updates the object in all storages where it is found. If it's not found anywhere, uploads a
 // new object to the first storage.
-func (mf Folder) PutObjectOrUpdateAllFound(name string, content io.Reader) error {
+func (mf Folder) PutObjectOrUpdateAllFound(ctx context.Context, name string, content io.Reader) error {
 	if len(mf.storages) == 0 {
 		return ErrNoUsedStorages
 	}
@@ -465,7 +471,7 @@ func (mf Folder) PutObjectOrUpdateAllFound(name string, content io.Reader) error
 			if buffer != nil {
 				content = bytes.NewReader(buffer)
 			}
-			err = s.PutObject(name, content)
+			err = s.PutObjectWithContext(ctx, name, content)
 			if err != nil {
 				return fmt.Errorf("put object to storage %q: %w", s.Name, err)
 			}
@@ -476,7 +482,7 @@ func (mf Folder) PutObjectOrUpdateAllFound(name string, content io.Reader) error
 		if buffer != nil {
 			content = bytes.NewReader(buffer)
 		}
-		return mf.storages[0].PutObject(name, content)
+		return mf.storages[0].PutObjectWithContext(ctx, name, content)
 	}
 
 	return nil

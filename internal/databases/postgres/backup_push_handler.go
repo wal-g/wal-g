@@ -132,7 +132,7 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 	}
 }
 
-func (bh *BackupHandler) createAndPushBackup() {
+func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	var err error
 	folder := bh.Arguments.Uploader.Folder()
 	// TODO: AB: this subfolder switch look ugly.
@@ -153,7 +153,7 @@ func (bh *BackupHandler) createAndPushBackup() {
 	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.markBackups(folder, sentinelDto)
-	bh.uploadMetadata(sentinelDto, filesMetaDto)
+	bh.uploadMetadata(ctx, sentinelDto, filesMetaDto)
 
 	// logging backup set Name
 	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.CurBackupInfo.Name)
@@ -311,17 +311,17 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 
 // HandleBackupPush handles the backup being read from Postgres or filesystem and being pushed to the repository
 // TODO : unit tests
-func (bh *BackupHandler) HandleBackupPush() {
+func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 	bh.CurBackupInfo.StartTime = utility.TimeNowCrossPlatformUTC()
 
 	if bh.Arguments.pgDataDirectory == "" {
-		bh.handleBackupPushRemote()
+		bh.handleBackupPushRemote(ctx)
 	} else {
-		bh.handleBackupPushLocal()
+		bh.handleBackupPushLocal(ctx)
 	}
 }
 
-func (bh *BackupHandler) handleBackupPushRemote() {
+func (bh *BackupHandler) handleBackupPushRemote(ctx context.Context) {
 	if bh.Arguments.forceIncremental {
 		tracelog.ErrorLogger.Println("Delta backup not available for remote backup.")
 		tracelog.ErrorLogger.Fatal("To run delta backup, supply [db_directory].")
@@ -334,10 +334,10 @@ func (bh *BackupHandler) handleBackupPushRemote() {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
 		bh.Arguments.verifyPageChecksums = true
 	}
-	bh.createAndPushRemoteBackup()
+	bh.createAndPushRemoteBackup(ctx)
 }
 
-func (bh *BackupHandler) handleBackupPushLocal() {
+func (bh *BackupHandler) handleBackupPushLocal(ctx context.Context) {
 	{
 		// The 'data' path provided on the command line must point at the same directory as the one listed by the Postgresql server.
 		// If mismatched, this means we aren't connected to the correct server. This is a fatal error.
@@ -363,10 +363,10 @@ func (bh *BackupHandler) handleBackupPushLocal() {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 
-	bh.createAndPushBackup()
+	bh.createAndPushBackup(ctx)
 }
 
-func (bh *BackupHandler) createAndPushRemoteBackup() {
+func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 	var err error
 	uploader := bh.Arguments.Uploader
 	uploader.ChangeDirectory(utility.BaseBackupPath)
@@ -379,7 +379,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 		tarFileSets = internal.NewRegularTarFileSets()
 	}
 
-	baseBackup := bh.runRemoteBackup()
+	baseBackup := bh.runRemoteBackup(ctx)
 	tracelog.InfoLogger.Println("Updating metadata")
 	bh.CurBackupInfo.startLSN = LSN(baseBackup.StartLSN)
 	bh.CurBackupInfo.endLSN = LSN(baseBackup.EndLSN)
@@ -391,21 +391,21 @@ func (bh *BackupHandler) createAndPushRemoteBackup() {
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
 	bh.CurBackupInfo.Name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")
-	bh.uploadMetadata(sentinelDto, filesMetadataDto)
+	bh.uploadMetadata(ctx, sentinelDto, filesMetadataDto)
 	// logging backup set Name
 	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.CurBackupInfo.Name)
 }
 
-func (bh *BackupHandler) uploadMetadata(sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) {
+func (bh *BackupHandler) uploadMetadata(ctx context.Context, sentinelDto BackupSentinelDto, filesMetaDto FilesMetadataDto) {
 	curBackupName := bh.CurBackupInfo.Name
 	meta := NewExtendedMetadataDto(bh.Arguments.isPermanent, bh.PgInfo.PgDataDirectory,
 		bh.CurBackupInfo.StartTime, sentinelDto)
 
-	err := bh.uploadExtendedMetadata(meta)
+	err := bh.uploadExtendedMetadata(ctx, meta)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload metadata file for backup %s: %v", curBackupName, err)
 	}
-	err = bh.uploadFilesMetadata(filesMetaDto)
+	err = bh.uploadFilesMetadata(ctx, filesMetaDto)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to upload files metadata for backup %s: %v", curBackupName, err)
 	}
@@ -453,7 +453,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	return bh, nil
 }
 
-func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
+func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBackup {
 	var diskLimit int32
 	if viper.IsSet(internal.DiskRateLimitSetting) {
 		// Note that BASE_BACKUP (pg protocol) allows to limit in kb/sec
@@ -480,7 +480,7 @@ func (bh *BackupHandler) runRemoteBackup() *StreamingBaseBackup {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
-	err = baseBackup.Upload(bh.Arguments.Uploader, bundleFiles)
+	err = baseBackup.Upload(ctx, bh.Arguments.Uploader, bundleFiles)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Finishing backup")
@@ -537,17 +537,17 @@ func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
 }
 
 // TODO : unit tests
-func (bh *BackupHandler) uploadExtendedMetadata(meta ExtendedMetadataDto) (err error) {
+func (bh *BackupHandler) uploadExtendedMetadata(ctx context.Context, meta ExtendedMetadataDto) (err error) {
 	metaFile := storage.JoinPath(bh.CurBackupInfo.Name, utility.MetadataFileName)
 	dtoBody, err := json.Marshal(meta)
 	if err != nil {
 		return internal.NewSentinelMarshallingError(metaFile, err)
 	}
 	tracelog.DebugLogger.Printf("Uploading metadata file (%s):\n%s", metaFile, dtoBody)
-	return bh.Arguments.Uploader.Upload(metaFile, bytes.NewReader(dtoBody))
+	return bh.Arguments.Uploader.Upload(ctx, metaFile, bytes.NewReader(dtoBody))
 }
 
-func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err error) {
+func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto FilesMetadataDto) (err error) {
 	if bh.Arguments.withoutFilesMetadata {
 		tracelog.InfoLogger.Printf("Files metadata tracking is disabled, will not upload the %s", FilesMetadataName)
 		return nil
@@ -557,7 +557,7 @@ func (bh *BackupHandler) uploadFilesMetadata(filesMetaDto FilesMetadataDto) (err
 	if err != nil {
 		return err
 	}
-	return bh.Arguments.Uploader.Upload(getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
+	return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {

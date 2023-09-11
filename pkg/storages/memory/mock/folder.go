@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"io"
 
 	"github.com/wal-g/wal-g/pkg/storages/memory"
@@ -16,7 +17,7 @@ type Folder struct {
 	ExistsMock        func(objectRelativePath string) (bool, error)
 	GetSubFolderMock  func(subFolderRelativePath string) storage.Folder
 	ReadObjectMock    func(objectRelativePath string) (io.ReadCloser, error)
-	PutObjectMock     func(name string, content io.Reader) error
+	PutObjectMock     func(ctx context.Context, name string, content io.Reader) error
 	CopyObjectMock    func(srcPath string, dstPath string) error
 }
 
@@ -70,9 +71,16 @@ func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 
 func (f *Folder) PutObject(name string, content io.Reader) error {
 	if f.PutObjectMock != nil {
-		return f.PutObjectMock(name, content)
+		return f.PutObjectMock(context.Background(), name, content)
 	}
 	return f.MemFolder.PutObject(name, content)
+}
+
+func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	if f.PutObjectMock != nil {
+		return f.PutObjectMock(ctx, name, content)
+	}
+	return f.MemFolder.PutObjectWithContext(ctx, name, content)
 }
 
 func (f *Folder) CopyObject(srcPath string, dstPath string) error {

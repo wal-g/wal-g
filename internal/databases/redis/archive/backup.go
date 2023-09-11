@@ -179,7 +179,7 @@ func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
 
-	dstPath, err := su.PushStream(stream)
+	dstPath, err := su.PushStream(context.Background(), stream)
 	if err != nil {
 		return fmt.Errorf("can not upload backup: %+v", err)
 	}

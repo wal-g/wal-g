@@ -29,43 +29,50 @@ const (
 	MONGO     = "MONGO"
 	GP        = "GP"
 
-	DownloadConcurrencySetting     = "WALG_DOWNLOAD_CONCURRENCY"
-	UploadConcurrencySetting       = "WALG_UPLOAD_CONCURRENCY"
-	UploadDiskConcurrencySetting   = "WALG_UPLOAD_DISK_CONCURRENCY"
-	UploadQueueSetting             = "WALG_UPLOAD_QUEUE"
-	SentinelUserDataSetting        = "WALG_SENTINEL_USER_DATA"
-	PreventWalOverwriteSetting     = "WALG_PREVENT_WAL_OVERWRITE"
-	UploadWalMetadata              = "WALG_UPLOAD_WAL_METADATA"
-	DeltaMaxStepsSetting           = "WALG_DELTA_MAX_STEPS"
-	DeltaOriginSetting             = "WALG_DELTA_ORIGIN"
-	CompressionMethodSetting       = "WALG_COMPRESSION_METHOD"
-	StoragePrefixSetting           = "WALG_STORAGE_PREFIX"
-	DiskRateLimitSetting           = "WALG_DISK_RATE_LIMIT"
-	NetworkRateLimitSetting        = "WALG_NETWORK_RATE_LIMIT"
-	UseWalDeltaSetting             = "WALG_USE_WAL_DELTA"
-	UseReverseUnpackSetting        = "WALG_USE_REVERSE_UNPACK"
-	SkipRedundantTarsSetting       = "WALG_SKIP_REDUNDANT_TARS"
-	VerifyPageChecksumsSetting     = "WALG_VERIFY_PAGE_CHECKSUMS"
-	StoreAllCorruptBlocksSetting   = "WALG_STORE_ALL_CORRUPT_BLOCKS"
-	UseRatingComposerSetting       = "WALG_USE_RATING_COMPOSER"
-	UseCopyComposerSetting         = "WALG_USE_COPY_COMPOSER"
-	UseDatabaseComposerSetting     = "WALG_USE_DATABASE_COMPOSER"
-	WithoutFilesMetadataSetting    = "WALG_WITHOUT_FILES_METADATA"
-	DeltaFromNameSetting           = "WALG_DELTA_FROM_NAME"
-	DeltaFromUserDataSetting       = "WALG_DELTA_FROM_USER_DATA"
-	FetchTargetUserDataSetting     = "WALG_FETCH_TARGET_USER_DATA"
-	LogLevelSetting                = "WALG_LOG_LEVEL"
-	TarSizeThresholdSetting        = "WALG_TAR_SIZE_THRESHOLD"
-	TarDisableFsyncSetting         = "WALG_TAR_DISABLE_FSYNC"
-	CseKmsIDSetting                = "WALG_CSE_KMS_ID"
-	CseKmsRegionSetting            = "WALG_CSE_KMS_REGION"
-	LibsodiumKeySetting            = "WALG_LIBSODIUM_KEY"
-	LibsodiumKeyPathSetting        = "WALG_LIBSODIUM_KEY_PATH"
-	LibsodiumKeyTransform          = "WALG_LIBSODIUM_KEY_TRANSFORM"
-	GpgKeyIDSetting                = "GPG_KEY_ID"
-	PgpKeySetting                  = "WALG_PGP_KEY"
-	PgpKeyPathSetting              = "WALG_PGP_KEY_PATH"
-	PgpKeyPassphraseSetting        = "WALG_PGP_KEY_PASSPHRASE"
+	DownloadConcurrencySetting    = "WALG_DOWNLOAD_CONCURRENCY"
+	UploadConcurrencySetting      = "WALG_UPLOAD_CONCURRENCY"
+	UploadDiskConcurrencySetting  = "WALG_UPLOAD_DISK_CONCURRENCY"
+	UploadQueueSetting            = "WALG_UPLOAD_QUEUE"
+	SentinelUserDataSetting       = "WALG_SENTINEL_USER_DATA"
+	PreventWalOverwriteSetting    = "WALG_PREVENT_WAL_OVERWRITE"
+	UploadWalMetadata             = "WALG_UPLOAD_WAL_METADATA"
+	DeltaMaxStepsSetting          = "WALG_DELTA_MAX_STEPS"
+	DeltaOriginSetting            = "WALG_DELTA_ORIGIN"
+	CompressionMethodSetting      = "WALG_COMPRESSION_METHOD"
+	StoragePrefixSetting          = "WALG_STORAGE_PREFIX"
+	DiskRateLimitSetting          = "WALG_DISK_RATE_LIMIT"
+	NetworkRateLimitSetting       = "WALG_NETWORK_RATE_LIMIT"
+	UseWalDeltaSetting            = "WALG_USE_WAL_DELTA"
+	UseReverseUnpackSetting       = "WALG_USE_REVERSE_UNPACK"
+	SkipRedundantTarsSetting      = "WALG_SKIP_REDUNDANT_TARS"
+	VerifyPageChecksumsSetting    = "WALG_VERIFY_PAGE_CHECKSUMS"
+	StoreAllCorruptBlocksSetting  = "WALG_STORE_ALL_CORRUPT_BLOCKS"
+	UseRatingComposerSetting      = "WALG_USE_RATING_COMPOSER"
+	UseCopyComposerSetting        = "WALG_USE_COPY_COMPOSER"
+	UseDatabaseComposerSetting    = "WALG_USE_DATABASE_COMPOSER"
+	WithoutFilesMetadataSetting   = "WALG_WITHOUT_FILES_METADATA"
+	DeltaFromNameSetting          = "WALG_DELTA_FROM_NAME"
+	DeltaFromUserDataSetting      = "WALG_DELTA_FROM_USER_DATA"
+	FetchTargetUserDataSetting    = "WALG_FETCH_TARGET_USER_DATA"
+	LogLevelSetting               = "WALG_LOG_LEVEL"
+	TarSizeThresholdSetting       = "WALG_TAR_SIZE_THRESHOLD"
+	TarDisableFsyncSetting        = "WALG_TAR_DISABLE_FSYNC"
+	CseKmsIDSetting               = "WALG_CSE_KMS_ID"
+	CseKmsRegionSetting           = "WALG_CSE_KMS_REGION"
+	LibsodiumKeySetting           = "WALG_LIBSODIUM_KEY"
+	LibsodiumKeyPathSetting       = "WALG_LIBSODIUM_KEY_PATH"
+	LibsodiumKeyTransform         = "WALG_LIBSODIUM_KEY_TRANSFORM"
+	GpgKeyIDSetting               = "GPG_KEY_ID"
+	PgpKeySetting                 = "WALG_PGP_KEY"
+	PgpKeyPathSetting             = "WALG_PGP_KEY_PATH"
+	PgpKeyPassphraseSetting       = "WALG_PGP_KEY_PASSPHRASE"
+	PgpEnvelopeKeySetting         = "WALG_ENVELOPE_PGP_KEY"
+	PgpEnvelopKeyPathSetting      = "WALG_ENVELOPE_PGP_KEY_PATH"
+	PgpEnvelopeYcKmsKeyIDSetting  = "WALG_ENVELOPE_PGP_YC_CSE_KMS_KEY_ID"
+	PgpEnvelopeYcSaKeyFileSetting = "WALG_ENVELOPE_PGP_YC_SERVICE_ACCOUNT_KEY_FILE"
+	PgpEnvelopeYcEndpointSetting  = "WALG_ENVELOPE_PGP_YC_ENDPOINT"
+	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
+
 	PgDataSetting                  = "PGDATA"
 	UserSetting                    = "USER" // TODO : do something with it
 	PgPortSetting                  = "PGPORT"
@@ -93,6 +100,7 @@ const (
 	PgFailoverStorages             = "WALG_FAILOVER_STORAGES"
 	PgFailoverStoragesCheckTimeout = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
 	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
+	PgDaemonWALUploadTimeout       = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -219,6 +227,7 @@ var (
 		LibsodiumKeyTransform:          "none",
 		PgFailoverStoragesCheckTimeout: "30s",
 		PgFailoverStorageCacheLifetime: "15m",
+		PgpEnvelopeCacheExpiration:     "0",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -242,9 +251,10 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize:            "16",
-		PgBackRestStanza:     "main",
-		PgAliveCheckInterval: "1m",
+		PgWalSize:                "16",
+		PgBackRestStanza:         "main",
+		PgAliveCheckInterval:     "1m",
+		PgDaemonWALUploadTimeout: "60s",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -263,48 +273,54 @@ var (
 
 	CommonAllowedSettings = map[string]bool{
 		// WAL-G core
-		DownloadConcurrencySetting:   true,
-		UploadConcurrencySetting:     true,
-		UploadDiskConcurrencySetting: true,
-		UploadQueueSetting:           true,
-		SentinelUserDataSetting:      true,
-		PreventWalOverwriteSetting:   true,
-		UploadWalMetadata:            true,
-		DeltaMaxStepsSetting:         true,
-		DeltaOriginSetting:           true,
-		CompressionMethodSetting:     true,
-		StoragePrefixSetting:         true,
-		DiskRateLimitSetting:         true,
-		NetworkRateLimitSetting:      true,
-		UseWalDeltaSetting:           true,
-		LogLevelSetting:              true,
-		TarSizeThresholdSetting:      true,
-		TarDisableFsyncSetting:       true,
-		"WALG_" + GpgKeyIDSetting:    true,
-		"WALE_" + GpgKeyIDSetting:    true,
-		PgpKeySetting:                true,
-		PgpKeyPathSetting:            true,
-		PgpKeyPassphraseSetting:      true,
-		LibsodiumKeySetting:          true,
-		LibsodiumKeyPathSetting:      true,
-		LibsodiumKeyTransform:        true,
-		TotalBgUploadedLimit:         true,
-		NameStreamCreateCmd:          true,
-		NameStreamRestoreCmd:         true,
-		UseReverseUnpackSetting:      true,
-		SkipRedundantTarsSetting:     true,
-		VerifyPageChecksumsSetting:   true,
-		StoreAllCorruptBlocksSetting: true,
-		UseRatingComposerSetting:     true,
-		UseCopyComposerSetting:       true,
-		UseDatabaseComposerSetting:   true,
-		WithoutFilesMetadataSetting:  true,
-		MaxDelayedSegmentsCount:      true,
-		DeltaFromNameSetting:         true,
-		DeltaFromUserDataSetting:     true,
-		FetchTargetUserDataSetting:   true,
-		SerializerTypeSetting:        true,
-		StatsdAddressSetting:         true,
+		DownloadConcurrencySetting:    true,
+		UploadConcurrencySetting:      true,
+		UploadDiskConcurrencySetting:  true,
+		UploadQueueSetting:            true,
+		SentinelUserDataSetting:       true,
+		PreventWalOverwriteSetting:    true,
+		UploadWalMetadata:             true,
+		DeltaMaxStepsSetting:          true,
+		DeltaOriginSetting:            true,
+		CompressionMethodSetting:      true,
+		StoragePrefixSetting:          true,
+		DiskRateLimitSetting:          true,
+		NetworkRateLimitSetting:       true,
+		UseWalDeltaSetting:            true,
+		LogLevelSetting:               true,
+		TarSizeThresholdSetting:       true,
+		TarDisableFsyncSetting:        true,
+		"WALG_" + GpgKeyIDSetting:     true,
+		"WALE_" + GpgKeyIDSetting:     true,
+		PgpKeySetting:                 true,
+		PgpKeyPathSetting:             true,
+		PgpKeyPassphraseSetting:       true,
+		PgpEnvelopeKeySetting:         true,
+		PgpEnvelopKeyPathSetting:      true,
+		PgpEnvelopeCacheExpiration:    true,
+		PgpEnvelopeYcKmsKeyIDSetting:  true,
+		PgpEnvelopeYcSaKeyFileSetting: true,
+		PgpEnvelopeYcEndpointSetting:  true,
+		LibsodiumKeySetting:           true,
+		LibsodiumKeyPathSetting:       true,
+		LibsodiumKeyTransform:         true,
+		TotalBgUploadedLimit:          true,
+		NameStreamCreateCmd:           true,
+		NameStreamRestoreCmd:          true,
+		UseReverseUnpackSetting:       true,
+		SkipRedundantTarsSetting:      true,
+		VerifyPageChecksumsSetting:    true,
+		StoreAllCorruptBlocksSetting:  true,
+		UseRatingComposerSetting:      true,
+		UseCopyComposerSetting:        true,
+		UseDatabaseComposerSetting:    true,
+		WithoutFilesMetadataSetting:   true,
+		MaxDelayedSegmentsCount:       true,
+		DeltaFromNameSetting:          true,
+		DeltaFromUserDataSetting:      true,
+		FetchTargetUserDataSetting:    true,
+		SerializerTypeSetting:         true,
+		StatsdAddressSetting:          true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,
@@ -407,6 +423,7 @@ var (
 		PgFailoverStorages:             true,
 		PgFailoverStoragesCheckTimeout: true,
 		PgFailoverStorageCacheLifetime: true,
+		PgDaemonWALUploadTimeout:       true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -496,6 +513,7 @@ var (
 		PgPasswordSetting:            true,
 		PgpKeyPassphraseSetting:      true,
 		PgpKeySetting:                true,
+		PgpEnvelopeKeySetting:        true,
 		RedisPassword:                true,
 		SQLServerConnectionString:    true,
 		SSHPassword:                  true,

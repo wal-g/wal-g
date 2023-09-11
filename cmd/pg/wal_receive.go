@@ -29,7 +29,7 @@ var walReceiveCmd = &cobra.Command{
 			tracelog.ErrorLogger.PrintError(err)
 			uploader.ArchiveStatusManager = asm.NewNopASM()
 		}
-		postgres.HandleWALReceive(uploader)
+		postgres.HandleWALReceive(cmd.Context(), uploader)
 	},
 }
 
