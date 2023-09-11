@@ -20,7 +20,7 @@ var walPushCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		walUploader := GetWalUploader()
-		err := postgres.HandleWALPush(walUploader, args[0])
+		err := postgres.HandleWALPush(cmd.Context(), walUploader, args[0])
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

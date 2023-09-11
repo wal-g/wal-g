@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"bufio"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -179,7 +180,7 @@ func archiveBinLog(uploader internal.Uploader, dataDir string, binlog string) er
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
 	}
 	defer utility.LoggedClose(walFile, "")
-	err = uploader.UploadFile(walFile)
+	err = uploader.UploadFile(context.Background(), walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
 	}

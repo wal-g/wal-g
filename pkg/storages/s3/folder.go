@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"hash/fnv"
 	"io"
 	"path"
@@ -183,7 +184,11 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	return folder.uploader.upload(*folder.Bucket, folder.Path+name, content)
+	return folder.uploader.upload(context.Background(), *folder.Bucket, folder.Path+name, content)
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+	return folder.uploader.upload(ctx, *folder.Bucket, folder.Path+name, content)
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {

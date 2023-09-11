@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
@@ -73,9 +74,9 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 	return uploadInput
 }
 
-func (uploader *Uploader) upload(bucket, path string, content io.Reader) error {
+func (uploader *Uploader) upload(ctx context.Context, bucket, path string, content io.Reader) error {
 	input := uploader.createUploadInput(bucket, path, content)
-	_, err := uploader.uploaderAPI.Upload(input)
+	_, err := uploader.uploaderAPI.UploadWithContext(ctx, input)
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
 }
 

@@ -15,9 +15,6 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// Looking at sysexits.h, EX_IOERR (74) is defined as a generic exit code for input/output errors
-const ExIoError = 74
-
 type InvalidWalFileMagicError struct {
 	error
 }

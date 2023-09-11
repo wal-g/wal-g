@@ -12,10 +12,15 @@ import (
 type Reader struct {
 	reader  io.Reader
 	limiter *rate.Limiter
+	ctx     context.Context
 }
 
-func NewReader(reader io.Reader, limiter *rate.Limiter) *Reader {
-	return &Reader{reader, limiter}
+func NewReader(ctx context.Context, reader io.Reader, limiter *rate.Limiter) *Reader {
+	return &Reader{
+		reader:  reader,
+		limiter: limiter,
+		ctx:     ctx,
+	}
 }
 
 func (r *Reader) Read(buf []byte) (int, error) {
@@ -26,13 +31,13 @@ func (r *Reader) Read(buf []byte) (int, error) {
 	n, err := r.reader.Read(buf[:end])
 
 	if err != nil {
-		limiterErr := r.limiter.WaitN(context.TODO(), utility.Max(n, 0))
+		limiterErr := r.limiter.WaitN(r.ctx, utility.Max(n, 0))
 		if limiterErr != nil {
 			tracelog.ErrorLogger.Printf("Error happened while limiting: %+v\n", limiterErr)
 		}
 		return n, err
 	}
 
-	err = r.limiter.WaitN(context.TODO(), n)
+	err = r.limiter.WaitN(r.ctx, n)
 	return n, err
 }

@@ -1,6 +1,7 @@
 package swift
 
 import (
+	"context"
 	"hash/fnv"
 	"io"
 	"os"
@@ -9,7 +10,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
-	"github.com/ncw/swift"
+	"github.com/ncw/swift/v2"
 )
 
 var SettingList = []string{
@@ -38,12 +39,13 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Hashabl
 	for prop, value := range settings {
 		os.Setenv(prop, value)
 	}
+	ctx := context.Background()
 	//users must set conventional openStack environment variables: username, key, auth-url, tenantName, region etc
 	err := connection.ApplyEnvironment()
 	if err != nil {
 		return nil, NewError(err, "Unable to apply env variables")
 	}
-	err = connection.Authenticate()
+	err = connection.Authenticate(ctx)
 	if err != nil {
 		return nil, NewError(err, "Unable to authenticate connection")
 	}
@@ -53,7 +55,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Hashabl
 	}
 	path = storage.AddDelimiterToPath(path)
 
-	container, _, err := connection.Container(containerName)
+	container, _, err := connection.Container(ctx, containerName)
 	if err != nil {
 		return nil, NewError(err, "Unable to fetch container from name %v", containerName)
 	}
@@ -73,7 +75,7 @@ func (folder *Folder) GetPath() string {
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
-	_, _, err := folder.connection.Object(folder.container.Name, path)
+	_, _, err := folder.connection.Object(context.Background(), folder.container.Name, path)
 	if err == swift.ObjectNotFound {
 		return false, nil
 	}
@@ -85,9 +87,12 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	//Iterate
-	err = folder.connection.ObjectsWalk(folder.container.Name, &swift.ObjectsOpts{Delimiter: int32('/'), Prefix: folder.path},
-		func(opts *swift.ObjectsOpts) (interface{}, error) {
-			objectNames, err := folder.connection.ObjectNames(folder.container.Name, opts)
+	err = folder.connection.ObjectsWalk(
+		context.Background(),
+		folder.container.Name,
+		&swift.ObjectsOpts{Delimiter: int32('/'), Prefix: folder.path},
+		func(ctx context.Context, opts *swift.ObjectsOpts) (interface{}, error) {
+			objectNames, err := folder.connection.ObjectNames(ctx, folder.container.Name, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -98,7 +103,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 					subFolders = append(subFolders, NewFolder(folder.connection, folder.container, objectName))
 				} else {
 					//It is a storage object name
-					obj, _, err := folder.connection.Object(folder.container.Name, objectName)
+					obj, _, err := folder.connection.Object(ctx, folder.container.Name, objectName)
 					// Some files can disappear during ListFolder execution - they can be deleted by another process
 					// for example. We can ignore that and return only files that really exist.
 					if err == swift.ObjectNotFound {
@@ -114,7 +119,8 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			}
 			//return objectNames if a further iteration is required.
 			return objectNames, err
-		})
+		},
+	)
 	if err != nil {
 		return nil, nil, NewError(err, "Unable to iterate %v", folder.path)
 	}
@@ -128,7 +134,7 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	//get the object from the cloud using full path
-	readContents, _, err := folder.connection.ObjectOpen(folder.container.Name, path, true, nil)
+	readContents, _, err := folder.connection.ObjectOpen(context.Background(), folder.container.Name, path, true, nil)
 	if err == swift.ObjectNotFound {
 		return nil, storage.NewObjectNotFoundError(path)
 	}
@@ -140,10 +146,14 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
+	return folder.PutObjectWithContext(context.Background(), name, content)
+}
+
+func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	path := storage.JoinPath(folder.path, name)
 	//put the object in the cloud using full path
-	_, err := folder.connection.ObjectPut(folder.container.Name, path, content, false, "", "", nil)
+	_, err := folder.connection.ObjectPut(ctx, folder.container.Name, path, content, false, "", "", nil)
 	if err != nil {
 		return NewError(err, "Unable to write content.")
 	}
@@ -158,7 +168,9 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		}
 		return err
 	}
-	_, err := folder.connection.ObjectCopy(folder.path, srcPath, folder.path, dstPath, nil)
+	srcPath = storage.JoinPath(folder.path, srcPath)
+	dstPath = storage.JoinPath(folder.path, dstPath)
+	_, err := folder.connection.ObjectCopy(context.Background(), folder.container.Name, srcPath, folder.container.Name, dstPath, nil)
 	return err
 }
 
@@ -166,7 +178,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		path := storage.JoinPath(folder.path, objectRelativePath)
 		tracelog.DebugLogger.Printf("Delete object %v\n", path)
-		err := folder.connection.ObjectDelete(folder.container.Name, path)
+		err := folder.connection.ObjectDelete(context.Background(), folder.container.Name, path)
 		if err == swift.ObjectNotFound {
 			continue
 		}

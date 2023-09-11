@@ -15,6 +15,16 @@ export SKIP_TEST_WAL_OVERWRITES="1"
 # show client version
 walg-daemon-client --version
 
+MAXCLIENTSIZE=4194304 # 4MB
+CLIENTSIZE=$(stat -c%s $(which walg-daemon-client))
+# assert that resulting binary has the correct size
+if [ $CLIENTSIZE -ge $MAXCLIENTSIZE ]; then
+    echo "WAL-G daemon client size is too big ($CLIENTSIZE)"
+    exit 1
+else
+    echo "WAL-G daemon client size OK ($CLIENTSIZE)"
+fi
+
 prepare_config "/tmp/configs/full_backup_test_config.json"
 start_daemon
 test_full_backup "${TMP_CONFIG}"

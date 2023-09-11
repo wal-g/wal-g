@@ -22,9 +22,11 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 
 	readCloser, err := storageFolder.ReadObject("file0")
 	assert.NoError(t, err)
-	all, err := io.ReadAll(readCloser)
-	assert.NoError(t, err)
-	assert.Equal(t, token, all)
+	if err == nil {
+		all, err := io.ReadAll(readCloser)
+		assert.NoError(t, err)
+		assert.Equal(t, token, all)
+	}
 
 	err = sub1.PutObject("file1", strings.NewReader("data1"))
 	assert.NoError(t, err)
@@ -33,6 +35,9 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, b)
 	b, err = sub1.Exists("file1")
+	assert.NoError(t, err)
+	assert.True(t, b)
+	b, err = storageFolder.Exists("Sub1/file1")
 	assert.NoError(t, err)
 	assert.True(t, b)
 
@@ -51,11 +56,13 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 
 	data, err := sub1.ReadObject("file1")
 	assert.NoError(t, err)
-	data0Str, err := io.ReadAll(data)
-	assert.NoError(t, err)
-	assert.Equal(t, "data1", string(data0Str))
-	err = data.Close()
-	assert.NoError(t, err)
+	if err == nil {
+		data0Str, err := io.ReadAll(data)
+		assert.NoError(t, err)
+		assert.Equal(t, "data1", string(data0Str))
+		err = data.Close()
+		assert.NoError(t, err)
+	}
 
 	err = storageFolder.CopyObject("Sub1/file1", "Sub2/file2")
 	assert.NoError(t, err)
@@ -75,11 +82,13 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 
 	data, err = sub2.ReadObject("file2")
 	assert.NoError(t, err)
-	data0Str, err = io.ReadAll(data)
-	assert.NoError(t, err)
-	assert.Equal(t, "data1", string(data0Str))
-	err = data.Close()
-	assert.NoError(t, err)
+	if err == nil {
+		data0Str, err := io.ReadAll(data)
+		assert.NoError(t, err)
+		assert.Equal(t, "data1", string(data0Str))
+		err = data.Close()
+		assert.NoError(t, err)
+	}
 
 	err = sub1.DeleteObjects([]string{"file1"})
 	assert.NoError(t, err)

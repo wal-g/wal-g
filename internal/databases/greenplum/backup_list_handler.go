@@ -8,6 +8,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -55,7 +56,53 @@ type BackupDetail struct {
 	IncrementCount    *int    `json:"increment_count,omitempty"`
 }
 
-//TODO: Implement backup-list handler
+func (bd *BackupDetail) PrintableFields() []printlist.TableField {
+	restorePoint := "-"
+	if bd.RestorePoint != nil {
+		restorePoint = *bd.RestorePoint
+	}
+	prettyStartTime := internal.PrettyFormatTime(bd.StartTime)
+	prettyFinishTime := internal.PrettyFormatTime(bd.FinishTime)
+	return []printlist.TableField{
+		{
+			Name:       "name",
+			PrettyName: "Name time",
+			Value:      bd.Name,
+		},
+		{
+			Name:       "restore_point",
+			PrettyName: "Restore point",
+			Value:      restorePoint,
+		},
+		{
+			Name:        "start_time",
+			PrettyName:  "Start time",
+			Value:       internal.FormatTime(bd.StartTime),
+			PrettyValue: &prettyStartTime,
+		},
+		{
+			Name:        "finish_time",
+			PrettyName:  "Finish time",
+			Value:       internal.FormatTime(bd.FinishTime),
+			PrettyValue: &prettyFinishTime,
+		},
+		{
+			Name:       "hostname",
+			PrettyName: "Hostname",
+			Value:      bd.Hostname,
+		},
+		{
+			Name:       "gp_version",
+			PrettyName: "GP version",
+			Value:      bd.GpVersion,
+		},
+		{
+			Name:       "is_permanent",
+			PrettyName: "Permanent",
+			Value:      fmt.Sprintf("%v", bd.IsPermanent),
+		},
+	}
+}
 
 // ListStorageBackups returns the list of storage backups sorted by finish time (in ascending order)
 func ListStorageBackups(folder storage.Folder) ([]Backup, error) {
@@ -94,11 +141,8 @@ func MakeBackupDetails(backups []Backup) []BackupDetail {
 	return details
 }
 
+// TODO: unit tests (table output)
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
-	if !json {
-		tracelog.ErrorLogger.Fatalf("non-json detailed backup list is not supported (yet)")
-	}
-
 	backups, err := ListStorageBackups(folder)
 
 	if len(backups) == 0 {
@@ -107,6 +151,12 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = internal.WriteAsJSON(MakeBackupDetails(backups), os.Stdout, pretty)
-	tracelog.ErrorLogger.FatalOnError(err)
+	backupDetails := MakeBackupDetails(backups)
+
+	printableEntities := make([]printlist.Entity, len(backupDetails))
+	for i := range backups {
+		printableEntities[i] = &backupDetails[i]
+	}
+	err = printlist.List(printableEntities, os.Stdout, pretty, json)
+	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
 }

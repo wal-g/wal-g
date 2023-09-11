@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -39,14 +40,14 @@ type DaemonOptions struct {
 }
 
 type SocketMessageHandler interface {
-	Handle(messageBody []byte) error
+	Handle(ctx context.Context, messageBody []byte) error
 }
 
 type CheckMessageHandler struct {
 	fd net.Conn
 }
 
-func (h *CheckMessageHandler) Handle(_ []byte) error {
+func (h *CheckMessageHandler) Handle(_ context.Context, _ []byte) error {
 	_, err := h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
 		return newSocketWriteFailedError(err)
@@ -60,7 +61,7 @@ type ArchiveMessageHandler struct {
 	uploader *WalUploader
 }
 
-func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
+func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
 	tracelog.DebugLogger.Printf("wal file name: %s\n", string(messageBody))
 
 	fullPath, err := getFullPath(path.Join("pg_wal", string(messageBody)))
@@ -68,7 +69,13 @@ func (h *ArchiveMessageHandler) Handle(messageBody []byte) error {
 		return err
 	}
 	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
-	err = HandleWALPush(h.uploader, fullPath)
+	pushTimeout, err := internal.GetDurationSetting(internal.PgDaemonWALUploadTimeout)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(ctx, pushTimeout)
+	defer cancel()
+	err = HandleWALPush(ctx, h.uploader, fullPath)
 	if err != nil {
 		return fmt.Errorf("file archiving failed: %w", err)
 	}
@@ -84,7 +91,7 @@ type WalFetchMessageHandler struct {
 	reader internal.StorageFolderReader
 }
 
-func (h *WalFetchMessageHandler) Handle(messageBody []byte) error {
+func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) error {
 	args, err := daemon.BytesToArgs(messageBody)
 	if err != nil {
 		return err
@@ -183,12 +190,12 @@ func HandleDaemon(options DaemonOptions, pathToSocket string) {
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go Listen(fd, options)
+		go Listen(context.Background(), fd, options)
 	}
 }
 
 // Listen is used for listening connection and processing messages
-func Listen(c net.Conn, opts DaemonOptions) {
+func Listen(ctx context.Context, c net.Conn, opts DaemonOptions) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
 	messageReader := NewMessageReader(c)
 	for {
@@ -206,7 +213,7 @@ func Listen(c net.Conn, opts DaemonOptions) {
 			tracelog.ErrorLogger.PrintOnError(err)
 			return
 		}
-		err = messageHandler.Handle(messageBody)
+		err = messageHandler.Handle(ctx, messageBody)
 		if err != nil {
 			tracelog.ErrorLogger.Println("Failed to handle message:", err)
 			_, err = c.Write(daemon.ErrorType.ToBytes())

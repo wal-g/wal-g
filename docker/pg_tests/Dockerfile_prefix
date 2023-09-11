@@ -23,10 +23,15 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
     cd ../../cmd/daemonclient && \
     go build -mod vendor -o walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
+RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache go test -v -c
+RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go test -v -c
+
 FROM wal-g/pg:latest
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y netcat-openbsd && apt-get clean
 
+COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/swift/swift.test /tmp/test_bins/
+COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/sh/sh.test /tmp/test_bins/
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
 COPY --from=build /go/src/github.com/wal-g/wal-g/cmd/daemonclient/walg-daemon-client /usr/bin
 
