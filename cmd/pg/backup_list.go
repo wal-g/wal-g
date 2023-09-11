@@ -2,6 +2,7 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -35,7 +36,15 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 			aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
 			tracelog.ErrorLogger.FatalOnError(err)
-			cache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+			aliveCheckSize := viper.GetSizeInBytes(internal.PgFailoverStoragesCheckSize)
+			cache, err := cache.NewStatusCache(
+				primaryStorage,
+				failoverStorages,
+				cacheLifetime,
+				aliveCheckTimeout,
+				aliveCheckSize,
+				false,
+			)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			folder := multistorage.NewFolder(cache)

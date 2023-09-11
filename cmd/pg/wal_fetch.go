@@ -61,6 +61,7 @@ func GetFolder() storage.Folder {
 		cacheLifetime,
 		aliveCheckTimeout,
 		aliveCheckSize,
+		false,
 	)
 	tracelog.ErrorLogger.FatalOnError(err)
 

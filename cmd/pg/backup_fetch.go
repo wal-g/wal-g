@@ -64,6 +64,7 @@ var backupFetchCmd = &cobra.Command{
 			cacheLifetime,
 			aliveCheckTimeout,
 			aliveCheckSize,
+			false,
 		)
 		tracelog.ErrorLogger.FatalOnError(err)
 

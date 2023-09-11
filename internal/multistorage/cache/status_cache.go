@@ -21,24 +21,28 @@ type statusCache struct {
 	storagesInOrder []NamedFolder
 	ttl             time.Duration
 	checkTimeout    time.Duration
-	checkSize       uint
+	checkWriteSize  uint
 }
 
 func NewStatusCache(
 	primary storage.Folder,
 	failover map[string]storage.Folder,
 	ttl, checkTimeout time.Duration,
-	checkSize uint,
+	checkWriteSize uint,
+	storageWrite bool,
 ) (StatusCache, error) {
 	storagesInOrder, err := NameAndOrderFolders(primary, failover)
 	if err != nil {
 		return &statusCache{}, err
 	}
+	if !storageWrite {
+		checkWriteSize = 0
+	}
 	return &statusCache{
 		storagesInOrder: storagesInOrder,
 		ttl:             ttl,
 		checkTimeout:    checkTimeout,
-		checkSize:       checkSize,
+		checkWriteSize:  checkWriteSize,
 	}, nil
 }
 
@@ -60,7 +64,7 @@ func (c *statusCache) AllAliveStorages() ([]NamedFolder, error) {
 		return memCache.getAllAlive(c.storagesInOrder), nil
 	}
 
-	checkResult := checkForAlive(c.checkTimeout, c.checkSize, outdated...)
+	checkResult := checkForAlive(c.checkTimeout, c.checkWriteSize, outdated...)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
@@ -99,7 +103,7 @@ func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 
 	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 
-	checkResult := checkForAlive(c.checkTimeout, c.checkSize, outdated...)
+	checkResult := checkForAlive(c.checkTimeout, c.checkWriteSize, outdated...)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
@@ -148,7 +152,7 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 		return getStorageIfAlive(oldFile)
 	}
 
-	checkResult := checkForAlive(c.checkTimeout, c.checkSize, *specificStorage)
+	checkResult := checkForAlive(c.checkTimeout, c.checkWriteSize, *specificStorage)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
