@@ -97,3 +97,4 @@ popd
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 
 /tmp/scripts/drop_pg.sh
+rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA}

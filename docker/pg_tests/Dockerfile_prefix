@@ -17,10 +17,10 @@ COPY utility/ utility/
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
     sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
-        vendor/github.com/cyberdelia/lzo/lzo.go && \
-    cd main/pg && \
-    go build -mod vendor -race -o wal-g -tags "brotli lzo" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`" && \
-    cd ../../cmd/daemonclient && \
+        vendor/github.com/cyberdelia/lzo/lzo.go
+RUN --mount=type=cache,target=/gocache cd main/pg && GOCACHE=/gocache \
+    go build -mod vendor -race -o wal-g -tags "brotli lzo" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+RUN --mount=type=cache,target=/gocache cd cmd/daemonclient && GOCACHE=/gocache \
     go build -mod vendor -o walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache go test -v -c
@@ -37,7 +37,4 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/cmd/daemonclient/walg-daemon-cl
 
 COPY docker/pg_tests/scripts/ /tmp
 
-RUN mkdir -p /tmp/logs/
-
-RUN chmod 777 /tmp/configs/
-RUN chmod 777 /tmp/logs/
+RUN mkdir -p /tmp/logs/ && chmod 777 /tmp/configs/ && chmod 777 /tmp/logs/

@@ -1,10 +1,11 @@
 name: Docker tests
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  workflow_call:
+    inputs:
+      command-json-array:
+        required: true
+        type: string
 
 env:
   CACHE_FOLDER: ~/docker-images-${{ github.sha }}
@@ -71,76 +72,9 @@ jobs:
     needs: [ buildimages ]
     strategy:
       matrix:
-        command: [ 'make TEST="pg_ready_rename_test" pg_integration_test',
-                   'make TEST="pg_backup_mark_impermanent_test" pg_integration_test',
-                   'make TEST="pg_backup_mark_permanent_test" pg_integration_test',
-                   'make TEST="pg_config_test" pg_integration_test',
-                   'make TEST="pg_crypto_test" pg_integration_test',
-                   'make TEST="pg_copy_all_test" pg_integration_test',
-                   'make TEST="pg_copy_backup_test" pg_integration_test',
-                   'make TEST="pg_delta_backup_wal_delta_test" pg_integration_test',
-                   'make TEST="pg_full_backup_test" pg_integration_test',
-                   'make TEST="pg_full_backup_streamed_test" pg_integration_test',
-                   'make TEST="pg_partial_restore_test" pg_integration_test',
-                   'make TEST="pg_remote_backup_test" pg_integration_test',
-                   'make TEST="pg_ssh_backup_test" pg_integration_test',
-                   'make TEST="pg_receive_wal_test" pg_integration_test',
-                   'make TEST="pg_full_backup_copy_composer_test" pg_integration_test',
-                   'make TEST="pg_full_backup_rating_composer_test" pg_integration_test',
-                   'make TEST="pg_full_backup_database_composer_test" pg_integration_test',
-                   'make TEST="pg_full_backup_failover_storage_test" pg_integration_test',
-                   'make TEST="pg_delete_before_name_find_full_test" pg_integration_test',
-                   'make TEST="pg_delete_retain_full_test" pg_integration_test',
-                   'make TEST="pg_delete_before_time_find_full_test" pg_integration_test',
-                   'make TEST="pg_delete_without_confirm_test" pg_integration_test',
-                   'make TEST="pg_ghost_table_test" pg_integration_test',
-                   'make TEST="pg_delete_end_to_end_test" pg_integration_test',
-                   'make TEST="pg_delta_backup_fullscan_test" pg_integration_test',
-                   'make TEST="pg_several_delta_backups_test" pg_integration_test',
-                   'make TEST="pg_several_delta_backups_reverse_test" pg_integration_test',
-                   'make TEST="pg_storage_swift_test" pg_integration_test',
-                   'make TEST="pg_storage_ssh_test" pg_integration_test',
-                   'make TEST="pg_delete_retain_find_full_test" pg_integration_test',
-                   'make TEST="pg_wale_compatibility_test" pg_integration_test',
-                   'make TEST="pg_delete_before_permanent_full_test" pg_integration_test',
-                   'make TEST="pg_delete_before_permanent_delta_test" pg_integration_test',
-                   'make TEST="pg_delete_target_test" pg_integration_test',
-                   'make TEST="pg_delete_target_delta_test" pg_integration_test',
-                   'make TEST="pg_delete_target_delta_find_full_test" pg_integration_test',
-                   'make TEST="pg_backup_mark_permanent_no_error_test" pg_integration_test',
-                   'make TEST="pg_delete_garbage_test" pg_integration_test',
-                   'make TEST="pg_daemon_test" pg_integration_test',
-                   'make TEST="pg_daemon_backup_and_restore_test" pg_integration_test',
-                   'make TEST="pg_daemon_client_test" pg_integration_test',
-                   'make mongo_test',
-                   'make MONGO_VERSION="6.0.3" MONGO_MAJOR="6.0" MONGO_REPO="repo.mongodb.org" MONGO_PACKAGE="mongodb-org" mongo_features',
-                   'make MONGO_VERSION="6.0.3" MONGO_MAJOR="6.0" MONGO_REPO="repo.mongodb.com" MONGO_PACKAGE="mongodb-enterprise" mongo_features',
-                   'make MONGO_VERSION="5.0.13" MONGO_MAJOR="5.0" MONGO_REPO="repo.mongodb.org" MONGO_PACKAGE="mongodb-org" mongo_features',
-                   'make MONGO_VERSION="5.0.13" MONGO_MAJOR="5.0" MONGO_REPO="repo.mongodb.com" MONGO_PACKAGE="mongodb-enterprise" mongo_features',
-                   'make MONGO_VERSION="4.4.17" MONGO_MAJOR="4.4" MONGO_REPO="repo.mongodb.org" MONGO_PACKAGE="mongodb-org" mongo_features',
-                   'make MONGO_VERSION="4.4.17" MONGO_MAJOR="4.4" MONGO_REPO="repo.mongodb.com" MONGO_PACKAGE="mongodb-enterprise" mongo_features',
-                   'make MONGO_VERSION="4.2.23" MONGO_MAJOR="4.2" MONGO_REPO="repo.mongodb.org" MONGO_PACKAGE="mongodb-org" mongo_features',
-                   'make redis_test',
-                   'make REDIS_VERSION="5.0.8" redis_features',
-                   'make REDIS_VERSION="6.0.8" redis_features',
-                   'make REDIS_VERSION="6.2.4" redis_features',
-                   'make FEATURE="backup" REDIS_VERSION="5.0.8" redis_features',
-                   'make FEATURE="backup" REDIS_VERSION="6.0.8" redis_features',
-                   'make FEATURE="backup" REDIS_VERSION="6.2.4" redis_features',
-                   'make TEST="pg_wale_tablespace_compatibility_test" pg_integration_test',
-                   'make TEST="pg_tablespace_support_test" pg_integration_test',
-                   'make TEST="pg_wal_perftest" pg_integration_test',
-                   'make TEST="pg_backup_perftest" pg_integration_test',
-                   'make TEST="pg_catchup_test" pg_integration_test',
-                   'make TEST="pg_wal_restore_test" pg_integration_test',
-                   'make MYSQL_TEST=mysql_base_tests mysql_integration_test',
-                   'make MYSQL_TEST=mysql_delete_tests mysql_integration_test',
-                   'make MYSQL_TEST=mysql_copy_tests mysql_integration_test',
-                   'make mariadb_test',
-                   'make gp_test',
-                   'make st_test',
-                   'make TEST="pg_pgbackrest_backup_fetch_test" pg_integration_test'
-      ]
+        # GH Actions lack of complex types support for inputs.
+        # Workaround https://github.com/orgs/community/discussions/11692#discussioncomment-3187271
+        command: ${{ fromJSON(inputs.command-json-array) }}
       # do not cancel all tests if one failed
       fail-fast: false
     steps:

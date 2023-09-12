@@ -1,4 +1,5 @@
-FROM golangci/golangci-lint:latest
+ARG TAG=latest
+FROM golangci/golangci-lint:${TAG}
 WORKDIR /app
 RUN apt-get update && apt-get install -y \
     liblzo2-dev \
