@@ -41,7 +41,6 @@ func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string,
 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
 	seenSize := int64(-1)
-
 	sizeStallInterations := 0
 	maxSizeStallTerations := 100
 	for {
@@ -68,7 +67,6 @@ func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string,
 		} else if !os.IsNotExist(err) {
 			return err
 		}
-
 		// We have race condition here, if running is renamed here, but it's OK
 
 		if runStat, err := os.Stat(running); err == nil {

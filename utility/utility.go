@@ -47,7 +47,7 @@ const (
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	CatchupPath      = "catchup_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
-	BackupNamePrefix = "base_"
+	BackupNamePrefix = "backup_"
 	BackupTimeFormat = "20060102T150405Z" // timestamps in that format should be lexicographically sorted
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
@@ -266,7 +266,11 @@ func CeilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
 }
 
 func TimeNowCrossPlatformUTC() time.Time {
-	return CeilTimeUpToMicroseconds(time.Now().In(time.UTC))
+	return TimeCrossPlatformUTC(time.Now())
+}
+
+func TimeCrossPlatformUTC(timeToTransform time.Time) time.Time {
+	return CeilTimeUpToMicroseconds(timeToTransform.In(time.UTC))
 }
 
 func TimeNowCrossPlatformLocal() time.Time {

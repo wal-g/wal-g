@@ -291,7 +291,7 @@ PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_S3_PREFIX=s3://deletebeforepermanentdeltabucket \
 WALG_USE_WAL_DELTA=true \
-wal-g backup-list | egrep -o "[0-9A-F]{24}"`
+wal-g backup-list | egrep -o "[0-9]{8}T[0-9]{6}Z"`
 
 # make permanent base backup
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
@@ -413,12 +413,12 @@ WALG_USE_WAL_DELTA=true \
 wal-g backup-list 2> /tmp/2 1> /tmp/1
 
 # check that stdout not include any backup
-! cat /tmp/1 | egrep -o "[0-9A-F]{24}" > /tmp/dump1
+! cat /tmp/1 | egrep -o "[0-9]{8}T[0-9]{6}Z" > /tmp/dump1
 diff /tmp/dump1 /tmp/dump2
 
 # check that stderr not include any backup
 # stderr shuld be "INFO: ... No backups found"
-! cat /tmp/2 | egrep -o "[0-9A-F]{24}" > /tmp/dump1
+! cat /tmp/2 | egrep -o "[0-9]{8}T[0-9]{6}Z" > /tmp/dump1
 diff /tmp/dump1 /tmp/dump2
 
 /tmp/scripts/drop_pg.sh

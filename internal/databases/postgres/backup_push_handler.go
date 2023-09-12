@@ -22,6 +22,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const (
+	BackupNamePrefix = "backup_"
+	BackupNameLength = len(BackupNamePrefix) + len(utility.BackupTimeFormat)
+)
+
 type backupFromFuture struct {
 	error
 }
@@ -172,11 +177,13 @@ func (bh *BackupHandler) startBackup() (err error) {
 	}
 
 	tracelog.DebugLogger.Println("Running StartBackup.")
-	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(
-		bh.Workers.QueryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
+	backupTime := time.Now()
+	backupStartLSN, err := bh.Workers.Bundle.StartBackup(bh.Workers.QueryRunner, backupTime)
 	if err != nil {
 		return
 	}
+
+	backupName := BackupNamePrefix + utility.TimeCrossPlatformUTC(backupTime).Format(utility.BackupTimeFormat)
 	bh.CurBackupInfo.startLSN = backupStartLSN
 	bh.CurBackupInfo.Name = backupName
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
@@ -211,7 +218,9 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 					"Fallback to full scan delta backup\n", err)
 			}
 		}
-		bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + "_D_" + utility.StripWalFileName(bh.prevBackupInfo.name)
+
+		baseName := bh.prevBackupInfo.name[len(BackupNamePrefix):BackupNameLength]
+		bh.CurBackupInfo.Name += "_D_" + baseName
 		tracelog.DebugLogger.Printf("Suffixing Backup name with Delta info: %s", bh.CurBackupInfo.Name)
 	}
 }
@@ -222,7 +231,7 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 	if !bh.Workers.Bundle.TablespaceSpec.empty() {
 		tablespaceSpec = &bh.Workers.Bundle.TablespaceSpec
 	}
-	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
+	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec, &bh.Workers.Bundle.Timeline)
 	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
 	filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata()
@@ -387,7 +396,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 	bh.CurBackupInfo.uncompressedSize = baseBackup.UncompressedSize
 	bh.CurBackupInfo.compressedSize, err = bh.Arguments.Uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
-	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
+	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec(), &baseBackup.TimeLine)
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
 	bh.CurBackupInfo.Name = baseBackup.BackupName()
 	tracelog.InfoLogger.Println("Uploading metadata")

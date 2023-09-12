@@ -94,7 +94,7 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
+func makeLessFunc() func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
 		time1, ok := utility.TryFetchTimeRFC3999(object1.GetName())
 		if !ok {
@@ -119,7 +119,7 @@ func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 		mysql.NewGenericMetaFetcher())
 
 	return &DeleteHandler{
-		DeleteHandler: internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder),
+		DeleteHandler: internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(),
 			internal.IsPermanentFunc(func(object storage.Object) bool {
 				return internal.IsPermanent(object.GetName(), permanentBackups, internal.StreamBackupNameLength)
 			}),

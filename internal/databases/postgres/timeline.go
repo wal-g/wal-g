@@ -2,20 +2,18 @@ package postgres
 
 import (
 	"fmt"
-	"regexp"
-	"strconv"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
+	"regexp"
+	"strconv"
 )
 
 const PatternTimelineAndLogSegNo = "[0-9A-F]{24}"
+const PatternTimestamp = "[0-9]{8}T[0-9]{6}Z"
 const PatternLSN = "[0-9A-F]{8}"
 
 var regexpTimelineAndLogSegNo = regexp.MustCompile(PatternTimelineAndLogSegNo)
-
-const maxCountOfLSN = 2
 
 type BytesPerWalSegmentError struct {
 	error
@@ -126,18 +124,6 @@ func ParseWALFilename(name string) (timelineID uint32, logSegNo uint64, err erro
 
 	logSegNo = logSegNoHi*xLogSegmentsPerXLogID + logSegNoLo
 	return
-}
-
-func TryFetchTimelineAndLogSegNo(objectName string) (uint32, uint64, bool) {
-	foundLsn := regexpTimelineAndLogSegNo.FindAllString(objectName, maxCountOfLSN)
-	if len(foundLsn) > 0 {
-		timelineID, logSegNo, err := ParseWALFilename(foundLsn[0])
-
-		if err == nil {
-			return timelineID, logSegNo, true
-		}
-	}
-	return 0, 0, false
 }
 
 func isWalFilename(filename string) bool {
