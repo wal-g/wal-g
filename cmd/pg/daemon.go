@@ -15,7 +15,7 @@ var daemonCmd = &cobra.Command{
 	Short: DaemonShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := postgres.ConfigureMultiStorageFolder()
+		folder, err := postgres.ConfigureMultiStorageFolder(true)
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
 
 		walUploader, err := postgres.PrepareMultiStorageWalUploader(folder, targetStorage)

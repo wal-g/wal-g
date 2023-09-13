@@ -17,7 +17,8 @@ import (
 // ConfigureMultiStorageFolder configures the primary storage folder and all the failover ones, if any, and builds a
 // multi-storage folder that aggregates them. It also sets up a cache to keep storage alive check results there.
 // This function doesn't set any specific multi-storage folder policies, so policies.Default are used initially.
-func ConfigureMultiStorageFolder() (storage.Folder, error) {
+// storageWrite should be true for operations supposes writing to the storage. It affects selecting R/O or R/W check.
+func ConfigureMultiStorageFolder(storageWrite bool) (storage.Folder, error) {
 	primaryStorage, err := internal.ConfigureFolder()
 	if err != nil {
 		return nil, fmt.Errorf("configure primary folder: %w", err)
@@ -36,7 +37,15 @@ func ConfigureMultiStorageFolder() (storage.Folder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get failover storage check timeout setting: %w", err)
 	}
-	statusCache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+	aliveCheckSize := viper.GetSizeInBytes(internal.PgFailoverStoragesCheckSize)
+	statusCache, err := cache.NewStatusCache(
+		primaryStorage,
+		failoverStorages,
+		cacheLifetime,
+		aliveCheckTimeout,
+		aliveCheckSize,
+		storageWrite,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("init cache with storage statuses: %w", err)
 	}
