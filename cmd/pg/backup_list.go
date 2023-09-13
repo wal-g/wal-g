@@ -49,7 +49,11 @@ var (
 
 			folder := multistorage.NewFolder(cache)
 			folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
-			folder, err = multistorage.UseAllAliveStorages(folder)
+			if targetStorage == "" {
+				folder, err = multistorage.UseAllAliveStorages(folder)
+			} else {
+				folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+			}
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			backupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
@@ -76,4 +80,6 @@ func init() {
 		"Prints output in JSON format, multiline and indented if combined with --pretty flag")
 	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false,
 		"Prints extra DB-specific backup details")
+	backupListCmd.Flags().StringVar(&targetStorage, "target-storage", "",
+		targetStorageDescription)
 }

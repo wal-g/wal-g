@@ -1,0 +1,18 @@
+# This workflow runs docker tests sequentially in one container.
+# It is made to check that no one test scripts is failed because of forgotten to add to parallel tests list.
+
+name: Docker tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  sequiential:
+    uses: ./.github/workflows/dockertests.yml
+    with:
+      command-json-array: >
+        [
+        "make pg_integration_test"
+        ]

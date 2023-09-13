@@ -90,7 +90,7 @@ func UsedStorages(folder storage.Folder) []string {
 func EnsureSingleStorageIsUsed(folder storage.Folder) error {
 	storages := UsedStorages(folder)
 	if len(storages) != 1 {
-		return fmt.Errorf("multi-storage folder must use a single storage, but it uses %d", len(storages))
+		return fmt.Errorf("multi-storage folder is expected to use a single storage, but it uses %d", len(storages))
 	}
 	return nil
 }

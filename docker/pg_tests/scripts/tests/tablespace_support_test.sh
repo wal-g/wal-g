@@ -110,4 +110,4 @@ pg_dumpall -f /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 diff -r /tmp/spaces_backup /tmp/spaces
 
-../scripts/drop_pg.sh
+/tmp/scripts/drop_pg.sh

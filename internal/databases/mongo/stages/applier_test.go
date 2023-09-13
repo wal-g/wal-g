@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	archiveMocks "github.com/wal-g/wal-g/internal/databases/mongo/archive/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -40,6 +41,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 					buf27.Write(make([]byte, 27))
 					buf27.Reader()
 					upl.On("UploadOplogArchive",
+						mock.Anything,
 						buf27,
 						models.Timestamp{TS: 1579002001, Inc: 1},
 						models.Timestamp{TS: 1579002003, Inc: 1}).
@@ -84,11 +86,13 @@ func TestStorageApplier_Apply(t *testing.T) {
 					buf16.Reader()
 
 					upl.On("UploadOplogArchive",
+						mock.Anything,
 						buf17,
 						models.Timestamp{TS: 1579002001, Inc: 1},
 						models.Timestamp{TS: 1579002002, Inc: 1}).
 						Return(nil).Once().
 						On("UploadOplogArchive",
+							mock.Anything,
 							buf16,
 							models.Timestamp{TS: 1579002002, Inc: 1},
 							models.Timestamp{TS: 1579002009, Inc: 1}).
@@ -130,6 +134,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 					buf8.Write(make([]byte, 8))
 					buf8.Reader()
 					upl.On("UploadOplogArchive",
+						mock.Anything,
 						buf8,
 						models.Timestamp{TS: 1579002001, Inc: 1},
 						models.Timestamp{TS: 1579002001, Inc: 1}).

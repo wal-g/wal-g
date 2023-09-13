@@ -70,7 +70,11 @@ var backupFetchCmd = &cobra.Command{
 
 		folder := multistorage.NewFolder(cache)
 		folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
-		folder, err = multistorage.UseAllAliveStorages(folder)
+		if targetStorage == "" {
+			folder, err = multistorage.UseAllAliveStorages(folder)
+		} else {
+			folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+		}
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if partialRestoreArgs != nil {
@@ -126,6 +130,8 @@ func init() {
 		"", targetUserDataDescription)
 	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only",
 		nil, restoreOnlyDescription)
+	backupFetchCmd.Flags().StringVar(&targetStorage, "target-storage",
+		"", targetStorageDescription)
 
 	Cmd.AddCommand(backupFetchCmd)
 }

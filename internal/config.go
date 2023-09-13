@@ -102,6 +102,7 @@ const (
 	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
 	PgFailoverStoragesCheckSize    = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
 	PgDaemonWALUploadTimeout       = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
+	PgTargetStorage                = "WALG_TARGET_STORAGE"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"

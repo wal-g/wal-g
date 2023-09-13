@@ -145,7 +145,7 @@ func TestEnsureSingleStorageIsUsed(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		err := EnsureSingleStorageIsUsed(folder)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "must use a single storage")
+		assert.Contains(t, err.Error(), "expected to use a single storage")
 	})
 
 	t.Run("no error if folder is not multistorage", func(t *testing.T) {

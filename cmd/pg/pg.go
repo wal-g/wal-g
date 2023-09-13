@@ -5,14 +5,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/common"
-
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/cmd/common"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const WalgShortDescription = "PostgreSQL backup tool"
@@ -34,8 +32,13 @@ var (
 			if viper.IsSet(internal.PgWalSize) {
 				postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))
 			}
+
+			targetStorage = viper.GetString(internal.PgTargetStorage)
 		},
 	}
+
+	targetStorage            string
+	targetStorageDescription = `Name of the storage to execute the command only for. Use "default" to select the primary one.`
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.

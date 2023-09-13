@@ -3,12 +3,20 @@ package mongo
 import (
 	"context"
 	"fmt"
+	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	mocks "github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type fetcherReturn struct {
@@ -134,4 +142,83 @@ func TestHandleOplogPush(t *testing.T) {
 			tc.mocks.AssertExpectations(t)
 		})
 	}
+}
+
+func TestHandleOplogPush_CancelLongUpload(t *testing.T) {
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+
+	fetcher := &mocks.Fetcher{}
+	oplogc := make(chan *models.Oplog)
+	errc := make(chan error)
+	fetcher.On("Fetch", mock.Anything).
+		Return(oplogc, errc, nil).
+		Once()
+
+	nextOplog := func() *models.Oplog {
+		ts := models.Timestamp{TS: uint32(time.Now().Unix()), Inc: uint32(time.Now().Nanosecond())}
+		data, err := bson.Marshal(map[string]interface{}{
+			"ts": ts.ToBsonTS(),
+		})
+		require.NoError(t, err)
+		return &models.Oplog{TS: ts, Data: data}
+	}
+	go func() {
+		for i := 0; i < 5; i++ {
+			oplogc <- nextOplog()
+		}
+		oplogc <- nextOplog()
+		t.Log("Cancel context")
+		cancelCtx()
+		close(oplogc)
+		close(errc)
+	}()
+
+	uploaderMock := &uploaderMock{
+		t:                  t,
+		waitForCancelAfter: 5,
+	}
+	buff := stages.NewMemoryBuffer()
+	statsUpdater := stats.NewOplogUploadStats(models.Timestamp{TS: uint32(time.Now().Unix()), Inc: uint32(time.Now().Nanosecond())})
+	applier := stages.NewStorageApplier(
+		uploaderMock,
+		buff,
+		1,
+		time.Hour,
+		statsUpdater,
+	)
+
+	err := HandleOplogPush(ctx, fetcher, applier)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "can not upload oplog archive: stop uploading oplog: context canceled")
+}
+
+var _ archive.Uploader = &uploaderMock{}
+
+type uploaderMock struct {
+	t                  *testing.T
+	waitForCancelAfter int
+}
+
+func (u *uploaderMock) UploadOplogArchive(ctx context.Context, stream io.Reader, firstTS, lastTS models.Timestamp) error {
+	if u.waitForCancelAfter <= 0 {
+		u.t.Log("Wait for context is cancelled")
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("stop uploading oplog: %w", ctx.Err())
+		}
+	}
+	u.waitForCancelAfter--
+	u.t.Logf("Uploaded oplog: firstTS %v, lastTS %v", firstTS, lastTS)
+	return nil
+}
+
+func (u *uploaderMock) UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error {
+	u.t.Fatal("unexpected call")
+	return nil
+}
+
+func (u *uploaderMock) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+	u.t.Fatal("unexpected call")
+	return nil
 }

@@ -3,7 +3,6 @@
 
 # all available settings of specific linters
 linters-settings:
-  modules-download-mode: vendor
   dupl:
     threshold: 400
   funlen:
@@ -84,6 +83,7 @@ linters:
 run:
   go: "1.20"
   timeout: 5m
+  modules-download-mode: readonly
   skip-dirs:
     - "tests_func"
     - "tmp"
