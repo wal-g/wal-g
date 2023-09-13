@@ -3,6 +3,8 @@ package internal
 import (
 	"io"
 
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -21,4 +23,19 @@ type FolderReaderImpl struct {
 
 func (fsr *FolderReaderImpl) SubFolder(subFolderRelativePath string) StorageFolderReader {
 	return NewFolderReader(fsr.GetSubFolder(subFolderRelativePath))
+}
+
+func PrepareMultiStorageFolderReader(folder storage.Folder, targetStorage string) (StorageFolderReader, error) {
+	folder = multistorage.SetPolicies(folder, policies.MergeAllStorages)
+	var err error
+	if targetStorage == "" {
+		folder, err = multistorage.UseAllAliveStorages(folder)
+	} else {
+		folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return NewFolderReader(folder), nil
 }

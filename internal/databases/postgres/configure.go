@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -8,7 +9,40 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+// ConfigureMultiStorageFolder configures the primary storage folder and all the failover ones, if any, and builds a
+// multi-storage folder that aggregates them. It also sets up a cache to keep storage alive check results there.
+// This function doesn't set any specific multi-storage folder policies, so policies.Default are used initially.
+func ConfigureMultiStorageFolder() (storage.Folder, error) {
+	primaryStorage, err := internal.ConfigureFolder()
+	if err != nil {
+		return nil, fmt.Errorf("configure primary folder: %w", err)
+	}
+
+	failoverStorages, err := internal.InitFailoverStorages()
+	if err != nil {
+		return nil, fmt.Errorf("configure failover folders: %w", err)
+	}
+
+	cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+	if err != nil {
+		return nil, fmt.Errorf("get failover storage cache lifetime setting: %w", err)
+	}
+	aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("get failover storage check timeout setting: %w", err)
+	}
+	statusCache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("init cache with storage statuses: %w", err)
+	}
+
+	return multistorage.NewFolder(statusCache), nil
+}
 
 // ConfigureWalUploader connects to storage and creates an uploader. It makes sure
 // that a valid session has started; if invalid, returns AWS error
