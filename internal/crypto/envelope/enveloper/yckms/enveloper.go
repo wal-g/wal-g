@@ -68,7 +68,7 @@ func serializeEncryptedKey(encryptedKey []byte) []byte {
 
 func readEncryptedKey(r io.Reader) ([]byte, error) {
 	magicSchemeBytes := make([]byte, len(magic)+1)
-	_, err := r.Read(magicSchemeBytes)
+	_, err := io.ReadFull(r, magicSchemeBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -82,14 +82,15 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 	}
 
 	encryptedKeyLenBytes := make([]byte, 4)
-	_, err = r.Read(encryptedKeyLenBytes)
+	_, err = io.ReadFull(r, encryptedKeyLenBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	encryptedKeyLen := binary.LittleEndian.Uint32(encryptedKeyLenBytes)
 	encryptedKey := make([]byte, encryptedKeyLen)
-	_, err = r.Read(encryptedKey)
+
+	_, err = io.ReadFull(r, encryptedKey)
 	if err != nil {
 		return nil, err
 	}
