@@ -131,11 +131,12 @@ func (crypter *Crypter) setupEncryptedKey() error {
 			return err
 		}
 		encryptedKey := make([]byte, base64.StdEncoding.DecodedLen(len(content)))
-		_, err = base64.StdEncoding.Decode(encryptedKey, content)
+		var decodedLen int
+		decodedLen, err = base64.StdEncoding.Decode(encryptedKey, content)
 		if err != nil {
 			return err
 		}
-		crypter.encryptedKey = encryptedKey
+		crypter.encryptedKey = encryptedKey[:decodedLen]
 	}
 	return nil
 }
