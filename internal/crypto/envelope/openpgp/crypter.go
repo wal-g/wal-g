@@ -120,25 +120,37 @@ func (crypter *Crypter) setupEncryptedKey() error {
 
 	switch {
 	case crypter.IsUseArmoredKey:
-		encryptedKey, err := base64.StdEncoding.DecodeString(crypter.ArmoredKey)
+		encryptedKey, err := readFromString(crypter.ArmoredKey)
 		if err != nil {
 			return err
 		}
 		crypter.encryptedKey = encryptedKey
 	case crypter.IsUseArmoredKeyPath:
-		content, err := os.ReadFile(crypter.ArmoredKeyPath)
+		encryptedKey, err := readFromFilePath(crypter.ArmoredKeyPath)
 		if err != nil {
 			return err
 		}
-		encryptedKey := make([]byte, base64.StdEncoding.DecodedLen(len(content)))
-		var decodedLen int
-		decodedLen, err = base64.StdEncoding.Decode(encryptedKey, content)
-		if err != nil {
-			return err
-		}
-		crypter.encryptedKey = encryptedKey[:decodedLen]
+		crypter.encryptedKey = encryptedKey
 	}
 	return nil
+}
+
+func readFromString(content string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(content)
+}
+
+func readFromFilePath(path string) ([]byte, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	encryptedKey := make([]byte, base64.StdEncoding.DecodedLen(len(content)))
+	var decodedLen int
+	decodedLen, err = base64.StdEncoding.Decode(encryptedKey, content)
+	if err != nil {
+		return nil, err
+	}
+	return encryptedKey[:decodedLen], nil
 }
 
 // CrypterFromKey creates Crypter from encrypted armored key.
