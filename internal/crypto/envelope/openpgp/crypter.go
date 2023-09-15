@@ -168,5 +168,8 @@ func readFromFilePath(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	// DecodedLen returns the maximum length in bytes of the decoded data
+	// which Decode writes at most, that's why need to be sliced
+	// with actually written length
 	return encryptedKey[:decodedLen], nil
 }
