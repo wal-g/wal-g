@@ -120,18 +120,13 @@ func (crypter *Crypter) setupEncryptedKey() error {
 
 	switch {
 	case crypter.IsUseArmoredKey:
-		encryptedKey, err := base64.StdEncoding.DecodeString(crypter.ArmoredKey)
+		encryptedKey, err := readFromString(crypter.ArmoredKey)
 		if err != nil {
 			return err
 		}
 		crypter.encryptedKey = encryptedKey
 	case crypter.IsUseArmoredKeyPath:
-		content, err := os.ReadFile(crypter.ArmoredKeyPath)
-		if err != nil {
-			return err
-		}
-		encryptedKey := make([]byte, base64.StdEncoding.DecodedLen(len(content)))
-		_, err = base64.StdEncoding.Decode(encryptedKey, content)
+		encryptedKey, err := readFromFilePath(crypter.ArmoredKeyPath)
 		if err != nil {
 			return err
 		}
@@ -156,4 +151,25 @@ func CrypterFromKeyPath(armoredKeyPath string, enveloper envelope.Enveloper) cry
 		IsUseArmoredKeyPath: true,
 		enveloper:           enveloper,
 	}
+}
+
+func readFromString(content string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(content)
+}
+
+func readFromFilePath(path string) ([]byte, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	encryptedKey := make([]byte, base64.StdEncoding.DecodedLen(len(content)))
+	var decodedLen int
+	decodedLen, err = base64.StdEncoding.Decode(encryptedKey, content)
+	if err != nil {
+		return nil, err
+	}
+	// DecodedLen returns the maximum length in bytes of the decoded data
+	// which Decode writes at most, that's why need to be sliced
+	// with actually written length
+	return encryptedKey[:decodedLen], nil
 }
