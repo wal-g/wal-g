@@ -33,7 +33,11 @@ var (
 				postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))
 			}
 
-			targetStorage = viper.GetString(internal.PgTargetStorage)
+			// In case the --target-storage flag isn't specified (the variable is set in commands' init() funcs),
+			// we take the value from the config.
+			if targetStorage == "" {
+				targetStorage = viper.GetString(internal.PgTargetStorage)
+			}
 		},
 	}
 
