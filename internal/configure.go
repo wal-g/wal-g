@@ -380,7 +380,7 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 		return nil, err
 	}
 	enveloper := cachenvlpr.EnveloperWithCache(yckmsEnveloper, expiration)
-	keyID := viper.GetString(PgpEnvelopeKeyIdSetting)
+	keyID := viper.GetString(PgpEnvelopeKeyIDSetting)
 
 	if config.IsSet(PgpEnvelopKeyPathSetting) {
 		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEnvelopKeyPathSetting), keyID, enveloper), nil

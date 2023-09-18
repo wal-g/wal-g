@@ -120,7 +120,7 @@ func readEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 		return nil, err
 	}
 
-	return &envelope.EncryptedKey{ID: keyID, Data: encryptedKey}, nil
+	return envelope.NewEncryptedKey(keyID, encryptedKey), nil
 }
 
 func getCredentials(saFilePath string) (ycsdk.Credentials, error) {

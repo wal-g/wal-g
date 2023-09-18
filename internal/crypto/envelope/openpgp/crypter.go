@@ -30,7 +30,7 @@ type Crypter struct {
 	enveloper    envelope.Enveloper
 	encryptedKey *envelope.EncryptedKey
 
-	ArmoredKeyId string
+	ArmoredKeyID string
 
 	ArmoredKey      string
 	IsUseArmoredKey bool
@@ -140,7 +140,7 @@ func (crypter *Crypter) setupEncryptedKey() error {
 		}
 	}
 
-	keyID := crypter.ArmoredKeyId
+	keyID := crypter.ArmoredKeyID
 	if keyID == "" {
 		tracelog.WarningLogger.Println("No any envelope key id was passed, sha1 will be used")
 		keyID = fmt.Sprintf("%x", sha1.Sum(rawEncryptedKey))
@@ -150,9 +150,9 @@ func (crypter *Crypter) setupEncryptedKey() error {
 }
 
 // CrypterFromKey creates Crypter from encrypted armored key.
-func CrypterFromKey(armoredKey, armoredKeyId string, enveloper envelope.Enveloper) crypto.Crypter {
+func CrypterFromKey(armoredKey, ArmoredKeyID string, enveloper envelope.Enveloper) crypto.Crypter {
 	return &Crypter{
-		ArmoredKeyId:    armoredKeyId,
+		ArmoredKeyID:    ArmoredKeyID,
 		ArmoredKey:      armoredKey,
 		IsUseArmoredKey: true,
 		enveloper:       enveloper,
@@ -160,9 +160,9 @@ func CrypterFromKey(armoredKey, armoredKeyId string, enveloper envelope.Envelope
 }
 
 // CrypterFromKeyPath creates Crypter from encrypted armored key path.
-func CrypterFromKeyPath(armoredKeyPath, armoredKeyId string, enveloper envelope.Enveloper) crypto.Crypter {
+func CrypterFromKeyPath(armoredKeyPath, ArmoredKeyID string, enveloper envelope.Enveloper) crypto.Crypter {
 	return &Crypter{
-		ArmoredKeyId:        armoredKeyId,
+		ArmoredKeyID:        ArmoredKeyID,
 		ArmoredKeyPath:      armoredKeyPath,
 		IsUseArmoredKeyPath: true,
 		enveloper:           enveloper,

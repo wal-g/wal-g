@@ -66,7 +66,7 @@ const (
 	PgpKeySetting                 = "WALG_PGP_KEY"
 	PgpKeyPathSetting             = "WALG_PGP_KEY_PATH"
 	PgpKeyPassphraseSetting       = "WALG_PGP_KEY_PASSPHRASE"
-	PgpEnvelopeKeyIdSetting       = "WALG_ENVELOPE_PGP_KEY_ID"
+	PgpEnvelopeKeyIDSetting       = "WALG_ENVELOPE_PGP_KEY_ID"
 	PgpEnvelopeKeySetting         = "WALG_ENVELOPE_PGP_KEY"
 	PgpEnvelopKeyPathSetting      = "WALG_ENVELOPE_PGP_KEY_PATH"
 	PgpEnvelopeYcKmsKeyIDSetting  = "WALG_ENVELOPE_PGP_YC_CSE_KMS_KEY_ID"
@@ -297,7 +297,7 @@ var (
 		PgpKeySetting:                 true,
 		PgpKeyPathSetting:             true,
 		PgpKeyPassphraseSetting:       true,
-		PgpEnvelopeKeyIdSetting:       true,
+		PgpEnvelopeKeyIDSetting:       true,
 		PgpEnvelopeKeySetting:         true,
 		PgpEnvelopKeyPathSetting:      true,
 		PgpEnvelopeCacheExpiration:    true,
