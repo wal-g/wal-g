@@ -6,8 +6,10 @@ import (
 	"encoding/base64"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/pkg/errors"
@@ -47,10 +49,25 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	var key []byte
+	key, err = crypter.enveloper.DecryptKey(crypter.encryptedKey)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't decrypt encryption key")
+	}
+	entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't read decrypyed gpg key")
+	}
+
+	keyID, err := encodeKeyID(entityList)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't encode gpg key id")
+	}
 
 	// need write header at first, with length less than maxHeaderLenAllowed
 	bufferedWriter := bufio.NewWriterSize(writer, maxHeaderLenAllowed)
-	header := crypter.enveloper.SerializeEncryptedKey(crypter.encryptedKey)
+
+	header := crypter.enveloper.SerializeEncryptedKey(crypter.encryptedKey, keyID)
 
 	if len(header) > maxHeaderLenAllowed {
 		return nil, errors.New("opengpg: invalid size of the encrypted key")
@@ -59,16 +76,8 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "can't write encryption key to buffer")
 	}
-	var key []byte
-	key, err = crypter.enveloper.DecryptKey(crypter.encryptedKey)
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't decrypt encryption key")
-	}
-	pubKey, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
-	if err != nil {
-		return nil, errors.Wrapf(err, "can't read decrypyed gpg key")
-	}
-	encryptedWriter, err := openpgp.Encrypt(bufferedWriter, pubKey, nil, nil, nil)
+
+	encryptedWriter, err := openpgp.Encrypt(bufferedWriter, entityList, nil, nil, nil)
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "opengpg encryption error")
@@ -172,4 +181,17 @@ func readFromFilePath(path string) ([]byte, error) {
 	// which Decode writes at most, that's why need to be sliced
 	// with actually written length
 	return encryptedKey[:decodedLen], nil
+}
+
+func encodeKeyID(entities openpgp.EntityList) (string, error) {
+	parts := make([]string, len(entities))
+
+	for id, entity := range entities {
+		_, ok := entity.EncryptionKey(time.Now())
+		if !ok {
+			return "", errors.Errorf("opengpg: %ds key has no valid encryption keys", id)
+		}
+		parts[id] = strings.ToUpper(strconv.FormatUint(entity.PrimaryKey.KeyId, 16))
+	}
+	return strings.Join(parts, ","), nil
 }

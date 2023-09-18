@@ -170,13 +170,13 @@ func (_c *Enveloper_ReadEncryptedKey_Call) RunAndReturn(run func(io.Reader) ([]b
 	return _c
 }
 
-// SerializeEncryptedKey provides a mock function with given fields: encryptedKey
-func (_m *Enveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
-	ret := _m.Called(encryptedKey)
+// SerializeEncryptedKey provides a mock function with given fields: encryptedKey, keyID
+func (_m *Enveloper) SerializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
+	ret := _m.Called(encryptedKey, keyID)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]byte) []byte); ok {
-		r0 = rf(encryptedKey)
+	if rf, ok := ret.Get(0).(func([]byte, string) []byte); ok {
+		r0 = rf(encryptedKey, keyID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -193,13 +193,14 @@ type Enveloper_SerializeEncryptedKey_Call struct {
 
 // SerializeEncryptedKey is a helper method to define mock.On call
 //   - encryptedKey []byte
-func (_e *Enveloper_Expecter) SerializeEncryptedKey(encryptedKey interface{}) *Enveloper_SerializeEncryptedKey_Call {
-	return &Enveloper_SerializeEncryptedKey_Call{Call: _e.mock.On("SerializeEncryptedKey", encryptedKey)}
+//   - keyID string
+func (_e *Enveloper_Expecter) SerializeEncryptedKey(encryptedKey interface{}, keyID interface{}) *Enveloper_SerializeEncryptedKey_Call {
+	return &Enveloper_SerializeEncryptedKey_Call{Call: _e.mock.On("SerializeEncryptedKey", encryptedKey, keyID)}
 }
 
-func (_c *Enveloper_SerializeEncryptedKey_Call) Run(run func(encryptedKey []byte)) *Enveloper_SerializeEncryptedKey_Call {
+func (_c *Enveloper_SerializeEncryptedKey_Call) Run(run func(encryptedKey []byte, keyID string)) *Enveloper_SerializeEncryptedKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
+		run(args[0].([]byte), args[1].(string))
 	})
 	return _c
 }
@@ -209,7 +210,7 @@ func (_c *Enveloper_SerializeEncryptedKey_Call) Return(_a0 []byte) *Enveloper_Se
 	return _c
 }
 
-func (_c *Enveloper_SerializeEncryptedKey_Call) RunAndReturn(run func([]byte) []byte) *Enveloper_SerializeEncryptedKey_Call {
+func (_c *Enveloper_SerializeEncryptedKey_Call) RunAndReturn(run func([]byte, string) []byte) *Enveloper_SerializeEncryptedKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

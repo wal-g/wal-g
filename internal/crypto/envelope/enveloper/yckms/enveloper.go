@@ -10,6 +10,7 @@ import (
 	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 
@@ -46,23 +47,30 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	return rsp.Plaintext, nil
 }
 
-func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
-	return serializeEncryptedKey(encryptedKey)
+func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
+	return serializeEncryptedKey(encryptedKey, keyID)
 }
 
-func serializeEncryptedKey(encryptedKey []byte) []byte {
+func serializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
 	/*
 		magic value "envelope-yc-kms"
 		scheme version (current version is 1)
+		uint32 - keyID len
+		keyID ...
 		uint32 - encrypted key len
 		encrypted key ...
 	*/
 
+	result := append([]byte(magic), schemeVersion)
+
+	keyIDLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(keyIDLen, uint32(len(keyID)))
+	result = append(result, keyIDLen...)
+	result = append(result, []byte(keyID)...)
+
 	encryptedKeyLen := make([]byte, 4)
 	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey)))
-	result := append([]byte(magic), schemeVersion)
 	result = append(result, encryptedKeyLen...)
-
 	return append(result, encryptedKey...)
 }
 
@@ -80,6 +88,22 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 	if schemeVersion != magicSchemeBytes[len(magic)] {
 		return nil, errors.New("envelope yc kms: scheme version is not supported")
 	}
+
+	keyIDLenBytes := make([]byte, 4)
+	_, err = io.ReadFull(r, keyIDLenBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	keyIDLen := binary.LittleEndian.Uint32(keyIDLenBytes)
+	keyIDBytes := make([]byte, keyIDLen)
+
+	_, err = io.ReadFull(r, keyIDBytes)
+	if err != nil {
+		return nil, err
+	}
+	keyID := string(keyIDBytes)
+	tracelog.DebugLogger.Printf("Encrypted key was found: %s\n", keyID)
 
 	encryptedKeyLenBytes := make([]byte, 4)
 	_, err = io.ReadFull(r, encryptedKeyLenBytes)

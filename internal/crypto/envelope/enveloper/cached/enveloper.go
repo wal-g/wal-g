@@ -73,8 +73,8 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	return decryptedKey, nil
 }
 
-func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
-	return enveloper.wrapped.SerializeEncryptedKey(encryptedKey)
+func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
+	return enveloper.wrapped.SerializeEncryptedKey(encryptedKey, keyID)
 }
 
 func EnveloperWithCache(enveloper envelope.Enveloper, expiration time.Duration) envelope.Enveloper {
