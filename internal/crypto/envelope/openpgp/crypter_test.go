@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -17,9 +16,9 @@ import (
 
 const (
 	PrivateKeyFilePath             = "./testdata/pgpTestPrivateKey"
-	PrivateAnotherKeyFilePath      = "./testdata/pgpTestPrivateAnotherKey"
 	PrivateEncryptedKeyFilePath    = "./testdata/pgpTestEncryptedPrivateKey"
 	PrivateEncryptedKeyEnvFilePath = "./testdata/pgpTestEncryptedPrivateKeyEnv"
+	dummyKey                       = "some key id"
 )
 
 func MockedEnveloper(t *testing.T) *mocks.Enveloper {
@@ -29,9 +28,9 @@ func MockedEnveloper(t *testing.T) *mocks.Enveloper {
 	}
 	enveloper := mocks.NewEnveloper(t)
 	enveloper.EXPECT().Name().Return("mocked").Maybe()
-	enveloper.EXPECT().ReadEncryptedKey(mock.Anything).Return([]byte(""), nil).Maybe()
+	enveloper.EXPECT().ReadEncryptedKey(mock.Anything).Return(envelope.NewEncryptedKey(dummyKey, []byte("")), nil).Maybe()
 	enveloper.EXPECT().DecryptKey(mock.Anything).Return(key, nil).Maybe()
-	enveloper.EXPECT().SerializeEncryptedKey(mock.Anything, mock.Anything).Return([]byte("")).Maybe()
+	enveloper.EXPECT().SerializeEncryptedKey(mock.Anything).Return([]byte("")).Maybe()
 	return enveloper
 }
 
@@ -41,11 +40,11 @@ func MockArmedCrypterFromEnv(enveloper envelope.Enveloper) crypto.Crypter {
 		panic(err)
 	}
 	env := string(rawEnv)
-	return CrypterFromKey(env, enveloper)
+	return CrypterFromKey(env, dummyKey, enveloper)
 }
 
 func MockArmedCrypterFromKeyPath(enveloper envelope.Enveloper) crypto.Crypter {
-	return CrypterFromKeyPath(PrivateEncryptedKeyFilePath, enveloper)
+	return CrypterFromKeyPath(PrivateEncryptedKeyFilePath, dummyKey, enveloper)
 }
 
 func TestMockCrypterFromEnv(t *testing.T) {
@@ -87,37 +86,4 @@ func TestEncryptionCycleFromEnv(t *testing.T) {
 func TestEncryptionCycleFromKeyPath(t *testing.T) {
 	enveloper := MockedEnveloper(t)
 	EncryptionCycle(t, MockArmedCrypterFromKeyPath(enveloper))
-}
-
-func TestEncodeKeyID(t *testing.T) {
-	key, err := os.ReadFile(PrivateKeyFilePath)
-	assert.NoError(t, err)
-	entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
-	assert.NoError(t, err)
-	keyID, err := encodeKeyID(entityList)
-	assert.NoError(t, err)
-	assert.Equal(t, "3BE0C94F8BDCA96B", keyID, "Key id is mismatch")
-}
-
-func TestEncodeEmptyKeyID(t *testing.T) {
-	var emptyKey []*openpgp.Entity
-	keyID, err := encodeKeyID(emptyKey)
-	assert.NoError(t, err)
-	assert.Equal(t, "", keyID, "Key id is mismatch")
-}
-
-func TestEncodeMultiKeyID(t *testing.T) {
-	keyPath := []string{PrivateKeyFilePath, PrivateAnotherKeyFilePath}
-	var keys []*openpgp.Entity
-	for _, path := range keyPath {
-		key, err := os.ReadFile(path)
-		assert.NoError(t, err)
-		entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
-		assert.NoError(t, err)
-		keys = append(keys, entityList...)
-
-	}
-	keyID, err := encodeKeyID(keys)
-	assert.NoError(t, err)
-	assert.Equal(t, "3BE0C94F8BDCA96B,F1A31F9064762905", keyID, "Key id is mismatch")
 }

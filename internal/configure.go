@@ -380,12 +380,13 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 		return nil, err
 	}
 	enveloper := cachenvlpr.EnveloperWithCache(yckmsEnveloper, expiration)
+	keyID := viper.GetString(PgpEnvelopeKeyIdSetting)
 
 	if config.IsSet(PgpEnvelopKeyPathSetting) {
-		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEnvelopKeyPathSetting), enveloper), nil
+		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEnvelopKeyPathSetting), keyID, enveloper), nil
 	}
 	if config.IsSet(PgpEnvelopeKeySetting) {
-		return envopenpgp.CrypterFromKey(viper.GetString(PgpEnvelopeKeySetting), enveloper), nil
+		return envopenpgp.CrypterFromKey(viper.GetString(PgpEnvelopeKeySetting), keyID, enveloper), nil
 	}
 	return nil, errors.New("there is no any supported envelope gpg crypter configuration")
 }

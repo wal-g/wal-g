@@ -1,6 +1,7 @@
 package cached
 
 import (
+	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"testing"
 	"time"
 
@@ -12,7 +13,7 @@ import (
 )
 
 func TestDecryptKey(t *testing.T) {
-	encryptedKey := []byte("encrypted key")
+	encryptedKey := envelope.NewEncryptedKey("example", []byte("encrypted key"))
 	expected := []byte("decrypted key")
 
 	t.Run("success", func(t *testing.T) {
