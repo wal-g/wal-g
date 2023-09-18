@@ -22,6 +22,7 @@ func transferFiles(prefix string) {
 	separateFileLister := transfer.NewRegularFileLister(prefix, transferOverwrite, int(transferMaxFiles))
 
 	cfg := &transfer.HandlerConfig{
+		PreserveInSource:         transferPreserveInSource,
 		FailOnFirstErr:           transferFailFast,
 		Concurrency:              transferConcurrency,
 		AppearanceChecks:         transferAppearanceChecks,

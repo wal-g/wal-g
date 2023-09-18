@@ -26,6 +26,7 @@ type Handler struct {
 }
 
 type HandlerConfig struct {
+	PreserveInSource         bool
 	FailOnFirstErr           bool
 	Concurrency              int
 	AppearanceChecks         uint
@@ -318,6 +319,9 @@ func (h *Handler) waitFile(job transferJob) (newJob *transferJob, err error) {
 
 	if appeared {
 		h.fileStatuses.Store(job.key.filePath, transferStatusAppeared)
+		if h.cfg.PreserveInSource {
+			return nil, nil
+		}
 		job.key.jobType = jobTypeDelete
 		newJob = &job
 		return newJob, nil

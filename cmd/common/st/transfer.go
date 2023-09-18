@@ -29,6 +29,7 @@ var transferCmd = &cobra.Command{
 var (
 	transferSourceStorage            string
 	transferOverwrite                bool
+	transferPreserveInSource         bool
 	transferFailFast                 bool
 	transferConcurrency              int
 	transferMaxFiles                 uint
@@ -41,6 +42,8 @@ func init() {
 		"storage name to move files from. Use 'default' to select the primary storage")
 	transferCmd.PersistentFlags().BoolVarP(&transferOverwrite, "overwrite", "o", false,
 		"whether to overwrite already existing files in the target storage and remove them from the source one")
+	transferCmd.PersistentFlags().BoolVarP(&transferPreserveInSource, "preserve", "p", false,
+		"whether to preserve files in the source storage and just copy them to the target one")
 	transferCmd.PersistentFlags().BoolVar(&transferFailFast, "fail-fast", false,
 		"if this flag is set, any error occurred with transferring a separate file will lead the whole command to stop immediately")
 	transferCmd.PersistentFlags().IntVarP(&transferConcurrency, "concurrency", "c", 10,
