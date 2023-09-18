@@ -88,19 +88,19 @@ func TestEncryptionCycleFromKeyPath(t *testing.T) {
 	EncryptionCycle(t, MockArmedCrypterFromKeyPath(enveloper))
 }
 
-func TestEncodeKeyId(t *testing.T) {
+func TestEncodeKeyID(t *testing.T) {
 	key, err := os.ReadFile(PrivateKeyFilePath)
 	assert.NoError(t, err)
 	entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
 	assert.NoError(t, err)
-	keyId, err := encodeKeyID(entityList)
+	keyID, err := encodeKeyID(entityList)
 	assert.NoError(t, err)
-	assert.Equal(t, "3BE0C94F8BDCA96B", keyId, "Key id is mismatch")
+	assert.Equal(t, "3BE0C94F8BDCA96B", keyID, "Key id is mismatch")
 }
 
-func TestEncodeEmptyKeyId(t *testing.T) {
+func TestEncodeEmptyKeyID(t *testing.T) {
 	var emptyKey []*openpgp.Entity
-	keyId, err := encodeKeyID(emptyKey)
+	keyID, err := encodeKeyID(emptyKey)
 	assert.NoError(t, err)
-	assert.Equal(t, "", keyId, "Key id is mismatch")
+	assert.Equal(t, "", keyID, "Key id is mismatch")
 }
