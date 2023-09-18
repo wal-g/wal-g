@@ -35,13 +35,14 @@ func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) (*envelope.EncryptedKe
 }
 
 func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]byte, error) {
-	tracelog.DebugLogger.Printf("Decrypt encrypted key %s\n", encryptedKey.ID)
+	KeyUID := encryptedKey.KeyUID()
+	tracelog.DebugLogger.Printf("Decrypt encrypted key %s\n", KeyUID)
 
 	enveloper.locker.RLock()
-	item, exists := enveloper.items[encryptedKey.ID]
+	item, exists := enveloper.items[KeyUID]
 	enveloper.locker.RUnlock()
 	if exists && item.isFresh() {
-		tracelog.DebugLogger.Printf("Use cached encrypted key %s \n", encryptedKey.ID)
+		tracelog.DebugLogger.Printf("Use cached encrypted key %s\n", KeyUID)
 		return item.Object, nil
 	}
 
@@ -49,7 +50,7 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]b
 	if err != nil {
 		if exists {
 			tracelog.WarningLogger.Printf(
-				"Unable to decrypt a key, use stale cache key %s, err: %v\n", encryptedKey.ID, err,
+				"Unable to decrypt a key, use stale cache key %s, err: %v\n", KeyUID, err,
 			)
 			return item.Object, nil
 		}
@@ -63,7 +64,7 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]b
 	if enveloper.expiration > 0 {
 		expiredAt = time.Now().Add(enveloper.expiration)
 	}
-	enveloper.items[encryptedKey.ID] = Item{
+	enveloper.items[KeyUID] = Item{
 		Object:    decryptedKey,
 		ExpiredAt: expiredAt,
 	}

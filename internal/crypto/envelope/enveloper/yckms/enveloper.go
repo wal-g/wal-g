@@ -64,10 +64,11 @@ func serializeEncryptedKey(encryptedKey *envelope.EncryptedKey) []byte {
 
 	result := append([]byte(magic), schemeVersion)
 
+	keyID := encryptedKey.ID()
 	keyIDLen := make([]byte, sizeofInt32)
-	binary.LittleEndian.PutUint32(keyIDLen, uint32(len(encryptedKey.ID)))
+	binary.LittleEndian.PutUint32(keyIDLen, uint32(len(keyID)))
 	result = append(result, keyIDLen...)
-	result = append(result, []byte(encryptedKey.ID)...)
+	result = append(result, []byte(keyID)...)
 
 	encryptedKeyLen := make([]byte, sizeofInt32)
 	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey.Data)))

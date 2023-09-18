@@ -3,18 +3,17 @@ package openpgp
 import (
 	"bufio"
 	"bytes"
-	"crypto/sha1"
 	"encoding/base64"
-	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/pkg/errors"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -29,8 +28,6 @@ const (
 type Crypter struct {
 	enveloper    envelope.Enveloper
 	encryptedKey *envelope.EncryptedKey
-
-	ArmoredKeyID string
 
 	ArmoredKey      string
 	IsUseArmoredKey bool
@@ -60,11 +57,15 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "can't read decrypyed gpg key")
 	}
+	keyID, err := encodeKeyID(entityList)
+	if err != nil {
+		return nil, errors.Wrapf(err, "can't encode gpg key id")
+	}
 
 	// need write header at first, with length less than maxHeaderLenAllowed
 	bufferedWriter := bufio.NewWriterSize(writer, maxHeaderLenAllowed)
 
-	header := crypter.enveloper.SerializeEncryptedKey(crypter.encryptedKey)
+	header := crypter.enveloper.SerializeEncryptedKey(crypter.encryptedKey.WithID(keyID))
 
 	if len(header) > maxHeaderLenAllowed {
 		return nil, errors.New("opengpg: invalid size of the encrypted key")
@@ -139,20 +140,13 @@ func (crypter *Crypter) setupEncryptedKey() error {
 			return err
 		}
 	}
-
-	keyID := crypter.ArmoredKeyID
-	if keyID == "" {
-		tracelog.WarningLogger.Println("No any envelope key id was passed, sha1 will be used")
-		keyID = fmt.Sprintf("%x", sha1.Sum(rawEncryptedKey))
-	}
-	crypter.encryptedKey = envelope.NewEncryptedKey(keyID, rawEncryptedKey)
+	crypter.encryptedKey = envelope.NewEncryptedKey("", rawEncryptedKey)
 	return nil
 }
 
 // CrypterFromKey creates Crypter from encrypted armored key.
-func CrypterFromKey(armoredKey, ArmoredKeyID string, enveloper envelope.Enveloper) crypto.Crypter {
+func CrypterFromKey(armoredKey string, enveloper envelope.Enveloper) crypto.Crypter {
 	return &Crypter{
-		ArmoredKeyID:    ArmoredKeyID,
 		ArmoredKey:      armoredKey,
 		IsUseArmoredKey: true,
 		enveloper:       enveloper,
@@ -160,9 +154,8 @@ func CrypterFromKey(armoredKey, ArmoredKeyID string, enveloper envelope.Envelope
 }
 
 // CrypterFromKeyPath creates Crypter from encrypted armored key path.
-func CrypterFromKeyPath(armoredKeyPath, ArmoredKeyID string, enveloper envelope.Enveloper) crypto.Crypter {
+func CrypterFromKeyPath(armoredKeyPath string, enveloper envelope.Enveloper) crypto.Crypter {
 	return &Crypter{
-		ArmoredKeyID:        ArmoredKeyID,
 		ArmoredKeyPath:      armoredKeyPath,
 		IsUseArmoredKeyPath: true,
 		enveloper:           enveloper,
@@ -188,4 +181,17 @@ func readFromFilePath(path string) ([]byte, error) {
 	// which Decode writes at most, that's why need to be sliced
 	// with actually written length
 	return encryptedKey[:decodedLen], nil
+}
+
+func encodeKeyID(entities openpgp.EntityList) (string, error) {
+	parts := make([]string, len(entities))
+
+	for id, entity := range entities {
+		_, ok := entity.EncryptionKey(time.Now())
+		if !ok {
+			return "", errors.Errorf("opengpg: %ds key has no valid encryption keys", id)
+		}
+		parts[id] = strings.ToUpper(strconv.FormatUint(entity.PrimaryKey.KeyId, 16))
+	}
+	return strings.Join(parts, ","), nil
 }

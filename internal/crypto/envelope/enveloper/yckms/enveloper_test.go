@@ -22,7 +22,7 @@ func TestSerializeDeserializeKeyHeader(t *testing.T) {
 	encryptedKey, err := readEncryptedKey(buffer)
 	assert.NoErrorf(t, err, "YcKms envelope key deserialization error: %v", err)
 
-	assert.Equal(t, expected.ID, encryptedKey.ID, "YcKms deserialized envelope key len is not equal to the original one")
+	assert.Equal(t, expected.ID(), encryptedKey.ID(), "YcKms deserialized envelope key len is not equal to the original one")
 	assert.Equal(t, len(expected.Data), len(encryptedKey.Data), "YcKms deserialized envelope key len is not equal to the original one")
 
 	for i := range expected.Data {
@@ -44,7 +44,7 @@ func TestHugeKey(t *testing.T) {
 	encryptedKey, err := readEncryptedKey(breader)
 	assert.NoErrorf(t, err, "YcKms envelope key deserialization error: %v", err)
 
-	assert.Equal(t, expected.ID, encryptedKey.ID, "YcKms deserialized envelope key len is not equal to the original one")
+	assert.Equal(t, expected.ID(), encryptedKey.ID(), "YcKms deserialized envelope key len is not equal to the original one")
 	assert.Equal(t, len(expected.Data), len(encryptedKey.Data), "YcKms deserialized envelope key len is not equal to the original one")
 
 	for i := range expected.Data {
