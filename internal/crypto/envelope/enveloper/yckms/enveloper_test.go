@@ -14,7 +14,7 @@ func TestSerializeDeserializeKeyHeader(t *testing.T) {
 	buffer := new(bytes.Buffer)
 
 	encryptedKey := []byte("awesomekey")
-	serializedKey := serializeEncryptedKey(encryptedKey)
+	serializedKey := serializeEncryptedKey(encryptedKey, "some key id")
 	buffer.Write(serializedKey)
 
 	deserializedKey, err := readEncryptedKey(buffer)
@@ -31,7 +31,7 @@ func TestHugeKey(t *testing.T) {
 	reader, writer := io.Pipe()
 
 	encryptedKey := []byte(strings.Repeat("awesomekey", 512))
-	serializedKey := serializeEncryptedKey(encryptedKey)
+	serializedKey := serializeEncryptedKey(encryptedKey, "some key id")
 	go func() {
 		defer writer.Close()
 		writer.Write(serializedKey)

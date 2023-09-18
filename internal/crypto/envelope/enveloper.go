@@ -7,5 +7,5 @@ type Enveloper interface {
 	Name() string
 	ReadEncryptedKey(r io.Reader) ([]byte, error)
 	DecryptKey([]byte) ([]byte, error)
-	SerializeEncryptedKey(encryptedKey []byte) []byte
+	SerializeEncryptedKey(encryptedKey []byte, keyID string) []byte
 }
