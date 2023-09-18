@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e -x
   CONFIG_FILE="/tmp/configs/delete_target_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
@@ -20,32 +20,39 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-for i in 1 2 3 4 5
+for _ in 1 2 3 4 5
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --target-storage default
 done
 
+# copy all backups to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
+
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 3 > /tmp/list_before_delete
+wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_before_delete
 
-FULL_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
+FIRST_FULL_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 
-wal-g --config=${TMP_CONFIG} delete target ${FULL_BACKUP} --confirm
+wal-g --config=${TMP_CONFIG} delete target ${FIRST_FULL_BACKUP} --confirm
 
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 3 > /tmp/list_after_delete
+wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_after_delete
 
-if [ $(($lines_before_delete-2)) -ne $lines_after_delete ];
+# we deleted 1 base backup and 1 delta backup from each of 2 storages
+expected_backups_deleted=$(((1+1)*2))
+
+if [ $(($lines_before_delete-$expected_backups_deleted)) -ne $lines_after_delete ];
 then
-    echo $(($lines_before_delete-2)) > /tmp/before_delete
+    echo $(($lines_before_delete-$expected_backups_deleted)) > /tmp/before_delete
     echo $lines_after_delete > /tmp/after_delete
     echo "Wrong number of deleted lines"
     diff /tmp/before_delete /tmp/after_delete
 fi
 
+# ensure all backups which we weren't going to delete still exist after performing deletion
+xargs -I {} grep {} /tmp/list_before_delete </tmp/list_after_delete
 
-diff /tmp/list_before_delete /tmp/list_after_delete
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}

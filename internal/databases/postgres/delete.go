@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -20,10 +21,10 @@ const (
 	DeleteGarbageBackupsModifier  = "BACKUPS"
 )
 
-func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map[string]bool,
+func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map[PermanentObject]bool,
 	useSentinelTime bool,
 ) (*DeleteHandler, error) {
-	backups, err := internal.GetBackupSentinelObjects(folder)
+	backupSentinels, err := internal.GetBackupSentinelObjects(folder)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +35,7 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 		// If all backups in storage have metadata, we will use backup start time from sentinel.
 		// Otherwise, for example in case when we are dealing with some ancient backup without
 		// metadata included, fall back to the default timeline and segment number comparator.
-		startTimeByBackupName, err = getBackupStartTimeMap(folder, backups)
+		startTimeByBackupName, err = getBackupStartTimeMap(folder, backupSentinels)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to get sentinel backup start times: %v,"+
 				" will fall back to timeline and segment number for ordering...\n", err)
@@ -42,7 +43,7 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 			lessFunc = makeLessFunc(startTimeByBackupName)
 		}
 	}
-	postgresBackups, err := makeBackupObjects(folder, backups, startTimeByBackupName)
+	postgresBackups, err := makeBackupObjects(folder, backupSentinels, startTimeByBackupName)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +61,13 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 	return deleteHandler, nil
 }
 
-func newBackupObject(incrementBase, incrementFrom string,
-	isFullBackup bool, creationTime time.Time, object storage.Object) BackupObject {
+func newBackupObject(
+	incrementBase, incrementFrom string,
+	isFullBackup bool,
+	creationTime time.Time,
+	object storage.Object,
+	storageName string,
+) BackupObject {
 	return BackupObject{
 		Object:            object,
 		isFullBackup:      isFullBackup,
@@ -69,6 +75,7 @@ func newBackupObject(incrementBase, incrementFrom string,
 		incrementFromName: incrementFrom,
 		creationTime:      creationTime,
 		BackupName:        DeduceBackupName(object),
+		storageName:       storageName,
 	}
 }
 
@@ -79,6 +86,7 @@ type BackupObject struct {
 	baseBackupName    string
 	incrementFromName string
 	creationTime      time.Time
+	storageName       string
 }
 
 func (o BackupObject) IsFullBackup() bool {
@@ -101,17 +109,22 @@ func (o BackupObject) GetIncrementFromName() string {
 	return o.incrementFromName
 }
 
+func (o BackupObject) GetStorage() string {
+	return o.storageName
+}
+
 func makeBackupObjects(
 	folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time,
 ) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
-		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(folder, object)
+		storageName := multistorage.GetStorage(object)
+		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(folder, object, storageName)
 		if err != nil {
 			return nil, err
 		}
 		postgresBackup := newBackupObject(
-			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object)
+			incrementBase, incrementFrom, isFullBackup, object.GetLastModified(), object, storageName)
 
 		if startTimeByBackupName != nil {
 			postgresBackup.creationTime = startTimeByBackupName[postgresBackup.BackupName]
@@ -121,9 +134,10 @@ func makeBackupObjects(
 	return backupObjects, nil
 }
 
-func makePermanentFunc(permanentBackups, permanentWals map[string]bool) func(object storage.Object) bool {
+func makePermanentFunc(permanentBackups, permanentWals map[PermanentObject]bool) func(object storage.Object) bool {
 	return func(object storage.Object) bool {
-		return IsPermanent(object.GetName(), permanentBackups, permanentWals)
+		storageName := multistorage.GetStorage(object)
+		return IsPermanent(object.GetName(), storageName, permanentBackups, permanentWals)
 	}
 }
 
@@ -192,8 +206,8 @@ func timelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bo
 	return tl1 < tl2 || tl1 == tl2 && segNo1 < segNo2
 }
 
-func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
-	backup, err := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object))
+func getIncrementInfo(folder storage.Folder, object storage.Object, storageName string) (string, string, bool, error) {
+	backup, err := NewBackupInStorage(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object), storageName)
 	if err != nil {
 		return "", "", true, err
 	}

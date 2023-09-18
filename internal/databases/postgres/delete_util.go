@@ -9,17 +9,24 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[string]bool) {
+type PermanentObject struct {
+	Name        string
+	StorageName string
+}
+
+func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool, map[PermanentObject]bool) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
 	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
-		return map[string]bool{}, map[string]bool{}
+		return map[PermanentObject]bool{}, map[PermanentObject]bool{}
 	}
 
-	permanentBackups := map[string]bool{}
-	permanentWals := map[string]bool{}
+	backupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	permanentBackups := map[PermanentObject]bool{}
+	permanentWals := map[PermanentObject]bool{}
 	for _, backupTime := range backupTimes {
-		backup, err := NewBackup(folder.GetSubFolder(utility.BaseBackupPath), backupTime.BackupName)
+		backup, err := NewBackupInStorage(backupsFolder, backupTime.BackupName, backupTime.StorageName)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
@@ -40,9 +47,17 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
 			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
 			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
-				permanentWals[walSegmentNo.getFilename(timelineID)] = true
+				walObj := PermanentObject{
+					Name:        walSegmentNo.getFilename(timelineID),
+					StorageName: backupTime.StorageName,
+				}
+				permanentWals[walObj] = true
 			}
-			permanentBackups[backupTime.BackupName] = true
+			backupObj := PermanentObject{
+				Name:        backupTime.BackupName,
+				StorageName: backupTime.StorageName,
+			}
+			permanentBackups[backupObj] = true
 		}
 	}
 	if len(permanentBackups) > 0 {
@@ -52,13 +67,19 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[string]bool, map[str
 	return permanentBackups, permanentWals
 }
 
-func IsPermanent(objectName string, permanentBackups, permanentWals map[string]bool) bool {
+func IsPermanent(objectName, storageName string, permanentBackups, permanentWals map[PermanentObject]bool) bool {
 	if strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24 {
-		wal := objectName[len(utility.WalPath) : len(utility.WalPath)+24]
+		wal := PermanentObject{
+			Name:        objectName[len(utility.WalPath) : len(utility.WalPath)+24],
+			StorageName: storageName,
+		}
 		return permanentWals[wal]
 	}
 	if strings.HasPrefix(objectName, utility.BaseBackupPath) {
-		backup := utility.StripLeftmostBackupName(objectName[len(utility.BaseBackupPath):])
+		backup := PermanentObject{
+			Name:        utility.StripLeftmostBackupName(objectName[len(utility.BaseBackupPath):]),
+			StorageName: storageName,
+		}
 		return permanentBackups[backup]
 	}
 	// should not reach here, default to false

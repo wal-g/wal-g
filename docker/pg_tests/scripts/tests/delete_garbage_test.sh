@@ -24,9 +24,14 @@ wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 pgbench -i -s 1 postgres
 pg_dumpall -f /tmp/dump1
 sleep 1
-# push permanent backup
-wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --permanent
+# push permanent backup and copy it to the failover storage
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --permanent --target-storage default
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
 
+wal-g --config=${TMP_CONFIG} backup-list
+
+# Backup on the 2nd line is permanent: 1st line is header, and 2nd and 3rd are the same permanent backup uploaded to
+# different storages
 PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 
 # add some WALs
@@ -41,14 +46,26 @@ do
     wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 
-FIRST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==3{print $1}')
+# copy all backups to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
+
+# copy all WALs to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer pg-wals --source default --target good_failover --preserve
+
+wal-g --config=${TMP_CONFIG} backup-list
+
+# the first non-permanent backup is on line 4: 1st line is header, 2nd and 3rd are permanent, and 4th-7th lines are
+# non-permanent backups uploaded to different storages.
+FIRST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==4{print $1}')
 
 # backup the first non-permanent backup sentinel and remove it from the storage
 # to emulate some partially deleted backup
 # then try to delete the garbage (without the --confirm flag)
 
-wal-g st cat "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" > "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --config=${TMP_CONFIG}
-wal-g st rm "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --config=${TMP_CONFIG}
+wal-g st cat "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" \
+    > "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --config=${TMP_CONFIG}
+wal-g st rm "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --config=${TMP_CONFIG} --target=default
+wal-g st rm "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --config=${TMP_CONFIG} --target=good_failover
 
 # check that ARCHIVES mode works
 wal-g delete garbage ARCHIVES --config=${TMP_CONFIG} > /tmp/delete_garbage_archives_output 2>&1
@@ -96,7 +113,8 @@ then
 fi
 
 # restore the backup sentinel
-wal-g st put "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --no-compress --no-encrypt --config=${TMP_CONFIG}
+wal-g st put "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --no-compress --no-encrypt --config=${TMP_CONFIG} --target default
+wal-g st put "/tmp/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" "basebackups_005/${FIRST_NON_PERMANENT_BACKUP}_backup_stop_sentinel.json" --no-compress --no-encrypt --config=${TMP_CONFIG} --target good_failover
 
 # delete the first non-permanent backup
 wal-g --config=${TMP_CONFIG} delete target "${FIRST_NON_PERMANENT_BACKUP}" --confirm
@@ -104,6 +122,10 @@ wal-g --config=${TMP_CONFIG} delete target "${FIRST_NON_PERMANENT_BACKUP}" --con
 # should delete WALs in ranges (0, PERMANENT_BACKUP) and (PERMANENT_BACKUP, second non-permanent backup)
 wal-g --config=${TMP_CONFIG} delete garbage --confirm
 
+wal-g --config=${TMP_CONFIG} backup-list
+
+# the desired first backup is on line 2: 1st line is the header, and 2nd and 3rd lines are the same backup uploaded to
+# different storages.
 FIRST_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 
 if [ "$PERMANENT_BACKUP" != "$FIRST_BACKUP" ];

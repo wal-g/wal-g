@@ -60,16 +60,26 @@ services:
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
       &&  mkdir -p /export/deleteretainfullbucket
+      &&  mkdir -p /export/deleteretainfullfailoverbucket
       &&  mkdir -p /export/deleteretainfindfullbucket
+      &&  mkdir -p /export/deleteretainfindfullfailoverbucket
       &&  mkdir -p /export/deletebeforenamefindfullbucket
+      &&  mkdir -p /export/deletebeforenamefindfullfailoverbucket
       &&  mkdir -p /export/deletebeforetimefindfullbucket
+      &&  mkdir -p /export/deletebeforetimefindfullfailoverbucket
       &&  mkdir -p /export/deletebeforepermanentfullbucket
+      &&  mkdir -p /export/deletebeforepermanentfullfailoverbucket
       &&  mkdir -p /export/deletebeforepermanentdeltabucket
+      &&  mkdir -p /export/deletebeforepermanentdeltafailoverbucket
       &&  mkdir -p /export/deletewithoutconfirm
+      &&  mkdir -p /export/deletewithoutconfirmfailover
       &&  mkdir -p /export/deleteendtoendbucket
+      &&  mkdir -p /export/deleteendtoendfailoverbucket
       &&  mkdir -p /export/deletetargetbucket
+      &&  mkdir -p /export/deletetargetfailoverbucket
       &&  mkdir -p /export/gpdeletetargetbucket
       &&  mkdir -p /export/deletegarbagebucket
+      &&  mkdir -p /export/deletegarbagefailoverbucket
       &&  mkdir -p /export/gpdeletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
       &&  mkdir -p /export/mysqlsplitfilesizebucket
@@ -126,7 +136,9 @@ services:
       &&  mkdir -p /export/backupperftestbucket
       &&  mkdir -p /export/catchupbucket
       &&  mkdir -p /export/deletetargetdeltafindfullbucket
+      &&  mkdir -p /export/deletetargetdeltafindfullfailoverbucket
       &&  mkdir -p /export/deletetargetdeltabucket
+      &&  mkdir -p /export/deletetargetdeltafailoverbucket
       &&  mkdir -p /export/fullstreamedbucket
       &&  mkdir -p /export/receivewalbucket
       &&  mkdir -p /export/severaldeltabackupsbucket

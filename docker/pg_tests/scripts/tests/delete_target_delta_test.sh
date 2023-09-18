@@ -21,7 +21,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 # create one base backup and one increment
-for i in 1 2
+for _ in 1 2
 do
     pgbench -i -s 1 postgres &
     sleep 1
@@ -39,10 +39,13 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --full
 pgbench -i -s 1 postgres & sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
-# remember the backup-list output with two full backups and two increments.
+# copy all backups to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
+
+# remember the backup-list output with two full backups and two increments (in each of two storages).
 # later in the test we create new backups which should be deleted so lists should be identical
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 4 > /tmp/list_before_delete
+wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_before_delete
 
 # now make increment from the FIRST_INCREMENT, which will be deleted later
 pgbench -i -s 1 postgres & sleep 1
@@ -57,11 +60,14 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${INCREMENT
 pgbench -i -s 1 postgres & sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${INCREMENT_TO_DELETE}
 
-# delete the INCREMENT_TO_DELETE, should leave only the first full backup w/ first increment and the second full backup w/ first increment
+# copy all newly created backups to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
+
+# delete the INCREMENT_TO_DELETE, should keep only the first full backup w/ first increment and the second full backup w/ second increment
 wal-g --config=${TMP_CONFIG} delete target ${INCREMENT_TO_DELETE} --confirm
 
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 4 > /tmp/list_after_delete
+wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_after_delete
 
 if [ $(($lines_before_delete)) -ne $lines_after_delete ];
 then
@@ -71,7 +77,8 @@ then
     diff /tmp/before_delete /tmp/after_delete
 fi
 
+# ensure all backups which we weren't going to delete still exist after performing deletion
+xargs -I {} grep {} /tmp/list_before_delete </tmp/list_after_delete
 
-diff /tmp/list_before_delete /tmp/list_after_delete
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}

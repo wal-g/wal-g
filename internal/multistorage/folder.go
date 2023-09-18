@@ -98,9 +98,13 @@ func EnsureSingleStorageIsUsed(folder storage.Folder) error {
 func changeDirectory(path string, storages ...cache.NamedFolder) []cache.NamedFolder {
 	newStorages := make([]cache.NamedFolder, len(storages))
 	for i := range storages {
+		folder := storages[i].Folder
+		if path != "" {
+			folder = folder.GetSubFolder(path)
+		}
 		newStorages[i] = cache.NamedFolder{
 			Name:   storages[i].Name,
-			Folder: storages[i].Folder.GetSubFolder(path),
+			Folder: folder,
 		}
 	}
 	return newStorages
@@ -352,7 +356,7 @@ func (mf Folder) listStorageFolder(storage cache.NamedFolder) ([]storage.Object,
 	for i, obj := range objects {
 		objects[i] = multiObject{
 			Object:      obj,
-			storageName: storage.Name,
+			StorageName: storage.Name,
 		}
 	}
 

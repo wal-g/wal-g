@@ -1,11 +1,11 @@
 "WALG_DELTA_MAX_STEPS": "0",
-"WALE_S3_PREFIX": "s3://deletewithoutconfirm",
+"WALE_S3_PREFIX": "s3://deletebeforepermanentdeltabucket",
 "WALG_USE_WAL_DELTA": "true",
 "WALG_FAILOVER_STORAGES": {
 "good_failover": {
 "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
-"WALE_S3_PREFIX": "s3://deletewithoutconfirmfailover"
+"WALE_S3_PREFIX": "s3://deletebeforepermanentdeltafailoverbucket"
 }
 },
 "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT": "5s"

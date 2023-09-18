@@ -3,6 +3,7 @@ package internal
 import (
 	"time"
 
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -33,4 +34,8 @@ func (o DefaultBackupObject) IsFullBackup() bool {
 
 func (o DefaultBackupObject) GetBackupTime() time.Time {
 	return o.Object.GetLastModified()
+}
+
+func (o DefaultBackupObject) GetStorage() string {
+	return consts.DefaultStorage
 }

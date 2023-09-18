@@ -6,8 +6,6 @@ import (
 	"io"
 	"path"
 	"strings"
-
-	"github.com/wal-g/tracelog"
 )
 
 //go:generate mockery --name Folder
@@ -52,36 +50,23 @@ type HashableFolder interface {
 
 type Hash uint64
 
-func DeleteObjectsWhere(folder Folder, confirm bool, objFilter func(object1 Object) bool, folderFilter func(name string) bool) error {
-	relativePathObjects, err := ListFolderRecursivelyWithFilter(folder, folderFilter)
-	if err != nil {
-		return err
-	}
-	filteredRelativePaths := make([]string, 0)
-	tracelog.InfoLogger.Println("Objects in folder:")
-	for _, object := range relativePathObjects {
-		if objFilter(object) {
-			tracelog.InfoLogger.Println("\twill be deleted: " + object.GetName())
-			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
-		} else {
-			tracelog.DebugLogger.Println("\tskipped: " + object.GetName())
-		}
-	}
-	if len(filteredRelativePaths) == 0 {
-		return nil
-	}
-	if confirm {
-		return folder.DeleteObjects(filteredRelativePaths)
-	}
-	tracelog.InfoLogger.Println("Dry run, nothing were deleted")
-	return nil
+type RelativePathObject struct {
+	Object
+	ParentDir string
+}
+
+func (o RelativePathObject) GetName() string {
+	return path.Join(o.ParentDir, o.Object.GetName())
 }
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
 	return ListFolderRecursivelyWithFilter(folder, func(string) bool { return true })
 }
 
-func ListFolderRecursivelyWithFilter(folder Folder, folderSelector func(path string) bool) (relativePathObjects []Object, err error) {
+func ListFolderRecursivelyWithFilter(
+	folder Folder,
+	folderSelector func(path string) bool,
+) (relativePathObjects []Object, err error) {
 	queue := make([]Folder, 0)
 	queue = append(queue, folder)
 	for len(queue) > 0 {
@@ -89,7 +74,7 @@ func ListFolderRecursivelyWithFilter(folder Folder, folderSelector func(path str
 		queue = queue[1:]
 		objects, subFolders, err := subFolder.ListFolder()
 		folderPrefix := strings.TrimPrefix(subFolder.GetPath(), folder.GetPath())
-		relativePathObjects = append(relativePathObjects, addPrefixToNames(objects, folderPrefix)...)
+		relativePathObjects = append(relativePathObjects, makePathsRelative(objects, folderPrefix)...)
 		if err != nil {
 			return nil, err
 		}
@@ -99,11 +84,14 @@ func ListFolderRecursivelyWithFilter(folder Folder, folderSelector func(path str
 	return relativePathObjects, nil
 }
 
-func addPrefixToNames(objects []Object, folderPrefix string) []Object {
+func makePathsRelative(objects []Object, folderPrefix string) []Object {
 	relativePathObjects := make([]Object, len(objects))
 	for i, object := range objects {
-		relativePath := path.Join(folderPrefix, object.GetName())
-		relativePathObjects[i] = NewLocalObject(relativePath, object.GetLastModified(), object.GetSize())
+		if relPathObj, ok := object.(RelativePathObject); ok {
+			relativePathObjects[i] = RelativePathObject{relPathObj.Object, path.Join(folderPrefix, relPathObj.ParentDir)}
+		} else {
+			relativePathObjects[i] = RelativePathObject{object, folderPrefix}
+		}
 	}
 	return relativePathObjects
 }
@@ -133,7 +121,7 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 		}
 		for _, obj := range objects {
 			if obj.GetName() == fileName {
-				return addPrefixToNames([]Object{obj}, dirName), nil
+				return makePathsRelative([]Object{obj}, dirName), nil
 			}
 		}
 	}
@@ -143,5 +131,5 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 	if err != nil {
 		return nil, fmt.Errorf("can't list folder %q: %w", prefix, err)
 	}
-	return addPrefixToNames(objects, prefix), nil
+	return makePathsRelative(objects, prefix), nil
 }

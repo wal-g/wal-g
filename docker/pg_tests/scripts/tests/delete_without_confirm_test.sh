@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e -x
 CONFIG_FILE="/tmp/configs/delete_without_confirm_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
@@ -20,11 +20,16 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-for i in 1 2
+for i in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+    if [ $((i%2)) -eq 0 ]
+    then target_storage="default"
+    else target_storage="good_failover"
+    fi
+    echo "PUSH BACKUP TO STORAGE ${target_storage}"
+    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --target-storage ${target_storage}
 done
 
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`

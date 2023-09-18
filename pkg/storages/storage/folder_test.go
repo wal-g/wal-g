@@ -6,7 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -37,91 +42,98 @@ func TestListFolderRecursively(t *testing.T) {
 	}
 }
 
-func CreateMockStorageFolder() storage.Folder {
-	var folder = memory.NewFolder("in_memory/", memory.NewStorage())
-	subFolder := folder.GetSubFolder("basebackups_005/")
-	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
-	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}"))
-	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{}) // last put
-	subFolder.PutObject("base_123312", &bytes.Buffer{})                        // not a sentinel
-	subFolder.PutObject("base_321/nop", &bytes.Buffer{})
-	subFolder.PutObject("folder123/nop", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{})
-	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
-	subFolder.PutObject("base_456/some_folder/3", &bytes.Buffer{})
-	return folder
-}
-
-func TestDeleteOldObjects(t *testing.T) {
-	folder := CreateMockStorageFolder()
-	expectedOnlyOneSavedObjectName := "basebackups_005/base_123312"
-	filter := func(object storage.Object) bool {
-		return object.GetName() != expectedOnlyOneSavedObjectName
-	}
-
-	folderFilter := func(path string) bool { return true }
-	err := storage.DeleteObjectsWhere(folder, true, filter, folderFilter)
-	assert.NoError(t, err)
-	savedObjects, err := storage.ListFolderRecursively(folder)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(savedObjects))
-	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
-}
-
-func TestDeleteOldObjectsWithFilter(t *testing.T) {
-	folder := CreateMockStorageFolder()
-	expectedOnlyOneSavedObjectName := "basebackups_005/base_456/some_folder/3"
-	filter := func(object storage.Object) bool {
-		return true
-	}
-
-	folderFilter := func(name string) bool {
-		return !strings.HasPrefix(name, "basebackups_005/base_456/some_folder")
-	}
-
-	err := storage.DeleteObjectsWhere(folder, true, filter, folderFilter)
-	assert.NoError(t, err)
-	savedObjects, err := storage.ListFolderRecursively(folder)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(savedObjects))
-	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
-}
-
 func TestListFolderRecursivelyWithFilter(t *testing.T) {
 	var folder = memory.NewFolder("in_memory/", memory.NewStorage())
-	subFolder := folder.GetSubFolder("basebackups_005/")
 	includedObjNames := []string{
-		"base_123_backup_stop_sentinel.json",
-		"base_456_backup_stop_sentinel.json",
-		"base_123312",
-		"base_321/nop",
-		"folder123/nop",
-		"base_456/some_folder/2",
-		"base_456/tar_partitions",
-		"base_456/tar_partitions_file",
+		"basebackups_005/base_123_backup_stop_sentinel.json",
+		"basebackups_005/base_456_backup_stop_sentinel.json",
+		"basebackups_005/base_123312",
+		"basebackups_005/base_321/nop",
+		"basebackups_005/folder123/nop",
+		"basebackups_005/base_456/some_folder/2",
+		"basebackups_005/base_456/tar_partitions",
+		"basebackups_005/base_456/tar_partitions_file",
 	}
 
 	for _, name := range includedObjNames {
-		subFolder.PutObject(name, &bytes.Buffer{})
+		_ = folder.PutObject(name, &bytes.Buffer{})
 	}
 
 	excludedObjNames := []string{
-		"base_456/tar_partitions/1",
-		"base_456/tar_partitions/2",
-		"base_456/tar_partitions/3",
-		"base_456/tar_partitions/1/1",
+		"basebackups_005/base_456/tar_partitions/1",
+		"basebackups_005/base_456/tar_partitions/2",
+		"basebackups_005/base_456/tar_partitions/3",
+		"basebackups_005/base_456/tar_partitions/1/1",
 	}
 
 	for _, name := range excludedObjNames {
-		subFolder.PutObject(name, &bytes.Buffer{})
+		_ = folder.PutObject(name, &bytes.Buffer{})
 	}
 
 	filterFunc := func(path string) bool {
-		return !strings.HasPrefix(path, "base_456/tar_partitions")
+		return !strings.HasPrefix(path, "basebackups_005/base_456/tar_partitions")
 	}
 
-	filtered, err := storage.ListFolderRecursivelyWithFilter(subFolder, filterFunc)
+	filtered, err := storage.ListFolderRecursivelyWithFilter(folder, filterFunc)
+
+	filteredNames := make([]string, 0)
+
+	for i := range filtered {
+		filteredNames = append(filteredNames, filtered[i].GetName())
+	}
+
+	sort.Strings(filteredNames)
+	sort.Strings(includedObjNames)
+
+	assert.NoError(t, err)
+	assert.Equal(t, filteredNames, includedObjNames)
+}
+
+func TestListFolderRecursivelyWithFilter_MultiStorage(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	t.Cleanup(mockCtrl.Finish)
+	cacheMock := cache.NewMockStatusCache(mockCtrl)
+	memFolder := cache.NamedFolder{
+		Name:   "test",
+		Folder: memory.NewFolder("", memory.NewStorage()),
+	}
+	cacheMock.EXPECT().SpecificStorage("test").Return(&memFolder, nil)
+	folder := multistorage.NewFolder(cacheMock)
+	folder, err := multistorage.UseSpecificStorage("test", folder)
+	require.NoError(t, err)
+	folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
+
+	includedObjNames := []string{
+		"basebackups_005/base_123_backup_stop_sentinel.json",
+		"basebackups_005/base_456_backup_stop_sentinel.json",
+		"basebackups_005/base_123312",
+		"basebackups_005/base_321/nop",
+		"basebackups_005/folder123/nop",
+		"basebackups_005/base_456/some_folder/2",
+		"basebackups_005/base_456/tar_partitions",
+		"basebackups_005/base_456/tar_partitions_file",
+	}
+
+	for _, name := range includedObjNames {
+		_ = folder.PutObject(name, &bytes.Buffer{})
+	}
+
+	excludedObjNames := []string{
+		"basebackups_005/base_456/tar_partitions/1",
+		"basebackups_005/base_456/tar_partitions/2",
+		"basebackups_005/base_456/tar_partitions/3",
+		"basebackups_005/base_456/tar_partitions/1/1",
+	}
+
+	for _, name := range excludedObjNames {
+		_ = folder.PutObject(name, &bytes.Buffer{})
+	}
+
+	filterFunc := func(path string) bool {
+		return !strings.HasPrefix(path, "basebackups_005/base_456/tar_partitions")
+	}
+
+	filtered, err := storage.ListFolderRecursivelyWithFilter(folder, filterFunc)
 
 	filteredNames := make([]string, 0)
 

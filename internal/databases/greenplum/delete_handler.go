@@ -24,7 +24,7 @@ type DeleteArgs struct {
 
 type DeleteHandler struct {
 	internal.DeleteHandler
-	permanentBackups map[string]bool
+	permanentBackups []string
 	args             DeleteArgs
 }
 
@@ -46,6 +46,10 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 
 	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath),
 		NewGenericMetaFetcher())
+	permanentBackupNames := make([]string, 0, len(permanentBackups))
+	for name := range permanentBackups {
+		permanentBackupNames = append(permanentBackupNames, name)
+	}
 	isPermanentFunc := func(obj storage.Object) bool {
 		return internal.IsPermanent(obj.GetName(), permanentBackups, BackupNameLength)
 	}
@@ -57,7 +61,7 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 			gpLessFunc,
 			internal.IsPermanentFunc(isPermanentFunc),
 		),
-		permanentBackups: permanentBackups,
+		permanentBackups: permanentBackupNames,
 		args:             args,
 	}, nil
 }
