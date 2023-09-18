@@ -17,6 +17,7 @@ import (
 
 const (
 	PrivateKeyFilePath             = "./testdata/pgpTestPrivateKey"
+	PrivateAnotherKeyFilePath      = "./testdata/pgpTestPrivateAnotherKey"
 	PrivateEncryptedKeyFilePath    = "./testdata/pgpTestEncryptedPrivateKey"
 	PrivateEncryptedKeyEnvFilePath = "./testdata/pgpTestEncryptedPrivateKeyEnv"
 )
@@ -103,4 +104,20 @@ func TestEncodeEmptyKeyID(t *testing.T) {
 	keyID, err := encodeKeyID(emptyKey)
 	assert.NoError(t, err)
 	assert.Equal(t, "", keyID, "Key id is mismatch")
+}
+
+func TestEncodeMultiKeyID(t *testing.T) {
+	keyPath := []string{PrivateKeyFilePath, PrivateAnotherKeyFilePath}
+	var keys []*openpgp.Entity
+	for _, path := range keyPath {
+		key, err := os.ReadFile(path)
+		assert.NoError(t, err)
+		entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
+		assert.NoError(t, err)
+		keys = append(keys, entityList...)
+
+	}
+	keyID, err := encodeKeyID(keys)
+	assert.NoError(t, err)
+	assert.Equal(t, "3BE0C94F8BDCA96B,F1A31F9064762905", keyID, "Key id is mismatch")
 }
