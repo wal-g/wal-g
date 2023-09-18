@@ -1,7 +1,6 @@
 package cached
 
 import (
-	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"testing"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/wal-g/wal-g/internal/crypto/envelope/mocks"
 )
 

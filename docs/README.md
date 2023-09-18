@@ -127,6 +127,11 @@ Ensure that you have set up and configured Yandex Cloud KMS mentioned below befo
 This setting controls kms response expiration. Default value is `0` to store keys permanent in memory.
 Please note that if the system will not be able to redecrypt the key in kms after expiration, the previous response will be used.
 
+* `WALG_ENVELOPE_PGP_KEY_ID`
+Envelope Key identifier.
+Please note that this key will be used to distinguish one key from another in cache.
+If no one identifier was passed sha1 will be calculated over the envelope key.
+
 * `WALG_ENVELOPE_PGP_YC_ENDPOINT`
 
 Endpoint is an API endpoint of Yandex.Cloud against which the SDK is used. Most users won't need to explicitly set it.

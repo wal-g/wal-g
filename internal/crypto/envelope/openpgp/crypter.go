@@ -123,8 +123,10 @@ func (crypter *Crypter) setupEncryptedKey() error {
 	if crypter.encryptedKey != nil {
 		return nil
 	}
-	var rawEncryptedKey []byte
-	var err error
+	var (
+		rawEncryptedKey []byte
+		err             error
+	)
 	switch {
 	case crypter.IsUseArmoredKey:
 		rawEncryptedKey, err = readFromString(crypter.ArmoredKey)
@@ -138,9 +140,9 @@ func (crypter *Crypter) setupEncryptedKey() error {
 		}
 	}
 
-	var keyID = crypter.ArmoredKeyId
+	keyID := crypter.ArmoredKeyId
 	if keyID == "" {
-		tracelog.WarningLogger.Println("No any key id was passed, sha1 will be used")
+		tracelog.WarningLogger.Println("No any envelope key id was passed, sha1 will be used")
 		keyID = fmt.Sprintf("%x", sha1.Sum(rawEncryptedKey))
 	}
 	crypter.encryptedKey = envelope.NewEncryptedKey(keyID, rawEncryptedKey)
