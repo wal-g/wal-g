@@ -17,6 +17,7 @@ import (
 const (
 	magic              = "envelope-yc-kms"
 	schemeVersion byte = 1
+	sizeofInt32        = 4
 )
 
 type Enveloper struct {
@@ -63,12 +64,12 @@ func serializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
 
 	result := append([]byte(magic), schemeVersion)
 
-	keyIDLen := make([]byte, 4)
+	keyIDLen := make([]byte, sizeofInt32)
 	binary.LittleEndian.PutUint32(keyIDLen, uint32(len(keyID)))
 	result = append(result, keyIDLen...)
 	result = append(result, []byte(keyID)...)
 
-	encryptedKeyLen := make([]byte, 4)
+	encryptedKeyLen := make([]byte, sizeofInt32)
 	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey)))
 	result = append(result, encryptedKeyLen...)
 	return append(result, encryptedKey...)
@@ -89,7 +90,7 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 		return nil, errors.New("envelope yc kms: scheme version is not supported")
 	}
 
-	keyIDLenBytes := make([]byte, 4)
+	keyIDLenBytes := make([]byte, sizeofInt32)
 	_, err = io.ReadFull(r, keyIDLenBytes)
 	if err != nil {
 		return nil, err
@@ -105,7 +106,7 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 	keyID := string(keyIDBytes)
 	tracelog.DebugLogger.Printf("Encrypted key was found: %s\n", keyID)
 
-	encryptedKeyLenBytes := make([]byte, 4)
+	encryptedKeyLenBytes := make([]byte, sizeofInt32)
 	_, err = io.ReadFull(r, encryptedKeyLenBytes)
 	if err != nil {
 		return nil, err

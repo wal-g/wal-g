@@ -49,8 +49,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	var key []byte
-	key, err = crypter.enveloper.DecryptKey(crypter.encryptedKey)
+	key, err := crypter.enveloper.DecryptKey(crypter.encryptedKey)
 	if err != nil {
 		return nil, errors.Wrapf(err, "can't decrypt encryption key")
 	}
