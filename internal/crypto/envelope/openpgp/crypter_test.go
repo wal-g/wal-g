@@ -2,11 +2,11 @@ package openpgp
 
 import (
 	"bytes"
-	"github.com/ProtonMail/go-crypto/openpgp"
 	"io"
 	"os"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -94,6 +94,13 @@ func TestEncodeKeyId(t *testing.T) {
 	entityList, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
 	assert.NoError(t, err)
 	keyId, err := encodeKeyID(entityList)
+	assert.NoError(t, err)
 	assert.Equal(t, "3BE0C94F8BDCA96B", keyId, "Key id is mismatch")
+}
 
+func TestEncodeEmptyKeyId(t *testing.T) {
+	var emptyKey []*openpgp.Entity
+	keyId, err := encodeKeyID(emptyKey)
+	assert.NoError(t, err)
+	assert.Equal(t, "", keyId, "Key id is mismatch")
 }
