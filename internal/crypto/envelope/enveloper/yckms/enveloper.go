@@ -29,15 +29,15 @@ func (enveloper *Enveloper) Name() string {
 	return "yckms"
 }
 
-func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
+func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 	return readEncryptedKey(r)
 }
 
-func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
+func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]byte, error) {
 	ctx := context.Background()
 	rsp, err := enveloper.sdk.KMSCrypto().SymmetricCrypto().Decrypt(ctx, &kms.SymmetricDecryptRequest{
 		KeyId:      enveloper.keyID,
-		Ciphertext: encryptedKey,
+		Ciphertext: encryptedKey.Data,
 		AadContext: nil,
 	})
 
@@ -48,11 +48,11 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	return rsp.Plaintext, nil
 }
 
-func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
-	return serializeEncryptedKey(encryptedKey, keyID)
+func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey *envelope.EncryptedKey) []byte {
+	return serializeEncryptedKey(encryptedKey)
 }
 
-func serializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
+func serializeEncryptedKey(encryptedKey *envelope.EncryptedKey) []byte {
 	/*
 		magic value "envelope-yc-kms"
 		scheme version (current version is 1)
@@ -64,18 +64,19 @@ func serializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
 
 	result := append([]byte(magic), schemeVersion)
 
+	keyID := encryptedKey.ID()
 	keyIDLen := make([]byte, sizeofInt32)
 	binary.LittleEndian.PutUint32(keyIDLen, uint32(len(keyID)))
 	result = append(result, keyIDLen...)
 	result = append(result, []byte(keyID)...)
 
 	encryptedKeyLen := make([]byte, sizeofInt32)
-	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey)))
+	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey.Data)))
 	result = append(result, encryptedKeyLen...)
-	return append(result, encryptedKey...)
+	return append(result, encryptedKey.Data...)
 }
 
-func readEncryptedKey(r io.Reader) ([]byte, error) {
+func readEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 	magicSchemeBytes := make([]byte, len(magic)+1)
 	_, err := io.ReadFull(r, magicSchemeBytes)
 	if err != nil {
@@ -120,7 +121,7 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 		return nil, err
 	}
 
-	return encryptedKey, nil
+	return envelope.NewEncryptedKey(keyID, encryptedKey), nil
 }
 
 func getCredentials(saFilePath string) (ycsdk.Credentials, error) {

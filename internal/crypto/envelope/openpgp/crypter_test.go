@@ -20,6 +20,7 @@ const (
 	PrivateAnotherKeyFilePath      = "./testdata/pgpTestPrivateAnotherKey"
 	PrivateEncryptedKeyFilePath    = "./testdata/pgpTestEncryptedPrivateKey"
 	PrivateEncryptedKeyEnvFilePath = "./testdata/pgpTestEncryptedPrivateKeyEnv"
+	dummyKey                       = "some key id"
 )
 
 func MockedEnveloper(t *testing.T) *mocks.Enveloper {
@@ -29,9 +30,9 @@ func MockedEnveloper(t *testing.T) *mocks.Enveloper {
 	}
 	enveloper := mocks.NewEnveloper(t)
 	enveloper.EXPECT().Name().Return("mocked").Maybe()
-	enveloper.EXPECT().ReadEncryptedKey(mock.Anything).Return([]byte(""), nil).Maybe()
+	enveloper.EXPECT().ReadEncryptedKey(mock.Anything).Return(envelope.NewEncryptedKey(dummyKey, []byte("")), nil).Maybe()
 	enveloper.EXPECT().DecryptKey(mock.Anything).Return(key, nil).Maybe()
-	enveloper.EXPECT().SerializeEncryptedKey(mock.Anything, mock.Anything).Return([]byte("")).Maybe()
+	enveloper.EXPECT().SerializeEncryptedKey(mock.Anything).Return([]byte("")).Maybe()
 	return enveloper
 }
 

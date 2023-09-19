@@ -27,7 +27,7 @@ const (
 // Includes keys, infrastructure information etc
 type Crypter struct {
 	enveloper    envelope.Enveloper
-	encryptedKey []byte
+	encryptedKey *envelope.EncryptedKey
 
 	ArmoredKey      string
 	IsUseArmoredKey bool
@@ -57,7 +57,6 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "can't read decrypyed gpg key")
 	}
-
 	keyID, err := encodeKeyID(entityList)
 	if err != nil {
 		return nil, errors.Wrapf(err, "can't encode gpg key id")
@@ -66,7 +65,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	// need write header at first, with length less than maxHeaderLenAllowed
 	bufferedWriter := bufio.NewWriterSize(writer, maxHeaderLenAllowed)
 
-	header := crypter.enveloper.SerializeEncryptedKey(crypter.encryptedKey, keyID)
+	header := crypter.enveloper.SerializeEncryptedKey(crypter.encryptedKey.WithID(keyID))
 
 	if len(header) > maxHeaderLenAllowed {
 		return nil, errors.New("opengpg: invalid size of the encrypted key")
@@ -125,21 +124,23 @@ func (crypter *Crypter) setupEncryptedKey() error {
 	if crypter.encryptedKey != nil {
 		return nil
 	}
-
+	var (
+		rawEncryptedKey []byte
+		err             error
+	)
 	switch {
 	case crypter.IsUseArmoredKey:
-		encryptedKey, err := readFromString(crypter.ArmoredKey)
+		rawEncryptedKey, err = readFromString(crypter.ArmoredKey)
 		if err != nil {
 			return err
 		}
-		crypter.encryptedKey = encryptedKey
 	case crypter.IsUseArmoredKeyPath:
-		encryptedKey, err := readFromFilePath(crypter.ArmoredKeyPath)
+		rawEncryptedKey, err = readFromFilePath(crypter.ArmoredKeyPath)
 		if err != nil {
 			return err
 		}
-		crypter.encryptedKey = encryptedKey
 	}
+	crypter.encryptedKey = envelope.NewEncryptedKey("", rawEncryptedKey)
 	return nil
 }
 

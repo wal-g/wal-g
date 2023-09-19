@@ -1,8 +1,6 @@
 package cached
 
 import (
-	"crypto/sha1"
-	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -27,33 +25,33 @@ type Enveloper struct {
 	expiration time.Duration
 }
 
-func createKey(s []byte) string { return fmt.Sprintf("%x", sha1.Sum(s)) }
-
 func (enveloper *Enveloper) Name() string {
 	return enveloper.wrapped.Name()
 }
 
-func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
+func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 	tracelog.DebugLogger.Println("Exctract encrypted key")
 	return enveloper.wrapped.ReadEncryptedKey(r)
 }
 
-func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
-	key := createKey(encryptedKey)
-	tracelog.DebugLogger.Printf("Decrypt encrypted key %s\n", key)
+func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]byte, error) {
+	KeyUID := encryptedKey.KeyUID()
+	tracelog.DebugLogger.Printf("Decrypt encrypted key %s\n", KeyUID)
 
 	enveloper.locker.RLock()
-	item, exists := enveloper.items[key]
+	item, exists := enveloper.items[KeyUID]
 	enveloper.locker.RUnlock()
 	if exists && item.isFresh() {
-		tracelog.DebugLogger.Printf("Use cached encrypted key %s \n", key)
+		tracelog.DebugLogger.Printf("Use cached encrypted key %s\n", KeyUID)
 		return item.Object, nil
 	}
 
 	decryptedKey, err := enveloper.wrapped.DecryptKey(encryptedKey)
 	if err != nil {
 		if exists {
-			tracelog.WarningLogger.Printf("Unable to decrypt a key, use stale cache key %s, err: %v\n", key, err)
+			tracelog.WarningLogger.Printf(
+				"Unable to decrypt a key, use stale cache key %s, err: %v\n", KeyUID, err,
+			)
 			return item.Object, nil
 		}
 		return nil, err
@@ -66,15 +64,15 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	if enveloper.expiration > 0 {
 		expiredAt = time.Now().Add(enveloper.expiration)
 	}
-	enveloper.items[key] = Item{
+	enveloper.items[KeyUID] = Item{
 		Object:    decryptedKey,
 		ExpiredAt: expiredAt,
 	}
 	return decryptedKey, nil
 }
 
-func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte, keyID string) []byte {
-	return enveloper.wrapped.SerializeEncryptedKey(encryptedKey, keyID)
+func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey *envelope.EncryptedKey) []byte {
+	return enveloper.wrapped.SerializeEncryptedKey(encryptedKey)
 }
 
 func EnveloperWithCache(enveloper envelope.Enveloper, expiration time.Duration) envelope.Enveloper {

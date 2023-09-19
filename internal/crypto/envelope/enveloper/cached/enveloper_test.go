@@ -8,11 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/wal-g/wal-g/internal/crypto/envelope/mocks"
 )
 
 func TestDecryptKey(t *testing.T) {
-	encryptedKey := []byte("encrypted key")
+	encryptedKey := envelope.NewEncryptedKey("example", []byte("encrypted key"))
 	expected := []byte("decrypted key")
 
 	t.Run("success", func(t *testing.T) {
