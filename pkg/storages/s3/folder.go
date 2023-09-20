@@ -118,6 +118,7 @@ func NewFolder(
 	region, accessKeyID *string,
 	useListObjectsV1 bool,
 ) *Folder {
+	path = strings.TrimPrefix(path, "/")
 	return &Folder{
 		uploader:         uploader,
 		S3API:            s3API,

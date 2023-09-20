@@ -98,13 +98,9 @@ func EnsureSingleStorageIsUsed(folder storage.Folder) error {
 func changeDirectory(path string, storages ...cache.NamedFolder) []cache.NamedFolder {
 	newStorages := make([]cache.NamedFolder, len(storages))
 	for i := range storages {
-		folder := storages[i].Folder
-		if path != "" {
-			folder = folder.GetSubFolder(path)
-		}
 		newStorages[i] = cache.NamedFolder{
 			Name:   storages[i].Name,
-			Folder: folder,
+			Folder: storages[i].Folder.GetSubFolder(path),
 		}
 	}
 	return newStorages

@@ -30,6 +30,7 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 }
 
 func NewFolder(connection *swift.Connection, container swift.Container, path string) *Folder {
+	path = strings.TrimPrefix(path, "/")
 	return &Folder{connection, container, path}
 }
 

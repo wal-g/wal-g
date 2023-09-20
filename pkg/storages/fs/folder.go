@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -28,6 +29,7 @@ type Folder struct {
 }
 
 func NewFolder(rootPath string, subPath string) *Folder {
+	subPath = strings.TrimPrefix(subPath, "/")
 	return &Folder{rootPath, subPath}
 }
 
@@ -87,14 +89,15 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	}
 	return true, nil
 }
+
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	sf := Folder{folder.rootPath, path.Join(folder.subpath, subFolderRelativePath)}
+	sf := NewFolder(folder.rootPath, path.Join(folder.subpath, subFolderRelativePath))
 	_ = sf.EnsureExists()
 
 	// This is something unusual when we cannot be sure that our subfolder exists in FS
 	// But we do not have to guarantee folder persistence, but any subsequent calls will fail
 	// Just like in all other Storage Folders
-	return &sf
+	return sf
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
