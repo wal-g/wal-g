@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Install deps
         run: sudo apt-get install liblzo2-dev brotli libsodium-dev
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
         with:
