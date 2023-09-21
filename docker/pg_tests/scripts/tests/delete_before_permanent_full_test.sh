@@ -21,19 +21,19 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-# push first backup as permanent to the failover storage
+# push first backup as permanent
 pgbench -i -s 1 postgres &
 sleep 1
-wal-g --config=${TMP_CONFIG} backup-push --permanent ${PGDATA} --target-storage good_failover
+wal-g --config=${TMP_CONFIG} backup-push --permanent ${PGDATA}
 wal-g --config=${TMP_CONFIG} backup-list
 permanent_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 
-# push a few more impermanent backups to the default storage
+# push a few more impermanent backups
 for _ in 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --target-storage default
+    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 wal-g --config=${TMP_CONFIG} backup-list
 

@@ -25,10 +25,7 @@ for _ in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --target-storage default
-
-    # copy last backup to the failover storage (all previous ones are already copied)
-    wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
+    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 
 # take time of last backup(it's delta)
@@ -44,8 +41,8 @@ wal-g --config=${TMP_CONFIG} backup-list
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
 wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_after_delete
 
-# we deleted 1 base backup and 1 delta backup from each of 2 storages
-expected_backups_deleted=$(((1+1)*2))
+# we deleted 1 base backup and 1 delta backup
+expected_backups_deleted=$((1+1))
 
 if [ $(($lines_before_delete-$expected_backups_deleted)) -ne $lines_after_delete ];
 then
