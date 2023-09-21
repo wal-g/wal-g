@@ -79,6 +79,8 @@ func newBackupObject(
 	}
 }
 
+var _ internal.BackupObject = BackupObject{}
+
 type BackupObject struct {
 	storage.Object
 	BackupName        string

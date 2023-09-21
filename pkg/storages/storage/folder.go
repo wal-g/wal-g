@@ -50,15 +50,6 @@ type HashableFolder interface {
 
 type Hash uint64
 
-type RelativePathObject struct {
-	Object
-	ParentDir string
-}
-
-func (o RelativePathObject) GetName() string {
-	return path.Join(o.ParentDir, o.Object.GetName())
-}
-
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
 	return ListFolderRecursivelyWithFilter(folder, func(string) bool { return true })
 }
@@ -74,7 +65,7 @@ func ListFolderRecursivelyWithFilter(
 		queue = queue[1:]
 		objects, subFolders, err := subFolder.ListFolder()
 		folderPrefix := strings.TrimPrefix(subFolder.GetPath(), folder.GetPath())
-		relativePathObjects = append(relativePathObjects, makePathsRelative(objects, folderPrefix)...)
+		relativePathObjects = append(relativePathObjects, prependPaths(objects, folderPrefix)...)
 		if err != nil {
 			return nil, err
 		}
@@ -84,14 +75,14 @@ func ListFolderRecursivelyWithFilter(
 	return relativePathObjects, nil
 }
 
-func makePathsRelative(objects []Object, folderPrefix string) []Object {
+func prependPaths(objects []Object, folderPrefix string) []Object {
 	relativePathObjects := make([]Object, len(objects))
 	for i, object := range objects {
-		if relPathObj, ok := object.(RelativePathObject); ok {
-			relativePathObjects[i] = RelativePathObject{relPathObj.Object, path.Join(folderPrefix, relPathObj.ParentDir)}
-		} else {
-			relativePathObjects[i] = RelativePathObject{object, folderPrefix}
-		}
+		relativePathObjects[i] = NewLocalObject(
+			path.Join(folderPrefix, object.GetName()),
+			object.GetLastModified(),
+			object.GetSize(),
+		)
 	}
 	return relativePathObjects
 }
@@ -121,7 +112,7 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 		}
 		for _, obj := range objects {
 			if obj.GetName() == fileName {
-				return makePathsRelative([]Object{obj}, dirName), nil
+				return prependPaths([]Object{obj}, dirName), nil
 			}
 		}
 	}
@@ -131,5 +122,5 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 	if err != nil {
 		return nil, fmt.Errorf("can't list folder %q: %w", prefix, err)
 	}
-	return makePathsRelative(objects, prefix), nil
+	return prependPaths(objects, prefix), nil
 }

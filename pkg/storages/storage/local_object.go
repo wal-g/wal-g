@@ -1,6 +1,10 @@
 package storage
 
-import "time"
+import (
+	"time"
+)
+
+var _ Object = LocalObject{}
 
 type LocalObject struct {
 	name         string

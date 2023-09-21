@@ -25,7 +25,7 @@ func TestListFolder(t *testing.T) {
 		for _, obj := range got {
 			multiObj, ok := obj.(multiObject)
 			assert.True(t, ok)
-			gotObj := listedObj{obj.GetName(), multiObj.StorageName}
+			gotObj := listedObj{obj.GetName(), multiObj.GetStorage()}
 			delete(want, gotObj)
 		}
 		assert.Empty(t, want)

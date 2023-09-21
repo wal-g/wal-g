@@ -352,7 +352,7 @@ func (mf Folder) listStorageFolder(storage cache.NamedFolder) ([]storage.Object,
 	for i, obj := range objects {
 		objects[i] = multiObject{
 			Object:      obj,
-			StorageName: storage.Name,
+			storageName: storage.Name,
 		}
 	}
 

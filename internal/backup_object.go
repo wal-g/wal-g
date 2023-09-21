@@ -12,6 +12,8 @@ func NewDefaultBackupObject(object storage.Object) BackupObject {
 	return DefaultBackupObject{object}
 }
 
+var _ BackupObject = DefaultBackupObject{}
+
 type DefaultBackupObject struct {
 	storage.Object
 }

@@ -12,7 +12,7 @@ func TestGetStorage(t *testing.T) {
 	t.Run("provides storage name", func(t *testing.T) {
 		obj := multiObject{
 			Object:      storage.LocalObject{},
-			StorageName: "some_name",
+			storageName: "some_name",
 		}
 		name := GetStorage(obj)
 		assert.Equal(t, "some_name", name)

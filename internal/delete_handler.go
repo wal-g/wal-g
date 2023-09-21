@@ -58,7 +58,8 @@ var errIncorrectArguments = errors.New("incorrect arguments")
 // BackupObject represents
 // the backup sentinel object uploaded on storage
 type BackupObject interface {
-	multistorage.MultiObject
+	storage.Object
+	multistorage.StorageTeller
 	GetBackupTime() time.Time
 	GetBackupName() string
 
@@ -465,7 +466,7 @@ func DeleteObjectsWhere(
 	objFilter func(object1 storage.Object) bool,
 	folderFilter func(name string) bool,
 ) error {
-	relativePathObjects, err := storage.ListFolderRecursivelyWithFilter(folder, folderFilter)
+	relativePathObjects, err := multistorage.ListFolderRecursivelyWithFilter(folder, folderFilter)
 	if err != nil {
 		return err
 	}
