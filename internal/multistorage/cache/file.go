@@ -13,15 +13,13 @@ import (
 )
 
 // StatusFile is stored on a disk and therefore shared between all WAL-G processes and commands.
-var StatusFile string
-
-func init() {
+var StatusFile = func() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		panic(fmt.Errorf("failed to get current user's home dir: %w", err))
+		return "", fmt.Errorf("can't get user home dir: %w", err)
 	}
 
-	StatusFile = filepath.Join(homeDir, ".walg_storage_status_cache")
+	return filepath.Join(homeDir, ".walg_storage_status_cache"), nil
 }
 
 type storageStatuses map[key]status
@@ -55,7 +53,12 @@ func updateFileContent(oldContent storageStatuses, checkResult map[key]bool) (ne
 }
 
 func readFile() (storageStatuses, error) {
-	file, err := os.OpenFile(StatusFile, os.O_RDONLY, 0666)
+	path, err := StatusFile()
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -89,7 +92,12 @@ func writeFile(content storageStatuses) error {
 		return fmt.Errorf("marshal cache file content: %w", err)
 	}
 
-	file, err := os.OpenFile(StatusFile, os.O_RDWR|os.O_CREATE, 0666)
+	path, err := StatusFile()
+	if err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return fmt.Errorf("open cache file: %w", err)
 	}
