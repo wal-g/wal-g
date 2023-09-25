@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e -x
-  CONFIG_FILE="/tmp/configs/delete_target_delta_find_full_test_config.json"
+  CONFIG_FILE="/tmp/configs/delete_target_delta_multist_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
@@ -20,46 +20,51 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-# create full backup and incremental
-for i in 1 2
+# create one base backup and one increment
+for _ in 1 2
 do
     pgbench -i -s 1 postgres &
     sleep 1
     wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 
-# remember the backup-list output
+# remember the name of the first increment
+FIRST_INCREMENT=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'END {print $1}')
+
+# make the second full backup
+pgbench -i -s 1 postgres & sleep 1
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --full
+
+# make the increment from the second full backup
+pgbench -i -s 1 postgres & sleep 1
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+
+# copy all backups to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
+
+# remember the backup-list output with two full backups and two increments (in each of two storages).
 # later in the test we create new backups which should be deleted so lists should be identical
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
 wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_before_delete
 
-# create one full and two increments
-for i in 1 2 3
-do
-    if [ $i -eq 1 ]; then
-       modifier='--full'
-    else
-       modifier=''
-    fi
-    pgbench -i -s 1 postgres &
-    sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} ${modifier}
-
-    # get the name of the second incremental backup (the second in general, the first for this full backup)
-    if [ $i -eq 2 ]
-    then SECOND_INCREMENT=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'END {print $1}')
-    fi
-done
-
-# make two increments from the SECOND_INCREMENT
+# now make increment from the FIRST_INCREMENT, which will be deleted later
 pgbench -i -s 1 postgres & sleep 1
-wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${SECOND_INCREMENT}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${FIRST_INCREMENT}
+INCREMENT_TO_DELETE=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'END {print $1}')
 
+# make the increment from the INCREMENT_TO_DELETE
 pgbench -i -s 1 postgres & sleep 1
-wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${SECOND_INCREMENT}
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${INCREMENT_TO_DELETE}
 
-# delete the SECOND_INCREMENT with FIND_FULL, should leave only the first full backup w/ first increment
-wal-g --config=${TMP_CONFIG} delete target FIND_FULL ${SECOND_INCREMENT} --confirm
+# make one more increment from the INCREMENT_TO_DELETE
+pgbench -i -s 1 postgres & sleep 1
+wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${INCREMENT_TO_DELETE}
+
+# copy all newly created backups to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
+
+# delete the INCREMENT_TO_DELETE, should keep only the first full backup w/ first increment and the second full backup w/ second increment
+wal-g --config=${TMP_CONFIG} delete target ${INCREMENT_TO_DELETE} --confirm
 
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
 wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_after_delete

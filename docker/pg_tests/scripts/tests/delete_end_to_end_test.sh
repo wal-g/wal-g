@@ -26,12 +26,16 @@ pgbench -c 2 -T 100000000 -S || true &
 for i in $(seq 1 9);
 do
     pgbench -i -s 2 postgres
-    if [ $i -eq 4 -o $i -eq 9 ];
+    if [ "$i" -eq 4 ] || [ "$i" -eq 9 ];
     then
-        pg_dumpall -f /tmp/dump$i
+        pg_dumpall -f "/tmp/dump${i}"
     fi
     sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+    if [ $((i%2)) -eq 0 ]
+    then target_storage="default"
+    else target_storage="good_failover"
+    fi
+    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --target-storage ${target_storage}
 done
 
 wal-g --config=${TMP_CONFIG} backup-list

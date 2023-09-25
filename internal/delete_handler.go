@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -58,6 +59,7 @@ var errIncorrectArguments = errors.New("incorrect arguments")
 // the backup sentinel object uploaded on storage
 type BackupObject interface {
 	storage.Object
+	multistorage.StorageTeller
 	GetBackupTime() time.Time
 	GetBackupName() string
 
@@ -170,7 +172,7 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups map[string]bool, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups []string, confirmed bool) {
 	forceModifier := false
 	modifier := ExtractDeleteEverythingModifierFromArgs(args)
 	if modifier == ForceDeleteModifier {
@@ -226,7 +228,7 @@ func (h *DeleteHandler) FindTargetRetain(retentionCount, modifier int) (BackupOb
 		return nil, utility.NewForbiddenActionError("Not allowed modifier for 'delete retain'")
 	}
 	target, err := findTarget(h.backups, h.greater, choiceFunc)
-	// it is OK to have no backups found outside of the specified retain window, skip this error
+	// it is OK to have no backups found outside the specified retain window, skip this error
 	if err != nil && err != errNotFound {
 		return nil, err
 	}
@@ -346,7 +348,7 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
 	folderFilter := func(path string) bool { return true }
-	err := storage.DeleteObjectsWhere(h.Folder, confirmed, filter, folderFilter)
+	err := DeleteObjectsWhere(h.Folder, confirmed, filter, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -357,15 +359,19 @@ func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) 
 	return h.DeleteBeforeTargetWhere(target, confirmed, objFilter, folderFilter)
 }
 
-func (h *DeleteHandler) DeleteBeforeTargetWhere(target BackupObject, confirmed bool,
-	objSelector func(object storage.Object) bool, folderFilter func(name string) bool) error {
+func (h *DeleteHandler) DeleteBeforeTargetWhere(
+	target BackupObject,
+	confirmed bool,
+	objSelector func(object storage.Object) bool,
+	folderFilter func(name string) bool,
+) error {
 	if !target.IsFullBackup() {
 		errorMessage := "%v is incremental and it's predecessors cannot be deleted. Consider FIND_FULL option."
 		return utility.NewForbiddenActionError(fmt.Sprintf(errorMessage, target.GetName()))
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
-	return storage.DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
+	return DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
 		return objSelector(object) && h.less(object, target) && !h.isPermanent(object)
 	}, folderFilter)
 }
@@ -390,7 +396,7 @@ func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bo
 		backupNamesToDelete[bTarget.GetBackupName()] = true
 	}
 
-	return storage.DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
+	return DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
 			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
 		}, folderFilter)
@@ -434,7 +440,7 @@ func (h *DeleteHandler) findRelatedBackups(target BackupObject) []BackupObject {
 // All delta backups which have the target as the ancestor in increment chain
 // are considered as dependant.
 func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject {
-	relatedBackups := make([]BackupObject, 0)
+	dependantBackups := make([]BackupObject, 0)
 
 	incrementsByBackup := make(map[string][]BackupObject)
 	for _, backup := range h.backups {
@@ -448,10 +454,40 @@ func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject
 	var curr BackupObject
 	for len(queue) > 0 {
 		curr, queue = queue[0], queue[1:]
-		relatedBackups = append(relatedBackups, curr)
+		dependantBackups = append(dependantBackups, curr)
 		queue = append(queue, incrementsByBackup[curr.GetBackupName()]...)
 	}
-	return relatedBackups
+	return dependantBackups
+}
+
+func DeleteObjectsWhere(
+	folder storage.Folder,
+	confirm bool,
+	objFilter func(object1 storage.Object) bool,
+	folderFilter func(name string) bool,
+) error {
+	relativePathObjects, err := multistorage.ListFolderRecursivelyWithFilter(folder, folderFilter)
+	if err != nil {
+		return err
+	}
+	filteredRelativePaths := make([]string, 0)
+	tracelog.InfoLogger.Println("Objects in folder:")
+	for _, object := range relativePathObjects {
+		if objFilter(object) {
+			tracelog.InfoLogger.Printf("\twill be deleted: %s, from storage: %s\n", object.GetName(), multistorage.GetStorage(object))
+			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
+		} else {
+			tracelog.DebugLogger.Printf("\tskipped: %s, in storage: %s\n", object.GetName(), multistorage.GetStorage(object))
+		}
+	}
+	if len(filteredRelativePaths) == 0 {
+		return nil
+	}
+	if confirm {
+		return folder.DeleteObjects(filteredRelativePaths)
+	}
+	tracelog.InfoLogger.Println("Dry run, nothing were deleted")
+	return nil
 }
 
 func findTarget(objects []BackupObject,
@@ -486,28 +522,28 @@ func getBeforeChoiceFunc(name string, modifier int) func(object BackupObject) bo
 }
 
 func getRetainChoiceFunc(retentionCount, modifier int) func(object BackupObject) bool {
-	count := 0
+	uniqueNames := map[string]bool{}
 	switch modifier {
 	case NoDeleteModifier:
 		return func(object BackupObject) bool {
-			count++
+			uniqueNames[object.GetBackupName()] = true
 
-			return count == retentionCount
+			return len(uniqueNames) == retentionCount
 		}
 	case FullDeleteModifier:
 		return func(object BackupObject) bool {
 			if object.IsFullBackup() {
-				count++
+				uniqueNames[object.GetBackupName()] = true
 			}
-			if count == retentionCount {
+			if len(uniqueNames) == retentionCount {
 				return true
 			}
 			return false
 		}
 	case FindFullDeleteModifier:
 		return func(object BackupObject) bool {
-			count++
-			if count >= retentionCount && object.IsFullBackup() {
+			uniqueNames[object.GetBackupName()] = true
+			if len(uniqueNames) >= retentionCount && object.IsFullBackup() {
 				return true
 			}
 			return false

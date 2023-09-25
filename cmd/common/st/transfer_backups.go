@@ -24,6 +24,7 @@ var backupsCmd = &cobra.Command{
 		}
 
 		cfg := &transfer.HandlerConfig{
+			PreserveInSource:         transferPreserveInSource,
 			FailOnFirstErr:           transferFailFast,
 			Concurrency:              transferConcurrency,
 			AppearanceChecks:         transferAppearanceChecks,

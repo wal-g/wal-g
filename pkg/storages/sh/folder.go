@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/sftp"
 	"github.com/wal-g/tracelog"
@@ -105,6 +106,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Hashabl
 }
 
 func NewFolder(client SftpClient, host, path, user string) *Folder {
+	path = strings.TrimPrefix(path, "/")
 	return &Folder{
 		client: client,
 		host:   host,

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +20,7 @@ import (
 
 type TestPostgresBackupObject struct {
 	storage.Object
+	storageName string
 }
 
 func (o TestPostgresBackupObject) GetBackupName() string {
@@ -41,6 +43,10 @@ func (o TestPostgresBackupObject) IsFullBackup() bool {
 
 func (o TestPostgresBackupObject) GetBackupTime() time.Time {
 	return o.GetLastModified()
+}
+
+func (o TestPostgresBackupObject) GetStorage() string {
+	return o.storageName
 }
 
 func TestFindTargetBeforeName_ReturnsBackup_Without_Modifier(t *testing.T) {
@@ -273,7 +279,7 @@ func TestDeleteBeforeTargetWithPermanentBackups(t *testing.T) {
 	isPermanent := makeTestPermanentFunc(permanentBackups, permanentWals)
 	deleteHandler := newTestDeleteHandler(folder, lessByTime, internal.IsPermanentFunc(isPermanent))
 
-	err := deleteHandler.DeleteBeforeTarget(TestPostgresBackupObject{target}, true)
+	err := deleteHandler.DeleteBeforeTarget(TestPostgresBackupObject{target, "default"}, true)
 	assert.NoError(t, err)
 
 	// verify expected permanent still exists
@@ -358,7 +364,7 @@ func newTestDeleteHandler(
 
 	testBackupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
-		testBackupObjects = append(testBackupObjects, TestPostgresBackupObject{object})
+		testBackupObjects = append(testBackupObjects, TestPostgresBackupObject{object, "default"})
 	}
 
 	return internal.NewDeleteHandler(folder, testBackupObjects, lessFunc, options...)
@@ -374,8 +380,8 @@ func getBackupObjects(folder storage.Folder) ([]storage.Object, error) {
 	return objects, nil
 }
 
-func makeTestPermanentFunc(permanentBackups, permanentWals map[string]bool) func(object storage.Object) bool {
+func makeTestPermanentFunc(permanentBackups, permanentWals map[postgres.PermanentObject]bool) func(object storage.Object) bool {
 	return func(object storage.Object) bool {
-		return postgres.IsPermanent(object.GetName(), permanentBackups, permanentWals)
+		return postgres.IsPermanent(object.GetName(), multistorage.GetStorage(object), permanentBackups, permanentWals)
 	}
 }

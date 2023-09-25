@@ -29,7 +29,7 @@ wal-g --config=${TMP_CONFIG} backup-list
 permanent_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
 
 # push a few more impermanent backups
-for i in 2 3 4
+for _ in 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1

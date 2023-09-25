@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e -x
-  CONFIG_FILE="/tmp/configs/delete_before_permanent_delta_test_config.json"
+  CONFIG_FILE="/tmp/configs/delete_before_permanent_delta_multist_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
@@ -33,6 +33,8 @@ do
     else
         wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
     fi
+    # copy last backup to the failover storage (all previous ones are already copied)
+    wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
 done
 
 wal-g --config=${TMP_CONFIG} backup-list --detail
@@ -42,6 +44,7 @@ wal-g --config=${TMP_CONFIG} backup-list --detail
 pgbench -i -s 1 postgres &
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
 wal-g --config=${TMP_CONFIG} backup-list --detail
 wal-g --config=${TMP_CONFIG} delete retain 1 --confirm
 
@@ -67,9 +70,11 @@ wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 # make impermanent base backup
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
 
 # make permanent base backup and copy to the failover storage
 wal-g --config=${TMP_CONFIG} backup-push --permanent ${PGDATA}
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
 
 wal-g --config=${TMP_CONFIG} backup-list --detail
 
@@ -99,3 +104,11 @@ diff /tmp/dump1 /tmp/dump2
 diff /tmp/dump1 /tmp/dump2
 
 /tmp/scripts/drop_pg.sh
+
+
+
+
+
+
+
+

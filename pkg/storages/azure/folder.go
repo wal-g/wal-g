@@ -70,6 +70,7 @@ func NewFolder(
 	credential *azblob.SharedKeyCredential,
 	timeout time.Duration,
 	path string) *Folder {
+	path = strings.TrimPrefix(path, "/")
 	return &Folder{
 		uploadStreamOptions,
 		containerClient,
