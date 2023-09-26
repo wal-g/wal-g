@@ -5,6 +5,9 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const UseSentinelTimeFlag = "use-sentinel-time"
@@ -61,8 +64,7 @@ var deleteGarbageCmd = &cobra.Command{
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
+	folder := configureFolder()
 
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 
@@ -73,8 +75,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
+	folder := configureFolder()
 
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 
@@ -85,20 +86,24 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
+	folder := configureFolder()
 
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 
 	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteEverything(args, permanentBackups, confirmed)
+	permanentBackupNames := make([]string, 0, len(permanentBackups))
+	for backup, isPerm := range permanentBackups {
+		if isPerm {
+			permanentBackupNames = append(permanentBackupNames, backup.Name)
+		}
+	}
+	deleteHandler.HandleDeleteEverything(args, permanentBackupNames, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
+	folder := configureFolder()
 
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 
@@ -119,8 +124,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
-	tracelog.ErrorLogger.FatalOnError(err)
+	folder := configureFolder()
 
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 
@@ -129,6 +133,14 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 
 	err = deleteHandler.HandleDeleteGarbage(args, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+func configureFolder() storage.Folder {
+	folder, err := postgres.ConfigureMultiStorageFolder()
+	tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
+	folder, err = multistorage.UseAllAliveStorages(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+	return multistorage.SetPolicies(folder, policies.UniteAllStorages)
 }
 
 func DeleteGarbageArgsValidator(cmd *cobra.Command, args []string) error {

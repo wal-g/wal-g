@@ -22,7 +22,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-for i in 1 2 3 4 5 6
+for _ in 1 2 3 4 5 6
 do
     pgbench -i -s 1 postgres &
     sleep 1
@@ -31,22 +31,27 @@ done
 
 wal-g --config=${TMP_CONFIG} backup-list
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 4 > /tmp/list_tail_before_delete
+wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_before_delete
 
 wal-g --config=${TMP_CONFIG} delete retain FIND_FULL 3 --confirm
 
 wal-g --config=${TMP_CONFIG} backup-list
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
-wal-g --config=${TMP_CONFIG} backup-list | tail -n 4 > /tmp/list_tail_after_delete
+wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_after_delete
 
-if [ $(($lines_before_delete-2)) -ne $lines_after_delete ];
+# we deleted 1 base backup and 1 delta backup
+expected_backups_deleted=$((1+1))
+
+if [ $(($lines_before_delete-$expected_backups_deleted)) -ne $lines_after_delete ];
 then
-    echo $(($lines_before_delete-2)) > /tmp/before_delete
+    echo $(($lines_before_delete-$expected_backups_deleted)) > /tmp/before_delete
     echo $lines_after_delete > /tmp/after_delete
     echo "Wrong number of deleted lines"
     diff /tmp/before_delete /tmp/after_delete
 fi
 
-diff /tmp/list_tail_before_delete /tmp/list_tail_after_delete
+# ensure all backups which we weren't going to delete still exist after performing deletion
+xargs -I {} grep {} /tmp/list_before_delete </tmp/list_after_delete
+
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}

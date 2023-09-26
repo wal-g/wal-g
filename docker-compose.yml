@@ -59,17 +59,28 @@ services:
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
-      &&  mkdir -p /export/deleteretainfullbucket
-      &&  mkdir -p /export/deleteretainfindfullbucket
-      &&  mkdir -p /export/deletebeforenamefindfullbucket
-      &&  mkdir -p /export/deletebeforetimefindfullbucket
-      &&  mkdir -p /export/deletebeforepermanentfullbucket
-      &&  mkdir -p /export/deletebeforepermanentdeltabucket
-      &&  mkdir -p /export/deletewithoutconfirm
-      &&  mkdir -p /export/deleteendtoendbucket
-      &&  mkdir -p /export/deletetargetbucket
+      &&  mkdir -p /export/delete-retain-full-bucket
+      &&  mkdir -p /export/delete-retain-full-multist-bucket
+      &&  mkdir -p /export/delete-retain-full-multist-fo-bucket
+      &&  mkdir -p /export/delete-retain-find-full-bucket
+      &&  mkdir -p /export/delete-before-name-find-full-bucket
+      &&  mkdir -p /export/delete-before-time-find-full-bucket
+      &&  mkdir -p /export/delete-before-permanent-full-bucket
+      &&  mkdir -p /export/delete-before-permanent-delta-bucket
+      &&  mkdir -p /export/delete-before-permanent-delta-multist-bucket
+      &&  mkdir -p /export/delete-before-permanent-delta-multist-fo-bucket
+      &&  mkdir -p /export/delete-without-confirm-bucket
+      &&  mkdir -p /export/delete-end-to-end-bucket
+      &&  mkdir -p /export/delete-end-to-end-fo-bucket
+      &&  mkdir -p /export/delete-target-bucket
+      &&  mkdir -p /export/delete-target-delta-find-full-bucket
+      &&  mkdir -p /export/delete-target-delta-bucket
+      &&  mkdir -p /export/delete-target-delta-multist-bucket
+      &&  mkdir -p /export/delete-target-delta-multist-fo-bucket
+      &&  mkdir -p /export/delete-garbage-bucket
+      &&  mkdir -p /export/delete-garbage-multist-bucket
+      &&  mkdir -p /export/delete-garbage-multist-fo-bucket
       &&  mkdir -p /export/gpdeletetargetbucket
-      &&  mkdir -p /export/deletegarbagebucket
       &&  mkdir -p /export/gpdeletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
       &&  mkdir -p /export/mysqlsplitfilesizebucket
@@ -125,8 +136,6 @@ services:
       &&  mkdir -p /export/backupmarkpermanentbucket
       &&  mkdir -p /export/backupperftestbucket
       &&  mkdir -p /export/catchupbucket
-      &&  mkdir -p /export/deletetargetdeltafindfullbucket
-      &&  mkdir -p /export/deletetargetdeltabucket
       &&  mkdir -p /export/fullstreamedbucket
       &&  mkdir -p /export/receivewalbucket
       &&  mkdir -p /export/severaldeltabackupsbucket
@@ -234,6 +243,11 @@ services:
     container_name: wal-g_pg_delete_before_permanent_delta_test
     command: /tmp/tests/delete_before_permanent_delta_test.sh
 
+  pg_delete_before_permanent_delta_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_before_permanent_delta_multist_test
+    command: /tmp/tests/delete_before_permanent_delta_multist_test.sh
+
   pg_wal_perftest:
     <<: *pg_test_common
     container_name: wal-g_pg_wal_perftest
@@ -253,6 +267,11 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delete_retain_full_test
     command: /tmp/tests/delete_retain_full_test.sh
+
+  pg_delete_retain_full_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_retain_full_multist_test
+    command: /tmp/tests/delete_retain_full_multist_test.sh
 
   pg_full_backup_test:
     <<: *pg_test_common
@@ -334,6 +353,11 @@ services:
     container_name: wal-g_pg_delete_garbage_test
     command: /tmp/tests/delete_garbage_test.sh
 
+  pg_delete_garbage_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_garbage_multist_test
+    command: /tmp/tests/delete_garbage_multist_test.sh
+
   pg_delete_target_test:
     <<: *pg_test_common
     container_name: wal-g_pg_delete_target_test
@@ -343,6 +367,11 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delete_target_delta_test
     command: /tmp/tests/delete_target_delta_test.sh
+
+  pg_delete_target_delta_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_target_delta_multist_test
+    command: /tmp/tests/delete_target_delta_multist_test.sh
 
   pg_delete_target_delta_find_full_test:
     <<: *pg_test_common

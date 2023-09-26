@@ -24,7 +24,7 @@ jobs:
         run: sudo apt-get install liblzo2-dev brotli libsodium-dev
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v4
@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Build on arch
         uses: uraimo/run-on-arch-action@v2

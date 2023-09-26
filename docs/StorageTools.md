@@ -111,6 +111,8 @@ Flags (supported in every subcommand):
 
    The duration must be specified in the golang `time.Duration` [format](https://pkg.go.dev/time#ParseDuration).
 
+9. Add `--preserve` to prevent transferred files from being deleted from the source storage ("copy" files instead of "moving").
+
 Examples:
 
 ``wal-g st transfer pg-wals --source='my_failover_ssh'``

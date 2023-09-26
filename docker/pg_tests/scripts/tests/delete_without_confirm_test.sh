@@ -20,7 +20,7 @@ echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-for i in 1 2
+for _ in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1

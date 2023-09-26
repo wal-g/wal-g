@@ -25,7 +25,7 @@ func TestListFolder(t *testing.T) {
 		for _, obj := range got {
 			multiObj, ok := obj.(multiObject)
 			assert.True(t, ok)
-			gotObj := listedObj{obj.GetName(), multiObj.storageName}
+			gotObj := listedObj{obj.GetName(), multiObj.GetStorage()}
 			delete(want, gotObj)
 		}
 		assert.Empty(t, want)
@@ -136,6 +136,27 @@ func TestListFolder(t *testing.T) {
 			"aaa/": true,
 			"bbb/": true,
 			"ccc/": true,
+		})
+	})
+
+	t.Run("list files with relative paths and subfolders with absolute paths", func(t *testing.T) {
+		folder := newTestFolder(t, "s1")
+		folder.policies.List = policies.ListPolicyFirst
+
+		_ = folder.storages[0].PutObject("sub/aaa", &bytes.Buffer{})
+		_ = folder.storages[0].PutObject("sub/sub2/bbb", &bytes.Buffer{})
+		_ = folder.storages[0].PutObject("sub/sub2/ccc", &bytes.Buffer{})
+
+		_, subFolders, err := folder.ListFolder()
+		require.NoError(t, err)
+		require.Len(t, subFolders, 1)
+		subFolder := subFolders[0]
+		objects, subFolders, err := subFolder.ListFolder()
+		assertListedObjects(t, objects, map[listedObj]bool{
+			{"aaa", "s1"}: true,
+		})
+		assertListedSubFolders(t, folder, subFolders, map[string]bool{
+			"sub/sub2/": true,
 		})
 	})
 

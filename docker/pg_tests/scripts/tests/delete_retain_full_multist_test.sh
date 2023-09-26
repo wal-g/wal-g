@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e -x
-CONFIG_FILE="/tmp/configs/delete_retain_full_test_config.json"
+CONFIG_FILE="/tmp/configs/delete_retain_full_multist_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
@@ -22,8 +22,11 @@ for _ in 1 2 3 4
 do
     pgbench -i -s 1 postgres &
     sleep 1
-    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
+    wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --target-storage default
 done
+
+# copy all backups to the failover storage
+wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
 
 wal-g --config=${TMP_CONFIG} backup-list
 lines_before_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
@@ -35,8 +38,8 @@ wal-g --config=${TMP_CONFIG} backup-list
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
 wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_after_delete
 
-# we deleted 1 base backup and 1 delta backup
-expected_backups_deleted=$((1+1))
+# we deleted 1 base backup and 1 delta backup from each of 2 storages
+expected_backups_deleted=$(((1+1)*2))
 
 if [ $(($lines_before_delete-$expected_backups_deleted)) -ne $lines_after_delete ];
 then

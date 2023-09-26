@@ -20,7 +20,7 @@ jobs:
         run: sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v4

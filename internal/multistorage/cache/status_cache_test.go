@@ -78,7 +78,8 @@ func testAllAliveStorages(t *testing.T) {
 	})
 
 	invalidateInMem(cache.storageKey(t, "default"))
-	err := os.WriteFile(StatusFile, []byte("malformed content"), 0666)
+	file, _ := StatusFile()
+	err := os.WriteFile(file, []byte("malformed content"), 0666)
 	require.NoError(t, err)
 
 	t.Run("check for alive if file is malformed", func(_ *testing.T) {
@@ -156,7 +157,8 @@ func testFirstAliveStorage(t *testing.T) {
 	})
 
 	invalidateInMem(cache.storageKey(t, "default"))
-	err := os.WriteFile(StatusFile, []byte("malformed content"), 0666)
+	file, _ := StatusFile()
+	err := os.WriteFile(file, []byte("malformed content"), 0666)
 	require.NoError(t, err)
 
 	t.Run("check for alive if file is malformed", func(_ *testing.T) {
@@ -246,7 +248,8 @@ func testSpecificStorage(t *testing.T) {
 	})
 
 	invalidateInMem(cache.storageKey(t, "default"))
-	err := os.WriteFile(StatusFile, []byte("malformed content"), 0666)
+	file, _ := StatusFile()
+	err := os.WriteFile(file, []byte("malformed content"), 0666)
 	require.NoError(t, err)
 
 	t.Run("check for alive if file is malformed", func(_ *testing.T) {
@@ -272,10 +275,12 @@ func testSpecificStorage(t *testing.T) {
 
 func initTest(t *testing.T) {
 	tmpFile := path.Join(t.TempDir(), "status_cache.yaml")
+	resqueStatusFile := StatusFile
+	StatusFile = func() (string, error) { return tmpFile, nil }
 	t.Cleanup(func() {
 		_ = os.Remove(tmpFile)
+		StatusFile = resqueStatusFile
 	})
-	StatusFile = tmpFile
 	memCache = storageStatuses{}
 }
 

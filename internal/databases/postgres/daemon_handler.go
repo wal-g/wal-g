@@ -100,10 +100,8 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	if len(args) != 2 {
 		return fmt.Errorf("wal-fetch incorrect arguments count")
 	}
-	var (
-		walFileName = args[0]
-		location    = args[1]
-	)
+	walFileName := args[0]
+	location := args[1]
 	fullPath, err := getFullPath(location)
 	if err != nil {
 		return err

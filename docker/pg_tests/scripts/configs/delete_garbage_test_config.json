@@ -1,3 +1,3 @@
 "WALG_DELTA_MAX_STEPS": "0",
-"WALE_S3_PREFIX": "s3://deletegarbagebucket",
+"WALE_S3_PREFIX": "s3://delete-garbage-bucket",
 "WALG_USE_WAL_DELTA": "true"

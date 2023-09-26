@@ -54,7 +54,7 @@ var deleteTargetCmd = &cobra.Command{
 
 type DeleteHandler struct {
 	*internal.DeleteHandler
-	permanentObjects map[string]bool
+	permanentObjects []string
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
@@ -117,6 +117,10 @@ func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 
 	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath),
 		mysql.NewGenericMetaFetcher())
+	permanentBackupNames := make([]string, 0, len(permanentBackups))
+	for name := range permanentBackups {
+		permanentBackupNames = append(permanentBackupNames, name)
+	}
 
 	return &DeleteHandler{
 		DeleteHandler: internal.NewDeleteHandler(folder, backupObjects, makeLessFunc(folder),
@@ -124,6 +128,6 @@ func NewMySQLDeleteHandler() (*DeleteHandler, error) {
 				return internal.IsPermanent(object.GetName(), permanentBackups, internal.StreamBackupNameLength)
 			}),
 		),
-		permanentObjects: permanentBackups,
+		permanentObjects: permanentBackupNames,
 	}, nil
 }

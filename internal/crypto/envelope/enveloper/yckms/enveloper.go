@@ -10,12 +10,14 @@ import (
 	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 
 const (
 	magic              = "envelope-yc-kms"
 	schemeVersion byte = 1
+	sizeofInt32        = 4
 )
 
 type Enveloper struct {
@@ -27,15 +29,15 @@ func (enveloper *Enveloper) Name() string {
 	return "yckms"
 }
 
-func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
+func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 	return readEncryptedKey(r)
 }
 
-func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
+func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]byte, error) {
 	ctx := context.Background()
 	rsp, err := enveloper.sdk.KMSCrypto().SymmetricCrypto().Decrypt(ctx, &kms.SymmetricDecryptRequest{
 		KeyId:      enveloper.keyID,
-		Ciphertext: encryptedKey,
+		Ciphertext: encryptedKey.Data,
 		AadContext: nil,
 	})
 
@@ -46,29 +48,37 @@ func (enveloper *Enveloper) DecryptKey(encryptedKey []byte) ([]byte, error) {
 	return rsp.Plaintext, nil
 }
 
-func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
+func (enveloper *Enveloper) SerializeEncryptedKey(encryptedKey *envelope.EncryptedKey) []byte {
 	return serializeEncryptedKey(encryptedKey)
 }
 
-func serializeEncryptedKey(encryptedKey []byte) []byte {
+func serializeEncryptedKey(encryptedKey *envelope.EncryptedKey) []byte {
 	/*
 		magic value "envelope-yc-kms"
 		scheme version (current version is 1)
+		uint32 - keyID len
+		keyID ...
 		uint32 - encrypted key len
 		encrypted key ...
 	*/
 
-	encryptedKeyLen := make([]byte, 4)
-	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey)))
 	result := append([]byte(magic), schemeVersion)
-	result = append(result, encryptedKeyLen...)
 
-	return append(result, encryptedKey...)
+	keyID := encryptedKey.ID()
+	keyIDLen := make([]byte, sizeofInt32)
+	binary.LittleEndian.PutUint32(keyIDLen, uint32(len(keyID)))
+	result = append(result, keyIDLen...)
+	result = append(result, []byte(keyID)...)
+
+	encryptedKeyLen := make([]byte, sizeofInt32)
+	binary.LittleEndian.PutUint32(encryptedKeyLen, uint32(len(encryptedKey.Data)))
+	result = append(result, encryptedKeyLen...)
+	return append(result, encryptedKey.Data...)
 }
 
-func readEncryptedKey(r io.Reader) ([]byte, error) {
+func readEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 	magicSchemeBytes := make([]byte, len(magic)+1)
-	_, err := r.Read(magicSchemeBytes)
+	_, err := io.ReadFull(r, magicSchemeBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -81,20 +91,37 @@ func readEncryptedKey(r io.Reader) ([]byte, error) {
 		return nil, errors.New("envelope yc kms: scheme version is not supported")
 	}
 
-	encryptedKeyLenBytes := make([]byte, 4)
-	_, err = r.Read(encryptedKeyLenBytes)
+	keyIDLenBytes := make([]byte, sizeofInt32)
+	_, err = io.ReadFull(r, keyIDLenBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	keyIDLen := binary.LittleEndian.Uint32(keyIDLenBytes)
+	keyIDBytes := make([]byte, keyIDLen)
+
+	_, err = io.ReadFull(r, keyIDBytes)
+	if err != nil {
+		return nil, err
+	}
+	keyID := string(keyIDBytes)
+	tracelog.DebugLogger.Printf("Encrypted key was found: %s\n", keyID)
+
+	encryptedKeyLenBytes := make([]byte, sizeofInt32)
+	_, err = io.ReadFull(r, encryptedKeyLenBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	encryptedKeyLen := binary.LittleEndian.Uint32(encryptedKeyLenBytes)
 	encryptedKey := make([]byte, encryptedKeyLen)
-	_, err = r.Read(encryptedKey)
+
+	_, err = io.ReadFull(r, encryptedKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return encryptedKey, nil
+	return envelope.NewEncryptedKey(keyID, encryptedKey), nil
 }
 
 func getCredentials(saFilePath string) (ycsdk.Credentials, error) {

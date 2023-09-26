@@ -5,6 +5,8 @@ package mocks
 import (
 	io "io"
 
+	envelope "github.com/wal-g/wal-g/internal/crypto/envelope"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -22,15 +24,15 @@ func (_m *Enveloper) EXPECT() *Enveloper_Expecter {
 }
 
 // DecryptKey provides a mock function with given fields: _a0
-func (_m *Enveloper) DecryptKey(_a0 []byte) ([]byte, error) {
+func (_m *Enveloper) DecryptKey(_a0 *envelope.EncryptedKey) ([]byte, error) {
 	ret := _m.Called(_a0)
 
 	var r0 []byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func([]byte) ([]byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(*envelope.EncryptedKey) ([]byte, error)); ok {
 		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func([]byte) []byte); ok {
+	if rf, ok := ret.Get(0).(func(*envelope.EncryptedKey) []byte); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -38,7 +40,7 @@ func (_m *Enveloper) DecryptKey(_a0 []byte) ([]byte, error) {
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+	if rf, ok := ret.Get(1).(func(*envelope.EncryptedKey) error); ok {
 		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
@@ -53,14 +55,14 @@ type Enveloper_DecryptKey_Call struct {
 }
 
 // DecryptKey is a helper method to define mock.On call
-//   - _a0 []byte
+//   - _a0 *envelope.EncryptedKey
 func (_e *Enveloper_Expecter) DecryptKey(_a0 interface{}) *Enveloper_DecryptKey_Call {
 	return &Enveloper_DecryptKey_Call{Call: _e.mock.On("DecryptKey", _a0)}
 }
 
-func (_c *Enveloper_DecryptKey_Call) Run(run func(_a0 []byte)) *Enveloper_DecryptKey_Call {
+func (_c *Enveloper_DecryptKey_Call) Run(run func(_a0 *envelope.EncryptedKey)) *Enveloper_DecryptKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
+		run(args[0].(*envelope.EncryptedKey))
 	})
 	return _c
 }
@@ -70,7 +72,7 @@ func (_c *Enveloper_DecryptKey_Call) Return(_a0 []byte, _a1 error) *Enveloper_De
 	return _c
 }
 
-func (_c *Enveloper_DecryptKey_Call) RunAndReturn(run func([]byte) ([]byte, error)) *Enveloper_DecryptKey_Call {
+func (_c *Enveloper_DecryptKey_Call) RunAndReturn(run func(*envelope.EncryptedKey) ([]byte, error)) *Enveloper_DecryptKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -116,25 +118,25 @@ func (_c *Enveloper_Name_Call) RunAndReturn(run func() string) *Enveloper_Name_C
 	return _c
 }
 
-// ReadEncryptedKey provides a mock function with given fields: r
-func (_m *Enveloper) ReadEncryptedKey(r io.Reader) ([]byte, error) {
-	ret := _m.Called(r)
+// ReadEncryptedKey provides a mock function with given fields: _a0
+func (_m *Enveloper) ReadEncryptedKey(_a0 io.Reader) (*envelope.EncryptedKey, error) {
+	ret := _m.Called(_a0)
 
-	var r0 []byte
+	var r0 *envelope.EncryptedKey
 	var r1 error
-	if rf, ok := ret.Get(0).(func(io.Reader) ([]byte, error)); ok {
-		return rf(r)
+	if rf, ok := ret.Get(0).(func(io.Reader) (*envelope.EncryptedKey, error)); ok {
+		return rf(_a0)
 	}
-	if rf, ok := ret.Get(0).(func(io.Reader) []byte); ok {
-		r0 = rf(r)
+	if rf, ok := ret.Get(0).(func(io.Reader) *envelope.EncryptedKey); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(*envelope.EncryptedKey)
 		}
 	}
 
 	if rf, ok := ret.Get(1).(func(io.Reader) error); ok {
-		r1 = rf(r)
+		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -148,35 +150,35 @@ type Enveloper_ReadEncryptedKey_Call struct {
 }
 
 // ReadEncryptedKey is a helper method to define mock.On call
-//   - r io.Reader
-func (_e *Enveloper_Expecter) ReadEncryptedKey(r interface{}) *Enveloper_ReadEncryptedKey_Call {
-	return &Enveloper_ReadEncryptedKey_Call{Call: _e.mock.On("ReadEncryptedKey", r)}
+//   - _a0 io.Reader
+func (_e *Enveloper_Expecter) ReadEncryptedKey(_a0 interface{}) *Enveloper_ReadEncryptedKey_Call {
+	return &Enveloper_ReadEncryptedKey_Call{Call: _e.mock.On("ReadEncryptedKey", _a0)}
 }
 
-func (_c *Enveloper_ReadEncryptedKey_Call) Run(run func(r io.Reader)) *Enveloper_ReadEncryptedKey_Call {
+func (_c *Enveloper_ReadEncryptedKey_Call) Run(run func(_a0 io.Reader)) *Enveloper_ReadEncryptedKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(io.Reader))
 	})
 	return _c
 }
 
-func (_c *Enveloper_ReadEncryptedKey_Call) Return(_a0 []byte, _a1 error) *Enveloper_ReadEncryptedKey_Call {
+func (_c *Enveloper_ReadEncryptedKey_Call) Return(_a0 *envelope.EncryptedKey, _a1 error) *Enveloper_ReadEncryptedKey_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *Enveloper_ReadEncryptedKey_Call) RunAndReturn(run func(io.Reader) ([]byte, error)) *Enveloper_ReadEncryptedKey_Call {
+func (_c *Enveloper_ReadEncryptedKey_Call) RunAndReturn(run func(io.Reader) (*envelope.EncryptedKey, error)) *Enveloper_ReadEncryptedKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// SerializeEncryptedKey provides a mock function with given fields: encryptedKey
-func (_m *Enveloper) SerializeEncryptedKey(encryptedKey []byte) []byte {
-	ret := _m.Called(encryptedKey)
+// SerializeEncryptedKey provides a mock function with given fields: _a0
+func (_m *Enveloper) SerializeEncryptedKey(_a0 *envelope.EncryptedKey) []byte {
+	ret := _m.Called(_a0)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]byte) []byte); ok {
-		r0 = rf(encryptedKey)
+	if rf, ok := ret.Get(0).(func(*envelope.EncryptedKey) []byte); ok {
+		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
@@ -192,14 +194,14 @@ type Enveloper_SerializeEncryptedKey_Call struct {
 }
 
 // SerializeEncryptedKey is a helper method to define mock.On call
-//   - encryptedKey []byte
-func (_e *Enveloper_Expecter) SerializeEncryptedKey(encryptedKey interface{}) *Enveloper_SerializeEncryptedKey_Call {
-	return &Enveloper_SerializeEncryptedKey_Call{Call: _e.mock.On("SerializeEncryptedKey", encryptedKey)}
+//   - _a0 *envelope.EncryptedKey
+func (_e *Enveloper_Expecter) SerializeEncryptedKey(_a0 interface{}) *Enveloper_SerializeEncryptedKey_Call {
+	return &Enveloper_SerializeEncryptedKey_Call{Call: _e.mock.On("SerializeEncryptedKey", _a0)}
 }
 
-func (_c *Enveloper_SerializeEncryptedKey_Call) Run(run func(encryptedKey []byte)) *Enveloper_SerializeEncryptedKey_Call {
+func (_c *Enveloper_SerializeEncryptedKey_Call) Run(run func(_a0 *envelope.EncryptedKey)) *Enveloper_SerializeEncryptedKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].([]byte))
+		run(args[0].(*envelope.EncryptedKey))
 	})
 	return _c
 }
@@ -209,7 +211,7 @@ func (_c *Enveloper_SerializeEncryptedKey_Call) Return(_a0 []byte) *Enveloper_Se
 	return _c
 }
 
-func (_c *Enveloper_SerializeEncryptedKey_Call) RunAndReturn(run func([]byte) []byte) *Enveloper_SerializeEncryptedKey_Call {
+func (_c *Enveloper_SerializeEncryptedKey_Call) RunAndReturn(run func(*envelope.EncryptedKey) []byte) *Enveloper_SerializeEncryptedKey_Call {
 	_c.Call.Return(run)
 	return _c
 }

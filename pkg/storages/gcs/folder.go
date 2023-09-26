@@ -61,6 +61,8 @@ func NewFolder(bucket *gcs.BucketHandle, bucketName, path string, contextTimeout
 	encryptionKeyCopy := make([]byte, len(encryptionKey))
 	copy(encryptionKeyCopy, encryptionKey)
 
+	path = strings.TrimPrefix(path, "/")
+
 	return &Folder{
 		bucket:          bucket,
 		bucketName:      bucketName,
