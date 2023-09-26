@@ -2,8 +2,6 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -15,20 +13,10 @@ var daemonCmd = &cobra.Command{
 	Short: DaemonShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := postgres.ConfigureMultiStorageFolder()
-		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
-
-		walUploader, err := postgres.PrepareMultiStorageWalUploader(folder, targetStorage)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		folderReader, err := internal.PrepareMultiStorageFolderReader(folder, targetStorage)
-		tracelog.ErrorLogger.FatalOnError(err)
-
 		daemonOpts := postgres.DaemonOptions{
-			Uploader: walUploader,
-			Reader:   folderReader,
+			SocketPath: args[0],
 		}
-		postgres.HandleDaemon(daemonOpts, args[0])
+		postgres.HandleDaemon(daemonOpts)
 	},
 }
 

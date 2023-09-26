@@ -35,8 +35,7 @@ func (err SocketWriteFailedError) Error() string {
 }
 
 type DaemonOptions struct {
-	Uploader *WalUploader
-	Reader   internal.StorageFolderReader
+	SocketPath string
 }
 
 type SocketMessageHandler interface {
@@ -129,16 +128,35 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	return nil
 }
 
-func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn, opts DaemonOptions) SocketMessageHandler {
+func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn) (SocketMessageHandler, error) {
 	switch messageType {
 	case daemon.CheckType:
-		return &CheckMessageHandler{c}
+		return &CheckMessageHandler{c}, nil
 	case daemon.WalPushType:
-		return &ArchiveMessageHandler{c, opts.Uploader}
+		folder, err := ConfigureMultiStorageFolder(true)
+		if err != nil {
+			return nil, err
+		}
+
+		walUploader, err := PrepareMultiStorageWalUploader(folder, "")
+		if err != nil {
+			return nil, err
+		}
+		return &ArchiveMessageHandler{c, walUploader}, nil
 	case daemon.WalFetchType:
-		return &WalFetchMessageHandler{c, opts.Reader}
+		folder, err := ConfigureMultiStorageFolder(false)
+		if err != nil {
+			return nil, err
+		}
+
+		folderReader, err := internal.PrepareMultiStorageFolderReader(folder, "")
+		if err != nil {
+			return nil, err
+		}
+
+		return &WalFetchMessageHandler{c, folderReader}, nil
 	default:
-		return nil
+		return nil, nil
 	}
 }
 
@@ -173,14 +191,14 @@ func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messa
 }
 
 // HandleDaemon is invoked to perform daemon mode
-func HandleDaemon(options DaemonOptions, pathToSocket string) {
-	if _, err := os.Stat(pathToSocket); err == nil {
-		err = os.Remove(pathToSocket)
+func HandleDaemon(options DaemonOptions) {
+	if _, err := os.Stat(options.SocketPath); err == nil {
+		err = os.Remove(options.SocketPath)
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to remove socket file:", err)
 		}
 	}
-	l, err := net.Listen("unix", pathToSocket)
+	l, err := net.Listen("unix", options.SocketPath)
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
 	}
@@ -194,34 +212,32 @@ func HandleDaemon(options DaemonOptions, pathToSocket string) {
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go Listen(context.Background(), fd, options)
+		go Listen(context.Background(), fd)
 	}
 }
 
 // Listen is used for listening connection and processing messages
-func Listen(ctx context.Context, c net.Conn, opts DaemonOptions) {
+func Listen(ctx context.Context, c net.Conn) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
 	messageReader := NewMessageReader(c)
 	for {
 		messageType, messageBody, err := messageReader.Next()
 		if err != nil {
-			tracelog.ErrorLogger.Printf("Failed to read message from %s, err: %v\n", c.RemoteAddr(), err)
-			_, err = c.Write(daemon.ErrorType.ToBytes())
-			tracelog.ErrorLogger.PrintOnError(err)
+			failAndLogError(c, fmt.Errorf("read message from %s, err: %v\n", c.RemoteAddr(), err))
 			return
 		}
-		messageHandler := NewMessageHandler(messageType, c, opts)
+		messageHandler, err := NewMessageHandler(messageType, c)
+		if err != nil {
+			failAndLogError(c, fmt.Errorf("init handler for message type %s: %v", string(messageType), err))
+			return
+		}
 		if messageHandler == nil {
-			tracelog.ErrorLogger.Printf("Unexpected message type: %s", string(messageType))
-			_, err = c.Write(daemon.ErrorType.ToBytes())
-			tracelog.ErrorLogger.PrintOnError(err)
+			failAndLogError(c, fmt.Errorf("unexpected message type: %s", string(messageType)))
 			return
 		}
 		err = messageHandler.Handle(ctx, messageBody)
 		if err != nil {
-			tracelog.ErrorLogger.Println("Failed to handle message:", err)
-			_, err = c.Write(daemon.ErrorType.ToBytes())
-			tracelog.ErrorLogger.PrintOnError(err)
+			failAndLogError(c, fmt.Errorf("handle message: %w", err))
 			return
 		}
 		if messageType == daemon.WalPushType {
@@ -231,6 +247,14 @@ func Listen(ctx context.Context, c net.Conn, opts DaemonOptions) {
 		if messageType == daemon.WalFetchType {
 			return
 		}
+	}
+}
+
+func failAndLogError(c net.Conn, err error) {
+	tracelog.ErrorLogger.Printf("Message loop failure: %v", err)
+	_, err = c.Write(daemon.ErrorType.ToBytes())
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Sending error response failed: %v", err)
 	}
 }
 

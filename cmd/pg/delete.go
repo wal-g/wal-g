@@ -136,7 +136,7 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 }
 
 func configureFolder() storage.Folder {
-	folder, err := postgres.ConfigureMultiStorageFolder()
+	folder, err := postgres.ConfigureMultiStorageFolder(true)
 	tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
 	folder, err = multistorage.UseAllAliveStorages(folder)
 	tracelog.ErrorLogger.FatalOnError(err)

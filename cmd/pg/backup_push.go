@@ -46,7 +46,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
-			folder, err := postgres.ConfigureMultiStorageFolder()
+			folder, err := postgres.ConfigureMultiStorageFolder(true)
 			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
 			folder = multistorage.SetPolicies(folder, policies.TakeFirstStorage)
 			if targetStorage == "" {

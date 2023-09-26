@@ -100,6 +100,7 @@ const (
 	PgFailoverStorages             = "WALG_FAILOVER_STORAGES"
 	PgFailoverStoragesCheckTimeout = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
 	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
+	PgFailoverStoragesCheckSize    = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
 	PgDaemonWALUploadTimeout       = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
 	PgTargetStorage                = "WALG_TARGET_STORAGE"
 
@@ -252,10 +253,11 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
-		PgWalSize:                "16",
-		PgBackRestStanza:         "main",
-		PgAliveCheckInterval:     "1m",
-		PgDaemonWALUploadTimeout: "60s",
+		PgWalSize:                   "16",
+		PgBackRestStanza:            "main",
+		PgAliveCheckInterval:        "1m",
+		PgFailoverStoragesCheckSize: "1mb",
+		PgDaemonWALUploadTimeout:    "60s",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -424,6 +426,7 @@ var (
 		PgFailoverStorages:             true,
 		PgFailoverStoragesCheckTimeout: true,
 		PgFailoverStorageCacheLifetime: true,
+		PgFailoverStoragesCheckSize:    true,
 		PgDaemonWALUploadTimeout:       true,
 	}
 

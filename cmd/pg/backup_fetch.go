@@ -9,7 +9,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
@@ -47,20 +46,9 @@ var backupFetchCmd = &cobra.Command{
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		primaryStorage, err := internal.ConfigureFolder()
+		folder, err := postgres.ConfigureMultiStorageFolder(false)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		failoverStorages, err := internal.InitFailoverStorages()
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
-		tracelog.ErrorLogger.FatalOnError(err)
-		aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
-		tracelog.ErrorLogger.FatalOnError(err)
-		cache, err := cache.NewStatusCache(primaryStorage, failoverStorages, cacheLifetime, aliveCheckTimeout)
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		folder := multistorage.NewFolder(cache)
 		folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
 		if targetStorage == "" {
 			folder, err = multistorage.UseAllAliveStorages(folder)

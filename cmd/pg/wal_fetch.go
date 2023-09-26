@@ -18,7 +18,7 @@ var walFetchCmd = &cobra.Command{
 	Short: WalFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := postgres.ConfigureMultiStorageFolder()
+		folder, err := postgres.ConfigureMultiStorageFolder(false)
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
 
 		folderReader, err := internal.PrepareMultiStorageFolderReader(folder, targetStorage)

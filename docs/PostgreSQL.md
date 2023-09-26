@@ -643,6 +643,13 @@ WAL-G will use no more than seconds to check for available alive storages. Defau
 
 WAL-G saves information about last used alive storage to disk to avoid excessive storage calls. This setting controls lifetime of this cache. Default value is `15m`.
 
+* `WALG_FAILOVER_STORAGES_CHECK_SIZE`
+
+WAL-G checks storage with simple ListObjects call. This setting controls additional file upload check.
+It allows to test the storage for read-only state and detect storage or network degraded performance.
+The file name is constant to avoid storage space waste.
+The value is the size of random generated data to upload. Set it to `0` to disable uploading check. Default value is `1 mb`.
+
 Playground
 -----------
 If you prefer to use a Docker image, you can directly test WAL-G with this [playground](https://github.com/stephane-klein/playground-postgresql-walg).

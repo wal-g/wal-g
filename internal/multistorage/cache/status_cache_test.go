@@ -330,7 +330,7 @@ func newTestCache(t *testing.T, failoverStorages int) *statusCache {
 		memory.NewFolder("default/", memory.NewStorage()),
 		failover,
 		time.Hour,
-		time.Hour,
+		NewRWAliveChecker(time.Hour, 1024),
 	)
 	require.NoError(t, err)
 	return c.(*statusCache)
