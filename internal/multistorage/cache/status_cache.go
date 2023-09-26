@@ -59,7 +59,7 @@ func (c *statusCache) AllAliveStorages() ([]NamedFolder, error) {
 		return memCache.getAllAlive(c.storagesInOrder), nil
 	}
 
-	checkResult := c.checker.CheckForAlive(outdated...)
+	checkResult := c.checker.checkForAlive(outdated...)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
@@ -98,7 +98,7 @@ func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 
 	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 
-	checkResult := c.checker.CheckForAlive(outdated...)
+	checkResult := c.checker.checkForAlive(outdated...)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)
@@ -147,7 +147,7 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 		return getStorageIfAlive(oldFile)
 	}
 
-	checkResult := c.checker.CheckForAlive(*specificStorage)
+	checkResult := c.checker.checkForAlive(*specificStorage)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	err = writeFile(newFile)

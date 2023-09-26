@@ -223,7 +223,7 @@ func Listen(ctx context.Context, c net.Conn) {
 	for {
 		messageType, messageBody, err := messageReader.Next()
 		if err != nil {
-			failAndLogError(c, fmt.Errorf("read message from %s, err: %v\n", c.RemoteAddr(), err))
+			failAndLogError(c, fmt.Errorf("read message from %s, err: %v", c.RemoteAddr(), err))
 			return
 		}
 		messageHandler, err := NewMessageHandler(messageType, c)
