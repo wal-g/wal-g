@@ -17,8 +17,8 @@ import (
 // ConfigureMultiStorageFolder configures the primary storage folder and all the failover ones, if any, and builds a
 // multi-storage folder that aggregates them. It also sets up a cache to keep storage alive check results there.
 // This function doesn't set any specific multi-storage folder policies, so policies.Default are used initially.
-// storageWrite should be true for operations supposes writing to the storage. It affects selecting R/O or R/W check.
-func ConfigureMultiStorageFolder(storageWrite bool) (storage.Folder, error) {
+// checkWrite should be true for operations supposes writing to the storage. It affects selecting R/O or R/W aliveness check.
+func ConfigureMultiStorageFolder(checkWrite bool) (storage.Folder, error) {
 	primaryStorage, err := internal.ConfigureFolder()
 	if err != nil {
 		return nil, fmt.Errorf("configure primary folder: %w", err)
@@ -33,24 +33,36 @@ func ConfigureMultiStorageFolder(storageWrite bool) (storage.Folder, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get failover storage cache lifetime setting: %w", err)
 	}
-	aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+
+	aliveChecker, err := configureStorageAliveChecker(checkWrite)
 	if err != nil {
-		return nil, fmt.Errorf("get failover storage check timeout setting: %w", err)
+		return nil, fmt.Errorf("configure storage alive checker: %w", err)
 	}
-	aliveCheckSize := viper.GetSizeInBytes(internal.PgFailoverStoragesCheckSize)
 	statusCache, err := cache.NewStatusCache(
 		primaryStorage,
 		failoverStorages,
 		cacheLifetime,
-		aliveCheckTimeout,
-		aliveCheckSize,
-		storageWrite,
+		aliveChecker,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("init cache with storage statuses: %w", err)
 	}
 
 	return multistorage.NewFolder(statusCache), nil
+}
+
+func configureStorageAliveChecker(checkWrite bool) (cache.AliveChecker, error) {
+	aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+	if err != nil {
+		return cache.AliveChecker{}, fmt.Errorf("get failover storage check timeout setting: %w", err)
+	}
+
+	if checkWrite {
+		aliveCheckSize := viper.GetSizeInBytes(internal.PgFailoverStoragesCheckSize)
+		return cache.NewRWAliveChecker(aliveCheckTimeout, uint32(aliveCheckSize)), nil
+	}
+
+	return cache.NewReadAliveChecker(aliveCheckTimeout), nil
 }
 
 // ConfigureWalUploader connects to storage and creates an uploader. It makes sure
