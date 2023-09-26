@@ -212,12 +212,12 @@ func HandleDaemon(options DaemonOptions) {
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go Listen(context.Background(), fd, options)
+		go Listen(context.Background(), fd)
 	}
 }
 
 // Listen is used for listening connection and processing messages
-func Listen(ctx context.Context, c net.Conn, opts DaemonOptions) {
+func Listen(ctx context.Context, c net.Conn) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
 	messageReader := NewMessageReader(c)
 	for {
@@ -251,7 +251,7 @@ func Listen(ctx context.Context, c net.Conn, opts DaemonOptions) {
 }
 
 func failAndLogError(c net.Conn, err error) {
-	tracelog.ErrorLogger.Println(err)
+	tracelog.ErrorLogger.Printf("Message loop failure: %v", err)
 	_, err = c.Write(daemon.ErrorType.ToBytes())
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Sending error response failed: %v", err)
