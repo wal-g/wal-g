@@ -33,7 +33,7 @@ type AliveChecker struct {
 	checks  []storageCheck
 }
 
-func (ac *AliveChecker) CheckForAlive(storages ...NamedFolder) map[key]bool {
+func (ac *AliveChecker) checkForAlive(storages ...NamedFolder) map[key]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), ac.timeout)
 	defer cancel()
 
@@ -102,7 +102,7 @@ type readCheck struct{}
 func (rc *readCheck) Check(_ context.Context, folder NamedFolder) error {
 	// We have to ignore the context.Context here as storages package
 	// can not provide a ListFolderWithContext. WAL-G might block here
-	// indefinetly (which is still quite unlikely).
+	// indefinitely (which is still quite unlikely).
 	_, _, err := folder.ListFolder()
 	if err != nil {
 		return fmt.Errorf("read check: %w", err)
