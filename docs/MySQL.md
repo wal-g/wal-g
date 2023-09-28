@@ -28,6 +28,16 @@ to STDIN and unpack it to MySQL datadir. Required.
 
 Command to prepare MySQL backup after restoring. Optional. Needed for xtrabackup case.
 
+* `WALG_DELTA_MAX_STEPS`
+
+Delta-backup is the difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
+Restoration process will automatically fetch all necessary deltas and base backup and compose valid restored backup (you still need WALs after start of last backup to restore consistent cluster).
+Delta computation is based on ModTime of file system and LSN number of pages in datafiles.
+
+* `WALG_DELTA_ORIGIN`
+
+To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
+
 * `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
 
 Command to replay binlog on running MySQL. Required for binlog-replay command.

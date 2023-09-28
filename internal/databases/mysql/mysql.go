@@ -26,15 +26,23 @@ const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 const TimeMysqlFormat = "2006-01-02 15:04:05"
 
-func getMySQLFlavor(db *sql.DB) (string, error) {
+func getMySQLVersion(db *sql.DB) (string, error) {
 	row := db.QueryRow("SELECT @@version")
-	var versionComment string
-	err := row.Scan(&versionComment)
+	var version string
+	err := row.Scan(&version)
+	if err != nil {
+		return "", err
+	}
+	return version, nil
+}
+
+func getMySQLFlavor(db *sql.DB) (string, error) {
+	version, err := getMySQLVersion(db)
 	if err != nil {
 		return "", err
 	}
 	// example: '10.6.4-MariaDB-1:10.6.4+maria~focal'
-	if strings.Contains(versionComment, "MariaDB") {
+	if strings.Contains(version, "MariaDB") {
 		return gomysql.MariaDBFlavor, nil
 	}
 	// It is possible to distinguish Percona & MySQL by checking 'version_comment',
@@ -61,6 +69,27 @@ func getMySQLGTIDExecuted(db *sql.DB, flavor string) (gomysql.GTIDSet, error) {
 	}
 
 	return gomysql.ParseGTIDSet(flavor, gtidStr)
+}
+
+func getServerUUID(db *sql.DB, flavor string) (string, error) {
+	query := ""
+	switch flavor {
+	case gomysql.MySQLFlavor:
+		query = "SELECT @@server_uuid"
+	case gomysql.MariaDBFlavor:
+		// MariaDB doesn't support `server_uuid`
+		return "", nil
+	default:
+		return "", fmt.Errorf("unknown MySQL flavor: %s", flavor)
+	}
+
+	row := db.QueryRow(query)
+	var uuid string
+	err := row.Scan(&uuid)
+	if err != nil {
+		return "", err
+	}
+	return uuid, nil
 }
 
 func getLastUploadedBinlog(folder storage.Folder) (string, error) {
@@ -186,10 +215,19 @@ type StreamSentinelDto struct {
 	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
 	Hostname         string `json:"Hostname,omitempty"`
+	ServerUUID       string `json:"ServerUUID,omitempty"`
+	ServerVersion    string `json:"ServerVersion,omitempty"`
 
-	IsPermanent bool        `json:"IsPermanent,omitempty"`
-	UserData    interface{} `json:"UserData,omitempty"`
+	IsPermanent   bool `json:"IsPermanent,omitempty"`
+	IsIncremental bool `json:"IsIncremental,omitempty"`
 
+	UserData interface{} `json:"UserData,omitempty"`
+
+	LSN               *LSN    `json:"LSN"`
+	IncrementFromLSN  *LSN    `json:"DeltaLSN,omitempty"`
+	IncrementFrom     *string `json:"DeltaFrom,omitempty"`
+	IncrementFullName *string `json:"DeltaFullName,omitempty"`
+	IncrementCount    *int    `json:"DeltaCount,omitempty"`
 	//todo: add other fields from internal.GenericMetadata
 }
 
