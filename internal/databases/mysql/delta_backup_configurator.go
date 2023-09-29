@@ -29,11 +29,13 @@ func NewRegularDeltaBackupConfigurator(folder storage.Folder, deltaBaseSelector 
 
 // incrementCount is increment level of new backup
 func (c RegularDeltaBackupConfigurator) Configure(isFullBackup bool, hostname string, serverUUID string, serverVersion string) (prevBackupInfo PrevBackupInfo, incrementCount int, err error) {
-	if !isFullBackup {
+	if isFullBackup {
+		tracelog.InfoLogger.Println("Full backup requested.")
 		return prevBackupInfo, 0, nil
 	}
 	maxDeltas, fromFull := internal.GetDeltaConfig()
 	if maxDeltas == 0 {
+		tracelog.InfoLogger.Println("WALG_DELTA_MAX_STEPS reached. Doing full backup.")
 		return PrevBackupInfo{}, 0, nil
 	}
 

@@ -87,7 +87,7 @@ func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFu
 
 	if !isFullBackup && (prevBackupInfo != PrevBackupInfo{} && prevBackupInfo.sentinel.LSN != nil) {
 		// –-incremental-lsn=LSN
-		injectArg(backupCmd, "–-incremental-lsn", prevBackupInfo.sentinel.LSN.String())
+		injectArg(backupCmd, "--incremental-lsn", prevBackupInfo.sentinel.LSN.String())
 	}
 
 	return nil

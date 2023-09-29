@@ -145,7 +145,9 @@ func handleXtrabackupBackup(uploader internal.Uploader, backupCmd *exec.Cmd, isP
 	}
 
 	backupInfo, err = readXtrabackupInfo(xtrabackupExtraDirectory)
-	tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
+	if err != nil {
+		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
+	}
 
 	err = removeXtrabackupExtraDirectory(xtrabackupExtraDirectory)
 	tracelog.ErrorLogger.FatalfOnError("failed to remove tmp directory from diff-backup: %v", err)
