@@ -56,8 +56,12 @@ func (c *statusCache) AllAliveStorages() ([]NamedFolder, error) {
 	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
 	if len(outdated) == 0 {
 		memCache = oldFile
-		return memCache.getAllAlive(c.storagesInOrder), nil
+		allAlive := memCache.getAllAlive(c.storagesInOrder)
+		tracelog.InfoLogger.Printf("Take all alive storages from file cache: %v", storageNames(allAlive))
+		return allAlive, nil
 	}
+
+	tracelog.InfoLogger.Printf("Storage status cache is outdated, checking for alive again: %v", storageNames(outdated))
 
 	checkResult := c.checker.checkForAlive(outdated...)
 
@@ -68,7 +72,9 @@ func (c *statusCache) AllAliveStorages() ([]NamedFolder, error) {
 	}
 
 	memCache = newFile
-	return memCache.getAllAlive(c.storagesInOrder), nil
+	allAlive := memCache.getAllAlive(c.storagesInOrder)
+	tracelog.InfoLogger.Printf("Found alive storages: %v", storageNames(allAlive))
+	return allAlive, nil
 }
 
 func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
@@ -80,6 +86,7 @@ func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 		return memFirstAlive, nil
 	}
 	if allRelevant {
+		tracelog.InfoLogger.Print("There is no alive storages in memory cache")
 		return nil, nil
 	}
 
@@ -89,14 +96,18 @@ func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 	}
 	fileFirstAlive, allRelevant := oldFile.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
 	if fileFirstAlive != nil {
+		tracelog.InfoLogger.Printf("Take first alive storage from file cache: %s", fileFirstAlive.Name)
 		memCache[fileFirstAlive.Key] = oldFile[fileFirstAlive.Key]
 		return fileFirstAlive, nil
 	}
 	if allRelevant {
+		tracelog.InfoLogger.Print("There is no alive storages in file cache")
 		return nil, nil
 	}
 
 	_, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
+
+	tracelog.InfoLogger.Printf("Storage status cache is outdated, checking for alive again: %v", storageNames(outdated))
 
 	checkResult := c.checker.checkForAlive(outdated...)
 
@@ -108,6 +119,11 @@ func (c *statusCache) FirstAliveStorage() (*NamedFolder, error) {
 
 	memCache = newFile
 	firstAlive, _ := memCache.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
+	if firstAlive == nil {
+		tracelog.InfoLogger.Print("Found no alive storages")
+	} else {
+		tracelog.InfoLogger.Printf("First found alive storage: %s", firstAlive.Name)
+	}
 	return firstAlive, nil
 }
 
@@ -127,15 +143,12 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 		return nil, fmt.Errorf("unknown storage %q", name)
 	}
 
-	getStorageIfAlive := func(statuses storageStatuses) (*NamedFolder, error) {
-		if statuses[specificStorage.Key].Alive {
+	if memCache.isRelevant(c.ttl, *specificStorage) {
+		if memCache[specificStorage.Key].Alive {
 			return specificStorage, nil
 		}
+		tracelog.InfoLogger.Printf("Storage is dead in memory cache: %s", specificStorage.Name)
 		return nil, nil
-	}
-
-	if memCache.isRelevant(c.ttl, *specificStorage) {
-		return getStorageIfAlive(memCache)
 	}
 
 	oldFile, err := readFile()
@@ -144,8 +157,15 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 	}
 	if oldFile.isRelevant(c.ttl, *specificStorage) {
 		memCache[specificStorage.Key] = oldFile[specificStorage.Key]
-		return getStorageIfAlive(oldFile)
+		if oldFile[specificStorage.Key].Alive {
+			tracelog.InfoLogger.Printf("Storage is alive in file cache: %s", specificStorage.Name)
+			return specificStorage, nil
+		}
+		tracelog.InfoLogger.Printf("Storage is dead in file cache: %s", specificStorage.Name)
+		return nil, nil
 	}
+
+	tracelog.InfoLogger.Printf("Storage status cache is outdated, checking for alive again: %s", specificStorage.Name)
 
 	checkResult := c.checker.checkForAlive(*specificStorage)
 
@@ -156,7 +176,20 @@ func (c *statusCache) SpecificStorage(name string) (*NamedFolder, error) {
 	}
 
 	memCache = newFile
-	return getStorageIfAlive(memCache)
+	if memCache[specificStorage.Key].Alive {
+		tracelog.InfoLogger.Printf("Storage is alive: %s", specificStorage.Name)
+		return specificStorage, nil
+	}
+	tracelog.InfoLogger.Printf("Storage is dead: %s", specificStorage.Name)
+	return nil, nil
+}
+
+func storageNames(folders []NamedFolder) []string {
+	names := make([]string, len(folders))
+	for i, f := range folders {
+		names[i] = f.Name
+	}
+	return names
 }
 
 type NamedFolder struct {

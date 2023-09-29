@@ -56,6 +56,7 @@ var backupFetchCmd = &cobra.Command{
 			folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
 		}
 		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.InfoLogger.Printf("Backup to fetch will be searched in storages: %v", multistorage.UsedStorages(folder))
 
 		if partialRestoreArgs != nil {
 			skipRedundantTars = true

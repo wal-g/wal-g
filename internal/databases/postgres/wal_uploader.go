@@ -84,6 +84,7 @@ func PrepareMultiStorageWalUploader(folder storage.Folder, targetStorage string)
 	if err != nil {
 		return nil, err
 	}
+	tracelog.InfoLogger.Printf("Files will be uploaded to storage: %v", multistorage.UsedStorages(folder)[0])
 
 	baseUploader, err := internal.ConfigureUploaderToFolder(folder)
 	if err != nil {
