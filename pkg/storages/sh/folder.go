@@ -7,7 +7,9 @@ import (
 	"hash/fnv"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"sync"
 
 	"github.com/pkg/sftp"
 	"github.com/wal-g/tracelog"
@@ -17,10 +19,10 @@ import (
 )
 
 type Folder struct {
-	client SftpClient
-	host   string
-	path   string
-	user   string
+	clientLazy func() (SftpClient, error)
+	host       string
+	path       string
+	user       string
 }
 
 const (
@@ -43,7 +45,7 @@ func NewFolderError(err error, format string, args ...interface{}) storage.Error
 }
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
-	host, path, err := storage.ParsePrefixAsURL(prefix)
+	host, folderPath, err := storage.ParsePrefixAsURL(prefix)
 
 	if err != nil {
 		return nil, err
@@ -84,32 +86,47 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Hashabl
 	}
 
 	address := fmt.Sprint(host, ":", port)
-	sshClient, err := ssh.Dial("tcp", address, config)
-	if err != nil {
-		return nil, NewFolderError(err, "Fail connect via ssh. Address: %s", address)
-	}
+	clientLazy := makeClientLazy(address, config)
 
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		return nil, NewFolderError(err, "Fail connect via sftp. Address: %s", address)
-	}
-
-	path = storage.AddDelimiterToPath(path)
+	folderPath = storage.AddDelimiterToPath(folderPath)
 
 	return NewFolder(
-		extend(sftpClient),
+		clientLazy,
 		host,
-		path,
+		folderPath,
 		user,
 	), nil
 }
 
-func NewFolder(client SftpClient, host, path, user string) *Folder {
+func makeClientLazy(address string, config *ssh.ClientConfig) func() (SftpClient, error) {
+	var connErr error
+	var client SftpClient
+	connOnce := new(sync.Once)
+	return func() (SftpClient, error) {
+		connOnce.Do(func() {
+			sshClient, err := ssh.Dial("tcp", address, config)
+			if err != nil {
+				connErr = fmt.Errorf("failed to connect to %s via ssh", address)
+				return
+			}
+
+			sftpClient, err := sftp.NewClient(sshClient)
+			if err != nil {
+				connErr = fmt.Errorf("failed to connect to %s via sftp", address)
+				return
+			}
+			client = extend(sftpClient)
+		})
+		return client, connErr
+	}
+}
+
+func NewFolder(clientLazy func() (SftpClient, error), host, path, user string) *Folder {
 	return &Folder{
-		client: client,
-		host:   host,
-		path:   path,
-		user:   user,
+		clientLazy: clientLazy,
+		host:       host,
+		path:       path,
+		user:       user,
 	}
 }
 
@@ -127,8 +144,10 @@ func (folder *Folder) GetPath() string {
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	client := folder.client
-	path := folder.path
+	client, err := folder.clientLazy()
+	if err != nil {
+		return nil, nil, err
+	}
 
 	filesInfo, err := client.ReadDir(folder.path)
 
@@ -141,12 +160,12 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 	if err != nil {
 		return nil, nil,
-			NewFolderError(err, "Fail read folder '%s'", path)
+			NewFolderError(err, "Fail read folder '%s'", folder.path)
 	}
 
 	for _, fileInfo := range filesInfo {
 		if fileInfo.IsDir() {
-			folder := NewFolder(folder.client, folder.host, client.Join(path, fileInfo.Name()), folder.user)
+			folder := NewFolder(folder.clientLazy, folder.host, client.Join(folder.path, fileInfo.Name()), folder.user)
 			subFolders = append(subFolders, folder)
 			// Folder is not object, just skip it
 			continue
@@ -164,14 +183,17 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	client := folder.client
+	client, err := folder.clientLazy()
+	if err != nil {
+		return err
+	}
 
 	for _, relativePath := range objectRelativePaths {
-		path := client.Join(folder.path, relativePath)
+		objPath := client.Join(folder.path, relativePath)
 
-		stat, err := client.Stat(path)
+		stat, err := client.Stat(objPath)
 		if err != nil {
-			return NewFolderError(err, "Fail to get object stat '%s': %v", path, err)
+			return NewFolderError(err, "Fail to get object stat '%s': %v", objPath, err)
 		}
 
 		// Do not try to remove directory. It may be not empty. TODO: remove if empty
@@ -179,9 +201,9 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 			continue
 		}
 
-		err = client.Remove(path)
+		err = client.Remove(objPath)
 		if err != nil {
-			return NewFolderError(err, "Fail delete object '%s': %v", path, err)
+			return NewFolderError(err, "Fail delete object '%s': %v", objPath, err)
 		}
 	}
 
@@ -189,8 +211,13 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
-	path := filepath.Join(folder.path, objectRelativePath)
-	_, err := folder.client.Stat(path)
+	client, err := folder.clientLazy()
+	if err != nil {
+		return false, err
+	}
+
+	objPath := filepath.Join(folder.path, objectRelativePath)
+	_, err = client.Stat(objPath)
 
 	if os.IsNotExist(err) {
 		return false, nil
@@ -198,7 +225,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 	if err != nil {
 		return false, NewFolderError(
-			err, "Fail check object existence '%s'", path,
+			err, "Fail check object existence '%s'", objPath,
 		)
 	}
 
@@ -207,19 +234,24 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
-		folder.client,
+		folder.clientLazy,
 		folder.host,
-		folder.client.Join(folder.path, subFolderRelativePath),
+		path.Join(folder.path, subFolderRelativePath),
 		folder.user,
 	)
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	path := folder.client.Join(folder.path, objectRelativePath)
-	file, err := folder.client.OpenFile(path)
+	client, err := folder.clientLazy()
+	if err != nil {
+		return nil, err
+	}
+
+	objPath := path.Join(folder.path, objectRelativePath)
+	file, err := client.OpenFile(objPath)
 
 	if err != nil {
-		return nil, storage.NewObjectNotFoundError(path)
+		return nil, storage.NewObjectNotFoundError(objPath)
 	}
 
 	return struct {
@@ -229,11 +261,15 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	client := folder.client
+	client, err := folder.clientLazy()
+	if err != nil {
+		return err
+	}
+
 	absolutePath := filepath.Join(folder.path, name)
 
 	dirPath := filepath.Dir(absolutePath)
-	err := client.Mkdir(dirPath)
+	err = client.Mkdir(dirPath)
 	if err != nil {
 		return NewFolderError(
 			err, "Fail to create directory '%s'",
