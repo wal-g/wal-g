@@ -27,3 +27,22 @@ func TestIsXtrabackup(t *testing.T) {
 		})
 	}
 }
+
+/*
+Test data from: (default Ubuntu 18.04 xtrabackup)
+xtrabackup version 2.4.9 based on MySQL server 5.7.13 Linux (x86_64) (revision id: a467167cdd4)
+*/
+const xtrabackup_checkpoints_example = `
+	backup_type = full-backuped
+	from_lsn = 0
+	to_lsn = 3738001
+	last_lsn = 3738068
+	compact = 0
+	recover_binlog_info = 0`
+
+func TestReadXtrabackupInfo(t *testing.T) {
+	info := NewXtrabackupInfo(xtrabackup_checkpoints_example)
+	assert.Equal(t, "0", info.FromLSN)
+	assert.Equal(t, "3738001", info.ToLSN)
+	assert.Equal(t, "3738068", info.LastLSN)
+}

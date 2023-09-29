@@ -11,14 +11,15 @@ func (lsn LSN) String() string {
 	return fmt.Sprintf("%v", uint64(lsn))
 }
 
-func ParseLSN(s string) (LSN, error) {
-	lsn, err := strconv.ParseUint(s, 0, 64) // FIXME: should we support hex?
+func ParseLSN(s string) *LSN {
+	lsn, err := strconv.ParseUint(s, 0, 64)
 
 	if err != nil {
-		return 0, nil
+		return nil
 	}
 
-	return LSN(lsn), nil
+	var result = LSN(lsn)
+	return &result
 }
 
 func lsnMin(a, b LSN) LSN {

@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -50,11 +51,12 @@ func HandleBackupPush(
 	var backupName string
 	var prevBackupInfo PrevBackupInfo
 	var incrementCount int = 0
+	var xtrabackupInfo XtrabackupInfo
 	if isXtrabackup(backupCmd) {
 		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
 		tracelog.ErrorLogger.FatalfOnError("failed to get previous backup for delta backup: %v", err)
 
-		backupName, err = handleXtrabackupBackup(uploader, backupCmd, isPermanent, isFullBackup, prevBackupInfo)
+		backupName, xtrabackupInfo, err = handleXtrabackupBackup(uploader, backupCmd, isPermanent, isFullBackup, prevBackupInfo)
 	} else {
 		backupName, err = handleRegularBackup(uploader, backupCmd)
 	}
@@ -77,24 +79,31 @@ func HandleBackupPush(
 	userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
+	var incrementFrom *string = nil
+	var incrementFullName *string = nil
+	if (prevBackupInfo != PrevBackupInfo{}) {
+		incrementFrom = &prevBackupInfo.name
+		incrementFullName = &prevBackupInfo.fullBackupName
+	}
+
 	sentinel := StreamSentinelDto{
-		BinLogStart:      binlogStart,
-		BinLogEnd:        binlogEnd,
-		StartLocalTime:   timeStart,
-		StopLocalTime:    timeStop,
-		CompressedSize:   uploadedSize,
-		UncompressedSize: rawSize,
-		Hostname:         hostname,
-		ServerUUID:       serverUUID,
-		ServerVersion:    version,
-		IsPermanent:      isPermanent,
-		//IsIncremental:     !isFullBackup, // FIXME
-		UserData: userData,
-		//LSN:               lsn, // FIXME
-		IncrementFromLSN: prevBackupInfo.sentinel.LSN,
-		//IncrementFrom:     prevBackupInfo.backupName,
-		//IncrementFullName: prevBackupInfo.fullName,
-		IncrementCount: &incrementCount,
+		BinLogStart:       binlogStart,
+		BinLogEnd:         binlogEnd,
+		StartLocalTime:    timeStart,
+		StopLocalTime:     timeStop,
+		CompressedSize:    uploadedSize,
+		UncompressedSize:  rawSize,
+		Hostname:          hostname,
+		ServerUUID:        serverUUID,
+		ServerVersion:     version,
+		IsPermanent:       isPermanent,
+		IsIncremental:     incrementCount != 0,
+		UserData:          userData,
+		LSN:               xtrabackupInfo.ToLSN,
+		IncrementFromLSN:  xtrabackupInfo.FromLSN,
+		IncrementFrom:     incrementFrom,
+		IncrementFullName: incrementFullName,
+		IncrementCount:    &incrementCount,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
@@ -116,12 +125,13 @@ func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backu
 	return
 }
 
-func handleXtrabackupBackup(uploader internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, isFullBackup bool, prevBackupInfo PrevBackupInfo) (backupName string, err error) {
-	xtrabackupExtraDirectory, err := prepareXtrabackupExtraDirectory(backupCmd)
+func handleXtrabackupBackup(uploader internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, isFullBackup bool, prevBackupInfo PrevBackupInfo) (backupName string, backupInfo XtrabackupInfo, err error) {
+	xtrabackupExtraDirectory, err := prepareXtrabackupExtraDirectory()
 	tracelog.ErrorLogger.FatalfOnError("failed to prepare tmp directory for diff-backup: %v", err)
 
 	err = enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, prevBackupInfo)
 	tracelog.ErrorLogger.FatalfOnError("failed to configure backup tool for diff-backup: %v", err)
+	tracelog.InfoLogger.Printf("Command to execute: %v", strings.Join(backupCmd.Args, " "))
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
@@ -134,7 +144,9 @@ func handleXtrabackupBackup(uploader internal.Uploader, backupCmd *exec.Cmd, isP
 		tracelog.ErrorLogger.Printf("Backup command output:\n%s", stderr.String())
 	}
 
-	// FIXME: return LSN
+	backupInfo, err = readXtrabackupInfo(xtrabackupExtraDirectory)
+	tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
+
 	err = removeXtrabackupExtraDirectory(xtrabackupExtraDirectory)
 	tracelog.ErrorLogger.FatalfOnError("failed to remove tmp directory from diff-backup: %v", err)
 	return

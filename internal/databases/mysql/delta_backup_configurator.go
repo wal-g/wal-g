@@ -64,11 +64,12 @@ func (c RegularDeltaBackupConfigurator) Configure(isFullBackup bool, hostname st
 
 	// When WALG_DELTA_ORIGIN = 'LATEST_FULL' we always make delta backup from full backup
 	// (incremental backups are not allowed)
+	var prevBackupName = previousBackup.Name
 	if fromFull {
 		tracelog.InfoLogger.Println("Delta will be made from full backup.")
 
 		prevName := previousBackup.Name
-		if prevBackupSentinelDto.IncrementFullName != nil {
+		if prevBackupSentinelDto.IncrementFullName != nil /* && previousBackup.Name != prevBackupSentinelDto.IncrementFullName */ {
 			prevName = *prevBackupSentinelDto.IncrementFullName
 		}
 
@@ -108,8 +109,8 @@ func (c RegularDeltaBackupConfigurator) Configure(isFullBackup bool, hostname st
 
 	tracelog.InfoLogger.Printf("Delta backup from %s with LSN %v.\n", previousBackup.Name, prevBackupSentinelDto.LSN)
 	prevBackupInfo = PrevBackupInfo{
+		prevBackupName,
 		previousBackup.Name,
-		previousBackup.Name, // FIXME
 		prevBackupSentinelDto}
 
 	return prevBackupInfo, incrementCount, nil
