@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -155,8 +156,13 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	bh.markBackups(folder, sentinelDto)
 	bh.uploadMetadata(ctx, sentinelDto, filesMetaDto)
 
+	storageNames := multistorage.UsedStorages(folder)
+	if len(storageNames) == 0 {
+		tracelog.ErrorLogger.Fatalf("No storages are used in the uploading folder")
+	}
+
 	// logging backup set Name
-	tracelog.InfoLogger.Printf("Wrote backup with name %s", bh.CurBackupInfo.Name)
+	tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
 }
 
 func (bh *BackupHandler) startBackup() (err error) {
