@@ -80,10 +80,8 @@ func HandleBackupPush(
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 	var incrementFrom *string = nil
-	var incrementFullName *string = nil
 	if (prevBackupInfo != PrevBackupInfo{}) {
 		incrementFrom = &prevBackupInfo.name
-		incrementFullName = &prevBackupInfo.fullBackupName
 	}
 
 	sentinel := StreamSentinelDto{
@@ -102,7 +100,7 @@ func HandleBackupPush(
 		LSN:               xtrabackupInfo.ToLSN,
 		IncrementFromLSN:  xtrabackupInfo.FromLSN,
 		IncrementFrom:     incrementFrom,
-		IncrementFullName: incrementFullName,
+		IncrementFullName: prevBackupInfo.fullBackupName,
 		IncrementCount:    &incrementCount,
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())

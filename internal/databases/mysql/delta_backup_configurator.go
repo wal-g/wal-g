@@ -8,9 +8,8 @@ import (
 )
 
 type PrevBackupInfo struct {
-	// should we have it here?
 	name           string
-	fullBackupName string
+	fullBackupName *string
 	sentinel       StreamSentinelDto
 }
 
@@ -67,6 +66,12 @@ func (c RegularDeltaBackupConfigurator) Configure(isFullBackup bool, hostname st
 	// When WALG_DELTA_ORIGIN = 'LATEST_FULL' we always make delta backup from full backup
 	// (incremental backups are not allowed)
 	var prevBackupName = previousBackup.Name
+	var prevFullBackupName *string
+	if prevBackupSentinelDto.IsIncremental {
+		prevFullBackupName = prevBackupSentinelDto.IncrementFullName
+	} else {
+		prevFullBackupName = &previousBackup.Name
+	}
 	if fromFull {
 		tracelog.InfoLogger.Println("Delta will be made from full backup.")
 
@@ -112,7 +117,7 @@ func (c RegularDeltaBackupConfigurator) Configure(isFullBackup bool, hostname st
 	tracelog.InfoLogger.Printf("Delta backup from %s with LSN %v.\n", previousBackup.Name, prevBackupSentinelDto.LSN)
 	prevBackupInfo = PrevBackupInfo{
 		prevBackupName,
-		previousBackup.Name,
+		prevFullBackupName,
 		prevBackupSentinelDto}
 
 	return prevBackupInfo, incrementCount, nil
