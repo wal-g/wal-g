@@ -24,7 +24,6 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 	return GenericMetaFetcher{}
 }
 
-// TODO: Unit tests
 func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
 	backup, err := NewBackup(backupFolder, backupName)
 	if err != nil {
