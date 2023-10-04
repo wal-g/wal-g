@@ -42,7 +42,7 @@ const xtrabackup_checkpoints_example = `
 
 func TestReadXtrabackupInfo(t *testing.T) {
 	info := NewXtrabackupInfo(xtrabackup_checkpoints_example)
-	assert.Equal(t, "0", info.FromLSN)
-	assert.Equal(t, "3738001", info.ToLSN)
-	assert.Equal(t, "3738068", info.LastLSN)
+	assert.Equal(t, uint64(0), uint64(*info.FromLSN))
+	assert.Equal(t, uint64(3738001), uint64(*info.ToLSN))
+	assert.Equal(t, uint64(3738068), uint64(*info.LastLSN))
 }

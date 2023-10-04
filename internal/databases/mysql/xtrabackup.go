@@ -52,9 +52,7 @@ func isXtrabackup(cmd *exec.Cmd) bool {
 func prepareXtrabackupExtraDirectory() (string, error) {
 	tmpDirRoot := "/tmp" // There is no Percona XtraBackup for Windows (c) @PeterZaitsev
 	tmpDirPattern := "wal-g"
-	var tmpDirPermissions os.FileMode = 0777 // should be octal
 	tmpPath, err := os.MkdirTemp(tmpDirRoot, tmpDirPattern)
-	_ = os.Chmod(tmpPath, tmpDirPermissions) // by default os.MkdirTemp creates directory has 0700 permissions
 
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to create temporary directory like %s/%s", tmpDirRoot, tmpDirPattern)

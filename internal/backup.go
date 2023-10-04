@@ -36,6 +36,9 @@ func (err SentinelMarshallingError) Error() string {
 // so the metadata file is useful for the quick fetch of backup-related information.
 // see FetchMetadata, UploadMetadata
 //
+// Metadata file (only for MySQL) - stores information about backup format.
+// WAL-G uses it to understand how to handle backup files during restore operations.
+//
 // All files of the backup must be stored in a single storage.
 type Backup struct {
 	Name string

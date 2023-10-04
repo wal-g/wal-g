@@ -24,8 +24,7 @@ type DeleteArgs struct {
 
 type DeleteHandler struct {
 	internal.DeleteHandler
-	permanentBackups []string
-	args             DeleteArgs
+	args DeleteArgs
 }
 
 func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, error) {
@@ -61,8 +60,7 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 			gpLessFunc,
 			internal.IsPermanentFunc(isPermanentFunc),
 		),
-		permanentBackups: permanentBackupNames,
-		args:             args,
+		args: args,
 	}, nil
 }
 
@@ -114,7 +112,7 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string) {
 }
 
 func (h *DeleteHandler) HandleDeleteEverything(args []string) {
-	h.DeleteHandler.HandleDeleteEverything(args, h.permanentBackups, h.args.Confirmed)
+	h.DeleteHandler.HandleDeleteEverything(args, h.args.Confirmed)
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
