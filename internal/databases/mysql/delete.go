@@ -31,10 +31,6 @@ func NewDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
-	permanentBackupNames := make([]string, 0, len(permanentBackups))
-	for name := range permanentBackups {
-		permanentBackupNames = append(permanentBackupNames, name)
-	}
 
 	return internal.NewDeleteHandler(
 		folder,

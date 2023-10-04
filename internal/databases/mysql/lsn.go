@@ -21,10 +21,3 @@ func ParseLSN(s string) *LSN {
 	var result = LSN(lsn)
 	return &result
 }
-
-func lsnMin(a, b LSN) LSN {
-	if a < b {
-		return a
-	}
-	return b
-}

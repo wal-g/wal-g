@@ -22,7 +22,7 @@ sleep 1
 # add data & create Incremental backup
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr02', NOW())"
 sleep 1
-wal-g backup-push
+wal-g backup-push --full=FALSE
 FIRST_INC_BACKUP=$(wal-g backup-list | grep -v "$FIRST_FULL_BACKUP" | awk 'NR==2{print $1}')
 
 sleep 1
@@ -31,13 +31,13 @@ sleep 1
 
 # add data & create second full backup
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr03', NOW())"
-wal-g backup-push --full
+wal-g backup-push
 SECOND_FULL_BACKUP=$(wal-g backup-list | grep -v "$FIRST_FULL_BACKUP" | grep -v "$FIRST_INC_BACKUP" | awk 'NR==2{print $1}')
 sleep 1
 
 # this data will be lost
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr04', NOW())"
-wal-g backup-push
+wal-g backup-push --full=FALSE
 SECOND_INC_BACKUP=$(wal-g backup-list | grep -v "$FIRST_FULL_BACKUP" | grep -v "$FIRST_INC_BACKUP" | grep -v "$SECOND_FULL_BACKUP" | awk 'NR==2{print $1}')
 
 # debug output:

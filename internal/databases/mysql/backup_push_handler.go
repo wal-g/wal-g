@@ -50,7 +50,7 @@ func HandleBackupPush(
 
 	var backupName string
 	var prevBackupInfo PrevBackupInfo
-	var incrementCount int = 0
+	var incrementCount int
 	var xtrabackupInfo XtrabackupInfo
 	if isXtrabackup(backupCmd) {
 		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
@@ -79,7 +79,7 @@ func HandleBackupPush(
 	userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
-	var incrementFrom *string = nil
+	var incrementFrom *string
 	if (prevBackupInfo != PrevBackupInfo{}) {
 		incrementFrom = &prevBackupInfo.name
 	}

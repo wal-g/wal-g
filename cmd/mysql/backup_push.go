@@ -70,7 +70,7 @@ var (
 		},
 	}
 	permanent         = false
-	fullBackup        = false
+	fullBackup        = true
 	deltaFromName     = ""
 	deltaFromUserData = ""
 	userData          = ""
@@ -84,7 +84,7 @@ func init() {
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
-		false, "Make full backup-push")
+		true, "Make full backup-push")
 	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,
 		"", "Select the backup specified by name as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,

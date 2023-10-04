@@ -28,13 +28,10 @@ func NewXtrabackupInfo(content string) XtrabackupInfo {
 		switch key {
 		case "from_lsn":
 			result.FromLSN = ParseLSN(value)
-			break
 		case "to_lsn":
 			result.ToLSN = ParseLSN(value)
-			break
 		case "last_lsn":
 			result.LastLSN = ParseLSN(value)
-			break
 		}
 	}
 	return result
@@ -42,13 +39,14 @@ func NewXtrabackupInfo(content string) XtrabackupInfo {
 
 func isXtrabackup(cmd *exec.Cmd) bool {
 	for _, arg := range cmd.Args {
-		if strings.Index(arg, "xtrabackup") != -1 || strings.Index(arg, "xbstream") != -1 {
+		if strings.Contains(arg, "xtrabackup") || strings.Contains(arg, "xbstream") {
 			return true
 		}
 	}
 	return false
 }
 
+//nolint:unparam
 func prepareXtrabackupExtraDirectory() (string, error) {
 	tmpDirRoot := "/tmp" // There is no Percona XtraBackup for Windows (c) @PeterZaitsev
 	tmpDirPattern := "wal-g"
@@ -62,6 +60,7 @@ func prepareXtrabackupExtraDirectory() (string, error) {
 	return tmpPath, nil
 }
 
+//nolint:unparam
 func removeXtrabackupExtraDirectory(xtrabackupExtraDirectory string) error {
 	err := os.RemoveAll(xtrabackupExtraDirectory)
 	if err != nil {
@@ -79,6 +78,7 @@ func readXtrabackupInfo(xtrabackupExtraDirectory string) (XtrabackupInfo, error)
 	return NewXtrabackupInfo(string(raw)), nil
 }
 
+//nolint:unparam
 func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, prevBackupInfo PrevBackupInfo) error {
 	// -–extra-lsndir=DIRECTORY - save an extra copy of the xtrabackup_checkpoints and xtrabackup_info files in this directory.
 	injectArg(backupCmd, "--extra-lsndir", xtrabackupExtraDirectory)
