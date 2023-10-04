@@ -34,6 +34,7 @@ var (
 				folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
 			}
 			tracelog.ErrorLogger.FatalOnError(err)
+			tracelog.InfoLogger.Printf("List backups from storages: %v", multistorage.UsedStorages(folder))
 
 			backupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
 			if detail {

@@ -68,7 +68,7 @@ func (ac *AliveChecker) checkForAlive(storages ...NamedFolder) map[key]bool {
 		tracelog.ErrorLogger.Print(res.err)
 	}
 
-	tracelog.DebugLogger.Printf("Found %d alive storages: %v", aliveCount, results)
+	tracelog.DebugLogger.Printf("Found %d alive storages among requested: %v", aliveCount, results)
 	return results
 }
 

@@ -55,6 +55,7 @@ var (
 				folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
 			}
 			tracelog.ErrorLogger.FatalOnError(err)
+			tracelog.InfoLogger.Printf("Backup will be pushed to storage: %v", multistorage.UsedStorages(folder)[0])
 
 			uploader, err := internal.ConfigureUploaderToFolder(folder)
 			tracelog.ErrorLogger.FatalOnError(err)

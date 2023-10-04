@@ -139,6 +139,7 @@ func configureFolder() storage.Folder {
 	folder, err := postgres.ConfigureMultiStorageFolder(true)
 	tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
 	folder, err = multistorage.UseAllAliveStorages(folder)
+	tracelog.InfoLogger.Printf("Backup to delete will be searched in storages: %v", multistorage.UsedStorages(folder))
 	tracelog.ErrorLogger.FatalOnError(err)
 	return multistorage.SetPolicies(folder, policies.UniteAllStorages)
 }

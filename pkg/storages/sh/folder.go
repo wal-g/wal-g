@@ -153,7 +153,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 	if os.IsNotExist(err) {
 		// Folder does not exist, it means where are no objects in folder
-		tracelog.InfoLogger.Println("\tskipped " + folder.path + ": " + err.Error())
+		tracelog.DebugLogger.Println("\tskipped " + folder.path + ": " + err.Error())
 		err = nil
 		return
 	}
