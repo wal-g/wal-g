@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strings"
 
 	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
@@ -96,10 +97,14 @@ func EnsureSingleStorageIsUsed(folder storage.Folder) error {
 }
 
 func changeDirectory(path string, storages ...cache.NamedFolder) []cache.NamedFolder {
+	if path == "" {
+		return storages
+	}
 	newStorages := make([]cache.NamedFolder, len(storages))
 	for i := range storages {
 		newStorages[i] = cache.NamedFolder{
 			Name:   storages[i].Name,
+			Root:   storages[i].Root,
 			Folder: storages[i].Folder.GetSubFolder(path),
 		}
 	}
@@ -361,14 +366,17 @@ func (mf Folder) listStorageFolder(storage cache.NamedFolder) ([]storage.Object,
 		for j, st := range mf.storages {
 			newStorages[j] = cache.NamedFolder{
 				Name:   st.Name,
+				Root:   st.Root,
 				Folder: st.GetSubFolder(path.Base(subFolder.GetPath())),
 			}
 		}
 
+		relPath := strings.TrimPrefix(subFolder.GetPath(), storage.Root)
+		relPath = strings.TrimPrefix(relPath, "/")
 		subFolders[i] = Folder{
 			cache:    mf.cache,
 			storages: newStorages,
-			path:     subFolder.GetPath(),
+			path:     relPath,
 			policies: mf.policies,
 		}
 	}

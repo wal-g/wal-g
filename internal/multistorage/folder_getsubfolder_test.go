@@ -17,16 +17,16 @@ func TestGetSubFolder(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "a/", aSubFolder.GetPath())
 		assert.Len(t, aSubFolder.storages, 2)
-		assert.Equal(t, "a/", aSubFolder.storages[0].GetPath())
-		assert.Equal(t, "a/", aSubFolder.storages[1].GetPath())
+		assert.Equal(t, "test/a/", aSubFolder.storages[0].GetPath())
+		assert.Equal(t, "test/a/", aSubFolder.storages[1].GetPath())
 
 		subf = aSubFolder.GetSubFolder("b")
 		bSubFolder, ok := subf.(Folder)
 		assert.True(t, ok)
 		assert.Equal(t, "a/b/", bSubFolder.GetPath())
 		assert.Len(t, bSubFolder.storages, 2)
-		assert.Equal(t, "a/b/", bSubFolder.storages[0].GetPath())
-		assert.Equal(t, "a/b/", bSubFolder.storages[1].GetPath())
+		assert.Equal(t, "test/a/b/", bSubFolder.storages[0].GetPath())
+		assert.Equal(t, "test/a/b/", bSubFolder.storages[1].GetPath())
 	})
 
 	t.Run("copies cache storages and policies to subfolders", func(t *testing.T) {

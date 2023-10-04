@@ -195,6 +195,7 @@ func storageNames(folders []NamedFolder) []string {
 type NamedFolder struct {
 	Key  key
 	Name string
+	Root string
 	storage.Folder
 }
 
@@ -213,6 +214,7 @@ func NameAndOrderFolders(primary storage.Folder, failover map[string]storage.Fol
 		failoverFolders = append(failoverFolders, NamedFolder{
 			Key:    formatKey(name, hashableFolder.Hash()),
 			Name:   name,
+			Root:   folder.GetPath(),
 			Folder: folder,
 		})
 	}
@@ -223,6 +225,7 @@ func NameAndOrderFolders(primary storage.Folder, failover map[string]storage.Fol
 			{
 				Key:    formatKey(consts.DefaultStorage, hashablePrimary.Hash()),
 				Name:   consts.DefaultStorage,
+				Root:   primary.GetPath(),
 				Folder: primary,
 			},
 		},
