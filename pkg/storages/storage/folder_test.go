@@ -95,6 +95,7 @@ func TestListFolderRecursivelyWithFilter_MultiStorage(t *testing.T) {
 	cacheMock := cache.NewMockStatusCache(mockCtrl)
 	memFolder := cache.NamedFolder{
 		Name:   "test",
+		Root:   "",
 		Folder: memory.NewFolder("", memory.NewStorage()),
 	}
 	cacheMock.EXPECT().SpecificStorage("test").Return(&memFolder, nil)

@@ -45,6 +45,7 @@ func TestUseDifferentStorages(t *testing.T) {
 		cacheMock := folder.cache.(*cache.MockStatusCache)
 		s3Folder := cache.NamedFolder{
 			Name:   "s3",
+			Root:   "",
 			Folder: memory.NewFolder("", memory.NewStorage()),
 		}
 
@@ -164,7 +165,8 @@ func newTestFolder(t *testing.T, storageNames ...string) Folder {
 	for _, name := range storageNames {
 		memStorages = append(memStorages, cache.NamedFolder{
 			Name:   name,
-			Folder: memory.NewFolder("", memory.NewStorage()),
+			Root:   "test",
+			Folder: memory.NewFolder("test/", memory.NewStorage()),
 		})
 	}
 

@@ -173,6 +173,7 @@ func newMultiStorageFolder(t *testing.T) storage.Folder {
 	memStorages := []cache.NamedFolder{
 		{
 			Name:   "test_storage",
+			Root:   "",
 			Folder: memory.NewFolder("", memory.NewStorage()),
 		},
 	}

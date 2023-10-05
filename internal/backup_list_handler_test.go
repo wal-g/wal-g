@@ -75,10 +75,12 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		memStorages := []cache.NamedFolder{
 			{
 				Name:   "storage_1",
+				Root:   "",
 				Folder: memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc))),
 			},
 			{
 				Name:   "storage_2",
+				Root:   "",
 				Folder: memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc))),
 			},
 		}

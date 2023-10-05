@@ -2,6 +2,7 @@ package multistorage
 
 import (
 	"bytes"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,7 +41,7 @@ func TestListFolder(t *testing.T) {
 			assert.Equal(t, testFolder.cache, multiFolder.cache)
 			assert.Equal(t, len(testFolder.storages), len(multiFolder.storages))
 			for _, st := range multiFolder.storages {
-				assert.Equal(t, subf.GetPath(), st.GetPath())
+				assert.Equal(t, path.Join(st.Root, subf.GetPath())+"/", st.GetPath())
 			}
 			gotPath := subf.GetPath()
 			delete(want, gotPath)
