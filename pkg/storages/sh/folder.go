@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/contextio"
@@ -192,6 +193,10 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		objPath := client.Join(folder.path, relativePath)
 
 		stat, err := client.Stat(objPath)
+		if errors.Is(err, os.ErrNotExist) {
+			// Don't throw error if the file doesn't exist, to follow the storage.Folder contract
+			continue
+		}
 		if err != nil {
 			return NewFolderError(err, "Fail to get object stat '%s': %v", objPath, err)
 		}
@@ -202,6 +207,10 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		}
 
 		err = client.Remove(objPath)
+		if errors.Is(err, os.ErrNotExist) {
+			// Don't throw error if the file doesn't exist, to follow the storage.Folder contract
+			continue
+		}
 		if err != nil {
 			return NewFolderError(err, "Fail delete object '%s': %v", objPath, err)
 		}
