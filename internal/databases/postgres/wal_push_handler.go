@@ -52,7 +52,7 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 	preventWalOverwrite := viper.GetBool(internal.PreventWalOverwriteSetting) || strings.HasSuffix(walFilePath, ".history")
 	readyRename := viper.GetBool(internal.PgReadyRename)
 
-	bgUploader := NewBgUploader(walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
+	bgUploader := NewBgUploader(ctx, walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
 

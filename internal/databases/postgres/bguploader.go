@@ -68,7 +68,7 @@ type BgUploader struct {
 // NewBgUploader creates a new BgUploader which looks for WAL files adjacent to
 // walFilePath. maxParallelWorkers and maxNumUploaded limits maximum concurrency
 // and total work done by this BgUploader respectively.
-func NewBgUploader(walFilePath string,
+func NewBgUploader(ctx context.Context, walFilePath string,
 	maxParallelWorkers int32,
 	maxNumUploaded int32,
 	uploader *WalUploader,
@@ -77,7 +77,7 @@ func NewBgUploader(walFilePath string,
 	started := make(map[string]struct{})
 	firstWalName := filepath.Base(walFilePath)
 	started[firstWalName+readySuffix] = struct{}{}
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(ctx)
 	return &BgUploader{
 		dir:                 filepath.Dir(walFilePath),
 		uploader:            uploader,
