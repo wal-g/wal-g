@@ -56,7 +56,7 @@ func HandleBackupPush(
 		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
 		tracelog.ErrorLogger.FatalfOnError("failed to get previous backup for delta backup: %v", err)
 
-		backupName, xtrabackupInfo, err = handleXtrabackupBackup(uploader, backupCmd, isPermanent, isFullBackup, prevBackupInfo)
+		backupName, xtrabackupInfo, err = handleXtrabackupBackup(uploader, backupCmd, isFullBackup, &prevBackupInfo)
 	} else {
 		backupName, err = handleRegularBackup(uploader, backupCmd)
 	}
@@ -123,12 +123,20 @@ func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backu
 	return
 }
 
-func handleXtrabackupBackup(uploader internal.Uploader, backupCmd *exec.Cmd, isPermanent bool, isFullBackup bool, prevBackupInfo PrevBackupInfo) (backupName string, backupInfo XtrabackupInfo, err error) {
+func handleXtrabackupBackup(
+	uploader internal.Uploader,
+	backupCmd *exec.Cmd,
+	isFullBackup bool,
+	prevBackupInfo *PrevBackupInfo,
+) (backupName string, backupInfo XtrabackupInfo, err error) {
+	if prevBackupInfo == nil {
+		tracelog.ErrorLogger.Fatalf("PrevBackupInfo is null")
+	}
+
 	xtrabackupExtraDirectory, err := prepareXtrabackupExtraDirectory()
 	tracelog.ErrorLogger.FatalfOnError("failed to prepare tmp directory for diff-backup: %v", err)
 
-	err = enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, prevBackupInfo)
-	tracelog.ErrorLogger.FatalfOnError("failed to configure backup tool for diff-backup: %v", err)
+	enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, prevBackupInfo)
 	tracelog.InfoLogger.Printf("Command to execute: %v", strings.Join(backupCmd.Args, " "))
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
@@ -148,6 +156,10 @@ func handleXtrabackupBackup(uploader internal.Uploader, backupCmd *exec.Cmd, isP
 	}
 
 	err = removeXtrabackupExtraDirectory(xtrabackupExtraDirectory)
-	tracelog.ErrorLogger.FatalfOnError("failed to remove tmp directory from diff-backup: %v", err)
-	return
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to remove tmp directory from diff-backup: %v", err)
+		err = nil // don't crash an app
+	}
+
+	return backupName, backupInfo, err
 }

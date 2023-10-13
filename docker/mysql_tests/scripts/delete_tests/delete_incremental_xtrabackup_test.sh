@@ -5,7 +5,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mysqlincrementalxtrabackupbucket
+export WALE_S3_PREFIX=s3://mysqldeleteincrementalxtrabackupbucket
 export WALG_DELTA_MAX_STEPS=5
 export WALG_DELTA_ORIGIN=LATEST
 

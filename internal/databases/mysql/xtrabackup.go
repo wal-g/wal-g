@@ -1,11 +1,20 @@
 package mysql
 
 import (
+	"bytes"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+)
+
+const (
+	XtrabackupApplyLogOnly   = "--apply-log-only"
+	XtrabackupIncrementalDir = "--incremental-dir"
 )
 
 type XtrabackupInfo struct {
@@ -65,7 +74,7 @@ func removeXtrabackupExtraDirectory(xtrabackupExtraDirectory string) error {
 	err := os.RemoveAll(xtrabackupExtraDirectory)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to remove temporary directory in %s", xtrabackupExtraDirectory)
-		return nil // don't crash the app
+		return err
 	}
 	return nil
 }
@@ -78,22 +87,103 @@ func readXtrabackupInfo(xtrabackupExtraDirectory string) (XtrabackupInfo, error)
 	return NewXtrabackupInfo(string(raw)), nil
 }
 
-//nolint:unparam
-func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, prevBackupInfo PrevBackupInfo) error {
-	// -–extra-lsndir=DIRECTORY - save an extra copy of the xtrabackup_checkpoints and xtrabackup_info files in this directory.
-	injectArg(backupCmd, "--extra-lsndir", xtrabackupExtraDirectory)
-
-	if !isFullBackup && (prevBackupInfo != PrevBackupInfo{} && prevBackupInfo.sentinel.LSN != nil) {
-		// –-incremental-lsn=LSN
-		injectArg(backupCmd, "--incremental-lsn", prevBackupInfo.sentinel.LSN.String())
+func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, prevBackupInfo *PrevBackupInfo) {
+	if prevBackupInfo == nil {
+		tracelog.ErrorLogger.Fatalf("PrevBackupInfo is null")
 	}
+	// -–extra-lsndir=DIRECTORY - save an extra copy of the xtrabackup_checkpoints and xtrabackup_info files in this directory.
+	injectCommandArgument(backupCmd, "--extra-lsndir="+xtrabackupExtraDirectory)
 
-	return nil
+	if !isFullBackup && (*prevBackupInfo != PrevBackupInfo{} && prevBackupInfo.sentinel.LSN != nil) {
+		// –-incremental-lsn=LSN
+		injectCommandArgument(backupCmd, "--incremental-lsn="+prevBackupInfo.sentinel.LSN.String())
+	}
 }
 
-func injectArg(cmd *exec.Cmd, key string, value string) {
-	// NA: It is unintuitive, but internal.GetCommandSetting() calls `/bin/sh -c <command>`
-	//     and when we are adding new arg to cmd.Args array - it won't be passed to xtrabackup
-	//     so, add it to the last argument (that we expect to be our backup tool arg).
-	cmd.Args[len(cmd.Args)-1] += " " + key + "=" + value
+func GetXtrabackupFetcher(restoreCmd, prepareCmd *exec.Cmd) func(folder storage.Folder, backup internal.Backup) {
+	return func(folder storage.Folder, backup internal.Backup) {
+		err := xtrabackupFetch(backup.Name, folder, restoreCmd, prepareCmd, true)
+		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
+	}
+}
+
+func xtrabackupFetch(
+	backupName string,
+	folder storage.Folder,
+	restoreCmd *exec.Cmd,
+	prepareCmd *exec.Cmd,
+	isLast bool) error {
+	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
+
+	var sentinel StreamSentinelDto
+	err = backup.FetchSentinel(&sentinel)
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
+
+	tempDeltaDir, err := prepareXtrabackupExtraDirectory()
+	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
+
+	// common procedure:
+	// xbstream -x -C /var/lib/mysql
+	// xbstream -x -C /data/inc1 < INC1.xbstream
+	// xbstream -x -C /data/inc2 < INC2.xbstream
+	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql
+	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql --incremental-dir=/data/inc1
+	// xtrabackup --prepare                  --target-dir=/var/lib/mysql --incremental-dir=/data/inc2
+
+	if sentinel.IsIncremental {
+		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinel.IncrementFrom, *sentinel.IncrementFromLSN)
+		err = xtrabackupFetch(*sentinel.IncrementFrom, folder, restoreCmd, prepareCmd, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	if sentinel.IsIncremental {
+		restoreCmd = cloneCommand(restoreCmd)
+		restoreArgs := strings.Split(restoreCmd.Args[len(restoreCmd.Args)-1], " ")
+		replaceCommandArgument(restoreCmd, restoreArgs[len(restoreArgs)-1], tempDeltaDir)
+
+		prepareCmd = cloneCommand(prepareCmd)
+		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
+	}
+	if !isLast {
+		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
+	}
+
+	stdin, err := restoreCmd.StdinPipe()
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
+	stderr := &bytes.Buffer{}
+	restoreCmd.Stderr = stderr
+
+	tracelog.InfoLogger.Printf("Restoring %s with cmd %v", backupName, restoreCmd.Args)
+	err = restoreCmd.Start()
+	if err != nil {
+		return err
+	}
+	err = internal.DownloadAndDecompressStream(backup, stdin)
+	if err != nil {
+		return err
+	}
+	cmdErr := restoreCmd.Wait()
+	if cmdErr != nil {
+		tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+		err = cmdErr
+	}
+	if err != nil {
+		return err
+	}
+	tracelog.InfoLogger.Printf("Restored %s", backupName)
+
+	if prepareCmd != nil {
+		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backupName, prepareCmd.Args)
+		err = prepareCmd.Run()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
+			return err
+		}
+		tracelog.InfoLogger.Printf("Prepared %s", backupName)
+	}
+
+	return os.RemoveAll(tempDeltaDir)
 }
