@@ -1,11 +1,15 @@
 #!/bin/sh
 set -e -x
 
+#
 # In this test we will cover `wal-g delete` section of README.md
+#
 
 . /usr/local/export_common.sh
 
 export WALE_S3_PREFIX=s3://mysqldeleteincrementalxtrabackupbucket
+
+# required configuration:
 export WALG_DELTA_MAX_STEPS=5
 export WALG_DELTA_ORIGIN=LATEST
 

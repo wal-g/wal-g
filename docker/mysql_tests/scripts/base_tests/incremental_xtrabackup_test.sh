@@ -3,7 +3,13 @@ set -e -x
 
 . /usr/local/export_common.sh
 
+#
+# In this test we check that wal-g can create incremental backups & restore them
+#
+
 export WALE_S3_PREFIX=s3://mysqlincrementalxtrabackupbucket
+
+# Required configuration:
 export WALG_DELTA_MAX_STEPS=5
 export WALG_DELTA_ORIGIN=LATEST
 

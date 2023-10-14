@@ -194,6 +194,12 @@ Runs mysql server implementation which can be used to fetch binlogs from storage
 wal-g binlog-server
 ```
 
+### ``backup-mark``
+
+Backups can be marked as permanent to prevent them from being removed when running ``delete``. To mark backup as permanent call `wal-g backup-mark -b backup_name`. To remove permanent flag - call `wal-g backup-mark -b backup_name -i`
+When incremental backup is marked as permanent - all parent backups also marked as permanent.
+
+
 Typical configurations
 -----
 

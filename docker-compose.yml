@@ -92,6 +92,8 @@ services:
       &&  mkdir -p /export/mysqldeleteeverythingpermanent
       &&  mkdir -p /export/mysqldeleteincrementalxtrabackupbucket
       &&  mkdir -p /export/mysqlmarkbucket
+      &&  mkdir -p /export/mysqlmarknoerrorbucket
+      &&  mkdir -p /export/mysqlmarkincrementalbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysql_pitr_binlogserver_bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket

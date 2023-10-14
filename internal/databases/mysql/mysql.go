@@ -218,7 +218,7 @@ type StreamSentinelDto struct {
 	ServerUUID       string `json:"ServerUUID,omitempty"`
 	ServerVersion    string `json:"ServerVersion,omitempty"`
 
-	IsPermanent   bool `json:"IsPermanent,omitempty"`
+	IsPermanent   bool `json:"IsPermanent"`
 	IsIncremental bool `json:"IsIncremental"`
 
 	UserData interface{} `json:"UserData,omitempty"`
