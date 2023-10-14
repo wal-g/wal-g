@@ -93,7 +93,13 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteEverything(args, confirmed)
+	permanentBackupNames := make([]string, 0, len(permanentBackups))
+	for backup, isPerm := range permanentBackups {
+		if isPerm {
+			permanentBackupNames = append(permanentBackupNames, backup.Name)
+		}
+	}
+	deleteHandler.HandleDeleteEverything(args, permanentBackupNames, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {

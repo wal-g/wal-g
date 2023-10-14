@@ -7,6 +7,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+type DeleteHandler struct {
+	internal.DeleteHandler
+	permanentBackups []string
+}
+
 func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
 	return func(object1, object2 storage.Object) bool {
 		time1, ok := utility.TryFetchTimeRFC3999(object1.GetName())
@@ -21,7 +26,7 @@ func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) b
 	}
 }
 
-func NewDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error) {
+func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
 	backupSentinels, err := internal.GetBackupSentinelObjects(folder)
 	if err != nil {
 		return nil, err
@@ -31,13 +36,25 @@ func NewDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
+	permanentBackupNames := make([]string, 0, len(permanentBackups))
+	for name := range permanentBackups {
+		permanentBackupNames = append(permanentBackupNames, name)
+	}
+	isPermanentFunc := func(object storage.Object) bool {
+		return internal.IsPermanent(object.GetName(), permanentBackups, internal.StreamBackupNameLength)
+	}
 
-	return internal.NewDeleteHandler(
-		folder,
-		backupObjects,
-		makeLessFunc(folder),
-		internal.IsPermanentFunc(func(object storage.Object) bool {
-			return internal.IsPermanent(object.GetName(), permanentBackups, internal.StreamBackupNameLength)
-		}),
-	), nil
+	return &DeleteHandler{
+		DeleteHandler: *internal.NewDeleteHandler(
+			folder,
+			backupObjects,
+			makeLessFunc(folder),
+			internal.IsPermanentFunc(isPermanentFunc),
+		),
+		permanentBackups: permanentBackupNames,
+	}, nil
+}
+
+func (h *DeleteHandler) HandleDeleteEverything(args []string, confirmed bool) {
+	h.DeleteHandler.HandleDeleteEverything(args, h.permanentBackups, confirmed)
 }
