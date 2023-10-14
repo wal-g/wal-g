@@ -44,7 +44,7 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 		StartTime:        sentinel.StartLocalTime,
 		FinishTime:       sentinel.StopLocalTime,
 		IsPermanent:      sentinel.IsPermanent,
-		IncrementDetails: NewIncrementDetailsFetcher(sentinel),
+		IncrementDetails: NewIncrementDetailsFetcher(&sentinel),
 		UserData:         sentinel.UserData,
 	}, nil
 }
