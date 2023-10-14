@@ -92,10 +92,10 @@ func modifyBackupSentinel(backupName string, backupFolder storage.Folder, modifi
 }
 
 type IncrementDetailsFetcher struct {
-	sentinel StreamSentinelDto
+	sentinel *StreamSentinelDto
 }
 
-func NewIncrementDetailsFetcher(sentinel StreamSentinelDto) *IncrementDetailsFetcher {
+func NewIncrementDetailsFetcher(sentinel *StreamSentinelDto) *IncrementDetailsFetcher {
 	return &IncrementDetailsFetcher{sentinel}
 }
 
