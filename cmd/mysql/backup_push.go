@@ -12,13 +12,9 @@ import (
 const (
 	backupPushShortDescription = "Creates new backup and pushes it to storage"
 	permanentFlag              = "permanent"
-	fullBackupFlag             = "full"
-	deltaFromUserDataFlag      = "delta-from-user-data"
-	deltaFromNameFlag          = "delta-from-name"
 	addUserDataFlag            = "add-user-data"
 
-	permanentShorthand  = "p"
-	fullBackupShorthand = "f"
+	permanentShorthand = "p"
 )
 
 var (
@@ -34,18 +30,6 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
-
-			// FIXME: do we need this?
-			if deltaFromName == "" {
-				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
-			}
-			if deltaFromUserData == "" {
-				deltaFromUserData = viper.GetString(internal.DeltaFromUserDataSetting)
-			}
-
-			deltaBaseSelector, err := internal.NewDeltaBaseSelector(
-				deltaFromName, deltaFromUserData, mysql.NewGenericMetaFetcher())
-			tracelog.ErrorLogger.FatalOnError(err)
 
 			uploader, err := internal.ConfigureSplitUploader()
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -63,17 +47,14 @@ var (
 				uploader,
 				backupCmd,
 				permanent,
-				fullBackup,
+				true,
 				userData,
-				mysql.NewRegularDeltaBackupConfigurator(folder, deltaBaseSelector),
+				mysql.NewNoDeltaBackupConfigurator(),
 			)
 		},
 	}
-	permanent         = false
-	fullBackup        = true
-	deltaFromName     = ""
-	deltaFromUserData = ""
-	userData          = ""
+	permanent = false
+	userData  = ""
 )
 
 func init() {
@@ -83,12 +64,6 @@ func init() {
 	// to avoid code duplication in command handlers
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
-	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
-		true, "Make full backup-push")
-	backupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,
-		"", "Select the backup specified by name as the target for the delta backup")
-	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,
-		"", "Select the backup specified by UserData as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 }

@@ -19,7 +19,7 @@ func HandleBackupFetch(folder storage.Folder,
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
 
 	// we should ba able to read & restore any backup we ever created:
-	if sentinel.IsIncremental {
+	if sentinel.Tool == WalgXtrabackupTool {
 		internal.HandleBackupFetch(folder, targetBackupSelector, GetXtrabackupFetcher(restoreCmd, prepareCmd))
 	} else {
 		internal.HandleBackupFetch(folder, targetBackupSelector, internal.GetBackupToCommandFetcher(restoreCmd))

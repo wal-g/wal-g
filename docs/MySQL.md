@@ -34,9 +34,13 @@ Delta-backup is the difference between previously taken backup and present state
 Restoration process will automatically fetch all necessary deltas and base backup and compose valid restored backup (you still need WALs after start of last backup to restore consistent cluster).
 Delta computation is based on ModTime of file system and LSN number of pages in datafiles.
 
+Note: Incremental backups only supported in `wal-g xtrabackup-push` command.
+
 * `WALG_DELTA_ORIGIN`
 
 To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
+
+Note: Incremental backups only supported in `wal-g xtrabackup-push` command.
 
 * `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
 
@@ -93,6 +97,16 @@ Creates new backup and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to 
 ```bash
 wal-g backup-push
 ```
+
+### ``xtrabackup-push``
+
+Creates new backup with `xtrabackup` tool and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
+WAL-G levereages knowledge of xtrabackup format to support additional feature (e.g. incremental backups)
+
+```bash
+wal-g xtrabackup-push
+```
+
 
 ### ``backup-list``
 

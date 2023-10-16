@@ -84,7 +84,15 @@ func HandleBackupPush(
 		incrementFrom = &prevBackupInfo.name
 	}
 
+	var tool = ""
+	if isXtrabackup(backupCmd) {
+		tool = WalgXtrabackupTool
+	} else {
+		tool = WalgUnspecifiedStreamBackupTool
+	}
+
 	sentinel := StreamSentinelDto{
+		Tool:              tool,
 		BinLogStart:       binlogStart,
 		BinLogEnd:         binlogEnd,
 		StartLocalTime:    timeStart,

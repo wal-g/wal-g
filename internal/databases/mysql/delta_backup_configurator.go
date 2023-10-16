@@ -17,6 +17,17 @@ type DeltaBackupConfigurator interface {
 	Configure(isFullBackup bool, hostname string, serverUUID string, serverVersion string) (PrevBackupInfo, int, error)
 }
 
+type NoDeltaBackupConfigurator struct{}
+
+func NewNoDeltaBackupConfigurator() NoDeltaBackupConfigurator {
+	return NoDeltaBackupConfigurator{}
+}
+
+// incrementCount is increment level of new backup
+func (c NoDeltaBackupConfigurator) Configure(_ bool, _ string, _ string, _ string) (prevBackupInfo PrevBackupInfo, incrementCount int, err error) {
+	return PrevBackupInfo{}, 0, nil
+}
+
 type RegularDeltaBackupConfigurator struct {
 	folder            storage.Folder
 	deltaBaseSelector internal.BackupSelector
