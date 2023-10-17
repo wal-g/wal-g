@@ -107,6 +107,9 @@ WAL-G levereages knowledge of xtrabackup format to support additional feature (e
 wal-g xtrabackup-push
 ```
 
+* `WALG_MYSQL_INCREMENTAL_BACKUP_DST`
+
+To place incremental backip in the specified directory during backup-fetch
 
 ### ``backup-list``
 

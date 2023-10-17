@@ -136,7 +136,7 @@ const (
 	MysqlBinlogServerID            = "WALG_MYSQL_BINLOG_SERVER_ID"
 	MysqlBinlogServerReplicaSource = "WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE"
 	MysqlBackupDownloadMaxRetry    = "WALG_BACKUP_DOWNLOAD_MAX_RETRY"
-	MysqlIncrementalBackupDir      = "WALG_MYSQL_INCREMENTAL_BACKUP_DIR"
+	MysqlIncrementalBackupDst      = "WALG_MYSQL_INCREMENTAL_BACKUP_DST"
 	// Deprecated: unused
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
@@ -246,7 +246,7 @@ var (
 	MysqlDefaultSettings = map[string]string{
 		StreamSplitterBlockSize:     "1048576",
 		MysqlBackupDownloadMaxRetry: "1",
-		MysqlIncrementalBackupDir:   "/tmp",
+		MysqlIncrementalBackupDst:   "/tmp",
 	}
 
 	SQLServerDefaultSettings = map[string]string{
@@ -476,7 +476,7 @@ var (
 		MysqlBinlogServerID:            true,
 		MysqlBinlogServerReplicaSource: true,
 		MysqlBackupDownloadMaxRetry:    true,
-		MysqlIncrementalBackupDir:      true,
+		MysqlIncrementalBackupDst:      true,
 	}
 
 	RedisAllowedSettings = map[string]bool{

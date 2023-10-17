@@ -119,7 +119,7 @@ func xtrabackupFetch(
 	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
 
-	incrementalBackupDir := viper.GetString(internal.MysqlIncrementalBackupDir)
+	incrementalBackupDir := viper.GetString(internal.MysqlIncrementalBackupDst)
 	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
 
