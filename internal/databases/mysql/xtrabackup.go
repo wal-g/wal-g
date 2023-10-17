@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"bytes"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -56,8 +57,7 @@ func isXtrabackup(cmd *exec.Cmd) bool {
 }
 
 //nolint:unparam
-func prepareXtrabackupExtraDirectory() (string, error) {
-	tmpDirRoot := "/tmp" // There is no Percona XtraBackup for Windows (c) @PeterZaitsev
+func prepareTemporaryDirectory(tmpDirRoot string) (string, error) {
 	tmpDirPattern := "wal-g"
 	tmpPath, err := os.MkdirTemp(tmpDirRoot, tmpDirPattern)
 
@@ -69,11 +69,10 @@ func prepareXtrabackupExtraDirectory() (string, error) {
 	return tmpPath, nil
 }
 
-//nolint:unparam
-func removeXtrabackupExtraDirectory(xtrabackupExtraDirectory string) error {
-	err := os.RemoveAll(xtrabackupExtraDirectory)
+func removeTemporaryDirectory(tmpDir string) error {
+	err := os.RemoveAll(tmpDir)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to remove temporary directory in %s", xtrabackupExtraDirectory)
+		tracelog.WarningLogger.Printf("Failed to remove temporary directory in %s", tmpDir)
 		return err
 	}
 	return nil
@@ -120,7 +119,8 @@ func xtrabackupFetch(
 	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
 
-	tempDeltaDir, err := prepareXtrabackupExtraDirectory()
+	incrementalBackupDir := viper.GetString(internal.MysqlIncrementalBackupDir)
+	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
 
 	// common procedure:

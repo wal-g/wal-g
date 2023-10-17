@@ -13,6 +13,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+//nolint:funlen
 func HandleBackupPush(
 	folder storage.Folder,
 	uploader internal.Uploader,
@@ -84,11 +85,9 @@ func HandleBackupPush(
 		incrementFrom = &prevBackupInfo.name
 	}
 
-	var tool = ""
+	var tool = WalgUnspecifiedStreamBackupTool
 	if isXtrabackup(backupCmd) {
 		tool = WalgXtrabackupTool
-	} else {
-		tool = WalgUnspecifiedStreamBackupTool
 	}
 
 	sentinel := StreamSentinelDto{
@@ -141,7 +140,8 @@ func handleXtrabackupBackup(
 		tracelog.ErrorLogger.Fatalf("PrevBackupInfo is null")
 	}
 
-	xtrabackupExtraDirectory, err := prepareXtrabackupExtraDirectory()
+	tmpDirRoot := "/tmp" // There is no Percona XtraBackup for Windows (c) @PeterZaitsev
+	xtrabackupExtraDirectory, err := prepareTemporaryDirectory(tmpDirRoot)
 	tracelog.ErrorLogger.FatalfOnError("failed to prepare tmp directory for diff-backup: %v", err)
 
 	enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, prevBackupInfo)
@@ -163,7 +163,7 @@ func handleXtrabackupBackup(
 		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
 	}
 
-	err = removeXtrabackupExtraDirectory(xtrabackupExtraDirectory)
+	err = removeTemporaryDirectory(xtrabackupExtraDirectory)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to remove tmp directory from diff-backup: %v", err)
 		err = nil // don't crash an app

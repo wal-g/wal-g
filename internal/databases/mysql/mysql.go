@@ -210,7 +210,7 @@ func replaceHostInDatasourceName(datasourceName string, newHost string) string {
 }
 
 type StreamSentinelDto struct {
-	Tool        string `json:"Tool,omitempty""`
+	Tool        string `json:"Tool,omitempty"`
 	BinLogStart string `json:"BinLogStart,omitempty"`
 	// BinLogEnd field is for debug purpose only.
 	// As we can not guarantee that transactions in BinLogEnd file happened before or after backup

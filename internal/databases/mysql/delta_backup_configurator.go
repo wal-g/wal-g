@@ -23,8 +23,7 @@ func NewNoDeltaBackupConfigurator() NoDeltaBackupConfigurator {
 	return NoDeltaBackupConfigurator{}
 }
 
-// incrementCount is increment level of new backup
-func (c NoDeltaBackupConfigurator) Configure(_ bool, _ string, _ string, _ string) (prevBackupInfo PrevBackupInfo, incrementCount int, err error) {
+func (c NoDeltaBackupConfigurator) Configure(_ bool, _ string, _ string, _ string) (PrevBackupInfo, int, error) {
 	return PrevBackupInfo{}, 0, nil
 }
 
