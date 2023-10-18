@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/wal-g/wal-g/tests_func/utils"
+	"golang.org/x/mod/semver"
 )
 
 const (
@@ -20,7 +21,7 @@ func EnvExists(path string) bool {
 	return err == nil
 }
 
-func SetupNewEnv(fromEnv map[string]string, envFilePath, stagingDir string) (map[string]string, error) {
+func SetupNewEnv(fromEnv map[string]string, osEnviron map[string]string, envFilePath, stagingDir string) (map[string]string, error) {
 	if _, err := os.Stat(stagingDir); err == nil {
 		err = os.Chmod(stagingDir, EnvDirPerm)
 		if err != nil {
@@ -29,7 +30,7 @@ func SetupNewEnv(fromEnv map[string]string, envFilePath, stagingDir string) (map
 	} else if err := os.Mkdir(stagingDir, EnvDirPerm); err != nil {
 		return nil, fmt.Errorf("can not create staging dir: %v", err)
 	}
-	env := utils.MergeEnvs(fromEnv, DynConf(fromEnv))
+	env := utils.MergeEnvs(fromEnv, DynConf(fromEnv, osEnviron))
 	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, EnvFilePerv)
 	if err != nil {
 		return nil, fmt.Errorf("can not open database file for writing: %v", err)
@@ -73,13 +74,23 @@ func SetupStaging(imagesDir, stagingDir string) error {
 	return nil
 }
 
-func DynConf(env map[string]string) map[string]string {
+func DynConf(env map[string]string, osEnviron map[string]string) map[string]string {
 	portFactor := env["TEST_ID"]
 	netName := fmt.Sprintf("test_net_%s", portFactor)
 
-	return map[string]string{
+	res := map[string]string{
 		"DOCKER_BRIDGE_ID": strconv.Itoa(rand.Intn(65535)),
 		"PORT_FACTOR":      portFactor,
 		"NETWORK_NAME":     netName,
 	}
+
+	if mongoVersion, ok := osEnviron["MONGO_VERSION"]; ok {
+		if semver.Compare(fmt.Sprintf("v%s", mongoVersion), "v6.1") < 0 {
+			res["MONGO_CONF_FILE"] = "mongod-4.4-6.0.conf"
+		} else {
+			res["MONGO_CONF_FILE"] = "mongod-6.1-7.0.conf"
+		}
+	}
+
+	return res
 }

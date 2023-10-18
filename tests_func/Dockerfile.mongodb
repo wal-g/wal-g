@@ -12,13 +12,8 @@ ENV TMP_DIR /var/tmp/wal-g
 ENV WALG_CONF_DIR /etc/wal-g/
 ENV USE_BROTLI 1
 
-RUN echo "deb http://$MONGO_REPO/apt/ubuntu bionic/${MONGO_PACKAGE}/${MONGO_MAJOR} multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
+RUN echo "deb http://$MONGO_REPO/apt/ubuntu focal/${MONGO_PACKAGE}/${MONGO_MAJOR} multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
     wget -qO - https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc | apt-key add -
-
-# Starting with MongoDB 4.4, the MongoDB Database Tools (mongodb-database-tools) are now released separately
-# You can remove this RUN after remove the support of MongoDB 4.2
-RUN echo "deb http://$MONGO_REPO/apt/ubuntu bionic/${MONGO_PACKAGE}/4.4 multiverse" | tee "/etc/apt/sources.list.d/mongodb_4.4.list" && \
-    wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | apt-key add -
 
 
 RUN apt-get update -qq && \

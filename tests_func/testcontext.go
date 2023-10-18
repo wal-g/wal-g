@@ -91,6 +91,8 @@ type TestContext struct {
 }
 
 func CreateTestContex(database string) (tctx *TestContext, err error) {
+	environ := utils.ParseEnvLines(os.Environ())
+
 	envFilePath := path.Join(stagingDir, envFile)
 
 	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
@@ -102,7 +104,7 @@ func CreateTestContex(database string) (tctx *TestContext, err error) {
 	var env map[string]string
 
 	if !EnvExists(envFilePath) {
-		env, err = SetupNewEnv(Env, envFilePath, stagingDir)
+		env, err = SetupNewEnv(Env, environ, envFilePath, stagingDir)
 		if err != nil {
 			return nil, err
 		}
@@ -112,8 +114,6 @@ func CreateTestContex(database string) (tctx *TestContext, err error) {
 			return nil, err
 		}
 	}
-
-	environ := utils.ParseEnvLines(os.Environ())
 
 	tctx = &TestContext{
 		EnvFilePath: envFilePath,
