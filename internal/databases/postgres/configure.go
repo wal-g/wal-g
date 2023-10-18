@@ -29,23 +29,37 @@ func ConfigureMultiStorageFolder(checkWrite bool) (storage.Folder, error) {
 		return nil, fmt.Errorf("configure failover folders: %w", err)
 	}
 
-	cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+	checkForAliveDefault := len(failoverStorages) > 0
+	checkForAlive, err := internal.GetBoolSettingDefault(internal.PgFailoverStoragesCheck, checkForAliveDefault)
 	if err != nil {
-		return nil, fmt.Errorf("get failover storage cache lifetime setting: %w", err)
+		return nil, fmt.Errorf("get failover storage check setting: %w", err)
 	}
 
-	aliveChecker, err := configureStorageAliveChecker(checkWrite)
-	if err != nil {
-		return nil, fmt.Errorf("configure storage alive checker: %w", err)
-	}
-	statusCache, err := cache.NewStatusCache(
-		primaryStorage,
-		failoverStorages,
-		cacheLifetime,
-		aliveChecker,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("init cache with storage statuses: %w", err)
+	var statusCache cache.StatusCache
+	if checkForAlive {
+		cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+		if err != nil {
+			return nil, fmt.Errorf("get failover storage cache lifetime setting: %w", err)
+		}
+
+		aliveChecker, err := configureStorageAliveChecker(checkWrite)
+		if err != nil {
+			return nil, fmt.Errorf("configure storage alive checker: %w", err)
+		}
+		statusCache, err = cache.NewStatusCache(
+			primaryStorage,
+			failoverStorages,
+			cacheLifetime,
+			aliveChecker,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("init cache with storage statuses: %w", err)
+		}
+	} else {
+		statusCache, err = cache.NewStatusCacheNoCheck(primaryStorage, failoverStorages)
+		if err != nil {
+			return nil, fmt.Errorf("init status cache with no checks: %w", err)
+		}
 	}
 
 	return multistorage.NewFolder(statusCache), nil
