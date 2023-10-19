@@ -64,7 +64,7 @@ func TryDownloadFile(reader StorageFolderReader, path string) (fileReader io.Rea
 		return
 	}
 	if _, ok := errors.Cause(err).(storage.ObjectNotFoundError); ok {
-		exists = true
+		exists = false
 		err = nil
 	}
 	return
