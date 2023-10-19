@@ -167,6 +167,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 	}
 
 	// TODO: wait for index building
+	// TODO: if we wait for index building, we can stop ignoring a BackgroundOperation... error in DropIndexes
 	if op.Operation == "c" && op.Object[0].Key == "commitIndexBuild" {
 		collName, indexes, err := indexSpecFromCommitIndexBuilds(op)
 		if err != nil {
@@ -183,6 +184,10 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 		dbName, _ := util.SplitNamespace(op.Namespace)
 		return ap.db.CreateIndexes(ctx, dbName, collName,
 			[]client.IndexDocument{indexes})
+	}
+	if op.Operation == "c" && op.Object[0].Key == "dropIndexes" {
+		dbName, _ := util.SplitNamespace(op.Namespace)
+		return ap.db.DropIndexes(ctx, dbName, op.Object)
 	}
 
 	//tracelog.DebugLogger.Printf("applying op: %+v", op)

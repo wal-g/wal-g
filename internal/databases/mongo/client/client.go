@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -71,6 +72,7 @@ type IsMaster struct {
 // MongoDriver defines methods to work with mongodb.
 type MongoDriver interface {
 	CreateIndexes(ctx context.Context, dbName, collName string, indexes []IndexDocument) error
+	DropIndexes(ctx context.Context, dbName string, rawCommand bson.D) error
 	EnsureIsMaster(ctx context.Context) error
 	IsMaster(ctx context.Context) (models.IsMaster, error)
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
@@ -215,6 +217,27 @@ func (mc *MongoClient) CreateIndexes(ctx context.Context, dbName, collName strin
 
 	if err := mc.c.Database(dbName).RunCommand(ctx, rawCommand).Err(); err != nil {
 		return fmt.Errorf("createIndexes command %q failed: %w", rawCommand, err)
+	}
+
+	return nil
+}
+
+func (mc *MongoClient) DropIndexes(ctx context.Context, dbName string, rawCommand bson.D) error {
+	if err := mc.c.Database(dbName).RunCommand(ctx, rawCommand).Err(); err != nil {
+		var mongoErr mongo.CommandError
+		isMongoErr := errors.As(err, &mongoErr)
+
+		if isMongoErr && mongoErr.Name == "BackgroundOperationInProgressForNamespace" {
+			// In Mongo versions Prior to 5.2, an attempt to drop an index during an in-progress build of another index
+			// on the same collection results in an error:
+			// https://www.mongodb.com/docs/manual/reference/command/dropIndexes/#behavior
+
+			// We just ignore these error and continue a replay
+			tracelog.WarningLogger.Printf("Unable to drop index, skipped. Error is: %w\n", err)
+			return nil
+		}
+
+		return fmt.Errorf("dropIndexes command %q failed: %w", rawCommand, err)
 	}
 
 	return nil
