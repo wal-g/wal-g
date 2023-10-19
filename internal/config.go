@@ -98,6 +98,7 @@ const (
 	PgAliveCheckInterval           = "WALG_ALIVE_CHECK_INTERVAL"
 	PgStopBackupTimeout            = "WALG_STOP_BACKUP_TIMEOUT"
 	PgFailoverStorages             = "WALG_FAILOVER_STORAGES"
+	PgFailoverStoragesCheck        = "WALG_FAILOVER_STORAGES_CHECK"
 	PgFailoverStoragesCheckTimeout = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
 	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
 	PgFailoverStoragesCheckSize    = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
