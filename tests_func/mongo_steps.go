@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"time"
+	"strings"
 
 	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
@@ -18,10 +19,12 @@ import (
 func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^a working mongodb on ([^\s]*)$`, tctx.testMongoConnect)
 	ctx.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
+	ctx.Step(`^mongodb replset is synchronized on ([^\s]*)$`, tctx.waitSecondariesSync)
 	ctx.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isMongoPrimary)
 	ctx.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.mongoEnableAuth)
 	ctx.Step(`^mongodb initialized on ([^\s]*)$`, tctx.mongoInit)
 	ctx.Step(`^([^\s]*) has no data$`, tctx.purgeMongoDataDir)
+	ctx.Step(`^([^\s]+) replset has no data$`, tctx.purgeMongoRsDataDir)
 
 	ctx.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
 	ctx.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
@@ -43,13 +46,18 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 func SetupMongodbLogicalSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we create ([^\s]*) mongo-backup$`, tctx.createMongoBackup)
 	ctx.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
+	ctx.Step(`^we restore rs from #(\d+) backup to "([^"]*)" timestamp to ([^\s]+)$`,
+		tctx.replayReplSetOplog)
 
 	// oplog
 	ctx.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
+	ctx.Step(`let's wait new oplog after "([^"]*)"`, tctx.waitNewOplogAfter)
 	ctx.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
 	ctx.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
 	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
+
+	ctx.Step(`^mongodb doesn't have initial sync on ([^\s]+)$`, tctx.checkInitialSync)
 }
 
 func (tctx *TestContext) createMongoBackup(container string) error {
@@ -95,6 +103,7 @@ func (tctx *TestContext) oplogArchiveIsNotEmpty() error {
 		return nil
 	})
 }
+
 
 func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error {
 	mc1, err := MongoCtlFromTestContext(tctx, host1)
@@ -282,7 +291,43 @@ func (tctx *TestContext) purgeMongoDataDir(host string) error {
 		return err
 	}
 
-	return mc.PurgeDatadir()
+	return mc.ResetMongod()
+}
+
+func (tctx *TestContext) purgeMongoRsDataDir(containers string) error {
+	containerNames := strings.Split(containers, ",")
+	var mongoCtlList []*helpers.MongoCtl
+
+	for _, container := range containerNames {
+		mongoCtl, err := MongoCtlFromTestContext(tctx, container)
+		if err != nil {
+			return err
+		}
+		mongoCtlList = append(mongoCtlList, mongoCtl)
+	}
+
+	for _, mongoCtl := range mongoCtlList {
+		err := mongoCtl.StopMongod()
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, mongoCtl := range mongoCtlList {
+		err := mongoCtl.PurgeDatadir()
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, mongoCtl := range mongoCtlList {
+		err := mongoCtl.StartMongod()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (tctx *TestContext) saveMongoSnapshot(host, dataId string) error {
@@ -311,6 +356,31 @@ func (tctx *TestContext) saveOplogTimestamp(host, timestampId string) error {
 	}
 	tctx.AuxData.Timestamps[timestampId] = ts
 	return nil
+}
+
+func (tctx *TestContext) waitNewOplogAfter(timestampId string) error {
+	until := tctx.AuxData.Timestamps[timestampId]
+	until.Inc++
+
+	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
+	tracelog.DebugLogger.Printf("Waiting until ts %v appears in storage", until)
+
+	return helpers.Retry(tctx.Context, 30, func() error {
+		archives, err := s3.Archives()
+		if err != nil {
+			return err
+		}
+		tracelog.DebugLogger.Printf("Current timestmaps %v", archives)
+
+		exists, err := s3.ArchTsExists(until)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf("ts %v does not exists", until)
+		}
+		return nil
+	})
 }
 
 func (tctx *TestContext) enableOplogPush(container string) error {
@@ -348,23 +418,96 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 	tracelog.DebugLogger.Printf("Saved timestamps:\nbackup #%d majTs: %v\n%s: %v\n", backupId, from, timestampId, until)
 	until.Inc++
 
-	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
-	tracelog.DebugLogger.Printf("Waiting until ts %v appears in storage", until)
-
-	err = helpers.Retry(tctx.Context, 30, func() error {
-		exists, err := s3.ArchTsExists(until)
-		if err != nil {
-			return err
-		}
-		if !exists {
-			return fmt.Errorf("ts %v does not exists", until)
-		}
-		return nil
-	})
+	err = tctx.waitNewOplogAfter(timestampId)
 	if err != nil {
 		return err
 	}
 
 	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
 	return walg.OplogReplay(from, until)
+}
+
+
+func (tctx *TestContext) replayReplSetOplog(backupNumber int, timestampId string, containers string) error {
+	containerNames := strings.Split(containers, ",")
+
+	for _, container := range containerNames {
+		mc, err := MongoCtlFromTestContext(tctx, container)
+
+		isMaster, err := mc.IsMaster()
+		if err != nil {
+			return err
+		}
+		if isMaster {
+			return tctx.replayOplog(backupNumber, timestampId, container)
+		}
+	}
+
+	return nil
+}
+
+
+func (tctx *TestContext) checkInitialSync(container string) error {
+	mongoCtl, err := MongoCtlFromTestContext(tctx, container)
+	if err != nil {
+		return err
+	}
+
+	markersOfInitialSync := []string {"Initial sync required", "Initial sync started"}
+
+	for _, text := range markersOfInitialSync {
+		logs, err := mongoCtl.GrepLogs(text)
+		if err != nil {
+			return err
+		}
+		if logs != "" {
+			return fmt.Errorf("Mongodb has done initial sync. Found logs: %s", logs)
+		}
+	}
+
+	return nil
+}
+
+
+func (tctx *TestContext) waitSecondariesSync(containers string) error {
+	containerNames := strings.Split(containers, ",")
+	var mongoCtlList []*helpers.MongoCtl
+	var masterId int
+
+	if len(containerNames) < 2 {
+		return fmt.Errorf("invalid count containers")
+	}
+
+	for _, container := range containerNames {
+		mongoCtl, err := MongoCtlFromTestContext(tctx, container)
+		if err != nil {
+			return err
+		}
+		mongoCtlList = append(mongoCtlList, mongoCtl)
+	}
+
+	for i, mongoCtl := range mongoCtlList {
+		isMaster, err := mongoCtl.IsMaster()
+		if err != nil {
+			return err
+		}
+		if isMaster {
+			masterId = i
+		}
+	}
+
+	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+		rsStatus, err := mongoCtlList[masterId].GetRsStatus()
+
+		if err != nil {
+			return err
+		}
+
+		for _, member := range rsStatus.Members {
+			if rsStatus.Optimes.LastCommittedOpTime != member.Optime {
+				return fmt.Errorf("mongos is not synchronized")
+			}
+		}
+		return nil
+	})
 }

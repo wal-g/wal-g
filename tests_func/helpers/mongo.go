@@ -78,6 +78,17 @@ type OpTime struct {
 	Term int64               `bson:"t" json:"t"`
 }
 
+type Member struct {
+	Optime OpTime `bson:"optime"`
+}
+
+type RsStatus struct {
+	Optimes struct {
+		LastCommittedOpTime OpTime `bson:"lastCommittedOpTime"`
+	} `bson:"optimes"`
+	Members []Member `bson:"members"`
+}
+
 // IsMasterLastWrite ...
 type IsMasterLastWrite struct {
 	OpTime         OpTime `bson:"opTime"`
@@ -466,6 +477,19 @@ func (mc *MongoCtl) GetConfigPath() (string, error) {
 	return getCmdLineOpts.Parsed.Config, nil
 }
 
+func (mc *MongoCtl) GetRsStatus() (rsStatus RsStatus, err error) {
+	adminConnect, err := mc.AdminConnect()
+	if err != nil {
+		return
+	}
+	err = adminConnect.Database("admin").RunCommand(mc.ctx, bson.M{"replSetGetStatus": 1}).Decode(&rsStatus)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
 func (mc *MongoCtl) EnableAuth() error {
 	eval := fmt.Sprintf("db.createUser({user: '%s', pwd: '%s', roles: ['root']})",
 		mc.adminCreds.Username,
@@ -534,12 +558,36 @@ func (mc *MongoCtl) StartMongod() error {
 	return err
 }
 
+
+func (mc *MongoCtl) GrepLogs(text string) (string, error) {
+	exc, err := mc.runCmd("grep", fmt.Sprintf("\"%s\"", text), "/var/log/mongodb/mongod.log")
+
+	if err != nil{
+		tracelog.ErrorLogger.Printf("Command failed %s", exc.Stderr())
+
+		// grep return exit code 1 for empty result
+		if exc.ExitCode == 1 {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return exc.Stdout(), err
+}
+
+
 func (mc *MongoCtl) PurgeDatadir() error {
+	_, err := mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
+	return err
+}
+
+
+func (mc *MongoCtl) ResetMongod() error {
 	err := mc.StopMongod()
 	if err != nil {
 		return err
 	}
-	_, err = mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
+	err = mc.PurgeDatadir()
 	if err != nil {
 		return err
 	}
