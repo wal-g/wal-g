@@ -70,6 +70,8 @@ type IsMaster struct {
 }
 
 // MongoDriver defines methods to work with mongodb.
+//
+//go:generate mockery --name MongoDriver
 type MongoDriver interface {
 	CreateIndexes(ctx context.Context, dbName, collName string, indexes []IndexDocument) error
 	DropIndexes(ctx context.Context, dbName string, rawCommand bson.D) error
@@ -233,7 +235,7 @@ func (mc *MongoClient) DropIndexes(ctx context.Context, dbName string, rawComman
 			// https://www.mongodb.com/docs/manual/reference/command/dropIndexes/#behavior
 
 			// We just ignore these error and continue a replay
-			tracelog.WarningLogger.Printf("Unable to drop index, skipped. Error is: %w\n", err)
+			tracelog.WarningLogger.Printf("Unable to drop index, skipped. Error is: %+v\n", err)
 			return nil
 		}
 
