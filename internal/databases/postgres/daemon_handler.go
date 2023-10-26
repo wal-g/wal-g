@@ -190,32 +190,6 @@ func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messa
 	return messageType, messageBody, err
 }
 
-// HandleDaemon is invoked to perform daemon mode
-func HandleDaemon(options DaemonOptions) {
-	if _, err := os.Stat(options.SocketPath); err == nil {
-		err = os.Remove(options.SocketPath)
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Failed to remove socket file:", err)
-		}
-	}
-	l, err := net.Listen("unix", options.SocketPath)
-	if err != nil {
-		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
-	}
-
-	sdNotifyTicker := time.NewTicker(30 * time.Second)
-	defer sdNotifyTicker.Stop()
-	go SendSdNotify(sdNotifyTicker.C)
-
-	for {
-		fd, err := l.Accept()
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
-		}
-		go Listen(context.Background(), fd)
-	}
-}
-
 // Listen is used for listening connection and processing messages
 func Listen(ctx context.Context, c net.Conn) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
@@ -256,33 +230,6 @@ func failAndLogError(c net.Conn, err error) {
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Sending error response failed: %v", err)
 	}
-}
-
-func SendSdNotify(c <-chan time.Time) {
-	for {
-		<-c
-		tracelog.ErrorLogger.PrintOnError(SdNotify(SdNotifyWatchdog))
-	}
-}
-
-func SdNotify(state string) error {
-	socketName, ok := internal.GetSetting(internal.SystemdNotifySocket)
-	if !ok {
-		return nil
-	}
-	socketAddr := &net.UnixAddr{
-		Name: socketName,
-		Net:  "unixgram",
-	}
-	conn, err := net.DialUnix(socketAddr.Net, nil, socketAddr)
-	if err != nil {
-		return fmt.Errorf("failed connect to service: %w", err)
-	}
-	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
-	if _, err = conn.Write([]byte(state)); err != nil {
-		return newSocketWriteFailedError(err)
-	}
-	return nil
 }
 
 func getFullPath(relativePath string) (string, error) {

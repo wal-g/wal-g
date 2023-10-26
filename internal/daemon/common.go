@@ -1,6 +1,10 @@
 package daemon
 
 import (
+	"os"
+	"time"
+	"net"
+
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -16,6 +20,10 @@ const (
 
 	WalPushType  SocketMessageType = 'F'
 	WalFetchType SocketMessageType = 'f'
+
+
+	STPutType  SocketMessageType = 'P'
+	STCatType  SocketMessageType = 'C'
 )
 
 var (
@@ -69,4 +77,60 @@ func BytesToArgs(body []byte) ([]string, error) {
 		return nil, ErrCorruptedCorruptedMessageBody
 	}
 	return res, nil
+}
+
+
+
+func SendSdNotify(c <-chan time.Time) {
+	for {
+		<-c
+		tracelog.ErrorLogger.PrintOnError(SdNotify(SdNotifyWatchdog))
+	}
+}
+
+func SdNotify(state string) error {
+	socketName, ok := internal.GetSetting(internal.SystemdNotifySocket)
+	if !ok {
+		return nil
+	}
+	socketAddr := &net.UnixAddr{
+		Name: socketName,
+		Net:  "unixgram",
+	}
+	conn, err := net.DialUnix(socketAddr.Net, nil, socketAddr)
+	if err != nil {
+		return fmt.Errorf("failed connect to service: %w", err)
+	}
+	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
+	if _, err = conn.Write([]byte(state)); err != nil {
+		return newSocketWriteFailedError(err)
+	}
+	return nil
+}
+
+
+// HandleDaemon is invoked to perform daemon mode
+func HandleDaemon(options DaemonOptions) {
+	if _, err := os.Stat(options.SocketPath); err == nil {
+		err = os.Remove(options.SocketPath)
+		if err != nil {
+			tracelog.ErrorLogger.Fatal("Failed to remove socket file:", err)
+		}
+	}
+	l, err := net.Listen("unix", options.SocketPath)
+	if err != nil {
+		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
+	}
+
+	sdNotifyTicker := time.NewTicker(30 * time.Second)
+	defer sdNotifyTicker.Stop()
+	go SendSdNotify(sdNotifyTicker.C)
+
+	for {
+		fd, err := l.Accept()
+		if err != nil {
+			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
+		}
+		go Listen(context.Background(), fd)
+	}
 }
