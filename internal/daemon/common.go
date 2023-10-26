@@ -7,7 +7,12 @@ import (
 
 	"encoding/binary"
 	"fmt"
+	"context"
 	"math"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type SocketMessageType byte
@@ -29,6 +34,23 @@ const (
 var (
 	ErrCorruptedCorruptedMessageBody = fmt.Errorf("currepted message body")
 )
+
+const (
+	SdNotifyWatchdog = "WATCHDOG=1"
+)
+
+type DaemonOptions struct {
+	SocketPath string
+}
+
+type SocketMessageHandler interface {
+	Handle(ctx context.Context, messageBody []byte) error
+}
+
+type DaemonListener interface {
+	// Listen is used for listening connection and processing messages
+	Listen(ctx context.Context, c net.Conn)
+}
 
 func (msg SocketMessageType) ToBytes() []byte {
 	return []byte{byte(msg)}
@@ -103,14 +125,14 @@ func SdNotify(state string) error {
 	}
 	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
 	if _, err = conn.Write([]byte(state)); err != nil {
-		return newSocketWriteFailedError(err)
+		return NewSocketWriteFailedError(err)
 	}
 	return nil
 }
 
 
 // HandleDaemon is invoked to perform daemon mode
-func HandleDaemon(options DaemonOptions) {
+func HandleDaemon(options DaemonOptions, dl DaemonListener) {
 	if _, err := os.Stat(options.SocketPath); err == nil {
 		err = os.Remove(options.SocketPath)
 		if err != nil {
@@ -131,6 +153,6 @@ func HandleDaemon(options DaemonOptions) {
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go Listen(context.Background(), fd)
+		go dl.Listen(context.Background(), fd)
 	}
 }

@@ -15,10 +15,10 @@ var daemonCmd = &cobra.Command{
 	Short: DaemonShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		daemonOpts := postgres.DaemonOptions{
+		daemonOpts := daemon.DaemonOptions{
 			SocketPath: args[0],
 		}
-		daemon.HandleDaemon(daemonOpts)
+		daemon.HandleDaemon(daemonOpts, postgres.NewPostgreSQLDaemonListener())
 	},
 }
 

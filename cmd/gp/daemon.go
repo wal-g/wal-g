@@ -1,8 +1,8 @@
-package pg
+package gp
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal/common/daemon"
+	"github.com/wal-g/wal-g/internal/daemon"
 )
 
 const DaemonShortDescription = "Runs WAL-G in daemon mode which executes commands sent from the lightweight walg-daemon-client."

@@ -7,40 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"path"
-	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/daemon"
 	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/internal/daemon"
 )
-
-const (
-	SdNotifyWatchdog = "WATCHDOG=1"
-)
-
-type SocketWriteFailedError struct {
-	error
-}
-
-func newSocketWriteFailedError(socketError error) SocketWriteFailedError {
-	return SocketWriteFailedError{errors.Errorf("socket write failed: %v", socketError)}
-}
-
-func (err SocketWriteFailedError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type DaemonOptions struct {
-	SocketPath string
-}
-
-type SocketMessageHandler interface {
-	Handle(ctx context.Context, messageBody []byte) error
-}
 
 type CheckMessageHandler struct {
 	fd net.Conn
@@ -49,7 +22,7 @@ type CheckMessageHandler struct {
 func (h *CheckMessageHandler) Handle(_ context.Context, _ []byte) error {
 	_, err := h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return newSocketWriteFailedError(err)
+		return daemon.NewSocketWriteFailedError(err)
 	}
 	tracelog.DebugLogger.Println("configuration successfully checked")
 	return nil
@@ -82,7 +55,7 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return newSocketWriteFailedError(err)
+		return daemon.NewSocketWriteFailedError(err)
 	}
 	return nil
 }
@@ -113,7 +86,7 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
 		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
 		if err != nil {
-			return newSocketWriteFailedError(err)
+			return daemon.NewSocketWriteFailedError(err)
 		}
 		return nil
 	}
@@ -122,13 +95,13 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return newSocketWriteFailedError(err)
+		return daemon.NewSocketWriteFailedError(err)
 	}
 	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
 	return nil
 }
 
-func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn) (SocketMessageHandler, error) {
+func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn) (daemon.SocketMessageHandler, error) {
 	switch messageType {
 	case daemon.CheckType:
 		return &CheckMessageHandler{c}, nil
@@ -238,4 +211,18 @@ func getFullPath(relativePath string) (string, error) {
 		return "", fmt.Errorf("PGDATA is not set in the conf")
 	}
 	return path.Join(PgDataSettingString, relativePath), nil
+}
+
+type PostgreSQLDaemonListener struct {
+	daemon.DaemonListener
+}
+
+func (pdl * PostgreSQLDaemonListener) Listen(ctx context.Context, c net.Conn) {
+	Listen(ctx, c)
+}
+
+func NewPostgreSQLDaemonListener() daemon.DaemonListener {
+	return &PostgreSQLDaemonListener{
+
+	}
 }
