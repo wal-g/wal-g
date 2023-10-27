@@ -28,9 +28,9 @@ type statusCache struct {
 	sharedMem   *storageStatuses
 	sharedMemMu *sync.Mutex
 
-	// sharedFile keeps the inter-process cache that's shared between different command executions.
-	sharedFile    string
-	sharedFileUse bool
+	// sharedFilePath is the path to the file that keeps the inter-process cache that's shared between different command executions.
+	sharedFilePath string
+	sharedFileUse  bool
 }
 
 type StatusCacheOpt func(c *statusCache)
@@ -42,9 +42,9 @@ func WithSharedMemory(mem *storageStatuses, memMu *sync.Mutex) StatusCacheOpt {
 	}
 }
 
-func WithSharedFile(file string) StatusCacheOpt {
+func WithSharedFile(filePath string) StatusCacheOpt {
 	return func(c *statusCache) {
-		c.sharedFile = file
+		c.sharedFilePath = filePath
 		c.sharedFileUse = true
 	}
 }
@@ -68,7 +68,7 @@ func NewStatusCache(
 	}
 
 	homeFileUse := true
-	homeFile, err := HomeStatusFile()
+	homeFilePath, err := HomeStatusFile()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Can't use storage status cache file from $HOME: %v", err)
 		homeFileUse = false
@@ -79,10 +79,10 @@ func NewStatusCache(
 		ttl:             ttl,
 		checker:         checker,
 
-		sharedMem:     &globalMemCache,
-		sharedMemMu:   globalMemCacheMu,
-		sharedFile:    homeFile,
-		sharedFileUse: homeFileUse,
+		sharedMem:      &globalMemCache,
+		sharedMemMu:    globalMemCacheMu,
+		sharedFilePath: homeFilePath,
+		sharedFileUse:  homeFileUse,
 	}
 
 	for _, o := range opts {
@@ -105,7 +105,7 @@ func (c *statusCache) AllAliveStorages() (allAlive []NamedFolder, err error) {
 
 	var oldFile storageStatuses
 	if c.sharedFileUse {
-		oldFile, err = readFile(c.sharedFile)
+		oldFile, err = readFile(c.sharedFilePath)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
 		}
@@ -132,16 +132,7 @@ func (c *statusCache) AllAliveStorages() (allAlive []NamedFolder, err error) {
 	}
 
 	defer func() {
-		if c.sharedFileUse {
-			err := writeFile(c.sharedFile, newFile)
-			if err != nil {
-				tracelog.WarningLogger.Printf(
-					"Failed to write cache file, each subsequent command will check the storages again: %v",
-					err,
-				)
-			}
-		}
-		c.sharedMem = &newFile
+		c.storeStatuses(newFile)
 		tracelog.InfoLogger.Printf("Found alive storages: %v", storageNames(allAlive))
 	}()
 
@@ -176,7 +167,7 @@ func (c *statusCache) FirstAliveStorage() (firstAlive *NamedFolder, err error) {
 
 	var oldFile storageStatuses
 	if c.sharedFileUse {
-		oldFile, err = readFile(c.sharedFile)
+		oldFile, err = readFile(c.sharedFilePath)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
 		}
@@ -202,16 +193,7 @@ func (c *statusCache) FirstAliveStorage() (firstAlive *NamedFolder, err error) {
 	}
 
 	defer func() {
-		if c.sharedFileUse {
-			err := writeFile(c.sharedFile, newFile)
-			if err != nil {
-				tracelog.WarningLogger.Printf(
-					"Failed to write cache file, each subsequent command will check the storages again: %v",
-					err,
-				)
-			}
-		}
-		c.sharedMem = &newFile
+		c.storeStatuses(newFile)
 		if firstAlive == nil {
 			tracelog.InfoLogger.Print("Found no alive storages")
 		} else {
@@ -251,7 +233,7 @@ func (c *statusCache) SpecificStorage(name string) (specific *NamedFolder, err e
 
 	var oldFile storageStatuses
 	if c.sharedFileUse {
-		oldFile, err = readFile(c.sharedFile)
+		oldFile, err = readFile(c.sharedFilePath)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
 		}
@@ -272,20 +254,25 @@ func (c *statusCache) SpecificStorage(name string) (specific *NamedFolder, err e
 	checkResult := c.checker.checkForAlive(*specific)
 
 	newFile := updateFileContent(oldFile, checkResult)
-	if c.sharedFileUse {
-		err = writeFile(c.sharedFile, newFile)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to write cache file, each subsequent command will check the storages again: %v", err)
-		}
-	}
+	c.storeStatuses(newFile)
 
-	c.sharedMem = &newFile
 	if (*c.sharedMem)[specific.Key].Alive {
 		tracelog.InfoLogger.Printf("Storage is alive: %s", specific.Name)
 		return specific, nil
 	}
 	tracelog.InfoLogger.Printf("Storage is dead: %s", specific.Name)
 	return nil, nil
+}
+
+func (c *statusCache) storeStatuses(new storageStatuses) {
+	if c.sharedFileUse {
+		err := writeFile(c.sharedFilePath, new)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Failed to write cache file, each subsequent command will check the storages again: %v", err)
+		}
+	}
+
+	c.sharedMem = &new
 }
 
 func storageWithName(storages []NamedFolder, name string) *NamedFolder {

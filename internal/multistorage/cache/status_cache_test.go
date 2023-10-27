@@ -144,7 +144,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		_, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		file, err := readFile(cache.sharedFile)
+		file, err := readFile(cache.sharedFilePath)
 		require.NoError(t, err)
 		assert.Equal(t, file, *cache.sharedMem)
 	})
@@ -176,10 +176,10 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 
 	t.Run("do not fail if cannot read or write file", func(t *testing.T) {
 		cache := testCache(t, 2, true)
-		cache.sharedFile = path.Join(t.TempDir(), "non-accessible-file")
-		_, err := os.Create(cache.sharedFile)
+		cache.sharedFilePath = path.Join(t.TempDir(), "non-accessible-file")
+		_, err := os.Create(cache.sharedFilePath)
 		require.NoError(t, err)
-		err = os.Chmod(cache.sharedFile, 0000)
+		err = os.Chmod(cache.sharedFilePath, 0000)
 		require.NoError(t, err)
 
 		_, err = cache.AllAliveStorages()
@@ -346,10 +346,10 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 
 	t.Run("do not fail if cannot read or write file", func(t *testing.T) {
 		cache := testCache(t, 2, true)
-		cache.sharedFile = path.Join(t.TempDir(), "non-accessible-file")
-		_, err := os.Create(cache.sharedFile)
+		cache.sharedFilePath = path.Join(t.TempDir(), "non-accessible-file")
+		_, err := os.Create(cache.sharedFilePath)
 		require.NoError(t, err)
-		err = os.Chmod(cache.sharedFile, 0000)
+		err = os.Chmod(cache.sharedFilePath, 0000)
 		require.NoError(t, err)
 
 		_, err = cache.FirstAliveStorage()
@@ -490,10 +490,10 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 
 	t.Run("do not fail if cannot read or write file", func(t *testing.T) {
 		cache := testCache(t, 2, true)
-		cache.sharedFile = path.Join(t.TempDir(), "non-accessible-file")
-		_, err := os.Create(cache.sharedFile)
+		cache.sharedFilePath = path.Join(t.TempDir(), "non-accessible-file")
+		_, err := os.Create(cache.sharedFilePath)
 		require.NoError(t, err)
-		err = os.Chmod(cache.sharedFile, 0000)
+		err = os.Chmod(cache.sharedFilePath, 0000)
 		require.NoError(t, err)
 
 		_, err = cache.SpecificStorage("default")
@@ -556,18 +556,18 @@ func getFromMem(t *testing.T, cache *statusCache, storage string) status {
 }
 
 func setInFile(t *testing.T, cache *statusCache, storage string, alive bool, checked time.Time) {
-	file, _ := readFile(cache.sharedFile)
+	file, _ := readFile(cache.sharedFilePath)
 	k := storageKey(t, cache, storage)
 	if file == nil {
 		file = map[key]status{}
 	}
 	file[k] = status{alive, checked}
-	err := writeFile(cache.sharedFile, file)
+	err := writeFile(cache.sharedFilePath, file)
 	require.NoError(t, err)
 }
 
 func getFromFile(t *testing.T, cache *statusCache, storage string) status {
-	file, err := readFile(cache.sharedFile)
+	file, err := readFile(cache.sharedFilePath)
 	require.NoError(t, err)
 	k := storageKey(t, cache, storage)
 	s, ok := file[k]
