@@ -125,7 +125,7 @@ Ensure that you have set up and configured Yandex Cloud KMS mentioned below befo
 * `WALG_ENVELOPE_CACHE_EXPIRATION`
 
 This setting controls kms response expiration. Default value is `0` to store keys permanent in memory.
-Please note that if the system will not be able to redecrypt the key in kms after expiration, the previous response will be used.
+Please note that if the system will not be able to decrypt the key in kms after expiration, the previous response will be used.
 
 * `WALG_ENVELOPE_PGP_YC_ENDPOINT`
 
@@ -192,7 +192,7 @@ Lists names and creation time of available backups.
 
 ### ``delete``
 
-Is used to delete backups and WALs before them. By default, ``delete`` will perform a dry run. If you want to execute deletion, you have to add ``--confirm`` flag at the end of the command. Backups marked as permanent will not be deleted.
+Is used to delete backups and WALs before them. By default, ``delete`` will perform a dry run. If you want to execute deletion, you have to add ``--confirm`` flag at the end of the command. Backups marked as permanently will not be deleted.
 
 ``delete`` can operate in four modes: ``retain``, ``before``, ``everything`` and ``target``.
 
