@@ -325,3 +325,22 @@ Replay oplog from backup `ts_before` to `2020-10-28T12:11:10+03:00`:
 ```bash
 # wal-g oplog-replay 1603838903.4 1603876270.1
 ```
+
+Known limitations
+-----
+
+### `dropIndexes` operation replay
+
+An oplog may contain `dropIndexes` operations 
+(if an index has been dropped by a [command](https://www.mongodb.com/docs/manual/reference/command/dropIndexes/)
+or by a collection [method](https://www.mongodb.com/docs/manual/reference/method/db.collection.dropIndex/)).
+
+For MongoDB versions prior to 5.2, there is a known limitation: if we try to drop
+an index during an in-progress build of another index on the same collection, it [results](https://www.mongodb.com/docs/manual/reference/command/dropIndexes/#behavior) in a
+`BackgroundOperationInProgressForNamespace` error.
+
+If WAL-G faces such an error during a `dropIndexes` operation replay, WAL-G ignores this error: 
+it logs a warning message and continues the replay.
+
+So, the oplog will be successfully replayed, but the specified index will remain and might be 
+dropped manually.

@@ -1,3 +1,4 @@
+#noinspection CucumberUndefinedStep
 Feature: MongoDB binary backups
 
   Background: Wait for working infrastructure

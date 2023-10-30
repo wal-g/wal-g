@@ -1,0 +1,4 @@
+[
+  {"op":"c", "db":"load4_db_1", "dc":{ "createIndexes": "coll_1", "indexes": [{"key": { "f1": 1 }, "name": "f1_1"}]}},
+  {"op":"c", "db":"load4_db_1", "dc":{ "dropIndexes": "coll_1", "index": "f1_1"}}
+]

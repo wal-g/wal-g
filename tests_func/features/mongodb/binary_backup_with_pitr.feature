@@ -1,3 +1,4 @@
+#noinspection CucumberUndefinedStep
 Feature: MongoDB binary backups with PITR
 
   Background: Wait for working infrastructure
@@ -31,14 +32,19 @@ Feature: MongoDB binary backups with PITR
     And we save last oplog timestamp on mongodb01 to "after third load"
     And we save mongodb01 data "after third load"
 
+    #: Fourth load
+    Given mongodb01 has been loaded with "load4"
+    And we save last oplog timestamp on mongodb01 to "after fourth load"
+    And we save mongodb01 data "after fourth load"
+
     # PITR: 1st backup to 1st ts
     Given mongodb02 has no data
     And mongodb initialized on mongodb02
 
     When we restore binary mongo-backup #0 to mongodb02
     And we restore from #0 backup to "after first load" timestamp to mongodb02
-    And we save mongodb02 data "restore to after first load from second backup"
-    Then we have same data in "after first load" and "restore to after first load from second backup"
+    And we save mongodb02 data "restore to after first load from first backup"
+    Then we have same data in "after first load" and "restore to after first load from first backup"
 
     # PITR: 2nd backup to 2nd ts
     Given mongodb02 has no data
@@ -64,5 +70,14 @@ Feature: MongoDB binary backups with PITR
 
     When we restore binary mongo-backup #1 to mongodb02
     And we restore from #1 backup to "after third load" timestamp to mongodb02
-    And we save mongodb02 data "restore to after third load from first backup"
-    Then we have same data in "after second load" and "restore to after second load from first backup"
+    And we save mongodb02 data "restore to after third load from second backup"
+    Then we have same data in "after second load" and "restore to after second load from second backup"
+
+    # PITR: 2nd backup to 4th ts
+    Given mongodb02 has no data
+    And mongodb initialized on mongodb02
+
+    When we restore binary mongo-backup #1 to mongodb02
+    And we restore from #1 backup to "after fourth load" timestamp to mongodb02
+    And we save mongodb02 data "restore to after fourth load from second backup"
+    Then we have same data in "after fourth load" and "restore to after fourth load from second backup"
