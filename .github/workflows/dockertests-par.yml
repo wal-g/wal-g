@@ -76,6 +76,7 @@ jobs:
         "make TEST=\"pg_wale_tablespace_compatibility_test\" pg_integration_test",
         "make TEST=\"pg_tablespace_support_test\" pg_integration_test",
         "make TEST=\"pg_wal_perftest\" pg_integration_test",
+        "make TEST=\"pg_zzz\" pg_integration_test",
         "make TEST=\"pg_backup_perftest\" pg_integration_test",
         "make TEST=\"pg_catchup_test\" pg_integration_test",
         "make TEST=\"pg_wal_restore_test\" pg_integration_test",

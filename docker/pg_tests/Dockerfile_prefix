@@ -38,3 +38,5 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/cmd/daemonclient/walg-daemon-cl
 COPY docker/pg_tests/scripts/ /tmp
 
 RUN mkdir -p /tmp/logs/ && chmod 777 /tmp/configs/ && chmod 777 /tmp/logs/
+
+RUN chmod 777 /tmp/tests/zzz.sh
