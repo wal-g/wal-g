@@ -5,13 +5,13 @@ import (
 	"time"
 )
 
-// memCache is stored in memory and therefore shared within a single WAL-G process.
-var memCache storageStatuses
-var memCacheMu *sync.Mutex
+// globalMemCache is the default in-memory cache that is shared within a single WAL-G process.
+var globalMemCache storageStatuses
+var globalMemCacheMu *sync.Mutex
 
 func init() {
-	memCache = map[key]status{}
-	memCacheMu = new(sync.Mutex)
+	globalMemCache = map[key]status{}
+	globalMemCacheMu = new(sync.Mutex)
 }
 
 func (ss storageStatuses) isRelevant(ttl time.Duration, storages ...NamedFolder) bool {
@@ -64,7 +64,9 @@ func (ss storageStatuses) getAllAlive(storagesInOrder []NamedFolder) []NamedFold
 	return alive
 }
 
-// getRelevantFirstAlive provides
+// getRelevantFirstAlive traverses storages in order of priority. If any relevant and alive storage is found, the
+// traverse stops and this storage is returned. If any outdated storage is found before the first relevant and alive,
+// nil is returned. If no alive storages are found, nil is returned as well.
 func (ss storageStatuses) getRelevantFirstAlive(ttl time.Duration, storagesInOrder []NamedFolder) (
 	firstAlive *NamedFolder,
 	allRelevant bool,

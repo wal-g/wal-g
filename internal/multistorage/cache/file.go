@@ -12,8 +12,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// StatusFile is stored on a disk and therefore shared between all WAL-G processes and commands.
-var StatusFile = func() (string, error) {
+// HomeStatusFile is the default file for storing cache on disk that is shared between all WAL-G processes and commands.
+var HomeStatusFile = func() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("can't get user home dir: %w", err)
@@ -52,16 +52,8 @@ func updateFileContent(oldContent storageStatuses, checkResult map[key]bool) (ne
 	return newContent
 }
 
-func readFile() (storageStatuses, error) {
-	path, err := StatusFile()
-	if err != nil {
-		return nil, err
-	}
-
+func readFile(path string) (storageStatuses, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, fmt.Errorf("open cache file: %w", err)
 	}
@@ -86,15 +78,10 @@ func readFile() (storageStatuses, error) {
 	return content, nil
 }
 
-func writeFile(content storageStatuses) error {
+func writeFile(path string, content storageStatuses) error {
 	bytes, err := json.Marshal(content)
 	if err != nil {
 		return fmt.Errorf("marshal cache file content: %w", err)
-	}
-
-	path, err := StatusFile()
-	if err != nil {
-		return err
 	}
 
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
