@@ -1,6 +1,5 @@
 FROM minio/mc:RELEASE.2021-06-08T01-29-37Z
 FROM minio/minio:RELEASE.2021-06-07T21-40-51Z
-FROM quay.io/minio/minio
 
 COPY --from=0 /usr/bin/mc /usr/bin/mc
 

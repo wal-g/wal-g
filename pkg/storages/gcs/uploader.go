@@ -135,7 +135,7 @@ func (u *Uploader) getCleanUpChunksFunc(tmpChunk *storage.ObjectHandle) func(con
 	}
 }
 
-func (u *Uploader) retry(ctx context.Context, retryableFunc func(ctx context.Context) error) error { //uploader retry
+func (u *Uploader) retry(ctx context.Context, retryableFunc func(ctx context.Context) error) error {
 	timer := time.NewTimer(u.baseRetryDelay)
 	defer func() {
 		timer.Stop()
