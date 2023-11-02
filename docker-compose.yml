@@ -281,10 +281,10 @@ services:
     container_name: wal-g_pg_wal_perftest
     command: /tmp/tests/wal_perftest.sh
 
-  pg_zzz:
+  pg_wal_perftest_with_throttling:
     <<: *pg_test_throttling
-    container_name: wal-g_pg_zzz
-    command: /tmp/tests/zzz.sh
+    container_name: wal-g_pg_wal_perftest_with_throttling
+    command: /tmp/tests/wal_perftest_with_throttling.sh
 
   pg_backup_perftest:
     <<: *pg_test_common
