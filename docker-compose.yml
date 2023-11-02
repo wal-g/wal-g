@@ -6,10 +6,14 @@ volumes:
 x-s3_common_depends: &s3_common_depends
   depends_on:
     - s3
-    - s3-another2
   links:
     - s3
-    - s3-another2
+
+x-s3_throttling_depends: &s3_throttling_depends
+  depends_on:
+    - s3-for-throttling
+  links:
+    - s3-for-throttling
 
 services:
   golang:
@@ -34,17 +38,14 @@ services:
       - "8010:8080"
 
   s3:
-    image: quay.io/minio/minio #minio/minio:RELEASE.2021-06-07T21-40-51Z
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
     hostname: s3
     ports:
       - "9000:9000"
-      - "9090:9090"
     environment:
-      - "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE"
-      - "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-      - "MINIO_API_REQUESTS_MAX=0"
-      - "MINIO_API_REQUESTS_DEADLINE=0s"
+      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE"
+      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
     entrypoint: sh
     command: >
       -c 'mkdir -p /export/fullbucket
@@ -145,7 +146,7 @@ services:
       &&  mkdir -p /export/receivewalbucket
       &&  mkdir -p /export/severaldeltabackupsbucket
       &&  mkdir -p /export/walperftestbucket
-      &&  minio server /export --console-address ":9090"'
+      &&  /usr/bin/minio server /export'
 
   s3-another:
     image: minio/minio:RELEASE.2021-06-07T21-40-51Z
@@ -160,20 +161,22 @@ services:
       -c 'mkdir -p /export/mysqlcopybackupto
       &&  /usr/bin/minio server /export'
 
-  s3-another2:
-    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
-    container_name: wal-g_s33
+  s3-for-throttling:
+    image: quay.io/minio/minio
+    container_name: wal-g_s3_3
+    hostname: s3
     ports:
-      - "9002:9000"
+      - "9000:9000"
+      - "9090:9090"
     environment:
-      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLEBUTANOHER"
-      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYBUTANOTHERTOO"
-      - "MINIO_API_REQUESTS_MAX=1"
-      - "MINIO_API_REQUESTS_DEADLINE=2m"
+      - "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE"
+      - "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      - "MINIO_API_REQUESTS_MAX=0"
+      - "MINIO_API_REQUESTS_DEADLINE=0s"
     entrypoint: sh
     command: >
-      -c 'mkdir -p /export/mysqlcopybackupto
-      &&  /usr/bin/minio server /export'
+      -c 'mkdir -p /export/walperftestbucket
+      &&  minio server /export --console-address ":9090"'
 
   ssh:
     build:
@@ -202,6 +205,11 @@ services:
     image: wal-g/docker_prefix
     user: postgres
     <<: *s3_common_depends
+
+  pg_test_throttling: &pg_test_throttling
+    image: wal-g/docker_prefix
+    user: postgres
+    <<: *s3_throttling_depends
 
   pg_tests:
     <<: *pg_test_common
@@ -274,7 +282,7 @@ services:
     command: /tmp/tests/wal_perftest.sh
 
   pg_zzz:
-    <<: *pg_test_common
+    <<: *pg_test_throttling
     container_name: wal-g_pg_zzz
     command: /tmp/tests/zzz.sh
 

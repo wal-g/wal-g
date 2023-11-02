@@ -78,13 +78,14 @@ pg_integration_test: clean_compose
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
 	@if [ "$(TEST)" = "pg_tests" ]; then\
-		docker-compose build pg_zzz &&\
-		docker-compose build s3-another2 &&\
-		#docker-compose build pg_pgbackrest ssh swift &&\
-		#docker-compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
-		# docker-compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
-		# docker-compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
-		# docker-compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test ;\
+		docker-compose build pg_pgbackrest ssh swift pg_zzz &&\
+		docker-compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
+		docker-compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
+		docker-compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
+		docker-compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
+		docker-compose down s3 &&\
+		sleep 5 &&\
+		docker-compose up --exit-code-from pg_zzz pg_zzz ;\
 	fi
 	make clean_compose
 
