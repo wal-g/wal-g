@@ -202,6 +202,10 @@ etcd_build: $(CMD_FILES) $(PKG_FILES)
 etcd_install: etcd_build
 	mv $(MAIN_ETCD_PATH)/wal-g $(GOBIN)/wal-g
 
+etcd_clean:
+	(cd $(MAIN_ETCD_PATH) && go clean)
+	./cleanup.sh
+
 # refactor
 etcd_integration_test: load_docker_common
 	docker-compose build etcd etcd_tests
