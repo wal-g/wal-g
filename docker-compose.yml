@@ -596,6 +596,32 @@ services:
       - docker/common/common_walg.env
     <<: *s3_common_depends
 
+  # etcd:
+  #   build:
+  #     dockerfile: docker/etcd/Dockerfile
+  #     context: .
+  #   image: wal-g/etcd
+  #   container_name: wal-g_etcd
+
+  etcd:
+    image: bitnami/etcd:latest
+    container_name: wal-g_etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    ports:
+      - 2379:2379
+      - 2380:2380
+
+  etcd_tests:
+    build:
+      dockerfile: docker/etcd_tests/Dockerfile
+      context: .
+    image: wal-g/etcd_tests
+    container_name: wal-g_etcd_tests
+    depends_on:
+      - etcd
+
   gp:
     build:
       dockerfile: docker/gp/Dockerfile
