@@ -8,7 +8,7 @@ for i in tests/*.sh; do
   if [ "$i" = "tests/pgbackrest_backup_fetch_test.sh" ]; then continue ;fi
   # Exclude ssh test because of ssh server container dependency.
   if [ "$i" = "tests/ssh_backup_test.sh" ]; then continue ;fi
-  # Exclude throttling test because of different s3 container.
+  # Exclude throttling test because of different s3 container for throttling.
   if [ "$i" = "tests/wal_perftest_with_throttling.sh" ]; then continue ;fi
   echo
   echo "===== RUNNING $i ====="
