@@ -26,9 +26,11 @@ const BinlogPath = "binlog_" + utility.VersionStr + "/"
 
 const TimeMysqlFormat = "2006-01-02 15:04:05"
 
+type BackupTool string
+
 const (
-	WalgUnspecifiedStreamBackupTool = "WALG_UNSPECIFIED_STREAM_BACKUP_TOOL"
-	WalgXtrabackupTool              = "WALG_XTRABACKUP_TOOL"
+	WalgUnspecifiedStreamBackupTool BackupTool = "WALG_UNSPECIFIED_STREAM_BACKUP_TOOL"
+	WalgXtrabackupTool              BackupTool = "WALG_XTRABACKUP_TOOL"
 )
 
 func getMySQLVersion(db *sql.DB) (string, error) {
@@ -210,8 +212,8 @@ func replaceHostInDatasourceName(datasourceName string, newHost string) string {
 }
 
 type StreamSentinelDto struct {
-	Tool        string `json:"Tool,omitempty"`
-	BinLogStart string `json:"BinLogStart,omitempty"`
+	Tool        BackupTool `json:"Tool,omitempty"`
+	BinLogStart string     `json:"BinLogStart,omitempty"`
 	// BinLogEnd field is for debug purpose only.
 	// As we can not guarantee that transactions in BinLogEnd file happened before or after backup
 	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
