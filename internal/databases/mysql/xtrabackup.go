@@ -161,10 +161,12 @@ func xtrabackupFetch(
 	if err != nil {
 		return err
 	}
-	err = internal.DownloadAndDecompressStream(backup, stdin)
+	fetcher, err := internal.GetBackupStreamFetcher(backup)
 	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to detect backup format: %v\n", err)
 		return err
 	}
+	err = fetcher(backup, stdin)
 	cmdErr := restoreCmd.Wait()
 	if cmdErr != nil {
 		tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
