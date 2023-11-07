@@ -28,6 +28,20 @@ to STDIN and unpack it to MySQL datadir. Required.
 
 Command to prepare MySQL backup after restoring. Optional. Needed for xtrabackup case.
 
+* `WALG_DELTA_MAX_STEPS`
+
+Delta-backup is the difference between previously taken backup and present state. `WALG_DELTA_MAX_STEPS` determines how many delta backups can be between full backups. Defaults to 0.
+Restoration process will automatically fetch all necessary deltas and base backup and compose valid restored backup (you still need WALs after start of last backup to restore consistent cluster).
+Delta computation is based on ModTime of file system and LSN number of pages in datafiles.
+
+Note: Incremental backups only supported in `wal-g xtrabackup-push` command.
+
+* `WALG_DELTA_ORIGIN`
+
+To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
+
+Note: Incremental backups only supported in `wal-g xtrabackup-push` command.
+
 * `WALG_MYSQL_BINLOG_REPLAY_COMMAND`
 
 Command to replay binlog on running MySQL. Required for binlog-replay command.
@@ -83,6 +97,19 @@ Creates new backup and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to 
 ```bash
 wal-g backup-push
 ```
+
+### ``xtrabackup-push``
+
+Creates new backup with `xtrabackup` tool and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
+WAL-G levereages knowledge of xtrabackup format to support additional feature (e.g. incremental backups)
+
+```bash
+wal-g xtrabackup-push
+```
+
+* `WALG_MYSQL_INCREMENTAL_BACKUP_DST`
+
+To place incremental backip in the specified directory during backup-fetch
 
 ### ``backup-list``
 
@@ -183,6 +210,12 @@ Runs mysql server implementation which can be used to fetch binlogs from storage
 ```bash
 wal-g binlog-server
 ```
+
+### ``backup-mark``
+
+Backups can be marked as permanent to prevent them from being removed when running ``delete``. To mark backup as permanent call `wal-g backup-mark -b backup_name`. To remove permanent flag - call `wal-g backup-mark -b backup_name -i`
+When incremental backup is marked as permanent - all parent backups also marked as permanent.
+
 
 Typical configurations
 -----

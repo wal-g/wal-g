@@ -83,13 +83,17 @@ services:
       &&  mkdir -p /export/gpdeletetargetbucket
       &&  mkdir -p /export/gpdeletegarbagebucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlincrementalxtrabackupbucket
       &&  mkdir -p /export/mysqlsplitfilesizebucket
       &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
       &&  mkdir -p /export/mysqldeleteeverythingpermanent
+      &&  mkdir -p /export/mysqldeleteincrementalxtrabackupbucket
       &&  mkdir -p /export/mysqlmarkbucket
+      &&  mkdir -p /export/mysqlmarknoerrorbucket
+      &&  mkdir -p /export/mysqlmarkincrementalbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysql_pitr_binlogserver_bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
