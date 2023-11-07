@@ -141,7 +141,7 @@ func xtrabackupFetch(
 
 	if sentinel.IsIncremental {
 		restoreCmd = cloneCommand(restoreCmd)
-		restoreArgs := strings.Split(restoreCmd.Args[len(restoreCmd.Args)-1], " ")
+		restoreArgs := strings.Fields(restoreCmd.Args[len(restoreCmd.Args)-1])
 		replaceCommandArgument(restoreCmd, restoreArgs[len(restoreArgs)-1], tempDeltaDir)
 
 		prepareCmd = cloneCommand(prepareCmd)
