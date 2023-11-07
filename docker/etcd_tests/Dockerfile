@@ -13,12 +13,13 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
-# ENV USE_BROTLI 1
+ENV USE_BROTLI 1
 
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
+        go mod download && \
         cd main/etcd && \
-        go build -mod vendor -tags "" -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+        go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
     
 RUN make etcd_build
 
