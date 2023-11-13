@@ -35,20 +35,13 @@ func NewAOLengthCheckSegmentHandler(port, segnum string) (*AOLengthCheckSegmentH
 		segnum: segnum}, nil
 }
 
-func (h *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
-	initialConn, err := postgres.Connect(func(config *pgx.ConnConfig) error {
-		a, err := strconv.Atoi(h.port)
-		if err != nil {
-			return err
-		}
-		config.Port = uint16(a)
-		return nil
-	})
+func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
+	initialConn, err := checker.connect("")
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
 
-	DBNames, err := h.GetDatabasesInfo(initialConn)
+	DBNames, err := checker.GetDatabasesInfo(initialConn)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
 	}
@@ -61,51 +54,19 @@ func (h *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 
 	for _, db := range DBNames {
 		tracelog.DebugLogger.Println(db.DBName)
-		conn, err := postgres.Connect(func(config *pgx.ConnConfig) error {
-			a, err := strconv.Atoi(h.port)
-			if err != nil {
-				return err
-			}
-			config.Port = uint16(a)
-			config.Database = db.DBName
-			return nil
-		})
+		conn, err := checker.connect(db.DBName)
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 		}
 
-		rows, err := conn.Query(`SELECT a.relfilenode file, a.relname tname, b.relname segname 
-	FROM (SELECT relname, relid, segrelid, relpersistence, relfilenode FROM pg_class JOIN pg_appendonly ON oid = relid) a,
-	(SELECT relname, segrelid FROM pg_class JOIN pg_appendonly ON oid = segrelid) b
-	WHERE a.relpersistence = 'p' AND a.segrelid = b.segrelid;`)
-
+		AOTablesSize, err := checker.getTablesSizes(conn)
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("unable to get ao/aocs tables %v", err)
-		}
-		defer rows.Close()
-
-		AOTables := make([]RelNames, 0)
-		for rows.Next() {
-			row := RelNames{}
-			if err := rows.Scan(&row.FileName, &row.TableName, &row.SegRelName); err != nil {
-				tracelog.ErrorLogger.FatalfOnError("unable to parse query output %v", err)
-			}
-			AOTables = append(AOTables, row)
-		}
-
-		AOTablesSize := make(map[string]RelNames, 0)
-		for _, table := range AOTables {
-			table.Size, err = h.GetTableMetadataEOF(table, conn)
-			if err != nil {
-				tracelog.ErrorLogger.FatalfOnError("unable to get table metadata %v", err)
-			}
-			AOTablesSize[fmt.Sprintf("%d", table.FileName)] = table
-			tracelog.DebugLogger.Printf("table: %s size: %d", table.TableName, table.Size)
+			tracelog.ErrorLogger.FatalfOnError("unable to get metadata EOF %v", err)
 		}
 
 		tracelog.DebugLogger.Printf("AO/AOCS relations in db: %d", len(AOTablesSize))
 
-		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", h.segnum), db.Oid))
+		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), db.Oid))
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("unable to list tables` file directory %v", err)
 		}
@@ -128,12 +89,7 @@ func (h *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 			}
 		}
 
-		errors := make([]string, 0)
-		for _, v := range AOTablesSize {
-			if v.Size > 0 {
-				errors = append(errors, fmt.Sprintf("file for table %s is shorter than expected for %d", v.TableName, v.Size))
-			}
-		}
+		errors := checker.checkFileSizes(AOTablesSize)
 		if len(errors) > 0 {
 			tracelog.ErrorLogger.Fatalf("check failed, tables files are too short:\n%s\n", strings.Join(errors, "\n"))
 		}
@@ -143,10 +99,65 @@ func (h *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 			tracelog.WarningLogger.Println("failed to close connection")
 		}
 	}
-
 }
 
-func (h *AOLengthCheckSegmentHandler) GetDatabasesInfo(conn *pgx.Conn) ([]DBInfo, error) {
+func (checker *AOLengthCheckSegmentHandler) checkFileSizes(AOTablesSize map[string]RelNames) []string {
+	errors := make([]string, 0)
+	for _, v := range AOTablesSize {
+		if v.Size > 0 {
+			errors = append(errors, fmt.Sprintf("file for table %s is shorter than expected for %d", v.TableName, v.Size))
+		}
+	}
+	return errors
+}
+
+func (checker *AOLengthCheckSegmentHandler) connect(db string) (*pgx.Conn, error) {
+	return postgres.Connect(func(config *pgx.ConnConfig) error {
+		a, err := strconv.Atoi(checker.port)
+		if err != nil {
+			return err
+		}
+		config.Port = uint16(a)
+		if db != "" {
+			config.Database = db
+		}
+		return nil
+	})
+}
+
+func (checker *AOLengthCheckSegmentHandler) getTablesSizes(conn *pgx.Conn) (map[string]RelNames, error) {
+	rows, err := conn.Query(`SELECT a.relfilenode file, a.relname tname, b.relname segname 
+	FROM (SELECT relname, relid, segrelid, relpersistence, relfilenode FROM pg_class JOIN pg_appendonly ON oid = relid) a,
+	(SELECT relname, segrelid FROM pg_class JOIN pg_appendonly ON oid = segrelid) b
+	WHERE a.relpersistence = 'p' AND a.segrelid = b.segrelid;`)
+
+	if err != nil {
+		return nil, fmt.Errorf("unable to get ao/aocs tables %v", err)
+	}
+	defer rows.Close()
+
+	AOTables := make([]RelNames, 0)
+	for rows.Next() {
+		row := RelNames{}
+		if err := rows.Scan(&row.FileName, &row.TableName, &row.SegRelName); err != nil {
+			return nil, fmt.Errorf("unable to parse query output %v", err)
+		}
+		AOTables = append(AOTables, row)
+	}
+
+	AOTablesSize := make(map[string]RelNames, 0)
+	for _, table := range AOTables {
+		table.Size, err = checker.GetTableMetadataEOF(table, conn)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get table metadata %v", err)
+		}
+		AOTablesSize[fmt.Sprintf("%d", table.FileName)] = table
+		tracelog.DebugLogger.Printf("table: %s size: %d", table.TableName, table.Size)
+	}
+	return AOTablesSize, nil
+}
+
+func (checker *AOLengthCheckSegmentHandler) GetDatabasesInfo(conn *pgx.Conn) ([]DBInfo, error) {
 	rows, err := conn.Query("SELECT datname, oid FROM pg_database WHERE datallowconn")
 	if err != nil {
 		return nil, err
@@ -166,7 +177,7 @@ func (h *AOLengthCheckSegmentHandler) GetDatabasesInfo(conn *pgx.Conn) ([]DBInfo
 	return names, nil
 }
 
-func (h *AOLengthCheckSegmentHandler) GetTableMetadataEOF(row RelNames, conn *pgx.Conn) (int64, error) {
+func (checker *AOLengthCheckSegmentHandler) GetTableMetadataEOF(row RelNames, conn *pgx.Conn) (int64, error) {
 	query := ""
 	if !strings.Contains(row.SegRelName, "aocs") {
 		query = fmt.Sprintf("SELECT sum(eofuncompressed) FROM pg_aoseg.%s", row.SegRelName)

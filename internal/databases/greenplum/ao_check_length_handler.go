@@ -19,7 +19,7 @@ func NewAOLengthCheckHandler(logsDir string) (*AOLengthCheckHandler, error) {
 	return &AOLengthCheckHandler{logsDir: logsDir}, nil
 }
 
-func (h *AOLengthCheckHandler) CheckAOTableLength() {
+func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	conn, err := postgres.Connect()
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
@@ -60,7 +60,7 @@ func buildCheckAOLengthCmd(contentID int, globalCluster *cluster.Cluster) string
 
 	backupPushArgs := []string{
 		fmt.Sprintf("--port=%d", segment.Port),
-		fmt.Sprintf("--segnum=%d", segment.ContentID+1),
+		fmt.Sprintf("--segnum=%d", segment.ContentID),
 	}
 
 	backupPushArgsLine := strings.Join(backupPushArgs, " ")
