@@ -35,6 +35,7 @@ WAL=$(ls -l ${PGDATA}/pg_wal | head -n2 | tail -n1 | egrep -o "[0-9A-F]{24}")
 du -hs "${PGDATA}"
 
 i=0
+START=$(date +%s)
 while [ "$i" -le 101 ];
 do
     cp  "${PGDATA}"/pg_wal/"${WAL}" "${PGDATA}"/pg_wal/"${WAL}${i}"
@@ -46,6 +47,10 @@ do
     i=$(( i + 1 ))
 done
 wait
+END=$(date +%s)
+DIFF=$(( $END - $START ))
+echo "It took $DIFF seconds"
+test $DIFF -le 45
 /tmp/scripts/drop_pg.sh
 
 i=0
