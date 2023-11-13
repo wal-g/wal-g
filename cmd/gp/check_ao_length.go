@@ -21,7 +21,7 @@ var checkAOTableLengthMasterCmd = &cobra.Command{
 }
 
 func init() {
-	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&logsDir, "logs", "l", "/var/log/greenplum", `TODO`)
+	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&logsDir, "logs", "l", "/var/log/greenplum", `directory to store logs`)
 
 	cmd.AddCommand(checkAOTableLengthMasterCmd)
 }
