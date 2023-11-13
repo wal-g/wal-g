@@ -99,6 +99,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 			tracelog.WarningLogger.Println("failed to close connection")
 		}
 	}
+	tracelog.InfoLogger.Println("check passed")
 }
 
 func (checker *AOLengthCheckSegmentHandler) checkFileSizes(AOTablesSize map[string]RelNames) []string {
