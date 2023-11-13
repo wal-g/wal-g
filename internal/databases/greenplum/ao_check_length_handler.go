@@ -71,7 +71,7 @@ func buildCheckAOLengthCmd(contentID int, globalCluster *cluster.Cluster) string
 		// config for wal-g
 		fmt.Sprintf("--config=%s", internal.CfgFile),
 		// method
-		"c",
+		"check-ao-aocs-length-segment",
 		// actual arguments to be passed to the backup-push command
 		backupPushArgsLine,
 		// forward stdout and stderr to the log file
