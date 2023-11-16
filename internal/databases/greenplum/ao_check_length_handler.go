@@ -11,12 +11,16 @@ import (
 )
 
 type AOLengthCheckHandler struct {
-	logsDir string
+	logsDir     string
+	checkBackup bool
 }
 
-func NewAOLengthCheckHandler(logsDir string) (*AOLengthCheckHandler, error) {
+func NewAOLengthCheckHandler(logsDir string, checkBackup bool) (*AOLengthCheckHandler, error) {
 	initGpLog(logsDir)
-	return &AOLengthCheckHandler{logsDir: logsDir}, nil
+	return &AOLengthCheckHandler{
+		logsDir:     logsDir,
+		checkBackup: checkBackup,
+	}, nil
 }
 
 func (checker *AOLengthCheckHandler) CheckAOTableLength() {
@@ -36,10 +40,10 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 		tracelog.ErrorLogger.FatalfOnError("could not get cluster info %v", err)
 	}
 
-	remoteOutput := globalCluster.GenerateAndExecuteCommand("Run ao/aocs table length check",
+	remoteOutput := globalCluster.GenerateAndExecuteCommand("Run ao/aocs length check",
 		cluster.ON_SEGMENTS,
 		func(contentID int) string {
-			return buildCheckAOLengthCmd(contentID, globalCluster)
+			return checker.buildCheckAOLengthCmd(contentID, globalCluster)
 		})
 
 	for _, command := range remoteOutput.Commands {
@@ -55,15 +59,19 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	}
 }
 
-func buildCheckAOLengthCmd(contentID int, globalCluster *cluster.Cluster) string {
+func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, globalCluster *cluster.Cluster) string {
 	segment := globalCluster.ByContent[contentID][0]
 
-	backupPushArgs := []string{
+	runCheckArgs := []string{
 		fmt.Sprintf("--port=%d", segment.Port),
 		fmt.Sprintf("--segnum=%d", segment.ContentID),
 	}
 
-	backupPushArgsLine := strings.Join(backupPushArgs, " ")
+	if checker.checkBackup {
+		runCheckArgs = append(runCheckArgs, "--check-backup")
+	}
+
+	runCheckArgsLine := strings.Join(runCheckArgs, " ")
 
 	cmd := []string{
 		// nohup to avoid the SIGHUP on SSH session disconnect
@@ -73,7 +81,7 @@ func buildCheckAOLengthCmd(contentID int, globalCluster *cluster.Cluster) string
 		// method
 		"check-ao-aocs-length-segment",
 		// actual arguments to be passed to the backup-push command
-		backupPushArgsLine,
+		runCheckArgsLine,
 		// forward stdout and stderr to the log file
 		"&>>", formatSegmentLogPath(contentID),
 	}
