@@ -103,7 +103,6 @@ func configureServerSideEncryption(settings map[string]string) (serverSideEncryp
 	return
 }
 
-// TODO : unit tests
 func partitionStrings(strings []string, blockSize int) [][]string {
 	// I've unsuccessfully tried this with interface{} but there was too much of casting
 	partition := make([][]string, 0)
