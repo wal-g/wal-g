@@ -1,26 +1,21 @@
 package greenplum
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx"
 	"github.com/jackc/pgx/pgtype"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 type dbInfo struct {
 	DBName string
 	Oid    pgtype.OID
-}
-
-type backupFileData struct {
-	EOF int64 `json:"EOF"`
 }
 
 type relNames struct {
@@ -66,7 +61,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 		}
 
 		for _, file := range entries {
-			fileName := fmt.Sprintf("/base/%d/%s", db.Oid, strings.Split(file.Name(), "."))
+			fileName := fmt.Sprintf("/base/%d/%s", db.Oid, strings.Split(file.Name(), ".")[0])
 			f, err := file.Info()
 			if err != nil {
 				tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
@@ -105,40 +100,30 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment() {
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
 	}
-	tracelog.DebugLogger.Printf("AO/AOCS backupped tables count: %d", len(backupFiles))
+	tracelog.DebugLogger.Printf("AO/AOCS backupped files count: %d", len(backupFiles))
+
+	errors := make([]string, 0)
 
 	for _, db := range DBNames {
-		tracelog.DebugLogger.Println(db.DBName)
-		conn, err := checker.connect(db.DBName)
+		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), db.Oid))
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
+			tracelog.ErrorLogger.FatalfOnError("unable to list tables` file directory %v", err)
 		}
 
-		AOTablesSize, err := checker.getTablesSizes(conn, db.Oid)
-		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("unable to get metadata EOF %v", err)
-		}
-		tracelog.DebugLogger.Printf("AO/AOCS relations in db: %d", len(AOTablesSize))
-
-		for k, v := range AOTablesSize {
-			cur, ok := backupFiles[k]
+		for _, file := range entries {
+			fileName := fmt.Sprintf("/base/%d/%s", db.Oid, file.Name())
+			f, err := file.Info()
+			if err != nil {
+				tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
+			}
+			tem, ok := backupFiles[fileName]
 			if !ok {
 				continue
 			}
-			cur.EOF -= v.Size
-			backupFiles[k] = cur
-		}
-
-		err = conn.Close()
-		if err != nil {
-			tracelog.WarningLogger.Println("failed to close connection")
-		}
-	}
-
-	errors := make([]string, 0)
-	for k, v := range backupFiles {
-		if v.EOF > 0 {
-			errors = append(errors, fmt.Sprintf("table file %s is shorter than backup for %d", k, v.EOF))
+			tracelog.DebugLogger.Printf("found file : %s with size: %d", fileName, f.Size())
+			if tem.EOF > f.Size() {
+				errors = append(errors, fmt.Sprintf("table file %s is shorter than backup for %d", fileName, tem.EOF-f.Size()))
+			}
 		}
 	}
 
@@ -257,75 +242,31 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 	return metaEOF, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) findFreshBackup() (string, error) {
-	cmd := exec.Command("wal-g", "st", "ls",
-		fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum),
-		"--config=/etc/wal-g/wal-g.yaml")
-	stdout, err := cmd.Output()
+func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles() (BackupAOFiles, error) {
+	uf, err := internal.ConfigureFolder()
 	if err != nil {
-		return "", fmt.Errorf("failed to read backups %v", err)
-	}
-	parts := strings.Split(string(stdout), "\n")
-	if len(parts) == 0 {
-		return "", fmt.Errorf("no backups")
-	}
-
-	// backup is last in directories list
-	str := ""
-	for _, part := range parts[1:] {
-		p := strings.Split(strings.Trim(part, "	 "), " ")
-		if p[0] != "dir" {
-			break
-		}
-		str = p[len(p)-1]
-	}
-	return str, nil
-}
-
-func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles() (map[string]backupFileData, error) {
-	backupname, err := checker.findFreshBackup()
-	if err != nil {
-		return nil, err
-	}
-	if backupname == "" {
-		return map[string]backupFileData{}, nil
-	}
-
-	cmd := exec.Command("wal-g", "st", "cat",
-		fmt.Sprintf("segments_005/%s/basebackups_005/seg%s/ao_files_metadata.json", checker.segnum, backupname), "--config=/etc/wal-g/wal-g.yaml")
-	stdout, err := cmd.Output()
-	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to configure folder")
 		return nil, err
 	}
 
-	/* Example json
-	"Files":
-		{"/base/12813/16628.1":
-			{"StoragePath":"1663_12813_50f0708dbf77042a9372e6f03660134c_16628_1_18_1696859787566135937_aoseg",
-			"IsSkipped":true,
-			"MTime":"2023-10-09T16:49:55.556943461+03:00",
-			"StorageType":97,
-			"EOF":3503064,
-			"ModCount":18,
-			"FileMode":384,
-			"InitialUploadTS":"2023-10-09T16:56:37.863631199+03:00"}}}
-	*/
-	files := make(map[string]map[string]backupFileData)
-	err = json.Unmarshal(stdout, &files)
+	f := uf.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
+
+	b, err := internal.GetLatestBackup(f)
 	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to get latest backup")
 		return nil, err
 	}
 
-	tables := make(map[string]backupFileData, 0)
-	for k, v := range files["Files"] {
-		fName := strings.Split(k, ".")[0]
-		cur, ok := tables[fName]
-		if !ok {
-			cur = backupFileData{EOF: 0}
-		}
-		cur.EOF += v.EOF
-		tables[fName] = cur
+	tracelog.DebugLogger.Printf("backup %s", b.Name)
+	files := NewAOFilesMetadataDTO()
+
+	err = internal.FetchDto(b.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", b.Name))
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to fetch file data")
+		return nil, err
 	}
 
-	return tables, nil
+	tracelog.DebugLogger.Printf("successfully loaded file data from backup")
+
+	return files.Files, nil
 }
