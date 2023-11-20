@@ -201,3 +201,14 @@ Usage:
 ```bash
 wal-g restore-point-list [--pretty] [--json]
 ```
+
+#### Check AO/AOCS tables 
+WAL-G has special command to validate AO/AOCS tables length:
+```bash
+wal-g check-ao-aocs-length
+```
+It ensures that table files on disc are not shorter than expected EOF in metadata.
+To check that last backup has EOF that is less or equal than current EOF, you can add flag: 
+```bash
+wal-g check-ao-aocs-length --check-backup
+```
