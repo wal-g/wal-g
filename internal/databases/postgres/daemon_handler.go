@@ -7,40 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"path"
-	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/daemon"
 	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/internal/daemon"
 )
-
-const (
-	SdNotifyWatchdog = "WATCHDOG=1"
-)
-
-type SocketWriteFailedError struct {
-	error
-}
-
-func newSocketWriteFailedError(socketError error) SocketWriteFailedError {
-	return SocketWriteFailedError{errors.Errorf("socket write failed: %v", socketError)}
-}
-
-func (err SocketWriteFailedError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type DaemonOptions struct {
-	SocketPath string
-}
-
-type SocketMessageHandler interface {
-	Handle(ctx context.Context, messageBody []byte) error
-}
 
 type CheckMessageHandler struct {
 	fd net.Conn
@@ -49,7 +22,7 @@ type CheckMessageHandler struct {
 func (h *CheckMessageHandler) Handle(_ context.Context, _ []byte) error {
 	_, err := h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return newSocketWriteFailedError(err)
+		return daemon.NewSocketWriteFailedError(err)
 	}
 	tracelog.DebugLogger.Println("configuration successfully checked")
 	return nil
@@ -82,7 +55,7 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return newSocketWriteFailedError(err)
+		return daemon.NewSocketWriteFailedError(err)
 	}
 	return nil
 }
@@ -113,7 +86,7 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
 		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
 		if err != nil {
-			return newSocketWriteFailedError(err)
+			return daemon.NewSocketWriteFailedError(err)
 		}
 		return nil
 	}
@@ -122,13 +95,13 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	}
 	_, err = h.fd.Write(daemon.OkType.ToBytes())
 	if err != nil {
-		return newSocketWriteFailedError(err)
+		return daemon.NewSocketWriteFailedError(err)
 	}
 	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
 	return nil
 }
 
-func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn) (SocketMessageHandler, error) {
+func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn) (daemon.SocketMessageHandler, error) {
 	switch messageType {
 	case daemon.CheckType:
 		return &CheckMessageHandler{c}, nil
@@ -190,32 +163,6 @@ func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messa
 	return messageType, messageBody, err
 }
 
-// HandleDaemon is invoked to perform daemon mode
-func HandleDaemon(options DaemonOptions) {
-	if _, err := os.Stat(options.SocketPath); err == nil {
-		err = os.Remove(options.SocketPath)
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Failed to remove socket file:", err)
-		}
-	}
-	l, err := net.Listen("unix", options.SocketPath)
-	if err != nil {
-		tracelog.ErrorLogger.Fatal("Error on listening socket:", err)
-	}
-
-	sdNotifyTicker := time.NewTicker(30 * time.Second)
-	defer sdNotifyTicker.Stop()
-	go SendSdNotify(sdNotifyTicker.C)
-
-	for {
-		fd, err := l.Accept()
-		if err != nil {
-			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
-		}
-		go Listen(context.Background(), fd)
-	}
-}
-
 // Listen is used for listening connection and processing messages
 func Listen(ctx context.Context, c net.Conn) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
@@ -258,37 +205,24 @@ func failAndLogError(c net.Conn, err error) {
 	}
 }
 
-func SendSdNotify(c <-chan time.Time) {
-	for {
-		<-c
-		tracelog.ErrorLogger.PrintOnError(SdNotify(SdNotifyWatchdog))
-	}
-}
-
-func SdNotify(state string) error {
-	socketName, ok := internal.GetSetting(internal.SystemdNotifySocket)
-	if !ok {
-		return nil
-	}
-	socketAddr := &net.UnixAddr{
-		Name: socketName,
-		Net:  "unixgram",
-	}
-	conn, err := net.DialUnix(socketAddr.Net, nil, socketAddr)
-	if err != nil {
-		return fmt.Errorf("failed connect to service: %w", err)
-	}
-	defer utility.LoggedClose(conn, fmt.Sprintf("Failed to close connection with %s \n", conn.RemoteAddr()))
-	if _, err = conn.Write([]byte(state)); err != nil {
-		return newSocketWriteFailedError(err)
-	}
-	return nil
-}
-
 func getFullPath(relativePath string) (string, error) {
 	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
 	if !ok {
 		return "", fmt.Errorf("PGDATA is not set in the conf")
 	}
 	return path.Join(PgDataSettingString, relativePath), nil
+}
+
+type PostgreSQLDaemonListener struct {
+	daemon.DaemonListener
+}
+
+func (pdl * PostgreSQLDaemonListener) Listen(ctx context.Context, c net.Conn) {
+	Listen(ctx, c)
+}
+
+func NewPostgreSQLDaemonListener() daemon.DaemonListener {
+	return &PostgreSQLDaemonListener{
+
+	}
 }

@@ -1,9 +1,7 @@
-package pg
+package gp
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/wal-g/wal-g/internal/daemon"
 )
 
@@ -15,10 +13,10 @@ var daemonCmd = &cobra.Command{
 	Short: DaemonShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		daemonOpts := daemon.DaemonOptions{
+		daemonOpts := postgres.DaemonOptions{
 			SocketPath: args[0],
 		}
-		daemon.HandleDaemon(daemonOpts, postgres.NewPostgreSQLDaemonListener())
+		daemon.HandleDaemon(daemonOpts)
 	},
 }
 
