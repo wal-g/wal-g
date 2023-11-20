@@ -62,18 +62,18 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 
 		for _, file := range entries {
 			fileName := fmt.Sprintf("/base/%d/%s", db.Oid, strings.Split(file.Name(), ".")[0])
-			f, err := file.Info()
+			fileInfo, err := file.Info()
 			if err != nil {
 				tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
 			}
-			if !f.IsDir() {
-				tem, ok := AOTablesSize[fileName]
+			if !fileInfo.IsDir() {
+				metaInfo, ok := AOTablesSize[fileName]
 				if !ok {
 					continue
 				}
-				tracelog.DebugLogger.Printf("found file for table: %s with size: %d", tem.TableName, f.Size())
-				tem.Size -= f.Size()
-				AOTablesSize[fileName] = tem
+				tracelog.DebugLogger.Printf("found file for table: %s with size: %d", metaInfo.TableName, fileInfo.Size())
+				metaInfo.Size -= fileInfo.Size()
+				AOTablesSize[fileName] = metaInfo
 			}
 		}
 
@@ -112,17 +112,17 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment() {
 
 		for _, file := range entries {
 			fileName := fmt.Sprintf("/base/%d/%s", db.Oid, file.Name())
-			f, err := file.Info()
+			fileInfo, err := file.Info()
 			if err != nil {
 				tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
 			}
-			tem, ok := backupFiles[fileName]
+			backupFile, ok := backupFiles[fileName]
 			if !ok {
 				continue
 			}
-			tracelog.DebugLogger.Printf("found file : %s with size: %d", fileName, f.Size())
-			if tem.EOF > f.Size() {
-				errors = append(errors, fmt.Sprintf("table file %s is shorter than backup for %d", fileName, tem.EOF-f.Size()))
+			tracelog.DebugLogger.Printf("found file : %s with size: %d", fileName, fileInfo.Size())
+			if backupFile.EOF > fileInfo.Size() {
+				errors = append(errors, fmt.Sprintf("table file %s is shorter than backup for %d", fileName, backupFile.EOF-fileInfo.Size()))
 			}
 		}
 	}
@@ -207,12 +207,12 @@ func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo() ([]dbInfo, error)
 
 	names := make([]dbInfo, 0)
 	for rows.Next() {
-		tem := dbInfo{}
-		if err = rows.Scan(&tem.DBName, &tem.Oid); err != nil {
+		db := dbInfo{}
+		if err = rows.Scan(&db.DBName, &db.Oid); err != nil {
 			return nil, err
 		}
-		tracelog.DebugLogger.Printf("existing database: %s oid: %d", tem.DBName, tem.Oid)
-		names = append(names, tem)
+		tracelog.DebugLogger.Printf("existing database: %s oid: %d", db.DBName, db.Oid)
+		names = append(names, db)
 	}
 
 	return names, nil
@@ -243,24 +243,23 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 }
 
 func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles() (BackupAOFiles, error) {
-	uf, err := internal.ConfigureFolder()
+	rootFolder, err := internal.ConfigureFolder()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to configure folder")
 		return nil, err
 	}
+	backupsFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
 
-	f := uf.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
-
-	b, err := internal.GetLatestBackup(f)
+	latestBackup, err := internal.GetLatestBackup(backupsFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get latest backup")
 		return nil, err
 	}
 
-	tracelog.DebugLogger.Printf("backup %s", b.Name)
+	tracelog.DebugLogger.Printf("backup %s", latestBackup.Name)
 	files := NewAOFilesMetadataDTO()
 
-	err = internal.FetchDto(b.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", b.Name))
+	err = internal.FetchDto(latestBackup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", latestBackup.Name))
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to fetch file data")
 		return nil, err
