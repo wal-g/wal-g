@@ -87,5 +87,6 @@ jobs:
         "make mariadb_test",
         "make gp_test",
         "make st_test",
-        "make TEST=\"pg_pgbackrest_backup_fetch_test\" pg_integration_test"
+        "make TEST=\"pg_pgbackrest_backup_fetch_test\" pg_integration_test",
+        "make etcd_integration_test"
         ]
