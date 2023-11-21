@@ -30,6 +30,7 @@ const (
 	FDB       = "FDB"
 	MONGO     = "MONGO"
 	GP        = "GP"
+	ETCD      = "ETCD"
 
 	DownloadConcurrencySetting    = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting      = "WALG_UPLOAD_CONCURRENCY"
