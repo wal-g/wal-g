@@ -1,0 +1,57 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        db: [fdb, gp, mongo, mysql, pg, redis, sqlserver]
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Set up Go 1.21
+        uses: actions/setup-go@v1
+        with:
+          go-version: '1.21'
+        id: go
+
+      - name: Prepare git
+        env:
+          GITHUB_USER: 1gtm
+          GITHUB_TOKEN: ${{ secrets.LGTM_GITHUB_TOKEN }}
+        run: |
+          set -x
+          git config --global user.name "${GITHUB_USER}"
+          git config --global user.email "${GITHUB_USER}@appscode.com"
+          git config --global \
+            url."https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com".insteadOf \
+            "https://github.com"
+
+      - name: Print version info
+        id: semver
+        run: |
+          make version -f ac.mk
+
+      - name: Set up QEMU
+        id: qemu
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Publish to GitHub Container Registry
+        env:
+          REGISTRY: ghcr.io/kubedb
+          DOCKER_TOKEN: ${{ secrets.LGTM_GITHUB_TOKEN }}
+          USERNAME: 1gtm
+        run: |
+          docker login ghcr.io --username ${USERNAME} --password ${DOCKER_TOKEN}
+          make release -f ac.mk DATABASES=${{ matrix.db }}
