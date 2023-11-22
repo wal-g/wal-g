@@ -93,7 +93,7 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 		return ExecResult{}, err
 	}
 
-	attach, err := Docker.ContainerExecAttach(ctx, containerExec.ID, types.ExecConfig{})
+	attach, err := Docker.ContainerExecAttach(ctx, containerExec.ID, types.ExecStartCheck{})
 	if err != nil {
 		return ExecResult{}, err
 	}
