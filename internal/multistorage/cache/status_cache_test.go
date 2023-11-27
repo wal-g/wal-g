@@ -29,7 +29,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_2")
+		want := []string{"default", "failover_2"}
 		assert.Equal(t, want, got)
 	})
 
@@ -42,7 +42,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_1", "failover_2")
+		want := []string{"default", "failover_1", "failover_2"}
 		assert.Equal(t, want, got)
 	})
 
@@ -55,7 +55,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_1", "failover_2")
+		want := []string{"default", "failover_1", "failover_2"}
 		assert.Equal(t, want, got)
 	})
 
@@ -64,7 +64,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_1", "failover_2")
+		want := []string{"default", "failover_1", "failover_2"}
 		assert.Equal(t, want, got)
 	})
 
@@ -82,7 +82,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "failover_1")
+		want := []string{"failover_1"}
 		assert.Equal(t, want, got)
 	})
 
@@ -100,7 +100,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_1")
+		want := []string{"default", "failover_1"}
 		assert.Equal(t, want, got)
 	})
 
@@ -113,7 +113,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_1", "failover_2")
+		want := []string{"default", "failover_1", "failover_2"}
 		assert.Equal(t, want, got)
 	})
 
@@ -126,7 +126,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_1")
+		want := []string{"default", "failover_1"}
 		assert.Equal(t, want, got)
 	})
 
@@ -201,7 +201,7 @@ func TestStatusCache_AllAliveStorages(t *testing.T) {
 		got, err := cache.AllAliveStorages()
 		require.NoError(t, err)
 
-		want := aliveFolders(cache, "default", "failover_1", "failover_2")
+		want := []string{"default", "failover_1", "failover_2"}
 		assert.Equal(t, want, got)
 	})
 }
@@ -216,8 +216,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "failover_2")
-		assert.Equal(t, want, got)
+		want := "failover_2"
+		assert.Equal(t, &want, got)
 	})
 
 	t.Run("do not take alive from mem if any previous is outdated", func(t *testing.T) {
@@ -229,8 +229,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		want := "default"
+		assert.Equal(t, &want, got)
 	})
 
 	t.Run("do not take from mem if all are dead", func(t *testing.T) {
@@ -242,8 +242,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		want := "default"
+		assert.Equal(t, &want, got)
 	})
 
 	t.Run("do not take from mem if it is empty", func(t *testing.T) {
@@ -251,8 +251,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		want := "default"
+		assert.Equal(t, &want, got)
 	})
 
 	t.Run("take from file if no relevant first alive in mem", func(t *testing.T) {
@@ -269,8 +269,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "failover_1")
-		assert.Equal(t, want, got)
+		want := "failover_1"
+		assert.Equal(t, &want, got)
 	})
 
 	t.Run("do not take from file if no relevant first alive", func(t *testing.T) {
@@ -282,8 +282,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		want := "default"
+		assert.Equal(t, &want, got)
 	})
 
 	t.Run("recheck storages outdated in file", func(t *testing.T) {
@@ -295,8 +295,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		want := "default"
+		assert.Equal(t, &want, got)
 	})
 
 	t.Run("update first alive in mem after reading from file", func(t *testing.T) {
@@ -313,10 +313,11 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		assert.Equal(t, "default", got.Name)
-		status := getFromMem(t, cache, "default")
-		assert.True(t, status.Alive)
-		assert.Equal(t, relevantTime.UnixMilli(), status.Checked.UnixMilli())
+		want := "default"
+		assert.Equal(t, &want, got)
+		sts := getFromMem(t, cache, "default")
+		assert.True(t, sts.Alive)
+		assert.Equal(t, relevantTime.UnixMilli(), sts.Checked.UnixMilli())
 	})
 
 	t.Run("update mem and file after checking", func(t *testing.T) {
@@ -334,13 +335,13 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		require.NoError(t, err)
 
 		for _, st := range cache.storagesInOrder {
-			status := getFromMem(t, cache, st.Name)
-			assert.True(t, status.Alive)
-			assert.NotEqual(t, int64(0), status.Checked.UnixMilli())
+			sts := getFromMem(t, cache, st.Name)
+			assert.True(t, sts.Alive)
+			assert.NotEqual(t, int64(0), sts.Checked.UnixMilli())
 
-			status = getFromFile(t, cache, st.Name)
-			assert.True(t, status.Alive)
-			assert.NotEqual(t, int64(0), status.Checked.UnixMilli())
+			sts = getFromFile(t, cache, st.Name)
+			assert.True(t, sts.Alive)
+			assert.NotEqual(t, int64(0), sts.Checked.UnixMilli())
 		}
 	})
 
@@ -371,8 +372,8 @@ func TestStatusCache_FirstAliveStorage(t *testing.T) {
 		got, err := cache.FirstAliveStorage()
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		want := "default"
+		assert.Equal(t, &want, got)
 	})
 }
 
@@ -384,8 +385,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("failover_1")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "failover_1")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 	})
 
 	t.Run("do not take from mem if outdated", func(t *testing.T) {
@@ -395,8 +395,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("failover_2")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "failover_2")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 		assertWasChecked(t, cache, "failover_2")
 	})
 
@@ -407,8 +406,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("default")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 	})
 
 	t.Run("do not take from mem if it is empty", func(t *testing.T) {
@@ -416,8 +414,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("failover_1")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "failover_1")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 		assertWasChecked(t, cache, "failover_1")
 	})
 
@@ -428,8 +425,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("failover_1")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "failover_1")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 		assertWasNotChecked(t, cache, "failover_1")
 	})
 
@@ -440,8 +436,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("default")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 		assertWasChecked(t, cache, "default")
 	})
 
@@ -452,8 +447,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("default")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 		assertWasChecked(t, cache, "default")
 	})
 
@@ -465,10 +459,10 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("default")
 		require.NoError(t, err)
 
-		assert.Equal(t, "default", got.Name)
-		status := getFromMem(t, cache, "default")
-		assert.True(t, status.Alive)
-		assert.Equal(t, relevantTime.UnixMilli(), status.Checked.UnixMilli())
+		assert.True(t, got)
+		sts := getFromMem(t, cache, "default")
+		assert.True(t, sts.Alive)
+		assert.Equal(t, relevantTime.UnixMilli(), sts.Checked.UnixMilli())
 	})
 
 	t.Run("update mem and file after checking", func(t *testing.T) {
@@ -479,13 +473,13 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		_, err := cache.SpecificStorage("failover_2")
 		require.NoError(t, err)
 
-		status := getFromMem(t, cache, "failover_2")
-		assert.True(t, status.Alive)
-		assert.NotEqual(t, int64(0), status.Checked.UnixMilli())
+		sts := getFromMem(t, cache, "failover_2")
+		assert.True(t, sts.Alive)
+		assert.NotEqual(t, int64(0), sts.Checked.UnixMilli())
 
-		status = getFromFile(t, cache, "failover_2")
-		assert.True(t, status.Alive)
-		assert.NotEqual(t, int64(0), status.Checked.UnixMilli())
+		sts = getFromFile(t, cache, "failover_2")
+		assert.True(t, sts.Alive)
+		assert.NotEqual(t, int64(0), sts.Checked.UnixMilli())
 	})
 
 	t.Run("do not fail if cannot read or write file", func(t *testing.T) {
@@ -510,8 +504,7 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 		got, err := cache.SpecificStorage("default")
 		require.NoError(t, err)
 
-		want := aliveFolder(cache, "default")
-		assert.Equal(t, want, got)
+		assert.True(t, got)
 		assertWasChecked(t, cache, "default")
 	})
 
@@ -524,24 +517,29 @@ func TestStatusCache_SpecificStorage(t *testing.T) {
 }
 
 func testCache(t *testing.T, failoverStorages int, useFile bool) *statusCache {
-	failover := map[string]storage.Folder{}
+	folders := map[string]storage.Folder{
+		"default": memory.NewFolder("default/", memory.NewKVS()),
+	}
 	for i := 0; i < failoverStorages; i++ {
 		name := fmt.Sprintf("failover_%d", i+1)
-		failover[name] = memory.NewFolder(name+"/", memory.NewStorage())
+		folders[name] = memory.NewFolder(name+"/", memory.NewKVS())
+	}
+	folderKeys := []Key{
+		{Name: "default", Hash: "def"},
+		{Name: "failover_1", Hash: "fo1"},
+		{Name: "failover_2", Hash: "fo2"},
 	}
 	fileOpt := WithoutSharedFile()
 	if useFile {
 		fileOpt = WithSharedFile(path.Join(t.TempDir(), "walg_status_cache"))
 	}
-	c, err := NewStatusCache(
-		memory.NewFolder("default/", memory.NewStorage()),
-		failover,
+	c := NewStatusCache(
+		folderKeys,
 		time.Hour,
-		NewRWAliveChecker(time.Hour, 1024),
+		NewRWAliveChecker(folders, time.Hour, 1024),
 		WithSharedMemory(&storageStatuses{}, new(sync.Mutex)),
 		fileOpt,
 	)
-	require.NoError(t, err)
 	return c.(*statusCache)
 }
 
@@ -559,7 +557,7 @@ func setInFile(t *testing.T, cache *statusCache, storage string, alive bool, che
 	file, _ := readFile(cache.sharedFilePath)
 	k := storageKey(t, cache, storage)
 	if file == nil {
-		file = map[key]status{}
+		file = map[Key]status{}
 	}
 	file[k] = status{alive, checked}
 	err := writeFile(cache.sharedFilePath, file)
@@ -577,14 +575,14 @@ func getFromFile(t *testing.T, cache *statusCache, storage string) status {
 	return s
 }
 
-func storageKey(t *testing.T, cache *statusCache, storage string) key {
+func storageKey(t *testing.T, cache *statusCache, storage string) Key {
 	for _, s := range cache.storagesInOrder {
 		if s.Name == storage {
-			return s.Key
+			return s
 		}
 	}
 	t.Fatalf("unknown storage %q", storage)
-	return ""
+	return Key{}
 }
 
 func assertWasChecked(t *testing.T, cache *statusCache, storage string) {
@@ -593,27 +591,4 @@ func assertWasChecked(t *testing.T, cache *statusCache, storage string) {
 
 func assertWasNotChecked(t *testing.T, cache *statusCache, storage string) {
 	assert.True(t, getFromMem(t, cache, storage).Checked.Before(relevantTime.Add(time.Duration(1))))
-}
-
-func aliveFolders(cache *statusCache, names ...string) []NamedFolder {
-	namesMap := make(map[string]bool, len(names))
-	for _, n := range names {
-		namesMap[n] = true
-	}
-	res := make([]NamedFolder, 0, len(names))
-	for _, s := range cache.storagesInOrder {
-		if namesMap[s.Name] {
-			res = append(res, s)
-		}
-	}
-	return res
-}
-
-func aliveFolder(cache *statusCache, name string) *NamedFolder {
-	for _, s := range cache.storagesInOrder {
-		if s.Name == name {
-			return &s
-		}
-	}
-	return nil
 }

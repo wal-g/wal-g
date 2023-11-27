@@ -11,21 +11,21 @@ import (
 )
 
 type LimitedFolder struct {
-	storage.HashableFolder
+	storage.Folder
 	limiter *rate.Limiter
 }
 
-func NewLimitedFolder(folder storage.HashableFolder, limiter *rate.Limiter) *LimitedFolder {
-	return &LimitedFolder{HashableFolder: folder, limiter: limiter}
+func NewLimitedFolder(folder storage.Folder, limiter *rate.Limiter) *LimitedFolder {
+	return &LimitedFolder{Folder: folder, limiter: limiter}
 }
 
 func (lf *LimitedFolder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	folder := lf.HashableFolder.GetSubFolder(subFolderRelativePath).(storage.HashableFolder)
+	folder := lf.Folder.GetSubFolder(subFolderRelativePath)
 	return NewLimitedFolder(folder, lf.limiter)
 }
 
 func (lf *LimitedFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	readCloser, err := lf.HashableFolder.ReadObject(objectRelativePath)
+	readCloser, err := lf.Folder.ReadObject(objectRelativePath)
 	if err != nil {
 		return nil, err
 	}
@@ -41,5 +41,5 @@ func (lf *LimitedFolder) PutObject(name string, content io.Reader) error {
 
 func (lf *LimitedFolder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	limitedReader := limiters.NewReader(ctx, content, lf.limiter)
-	return lf.HashableFolder.PutObjectWithContext(ctx, name, limitedReader)
+	return lf.Folder.PutObjectWithContext(ctx, name, limitedReader)
 }

@@ -27,12 +27,12 @@ func TestPutObject(t *testing.T) {
 		err := folder.PutObject("a/b/c/file", bytes.NewBufferString("abc"))
 		require.NoError(t, err)
 
-		reader, err := folder.storages[0].ReadObject("a/b/c/file")
+		reader, err := folder.usedFolders[0].ReadObject("a/b/c/file")
 		require.NoError(t, err)
 		content, _ := io.ReadAll(reader)
 		assert.Equal(t, "abc", string(content))
 
-		_, err = folder.storages[1].ReadObject("a/b/c/file")
+		_, err = folder.usedFolders[1].ReadObject("a/b/c/file")
 		assert.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 	})
 
@@ -40,21 +40,21 @@ func TestPutObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Put = policies.PutPolicyUpdateFirstFound
 
-		_ = folder.storages[1].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
-		_ = folder.storages[2].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
+		_ = folder.usedFolders[1].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
+		_ = folder.usedFolders[2].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
 
 		err := folder.PutObject("a/b/c/file", bytes.NewBufferString("new_content"))
 		require.NoError(t, err)
 
-		_, err = folder.storages[0].ReadObject("a/b/c/file")
+		_, err = folder.usedFolders[0].ReadObject("a/b/c/file")
 		assert.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 
-		reader, err := folder.storages[1].ReadObject("a/b/c/file")
+		reader, err := folder.usedFolders[1].ReadObject("a/b/c/file")
 		require.NoError(t, err)
 		content, _ := io.ReadAll(reader)
 		assert.Equal(t, "new_content", string(content))
 
-		reader, err = folder.storages[2].ReadObject("a/b/c/file")
+		reader, err = folder.usedFolders[2].ReadObject("a/b/c/file")
 		require.NoError(t, err)
 		content, _ = io.ReadAll(reader)
 		assert.Equal(t, "old_content", string(content))
@@ -72,12 +72,12 @@ func TestPutObject(t *testing.T) {
 			err := folder.PutObject("a/b/c/file", bytes.NewBufferString("abc"))
 			require.NoError(t, err)
 
-			reader, err := folder.storages[0].ReadObject("a/b/c/file")
+			reader, err := folder.usedFolders[0].ReadObject("a/b/c/file")
 			require.NoError(t, err)
 			content, _ := io.ReadAll(reader)
 			assert.Equal(t, "abc", string(content))
 
-			_, err = folder.storages[1].ReadObject("a/b/c/file")
+			_, err = folder.usedFolders[1].ReadObject("a/b/c/file")
 			assert.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 		}
 	})
@@ -90,7 +90,7 @@ func TestPutObject(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 2; i++ {
-			reader, err := folder.storages[i].ReadObject("a/b/c/file")
+			reader, err := folder.usedFolders[i].ReadObject("a/b/c/file")
 			require.NoError(t, err)
 			content, _ := io.ReadAll(reader)
 			assert.Equal(t, "abc", string(content))
@@ -101,21 +101,21 @@ func TestPutObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Put = policies.PutPolicyUpdateAllFound
 
-		_ = folder.storages[1].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
-		_ = folder.storages[2].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
+		_ = folder.usedFolders[1].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
+		_ = folder.usedFolders[2].PutObject("a/b/c/file", bytes.NewBufferString("old_content"))
 
 		err := folder.PutObject("a/b/c/file", bytes.NewBufferString("new_content"))
 		require.NoError(t, err)
 
-		_, err = folder.storages[0].ReadObject("a/b/c/file")
+		_, err = folder.usedFolders[0].ReadObject("a/b/c/file")
 		assert.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 
-		reader, err := folder.storages[1].ReadObject("a/b/c/file")
+		reader, err := folder.usedFolders[1].ReadObject("a/b/c/file")
 		require.NoError(t, err)
 		content, _ := io.ReadAll(reader)
 		assert.Equal(t, "new_content", string(content))
 
-		reader, err = folder.storages[2].ReadObject("a/b/c/file")
+		reader, err = folder.usedFolders[2].ReadObject("a/b/c/file")
 		require.NoError(t, err)
 		content, _ = io.ReadAll(reader)
 		assert.Equal(t, "new_content", string(content))

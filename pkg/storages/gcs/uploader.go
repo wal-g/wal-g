@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"math"
+	"math/rand"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -13,23 +14,19 @@ import (
 )
 
 const (
-	// The maximum number of chunks cannot exceed 32.
-	// So, increase the chunk size to 50 MiB to be able to upload files up to 1600 MiB.
-	defaultMaxChunkSize = 50 << 20
+	// baseRetryDelay defines the first delay for retry.
+	baseRetryDelay = 128 * time.Millisecond
 
-	// defaultMaxRetries limits upload and download retries during interaction with GCS.
-	defaultMaxRetries = 16
+	maxRetryDelay = 5 * time.Minute
 )
 
 type Uploader struct {
 	objHandle        *storage.ObjectHandle
 	maxChunkSize     int64
+	maxUploadRetries int
 	baseRetryDelay   time.Duration
 	maxRetryDelay    time.Duration
-	maxUploadRetries int
 }
-
-type UploaderOption func(*Uploader)
 
 type chunk struct {
 	name  string
@@ -38,17 +35,13 @@ type chunk struct {
 	size  int
 }
 
-func NewUploader(objHandle *storage.ObjectHandle, options ...UploaderOption) *Uploader {
+func NewUploader(objHandle *storage.ObjectHandle, config *UploaderConfig) *Uploader {
 	u := &Uploader{
 		objHandle:        objHandle,
-		maxChunkSize:     defaultMaxChunkSize,
-		baseRetryDelay:   BaseRetryDelay,
+		maxChunkSize:     config.MaxChunkSize,
+		maxUploadRetries: config.MaxRetries,
+		baseRetryDelay:   baseRetryDelay,
 		maxRetryDelay:    maxRetryDelay,
-		maxUploadRetries: defaultMaxRetries,
-	}
-
-	for _, opt := range options {
-		opt(u)
 	}
 
 	return u
@@ -162,4 +155,18 @@ func (u *Uploader) retry(ctx context.Context, retryableFunc func(ctx context.Con
 	}
 
 	return errors.Errorf("retry limit has been exceeded, total attempts: %d", u.maxUploadRetries)
+}
+
+// getJitterDelay calculates an equal jitter delay.
+func getJitterDelay(delay time.Duration) time.Duration {
+	return time.Duration(rand.Float64()*float64(delay)) + delay
+}
+
+// minDuration returns the minimum value of provided durations.
+func minDuration(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+
+	return b
 }

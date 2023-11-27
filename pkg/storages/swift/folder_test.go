@@ -27,7 +27,7 @@ func TestSwiftFolderUsingEnvVariables(t *testing.T) {
 	container := createTestContainerMust()
 	t.Logf("Swift created test container: '%s'", container)
 
-	storageFolderUsingEnvVars, err := ConfigureFolder(
+	stWithEnv, err := ConfigureStorage(
 		fmt.Sprintf("swift://%s/test-folder/sub0", container),
 		nil,
 	)
@@ -35,7 +35,7 @@ func TestSwiftFolderUsingEnvVariables(t *testing.T) {
 	if t.Failed() {
 		return
 	}
-	storage.RunFolderTest(storageFolderUsingEnvVars, t)
+	storage.RunFolderTest(stWithEnv.RootFolder(), t)
 }
 
 // createTestContainerMust creates a container with random name for test purposes.

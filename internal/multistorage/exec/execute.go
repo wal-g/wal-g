@@ -5,30 +5,27 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func OnAllStorages(fn func(folder storage.Folder) error) error {
-	failover, err := internal.InitFailoverStorages()
+	failover, err := internal.ConfigureFailoverStorages()
 	if err != nil {
 		return err
 	}
 
-	folder, err := internal.ConfigureFolder()
+	primary, err := internal.ConfigureStorage()
 	if err != nil {
 		return err
 	}
-	toRun, err := cache.NameAndOrderFolders(folder, failover)
-	if err != nil {
-		return err
-	}
+	toRun := multistorage.NameAndOrderStorages(primary, failover)
 
 	atLeastOneOK := false
-	for _, f := range toRun {
-		tracelog.InfoLogger.Printf("storage %s", f.Name)
-		err := fn(f)
+	for _, st := range toRun {
+		tracelog.InfoLogger.Printf("storage %s", st.Name)
+		err := fn(st.RootFolder())
 		tracelog.ErrorLogger.PrintOnError(err)
 		if err == nil {
 			atLeastOneOK = true
@@ -47,31 +44,29 @@ func OnStorage(name string, fn func(folder storage.Folder) error) error {
 		return OnAllStorages(fn)
 	}
 
-	folder, err := ConfigureStorage(name)
+	st, err := ConfigureStorage(name)
 	if err != nil {
 		return fmt.Errorf("failed to init folder for storage %q: %w", name, err)
 	}
 
-	return fn(folder)
+	return fn(st.RootFolder())
 }
 
-func ConfigureStorage(name string) (storage.Folder, error) {
+func ConfigureStorage(name string) (storage.Storage, error) {
 	switch name {
 	case consts.AllStorages:
 		return nil, fmt.Errorf("a specific storage name was expected instead of 'all'")
 	case consts.DefaultStorage:
-		return internal.ConfigureFolder()
+		return internal.ConfigureStorage()
 	default:
-		failover, err := internal.InitFailoverStorages()
+		failover, err := internal.ConfigureFailoverStorages()
 		if err != nil {
 			return nil, err
 		}
 
-		for n, folder := range failover {
-			if name != n {
-				continue
-			}
-			return folder, nil
+		st, found := failover[name]
+		if found {
+			return st, nil
 		}
 
 		available := []string{consts.DefaultStorage}

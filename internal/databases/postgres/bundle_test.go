@@ -119,7 +119,7 @@ func makeDeltaFile(locations []walparser.BlockLocation) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func putDeltaIntoStorage(storage *memory.Storage, locations []walparser.BlockLocation, deltaFilename string) error {
+func putDeltaIntoStorage(storage *memory.KVS, locations []walparser.BlockLocation, deltaFilename string) error {
 	deltaData, err := makeDeltaFile(locations)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func putDeltaIntoStorage(storage *memory.Storage, locations []walparser.BlockLoc
 	return nil
 }
 
-func putWalIntoStorage(storage *memory.Storage, data []byte, walFilename string) error {
+func putWalIntoStorage(storage *memory.KVS, data []byte, walFilename string) error {
 	compressor := compression.Compressors[lz4.AlgorithmName]
 	var compressedData bytes.Buffer
 	compressingWriter := compressor.NewWriter(&compressedData)
@@ -144,7 +144,7 @@ func putWalIntoStorage(storage *memory.Storage, data []byte, walFilename string)
 	return nil
 }
 
-func fillStorageWithMockDeltas(storage *memory.Storage) error {
+func fillStorageWithMockDeltas(storage *memory.KVS) error {
 	err := putDeltaIntoStorage(
 		storage,
 		[]walparser.BlockLocation{
@@ -182,7 +182,7 @@ func fillStorageWithMockDeltas(storage *memory.Storage) error {
 }
 
 func setupFolderAndBundle() (folder storage.Folder, bundle *postgres.Bundle, err error) {
-	storage := memory.NewStorage()
+	storage := memory.NewKVS()
 	err = fillStorageWithMockDeltas(storage)
 	if err != nil {
 		return nil, nil, err

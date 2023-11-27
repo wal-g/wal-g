@@ -1,68 +1,36 @@
 package memory
 
 import (
-	"bytes"
-	"sync"
-	"time"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-// This function is needed for being cross-platform
-func CeilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
-	if timeToCeil.Nanosecond()%1000 != 0 {
-		timeToCeil = timeToCeil.Add(time.Microsecond)
-		timeToCeil = timeToCeil.Add(-time.Duration(timeToCeil.Nanosecond() % 1000))
-	}
-	return timeToCeil
-}
+var _ storage.HashableStorage = &Storage{}
 
-type TimeStampedData struct {
-	Data      bytes.Buffer
-	Timestamp time.Time
-	Size      int
-}
-
-func TimeStampData(data bytes.Buffer, timeNow func() time.Time) TimeStampedData {
-	return TimeStampedData{data, CeilTimeUpToMicroseconds(timeNow()), data.Len()}
-}
-
-// Storage is supposed to be used for tests. It doesn't guarantee data safety!
 type Storage struct {
-	underlying *sync.Map
-	timeNow    func() time.Time
+	rootFolder storage.Folder
+	hash       string
 }
 
-func NewStorage(opts ...func(*Storage)) *Storage {
-	s := &Storage{underlying: &sync.Map{}, timeNow: time.Now}
-	for _, o := range opts {
-		o(s)
-	}
-	return s
-}
-
-func WithCustomTime(timeNow func() time.Time) func(*Storage) {
-	return func(s *Storage) {
-		s.timeNow = timeNow
+func NewStorage(rootPath string, kvs *KVS) *Storage {
+	return &Storage{
+		rootFolder: NewFolder(rootPath, kvs),
+		hash:       "mem:" + rootPath,
 	}
 }
 
-func (storage *Storage) Load(key string) (value TimeStampedData, exists bool) {
-	valueInterface, ok := storage.underlying.Load(key)
-	if !ok {
-		return TimeStampedData{}, ok
-	}
-	return valueInterface.(TimeStampedData), ok
+func (s *Storage) RootFolder() storage.Folder {
+	return s.rootFolder
 }
 
-func (storage *Storage) Store(key string, value bytes.Buffer) {
-	storage.underlying.Store(key, TimeStampData(value, storage.timeNow))
+func (s *Storage) SetRootFolder(folder storage.Folder) {
+	s.rootFolder = folder
 }
 
-func (storage *Storage) Delete(key string) {
-	storage.underlying.Delete(key)
+func (s *Storage) Close() error {
+	// Nothing to close
+	return nil
 }
 
-func (storage *Storage) Range(callback func(key string, value TimeStampedData) bool) {
-	storage.underlying.Range(func(iKey, iValue interface{}) bool {
-		return callback(iKey.(string), iValue.(TimeStampedData))
-	})
+func (s *Storage) ConfigHash() string {
+	return s.hash
 }

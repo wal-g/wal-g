@@ -172,7 +172,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 
 func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.BinlogStreamer) error {
 	// get necessary settings
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.Binlo
 	logFilesProvider := storage.NewLowMemoryObjectProvider()
 	// start sync
 	go sendEventsFromBinlogFiles(logFilesProvider, pos, s)
-	go provideLogs(folder, dstDir, startTS, untilTS, logFilesProvider)
+	go provideLogs(st.RootFolder(), dstDir, startTS, untilTS, logFilesProvider)
 
 	return nil
 }
@@ -199,12 +199,12 @@ func (h Handler) HandleRegisterSlave(data []byte) error {
 func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	s := replication.NewBinlogStreamer()
 
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return nil, err
 	}
 
-	startTime, err := GetBinlogTS(folder, pos.Name)
+	startTime, err := GetBinlogTS(st.RootFolder(), pos.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -258,9 +258,9 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 }
 
 func HandleBinlogServer(since string, until string) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
-	startTS, untilTS, _, err = getTimestamps(folder, since, until, "")
+	startTS, untilTS, _, err = getTimestamps(st.RootFolder(), since, until, "")
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Starting binlog server")

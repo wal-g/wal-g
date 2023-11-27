@@ -2,47 +2,31 @@ package cache
 
 import (
 	"fmt"
-
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type statusCacheNoCheck struct {
-	storagesInOrder []NamedFolder
+	storagesInOrder []string
 }
 
-func NewStatusCacheNoCheck(
-	primary storage.Folder,
-	failover map[string]storage.Folder,
-) (StatusCache, error) {
-	storagesInOrder, err := NameAndOrderFolders(primary, failover)
-	if err != nil {
-		return &statusCacheNoCheck{}, err
-	}
-
+func NewStatusCacheNoCheck(storagesInOrder []Key) StatusCache {
 	return &statusCacheNoCheck{
-		storagesInOrder: storagesInOrder,
-	}, nil
+		storagesInOrder: storageNames(storagesInOrder),
+	}
 }
 
-func (c *statusCacheNoCheck) AllAliveStorages() ([]NamedFolder, error) {
+func (c *statusCacheNoCheck) AllAliveStorages() ([]string, error) {
 	return c.storagesInOrder, nil
 }
 
-func (c *statusCacheNoCheck) FirstAliveStorage() (*NamedFolder, error) {
+func (c *statusCacheNoCheck) FirstAliveStorage() (*string, error) {
 	return &c.storagesInOrder[0], nil
 }
 
-func (c *statusCacheNoCheck) SpecificStorage(name string) (*NamedFolder, error) {
-	var specificStorage *NamedFolder
+func (c *statusCacheNoCheck) SpecificStorage(name string) (bool, error) {
 	for _, s := range c.storagesInOrder {
-		if s.Name == name {
-			sCpy := s
-			specificStorage = &sCpy
-			break
+		if s == name {
+			return true, nil
 		}
 	}
-	if specificStorage == nil {
-		return nil, fmt.Errorf("unknown storage %q", name)
-	}
-	return specificStorage, nil
+	return false, fmt.Errorf("unknown storage %q", name)
 }

@@ -23,8 +23,8 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 	defaultHandler := func() *Handler {
 		lister := NewAllBackupsFileLister(false, 1000, 4)
 		return &Handler{
-			source:     memory.NewFolder("source/", memory.NewStorage()),
-			target:     memory.NewFolder("target/", memory.NewStorage()),
+			source:     memory.NewFolder("source/", memory.NewKVS()),
+			target:     memory.NewFolder("target/", memory.NewKVS()),
 			fileLister: lister,
 			cfg: &HandlerConfig{
 				FailOnFirstErr:           false,
@@ -75,9 +75,9 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 
 	t.Run("operate backup files in correct order", func(t *testing.T) {
 		h := defaultHandler()
-		sourceMock := mock.NewFolder(memory.NewFolder("source/", memory.NewStorage()))
+		sourceMock := mock.NewFolder(memory.NewFolder("source/", memory.NewKVS()))
 		h.source = sourceMock
-		targetMock := mock.NewFolder(memory.NewFolder("target/", memory.NewStorage()))
+		targetMock := mock.NewFolder(memory.NewFolder("target/", memory.NewKVS()))
 		h.target = targetMock
 
 		for _, f := range genBackupFiles(1, 100) {
@@ -130,8 +130,8 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 func TestTransferHandler_Handle(t *testing.T) {
 	defaultHandler := func() *Handler {
 		return &Handler{
-			source:     memory.NewFolder("source/", memory.NewStorage()),
-			target:     memory.NewFolder("target/", memory.NewStorage()),
+			source:     memory.NewFolder("source/", memory.NewKVS()),
+			target:     memory.NewFolder("target/", memory.NewKVS()),
 			fileLister: NewRegularFileLister("/", false, 100500),
 			cfg: &HandlerConfig{
 				FailOnFirstErr:           false,
@@ -176,7 +176,7 @@ func TestTransferHandler_Handle(t *testing.T) {
 	})
 
 	t.Run("tolerate errors with some files", func(t *testing.T) {
-		targetMock := mock.NewFolder(memory.NewFolder("target/", memory.NewStorage()))
+		targetMock := mock.NewFolder(memory.NewFolder("target/", memory.NewKVS()))
 
 		putCalls := 0
 		putCallsMux := new(sync.Mutex)
@@ -206,7 +206,7 @@ func TestTransferHandler_Handle(t *testing.T) {
 	})
 
 	t.Run("fail after first error if it is configured so", func(t *testing.T) {
-		sourceMock := mock.NewFolder(memory.NewFolder("source/", memory.NewStorage()))
+		sourceMock := mock.NewFolder(memory.NewFolder("source/", memory.NewKVS()))
 
 		delCalls := 0
 		dellCallsMux := new(sync.Mutex)
@@ -349,8 +349,8 @@ func TestTransferHandler_checkRequirements(t *testing.T) {
 func TestTransferHandler_copyFile(t *testing.T) {
 	defaultHandler := func() *Handler {
 		return &Handler{
-			source:       memory.NewFolder("source/", memory.NewStorage()),
-			target:       memory.NewFolder("target/", memory.NewStorage()),
+			source:       memory.NewFolder("source/", memory.NewKVS()),
+			target:       memory.NewFolder("target/", memory.NewKVS()),
 			fileStatuses: new(sync.Map),
 		}
 	}
@@ -445,8 +445,8 @@ func TestTransferHandler_copyFile(t *testing.T) {
 func TestTransferHandler_aitFile(t *testing.T) {
 	defaultHandler := func() *Handler {
 		return &Handler{
-			source:       memory.NewFolder("source/", memory.NewStorage()),
-			target:       memory.NewFolder("target/", memory.NewStorage()),
+			source:       memory.NewFolder("source/", memory.NewKVS()),
+			target:       memory.NewFolder("target/", memory.NewKVS()),
 			fileStatuses: new(sync.Map),
 			cfg: &HandlerConfig{
 				AppearanceChecks:         3,
@@ -549,8 +549,8 @@ func TestTransferHandler_aitFile(t *testing.T) {
 
 func TestTransferHandler_deleteFile(t *testing.T) {
 	h := &Handler{
-		source:       memory.NewFolder("source/", memory.NewStorage()),
-		target:       memory.NewFolder("target/", memory.NewStorage()),
+		source:       memory.NewFolder("source/", memory.NewKVS()),
+		target:       memory.NewFolder("target/", memory.NewKVS()),
 		fileStatuses: new(sync.Map),
 	}
 
@@ -578,7 +578,7 @@ func TestTransferHandler_deleteFile(t *testing.T) {
 func TestTransferHandler_checkForAppearance(t *testing.T) {
 	t.Run("wait until next check time", func(t *testing.T) {
 		h := &Handler{
-			target: memory.NewFolder("target/", memory.NewStorage()),
+			target: memory.NewFolder("target/", memory.NewKVS()),
 			cfg: &HandlerConfig{
 				AppearanceChecksInterval: 100 * time.Millisecond,
 			},
@@ -597,7 +597,7 @@ func TestTransferHandler_checkForAppearance(t *testing.T) {
 
 	t.Run("dont wait if time has come", func(t *testing.T) {
 		h := &Handler{
-			target: memory.NewFolder("target/", memory.NewStorage()),
+			target: memory.NewFolder("target/", memory.NewKVS()),
 			cfg: &HandlerConfig{
 				AppearanceChecksInterval: time.Hour,
 			},

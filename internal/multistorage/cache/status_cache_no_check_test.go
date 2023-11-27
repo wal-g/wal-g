@@ -5,52 +5,47 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/wal-g/wal-g/pkg/storages/memory"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func TestStatusCacheNoCheck(t *testing.T) {
-	failover := map[string]storage.Folder{}
-	for i := 0; i < 3; i++ {
-		name := fmt.Sprintf("failover_%d", i+1)
-		failover[name] = memory.NewFolder(name+"/", memory.NewStorage())
-	}
-	primary := memory.NewFolder("default/", memory.NewStorage())
-	c, err := NewStatusCacheNoCheck(
-		primary,
-		failover,
+	c := NewStatusCacheNoCheck(
+		[]Key{
+			{Name: "default"},
+			{Name: "failover_1"},
+			{Name: "failover_2"},
+			{Name: "failover_3"},
+		},
 	)
-	require.NoError(t, err)
 
 	t.Run("AllAliveStorages simply returns all storages without checking", func(t *testing.T) {
 		got, err := c.AllAliveStorages()
 		assert.NoError(t, err)
-		assert.Equal(t, "default", got[0].Name)
-		assert.Equal(t, primary, got[0].Folder)
+		assert.Equal(t, "default", got[0])
 		for i := 1; i <= 3; i++ {
 			name := fmt.Sprintf("failover_%d", i)
-			assert.Equal(t, name, got[i].Name)
-			assert.Equal(t, failover[name], got[i].Folder)
+			assert.Equal(t, name, got[i])
 		}
 	})
 
-	t.Run("AllAliveStorages returns default storage", func(t *testing.T) {
+	t.Run("FirstAliveStorage returns default storage", func(t *testing.T) {
 		got, err := c.FirstAliveStorage()
 		assert.NoError(t, err)
-		assert.Equal(t, "default", got.Name)
-		assert.Equal(t, primary, got.Folder)
+		assert.Equal(t, "default", *got)
 	})
 
-	t.Run("SpecificStorage returns storage with requested name", func(t *testing.T) {
+	t.Run("SpecificStorage returns true if storage is known", func(t *testing.T) {
 		got, err := c.SpecificStorage("default")
 		assert.NoError(t, err)
-		assert.Equal(t, "default", got.Name)
-		assert.Equal(t, primary, got.Folder)
+		assert.Equal(t, true, got)
 
 		got, err = c.SpecificStorage("failover_2")
 		assert.NoError(t, err)
-		assert.Equal(t, "failover_2", got.Name)
-		assert.Equal(t, failover["failover_2"], got.Folder)
+		assert.Equal(t, true, got)
+	})
+
+	t.Run("SpecificStorage returns false and error if storage is unknown", func(t *testing.T) {
+		got, err := c.SpecificStorage("failover_4")
+		assert.Error(t, err)
+		assert.Equal(t, false, got)
 	})
 }

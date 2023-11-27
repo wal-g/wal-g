@@ -11,14 +11,14 @@ import (
 
 func TestHandleRemove(t *testing.T) {
 	t.Run("throw err when there is no files at prefix", func(t *testing.T) {
-		emptyFolder := memory.NewFolder("test/", memory.NewStorage())
+		emptyFolder := memory.NewFolder("test/", memory.NewKVS())
 		err := HandleRemove("a/b/c/nonexistent", emptyFolder)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not exist")
 	})
 
 	t.Run("remove single file", func(t *testing.T) {
-		folder := memory.NewFolder("test/", memory.NewStorage())
+		folder := memory.NewFolder("test/", memory.NewKVS())
 
 		targetFile := "a/b/c/target"
 		targetFolder := []string{
@@ -46,7 +46,7 @@ func TestHandleRemove(t *testing.T) {
 	})
 
 	t.Run("remove all files in folder", func(t *testing.T) {
-		folder := memory.NewFolder("test/", memory.NewStorage())
+		folder := memory.NewFolder("test/", memory.NewKVS())
 
 		targetFile := "a/b/c/target"
 		targetFolder := []string{

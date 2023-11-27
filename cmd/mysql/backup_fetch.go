@@ -26,7 +26,7 @@ var (
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
-			folder, err := internal.ConfigureFolder()
+			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
 			restoreCmd, err := internal.GetCommandSetting(internal.NameStreamRestoreCmd)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -35,7 +35,7 @@ var (
 			targetBackupSelector, err := createTargetBackupSelector(args, fetchTargetUserData)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			mysql.HandleBackupFetch(folder, targetBackupSelector, restoreCmd, prepareCmd)
+			mysql.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd)
 		},
 	}
 	fetchTargetUserData string

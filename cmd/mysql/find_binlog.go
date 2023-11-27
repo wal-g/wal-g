@@ -22,9 +22,9 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			folder, err := internal.ConfigureFolder()
+			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
-			mysql.HandleBinlogFind(folder, findGtid)
+			mysql.HandleBinlogFind(storage.RootFolder(), findGtid)
 		},
 	}
 )

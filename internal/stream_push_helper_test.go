@@ -78,10 +78,7 @@ func GetFolder(networkErrorAfterByteSize int) (storage.Folder, func() error, err
 		return nil, nil, err
 	}
 
-	folder, err := fs.ConfigureFolder(tmpDir, nil)
-	if err != nil {
-		return nil, nil, err
-	}
+	folder := fs.NewFolder(tmpDir, "")
 	if networkErrorAfterByteSize != 0 {
 		return functests.NewNetworkErrorFolder(folder, networkErrorAfterByteSize),
 			func() error {
@@ -185,10 +182,7 @@ func GetS3Folder(networkErrorAfterByteSize int) (storage.Folder, func() error, e
 		return nil, nil, err
 	}
 
-	folder, err := fs.ConfigureFolder(tmpDir, nil)
-	if err != nil {
-		return nil, nil, err
-	}
+	folder := fs.NewFolder(tmpDir, "")
 	if networkErrorAfterByteSize != 0 {
 		return functests.NewS3ErrorFolder(folder, networkErrorAfterByteSize),
 			func() error {

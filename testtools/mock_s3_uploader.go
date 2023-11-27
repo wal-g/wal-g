@@ -29,10 +29,10 @@ type MockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multiErr bool
 	err      bool
-	storage  *memory.Storage
+	storage  *memory.KVS
 }
 
-func NewMockS3Uploader(multiErr, err bool, storage *memory.Storage) *MockS3Uploader {
+func NewMockS3Uploader(multiErr, err bool, storage *memory.KVS) *MockS3Uploader {
 	return &MockS3Uploader{multiErr: multiErr, err: err, storage: storage}
 }
 
