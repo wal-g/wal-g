@@ -54,19 +54,6 @@ type oplogReplayRunArgs struct {
 }
 
 func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err error) {
-	// resolve archiving settings
-	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
-	if err != nil {
-		return args, err
-	}
-	args.since, err = processArg(cmdargs[0], downloader)
-	if err != nil {
-		return
-	}
-	args.until, err = processArg(cmdargs[1], downloader)
-	if err != nil {
-		return
-	}
 	args.since, err = models.TimestampFromTime(cmdargs[0])
 	if err != nil {
 		return
