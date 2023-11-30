@@ -129,20 +129,19 @@ func ConfigureLimiters() {
 
 // TODO : unit tests
 func ConfigureStorage() (storage.HashableStorage, error) {
-	st, err := ConfigureStorageForSpecificConfig(viper.GetViper())
+	var rootWraps []storage.WrapRootFolder
+	if limiters.NetworkLimiter != nil {
+		rootWraps = append(rootWraps, func(prevFolder storage.Folder) (newFolder storage.Folder) {
+			return NewLimitedFolder(prevFolder, limiters.NetworkLimiter)
+		})
+	}
+	rootWraps = append(rootWraps, ConfigureStoragePrefix)
+
+	st, err := ConfigureStorageForSpecificConfig(viper.GetViper(), rootWraps...)
 	if err != nil {
 		return nil, err
 	}
 
-	rootFolder := st.RootFolder()
-
-	if limiters.NetworkLimiter != nil {
-		rootFolder = NewLimitedFolder(rootFolder, limiters.NetworkLimiter)
-	}
-
-	rootFolder = ConfigureStoragePrefix(rootFolder)
-
-	st.SetRootFolder(rootFolder)
 	return st, nil
 }
 
@@ -158,7 +157,10 @@ func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
 // when provided multiple 'keys' in the config,
 // this function will always return only one concrete 'storage'.
 // Chosen folder depends only on 'StorageAdapters' order
-func ConfigureStorageForSpecificConfig(config *viper.Viper) (storage.HashableStorage, error) {
+func ConfigureStorageForSpecificConfig(
+	config *viper.Viper,
+	rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
 		prefix, ok := getWaleCompatibleSettingFrom(adapter.PrefixSettingKey(), config)
@@ -168,7 +170,7 @@ func ConfigureStorageForSpecificConfig(config *viper.Viper) (storage.HashableSto
 		}
 
 		settings := adapter.loadSettings(config)
-		st, err := adapter.configure(prefix, settings)
+		st, err := adapter.configure(prefix, settings, rootWraps...)
 		if err != nil {
 			return nil, fmt.Errorf("configure storage with prefix %q: %w", prefix, err)
 		}

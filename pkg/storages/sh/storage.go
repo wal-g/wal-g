@@ -30,7 +30,7 @@ type Secrets struct {
 }
 
 // TODO: Unit tests
-func NewStorage(config *Config) (*Storage, error) {
+func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	var authMethods []ssh.AuthMethod
 	if config.PrivateKeyPath != "" {
 		pkey, err := os.ReadFile(config.PrivateKeyPath)
@@ -59,7 +59,11 @@ func NewStorage(config *Config) (*Storage, error) {
 	client := NewSFTPLazy(address, sshConfig)
 
 	path := storage.AddDelimiterToPath(config.RootPath)
-	folder := NewFolder(client, path)
+	var folder storage.Folder = NewFolder(client, path)
+
+	for _, wrap := range rootWraps {
+		folder = wrap(folder)
+	}
 
 	hash, err := storage.ComputeConfigHash("sh", config)
 	if err != nil {
@@ -71,10 +75,6 @@ func NewStorage(config *Config) (*Storage, error) {
 
 func (s *Storage) RootFolder() storage.Folder {
 	return s.rootFolder
-}
-
-func (s *Storage) SetRootFolder(folder storage.Folder) {
-	s.rootFolder = folder
 }
 
 func (s *Storage) ConfigHash() string {

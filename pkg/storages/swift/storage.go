@@ -28,7 +28,7 @@ type Config struct {
 }
 
 // TODO: Unit tests
-func NewStorage(config *Config) (*Storage, error) {
+func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	connection := new(swift.Connection)
 	for envKey, envValue := range config.EnvVariables {
 		err := os.Setenv(envKey, envValue)
@@ -58,7 +58,11 @@ func NewStorage(config *Config) (*Storage, error) {
 		return nil, fmt.Errorf("get container by name: %w", err)
 	}
 
-	folder := NewFolder(connection, container, config.RootPath)
+	var folder storage.Folder = NewFolder(connection, container, config.RootPath)
+
+	for _, wrap := range rootWraps {
+		folder = wrap(folder)
+	}
 
 	hash, err := storage.ComputeConfigHash("swift", config)
 	if err != nil {
@@ -70,10 +74,6 @@ func NewStorage(config *Config) (*Storage, error) {
 
 func (s *Storage) RootFolder() storage.Folder {
 	return s.rootFolder
-}
-
-func (s *Storage) SetRootFolder(folder storage.Folder) {
-	s.rootFolder = folder
 }
 
 func (s *Storage) ConfigHash() string {

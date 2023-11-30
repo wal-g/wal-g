@@ -13,8 +13,6 @@ type Storage interface {
 	// RootFolder of the storage. All objects that can be interacted with are located in it or its subfolders.
 	RootFolder() Folder
 
-	SetRootFolder(Folder)
-
 	// Close releases all resources (files, connections, etc.) opened by the storage implementation, if any.
 	Close() error
 }
@@ -37,3 +35,6 @@ func ComputeConfigHash(storageType string, config any) (string, error) {
 	hash.Write(configBytes)
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
+
+// WrapRootFolder allows to modify the storage root folder somehow (cd into a subfolder, wrap with some limiters, etc).
+type WrapRootFolder func(prevFolder Folder) (newFolder Folder)

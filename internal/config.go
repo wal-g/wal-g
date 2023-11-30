@@ -892,20 +892,23 @@ func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, 
 		if name == "default" {
 			return nil, fmt.Errorf("'%s' storage name is reserved", name)
 		}
+
 		cfg := viper.Sub(PgFailoverStorages + "." + name)
-		st, err := ConfigureStorageForSpecificConfig(cfg)
+
+		var rootWraps []storage.WrapRootFolder
+		if limiters.NetworkLimiter != nil {
+			rootWraps = append(rootWraps, func(prevFolder storage.Folder) (newFolder storage.Folder) {
+				return NewLimitedFolder(prevFolder, limiters.NetworkLimiter)
+			})
+		}
+		rootWraps = append(rootWraps, ConfigureStoragePrefix)
+
+		st, err := ConfigureStorageForSpecificConfig(cfg, rootWraps...)
 		if err != nil {
 			return nil, fmt.Errorf("failover storage %s: %v", name, err)
 		}
 		errClosers = append(errClosers, st)
-		rootFolder := st.RootFolder()
-		if limiters.NetworkLimiter != nil {
-			rootFolder = NewLimitedFolder(rootFolder, limiters.NetworkLimiter)
-		}
 
-		rootFolder = ConfigureStoragePrefix(rootFolder)
-
-		st.SetRootFolder(rootFolder)
 		storages[name] = st
 	}
 

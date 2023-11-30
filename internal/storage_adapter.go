@@ -17,7 +17,11 @@ type StorageAdapter struct {
 	configure    ConfigureStorageFunc
 }
 
-type ConfigureStorageFunc func(prefix string, settings map[string]string) (storage.HashableStorage, error)
+type ConfigureStorageFunc func(
+	prefix string,
+	settings map[string]string,
+	rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error)
 
 func (adapter *StorageAdapter) PrefixSettingKey() string {
 	return adapter.storageType + "_PREFIX"

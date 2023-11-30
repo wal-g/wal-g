@@ -80,7 +80,11 @@ const (
 )
 
 // TODO: Unit tests
-func ConfigureStorage(prefix string, settings map[string]string) (storage.HashableStorage, error) {
+func ConfigureStorage(
+	prefix string,
+	settings map[string]string,
+	rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
 	bucket, rootPath, err := storage.GetPathFromPrefix(prefix)
 	if err != nil {
 		return nil, fmt.Errorf("extract bucket and path from prefix %q: %w", prefix, err)
@@ -156,7 +160,7 @@ func ConfigureStorage(prefix string, settings map[string]string) (storage.Hashab
 		RangeMaxRetries:   rangeMaxRetries,
 	}
 
-	st, err := NewStorage(config)
+	st, err := NewStorage(config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}

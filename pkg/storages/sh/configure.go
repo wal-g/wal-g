@@ -25,7 +25,11 @@ var SettingList = []string{
 const defaultPort = "22"
 
 // TODO: Unit tests
-func ConfigureStorage(prefix string, settings map[string]string) (storage.HashableStorage, error) {
+func ConfigureStorage(
+	prefix string,
+	settings map[string]string,
+	rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
 	host, folderPath, err := storage.ParsePrefixAsURL(prefix)
 	if err != nil {
 		return nil, fmt.Errorf("parse SSH storage prefix %q: %w", prefix, err)
@@ -47,7 +51,7 @@ func ConfigureStorage(prefix string, settings map[string]string) (storage.Hashab
 		PrivateKeyPath: settings[privateKeyPathSetting],
 	}
 
-	st, err := NewStorage(config)
+	st, err := NewStorage(config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create SSH storage: %w", err)
 	}

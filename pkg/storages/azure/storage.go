@@ -48,7 +48,7 @@ const (
 )
 
 // TODO: Unit tests
-func NewStorage(config *Config) (*Storage, error) {
+func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	var containerClient *azblob.ContainerClient
 	var err error
 	switch config.AuthType {
@@ -69,7 +69,11 @@ func NewStorage(config *Config) (*Storage, error) {
 		MaxBuffers: config.Uploader.Buffers,
 	}
 
-	folder := NewFolder(config.RootPath, *containerClient, uploadStreamOpts, config.TryTimeout)
+	var folder storage.Folder = NewFolder(config.RootPath, *containerClient, uploadStreamOpts, config.TryTimeout)
+
+	for _, wrap := range rootWraps {
+		folder = wrap(folder)
+	}
 
 	hash, err := storage.ComputeConfigHash("azure", config)
 	if err != nil {
@@ -145,10 +149,6 @@ func containerClientWithDefaultAuth(config *Config) (*azblob.ContainerClient, er
 
 func (s *Storage) RootFolder() storage.Folder {
 	return s.rootFolder
-}
-
-func (s *Storage) SetRootFolder(folder storage.Folder) {
-	s.rootFolder = folder
 }
 
 func (s *Storage) ConfigHash() string {

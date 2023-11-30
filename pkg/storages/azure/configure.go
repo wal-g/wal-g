@@ -43,7 +43,11 @@ const (
 )
 
 // TODO: Unit tests
-func ConfigureStorage(prefix string, settings map[string]string) (storage.HashableStorage, error) {
+func ConfigureStorage(
+	prefix string,
+	settings map[string]string,
+	rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
 	accountName, ok := settings[AccountSetting]
 	if !ok {
 		return nil, fmt.Errorf("%q is not specified", AccountSetting)
@@ -105,7 +109,7 @@ func ConfigureStorage(prefix string, settings map[string]string) (storage.Hashab
 		},
 	}
 
-	st, err := NewStorage(config)
+	st, err := NewStorage(config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create Google Cloud storage: %w", err)
 	}

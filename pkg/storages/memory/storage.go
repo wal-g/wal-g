@@ -22,10 +22,6 @@ func (s *Storage) RootFolder() storage.Folder {
 	return s.rootFolder
 }
 
-func (s *Storage) SetRootFolder(folder storage.Folder) {
-	s.rootFolder = folder
-}
-
 func (s *Storage) Close() error {
 	// Nothing to close
 	return nil

@@ -10,14 +10,14 @@ import (
 const waleFileURL = "file://localhost"
 
 // TODO: Unit tests
-func ConfigureStorage(prefix string, _ map[string]string) (storage.HashableStorage, error) {
+func ConfigureStorage(prefix string, _ map[string]string, rootWraps ...storage.WrapRootFolder) (storage.HashableStorage, error) {
 	prefix = strings.TrimPrefix(prefix, waleFileURL) // WAL-E backward compatibility
 
 	config := &Config{
 		RootPath: prefix,
 	}
 
-	st, err := NewStorage(config)
+	st, err := NewStorage(config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create FS storage: %w", err)
 	}

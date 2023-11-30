@@ -43,7 +43,7 @@ type Secrets struct {
 }
 
 // TODO: Unit tests
-func NewStorage(config *Config) (*Storage, error) {
+func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	sess, err := createSession(config)
 	if err != nil {
 		return nil, fmt.Errorf("create new AWS session: %w", err)
@@ -56,7 +56,11 @@ func NewStorage(config *Config) (*Storage, error) {
 		return nil, fmt.Errorf("create new S3 uploader: %w", err)
 	}
 
-	folder := NewFolder(s3Client, uploader, config.RootPath, config)
+	var folder storage.Folder = NewFolder(s3Client, uploader, config.RootPath, config)
+
+	for _, wrap := range rootWraps {
+		folder = wrap(folder)
+	}
 
 	hash, err := storage.ComputeConfigHash("s3", config)
 	if err != nil {
@@ -68,10 +72,6 @@ func NewStorage(config *Config) (*Storage, error) {
 
 func (s *Storage) RootFolder() storage.Folder {
 	return s.rootFolder
-}
-
-func (s *Storage) SetRootFolder(folder storage.Folder) {
-	s.rootFolder = folder
 }
 
 func (s *Storage) ConfigHash() string {

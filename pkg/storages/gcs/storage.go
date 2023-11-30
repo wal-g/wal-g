@@ -36,7 +36,7 @@ type UploaderConfig struct {
 }
 
 // TODO: unit tests
-func NewStorage(config *Config) (*Storage, error) {
+func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	ctx := context.Background()
 	client, err := gcs.NewClient(ctx)
 	if err != nil {
@@ -44,7 +44,11 @@ func NewStorage(config *Config) (*Storage, error) {
 	}
 	bucket := client.Bucket(config.Bucket)
 
-	folder := NewFolder(bucket, config.RootPath, config.Secrets.EncryptionKey, config)
+	var folder storage.Folder = NewFolder(bucket, config.RootPath, config.Secrets.EncryptionKey, config)
+
+	for _, wrap := range rootWraps {
+		folder = wrap(folder)
+	}
 
 	hash, err := storage.ComputeConfigHash("gcs", config)
 	if err != nil {
@@ -56,10 +60,6 @@ func NewStorage(config *Config) (*Storage, error) {
 
 func (s *Storage) RootFolder() storage.Folder {
 	return s.rootFolder
-}
-
-func (s *Storage) SetRootFolder(folder storage.Folder) {
-	s.rootFolder = folder
 }
 
 func (s *Storage) ConfigHash() string {
