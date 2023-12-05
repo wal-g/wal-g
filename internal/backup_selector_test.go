@@ -151,8 +151,9 @@ func TestUserDataBackupSelector(t *testing.T) {
 
 	_ = folder.PutObject(b1, strings.NewReader(string(bytesMeta1)))
 
-	userData := greenplum.NewSegmentUserDataFromID("mdbb7sekqnv5lsuretgg").String()
-	backupSelector, err := internal.NewUserDataBackupSelector(userData, greenplum.NewGenericMetaFetcher())
+	byteUserData, err := json.Marshal(testOldestBackup.UserData)
+	assert.NoError(t, err)
+	backupSelector, err := internal.NewUserDataBackupSelector(string(byteUserData), greenplum.NewGenericMetaFetcher())
 	assert.NoError(t, err)
 
 	latestBackup, err := backupSelector.Select(folder)
@@ -174,8 +175,9 @@ func TestUserDataBackupSelector_tooManyBackupsFound(t *testing.T) {
 	_ = folder.PutObject(b1, strings.NewReader(string(bytesMeta1)))
 	_ = folder.PutObject(b2, strings.NewReader(string(bytesMeta2)))
 
-	userData := greenplum.NewSegmentUserDataFromID("mdbb7sekqnv5lsuretgg").String()
-	backupSelector, err := internal.NewUserDataBackupSelector(userData, greenplum.NewGenericMetaFetcher())
+	byteUserData, err := json.Marshal(testOldestBackup.UserData)
+	assert.NoError(t, err)
+	backupSelector, err := internal.NewUserDataBackupSelector(string(byteUserData), greenplum.NewGenericMetaFetcher())
 	assert.NoError(t, err)
 
 	latestBackup, err := backupSelector.Select(folder)
@@ -185,8 +187,9 @@ func TestUserDataBackupSelector_tooManyBackupsFound(t *testing.T) {
 }
 
 func TestUserDataBackupSelector_emptyFolder(t *testing.T) {
-	userData := greenplum.NewSegmentUserDataFromID("mdbb7sekqnv5lsuretgg").String()
-	backupSelector, err := internal.NewUserDataBackupSelector(userData, greenplum.NewGenericMetaFetcher())
+	byteUserData, err := json.Marshal(testOldestBackup.UserData)
+	assert.NoError(t, err)
+	backupSelector, err := internal.NewUserDataBackupSelector(string(byteUserData), greenplum.NewGenericMetaFetcher())
 	assert.NoError(t, err)
 	checkEmptyFolderBehaviour(t, backupSelector)
 }
