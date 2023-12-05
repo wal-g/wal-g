@@ -50,15 +50,19 @@ func convertMetadata(input internal.GenericMetadata) map[string]interface{} {
 	return metadata
 }
 
-func TestLatestBackupSelector_emptyFolder(t *testing.T) {
+func checkEmptyFolderBehaviour(t *testing.T, backupSelector internal.BackupSelector) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	_ = folder.PutObject("not_backup_path", &bytes.Buffer{})
 
-	backupSelector := internal.NewLatestBackupSelector()
 	latestBackup, err := backupSelector.Select(folder)
 
 	assert.Empty(t, latestBackup)
 	assert.Error(t, err, internal.NoBackupsFoundError{})
+}
+
+func TestLatestBackupSelector_emptyFolder(t *testing.T) {
+	backupSelector := internal.NewLatestBackupSelector()
+	checkEmptyFolderBehaviour(t, backupSelector)
 }
 
 func TestLatestBackupSelector(t *testing.T) {
@@ -134,14 +138,8 @@ func TestOldestNonPermanentSelector_ignorePermanentBackups(t *testing.T) {
 }
 
 func TestOldestNonPermanentSelector_emptyFolder(t *testing.T) {
-	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("not_backup_path", &bytes.Buffer{})
-
 	backupSelector := internal.NewOldestNonPermanentSelector(greenplum.NewGenericMetaFetcher())
-	latestBackup, err := backupSelector.Select(folder)
-
-	assert.Empty(t, latestBackup)
-	assert.Error(t, err, internal.NoBackupsFoundError{})
+	checkEmptyFolderBehaviour(t, backupSelector)
 }
 
 func TestUserDataBackupSelector(t *testing.T) {
@@ -186,6 +184,13 @@ func TestUserDataBackupSelector_tooManyBackupsFound(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestUserDataBackupSelector_emptyFolder(t *testing.T) {
+	userData := greenplum.NewSegmentUserDataFromID("mdbb7sekqnv5lsuretgg").String()
+	backupSelector, err := internal.NewUserDataBackupSelector(userData, greenplum.NewGenericMetaFetcher())
+	assert.NoError(t, err)
+	checkEmptyFolderBehaviour(t, backupSelector)
+}
+
 func TestBackupNameSelector(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 
@@ -212,4 +217,10 @@ func TestBackupNameSelector_backupNotFound(t *testing.T) {
 	latestBackup, err := backupSelector.Select(folder)
 	assert.Empty(t, latestBackup)
 	assert.Error(t, err)
+}
+
+func TestBackupNameSelector_emptyFolder(t *testing.T) {
+	backupSelector, err := internal.NewBackupNameSelector(testOldestBackup.BackupName, true)
+	assert.NoError(t, err)
+	checkEmptyFolderBehaviour(t, backupSelector)
 }
