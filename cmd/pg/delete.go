@@ -136,12 +136,13 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 }
 
 func configureFolder() storage.Folder {
-	folder, err := postgres.ConfigureMultiStorageFolder(true)
-	tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
-	folder, err = multistorage.UseAllAliveStorages(folder)
-	tracelog.InfoLogger.Printf("Backup to delete will be searched in storages: %v", multistorage.UsedStorages(folder))
+	multiSt, err := postgres.ConfigureMultiStorage(true)
+	tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
+
+	rootFolder, err := multistorage.UseAllAliveStorages(multiSt.RootFolder())
+	tracelog.InfoLogger.Printf("Backup to delete will be searched in storages: %v", multistorage.UsedStorages(rootFolder))
 	tracelog.ErrorLogger.FatalOnError(err)
-	return multistorage.SetPolicies(folder, policies.UniteAllStorages)
+	return multistorage.SetPolicies(rootFolder, policies.UniteAllStorages)
 }
 
 func DeleteGarbageArgsValidator(cmd *cobra.Command, args []string) error {

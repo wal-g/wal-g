@@ -24,19 +24,19 @@ var (
 		Short: backupListShortDescription,
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			folder, err := postgres.ConfigureMultiStorageFolder(false)
+			storage, err := postgres.ConfigureMultiStorage(false)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
+			rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.UniteAllStorages)
 			if targetStorage == "" {
-				folder, err = multistorage.UseAllAliveStorages(folder)
+				rootFolder, err = multistorage.UseAllAliveStorages(rootFolder)
 			} else {
-				folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+				rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 			}
 			tracelog.ErrorLogger.FatalOnError(err)
-			tracelog.InfoLogger.Printf("List backups from storages: %v", multistorage.UsedStorages(folder))
+			tracelog.InfoLogger.Printf("List backups from storages: %v", multistorage.UsedStorages(rootFolder))
 
-			backupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+			backupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
 			if detail {
 				postgres.HandleDetailedBackupList(backupsFolder, pretty, json)
 			} else {

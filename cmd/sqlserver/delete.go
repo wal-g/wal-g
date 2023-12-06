@@ -67,8 +67,10 @@ func init() {
 }
 
 func newSQLServerDeleteHandler() (*internal.DeleteHandler, error) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	folder := st.RootFolder()
 
 	backups, err := internal.GetBackupSentinelObjects(folder)
 	if err != nil {

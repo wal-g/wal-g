@@ -41,7 +41,7 @@ var segBackupFetchCmd = &cobra.Command{
 		targetBackupSelector, err := createTargetFetchSegBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		reverseDeltaUnpack := viper.GetBool(internal.UseReverseUnpackSetting)
@@ -61,7 +61,7 @@ var segBackupFetchCmd = &cobra.Command{
 		}
 
 		pgFetcher := postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
-		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
+		internal.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, pgFetcher)
 	},
 }
 

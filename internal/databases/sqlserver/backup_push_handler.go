@@ -19,7 +19,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool) {
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
 
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -30,7 +30,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool) {
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
 
-	lock, err := RunOrReuseProxy(ctx, cancel, folder)
+	lock, err := RunOrReuseProxy(ctx, cancel, storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer lock.Close()
 
@@ -39,7 +39,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool) {
 	var backupName string
 	var sentinel *SentinelDto
 	if updateLatest {
-		backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
+		backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, storage.RootFolder())
 		tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
 		backupName = backup.Name
 		sentinel = new(SentinelDto)
@@ -63,7 +63,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool) {
 	if !updateLatest {
 		sentinel.StopLocalTime = utility.TimeNowCrossPlatformLocal()
 	}
-	uploader := internal.NewRegularUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
+	uploader := internal.NewRegularUploader(nil, storage.RootFolder().GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
 	err = internal.UploadSentinel(uploader, sentinel, backupName)
 	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)

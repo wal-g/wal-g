@@ -26,7 +26,7 @@ var backupFetchCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
@@ -39,7 +39,7 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
-		err = redis.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
+		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

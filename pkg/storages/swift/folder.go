@@ -2,9 +2,8 @@ package swift
 
 import (
 	"context"
-	"hash/fnv"
+	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"github.com/wal-g/tracelog"
@@ -13,61 +12,17 @@ import (
 	"github.com/ncw/swift/v2"
 )
 
-var SettingList = []string{
-	"OS_USERNAME",
-	"OS_PASSWORD",
-	"OS_AUTH_URL",
-	"OS_TENANT_NAME",
-	"OS_REGION_NAME",
-}
-
-func NewError(err error, format string, args ...interface{}) storage.Error {
-	return storage.NewError(err, "Swift", format, args...)
-}
-
-func NewFolderError(err error, format string, args ...interface{}) storage.Error {
-	return storage.NewError(err, "Swift", format, args...)
-}
-
-func NewFolder(connection *swift.Connection, container swift.Container, path string) *Folder {
-	path = strings.TrimPrefix(path, "/")
-	return &Folder{connection, container, path}
-}
-
-func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
-	connection := new(swift.Connection)
-	//Set settings as env variables
-	for prop, value := range settings {
-		os.Setenv(prop, value)
-	}
-	ctx := context.Background()
-	//users must set conventional openStack environment variables: username, key, auth-url, tenantName, region etc
-	err := connection.ApplyEnvironment()
-	if err != nil {
-		return nil, NewError(err, "Unable to apply env variables")
-	}
-	err = connection.Authenticate(ctx)
-	if err != nil {
-		return nil, NewError(err, "Unable to authenticate connection")
-	}
-	containerName, path, err := storage.GetPathFromPrefix(prefix)
-	if err != nil {
-		return nil, NewError(err, "Unable to get container name and path from prefix %v", prefix)
-	}
-	path = storage.AddDelimiterToPath(path)
-
-	container, _, err := connection.Container(ctx, containerName)
-	if err != nil {
-		return nil, NewError(err, "Unable to fetch container from name %v", containerName)
-	}
-
-	return NewFolder(connection, container, path), nil
-}
-
+// TODO: Unit tests
 type Folder struct {
 	connection *swift.Connection
 	container  swift.Container
 	path       string
+}
+
+func NewFolder(connection *swift.Connection, container swift.Container, path string) *Folder {
+	// Trim leading slash because there's no difference between absolute and relative paths in Swift.
+	path = strings.TrimPrefix(path, "/")
+	return &Folder{connection, container, path}
 }
 
 func (folder *Folder) GetPath() string {
@@ -81,7 +36,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		return false, nil
 	}
 	if err != nil {
-		return false, NewError(err, "Unable to stat object %v", path)
+		return false, fmt.Errorf("get Swift object stats %q: %w", path, err)
 	}
 	return true, nil
 }
@@ -95,7 +50,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		func(ctx context.Context, opts *swift.ObjectsOpts) (interface{}, error) {
 			objectNames, err := folder.connection.ObjectNames(ctx, folder.container.Name, opts)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("retrieve Swift object names in container %q: %w", folder.container.Name, err)
 			}
 			// Retrieved object names successfully.
 			for _, objectName := range objectNames {
@@ -111,7 +66,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 						continue
 					}
 					if err != nil {
-						return nil, err
+						return nil, fmt.Errorf("get Swift object %q: %w", obj.Name, err)
 					}
 					//trim prefix to get object's standalone name
 					objName := strings.TrimPrefix(obj.Name, folder.path)
@@ -123,9 +78,9 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		},
 	)
 	if err != nil {
-		return nil, nil, NewError(err, "Unable to iterate %v", folder.path)
+		return nil, nil, fmt.Errorf("iterate Swift folder %q: %w", folder.path, err)
 	}
-	return objects, subFolders, err
+	return objects, subFolders, nil
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
@@ -140,7 +95,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		return nil, storage.NewObjectNotFoundError(path)
 	}
 	if err != nil {
-		return nil, NewError(err, "Unable to OPEN Object %v", path)
+		return nil, fmt.Errorf("open Swift object %q: %w", path, err)
 	}
 	//retrieved object from  the cloud
 	return io.NopCloser(readContents), nil
@@ -156,7 +111,7 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 	//put the object in the cloud using full path
 	_, err := folder.connection.ObjectPut(ctx, folder.container.Name, path, content, false, "", "", nil)
 	if err != nil {
-		return NewError(err, "Unable to write content.")
+		return fmt.Errorf("put Swift object %q: %w", path, err)
 	}
 	//Object stored successfully
 	return nil
@@ -167,12 +122,15 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
-		return err
+		return fmt.Errorf("check if Swift object exists %q: %w", srcPath, err)
 	}
 	srcPath = storage.JoinPath(folder.path, srcPath)
 	dstPath = storage.JoinPath(folder.path, dstPath)
 	_, err := folder.connection.ObjectCopy(context.Background(), folder.container.Name, srcPath, folder.container.Name, dstPath, nil)
-	return err
+	if err != nil {
+		return fmt.Errorf("copy Swift object %q -> %q: %w", srcPath, dstPath, err)
+	}
+	return nil
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
@@ -184,27 +142,8 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 			continue
 		}
 		if err != nil {
-			return NewError(err, "Unable to delete object %v", path)
+			return fmt.Errorf("delete Swift object %q: %w", path, err)
 		}
 	}
 	return nil
-}
-
-func (folder *Folder) Hash() storage.Hash {
-	hash := fnv.New64a()
-
-	addToHash := func(data []byte) {
-		_, err := hash.Write(data)
-		if err != nil {
-			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
-			panic(err)
-		}
-	}
-
-	addToHash([]byte("swift"))
-	addToHash([]byte(folder.container.Name))
-	addToHash([]byte(folder.path))
-	addToHash([]byte(folder.connection.UserName))
-
-	return storage.Hash(hash.Sum64())
 }

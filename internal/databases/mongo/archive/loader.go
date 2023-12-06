@@ -72,10 +72,11 @@ type StorageDownloader struct {
 
 // NewStorageDownloader builds mongodb downloader.
 func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return nil, err
 	}
+	folder := st.RootFolder()
 	return &StorageDownloader{rootFolder: folder,
 			oplogsFolder:  folder.GetSubFolder(opts.oplogsPath),
 			backupsFolder: folder.GetSubFolder(opts.backupsPath)},
@@ -277,13 +278,13 @@ type StoragePurger struct {
 
 // NewStoragePurger builds mongodb StoragePurger.
 func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return nil, err
 	}
 
-	return &StoragePurger{oplogsFolder: folder.GetSubFolder(opts.oplogsPath),
-		backupsFolder: folder.GetSubFolder(opts.backupsPath)}, nil
+	return &StoragePurger{oplogsFolder: st.RootFolder().GetSubFolder(opts.oplogsPath),
+		backupsFolder: st.RootFolder().GetSubFolder(opts.backupsPath)}, nil
 }
 
 // DeleteBackups purges given backups files

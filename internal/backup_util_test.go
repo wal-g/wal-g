@@ -124,7 +124,7 @@ func TestGetGarbageFromPrefix(t *testing.T) {
 	nonGarbage := []internal.BackupTime{{BackupName: "backup", Time: time.Now(), WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ"}}
 
 	for _, prefix := range backupNames {
-		folders = append(folders, memory.NewFolder(prefix, memory.NewStorage()))
+		folders = append(folders, memory.NewFolder(prefix, memory.NewKVS()))
 	}
 
 	garbage := internal.GetGarbageFromPrefix(folders, nonGarbage)
@@ -137,7 +137,7 @@ func TestGetGarbageFromPrefix_emptyNonGarbage(t *testing.T) {
 	nonGarbage := make([]internal.BackupTime, 0)
 
 	for _, prefix := range backupNames {
-		folders = append(folders, memory.NewFolder(prefix, memory.NewStorage()))
+		folders = append(folders, memory.NewFolder(prefix, memory.NewKVS()))
 	}
 
 	garbage := internal.GetGarbageFromPrefix(folders, nonGarbage)

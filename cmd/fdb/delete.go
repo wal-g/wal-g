@@ -47,40 +47,40 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(folder)
+	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(folder)
+	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(args []string) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(folder)
+	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
 
 func runDeleteRetainAfter(args []string) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(folder)
+	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetainAfter(args, confirmed)

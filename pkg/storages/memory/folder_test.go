@@ -7,5 +7,5 @@ import (
 )
 
 func TestMemoryFolder(t *testing.T) {
-	storage.RunFolderTest(NewFolder("in_memory/", NewStorage()), t)
+	storage.RunFolderTest(NewFolder("in_memory/", NewKVS()), t)
 }

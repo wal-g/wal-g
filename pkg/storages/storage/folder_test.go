@@ -17,7 +17,7 @@ import (
 )
 
 func TestListFolderRecursively(t *testing.T) {
-	var folder = memory.NewFolder("in_memory/", memory.NewStorage())
+	var folder = memory.NewFolder("in_memory/", memory.NewKVS())
 	paths := []string{
 		"a",
 		"subfolder1/b",
@@ -43,7 +43,7 @@ func TestListFolderRecursively(t *testing.T) {
 }
 
 func TestListFolderRecursivelyWithFilter(t *testing.T) {
-	var folder = memory.NewFolder("in_memory/", memory.NewStorage())
+	var folder = memory.NewFolder("in_memory/", memory.NewKVS())
 	includedObjNames := []string{
 		"basebackups_005/base_123_backup_stop_sentinel.json",
 		"basebackups_005/base_456_backup_stop_sentinel.json",
@@ -93,13 +93,11 @@ func TestListFolderRecursivelyWithFilter_MultiStorage(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
 	cacheMock := cache.NewMockStatusCache(mockCtrl)
-	memFolder := cache.NamedFolder{
-		Name:   "test",
-		Root:   "",
-		Folder: memory.NewFolder("", memory.NewStorage()),
+	cacheMock.EXPECT().SpecificStorage("test").Return(true, nil)
+	storages := map[string]storage.Folder{
+		"test": memory.NewFolder("mem/", memory.NewKVS()),
 	}
-	cacheMock.EXPECT().SpecificStorage("test").Return(&memFolder, nil)
-	folder := multistorage.NewFolder(cacheMock)
+	folder := multistorage.NewFolder(storages, cacheMock)
 	folder, err := multistorage.UseSpecificStorage("test", folder)
 	require.NoError(t, err)
 	folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
@@ -161,7 +159,7 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 	}
 
 	t.Run("list single file with prefix name if exists", func(t *testing.T) {
-		folder := memory.NewFolder("memory/", memory.NewStorage())
+		folder := memory.NewFolder("memory/", memory.NewKVS())
 		_ = folder.PutObject("a/b/c/123", &bytes.Buffer{})
 		_ = folder.PutObject("a/b/c/123/waste1", &bytes.Buffer{})
 		_ = folder.PutObject("a/b/c/123/waste2/waste3", &bytes.Buffer{})
@@ -179,7 +177,7 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 	})
 
 	t.Run("list all files in dir with prefix name", func(t *testing.T) {
-		folder := memory.NewFolder("memory/", memory.NewStorage())
+		folder := memory.NewFolder("memory/", memory.NewKVS())
 		_ = folder.PutObject("waste1", &bytes.Buffer{})
 		_ = folder.PutObject("a/111", &bytes.Buffer{})
 		_ = folder.PutObject("a/b/222", &bytes.Buffer{})
@@ -194,7 +192,7 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 	})
 
 	t.Run("list all files for empty prefix", func(t *testing.T) {
-		folder := memory.NewFolder("memory/", memory.NewStorage())
+		folder := memory.NewFolder("memory/", memory.NewKVS())
 		_ = folder.PutObject("000", &bytes.Buffer{})
 		_ = folder.PutObject("a/111", &bytes.Buffer{})
 		_ = folder.PutObject("a/b/222", &bytes.Buffer{})
@@ -208,7 +206,7 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 	})
 
 	t.Run("dont list files and dirs with names starting with prefix", func(t *testing.T) {
-		folder := memory.NewFolder("memory/", memory.NewStorage())
+		folder := memory.NewFolder("memory/", memory.NewKVS())
 		_ = folder.PutObject("a_waste1", &bytes.Buffer{})
 		_ = folder.PutObject("a/111", &bytes.Buffer{})
 		_ = folder.PutObject("a/b/222", &bytes.Buffer{})
