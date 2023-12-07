@@ -30,7 +30,6 @@ func NewLatestBackupSelector() LatestBackupSelector {
 	return LatestBackupSelector{}
 }
 
-// TODO: unit tests
 func (s LatestBackupSelector) Select(folder storage.Folder) (Backup, error) {
 	return GetLatestBackup(folder.GetSubFolder(utility.BaseBackupPath))
 }
