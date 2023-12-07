@@ -112,6 +112,12 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	return file, nil
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	// TODO implement
+	panic("Not implemented yet")
+	return nil
+}
+
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subpath)
 	filePath := folder.GetFilePath(name)

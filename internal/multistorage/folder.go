@@ -567,6 +567,12 @@ func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
 	return nil
 }
 
+func (mf Folder) MoveObject(srcPath string, dstPath string) error {
+	// TODO implement
+	panic("Not implemented yet")
+	return nil
+}
+
 var (
 	ErrNoUsedStorages  = fmt.Errorf("no storages are used")
 	ErrNoAliveStorages = fmt.Errorf("no alive storages")

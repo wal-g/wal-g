@@ -376,6 +376,12 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return err
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	// TODO implement
+	panic("Not implemented yet")
+	return nil
+}
+
 func (folder *Folder) joinPath(one string, another string) string {
 	if folder.normalizePrefix {
 		return storage.JoinPath(one, another)

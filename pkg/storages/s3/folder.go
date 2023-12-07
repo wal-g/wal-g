@@ -209,6 +209,12 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return nil
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	// TODO implement
+	panic("Not implemented yet")
+	return nil
+}
+
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	objectPath := folder.Path + objectRelativePath
 	input := &s3.GetObjectInput{

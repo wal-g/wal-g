@@ -41,6 +41,10 @@ type Folder interface {
 	// CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
 	// an error if the source object doesn't exist.
 	CopyObject(srcPath string, dstPath string) error
+
+	// MoveObject moves an object from the source to the destination. There may be inefficient copying of the object
+	// if there are storage limitations.
+	MoveObject(srcPath string, dstPath string) error
 }
 
 type HashableFolder interface {

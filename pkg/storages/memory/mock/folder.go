@@ -89,3 +89,9 @@ func (f *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	return f.MemFolder.CopyObject(srcPath, dstPath)
 }
+
+func (f *Folder) MoveObject(srcPath string, dstPath string) error {
+	// TODO implement
+	panic("Not implemented yet")
+	return nil
+}

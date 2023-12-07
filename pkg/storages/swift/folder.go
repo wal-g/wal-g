@@ -175,6 +175,12 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return err
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	// TODO implement
+	panic("Not implemented yet")
+	return nil
+}
+
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		path := storage.JoinPath(folder.path, objectRelativePath)

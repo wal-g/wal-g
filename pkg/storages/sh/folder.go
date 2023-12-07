@@ -338,6 +338,12 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return nil
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	// TODO implement
+	panic("Not implemented yet")
+	return nil
+}
+
 func (folder *Folder) Hash() storage.Hash {
 	hash := fnv.New64a()
 

@@ -16,7 +16,7 @@ func HandleMoveObject(srcPath string, dstPath string, folder storage.Folder) err
 		return err
 	}
 
-	// err = folder.MoveObject(srcPath, dstPath)
+	err = folder.MoveObject(srcPath, dstPath)
 	if err != nil {
 		return fmt.Errorf("move object failed: %w", err)
 	}
