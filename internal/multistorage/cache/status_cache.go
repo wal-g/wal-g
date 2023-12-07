@@ -2,297 +2,172 @@ package cache
 
 import (
 	"fmt"
-	"math"
-	"sync"
 	"time"
 
 	"github.com/wal-g/tracelog"
 )
 
-//go:generate mockgen -source status_cache.go -destination status_cache_mock.go -package cache
-type StatusCache interface {
-	AllAliveStorages() ([]string, error)
-	FirstAliveStorage() (*string, error)
-	SpecificStorage(name string) (bool, error)
+type Cache interface {
+	// Read the cached state for storages with specified names and split them by relevance according to the cache TTL.
+	Read(storageNames ...string) (relevant, outdated AliveMap, err error)
+
+	// ApplyExplicitCheckResult with specifying which checked storages were alive, and return the new cached state for
+	// all storages with specified names.
+	ApplyExplicitCheckResult(checkResult AliveMap, storageNames ...string) (AliveMap, error)
+
+	// ApplyOperationResult to the cache for a specific storage, indicating whether the storage was alive, and the
+	// weight of the performed operation.
+	ApplyOperationResult(storage string, alive bool, weight int)
+
+	// Flush changes made in memory to the shared cache file.
+	Flush()
 }
 
-type statusCache struct {
-	storagesInOrder []Key
-	ttl             time.Duration
-	checker         AliveChecker
+var _ Cache = &cache{}
 
-	// sharedMem keeps the intra-process cache that's shared between different threads and subsequent storages requests.
-	sharedMem   *storageStatuses
-	sharedMemMu *sync.Mutex
+type cache struct {
+	// usedKeys matches all storage names that can be requested from this cache with corresponding keys.
+	usedKeys map[string]Key
+	ttl      time.Duration
 
-	// sharedFilePath is the path to the file that keeps the inter-process cache that's shared between different command executions.
-	sharedFilePath string
-	sharedFileUse  bool
+	// shMem keeps the intra-process cache that's shared among different threads and subsequent storages requests.
+	shMem *SharedMemory
+
+	// shFile is the path to the file that keeps the inter-process cache that's shared between different command executions.
+	shFile             *SharedFile
+	shFileUsed         bool
+	shFileFlushTimeout time.Duration
 }
 
-type StatusCacheOpt func(c *statusCache)
-
-func WithSharedMemory(mem *storageStatuses, memMu *sync.Mutex) StatusCacheOpt {
-	return func(c *statusCache) {
-		c.sharedMem = mem
-		c.sharedMemMu = memMu
-	}
-}
-
-func WithSharedFile(filePath string) StatusCacheOpt {
-	return func(c *statusCache) {
-		c.sharedFilePath = filePath
-		c.sharedFileUse = true
-	}
-}
-
-func WithoutSharedFile() StatusCacheOpt {
-	return func(c *statusCache) {
-		c.sharedFileUse = false
-	}
-}
-
-func NewStatusCache(
-	storagesInOrder []Key,
+func New(
+	usedKeys map[string]Key,
 	ttl time.Duration,
-	checker AliveChecker,
-	opts ...StatusCacheOpt,
-) StatusCache {
-	homeFileUse := true
-	homeFilePath, err := HomeStatusFile()
+	sharedMem *SharedMemory,
+	sharedFile *SharedFile,
+) Cache {
+	return &cache{
+		usedKeys:           usedKeys,
+		ttl:                ttl,
+		shMem:              sharedMem,
+		shFile:             sharedFile,
+		shFileUsed:         sharedFile != nil,
+		shFileFlushTimeout: 5 * time.Minute,
+	}
+}
+
+func (c *cache) Read(storageNames ...string) (relevant, outdated AliveMap, err error) {
+	c.shMem.Lock()
+	defer c.shMem.Unlock()
+
+	storageKeys, err := c.correspondingKeys(storageNames...)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't use storage status cache file from $HOME: %v", err)
-		homeFileUse = false
+		return nil, nil, err
 	}
 
-	c := &statusCache{
-		storagesInOrder: storagesInOrder,
-		ttl:             ttl,
-		checker:         checker,
-
-		sharedMem:      &globalMemCache,
-		sharedMemMu:    globalMemCacheMu,
-		sharedFilePath: homeFilePath,
-		sharedFileUse:  homeFileUse,
+	allMemRelevant := c.shMem.Statuses.isRelevant(c.ttl, storageKeys...)
+	if allMemRelevant {
+		return c.shMem.Statuses.aliveMap(), nil, nil
 	}
 
-	for _, o := range opts {
-		o(c)
+	fileStatuses, err := c.shFile.read()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to read storage status cache file %q: %v", c.shFile.Path, err)
 	}
+	memAndFileMerged := mergeByRelevance(c.shMem.Statuses, fileStatuses)
 
-	return c
+	c.shMem.Statuses = memAndFileMerged
+
+	relevantStatuses, outdatedStatuses := memAndFileMerged.splitByRelevance(c.ttl, storageKeys)
+	return relevantStatuses.aliveMap(), outdatedStatuses.aliveMap(), nil
 }
 
-func (c *statusCache) AllAliveStorages() (allAlive []string, err error) {
-	c.sharedMemMu.Lock()
-	defer c.sharedMemMu.Unlock()
+func (c *cache) ApplyExplicitCheckResult(checkResult AliveMap, storageNames ...string) (AliveMap, error) {
+	c.shMem.Lock()
+	defer c.shMem.Unlock()
 
-	if c.sharedMem.isRelevant(c.ttl, c.storagesInOrder...) {
-		allAlive = c.sharedMem.getAllAlive(c.storagesInOrder)
-		if len(allAlive) > 0 {
-			return allAlive, nil
+	checkResultByKeys := make(map[Key]bool, len(checkResult))
+	for _, key := range c.usedKeys {
+		if res, ok := checkResult[key.Name]; ok {
+			checkResultByKeys[key] = res
 		}
 	}
 
-	var oldFile storageStatuses
-	if c.sharedFileUse {
-		oldFile, err = readFile(c.sharedFilePath)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
-		}
-	}
-	relevant, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
-	if len(outdated) == 0 {
-		c.sharedMem = &oldFile
-		allAlive = c.sharedMem.getAllAlive(c.storagesInOrder)
-		if len(allAlive) > 0 {
-			tracelog.InfoLogger.Printf("Take all alive storages from file cache: %v", allAlive)
-			return allAlive, nil
-		}
-	}
+	c.shMem.Statuses = c.shMem.Statuses.applyExplicitCheckResult(checkResultByKeys)
 
-	newFile := oldFile
-	if len(outdated) > 0 {
-		tracelog.InfoLogger.Printf(
-			"Storage status cache is outdated, checking for alive again: %v",
-			storageNames(outdated),
-		)
-		checkResult := c.checkForAlive(outdated...)
-		newFile = updateFileContent(oldFile, checkResult)
-		allAlive = newFile.getAllAlive(c.storagesInOrder)
+	storageKeys, err := c.correspondingKeys(storageNames...)
+	if err != nil {
+		return nil, err
 	}
+	aliveMap := c.shMem.Statuses.filter(storageKeys).aliveMap()
 
-	defer func() {
-		c.storeStatuses(newFile)
-		tracelog.InfoLogger.Printf("Found alive storages: %v", allAlive)
-	}()
-
-	if len(allAlive) > 0 {
-		return allAlive, nil
+	if !c.shFileUsed {
+		return aliveMap, nil
 	}
-
-	if len(relevant) > 0 {
-		tracelog.InfoLogger.Printf(
-			"All storages are dead in cache, rechecking relevant ones: %v",
-			storageNames(relevant),
-		)
-		checkResult := c.checkForAlive(relevant...)
-		newFile = updateFileContent(newFile, checkResult)
-		allAlive = newFile.getAllAlive(c.storagesInOrder)
+	shFileRelevant := time.Since(c.shFile.Updated) < c.shFileFlushTimeout
+	if shFileRelevant {
+		return aliveMap, nil
 	}
-
-	return allAlive, nil
+	err = c.shFile.write(c.shMem.Statuses)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to apply check result to storage status cache file %q: %v", c.shFile.Path, err)
+	}
+	return aliveMap, nil
 }
 
-func (c *statusCache) FirstAliveStorage() (firstAlive *string, err error) {
-	c.sharedMemMu.Lock()
-	defer c.sharedMemMu.Unlock()
-
-	memFirstAlive, allRelevant := c.sharedMem.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
-	if memFirstAlive != nil {
-		return &memFirstAlive.Name, nil
-	}
-	if allRelevant {
-		tracelog.InfoLogger.Print("There are no alive storages in memory cache")
-	}
-
-	var oldFile storageStatuses
-	if c.sharedFileUse {
-		oldFile, err = readFile(c.sharedFilePath)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
+func (c *cache) correspondingKeys(names ...string) ([]Key, error) {
+	keys := make([]Key, len(names))
+	for _, name := range names {
+		key, ok := c.usedKeys[name]
+		if !ok {
+			return nil, fmt.Errorf("unknown storage %q", name)
 		}
+		keys = append(keys, key)
 	}
-	fileFirstAlive, allRelevant := oldFile.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
-	if fileFirstAlive != nil {
-		tracelog.InfoLogger.Printf("Take first alive storage from file cache: %s", fileFirstAlive.Name)
-		(*c.sharedMem)[*fileFirstAlive] = oldFile[*fileFirstAlive]
-		return &fileFirstAlive.Name, nil
-	}
-	if allRelevant {
-		tracelog.InfoLogger.Print("There are no alive storages in file cache")
-	}
-
-	relevant, outdated := oldFile.splitByRelevance(c.ttl, c.storagesInOrder)
-
-	newFile := oldFile
-	if len(outdated) > 0 {
-		tracelog.InfoLogger.Printf("Storage status cache is outdated, checking for alive again: %v", storageNames(outdated))
-		checkResult := c.checkForAlive(outdated...)
-		newFile = updateFileContent(newFile, checkResult)
-		firstAliveKey, _ := newFile.getRelevantFirstAlive(time.Duration(math.MaxInt64), c.storagesInOrder)
-		if firstAliveKey != nil {
-			firstAlive = &firstAliveKey.Name
-		}
-	}
-
-	defer func() {
-		c.storeStatuses(newFile)
-		if firstAlive == nil {
-			tracelog.InfoLogger.Print("Found no alive storages")
-		} else {
-			tracelog.InfoLogger.Printf("First found alive storage: %s", *firstAlive)
-		}
-	}()
-
-	if firstAlive != nil {
-		return firstAlive, nil
-	}
-
-	if len(relevant) > 0 {
-		tracelog.InfoLogger.Printf("All storages are dead in cache, rechecking relevant ones: %v", storageNames(relevant))
-		checkResult := c.checkForAlive(relevant...)
-		newFile = updateFileContent(newFile, checkResult)
-		firstAliveKey, _ := newFile.getRelevantFirstAlive(time.Duration(math.MaxInt64), c.storagesInOrder)
-		if firstAliveKey != nil {
-			firstAlive = &firstAliveKey.Name
-		}
-	}
-
-	return firstAlive, nil
+	return keys, nil
 }
 
-func (c *statusCache) SpecificStorage(name string) (alive bool, err error) {
-	c.sharedMemMu.Lock()
-	defer c.sharedMemMu.Unlock()
+func (c *cache) ApplyOperationResult(storage string, alive bool, weight int) {
+	c.shMem.Lock()
+	defer c.shMem.Unlock()
 
-	var specific *Key
-	for _, s := range c.storagesInOrder {
-		if s.Name == name {
-			cpy := s
-			specific = &cpy
+	var key Key
+	for _, k := range c.usedKeys {
+		if k.Name == storage {
+			key = k
+			break
 		}
 	}
-	if specific == nil {
-		return false, fmt.Errorf("unknown storage %q", name)
+
+	c.shMem.Statuses[key] = c.shMem.Statuses[key].applyOperationResult(alive, weight, time.Now())
+
+	if !c.shFileUsed {
+		return
 	}
-
-	if c.sharedMem.isRelevant(c.ttl, *specific) {
-		if (*c.sharedMem)[*specific].Alive {
-			return true, nil
-		}
-		tracelog.InfoLogger.Printf("Storage is dead in memory cache: %s", specific.Name)
+	shFileRelevant := time.Since(c.shFile.Updated) < c.shFileFlushTimeout
+	if shFileRelevant {
+		return
 	}
-
-	var oldFile storageStatuses
-	if c.sharedFileUse {
-		oldFile, err = readFile(c.sharedFilePath)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to read cache file, it will be overwritten: %v", err)
-		}
+	err := c.shFile.write(c.shMem.Statuses)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to apply operation result to storage status cache file %q: %v", c.shFile.Path, err)
 	}
-	if oldFile.isRelevant(c.ttl, *specific) {
-		(*c.sharedMem)[*specific] = oldFile[*specific]
-		if oldFile[*specific].Alive {
-			tracelog.InfoLogger.Printf("Storage is alive in file cache: %s", specific.Name)
-			return true, nil
-		}
-		tracelog.InfoLogger.Printf("Storage is dead in file cache: %s", specific.Name)
-	} else {
-		tracelog.InfoLogger.Printf("Storage status is outdated in file cache: %s", specific.Name)
-	}
-
-	tracelog.InfoLogger.Printf("Checking for alive again: %s", specific.Name)
-
-	checkResult := c.checkForAlive(*specific)
-
-	newFile := updateFileContent(oldFile, checkResult)
-	c.storeStatuses(newFile)
-
-	if (*c.sharedMem)[*specific].Alive {
-		tracelog.InfoLogger.Printf("Storage is alive: %s", specific.Name)
-		return true, nil
-	}
-	tracelog.InfoLogger.Printf("Storage is dead: %s", specific.Name)
-	return false, nil
 }
 
-func (c *statusCache) storeStatuses(new storageStatuses) {
-	if c.sharedFileUse {
-		err := writeFile(c.sharedFilePath, new)
-		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to write cache file, each subsequent command will check the storages again: %v", err)
-		}
+func (c *cache) Flush() {
+	if !c.shFileUsed {
+		return
 	}
 
-	c.sharedMem = &new
-}
+	c.shMem.Lock()
+	defer c.shMem.Unlock()
 
-func (c *statusCache) checkForAlive(storageKeys ...Key) map[Key]bool {
-	nameResult := c.checker.CheckForAlive(storageNames(storageKeys)...)
-	keyResult := make(map[Key]bool, len(nameResult))
-	for _, key := range storageKeys {
-		if res, ok := nameResult[key.Name]; ok {
-			keyResult[key] = res
-		}
+	fileStatuses, err := c.shFile.read()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to read storage status cache file to merge it with memory %q: %v", c.shFile.Path, err)
 	}
-	return keyResult
-}
-
-func storageNames(keys []Key) []string {
-	names := make([]string, len(keys))
-	for i, k := range keys {
-		names[i] = k.Name
+	memAndFileMerged := mergeByRelevance(c.shMem.Statuses, fileStatuses)
+	err = c.shFile.write(memAndFileMerged)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to flush storage status cache file: %v", err)
 	}
-	return names
 }

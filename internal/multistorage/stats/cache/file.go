@@ -5,63 +5,25 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
 )
 
-// HomeStatusFile is the default file for storing cache on disk that is shared between all WAL-G processes and commands.
-var HomeStatusFile = func() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("can't get user home dir: %w", err)
+type SharedFile struct {
+	Path    string
+	Updated time.Time
+}
+
+func NewSharedFile(path string) *SharedFile {
+	return &SharedFile{
+		Path:    path,
+		Updated: time.Now(),
 	}
-
-	return filepath.Join(homeDir, ".walg_storage_status_cache"), nil
 }
 
-type storageStatuses map[Key]status
-
-type Key struct {
-	Name string
-	Hash string
-}
-
-func ParseKey(str string) Key {
-	delim := strings.LastIndex(str, "#")
-	return Key{str[:delim], str[delim+1:]}
-}
-
-func (k Key) String() string {
-	return fmt.Sprintf("%s#%s", k.Name, k.Hash)
-}
-
-type status struct {
-	Alive   bool      `json:"alive"`
-	Checked time.Time `json:"checked"`
-}
-
-func updateFileContent(oldContent storageStatuses, checkResult map[Key]bool) (newContent storageStatuses) {
-	newContent = make(storageStatuses, len(oldContent))
-	for key, status := range oldContent {
-		newContent[key] = status
-	}
-
-	checkTime := time.Now()
-	for key, alive := range checkResult {
-		newContent[key] = status{
-			Alive:   alive,
-			Checked: checkTime,
-		}
-	}
-
-	return newContent
-}
-
-func readFile(path string) (storageStatuses, error) {
-	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
+func (sf *SharedFile) read() (storageStatuses, error) {
+	file, err := os.OpenFile(sf.Path, os.O_RDONLY, 0666)
 	if err != nil {
 		return nil, fmt.Errorf("open cache file: %w", err)
 	}
@@ -77,7 +39,7 @@ func readFile(path string) (storageStatuses, error) {
 		return nil, fmt.Errorf("read cache file: %w", err)
 	}
 
-	var validJSONContent map[string]status
+	var validJSONContent map[string]storageStatus
 	err = json.Unmarshal(bytes, &validJSONContent)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal cache file content: %w", err)
@@ -90,8 +52,8 @@ func readFile(path string) (storageStatuses, error) {
 	return content, nil
 }
 
-func writeFile(path string, content storageStatuses) error {
-	validJSONContent := make(map[string]status, len(content))
+func (sf *SharedFile) write(content storageStatuses) error {
+	validJSONContent := make(map[string]storageStatus, len(content))
 	for key, stat := range content {
 		validJSONContent[key.String()] = stat
 	}
@@ -100,7 +62,7 @@ func writeFile(path string, content storageStatuses) error {
 		return fmt.Errorf("marshal cache file content: %w", err)
 	}
 
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(sf.Path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return fmt.Errorf("open cache file: %w", err)
 	}
