@@ -17,7 +17,7 @@ type Cache interface {
 
 	// ApplyOperationResult to the cache for a specific storage, indicating whether the storage was alive, and the
 	// weight of the performed operation.
-	ApplyOperationResult(storage string, alive bool, weight int)
+	ApplyOperationResult(storage string, alive bool, weight float64)
 
 	// Flush changes made in memory to the shared cache file.
 	Flush()
@@ -126,7 +126,7 @@ func (c *cache) correspondingKeys(names ...string) ([]Key, error) {
 	return keys, nil
 }
 
-func (c *cache) ApplyOperationResult(storage string, alive bool, weight int) {
+func (c *cache) ApplyOperationResult(storage string, alive bool, weight float64) {
 	c.shMem.Lock()
 	defer c.shMem.Unlock()
 

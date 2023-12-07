@@ -2,7 +2,7 @@ package stats
 
 import "math"
 
-type OperationWeight int
+type OperationWeight float64
 
 var (
 	OperationExists OperationWeight = 1_000

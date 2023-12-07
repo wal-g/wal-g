@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
@@ -56,7 +57,8 @@ func configureStatsCollector(storages NamedStorages, config *Config) stats.Colle
 		return stats.NewNopCollector(storages.Names())
 
 	default:
-		panic("can't init multi-storage stats collector")
+		tracelog.ErrorLogger.Printf("Failed to init multi-storage stats collector: nop collector will be used")
+		return stats.NewNopCollector(storages.Names())
 	}
 }
 

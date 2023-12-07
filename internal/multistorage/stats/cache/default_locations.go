@@ -31,7 +31,8 @@ func pathInHomeOrTmp(name string) string {
 	if err == nil {
 		return filepath.Join(homeDir, name)
 	}
-	tracelog.DebugLogger.Printf("Failed to get user HOME dir: %v", err)
+	tmpDir := "/tmp"
+	tracelog.DebugLogger.Printf("Failed to get user HOME dir, will use %q instead: %q", tmpDir, err)
 
-	return filepath.Join("/tmp", name)
+	return filepath.Join(tmpDir, name)
 }

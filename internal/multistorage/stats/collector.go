@@ -109,7 +109,7 @@ func (c *collector) SpecificStorage(name string) (bool, error) {
 }
 
 func (c *collector) ReportOperationResult(storage string, opWeight OperationWeight, success bool) {
-	c.cache.ApplyOperationResult(storage, success, int(opWeight))
+	c.cache.ApplyOperationResult(storage, success, float64(opWeight))
 }
 
 func (c *collector) Close() error {

@@ -14,6 +14,7 @@ type Key struct {
 	Hash string
 }
 
+// TODO: Unit tests
 func ParseKey(str string) Key {
 	delim := strings.LastIndex(str, "#")
 	return Key{str[:delim], str[delim+1:]}
@@ -25,7 +26,7 @@ func (k Key) String() string {
 
 // Aliveness measured in arbitrary units and shows how much a storage is alive. When some operation is performed with
 // this storage, the metrica is increased or decreased based on the result of the operation and its weight.
-type Aliveness int
+type Aliveness float64
 
 type storageStatus struct {
 	// PotentialAliveness is the maximum Aliveness value, as if all operations with this storage were successful.
@@ -35,16 +36,26 @@ type storageStatus struct {
 	// If it is equal to PotentialAliveness, the storage is fully alive. If it is 0, the storage is fully dead.
 	ActualAliveness Aliveness `json:"actual_aliveness"`
 
+	// WasAlive is the previous storageStatus.alive() result, that was actual before the latest check.
+	WasAlive bool `json:"previous_aliveness"`
+
 	Updated time.Time `json:"updated"`
 }
 
 const (
-	aliveLimitNumerator   = 95
-	aliveLimitDenominator = 100
+	// aliveLimit is used to mark the storage alive when its Aliveness reaches this value
+	aliveLimit Aliveness = 0.99
+
+	// deadLimit is used to mark the storage dead when its Aliveness falls below this value
+	deadLimit Aliveness = 0.95
 )
 
 func (s storageStatus) alive() bool {
-	return s.ActualAliveness >= s.PotentialAliveness*aliveLimitNumerator/aliveLimitDenominator
+	if s.WasAlive {
+		return s.ActualAliveness >= s.PotentialAliveness*deadLimit
+	} else {
+		return s.ActualAliveness >= s.PotentialAliveness*aliveLimit
+	}
 }
 
 func (s storageStatus) applyExplicitCheckResult(alive bool, checkTime time.Time) storageStatus {
@@ -52,42 +63,41 @@ func (s storageStatus) applyExplicitCheckResult(alive bool, checkTime time.Time)
 		return storageStatus{
 			PotentialAliveness: s.PotentialAliveness,
 			ActualAliveness:    s.PotentialAliveness,
+			WasAlive:           true,
 			Updated:            checkTime,
 		}
 	} else {
 		return storageStatus{
 			PotentialAliveness: s.PotentialAliveness,
 			ActualAliveness:    0,
+			WasAlive:           true,
 			Updated:            checkTime,
 		}
 	}
 }
 
-func (s storageStatus) applyOperationResult(alive bool, weight int, checkTime time.Time) storageStatus {
+func (s storageStatus) applyOperationResult(alive bool, weight float64, checkTime time.Time) storageStatus {
 	if alive {
 		return storageStatus{
 			PotentialAliveness: expMovingAverage(s.PotentialAliveness, weight),
 			ActualAliveness:    expMovingAverage(s.ActualAliveness, weight),
+			WasAlive:           s.alive(),
 			Updated:            checkTime,
 		}
 	} else {
 		return storageStatus{
 			PotentialAliveness: expMovingAverage(s.PotentialAliveness, weight),
 			ActualAliveness:    expMovingAverage(s.ActualAliveness, 0),
+			WasAlive:           s.alive(),
 			Updated:            checkTime,
 		}
 	}
 }
 
-const (
-	emaAlphaNumerator       = 875
-	emaAlphaDenominator     = 1000
-	ema1MinusAlphaNumerator = emaAlphaDenominator - emaAlphaNumerator
-)
+const emaAlpha = 0.875
 
-func expMovingAverage(prevAverage Aliveness, newValue int) Aliveness {
-	return (prevAverage * emaAlphaNumerator / emaAlphaDenominator) +
-		(Aliveness(newValue) * ema1MinusAlphaNumerator / emaAlphaDenominator)
+func expMovingAverage(prevAverage Aliveness, newValue float64) Aliveness {
+	return (prevAverage * emaAlpha) + (Aliveness(newValue) * (1 - emaAlpha))
 }
 
 type storageStatuses map[Key]storageStatus
@@ -156,11 +166,7 @@ func (ss storageStatuses) filter(storages []Key) storageStatuses {
 func (ss storageStatuses) aliveMap() AliveMap {
 	aliveMap := make(AliveMap, len(ss))
 	for key, status := range ss {
-		if status.alive() {
-			aliveMap[key.Name] = true
-		} else {
-			aliveMap[key.Name] = false
-		}
+		aliveMap[key.Name] = status.alive()
 	}
 	return aliveMap
 }
