@@ -30,7 +30,6 @@ func NewLatestBackupSelector() LatestBackupSelector {
 	return LatestBackupSelector{}
 }
 
-// TODO: unit tests
 func (s LatestBackupSelector) Select(folder storage.Folder) (Backup, error) {
 	return GetLatestBackup(folder.GetSubFolder(utility.BaseBackupPath))
 }
@@ -52,7 +51,6 @@ func NewUserDataBackupSelector(userDataRaw string, metaFetcher GenericMetaFetche
 	}, nil
 }
 
-// TODO: unit tests
 func (s UserDataBackupSelector) Select(folder storage.Folder) (Backup, error) {
 	return s.findBackupByUserData(s.userData, folder)
 }
@@ -145,7 +143,6 @@ func NewBackupNameSelector(backupName string, checkExistence bool) (BackupNameSe
 	return BackupNameSelector{backupName: backupName, checkExistence: checkExistence}, nil
 }
 
-// TODO: unit tests
 func (s BackupNameSelector) Select(folder storage.Folder) (Backup, error) {
 	if !s.checkExistence {
 		return NewBackupInStorage(folder, s.backupName, consts.DefaultStorage)
@@ -208,7 +205,6 @@ func NewOldestNonPermanentSelector(metaFetcher GenericMetaFetcher) *OldestNonPer
 	return &OldestNonPermanentSelector{metaFetcher: metaFetcher}
 }
 
-// TODO: unit tests
 func (s *OldestNonPermanentSelector) Select(folder storage.Folder) (Backup, error) {
 	searchFn := func(d GenericMetadata) bool {
 		if !d.IsPermanent {

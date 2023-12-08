@@ -46,17 +46,17 @@ var backupFetchCmd = &cobra.Command{
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder, err := postgres.ConfigureMultiStorageFolder(false)
+		storage, err := postgres.ConfigureMultiStorage(false)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
+		rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.UniteAllStorages)
 		if targetStorage == "" {
-			folder, err = multistorage.UseAllAliveStorages(folder)
+			rootFolder, err = multistorage.UseAllAliveStorages(rootFolder)
 		} else {
-			folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+			rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 		}
 		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.InfoLogger.Printf("Backup to fetch will be searched in storages: %v", multistorage.UsedStorages(folder))
+		tracelog.InfoLogger.Printf("Backup to fetch will be searched in storages: %v", multistorage.UsedStorages(rootFolder))
 
 		if partialRestoreArgs != nil {
 			skipRedundantTars = true
@@ -80,7 +80,7 @@ var backupFetchCmd = &cobra.Command{
 			pgFetcher = postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
-		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
+		internal.HandleBackupFetch(rootFolder, targetBackupSelector, pgFetcher)
 	},
 }
 

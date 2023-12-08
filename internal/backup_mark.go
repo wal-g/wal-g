@@ -183,7 +183,7 @@ type BackupHasPermanentBackupInFutureError struct {
 
 func newBackupHasPermanentBackupInFutureError(backupName string) BackupHasPermanentBackupInFutureError {
 	return BackupHasPermanentBackupInFutureError{
-		errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup.",
+		errors.Errorf("Can't mark backup '%s' as impermanent. There is permanent increment backup that depends on this backup.",
 			backupName)}
 }
 

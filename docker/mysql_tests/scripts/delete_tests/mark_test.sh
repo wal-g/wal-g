@@ -3,6 +3,9 @@ set -e -x
 
 . /usr/local/export_common.sh
 
+#
+# In this test we cover basic `wal-g backup-mark` features
+#
 export WALE_S3_PREFIX=s3://mysqlmarkbucket
 
 

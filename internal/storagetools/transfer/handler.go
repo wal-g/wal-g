@@ -38,18 +38,18 @@ func NewHandler(
 	fileLister FileLister,
 	cfg *HandlerConfig,
 ) (*Handler, error) {
-	sourceFolder, err := exec.ConfigureStorage(sourceStorage)
+	source, err := exec.ConfigureStorage(sourceStorage)
 	if err != nil {
 		return nil, fmt.Errorf("configure source storage folder: %w", err)
 	}
-	targetFolder, err := exec.ConfigureStorage(targetStorage)
+	target, err := exec.ConfigureStorage(targetStorage)
 	if err != nil {
 		return nil, fmt.Errorf("configure target storage folder: %w", err)
 	}
 
 	return &Handler{
-		source:          sourceFolder,
-		target:          targetFolder,
+		source:          source.RootFolder(),
+		target:          target.RootFolder(),
 		fileLister:      fileLister,
 		cfg:             cfg,
 		fileStatuses:    new(sync.Map),

@@ -13,12 +13,12 @@ import (
 
 // HandleCopyBackup copy specific backups from one storage to another
 func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
-	var from, fromError = internal.FolderFromConfig(fromConfigFile)
-	var to, toError = internal.FolderFromConfig(toConfigFile)
+	var from, fromError = internal.StorageFromConfig(fromConfigFile)
+	var to, toError = internal.StorageFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := backupCopyingInfo(backupName, prefix, from, to)
+	infos, err := backupCopyingInfo(backupName, prefix, from.RootFolder(), to.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Printf("copying files %s\n", strings.Join(func() []string {
@@ -37,12 +37,12 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 
 // HandleCopyBackup copy  all backups from one storage to another
 func HandleCopyAll(fromConfigFile string, toConfigFile string) {
-	var from, fromError = internal.FolderFromConfig(fromConfigFile)
-	var to, toError = internal.FolderFromConfig(toConfigFile)
+	var from, fromError = internal.StorageFromConfig(fromConfigFile)
+	var to, toError = internal.StorageFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := WildcardInfo(from, to)
+	infos, err := WildcardInfo(from.RootFolder(), to.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = copy.Infos(infos)
 	tracelog.ErrorLogger.FatalOnError(err)

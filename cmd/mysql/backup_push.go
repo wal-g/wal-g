@@ -12,8 +12,9 @@ import (
 const (
 	backupPushShortDescription = "Creates new backup and pushes it to storage"
 	permanentFlag              = "permanent"
-	permanentShorthand         = "p"
 	addUserDataFlag            = "add-user-data"
+
+	permanentShorthand = "p"
 )
 
 var (
@@ -41,7 +42,15 @@ var (
 				userData = viper.GetString(internal.SentinelUserDataSetting)
 			}
 
-			mysql.HandleBackupPush(folder, uploader, backupCmd, permanent, userData)
+			mysql.HandleBackupPush(
+				folder,
+				uploader,
+				backupCmd,
+				permanent,
+				true,
+				userData,
+				mysql.NewNoDeltaBackupConfigurator(),
+			)
 		},
 	}
 	permanent = false

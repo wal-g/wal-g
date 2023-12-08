@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -15,23 +15,18 @@ func TestSHFolder(t *testing.T) {
 		t.Skip("Credentials needed to run SSH tests")
 	}
 
-	var storageFolder storage.Folder
-
-	storageFolder, err := ConfigureFolder(
+	st, err := ConfigureStorage(
 		// Configuration source docker/pg_tests/scripts/configs/ssh_backup_test_config.json
 		fmt.Sprintf("ssh://wal-g_ssh/tmp/sh-folder-test-%x", rand.Int63()),
 		map[string]string{
-			Username:       "root",
-			Port:           "6942",
-			PrivateKeyPath: "/tmp/SSH_KEY", // run in docker on dev machine or CI
+			usernameSetting:       "root",
+			portSetting:           "6942",
+			privateKeyPathSetting: "/tmp/SSH_KEY", // run in docker on dev machine or CI
 			// PrivateKeyPath: "../../../docker/pg/SSH_KEY", // local manual run on dev machine
 		},
 	)
 
-	assert.NoError(t, err)
-	if t.Failed() {
-		return
-	}
+	require.NoError(t, err)
 
-	storage.RunFolderTest(storageFolder, t)
+	storage.RunFolderTest(st.RootFolder(), t)
 }

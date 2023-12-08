@@ -24,9 +24,9 @@ var binlogReplayCmd = &cobra.Command{
 	Short: "Fetch binlogs from storage and replays them to MySQL",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogReplay(folder, replayBackupName, replayUntilTS, replayUntilBinlogLastModifiedTS)
+		mysql.HandleBinlogReplay(storage.RootFolder(), replayBackupName, replayUntilTS, replayUntilBinlogLastModifiedTS)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		internal.RequiredSettings[internal.MysqlBinlogReplayCmd] = true

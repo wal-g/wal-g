@@ -13,12 +13,12 @@ import (
 
 // HandleCopy copy specific or all backups from one storage to another
 func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withoutHistory bool) {
-	var from, fromError = internal.FolderFromConfig(fromConfigFile)
-	var to, toError = internal.FolderFromConfig(toConfigFile)
+	var from, fromError = internal.StorageFromConfig(fromConfigFile)
+	var to, toError = internal.StorageFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := getCopyingInfos(backupName, from, to, withoutHistory)
+	infos, err := getCopyingInfos(backupName, from.RootFolder(), to.RootFolder(), withoutHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = copy.Infos(infos)
 	tracelog.ErrorLogger.FatalOnError(err)

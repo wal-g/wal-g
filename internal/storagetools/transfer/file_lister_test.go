@@ -13,8 +13,8 @@ import (
 func TestRegularFileLister_ListFilesToMove(t *testing.T) {
 	defaultLister := func() (lister *RegularFileLister, source, target storage.Folder) {
 		lister = NewRegularFileLister("/", false, 100)
-		source = memory.NewFolder("source/", memory.NewStorage())
-		target = memory.NewFolder("target/", memory.NewStorage())
+		source = memory.NewFolder("source/", memory.NewKVS())
+		target = memory.NewFolder("target/", memory.NewKVS())
 		return
 	}
 

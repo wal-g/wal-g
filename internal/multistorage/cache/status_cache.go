@@ -3,24 +3,21 @@ package cache
 import (
 	"fmt"
 	"math"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/multistorage/consts"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 //go:generate mockgen -source status_cache.go -destination status_cache_mock.go -package cache
 type StatusCache interface {
-	AllAliveStorages() ([]NamedFolder, error)
-	FirstAliveStorage() (*NamedFolder, error)
-	SpecificStorage(name string) (*NamedFolder, error)
+	AllAliveStorages() ([]string, error)
+	FirstAliveStorage() (*string, error)
+	SpecificStorage(name string) (bool, error)
 }
 
 type statusCache struct {
-	storagesInOrder []NamedFolder
+	storagesInOrder []Key
 	ttl             time.Duration
 	checker         AliveChecker
 
@@ -56,17 +53,11 @@ func WithoutSharedFile() StatusCacheOpt {
 }
 
 func NewStatusCache(
-	primary storage.Folder,
-	failover map[string]storage.Folder,
+	storagesInOrder []Key,
 	ttl time.Duration,
 	checker AliveChecker,
 	opts ...StatusCacheOpt,
-) (StatusCache, error) {
-	storagesInOrder, err := NameAndOrderFolders(primary, failover)
-	if err != nil {
-		return &statusCache{}, err
-	}
-
+) StatusCache {
 	homeFileUse := true
 	homeFilePath, err := HomeStatusFile()
 	if err != nil {
@@ -89,10 +80,10 @@ func NewStatusCache(
 		o(c)
 	}
 
-	return c, nil
+	return c
 }
 
-func (c *statusCache) AllAliveStorages() (allAlive []NamedFolder, err error) {
+func (c *statusCache) AllAliveStorages() (allAlive []string, err error) {
 	c.sharedMemMu.Lock()
 	defer c.sharedMemMu.Unlock()
 
@@ -115,7 +106,7 @@ func (c *statusCache) AllAliveStorages() (allAlive []NamedFolder, err error) {
 		c.sharedMem = &oldFile
 		allAlive = c.sharedMem.getAllAlive(c.storagesInOrder)
 		if len(allAlive) > 0 {
-			tracelog.InfoLogger.Printf("Take all alive storages from file cache: %v", storageNames(allAlive))
+			tracelog.InfoLogger.Printf("Take all alive storages from file cache: %v", allAlive)
 			return allAlive, nil
 		}
 	}
@@ -126,14 +117,14 @@ func (c *statusCache) AllAliveStorages() (allAlive []NamedFolder, err error) {
 			"Storage status cache is outdated, checking for alive again: %v",
 			storageNames(outdated),
 		)
-		checkResult := c.checker.checkForAlive(outdated...)
+		checkResult := c.checkForAlive(outdated...)
 		newFile = updateFileContent(oldFile, checkResult)
 		allAlive = newFile.getAllAlive(c.storagesInOrder)
 	}
 
 	defer func() {
 		c.storeStatuses(newFile)
-		tracelog.InfoLogger.Printf("Found alive storages: %v", storageNames(allAlive))
+		tracelog.InfoLogger.Printf("Found alive storages: %v", allAlive)
 	}()
 
 	if len(allAlive) > 0 {
@@ -145,7 +136,7 @@ func (c *statusCache) AllAliveStorages() (allAlive []NamedFolder, err error) {
 			"All storages are dead in cache, rechecking relevant ones: %v",
 			storageNames(relevant),
 		)
-		checkResult := c.checker.checkForAlive(relevant...)
+		checkResult := c.checkForAlive(relevant...)
 		newFile = updateFileContent(newFile, checkResult)
 		allAlive = newFile.getAllAlive(c.storagesInOrder)
 	}
@@ -153,13 +144,13 @@ func (c *statusCache) AllAliveStorages() (allAlive []NamedFolder, err error) {
 	return allAlive, nil
 }
 
-func (c *statusCache) FirstAliveStorage() (firstAlive *NamedFolder, err error) {
+func (c *statusCache) FirstAliveStorage() (firstAlive *string, err error) {
 	c.sharedMemMu.Lock()
 	defer c.sharedMemMu.Unlock()
 
 	memFirstAlive, allRelevant := c.sharedMem.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
 	if memFirstAlive != nil {
-		return memFirstAlive, nil
+		return &memFirstAlive.Name, nil
 	}
 	if allRelevant {
 		tracelog.InfoLogger.Print("There are no alive storages in memory cache")
@@ -175,8 +166,8 @@ func (c *statusCache) FirstAliveStorage() (firstAlive *NamedFolder, err error) {
 	fileFirstAlive, allRelevant := oldFile.getRelevantFirstAlive(c.ttl, c.storagesInOrder)
 	if fileFirstAlive != nil {
 		tracelog.InfoLogger.Printf("Take first alive storage from file cache: %s", fileFirstAlive.Name)
-		(*c.sharedMem)[fileFirstAlive.Key] = oldFile[fileFirstAlive.Key]
-		return fileFirstAlive, nil
+		(*c.sharedMem)[*fileFirstAlive] = oldFile[*fileFirstAlive]
+		return &fileFirstAlive.Name, nil
 	}
 	if allRelevant {
 		tracelog.InfoLogger.Print("There are no alive storages in file cache")
@@ -187,9 +178,12 @@ func (c *statusCache) FirstAliveStorage() (firstAlive *NamedFolder, err error) {
 	newFile := oldFile
 	if len(outdated) > 0 {
 		tracelog.InfoLogger.Printf("Storage status cache is outdated, checking for alive again: %v", storageNames(outdated))
-		checkResult := c.checker.checkForAlive(outdated...)
+		checkResult := c.checkForAlive(outdated...)
 		newFile = updateFileContent(newFile, checkResult)
-		firstAlive, _ = newFile.getRelevantFirstAlive(time.Duration(math.MaxInt64), c.storagesInOrder)
+		firstAliveKey, _ := newFile.getRelevantFirstAlive(time.Duration(math.MaxInt64), c.storagesInOrder)
+		if firstAliveKey != nil {
+			firstAlive = &firstAliveKey.Name
+		}
 	}
 
 	defer func() {
@@ -197,7 +191,7 @@ func (c *statusCache) FirstAliveStorage() (firstAlive *NamedFolder, err error) {
 		if firstAlive == nil {
 			tracelog.InfoLogger.Print("Found no alive storages")
 		} else {
-			tracelog.InfoLogger.Printf("First found alive storage: %s", firstAlive.Name)
+			tracelog.InfoLogger.Printf("First found alive storage: %s", *firstAlive)
 		}
 	}()
 
@@ -207,26 +201,35 @@ func (c *statusCache) FirstAliveStorage() (firstAlive *NamedFolder, err error) {
 
 	if len(relevant) > 0 {
 		tracelog.InfoLogger.Printf("All storages are dead in cache, rechecking relevant ones: %v", storageNames(relevant))
-		checkResult := c.checker.checkForAlive(relevant...)
+		checkResult := c.checkForAlive(relevant...)
 		newFile = updateFileContent(newFile, checkResult)
-		firstAlive, _ = newFile.getRelevantFirstAlive(time.Duration(math.MaxInt64), c.storagesInOrder)
+		firstAliveKey, _ := newFile.getRelevantFirstAlive(time.Duration(math.MaxInt64), c.storagesInOrder)
+		if firstAliveKey != nil {
+			firstAlive = &firstAliveKey.Name
+		}
 	}
 
 	return firstAlive, nil
 }
 
-func (c *statusCache) SpecificStorage(name string) (specific *NamedFolder, err error) {
+func (c *statusCache) SpecificStorage(name string) (alive bool, err error) {
 	c.sharedMemMu.Lock()
 	defer c.sharedMemMu.Unlock()
 
-	specific = storageWithName(c.storagesInOrder, name)
+	var specific *Key
+	for _, s := range c.storagesInOrder {
+		if s.Name == name {
+			cpy := s
+			specific = &cpy
+		}
+	}
 	if specific == nil {
-		return nil, fmt.Errorf("unknown storage %q", name)
+		return false, fmt.Errorf("unknown storage %q", name)
 	}
 
 	if c.sharedMem.isRelevant(c.ttl, *specific) {
-		if (*c.sharedMem)[specific.Key].Alive {
-			return specific, nil
+		if (*c.sharedMem)[*specific].Alive {
+			return true, nil
 		}
 		tracelog.InfoLogger.Printf("Storage is dead in memory cache: %s", specific.Name)
 	}
@@ -239,10 +242,10 @@ func (c *statusCache) SpecificStorage(name string) (specific *NamedFolder, err e
 		}
 	}
 	if oldFile.isRelevant(c.ttl, *specific) {
-		(*c.sharedMem)[specific.Key] = oldFile[specific.Key]
-		if oldFile[specific.Key].Alive {
+		(*c.sharedMem)[*specific] = oldFile[*specific]
+		if oldFile[*specific].Alive {
 			tracelog.InfoLogger.Printf("Storage is alive in file cache: %s", specific.Name)
-			return specific, nil
+			return true, nil
 		}
 		tracelog.InfoLogger.Printf("Storage is dead in file cache: %s", specific.Name)
 	} else {
@@ -251,17 +254,17 @@ func (c *statusCache) SpecificStorage(name string) (specific *NamedFolder, err e
 
 	tracelog.InfoLogger.Printf("Checking for alive again: %s", specific.Name)
 
-	checkResult := c.checker.checkForAlive(*specific)
+	checkResult := c.checkForAlive(*specific)
 
 	newFile := updateFileContent(oldFile, checkResult)
 	c.storeStatuses(newFile)
 
-	if (*c.sharedMem)[specific.Key].Alive {
+	if (*c.sharedMem)[*specific].Alive {
 		tracelog.InfoLogger.Printf("Storage is alive: %s", specific.Name)
-		return specific, nil
+		return true, nil
 	}
 	tracelog.InfoLogger.Printf("Storage is dead: %s", specific.Name)
-	return nil, nil
+	return false, nil
 }
 
 func (c *statusCache) storeStatuses(new storageStatuses) {
@@ -275,61 +278,21 @@ func (c *statusCache) storeStatuses(new storageStatuses) {
 	c.sharedMem = &new
 }
 
-func storageWithName(storages []NamedFolder, name string) *NamedFolder {
-	for _, s := range storages {
-		if s.Name == name {
-			sCpy := s
-			return &sCpy
+func (c *statusCache) checkForAlive(storageKeys ...Key) map[Key]bool {
+	nameResult := c.checker.CheckForAlive(storageNames(storageKeys)...)
+	keyResult := make(map[Key]bool, len(nameResult))
+	for _, key := range storageKeys {
+		if res, ok := nameResult[key.Name]; ok {
+			keyResult[key] = res
 		}
 	}
-	return nil
+	return keyResult
 }
 
-func storageNames(folders []NamedFolder) []string {
-	names := make([]string, len(folders))
-	for i, f := range folders {
-		names[i] = f.Name
+func storageNames(keys []Key) []string {
+	names := make([]string, len(keys))
+	for i, k := range keys {
+		names[i] = k.Name
 	}
 	return names
-}
-
-type NamedFolder struct {
-	Key  key
-	Name string
-	Root string
-	storage.Folder
-}
-
-func NameAndOrderFolders(primary storage.Folder, failover map[string]storage.Folder) ([]NamedFolder, error) {
-	hashablePrimary, ok := primary.(storage.HashableFolder)
-	if !ok {
-		return nil, fmt.Errorf("storage \"default\" must be hashabe to be used in multi-storage folder")
-	}
-
-	var failoverFolders []NamedFolder
-	for name, folder := range failover {
-		hashableFolder, ok := folder.(storage.HashableFolder)
-		if !ok {
-			return nil, fmt.Errorf("storage %q must be hashable to be used in multi-storage folder", name)
-		}
-		failoverFolders = append(failoverFolders, NamedFolder{
-			Key:    formatKey(name, hashableFolder.Hash()),
-			Name:   name,
-			Root:   folder.GetPath(),
-			Folder: folder,
-		})
-	}
-	sort.Slice(failoverFolders, func(i, j int) bool { return failoverFolders[i].Key < failoverFolders[j].Key })
-
-	return append(
-		[]NamedFolder{
-			{
-				Key:    formatKey(consts.DefaultStorage, hashablePrimary.Hash()),
-				Name:   consts.DefaultStorage,
-				Root:   primary.GetPath(),
-				Folder: primary,
-			},
-		},
-		failoverFolders...,
-	), nil
 }

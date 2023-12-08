@@ -11,7 +11,7 @@ import (
 )
 
 func CreateMockStorageFolder() storage.Folder {
-	var folder = memory.NewFolder("in_memory/", memory.NewStorage())
+	var folder = memory.NewFolder("in_memory/", memory.NewKVS())
 	subFolder := folder.GetSubFolder("basebackups_005/")
 	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})
 	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}"))

@@ -26,14 +26,14 @@ var backupFetchCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		targetBackupSelector, err := internal.NewBackupNameSelector(args[0], true)
 		tracelog.ErrorLogger.FatalOnError(err)
-		fdb.HandleBackupFetch(ctx, folder, targetBackupSelector, restoreCmd)
+		fdb.HandleBackupFetch(ctx, storage.RootFolder(), targetBackupSelector, restoreCmd)
 	},
 }
 

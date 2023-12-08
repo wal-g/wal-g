@@ -25,7 +25,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 	}
 
 	t.Run("print correct backup details in correct order", func(t *testing.T) {
-		folder := memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc)))
+		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
 		curTime = time.Unix(1690000000, 0)
 		_ = folder.PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
 		_ = folder.PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
@@ -110,34 +110,25 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		t.Cleanup(mockCtrl.Finish)
 		cacheMock := cache.NewMockStatusCache(mockCtrl)
+		cacheMock.EXPECT().AllAliveStorages().Return([]string{"storage_1", "storage_2"}, nil)
+		cacheMock.EXPECT().SpecificStorage("storage_1").Return(true, nil)
+		cacheMock.EXPECT().SpecificStorage("storage_2").Return(true, nil)
 
-		memStorages := []cache.NamedFolder{
-			{
-				Name:   "storage_1",
-				Root:   "",
-				Folder: memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc))),
-			},
-			{
-				Name:   "storage_2",
-				Root:   "",
-				Folder: memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc))),
-			},
+		memFolders := map[string]storage.Folder{
+			"storage_1": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
+			"storage_2": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
 		}
-		cacheMock.EXPECT().AllAliveStorages().Return(memStorages, nil)
-		cacheMock.EXPECT().SpecificStorage("storage_1").Return(&memStorages[0], nil)
-		cacheMock.EXPECT().SpecificStorage("storage_2").Return(&memStorages[1], nil)
-
-		multiFolder := multistorage.NewFolder(cacheMock).(storage.Folder)
+		multiFolder := multistorage.NewFolder(memFolders, cacheMock).(storage.Folder)
 		multiFolder = multistorage.SetPolicies(multiFolder, policies.UniteAllStorages)
 		multiFolder, err := multistorage.UseAllAliveStorages(multiFolder)
 		require.NoError(t, err)
 
 		curTime = time.Unix(1690000000, 0)
-		_ = memStorages[0].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = memStorages[0].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
+		_ = memFolders["storage_1"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memFolders["storage_1"].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
 		curTime = curTime.Add(time.Second)
-		_ = memStorages[1].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = memStorages[1].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
+		_ = memFolders["storage_2"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memFolders["storage_2"].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
 
 		rescueStdout := os.Stdout
 		r, w, _ := os.Pipe()
@@ -192,7 +183,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 	})
 
 	t.Run("handle error with no backups", func(t *testing.T) {
-		folder := memory.NewFolder("", memory.NewStorage(memory.WithCustomTime(curTimeFunc)))
+		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
 
 		infoOutput := new(bytes.Buffer)
 		rescueInfoOutput := tracelog.InfoLogger.Writer()

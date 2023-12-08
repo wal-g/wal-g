@@ -469,7 +469,7 @@ func newAoStorageUploader(
 	baseFiles greenplum.BackupAOFiles, bundleFiles internal.BundleFiles, isIncremental bool,
 	deduplicationAgeLimit time.Duration,
 ) *greenplum.AoStorageUploader {
-	storage := memory.NewStorage()
+	storage := memory.NewKVS()
 	mockUploader := testtools.NewStoringMockUploader(storage)
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, func() (string, bool) {
 		return "", false
