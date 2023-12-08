@@ -4,8 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/utility"
+	"github.com/wal-g/wal-g/internal/databases/etcd"
 )
 
 var confirmed = false
@@ -43,7 +42,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newEtcdDeleteHandler(storage.RootFolder())
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
@@ -53,7 +52,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newEtcdDeleteHandler(storage.RootFolder())
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
@@ -63,7 +62,7 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newEtcdDeleteHandler(storage.RootFolder())
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
@@ -73,29 +72,4 @@ func init() {
 	cmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
-}
-
-func newEtcdDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error) {
-	backups, err := internal.GetBackupSentinelObjects(folder)
-	if err != nil {
-		return nil, err
-	}
-
-	backupObjects := make([]internal.BackupObject, 0, len(backups))
-	for _, object := range backups {
-		backupObjects = append(backupObjects, internal.NewDefaultBackupObject(object))
-	}
-
-	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc()), nil
-}
-
-func makeLessFunc() func(object1, object2 storage.Object) bool {
-	return func(object1, object2 storage.Object) bool {
-		time1, ok1 := utility.TryFetchTimeRFC3999(object1.GetName())
-		time2, ok2 := utility.TryFetchTimeRFC3999(object2.GetName())
-		if !ok1 || !ok2 {
-			return object2.GetLastModified().After(object1.GetLastModified())
-		}
-		return time1 < time2
-	}
 }
