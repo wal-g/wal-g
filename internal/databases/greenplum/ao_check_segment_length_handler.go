@@ -243,11 +243,12 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 }
 
 func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles() (BackupAOFiles, error) {
-	rootFolder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to configure folder")
 		return nil, err
 	}
+	rootFolder := storage.RootFolder()
 	backupsFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
 
 	latestBackup, err := internal.GetLatestBackup(backupsFolder)

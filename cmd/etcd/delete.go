@@ -40,30 +40,30 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newEtcdDeleteHandler(folder)
+	deleteHandler, err := newEtcdDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newEtcdDeleteHandler(folder)
+	deleteHandler, err := newEtcdDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newEtcdDeleteHandler(folder)
+	deleteHandler, err := newEtcdDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
