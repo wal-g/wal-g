@@ -377,8 +377,26 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 }
 
 func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
-	// TODO implement
-	panic("Not implemented yet")
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return storage.NewObjectNotFoundError(srcPath)
+		}
+		return err
+	}
+	sourceFullPath := path.Join(folder.path, srcPath)
+	dstFullPath := path.Join(folder.path, dstPath)
+
+	src := folder.bucket.Object(sourceFullPath)
+	dst := folder.bucket.Object(dstFullPath)
+
+	ctx := context.Background()
+	if _, err := dst.CopierFrom(src).Run(ctx); err != nil {
+		return NewError(err, "Unable to copy an object from source %s to destination %s", sourceFullPath, dstFullPath)
+	}
+	if err := src.Delete(ctx); err != nil {
+		return NewError(err, "Unable to delete source object %v", sourceFullPath)
+	}
+
 	return nil
 }
 
