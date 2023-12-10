@@ -362,21 +362,22 @@ func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
 	}
 
 	srcFullPath := storage.JoinPath(folder.path, srcPath)
+	dstFullPath := storage.JoinPath(folder.path, dstPath)
 
 	var srcClient, dstClient *azblob.BlockBlobClient
 	srcClient, err = folder.containerClient.NewBlockBlobClient(srcFullPath)
 	if err != nil {
 		return NewFolderError(err, "Unable to init Azure Blob client for copy source %s", srcPath)
 	}
-	dstClient, err = folder.containerClient.NewBlockBlobClient(dstPath)
+	dstClient, err = folder.containerClient.NewBlockBlobClient(dstFullPath)
 	if err != nil {
-		return NewFolderError(err, "Unable to init Azure Blob client for copy destination %s", dstPath)
+		return NewFolderError(err, "Unable to init Azure Blob client for copy destination %s", dstFullPath)
 	}
 	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(),
 		&azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
 	if err != nil {
 		return NewFolderError(err, "Unable to copy an object from source %s to destination %s",
-			srcFullPath, dstPath)
+			srcFullPath, dstFullPath)
 	}
 
 	tracelog.DebugLogger.Printf("Delete source object %v\n", srcPath)
