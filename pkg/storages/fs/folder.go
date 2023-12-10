@@ -112,12 +112,6 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	return file, nil
 }
 
-func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
-	// TODO implement
-	panic("Not implemented yet")
-	return nil
-}
-
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subpath)
 	filePath := folder.GetFilePath(name)
@@ -163,6 +157,21 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	err = folder.PutObject(dstPath, file)
 	return err
+}
+
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	src := path.Join(folder.rootPath, srcPath)
+	srcStat, err := os.Stat(src)
+	if errors.Is(err, os.ErrNotExist) {
+		return storage.NewObjectNotFoundError(srcPath)
+	}
+	if err != nil {
+		return err
+	}
+	if !srcStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", srcPath)
+	}
+	return os.Rename(src, dstPath)
 }
 
 func OpenFileWithDir(filePath string) (*os.File, error) {
