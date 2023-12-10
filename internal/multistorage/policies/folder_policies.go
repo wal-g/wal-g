@@ -9,6 +9,7 @@ var MergeAllStorages = Policies{
 	Put:    PutPolicyUpdateFirstFound,
 	Delete: DeletePolicyAll,
 	Copy:   CopyPolicyAll,
+	Move:   MovePolicyAll,
 }
 
 var UniteAllStorages = Policies{
@@ -18,6 +19,7 @@ var UniteAllStorages = Policies{
 	Put:    PutPolicyUpdateAllFound,
 	Delete: DeletePolicyAll,
 	Copy:   CopyPolicyAll,
+	Move:   MovePolicyAll,
 }
 
 var TakeFirstStorage = Policies{
@@ -27,6 +29,7 @@ var TakeFirstStorage = Policies{
 	Put:    PutPolicyFirst,
 	Delete: DeletePolicyFirst,
 	Copy:   CopyPolicyFirst,
+	Move:   MovePolicyFirst,
 }
 
 type Policies struct {
@@ -36,6 +39,7 @@ type Policies struct {
 	Put    PutPolicy
 	Delete DeletePolicy
 	Copy   CopyPolicy
+	Move   MovePolicy
 }
 
 type ExistsPolicy int
@@ -82,4 +86,11 @@ type CopyPolicy int
 const (
 	CopyPolicyFirst CopyPolicy = iota
 	CopyPolicyAll
+)
+
+type MovePolicy int
+
+const (
+	MovePolicyFirst MovePolicy = iota
+	MovePolicyAll
 )
