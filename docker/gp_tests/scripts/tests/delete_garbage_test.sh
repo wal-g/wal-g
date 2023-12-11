@@ -26,7 +26,7 @@ PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $
 insert_a_lot_of_data
 sleep 1
 
-# make two non-permanent backups
+# make three non-permanent backups
 for _ in 1 2 3
 do
     insert_data
