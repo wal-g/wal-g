@@ -27,7 +27,7 @@ insert_a_lot_of_data
 sleep 1
 
 # make two non-permanent backups
-for _ in 1 2
+for _ in 1 2 3
 do
     insert_data
     sleep 1
@@ -35,6 +35,7 @@ do
 done
 
 FIRST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==3{print $1}')
+EXPECTED_OLDEST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==4{print $1}')
 
 # backup the first non-permanent backup sentinel and remove it from the storage
 # to emulate some partially deleted backup
@@ -71,6 +72,14 @@ FIRST_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 if [ "$PERMANENT_BACKUP" != "$FIRST_BACKUP" ];
 then
     echo "oh no! delete garbage deleted the permanent backup!"
+    exit 1
+fi
+
+ACTUAL_OLDEST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==3{print $1}')
+
+if [ "$EXPECTED_OLDEST_NON_PERMANENT_BACKUP" != "$ACTUAL_OLDEST_NON_PERMANENT_BACKUP" ];
+then
+    echo "oh no! delete garbage deleted some backups that should have stayed!"
     exit 1
 fi
 
