@@ -51,11 +51,11 @@ cleanup() {
 }
 
 stop_cluster() {
-  /usr/local/gpdb_src/bin/gpstop -a -M immediate
+  /usr/local/gpdb_src/bin/gpstop -va
 }
 
 start_cluster() {
-  /usr/local/gpdb_src/bin/gpstart -a
+  /usr/local/gpdb_src/bin/gpstart -va
 }
 
 setup_wal_archiving() {
