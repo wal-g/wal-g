@@ -145,7 +145,6 @@ func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
 }
 
 func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, sleeper Sleeper) error {
-	tracelog.WarningLogger.Printf("extracting\n")
 	if len(files) == 0 {
 		return newNoFilesToExtractError()
 	}
@@ -153,7 +152,6 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency, err := GetMaxDownloadConcurrency()
 	retries := GetFetchRetries()
-	tracelog.WarningLogger.Printf("%d retries", retries)
 	if err != nil {
 		return err
 	}
@@ -206,7 +204,6 @@ func tryExtractFiles(files []ReaderMaker,
 	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
 
-	tracelog.WarningLogger.Printf("extracting\n")
 	for _, file := range files {
 		err := downloadingSemaphore.Acquire(downloadingContext, 1)
 		if err != nil {
@@ -215,7 +212,6 @@ func tryExtractFiles(files []ReaderMaker,
 		}
 		fileClosure := file
 
-		tracelog.WarningLogger.Printf("before go func\n")
 		go func() {
 			defer downloadingSemaphore.Release(1)
 
@@ -226,7 +222,6 @@ func tryExtractFiles(files []ReaderMaker,
 				filePath := fileClosure.StoragePath()
 				var extractingReader io.ReadCloser
 				extractingReader, err = DecryptAndDecompressTar(readCloser, filePath, crypter)
-				tracelog.WarningLogger.Printf("got error %+v\n", err)
 				if err == nil {
 					defer extractingReader.Close()
 					err = extractFile(tarInterpreter, extractingReader, fileClosure)
