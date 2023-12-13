@@ -19,6 +19,10 @@ Concurrency values can be configured using:
 
 To configure how many goroutines to use during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_CONCURRENCY`. By default, WAL-G uses the minimum of the number of files to extract and 10.
 
+* `WALG_DOWNLOAD_FILE_RETRIES`
+
+To configure how many times failed file will be retried during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_FILE_RETRIES`. By default is set to 15.
+
 * `WALG_PREFETCH_DIR`
 
 By default WAL prefetch is storing prefetched data in pg_wal directory. This ensures that WAL can be easily moved from prefetch location to actual WAL consumption directory. But it may have negative consequences if you use it with pg_rewind in PostgreSQL 13.
