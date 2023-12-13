@@ -151,10 +151,11 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 
 	// Set maximum number of goroutines spun off by ExtractAll
 	downloadingConcurrency, err := GetMaxDownloadConcurrency()
-	retries := GetFetchRetries()
 	if err != nil {
 		return err
 	}
+	retries := GetFetchRetries()
+
 	for currentRun := files; len(currentRun) > 0; {
 		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {

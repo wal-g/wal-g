@@ -73,6 +73,7 @@ func makeTar(name string) (BufferReaderMaker, []byte) {
 	return BufferReaderMaker{tarContents, "/usr/local.tar"}, bCopy
 }
 
+// Returns byte array and encrypted, compressed and corrupted tar
 func makeCorruptedTar(name string) (BufferReaderMaker, []byte) {
 	b := generateRandomBytes()
 	bCopy := make([]byte, len(b))
@@ -144,7 +145,9 @@ func TestDecryptAndDecompressTar_encrypted2(t *testing.T) {
 
 	duration := time.Since(start)
 
+	// file corrupted so we expect error
 	assert.Error(t, err)
+	// function must retry 7 times so overall time should be +- 3.5 seconds
 	assert.Greater(t, duration, time.Second*3)
 	assert.Less(t, duration, time.Second*4)
 }
@@ -355,6 +358,7 @@ type NOPSleeper struct{}
 
 func (s NOPSleeper) Sleep() {}
 
+// sleeps for 0.5 econds
 type Sleeper05 struct{}
 
 func (s Sleeper05) Sleep() {
