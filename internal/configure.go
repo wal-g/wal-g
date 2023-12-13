@@ -445,7 +445,7 @@ func GetMaxConcurrency(concurrencyType string) (int, error) {
 }
 
 func GetFetchRetries() int {
-	concurrency := viper.GetInt("smth")
+	concurrency := viper.GetInt(DownloadFileRetriesSetting)
 	return concurrency
 }
 

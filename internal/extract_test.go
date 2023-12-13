@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -72,6 +73,44 @@ func makeTar(name string) (BufferReaderMaker, []byte) {
 	return BufferReaderMaker{tarContents, "/usr/local.tar"}, bCopy
 }
 
+func makeCorruptedTar(name string) (BufferReaderMaker, []byte) {
+	b := generateRandomBytes()
+	bCopy := make([]byte, len(b))
+	copy(bCopy, b)
+
+	r, w := io.Pipe()
+	go func() {
+		bw := bufio.NewWriterSize(w, minBufferSize)
+
+		defer utility.LoggedClose(w, "")
+		defer func() {
+			if err := bw.Flush(); err != nil {
+				panic(err)
+			}
+		}()
+
+		crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
+
+		compressor := GetLz4Compressor()
+		compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+
+		temp, err := io.ReadAll(compressed)
+		if err != nil {
+			panic(err)
+		}
+
+		testtools.CreateNamedTar(bw, &io.LimitedReader{
+			R: bytes.NewBuffer(temp[0 : len(temp)-1]),
+			N: int64(len(temp) - 1),
+		}, name)
+
+	}()
+	tarContents := &bytes.Buffer{}
+	io.Copy(tarContents, r)
+
+	return BufferReaderMaker{tarContents, "/usr/local2.tar.lz4"}, bCopy
+}
+
 func TestExtractAll_simpleTar(t *testing.T) {
 	os.Setenv(internal.DownloadConcurrencySetting, "1")
 	defer os.Unsetenv(internal.DownloadConcurrencySetting)
@@ -87,6 +126,27 @@ func TestExtractAll_simpleTar(t *testing.T) {
 	}
 
 	assert.Equalf(t, b, buf.Out, "ExtractAll: Output does not match input.")
+}
+
+func TestDecryptAndDecompressTar_encrypted2(t *testing.T) {
+	os.Setenv(internal.DownloadConcurrencySetting, "1")
+	os.Setenv(internal.DownloadFileRetriesSetting, "7")
+	defer os.Unsetenv(internal.DownloadConcurrencySetting)
+
+	brm, _ := makeCorruptedTar("corrupted")
+
+	buf := &testtools.BufferTarInterpreter{}
+	files := []internal.ReaderMaker{&brm}
+
+	start := time.Now()
+
+	err := internal.ExtractAllWithSleeper(buf, files, Sleeper05{})
+
+	duration := time.Since(start)
+
+	assert.Error(t, err)
+	assert.Greater(t, duration, time.Second*3)
+	assert.Less(t, duration, time.Second*4)
 }
 
 func TestExtractAll_multipleTars(t *testing.T) {
@@ -294,3 +354,9 @@ func (b *BufferReaderMaker) Mode() int64                    { return 0 }
 type NOPSleeper struct{}
 
 func (s NOPSleeper) Sleep() {}
+
+type Sleeper05 struct{}
+
+func (s Sleeper05) Sleep() {
+	time.Sleep(time.Millisecond * 500)
+}
