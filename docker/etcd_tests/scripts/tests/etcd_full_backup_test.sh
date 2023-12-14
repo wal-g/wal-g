@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e -x
 
-export WALG_STREAM_CREATE_COMMAND='TMP_DIR=$(mktemp) && etcdctl --endpoints=localhost:2379 snapshot save $TMP_DIR > /dev/null && cat < $TMP_DIR'
+export WALG_STREAM_CREATE_COMMAND='TMP_DIR=$(mktemp) && etcdctl snapshot save $TMP_DIR > /dev/null && cat < $TMP_DIR'
 export WALG_STREAM_RESTORE_COMMAND='TMP_DIR=$(mktemp) && cat > $TMP_DIR && etcdctl snapshot restore $TMP_DIR --data-dir /tmp/etcd/cluster'
 export WALG_FILE_PREFIX='/tmp/wal-g'
 
@@ -15,7 +15,10 @@ wal-g backup-push
 
 expected_output=$(etcdctl get "" --prefix=true)
 
+pkill etcd
 wal-g backup-fetch LATEST
+export ETCD_DATA_DIR='/tmp/etcd/cluster'
+etcd &
 
 actual_output=$(etcdctl get "" --prefix=true)
 

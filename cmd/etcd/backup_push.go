@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	backupPushShortDescription = "Pushes backup to storage"
+	backupPushShortDescription = "Creates new backup and pushes it to storage"
 )
 
 var backupPushCmd = &cobra.Command{

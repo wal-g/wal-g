@@ -61,7 +61,8 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 				cache.LastArchivedWal, walFiles[0])
 			cache = LogsCache{}
 		} else {
-			fromWal = int(cachedSeq)
+			//cacheSeq is last wal that was already archived, start archiving from the next
+			fromWal = int(cachedSeq) + 1
 			tracelog.WarningLogger.Printf("Start to archive from wal: %s\n",
 				cache.LastArchivedWal)
 		}
