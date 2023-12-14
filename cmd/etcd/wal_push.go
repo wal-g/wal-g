@@ -23,6 +23,7 @@ var walPushCmd = &cobra.Command{
 	Short: walPushShortDescribtion,
 	Args:  cobra.ExactArgs(1),
 	PreRun: func(cmd *cobra.Command, args []string) {
+		internal.RequiredSettings[internal.ETCDMemberConfigDirectory] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -34,7 +35,7 @@ var walPushCmd = &cobra.Command{
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = etcd.HandleWALPush(ctx, uploader, args[0])
+		err = etcd.HandleWALPush(ctx, uploader, args[0], internal.ETCDMemberConfigDirectory)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

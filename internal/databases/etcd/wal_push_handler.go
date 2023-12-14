@@ -28,9 +28,9 @@ type LogsCache struct {
 
 func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd_wals_cache") }
 
-func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
+func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir, confDir string) error {
 	// somehow send configurations
-	config, err := embed.ConfigFromFile("/Users/kosovgrigorii/Desktop/etcd.yaml")
+	config, err := embed.ConfigFromFile(confDir)
 	if err != nil {
 		return err
 	}

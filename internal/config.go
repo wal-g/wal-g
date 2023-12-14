@@ -157,6 +157,8 @@ const (
 	GPAoSegSizeThreshold      = "WALG_GP_AOSEG_SIZE_THRESHOLD"
 	GPAoDeduplicationAgeLimit = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
 
+	ETCDMemberConfigDirectory = "WALG_ETCD_CONFIG_DIR"
+
 	GoMaxProcs = "GOMAXPROCS"
 
 	HTTPListen       = "HTTP_LISTEN"
