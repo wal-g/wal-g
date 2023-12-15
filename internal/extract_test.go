@@ -3,13 +3,15 @@ package internal_test
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/testtools"
@@ -129,7 +131,7 @@ func TestExtractAll_simpleTar(t *testing.T) {
 	assert.Equalf(t, b, buf.Out, "ExtractAll: Output does not match input.")
 }
 
-func TestDecryptAndDecompressTar_encrypted2(t *testing.T) {
+func TestRetryExtractWithSleeper(t *testing.T) {
 	os.Setenv(internal.DownloadConcurrencySetting, "1")
 	os.Setenv(internal.DownloadFileRetriesSetting, "7")
 	defer os.Unsetenv(internal.DownloadConcurrencySetting)
@@ -139,17 +141,41 @@ func TestDecryptAndDecompressTar_encrypted2(t *testing.T) {
 	buf := &testtools.BufferTarInterpreter{}
 	files := []internal.ReaderMaker{&brm}
 
-	start := time.Now()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("couldn't get os Pipe: %v", err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatalf("couldn't close os Pipe: %v", err)
+		}
+	}()
 
-	err := internal.ExtractAllWithSleeper(buf, files, Sleeper05{})
+	// set warnings output to buffer
+	tracelog.SetWarningOutput(writer)
 
-	duration := time.Since(start)
+	err = internal.ExtractAllWithSleeper(buf, files, NOPSleeper{})
 
-	// file corrupted so we expect error
+	// return logger output back to std
+	tracelog.SetWarningOutput(os.Stderr)
+	err1 := writer.Close()
+	if err1 != nil {
+		t.Fatalf("couldn't close os Pipe: %v", err)
+	}
+
+	retriesLeft := 6
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), fmt.Sprintf("retries left: %d", retriesLeft)) {
+			retriesLeft--
+		}
+	}
+
+	// file is corrupted so we expect error
 	assert.Error(t, err)
-	// function must retry 7 times so overall time should be +- 3.5 seconds
-	assert.Greater(t, duration, time.Second*3)
-	assert.Less(t, duration, time.Second*4)
+
+	assert.Equal(t, -1, retriesLeft)
 }
 
 func TestExtractAll_multipleTars(t *testing.T) {
@@ -357,10 +383,3 @@ func (b *BufferReaderMaker) Mode() int64                    { return 0 }
 type NOPSleeper struct{}
 
 func (s NOPSleeper) Sleep() {}
-
-// sleeps for 0.5 econds
-type Sleeper05 struct{}
-
-func (s Sleeper05) Sleep() {
-	time.Sleep(time.Millisecond * 500)
-}
