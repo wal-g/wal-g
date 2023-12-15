@@ -17,7 +17,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/wal-g/wal-g/utility"
-	"go.etcd.io/etcd/server/v3/embed"
 )
 
 var errBadWALName = errors.New("bad wal name")
@@ -28,19 +27,11 @@ type LogsCache struct {
 
 func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd_wals_cache") }
 
-func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir, confDir string) error {
-	// somehow send configurations
-	config, err := embed.ConfigFromFile(confDir)
-	if err != nil {
-		return err
-	}
+func walDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
 
-	etcdMember, err := embed.StartEtcd(config)
-	if err != nil {
-		return err
-	}
-
-	walDir := etcdMember.Server.Cfg.WALDir()
+func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
+	//ensure that you read from leader member?
+	walDir := walDir(dataDir)
 
 	uploader.ChangeDirectory(utility.WalPath)
 	files, err := ReadDir(walDir)

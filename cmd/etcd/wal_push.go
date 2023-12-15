@@ -19,11 +19,11 @@ const (
 )
 
 var walPushCmd = &cobra.Command{
-	Use:   "wal-push data-dir",
+	Use:   "wal-push",
 	Short: walPushShortDescribtion,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.NoArgs,
 	PreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.ETCDMemberConfigDirectory] = true
+		internal.RequiredSettings[internal.ETCDMemberDataDirectory] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -35,7 +35,7 @@ var walPushCmd = &cobra.Command{
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = etcd.HandleWALPush(ctx, uploader, args[0], internal.ETCDMemberConfigDirectory)
+		err = etcd.HandleWALPush(ctx, uploader, internal.ETCDMemberDataDirectory)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
