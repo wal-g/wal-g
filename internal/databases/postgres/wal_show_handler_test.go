@@ -326,7 +326,7 @@ func putWalSegments(walFilenames []string, walFolder storage.Folder) {
 }
 
 func setupTestStorageFolder() storage.Folder {
-	memoryStorage := memory.NewStorage()
+	memoryStorage := memory.NewKVS()
 	return memory.NewFolder("in_memory/", memoryStorage)
 }
 

@@ -29,9 +29,9 @@ func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup,
 }
 
 func GetBackupFolder() (backupFolder storage.Folder, err error) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return nil, err
 	}
-	return folder.GetSubFolder(utility.BaseBackupPath), err
+	return st.RootFolder().GetSubFolder(utility.BaseBackupPath), err
 }

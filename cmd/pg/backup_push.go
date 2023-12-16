@@ -46,18 +46,19 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
-			folder, err := postgres.ConfigureMultiStorageFolder(true)
-			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
-			folder = multistorage.SetPolicies(folder, policies.TakeFirstStorage)
+			storage, err := postgres.ConfigureMultiStorage(true)
+			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
+
+			rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.TakeFirstStorage)
 			if targetStorage == "" {
-				folder, err = multistorage.UseFirstAliveStorage(folder)
+				rootFolder, err = multistorage.UseFirstAliveStorage(rootFolder)
 			} else {
-				folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+				rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 			}
 			tracelog.ErrorLogger.FatalOnError(err)
-			tracelog.InfoLogger.Printf("Backup will be pushed to storage: %v", multistorage.UsedStorages(folder)[0])
+			tracelog.InfoLogger.Printf("Backup will be pushed to storage: %v", multistorage.UsedStorages(rootFolder)[0])
 
-			uploader, err := internal.ConfigureUploaderToFolder(folder)
+			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			var dataDirectory string

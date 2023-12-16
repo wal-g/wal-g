@@ -34,10 +34,10 @@ func (m *MockStatusCache) EXPECT() *MockStatusCacheMockRecorder {
 }
 
 // AllAliveStorages mocks base method.
-func (m *MockStatusCache) AllAliveStorages() ([]NamedFolder, error) {
+func (m *MockStatusCache) AllAliveStorages() ([]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AllAliveStorages")
-	ret0, _ := ret[0].([]NamedFolder)
+	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -49,10 +49,10 @@ func (mr *MockStatusCacheMockRecorder) AllAliveStorages() *gomock.Call {
 }
 
 // FirstAliveStorage mocks base method.
-func (m *MockStatusCache) FirstAliveStorage() (*NamedFolder, error) {
+func (m *MockStatusCache) FirstAliveStorage() (*string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FirstAliveStorage")
-	ret0, _ := ret[0].(*NamedFolder)
+	ret0, _ := ret[0].(*string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -64,10 +64,10 @@ func (mr *MockStatusCacheMockRecorder) FirstAliveStorage() *gomock.Call {
 }
 
 // SpecificStorage mocks base method.
-func (m *MockStatusCache) SpecificStorage(name string) (*NamedFolder, error) {
+func (m *MockStatusCache) SpecificStorage(name string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SpecificStorage", name)
-	ret0, _ := ret[0].(*NamedFolder)
+	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

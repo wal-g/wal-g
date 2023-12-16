@@ -169,17 +169,12 @@ func newMultiStorageFolder(t *testing.T) storage.Folder {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
 	cacheMock := cache.NewMockStatusCache(mockCtrl)
+	cacheMock.EXPECT().AllAliveStorages().Return([]string{"test_storage"}, nil)
 
-	memStorages := []cache.NamedFolder{
-		{
-			Name:   "test_storage",
-			Root:   "",
-			Folder: memory.NewFolder("", memory.NewStorage()),
-		},
+	memStorages := map[string]storage.Folder{
+		"test_storage": memory.NewFolder("", memory.NewKVS()),
 	}
-	cacheMock.EXPECT().AllAliveStorages().Return(memStorages, nil)
-
-	folder := multistorage.NewFolder(cacheMock)
+	folder := multistorage.NewFolder(memStorages, cacheMock)
 	folder, err := multistorage.UseAllAliveStorages(folder)
 	require.NoError(t, err)
 	multistorage.SetPolicies(folder, policies.TakeFirstStorage)

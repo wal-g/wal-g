@@ -2,18 +2,21 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const checkObjectName = "wal-g_storage_check"
 
-func NewRWAliveChecker(timeout time.Duration, writeSize uint32) AliveChecker {
+func NewRWAliveChecker(folders map[string]storage.Folder, timeout time.Duration, writeSize uint) AliveChecker {
 	return AliveChecker{
+		folders: folders,
 		timeout: timeout,
 		checks: []storageCheck{&readCheck{}, &writeCheck{
 			writeSize: writeSize,
@@ -21,50 +24,59 @@ func NewRWAliveChecker(timeout time.Duration, writeSize uint32) AliveChecker {
 	}
 }
 
-func NewReadAliveChecker(timeout time.Duration) AliveChecker {
+func NewReadAliveChecker(folders map[string]storage.Folder, timeout time.Duration) AliveChecker {
 	return AliveChecker{
+		folders: folders,
 		timeout: timeout,
 		checks:  []storageCheck{&readCheck{}},
 	}
 }
 
 type AliveChecker struct {
+	folders map[string]storage.Folder
 	timeout time.Duration
 	checks  []storageCheck
 }
 
-func (ac *AliveChecker) checkForAlive(storages ...NamedFolder) map[key]bool {
+func (ac *AliveChecker) CheckForAlive(storageNames ...string) map[string]bool {
 	ctx, cancel := context.WithTimeout(context.Background(), ac.timeout)
 	defer cancel()
 
-	resCh := make(chan checkRes, len(storages))
-	for _, stor := range storages {
-		go func(s NamedFolder) {
-			err := ac.checkStorage(ctx, s)
+	resCh := make(chan checkRes, len(storageNames))
+	for _, name := range storageNames {
+		folder, ok := ac.folders[name]
+		if !ok {
+			resCh <- checkRes{
+				name: name,
+				err:  fmt.Errorf("unknown storage '%s'", name),
+			}
+		}
+		go func(folder storage.Folder, name string) {
+			err := ac.checkStorage(ctx, folder)
 			if err != nil {
 				resCh <- checkRes{
-					key: s.Key,
-					err: fmt.Errorf("storage '%s': %v", s.Name, err),
+					name: name,
+					err:  fmt.Errorf("storage '%s': %v", name, err),
 				}
 				return
 			}
 			resCh <- checkRes{
-				key: s.Key,
-				err: nil,
+				name: name,
+				err:  nil,
 			}
-		}(stor)
+		}(folder, name)
 	}
 
 	aliveCount := 0
-	results := make(map[key]bool, len(storages))
-	for range storages {
+	results := make(map[string]bool, len(storageNames))
+	for range storageNames {
 		res := <-resCh
 		if res.err == nil {
-			results[res.key] = true
+			results[res.name] = true
 			aliveCount++
 			continue
 		}
-		results[res.key] = false
+		results[res.name] = false
 		tracelog.ErrorLogger.Print(res.err)
 	}
 
@@ -72,7 +84,7 @@ func (ac *AliveChecker) checkForAlive(storages ...NamedFolder) map[key]bool {
 	return results
 }
 
-func (ac *AliveChecker) checkStorage(ctx context.Context, folder NamedFolder) error {
+func (ac *AliveChecker) checkStorage(ctx context.Context, folder storage.Folder) error {
 	errCh := make(chan error, 1)
 	go func() {
 		for i := range ac.checks {
@@ -84,22 +96,22 @@ func (ac *AliveChecker) checkStorage(ctx context.Context, folder NamedFolder) er
 	case err := <-errCh:
 		return err
 	case <-ctx.Done():
-		return fmt.Errorf("storage '%s' alive check timeout", folder.Name)
+		return errors.New("alive check timeout")
 	}
 }
 
 type checkRes struct {
-	key key
-	err error
+	name string
+	err  error
 }
 
 type storageCheck interface {
-	Check(ctx context.Context, folder NamedFolder) error
+	Check(ctx context.Context, folder storage.Folder) error
 }
 
 type readCheck struct{}
 
-func (rc *readCheck) Check(_ context.Context, folder NamedFolder) error {
+func (rc *readCheck) Check(_ context.Context, folder storage.Folder) error {
 	// We have to ignore the context.Context here as storages package
 	// can not provide a ListFolderWithContext. WAL-G might block here
 	// indefinitely (which is still quite unlikely).
@@ -111,10 +123,10 @@ func (rc *readCheck) Check(_ context.Context, folder NamedFolder) error {
 }
 
 type writeCheck struct {
-	writeSize uint32
+	writeSize uint
 }
 
-func (wc *writeCheck) Check(ctx context.Context, folder NamedFolder) error {
+func (wc *writeCheck) Check(ctx context.Context, folder storage.Folder) error {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	lr := io.LimitReader(r, int64(wc.writeSize))
 	err := folder.PutObjectWithContext(ctx, checkObjectName, lr)

@@ -6,9 +6,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/sys/unix"
 )
 
@@ -22,12 +22,20 @@ var HomeStatusFile = func() (string, error) {
 	return filepath.Join(homeDir, ".walg_storage_status_cache"), nil
 }
 
-type storageStatuses map[key]status
+type storageStatuses map[Key]status
 
-type key string
+type Key struct {
+	Name string
+	Hash string
+}
 
-func formatKey(name string, hash storage.Hash) key {
-	return key(fmt.Sprintf("%s#%d", name, hash))
+func ParseKey(str string) Key {
+	delim := strings.LastIndex(str, "#")
+	return Key{str[:delim], str[delim+1:]}
+}
+
+func (k Key) String() string {
+	return fmt.Sprintf("%s#%s", k.Name, k.Hash)
 }
 
 type status struct {
@@ -35,7 +43,7 @@ type status struct {
 	Checked time.Time `json:"checked"`
 }
 
-func updateFileContent(oldContent storageStatuses, checkResult map[key]bool) (newContent storageStatuses) {
+func updateFileContent(oldContent storageStatuses, checkResult map[Key]bool) (newContent storageStatuses) {
 	newContent = make(storageStatuses, len(oldContent))
 	for key, status := range oldContent {
 		newContent[key] = status
@@ -69,17 +77,25 @@ func readFile(path string) (storageStatuses, error) {
 		return nil, fmt.Errorf("read cache file: %w", err)
 	}
 
-	var content storageStatuses
-	err = json.Unmarshal(bytes, &content)
+	var validJSONContent map[string]status
+	err = json.Unmarshal(bytes, &validJSONContent)
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal cache file content: %w", err)
+	}
+	content := make(storageStatuses, len(validJSONContent))
+	for str, stat := range validJSONContent {
+		content[ParseKey(str)] = stat
 	}
 
 	return content, nil
 }
 
 func writeFile(path string, content storageStatuses) error {
-	bytes, err := json.Marshal(content)
+	validJSONContent := make(map[string]status, len(content))
+	for key, stat := range content {
+		validJSONContent[key.String()] = stat
+	}
+	bytes, err := json.Marshal(validJSONContent)
 	if err != nil {
 		return fmt.Errorf("marshal cache file content: %w", err)
 	}

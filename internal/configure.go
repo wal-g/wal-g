@@ -128,17 +128,21 @@ func ConfigureLimiters() {
 }
 
 // TODO : unit tests
-func ConfigureFolder() (storage.Folder, error) {
-	folder, err := ConfigureFolderForSpecificConfig(viper.GetViper())
+func ConfigureStorage() (storage.HashableStorage, error) {
+	var rootWraps []storage.WrapRootFolder
+	if limiters.NetworkLimiter != nil {
+		rootWraps = append(rootWraps, func(prevFolder storage.Folder) (newFolder storage.Folder) {
+			return NewLimitedFolder(prevFolder, limiters.NetworkLimiter)
+		})
+	}
+	rootWraps = append(rootWraps, ConfigureStoragePrefix)
+
+	st, err := ConfigureStorageForSpecificConfig(viper.GetViper(), rootWraps...)
 	if err != nil {
 		return nil, err
 	}
 
-	if limiters.NetworkLimiter != nil {
-		folder = NewLimitedFolder(folder, limiters.NetworkLimiter)
-	}
-
-	return ConfigureStoragePrefix(folder), nil
+	return st, nil
 }
 
 func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
@@ -151,22 +155,26 @@ func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
 
 // TODO: something with that
 // when provided multiple 'keys' in the config,
-// this function will always return only one concrete 'folder'.
+// this function will always return only one concrete 'storage'.
 // Chosen folder depends only on 'StorageAdapters' order
-func ConfigureFolderForSpecificConfig(config *viper.Viper) (storage.HashableFolder, error) {
+func ConfigureStorageForSpecificConfig(
+	config *viper.Viper,
+	rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix, ok := getWaleCompatibleSettingFrom(adapter.prefixName, config)
+		prefix, ok := getWaleCompatibleSettingFrom(adapter.PrefixSettingKey(), config)
 		if !ok {
-			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.prefixName)
+			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.PrefixSettingKey())
 			continue
-		}
-		if adapter.prefixPreprocessor != nil {
-			prefix = adapter.prefixPreprocessor(prefix)
 		}
 
 		settings := adapter.loadSettings(config)
-		return adapter.configureFolder(prefix, settings)
+		st, err := adapter.configure(prefix, settings, rootWraps...)
+		if err != nil {
+			return nil, fmt.Errorf("configure storage with prefix %q: %w", prefix, err)
+		}
+		return st, nil
 	}
 	return nil, newUnconfiguredStorageError(skippedPrefixes)
 }
@@ -238,13 +246,14 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 }
 
 // ConfigureUploader is like ConfigureUploaderToFolder, but configures the default storage.
-func ConfigureUploader() (uploader *RegularUploader, err error) {
-	folder, err := ConfigureFolder()
+func ConfigureUploader() (*RegularUploader, error) {
+	st, err := ConfigureStorage()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
+		return nil, errors.Wrap(err, "failed to configure storage")
 	}
 
-	return ConfigureUploaderToFolder(folder)
+	uploader, err := ConfigureUploaderToFolder(st.RootFolder())
+	return uploader, err
 }
 
 // ConfigureUploaderToFolder connects to storage with the specified folder and creates an uploader.
@@ -259,13 +268,13 @@ func ConfigureUploaderToFolder(folder storage.Folder) (uploader *RegularUploader
 	return uploader, err
 }
 
-func ConfigureUploaderWithoutCompressor() (uploader Uploader, err error) {
-	folder, err := ConfigureFolder()
+func ConfigureUploaderWithoutCompressor() (Uploader, error) {
+	st, err := ConfigureStorage()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to configure folder")
+		return nil, errors.Wrap(err, "failed to configure storage")
 	}
 
-	uploader = NewRegularUploader(nil, folder)
+	uploader := NewRegularUploader(nil, st.RootFolder())
 	return uploader, err
 }
 

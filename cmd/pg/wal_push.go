@@ -14,10 +14,10 @@ var walPushCmd = &cobra.Command{
 	Short: WalPushShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := postgres.ConfigureMultiStorageFolder(true)
-		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage folder: %v", err)
+		storage, err := postgres.ConfigureMultiStorage(true)
+		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
-		walUploader, err := postgres.PrepareMultiStorageWalUploader(folder, targetStorage)
+		walUploader, err := postgres.PrepareMultiStorageWalUploader(storage.RootFolder(), targetStorage)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		err = postgres.HandleWALPush(cmd.Context(), walUploader, args[0])

@@ -22,12 +22,12 @@ var (
 		Short: backupListShortDescription,
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			folder, err := internal.ConfigureFolder()
+			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if detail {
-				mysql.HandleDetailedBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+				mysql.HandleDetailedBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), pretty, json)
 			} else {
-				internal.HandleDefaultBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, json)
+				internal.HandleDefaultBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), pretty, json)
 			}
 		},
 	}

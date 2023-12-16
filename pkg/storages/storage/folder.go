@@ -43,13 +43,6 @@ type Folder interface {
 	CopyObject(srcPath string, dstPath string) error
 }
 
-type HashableFolder interface {
-	Folder
-	Hash() Hash
-}
-
-type Hash uint64
-
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
 	return ListFolderRecursivelyWithFilter(folder, func(string) bool { return true })
 }

@@ -3,6 +3,7 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/user"
 	"runtime"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -28,6 +30,7 @@ const (
 	FDB       = "FDB"
 	MONGO     = "MONGO"
 	GP        = "GP"
+	ETCD      = "ETCD"
 
 	DownloadConcurrencySetting    = "WALG_DOWNLOAD_CONCURRENCY"
 	UploadConcurrencySetting      = "WALG_UPLOAD_CONCURRENCY"
@@ -590,7 +593,7 @@ func ConfigureSettings(currentType string) {
 			for _, setting := range adapter.settingNames {
 				AllowedSettings[setting] = true
 			}
-			AllowedSettings["WALG_"+adapter.prefixName] = true
+			AllowedSettings["WALG_"+adapter.PrefixSettingKey()] = true
 		}
 	}
 }
@@ -812,7 +815,7 @@ func AssertRequiredSettingsSet() error {
 
 func isAnyStorageSet() bool {
 	for _, adapter := range StorageAdapters {
-		_, exists := getWaleCompatibleSetting(adapter.prefixName)
+		_, exists := getWaleCompatibleSetting(adapter.PrefixSettingKey())
 		if exists {
 			return true
 		}
@@ -825,14 +828,14 @@ func toFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
 }
 
-// FolderFromConfig prefers the config parameters instead of the current environment variables
-func FolderFromConfig(configFile string) (storage.Folder, error) {
+// StorageFromConfig prefers the config parameters instead of the current environment variables
+func StorageFromConfig(configFile string) (storage.Storage, error) {
 	var config = viper.New()
 	SetDefaultValues(config)
 	ReadConfigFromFile(config, configFile)
 	CheckAllowedSettings(config)
 
-	var folder, err = ConfigureFolderForSpecificConfig(config)
+	folder, err := ConfigureStorageForSpecificConfig(config)
 
 	if err != nil {
 		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
@@ -867,30 +870,48 @@ func bindConfigToEnv(globalViper *viper.Viper) {
 	}
 }
 
-func InitFailoverStorages() (res map[string]storage.Folder, err error) {
-	storages := viper.GetStringMap(PgFailoverStorages)
+func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, err error) {
+	storageConfigs := viper.GetStringMap(PgFailoverStorages)
 
-	if len(storages) == 0 {
+	if len(storageConfigs) == 0 {
 		return nil, nil
 	}
 
-	res = make(map[string]storage.Folder, 0)
-	for name := range storages {
+	// errClosers are needed to close already configured storages if failed to configure all of them.
+	var errClosers []io.Closer
+	defer func() {
+		if err == nil {
+			return
+		}
+		for _, closer := range errClosers {
+			utility.LoggedClose(closer, "Failed to close storage")
+		}
+	}()
+
+	storages := make(map[string]storage.HashableStorage, len(storageConfigs))
+	for name := range storageConfigs {
 		if name == "default" {
 			return nil, fmt.Errorf("'%s' storage name is reserved", name)
 		}
+
 		cfg := viper.Sub(PgFailoverStorages + "." + name)
-		folder, err := ConfigureFolderForSpecificConfig(cfg)
+
+		var rootWraps []storage.WrapRootFolder
+		if limiters.NetworkLimiter != nil {
+			rootWraps = append(rootWraps, func(prevFolder storage.Folder) (newFolder storage.Folder) {
+				return NewLimitedFolder(prevFolder, limiters.NetworkLimiter)
+			})
+		}
+		rootWraps = append(rootWraps, ConfigureStoragePrefix)
+
+		st, err := ConfigureStorageForSpecificConfig(cfg, rootWraps...)
 		if err != nil {
 			return nil, fmt.Errorf("failover storage %s: %v", name, err)
 		}
-		if limiters.NetworkLimiter != nil {
-			folder = NewLimitedFolder(folder, limiters.NetworkLimiter)
-		}
+		errClosers = append(errClosers, st)
 
-		folder = ConfigureStoragePrefix(folder).(storage.HashableFolder)
-		res[name] = folder
+		storages[name] = st
 	}
 
-	return res, nil
+	return storages, nil
 }

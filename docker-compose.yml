@@ -9,6 +9,12 @@ x-s3_common_depends: &s3_common_depends
   links:
     - s3
 
+x-s3_throttling_depends: &s3_throttling_depends
+  depends_on:
+    - s3-for-throttling
+  links:
+    - s3-for-throttling
+
 services:
   golang:
     build:
@@ -159,6 +165,23 @@ services:
       -c 'mkdir -p /export/mysqlcopybackupto
       &&  /usr/bin/minio server /export'
 
+  s3-for-throttling:
+    image: quay.io/minio/minio
+    container_name: wal-g_s3_3
+    hostname: s3
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    environment:
+      - "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE"
+      - "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      - "MINIO_API_REQUESTS_MAX=0"
+      - "MINIO_API_REQUESTS_DEADLINE=0s"
+    entrypoint: sh
+    command: >
+      -c 'mkdir -p /export/walperftestbucket
+      &&  minio server /export --console-address ":9090"'
+
   ssh:
     build:
       dockerfile: docker/ssh/Dockerfile
@@ -186,6 +209,11 @@ services:
     image: wal-g/docker_prefix
     user: postgres
     <<: *s3_common_depends
+
+  pg_test_throttling: &pg_test_throttling
+    image: wal-g/docker_prefix
+    user: postgres
+    <<: *s3_throttling_depends
 
   pg_tests:
     <<: *pg_test_common
@@ -256,6 +284,11 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_wal_perftest
     command: /tmp/tests/wal_perftest.sh
+
+  pg_wal_perftest_with_throttling:
+    <<: *pg_test_throttling
+    container_name: wal-g_pg_wal_perftest_with_throttling
+    command: /tmp/tests/wal_perftest_with_throttling.sh
 
   pg_backup_perftest:
     <<: *pg_test_common
@@ -599,6 +632,25 @@ services:
     env_file:
       - docker/common/common_walg.env
     <<: *s3_common_depends
+
+  etcd:
+    image: bitnami/etcd:latest
+    container_name: wal-g_etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+    ports:
+      - 2379:2379
+      - 2380:2380
+
+  etcd_tests:
+    build:
+      dockerfile: docker/etcd_tests/Dockerfile
+      context: .
+    image: wal-g/etcd_tests
+    container_name: wal-g_etcd_tests
+    depends_on:
+      - etcd
 
   gp:
     build:

@@ -37,7 +37,7 @@ var (
 		Long:  WalVerifyLongDescription,
 		Args:  checkArgs,
 		Run: func(cmd *cobra.Command, checks []string) {
-			folder, err := internal.ConfigureFolder()
+			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
 			outputType := postgres.WalVerifyTableOutput
 			if useJSONOutput {
@@ -46,7 +46,7 @@ var (
 			outputWriter := postgres.NewWalVerifyOutputWriter(outputType, os.Stdout)
 			checkTypes := parseChecks(checks)
 
-			postgres.HandleWalVerify(checkTypes, folder, postgres.QueryCurrentWalSegment(), outputWriter)
+			postgres.HandleWalVerify(checkTypes, storage.RootFolder(), postgres.QueryCurrentWalSegment(), outputWriter)
 		},
 	}
 	useJSONOutput bool

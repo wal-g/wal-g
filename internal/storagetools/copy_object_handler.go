@@ -53,24 +53,24 @@ func collectCopyingInfo(
 	decryptSource bool,
 	encryptTarget bool) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Printf("Collecting files with prefix %s.", prefix)
-	from, err := internal.FolderFromConfig(fromConfigFile)
+	from, err := internal.StorageFromConfig(fromConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	to, err := internal.FolderFromConfig(toConfigFile)
+	to, err := internal.StorageFromConfig(toConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
-	objects, err := storage.ListFolderRecursively(from)
+	objects, err := storage.ListFolderRecursively(from.RootFolder())
 	if err != nil {
 		return nil, err
 	}
 
 	var hasPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), prefix) }
 	return copy.BuildCopyingInfos(
-		from,
-		to,
+		from.RootFolder(),
+		to.RootFolder(),
 		objects,
 		hasPrefix,
 		func(object storage.Object) string {

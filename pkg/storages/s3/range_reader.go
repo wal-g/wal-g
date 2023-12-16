@@ -15,39 +15,38 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-var (
-	DebugLogBufferCounter = 0
+const (
+	minRetryDelay = 30 * time.Millisecond
+	maxRetryDelay = 300 * time.Second
 )
 
-// nolint: unused
-type s3Reader struct {
+var DebugLogBufferCounter = 0
+
+type RangeReader struct {
 	lastBody      io.ReadCloser
 	folder        *Folder
 	maxRetries    int
-	retryNum      int
 	objectPath    string
 	storageCursor int64
-	maxRetryDelay time.Duration
-	minRetryDelay time.Duration
 	reconnectID   int
 	logDebugID    string // hash from filename and logDebugID - unique logDebugID used only for debug
 }
 
-func (reader *s3Reader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
+func (reader *RangeReader) getObjectRange(from, to int64) (*s3.GetObjectOutput, error) {
 	bytesRange := fmt.Sprintf("bytes=%d-", from)
 	if to != 0 {
 		bytesRange += strconv.Itoa(int(to))
 	}
 	input := &s3.GetObjectInput{
-		Bucket: reader.folder.Bucket,
+		Bucket: reader.folder.bucket,
 		Key:    aws.String(reader.objectPath),
 		Range:  aws.String(bytesRange),
 	}
 	reader.debugLog("GetObject with range %s", bytesRange)
-	return reader.folder.S3API.GetObject(input)
+	return reader.folder.s3API.GetObject(input)
 }
 
-func (reader *s3Reader) Read(p []byte) (n int, err error) {
+func (reader *RangeReader) Read(p []byte) (n int, err error) {
 	reconnect := false
 	if reader.lastBody == nil { // initial connect, if lastBody wasn't provided
 		reconnect = true
@@ -71,17 +70,17 @@ func (reader *s3Reader) Read(p []byte) (n int, err error) {
 		return n, err
 	}
 }
-func (reader *s3Reader) getDebugLogLine(format string, v ...interface{}) string {
-	prefix := fmt.Sprintf("s3Reader [%s] ", reader.logDebugID)
+func (reader *RangeReader) getDebugLogLine(format string, v ...interface{}) string {
+	prefix := fmt.Sprintf("RangeReader [%s] ", reader.logDebugID)
 	message := fmt.Sprintf(format, v...)
 	return prefix + message
 }
 
-func (reader *s3Reader) debugLog(format string, v ...interface{}) {
+func (reader *RangeReader) debugLog(format string, v ...interface{}) {
 	tracelog.DebugLogger.Print(reader.getDebugLogLine(format, v...))
 }
 
-func (reader *s3Reader) reconnect() error {
+func (reader *RangeReader) reconnect() error {
 	failed := 0
 
 	for {
@@ -116,9 +115,9 @@ func (reader *s3Reader) reconnect() error {
 // THIS COde stolen from s3 lib, from vendor/github.com/aws/aws-sdk-go/aws/client/default_retryer.go
 // func (d DefaultRetryer) RetryRules( .. ) time.Duration
 // this calculate sleep duration (jitter and exponential backoff)
-func (reader *s3Reader) getIncrSleep(retryCount int) time.Duration {
-	minDelay := reader.minRetryDelay
-	maxDelay := reader.maxRetryDelay
+func (reader *RangeReader) getIncrSleep(retryCount int) time.Duration {
+	minDelay := minRetryDelay
+	maxDelay := maxRetryDelay
 	var delay time.Duration
 
 	actualRetryCount := int(math.Log2(float64(minDelay))) + 1
@@ -133,16 +132,19 @@ func (reader *s3Reader) getIncrSleep(retryCount int) time.Duration {
 	return delay
 }
 
-func (reader *s3Reader) Close() (err error) {
+func (reader *RangeReader) Close() (err error) {
 	return reader.lastBody.Close()
 }
 
-// nolint: revive, lll
-func NewS3Reader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder, minRetryDelay, maxRetryDelay time.Duration) *s3Reader {
+func NewRangeReader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder) *RangeReader {
 	DebugLogBufferCounter++
-	reader := &s3Reader{lastBody: body, objectPath: objectPath, maxRetries: retriesCount,
+	reader := &RangeReader{
+		lastBody:   body,
+		objectPath: objectPath,
+		maxRetries: retriesCount,
 		logDebugID: getHash(objectPath, DebugLogBufferCounter),
-		folder:     folder, minRetryDelay: minRetryDelay, maxRetryDelay: maxRetryDelay}
+		folder:     folder,
+	}
 
 	reader.debugLog("Init s3reader path %s", objectPath)
 	return reader

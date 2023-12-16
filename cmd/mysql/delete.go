@@ -46,17 +46,17 @@ var deleteTargetCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := mysql.NewDeleteHandler(folder)
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteEverything(args, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	findFullBackup := false
@@ -67,7 +67,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 		args = args[1:]
 	}
 
-	deleteHandler, err := mysql.NewDeleteHandler(folder)
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	backupName := args[0]
@@ -78,20 +78,20 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := mysql.NewDeleteHandler(folder)
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := mysql.NewDeleteHandler(folder)
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
