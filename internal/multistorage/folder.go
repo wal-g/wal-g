@@ -3,7 +3,6 @@ package multistorage
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -271,6 +270,10 @@ func (mf Folder) ReadObjectFromFirst(objectRelativePath string) (io.ReadCloser, 
 	first := mf.usedFolders[0]
 	file, err := first.ReadObject(objectRelativePath)
 	if err != nil {
+		if _, ok := err.(storage.ObjectNotFoundError); ok {
+			mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationRead(0), true)
+			return file, first.StorageName, err
+		}
 		mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationRead(0), false)
 		return nil, first.StorageName, fmt.Errorf("read object from %q: %w", first.StorageName, err)
 	}
@@ -289,6 +292,10 @@ func (mf Folder) ReadObjectFoundFirst(objectRelativePath string) (io.ReadCloser,
 		if exists {
 			file, err := f.ReadObject(objectRelativePath)
 			if err != nil {
+				if _, ok := err.(storage.ObjectNotFoundError); ok {
+					mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationRead(0), true)
+					return file, f.StorageName, err
+				}
 				mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationRead(0), false)
 				return nil, f.StorageName, fmt.Errorf("read object from %q: %w", f.StorageName, err)
 			}
@@ -613,10 +620,12 @@ func (mf Folder) CopyObjectInFirst(srcPath string, dstPath string) error {
 	}
 	first := mf.usedFolders[0]
 	err := first.CopyObject(srcPath, dstPath)
-	notFound := &storage.ObjectNotFoundError{}
-	if err != nil && !errors.As(err, &notFound) {
-		mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationCopy, false)
-		return fmt.Errorf("copy object in storage %q: %w", first.StorageName, err)
+	if err != nil {
+		_, notFound := err.(storage.ObjectNotFoundError)
+		if !notFound {
+			mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationCopy, false)
+			return fmt.Errorf("copy object in storage %q: %w", first.StorageName, err)
+		}
 	}
 	mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationCopy, true)
 	return err

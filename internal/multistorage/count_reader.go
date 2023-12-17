@@ -3,8 +3,6 @@ package multistorage
 import (
 	"io"
 	"sync/atomic"
-
-	"github.com/wal-g/wal-g/internal/multistorage/stats"
 )
 
 var _ io.Reader = &countReader{}
@@ -12,8 +10,7 @@ var _ io.Reader = &countReader{}
 // countReader wraps an io.Reader and counts how many bytes were read from it.
 type countReader struct {
 	io.Reader
-	statsCollector stats.Collector
-	readBytes      atomic.Int64
+	readBytes atomic.Int64
 }
 
 func newCountReader(reader io.Reader) *countReader {

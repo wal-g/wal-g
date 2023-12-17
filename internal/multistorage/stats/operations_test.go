@@ -20,9 +20,9 @@ func Test_scaleWeight(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, OperationWeight(tt.want),
-				scaleWeight(1000, sizeInMB(tt.fileSize)),
-				"ScaleWeight(%v, %v)", 1000, sizeInMB(tt.fileSize),
+			assert.Equalf(t, tt.want,
+				int(scaleWeight(1000, sizeInMB(tt.fileSize))),
+				"scaleWeight(%v, %v)", 1000, sizeInMB(tt.fileSize),
 			)
 		})
 	}

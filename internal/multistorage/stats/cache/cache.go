@@ -13,7 +13,7 @@ type Cache interface {
 
 	// ApplyExplicitCheckResult with specifying which checked storages were alive, and return the new cached state for
 	// all storages with specified names.
-	ApplyExplicitCheckResult(checkResult AliveMap, storageNames ...string) (AliveMap, error)
+	ApplyExplicitCheckResult(checkResult AliveMap, checkTime time.Time, storageNames ...string) (AliveMap, error)
 
 	// ApplyOperationResult to the cache for a specific storage, indicating whether the storage was alive, and the
 	// weight of the performed operation.
@@ -39,20 +39,35 @@ type cache struct {
 	shFileFlushTimeout time.Duration
 }
 
+type Option func(c *cache)
+
+func WithCustomFlushTimeout(timeout time.Duration) Option {
+	return func(c *cache) {
+		c.shFileFlushTimeout = timeout
+	}
+}
+
+const defaultFlushTimeout = 5 * time.Minute
+
 func New(
 	usedKeys map[string]Key,
 	ttl time.Duration,
 	sharedMem *SharedMemory,
 	sharedFile *SharedFile,
+	opts ...Option,
 ) Cache {
-	return &cache{
+	c := &cache{
 		usedKeys:           usedKeys,
 		ttl:                ttl,
 		shMem:              sharedMem,
 		shFile:             sharedFile,
 		shFileUsed:         sharedFile != nil,
-		shFileFlushTimeout: 5 * time.Minute,
+		shFileFlushTimeout: defaultFlushTimeout,
 	}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 func (c *cache) Read(storageNames ...string) (relevant, outdated AliveMap, err error) {
@@ -66,22 +81,25 @@ func (c *cache) Read(storageNames ...string) (relevant, outdated AliveMap, err e
 
 	allMemRelevant := c.shMem.Statuses.isRelevant(c.ttl, storageKeys...)
 	if allMemRelevant {
-		return c.shMem.Statuses.aliveMap(), nil, nil
+		return c.shMem.Statuses.filter(storageKeys).aliveMap(), nil, nil
 	}
 
-	fileStatuses, err := c.shFile.read()
-	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to read storage status cache file %q: %v", c.shFile.Path, err)
+	var fileStatuses storageStatuses
+	if c.shFileUsed {
+		fileStatuses, err = c.shFile.read()
+		if err != nil {
+			tracelog.WarningLogger.Printf("Failed to read storage status cache file %q: %v", c.shFile.Path, err)
+		}
 	}
 	memAndFileMerged := mergeByRelevance(c.shMem.Statuses, fileStatuses)
 
 	c.shMem.Statuses = memAndFileMerged
 
 	relevantStatuses, outdatedStatuses := memAndFileMerged.splitByRelevance(c.ttl, storageKeys)
-	return relevantStatuses.aliveMap(), outdatedStatuses.aliveMap(), nil
+	return relevantStatuses.filter(storageKeys).aliveMap(), outdatedStatuses.filter(storageKeys).aliveMap(), nil
 }
 
-func (c *cache) ApplyExplicitCheckResult(checkResult AliveMap, storageNames ...string) (AliveMap, error) {
+func (c *cache) ApplyExplicitCheckResult(checkResult AliveMap, checkTime time.Time, storageNames ...string) (AliveMap, error) {
 	c.shMem.Lock()
 	defer c.shMem.Unlock()
 
@@ -92,7 +110,7 @@ func (c *cache) ApplyExplicitCheckResult(checkResult AliveMap, storageNames ...s
 		}
 	}
 
-	c.shMem.Statuses = c.shMem.Statuses.applyExplicitCheckResult(checkResultByKeys)
+	c.shMem.Statuses = c.shMem.Statuses.applyExplicitCheckResult(checkResultByKeys, checkTime)
 
 	storageKeys, err := c.correspondingKeys(storageNames...)
 	if err != nil {
@@ -107,15 +125,12 @@ func (c *cache) ApplyExplicitCheckResult(checkResult AliveMap, storageNames ...s
 	if shFileRelevant {
 		return aliveMap, nil
 	}
-	err = c.shFile.write(c.shMem.Statuses)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to apply check result to storage status cache file %q: %v", c.shFile.Path, err)
-	}
+	c.flushFileFromMem()
 	return aliveMap, nil
 }
 
 func (c *cache) correspondingKeys(names ...string) ([]Key, error) {
-	keys := make([]Key, len(names))
+	keys := make([]Key, 0, len(names))
 	for _, name := range names {
 		key, ok := c.usedKeys[name]
 		if !ok {
@@ -131,11 +146,16 @@ func (c *cache) ApplyOperationResult(storage string, alive bool, weight float64)
 	defer c.shMem.Unlock()
 
 	var key Key
+	keyFound := false
 	for _, k := range c.usedKeys {
 		if k.Name == storage {
 			key = k
+			keyFound = true
 			break
 		}
+	}
+	if !keyFound {
+		return
 	}
 
 	c.shMem.Statuses[key] = c.shMem.Statuses[key].applyOperationResult(alive, weight, time.Now())
@@ -147,10 +167,7 @@ func (c *cache) ApplyOperationResult(storage string, alive bool, weight float64)
 	if shFileRelevant {
 		return
 	}
-	err := c.shFile.write(c.shMem.Statuses)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to apply operation result to storage status cache file %q: %v", c.shFile.Path, err)
-	}
+	c.flushFileFromMem()
 }
 
 func (c *cache) Flush() {
@@ -161,6 +178,10 @@ func (c *cache) Flush() {
 	c.shMem.Lock()
 	defer c.shMem.Unlock()
 
+	c.flushFileFromMem()
+}
+
+func (c *cache) flushFileFromMem() {
 	fileStatuses, err := c.shFile.read()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to read storage status cache file to merge it with memory %q: %v", c.shFile.Path, err)

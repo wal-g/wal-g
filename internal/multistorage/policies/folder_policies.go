@@ -33,7 +33,7 @@ var TakeFirstStorage = Policies{
 	Copy:   CopyPolicyFirst,
 }
 
-// Policies define the behaviour of the multi-storage folder in terms of selecting which underlying storages should be
+// Policies define the behavior of the multi-storage folder in terms of selecting which underlying storages should be
 // used to perform different operations.
 type Policies struct {
 	Exists ExistsPolicy

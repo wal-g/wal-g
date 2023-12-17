@@ -14,7 +14,6 @@ type Key struct {
 	Hash string
 }
 
-// TODO: Unit tests
 func ParseKey(str string) Key {
 	delim := strings.LastIndex(str, "#")
 	return Key{str[:delim], str[delim+1:]}
@@ -46,16 +45,18 @@ const (
 	// aliveLimit is used to mark the storage alive when its Aliveness reaches this value
 	aliveLimit Aliveness = 0.99
 
-	// deadLimit is used to mark the storage dead when its Aliveness falls below this value
-	deadLimit Aliveness = 0.95
+	// deadLimit is used to mark the storage dead when its Aliveness drops to this value
+	deadLimit Aliveness = 0.05
 )
 
 func (s storageStatus) alive() bool {
+	if s.PotentialAliveness == 0 {
+		return s.WasAlive
+	}
 	if s.WasAlive {
 		return s.ActualAliveness >= s.PotentialAliveness*deadLimit
-	} else {
-		return s.ActualAliveness >= s.PotentialAliveness*aliveLimit
 	}
+	return s.ActualAliveness >= s.PotentialAliveness*aliveLimit
 }
 
 func (s storageStatus) applyExplicitCheckResult(alive bool, checkTime time.Time) storageStatus {
@@ -66,13 +67,12 @@ func (s storageStatus) applyExplicitCheckResult(alive bool, checkTime time.Time)
 			WasAlive:           true,
 			Updated:            checkTime,
 		}
-	} else {
-		return storageStatus{
-			PotentialAliveness: s.PotentialAliveness,
-			ActualAliveness:    0,
-			WasAlive:           true,
-			Updated:            checkTime,
-		}
+	}
+	return storageStatus{
+		PotentialAliveness: s.PotentialAliveness,
+		ActualAliveness:    0,
+		WasAlive:           false,
+		Updated:            checkTime,
 	}
 }
 
@@ -84,17 +84,17 @@ func (s storageStatus) applyOperationResult(alive bool, weight float64, checkTim
 			WasAlive:           s.alive(),
 			Updated:            checkTime,
 		}
-	} else {
-		return storageStatus{
-			PotentialAliveness: expMovingAverage(s.PotentialAliveness, weight),
-			ActualAliveness:    expMovingAverage(s.ActualAliveness, 0),
-			WasAlive:           s.alive(),
-			Updated:            checkTime,
-		}
+	}
+	return storageStatus{
+		PotentialAliveness: expMovingAverage(s.PotentialAliveness, weight),
+		ActualAliveness:    expMovingAverage(s.ActualAliveness, 0),
+		WasAlive:           s.alive(),
+		Updated:            checkTime,
 	}
 }
 
-const emaAlpha = 0.875
+// This exponential moving average α value allows a fully dead storage to become alive after 10 successful operations.
+const emaAlpha = 0.6
 
 func expMovingAverage(prevAverage Aliveness, newValue float64) Aliveness {
 	return (prevAverage * emaAlpha) + (Aliveness(newValue) * (1 - emaAlpha))
@@ -102,13 +102,12 @@ func expMovingAverage(prevAverage Aliveness, newValue float64) Aliveness {
 
 type storageStatuses map[Key]storageStatus
 
-func (ss storageStatuses) applyExplicitCheckResult(checkResult map[Key]bool) storageStatuses {
+func (ss storageStatuses) applyExplicitCheckResult(checkResult map[Key]bool, checkTime time.Time) storageStatuses {
 	newStatuses := make(storageStatuses, len(ss))
 	for key, status := range ss {
 		newStatuses[key] = status
 	}
 
-	checkTime := time.Now()
 	for key, alive := range checkResult {
 		newStatuses[key] = newStatuses[key].applyExplicitCheckResult(alive, checkTime)
 	}
@@ -181,7 +180,8 @@ func mergeByRelevance(a, b storageStatuses) storageStatuses {
 		result[key] = status
 	}
 	for key := range b {
-		if b[key].Updated.After(result[key].Updated) {
+		_, ok := result[key]
+		if !ok || b[key].Updated.After(result[key].Updated) {
 			result[key] = b[key]
 		}
 	}

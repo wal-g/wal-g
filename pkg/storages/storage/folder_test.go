@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/multistorage"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -92,12 +92,13 @@ func TestListFolderRecursivelyWithFilter(t *testing.T) {
 func TestListFolderRecursivelyWithFilter_MultiStorage(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
-	cacheMock := cache.NewMockStatusCache(mockCtrl)
-	cacheMock.EXPECT().SpecificStorage("test").Return(true, nil)
+	collectorMock := stats.NewMockCollector(mockCtrl)
+	collectorMock.EXPECT().SpecificStorage("test").Return(true, nil)
+	collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	storages := map[string]storage.Folder{
 		"test": memory.NewFolder("mem/", memory.NewKVS()),
 	}
-	folder := multistorage.NewFolder(storages, cacheMock)
+	folder := multistorage.NewFolder(storages, collectorMock)
 	folder, err := multistorage.UseSpecificStorage("test", folder)
 	require.NoError(t, err)
 	folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)

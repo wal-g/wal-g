@@ -2,12 +2,15 @@ package stats
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
 )
 
 // Collector collects information about the success of operations performed with some storages, and answers which
 // storages are considered alive or dead at the moment, based on the time-aggregated statistics.
+//
+//go:generate mockgen -source collector.go -destination collector_mock.go -package stats
 type Collector interface {
 	AllAliveStorages() ([]string, error)
 	FirstAliveStorage() (*string, error)
@@ -46,7 +49,7 @@ func (c *collector) AllAliveStorages() ([]string, error) {
 	}
 
 	outdatedCheckResult := c.aliveChecker.CheckForAlive(outdated.Names()...)
-	afterRecheckOutdated, err := c.cache.ApplyExplicitCheckResult(outdatedCheckResult, c.storagesInOrder...)
+	afterRecheckOutdated, err := c.cache.ApplyExplicitCheckResult(outdatedCheckResult, time.Now(), c.storagesInOrder...)
 	if err != nil {
 		return nil, fmt.Errorf("apply outdated storages check result: %w", err)
 	}
@@ -55,7 +58,7 @@ func (c *collector) AllAliveStorages() ([]string, error) {
 	}
 
 	relevantCheckResult := c.aliveChecker.CheckForAlive(relevant.Names()...)
-	afterRecheckAll, err := c.cache.ApplyExplicitCheckResult(relevantCheckResult, c.storagesInOrder...)
+	afterRecheckAll, err := c.cache.ApplyExplicitCheckResult(relevantCheckResult, time.Now(), c.storagesInOrder...)
 	if err != nil {
 		return nil, fmt.Errorf("apply relevant storages check result: %w", err)
 	}
@@ -73,7 +76,7 @@ func (c *collector) FirstAliveStorage() (*string, error) {
 	}
 
 	outdatedCheckResult := c.aliveChecker.CheckForAlive(outdated.Names()...)
-	afterRecheckOutdated, err := c.cache.ApplyExplicitCheckResult(outdatedCheckResult, c.storagesInOrder...)
+	afterRecheckOutdated, err := c.cache.ApplyExplicitCheckResult(outdatedCheckResult, time.Now(), c.storagesInOrder...)
 	if err != nil {
 		return nil, fmt.Errorf("apply outdated storages check result: %w", err)
 	}
@@ -83,7 +86,7 @@ func (c *collector) FirstAliveStorage() (*string, error) {
 	}
 
 	relevantCheckResult := c.aliveChecker.CheckForAlive(relevant.Names()...)
-	afterRecheckAll, err := c.cache.ApplyExplicitCheckResult(relevantCheckResult)
+	afterRecheckAll, err := c.cache.ApplyExplicitCheckResult(relevantCheckResult, time.Now(), c.storagesInOrder...)
 	if err != nil {
 		return nil, fmt.Errorf("apply relevant storages check result: %w", err)
 	}
@@ -100,7 +103,7 @@ func (c *collector) SpecificStorage(name string) (bool, error) {
 	}
 
 	checkResult := c.aliveChecker.CheckForAlive(name)
-	afterRecheck, err := c.cache.ApplyExplicitCheckResult(checkResult)
+	afterRecheck, err := c.cache.ApplyExplicitCheckResult(checkResult, time.Now(), name)
 	if err != nil {
 		return false, fmt.Errorf("apply storage %q check result: %w", name, err)
 	}

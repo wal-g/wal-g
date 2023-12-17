@@ -26,12 +26,12 @@ var (
 
 // scaleWeight logarithmically. So, if the scale is 1 or less, the weight doesn't change. If the scale is 10, the weight
 // doubles. If 100, triples. And so on.
-func scaleWeight(weightForScale1 OperationWeight, scale int) OperationWeight {
+func scaleWeight(weightForScale OperationWeight, scale int) OperationWeight {
 	if scale <= 1 {
-		return weightForScale1
+		return weightForScale
 	}
 	scaleFloat := 1 + math.Log10(float64(scale))
-	metricForFileSize := float64(weightForScale1) * scaleFloat
+	metricForFileSize := float64(weightForScale) * scaleFloat
 	return OperationWeight(metricForFileSize)
 }
 
