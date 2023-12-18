@@ -134,9 +134,8 @@ func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, c
 	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
 }
 
-func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (
-	map[postgres.PermanentObject]bool, map[postgres.PermanentObject]bool) {
-
+func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[postgres.PermanentObject]bool,
+	map[postgres.PermanentObject]bool) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
 	folder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
