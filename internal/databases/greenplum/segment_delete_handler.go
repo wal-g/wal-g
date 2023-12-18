@@ -34,11 +34,7 @@ func NewSegDeleteHandler(rootFolder storage.Folder, contentID int, args DeleteAr
 ) (SegDeleteHandler, error) {
 	segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 
-	tracelog.InfoLogger.Println("Try to perform getting permanent objects")
 	permanentBackups, permanentWals := GetPermanentBackupsAndWals(rootFolder, contentID)
-	//permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
-
-	tracelog.InfoLogger.Println("OK getting permanent objects")
 
 	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
 	if err != nil {
@@ -138,7 +134,9 @@ func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, c
 	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
 }
 
-func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[postgres.PermanentObject]bool, map[postgres.PermanentObject]bool) {
+func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (
+	map[postgres.PermanentObject]bool, map[postgres.PermanentObject]bool) {
+
 	tracelog.InfoLogger.Println("retrieving permanent objects")
 	folder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
@@ -164,8 +162,7 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 			continue
 		}
 
-		tracelog.InfoLogger.Printf("formated time is %s\n", RestorePointMetadataFileName(fmt.Sprintf("backup_%s", meta.StartTime.Format("20060102T150405Z"))))
-		rp, err := FindRestorePointAfterTS(meta.StartTime.Format(time.RFC3339), rootFolder)
+		rp, err := FindRestorePointWithTS(meta.StartTime.Format(time.RFC3339), rootFolder)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
@@ -192,8 +189,9 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 				tracelog.ErrorLogger.Printf("failed to parse lsn  %v\n", err)
 				continue
 			}
-			endWalSegmentNo := postgres.NewWalSegmentNo(lsn) //get lsn of restore point
-			tracelog.InfoLogger.Printf("Hey`a!!! permament from %s to %s\n", startWalSegmentNo.GetFilename(timelineID), endWalSegmentNo.GetFilename(timelineID))
+			endWalSegmentNo := postgres.NewWalSegmentNo(lsn)
+			tracelog.InfoLogger.Printf("permament wal from %s to %s\n",
+				startWalSegmentNo.GetFilename(timelineID), endWalSegmentNo.GetFilename(timelineID))
 
 			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.Next() {
 				walObj := postgres.PermanentObject{

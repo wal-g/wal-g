@@ -51,7 +51,7 @@ cleanup() {
 }
 
 stop_cluster() {
-  /usr/local/gpdb_src/bin/gpstop -a -M immediate
+  /usr/local/gpdb_src/bin/gpstop -a -M fast
 }
 
 start_cluster() {

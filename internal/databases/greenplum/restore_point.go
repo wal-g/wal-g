@@ -248,12 +248,13 @@ func FindRestorePointBeforeTS(timestampStr string, folder storage.Folder) (strin
 	return targetPoint.Name, nil
 }
 
-func FindRestorePointAfterTS(timestampStr string, folder storage.Folder) (string, error) {
+// Finds restore point that contains timestamp
+func FindRestorePointWithTS(timestampStr string, folder storage.Folder) (string, error) {
 	ts, err := time.Parse(time.RFC3339, timestampStr)
 	if err != nil {
 		return "", fmt.Errorf("timestamp parse error: %v", err)
 	}
-	//add second because we loose milliseconds when formatting
+	// add second because we round down when formatting
 	ts = ts.Add(time.Second)
 
 	restorePointTimes, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
@@ -276,11 +277,8 @@ func FindRestorePointAfterTS(timestampStr string, folder storage.Folder) (string
 		meta := restorePointMetas[i]
 		// target restore point should be started before or right at the provided ts
 		if meta.StartTime.After(ts) {
-			tracelog.InfoLogger.Printf("restore point %s is to late for %s because %s", meta.Name, ts, meta.StartTime)
 			continue
 		}
-
-		tracelog.InfoLogger.Printf("restore point %s is ok for %s because %s", meta.Name, ts, meta.StartTime)
 
 		// we choose the restore point closest to the provided time
 		if targetPoint == nil || meta.StartTime.After(targetPoint.StartTime) {
