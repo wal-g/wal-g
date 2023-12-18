@@ -28,24 +28,6 @@ func NewBackup(rootFolder storage.Folder, name string) (Backup, error) {
 	}, nil
 }
 
-func NewBackupInStorage(baseBackupFolder storage.Folder, name, storage string) (Backup, error) {
-	backup, err := internal.NewBackupInStorage(baseBackupFolder, name, storage)
-	if err != nil {
-		return Backup{}, err
-	}
-	return Backup{Backup: backup}, nil
-}
-
-func (backup *Backup) FetchMeta() (postgres.ExtendedMetadataDto, error) {
-	extendedMetadataDto := postgres.ExtendedMetadataDto{}
-	err := backup.FetchMetadata(&extendedMetadataDto)
-	if err != nil {
-		return postgres.ExtendedMetadataDto{}, err
-	}
-
-	return extendedMetadataDto, nil
-}
-
 func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	if backup.SentinelDto != nil {
 		return *backup.SentinelDto, nil

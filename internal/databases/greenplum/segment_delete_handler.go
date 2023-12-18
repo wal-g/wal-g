@@ -149,7 +149,7 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 	permanentBackups := map[postgres.PermanentObject]bool{}
 	permanentWals := map[postgres.PermanentObject]bool{}
 	for _, backupTime := range backupTimes {
-		backup, err := NewBackupInStorage(backupsFolder, backupTime.BackupName, backupTime.StorageName)
+		backup, err := postgres.NewBackupInStorage(backupsFolder, backupTime.BackupName, backupTime.StorageName)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
@@ -161,14 +161,13 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 			continue
 		}
 
-		rp, err := FindRestorePointWithTS(meta.StartTime.Format(time.RFC3339), rootFolder)
+		restorePoint, err := FindRestorePointWithTS(meta.StartTime.Format(time.RFC3339), rootFolder)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
 		}
-		tracelog.InfoLogger.Printf("or maybe closest rp %s\n", rp)
 
-		mtd, err := FetchRestorePointMetadata(rootFolder, rp)
+		restorePointMeta, err := FetchRestorePointMetadata(rootFolder, restorePoint)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
@@ -183,7 +182,7 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 			}
 
 			startWalSegmentNo := postgres.NewWalSegmentNo(meta.StartLsn - 1)
-			lsn, err := postgres.ParseLSN(mtd.LsnBySegment[contentID])
+			lsn, err := postgres.ParseLSN(restorePointMeta.LsnBySegment[contentID])
 			if err != nil {
 				tracelog.ErrorLogger.Printf("failed to parse lsn  %v\n", err)
 				continue

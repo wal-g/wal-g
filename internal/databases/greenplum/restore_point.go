@@ -276,12 +276,12 @@ func FindRestorePointWithTS(timestampStr string, folder storage.Folder) (string,
 	for i := range restorePointMetas {
 		meta := restorePointMetas[i]
 		// target restore point should be started before or right at the provided ts
-		if meta.StartTime.After(ts) {
+		if meta.FinishTime.Before(ts) {
 			continue
 		}
 
 		// we choose the restore point closest to the provided time
-		if targetPoint == nil || meta.StartTime.After(targetPoint.StartTime) {
+		if targetPoint == nil || meta.FinishTime.Before(targetPoint.FinishTime) {
 			targetPoint = &meta
 		}
 	}
