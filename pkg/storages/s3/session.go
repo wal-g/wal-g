@@ -132,6 +132,8 @@ func configWithSettings(config *aws.Config, bucket string, settings map[string]s
 			switch s {
 			case "DEVEL":
 				return aws.LogDebug
+			case "DEVEL_SIGNING":
+				return aws.LogDebug | aws.LogDebugWithSigning | aws.LogDebugWithRequestRetries
 			default:
 				return aws.LogOff
 			}
@@ -149,6 +151,15 @@ func configWithSettings(config *aws.Config, bucket string, settings map[string]s
 		}
 		config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
 	}
+
+	if disable100ContinueStr, ok := settings[Disable100ContinueSetting]; ok {
+		disable100Continue, err := strconv.ParseBool(disable100ContinueStr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to parse %s", Disable100ContinueSetting)
+		}
+		config.S3Disable100Continue = aws.Bool(disable100Continue)
+	}
+
 
 	region, err := getAWSRegion(bucket, config, settings)
 	if err != nil {

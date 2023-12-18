@@ -43,6 +43,7 @@ const (
 	RangeQueriesMaxRetries   = "S3_RANGE_MAX_RETRIES"
 	// MaxRetriesSetting limits retries during interaction with S3
 	MaxRetriesSetting = "S3_MAX_RETRIES"
+	Disable100ContinueSetting = "S3_DISABLE_100_CONTINUE"
 
 	RangeBatchEnabledDefault = false
 	RangeMaxRetriesDefault   = 10
@@ -78,6 +79,7 @@ var (
 		RangeBatchEnabled,
 		RangeQueriesMaxRetries,
 		MaxRetriesSetting,
+		Disable100ContinueSetting,
 	}
 )
 
