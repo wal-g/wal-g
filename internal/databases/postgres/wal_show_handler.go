@@ -31,8 +31,8 @@ type TimelineInfo struct {
 func NewTimelineInfo(walSegments *WalSegmentsSequence, historyRecords []*TimelineHistoryRecord) (*TimelineInfo, error) {
 	timelineInfo := &TimelineInfo{
 		ID:               walSegments.TimelineID,
-		StartSegment:     walSegments.MinSegmentNo.getFilename(walSegments.TimelineID),
-		EndSegment:       walSegments.MaxSegmentNo.getFilename(walSegments.TimelineID),
+		StartSegment:     walSegments.MinSegmentNo.GetFilename(walSegments.TimelineID),
+		EndSegment:       walSegments.MaxSegmentNo.GetFilename(walSegments.TimelineID),
 		SegmentsCount:    len(walSegments.WalSegmentNumbers),
 		SegmentRangeSize: uint64(walSegments.MaxSegmentNo-walSegments.MinSegmentNo) + 1,
 		Status:           TimelineOkStatus,
@@ -198,8 +198,8 @@ func getBackupsInRange(startSegmentName, endSegmentName string, timeline uint32,
 		if err != nil {
 			return nil, err
 		}
-		startSegment := newWalSegmentNo(backup.StartLsn).getFilename(backupTimeline)
-		endSegment := newWalSegmentNo(backup.FinishLsn).getFilename(backupTimeline)
+		startSegment := NewWalSegmentNo(backup.StartLsn).GetFilename(backupTimeline)
+		endSegment := NewWalSegmentNo(backup.FinishLsn).GetFilename(backupTimeline)
 
 		// there we compare segments lexicographically, maybe it is wrong...
 		if timeline == backupTimeline && startSegment >= startSegmentName && endSegment <= endSegmentName {

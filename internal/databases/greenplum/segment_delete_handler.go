@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -32,7 +33,12 @@ type SegDeleteBeforeHandler struct {
 func NewSegDeleteHandler(rootFolder storage.Folder, contentID int, args DeleteArgs, delType SegDeleteType,
 ) (SegDeleteHandler, error) {
 	segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
+
+	tracelog.InfoLogger.Println("Try to perform getting permanent objects")
+	permanentBackups, permanentWals := GetPermanentBackupsAndWals(rootFolder, contentID)
+	//permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(segFolder)
+
+	tracelog.InfoLogger.Println("OK getting permanent objects")
 
 	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
 	if err != nil {
@@ -130,6 +136,84 @@ func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, c
 	}
 
 	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
+}
+
+func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[postgres.PermanentObject]bool, map[postgres.PermanentObject]bool) {
+	tracelog.InfoLogger.Println("retrieving permanent objects")
+	folder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
+	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		tracelog.WarningLogger.Println("Error while time")
+		return map[postgres.PermanentObject]bool{}, map[postgres.PermanentObject]bool{}
+	}
+
+	backupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	permanentBackups := map[postgres.PermanentObject]bool{}
+	permanentWals := map[postgres.PermanentObject]bool{}
+	for _, backupTime := range backupTimes {
+		backup, err := NewBackupInStorage(backupsFolder, backupTime.BackupName, backupTime.StorageName)
+		if err != nil {
+			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
+			continue
+		}
+
+		meta, err := backup.FetchMeta()
+		if err != nil {
+			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
+			continue
+		}
+
+		tracelog.InfoLogger.Printf("formated time is %s\n", RestorePointMetadataFileName(fmt.Sprintf("backup_%s", meta.StartTime.Format("20060102T150405Z"))))
+		rp, err := FindRestorePointAfterTS(meta.StartTime.Format(time.RFC3339), rootFolder)
+		if err != nil {
+			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
+			continue
+		}
+		tracelog.InfoLogger.Printf("or maybe closest rp %s\n", rp)
+
+		mtd, err := FetchRestorePointMetadata(rootFolder, rp)
+		if err != nil {
+			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
+			continue
+		}
+
+		if meta.IsPermanent {
+			timelineID, err := postgres.ParseTimelineFromBackupName(backup.Name)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...",
+					backupTime.BackupName, err.Error())
+				continue
+			}
+
+			startWalSegmentNo := postgres.NewWalSegmentNo(meta.StartLsn - 1)
+			lsn, err := postgres.ParseLSN(mtd.LsnBySegment[contentID])
+			if err != nil {
+				tracelog.ErrorLogger.Printf("failed to parse lsn  %v\n", err)
+				continue
+			}
+			endWalSegmentNo := postgres.NewWalSegmentNo(lsn) //get lsn of restore point
+			tracelog.InfoLogger.Printf("Hey`a!!! permament from %s to %s\n", startWalSegmentNo.GetFilename(timelineID), endWalSegmentNo.GetFilename(timelineID))
+
+			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.Next() {
+				walObj := postgres.PermanentObject{
+					Name:        walSegmentNo.GetFilename(timelineID),
+					StorageName: backupTime.StorageName,
+				}
+				permanentWals[walObj] = true
+			}
+			backupObj := postgres.PermanentObject{
+				Name:        backupTime.BackupName,
+				StorageName: backupTime.StorageName,
+			}
+			permanentBackups[backupObj] = true
+		}
+	}
+	if len(permanentBackups) > 0 {
+		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
+			permanentBackups, permanentWals)
+	}
+	return permanentBackups, permanentWals
 }
 
 // TODO: unit tests

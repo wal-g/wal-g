@@ -91,9 +91,9 @@ func getWalFilename(lsn LSN, queryRunner *PgQueryRunner) (walFilename string, ti
 		return "", 0, err
 	}
 
-	walSegmentNo := newWalSegmentNo(lsn - 1)
+	walSegmentNo := NewWalSegmentNo(lsn - 1)
 
-	return walSegmentNo.getFilename(timeline), timeline, nil
+	return walSegmentNo.GetFilename(timeline), timeline, nil
 }
 
 func formatWALFileName(timeline uint32, logSegNo uint64) string {

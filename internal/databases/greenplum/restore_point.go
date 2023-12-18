@@ -248,6 +248,55 @@ func FindRestorePointBeforeTS(timestampStr string, folder storage.Folder) (strin
 	return targetPoint.Name, nil
 }
 
+func FindRestorePointAfterTS(timestampStr string, folder storage.Folder) (string, error) {
+	ts, err := time.Parse(time.RFC3339, timestampStr)
+	if err != nil {
+		return "", fmt.Errorf("timestamp parse error: %v", err)
+	}
+	//add second because we loose milliseconds when formatting
+	ts = ts.Add(time.Second)
+
+	restorePointTimes, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return "", err
+	}
+
+	restorePointMetas := make([]RestorePointMetadata, 0)
+	for _, rp := range restorePointTimes {
+		meta, err := FetchRestorePointMetadata(folder, rp.Name)
+		if err != nil {
+			return "", fmt.Errorf("fetch restore point %s metadata: %v", rp.Name, err)
+		}
+
+		restorePointMetas = append(restorePointMetas, meta)
+	}
+
+	var targetPoint *RestorePointMetadata
+	for i := range restorePointMetas {
+		meta := restorePointMetas[i]
+		// target restore point should be started before or right at the provided ts
+		if meta.StartTime.After(ts) {
+			tracelog.InfoLogger.Printf("restore point %s is to late for %s because %s", meta.Name, ts, meta.StartTime)
+			continue
+		}
+
+		tracelog.InfoLogger.Printf("restore point %s is ok for %s because %s", meta.Name, ts, meta.StartTime)
+
+		// we choose the restore point closest to the provided time
+		if targetPoint == nil || meta.StartTime.After(targetPoint.StartTime) {
+			targetPoint = &meta
+		}
+	}
+
+	if targetPoint == nil {
+		return "", NewNoRestorePointsFoundError()
+	}
+
+	tracelog.InfoLogger.Printf("Found restore point %s with start time %s, closest to the provided time %s",
+		targetPoint.Name, targetPoint.StartTime, ts)
+	return targetPoint.Name, nil
+}
+
 // GetRestorePoints receives restore points descriptions and sorts them by time
 func GetRestorePoints(folder storage.Folder) (restorePoints []RestorePointTime, err error) {
 	restorePointsObjects, _, err := folder.ListFolder()
