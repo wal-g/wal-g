@@ -157,9 +157,9 @@ func configWithSettings(config *aws.Config, bucket string, settings map[string]s
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to parse %s", Disable100ContinueSetting)
 		}
+		tracelog.DebugLogger.Printf("disable 100 continue %t", disable100Continue)
 		config.S3Disable100Continue = aws.Bool(disable100Continue)
 	}
-
 
 	region, err := getAWSRegion(bucket, config, settings)
 	if err != nil {
