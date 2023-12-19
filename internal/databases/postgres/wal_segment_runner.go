@@ -48,7 +48,7 @@ func NewWalSegmentDescription(name string) (WalSegmentDescription, error) {
 }
 
 func (desc WalSegmentDescription) GetFileName() string {
-	return desc.Number.getFilename(desc.Timeline)
+	return desc.Number.GetFilename(desc.Timeline)
 }
 
 // WalSegmentRunner is used for sequential iteration over WAL segments in the storage

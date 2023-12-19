@@ -356,8 +356,8 @@ func GetLastWalFilename(backup Backup) (string, error) {
 		tracelog.InfoLogger.FatalError(err)
 		return "", err
 	}
-	endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
-	return endWalSegmentNo.getFilename(timelineID), nil
+	endWalSegmentNo := NewWalSegmentNo(meta.FinishLsn - 1)
+	return endWalSegmentNo.GetFilename(timelineID), nil
 }
 
 func DeduceBackupName(object storage.Object) string {

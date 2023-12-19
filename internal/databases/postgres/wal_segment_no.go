@@ -6,11 +6,11 @@ import (
 
 type WalSegmentNo uint64
 
-func newWalSegmentNo(lsn LSN) WalSegmentNo {
-	return WalSegmentNo(getSegmentNoFromLsn(lsn))
+func NewWalSegmentNo(lsn LSN) WalSegmentNo {
+	return WalSegmentNo(GetSegmentNoFromLsn(lsn))
 }
 
-func getSegmentNoFromLsn(lsn LSN) uint64 {
+func GetSegmentNoFromLsn(lsn LSN) uint64 {
 	return uint64(lsn) / WalSegmentSize
 }
 
@@ -19,7 +19,7 @@ func newWalSegmentNoFromFilename(filename string) (WalSegmentNo, error) {
 	return WalSegmentNo(no), err
 }
 
-func (walSegmentNo WalSegmentNo) next() WalSegmentNo {
+func (walSegmentNo WalSegmentNo) Next() WalSegmentNo {
 	return walSegmentNo.add(1)
 }
 
@@ -39,7 +39,7 @@ func (walSegmentNo WalSegmentNo) firstLsn() LSN {
 	return LSN(uint64(walSegmentNo) * WalSegmentSize)
 }
 
-func (walSegmentNo WalSegmentNo) getFilename(timeline uint32) string {
+func (walSegmentNo WalSegmentNo) GetFilename(timeline uint32) string {
 	return fmt.Sprintf(walFileFormat,
 		timeline, uint64(walSegmentNo)/xLogSegmentsPerXLogID,
 		uint64(walSegmentNo)%xLogSegmentsPerXLogID)
