@@ -152,8 +152,8 @@ func newIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
 	status ScannedSegmentStatus) *IntegrityScanSegmentSequence {
 	return &IntegrityScanSegmentSequence{
 		TimelineID:    sequence.TimelineID,
-		StartSegment:  sequence.MinSegmentNo.getFilename(sequence.TimelineID),
-		EndSegment:    sequence.MaxSegmentNo.getFilename(sequence.TimelineID),
+		StartSegment:  sequence.MinSegmentNo.GetFilename(sequence.TimelineID),
+		EndSegment:    sequence.MaxSegmentNo.GetFilename(sequence.TimelineID),
 		Status:        status,
 		SegmentsCount: len(sequence.WalSegmentNumbers),
 	}
@@ -245,7 +245,7 @@ func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*Timelin
 	// switchLsnBySegNo is used for fast lookup of the timeline switch segment
 	switchLsnBySegNo := make(map[uint32]WalSegmentNo, len(timelineSwitchMap))
 	for _, historyRecord := range timelineSwitchMap {
-		switchLsnBySegNo[historyRecord.timeline] = newWalSegmentNo(historyRecord.lsn)
+		switchLsnBySegNo[historyRecord.timeline] = NewWalSegmentNo(historyRecord.lsn)
 	}
 	earliestBackup, earliestBackupSegNo, err :=
 		findEarliestBackup(currentTimeline, backupDetails, switchLsnBySegNo)

@@ -12,7 +12,7 @@ func newDeltaNoFromWalSegmentNo(walSegmentNo WalSegmentNo) DeltaNo {
 }
 
 func newDeltaNoFromLsn(lsn LSN) DeltaNo {
-	return newDeltaNoFromWalSegmentNo(newWalSegmentNo(lsn))
+	return newDeltaNoFromWalSegmentNo(NewWalSegmentNo(lsn))
 }
 
 func newDeltaNoFromFilename(filename string) (DeltaNo, error) {
@@ -47,5 +47,5 @@ func (deltaNo DeltaNo) firstLsn() LSN {
 }
 
 func (deltaNo DeltaNo) getFilename(timeline uint32) string {
-	return deltaNo.firstWalSegmentNo().getFilename(timeline) + DeltaFilenameSuffix
+	return deltaNo.firstWalSegmentNo().GetFilename(timeline) + DeltaFilenameSuffix
 }

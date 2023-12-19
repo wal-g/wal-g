@@ -161,8 +161,8 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(reader internal.StorageF
 	first,
 	last WalSegmentNo,
 	walParser *walparser.WalParser) error {
-	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.next() {
-		filename := walSegmentNo.getFilename(timeline)
+	for walSegmentNo := first; walSegmentNo < last; walSegmentNo = walSegmentNo.Next() {
+		filename := walSegmentNo.GetFilename(timeline)
 		err := deltaMap.getLocationsFromWal(reader, filename, walParser)
 		if err != nil {
 			return err
