@@ -3,12 +3,15 @@ package internal_test
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/testtools"
@@ -72,6 +75,45 @@ func makeTar(name string) (BufferReaderMaker, []byte) {
 	return BufferReaderMaker{tarContents, "/usr/local.tar"}, bCopy
 }
 
+// Returns byte array and encrypted, compressed and corrupted tar
+func makeCorruptedTar(name string) (BufferReaderMaker, []byte) {
+	b := generateRandomBytes()
+	bCopy := make([]byte, len(b))
+	copy(bCopy, b)
+
+	r, w := io.Pipe()
+	go func() {
+		bw := bufio.NewWriterSize(w, minBufferSize)
+
+		defer utility.LoggedClose(w, "")
+		defer func() {
+			if err := bw.Flush(); err != nil {
+				panic(err)
+			}
+		}()
+
+		crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
+
+		compressor := GetLz4Compressor()
+		compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+
+		temp, err := io.ReadAll(compressed)
+		if err != nil {
+			panic(err)
+		}
+
+		testtools.CreateNamedTar(bw, &io.LimitedReader{
+			R: bytes.NewBuffer(temp[0 : len(temp)-1]),
+			N: int64(len(temp) - 1),
+		}, name)
+
+	}()
+	tarContents := &bytes.Buffer{}
+	io.Copy(tarContents, r)
+
+	return BufferReaderMaker{tarContents, "/usr/local2.tar.lz4"}, bCopy
+}
+
 func TestExtractAll_simpleTar(t *testing.T) {
 	os.Setenv(internal.DownloadConcurrencySetting, "1")
 	defer os.Unsetenv(internal.DownloadConcurrencySetting)
@@ -87,6 +129,53 @@ func TestExtractAll_simpleTar(t *testing.T) {
 	}
 
 	assert.Equalf(t, b, buf.Out, "ExtractAll: Output does not match input.")
+}
+
+func TestRetryExtractWithSleeper(t *testing.T) {
+	os.Setenv(internal.DownloadConcurrencySetting, "1")
+	os.Setenv(internal.DownloadFileRetriesSetting, "7")
+	defer os.Unsetenv(internal.DownloadConcurrencySetting)
+
+	brm, _ := makeCorruptedTar("corrupted")
+
+	buf := &testtools.BufferTarInterpreter{}
+	files := []internal.ReaderMaker{&brm}
+
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("couldn't get os Pipe: %v", err)
+	}
+	defer func() {
+		err := reader.Close()
+		if err != nil {
+			t.Fatalf("couldn't close os Pipe: %v", err)
+		}
+	}()
+
+	// set warnings output to buffer
+	tracelog.SetWarningOutput(writer)
+
+	err = internal.ExtractAllWithSleeper(buf, files, NOPSleeper{})
+
+	// return logger output back to std
+	tracelog.SetWarningOutput(os.Stderr)
+	err1 := writer.Close()
+	if err1 != nil {
+		t.Fatalf("couldn't close os Pipe: %v", err)
+	}
+
+	retriesLeft := 6
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), fmt.Sprintf("retries left: %d", retriesLeft)) {
+			retriesLeft--
+		}
+	}
+
+	// file is corrupted so we expect error
+	assert.Error(t, err)
+
+	assert.Equal(t, -1, retriesLeft)
 }
 
 func TestExtractAll_multipleTars(t *testing.T) {

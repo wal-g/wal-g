@@ -444,6 +444,11 @@ func GetMaxConcurrency(concurrencyType string) (int, error) {
 	return concurrency, nil
 }
 
+func GetFetchRetries() int {
+	concurrency := viper.GetInt(DownloadFileRetriesSetting)
+	return concurrency
+}
+
 func GetSentinelUserData() (interface{}, error) {
 	dataStr, ok := GetSetting(SentinelUserDataSetting)
 	if !ok {
