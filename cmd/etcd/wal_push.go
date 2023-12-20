@@ -35,7 +35,10 @@ var walPushCmd = &cobra.Command{
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = etcd.HandleWALPush(ctx, uploader, internal.ETCDMemberDataDirectory)
+		dataDir, err := internal.GetRequiredSetting(internal.ETCDMemberDataDirectory)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		err = etcd.HandleWALPush(ctx, uploader, dataDir)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

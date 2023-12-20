@@ -30,7 +30,6 @@ func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd
 func walDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
 
 func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
-	//ensure that you read from leader member?
 	walDir := walDir(dataDir)
 
 	uploader.ChangeDirectory(utility.WalPath)
@@ -46,7 +45,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 		lastSeq, _, _ := parseWALName(walFiles[len(walFiles)-1])
 		cachedSeq, _, _ := parseWALName(cache.LastArchivedWal)
 
-		//write ensurance that reading master member of cluster
+		//write ensurance that reading leader member of cluster
 		if lastSeq < cachedSeq {
 			tracelog.WarningLogger.Printf("wal was reset (%s => %s), clearing cache",
 				cache.LastArchivedWal, walFiles[0])
