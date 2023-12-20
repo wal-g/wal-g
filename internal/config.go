@@ -36,6 +36,7 @@ const (
 	UploadConcurrencySetting      = "WALG_UPLOAD_CONCURRENCY"
 	UploadDiskConcurrencySetting  = "WALG_UPLOAD_DISK_CONCURRENCY"
 	UploadQueueSetting            = "WALG_UPLOAD_QUEUE"
+	DownloadFileRetriesSetting    = "WALG_DOWNLOAD_FILE_RETRIES"
 	SentinelUserDataSetting       = "WALG_SENTINEL_USER_DATA"
 	PreventWalOverwriteSetting    = "WALG_PREVENT_WAL_OVERWRITE"
 	UploadWalMetadata             = "WALG_UPLOAD_WAL_METADATA"
@@ -215,6 +216,7 @@ var (
 		UploadConcurrencySetting:       "16",
 		UploadDiskConcurrencySetting:   "1",
 		UploadQueueSetting:             "2",
+		DownloadFileRetriesSetting:     "15",
 		PreventWalOverwriteSetting:     "false",
 		UploadWalMetadata:              "NOMETADATA",
 		DeltaMaxStepsSetting:           "0",
@@ -288,6 +290,7 @@ var (
 		UploadConcurrencySetting:      true,
 		UploadDiskConcurrencySetting:  true,
 		UploadQueueSetting:            true,
+		DownloadFileRetriesSetting:    true,
 		SentinelUserDataSetting:       true,
 		PreventWalOverwriteSetting:    true,
 		UploadWalMetadata:             true,

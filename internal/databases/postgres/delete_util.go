@@ -44,11 +44,12 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool
 				continue
 			}
 
-			startWalSegmentNo := newWalSegmentNo(meta.StartLsn - 1)
-			endWalSegmentNo := newWalSegmentNo(meta.FinishLsn - 1)
-			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.next() {
+			startWalSegmentNo := NewWalSegmentNo(meta.StartLsn - 1)
+			endWalSegmentNo := NewWalSegmentNo(meta.FinishLsn - 1)
+
+			for walSegmentNo := startWalSegmentNo; walSegmentNo <= endWalSegmentNo; walSegmentNo = walSegmentNo.Next() {
 				walObj := PermanentObject{
-					Name:        walSegmentNo.getFilename(timelineID),
+					Name:        walSegmentNo.GetFilename(timelineID),
 					StorageName: backupTime.StorageName,
 				}
 				permanentWals[walObj] = true

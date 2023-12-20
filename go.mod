@@ -42,7 +42,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	github.com/ulikunitz/xz v0.5.8
 	github.com/wal-g/json v0.3.1
-	github.com/wal-g/tracelog v0.0.0-20190824100002-0ab2b054ff30
+	github.com/wal-g/tracelog v0.0.0-20231219102105-60dcd9126592
 	github.com/yandex-cloud/go-genproto v0.0.0-20230918115514-93a99045c9de
 	github.com/yandex-cloud/go-sdk v0.0.0-20230918120620-9e95f0816d79
 	go.mongodb.org/mongo-driver v1.9.1
