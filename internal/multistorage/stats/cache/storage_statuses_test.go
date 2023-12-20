@@ -2,11 +2,14 @@ package cache
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+var p = &DefaultEMAParams
 
 func TestKey(t *testing.T) {
 	t.Run("make string and parse", func(t *testing.T) {
@@ -39,9 +42,9 @@ func Test_storageStatus_alive(t *testing.T) {
 		wasAlive  bool
 		nowAlive  bool
 	}{
-		{"now alive when was alive and dropped to 5", 5, 100, true, true},
+		{"now alive when was alive and dropped to 88", 88, 100, true, true},
 		{"now alive when was dead and reached 99", 99, 100, false, true},
-		{"now dead when was alive and dropped to 4", 4, 100, true, false},
+		{"now dead when was alive and dropped to 87", 87, 100, true, false},
 		{"now dead when was dead and reached 98", 98, 100, false, false},
 		{"now alive when was alive with 0 potential", 0, 0, true, true},
 		{"now dead when was dead with 0 potential", 0, 0, false, false},
@@ -53,7 +56,8 @@ func Test_storageStatus_alive(t *testing.T) {
 				ActualAliveness:    tt.actual,
 				WasAlive:           tt.wasAlive,
 			}
-			assert.Equalf(t, tt.nowAlive, s.alive(), "{%v, %v, %v}.alive()", tt.potential, tt.actual, tt.wasAlive)
+			alive := s.alive(p)
+			assert.Equalf(t, tt.nowAlive, alive, "{%v, %v, %v}.alive()", tt.potential, tt.actual, tt.wasAlive)
 		})
 	}
 }
@@ -81,48 +85,56 @@ func Test_storageStatus_applyExplicitCheckResult(t *testing.T) {
 }
 
 func Test_storageStatus_applyOperationResult(t *testing.T) {
-	t.Run("make dead status alive after 10 successful operations", func(t *testing.T) {
-		s := storageStatus{PotentialAliveness: 100, ActualAliveness: 0, WasAlive: false, Updated: time.Time{}}
-		fmt.Printf("#0: actual aliveness: %v\n", s.ActualAliveness)
+	logStatus := func(idx int, s storageStatus) {
+		alive := s.alive(p)
+		alivenessFactor := s.alivenessFactor(p)
+		fmt.Printf("#%-5d: alive: %v,\taliveness: %8.6f\n", idx, alive, alivenessFactor)
+	}
+
+	t.Run("make dead status alive after 20 successful operations", func(t *testing.T) {
+		s := deadStatus()
+		fmt.Printf("Initial status\n")
+		logStatus(0, s)
 
 		iteration := 0
+		fmt.Printf("\nMonitor status changes\n")
 		for {
 			now := time.Now()
 			iteration++
-			newS := s.applyOperationResult(true, 100, now)
+			newS := s.applyOperationResult(p, true, 100, now)
+			logStatus(iteration, newS)
 			assert.Greater(t, newS.ActualAliveness, s.ActualAliveness)
 			assert.Equal(t, newS.PotentialAliveness, s.PotentialAliveness)
-			assert.Equal(t, newS.WasAlive, s.alive())
+			assert.Equal(t, newS.WasAlive, s.alive(p))
 			assert.Equal(t, now, newS.Updated)
 
-			fmt.Printf("#%d: actual aliveness: %v\n", iteration, newS.ActualAliveness)
-
-			if newS.alive() {
+			if newS.alive(p) {
 				break
 			}
 			s = newS
 		}
 
-		assert.Equal(t, 10, iteration)
+		assert.Equal(t, 28, iteration)
 	})
 
-	t.Run("make alive status dead after 6 unsuccessful operations", func(t *testing.T) {
-		s := storageStatus{PotentialAliveness: 100, ActualAliveness: 100, WasAlive: false, Updated: time.Time{}}
-		fmt.Printf("#0: actual aliveness: %v\n", s.ActualAliveness)
+	t.Run("make alive status dead after 10 unsuccessful operations", func(t *testing.T) {
+		s := aliveStatus()
+		fmt.Printf("Initial status\n")
+		logStatus(0, s)
 
 		iteration := 0
+		fmt.Printf("\nMonitor status changes\n")
 		for {
 			now := time.Now()
 			iteration++
-			newS := s.applyOperationResult(false, 100, now)
+			newS := s.applyOperationResult(p, false, 100, now)
+			logStatus(iteration, newS)
 			assert.Less(t, newS.ActualAliveness, s.ActualAliveness)
 			assert.Equal(t, newS.PotentialAliveness, s.PotentialAliveness)
-			assert.Equal(t, newS.WasAlive, s.alive())
+			assert.Equal(t, newS.WasAlive, s.alive(p))
 			assert.Equal(t, now, newS.Updated)
 
-			fmt.Printf("#%d: actual aliveness: %v\n", iteration, newS.ActualAliveness)
-
-			if !newS.alive() {
+			if !newS.alive(p) {
 				break
 			}
 			s = newS
@@ -131,29 +143,116 @@ func Test_storageStatus_applyOperationResult(t *testing.T) {
 		assert.Equal(t, 6, iteration)
 	})
 
+	t.Run("preserves alive status with 10% of failures", func(t *testing.T) {
+		s := aliveStatus()
+		fmt.Printf("Initial status\n")
+		logStatus(0, s)
+		success := func(i int) bool { return i%10 != 0 }
+
+		minAliveness := math.MaxFloat64
+		fmt.Printf("\nMonitor status changes\n")
+		for i := 1; i <= 1000; i++ {
+			s = s.applyOperationResult(p, success(i), 100, time.Now())
+			logStatus(i, s)
+			if s.alivenessFactor(p) < minAliveness {
+				minAliveness = s.alivenessFactor(p)
+			}
+			assert.True(t, s.alive(p))
+		}
+		fmt.Printf("Min aliveness: %v\n", minAliveness)
+	})
+
+	t.Run("makes alive status dead with 12.5% of failures", func(t *testing.T) {
+		s := aliveStatus()
+		fmt.Printf("Initial status\n")
+		logStatus(0, s)
+		success := func(i int) bool { return i%8 != 0 }
+
+		becomeDead := false
+		becomeAliveAgain := false
+		minAliveness := math.MaxFloat64
+		fmt.Printf("\nMonitor status changes\n")
+		for i := 1; i <= 1000; i++ {
+			s = s.applyOperationResult(p, success(i), 100, time.Now())
+			logStatus(i, s)
+			if s.alivenessFactor(p) < minAliveness {
+				minAliveness = s.alivenessFactor(p)
+			}
+			if !becomeDead && !s.alive(p) {
+				becomeDead = true
+			}
+			if !becomeAliveAgain && becomeDead && s.alive(p) {
+				becomeAliveAgain = true
+			}
+		}
+		fmt.Printf("Min aliveness: %v\n", minAliveness)
+
+		assert.True(t, becomeDead, "not become dead")
+		assert.False(t, becomeAliveAgain, "become alive again")
+	})
+
+	t.Run("preserves dead status with 5% of failures", func(t *testing.T) {
+		s := deadStatus()
+		fmt.Printf("Initial status\n")
+		logStatus(0, s)
+		success := func(i int) bool { return i%20 != 0 }
+
+		maxAliveness := 0.0
+		fmt.Printf("\nMonitor status changes\n")
+		for i := 1; i <= 100; i++ {
+			s = s.applyOperationResult(p, success(i), 100, time.Now())
+			logStatus(i, s)
+			if s.alivenessFactor(p) > maxAliveness {
+				maxAliveness = s.alivenessFactor(p)
+			}
+			assert.False(t, s.alive(p))
+		}
+		fmt.Printf("Max aliveness: %v\n", maxAliveness)
+	})
+
+	t.Run("makes dead status alive with 4% of failures", func(t *testing.T) {
+		s := deadStatus()
+		fmt.Printf("Initial status\n")
+		logStatus(0, s)
+		success := func(i int) bool { return i%25 != 0 }
+
+		becomeAlive := false
+		becomeDeadAgain := false
+		maxAliveness := 0.0
+		fmt.Printf("\nMonitor status changes\n")
+		for i := 1; i <= 1000; i++ {
+			s = s.applyOperationResult(p, success(i), 100, time.Now())
+			logStatus(i, s)
+			if s.alivenessFactor(p) > maxAliveness {
+				maxAliveness = s.alivenessFactor(p)
+			}
+			if !becomeAlive && s.alive(p) {
+				becomeAlive = true
+			}
+			if !becomeDeadAgain && becomeAlive && !s.alive(p) {
+				becomeDeadAgain = true
+			}
+		}
+		fmt.Printf("Max aliveness: %v\n", maxAliveness)
+
+		assert.True(t, becomeAlive, "not become alive")
+		assert.False(t, becomeDeadAgain, "become dead again")
+	})
+
 	t.Run("works with different weights", func(t *testing.T) {
 		weights := [10]float64{1000, 2000, 500, 3000, 1000, 2000, 1500, 2500, 500, 1000}
 		alives := [10]bool{false, true, true, false, true, false, true, false, false, true}
-		s := storageStatus{}
-
-		alivePerc := func(actual, potential Aliveness) float64 {
-			if actual == potential {
-				return 100.0
-			}
-			return float64(actual / potential * 100.0)
-		}
+		s := aliveStatus()
 
 		for i := 0; i < 10; i++ {
 			now := time.Now()
-			newS := s.applyOperationResult(alives[i], weights[i], now)
+			newS := s.applyOperationResult(p, alives[i], weights[i], now)
 			fmt.Printf("applied result %v with weight %f\n", alives[i], weights[i])
 
-			perc := alivePerc(s.ActualAliveness, s.PotentialAliveness)
-			newPerc := alivePerc(newS.ActualAliveness, newS.PotentialAliveness)
 			if alives[i] {
-				assert.GreaterOrEqual(t, newPerc, perc)
+				assert.Greater(t, newS.alivenessFactor(p), s.alivenessFactor(p))
 			} else {
-				assert.LessOrEqual(t, newPerc, perc)
+				assert.Less(t, newS.alivenessFactor(p), s.alivenessFactor(p))
 			}
 
 			fmt.Printf(
@@ -167,7 +266,7 @@ func Test_storageStatus_applyOperationResult(t *testing.T) {
 			s = newS
 		}
 
-		assert.False(t, s.alive())
+		assert.False(t, s.alive(p))
 	})
 }
 
@@ -195,10 +294,10 @@ func Test_storageStatuses_applyExplicitCheckResult(t *testing.T) {
 		newSS := ss.applyExplicitCheckResult(checkResult, time.Now())
 
 		t.Run("applies to all statuses", func(t *testing.T) {
-			assert.Equal(t, true, newSS[keys[0]].alive())
-			assert.Equal(t, false, newSS[keys[1]].alive())
-			assert.Equal(t, true, newSS[keys[2]].alive())
-			assert.Equal(t, false, newSS[keys[3]].alive())
+			assert.Equal(t, true, newSS[keys[0]].alive(p))
+			assert.Equal(t, false, newSS[keys[1]].alive(p))
+			assert.Equal(t, true, newSS[keys[2]].alive(p))
+			assert.Equal(t, false, newSS[keys[3]].alive(p))
 		})
 
 		t.Run("updates checking times", func(t *testing.T) {
@@ -333,13 +432,13 @@ func Test_storageStatuses_filter(t *testing.T) {
 func Test_storageStatuses_aliveMap(t *testing.T) {
 	t.Run("works with nil statuses", func(t *testing.T) {
 		var ss storageStatuses = nil
-		gotAM := ss.aliveMap()
+		gotAM := ss.aliveMap(p)
 		assert.Len(t, gotAM, 0)
 	})
 
 	t.Run("works with empty statuses", func(t *testing.T) {
 		ss := storageStatuses{}
-		gotAM := ss.aliveMap()
+		gotAM := ss.aliveMap(p)
 		assert.Len(t, gotAM, 0)
 	})
 
@@ -350,7 +449,7 @@ func Test_storageStatuses_aliveMap(t *testing.T) {
 			keys[2]: aliveStatus(),
 			keys[3]: deadStatus(),
 		}
-		gotAM := ss.aliveMap()
+		gotAM := ss.aliveMap(p)
 		wantAM := AliveMap{
 			keys[0].Name: true,
 			keys[1].Name: false,

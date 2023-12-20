@@ -26,7 +26,7 @@ type Config struct {
 	AliveCheckTimeout    time.Duration
 	AliveCheckWriteBytes uint
 	CheckWrite           bool
-	StatusCacheTTL       time.Duration
+	StatusCache          *cache.Config
 }
 
 func NewStorage(config *Config, primary storage.HashableStorage, failovers map[string]storage.HashableStorage) *Storage {
@@ -44,12 +44,12 @@ func NewStorage(config *Config, primary storage.HashableStorage, failovers map[s
 func configureStatsCollector(storages NamedStorages, config *Config) stats.Collector {
 	switch {
 	case config.AliveChecks && config.CheckWrite:
-		statusCache := cache.New(storages.Keys(), config.StatusCacheTTL, cache.DefaultRWMem, cache.DefaultRWFile)
+		statusCache := cache.New(storages.Keys(), config.StatusCache, cache.DefaultRWMem, cache.DefaultRWFile)
 		aliveChecker := stats.NewRWAliveChecker(storages.RootFolders(), config.AliveCheckTimeout, config.AliveCheckWriteBytes)
 		return stats.NewCollector(storages.Names(), statusCache, aliveChecker)
 
 	case config.AliveChecks && !config.CheckWrite:
-		statusCache := cache.New(storages.Keys(), config.StatusCacheTTL, cache.DefaultROMem, cache.DefaultROFile)
+		statusCache := cache.New(storages.Keys(), config.StatusCache, cache.DefaultROMem, cache.DefaultROFile)
 		aliveChecker := stats.NewROAliveChecker(storages.RootFolders(), config.AliveCheckTimeout)
 		return stats.NewCollector(storages.Names(), statusCache, aliveChecker)
 
@@ -81,11 +81,18 @@ func (s *Storage) Close() error {
 	if err != nil {
 		closErr.Add(fmt.Errorf("close storage stats collector: %w", err))
 	}
-	return closErr
+	if !closErr.Empty() {
+		return closErr
+	}
+	return nil
 }
 
 type CloseError struct {
 	specificStorageErrs []error
+}
+
+func (ce *CloseError) Empty() bool {
+	return len(ce.specificStorageErrs) == 0
 }
 
 func (ce *CloseError) Add(err error) {

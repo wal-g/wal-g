@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/wal-g/tracelog"
 )
 
 // Key identifies a storage and is unique within all WAL-G configurations, in contrast to Name, that is unique only
@@ -41,22 +43,24 @@ type storageStatus struct {
 	Updated time.Time `json:"updated"`
 }
 
-const (
-	// aliveLimit is used to mark the storage alive when its Aliveness reaches this value
-	aliveLimit Aliveness = 0.99
-
-	// deadLimit is used to mark the storage dead when its Aliveness drops to this value
-	deadLimit Aliveness = 0.05
-)
-
-func (s storageStatus) alive() bool {
-	if s.PotentialAliveness == 0 {
-		return s.WasAlive
-	}
+func (s storageStatus) alive(p *EMAParams) bool {
 	if s.WasAlive {
-		return s.ActualAliveness >= s.PotentialAliveness*deadLimit
+		return s.alivenessFactor(p) >= p.DeadLimit
 	}
-	return s.ActualAliveness >= s.PotentialAliveness*aliveLimit
+	return s.alivenessFactor(p) >= p.AliveLimit
+}
+
+func (s storageStatus) alivenessFactor(p *EMAParams) float64 {
+	// In case the storage has no data, consider it having the minimum limit of aliveness.
+	if s.hasNoData() {
+		return p.DeadLimit
+	}
+	return float64(s.ActualAliveness / s.PotentialAliveness)
+}
+
+// hasNoData returns true if the storageStatus has just been initialized.
+func (s storageStatus) hasNoData() bool {
+	return s.PotentialAliveness == 0 && s.ActualAliveness == 0
 }
 
 func (s storageStatus) applyExplicitCheckResult(alive bool, checkTime time.Time) storageStatus {
@@ -76,28 +80,43 @@ func (s storageStatus) applyExplicitCheckResult(alive bool, checkTime time.Time)
 	}
 }
 
-func (s storageStatus) applyOperationResult(alive bool, weight float64, checkTime time.Time) storageStatus {
+func (s storageStatus) applyOperationResult(p *EMAParams, alive bool, weight float64, checkTime time.Time) storageStatus {
+	alpha := s.calcEMAAlpha(p)
+	tracelog.DebugLogger.Printf("Apply storage operation result with EMA alpha = %v", alpha)
+
 	if alive {
 		return storageStatus{
-			PotentialAliveness: expMovingAverage(s.PotentialAliveness, weight),
-			ActualAliveness:    expMovingAverage(s.ActualAliveness, weight),
-			WasAlive:           s.alive(),
+			PotentialAliveness: expMovingAverage(alpha, s.PotentialAliveness, weight),
+			ActualAliveness:    expMovingAverage(alpha, s.ActualAliveness, weight),
+			WasAlive:           s.alive(p),
 			Updated:            checkTime,
 		}
 	}
 	return storageStatus{
-		PotentialAliveness: expMovingAverage(s.PotentialAliveness, weight),
-		ActualAliveness:    expMovingAverage(s.ActualAliveness, 0),
-		WasAlive:           s.alive(),
+		PotentialAliveness: expMovingAverage(alpha, s.PotentialAliveness, weight),
+		ActualAliveness:    expMovingAverage(alpha, s.ActualAliveness, 0),
+		WasAlive:           s.alive(p),
 		Updated:            checkTime,
 	}
 }
 
-// This exponential moving average α value allows a fully dead storage to become alive after 10 successful operations.
-const emaAlpha = 0.6
+// calcEMAAlpha returns alpha from the allowed ranges, such that it is larger when aliveness is close to the limits, and
+// smaller away from these limits.
+func (s storageStatus) calcEMAAlpha(p *EMAParams) float64 {
+	if s.alive(p) {
+		// Take such EMA alpha value so that it is maximal with aliveness = deadLimit, and minimal with aliveness = 1.
+		amplifier := (s.alivenessFactor(p) - p.DeadLimit) / (1 - p.DeadLimit)
+		alphaRange := p.AlphaAlive
+		return alphaRange.Min + (alphaRange.Max-alphaRange.Min)*amplifier
+	}
+	// Take such EMA alpha value so that it is maximal with aliveness = aliveLimit, and minimal with aliveness = 0.
+	amplifier := s.alivenessFactor(p) / p.AliveLimit
+	alphaRange := p.AlphaDead
+	return alphaRange.Min + (alphaRange.Max-alphaRange.Min)*amplifier
+}
 
-func expMovingAverage(prevAverage Aliveness, newValue float64) Aliveness {
-	return (prevAverage * emaAlpha) + (Aliveness(newValue) * (1 - emaAlpha))
+func expMovingAverage(alpha float64, prevAverage Aliveness, newValue float64) Aliveness {
+	return Aliveness((float64(prevAverage) * alpha) + (newValue * (1 - alpha)))
 }
 
 type storageStatuses map[Key]storageStatus
@@ -162,10 +181,10 @@ func (ss storageStatuses) filter(storages []Key) storageStatuses {
 	return result
 }
 
-func (ss storageStatuses) aliveMap() AliveMap {
+func (ss storageStatuses) aliveMap(p *EMAParams) AliveMap {
 	aliveMap := make(AliveMap, len(ss))
 	for key, status := range ss {
-		aliveMap[key.Name] = status.alive()
+		aliveMap[key.Name] = status.alive(p)
 	}
 	return aliveMap
 }
@@ -186,4 +205,45 @@ func mergeByRelevance(a, b storageStatuses) storageStatuses {
 		}
 	}
 	return result
+}
+
+// EMAParams are used by the Exponential Moving Average algorithm that makes the decision if a storage with a certain
+// aliveness metric is alive or dead now.
+type EMAParams struct {
+	// AliveLimit is compared with the aliveness factor of a dead storage to decide if this storage should become alive.
+	AliveLimit float64
+
+	// DeadLimit is compared with the aliveness factor of an alive storage to decide if this storage should become dead.
+	DeadLimit float64
+
+	// AlphaAlive is the range of possible Alpha values for an alive storage.
+	AlphaAlive EMAAlphaRange
+
+	// AlphaDead is the range of possible Alpha values for a dead storage.
+	AlphaDead EMAAlphaRange
+}
+
+// EMAAlphaRange specifies a minimum and a maximum value of Alpha used in the Exponential Moving Average algorithm.
+type EMAAlphaRange struct {
+	Max float64
+	Min float64
+}
+
+// DefaultEMAParams provides the default Exponential Moving Average behavior, which is described in the unit tests.
+// That is:
+// (1) a fully dead storage becomes alive after 20 subsequent successful operations,
+// (2) a fully alive storage becomes dead after 10 subsequent unsuccessful operations,
+// (3) a storage becomes dead when it has more than 10% of unsuccessful operations (with the same weight),
+// (4) a storage becomes alive when it has less than 5% of unsuccessful operations (with the same weight).
+var DefaultEMAParams = EMAParams{
+	AliveLimit: 0.99,
+	DeadLimit:  0.88,
+	AlphaAlive: EMAAlphaRange{
+		Max: 0.99,
+		Min: 0.95,
+	},
+	AlphaDead: EMAAlphaRange{
+		Max: 0.9,
+		Min: 0.5,
+	},
 }

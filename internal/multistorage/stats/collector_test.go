@@ -204,7 +204,8 @@ func newTestCollector(t *testing.T, storages int, deadOnCheck ...int) *collector
 	}
 	shMem := cache.NewSharedMemory()
 	shFile := cache.NewSharedFile(path.Join(t.TempDir(), "walg_status_cache"))
-	testCache := cache.New(keys, time.Hour, shMem, shFile)
+	testCacheConfig := &cache.Config{TTL: time.Hour, EMAParams: &cache.DefaultEMAParams}
+	testCache := cache.New(keys, testCacheConfig, shMem, shFile)
 	check := checkMock{}
 	for _, deadNum := range deadOnCheck {
 		deadIdx := deadNum - 1

@@ -162,7 +162,7 @@ func Test_cache_ApplyExplicitCheckResult(t *testing.T) {
 		}
 		_, err := c.ApplyExplicitCheckResult(checkRes, time.Now())
 		require.NoError(t, err)
-		assert.Equal(t, checkRes, c.shMem.Statuses.aliveMap())
+		assert.Equal(t, checkRes, c.shMem.Statuses.aliveMap(c.emaParams))
 	})
 
 	t.Run("applies check result to file if flush timeout exceeded", func(t *testing.T) {
@@ -179,7 +179,7 @@ func Test_cache_ApplyExplicitCheckResult(t *testing.T) {
 		fileStatuses, err := c.shFile.read()
 		require.NoError(t, err)
 
-		assert.Equal(t, checkRes, fileStatuses.aliveMap())
+		assert.Equal(t, checkRes, fileStatuses.aliveMap(c.emaParams))
 	})
 
 	t.Run("does not apply check result to file if flush timeout did not exceed", func(t *testing.T) {
@@ -200,7 +200,7 @@ func Test_cache_ApplyExplicitCheckResult(t *testing.T) {
 		fileStatuses, err := c.shFile.read()
 		require.NoError(t, err)
 
-		assert.Len(t, fileStatuses.aliveMap(), 0)
+		assert.Len(t, fileStatuses.aliveMap(c.emaParams), 0)
 	})
 
 	t.Run("merges old mem and file statuses with new check result", func(t *testing.T) {
@@ -232,7 +232,7 @@ func Test_cache_ApplyExplicitCheckResult(t *testing.T) {
 			"fo1": false,
 			"fo2": true,
 		}
-		assert.Equal(t, wantMem, c.shMem.Statuses.aliveMap())
+		assert.Equal(t, wantMem, c.shMem.Statuses.aliveMap(c.emaParams))
 
 		fileStatuses, err := c.shFile.read()
 		require.NoError(t, err)
@@ -243,7 +243,7 @@ func Test_cache_ApplyExplicitCheckResult(t *testing.T) {
 			"fo2": true,
 			"fo3": false,
 		}
-		assert.Equal(t, wantFile, fileStatuses.aliveMap())
+		assert.Equal(t, wantFile, fileStatuses.aliveMap(c.emaParams))
 	})
 
 	t.Run("provides actual aliveness for requested storages", func(t *testing.T) {
@@ -274,7 +274,7 @@ func Test_cache_ApplyOperationResult(t *testing.T) {
 		c := newTestCache(t, 0, false)
 		WithCustomFlushTimeout(time.Hour)(c)
 		c.ApplyOperationResult("def", true, 100)
-		assert.True(t, c.shMem.Statuses[key("def")].alive())
+		assert.True(t, c.shMem.Statuses[key("def")].alive(c.emaParams))
 	})
 
 	t.Run("applies operation result to file if flush timeout exceeded", func(t *testing.T) {
@@ -286,7 +286,7 @@ func Test_cache_ApplyOperationResult(t *testing.T) {
 		fileStatuses, err := c.shFile.read()
 		require.NoError(t, err)
 
-		assert.True(t, fileStatuses[key("fo1")].alive())
+		assert.True(t, fileStatuses[key("fo1")].alive(c.emaParams))
 	})
 
 	t.Run("does not apply operation result to file if flush timeout did not exceed", func(t *testing.T) {
@@ -342,7 +342,7 @@ func Test_cache_ApplyOperationResult(t *testing.T) {
 			"fo1": false,
 			"fo2": false,
 		}
-		assert.Equal(t, wantMem, c.shMem.Statuses.aliveMap())
+		assert.Equal(t, wantMem, c.shMem.Statuses.aliveMap(c.emaParams))
 
 		fileStatuses, err := c.shFile.read()
 		require.NoError(t, err)
@@ -353,7 +353,7 @@ func Test_cache_ApplyOperationResult(t *testing.T) {
 			"fo2": false,
 			"fo3": true,
 		}
-		assert.Equal(t, wantFile, fileStatuses.aliveMap())
+		assert.Equal(t, wantFile, fileStatuses.aliveMap(c.emaParams))
 	})
 }
 
@@ -403,7 +403,7 @@ func Test_cache_Flush(t *testing.T) {
 			"fo2": true,
 			"fo3": false,
 		}
-		assert.Equal(t, want, fileStatuses.aliveMap())
+		assert.Equal(t, want, fileStatuses.aliveMap(c.emaParams))
 	})
 }
 
@@ -446,7 +446,7 @@ func newTestCache(t *testing.T, failoverStorages int, useFile bool) *cache {
 	}
 	return New(
 		keysMap,
-		time.Hour,
+		&Config{TTL: time.Hour, EMAParams: &DefaultEMAParams},
 		shMem,
 		shFile,
 	).(*cache)

@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -53,9 +54,9 @@ func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error
 	}
 
 	if config.AliveChecks {
-		config.StatusCacheTTL, err = internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+		config.StatusCache, err = configureStatusCache()
 		if err != nil {
-			return nil, fmt.Errorf("get failover storage cache lifetime setting: %w", err)
+			return nil, fmt.Errorf("configure failover storages status cache: %w", err)
 		}
 
 		config.AliveCheckTimeout, err = internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
@@ -71,6 +72,53 @@ func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error
 	}
 
 	return multistorage.NewStorage(config, primary, failovers), nil
+}
+
+func configureStatusCache() (*cache.Config, error) {
+	config := &cache.Config{}
+
+	var err error
+	config.TTL, err = internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+	if err != nil {
+		return nil, fmt.Errorf("get cache lifetime setting: %w", err)
+	}
+
+	emaDefault := cache.DefaultEMAParams
+	ema := &cache.EMAParams{}
+
+	ema.AliveLimit, err = internal.GetFloatSettingDefault(internal.PgFailoverStorageCacheEMAAliveLimit, emaDefault.AliveLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alive limit setting: %w", err)
+	}
+
+	ema.DeadLimit, err = internal.GetFloatSettingDefault(internal.PgFailoverStorageCacheEMADeadLimit, emaDefault.DeadLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA dead limit setting: %w", err)
+	}
+
+	ema.AlphaAlive.Max, err = internal.GetFloatSettingDefault(internal.PgFailoverStorageCacheEMAAlphaAliveMax, emaDefault.AlphaAlive.Max)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha alive max setting: %w", err)
+	}
+
+	ema.AlphaAlive.Min, err = internal.GetFloatSettingDefault(internal.PgFailoverStorageCacheEMAAlphaAliveMin, emaDefault.AlphaAlive.Min)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha alive min setting: %w", err)
+	}
+
+	ema.AlphaDead.Max, err = internal.GetFloatSettingDefault(internal.PgFailoverStorageCacheEMAAlphaDeadMax, emaDefault.AlphaDead.Max)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha dead max setting: %w", err)
+	}
+
+	ema.AlphaDead.Min, err = internal.GetFloatSettingDefault(internal.PgFailoverStorageCacheEMAAlphaDeadMin, emaDefault.AlphaDead.Min)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha dead min setting: %w", err)
+	}
+
+	config.EMAParams = ema
+
+	return config, nil
 }
 
 // ConfigureWalUploader connects to storage and creates an uploader. It makes sure

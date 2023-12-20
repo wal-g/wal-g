@@ -37,6 +37,8 @@ type cache struct {
 	shFile             *SharedFile
 	shFileUsed         bool
 	shFileFlushTimeout time.Duration
+
+	emaParams *EMAParams
 }
 
 type Option func(c *cache)
@@ -49,20 +51,26 @@ func WithCustomFlushTimeout(timeout time.Duration) Option {
 
 const defaultFlushTimeout = 5 * time.Minute
 
+type Config struct {
+	TTL       time.Duration
+	EMAParams *EMAParams
+}
+
 func New(
 	usedKeys map[string]Key,
-	ttl time.Duration,
+	config *Config,
 	sharedMem *SharedMemory,
 	sharedFile *SharedFile,
 	opts ...Option,
 ) Cache {
 	c := &cache{
 		usedKeys:           usedKeys,
-		ttl:                ttl,
+		ttl:                config.TTL,
 		shMem:              sharedMem,
 		shFile:             sharedFile,
 		shFileUsed:         sharedFile != nil,
 		shFileFlushTimeout: defaultFlushTimeout,
+		emaParams:          config.EMAParams,
 	}
 	for _, o := range opts {
 		o(c)
@@ -81,7 +89,7 @@ func (c *cache) Read(storageNames ...string) (relevant, outdated AliveMap, err e
 
 	allMemRelevant := c.shMem.Statuses.isRelevant(c.ttl, storageKeys...)
 	if allMemRelevant {
-		return c.shMem.Statuses.filter(storageKeys).aliveMap(), nil, nil
+		return c.shMem.Statuses.filter(storageKeys).aliveMap(c.emaParams), nil, nil
 	}
 
 	var fileStatuses storageStatuses
@@ -96,7 +104,9 @@ func (c *cache) Read(storageNames ...string) (relevant, outdated AliveMap, err e
 	c.shMem.Statuses = memAndFileMerged
 
 	relevantStatuses, outdatedStatuses := memAndFileMerged.splitByRelevance(c.ttl, storageKeys)
-	return relevantStatuses.filter(storageKeys).aliveMap(), outdatedStatuses.filter(storageKeys).aliveMap(), nil
+	relevantAliveMap := relevantStatuses.filter(storageKeys).aliveMap(c.emaParams)
+	outdatedAliveMap := outdatedStatuses.filter(storageKeys).aliveMap(c.emaParams)
+	return relevantAliveMap, outdatedAliveMap, nil
 }
 
 func (c *cache) ApplyExplicitCheckResult(checkResult AliveMap, checkTime time.Time, storageNames ...string) (AliveMap, error) {
@@ -116,7 +126,7 @@ func (c *cache) ApplyExplicitCheckResult(checkResult AliveMap, checkTime time.Ti
 	if err != nil {
 		return nil, err
 	}
-	aliveMap := c.shMem.Statuses.filter(storageKeys).aliveMap()
+	aliveMap := c.shMem.Statuses.filter(storageKeys).aliveMap(c.emaParams)
 
 	if !c.shFileUsed {
 		return aliveMap, nil
@@ -158,7 +168,7 @@ func (c *cache) ApplyOperationResult(storage string, alive bool, weight float64)
 		return
 	}
 
-	c.shMem.Statuses[key] = c.shMem.Statuses[key].applyOperationResult(alive, weight, time.Now())
+	c.shMem.Statuses[key] = c.shMem.Statuses[key].applyOperationResult(c.emaParams, alive, weight, time.Now())
 
 	if !c.shFileUsed {
 		return
