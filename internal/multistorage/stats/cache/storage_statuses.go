@@ -116,7 +116,7 @@ func (s storageStatus) calcEMAAlpha(p *EMAParams) float64 {
 }
 
 func expMovingAverage(alpha float64, prevAverage Aliveness, newValue float64) Aliveness {
-	return Aliveness((float64(prevAverage) * alpha) + (newValue * (1 - alpha)))
+	return Aliveness((newValue * alpha) + (float64(prevAverage) * (1 - alpha)))
 }
 
 type storageStatuses map[Key]storageStatus
@@ -239,11 +239,11 @@ var DefaultEMAParams = EMAParams{
 	AliveLimit: 0.99,
 	DeadLimit:  0.88,
 	AlphaAlive: EMAAlphaRange{
-		Max: 0.99,
-		Min: 0.95,
+		Max: 0.01,
+		Min: 0.05,
 	},
 	AlphaDead: EMAAlphaRange{
-		Max: 0.9,
+		Max: 0.1,
 		Min: 0.5,
 	},
 }
