@@ -29,36 +29,45 @@ type Config struct {
 	StatusCache          *cache.Config
 }
 
-func NewStorage(config *Config, primary storage.HashableStorage, failovers map[string]storage.HashableStorage) *Storage {
+func NewStorage(config *Config, primary storage.HashableStorage, failovers map[string]storage.HashableStorage) (*Storage, error) {
 	specificStorages := NameAndOrderStorages(primary, failovers)
-	statsCollector := configureStatsCollector(specificStorages, config)
+	statsCollector, err := configureStatsCollector(specificStorages, config)
+	if err != nil {
+		return nil, fmt.Errorf("configure stats collector: %w", err)
+	}
 	rootFolder := NewFolder(specificStorages.RootFolders(), statsCollector)
 
 	return &Storage{
 		statsCollector:   statsCollector,
 		specificStorages: specificStorages,
 		rootFolder:       rootFolder,
-	}
+	}, nil
 }
 
-func configureStatsCollector(storages NamedStorages, config *Config) stats.Collector {
+func configureStatsCollector(storages NamedStorages, config *Config) (stats.Collector, error) {
 	switch {
 	case config.AliveChecks && config.CheckWrite:
-		statusCache := cache.New(storages.Keys(), config.StatusCache, cache.DefaultRWMem, cache.DefaultRWFile)
+		statusCache, err := cache.New(storages.Keys(), config.StatusCache, cache.DefaultRWMem, cache.DefaultRWFile)
+		if err != nil {
+			return nil, fmt.Errorf("init storage status cache: %w", err)
+		}
 		aliveChecker := stats.NewRWAliveChecker(storages.RootFolders(), config.AliveCheckTimeout, config.AliveCheckWriteBytes)
-		return stats.NewCollector(storages.Names(), statusCache, aliveChecker)
+		return stats.NewCollector(storages.Names(), statusCache, aliveChecker), nil
 
 	case config.AliveChecks && !config.CheckWrite:
-		statusCache := cache.New(storages.Keys(), config.StatusCache, cache.DefaultROMem, cache.DefaultROFile)
+		statusCache, err := cache.New(storages.Keys(), config.StatusCache, cache.DefaultROMem, cache.DefaultROFile)
+		if err != nil {
+			return nil, fmt.Errorf("init storage status cache: %w", err)
+		}
 		aliveChecker := stats.NewROAliveChecker(storages.RootFolders(), config.AliveCheckTimeout)
-		return stats.NewCollector(storages.Names(), statusCache, aliveChecker)
+		return stats.NewCollector(storages.Names(), statusCache, aliveChecker), nil
 
 	case !config.AliveChecks:
-		return stats.NewNopCollector(storages.Names())
+		return stats.NewNopCollector(storages.Names()), nil
 
 	default:
 		tracelog.ErrorLogger.Printf("Failed to init multi-storage stats collector: nop collector will be used")
-		return stats.NewNopCollector(storages.Names())
+		return stats.NewNopCollector(storages.Names()), nil
 	}
 }
 

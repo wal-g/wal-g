@@ -444,12 +444,14 @@ func newTestCache(t *testing.T, failoverStorages int, useFile bool) *cache {
 	if useFile {
 		shFile = NewSharedFile(path.Join(t.TempDir(), "walg_status_cache"))
 	}
-	return New(
+	c, err := New(
 		keysMap,
 		&Config{TTL: time.Hour, EMAParams: &DefaultEMAParams},
 		shMem,
 		shFile,
-	).(*cache)
+	)
+	require.NoError(t, err)
+	return c.(*cache)
 }
 
 func key(name string) Key {

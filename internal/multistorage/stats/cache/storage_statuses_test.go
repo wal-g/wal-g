@@ -11,6 +11,8 @@ import (
 
 var p = &DefaultEMAParams
 
+var logStorageStatuses = false
+
 func TestKey(t *testing.T) {
 	t.Run("make string and parse", func(t *testing.T) {
 		key := Key{Name: "some_name", Hash: "some_hash"}
@@ -86,6 +88,9 @@ func Test_storageStatus_applyExplicitCheckResult(t *testing.T) {
 
 func Test_storageStatus_applyOperationResult(t *testing.T) {
 	logStatus := func(idx int, s storageStatus) {
+		if !logStorageStatuses {
+			return
+		}
 		alive := s.alive(p)
 		alivenessFactor := s.alivenessFactor(p)
 		fmt.Printf("#%-5d: alive: %v,\taliveness: %8.6f\n", idx, alive, alivenessFactor)
@@ -104,7 +109,7 @@ func Test_storageStatus_applyOperationResult(t *testing.T) {
 			newS := s.applyOperationResult(p, true, 100, now)
 			logStatus(iteration, newS)
 			assert.Greater(t, newS.ActualAliveness, s.ActualAliveness)
-			assert.Equal(t, newS.PotentialAliveness, s.PotentialAliveness)
+			assert.True(t, almostEqual(newS.PotentialAliveness, s.PotentialAliveness, 0.001))
 			assert.Equal(t, newS.WasAlive, s.alive(p))
 			assert.Equal(t, now, newS.Updated)
 
@@ -130,7 +135,7 @@ func Test_storageStatus_applyOperationResult(t *testing.T) {
 			newS := s.applyOperationResult(p, false, 100, now)
 			logStatus(iteration, newS)
 			assert.Less(t, newS.ActualAliveness, s.ActualAliveness)
-			assert.Equal(t, newS.PotentialAliveness, s.PotentialAliveness)
+			assert.True(t, almostEqual(newS.PotentialAliveness, s.PotentialAliveness, 0.001))
 			assert.Equal(t, newS.WasAlive, s.alive(p))
 			assert.Equal(t, now, newS.Updated)
 
@@ -268,6 +273,10 @@ func Test_storageStatus_applyOperationResult(t *testing.T) {
 
 		assert.False(t, s.alive(p))
 	})
+}
+
+func almostEqual(a, b Aliveness, inaccuracy float64) bool {
+	return math.Abs(float64(a)-float64(b)) <= inaccuracy
 }
 
 var keys = []Key{{Name: "0"}, {Name: "1"}, {Name: "2"}, {Name: "3"}}

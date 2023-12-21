@@ -62,7 +62,7 @@ func New(
 	sharedMem *SharedMemory,
 	sharedFile *SharedFile,
 	opts ...Option,
-) Cache {
+) (Cache, error) {
 	c := &cache{
 		usedKeys:           usedKeys,
 		ttl:                config.TTL,
@@ -75,7 +75,11 @@ func New(
 	for _, o := range opts {
 		o(c)
 	}
-	return c
+	err := c.emaParams.Validate()
+	if err != nil {
+		return nil, fmt.Errorf("invalid EMA params: %w", err)
+	}
+	return c, nil
 }
 
 func (c *cache) Read(storageNames ...string) (relevant, outdated AliveMap, err error) {

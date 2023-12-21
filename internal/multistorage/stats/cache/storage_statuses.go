@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -104,15 +105,15 @@ func (s storageStatus) applyOperationResult(p *EMAParams, alive bool, weight flo
 // smaller away from these limits.
 func (s storageStatus) calcEMAAlpha(p *EMAParams) float64 {
 	if s.alive(p) {
-		// Take such EMA alpha value so that it is maximal with aliveness = deadLimit, and minimal with aliveness = 1.
+		// Take such EMA alpha value so that it is minimal with aliveness = deadLimit, and maximal with aliveness = 1.
 		amplifier := (s.alivenessFactor(p) - p.DeadLimit) / (1 - p.DeadLimit)
 		alphaRange := p.AlphaAlive
-		return alphaRange.Min + (alphaRange.Max-alphaRange.Min)*amplifier
+		return alphaRange.Max + (alphaRange.Min-alphaRange.Max)*amplifier
 	}
-	// Take such EMA alpha value so that it is maximal with aliveness = aliveLimit, and minimal with aliveness = 0.
+	// Take such EMA alpha value so that it is minimal with aliveness = aliveLimit, and maximal with aliveness = 0.
 	amplifier := s.alivenessFactor(p) / p.AliveLimit
 	alphaRange := p.AlphaDead
-	return alphaRange.Min + (alphaRange.Max-alphaRange.Min)*amplifier
+	return alphaRange.Max + (alphaRange.Min-alphaRange.Max)*amplifier
 }
 
 func expMovingAverage(alpha float64, prevAverage Aliveness, newValue float64) Aliveness {
@@ -225,8 +226,51 @@ type EMAParams struct {
 
 // EMAAlphaRange specifies a minimum and a maximum value of Alpha used in the Exponential Moving Average algorithm.
 type EMAAlphaRange struct {
-	Max float64
 	Min float64
+	Max float64
+}
+
+func (p *EMAParams) Validate() error {
+	ensureBetween0And1 := func(val float64, paramName string) error {
+		if val <= 0 || val >= 1 {
+			return fmt.Errorf("%s is expected to be in range (0, 1)", paramName)
+		}
+		return nil
+	}
+	err := ensureBetween0And1(p.AliveLimit, "alive limit")
+	if err != nil {
+		return err
+	}
+	err = ensureBetween0And1(p.DeadLimit, "dead limit")
+	if err != nil {
+		return err
+	}
+	if p.AliveLimit < p.DeadLimit {
+		return errors.New("alive limit must be greater than dead limit")
+	}
+	err = ensureBetween0And1(p.AlphaAlive.Min, "max EMA alpha for alive storage")
+	if err != nil {
+		return err
+	}
+	err = ensureBetween0And1(p.AlphaAlive.Max, "min EMA alpha for alive storage")
+	if err != nil {
+		return err
+	}
+	if p.AlphaAlive.Min > p.AlphaAlive.Max {
+		return errors.New("max EMA alpha must be greater than min EMA alpha for alive storage")
+	}
+	err = ensureBetween0And1(p.AlphaDead.Min, "max EMA alpha for dead storage")
+	if err != nil {
+		return err
+	}
+	err = ensureBetween0And1(p.AlphaDead.Max, "min EMA alpha for dead storage")
+	if err != nil {
+		return err
+	}
+	if p.AlphaDead.Min > p.AlphaDead.Max {
+		return errors.New("max EMA alpha must be greater than min EMA alpha for dead storage")
+	}
+	return nil
 }
 
 // DefaultEMAParams provides the default Exponential Moving Average behavior, which is described in the unit tests.
@@ -239,11 +283,11 @@ var DefaultEMAParams = EMAParams{
 	AliveLimit: 0.99,
 	DeadLimit:  0.88,
 	AlphaAlive: EMAAlphaRange{
-		Max: 0.01,
-		Min: 0.05,
+		Min: 0.01,
+		Max: 0.05,
 	},
 	AlphaDead: EMAAlphaRange{
-		Max: 0.1,
-		Min: 0.5,
+		Min: 0.1,
+		Max: 0.5,
 	},
 }
