@@ -553,3 +553,20 @@ func GetBoolSetting(setting string) (val bool, ok bool, err error) {
 	val, err = strconv.ParseBool(valstr)
 	return val, true, err
 }
+
+func GetFloatSettingDefault(setting string, def float64) (float64, error) {
+	val, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
+	}
+	return strconv.ParseFloat(val, 64)
+}
+
+func GetFloatSetting(setting string) (val float64, ok bool, err error) {
+	valstr, ok := GetSetting(setting)
+	if !ok {
+		return 0, false, nil
+	}
+	val, err = strconv.ParseFloat(valstr, 64)
+	return val, true, err
+}

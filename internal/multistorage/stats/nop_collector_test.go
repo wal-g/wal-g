@@ -1,4 +1,4 @@
-package cache
+package stats
 
 import (
 	"fmt"
@@ -7,13 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStatusCacheNoCheck(t *testing.T) {
-	c := NewStatusCacheNoCheck(
-		[]Key{
-			{Name: "default"},
-			{Name: "failover_1"},
-			{Name: "failover_2"},
-			{Name: "failover_3"},
+func Test_nopCollector(t *testing.T) {
+	c := NewNopCollector(
+		[]string{
+			"default",
+			"failover_1",
+			"failover_2",
+			"failover_3",
 		},
 	)
 

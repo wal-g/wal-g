@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestDeleteObjects(t *testing.T) {
 	t.Run("require at least one storage for first storage policy", func(t *testing.T) {
 		folder := newTestFolder(t)
