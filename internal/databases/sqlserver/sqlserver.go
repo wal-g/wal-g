@@ -19,6 +19,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -508,9 +509,6 @@ func GetBackupProperties(db *sql.DB,
 		return res, err
 	}
 	defer rows.Close()
-	if err != nil {
-		return nil, err
-	}
 	for rows.Next() {
 		var dbf BackupProperties
 		err = utility.ScanToMap(rows, map[string]interface{}{
