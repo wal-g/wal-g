@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -34,6 +35,27 @@ func (meta DatabasesByNames) Resolve(key string) (uint32, uint32, error) {
 		return 0, 0, newMetaTableNameError(database, table)
 	}
 	return 0, 0, newMetaDatabaseNameError(database)
+}
+
+func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, error) {
+	database, table, err := meta.unpackKey(key)
+	if err != nil {
+		return map[uint32][]uint32{}, err
+	}
+	di := map[uint32][]uint32{}
+	rdb := regexp.MustCompile(database)
+	rt := regexp.MustCompile(table)
+	for db, obj := range meta {
+		if rdb.MatchString(db) {
+			di[obj.Oid] = []uint32{}
+			for tab, oid := range obj.Tables {
+				if rt.MatchString(tab) {
+					di[obj.Oid] = append(di[obj.Oid], oid)
+				}
+			}
+		}
+	}
+	return di, nil
 }
 
 func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {

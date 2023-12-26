@@ -14,7 +14,7 @@ const (
 
 type RestoreDescMaker struct{}
 
-func (m RestoreDescMaker) Make(restoreParameters []string, names postgres.DatabasesByNames) (postgres.RestoreDesc, error) {
+func (m RestoreDescMaker) Make(restoreParameters []string, names postgres.DatabasesByNames) (postgres.RestoreDesc, error) { //making func
 	restoredDatabases, err := postgres.DefaultRestoreDescMaker{}.Make(restoreParameters, names)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec
 	return &ExtractProviderDBSpec{restoreParameters, RestoreDescMaker{}}
 }
 
-func (p ExtractProviderDBSpec) Get(
+func (p ExtractProviderDBSpec) Get( // get from provider
 	backup postgres.Backup,
 	filesToUnwrap map[string]bool,
 	skipRedundantTars bool,
@@ -59,6 +59,7 @@ func (p ExtractProviderDBSpec) Get(
 
 	desc, err := p.restoreDescMaker.Make(p.restoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.WarningLogger.Println("filter for gp")
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
 	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)

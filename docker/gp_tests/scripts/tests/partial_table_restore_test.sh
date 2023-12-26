@@ -59,7 +59,7 @@ done
 run_backup_logged ${TMP_CONFIG} ${PGDATA}
 stop_and_delete_cluster_dir
 
-wal-g --config=${TMP_CONFIG} backup-fetch LATEST --in-place --restore-only=db/heap_to_restore,db/ao_to_restore,db/co_to_restore
+wal-g --config=${TMP_CONFIG} backup-fetch LATEST --in-place --restore-only=db/*to_restore
 
 start_cluster
 
