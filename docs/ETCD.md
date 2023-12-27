@@ -20,6 +20,10 @@ to STDIN. Required for restore procedure.
 
 Route to ETCD data-dir. Stored in env variable ETCD_DATA_DIR or specified in --data-dir flag when running etcd command. Required for wal archiving procedure.
 
+* `WALG_ETCD_WAL_DIR`
+
+Route to ETCD wal-dir. Use it in case you changed wal directory when configuring cluster.
+
 Usage
 -----
 
@@ -61,7 +65,8 @@ wal-g backup-fetch LATEST
 
 ### `wal-push`
 
-Get all wal files frometcd data directory and send to storage. Data directory should be stored in `WALG_ETCD_DATA_DIR`. 
+Get all wal files from etcd data directory and send to storage. Data directory must be stored in `WALG_ETCD_DATA_DIR`. 
+If you set `WALG_ETCD_WAL_DIR` then this directory wil be used.
 
 On second run sends only complete wal files which are not yet in storage.
 

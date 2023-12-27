@@ -159,6 +159,7 @@ const (
 	GPAoDeduplicationAgeLimit = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
 
 	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
+	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
 

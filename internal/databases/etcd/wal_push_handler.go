@@ -27,10 +27,14 @@ type LogsCache struct {
 
 func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd_wals_cache") }
 
-func walDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
+func getWalDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
 
 func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
-	walDir := walDir(dataDir)
+
+	walDir, ok := internal.GetSetting(internal.ETCDWalDirectory)
+	if !ok {
+		walDir = getWalDir(dataDir)
+	}
 
 	uploader.ChangeDirectory(utility.WalPath)
 	files, err := ReadDir(walDir)
