@@ -266,6 +266,9 @@ Databases
 ### Greenplum [Work in progress]
 [Information about installing, configuration and usage](Greenplum.md)
 
+### ETCD [Work in progress]
+[Information about installing, configuration and usage](ETCD.md)
+
 Development
 -----------
 
