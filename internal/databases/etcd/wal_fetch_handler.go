@@ -36,14 +36,12 @@ func HandleWalFetch(folder storage.Folder, backupName string, dstDir string, bas
 		return walFiles[i].GetLastModified().Before(walFiles[j].GetLastModified())
 	})
 
-	// var walsToFetch []storage.Object
 	for _, walFile := range walFiles {
 		if lastBackupSentinel.StartLocalTime.Before(walFile.GetLastModified()) {
 			walName := strings.TrimSuffix(walFile.GetName(), filepath.Ext(walFile.GetName()))
 			walPath := path.Join(dstDir, walName)
 			tracelog.InfoLogger.Printf("fetching %s into %s", walName, walPath)
 			internal.DownloadFileTo(reader, walName, walPath)
-			// walsToFetch = append(walsToFetch, walFile)
 		}
 	}
 }
