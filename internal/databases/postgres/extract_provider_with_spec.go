@@ -33,10 +33,8 @@ func (desc RestoreDesc) IsFull(database uint32) bool {
 
 func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
 	if database < systemIDLimit || desc.IsFull(database) {
-		tracelog.WarningLogger.Printf("FULL restore for %d", database)
 		return false
 	}
-	tracelog.WarningLogger.Printf("SOMETHING IS NOT FULL %d %d", database, table)
 	if _, ok := desc[database]; ok {
 		_, found := desc[database][table]
 		return table >= systemIDLimit && !found
@@ -85,12 +83,28 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 	restoredDatabases := make(RestoreDesc)
 
 	for _, parameter := range restoreParameters {
+		dbID, tableID, err := names.Resolve(parameter)
+		if err != nil {
+			return nil, err
+		}
+
+		restoredDatabases.Add(dbID, tableID)
+	}
+
+	return restoredDatabases, nil
+}
+
+type RegexpRestoreDescMaker struct{}
+
+func (m RegexpRestoreDescMaker) Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
+	restoredDatabases := make(RestoreDesc)
+
+	for _, parameter := range restoreParameters {
 		ids, err := names.ResolveRegexp(parameter)
 		if err != nil {
 			return nil, err
 		}
 
-		//restoredDatabases.Add(dbID, tableID)
 		for db, tables := range ids {
 			for _, oid := range tables {
 				restoredDatabases.Add(db, oid)

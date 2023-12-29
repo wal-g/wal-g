@@ -42,12 +42,20 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 	if err != nil {
 		return map[uint32][]uint32{}, err
 	}
+	tracelog.DebugLogger.Printf("unpaсked keys  %s %s", database, table)
 	di := map[uint32][]uint32{}
-	rdb := regexp.MustCompile(database)
-	rt := regexp.MustCompile(table)
+	database = strings.ReplaceAll(database, "*", ".*")
+	table = strings.ReplaceAll(table, "*", ".*")
+	rdb := regexp.MustCompile(fmt.Sprintf("^%s$", database))
+	rt := regexp.MustCompile(fmt.Sprintf("^%s$", table))
 	for db, obj := range meta {
 		if rdb.MatchString(db) {
 			di[obj.Oid] = []uint32{}
+			if table == "" {
+				tracelog.DebugLogger.Printf("restore all for  %s", db)
+				di[obj.Oid] = append(di[obj.Oid], 0)
+				continue
+			}
 			for tab, oid := range obj.Tables {
 				if rt.MatchString(tab) {
 					di[obj.Oid] = append(di[obj.Oid], oid)
