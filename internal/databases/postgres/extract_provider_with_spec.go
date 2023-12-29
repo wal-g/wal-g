@@ -136,7 +136,6 @@ func (p ExtractProviderDBSpec) Get(
 
 	desc, err := p.restoreDescMaker.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.WarningLogger.Println("filter for postgres")
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
 	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)

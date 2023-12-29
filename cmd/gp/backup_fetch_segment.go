@@ -55,7 +55,7 @@ var segBackupFetchCmd = &cobra.Command{
 		var extractProv postgres.ExtractProvider
 
 		if partialRestoreArgs != nil {
-			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs) //new provider
+			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs)
 		} else {
 			extractProv = greenplum.ExtractProviderImpl{}
 		}
