@@ -28,7 +28,7 @@ Installation
 ----------
 A precompiled binary for Linux AMD 64 of the latest version of WAL-G can be obtained under the [Releases tab](https://github.com/wal-g/wal-g/releases).
 
-Binary name has the following format: `wal-g-DBNAME-OSNAME`, where `DBNAME` stands for the name of the database (for example pg, mysql), `OSNAME` stands for the name of the operating system used for building the binary.
+The Binary name has the following format: `wal-g-DBNAME-OSNAME`, where `DBNAME` stands for the name of the database (for example pg, mysql), `OSNAME` stands for the name of the operating system used for building the binary.
 
 To decompress the binary, use:
 
@@ -92,7 +92,7 @@ Similar to `WALG_LIBSODIUM_KEY`, but value is the path to the key on file system
 * `WALG_LIBSODIUM_KEY_TRANSFORM`
 
 The transform that will be applied to the `WALG_LIBSODIUM_KEY` to get the required 32 byte key. Supported transformations are `base64`, `hex` or `none` (default).
-The option `none` exists for backwards compatbility, the user input will be converted to 32 byte either via truncation or by zero-padding.
+The option `none` exists for backwards compatibility, the user input will be converted to 32 byte either via truncation or by zero-padding.
 
 * `WALG_GPG_KEY_ID`  (alternative form `WALE_GPG_KEY_ID`) ⚠️ **DEPRECATED**
 
