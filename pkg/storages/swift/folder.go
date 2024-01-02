@@ -176,9 +176,16 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 }
 
 func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
-	// TODO implement
-	panic("Not implemented yet")
-	return nil
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return storage.NewObjectNotFoundError(srcPath)
+		}
+		return err
+	}
+	srcPath = storage.JoinPath(folder.path, srcPath)
+	dstPath = storage.JoinPath(folder.path, dstPath)
+	err := folder.connection.ObjectMove(context.Background(), folder.container.Name, srcPath, folder.container.Name, dstPath)
+	return err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
