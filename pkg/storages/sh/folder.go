@@ -339,9 +339,12 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 }
 
 func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
-	// TODO implement
-	panic("Not implemented yet")
-	return nil
+	err := folder.CopyObject(srcPath, dstPath)
+	if err != nil {
+		return err
+	}
+	err = folder.DeleteObjects([]string{srcPath})
+	return err
 }
 
 func (folder *Folder) Hash() storage.Hash {
