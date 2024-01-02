@@ -57,6 +57,18 @@ func (storage *Storage) Store(key string, value bytes.Buffer) {
 	storage.underlying.Store(key, TimeStampData(value, storage.timeNow))
 }
 
+func (storage *Storage) Move(oldKey string, newKey string) (success bool) {
+	valueInterface, ok := storage.underlying.Load(oldKey)
+	if !ok {
+		return false
+	}
+
+	storage.underlying.Store(newKey, valueInterface)
+	storage.underlying.CompareAndDelete(oldKey, valueInterface)
+
+	return true
+}
+
 func (storage *Storage) Delete(key string) {
 	storage.underlying.Delete(key)
 }
