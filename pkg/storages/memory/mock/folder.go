@@ -19,6 +19,7 @@ type Folder struct {
 	ReadObjectMock    func(objectRelativePath string) (io.ReadCloser, error)
 	PutObjectMock     func(ctx context.Context, name string, content io.Reader) error
 	CopyObjectMock    func(srcPath string, dstPath string) error
+	MoveObjectMock    func(srcPath string, dstPath string) error
 }
 
 func NewFolder(memFolder *memory.Folder) *Folder {
@@ -91,7 +92,8 @@ func (f *Folder) CopyObject(srcPath string, dstPath string) error {
 }
 
 func (f *Folder) MoveObject(srcPath string, dstPath string) error {
-	// TODO implement
-	panic("Not implemented yet")
-	return nil
+	if f.MoveObjectMock != nil {
+		return f.MoveObjectMock(srcPath, dstPath)
+	}
+	return f.MemFolder.MoveObject(srcPath, dstPath)
 }
