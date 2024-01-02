@@ -24,6 +24,13 @@ Examples:
 
 ``wal-g st get path/to/remote_file path/to/local_file --no-decrypt`` download the file from storage without decryption.
 
+### ``mv``
+Moves the specified storage object. Copying can take place when moving.
+
+Examples:
+
+``wal-g st mv old/path new/path`` move file Moves a file from old/path to the new/path.
+
 ### ``cat``
 Show the specified storage object to STDOUT. 
 By default, the command will NOT try to decompress and decrypt it.
