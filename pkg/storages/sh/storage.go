@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/crypto/ssh"
 )
@@ -82,13 +83,16 @@ func (s *Storage) ConfigHash() string {
 }
 
 func (s *Storage) Close() error {
-	client, _ := s.sftpClientLazy.Client()
-	if client == nil {
+	client, connErr := s.sftpClientLazy.Client()
+	// Don't try to close the client if the initial connection failed
+	if connErr != nil {
+		tracelog.DebugLogger.Printf("SSH storage isn't closed due to the initial connection error: %v", connErr)
 		return nil
 	}
 	err := client.Close()
 	if err != nil {
 		return fmt.Errorf("close SFTP client: %w", err)
 	}
+	tracelog.DebugLogger.Printf("SSH storage closed")
 	return nil
 }
