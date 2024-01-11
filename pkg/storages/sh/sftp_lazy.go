@@ -53,12 +53,12 @@ func (l *SFTPLazy) Client() (SFTPClient, error) {
 func connect(addr string, config *ssh.ClientConfig) (*sftp.Client, error) {
 	sshClient, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to %s via SSH", addr)
+		return nil, fmt.Errorf("failed to connect to %s via SSH: %w", addr, err)
 	}
 
 	sftpClient, err := sftp.NewClient(sshClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to %s via SFTP", addr)
+		return nil, fmt.Errorf("failed to connect to %s via SFTP: %w", addr, err)
 	}
 
 	return sftpClient, nil
