@@ -43,27 +43,27 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 		return map[uint32][]uint32{}, err
 	}
 	tracelog.DebugLogger.Printf("unpaсked keys  %s %s", database, table)
-	di := map[uint32][]uint32{}
+	toRestore := map[uint32][]uint32{}
 	database = strings.ReplaceAll(database, "*", ".*")
 	table = strings.ReplaceAll(table, "*", ".*")
-	rdb := regexp.MustCompile(fmt.Sprintf("^%s$", database))
-	rt := regexp.MustCompile(fmt.Sprintf("^%s$", table))
-	for db, obj := range meta {
-		if rdb.MatchString(db) {
-			di[obj.Oid] = []uint32{}
+	databaseRegexp := regexp.MustCompile(fmt.Sprintf("^%s$", database))
+	tableRegexp := regexp.MustCompile(fmt.Sprintf("^%s$", table))
+	for db, dbInfo := range meta {
+		if databaseRegexp.MatchString(db) {
+			toRestore[dbInfo.Oid] = []uint32{}
 			if table == "" {
 				tracelog.DebugLogger.Printf("restore all for  %s", db)
-				di[obj.Oid] = append(di[obj.Oid], 0)
+				toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], 0)
 				continue
 			}
-			for tab, oid := range obj.Tables {
-				if rt.MatchString(tab) {
-					di[obj.Oid] = append(di[obj.Oid], oid)
+			for name, oid := range dbInfo.Tables {
+				if tableRegexp.MatchString(name) {
+					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], oid)
 				}
 			}
 		}
 	}
-	return di, nil
+	return toRestore, nil
 }
 
 func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {

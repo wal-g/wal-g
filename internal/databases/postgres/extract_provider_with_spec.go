@@ -100,12 +100,12 @@ func (m RegexpRestoreDescMaker) Make(restoreParameters []string, names Databases
 	restoredDatabases := make(RestoreDesc)
 
 	for _, parameter := range restoreParameters {
-		ids, err := names.ResolveRegexp(parameter)
+		oids, err := names.ResolveRegexp(parameter)
 		if err != nil {
 			return nil, err
 		}
 
-		for db, tables := range ids {
+		for db, tables := range oids {
 			for _, oid := range tables {
 				restoredDatabases.Add(db, oid)
 			}
