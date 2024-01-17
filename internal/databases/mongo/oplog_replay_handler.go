@@ -2,7 +2,7 @@ package mongo
 
 import (
 	"context"
-
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"golang.org/x/sync/errgroup"
@@ -14,6 +14,8 @@ func HandleOplogReplay(ctx context.Context,
 	until models.Timestamp,
 	fetcher stages.BetweenFetcher,
 	applier stages.Applier) error {
+	tracelog.InfoLogger.Printf("Since: %s, Until: %s", since, until)
+
 	errgrp, ctx := errgroup.WithContext(ctx)
 	var errs []<-chan error
 

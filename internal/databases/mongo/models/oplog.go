@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -49,6 +50,19 @@ func TimestampFromStr(s string) (Timestamp, error) {
 	if err != nil {
 		return Timestamp{}, fmt.Errorf("can not convert inc string '%v': %w", inc, err)
 	}
+
+	return Timestamp{TS: uint32(ts), Inc: uint32(inc)}, nil
+}
+
+// TimestampFromTime builds Timestamp from time.Time
+func TimestampFromTime(s string) (Timestamp, error) {
+	pt, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return Timestamp{}, err
+	}
+
+	ts := pt.Unix()
+	inc := 1
 
 	return Timestamp{TS: uint32(ts), Inc: uint32(inc)}, nil
 }
