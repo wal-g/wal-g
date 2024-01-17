@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/pkg/sftp"
+	"github.com/wal-g/tracelog"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -19,34 +20,53 @@ type SFTPClient interface {
 	Open(path string) (*sftp.File, error)
 	Create(path string) (*sftp.File, error)
 	MkdirAll(path string) error
+	Getwd() (string, error)
 	Close() error
 }
 
 type SFTPLazy struct {
-	address string
-	config  *ssh.ClientConfig
-	client  SFTPClient
-	connErr error
-	once    *sync.Once
+	address   string
+	config    *ssh.ClientConfig
+	client    SFTPClient
+	clientMux *sync.Mutex
+	connErr   error
 }
 
 func NewSFTPLazy(addr string, config *ssh.ClientConfig) *SFTPLazy {
 	return &SFTPLazy{
-		address: addr,
-		config:  config,
-		once:    new(sync.Once),
+		address:   addr,
+		config:    config,
+		clientMux: new(sync.Mutex),
 	}
 }
 
 func (l *SFTPLazy) Client() (SFTPClient, error) {
-	// Establish the SFTP connection only once on the first call, and reuse the connection in all subsequent calls
-	l.once.Do(func() {
+	l.clientMux.Lock()
+	defer l.clientMux.Unlock()
+
+	needConnect := func() bool {
+		// Establish the SFTP connection only once on the first call, and reuse the connection in all subsequent calls
+		if l.client == nil {
+			tracelog.DebugLogger.Printf("Establish an initial SFTP connection")
+			return true
+		}
+		// Re-establish the SFTP connection if the previous one has died
+		_, err := l.client.Getwd()
+		if err != nil {
+			tracelog.WarningLogger.Printf("Establish a new SFTP connection because the previous one has died with the error: getwd: %v", err)
+			return true
+		}
+		return false
+	}
+
+	if needConnect() {
 		client, err := connect(l.address, l.config)
 		if err != nil {
 			l.connErr = fmt.Errorf("lazy SSH connection error: %w", err)
 		}
 		l.client = client
-	})
+	}
+
 	return l.client, l.connErr
 }
 
