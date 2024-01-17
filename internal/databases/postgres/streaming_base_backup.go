@@ -6,6 +6,7 @@ A base backup object can connect to Postgres, issue a BASE_BACKUP command, and r
 */
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -13,9 +14,9 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgproto3/v2"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -25,6 +26,9 @@ import (
 var (
 	errTbsOutOfRange     = errors.New("requesting next tablespace after all tablespaces are streamed")
 	errTbsStillStreaming = errors.New("cannot move to next table. Current tablespace is not yet fully streamed")
+
+	// zero block
+	zeroBlock = [512]byte{}
 )
 
 // The StreamingBaseBackup object represents a Postgres BASE_BACKUP, connecting to Postgres, and streaming backup data.
@@ -46,14 +50,16 @@ type StreamingBaseBackup struct {
 	uploader         internal.Uploader
 	streamer         *TarballStreamer
 	fileNo           int
+	pgVersion        int
 }
 
 // NewStreamingBaseBackup will define a new StreamingBaseBackup object
-func NewStreamingBaseBackup(pgDataDir string, maxTarSize int64, pgConn *pgconn.PgConn) (bb *StreamingBaseBackup) {
+func NewStreamingBaseBackup(pgDataDir string, maxTarSize int64, pgVersion int, pgConn *pgconn.PgConn) (bb *StreamingBaseBackup, err error) {
 	bb = &StreamingBaseBackup{
 		dataDir:    pgDataDir,
 		maxTarSize: maxTarSize,
 		pgConn:     pgConn,
+		pgVersion:  pgVersion,
 	}
 	return
 }
@@ -219,11 +225,28 @@ func (bb *StreamingBaseBackup) streamFromPostgres() (err error) {
 		tracelog.ErrorLogger.FatalOnError(err)
 		switch msg := message.(type) {
 		case *pgproto3.CopyData:
-			bb.buffer = msg.Data
-			return nil
+			// Receive information from pgsql version less than 15
+			if bb.pgVersion < 150000 {
+				bb.buffer = msg.Data
+				return nil
+			}
+
+			// Receive information from pgsql version 15 or later
+			switch msg.Data[0] {
+			case 'd':
+				bb.buffer = msg.Data[1:]
+				return nil
+			case 'n', 'm', 'p':
+				// Handled by ReceiveMessage
+				// 'n': process the basic backup name. for example, nbase.tar
+				// 'm': process backup manifest data
+				// 'p': process progress, counting the number of bytes processed
+			}
 		case *pgproto3.CopyDone:
 			bb.tbsStreaming = false
 			return nil
+		case *pgproto3.NoticeResponse:
+			// Handled by ReceiveMessage
 		default:
 			return errors.Errorf("Received unexpected message: %#v\n", msg)
 		}
@@ -249,6 +272,18 @@ func (bb *StreamingBaseBackup) Read(p []byte) (n int, err error) {
 		//The entire buffer is returned. Empty buffer.
 		bb.buffer = []byte{}
 		bb.readIndex = 0
+	}
+
+	// Troubleshoot EOF problems caused by the last zeroBlock message sent from pgsql15 or later
+	if bytes.Equal(p, zeroBlock[:]) {
+		err = bb.streamFromPostgres()
+		if err == errTbsOutOfRange {
+			// Buffer is empty, and we have streamed all tablespaces. We are done here.
+			return 0, io.EOF
+		}
+		if err != nil {
+			return
+		}
 	}
 	return n, nil
 }
