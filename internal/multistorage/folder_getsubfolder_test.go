@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestGetSubFolder(t *testing.T) {
 	t.Run("change path in all storages regardless of policies", func(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
@@ -29,7 +30,7 @@ func TestGetSubFolder(t *testing.T) {
 		assert.Equal(t, "s2/a/b/", bSubFolder.usedFolders[1].GetPath())
 	})
 
-	t.Run("copies cache storages and policies to subfolders", func(t *testing.T) {
+	t.Run("copies stats collector storages and policies to subfolders", func(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies = policies.UniteAllStorages
 
@@ -40,6 +41,6 @@ func TestGetSubFolder(t *testing.T) {
 		assert.Len(t, aSubFolder.usedFolders, 2)
 		assert.Equal(t, "s1", aSubFolder.usedFolders[0].StorageName)
 		assert.Equal(t, "s2", aSubFolder.usedFolders[1].StorageName)
-		assert.Equal(t, folder.cache, aSubFolder.cache)
+		assert.Equal(t, folder.statsCollector, aSubFolder.statsCollector)
 	})
 }

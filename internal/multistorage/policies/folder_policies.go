@@ -2,6 +2,8 @@ package policies
 
 var Default = MergeAllStorages
 
+// MergeAllStorages implies merging all storages into one as if it was a single storage. So, if a file with the same
+// path exists in several storages, only the one from the first storage is taken.
 var MergeAllStorages = Policies{
 	Exists: ExistsPolicyAny,
 	Read:   ReadPolicyFoundFirst,
@@ -11,6 +13,7 @@ var MergeAllStorages = Policies{
 	Copy:   CopyPolicyAll,
 }
 
+// UniteAllStorages implies uniting all storages into one so that multiple files with the same path could exist.
 var UniteAllStorages = Policies{
 	Exists: ExistsPolicyAny,
 	Read:   ReadPolicyFoundFirst,
@@ -20,6 +23,7 @@ var UniteAllStorages = Policies{
 	Copy:   CopyPolicyAll,
 }
 
+// TakeFirstStorage implies that only the first storage is used, as if it is not a multi-storage at all.
 var TakeFirstStorage = Policies{
 	Exists: ExistsPolicyFirst,
 	Read:   ReadPolicyFirst,
@@ -29,6 +33,8 @@ var TakeFirstStorage = Policies{
 	Copy:   CopyPolicyFirst,
 }
 
+// Policies define the behavior of the multi-storage folder in terms of selecting which underlying storages should be
+// used to perform different operations.
 type Policies struct {
 	Exists ExistsPolicy
 	Read   ReadPolicy

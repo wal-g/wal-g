@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/multistorage"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -109,16 +109,17 @@ func TestHandleDetailedBackupList(t *testing.T) {
 	t.Run("print backups from different storages", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		t.Cleanup(mockCtrl.Finish)
-		cacheMock := cache.NewMockStatusCache(mockCtrl)
-		cacheMock.EXPECT().AllAliveStorages().Return([]string{"storage_1", "storage_2"}, nil)
-		cacheMock.EXPECT().SpecificStorage("storage_1").Return(true, nil)
-		cacheMock.EXPECT().SpecificStorage("storage_2").Return(true, nil)
+		collectorMock := stats.NewMockCollector(mockCtrl)
+		collectorMock.EXPECT().AllAliveStorages().Return([]string{"storage_1", "storage_2"}, nil)
+		collectorMock.EXPECT().SpecificStorage("storage_1").Return(true, nil)
+		collectorMock.EXPECT().SpecificStorage("storage_2").Return(true, nil)
+		collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		memFolders := map[string]storage.Folder{
 			"storage_1": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
 			"storage_2": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
 		}
-		multiFolder := multistorage.NewFolder(memFolders, cacheMock).(storage.Folder)
+		multiFolder := multistorage.NewFolder(memFolders, collectorMock).(storage.Folder)
 		multiFolder = multistorage.SetPolicies(multiFolder, policies.UniteAllStorages)
 		multiFolder, err := multistorage.UseAllAliveStorages(multiFolder)
 		require.NoError(t, err)

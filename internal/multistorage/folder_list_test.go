@@ -7,11 +7,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestListFolder(t *testing.T) {
 	t.Run("require at least one storage for first storage policy", func(t *testing.T) {
 		folder := newTestFolder(t)
@@ -38,7 +39,7 @@ func TestListFolder(t *testing.T) {
 			multiFolder, ok := subf.(Folder)
 			assert.True(t, ok)
 			assert.Equal(t, testFolder.policies, multiFolder.policies)
-			assert.Equal(t, testFolder.cache, multiFolder.cache)
+			assert.Equal(t, testFolder.statsCollector, multiFolder.statsCollector)
 			assert.Equal(t, len(testFolder.usedFolders), len(multiFolder.usedFolders))
 			for _, st := range multiFolder.usedFolders {
 				rootf := testFolder.configuredRootFolders[st.StorageName]
@@ -269,7 +270,7 @@ func TestListFolder(t *testing.T) {
 	t.Run("storages can be changed and returned back for subfolders", func(t *testing.T) {
 		rootFolder := newTestFolder(t, "s1", "s2")
 		rootFolder.policies.List = policies.ListPolicyAll
-		cacheMock := rootFolder.cache.(*cache.MockStatusCache)
+		collectorMock := rootFolder.statsCollector.(*stats.MockCollector)
 
 		_ = rootFolder.usedFolders[0].PutObject("file1", &bytes.Buffer{})
 		_ = rootFolder.usedFolders[0].PutObject("a/file2", &bytes.Buffer{})
@@ -286,7 +287,7 @@ func TestListFolder(t *testing.T) {
 		})
 		aSubFolder := getSubFolder(t, subFolders, "a/")
 
-		cacheMock.EXPECT().SpecificStorage("s1").Return(true, nil)
+		collectorMock.EXPECT().SpecificStorage("s1").Return(true, nil)
 		aSubFolder, err = UseSpecificStorage("s1", aSubFolder)
 		require.NoError(t, err)
 
@@ -297,7 +298,7 @@ func TestListFolder(t *testing.T) {
 		})
 		bSubFolder := getSubFolder(t, subFolders, "a/b/")
 
-		cacheMock.EXPECT().AllAliveStorages().Return([]string{"s1", "s2", "s3"}, nil)
+		collectorMock.EXPECT().AllAliveStorages().Return([]string{"s1", "s2", "s3"}, nil)
 		bSubFolder, err = UseAllAliveStorages(bSubFolder)
 
 		require.NoError(t, err)

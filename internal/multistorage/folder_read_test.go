@@ -12,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestReadObject(t *testing.T) {
 	t.Run("check folder implementation and provide default name if it is not multistorage", func(t *testing.T) {
 		singleStorageFolder := memory.NewFolder("/test", memory.NewKVS())
