@@ -30,7 +30,6 @@ func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd
 func getWalDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
 
 func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
-
 	walDir, ok := internal.GetSetting(internal.ETCDWalDirectory)
 	if !ok {
 		walDir = getWalDir(dataDir)
@@ -46,8 +45,8 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	cache := getCache()
 	fromWal := 0
 	if len(walFiles) > 0 && cache.LastArchivedWal != "" {
-		lastSeq, _, _ := parseWALName(walFiles[len(walFiles)-1])
-		cachedSeq, _, _ := parseWALName(cache.LastArchivedWal)
+		lastSeq, _ := parseWALName(walFiles[len(walFiles)-1])
+		cachedSeq, _ := parseWALName(cache.LastArchivedWal)
 
 		//write ensurance that reading leader member of cluster
 		if lastSeq < cachedSeq {
@@ -158,7 +157,7 @@ func ReadDir(d string) ([]string, error) {
 func checkWalNames(names []string) []string {
 	wnames := make([]string, 0)
 	for _, name := range names {
-		if _, _, err := parseWALName(name); err != nil {
+		if _, err := parseWALName(name); err != nil {
 			// don't complain about left over tmp files
 			if !strings.HasSuffix(name, ".tmp") {
 				tracelog.ErrorLogger.Printf("ignored file in WAL directory: %v\n", name)
@@ -170,11 +169,16 @@ func checkWalNames(names []string) []string {
 	return wnames
 }
 
-func parseWALName(wal string) (seq, index uint64, err error) {
+func parseWALName(wal string) (seq uint64, err error) {
 	if !strings.HasSuffix(wal, ".wal") {
-		return 0, 0, errBadWALName
+		return 0, errBadWALName
 	}
 
+	var index uint64
 	_, err = fmt.Sscanf(wal, "%016x-%016x.wal", &seq, &index)
+
+	if index < seq {
+		tracelog.ErrorLogger.Printf("wrong naming of wal files. Sequence number can not be bigger than index\n")
+	}
 	return
 }

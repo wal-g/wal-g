@@ -85,7 +85,7 @@ require (
 	cloud.google.com/go v0.110.7 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.0.0 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
-	github.com/Azure/go-autorest/autorest/adal v0.9.14 // indirect
+	github.com/Azure/go-autorest/autorest/adal v0.9.23 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/logger v0.2.1 // indirect
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
@@ -110,7 +110,7 @@ require (
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/golang-jwt/jwt v3.2.1+incompatible // indirect
-	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect

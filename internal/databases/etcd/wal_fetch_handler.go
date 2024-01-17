@@ -41,7 +41,8 @@ func HandleWalFetch(folder storage.Folder, backupName string, dstDir string, bas
 			walName := strings.TrimSuffix(walFile.GetName(), filepath.Ext(walFile.GetName()))
 			walPath := path.Join(dstDir, walName)
 			tracelog.InfoLogger.Printf("fetching %s into %s", walName, walPath)
-			internal.DownloadFileTo(reader, walName, walPath)
+			err = internal.DownloadFileTo(reader, walName, walPath)
+			tracelog.ErrorLogger.FatalfOnError("Failed to download wal file: %v", err)
 		}
 	}
 }
