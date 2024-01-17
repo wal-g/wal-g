@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -34,6 +35,35 @@ func (meta DatabasesByNames) Resolve(key string) (uint32, uint32, error) {
 		return 0, 0, newMetaTableNameError(database, table)
 	}
 	return 0, 0, newMetaDatabaseNameError(database)
+}
+
+func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, error) {
+	database, table, err := meta.unpackKey(key)
+	if err != nil {
+		return map[uint32][]uint32{}, err
+	}
+	tracelog.DebugLogger.Printf("unpaсked keys  %s %s", database, table)
+	toRestore := map[uint32][]uint32{}
+	database = strings.ReplaceAll(database, "*", ".*")
+	table = strings.ReplaceAll(table, "*", ".*")
+	databaseRegexp := regexp.MustCompile(fmt.Sprintf("^%s$", database))
+	tableRegexp := regexp.MustCompile(fmt.Sprintf("^%s$", table))
+	for db, dbInfo := range meta {
+		if databaseRegexp.MatchString(db) {
+			toRestore[dbInfo.Oid] = []uint32{}
+			if table == "" {
+				tracelog.DebugLogger.Printf("restore all for  %s", db)
+				toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], 0)
+				continue
+			}
+			for name, oid := range dbInfo.Tables {
+				if tableRegexp.MatchString(name) {
+					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], oid)
+				}
+			}
+		}
+	}
+	return toRestore, nil
 }
 
 func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {

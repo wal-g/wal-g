@@ -94,6 +94,27 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 	return restoredDatabases, nil
 }
 
+type RegexpRestoreDescMaker struct{}
+
+func (m RegexpRestoreDescMaker) Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
+	restoredDatabases := make(RestoreDesc)
+
+	for _, parameter := range restoreParameters {
+		oids, err := names.ResolveRegexp(parameter)
+		if err != nil {
+			return nil, err
+		}
+
+		for db, tables := range oids {
+			for _, oid := range tables {
+				restoredDatabases.Add(db, oid)
+			}
+		}
+	}
+
+	return restoredDatabases, nil
+}
+
 type ExtractProviderDBSpec struct {
 	RestoreParameters []string
 	restoreDescMaker  RestoreDescMaker
