@@ -143,7 +143,13 @@ func ReadDir(d string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer dir.Close()
+
+	defer func() {
+		err := dir.Close()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to close directory %v", err)
+		}
+	}()
 
 	names, err := dir.Readdirnames(-1)
 	if err != nil {
