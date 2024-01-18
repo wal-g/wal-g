@@ -76,21 +76,36 @@ func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {
 	return "", false
 }
 
+/*
+Unpaks key, which can be:
+1. "db" - then we return "db" and empty string for table
+2. "db/table" - then we return "db" and "public.table"
+3. "db/schema.table" - then we return "db" and "schema.table"
+4. "db/schema/table" - then we return "db" and "schema.table"
+*/
 func (meta DatabasesByNames) unpackKey(key string) (string, string, error) {
 	tokens := strings.Split(key, "/")
-	if len(tokens) < 2 {
+	switch len(tokens) {
+	case 1:
 		return tokens[0], "", nil
-	}
-	if len(tokens) > 2 {
+
+	case 2:
+		table, ok := meta.tryFormatTableName(tokens[1])
+		if !ok {
+			return "", "", newMetaIncorrectKeyError(key)
+		}
+		return tokens[0], table, nil
+
+	case 3:
+		table, ok := meta.tryFormatTableName(fmt.Sprintf("%s.%s", tokens[1], tokens[2]))
+		if !ok {
+			return "", "", newMetaIncorrectKeyError(key)
+		}
+		return tokens[0], table, nil
+
+	default:
 		return "", "", newMetaIncorrectKeyError(key)
 	}
-
-	table, ok := meta.tryFormatTableName(tokens[1])
-	if !ok {
-		return "", "", newMetaIncorrectKeyError(key)
-	}
-
-	return tokens[0], table, nil
 }
 
 type metaDatabaseNameError struct {
