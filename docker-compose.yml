@@ -634,14 +634,13 @@ services:
     <<: *s3_common_depends
 
   etcd:
-    image: bitnami/etcd:latest
+    build:
+      dockerfile: docker/etcd/Dockerfile
+      context: .
+    image: wal-g/etcd
     container_name: wal-g_etcd
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
-      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-    ports:
-      - 2379:2379
-      - 2380:2380
 
   etcd_tests:
     build:
