@@ -77,7 +77,7 @@ func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {
 }
 
 /*
-Unpaks key, which can be:
+Unpacks key, which can be:
 1. "db" - then we return "db" and empty string for table
 2. "db/table" - then we return "db" and "public.table"
 3. "db/schema.table" - then we return "db" and "schema.table"
