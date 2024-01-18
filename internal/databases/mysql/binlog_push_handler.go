@@ -21,7 +21,8 @@ import (
 const BinlogCacheFileName = ".walg_mysql_binlogs_cache"
 
 type LogsCache struct {
-	LastArchivedBinlog string `json:"LastArchivedBinlog"`
+	LastArchivedBinlog     string `json:"LastArchivedBinlog"`
+	LastArchivedBinlogSize int64  `json:"LastArchivedBinlogSize"`
 }
 
 //gocyclo:ignore
@@ -41,7 +42,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	lastBinlog := lastOrDefault(binlogs, "")
-	if untilBinlog == "" || BinlogNum(untilBinlog) > BinlogNum(lastBinlog) {
+	if untilBinlog != "" && BinlogNum(untilBinlog) > BinlogNum(lastBinlog) {
 		untilBinlog = lastBinlog
 	}
 
@@ -91,7 +92,10 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 			continue
 		}
 
-		if cache.LastArchivedBinlog != "" && BinlogNum(binlog) <= BinlogNum(cache.LastArchivedBinlog) {
+		if cache.LastArchivedBinlog != "" && (
+			BinlogNum(binlog) < BinlogNum(cache.LastArchivedBinlog) || (
+				BinlogNum(binlog) == BinlogNum(cache.LastArchivedBinlog) &&
+				getBinlogSize(binlogsFolder, binlog) <= cache.LastArchivedBinlogSize)) {
 			tracelog.DebugLogger.Printf("Skip binlog %v (archived binlog check)\n", binlog)
 			continue
 		}
@@ -106,6 +110,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 				tracelog.DebugLogger.Printf("Skip binlog %v (gtid check)\n", binlog)
 				// in fact this binlog had been uploaded before. Mark it as uploaded:
 				cache.LastArchivedBinlog = binlog
+				cache.LastArchivedBinlogSize = getBinlogSize(binlogsFolder, binlog)
 				continue
 			}
 
@@ -123,6 +128,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		cache.LastArchivedBinlog = binlog
+		cache.LastArchivedBinlogSize = getBinlogSize(binlogsFolder, binlog)
 		putCache(cache)
 
 		// Write Binlog Sentinel
@@ -317,4 +323,13 @@ func lastOrDefault(data []string, defaultValue string) string {
 		return data[len(data)-1]
 	}
 	return defaultValue
+}
+
+func getBinlogSize(binlogsFolder string, binlog string) int64 {
+	fi, err := os.Stat(path.Join(binlogsFolder, binlog))
+	if err != nil {
+		tracelog.InfoLogger.Printf("Cannot stat binlog %s: %v", binlog, err)
+		return 0
+	}
+	return fi.Size()
 }
