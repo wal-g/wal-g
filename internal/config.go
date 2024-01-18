@@ -240,6 +240,7 @@ var (
 		MaxDelayedSegmentsCount:        "0",
 		SerializerTypeSetting:          "json_default",
 		LibsodiumKeyTransform:          "none",
+		PgpEnvelopeCacheExpiration:     "0",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -271,7 +272,6 @@ var (
 		PgDaemonWALUploadTimeout:       "60s",
 		PgFailoverStoragesCheckTimeout: "30s",
 		PgFailoverStorageCacheLifetime: "15m",
-		PgpEnvelopeCacheExpiration:     "0",
 	}
 
 	GPDefaultSettings = map[string]string{
