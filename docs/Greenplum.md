@@ -151,7 +151,7 @@ wal-g backup-fetch LATEST --mode=unpack --restore-config=restore-config.json --c
 ```
 
 #### Restore only specific databases
-During partial restore wal-g restores only specified databases' files. Use 'database' or 'database/namespace.table' as a parameter ('public' namespace can be omitted).
+During partial restore wal-g restores only specified databases' files. Use 'database', 'database/namespace.table' or 'database/namespace/table' as a parameter ('public' namespace can be omitted).
 
 Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
 
