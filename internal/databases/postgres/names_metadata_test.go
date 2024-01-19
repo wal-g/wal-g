@@ -1,6 +1,7 @@
 package postgres_test
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -137,6 +138,7 @@ func TestResolveRegexp_RestoreAllForDatabaseRegexp(t *testing.T) {
 	assert.False(t, ok2)
 	assert.False(t, ok3)
 
+	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
 	assert.Equal(t, 3, len(db1))
 	assert.Equal(t, uint32(40000), db1[0])
 	assert.Equal(t, uint32(40001), db1[1])
@@ -155,6 +157,7 @@ func TestResolveRegexp_RestoreSomeTablesInDatabase(t *testing.T) {
 	assert.False(t, ok2)
 	assert.False(t, ok3)
 
+	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
 	assert.Equal(t, 2, len(db1))
 	assert.Equal(t, uint32(40000), db1[0])
 	assert.Equal(t, uint32(40001), db1[1])
@@ -188,6 +191,7 @@ func TestResolveRegexp_RestoreSomeNamespaces(t *testing.T) {
 	assert.True(t, ok2)
 	assert.False(t, ok3)
 
+	sort.Slice(db2, func(i, j int) bool { return db2[i] < db2[j] })
 	assert.Equal(t, 2, len(db2))
 	assert.Equal(t, uint32(40100), db2[0])
 	assert.Equal(t, uint32(40101), db2[1])
@@ -205,6 +209,7 @@ func TestResolveRegexp_RestoreAllInNamespace(t *testing.T) {
 	assert.True(t, ok2)
 	assert.False(t, ok3)
 
+	sort.Slice(db2, func(i, j int) bool { return db2[i] < db2[j] })
 	assert.Equal(t, 2, len(db2))
 	assert.Equal(t, uint32(40102), db2[0])
 	assert.Equal(t, uint32(40103), db2[1])
