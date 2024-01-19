@@ -49,7 +49,7 @@ psql -p 6000 -d db -c "INSERT INTO skip.table2 SELECT i FROM generate_series(1,$
 run_backup_logged ${TMP_CONFIG} ${PGDATA}
 stop_and_delete_cluster_dir
 
-wal-g --config=${TMP_CONFIG} backup-fetch LATEST --in-place --restore-only=db/restore*/*,db/partial/table2
+wal-g --config=${TMP_CONFIG} backup-fetch LATEST --in-place --restore-only=db/restore*/*,db/partial.table2
 
 start_cluster
 
