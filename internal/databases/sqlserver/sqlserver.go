@@ -508,7 +508,12 @@ func GetBackupProperties(db *sql.DB,
 	if err != nil {
 		return res, err
 	}
-	defer rows.Close()
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to close connection: %v", err)
+		}
+	}()
 	for rows.Next() {
 		var dbf BackupProperties
 		err = utility.ScanToMap(rows, map[string]interface{}{
