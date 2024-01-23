@@ -29,7 +29,7 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 	}, nil
 }
 
-func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion string, rsConf RsConfig, shConf ShConfig, cfgConf MongoCfgConfig) error {
+func (restoreService *RestoreService) DoRestore(backupName, restVersion string, rsConf RsConfig, shConf ShConfig, cfgConf MongoCfgConfig) error {
 	disableHostResetup, err := internal.GetBoolSettingDefault(internal.MongoDBRestoreDisableHostResetup, false)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func (restoreService *RestoreService) DoRestore(backupName, restoreMongodVersion
 		return err
 	}
 
-	err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, restoreMongodVersion)
+	err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, restVersion)
 	if err != nil {
 		return err
 	}
