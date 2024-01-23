@@ -392,8 +392,8 @@ func (rsConfig RsConfig) Empty() bool {
 	return rsConfig.RsName == "" && len(rsConfig.RsMembers) == 0
 }
 
-func (rsConfig ShConfig) Empty() bool {
-	return rsConfig.ShardName == ""
+func (shConfig ShConfig) Empty() bool {
+	return shConfig.ShardName == ""
 }
 
 func (mongocfgConfig MongoCfgConfig) Empty() bool {
