@@ -15,6 +15,7 @@ import (
 	"github.com/blang/semver"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
@@ -303,9 +304,6 @@ func GetRestorePoints(folder storage.Folder) (restorePoints []RestorePointTime, 
 	}
 
 	restorePoints = GetRestorePointsTimeSlices(restorePointsObjects)
-	if err != nil {
-		return nil, err
-	}
 
 	count := len(restorePoints)
 	if count == 0 {
