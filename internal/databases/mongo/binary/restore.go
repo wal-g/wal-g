@@ -88,7 +88,6 @@ func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig, shConfig 
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
-
 	defer mongodProcess.Close()
 
 	mongodService, err := CreateMongodService(
