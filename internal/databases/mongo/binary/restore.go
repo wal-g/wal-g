@@ -29,7 +29,12 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 	}, nil
 }
 
-func (restoreService *RestoreService) DoRestore(backupName, restVersion string, rsConf RsConfig, shConf ShConfig, cfgConf MongoCfgConfig) error {
+func (restoreService *RestoreService) DoRestore(
+	backupName, restVersion string,
+	rsConf RsConfig,
+	shConf ShConfig,
+	cfgConf MongoCfgConfig
+) error {
 	disableHostResetup, err := internal.GetBoolSettingDefault(internal.MongoDBRestoreDisableHostResetup, false)
 	if err != nil {
 		return err
