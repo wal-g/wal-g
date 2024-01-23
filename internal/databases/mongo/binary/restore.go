@@ -33,7 +33,7 @@ func (restoreService *RestoreService) DoRestore(
 	backupName, restVersion string,
 	rsConf RsConfig,
 	shConf ShConfig,
-	cfgConf MongoCfgConfig
+	cfgConf MongoCfgConfig,
 ) error {
 	disableHostResetup, err := internal.GetBoolSettingDefault(internal.MongoDBRestoreDisableHostResetup, false)
 	if err != nil {
