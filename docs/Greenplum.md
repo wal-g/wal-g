@@ -213,3 +213,7 @@ To check that last backup has EOF that is less or equal than current EOF, you ca
 ```bash
 wal-g check-ao-aocs-length --check-backup
 ```
+If you want to secect special backup for check, you can add it`s name:
+```bash
+wal-g check-ao-aocs-length --check-backup --backup-name=backup_name
+```
