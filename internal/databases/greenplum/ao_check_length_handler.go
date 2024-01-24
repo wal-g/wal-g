@@ -76,8 +76,7 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 	}
 
 	if checker.checkBackup {
-		runCheckArgs = append(runCheckArgs, "--check-backup")
-		runCheckArgs = append(runCheckArgs, fmt.Sprintf("--backup-name=%s", backupName))
+		runCheckArgs = append(runCheckArgs, "--check-backup", fmt.Sprintf("--backup-name=%s", backupName))
 	}
 
 	runCheckArgsLine := strings.Join(runCheckArgs, " ")
