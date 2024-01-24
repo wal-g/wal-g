@@ -33,7 +33,7 @@ func init() {
 	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&segnum, "segnum", "s", "", `database segment number`)
 	checkAOLengthSegmentCmd.PersistentFlags().BoolVar(&checkBackup, "check-backup", false,
 		"if the flag is set, checks last backup`s length")
-	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&backupName, "segment-backup-name", "n", internal.LatestString,
+	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&backupName, "backup-name", "n", internal.LatestString,
 		"sets name of backup to check, checks last when empty")
 
 	cmd.AddCommand(checkAOLengthSegmentCmd)

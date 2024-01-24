@@ -27,7 +27,7 @@ func init() {
 	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&logsDir, "logs", "l", "/var/log/greenplum", `directory to store logs`)
 	checkAOTableLengthMasterCmd.PersistentFlags().BoolVar(&runBackupCheck, "check-backup", false,
 		"if the flag is set, checks last backup`s length")
-	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&name, "backup-name", "n", internal.LatestString,
+	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&name, "backup-name", "n", internal.LatestString,
 		"sets name of backup to check, checks last when empty")
 
 	cmd.AddCommand(checkAOTableLengthMasterCmd)
