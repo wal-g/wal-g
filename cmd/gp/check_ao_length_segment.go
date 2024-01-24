@@ -3,6 +3,7 @@ package gp
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 )
 
@@ -10,6 +11,7 @@ var (
 	port        string
 	segnum      string
 	checkBackup bool
+	backupName  string
 )
 
 var checkAOLengthSegmentCmd = &cobra.Command{
@@ -19,7 +21,7 @@ var checkAOLengthSegmentCmd = &cobra.Command{
 		handler, err := greenplum.NewAOLengthCheckSegmentHandler(port, segnum)
 		tracelog.ErrorLogger.FatalOnError(err)
 		if checkBackup {
-			handler.CheckAOBackupLengthSegment()
+			handler.CheckAOBackupLengthSegment(backupName)
 		} else {
 			handler.CheckAOTableLengthSegment()
 		}
@@ -31,6 +33,8 @@ func init() {
 	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&segnum, "segnum", "s", "", `database segment number`)
 	checkAOLengthSegmentCmd.PersistentFlags().BoolVar(&checkBackup, "check-backup", false,
 		"if the flag is set, checks last backup`s length")
+	checkAOLengthSegmentCmd.PersistentFlags().StringVarP(&backupName, "backup-name", "n", internal.LatestString,
+		"sets name of backup to check, checks last when empty")
 
 	cmd.AddCommand(checkAOLengthSegmentCmd)
 }

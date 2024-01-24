@@ -90,13 +90,13 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 	tracelog.InfoLogger.Println("ao table length check passed")
 }
 
-func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment() {
+func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupName string) {
 	DBNames, err := checker.getDatabasesInfo()
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
 	}
 
-	backupFiles, err := checker.getAOBackupFiles()
+	backupFiles, err := checker.getAOBackupFiles(backupName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
 	}
@@ -242,19 +242,28 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 	return metaEOF, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles() (BackupAOFiles, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles(backupName string) (BackupAOFiles, error) {
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to configure folder")
 		return nil, err
 	}
 	rootFolder := storage.RootFolder()
-	backupsFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
 
-	latestBackup, err := internal.GetLatestBackup(backupsFolder)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to get latest backup")
-		return nil, err
+	var latestBackup internal.Backup
+	if backupName != "" {
+		backupsFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
+		latestBackup, err = internal.GetLatestBackup(backupsFolder)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to get latest backup")
+			return nil, err
+		}
+	} else {
+		latestBackup, err = internal.GetBackupByName(backupName, fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum), rootFolder)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to get latest backup")
+			return nil, err
+		}
 	}
 
 	tracelog.DebugLogger.Printf("backup %s", latestBackup.Name)
