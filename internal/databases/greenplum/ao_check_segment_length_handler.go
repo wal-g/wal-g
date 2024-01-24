@@ -250,26 +250,18 @@ func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles(backupName string) 
 	}
 	rootFolder := storage.RootFolder()
 
-	var latestBackup internal.Backup
-	if backupName != "" {
-		backupsFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
-		latestBackup, err = internal.GetLatestBackup(backupsFolder)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to get latest backup")
-			return nil, err
-		}
-	} else {
-		latestBackup, err = internal.GetBackupByName(backupName, fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum), rootFolder)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to get latest backup")
-			return nil, err
-		}
+	var backup internal.Backup
+
+	backup, err = internal.GetBackupByName(backupName, fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum), rootFolder)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to get backup with name: %s", backupName)
+		return nil, err
 	}
 
-	tracelog.DebugLogger.Printf("backup %s", latestBackup.Name)
+	tracelog.DebugLogger.Printf("backup %s", backup.Name)
 	files := NewAOFilesMetadataDTO()
 
-	err = internal.FetchDto(latestBackup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", latestBackup.Name))
+	err = internal.FetchDto(backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to fetch file data")
 		return nil, err

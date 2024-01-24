@@ -43,7 +43,7 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 		tracelog.ErrorLogger.FatalfOnError("could not get cluster info %v", err)
 	}
 
-	d, err := getSegmentBackupNames(checker.backupName)
+	segmentsBaccups, err := getSegmentBackupNames(checker.backupName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
 	}
@@ -51,7 +51,7 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	remoteOutput := globalCluster.GenerateAndExecuteCommand("Run ao/aocs length check",
 		cluster.ON_SEGMENTS,
 		func(contentID int) string {
-			return checker.buildCheckAOLengthCmd(contentID, d[contentID], globalCluster)
+			return checker.buildCheckAOLengthCmd(contentID, segmentsBaccups[contentID], globalCluster)
 		})
 
 	for _, command := range remoteOutput.Commands {
@@ -107,20 +107,20 @@ func getSegmentBackupNames(name string) (map[int]string, error) {
 	}
 	rootFolder := storage.RootFolder()
 
-	latestBackup, err := internal.GetBackupByName(name, utility.BaseBackupPath, rootFolder)
+	backup, err := internal.GetBackupByName(name, utility.BaseBackupPath, rootFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get latest backup")
 		return nil, err
 	}
 	var sentinel BackupSentinelDto
-	err = latestBackup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(&sentinel)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get latest backup")
 		return nil, err
 	}
-	dict := map[int]string{}
+	segmentsBackupNames := map[int]string{}
 	for _, meta := range sentinel.Segments {
-		dict[meta.ContentID] = meta.BackupName
+		segmentsBackupNames[meta.ContentID] = meta.BackupName
 	}
-	return dict, nil
+	return segmentsBackupNames, nil
 }
