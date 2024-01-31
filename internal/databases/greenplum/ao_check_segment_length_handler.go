@@ -222,9 +222,9 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 	//query to get expected table size in metadata
 	query := ""
 	if !strings.Contains(row.SegRelName, "aocs") {
-		query = fmt.Sprintf("SELECT sum(eofuncompressed) FROM pg_aoseg.%s", row.SegRelName)
+		query = fmt.Sprintf("SELECT sum(eof) FROM pg_aoseg.%s", row.SegRelName)
 	} else {
-		query = fmt.Sprintf("SELECT sum(eof_uncompressed) FROM gp_toolkit.__gp_aocsseg('\"%s\"')", row.TableName)
+		query = fmt.Sprintf("SELECT sum(eof) FROM gp_toolkit.__gp_aocsseg('\"%s\"')", row.TableName)
 	}
 
 	size, err := conn.Query(query)

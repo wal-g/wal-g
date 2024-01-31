@@ -61,7 +61,7 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	}
 
 	if remoteOutput.NumErrors > 0 {
-		tracelog.ErrorLogger.Fatalln("failed check")
+		tracelog.ErrorLogger.Fatalln("check failed, for more information check log on segments")
 	} else {
 		tracelog.InfoLogger.Println("check passed")
 	}
