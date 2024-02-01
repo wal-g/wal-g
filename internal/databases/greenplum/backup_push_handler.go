@@ -206,16 +206,12 @@ func (bh *BackupHandler) HandleBackupPush() {
 		bh.abortBackup()
 	}
 
-	// WAL-G will reconnect later
-	bh.disconnect()
-
 	// wait for segments to complete their backups
 	waitBackupsErr := bh.waitSegmentBackups()
 	if waitBackupsErr != nil {
 		tracelog.ErrorLogger.Printf("Segment backups wait error: %v", waitBackupsErr)
 	}
-	tracelog.ErrorLogger.FatalfOnError("Failed to connect to the greenplum master: %v",
-		bh.connect())
+
 	if waitBackupsErr != nil {
 		bh.abortBackup()
 	}
