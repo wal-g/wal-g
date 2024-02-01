@@ -172,7 +172,7 @@ SELECT pg_is_in_backup(), -1;
 func (queryRunner *GpQueryRunner) TryGetLock() (err error) {
 	conn := queryRunner.Connection
 	var ans string
-	err = conn.QueryRow("SELECT pg_try_advisory_lock('21311'").Scan(&ans)
+	err = conn.QueryRow("SELECT pg_try_advisory_lock('21311')").Scan(&ans)
 	if err != nil {
 		return err
 	}
