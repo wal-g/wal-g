@@ -168,6 +168,21 @@ SELECT pg_is_in_backup(), -1;
 `
 }
 
+// TryGetLock tries to take advisory lock
+func (queryRunner *GpQueryRunner) TryGetLock() (err error) {
+	conn := queryRunner.Connection
+	var ans string
+	err = conn.QueryRow("SELECT pg_try_advisory_lock('21311'").Scan(&ans)
+	if err != nil {
+		return err
+	}
+
+	if ans == "f" {
+		return fmt.Errorf("lock is already taken")
+	}
+	return nil
+}
+
 // buildAbortBackupSegments aborts the running backup on the segments
 func (queryRunner *GpQueryRunner) buildAbortBackupSegments() string {
 	return `SELECT pg_stop_backup(), gp_segment_id FROM gp_dist_random('gp_id');`
