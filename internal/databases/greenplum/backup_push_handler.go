@@ -175,9 +175,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 	initGpLog(bh.arguments.logsDir)
 
-	//TODO try lock
-	err := bh.tryLock()
-	//err := bh.checkPrerequisites()
+	err := bh.checkPrerequisites()
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
 
 	err = bh.configureDeltaBackup()
@@ -393,40 +391,6 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 		return nil
 	}
 
-	tracelog.InfoLogger.Println("Checking for the existing running backup...")
-	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
-	if err != nil {
-		return err
-	}
-	backupStatuses, err := queryRunner.IsInBackup()
-	if err != nil {
-		return err
-	}
-
-	isInBackupSegments := make([]int, 0)
-	for contentID, isInBackup := range backupStatuses {
-		if isInBackup {
-			isInBackupSegments = append(isInBackupSegments, contentID)
-		}
-	}
-
-	if len(isInBackupSegments) > 0 {
-		return fmt.Errorf("backup is already in progress on one or more segments: %v", isInBackupSegments)
-	}
-	tracelog.InfoLogger.Printf("No running backups were found")
-	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
-	return nil
-}
-
-func (bh *BackupHandler) tryLock() (err error) {
-	tracelog.InfoLogger.Println("Checking backup prerequisites")
-
-	if bh.currBackupInfo.gpVersion.Major >= 7 {
-		// GP7+ allows the non-exclusive backups
-		tracelog.InfoLogger.Println("Checking backup prerequisites: OK")
-		return nil
-	}
-
 	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return err
@@ -437,6 +401,7 @@ func (bh *BackupHandler) tryLock() (err error) {
 	if err != nil {
 		return err
 	}
+	tracelog.InfoLogger.Println("Lock successfully acquired")
 
 	backupStatuses, err := queryRunner.IsInBackup()
 	if err != nil {
@@ -457,7 +422,7 @@ func (bh *BackupHandler) tryLock() (err error) {
 			return fmt.Errorf("closing old backups failed: %v", err)
 		}
 	}
-	//tracelog.InfoLogger.Printf("No running backups were found")
+
 	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
 	return nil
 }
