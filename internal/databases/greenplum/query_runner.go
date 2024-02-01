@@ -171,13 +171,13 @@ SELECT pg_is_in_backup(), -1;
 // TryGetLock tries to take advisory lock
 func (queryRunner *GpQueryRunner) TryGetLock() (err error) {
 	conn := queryRunner.Connection
-	var ans string
-	err = conn.QueryRow("SELECT pg_try_advisory_lock('21311')").Scan(&ans)
+	var lockFree bool
+	err = conn.QueryRow("SELECT pg_try_advisory_lock('21311')").Scan(&lockFree)
 	if err != nil {
 		return err
 	}
 
-	if ans == "f" {
+	if !lockFree {
 		return fmt.Errorf("lock is already taken")
 	}
 	return nil
