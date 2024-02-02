@@ -19,6 +19,35 @@ func TestPartitionStrings(t *testing.T) {
 		{[]string{"1", "2"}, 5, [][]string{{"1", "2"}}},
 		{[]string{"1"}, 1, [][]string{{"1"}}},
 		{[]string{}, 1, [][]string{}},
+		{[]string{"foo", "bar", "baz"}, 4, [][]string{{"foo", "bar", "baz"}}},
+		{[]string{"foo", "bar", "baz"}, 3, [][]string{{"foo", "bar", "baz"}}},
+		{[]string{"foo", "bar", "baz"}, 2, [][]string{{"foo", "bar"}, {"baz"}}},
+		{[]string{"foo", "bar", "baz"}, 1, [][]string{{"foo"}, {"bar"}, {"baz"}}},
+		{
+			[]string{
+				"This is a long string that contains a lot of words and characters for testing purposes.",
+				"The quick brown fox jumps over the lazy dog",
+				"Lorem ipsum dolor sit amet, consectetur adipiscing elit",
+				"Hello, World!",
+				" ",
+				"",
+			},
+			2,
+			[][]string{
+				{
+					"This is a long string that contains a lot of words and characters for testing purposes.",
+					"The quick brown fox jumps over the lazy dog",
+				},
+				{
+					"Lorem ipsum dolor sit amet, consectetur adipiscing elit",
+					"Hello, World!",
+				},
+				{
+					" ",
+					"",
+				},
+			},
+		},
 	}
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
