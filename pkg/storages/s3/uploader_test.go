@@ -16,6 +16,8 @@ func TestPartitionStrings(t *testing.T) {
 		{[]string{"1", "2", "3", "4", "5", "6"}, 3, [][]string{{"1", "2", "3"}, {"4", "5", "6"}}},
 		{[]string{"1", "2", "3", "4", "5"}, 1000, [][]string{{"1", "2", "3", "4", "5"}}},
 		{[]string{"1", "2", "3", "4", "5"}, 1, [][]string{{"1"}, {"2"}, {"3"}, {"4"}, {"5"}}},
+		{[]string{"1", "2", "3", "4", "5"}, 0, [][]string{}},
+		{[]string{"1", "2", "3", "4", "5"}, -1, [][]string{}},
 		{[]string{"1", "2"}, 5, [][]string{{"1", "2"}}},
 		{[]string{"1"}, 1, [][]string{{"1"}}},
 		{[]string{}, 1, [][]string{}},
@@ -23,6 +25,8 @@ func TestPartitionStrings(t *testing.T) {
 		{[]string{"foo", "bar", "baz"}, 3, [][]string{{"foo", "bar", "baz"}}},
 		{[]string{"foo", "bar", "baz"}, 2, [][]string{{"foo", "bar"}, {"baz"}}},
 		{[]string{"foo", "bar", "baz"}, 1, [][]string{{"foo"}, {"bar"}, {"baz"}}},
+		{[]string{"foo", "bar", "baz"}, 0, [][]string{}},
+		{[]string{"foo", "bar", "baz"}, -1, [][]string{}},
 		{
 			[]string{
 				"This is a long string that contains a lot of words and characters for testing purposes.",
