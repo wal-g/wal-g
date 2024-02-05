@@ -62,6 +62,7 @@ services:
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/deleteretainafterbucket
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
@@ -309,6 +310,11 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delete_retain_full_multist_test
     command: /tmp/tests/delete_retain_full_multist_test.sh
+
+  pg_delete_retain_after_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_retain_after_test
+    command: /tmp/tests/delete_retain_after_test.sh
 
   pg_full_backup_test:
     <<: *pg_test_common
