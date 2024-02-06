@@ -14,6 +14,8 @@ set +x -v
 fill_wal_data 3
 set -x
 
+#make sure that etcd commited all transactions
+sleep 1
 wal-g wal-push
 
 # create dir where to store fetched wals

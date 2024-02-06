@@ -28,4 +28,8 @@ fill_wal_data() {
         STATUS=$(etcdctl put $KEY $FILE_CONTENT)
         i=$((i+1))
     done
+    #add one record to the last file
+    KEY="key$i"
+    STATUS=$(etcdctl put $KEY $FILE_CONTENT)
+    i=$((i+1))
 }
