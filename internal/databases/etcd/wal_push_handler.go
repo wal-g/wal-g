@@ -21,6 +21,7 @@ import (
 )
 
 var errBadWALName = errors.New("bad wal name")
+var errNotLeaderNode = errors.New("Current node is not leader, it can provide inconsistent wal records")
 
 type LogsCache struct {
 	LastArchivedIndex uint64 `json:"LastArchivedIndex"`
@@ -47,7 +48,9 @@ func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd
 func getWalDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
 
 func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
-	raftIndex := getRaftIndex()
+	raftIndex, err := getRaftIndex()
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	walDir, ok := internal.GetSetting(internal.ETCDWalDirectory)
 	if !ok {
 		walDir = getWalDir(dataDir)
@@ -56,9 +59,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	uploader.ChangeDirectory(utility.WalPath)
 	files, err := ReadDir(walDir)
 	walFiles := checkWalNames(files)
-	if err != nil {
-		return err
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	cache := getCache()
 	if len(walFiles) > 0 && cache.LastArchivedIndex != 0 {
@@ -78,6 +79,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 		tracelog.DebugLogger.Printf("Testing... %v\n", wal)
 
 		ind, err := parseWALName(walFiles[i])
+		tracelog.ErrorLogger.FatalOnError(err)
 		// if index of last record in wal is not greater than last archived index, skip this wal
 		if ind-1 <= cache.LastArchivedIndex {
 			continue
@@ -117,24 +119,24 @@ func archiveWal(uploader internal.Uploader, dataDir string, wal string) error {
 	return nil
 }
 
-func getRaftIndex() uint64 {
+func getRaftIndex() (uint64, error) {
 	out, err := exec.Command("etcdctl", "endpoint", "status", "-w", "json").Output()
 	if err != nil {
-		tracelog.ErrorLogger.Println("Could not check if node is a leader. Error: %v\n", err)
+		return 0, err
 	}
 
 	var data []ServerResponse
 	err = json.Unmarshal(out, &data)
-	if err != nil || len(data) == 0 {
-		tracelog.ErrorLogger.Println("Could not unmarshal etcd output. Error: %v\n", err)
+	if err != nil {
+		return 0, err
 	}
 
 	response := data[0]
 	if response.Status.Leader != response.Status.Header.MemberID {
-		tracelog.ErrorLogger.Println("Current node is not leader, it can provide inconsistent wal records")
+		return 0, errNotLeaderNode
 	}
 
-	return response.Status.RaftIndex
+	return response.Status.RaftIndex, nil
 }
 
 func getCache() LogsCache {
