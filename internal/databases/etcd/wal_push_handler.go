@@ -38,8 +38,8 @@ type Status struct {
 }
 
 type Header struct {
-	ClusterId uint64 `json:"cluster_id"`
-	MemberId  uint64 `json:"member_id"`
+	ClusterID uint64 `json:"cluster_id"`
+	MemberID  uint64 `json:"member_id"`
 }
 
 func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd_wals_cache") }
@@ -63,11 +63,11 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	cache := getCache()
 	if len(walFiles) > 0 && cache.LastArchivedIndex != 0 {
 		if raftIndex < cache.LastArchivedIndex {
-			tracelog.WarningLogger.Printf("wal was reset (%s => %s), clearing cache",
-				cache.LastArchivedIndex, walFiles[0])
+			tracelog.WarningLogger.Printf("wal was reset (%d => %d), clearing cache",
+				cache.LastArchivedIndex, raftIndex)
 			cache = LogsCache{}
 		} else {
-			tracelog.WarningLogger.Printf("Start to archive from wal record: %s\n",
+			tracelog.WarningLogger.Printf("Start to archive from wal record: %d\n",
 				cache.LastArchivedIndex)
 		}
 	}
@@ -120,18 +120,18 @@ func archiveWal(uploader internal.Uploader, dataDir string, wal string) error {
 func getRaftIndex() uint64 {
 	out, err := exec.Command("etcdctl", "endpoint", "status", "-w", "json").Output()
 	if err != nil {
-		tracelog.ErrorLogger.Println("Could not check if node is a leader ", err)
+		tracelog.ErrorLogger.Println("Could not check if node is a leader. Error: %v\n", err)
 	}
 
 	var data []ServerResponse
 	err = json.Unmarshal(out, &data)
 	if err != nil || len(data) == 0 {
-		tracelog.ErrorLogger.Println("Could not unmarshal etcd output ", err)
+		tracelog.ErrorLogger.Println("Could not unmarshal etcd output. Error: %v\n", err)
 	}
 
 	response := data[0]
-	if response.Status.Leader != response.Status.Header.MemberId {
-		tracelog.ErrorLogger.Println("Current node is not leader, it can provide inconsistent wal records", err)
+	if response.Status.Leader != response.Status.Header.MemberID {
+		tracelog.ErrorLogger.Println("Current node is not leader, it can provide inconsistent wal records")
 	}
 
 	return response.Status.RaftIndex
