@@ -366,8 +366,8 @@ Prints out the used configuration of WAL-G and detailed logs of the used command
 
 * `S3_LOG_LEVEL=DEVEL`
 
-If your commands seem to be stuck it could be that the s3 is not reachable, certificate problems or other s3 related issues.
-With this environment variable set you can see the Requests and Responses from s3 
+If your commands seem to be stuck it could be that the S3 is not reachable, certificate problems or other S3 related issues.
+With this environment variable set you can see the Requests and Responses from S3 
 
 
 Authors
