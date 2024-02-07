@@ -90,13 +90,13 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 	tracelog.InfoLogger.Println("ao table length check passed")
 }
 
-func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment() {
+func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupName string) {
 	DBNames, err := checker.getDatabasesInfo()
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
 	}
 
-	backupFiles, err := checker.getAOBackupFiles()
+	backupFiles, err := checker.getAOBackupFiles(backupName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
 	}
@@ -222,9 +222,9 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 	//query to get expected table size in metadata
 	query := ""
 	if !strings.Contains(row.SegRelName, "aocs") {
-		query = fmt.Sprintf("SELECT sum(eofuncompressed) FROM pg_aoseg.%s", row.SegRelName)
+		query = fmt.Sprintf("SELECT sum(eof) FROM pg_aoseg.%s", row.SegRelName)
 	} else {
-		query = fmt.Sprintf("SELECT sum(eof_uncompressed) FROM gp_toolkit.__gp_aocsseg('\"%s\"')", row.TableName)
+		query = fmt.Sprintf("SELECT sum(eof) FROM gp_toolkit.__gp_aocsseg('\"%s\"')", row.TableName)
 	}
 
 	size, err := conn.Query(query)
@@ -242,25 +242,26 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 	return metaEOF, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles() (BackupAOFiles, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles(backupName string) (BackupAOFiles, error) {
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to configure folder")
 		return nil, err
 	}
 	rootFolder := storage.RootFolder()
-	backupsFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum))
 
-	latestBackup, err := internal.GetLatestBackup(backupsFolder)
+	var backup internal.Backup
+
+	backup, err = internal.GetBackupByName(backupName, fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum), rootFolder)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to get latest backup")
+		tracelog.ErrorLogger.Printf("failed to get backup with name: %s", backupName)
 		return nil, err
 	}
 
-	tracelog.DebugLogger.Printf("backup %s", latestBackup.Name)
+	tracelog.DebugLogger.Printf("backup %s", backup.Name)
 	files := NewAOFilesMetadataDTO()
 
-	err = internal.FetchDto(latestBackup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", latestBackup.Name))
+	err = internal.FetchDto(backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to fetch file data")
 		return nil, err

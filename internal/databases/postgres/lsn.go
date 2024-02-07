@@ -11,7 +11,7 @@ func (lsn LSN) String() string {
 func ParseLSN(s string) (LSN, error) {
 	lsn, err := pgx.ParseLSN(s)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	return LSN(lsn), nil

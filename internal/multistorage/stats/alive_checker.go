@@ -1,4 +1,4 @@
-package cache
+package stats
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"path"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -14,8 +15,8 @@ import (
 
 const checkObjectName = "wal-g_storage_check"
 
-func NewRWAliveChecker(folders map[string]storage.Folder, timeout time.Duration, writeSize uint) AliveChecker {
-	return AliveChecker{
+func NewRWAliveChecker(folders map[string]storage.Folder, timeout time.Duration, writeSize uint) *AliveChecker {
+	return &AliveChecker{
 		folders: folders,
 		timeout: timeout,
 		checks: []storageCheck{&readCheck{}, &writeCheck{
@@ -24,8 +25,8 @@ func NewRWAliveChecker(folders map[string]storage.Folder, timeout time.Duration,
 	}
 }
 
-func NewReadAliveChecker(folders map[string]storage.Folder, timeout time.Duration) AliveChecker {
-	return AliveChecker{
+func NewROAliveChecker(folders map[string]storage.Folder, timeout time.Duration) *AliveChecker {
+	return &AliveChecker{
 		folders: folders,
 		timeout: timeout,
 		checks:  []storageCheck{&readCheck{}},
@@ -33,6 +34,7 @@ func NewReadAliveChecker(folders map[string]storage.Folder, timeout time.Duratio
 }
 
 type AliveChecker struct {
+	// folders that can be checked by this checker, matched by storage names.
 	folders map[string]storage.Folder
 	timeout time.Duration
 	checks  []storageCheck
@@ -117,7 +119,7 @@ func (rc *readCheck) Check(_ context.Context, folder storage.Folder) error {
 	// indefinitely (which is still quite unlikely).
 	_, _, err := folder.ListFolder()
 	if err != nil {
-		return fmt.Errorf("read check: %w", err)
+		return fmt.Errorf("read check: list folder %q: %w", folder.GetPath(), err)
 	}
 	return nil
 }
@@ -130,8 +132,13 @@ func (wc *writeCheck) Check(ctx context.Context, folder storage.Folder) error {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	lr := io.LimitReader(r, int64(wc.writeSize))
 	err := folder.PutObjectWithContext(ctx, checkObjectName, lr)
+	objPath := path.Join(folder.GetPath(), checkObjectName)
 	if err != nil {
-		return fmt.Errorf("write check: %w", err)
+		return fmt.Errorf("write check: put object %q: %w", objPath, err)
+	}
+	err = folder.DeleteObjects([]string{checkObjectName})
+	if err != nil {
+		return fmt.Errorf("write check: delete object %q: %w", objPath, err)
 	}
 	return nil
 }

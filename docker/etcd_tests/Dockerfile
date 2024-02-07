@@ -22,7 +22,7 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
     
 RUN make etcd_build
 
-FROM bitnami/etcd:latest
+FROM wal-g/etcd:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/etcd/wal-g /usr/bin
 
 COPY docker/etcd_tests/scripts/ /tmp

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -99,9 +100,6 @@ func GetBackups(folder storage.Folder) (backups []BackupTime, err error) {
 	}
 
 	backups = GetBackupTimeSlices(backupObjects)
-	if err != nil {
-		return nil, err
-	}
 
 	count := len(backups)
 	if count == 0 {

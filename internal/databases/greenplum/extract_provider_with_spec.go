@@ -15,7 +15,7 @@ const (
 type RestoreDescMaker struct{}
 
 func (m RestoreDescMaker) Make(restoreParameters []string, names postgres.DatabasesByNames) (postgres.RestoreDesc, error) {
-	restoredDatabases, err := postgres.DefaultRestoreDescMaker{}.Make(restoreParameters, names)
+	restoredDatabases, err := postgres.RegexpRestoreDescMaker{}.Make(restoreParameters, names)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,6 @@ func (m RestoreDescMaker) Make(restoreParameters []string, names postgres.Databa
 			}
 		}
 	}
-
 	return restoredDatabases, nil
 }
 

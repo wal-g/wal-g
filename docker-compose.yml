@@ -62,6 +62,7 @@ services:
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/deleteretainafterbucket
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
@@ -309,6 +310,11 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delete_retain_full_multist_test
     command: /tmp/tests/delete_retain_full_multist_test.sh
+
+  pg_delete_retain_after_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_retain_after_test
+    command: /tmp/tests/delete_retain_after_test.sh
 
   pg_full_backup_test:
     <<: *pg_test_common
@@ -634,14 +640,13 @@ services:
     <<: *s3_common_depends
 
   etcd:
-    image: bitnami/etcd:latest
+    build:
+      dockerfile: docker/etcd/Dockerfile
+      context: .
+    image: wal-g/etcd
     container_name: wal-g_etcd
     environment:
       - ALLOW_NONE_AUTHENTICATION=yes
-      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
-    ports:
-      - 2379:2379
-      - 2380:2380
 
   etcd_tests:
     build:

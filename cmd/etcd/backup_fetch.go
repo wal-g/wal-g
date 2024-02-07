@@ -19,6 +19,11 @@ var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch backup-name",
 	Short: backupFetchShortDescription,
 	Args:  cobra.ExactArgs(1),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		internal.RequiredSettings[internal.NameStreamRestoreCmd] = true
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 

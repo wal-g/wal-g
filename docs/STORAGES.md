@@ -121,7 +121,7 @@ WAL-G determines Azure Storage credentials using the [azure default credential c
 
 Alternatively, you can set `AZURE_STORAGE_ACCESS_KEY` to authenticate using the storage account's [access keys](https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage), or set `AZURE_STORAGE_SAS_TOKEN` to make use of [SAS tokens](https://docs.microsoft.com/en-us/azure/storage/common/storage-sas-overview).
 
-For deployments where Azure Storage is not under AzurePuplicCloud environment, WAL-G need to use different Azure Storage endpoint. You can use optional setting `AZURE_STORAGE_SAS_TOKEN` to select the correct Azure Storage endpoint. Available setting values:  `"AzurePublicCloud"`, `"AzureUSGovernmentCloud"`, `"AzureChinaCloud"`, `"AzureGermanCloud"`. If setting is omitted or has a value different to the ones defined here, WAL-G will default to the Azure Storage endpoint for AzurePublicCloud.
+For deployments where Azure Storage is not under AzurePuplicCloud environment, WAL-G need to use different Azure Storage endpoint. You can use optional setting `AZURE_ENVIRONMENT_NAME` to select the correct Azure Environment, which will set the right Storage endpoint. Available setting values:  `"AzurePublicCloud"`, `"AzureUSGovernmentCloud"`, `"AzureChinaCloud"`, `"AzureGermanCloud"`. If setting is omitted or has a value different to the ones defined here, WAL-G will default to AzurePublicCloud.
 
 WAL-G sets default upload buffer size to 64 Megabytes and uses 3 buffers by default. However, users can choose to override these values by setting optional environment variables.
 

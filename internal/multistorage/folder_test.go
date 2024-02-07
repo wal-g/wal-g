@@ -6,8 +6,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -42,21 +42,21 @@ func TestUseDifferentStorages(t *testing.T) {
 
 	newMockFolder := func(t *testing.T, initialStorages ...string) Folder {
 		folder := newTestFolder(t, initialStorages...)
-		cacheMock := folder.cache.(*cache.MockStatusCache)
+		collectorMock := folder.statsCollector.(*stats.MockCollector)
 		newAliveStorage := "s3"
-		cacheMock.EXPECT().AllAliveStorages().Return([]string{newAliveStorage}, nil).AnyTimes()
-		cacheMock.EXPECT().FirstAliveStorage().Return(&newAliveStorage, nil).AnyTimes()
-		cacheMock.EXPECT().SpecificStorage(newAliveStorage).Return(true, nil).AnyTimes()
+		collectorMock.EXPECT().AllAliveStorages().Return([]string{newAliveStorage}, nil).AnyTimes()
+		collectorMock.EXPECT().FirstAliveStorage().Return(&newAliveStorage, nil).AnyTimes()
+		collectorMock.EXPECT().SpecificStorage(newAliveStorage).Return(true, nil).AnyTimes()
 		return folder
 	}
 
 	newMockFolderWithNoAlive := func(t *testing.T, initialStorages ...string) Folder {
 		folder := newTestFolder(t, initialStorages...)
-		cacheMock := folder.cache.(*cache.MockStatusCache)
+		collectorMock := folder.statsCollector.(*stats.MockCollector)
 
-		cacheMock.EXPECT().AllAliveStorages().Return(nil, nil).AnyTimes()
-		cacheMock.EXPECT().FirstAliveStorage().Return(nil, nil).AnyTimes()
-		cacheMock.EXPECT().SpecificStorage("s3").Return(false, nil).AnyTimes()
+		collectorMock.EXPECT().AllAliveStorages().Return(nil, nil).AnyTimes()
+		collectorMock.EXPECT().FirstAliveStorage().Return(nil, nil).AnyTimes()
+		collectorMock.EXPECT().SpecificStorage("s3").Return(false, nil).AnyTimes()
 
 		return folder
 	}
@@ -113,8 +113,8 @@ func TestUseDifferentStorages(t *testing.T) {
 func TestUseSpecificStorage(t *testing.T) {
 	t.Run("do nothing if this storage is already used", func(t *testing.T) {
 		folder := newTestFolder(t, "s2")
-		cacheMock := folder.cache.(*cache.MockStatusCache)
-		cacheMock.EXPECT().SpecificStorage(gomock.Any()).Times(0)
+		collectorMock := folder.statsCollector.(*stats.MockCollector)
+		collectorMock.EXPECT().SpecificStorage(gomock.Any()).Times(0)
 
 		newFolder, err := UseSpecificStorage("s2", folder)
 		require.NoError(t, err, ErrNoAliveStorages)
@@ -160,14 +160,15 @@ func TestEnsureSingleStorageIsUsed(t *testing.T) {
 func newTestFolder(t *testing.T, usedStorages ...string) Folder {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
-	cacheMock := cache.NewMockStatusCache(mockCtrl)
+	statsCollectorMock := stats.NewMockCollector(mockCtrl)
+	statsCollectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	memFolders := map[string]storage.Folder{
 		"s1": memory.NewFolder("s1/", memory.NewKVS()),
 		"s2": memory.NewFolder("s2/", memory.NewKVS()),
 		"s3": memory.NewFolder("s3/", memory.NewKVS()),
 	}
-	folder := NewFolder(memFolders, cacheMock).(Folder)
+	folder := NewFolder(memFolders, statsCollectorMock).(Folder)
 	for _, us := range usedStorages {
 		folder.usedFolders = append(folder.usedFolders, NamedFolder{
 			Folder:      memFolders[us],

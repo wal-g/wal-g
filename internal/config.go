@@ -36,6 +36,7 @@ const (
 	UploadConcurrencySetting      = "WALG_UPLOAD_CONCURRENCY"
 	UploadDiskConcurrencySetting  = "WALG_UPLOAD_DISK_CONCURRENCY"
 	UploadQueueSetting            = "WALG_UPLOAD_QUEUE"
+	DownloadFileRetriesSetting    = "WALG_DOWNLOAD_FILE_RETRIES"
 	SentinelUserDataSetting       = "WALG_SENTINEL_USER_DATA"
 	PreventWalOverwriteSetting    = "WALG_PREVENT_WAL_OVERWRITE"
 	UploadWalMetadata             = "WALG_UPLOAD_WAL_METADATA"
@@ -76,37 +77,43 @@ const (
 	PgpEnvelopeYcEndpointSetting  = "WALG_ENVELOPE_PGP_YC_ENDPOINT"
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
 
-	PgDataSetting                  = "PGDATA"
-	UserSetting                    = "USER" // TODO : do something with it
-	PgPortSetting                  = "PGPORT"
-	PgUserSetting                  = "PGUSER"
-	PgHostSetting                  = "PGHOST"
-	PgPasswordSetting              = "PGPASSWORD"
-	PgPassfileSetting              = "PGPASSFILE"
-	PgDatabaseSetting              = "PGDATABASE"
-	PgSslModeSetting               = "PGSSLMODE"
-	PgSlotName                     = "WALG_SLOTNAME"
-	PgWalSize                      = "WALG_PG_WAL_SIZE"
-	TotalBgUploadedLimit           = "TOTAL_BG_UPLOADED_LIMIT"
-	NameStreamCreateCmd            = "WALG_STREAM_CREATE_COMMAND"
-	NameStreamRestoreCmd           = "WALG_STREAM_RESTORE_COMMAND"
-	MaxDelayedSegmentsCount        = "WALG_INTEGRITY_MAX_DELAYED_WALS"
-	PrefetchDir                    = "WALG_PREFETCH_DIR"
-	PgReadyRename                  = "PG_READY_RENAME"
-	SerializerTypeSetting          = "WALG_SERIALIZER_TYPE"
-	StreamSplitterPartitions       = "WALG_STREAM_SPLITTER_PARTITIONS"
-	StreamSplitterBlockSize        = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
-	StreamSplitterMaxFileSize      = "WALG_STREAM_SPLITTER_MAX_FILE_SIZE"
-	StatsdAddressSetting           = "WALG_STATSD_ADDRESS"
-	PgAliveCheckInterval           = "WALG_ALIVE_CHECK_INTERVAL"
-	PgStopBackupTimeout            = "WALG_STOP_BACKUP_TIMEOUT"
-	PgFailoverStorages             = "WALG_FAILOVER_STORAGES"
-	PgFailoverStoragesCheck        = "WALG_FAILOVER_STORAGES_CHECK"
-	PgFailoverStoragesCheckTimeout = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
-	PgFailoverStorageCacheLifetime = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
-	PgFailoverStoragesCheckSize    = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
-	PgDaemonWALUploadTimeout       = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
-	PgTargetStorage                = "WALG_TARGET_STORAGE"
+	PgDataSetting                          = "PGDATA"
+	UserSetting                            = "USER" // TODO : do something with it
+	PgPortSetting                          = "PGPORT"
+	PgUserSetting                          = "PGUSER"
+	PgHostSetting                          = "PGHOST"
+	PgPasswordSetting                      = "PGPASSWORD"
+	PgPassfileSetting                      = "PGPASSFILE"
+	PgDatabaseSetting                      = "PGDATABASE"
+	PgSslModeSetting                       = "PGSSLMODE"
+	PgSlotName                             = "WALG_SLOTNAME"
+	PgWalSize                              = "WALG_PG_WAL_SIZE"
+	TotalBgUploadedLimit                   = "TOTAL_BG_UPLOADED_LIMIT"
+	NameStreamCreateCmd                    = "WALG_STREAM_CREATE_COMMAND"
+	NameStreamRestoreCmd                   = "WALG_STREAM_RESTORE_COMMAND"
+	MaxDelayedSegmentsCount                = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir                            = "WALG_PREFETCH_DIR"
+	PgReadyRename                          = "PG_READY_RENAME"
+	SerializerTypeSetting                  = "WALG_SERIALIZER_TYPE"
+	StreamSplitterPartitions               = "WALG_STREAM_SPLITTER_PARTITIONS"
+	StreamSplitterBlockSize                = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
+	StreamSplitterMaxFileSize              = "WALG_STREAM_SPLITTER_MAX_FILE_SIZE"
+	StatsdAddressSetting                   = "WALG_STATSD_ADDRESS"
+	PgAliveCheckInterval                   = "WALG_ALIVE_CHECK_INTERVAL"
+	PgStopBackupTimeout                    = "WALG_STOP_BACKUP_TIMEOUT"
+	PgFailoverStorages                     = "WALG_FAILOVER_STORAGES"
+	PgFailoverStoragesCheck                = "WALG_FAILOVER_STORAGES_CHECK"
+	PgFailoverStoragesCheckTimeout         = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
+	PgFailoverStorageCacheLifetime         = "WALG_FAILOVER_STORAGES_CACHE_LIFETIME"
+	PgFailoverStorageCacheEMAAliveLimit    = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALIVE_LIMIT"
+	PgFailoverStorageCacheEMADeadLimit     = "WALG_FAILOVER_STORAGES_CACHE_EMA_DEAD_LIMIT"
+	PgFailoverStorageCacheEMAAlphaAliveMax = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALPHA_ALIVE_MAX"
+	PgFailoverStorageCacheEMAAlphaAliveMin = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALPHA_ALIVE_MIN"
+	PgFailoverStorageCacheEMAAlphaDeadMax  = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALPHA_DEAD_MAX"
+	PgFailoverStorageCacheEMAAlphaDeadMin  = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALPHA_DEAD_MIN"
+	PgFailoverStoragesCheckSize            = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
+	PgDaemonWALUploadTimeout               = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
+	PgTargetStorage                        = "WALG_TARGET_STORAGE"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -156,6 +163,9 @@ const (
 	GPDeleteConcurrency       = "WALG_GP_DELETE_CONCURRENCY"
 	GPAoSegSizeThreshold      = "WALG_GP_AOSEG_SIZE_THRESHOLD"
 	GPAoDeduplicationAgeLimit = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
+
+	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
+	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
 
@@ -213,6 +223,7 @@ var (
 		UploadConcurrencySetting:       "16",
 		UploadDiskConcurrencySetting:   "1",
 		UploadQueueSetting:             "2",
+		DownloadFileRetriesSetting:     "15",
 		PreventWalOverwriteSetting:     "false",
 		UploadWalMetadata:              "NOMETADATA",
 		DeltaMaxStepsSetting:           "0",
@@ -286,6 +297,7 @@ var (
 		UploadConcurrencySetting:      true,
 		UploadDiskConcurrencySetting:  true,
 		UploadQueueSetting:            true,
+		DownloadFileRetriesSetting:    true,
 		SentinelUserDataSetting:       true,
 		PreventWalOverwriteSetting:    true,
 		UploadWalMetadata:             true,
@@ -414,26 +426,32 @@ var (
 
 	PGAllowedSettings = map[string]bool{
 		// Postgres
-		PgPortSetting:                  true,
-		PgUserSetting:                  true,
-		PgHostSetting:                  true,
-		PgDataSetting:                  true,
-		PgPasswordSetting:              true,
-		PgPassfileSetting:              true,
-		PgDatabaseSetting:              true,
-		PgSslModeSetting:               true,
-		PgSlotName:                     true,
-		PgWalSize:                      true,
-		PrefetchDir:                    true,
-		PgReadyRename:                  true,
-		PgBackRestStanza:               true,
-		PgAliveCheckInterval:           true,
-		PgStopBackupTimeout:            true,
-		PgFailoverStorages:             true,
-		PgFailoverStoragesCheckTimeout: true,
-		PgFailoverStorageCacheLifetime: true,
-		PgFailoverStoragesCheckSize:    true,
-		PgDaemonWALUploadTimeout:       true,
+		PgPortSetting:                          true,
+		PgUserSetting:                          true,
+		PgHostSetting:                          true,
+		PgDataSetting:                          true,
+		PgPasswordSetting:                      true,
+		PgPassfileSetting:                      true,
+		PgDatabaseSetting:                      true,
+		PgSslModeSetting:                       true,
+		PgSlotName:                             true,
+		PgWalSize:                              true,
+		PrefetchDir:                            true,
+		PgReadyRename:                          true,
+		PgBackRestStanza:                       true,
+		PgAliveCheckInterval:                   true,
+		PgStopBackupTimeout:                    true,
+		PgFailoverStorages:                     true,
+		PgFailoverStoragesCheckTimeout:         true,
+		PgFailoverStorageCacheLifetime:         true,
+		PgFailoverStorageCacheEMAAliveLimit:    true,
+		PgFailoverStorageCacheEMADeadLimit:     true,
+		PgFailoverStorageCacheEMAAlphaAliveMax: true,
+		PgFailoverStorageCacheEMAAlphaAliveMin: true,
+		PgFailoverStorageCacheEMAAlphaDeadMax:  true,
+		PgFailoverStorageCacheEMAAlphaDeadMin:  true,
+		PgFailoverStoragesCheckSize:            true,
+		PgDaemonWALUploadTimeout:               true,
 	}
 
 	MongoAllowedSettings = map[string]bool{

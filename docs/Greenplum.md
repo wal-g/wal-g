@@ -25,6 +25,7 @@ AWS_ACCESS_KEY_ID: "aws_access_key_id"
 WALG_UPLOAD_CONCURRENCY: 5
 WALG_PGP_KEY_PATH: "/path/to/PGP_KEY"
 WALG_DOWNLOAD_CONCURRENCY: 5
+WALG_DOWNLOAD_FILE_RETRIES: 15
 WALE_GPG_KEY_ID: "gpg_key_id"
 WALG_DISK_RATE_LIMIT: 167772160
 PGUSER: "gpadmin"
@@ -150,7 +151,7 @@ wal-g backup-fetch LATEST --mode=unpack --restore-config=restore-config.json --c
 ```
 
 #### Restore only specific databases
-During partial restore wal-g restores only specified databases' files. Use 'database' or 'database/namespace.table' as a parameter ('public' namespace can be omitted).
+During partial restore wal-g restores only specified databases' files. Use 'database', 'database/namespace.table' or 'database/namespace/table' as a parameter ('public' namespace can be omitted).
 
 Require files metadata with database names data, which is automatically collected during local backup. With remote backup this option does not work.   
 
@@ -211,4 +212,8 @@ It ensures that table files on disc are not shorter than expected EOF in metadat
 To check that last backup has EOF that is less or equal than current EOF, you can add flag: 
 ```bash
 wal-g check-ao-aocs-length --check-backup
+```
+If you want to secect special backup for check, you can add it`s name:
+```bash
+wal-g check-ao-aocs-length --check-backup --backup-name=backup_name
 ```

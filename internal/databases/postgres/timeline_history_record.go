@@ -78,7 +78,7 @@ func createTimelineSwitchMap(startTimeline uint32,
 	}
 	// store records in a map for fast lookup by wal segment number
 	for _, record := range historyRecords {
-		walSegmentNo := newWalSegmentNo(record.lsn)
+		walSegmentNo := NewWalSegmentNo(record.lsn)
 		timeLineHistoryMap[walSegmentNo] = record
 	}
 	return timeLineHistoryMap, nil

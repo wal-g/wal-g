@@ -154,18 +154,22 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	if err != nil {
 		return err
 	}
+	retries := GetFetchRetries()
+
 	for currentRun := files; len(currentRun) > 0; {
 		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
-		} else if len(failed) == len(currentRun) {
+		} else if len(failed) == len(currentRun) && retries <= 0 {
 			return errors.Errorf("failed to extract files:\n%s\n",
 				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}
+		retries--
 		currentRun = failed
 		if len(failed) > 0 {
 			tracelog.WarningLogger.Printf("%d files failed to download: %s. Going to sleep and retry downloading them.\n",
 				len(failed), readerMakersToFilePaths(failed))
+			tracelog.WarningLogger.Printf("retries left: %d", retries)
 			sleeper.Sleep()
 		}
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestCopyObject(t *testing.T) {
 	t.Run("require at least one storage for first storage policy", func(t *testing.T) {
 		folder := newTestFolder(t)
