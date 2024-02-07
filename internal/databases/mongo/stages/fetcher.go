@@ -193,7 +193,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 				}
 
 				if !firstFound {
-					if op.TS != from { // from ts is not reached, continue
+					if models.LessTS(op.TS, from) {
 						continue
 					}
 					firstFound = true
@@ -214,10 +214,6 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 				}
 			}
 			buf.Reset()
-			if !firstFound { // TODO: do we need this check, add skip flag
-				errc <- fmt.Errorf("'from' timestamp '%s' was not found in first archive: %s", from, arch.Filename())
-				return
-			}
 		}
 		errc <- fmt.Errorf("restore sequence was fetched, but restore point '%s' is not reached",
 			until)
