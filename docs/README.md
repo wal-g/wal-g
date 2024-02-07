@@ -362,12 +362,12 @@ A good way to start troubleshooting problems is by setting one or both of these 
 
 * `WALG_LOG_LEVEL=DEVEL`
 
-Prints out the used configuration of WAL-G and detailed logs of the used command 
+Prints out the used configuration of WAL-G and detailed logs of the used command.
 
 * `S3_LOG_LEVEL=DEVEL`
 
 If your commands seem to be stuck it could be that the S3 is not reachable, certificate problems or other S3 related issues.
-With this environment variable set you can see the Requests and Responses from S3 
+With this environment variable set you can see the Requests and Responses from S3.
 
 
 Authors
