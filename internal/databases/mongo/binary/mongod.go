@@ -181,26 +181,26 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig,
 	} else {
 		val := adminDatabase.Collection("system.version").FindOne(ctx, bson.D{{Key: "_id", Value: "shardIdentity"}})
 		if val.Err() != nil {
-			return errors.Wrap(val.Err(), "unable to find shardIdentity document")
-		}
+			tracelog.WarningLogger.Printf("Unable to find system.version in admin database. Skipping this step, assuming oplog replay will fix this")
+		} else {
+			var systemShConfig bson.M
+			err := val.Decode(&systemShConfig)
+			if err != nil {
+				return errors.Wrap(err, "couldn't decode shard config")
+			}
 
-		var systemShConfig bson.M
-		err := val.Decode(&systemShConfig)
-		if err != nil {
-			return errors.Wrap(err, "couldn't decode shard config")
-		}
+			systemShConfig["shardName"] = shConfig.ShardName
+			systemShConfig["configsvrConnectionString"] = shConfig.MongoCfgConnectionString
 
-		systemShConfig["shardName"] = shConfig.ShardName
-		systemShConfig["configsvrConnectionString"] = shConfig.MongoCfgConnectionString
-
-		_, err = adminDatabase.Collection("system.version").
-			UpdateOne(ctx,
-				bson.D{{Key: "_id", Value: "shardIdentity"}},
-				bson.D{{Key: "$set", Value: systemShConfig}})
-		if err != nil {
-			return errors.Wrap(err, "unable to update shardIdentity in system.version")
+			_, err = adminDatabase.Collection("system.version").
+				UpdateOne(ctx,
+					bson.D{{Key: "_id", Value: "shardIdentity"}},
+					bson.D{{Key: "$set", Value: systemShConfig}})
+			if err != nil {
+				return errors.Wrap(err, "unable to update shardIdentity in system.version")
+			}
+			tracelog.InfoLogger.Printf("Successfully fixed admin.system.version document with proper shardIdentity")
 		}
-		tracelog.InfoLogger.Printf("Successfully replaced connection string to MongoDB config server")
 	}
 
 	if !mongocfgConfig.Empty() {
