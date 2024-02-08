@@ -25,7 +25,7 @@ const (
 	ShNameFlag                   = "mongo-sh-name"
 	ShNameDescription            = "Name of shard"
 	ShCfgConnStr                 = "mongo-cfg-conn-str"
-	ShCfgConnStrDescription      = "Connection string to mongocfg replicas in shanded cluster"
+	ShCfgConnStrDescription      = "Connection string to mongocfg replicas in sharded cluster"
 	ShShardConnStr               = "mongo-shard-conn-str"
 	ShShardConnStrDescription    = "Connection string to some shard (can be specified multiple times)"
 )
