@@ -167,7 +167,7 @@ services:
       &&  /usr/bin/minio server /export'
 
   s3-for-throttling:
-    image: quay.io/minio/minio
+    image: quay.io/minio/minio:RELEASE.2024-01-18T22-51-28Z
     container_name: wal-g_s3_3
     hostname: s3
     ports:

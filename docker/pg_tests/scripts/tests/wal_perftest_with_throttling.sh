@@ -3,7 +3,7 @@ set -e -x
 
 rm -rf /var/lib/postgresql/10/main
 
-CONFIG_FILE="/tmp/configs/wal_perftest_config.json"
+CONFIG_FILE="/tmp/configs/wal_perftest_throttling_config.json"
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
