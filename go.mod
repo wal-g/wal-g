@@ -62,15 +62,15 @@ require (
 	github.com/ncw/swift/v2 v2.0.2
 	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.13.0
-	github.com/prometheus/client_model v0.2.0
+	github.com/prometheus/client_model v0.3.0
 	golang.org/x/mod v0.9.0
 	golang.org/x/sys v0.13.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/apimachinery v0.25.3
+	k8s.io/apimachinery v0.25.4
 	k8s.io/client-go v0.25.3
-	kmodules.xyz/client-go v0.25.41
-	kubedb.dev/apimachinery v0.37.1-0.20231121085114-0a987940309d
-	kubestash.dev/apimachinery v0.2.0-rc.0.0.20231114115833-0b99d5ce666e
+	kmodules.xyz/client-go v0.25.44
+	kubedb.dev/apimachinery v0.40.0
+	kubestash.dev/apimachinery v0.3.0
 	sigs.k8s.io/controller-runtime v0.13.1
 )
 
@@ -174,7 +174,7 @@ require (
 	github.com/siddontang/go-log v0.0.0-20180807004314-8d05993dda07 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
-	github.com/spf13/cast v1.4.1 // indirect
+	github.com/spf13/cast v1.5.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tinylib/msgp v1.1.0 // indirect
@@ -186,14 +186,13 @@ require (
 	github.com/yudai/gojsondiff v1.0.0 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	gomodules.xyz/encoding v0.0.7 // indirect
-	gomodules.xyz/envsubst v0.2.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gomodules.xyz/mergo v0.3.13 // indirect
 	gomodules.xyz/pointer v0.1.0 // indirect
@@ -215,12 +214,14 @@ require (
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	k8s.io/metrics v0.25.1 // indirect
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2 // indirect
+	kmodules.xyz/apiversion v0.2.0 // indirect
 	kmodules.xyz/custom-resources v0.25.2 // indirect
-	kmodules.xyz/monitoring-agent-api v0.25.5 // indirect
+	kmodules.xyz/monitoring-agent-api v0.25.6 // indirect
 	kmodules.xyz/objectstore-api v0.25.1 // indirect
-	kmodules.xyz/offshoot-api v0.25.5-0.20231004063620-dff8fb030d57 // indirect
+	kmodules.xyz/offshoot-api v0.25.5 // indirect
 	kmodules.xyz/prober v0.25.0 // indirect
-	kubeops.dev/sidekick v0.0.2-0.20230304025549-a99a1477617d // indirect
+	kmodules.xyz/resource-metadata v0.17.44 // indirect
+	kubeops.dev/sidekick v0.0.4 // indirect
 	sigs.k8s.io/gateway-api v0.4.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
