@@ -14,18 +14,6 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type AdvisoryLockTakenError struct {
-	error
-}
-
-func NewAdvisoryLockTakenError() AdvisoryLockTakenError {
-	return AdvisoryLockTakenError{errors.New("Lock is already taken by other process")}
-}
-
-func (err AdvisoryLockTakenError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 type NoPostgresVersionError struct {
 	error
 }
@@ -545,7 +533,7 @@ func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
 	}
 
 	if !lockFree {
-		return NewAdvisoryLockTakenError()
+		return errors.New("Lock is already taken by other process")
 	}
 	return nil
 }

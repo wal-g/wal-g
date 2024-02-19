@@ -174,7 +174,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
 }
 
-func (bh *BackupHandler) startBackup() (err error) {
+func (bh *BackupHandler) startBackup() error {
 	// Connect to postgres and start/finish a nonexclusive backup.
 	tracelog.DebugLogger.Println("Connecting to Postgres.")
 	conn, err := Connect()

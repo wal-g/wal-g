@@ -208,9 +208,6 @@ func (bh *BackupHandler) HandleBackupPush() {
 	waitBackupsErr := bh.waitSegmentBackups()
 	if waitBackupsErr != nil {
 		tracelog.ErrorLogger.Printf("Segment backups wait error: %v", waitBackupsErr)
-	}
-
-	if waitBackupsErr != nil {
 		bh.abortBackup()
 	}
 
