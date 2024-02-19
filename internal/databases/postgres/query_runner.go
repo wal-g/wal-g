@@ -14,6 +14,18 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+type AdvisoryLockTakenError struct {
+	error
+}
+
+func NewAdvisoryLockTakenError() AdvisoryLockTakenError {
+	return AdvisoryLockTakenError{errors.New("Lock is already taken by other process")}
+}
+
+func (err AdvisoryLockTakenError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 type NoPostgresVersionError struct {
 	error
 }
@@ -519,6 +531,37 @@ func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
 	default:
 		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
 	}
+}
+
+func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	conn := queryRunner.Connection
+	var lockFree bool
+	err = conn.QueryRow("SELECT pg_try_advisory_lock('2131122')").Scan(&lockFree)
+	if err != nil {
+		return err
+	}
+
+	if !lockFree {
+		return NewAdvisoryLockTakenError()
+	}
+	return nil
+}
+
+func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	conn := queryRunner.Connection
+	var pid int
+	err := conn.QueryRow("SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid = 2131122").Scan(&pid)
+	if err != nil {
+		return 0, err
+	}
+
+	return pid, nil
 }
 
 func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {

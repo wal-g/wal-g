@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -49,18 +51,19 @@ func (err backupFromOtherBD) Error() string {
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
-	Uploader              internal.Uploader
-	isPermanent           bool
-	verifyPageChecksums   bool
-	storeAllCorruptBlocks bool
-	userData              interface{}
-	forceIncremental      bool
-	backupsFolder         string
-	pgDataDirectory       string
-	isFullBackup          bool
-	deltaConfigurator     DeltaBackupConfigurator
-	withoutFilesMetadata  bool
-	composerInitFunc      func(handler *BackupHandler) error
+	Uploader                 internal.Uploader
+	isPermanent              bool
+	verifyPageChecksums      bool
+	storeAllCorruptBlocks    bool
+	userData                 interface{}
+	forceIncremental         bool
+	backupsFolder            string
+	pgDataDirectory          string
+	isFullBackup             bool
+	deltaConfigurator        DeltaBackupConfigurator
+	withoutFilesMetadata     bool
+	composerInitFunc         func(handler *BackupHandler) error
+	preventConcurrentBackups bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -98,7 +101,7 @@ type BackupWorkers struct {
 
 // BackupPgInfo holds the PostgreSQL info that the handler queries before running the backup
 type BackupPgInfo struct {
-	pgVersion        int
+	PgVersion        int
 	PgDataDirectory  string
 	systemIdentifier *uint64
 }
@@ -130,7 +133,13 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 		composerInitFunc: func(handler *BackupHandler) error {
 			return configureTarBallComposer(handler, tarBallComposerType)
 		},
+		preventConcurrentBackups: false,
 	}
+}
+
+func (ba *BackupArguments) EnablePreventConcurrentBackups() {
+	ba.preventConcurrentBackups = true
+	tracelog.InfoLogger.Println("Concurrent backups are disabled")
 }
 
 func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
@@ -175,6 +184,36 @@ func (bh *BackupHandler) startBackup() (err error) {
 	bh.Workers.QueryRunner, err = NewPgQueryRunner(conn)
 	if err != nil {
 		return fmt.Errorf("failed to build query runner: %v", err)
+	}
+
+	// If preventConcurrentBackups is set to true, we need to ensure that no backups are in progress
+	if bh.Arguments.preventConcurrentBackups {
+		err = bh.Workers.QueryRunner.TryGetLock()
+		if err != nil {
+			tracelog.WarningLogger.Println("Failed to get advisory lock")
+			if strings.Contains(err.Error(), "Lock is already taken") {
+				tracelog.WarningLogger.Println("Another process holds backup lock")
+				pid, err1 := bh.Workers.QueryRunner.GetLockingPID()
+				if err1 != nil {
+					return fmt.Errorf("failed to acquire blocking process id: %v", err)
+				}
+				tracelog.InfoLogger.Printf("Process with id %d holds backup lock\n", pid)
+				command := exec.Command("kill", fmt.Sprintf("%d", pid))
+				_, err1 = command.Output()
+				if err1 != nil {
+					return fmt.Errorf("failed to kill blocking process: %v", err1)
+				}
+				tracelog.InfoLogger.Printf("Sucessfully killed process with id %d\n", pid)
+
+				err1 = bh.Workers.QueryRunner.TryGetLock()
+				if err1 != nil {
+					return fmt.Errorf("failed to acquire lock: %v", err1)
+				}
+			} else {
+				return fmt.Errorf("failed to acquire lock: %v", err)
+			}
+			tracelog.InfoLogger.Println("Sucessfully acquired backup lock")
+		}
 	}
 
 	tracelog.DebugLogger.Println("Running StartBackup.")
@@ -336,7 +375,7 @@ func (bh *BackupHandler) handleBackupPushRemote(ctx context.Context) {
 	tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
 	tracelog.InfoLogger.Println("Features like delta backup and partial restore are disabled, there might be a performance impact.")
 	tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
-	if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
+	if bh.PgInfo.PgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
 		bh.Arguments.verifyPageChecksums = true
 	}
@@ -524,7 +563,7 @@ func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
 	if err != nil {
 		return pgInfo, err
 	}
-	pgInfo.pgVersion = queryRunner.Version
+	pgInfo.PgVersion = queryRunner.Version
 	tracelog.DebugLogger.Printf("Postgres version: %d", queryRunner.Version)
 
 	err = queryRunner.getSystemIdentifier()
@@ -581,7 +620,7 @@ func (bh *BackupHandler) initBackupTerminator() {
 	addSignalListener(errCh)
 	addPgIsAliveChecker(bh.Workers.QueryRunner, errCh)
 
-	terminator := NewBackupTerminator(bh.Workers.QueryRunner, bh.PgInfo.pgVersion, bh.PgInfo.PgDataDirectory)
+	terminator := NewBackupTerminator(bh.Workers.QueryRunner, bh.PgInfo.PgVersion, bh.PgInfo.PgDataDirectory)
 
 	go func() {
 		err := <-errCh

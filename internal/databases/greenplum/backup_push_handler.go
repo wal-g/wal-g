@@ -204,6 +204,8 @@ func (bh *BackupHandler) HandleBackupPush() {
 		bh.abortBackup()
 	}
 
+	//TODO prevent disconnecting wile long backup
+
 	// wait for segments to complete their backups
 	waitBackupsErr := bh.waitSegmentBackups()
 	if waitBackupsErr != nil {
