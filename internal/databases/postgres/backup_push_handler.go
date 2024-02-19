@@ -179,7 +179,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 	tracelog.DebugLogger.Println("Connecting to Postgres.")
 	conn, err := Connect()
 	if err != nil {
-		return
+		return err
 	}
 	bh.Workers.QueryRunner, err = NewPgQueryRunner(conn)
 	if err != nil {
@@ -203,7 +203,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 				if err1 != nil {
 					return fmt.Errorf("failed to kill blocking process: %v", err1)
 				}
-				tracelog.InfoLogger.Printf("Sucessfully killed process with id %d\n", pid)
+				tracelog.InfoLogger.Printf("Successfully killed process with id %d\n", pid)
 
 				err1 = bh.Workers.QueryRunner.TryGetLock()
 				if err1 != nil {
@@ -212,7 +212,7 @@ func (bh *BackupHandler) startBackup() (err error) {
 			} else {
 				return fmt.Errorf("failed to acquire lock: %v", err)
 			}
-			tracelog.InfoLogger.Println("Sucessfully acquired backup lock")
+			tracelog.InfoLogger.Println("Successfully acquired backup lock")
 		}
 	}
 
@@ -220,13 +220,13 @@ func (bh *BackupHandler) startBackup() (err error) {
 	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(
 		bh.Workers.QueryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	if err != nil {
-		return
+		return err
 	}
 	bh.CurBackupInfo.startLSN = backupStartLSN
 	bh.CurBackupInfo.Name = backupName
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
 	bh.initBackupTerminator()
-	return
+	return nil
 }
 
 func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
