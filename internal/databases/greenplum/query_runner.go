@@ -235,11 +235,13 @@ func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: segment backups stop error"))
 	}
+	tracelog.DebugLogger.Println("Stopped backups on segments")
 
 	_, err = conn.Exec(queryRunner.buildAbortBackupMaster())
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: master backup stop error"))
 	}
+	tracelog.DebugLogger.Println("Stopped backups on master")
 
 	var finalErr error
 	for i := range errs {
