@@ -1,4 +1,4 @@
-FROM wal-g/ubuntu:latest
+FROM wal-g/ubuntu:18.04
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests locales iputils-ping ssh python-dev iproute2 less sudo \

@@ -27,7 +27,7 @@ services:
     build:
       dockerfile: ./docker/ubuntu/Dockerfile
       context: .
-    image: wal-g/ubuntu
+    image: wal-g/ubuntu:18.04
     container_name: wal-g_ubuntu
 
   ubuntu_20_04:

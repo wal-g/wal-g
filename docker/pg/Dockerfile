@@ -1,4 +1,4 @@
-FROM wal-g/ubuntu:latest
+FROM wal-g/ubuntu:18.04
 
 ENV PGDATA /var/lib/postgresql/10/main
 
