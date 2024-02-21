@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -117,4 +118,63 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 		return nil, fmt.Errorf("can't list folder %q: %w", prefix, err)
 	}
 	return prependPaths(objects, prefix), nil
+}
+
+func Glob(folder Folder, pattern string) (paths []string, err error) {
+	paths = make([]string, 0)
+	type queueItem struct {
+		folder  Folder
+		pattern string
+	}
+	queue := make([]queueItem, 0)
+	queue = append(queue, queueItem{folder: folder, pattern: pattern})
+	rootPath := folder.GetPath()
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		patternParts := strings.Split(current.pattern, "/")
+		patternPart := patternParts[0]
+		isLast := len(patternParts) == 1 || (len(patternParts) == 2 && patternParts[1] == "")
+
+		folderPath := current.folder.GetPath()
+		objects, subfolders, err := current.folder.ListFolder()
+		if err != nil {
+			return nil, err
+		}
+		for _, subfolder := range subfolders {
+			subfolderPath := subfolder.GetPath()
+			subfolderName := strings.Trim(strings.TrimPrefix(subfolderPath, folderPath), "/")
+			matched, err := filepath.Match(patternPart, subfolderName)
+			if err != nil {
+				return nil, err
+			}
+			if matched {
+				if isLast {
+					paths = append(paths, strings.TrimPrefix(subfolderPath, rootPath))
+				} else {
+					queue = append(queue, queueItem{
+						folder:  subfolder,
+						pattern: strings.TrimPrefix(current.pattern, patternPart+"/"),
+					})
+				}
+			}
+		}
+
+		if !isLast {
+			continue
+		}
+		for _, object := range objects {
+			objectName := object.GetName()
+			matched, err := filepath.Match(patternPart, objectName)
+			if err != nil {
+				return nil, err
+			}
+			if matched {
+				paths = append(paths, strings.TrimPrefix(folderPath+objectName, rootPath))
+			}
+		}
+	}
+	return paths, nil
 }
