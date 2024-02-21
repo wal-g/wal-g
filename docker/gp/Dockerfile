@@ -13,7 +13,7 @@ RUN apt-get update && \
 ADD docker/gp/run_greenplum.sh /home/gpadmin/run_greenplum.sh
 
 WORKDIR /usr/local
-RUN git clone https://github.com/greenplum-db/gpdb.git gpdb_src && cd gpdb_src && git checkout 6X_STABLE && cd .. \
+RUN git clone https://github.com/greenplum-db/gpdb.git gpdb_src --single-branch --branch 6X_STABLE --depth 1 \
  && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
 
 WORKDIR /usr/local/gpdb_src
