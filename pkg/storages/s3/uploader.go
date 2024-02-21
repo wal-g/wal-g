@@ -96,9 +96,11 @@ func CreateUploaderAPI(svc s3iface.S3API, partsize, concurrency int) s3managerif
 	return uploaderAPI
 }
 
-// TODO : unit tests
 func partitionStrings(strings []string, blockSize int) [][]string {
 	// I've unsuccessfully tried this with interface{} but there was too much of casting
+	if blockSize <= 0 {
+		return [][]string{strings};
+	}
 	partition := make([][]string, 0)
 	for i := 0; i < len(strings); i += blockSize {
 		if i+blockSize > len(strings) {

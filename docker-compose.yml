@@ -62,6 +62,7 @@ services:
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/deleteretainafterbucket
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
@@ -166,7 +167,7 @@ services:
       &&  /usr/bin/minio server /export'
 
   s3-for-throttling:
-    image: quay.io/minio/minio
+    image: quay.io/minio/minio:RELEASE.2024-01-18T22-51-28Z
     container_name: wal-g_s3_3
     hostname: s3
     ports:
@@ -309,6 +310,11 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delete_retain_full_multist_test
     command: /tmp/tests/delete_retain_full_multist_test.sh
+
+  pg_delete_retain_after_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_retain_after_test
+    command: /tmp/tests/delete_retain_after_test.sh
 
   pg_full_backup_test:
     <<: *pg_test_common

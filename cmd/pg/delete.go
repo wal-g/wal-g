@@ -16,6 +16,7 @@ const DeleteGarbageExamples = `  garbage           Deletes outdated WAL archives
   garbage ARCHIVES  Deletes only outdated WAL archives from storage
   garbage BACKUPS   Deletes only leftover backups files from storage`
 const DeleteGarbageUse = "garbage [ARCHIVES|BACKUPS]"
+const afterFlag = "after"
 
 var confirmed = false
 var useSentinelTime = false
@@ -38,6 +39,7 @@ var deleteRetainCmd = &cobra.Command{
 	Use:       internal.DeleteRetainUsageExample, // TODO : improve description
 	Example:   internal.DeleteRetainExamples,
 	ValidArgs: internal.StringModifiers,
+	Args:      internal.DeleteRetainArgsValidator,
 	Run:       runDeleteRetain,
 }
 
@@ -82,7 +84,12 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteRetain(args, confirmed)
+	afterValue, _ := cmd.Flags().GetString(afterFlag)
+	if afterValue == "" {
+		deleteHandler.HandleDeleteRetain(args, confirmed)
+	} else {
+		deleteHandler.HandleDeleteRetainAfter(append(args, afterValue), confirmed)
+	}
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
@@ -155,6 +162,7 @@ func init() {
 
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
+	deleteRetainCmd.Flags().StringP(afterFlag, "a", "", "Set the time after which retain backups")
 
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")

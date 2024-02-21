@@ -151,7 +151,7 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *Ba
 	})
 }
 
-func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig) error {
+func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig) error {
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
@@ -171,11 +171,51 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig)
 
 	adminDatabase := mongodService.MongoClient.Database(adminDB)
 
-	_, err := adminDatabase.Collection("system.version").DeleteOne(ctx, bson.D{
-		{Key: "_id", Value: "shardIdentity"},
-	})
-	if err != nil {
-		return errors.Wrap(err, "unable to fix data in admin.system.version")
+	if shConfig.Empty() {
+		_, err := adminDatabase.Collection("system.version").DeleteOne(ctx, bson.D{
+			{Key: "_id", Value: "shardIdentity"},
+		})
+		if err != nil {
+			return errors.Wrap(err, "unable to fix data in admin.system.version")
+		}
+	} else {
+		val := adminDatabase.Collection("system.version").FindOne(ctx, bson.D{{Key: "_id", Value: "shardIdentity"}})
+		if val.Err() != nil {
+			tracelog.WarningLogger.Printf("Unable to find system.version in admin database. Skipping this step, assuming oplog replay will fix this")
+		} else {
+			var systemShConfig bson.M
+			err := val.Decode(&systemShConfig)
+			if err != nil {
+				return errors.Wrap(err, "couldn't decode shard config")
+			}
+
+			systemShConfig["shardName"] = shConfig.ShardName
+			systemShConfig["configsvrConnectionString"] = shConfig.MongoCfgConnectionString
+
+			_, err = adminDatabase.Collection("system.version").
+				UpdateOne(ctx,
+					bson.D{{Key: "_id", Value: "shardIdentity"}},
+					bson.D{{Key: "$set", Value: systemShConfig}})
+			if err != nil {
+				return errors.Wrap(err, "unable to update shardIdentity in system.version")
+			}
+			tracelog.InfoLogger.Printf("Successfully fixed admin.system.version document with proper shardIdentity")
+		}
+	}
+
+	if !mongocfgConfig.Empty() {
+		configDatabase := mongodService.MongoClient.Database("config")
+		_, err := configDatabase.Collection("shards").DeleteMany(ctx, bson.D{})
+		if err != nil {
+			return errors.Wrap(err, "failed to drop config.shards collection")
+		}
+		for shardName, connStr := range mongocfgConfig.Shards {
+			_, err := configDatabase.Collection("shards").InsertOne(ctx, bson.D{{Key: "_id", Value: shardName}, {Key: "host", Value: connStr}})
+			if err != nil {
+				return errors.Wrap(err, fmt.Sprintf("unable to insert shard info for name '%s'", shardName))
+			}
+		}
+		tracelog.InfoLogger.Printf("Successfully updated config.shards collection")
 	}
 
 	return nil
@@ -304,6 +344,15 @@ type RsConfig struct {
 	RsMemberIds []int
 }
 
+type ShConfig struct {
+	ShardName                string
+	MongoCfgConnectionString string
+}
+
+type MongoCfgConfig struct {
+	Shards map[string]string
+}
+
 func NewRsConfig(rsName string, rsMembers []string, rsMemberIds []int) RsConfig {
 	if len(rsMemberIds) == 0 {
 		rsMemberIds = make([]int, len(rsMembers))
@@ -318,8 +367,37 @@ func NewRsConfig(rsName string, rsMembers []string, rsMemberIds []int) RsConfig 
 	}
 }
 
+func NewShConfig(shardName string, connectionString string) ShConfig {
+	return ShConfig{
+		ShardName:                shardName,
+		MongoCfgConnectionString: connectionString,
+	}
+}
+
+func NewMongoCfgConfig(shardConnectionStrings []string) (MongoCfgConfig, error) {
+	res := MongoCfgConfig{
+		Shards: make(map[string]string),
+	}
+	for _, shardConnStr := range shardConnectionStrings {
+		shardName, _, found := strings.Cut(shardConnStr, "/")
+		if !found {
+			return res, fmt.Errorf("%s does not contain shard name separator '/'", shardConnStr)
+		}
+		res.Shards[shardName] = shardConnStr
+	}
+	return res, nil
+}
+
 func (rsConfig RsConfig) Empty() bool {
 	return rsConfig.RsName == "" && len(rsConfig.RsMembers) == 0
+}
+
+func (shConfig ShConfig) Empty() bool {
+	return shConfig.ShardName == ""
+}
+
+func (mongocfgConfig MongoCfgConfig) Empty() bool {
+	return len(mongocfgConfig.Shards) == 0
 }
 
 func (rsConfig RsConfig) Validate() error {
@@ -331,6 +409,13 @@ func (rsConfig RsConfig) Validate() error {
 	}
 	if len(rsConfig.RsMembers) < len(rsConfig.RsMemberIds) {
 		return errors.Errorf("excessive number of replica set IDs")
+	}
+	return nil
+}
+
+func (shConfig ShConfig) Validate() error {
+	if (shConfig.ShardName == "") != (shConfig.MongoCfgConnectionString == "") {
+		return fmt.Errorf("got shard name %s, but mongocfg connection string is %s", shConfig.ShardName, shConfig.MongoCfgConnectionString)
 	}
 	return nil
 }
