@@ -9,9 +9,6 @@ RUN apt-get update && \
     python3-setuptools \
     python3-pip \
     git \
-    pv \
-    htop \
-    nano \
     liblzo2-2 \
     lzop \
     libbrotli1 && \
