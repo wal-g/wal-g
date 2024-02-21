@@ -12,7 +12,16 @@ RUN apt-get update && \
     time \
     bc \
     jq \
-    s3cmd
+    s3cmd \
+    python3.7 \
+    python3-setuptools \
+    python3-pip \
+    git \
+    lzop \
+    pv && \
+    python3.7 -m pip install --upgrade pip && \
+    python3.7 -m pip install git+https://github.com/wal-e/wal-e.git && \
+    python3.7 -m pip install boto
 
 COPY docker/pg/PGP_KEY /tmp/PGP_KEY
 COPY docker/pg/SSH_KEY /tmp/SSH_KEY
