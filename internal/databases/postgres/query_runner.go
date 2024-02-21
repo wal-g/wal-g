@@ -527,7 +527,7 @@ func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
 
 	conn := queryRunner.Connection
 	var lockFree bool
-	err = conn.QueryRow("SELECT pg_try_advisory_lock('2131122')").Scan(&lockFree)
+	err = conn.QueryRow("SELECT pg_try_advisory_lock(hashtext('pg_backup'))").Scan(&lockFree)
 	if err != nil {
 		return err
 	}
@@ -544,7 +544,7 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 
 	conn := queryRunner.Connection
 	var pid int
-	err := conn.QueryRow("SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid = 2131122").Scan(&pid)
+	err := conn.QueryRow("SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid = hashtext('pg_backup')").Scan(&pid)
 	if err != nil {
 		return 0, err
 	}
