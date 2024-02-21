@@ -16,7 +16,6 @@ RUN apt-get update && \
     python3.7 \
     python3-setuptools \
     python3-pip \
-    git \
     lzop \
     pv && \
     python3.7 -m pip install --upgrade pip && \
