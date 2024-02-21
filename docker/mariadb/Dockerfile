@@ -5,7 +5,7 @@ ENV MYSQLDATA /var/lib/mysql
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests software-properties-common dirmngr gnupg2 curl apt-transport-https && \
-    curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | /bin/bash -s -- --mariadb-server-version="mariadb-10.11" --os-type=ubuntu --os-version=bionic  && \
+    curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | /bin/bash -s -- --mariadb-server-version="mariadb-10.11" --os-type=ubuntu --os-version=bionic --skip-maxscale && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes \
     mariadb-server \
     mariadb-client \
