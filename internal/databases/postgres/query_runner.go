@@ -521,6 +521,37 @@ func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
 	}
 }
 
+func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	conn := queryRunner.Connection
+	var lockFree bool
+	err = conn.QueryRow("SELECT pg_try_advisory_lock(hashtext('pg_backup'))").Scan(&lockFree)
+	if err != nil {
+		return err
+	}
+
+	if !lockFree {
+		return errors.New("Lock is already taken by other process")
+	}
+	return nil
+}
+
+func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	conn := queryRunner.Connection
+	var pid int
+	err := conn.QueryRow("SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid = hashtext('pg_backup')").Scan(&pid)
+	if err != nil {
+		return 0, err
+	}
+
+	return pid, nil
+}
+
 func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()

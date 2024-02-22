@@ -204,17 +204,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 		bh.abortBackup()
 	}
 
-	// WAL-G will reconnect later
-	bh.disconnect()
-
 	// wait for segments to complete their backups
 	waitBackupsErr := bh.waitSegmentBackups()
 	if waitBackupsErr != nil {
 		tracelog.ErrorLogger.Printf("Segment backups wait error: %v", waitBackupsErr)
-	}
-	tracelog.ErrorLogger.FatalfOnError("Failed to connect to the greenplum master: %v",
-		bh.connect())
-	if waitBackupsErr != nil {
 		bh.abortBackup()
 	}
 
@@ -395,11 +388,18 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 		return nil
 	}
 
-	tracelog.InfoLogger.Println("Checking for the existing running backup...")
 	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
 	if err != nil {
 		return err
 	}
+
+	tracelog.InfoLogger.Println("Trying to acquire lock")
+	err = queryRunner.TryGetLock()
+	if err != nil {
+		return err
+	}
+	tracelog.InfoLogger.Println("Lock successfully acquired")
+
 	backupStatuses, err := queryRunner.IsInBackup()
 	if err != nil {
 		return err
@@ -413,9 +413,13 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	}
 
 	if len(isInBackupSegments) > 0 {
-		return fmt.Errorf("backup is already in progress on one or more segments: %v", isInBackupSegments)
+		tracelog.InfoLogger.Printf("backup is already in progress on one or more segments: %v", isInBackupSegments)
+		err = queryRunner.AbortBackup()
+		if err != nil {
+			return fmt.Errorf("closing old backups failed: %v", err)
+		}
 	}
-	tracelog.InfoLogger.Printf("No running backups were found")
+
 	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
 	return nil
 }
@@ -430,6 +434,7 @@ func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err erro
 	return internal.UploadSentinel(sentinelUploader, sentinelDto, bh.currBackupInfo.backupName)
 }
 
+// nolint:unused
 func (bh *BackupHandler) connect() (err error) {
 	tracelog.InfoLogger.Println("Connecting to Greenplum master.")
 	bh.workers.Conn, err = postgres.Connect()

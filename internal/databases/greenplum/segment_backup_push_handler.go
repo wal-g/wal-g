@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -26,6 +27,11 @@ func NewSegBackupHandler(arguments postgres.BackupArguments) (*postgres.BackupHa
 	}
 
 	bh.SetComposerInitFunc(composerInitFunc)
+
+	if bh.PgInfo.PgVersion < 100000 {
+		tracelog.DebugLogger.Printf("Query runner version is %d, disabling concurrent backups", bh.PgInfo.PgVersion)
+		bh.Arguments.EnablePreventConcurrentBackups()
+	}
 
 	return bh, err
 }
