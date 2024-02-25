@@ -26,8 +26,10 @@ var (
 		Short:   WalgShortDescription, // TODO : improve short and long descriptions
 		Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "PostgreSQL"}, "\t"),
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalOnError(err)
+			if _, ok := cmd.Annotations["NoStorage"]; !ok {
+				err := internal.AssertRequiredSettingsSet()
+				tracelog.ErrorLogger.FatalOnError(err)
+			}
 
 			if viper.IsSet(internal.PgWalSize) {
 				postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))

@@ -41,7 +41,7 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 		tracelog.ErrorLogger.Fatal("System identifiers of target and source clusters are not equal\n")
 	}
 	if targetPgData.GetCurrentTimeline() == sourcePgData.GetCurrentTimeline() {
-		tracelog.ErrorLogger.Fatal("Latest checkpoint timelines of target and source clusters are equal\n")
+		tracelog.ErrorLogger.Fatal("Latest Checkpoint timelines of target and source clusters are equal\n")
 	}
 
 	targetWalDir, err := getWalDirName(targetPath)
