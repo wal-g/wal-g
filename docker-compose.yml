@@ -130,6 +130,7 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpafterfailedbucket
       &&  mkdir -p /export/gpfullserializedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
       &&  mkdir -p /export/gpdeleteretainbucket
