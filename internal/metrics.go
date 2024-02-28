@@ -53,13 +53,15 @@ func PushMetrics() {
 		return
 	}
 
-	err := pushMetrics(address)
+	extraTags := viper.GetStringMapString(StatsdExtraTagsSetting)
+
+	err := pushMetrics(address, extraTags)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Pushing metrics failed: %v", err)
 	}
 }
 
-func pushMetrics(address string) error {
+func pushMetrics(address string, extraTags map[string]string) error {
 	config := &statsd.ClientConfig{
 		Address:       address,
 		UseBuffered:   true,
@@ -80,7 +82,7 @@ func pushMetrics(address string) error {
 		return err
 	}
 	for _, mf := range mfs {
-		if err := writeMetricFamilyToStatsd(client, mf); err != nil {
+		if err := writeMetricFamilyToStatsd(client, mf, extraTags); err != nil {
 			return err
 		}
 	}
@@ -88,14 +90,17 @@ func pushMetrics(address string) error {
 	return nil
 }
 
-func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily) error {
+func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extraTags map[string]string) error {
 	name := in.GetName()
 	metricType := in.GetType()
 
 	for _, metric := range in.Metric {
-		var tags []statsd.Tag
+		tags := make([]statsd.Tag, 0, len(metric.Label)+len(extraTags))
 		for _, lp := range metric.Label {
 			tags = append(tags, statsd.Tag{lp.GetName(), lp.GetValue()})
+		}
+		for k, v := range extraTags {
+			tags = append(tags, statsd.Tag{k, v})
 		}
 
 		switch metricType {

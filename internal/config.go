@@ -99,6 +99,7 @@ const (
 	StreamSplitterBlockSize                = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
 	StreamSplitterMaxFileSize              = "WALG_STREAM_SPLITTER_MAX_FILE_SIZE"
 	StatsdAddressSetting                   = "WALG_STATSD_ADDRESS"
+	StatsdExtraTagsSetting                 = "WALG_STATSD_EXTRA_TAGS"
 	PgAliveCheckInterval                   = "WALG_ALIVE_CHECK_INTERVAL"
 	PgStopBackupTimeout                    = "WALG_STOP_BACKUP_TIMEOUT"
 	PgFailoverStorages                     = "WALG_FAILOVER_STORAGES"
@@ -342,6 +343,7 @@ var (
 		FetchTargetUserDataSetting:    true,
 		SerializerTypeSetting:         true,
 		StatsdAddressSetting:          true,
+		StatsdExtraTagsSetting:        true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,
