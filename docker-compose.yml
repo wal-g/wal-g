@@ -27,8 +27,15 @@ services:
     build:
       dockerfile: ./docker/ubuntu/Dockerfile
       context: .
-    image: wal-g/ubuntu
+    image: wal-g/ubuntu:18.04
     container_name: wal-g_ubuntu
+
+  ubuntu_20_04:
+    build:
+      dockerfile: ./docker/ubuntu/Dockerfile_20_04
+      context: .
+    image: wal-g/ubuntu:20.04
+    container_name: wal-g_ubuntu_20_04
 
   swift:
     image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"

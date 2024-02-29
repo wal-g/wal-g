@@ -1,4 +1,4 @@
-FROM wal-g/ubuntu:latest
+FROM wal-g/ubuntu:18.04
 
 ENV WALG_REDIS_DATA_FOLDER /var/lib/redis
 
