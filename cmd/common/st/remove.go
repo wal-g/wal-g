@@ -17,7 +17,10 @@ var removeCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
-			return storagetools.HandleRemove(args[0], folder)
+            pathPattern := args[0]
+            return handleGlobPattern(folder, pathPattern, func(path string) error {
+                return storagetools.HandleRemove(pathPattern, folder)
+            })
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
