@@ -1,16 +1,22 @@
-FROM wal-g/ubuntu:18.04
+FROM wal-g/ubuntu:20.04
 
 ENV MYSQLDATA /var/lib/mysql
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    curl \
+    curl wget \
     mysql-server \
     mysql-client \
-    percona-xtrabackup \
     s3cmd \
-    jq
+    jq \
+    lsb-release gnupg
 
+RUN wget https://repo.percona.com/apt/percona-release_latest.focal_all.deb && \
+    dpkg -i percona-release_latest.focal_all.deb && \
+    percona-release enable tools release && \
+    apt-get update && \
+    apt install --yes --no-install-recommends --no-install-suggests \
+    percona-xtrabackup-80
 
 RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
 RUN rm -rf $MYSQLDATA
