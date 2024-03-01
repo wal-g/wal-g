@@ -2,7 +2,7 @@ package mysql
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -10,7 +10,9 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 //nolint:funlen
@@ -20,6 +22,7 @@ func HandleBackupPush(
 	backupCmd *exec.Cmd,
 	isPermanent bool,
 	isFullBackup bool,
+	fifoStreams int,
 	userDataRaw string,
 	deltaBackupConfigurator DeltaBackupConfigurator,
 ) {
@@ -57,7 +60,7 @@ func HandleBackupPush(
 		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
 		tracelog.ErrorLogger.FatalfOnError("failed to get previous backup for delta backup: %v", err)
 
-		backupName, xtrabackupInfo, err = handleXtrabackupBackup(uploader, backupCmd, isFullBackup, &prevBackupInfo)
+		backupName, xtrabackupInfo, err = handleXtrabackupBackup(uploader, backupCmd, isFullBackup, fifoStreams, &prevBackupInfo)
 	} else {
 		backupName, err = handleRegularBackup(uploader, backupCmd)
 	}
@@ -134,6 +137,7 @@ func handleXtrabackupBackup(
 	uploader internal.Uploader,
 	backupCmd *exec.Cmd,
 	isFullBackup bool,
+	fifoStreams int,
 	prevBackupInfo *PrevBackupInfo,
 ) (backupName string, backupInfo XtrabackupInfo, err error) {
 	if prevBackupInfo == nil {
@@ -144,14 +148,36 @@ func handleXtrabackupBackup(
 	xtrabackupExtraDirectory, err := prepareTemporaryDirectory(tmpDirRoot)
 	tracelog.ErrorLogger.FatalfOnError("failed to prepare tmp directory for diff-backup: %v", err)
 
-	enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, prevBackupInfo)
+	enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, fifoStreams, prevBackupInfo)
 	tracelog.InfoLogger.Printf("Command to execute: %v", strings.Join(backupCmd.Args, " "))
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
-	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	if fifoStreams == 1 {
+		backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
+		tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	} else {
+		backupName = internal.NewBackupStreamName()
+		errGroup, groupContext := errgroup.WithContext(context.Background())
+		for idx := 0; idx < fifoStreams; idx++ {
+			idx := idx
+			threadUploader := uploader.Clone()
+			fifoFileName := getXtrabackupFifoFileName(idx)
+			file, err := openFifoFile(fifoFileName)
+			tracelog.ErrorLogger.FatalfOnError("failed to open named pipe: %v", err)
+
+			errGroup.Go(func() error {
+				return threadUploader.PushStreamToDestination(
+					groupContext,
+					limiters.NewDiskLimitReader(file),
+					fmt.Sprintf("%s/thread_%v", backupName, idx),
+				)
+			})
+		}
+		err = errGroup.Wait()
+		tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	}
 
 	err = backupCmd.Wait()
 	if err != nil {
