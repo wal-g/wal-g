@@ -5,7 +5,7 @@ set -e -x
 
 # https://github.com/wal-g/wal-g/issues/790
 ## ensure correct conf option will overwrite this trash
-#export AWS_ENDPOINT=we23i902309239
+export AWS_ENDPOINT=we23i902309239
 
 cat > /root/conf.yaml <<EOH
 WALE_S3_PREFIX: s3://mysqlconfonly
@@ -31,8 +31,9 @@ mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
 mysql mysql -e 'create table testt1(i int)'
 
-export NAME
-NAME=$(wal-g backup-push --config=/root/conf.yaml 2>&1 | grep -oe 'stream_[0-9]*T[0-9]*Z' | sort -u)
+wal-g backup-push --config=/root/conf.yaml
+
+NAME=$(wal-g backup-list --config=/root/conf.yaml | grep -oe 'stream_[0-9]*T[0-9]*Z' | sort -u)
 
 mysql_kill_and_clean_data
 
