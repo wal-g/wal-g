@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/wal-g/tracelog"
@@ -163,15 +164,22 @@ func handleXtrabackupBackup(
 		for idx := 0; idx < fifoStreams; idx++ {
 			idx := idx
 			threadUploader := uploader.Clone()
-			fifoFileName := getXtrabackupFifoFileName(idx)
+			fifoFileName := getXtrabackupFifoFileName("/tmp", idx) // FIXME: make configurable
 			file, err := openFifoFile(fifoFileName)
 			tracelog.ErrorLogger.FatalfOnError("failed to open named pipe: %v", err)
 
 			errGroup.Go(func() error {
+				// FIXME: SplitStreamUploader and RegularUploader's PushStreamToDestination() method has different understanding of dstPath... that is bug
+				dstPath := path.Join(utility.SanitizePath(backupName), fmt.Sprintf("thread_%v", idx))
+				if _, ok := threadUploader.(*internal.SplitStreamUploader); ok {
+					// for SplitStreamUploader leave `dstPath` is directory
+				} else {
+					dstPath = internal.GetStreamName(dstPath, uploader.Compression().FileExtension())
+				}
 				return threadUploader.PushStreamToDestination(
 					groupContext,
 					limiters.NewDiskLimitReader(file),
-					fmt.Sprintf("%s/thread_%v", backupName, idx),
+					dstPath,
 				)
 			})
 		}
