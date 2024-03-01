@@ -29,6 +29,7 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			const backupStreamsCnt = 1
 			internal.ConfigureLimiters()
 
 			uploader, err := internal.ConfigureSplitUploader()
@@ -48,6 +49,7 @@ var (
 				backupCmd,
 				permanent,
 				true,
+				backupStreamsCnt,
 				userData,
 				mysql.NewNoDeltaBackupConfigurator(),
 			)
