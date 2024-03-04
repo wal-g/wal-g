@@ -35,7 +35,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 		tracelog.ErrorLogger.Fatal("System identifiers do not match")
 	}
 	if control.CurrentTimeline != info.Timeline {
-		tracelog.ErrorLogger.Fatal("Destination is on timeline %v, but we are on %v", control.CurrentTimeline, info.Timeline)
+		tracelog.ErrorLogger.Fatalf("Destination is on timeline %v, but we are on %v", control.CurrentTimeline, info.Timeline)
 	}
 	var fileList internal.BackupFileList
 	err = decoder.Decode(&fileList)
@@ -46,7 +46,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	lsn, err := ParseLSN(lsnStr)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if lsn <= control.Checkpoint {
-		tracelog.ErrorLogger.Fatal("Catchup destination is already ahead (our LSN %v, destination LSN %v).", lsn, control.Checkpoint)
+		tracelog.ErrorLogger.Fatalf("Catchup destination is already ahead (our LSN %v, destination LSN %v).", lsn, control.Checkpoint)
 	}
 
 	encoder := gob.NewEncoder(dial)
@@ -72,7 +72,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 
 func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
 	extendExcludedFiles()
-	filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
 				tracelog.WarningLogger.Println(path, " deleted during filepath walk")
@@ -138,9 +138,11 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 				min = int(size)
 			}
 			var bytes = make([]byte, min)
-			io.ReadFull(reader, bytes)
+			_, err := io.ReadFull(reader, bytes)
+			tracelog.ErrorLogger.FatalOnError(err)
 			size -= int64(len(bytes))
-			encoder.Encode(bytes)
+			err = encoder.Encode(bytes)
+			tracelog.ErrorLogger.FatalOnError(err)
 		}
 
 		tracelog.InfoLogger.Printf("Sent %v, %v bytes", fullFileName, info.Size())
@@ -150,6 +152,7 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 
 		return nil
 	})
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("Filepath walk done")
 }
 
@@ -260,7 +263,7 @@ func sendControlAndFileList(pgDataDirectory string, err error, conn net.Conn) {
 
 func receiveFileList(directory string) internal.BackupFileList {
 	var result = make(internal.BackupFileList)
-	filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			tracelog.WarningLogger.Println("Apparent concurrent modification")
 			return err
@@ -281,5 +284,6 @@ func receiveFileList(directory string) internal.BackupFileList {
 
 		return nil
 	})
+	tracelog.ErrorLogger.FatalOnError(err)
 	return result
 }
