@@ -150,6 +150,10 @@ Similar to `WALG_ENVELOPE_PGP_KEY`, but value is the path to the key on file sys
 
 To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `9125`.
 
+* `WALG_STATSD_EXTRA_TAGS`
+
+Use this setting to add static tags (`host`, `operation`, `database`, etc) to the metrics WAL-G publishes to statsd.
+
 ### Profiling
 
 Profiling is useful for identifying bottlenecks within WAL-G.
