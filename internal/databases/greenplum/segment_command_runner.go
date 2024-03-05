@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/wal-g/tracelog"
 )
@@ -39,8 +39,8 @@ func (r *SegCmdRunner) Run() {
 	args := []string{r.cmdName, fmt.Sprintf("--content-id=%d", r.contentID)}
 	args = append(args, strings.Fields(r.cmdArgs)...)
 
-	if internal.CfgFile != "" {
-		args = append(args, "--config", internal.CfgFile)
+	if conf.CfgFile != "" {
+		args = append(args, "--config", conf.CfgFile)
 	}
 
 	segCmdStatesPath := FormatSegmentStateFolderPath(r.contentID)

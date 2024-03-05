@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
@@ -115,8 +116,8 @@ func makeCorruptedTar(name string) (BufferReaderMaker, []byte) {
 }
 
 func TestExtractAll_simpleTar(t *testing.T) {
-	os.Setenv(internal.DownloadConcurrencySetting, "1")
-	defer os.Unsetenv(internal.DownloadConcurrencySetting)
+	os.Setenv(conf.DownloadConcurrencySetting, "1")
+	defer os.Unsetenv(conf.DownloadConcurrencySetting)
 
 	brm, b := makeTar("booba")
 
@@ -132,9 +133,9 @@ func TestExtractAll_simpleTar(t *testing.T) {
 }
 
 func TestRetryExtractWithSleeper(t *testing.T) {
-	os.Setenv(internal.DownloadConcurrencySetting, "1")
-	os.Setenv(internal.DownloadFileRetriesSetting, "7")
-	defer os.Unsetenv(internal.DownloadConcurrencySetting)
+	os.Setenv(conf.DownloadConcurrencySetting, "1")
+	os.Setenv(conf.DownloadFileRetriesSetting, "7")
+	defer os.Unsetenv(conf.DownloadConcurrencySetting)
 
 	brm, _ := makeCorruptedTar("corrupted")
 
@@ -180,8 +181,8 @@ func TestRetryExtractWithSleeper(t *testing.T) {
 
 func TestExtractAll_multipleTars(t *testing.T) {
 	internal.GetMaxDownloadConcurrency()
-	os.Setenv(internal.DownloadConcurrencySetting, "1")
-	defer os.Unsetenv(internal.DownloadConcurrencySetting)
+	os.Setenv(conf.DownloadConcurrencySetting, "1")
+	defer os.Unsetenv(conf.DownloadConcurrencySetting)
 
 	fileAmount := 3
 	bufs := [][]byte{}
@@ -206,8 +207,8 @@ func TestExtractAll_multipleTars(t *testing.T) {
 }
 
 func TestExtractAll_multipleConcurrentTars(t *testing.T) {
-	os.Setenv(internal.DownloadConcurrencySetting, "4")
-	defer os.Unsetenv(internal.DownloadConcurrencySetting)
+	os.Setenv(conf.DownloadConcurrencySetting, "4")
+	defer os.Unsetenv(conf.DownloadConcurrencySetting)
 
 	fileAmount := 24
 	bufs := [][]byte{}

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -47,10 +48,10 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 		return err
 	}
 
-	totalBgUploadedLimit := viper.GetInt32(internal.TotalBgUploadedLimit)
+	totalBgUploadedLimit := viper.GetInt32(conf.TotalBgUploadedLimit)
 	// .history files must not be overwritten, see https://github.com/wal-g/wal-g/issues/420
-	preventWalOverwrite := viper.GetBool(internal.PreventWalOverwriteSetting) || strings.HasSuffix(walFilePath, ".history")
-	readyRename := viper.GetBool(internal.PgReadyRename)
+	preventWalOverwrite := viper.GetBool(conf.PreventWalOverwriteSetting) || strings.HasSuffix(walFilePath, ".history")
+	readyRename := viper.GetBool(conf.PgReadyRename)
 
 	bgUploader := NewBgUploader(ctx, walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
 	// Look for new WALs while doing main upload

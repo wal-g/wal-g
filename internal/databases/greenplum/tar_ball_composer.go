@@ -13,6 +13,7 @@ import (
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/wal-g/tracelog"
@@ -51,7 +52,7 @@ func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.Tar
 	}
 
 	filePacker := postgres.NewTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, filePackerOptions)
-	deduplicationAgeLimit, err := internal.GetDurationSetting(internal.GPAoDeduplicationAgeLimit)
+	deduplicationAgeLimit, err := internal.GetDurationSetting(conf.GPAoDeduplicationAgeLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func NewGpTarBallComposer(
 		relStorageMap:      relStorageMap,
 		files:              bundleFiles,
 		aoStorageUploader:  aoStorageUploader,
-		aoSegSizeThreshold: viper.GetInt64(internal.GPAoSegSizeThreshold),
+		aoSegSizeThreshold: viper.GetInt64(conf.GPAoSegSizeThreshold),
 		uploader:           uploader.Clone(),
 		tarFileSets:        tarFileSets,
 		errorGroup:         errorGroup,

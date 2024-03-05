@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/daemon"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -71,7 +72,7 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 		return err
 	}
 	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
-	pushTimeout, err := internal.GetDurationSetting(internal.PgDaemonWALUploadTimeout)
+	pushTimeout, err := internal.GetDurationSetting(conf.PgDaemonWALUploadTimeout)
 	if err != nil {
 		return err
 	}
@@ -278,7 +279,7 @@ func SendSdNotify(c <-chan time.Time) {
 }
 
 func SdNotify(state string) error {
-	socketName, ok := internal.GetSetting(internal.SystemdNotifySocket)
+	socketName, ok := conf.GetSetting(conf.SystemdNotifySocket)
 	if !ok {
 		return nil
 	}
@@ -298,7 +299,7 @@ func SdNotify(state string) error {
 }
 
 func getFullPath(relativePath string) (string, error) {
-	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
+	PgDataSettingString, ok := conf.GetSetting(conf.PgDataSetting)
 	if !ok {
 		return "", fmt.Errorf("PGDATA is not set in the conf")
 	}

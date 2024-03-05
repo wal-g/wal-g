@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -78,7 +79,7 @@ func NewIntegrityCheckRunner(
 		startWalSegment:           currentWalSegment,
 		stopWalSegmentNo:          stopWalSegmentNo,
 		uploadingSegmentRangeSize: uploadingSegmentRangeSize,
-		delayedSegmentRangeSize:   viper.GetInt(internal.MaxDelayedSegmentsCount),
+		delayedSegmentRangeSize:   viper.GetInt(conf.MaxDelayedSegmentsCount),
 		walFolderFilenames:        walFolderFilenames,
 		timelineSwitchMap:         timelineSwitchMap,
 		noBackupsFound:            noBackupsFound,

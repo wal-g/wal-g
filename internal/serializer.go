@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 	streamJSON "github.com/wal-g/json"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 type UnknownSerializerTypeError struct {
@@ -36,7 +37,7 @@ type DtoSerializer interface {
 }
 
 func NewDtoSerializer() (DtoSerializer, error) {
-	switch t := DtoSerializerType(viper.GetString(SerializerTypeSetting)); t {
+	switch t := DtoSerializerType(viper.GetString(conf.SerializerTypeSetting)); t {
 	case RegularJSONSerializer:
 		return RegularJSON{}, nil
 	case StreamedJSONSerializer:

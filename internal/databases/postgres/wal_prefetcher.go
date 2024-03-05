@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/wal-g/tracelog"
 )
@@ -30,10 +31,10 @@ func (p RegularPrefetcher) Prefetch(_ internal.StorageFolderReader, walFileName 
 		return
 	}
 	prefetchArgs := []string{"wal-prefetch", walFileName, location}
-	if internal.CfgFile != "" {
-		prefetchArgs = append(prefetchArgs, "--config", internal.CfgFile)
+	if conf.CfgFile != "" {
+		prefetchArgs = append(prefetchArgs, "--config", conf.CfgFile)
 	}
-	storagePrefix := viper.GetString(internal.StoragePrefixSetting)
+	storagePrefix := viper.GetString(conf.StoragePrefixSetting)
 	if storagePrefix != "" {
 		prefetchArgs = append(prefetchArgs, "--walg-storage-prefix", storagePrefix)
 	}

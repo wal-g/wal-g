@@ -13,6 +13,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -164,7 +165,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 
 	errorGroup, _ := errgroup.WithContext(context.Background())
 
-	deleteConcurrency, err := internal.GetMaxConcurrency(internal.GPDeleteConcurrency)
+	deleteConcurrency, err := internal.GetMaxConcurrency(conf.GPDeleteConcurrency)
 	if err != nil {
 		tracelog.WarningLogger.Printf("config error: %v", err)
 	}

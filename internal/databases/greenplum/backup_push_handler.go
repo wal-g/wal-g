@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -138,7 +139,7 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 		// actual arguments to be passed to the backup-push command
 		backupPushArgsLine,
 		// pass the config file location
-		fmt.Sprintf("--config=%s", internal.CfgFile),
+		fmt.Sprintf("--config=%s", conf.CfgFile),
 		// forward stdout and stderr to the log file
 		"&>>", formatSegmentLogPath(contentID),
 		// run in the background and get the launched process PID

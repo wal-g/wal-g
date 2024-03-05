@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/spf13/viper"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/azure"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/gcs"
@@ -38,9 +39,9 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]stri
 			continue
 		}
 
-		settingValue, ok := getWaleCompatibleSettingFrom(settingName, config)
+		settingValue, ok := conf.GetWaleCompatibleSettingFrom(settingName, config)
 		if !ok {
-			settingValue, ok = GetSetting(settingName)
+			settingValue, ok = conf.GetSetting(settingName)
 		}
 		if ok {
 			settings[settingName] = settingValue

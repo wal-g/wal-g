@@ -16,6 +16,7 @@ import (
 
 	"github.com/jackc/pgconn"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"github.com/pkg/errors"
@@ -154,7 +155,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	crypter := internal.ConfigureCrypter()
 	bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
 		bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
-		viper.GetInt64(internal.TarSizeThresholdSetting))
+		viper.GetInt64(conf.TarSizeThresholdSetting))
 
 	err = bh.startBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -500,10 +501,10 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 
 func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBackup {
 	var diskLimit int32
-	if viper.IsSet(internal.DiskRateLimitSetting) {
+	if viper.IsSet(conf.DiskRateLimitSetting) {
 		// Note that BASE_BACKUP (pg protocol) allows to limit in kb/sec
 		// Also note that the basebackup class  only enables this when set > 32kb/s
-		diskLimit = int32(viper.GetInt64(internal.DiskRateLimitSetting)) / 1024
+		diskLimit = int32(viper.GetInt64(conf.DiskRateLimitSetting)) / 1024
 		if diskLimit > 32 {
 			tracelog.InfoLogger.Printf("DiskIO limited to %d kb/s", diskLimit)
 		}
@@ -513,7 +514,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
+	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), conn)
 	var bundleFiles internal.BundleFiles
 	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}
@@ -641,10 +642,10 @@ func addSignalListener(errCh chan error) {
 }
 
 func addPgIsAliveChecker(queryRunner *PgQueryRunner, errCh chan error) {
-	if !viper.IsSet(internal.PgAliveCheckInterval) {
+	if !viper.IsSet(conf.PgAliveCheckInterval) {
 		return
 	}
-	stateUpdateInterval, err := internal.GetDurationSetting(internal.PgAliveCheckInterval)
+	stateUpdateInterval, err := internal.GetDurationSetting(conf.PgAliveCheckInterval)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Initializing the PG alive checker (interval=%s)...", stateUpdateInterval)
 	pgWatcher := NewPgWatcher(queryRunner, stateUpdateInterval)

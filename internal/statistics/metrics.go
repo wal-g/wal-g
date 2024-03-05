@@ -1,4 +1,4 @@
-package internal
+package statistics
 
 import (
 	"fmt"
@@ -10,25 +10,26 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 type metrics struct {
-	uploadedFilesTotal       prometheus.Counter
-	uploadedFilesFailedTotal prometheus.Counter
+	UploadedFilesTotal       prometheus.Counter
+	UploadedFilesFailedTotal prometheus.Counter
 }
 
 var (
 	WalgMetricsPrefix = "walg_"
 
 	WalgMetrics = metrics{
-		uploadedFilesTotal: prometheus.NewCounter(
+		UploadedFilesTotal: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_total",
 				Help: "Number of uploaded files.",
 			},
 		),
 
-		uploadedFilesFailedTotal: prometheus.NewCounter(
+		UploadedFilesFailedTotal: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
 				Help: "Number of file upload failures.",
@@ -43,22 +44,26 @@ func init() {
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	prometheus.Unregister(collectors.NewGoCollector())
 
-	prometheus.MustRegister(WalgMetrics.uploadedFilesTotal)
-	prometheus.MustRegister(WalgMetrics.uploadedFilesFailedTotal)
+	prometheus.MustRegister(WalgMetrics.UploadedFilesTotal)
+	prometheus.MustRegister(WalgMetrics.UploadedFilesFailedTotal)
 }
 
 func PushMetrics() {
-	address := viper.GetString(StatsdAddressSetting)
+	address := viper.GetString(conf.StatsdAddressSetting)
 	if address == "" {
 		return
 	}
 
-	extraTags := viper.GetStringMapString(StatsdExtraTagsSetting)
+	extraTags := viper.GetStringMapString(conf.StatsdExtraTagsSetting)
 
 	err := pushMetrics(address, extraTags)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Pushing metrics failed: %v", err)
 	}
+}
+
+func WriteStatusCodeMetric(code int) {
+	//TODO
 }
 
 func pushMetrics(address string, extraTags map[string]string) error {

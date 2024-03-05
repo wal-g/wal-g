@@ -12,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -34,8 +35,8 @@ func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string,
 	reader := baseReader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
 	prefetchLocation := location
-	if viper.IsSet(internal.PrefetchDir) {
-		prefetchLocation = viper.GetString(internal.PrefetchDir)
+	if viper.IsSet(conf.PrefetchDir) {
+		prefetchLocation = viper.GetString(conf.PrefetchDir)
 	}
 	defer prefetcher.Prefetch(baseReader, walFileName, prefetchLocation)
 

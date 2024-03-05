@@ -8,20 +8,20 @@ import (
 	"testing"
 	"time"
 
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
 
 func init() {
 	// this setting affects the ProbablyUploading segments range size
-	viper.Set(internal.UploadConcurrencySetting, "4")
+	viper.Set(conf.UploadConcurrencySetting, "4")
 
 	// this setting controls the ProbablyDelayed segments range size
-	viper.Set(internal.MaxDelayedSegmentsCount, "3")
+	viper.Set(conf.MaxDelayedSegmentsCount, "3")
 }
 
 type WalVerifyTestSetup struct {
