@@ -16,6 +16,10 @@ import (
 type metrics struct {
 	UploadedFilesTotal       prometheus.Counter
 	UploadedFilesFailedTotal prometheus.Counter
+
+	S3Code200 prometheus.Counter
+	S3Code400 prometheus.Counter
+	S3Code500 prometheus.Counter
 }
 
 var (
@@ -28,11 +32,28 @@ var (
 				Help: "Number of uploaded files.",
 			},
 		),
-
 		UploadedFilesFailedTotal: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
 				Help: "Number of file upload failures.",
+			},
+		),
+		S3Code200: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "s3_answer_code_200",
+				Help: "Number of 200 status code answers from s3.",
+			},
+		),
+		S3Code400: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "s3_answer_code_400",
+				Help: "Number of 200 status code answers from s3.",
+			},
+		),
+		S3Code500: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "s3_answer_code_500",
+				Help: "Number of 200 status code answers from s3.",
 			},
 		),
 	}
@@ -63,7 +84,13 @@ func PushMetrics() {
 }
 
 func WriteStatusCodeMetric(code int) {
-	//TODO
+	if code >= 500 {
+		WalgMetrics.S3Code500.Inc()
+	} else if code >= 400 {
+		WalgMetrics.S3Code400.Inc()
+	} else {
+		WalgMetrics.S3Code200.Inc()
+	}
 }
 
 func pushMetrics(address string, extraTags map[string]string) error {
