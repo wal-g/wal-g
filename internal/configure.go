@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto/yckms"
@@ -37,8 +36,6 @@ const (
 	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )
-
-const MinAllowedConcurrency = 1
 
 var DeprecatedExternalGpgMessage = fmt.Sprintf(
 	`You are using deprecated functionality that uses an external gpg library.
@@ -71,20 +68,6 @@ func newUnknownCompressionMethodError(method string) UnknownCompressionMethodErr
 }
 
 func (err UnknownCompressionMethodError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type InvalidConcurrencyValueError struct {
-	error
-}
-
-func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
-	return InvalidConcurrencyValueError{
-		errors.Errorf("%v value is expected to be positive but is: %v",
-			concurrencyType, value)}
-}
-
-func (err InvalidConcurrencyValueError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -368,7 +351,7 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	if err != nil {
 		return nil, err
 	}
-	expiration, err := GetDurationSetting(conf.PgpEnvelopeCacheExpiration)
+	expiration, err := conf.GetDurationSetting(conf.PgpEnvelopeCacheExpiration)
 	if err != nil {
 		return nil, err
 	}
@@ -381,20 +364,6 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 		return envopenpgp.CrypterFromKey(viper.GetString(conf.PgpEnvelopeKeySetting), enveloper), nil
 	}
 	return nil, errors.New("there is no any supported envelope gpg crypter configuration")
-}
-
-func GetMaxDownloadConcurrency() (int, error) {
-	return GetMaxConcurrency(conf.DownloadConcurrencySetting)
-}
-
-func GetMaxUploadConcurrency() (int, error) {
-	return GetMaxConcurrency(conf.UploadConcurrencySetting)
-}
-
-// This setting is intentionally undocumented in README. Effectively, this configures how many prepared tar Files there
-// may be in uploading state during backup-push.
-func getMaxUploadQueue() (int, error) {
-	return GetMaxConcurrency(conf.UploadQueueSetting)
 }
 
 // TODO : unit tests
@@ -410,27 +379,6 @@ func GetDeltaConfig() (maxDeltas int, fromFull bool) {
 		}
 	}
 	return
-}
-
-func GetMaxUploadDiskConcurrency() (int, error) {
-	if conf.Turbo {
-		return 4, nil
-	}
-	return GetMaxConcurrency(conf.UploadDiskConcurrencySetting)
-}
-
-func GetMaxConcurrency(concurrencyType string) (int, error) {
-	concurrency := viper.GetInt(concurrencyType)
-
-	if concurrency < MinAllowedConcurrency {
-		return MinAllowedConcurrency, newInvalidConcurrencyValueError(concurrencyType, concurrency)
-	}
-	return concurrency, nil
-}
-
-func GetFetchRetries() int {
-	concurrency := viper.GetInt(conf.DownloadFileRetriesSetting)
-	return concurrency
 }
 
 func GetSentinelUserData() (interface{}, error) {
@@ -487,30 +435,6 @@ func GetOplogArchiveAfterSize() (int, error) {
 				conf.OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
-}
-
-func GetDurationSetting(setting string) (time.Duration, error) {
-	intervalStr, ok := conf.GetSetting(setting)
-	if !ok {
-		return 0, conf.NewUnsetRequiredSettingError(setting)
-	}
-	interval, err := time.ParseDuration(intervalStr)
-	if err != nil {
-		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
-	}
-	return interval, nil
-}
-
-func GetOplogPITRDiscoveryIntervalSetting() (*time.Duration, error) {
-	durStr, ok := conf.GetSetting(conf.OplogPITRDiscoveryInterval)
-	if !ok {
-		return nil, nil
-	}
-	dur, err := time.ParseDuration(durStr)
-	if err != nil {
-		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", conf.OplogPITRDiscoveryInterval, durStr, err)
-	}
-	return &dur, nil
 }
 
 // nolint: gocyclo

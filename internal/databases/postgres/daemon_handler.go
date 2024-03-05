@@ -72,7 +72,7 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 		return err
 	}
 	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
-	pushTimeout, err := internal.GetDurationSetting(conf.PgDaemonWALUploadTimeout)
+	pushTimeout, err := conf.GetDurationSetting(conf.PgDaemonWALUploadTimeout)
 	if err != nil {
 		return err
 	}

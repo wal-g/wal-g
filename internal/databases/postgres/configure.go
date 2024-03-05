@@ -60,7 +60,7 @@ func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error
 			return nil, fmt.Errorf("configure failover storages status cache: %w", err)
 		}
 
-		config.AliveCheckTimeout, err = internal.GetDurationSetting(conf.PgFailoverStoragesCheckTimeout)
+		config.AliveCheckTimeout, err = conf.GetDurationSetting(conf.PgFailoverStoragesCheckTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("get failover storage check timeout setting: %w", err)
 		}
@@ -83,7 +83,7 @@ func configureStatusCache() (*cache.Config, error) {
 	config := &cache.Config{}
 
 	var err error
-	config.TTL, err = internal.GetDurationSetting(conf.PgFailoverStorageCacheLifetime)
+	config.TTL, err = conf.GetDurationSetting(conf.PgFailoverStorageCacheLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("get cache lifetime setting: %w", err)
 	}
@@ -166,7 +166,7 @@ func getStopBackupTimeoutSetting() (time.Duration, error) {
 		return 0, nil
 	}
 
-	timeout, err := internal.GetDurationSetting(conf.PgStopBackupTimeout)
+	timeout, err := conf.GetDurationSetting(conf.PgStopBackupTimeout)
 	if err != nil {
 		return 0, err
 	}

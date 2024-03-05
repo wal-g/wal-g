@@ -165,7 +165,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 
 	errorGroup, _ := errgroup.WithContext(context.Background())
 
-	deleteConcurrency, err := internal.GetMaxConcurrency(conf.GPDeleteConcurrency)
+	deleteConcurrency, err := conf.GetMaxConcurrency(conf.GPDeleteConcurrency)
 	if err != nil {
 		tracelog.WarningLogger.Printf("config error: %v", err)
 	}

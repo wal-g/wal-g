@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -552,6 +553,22 @@ var (
 	}
 )
 
+const MinAllowedConcurrency = 1
+
+type InvalidConcurrencyValueError struct {
+	error
+}
+
+func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
+	return InvalidConcurrencyValueError{
+		errors.Errorf("%v value is expected to be positive but is: %v",
+			concurrencyType, value)}
+}
+
+func (err InvalidConcurrencyValueError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 type UnsetRequiredSettingError struct {
 	error
 }
@@ -843,4 +860,63 @@ func GetFloatSetting(setting string) (val float64, ok bool, err error) {
 	}
 	val, err = strconv.ParseFloat(valstr, 64)
 	return val, true, err
+}
+
+func GetMaxUploadDiskConcurrency() (int, error) {
+	if Turbo {
+		return 4, nil
+	}
+	return GetMaxConcurrency(UploadDiskConcurrencySetting)
+}
+
+func GetMaxConcurrency(concurrencyType string) (int, error) {
+	concurrency := viper.GetInt(concurrencyType)
+
+	if concurrency < MinAllowedConcurrency {
+		return MinAllowedConcurrency, newInvalidConcurrencyValueError(concurrencyType, concurrency)
+	}
+	return concurrency, nil
+}
+
+func GetMaxDownloadConcurrency() (int, error) {
+	return GetMaxConcurrency(DownloadConcurrencySetting)
+}
+
+func GetMaxUploadConcurrency() (int, error) {
+	return GetMaxConcurrency(UploadConcurrencySetting)
+}
+
+// This setting is intentionally undocumented in README. Effectively, this configures how many prepared tar Files there
+// may be in uploading state during backup-push.
+func GetMaxUploadQueue() (int, error) {
+	return GetMaxConcurrency(UploadQueueSetting)
+}
+
+func GetFetchRetries() int {
+	concurrency := viper.GetInt(DownloadFileRetriesSetting)
+	return concurrency
+}
+
+func GetDurationSetting(setting string) (time.Duration, error) {
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return 0, NewUnsetRequiredSettingError(setting)
+	}
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
+}
+
+func GetOplogPITRDiscoveryIntervalSetting() (*time.Duration, error) {
+	durStr, ok := GetSetting(OplogPITRDiscoveryInterval)
+	if !ok {
+		return nil, nil
+	}
+	dur, err := time.ParseDuration(durStr)
+	if err != nil {
+		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogPITRDiscoveryInterval, durStr, err)
+	}
+	return &dur, nil
 }

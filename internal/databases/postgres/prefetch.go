@@ -26,7 +26,7 @@ func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName st
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	concurrency, err := internal.GetMaxDownloadConcurrency()
+	concurrency, err := conf.GetMaxDownloadConcurrency()
 	if err != nil {
 		return fmt.Errorf("get max concurrency: %v", err)
 	}

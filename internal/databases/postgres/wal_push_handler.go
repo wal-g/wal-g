@@ -43,7 +43,7 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 		return uploadLocalWalMetadata(ctx, walFilePath, uploader)
 	}
 
-	concurrency, err := internal.GetMaxUploadConcurrency()
+	concurrency, err := conf.GetMaxUploadConcurrency()
 	if err != nil {
 		return err
 	}

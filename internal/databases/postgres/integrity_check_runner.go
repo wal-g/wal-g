@@ -70,7 +70,7 @@ func NewIntegrityCheckRunner(
 
 	// uploadingSegmentRangeSize is needed to determine max amount of missing WAL segments
 	// after the last found WAL segment which can be marked as "uploading"
-	uploadingSegmentRangeSize, err := internal.GetMaxUploadConcurrency()
+	uploadingSegmentRangeSize, err := conf.GetMaxUploadConcurrency()
 	if err != nil {
 		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to resolve MaxUploadConcurrency")
 	}

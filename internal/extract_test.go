@@ -180,7 +180,7 @@ func TestRetryExtractWithSleeper(t *testing.T) {
 }
 
 func TestExtractAll_multipleTars(t *testing.T) {
-	internal.GetMaxDownloadConcurrency()
+	conf.GetMaxDownloadConcurrency()
 	os.Setenv(conf.DownloadConcurrencySetting, "1")
 	defer os.Unsetenv(conf.DownloadConcurrencySetting)
 

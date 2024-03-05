@@ -645,7 +645,7 @@ func addPgIsAliveChecker(queryRunner *PgQueryRunner, errCh chan error) {
 	if !viper.IsSet(conf.PgAliveCheckInterval) {
 		return
 	}
-	stateUpdateInterval, err := internal.GetDurationSetting(conf.PgAliveCheckInterval)
+	stateUpdateInterval, err := conf.GetDurationSetting(conf.PgAliveCheckInterval)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Initializing the PG alive checker (interval=%s)...", stateUpdateInterval)
 	pgWatcher := NewPgWatcher(queryRunner, stateUpdateInterval)

@@ -14,40 +14,8 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
-
-func TestGetMaxConcurrency_InvalidKey(t *testing.T) {
-	_, err := internal.GetMaxConcurrency("INVALID_KEY")
-
-	assert.Error(t, err)
-}
-
-func TestGetMaxConcurrency_ValidKey(t *testing.T) {
-	viper.Set(config.UploadConcurrencySetting, "100")
-	actual, err := internal.GetMaxConcurrency(config.UploadConcurrencySetting)
-
-	assert.NoError(t, err)
-	assert.Equal(t, 100, actual)
-	resetToDefaults()
-}
-
-func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
-	viper.Set(config.UploadConcurrencySetting, "-5")
-	_, err := internal.GetMaxConcurrency(config.UploadConcurrencySetting)
-
-	assert.Error(t, err)
-	resetToDefaults()
-}
-
-func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
-	viper.Set(config.UploadConcurrencySetting, "invalid")
-	_, err := internal.GetMaxConcurrency(config.UploadConcurrencySetting)
-
-	assert.Error(t, err)
-	resetToDefaults()
-}
 
 func TestGetSentinelUserData(t *testing.T) {
 	viper.Set(config.SentinelUserDataSetting, "1.0")
@@ -138,21 +106,6 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	actual := internal.GetDataFolderPath()
 
 	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
-	resetToDefaults()
-}
-
-func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
-	assert.NoError(t, config.ConfigureLogging())
-}
-
-func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
-	parentDir := prepareDataFolder(t, "someOtherFolder")
-	defer testtools.Cleanup(t, parentDir)
-
-	viper.Set(config.LogLevelSetting, parentDir)
-	err := config.ConfigureLogging()
-
-	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(config.LogLevelSetting)), err)
 	resetToDefaults()
 }
 

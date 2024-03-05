@@ -52,7 +52,7 @@ func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.Tar
 	}
 
 	filePacker := postgres.NewTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, filePackerOptions)
-	deduplicationAgeLimit, err := internal.GetDurationSetting(conf.GPAoDeduplicationAgeLimit)
+	deduplicationAgeLimit, err := conf.GetDurationSetting(conf.GPAoDeduplicationAgeLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func NewGpTarBallComposer(
 		ctx:                ctx,
 	}
 
-	maxUploadDiskConcurrency, err := internal.GetMaxUploadDiskConcurrency()
+	maxUploadDiskConcurrency, err := conf.GetMaxUploadDiskConcurrency()
 	if err != nil {
 		return nil, err
 	}

@@ -67,7 +67,7 @@ func (p DaemonPrefetcher) Prefetch(reader internal.StorageFolderReader, walFileN
 }
 
 func checkPrefetchPossible(walFileName string) bool {
-	concurrency, err := internal.GetMaxDownloadConcurrency()
+	concurrency, err := conf.GetMaxDownloadConcurrency()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("WAL-prefetch: get max concurrency: %v", err)
 		return false
