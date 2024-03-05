@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/statistics"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -54,20 +56,26 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 	_, err := folder.s3API.HeadObject(stopSentinelObjectInput)
 	if err != nil {
+		tracelog.DebugLogger.Printf("expected HTTP Status Code: %v", err)
+		if reqErr, ok := err.(awserr.RequestFailure); ok {
+			statistics.WriteStatusCodeMetric(reqErr.StatusCode())
+		}
 		if isAwsNotExist(err) {
 			return false, nil
 		}
 		return false, errors.Wrapf(err, "failed to check s3 object '%s' existence", objectPath)
+	} else {
+		statistics.WriteStatusCodeMetric(200)
 	}
 	return true, nil
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	return folder.uploader.upload(context.Background(), *folder.bucket, folder.path+name, content)
+	return folder.uploader.upload(context.Background(), *folder.bucket, folder.path+name, content) //TODO
 }
 
 func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	return folder.uploader.upload(ctx, *folder.bucket, folder.path+name, content)
+	return folder.uploader.upload(ctx, *folder.bucket, folder.path+name, content) //TODO
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
@@ -82,9 +90,14 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	input := &s3.CopyObjectInput{CopySource: &source, Bucket: folder.bucket, Key: &dst}
 	_, err := folder.s3API.CopyObject(input)
 	if err != nil {
-		return err
+		tracelog.DebugLogger.Printf("expected HTTP Status Code: %v", err)
+		if reqErr, ok := err.(awserr.RequestFailure); ok {
+			statistics.WriteStatusCodeMetric(reqErr.StatusCode())
+		}
+	} else {
+		statistics.WriteStatusCodeMetric(200)
 	}
-	return nil
+	return err
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
@@ -96,10 +109,15 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 
 	object, err := folder.s3API.GetObject(input)
 	if err != nil {
+		if reqErr, ok := err.(awserr.RequestFailure); ok {
+			statistics.WriteStatusCodeMetric(reqErr.StatusCode())
+		}
 		if isAwsNotExist(err) {
 			return nil, storage.NewObjectNotFoundError(objectPath)
 		}
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
+	} else {
+		statistics.WriteStatusCodeMetric(200)
 	}
 
 	reader := object.Body
@@ -162,10 +180,20 @@ func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
-	return folder.s3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
+
+	err := folder.s3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
 		listFunc(files.CommonPrefixes, files.Contents)
 		return true
 	})
+	if err != nil {
+		tracelog.DebugLogger.Printf("expected HTTP Status Code: %v", err)
+		if reqErr, ok := err.(awserr.RequestFailure); ok {
+			statistics.WriteStatusCodeMetric(reqErr.StatusCode())
+		}
+	} else {
+		statistics.WriteStatusCodeMetric(200)
+	}
+	return err
 }
 
 func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
@@ -175,10 +203,18 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
-	return folder.s3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := folder.s3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
 		listFunc(files.CommonPrefixes, files.Contents)
 		return true
 	})
+	if err != nil {
+		if reqErr, ok := err.(awserr.RequestFailure); ok {
+			statistics.WriteStatusCodeMetric(reqErr.StatusCode())
+		}
+	} else {
+		statistics.WriteStatusCodeMetric(200)
+	}
+	return err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
@@ -189,7 +225,12 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		}}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
+			if reqErr, ok := err.(awserr.RequestFailure); ok {
+				statistics.WriteStatusCodeMetric(reqErr.StatusCode())
+			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
+		} else {
+			statistics.WriteStatusCodeMetric(200)
 		}
 	}
 	return nil
