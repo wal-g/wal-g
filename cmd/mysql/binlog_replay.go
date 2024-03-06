@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -29,7 +30,7 @@ var binlogReplayCmd = &cobra.Command{
 		mysql.HandleBinlogReplay(storage.RootFolder(), replayBackupName, replayUntilTS, replayUntilBinlogLastModifiedTS)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.MysqlBinlogReplayCmd] = true
+		conf.RequiredSettings[conf.MysqlBinlogReplayCmd] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

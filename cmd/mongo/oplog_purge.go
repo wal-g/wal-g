@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 )
@@ -22,7 +23,7 @@ var oplogPurgeCmd = &cobra.Command{
 }
 
 func pitrDiscoveryAfterTime() *time.Time {
-	pitrDur, err := internal.GetOplogPITRDiscoveryIntervalSetting()
+	pitrDur, err := conf.GetOplogPITRDiscoveryIntervalSetting()
 	tracelog.ErrorLogger.FatalOnError(err)
 	if pitrDur == nil {
 		return nil

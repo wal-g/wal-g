@@ -64,9 +64,8 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 			return false, nil
 		}
 		return false, errors.Wrapf(err, "failed to check s3 object '%s' existence", objectPath)
-	} else {
-		statistics.WriteStatusCodeMetric(200)
 	}
+	statistics.WriteStatusCodeMetric(200)
 	return true, nil
 }
 
@@ -94,9 +93,8 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		if reqErr, ok := err.(awserr.RequestFailure); ok {
 			statistics.WriteStatusCodeMetric(reqErr.StatusCode())
 		}
-	} else {
-		statistics.WriteStatusCodeMetric(200)
 	}
+	statistics.WriteStatusCodeMetric(200)
 	return err
 }
 
@@ -116,9 +114,8 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 			return nil, storage.NewObjectNotFoundError(objectPath)
 		}
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
-	} else {
-		statistics.WriteStatusCodeMetric(200)
 	}
+	statistics.WriteStatusCodeMetric(200)
 
 	reader := object.Body
 	if folder.config.RangeBatchEnabled {
@@ -229,9 +226,8 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 				statistics.WriteStatusCodeMetric(reqErr.StatusCode())
 			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
-		} else {
-			statistics.WriteStatusCodeMetric(200)
 		}
+		statistics.WriteStatusCodeMetric(200)
 	}
 	return nil
 }

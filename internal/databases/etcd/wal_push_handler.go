@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/wal-g/wal-g/utility"
 )
@@ -30,7 +31,7 @@ func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd
 func getWalDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
 
 func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
-	walDir, ok := internal.GetSetting(internal.ETCDWalDirectory)
+	walDir, ok := conf.GetSetting(conf.ETCDWalDirectory)
 	if !ok {
 		walDir = getWalDir(dataDir)
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -46,7 +47,7 @@ func (rh *replayHandler) replayLogs() {
 }
 
 func (rh *replayHandler) replayLog(binlogPath string) error {
-	cmd, err := internal.GetCommandSetting(internal.MysqlBinlogReplayCmd)
+	cmd, err := internal.GetCommandSetting(conf.MysqlBinlogReplayCmd)
 	if err != nil {
 		return err
 	}
@@ -73,7 +74,7 @@ func (rh *replayHandler) handleBinlog(binlogPath string) error {
 }
 
 func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
-	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)

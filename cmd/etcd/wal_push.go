@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/etcd"
 
 	"github.com/wal-g/wal-g/utility"
@@ -23,7 +24,7 @@ var walPushCmd = &cobra.Command{
 	Short: walPushShortDescribtion,
 	Args:  cobra.NoArgs,
 	PreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.ETCDMemberDataDirectory] = true
+		conf.RequiredSettings[conf.ETCDMemberDataDirectory] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -35,7 +36,7 @@ var walPushCmd = &cobra.Command{
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		dataDir, err := internal.GetRequiredSetting(internal.ETCDMemberDataDirectory)
+		dataDir, err := conf.GetRequiredSetting(conf.ETCDMemberDataDirectory)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		err = etcd.HandleWALPush(ctx, uploader, dataDir)
