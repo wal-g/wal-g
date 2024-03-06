@@ -14,10 +14,10 @@ x-s3_common_depends: &s3_common_depends
 x-s3_throttling_depends: &s3_throttling_depends
   depends_on:
     - s3-for-throttling
-    - graphite
+    # - graphite
   links:
     - s3-for-throttling
-    - graphite
+    # - graphite
 
 services:
   golang:
@@ -47,15 +47,6 @@ services:
     hostname: swift
     ports:
       - "8010:8080"
-
-  statsd:
-    build:
-      dockerfile: docker/common/Dockerfile
-      context: .
-    container_name: wal-g_statsd
-    ports:
-      - "8125:8125"
-      - "2003:2003"
 
   # "WALG_STATSD_ADDRESS": "wal-g_graphite:8125"
   graphite:

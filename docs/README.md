@@ -148,11 +148,13 @@ Similar to `WALG_ENVELOPE_PGP_KEY`, but value is the path to the key on file sys
 
 * `WALG_STATSD_ADDRESS`
 
-To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `9125`.
+To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `8125`.
 
 * `WALG_STATSD_EXTRA_TAGS`
 
 Use this setting to add static tags (`host`, `operation`, `database`, etc) to the metrics WAL-G publishes to statsd.
+
+If you want to make demo for testing purposes, you can use graphite service from docker-compose file.
 
 ### Profiling
 
