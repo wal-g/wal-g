@@ -19,6 +19,8 @@ type metrics struct {
 
 	S3Code200 prometheus.Counter
 	S3Code400 prometheus.Counter
+	S3Code404 prometheus.Counter
+	S3Code429 prometheus.Counter
 	S3Code500 prometheus.Counter
 }
 
@@ -47,13 +49,25 @@ var (
 		S3Code400: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "s3_answer_code_400",
-				Help: "Number of 200 status code answers from s3.",
+				Help: "Number of 400 status code answers from s3.",
+			},
+		),
+		S3Code404: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "s3_answer_code_404",
+				Help: "Number of 404 status code answers from s3.",
+			},
+		),
+		S3Code429: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "s3_answer_code_429",
+				Help: "Number of 429 status code answers from s3.",
 			},
 		),
 		S3Code500: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "s3_answer_code_500",
-				Help: "Number of 200 status code answers from s3.",
+				Help: "Number of 500 status code answers from s3.",
 			},
 		),
 	}
@@ -67,6 +81,12 @@ func init() {
 
 	prometheus.MustRegister(WalgMetrics.UploadedFilesTotal)
 	prometheus.MustRegister(WalgMetrics.UploadedFilesFailedTotal)
+
+	prometheus.MustRegister(WalgMetrics.S3Code200)
+	prometheus.MustRegister(WalgMetrics.S3Code400)
+	prometheus.MustRegister(WalgMetrics.S3Code404)
+	prometheus.MustRegister(WalgMetrics.S3Code429)
+	prometheus.MustRegister(WalgMetrics.S3Code500)
 }
 
 func PushMetrics() {
@@ -87,7 +107,13 @@ func WriteStatusCodeMetric(code int) {
 	if code >= 500 {
 		WalgMetrics.S3Code500.Inc()
 	} else if code >= 400 {
-		WalgMetrics.S3Code400.Inc()
+		if code == 404 {
+			WalgMetrics.S3Code404.Inc()
+		} else if code == 429 {
+			WalgMetrics.S3Code429.Inc()
+		} else {
+			WalgMetrics.S3Code400.Inc()
+		}
 	} else {
 		WalgMetrics.S3Code200.Inc()
 	}

@@ -3,7 +3,7 @@ package gp
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 )
 
@@ -22,7 +22,7 @@ var (
 
 			greenplum.SetSegmentStoragePrefix(contentID)
 
-			stateUpdateInterval, err := internal.GetDurationSetting(internal.GPSegmentsUpdInterval)
+			stateUpdateInterval, err := conf.GetDurationSetting(conf.GPSegmentsUpdInterval)
 			tracelog.ErrorLogger.FatalOnError(err)
 			greenplum.NewSegCmdRunner(contentID, cmdName, cmdArgs, stateUpdateInterval).Run()
 		},

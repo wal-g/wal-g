@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const (
@@ -47,7 +48,7 @@ var backupFetchCmd = &cobra.Command{
 		}
 
 		if fetchTargetUserData == "" {
-			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
+			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 
 		storage, err := internal.ConfigureStorage()
@@ -65,7 +66,7 @@ var backupFetchCmd = &cobra.Command{
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData, restorePoint)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		logsDir := viper.GetString(internal.GPLogsDirectory)
+		logsDir := viper.GetString(conf.GPLogsDirectory)
 
 		if len(*fetchContentIds) > 0 {
 			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIds)

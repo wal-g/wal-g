@@ -8,6 +8,8 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common/st"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/statistics"
 )
 
 const usageTemplate = `Usage:{{if .Runnable}}
@@ -44,12 +46,12 @@ const hiddenConfigFlagAnnotation = "walg_annotation_hidden_config_flag"
 
 func Init(cmd *cobra.Command, dbName string) {
 	internal.ConfigureSettings(dbName)
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+	cobra.OnInitialize(conf.InitConfig, conf.Configure)
 
 	cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(cmd, hiddenConfigFlagAnnotation)
+	conf.AddConfigFlags(cmd, hiddenConfigFlagAnnotation)
 
-	cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	cmd.PersistentFlags().StringVar(&conf.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
 
 	initHelp(cmd)
 
@@ -82,7 +84,7 @@ func Init(cmd *cobra.Command, dbName string) {
 		}
 
 		// metrics hook
-		internal.PushMetrics()
+		statistics.PushMetrics()
 
 		if p != nil {
 			p.Stop()

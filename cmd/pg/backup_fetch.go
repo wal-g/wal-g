@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -41,7 +42,7 @@ var backupFetchCmd = &cobra.Command{
 		internal.ConfigureLimiters()
 
 		if fetchTargetUserData == "" {
-			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
+			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -62,8 +63,8 @@ var backupFetchCmd = &cobra.Command{
 			skipRedundantTars = true
 			reverseDeltaUnpack = true
 		}
-		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(internal.UseReverseUnpackSetting)
-		skipRedundantTars = skipRedundantTars || viper.GetBool(internal.SkipRedundantTarsSetting)
+		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(conf.UseReverseUnpackSetting)
+		skipRedundantTars = skipRedundantTars || viper.GetBool(conf.SkipRedundantTarsSetting)
 
 		var extractProv postgres.ExtractProvider
 

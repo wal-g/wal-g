@@ -8,4 +8,7 @@
 "PGDATABASE": "postgres",
 "AWS_S3_FORCE_PATH_STYLE": "true",
 "WALG_COMPRESSION_METHOD": "brotli",
-"PGHOST": "/var/run/postgresql"
+"PGHOST": "/var/run/postgresql",
+"WALG_LOG_LEVEL": "DEVEL",
+"WALG_STATSD_ADDRESS": "wal-g_graphite:8125",
+"WALG_DOWNLOAD_CONCURRENCY": "1"
