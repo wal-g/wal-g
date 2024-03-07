@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
@@ -17,11 +18,7 @@ type metrics struct {
 	UploadedFilesTotal       prometheus.Counter
 	UploadedFilesFailedTotal prometheus.Counter
 
-	S3Code200 prometheus.Counter
-	S3Code400 prometheus.Counter
-	S3Code404 prometheus.Counter
-	S3Code429 prometheus.Counter
-	S3Code500 prometheus.Counter
+	S3Codes prometheus.CounterVec
 }
 
 var (
@@ -40,35 +37,12 @@ var (
 				Help: "Number of file upload failures.",
 			},
 		),
-		S3Code200: prometheus.NewCounter(
+		S3Codes: *prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Name: WalgMetricsPrefix + "s3_answer_code_200",
-				Help: "Number of 200 status code answers from s3.",
+				Name: WalgMetricsPrefix + "s3_response_",
+				Help: "S3 response codes.",
 			},
-		),
-		S3Code400: prometheus.NewCounter(
-			prometheus.CounterOpts{
-				Name: WalgMetricsPrefix + "s3_answer_code_400",
-				Help: "Number of 400 status code answers from s3.",
-			},
-		),
-		S3Code404: prometheus.NewCounter(
-			prometheus.CounterOpts{
-				Name: WalgMetricsPrefix + "s3_answer_code_404",
-				Help: "Number of 404 status code answers from s3.",
-			},
-		),
-		S3Code429: prometheus.NewCounter(
-			prometheus.CounterOpts{
-				Name: WalgMetricsPrefix + "s3_answer_code_429",
-				Help: "Number of 429 status code answers from s3.",
-			},
-		),
-		S3Code500: prometheus.NewCounter(
-			prometheus.CounterOpts{
-				Name: WalgMetricsPrefix + "s3_answer_code_500",
-				Help: "Number of 500 status code answers from s3.",
-			},
+			[]string{"code"},
 		),
 	}
 )
@@ -81,12 +55,7 @@ func init() {
 
 	prometheus.MustRegister(WalgMetrics.UploadedFilesTotal)
 	prometheus.MustRegister(WalgMetrics.UploadedFilesFailedTotal)
-
-	prometheus.MustRegister(WalgMetrics.S3Code200)
-	prometheus.MustRegister(WalgMetrics.S3Code400)
-	prometheus.MustRegister(WalgMetrics.S3Code404)
-	prometheus.MustRegister(WalgMetrics.S3Code429)
-	prometheus.MustRegister(WalgMetrics.S3Code500)
+	prometheus.MustRegister(WalgMetrics.S3Codes)
 }
 
 func PushMetrics() {
@@ -104,19 +73,7 @@ func PushMetrics() {
 }
 
 func WriteStatusCodeMetric(code int) {
-	if code >= 500 {
-		WalgMetrics.S3Code500.Inc()
-	} else if code >= 400 {
-		if code == 404 {
-			WalgMetrics.S3Code404.Inc()
-		} else if code == 429 {
-			WalgMetrics.S3Code429.Inc()
-		} else {
-			WalgMetrics.S3Code400.Inc()
-		}
-	} else {
-		WalgMetrics.S3Code200.Inc()
-	}
+	WalgMetrics.S3Codes.WithLabelValues(strconv.Itoa(code)).Inc()
 }
 
 func pushMetrics(address string, extraTags map[string]string) error {
