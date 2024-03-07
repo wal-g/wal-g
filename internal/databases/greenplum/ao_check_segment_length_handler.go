@@ -64,7 +64,11 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 			fileName := fmt.Sprintf("/base/%d/%s", db.Oid, strings.Split(file.Name(), ".")[0])
 			fileInfo, err := file.Info()
 			if err != nil {
-				tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
+				if os.IsNotExist(err) {
+					tracelog.WarningLogger.Println(fileName, " deleted during filepath walk")
+				} else {
+					tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
+				}
 			}
 			if !fileInfo.IsDir() {
 				metaInfo, ok := AOTablesSize[fileName]
@@ -96,11 +100,16 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
 	}
 
-	backupFiles, err := checker.getAOBackupFiles(backupName)
+	s3Files, err := checker.getAOBackupFilesData()
+	if err != nil {
+		tracelog.ErrorLogger.FatalfOnError("unable to get files data from s3 %v", err)
+	}
+
+	backupFilesMetadata, err := checker.getAOMetadata(backupName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
 	}
-	tracelog.DebugLogger.Printf("AO/AOCS backupped files count: %d", len(backupFiles))
+	tracelog.DebugLogger.Printf("AO/AOCS backupped files count: %d", len(backupFilesMetadata))
 
 	errors := make([]string, 0)
 
@@ -114,15 +123,23 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 			fileName := fmt.Sprintf("/base/%d/%s", db.Oid, file.Name())
 			fileInfo, err := file.Info()
 			if err != nil {
-				tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
+				if os.IsNotExist(err) {
+					tracelog.WarningLogger.Println(fileName, " deleted during filepath walk")
+				} else {
+					tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
+				}
 			}
-			backupFile, ok := backupFiles[fileName]
+			backupFile, ok := backupFilesMetadata[fileName]
 			if !ok {
 				continue
 			}
 			tracelog.DebugLogger.Printf("found file : %s with size: %d", fileName, fileInfo.Size())
 			if backupFile.EOF > fileInfo.Size() {
 				errors = append(errors, fmt.Sprintf("table file %s is shorter than backup for %d", fileName, backupFile.EOF-fileInfo.Size()))
+			}
+
+			if backupFile.EOF > s3Files[backupFile.StoragePath] {
+				errors = append(errors, fmt.Sprintf("s3 file %s is shorter than backup for %d", backupFile.StoragePath, backupFile.EOF-s3Files[backupFile.StoragePath]))
 			}
 		}
 	}
@@ -242,7 +259,7 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 	return metaEOF, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles(backupName string) (BackupAOFiles, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (BackupAOFiles, error) {
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to configure folder")
@@ -267,7 +284,33 @@ func (checker *AOLengthCheckSegmentHandler) getAOBackupFiles(backupName string) 
 		return nil, err
 	}
 
-	tracelog.DebugLogger.Printf("successfully loaded file data from backup")
+	tracelog.DebugLogger.Printf("successfully loaded file metadata from backup")
 
 	return files.Files, nil
+}
+
+func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData() (map[string]int64, error) {
+	storage, err := internal.ConfigureStorage()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to configure folder")
+		return nil, err
+	}
+	rootFolder := storage.RootFolder()
+	aoFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/aosegments/", checker.segnum))
+
+	files, _, err := aoFolder.ListFolder()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to list s3 objects: %v", err)
+		return nil, err
+	}
+
+	fileData := make(map[string]int64, len(files))
+
+	for _, file := range files {
+		fileData[file.GetName()] = file.GetSize()
+	}
+
+	tracelog.DebugLogger.Printf("successfully loaded file data from backup")
+
+	return fileData, nil
 }
