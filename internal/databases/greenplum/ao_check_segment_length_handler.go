@@ -139,7 +139,8 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 			}
 
 			if backupFile.EOF > s3Files[backupFile.StoragePath] {
-				errors = append(errors, fmt.Sprintf("s3 file %s is shorter than backup for %d", backupFile.StoragePath, backupFile.EOF-s3Files[backupFile.StoragePath]))
+				errors = append(errors, fmt.Sprintf("s3 file %s is shorter than backup for %d",
+					backupFile.StoragePath, backupFile.EOF-s3Files[backupFile.StoragePath]))
 			}
 		}
 	}
