@@ -112,6 +112,9 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 		var size int64
 		if !increment {
 			fd, err = os.Open(path)
+			if os.IsNotExist(err) {
+				return nil
+			}
 			tracelog.ErrorLogger.FatalOnError(err)
 			size = info.Size()
 		} else {
@@ -119,6 +122,9 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 
 			if _, ok := err.(*InvalidBlockError); ok {
 				fd, err = os.Open(path)
+				if os.IsNotExist(err) {
+					return nil
+				}
 				tracelog.ErrorLogger.FatalOnError(err)
 				size = info.Size()
 				increment = false
@@ -127,7 +133,6 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 			}
 		}
 
-		//size := info.Size()
 		err = encoder.Encode(CatchupCommandDto{FileName: fullFileName, IsFull: !increment, FileSize: uint64(size), IsIncremental: increment})
 		tracelog.ErrorLogger.FatalOnError(err)
 		reader := io.MultiReader(fd, &ioextensions.ZeroReader{})
@@ -167,9 +172,6 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	for {
 		var cmd CatchupCommandDto
 		err := decoder.Decode(&cmd)
-		if io.EOF == err {
-			break
-		}
 		tracelog.ErrorLogger.FatalOnError(err)
 		if cmd.IsDone {
 			break
