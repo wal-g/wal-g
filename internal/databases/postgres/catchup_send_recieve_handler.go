@@ -111,60 +111,13 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 			wasInBase = true
 		}
 
-		increment := isPagedFile(info, path) && wasInBase
-
-		var fd io.ReadCloser
-		var size int64
-		if !increment {
-			fd, err = os.Open(path)
-			if os.IsNotExist(err) {
-				return nil
-			}
-			tracelog.ErrorLogger.FatalOnError(err)
-			size = info.Size()
-		} else {
-			fd, size, err = ReadIncrementalFile(path, info.Size(), checkpoint, nil)
-
-			if _, ok := err.(*InvalidBlockError); ok {
-				fd, err = os.Open(path)
-				if os.IsNotExist(err) {
-					return nil
-				}
-				tracelog.ErrorLogger.FatalOnError(err)
-				size = info.Size()
-				increment = false
-			} else {
-				tracelog.ErrorLogger.FatalOnError(err)
-			}
-		}
-
-		err = encoder.Encode(CatchupCommandDto{FileName: fullFileName, IsFull: !increment, FileSize: uint64(size), IsIncremental: increment})
-		tracelog.ErrorLogger.FatalOnError(err)
-		reader := io.MultiReader(fd, &ioextensions.ZeroReader{})
-
-		for size != 0 {
-			min := 8192
-			if int64(min) > size {
-				min = int(size)
-			}
-			var bytes = make([]byte, min)
-			_, err := io.ReadFull(reader, bytes)
-			tracelog.ErrorLogger.FatalOnError(err)
-			size -= int64(len(bytes))
-			err = encoder.Encode(bytes)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-
-		tracelog.InfoLogger.Printf("Sent %v, %v bytes", fullFileName, info.Size())
-		tracelog.ErrorLogger.FatalOnError(err)
-		err = fd.Close()
-		tracelog.ErrorLogger.FatalOnError(err)
+		sendOneFile(path, info, err, wasInBase, checkpoint, encoder, fullFileName)
 
 		return nil
 	})
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("Filepath walk done")
-	for k, _ := range list {
+	for k := range list {
 		if _, ok := seenFiles[k]; ok {
 			continue
 		}
@@ -184,6 +137,57 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 		err = encoder.Encode(CatchupCommandDto{IsDelete: true, FilesToDelete: filesToDelete})
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
+}
+
+func sendOneFile(path string, info fs.FileInfo, err error, wasInBase bool, checkpoint LSN, encoder *gob.Encoder, fullFileName string) {
+	increment := isPagedFile(info, path) && wasInBase
+
+	var fd io.ReadCloser
+	var size int64
+	if !increment {
+		fd, err = os.Open(path)
+		if os.IsNotExist(err) {
+			return
+		}
+		tracelog.ErrorLogger.FatalOnError(err)
+		size = info.Size()
+	} else {
+		fd, size, err = ReadIncrementalFile(path, info.Size(), checkpoint, nil)
+
+		if _, ok := err.(*InvalidBlockError); ok {
+			fd, err = os.Open(path)
+			if os.IsNotExist(err) {
+				return
+			}
+			tracelog.ErrorLogger.FatalOnError(err)
+			size = info.Size()
+			increment = false
+		} else {
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+	}
+
+	err = encoder.Encode(CatchupCommandDto{FileName: fullFileName, IsFull: !increment, FileSize: uint64(size), IsIncremental: increment})
+	tracelog.ErrorLogger.FatalOnError(err)
+	reader := io.MultiReader(fd, &ioextensions.ZeroReader{})
+
+	for size != 0 {
+		min := 8192
+		if int64(min) > size {
+			min = int(size)
+		}
+		var bytes = make([]byte, min)
+		_, err := io.ReadFull(reader, bytes)
+		tracelog.ErrorLogger.FatalOnError(err)
+		size -= int64(len(bytes))
+		err = encoder.Encode(bytes)
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	tracelog.InfoLogger.Printf("Sent %v, %v bytes", fullFileName, info.Size())
+	tracelog.ErrorLogger.FatalOnError(err)
+	err = fd.Close()
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func HandleCatchupReceive(pgDataDirectory string, port int) {
