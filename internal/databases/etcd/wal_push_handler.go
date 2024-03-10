@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"os/user"
 	"path"
 	"path/filepath"
@@ -20,9 +21,26 @@ import (
 )
 
 var errBadWALName = errors.New("bad wal name")
+var errNotLeaderNode = errors.New("Current node is not leader, it can provide inconsistent wal records")
 
 type LogsCache struct {
-	LastArchivedWal string `json:"LastArchivedWal"`
+	LastArchivedIndex uint64 `json:"LastArchivedIndex"`
+}
+
+type ServerResponse struct {
+	Endpoint string `json:"Endpoint"`
+	Status   Status `json:"Status"`
+}
+
+type Status struct {
+	Leader    uint64 `json:"leader"`
+	RaftIndex uint64 `json:"raftIndex"`
+	Header    Header `json:"header"`
+}
+
+type Header struct {
+	ClusterID uint64 `json:"cluster_id"`
+	MemberID  uint64 `json:"member_id"`
 }
 
 func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd_wals_cache") }
@@ -30,6 +48,9 @@ func cacheDir(dataDir string) string { return filepath.Join(dataDir, ".walg_etcd
 func getWalDir(dataDir string) string { return filepath.Join(dataDir, "member", "wal") }
 
 func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir string) error {
+	raftIndex, err := getRaftIndex()
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	walDir, ok := internal.GetSetting(internal.ETCDWalDirectory)
 	if !ok {
 		walDir = getWalDir(dataDir)
@@ -38,40 +59,41 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	uploader.ChangeDirectory(utility.WalPath)
 	files, err := ReadDir(walDir)
 	walFiles := checkWalNames(files)
-	if err != nil {
-		return err
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	cache := getCache()
-	fromWal := 0
-	if len(walFiles) > 0 && cache.LastArchivedWal != "" {
-		lastSeq, _ := parseWALName(walFiles[len(walFiles)-1])
-		cachedSeq, _ := parseWALName(cache.LastArchivedWal)
-
-		//write ensurance that reading leader member of cluster
-		if lastSeq < cachedSeq {
-			tracelog.WarningLogger.Printf("wal was reset (%s => %s), clearing cache",
-				cache.LastArchivedWal, walFiles[0])
+	if len(walFiles) > 0 && cache.LastArchivedIndex != 0 {
+		if raftIndex < cache.LastArchivedIndex {
+			tracelog.WarningLogger.Printf("wal was reset (%d => %d), clearing cache",
+				cache.LastArchivedIndex, raftIndex)
 			cache = LogsCache{}
 		} else {
-			//cacheSeq is last wal that was already archived, start archiving from the next
-			fromWal = int(cachedSeq) + 1
-			tracelog.WarningLogger.Printf("Start to archive from wal: %s\n",
-				cache.LastArchivedWal)
+			tracelog.WarningLogger.Printf("Start to archive from wal record: %d\n",
+				cache.LastArchivedIndex)
 		}
 	}
 
 	// Archive all wals that are complete (skip the last one) and have not been archived yet
-	for i := fromWal; i < len(walFiles)-1; i++ {
-		wal := walFiles[i]
-
+	for i := 1; i < len(walFiles); i++ {
+		wal := walFiles[i-1]
 		tracelog.DebugLogger.Printf("Testing... %v\n", wal)
 
+		ind, err := parseWALName(walFiles[i])
+		tracelog.ErrorLogger.FatalOnError(err)
+		// if index of last record in wal is not greater than last archived index, skip this wal
+		if ind-1 <= cache.LastArchivedIndex {
+			continue
+		}
+		// if index of first record in current wal is greater than raft index, exit the loop, further records can not yet be trusted
+		if ind > raftIndex {
+			break
+		}
+		//Now we are sure that all wal records from walFiles[i-1] can be trusted and some of them were not yet archived
 		// Upload wals:
 		err = archiveWal(uploader, walDir, wal)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		cache.LastArchivedWal = wal
+		cache.LastArchivedIndex = ind - 1
 		putCache(cache)
 	}
 
@@ -95,6 +117,26 @@ func archiveWal(uploader internal.Uploader, dataDir string, wal string) error {
 	}
 
 	return nil
+}
+
+func getRaftIndex() (uint64, error) {
+	out, err := exec.Command("etcdctl", "endpoint", "status", "-w", "json").Output()
+	if err != nil {
+		return 0, err
+	}
+
+	var data []ServerResponse
+	err = json.Unmarshal(out, &data)
+	if err != nil {
+		return 0, err
+	}
+
+	response := data[0]
+	if response.Status.Leader != response.Status.Header.MemberID {
+		return 0, errNotLeaderNode
+	}
+
+	return response.Status.RaftIndex, nil
 }
 
 func getCache() LogsCache {
@@ -175,12 +217,12 @@ func checkWalNames(names []string) []string {
 	return wnames
 }
 
-func parseWALName(wal string) (seq uint64, err error) {
+func parseWALName(wal string) (index uint64, err error) {
 	if !strings.HasSuffix(wal, ".wal") {
 		return 0, errBadWALName
 	}
 
-	var index uint64
+	var seq uint64
 	_, err = fmt.Sscanf(wal, "%016x-%016x.wal", &seq, &index)
 
 	if index < seq {
