@@ -25,7 +25,10 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	dial, err := net.Dial("tcp", destination)
 	tracelog.ErrorLogger.FatalOnError(err)
+
 	decoder := gob.NewDecoder(dial)
+	encoder := gob.NewEncoder(dial)
+
 	var control PgControlData
 	err = decoder.Decode(&control)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -48,8 +51,6 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	if lsn <= control.Checkpoint {
 		tracelog.ErrorLogger.Fatalf("Catchup destination is already ahead (our LSN %v, destination LSN %v).", lsn, control.Checkpoint)
 	}
-
-	encoder := gob.NewEncoder(dial)
 
 	label, offsetMap, _, err := runner.StopBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -167,8 +168,10 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
 	tracelog.ErrorLogger.FatalOnError(err)
 	conn, err := listen.Accept()
-	sendControlAndFileList(pgDataDirectory, err, conn)
+	tracelog.ErrorLogger.FatalOnError(err)
 	decoder := gob.NewDecoder(conn)
+	encoder := gob.NewEncoder(conn)
+	sendControlAndFileList(pgDataDirectory, err, encoder)
 	for {
 		var cmd CatchupCommandDto
 		err := decoder.Decode(&cmd)
@@ -250,12 +253,11 @@ type CatchupCommandDto struct {
 	BinaryContents []byte
 }
 
-func sendControlAndFileList(pgDataDirectory string, err error, conn net.Conn) {
+func sendControlAndFileList(pgDataDirectory string, err error, encoder *gob.Encoder) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	control, err := ExtractPgControl(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Our system id %v, need catchup from %v", control.SystemIdentifier, control.Checkpoint)
 	tracelog.ErrorLogger.FatalOnError(err)
-	encoder := gob.NewEncoder(conn)
 	err = encoder.Encode(control)
 	tracelog.ErrorLogger.FatalOnError(err)
 	rcvFileList := receiveFileList(pgDataDirectory)
