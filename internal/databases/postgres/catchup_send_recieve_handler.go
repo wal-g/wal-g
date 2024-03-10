@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 func HandleCatchupSend(pgDataDirectory string, destination string) {
@@ -73,7 +74,11 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 
 func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
 	extendExcludedFiles()
+	seenFiles := make(map[string]bool)
+	var filesToDelete []string
 	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
+		fullFileName := utility.GetSubdirectoryRelativePath(path, directory)
+		seenFiles[fullFileName] = true
 		if err != nil {
 			if os.IsNotExist(err) {
 				tracelog.WarningLogger.Println(path, " deleted during filepath walk")
@@ -96,7 +101,6 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 		if excluded {
 			return nil
 		}
-		fullFileName := utility.GetSubdirectoryRelativePath(path, directory)
 
 		wasInBase := false
 		if fdto, ok := list[fullFileName]; ok {
@@ -160,6 +164,26 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 	})
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("Filepath walk done")
+	for k, _ := range list {
+		if _, ok := seenFiles[k]; ok {
+			continue
+		}
+		excluded := false
+		for _, e := range strings.Split(k, string(os.PathSeparator)) {
+			if _, ok := ExcludedFilenames[e]; ok {
+				excluded = true
+				break
+			}
+		}
+		if excluded {
+			continue
+		}
+		filesToDelete = append(filesToDelete, k)
+	}
+	if len(filesToDelete) > 0 {
+		err = encoder.Encode(CatchupCommandDto{IsDelete: true, FilesToDelete: filesToDelete})
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
 }
 
 func HandleCatchupReceive(pgDataDirectory string, port int) {
@@ -240,6 +264,15 @@ func doRcvCommand(cmd CatchupCommandDto, directory string, decoder *gob.Decoder)
 		tracelog.ErrorLogger.FatalOnError(err)
 		return
 	}
+	if cmd.IsDelete {
+		tracelog.InfoLogger.Printf("Deleting files %v", cmd.FilesToDelete)
+		for _, f := range cmd.FilesToDelete {
+			err := os.Remove(path.Join(directory, f))
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+		return
+	}
+	tracelog.ErrorLogger.Fatal("Unknown command")
 }
 
 type CatchupCommandDto struct {
@@ -251,6 +284,7 @@ type CatchupCommandDto struct {
 	FileSize       uint64
 	FileName       string
 	BinaryContents []byte
+	FilesToDelete  []string
 }
 
 func sendControlAndFileList(pgDataDirectory string, err error, encoder *gob.Encoder) {
