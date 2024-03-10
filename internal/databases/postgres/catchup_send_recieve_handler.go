@@ -44,7 +44,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	var fileList internal.BackupFileList
 	err = decoder.Decode(&fileList)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Printf("Received file list of %v failes", len(fileList))
+	tracelog.InfoLogger.Printf("Received file list of %v files", len(fileList))
 	_, lsnStr, _, err := runner.StartBackup("")
 	tracelog.ErrorLogger.FatalOnError(err)
 	lsn, err := ParseLSN(lsnStr)
