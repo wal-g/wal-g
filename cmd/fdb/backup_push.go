@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/fdb"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -29,12 +30,12 @@ var backupPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		uploader.ChangeDirectory(utility.BaseBackupPath)
 
-		backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
+		backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		fdb.HandleBackupPush(uploader, backupCmd)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
+		conf.RequiredSettings[conf.NameStreamCreateCmd] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

@@ -6,14 +6,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/testtools"
 )
 
 func init() {
 	internal.ConfigureSettings("")
-	internal.InitConfig()
-	internal.Configure()
+	conf.InitConfig()
+	conf.Configure()
 }
 
 func TestFetch(t *testing.T) {

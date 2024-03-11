@@ -6,14 +6,18 @@ volumes:
 x-s3_common_depends: &s3_common_depends
   depends_on:
     - s3
+    # - graphite
   links:
     - s3
+    # - graphite
 
 x-s3_throttling_depends: &s3_throttling_depends
   depends_on:
     - s3-for-throttling
+    # - graphite
   links:
     - s3-for-throttling
+    # - graphite
 
 services:
   golang:
@@ -43,6 +47,22 @@ services:
     hostname: swift
     ports:
       - "8010:8080"
+
+  # "WALG_STATSD_ADDRESS": "wal-g_graphite:8125"
+  graphite:
+    image: hopsoft/graphite-statsd
+    hostname: wal-g_graphite
+    container_name: wal-g_graphite
+    ports:
+      - "8125:8125"
+      - "8126:8126"
+      - "2003:2003"
+      - "2023:2023"
+      - "2004:2004"
+      - "2024:2024"
+      - "80:80"
+      - "81:81"
+      - "3000:3000"
 
   s3:
     image: minio/minio:RELEASE.2021-06-07T21-40-51Z

@@ -12,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/pkg/errors"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/sync/errgroup"
 )
@@ -129,7 +130,7 @@ func NewRatingTarBallComposer(
 		ctx:                    ctx,
 	}
 
-	maxUploadDiskConcurrency, err := internal.GetMaxUploadDiskConcurrency()
+	maxUploadDiskConcurrency, err := conf.GetMaxUploadDiskConcurrency()
 	if err != nil {
 		return nil, err
 	}

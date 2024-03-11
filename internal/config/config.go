@@ -1,17 +1,15 @@
-package internal
+package config
 
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"os/user"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
-
-	"github.com/wal-g/wal-g/internal/limiters"
-	"github.com/wal-g/wal-g/utility"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -19,7 +17,6 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/webserver"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -217,9 +214,9 @@ const (
 
 var (
 	CfgFile             string
-	defaultConfigValues map[string]string
+	DefaultConfigValues map[string]string
 
-	commonDefaultConfigValues = map[string]string{
+	CommonDefaultConfigValues = map[string]string{
 		DownloadConcurrencySetting:     "10",
 		UploadConcurrencySetting:       "16",
 		UploadDiskConcurrencySetting:   "1",
@@ -556,66 +553,37 @@ var (
 	}
 )
 
+const MinAllowedConcurrency = 1
+
+type InvalidConcurrencyValueError struct {
+	error
+}
+
+func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
+	return InvalidConcurrencyValueError{
+		errors.Errorf("%v value is expected to be positive but is: %v",
+			concurrencyType, value)}
+}
+
+func (err InvalidConcurrencyValueError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type UnsetRequiredSettingError struct {
+	error
+}
+
+func NewUnsetRequiredSettingError(settingName string) UnsetRequiredSettingError {
+	return UnsetRequiredSettingError{errors.Errorf("%v is required to be set, but it isn't", settingName)}
+}
+
+func (err UnsetRequiredSettingError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 func AddTurboFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&Turbo, "turbo", "", false,
 		"Ignore all kinds of throttling defined in config")
-}
-
-// nolint: gocyclo
-func ConfigureSettings(currentType string) {
-	if len(defaultConfigValues) == 0 {
-		defaultConfigValues = commonDefaultConfigValues
-		dbSpecificDefaultSettings := map[string]string{}
-		switch currentType {
-		case PG:
-			dbSpecificDefaultSettings = PGDefaultSettings
-		case MONGO:
-			dbSpecificDefaultSettings = MongoDefaultSettings
-		case MYSQL:
-			dbSpecificDefaultSettings = MysqlDefaultSettings
-		case SQLSERVER:
-			dbSpecificDefaultSettings = SQLServerDefaultSettings
-		case GP:
-			dbSpecificDefaultSettings = GPDefaultSettings
-		}
-
-		for k, v := range dbSpecificDefaultSettings {
-			defaultConfigValues[k] = v
-		}
-	}
-
-	if len(AllowedSettings) == 0 {
-		AllowedSettings = CommonAllowedSettings
-		dbSpecificSettings := map[string]bool{}
-		switch currentType {
-		case PG:
-			dbSpecificSettings = PGAllowedSettings
-		case GP:
-			for setting := range PGAllowedSettings {
-				GPAllowedSettings[setting] = true
-			}
-			dbSpecificSettings = GPAllowedSettings
-		case MONGO:
-			dbSpecificSettings = MongoAllowedSettings
-		case MYSQL:
-			dbSpecificSettings = MysqlAllowedSettings
-		case SQLSERVER:
-			dbSpecificSettings = SQLServerAllowedSettings
-		case REDIS:
-			dbSpecificSettings = RedisAllowedSettings
-		}
-
-		for k, v := range dbSpecificSettings {
-			AllowedSettings[k] = v
-		}
-
-		for _, adapter := range StorageAdapters {
-			for _, setting := range adapter.settingNames {
-				AllowedSettings[setting] = true
-			}
-			AllowedSettings["WALG_"+adapter.PrefixSettingKey()] = true
-		}
-	}
 }
 
 func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists bool) {
@@ -631,11 +599,11 @@ func GetSetting(key string) (value string, ok bool) {
 	return "", false
 }
 
-func getWaleCompatibleSetting(key string) (value string, exists bool) {
-	return getWaleCompatibleSettingFrom(key, viper.GetViper())
+func GetWaleCompatibleSetting(key string) (value string, exists bool) {
+	return GetWaleCompatibleSettingFrom(key, viper.GetViper())
 }
 
-func getWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string, exists bool) {
+func GetWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string, exists bool) {
 	settingKeys := []string{
 		"WALG_" + key,
 		"WALE_" + key,
@@ -648,11 +616,18 @@ func getWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string
 	}
 	// Then we try to get default value
 	for _, settingKey := range settingKeys {
-		if val, ok := defaultConfigValues[settingKey]; ok && len(val) > 0 {
+		if val, ok := DefaultConfigValues[settingKey]; ok && len(val) > 0 {
 			return val, true
 		}
 	}
 	return "", false
+}
+
+func ConfigureLogging() error {
+	if viper.IsSet(LogLevelSetting) {
+		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
+	}
+	return nil
 }
 
 func Configure() {
@@ -725,7 +700,7 @@ func ConfigureAndRunDefaultWebServer() error {
 func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
-		flagName := toFlagName(k)
+		flagName := ToFlagName(k)
 		isRequired, exist := RequiredSettings[k]
 		flagUsage := ""
 		if exist && isRequired {
@@ -784,7 +759,7 @@ func ReadConfigFromFile(config *viper.Viper, configFile string) {
 
 // SetDefaultValues set default settings to the viper instance
 func SetDefaultValues(config *viper.Viper) {
-	for setting, value := range defaultConfigValues {
+	for setting, value := range DefaultConfigValues {
 		config.SetDefault(setting, value)
 	}
 }
@@ -815,53 +790,8 @@ func CheckAllowedSettings(config *viper.Viper) {
 	}
 }
 
-func AssertRequiredSettingsSet() error {
-	if !isAnyStorageSet() {
-		return errors.New("Failed to find any configured storage")
-	}
-
-	for setting, required := range RequiredSettings {
-		isSet := viper.IsSet(setting)
-
-		if !isSet && required {
-			message := "Required variable " + setting + " is not set. You can set is using --" + toFlagName(setting) +
-				" flag or variable " + setting
-			return errors.New(message)
-		}
-	}
-
-	return nil
-}
-
-func isAnyStorageSet() bool {
-	for _, adapter := range StorageAdapters {
-		_, exists := getWaleCompatibleSetting(adapter.PrefixSettingKey())
-		if exists {
-			return true
-		}
-	}
-
-	return false
-}
-
-func toFlagName(s string) string {
+func ToFlagName(s string) string {
 	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
-}
-
-// StorageFromConfig prefers the config parameters instead of the current environment variables
-func StorageFromConfig(configFile string) (storage.Storage, error) {
-	var config = viper.New()
-	SetDefaultValues(config)
-	ReadConfigFromFile(config, configFile)
-	CheckAllowedSettings(config)
-
-	folder, err := ConfigureStorageForSpecificConfig(config)
-
-	if err != nil {
-		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
-		tracelog.ErrorLogger.FatalError(err)
-	}
-	return folder, err
 }
 
 // Set the compiled config to ENV.
@@ -890,48 +820,103 @@ func bindConfigToEnv(globalViper *viper.Viper) {
 	}
 }
 
-func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, err error) {
-	storageConfigs := viper.GetStringMap(PgFailoverStorages)
+func GetRequiredSetting(setting string) (string, error) {
+	val, ok := GetSetting(setting)
+	if !ok {
+		return "", NewUnsetRequiredSettingError(setting)
+	}
+	return val, nil
+}
 
-	if len(storageConfigs) == 0 {
+func GetBoolSettingDefault(setting string, def bool) (bool, error) {
+	val, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
+	}
+	return strconv.ParseBool(val)
+}
+
+func GetBoolSetting(setting string) (val bool, ok bool, err error) {
+	valstr, ok := GetSetting(setting)
+	if !ok {
+		return false, false, nil
+	}
+	val, err = strconv.ParseBool(valstr)
+	return val, true, err
+}
+
+func GetFloatSettingDefault(setting string, def float64) (float64, error) {
+	val, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
+	}
+	return strconv.ParseFloat(val, 64)
+}
+
+func GetFloatSetting(setting string) (val float64, ok bool, err error) {
+	valstr, ok := GetSetting(setting)
+	if !ok {
+		return 0, false, nil
+	}
+	val, err = strconv.ParseFloat(valstr, 64)
+	return val, true, err
+}
+
+func GetMaxUploadDiskConcurrency() (int, error) {
+	if Turbo {
+		return 4, nil
+	}
+	return GetMaxConcurrency(UploadDiskConcurrencySetting)
+}
+
+func GetMaxConcurrency(concurrencyType string) (int, error) {
+	concurrency := viper.GetInt(concurrencyType)
+
+	if concurrency < MinAllowedConcurrency {
+		return MinAllowedConcurrency, newInvalidConcurrencyValueError(concurrencyType, concurrency)
+	}
+	return concurrency, nil
+}
+
+func GetMaxDownloadConcurrency() (int, error) {
+	return GetMaxConcurrency(DownloadConcurrencySetting)
+}
+
+func GetMaxUploadConcurrency() (int, error) {
+	return GetMaxConcurrency(UploadConcurrencySetting)
+}
+
+// This setting is intentionally undocumented in README. Effectively, this configures how many prepared tar Files there
+// may be in uploading state during backup-push.
+func GetMaxUploadQueue() (int, error) {
+	return GetMaxConcurrency(UploadQueueSetting)
+}
+
+func GetFetchRetries() int {
+	concurrency := viper.GetInt(DownloadFileRetriesSetting)
+	return concurrency
+}
+
+func GetDurationSetting(setting string) (time.Duration, error) {
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return 0, NewUnsetRequiredSettingError(setting)
+	}
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
+}
+
+func GetOplogPITRDiscoveryIntervalSetting() (*time.Duration, error) {
+	durStr, ok := GetSetting(OplogPITRDiscoveryInterval)
+	if !ok {
 		return nil, nil
 	}
-
-	// errClosers are needed to close already configured storages if failed to configure all of them.
-	var errClosers []io.Closer
-	defer func() {
-		if err == nil {
-			return
-		}
-		for _, closer := range errClosers {
-			utility.LoggedClose(closer, "Failed to close storage")
-		}
-	}()
-
-	storages := make(map[string]storage.HashableStorage, len(storageConfigs))
-	for name := range storageConfigs {
-		if name == "default" {
-			return nil, fmt.Errorf("'%s' storage name is reserved", name)
-		}
-
-		cfg := viper.Sub(PgFailoverStorages + "." + name)
-
-		var rootWraps []storage.WrapRootFolder
-		if limiters.NetworkLimiter != nil {
-			rootWraps = append(rootWraps, func(prevFolder storage.Folder) (newFolder storage.Folder) {
-				return NewLimitedFolder(prevFolder, limiters.NetworkLimiter)
-			})
-		}
-		rootWraps = append(rootWraps, ConfigureStoragePrefix)
-
-		st, err := ConfigureStorageForSpecificConfig(cfg, rootWraps...)
-		if err != nil {
-			return nil, fmt.Errorf("failover storage %s: %v", name, err)
-		}
-		errClosers = append(errClosers, st)
-
-		storages[name] = st
+	dur, err := time.ParseDuration(durStr)
+	if err != nil {
+		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogPITRDiscoveryInterval, durStr, err)
 	}
-
-	return storages, nil
+	return &dur, nil
 }

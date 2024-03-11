@@ -1,7 +1,8 @@
-package internal
+package statistics
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
@@ -10,29 +11,38 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 type metrics struct {
-	uploadedFilesTotal       prometheus.Counter
-	uploadedFilesFailedTotal prometheus.Counter
+	UploadedFilesTotal       prometheus.Counter
+	UploadedFilesFailedTotal prometheus.Counter
+
+	S3Codes prometheus.CounterVec
 }
 
 var (
 	WalgMetricsPrefix = "walg_"
 
 	WalgMetrics = metrics{
-		uploadedFilesTotal: prometheus.NewCounter(
+		UploadedFilesTotal: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_total",
 				Help: "Number of uploaded files.",
 			},
 		),
-
-		uploadedFilesFailedTotal: prometheus.NewCounter(
+		UploadedFilesFailedTotal: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
 				Help: "Number of file upload failures.",
 			},
+		),
+		S3Codes: *prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: WalgMetricsPrefix + "s3_response_",
+				Help: "S3 response codes.",
+			},
+			[]string{"code"},
 		),
 	}
 )
@@ -43,22 +53,27 @@ func init() {
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	prometheus.Unregister(collectors.NewGoCollector())
 
-	prometheus.MustRegister(WalgMetrics.uploadedFilesTotal)
-	prometheus.MustRegister(WalgMetrics.uploadedFilesFailedTotal)
+	prometheus.MustRegister(WalgMetrics.UploadedFilesTotal)
+	prometheus.MustRegister(WalgMetrics.UploadedFilesFailedTotal)
+	prometheus.MustRegister(WalgMetrics.S3Codes)
 }
 
 func PushMetrics() {
-	address := viper.GetString(StatsdAddressSetting)
+	address := viper.GetString(conf.StatsdAddressSetting)
 	if address == "" {
 		return
 	}
 
-	extraTags := viper.GetStringMapString(StatsdExtraTagsSetting)
+	extraTags := viper.GetStringMapString(conf.StatsdExtraTagsSetting)
 
 	err := pushMetrics(address, extraTags)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Pushing metrics failed: %v", err)
 	}
+}
+
+func WriteStatusCodeMetric(code int) {
+	WalgMetrics.S3Codes.WithLabelValues(strconv.Itoa(code)).Inc()
 }
 
 func pushMetrics(address string, extraTags map[string]string) error {

@@ -2,74 +2,44 @@ package internal_test
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/internal/compression/lz4"
-	"github.com/wal-g/wal-g/internal/compression/lzma"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/wal-g/wal-g/internal/compression/lz4"
+	"github.com/wal-g/wal-g/internal/compression/lzma"
+	"github.com/wal-g/wal-g/internal/config"
 
 	"github.com/wal-g/wal-g/testtools"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
-func TestGetMaxConcurrency_InvalidKey(t *testing.T) {
-	_, err := internal.GetMaxConcurrency("INVALID_KEY")
-
-	assert.Error(t, err)
-}
-
-func TestGetMaxConcurrency_ValidKey(t *testing.T) {
-	viper.Set(internal.UploadConcurrencySetting, "100")
-	actual, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
-
-	assert.NoError(t, err)
-	assert.Equal(t, 100, actual)
-	resetToDefaults()
-}
-
-func TestGetMaxConcurrency_ValidKeyAndNegativeValue(t *testing.T) {
-	viper.Set(internal.UploadConcurrencySetting, "-5")
-	_, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
-
-	assert.Error(t, err)
-	resetToDefaults()
-}
-
-func TestGetMaxConcurrency_ValidKeyAndInvalidValue(t *testing.T) {
-	viper.Set(internal.UploadConcurrencySetting, "invalid")
-	_, err := internal.GetMaxConcurrency(internal.UploadConcurrencySetting)
-
-	assert.Error(t, err)
-	resetToDefaults()
-}
-
 func TestGetSentinelUserData(t *testing.T) {
-	viper.Set(internal.SentinelUserDataSetting, "1.0")
+	viper.Set(config.SentinelUserDataSetting, "1.0")
 
 	data, err := internal.GetSentinelUserData()
 	assert.NoError(t, err)
 	t.Log(data)
 	assert.Equalf(t, 1.0, data.(float64), "Unable to parse WALG_SENTINEL_USER_DATA")
 
-	viper.Set(internal.SentinelUserDataSetting, "\"1\"")
+	viper.Set(config.SentinelUserDataSetting, "\"1\"")
 
 	data, err = internal.GetSentinelUserData()
 	assert.NoError(t, err)
 	t.Log(data)
 	assert.Equalf(t, "1", data.(string), "Unable to parse WALG_SENTINEL_USER_DATA")
 
-	viper.Set(internal.SentinelUserDataSetting, `{"x":123,"y":["asdasd",123]}`)
+	viper.Set(config.SentinelUserDataSetting, `{"x":123,"y":["asdasd",123]}`)
 
 	data, err = internal.GetSentinelUserData()
 	assert.NoError(t, err)
 	t.Log(data)
 	assert.NotNilf(t, data, "Unable to parse WALG_SENTINEL_USER_DATA")
 
-	viper.Set(internal.SentinelUserDataSetting, `"x",1`)
+	viper.Set(config.SentinelUserDataSetting, `"x",1`)
 
 	data, err = internal.GetSentinelUserData()
 	assert.Error(t, err, "Should fail on the invalid user data")
@@ -79,7 +49,7 @@ func TestGetSentinelUserData(t *testing.T) {
 }
 
 func TestGetDataFolderPath_Default(t *testing.T) {
-	viper.Set(internal.PgDataSetting, nil)
+	viper.Set(config.PgDataSetting, nil)
 
 	actual := internal.GetDataFolderPath()
 
@@ -91,7 +61,7 @@ func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 	parentDir := prepareDataFolder(t, "someOtherFolder")
 	defer testtools.Cleanup(t, parentDir)
 
-	viper.Set(internal.PgDataSetting, parentDir)
+	viper.Set(config.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
@@ -103,7 +73,7 @@ func TestGetDataFolderPath_Wal(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_wal")
 	defer testtools.Cleanup(t, parentDir)
 
-	viper.Set(internal.PgDataSetting, parentDir)
+	viper.Set(config.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
@@ -115,7 +85,7 @@ func TestGetDataFolderPath_Xlog(t *testing.T) {
 	parentDir := prepareDataFolder(t, "pg_xlog")
 	defer testtools.Cleanup(t, parentDir)
 
-	viper.Set(internal.PgDataSetting, parentDir)
+	viper.Set(config.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
@@ -131,7 +101,7 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
-	viper.Set(internal.PgDataSetting, parentDir)
+	viper.Set(config.PgDataSetting, parentDir)
 
 	actual := internal.GetDataFolderPath()
 
@@ -139,23 +109,8 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	resetToDefaults()
 }
 
-func TestConfigureLogging_WhenLogLevelSettingIsNotSet(t *testing.T) {
-	assert.NoError(t, internal.ConfigureLogging())
-}
-
-func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
-	parentDir := prepareDataFolder(t, "someOtherFolder")
-	defer testtools.Cleanup(t, parentDir)
-
-	viper.Set(internal.LogLevelSetting, parentDir)
-	err := internal.ConfigureLogging()
-
-	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(internal.LogLevelSetting)), err)
-	resetToDefaults()
-}
-
 func TestConfigureCompressor_Lz4Method(t *testing.T) {
-	viper.Set(internal.CompressionMethodSetting, "lz4")
+	viper.Set(config.CompressionMethodSetting, "lz4")
 	compressor, err := internal.ConfigureCompressor()
 	assert.NoError(t, err)
 	assert.Equal(t, compressor, lz4.Compressor{})
@@ -163,7 +118,7 @@ func TestConfigureCompressor_Lz4Method(t *testing.T) {
 }
 
 func TestConfigureCompressor_LzmaMethod(t *testing.T) {
-	viper.Set(internal.CompressionMethodSetting, "lzma")
+	viper.Set(config.CompressionMethodSetting, "lzma")
 	compressor, err := internal.ConfigureCompressor()
 	assert.NoError(t, err)
 	assert.Equal(t, compressor, lzma.Compressor{})
@@ -186,7 +141,7 @@ func TestConfigureCompressor_ErrorWhenViperClear(t *testing.T) {
 }
 
 func TestConfigureCompressor_FailsOnInvalidCompressorString(t *testing.T) {
-	viper.Set(internal.CompressionMethodSetting, "kek123kek")
+	viper.Set(config.CompressionMethodSetting, "kek123kek")
 	compressor, err := internal.ConfigureCompressor()
 	assert.Error(t, err)
 	assert.Equal(t, compressor, nil)
@@ -213,7 +168,7 @@ func prepareDataFolder(t *testing.T, name string) string {
 
 func resetToDefaults() {
 	viper.Reset()
-	internal.ConfigureSettings(internal.PG)
-	internal.InitConfig()
-	internal.Configure()
+	internal.ConfigureSettings(config.PG)
+	config.InitConfig()
+	config.Configure()
 }

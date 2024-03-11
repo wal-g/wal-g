@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const (
@@ -34,13 +35,13 @@ var (
 			dataDirectory := args[0]
 
 			if deltaFromName == "" {
-				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
+				deltaFromName = viper.GetString(conf.DeltaFromNameSetting)
 			}
 			if deltaFromUserData == "" {
-				deltaFromUserData = viper.GetString(internal.DeltaFromUserDataSetting)
+				deltaFromUserData = viper.GetString(conf.DeltaFromUserDataSetting)
 			}
 			if userDataRaw == "" {
-				userDataRaw = viper.GetString(internal.SentinelUserDataSetting)
+				userDataRaw = viper.GetString(conf.SentinelUserDataSetting)
 			}
 
 			if deltaFromName == "" && deltaFromUserData == "" {

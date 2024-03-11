@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 var ShortDescription = "Redis backup tool"
@@ -39,5 +40,5 @@ func Execute() {
 }
 
 func init() {
-	common.Init(cmd, internal.REDIS)
+	common.Init(cmd, conf.REDIS)
 }

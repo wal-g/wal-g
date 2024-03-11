@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const stateFilesDirPrefix = "walg_seg_states"
@@ -21,7 +21,7 @@ func FormatCmdStatePath(contentID int, cmdName string) string {
 }
 
 func FormatSegmentStateFolderPath(contentID int) string {
-	segStatesDirPath := viper.GetString(internal.GPSegmentStatesDir)
+	segStatesDirPath := viper.GetString(conf.GPSegmentStatesDir)
 	currSegmentStatePath := fmt.Sprintf("%s_seg%d", stateFilesDirPrefix, contentID)
 	return path.Join(segStatesDirPath, currSegmentStatePath)
 }

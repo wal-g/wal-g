@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -35,7 +36,7 @@ func (restoreService *RestoreService) DoRestore(
 	shConf ShConfig,
 	cfgConf MongoCfgConfig,
 ) error {
-	disableHostResetup, err := internal.GetBoolSettingDefault(internal.MongoDBRestoreDisableHostResetup, false)
+	disableHostResetup, err := conf.GetBoolSettingDefault(conf.MongoDBRestoreDisableHostResetup, false)
 	if err != nil {
 		return err
 	}

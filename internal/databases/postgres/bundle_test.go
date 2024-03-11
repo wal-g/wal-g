@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
@@ -25,9 +26,9 @@ var BundleTestLocations = []walparser.BlockLocation{
 }
 
 func TestEmptyBundleQueue(t *testing.T) {
-	internal.ConfigureSettings(internal.PG)
-	internal.InitConfig()
-	internal.Configure()
+	internal.ConfigureSettings(conf.PG)
+	conf.InitConfig()
+	conf.Configure()
 
 	bundle := &postgres.Bundle{
 		Bundle: internal.Bundle{
@@ -51,12 +52,12 @@ func TestBundleQueue(t *testing.T) {
 }
 
 func TestBundleQueueHighConcurrency(t *testing.T) {
-	viper.Set(internal.UploadConcurrencySetting, "100")
+	viper.Set(conf.UploadConcurrencySetting, "100")
 	queueTest(t)
 }
 
 func TestBundleQueueLowConcurrency(t *testing.T) {
-	viper.Set(internal.UploadConcurrencySetting, "1")
+	viper.Set(conf.UploadConcurrencySetting, "1")
 	queueTest(t)
 }
 

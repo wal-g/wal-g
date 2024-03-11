@@ -7,6 +7,7 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -85,7 +86,7 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 		// nohup to avoid the SIGHUP on SSH session disconnect
 		"nohup", "wal-g",
 		// config for wal-g
-		fmt.Sprintf("--config=%s", internal.CfgFile),
+		fmt.Sprintf("--config=%s", conf.CfgFile),
 		// method
 		"check-ao-aocs-length-segment",
 		// actual arguments to be passed to the backup-push command

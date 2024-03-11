@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
@@ -19,11 +20,11 @@ var binlogPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
-		checkGTIDs, _ := internal.GetBoolSettingDefault(internal.MysqlCheckGTIDs, false)
+		checkGTIDs, _ := conf.GetBoolSettingDefault(conf.MysqlCheckGTIDs, false)
 		mysql.HandleBinlogPush(uploader, untilBinlog, checkGTIDs)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
+		conf.RequiredSettings[conf.MysqlDatasourceNameSetting] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

@@ -6,7 +6,7 @@ import (
 	"path"
 
 	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -15,7 +15,7 @@ func NewIncrementalTarInterpreter(dbDataDirectory string, sentinel postgres.Back
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) *IncrementalTarInterpreter {
 	return &IncrementalTarInterpreter{
 		FileTarInterpreter: postgres.NewFileTarInterpreter(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles),
-		fsync:              !viper.GetBool(internal.TarDisableFsyncSetting),
+		fsync:              !viper.GetBool(conf.TarDisableFsyncSetting),
 		aoFilesMetadata:    aoFilesMetadata,
 	}
 }

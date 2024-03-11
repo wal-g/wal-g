@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal/abool"
+	"github.com/wal-g/wal-g/internal/statistics"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -170,13 +171,13 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	uploader.waitGroup.Add(1)
 	defer uploader.waitGroup.Done()
 
-	WalgMetrics.uploadedFilesTotal.Inc()
+	statistics.WalgMetrics.UploadedFilesTotal.Inc()
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
 	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
 	if err != nil {
-		WalgMetrics.uploadedFilesFailedTotal.Inc()
+		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
 		uploader.failed.Set()
 		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 		return err

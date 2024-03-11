@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -29,10 +30,10 @@ var backupFetchCmd = &cobra.Command{
 		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
+		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		redisPassword, ok := internal.GetSetting(internal.RedisPassword)
+		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
 		if ok && redisPassword != "" { // special hack for redis-cli
 			restoreCmd.Env = append(restoreCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
 		}

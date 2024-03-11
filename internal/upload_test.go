@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 func TestConfigure(t *testing.T) {
@@ -43,8 +44,8 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	}
 	assert.Nil(t, uploader)
 	internal.ConfigureSettings("")
-	internal.InitConfig()
-	internal.Configure()
+	conf.InitConfig()
+	conf.Configure()
 	os.Setenv("AWS_ACCESS_KEY_ID", "aws_access_key_id")
 	os.Setenv("AWS_SECRET_ACCESS_KEY", "aws_secret_access_key")
 	os.Setenv("AWS_SESSION_TOKEN", "aws_session_token")

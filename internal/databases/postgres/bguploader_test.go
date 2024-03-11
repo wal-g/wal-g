@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/stretchr/testify/assert"
@@ -81,7 +82,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 		},
 	}
 
-	viper.Set(internal.UploadWalMetadata, "NOMETADATA")
+	viper.Set(conf.UploadWalMetadata, "NOMETADATA")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer testtools.Cleanup(t, internal.GetDataFolderPath())

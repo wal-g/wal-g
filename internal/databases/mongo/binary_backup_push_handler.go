@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -12,7 +13,7 @@ import (
 func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string) error {
 	backupName := binary.GenerateNewBackupName()
 
-	mongodbURI, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
 		return err
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/etcd"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -20,7 +21,7 @@ var backupFetchCmd = &cobra.Command{
 	Short: backupFetchShortDescription,
 	Args:  cobra.ExactArgs(1),
 	PreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.NameStreamRestoreCmd] = true
+		conf.RequiredSettings[conf.NameStreamRestoreCmd] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -34,7 +35,7 @@ var backupFetchCmd = &cobra.Command{
 		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
+		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		targetBackupSelector, err := internal.NewBackupNameSelector(args[0], true)
 		tracelog.ErrorLogger.FatalOnError(err)

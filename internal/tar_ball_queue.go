@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/abool"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 // TarBallQueue is used to process multiple tarballs concurrently
@@ -38,11 +39,11 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 		panic("Trying to start already started Queue")
 	}
 	var err error
-	tarQueue.parallelTarballs, err = GetMaxUploadDiskConcurrency()
+	tarQueue.parallelTarballs, err = conf.GetMaxUploadDiskConcurrency()
 	if err != nil {
 		return err
 	}
-	tarQueue.maxUploadQueue, err = getMaxUploadQueue()
+	tarQueue.maxUploadQueue, err = conf.GetMaxUploadQueue()
 	if err != nil {
 		return err
 	}

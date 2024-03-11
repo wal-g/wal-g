@@ -11,16 +11,17 @@ package internal
 import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/wal-g/wal-g/internal/crypto"
 )
 
 func configureLibsodiumCrypter(config *viper.Viper) (crypto.Crypter, error) {
-	if config.IsSet(LibsodiumKeySetting) {
+	if config.IsSet(conf.LibsodiumKeySetting) {
 		return nil, errors.New("non-empty WALG_LIBSODIUM_KEY but wal-g was not compiled with libsodium")
 	}
 
-	if config.IsSet(LibsodiumKeyPathSetting) {
+	if config.IsSet(conf.LibsodiumKeyPathSetting) {
 		return nil, errors.New("non-empty WALG_LIBSODIUM_KEY_PATH but wal-g was not compiled with libsodium")
 	}
 

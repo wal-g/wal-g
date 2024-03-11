@@ -7,6 +7,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
@@ -28,7 +29,7 @@ var cmd = &cobra.Command{
 		if err != nil {
 			tracelog.WarningLogger.PrintError(err)
 		}
-		err = internal.ConfigureAndRunDefaultWebServer()
+		err = conf.ConfigureAndRunDefaultWebServer()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -43,5 +44,5 @@ func Execute() {
 }
 
 func init() {
-	common.Init(cmd, internal.SQLSERVER)
+	common.Init(cmd, conf.SQLSERVER)
 }
