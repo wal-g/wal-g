@@ -3,6 +3,7 @@ package s3
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"syscall"
 	"testing"
@@ -38,6 +39,11 @@ func TestConnResetRetryerRandomError(t *testing.T) {
 }
 
 func TestConnResetRetryerNoError(t *testing.T) {
-	retryer := NewConnResetRetryer(client.DefaultRetryer{})
+	retryer := NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: 15})
 	assert.False(t, retryer.ShouldRetry(&request.Request{}))
+}
+func TestConnResetRetryerThrottling(t *testing.T) {
+	retryer := client.DefaultRetryer{NumMaxRetries: 15}
+	resp := &http.Response{StatusCode: 429}
+	assert.True(t, retryer.ShouldRetry(&request.Request{HTTPResponse: resp}))
 }

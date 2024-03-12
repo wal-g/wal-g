@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -36,6 +37,8 @@ type Config struct {
 	Uploader                 *UploaderConfig
 	RangeBatchEnabled        bool
 	RangeMaxRetries          int
+	MinThrottlingRetryDelay  time.Duration
+	MaxThrottlingRetryDelay  time.Duration
 }
 
 type Secrets struct {
@@ -49,7 +52,7 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 		return nil, fmt.Errorf("create new AWS session: %w", err)
 	}
 
-	s3Client := s3.New(sess)
+	s3Client := s3.New(sess) //maybe here add retry settings
 
 	uploader, err := createUploader(s3Client, config.Uploader)
 	if err != nil {

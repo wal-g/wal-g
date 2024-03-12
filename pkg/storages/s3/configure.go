@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/storage/setting"
@@ -35,8 +36,10 @@ const (
 	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
 	rangeQueriesMaxRetriesSetting   = "S3_RANGE_MAX_RETRIES"
 	requestAdditionalHeadersSetting = "S3_REQUEST_ADDITIONAL_HEADERS"
-	// maxRetriesSetting limits retries during interaction with S3
-	maxRetriesSetting = "S3_MAX_RETRIES"
+	// limiters for retry policy during interaction with S3
+	maxRetriesSetting              = "S3_MAX_RETRIES"
+	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
+	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
 )
 
 var SettingList = []string{
@@ -66,17 +69,21 @@ var SettingList = []string{
 	rangeQueriesMaxRetriesSetting,
 	maxRetriesSetting,
 	requestAdditionalHeadersSetting,
+	minThrottlingRetryDelaySetting,
+	maxThrottlingRetryDelaySetting,
 }
 
 const (
-	defaultPort              = "443"
-	defaultForcePathStyle    = false
-	defaultUseListObjectsV1  = false
-	defaultMaxRetries        = 15
-	defaultMaxPartSize       = 20 << 20
-	defaultStorageClass      = "STANDARD"
-	defaultRangeBatchEnabled = false
-	defaultRangeMaxRetries   = 10
+	defaultPort                    = "443"
+	defaultForcePathStyle          = false
+	defaultUseListObjectsV1        = false
+	defaultMaxRetries              = 15
+	defaultMinThrottlingRetryDelay = 500
+	defaultMaxThrottlingRetryDelay = 300000
+	defaultMaxPartSize             = 20 << 20
+	defaultStorageClass            = "STANDARD"
+	defaultRangeBatchEnabled       = false
+	defaultRangeMaxRetries         = 10
 )
 
 // TODO: Unit tests
@@ -103,6 +110,14 @@ func ConfigureStorage(
 		return nil, err
 	}
 	maxRetries, err := setting.IntOptional(settings, maxRetriesSetting, defaultMaxRetries)
+	if err != nil {
+		return nil, err
+	}
+	minThrottlingRetryDelay, err := setting.IntOptional(settings, minThrottlingRetryDelaySetting, defaultMinThrottlingRetryDelay)
+	if err != nil {
+		return nil, err
+	}
+	maxThrottlingRetryDelay, err := setting.IntOptional(settings, maxThrottlingRetryDelaySetting, defaultMaxThrottlingRetryDelay)
 	if err != nil {
 		return nil, err
 	}
@@ -156,8 +171,10 @@ func ConfigureStorage(
 			ServerSideEncryptionCustomer: settings[sseCSetting],
 			ServerSideEncryptionKMSID:    settings[sseKmsIDSetting],
 		},
-		RangeBatchEnabled: rangeBatchEnabled,
-		RangeMaxRetries:   rangeMaxRetries,
+		RangeBatchEnabled:       rangeBatchEnabled,
+		RangeMaxRetries:         rangeMaxRetries,
+		MinThrottlingRetryDelay: time.Duration(minThrottlingRetryDelay) * time.Millisecond,
+		MaxThrottlingRetryDelay: time.Duration(maxThrottlingRetryDelay) * time.Millisecond,
 	}
 
 	st, err := NewStorage(config, rootWraps...)
