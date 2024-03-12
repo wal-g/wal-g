@@ -52,7 +52,7 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 		return nil, fmt.Errorf("create new AWS session: %w", err)
 	}
 
-	s3Client := s3.New(sess) //maybe here add retry settings
+	s3Client := s3.New(sess)
 
 	uploader, err := createUploader(s3Client, config.Uploader)
 	if err != nil {
