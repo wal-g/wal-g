@@ -18,7 +18,7 @@ type metrics struct {
 	UploadedFilesTotal       prometheus.Counter
 	UploadedFilesFailedTotal prometheus.Counter
 
-	S3Codes prometheus.CounterVec
+	S3Codes prometheus.GaugeVec
 }
 
 var (
@@ -37,8 +37,8 @@ var (
 				Help: "Number of file upload failures.",
 			},
 		),
-		S3Codes: *prometheus.NewCounterVec(
-			prometheus.CounterOpts{
+		S3Codes: *prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Name: WalgMetricsPrefix + "s3_response_",
 				Help: "S3 response codes.",
 			},
@@ -131,6 +131,7 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extr
 			if metric.Gauge == nil {
 				return fmt.Errorf("expected gauge in metric %s %s", name, metric)
 			}
+			tracelog.DebugLogger.Printf("writing metric: %s", metric.String())
 			err := client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
 			if err != nil {
 				return err
