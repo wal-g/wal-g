@@ -32,7 +32,7 @@ require (
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/minio/sio v0.2.0
 	github.com/mongodb/mongo-tools-common v2.0.1+incompatible
-	github.com/pierrec/lz4/v4 v4.1.11
+	github.com/pierrec/lz4/v4 v4.1.21
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
 	github.com/spf13/cobra v1.4.0
@@ -40,7 +40,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.8.2
-	github.com/ulikunitz/xz v0.5.8
+	github.com/ulikunitz/xz v0.5.11
 	github.com/wal-g/json v0.3.1
 	github.com/wal-g/tracelog v0.0.0-20231219102105-60dcd9126592
 	github.com/yandex-cloud/go-genproto v0.0.0-20230918115514-93a99045c9de

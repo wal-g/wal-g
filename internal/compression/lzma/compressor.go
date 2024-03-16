@@ -1,6 +1,7 @@
 package lzma
 
 import (
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 
 	"github.com/ulikunitz/xz/lzma"
@@ -13,8 +14,8 @@ const (
 
 type Compressor struct{}
 
-func (compressor Compressor) NewWriter(writer io.Writer) io.WriteCloser {
-	lzmaWriter, err := lzma.NewWriter(writer)
+func (compressor Compressor) NewWriter(writer io.Writer) ioextensions.WriteFlushCloser {
+	lzmaWriter, err := lzma.NewWriter2(writer)
 	if err != nil {
 		panic(err)
 	}

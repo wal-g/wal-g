@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 	"io"
@@ -27,8 +28,13 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	dial, err := net.Dial("tcp", destination)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	decoder := gob.NewDecoder(dial)
-	encoder := gob.NewEncoder(dial)
+	cmpr, decmpr := chooseCompression()
+
+	writer := cmpr.NewWriter(dial)
+	reader, err := decmpr.Decompress(dial)
+	tracelog.ErrorLogger.FatalOnError(err)
+	decoder := gob.NewDecoder(reader)
+	encoder := gob.NewEncoder(writer)
 
 	var control PgControlData
 	err = decoder.Decode(&control)
@@ -69,7 +75,20 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 
 	err = encoder.Encode(CatchupCommandDto{IsDone: true})
 	tracelog.ErrorLogger.FatalOnError(err)
+	err = writer.Flush()
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Send done")
+}
+
+func chooseCompression() (compression.Compressor, compression.Decompressor) {
+	var c compression.Compressor
+	var ok bool
+	if c, ok = compression.Compressors["br"]; !ok {
+		c = compression.Compressors["lz4"]
+	}
+
+	d := compression.GetDecompressorByCompressor(c)
+	return c, d
 }
 
 func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
@@ -197,9 +216,17 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	conn, err := listen.Accept()
 	tracelog.ErrorLogger.FatalOnError(err)
-	decoder := gob.NewDecoder(conn)
-	encoder := gob.NewEncoder(conn)
+
+	cmpr, decmpr := chooseCompression()
+
+	writer := cmpr.NewWriter(conn)
+	reader, err := decmpr.Decompress(conn)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	decoder := gob.NewDecoder(reader)
+	encoder := gob.NewEncoder(writer)
 	sendControlAndFileList(pgDataDirectory, err, encoder)
+	writer.Flush()
 	for {
 		var cmd CatchupCommandDto
 		err := decoder.Decode(&cmd)
