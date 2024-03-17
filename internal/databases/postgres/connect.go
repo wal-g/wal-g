@@ -41,9 +41,22 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		}
 	}
 
+	// TODO: Move this logic to queryRunner
+
+	var standby bool
+
+	err = conn.QueryRow("select pg_is_in_recovery()").Scan(&standby)
+	if err != nil {
+		return nil, errors.Wrap(err, "Connect: postgres standby test failed")
+	}
+
+	if standby {
+		// archive_mode may be configured on primary
+		return conn, nil
+	}
+
 	var archiveMode string
 
-	// TODO: Move this logic to queryRunner
 	err = conn.QueryRow("show archive_mode").Scan(&archiveMode)
 
 	if err != nil {
