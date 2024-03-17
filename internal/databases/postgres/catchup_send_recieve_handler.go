@@ -130,7 +130,7 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 			wasInBase = true
 		}
 
-		sendOneFile(path, info, err, wasInBase, checkpoint, encoder, fullFileName)
+		sendOneFile(path, info, wasInBase, checkpoint, encoder, fullFileName)
 
 		return nil
 	})
@@ -158,8 +158,9 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 	}
 }
 
-func sendOneFile(path string, info fs.FileInfo, err error, wasInBase bool, checkpoint LSN, encoder *gob.Encoder, fullFileName string) {
+func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN, encoder *gob.Encoder, fullFileName string) {
 	increment := isPagedFile(info, path) && wasInBase
+	var err error
 
 	var fd io.ReadCloser
 	var size int64
