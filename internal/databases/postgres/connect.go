@@ -41,7 +41,7 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		}
 	}
 
-	err = checkArchiveCommand(err, conn)
+	err = checkArchiveCommand(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -49,12 +49,12 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 	return conn, nil
 }
 
-func checkArchiveCommand(err error, conn *pgx.Conn) error {
+func checkArchiveCommand(conn *pgx.Conn) error {
 	// TODO: Move this logic to queryRunner
 
 	var standby bool
 
-	err = conn.QueryRow("select pg_is_in_recovery()").Scan(&standby)
+	err := conn.QueryRow("select pg_is_in_recovery()").Scan(&standby)
 	if err != nil {
 		return errors.Wrap(err, "Connect: postgres standby test failed")
 	}
