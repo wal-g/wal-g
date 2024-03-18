@@ -15,11 +15,20 @@ const (
 type Compressor struct{}
 
 func (compressor Compressor) NewWriter(writer io.Writer) ioextensions.WriteFlushCloser {
-	lzmaWriter, err := lzma.NewWriter2(writer)
+	lzmaWriter, err := lzma.NewWriter(writer)
 	if err != nil {
 		panic(err)
 	}
-	return lzmaWriter
+	return Writer{lzmaWriter}
+}
+
+type Writer struct {
+	*lzma.Writer
+}
+
+func (l Writer) Flush() error {
+	// Maybe in LZMA2
+	panic("Flush not implemented for LZMA.")
 }
 
 func (compressor Compressor) FileExtension() string {
