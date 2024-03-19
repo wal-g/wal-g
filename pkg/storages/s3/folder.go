@@ -115,6 +115,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		}
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
 	}
+	// object.ContentLength read bytes
 	statistics.WriteStatusCodeMetric(200)
 
 	reader := object.Body

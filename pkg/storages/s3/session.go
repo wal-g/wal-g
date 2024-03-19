@@ -91,6 +91,39 @@ func createSession(config *Config) (*session.Session, error) {
 	return sess, err
 }
 
+type CustomHTTPClient struct {
+	Client http.Client
+}
+
+// // Do wraps the default Do method to log the size of the request and response.
+// func (c *CustomHTTPClient) Do(req *http.Request) (*http.Response, error) {
+// 	// Log the request size
+// 	if req.Body != nil {
+// 		bodyBytes, err := io.ReadAll(req.Body)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Reset the body to be read again
+// 		fmt.Printf("Request size: %d bytes\n", len(bodyBytes))
+// 	}
+
+// 	// Perform the request
+// 	resp, err := c.Client.Do(req)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Log the response size
+// 	bodyBytes, err := io.ReadAll(resp.Body)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	resp.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Reset the body to be read again
+// 	fmt.Printf("Response size: %d bytes\n", len(bodyBytes))
+
+// 	return resp, nil
+// }
+
 func configureSession(sess *session.Session, config *Config) error {
 	awsConfig := sess.Config
 
@@ -103,6 +136,9 @@ func configureSession(sess *session.Session, config *Config) error {
 			MinThrottleDelay: config.MinThrottlingRetryDelay,
 			MaxThrottleDelay: config.MaxThrottlingRetryDelay,
 		}))
+
+	client := &CustomHTTPClient{}
+	awsConfig.HTTPClient = client
 
 	accessKey := config.AccessKey
 	secretKey := config.Secrets.SecretKey

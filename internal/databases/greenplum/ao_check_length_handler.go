@@ -44,15 +44,18 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 		tracelog.ErrorLogger.FatalfOnError("could not get cluster info %v", err)
 	}
 
-	segmentsBaccups, err := getSegmentBackupNames(checker.backupName)
-	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
+	segmentsBackups := make(map[int]string)
+	if checker.checkBackup {
+		segmentsBackups, err = getSegmentBackupNames(checker.backupName)
+		if err != nil {
+			tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
+		}
 	}
 
 	remoteOutput := globalCluster.GenerateAndExecuteCommand("Run ao/aocs length check",
 		cluster.ON_SEGMENTS,
 		func(contentID int) string {
-			return checker.buildCheckAOLengthCmd(contentID, segmentsBaccups[contentID], globalCluster)
+			return checker.buildCheckAOLengthCmd(contentID, segmentsBackups, globalCluster)
 		})
 
 	for _, command := range remoteOutput.Commands {
@@ -68,16 +71,15 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	}
 }
 
-func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupName string, globalCluster *cluster.Cluster) string {
+func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupNames map[int]string, globalCluster *cluster.Cluster) string {
 	segment := globalCluster.ByContent[contentID][0]
-
 	runCheckArgs := []string{
 		fmt.Sprintf("--port=%d", segment.Port),
 		fmt.Sprintf("--segnum=%d", segment.ContentID),
 	}
 
 	if checker.checkBackup {
-		runCheckArgs = append(runCheckArgs, "--check-backup", fmt.Sprintf("--backup-name=%s", backupName))
+		runCheckArgs = append(runCheckArgs, "--check-backup", fmt.Sprintf("--backup-name=%s", backupNames[contentID]))
 	}
 
 	runCheckArgsLine := strings.Join(runCheckArgs, " ")

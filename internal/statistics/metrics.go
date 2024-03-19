@@ -18,7 +18,9 @@ type metrics struct {
 	UploadedFilesTotal       prometheus.Counter
 	UploadedFilesFailedTotal prometheus.Counter
 
-	S3Codes prometheus.GaugeVec
+	S3Codes        prometheus.GaugeVec
+	S3BytesWritten prometheus.Gauge
+	S3BytesRead    prometheus.Gauge
 }
 
 var (
