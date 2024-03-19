@@ -2,8 +2,10 @@ package gp
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 )
 
@@ -24,7 +26,8 @@ var checkAOTableLengthMasterCmd = &cobra.Command{
 }
 
 func init() {
-	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&logsDir, "logs", "l", "/var/log/greenplum", `directory to store logs`)
+	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&logsDir, "logs", "l", viper.GetString(conf.GPLogsDirectory),
+		"directory to store logs")
 	checkAOTableLengthMasterCmd.PersistentFlags().BoolVar(&runBackupCheck, "check-backup", false,
 		"if the flag is set, checks backup`s length")
 	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&name, "backup-name", "n", internal.LatestString,
