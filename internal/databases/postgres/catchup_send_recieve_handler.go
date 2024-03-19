@@ -94,7 +94,6 @@ func chooseCompression() (compression.Compressor, compression.Decompressor) {
 func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
 	extendExcludedFiles()
 	seenFiles := make(map[string]bool)
-	var filesToDelete []string
 	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
 		fullFileName := utility.GetSubdirectoryRelativePath(path, directory)
 		seenFiles[fullFileName] = true
@@ -136,6 +135,11 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 	})
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("Filepath walk done")
+	sendDeletedFiles(encoder, list, seenFiles)
+}
+
+func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool) {
+	var filesToDelete []string
 	for k := range list {
 		if _, ok := seenFiles[k]; ok {
 			continue
@@ -153,7 +157,7 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 		filesToDelete = append(filesToDelete, k)
 	}
 	if len(filesToDelete) > 0 {
-		err = encoder.Encode(CatchupCommandDto{IsDelete: true, FilesToDelete: filesToDelete})
+		err := encoder.Encode(CatchupCommandDto{IsDelete: true, FilesToDelete: filesToDelete})
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }
@@ -227,7 +231,8 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	decoder := gob.NewDecoder(reader)
 	encoder := gob.NewEncoder(writer)
 	sendControlAndFileList(pgDataDirectory, err, encoder)
-	writer.Flush()
+	err = writer.Flush()
+	tracelog.ErrorLogger.FatalOnError(err)
 	for {
 		var cmd CatchupCommandDto
 		err := decoder.Decode(&cmd)
