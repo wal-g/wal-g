@@ -69,7 +69,8 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	}
 }
 
-func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupNames map[int]string, globalCluster *cluster.Cluster) string {
+func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupNames map[int]string,
+	globalCluster *cluster.Cluster) string {
 	segment := globalCluster.ByContent[contentID][0]
 	runCheckArgs := []string{
 		fmt.Sprintf("--port=%d", segment.Port),
