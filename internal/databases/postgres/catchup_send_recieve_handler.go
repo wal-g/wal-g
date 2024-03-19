@@ -28,13 +28,26 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	dial, err := net.Dial("tcp", destination)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	crypter := internal.ConfigureCrypter()
+
 	cmpr, decmpr := chooseCompression()
 
 	writer := cmpr.NewWriter(dial)
 	reader, err := decmpr.Decompress(dial)
 	tracelog.ErrorLogger.FatalOnError(err)
-	decoder := gob.NewDecoder(reader)
-	encoder := gob.NewEncoder(writer)
+	var decoder *gob.Decoder
+	var encoder *gob.Encoder
+	if crypter != nil {
+		decrypt, err := crypter.Decrypt(reader)
+		tracelog.ErrorLogger.FatalOnError(err)
+		decoder = gob.NewDecoder(decrypt)
+		encrypt, err := crypter.Encrypt(writer)
+		tracelog.ErrorLogger.FatalOnError(err)
+		encoder = gob.NewEncoder(encrypt)
+	} else {
+		decoder = gob.NewDecoder(reader)
+		encoder = gob.NewEncoder(writer)
+	}
 
 	var control PgControlData
 	err = decoder.Decode(&control)
@@ -228,8 +241,21 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	reader, err := decmpr.Decompress(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	decoder := gob.NewDecoder(reader)
-	encoder := gob.NewEncoder(writer)
+	crypter := internal.ConfigureCrypter()
+
+	var decoder *gob.Decoder
+	var encoder *gob.Encoder
+	if crypter != nil {
+		decrypt, err := crypter.Decrypt(reader)
+		tracelog.ErrorLogger.FatalOnError(err)
+		decoder = gob.NewDecoder(decrypt)
+		encrypt, err := crypter.Encrypt(writer)
+		tracelog.ErrorLogger.FatalOnError(err)
+		encoder = gob.NewEncoder(encrypt)
+	} else {
+		decoder = gob.NewDecoder(reader)
+		encoder = gob.NewEncoder(writer)
+	}
 	sendControlAndFileList(pgDataDirectory, err, encoder)
 	err = writer.Flush()
 	tracelog.ErrorLogger.FatalOnError(err)
