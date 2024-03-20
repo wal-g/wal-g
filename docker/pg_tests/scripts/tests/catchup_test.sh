@@ -118,7 +118,7 @@ popd
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w stop
 
-#diff ${ALPHA_DUMP} ${BETA_DUMP}
+diff ${ALPHA_DUMP} ${BETA_DUMP}
 
 /tmp/scripts/drop_pg.sh
 rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA}
