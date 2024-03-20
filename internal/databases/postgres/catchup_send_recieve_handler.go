@@ -25,29 +25,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 		tracelog.ErrorLogger.Fatal("Our system lacks System Identifier, cannot proceed")
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
-	dial, err := net.Dial("tcp", destination)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	crypter := internal.ConfigureCrypter()
-
-	cmpr, decmpr := chooseCompression()
-
-	writer := cmpr.NewWriter(dial)
-	reader, err := decmpr.Decompress(dial)
-	tracelog.ErrorLogger.FatalOnError(err)
-	var decoder *gob.Decoder
-	var encoder *gob.Encoder
-	if crypter != nil {
-		decrypt, err := crypter.Decrypt(reader)
-		tracelog.ErrorLogger.FatalOnError(err)
-		decoder = gob.NewDecoder(decrypt)
-		encrypt, err := crypter.Encrypt(writer)
-		tracelog.ErrorLogger.FatalOnError(err)
-		encoder = gob.NewEncoder(encrypt)
-	} else {
-		decoder = gob.NewDecoder(reader)
-		encoder = gob.NewEncoder(writer)
-	}
+	writer, decoder, encoder := startSendConnection(destination)
 
 	var control PgControlData
 	err = decoder.Decode(&control)
@@ -91,6 +69,33 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	err = writer.Flush()
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Send done")
+}
+
+func startSendConnection(destination string) (ioextensions.WriteFlushCloser, *gob.Decoder, *gob.Encoder) {
+	dial, err := net.Dial("tcp", destination)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	crypter := internal.ConfigureCrypter()
+
+	cmpr, decmpr := chooseCompression()
+
+	writer := cmpr.NewWriter(dial)
+	reader, err := decmpr.Decompress(dial)
+	tracelog.ErrorLogger.FatalOnError(err)
+	var decoder *gob.Decoder
+	var encoder *gob.Encoder
+	if crypter != nil {
+		decrypt, err := crypter.Decrypt(reader)
+		tracelog.ErrorLogger.FatalOnError(err)
+		decoder = gob.NewDecoder(decrypt)
+		encrypt, err := crypter.Encrypt(writer)
+		tracelog.ErrorLogger.FatalOnError(err)
+		encoder = gob.NewEncoder(encrypt)
+	} else {
+		decoder = gob.NewDecoder(reader)
+		encoder = gob.NewEncoder(writer)
+	}
+	return writer, decoder, encoder
 }
 
 func chooseCompression() (compression.Compressor, compression.Decompressor) {
