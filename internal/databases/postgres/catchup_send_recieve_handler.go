@@ -36,7 +36,8 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 		tracelog.ErrorLogger.Fatal("System identifiers do not match")
 	}
 	if control.CurrentTimeline != info.Timeline {
-		tracelog.ErrorLogger.Fatalf("Destination is on timeline %v, but we are on %v", control.CurrentTimeline, info.Timeline)
+		tracelog.ErrorLogger.Fatalf("Destination is on timeline %v, but we are on %v",
+			control.CurrentTimeline, info.Timeline)
 	}
 	var fileList internal.BackupFileList
 	err = decoder.Decode(&fileList)
@@ -47,7 +48,8 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	lsn, err := ParseLSN(lsnStr)
 	tracelog.ErrorLogger.FatalOnError(err)
 	if lsn <= control.Checkpoint {
-		tracelog.ErrorLogger.Fatalf("Catchup destination is already ahead (our LSN %v, destination LSN %v).", lsn, control.Checkpoint)
+		tracelog.ErrorLogger.Fatalf("Catchup destination is already ahead (our LSN %v, destination LSN %v).",
+			lsn, control.Checkpoint)
 	}
 
 	label, offsetMap, _, err := runner.StopBackup()
@@ -55,13 +57,18 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 
 	sendFileCommands(encoder, pgDataDirectory, fileList, control.Checkpoint)
 
-	err = encoder.Encode(CatchupCommandDto{BinaryContents: []byte(label), FileName: BackupLabelFilename, IsBinContents: true})
+	err = encoder.Encode(
+		CatchupCommandDto{BinaryContents: []byte(label), FileName: BackupLabelFilename, IsBinContents: true})
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = encoder.Encode(CatchupCommandDto{BinaryContents: []byte(offsetMap), FileName: TablespaceMapFilename, IsBinContents: true})
+	err = encoder.Encode(
+		CatchupCommandDto{BinaryContents: []byte(offsetMap), FileName: TablespaceMapFilename, IsBinContents: true})
 	tracelog.ErrorLogger.FatalOnError(err)
 	ourPgControl, err := os.ReadFile(path.Join(pgDataDirectory, PgControlPath))
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = encoder.Encode(CatchupCommandDto{BinaryContents: ourPgControl, FileName: utility.SanitizePath(PgControlPath), IsBinContents: true})
+	err = encoder.Encode(
+		CatchupCommandDto{
+			BinaryContents: ourPgControl, FileName: utility.SanitizePath(PgControlPath), IsBinContents: true,
+		})
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = encoder.Encode(CatchupCommandDto{IsDone: true})
@@ -180,7 +187,8 @@ func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFi
 	}
 }
 
-func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN, encoder *gob.Encoder, fullFileName string) {
+func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
+	encoder *gob.Encoder, fullFileName string) {
 	increment := isPagedFile(info, path) && wasInBase
 	var err error
 
@@ -209,7 +217,8 @@ func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN, 
 		}
 	}
 
-	err = encoder.Encode(CatchupCommandDto{FileName: fullFileName, IsFull: !increment, FileSize: uint64(size), IsIncremental: increment})
+	err = encoder.Encode(
+		CatchupCommandDto{FileName: fullFileName, IsFull: !increment, FileSize: uint64(size), IsIncremental: increment})
 	tracelog.ErrorLogger.FatalOnError(err)
 	reader := io.MultiReader(fd, &ioextensions.ZeroReader{})
 
@@ -328,7 +337,8 @@ func doRcvCommand(cmd CatchupCommandDto, directory string, decoder *gob.Decoder)
 	if cmd.IsIncremental {
 		tracelog.InfoLogger.Printf("Incremental file %v", cmd.FileName)
 
-		err := ApplyFileIncrement(path.Join(directory, cmd.FileName), &DecoderReader{decoder, nil, int64(cmd.FileSize)}, true, false)
+		err := ApplyFileIncrement(path.Join(directory, cmd.FileName),
+			&DecoderReader{decoder, nil, int64(cmd.FileSize)}, true, false)
 		tracelog.ErrorLogger.FatalOnError(err)
 		return
 	}
@@ -358,7 +368,8 @@ type CatchupCommandDto struct {
 func sendControlAndFileList(pgDataDirectory string, err error, encoder *gob.Encoder) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	control, err := ExtractPgControl(pgDataDirectory)
-	tracelog.InfoLogger.Printf("Our system id %v, need catchup from %v", control.SystemIdentifier, control.Checkpoint)
+	tracelog.InfoLogger.Printf("Our system id %v, need catchup from %v",
+		control.SystemIdentifier, control.Checkpoint)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = encoder.Encode(control)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -386,7 +397,8 @@ func receiveFileList(directory string) internal.BackupFileList {
 		if excluded {
 			return nil
 		}
-		result[utility.GetSubdirectoryRelativePath(path, directory)] = internal.BackupFileDescription{MTime: info.ModTime(), IsSkipped: false, IsIncremented: false}
+		result[utility.GetSubdirectoryRelativePath(path, directory)] =
+			internal.BackupFileDescription{MTime: info.ModTime(), IsSkipped: false, IsIncremented: false}
 
 		return nil
 	})
