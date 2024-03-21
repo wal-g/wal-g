@@ -63,7 +63,7 @@ func (u *AoStorageUploader) AddFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 	return err
 }
 
-func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
+func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error { //here
 	remoteFile, ok := u.baseAoFiles[cfi.Header.Name]
 	if !ok {
 		tracelog.DebugLogger.Printf("%s: no base file in storage, will perform a regular upload", cfi.Header.Name)
@@ -73,6 +73,12 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 	if remoteFile.InitialUploadTS.Before(u.deduplicationMinAge) {
 		tracelog.DebugLogger.Printf("%s: deduplication age limit passed (initial upload time: %s), will perform a regular upload",
 			cfi.Header.Name, remoteFile.InitialUploadTS)
+		return u.regularAoUpload(cfi, aoMeta, location)
+	}
+
+	if !u.isIncremental && remoteFile.IsIncremented {
+		tracelog.DebugLogger.Printf("%s: isIncremental: %t, will perform a regular upload",
+			cfi.Header.Name, u.isIncremental)
 		return u.regularAoUpload(cfi, aoMeta, location)
 	}
 
