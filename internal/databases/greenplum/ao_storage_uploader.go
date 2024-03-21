@@ -63,7 +63,7 @@ func (u *AoStorageUploader) AddFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 	return err
 }
 
-func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error { //here
+func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
 	remoteFile, ok := u.baseAoFiles[cfi.Header.Name]
 	if !ok {
 		tracelog.DebugLogger.Printf("%s: no base file in storage, will perform a regular upload", cfi.Header.Name)
@@ -77,8 +77,8 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 	}
 
 	if !u.isIncremental && remoteFile.IsIncremented {
-		tracelog.DebugLogger.Printf("%s: isIncremental: %t, will perform a regular upload",
-			cfi.Header.Name, u.isIncremental)
+		tracelog.DebugLogger.Printf("%s: backup isIncremental: %t, remote file isIncremented: %t, will perform a regular upload",
+			cfi.Header.Name, u.isIncremental, remoteFile.IsIncremented)
 		return u.regularAoUpload(cfi, aoMeta, location)
 	}
 
