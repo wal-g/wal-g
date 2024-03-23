@@ -9,7 +9,7 @@ import (
 )
 
 func extendExcludedFiles() {
-	for _, fname := range []string{"pg_hba.conf", "postgresql.conf"} {
+	for _, fname := range []string{"pg_hba.conf", "postgresql.conf", "postgresql.auto.conf"} {
 		ExcludedFilenames[fname] = utility.Empty{}
 	}
 }

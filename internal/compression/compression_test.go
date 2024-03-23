@@ -36,6 +36,9 @@ func testCompressor(compressor Compressor, testData bytes.Buffer, t *testing.T) 
 	dr, err := decompressor.Decompress(&compressed)
 	assert.NoError(t, err)
 	assert.NotNil(t, dr)
+	if dr == nil {
+		return
+	}
 	_, err = io.Copy(&decompressed, dr)
 	assert.NoError(t, err)
 	assert.Equal(t, initialData.Bytes(), decompressed.Bytes())

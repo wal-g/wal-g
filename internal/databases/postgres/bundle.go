@@ -146,7 +146,7 @@ func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 	backup string) (backupName string, lsn LSN, err error) {
 	var name, lsnStr string
-	name, lsnStr, bundle.Replica, err = queryRunner.startBackup(backup)
+	name, lsnStr, bundle.Replica, err = queryRunner.StartBackup(backup)
 
 	if err != nil {
 		return "", 0, err
@@ -343,7 +343,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
 func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner) (string, []string, LSN, error) {
-	label, offsetMap, lsnStr, err := queryRunner.stopBackup()
+	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}

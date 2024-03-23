@@ -24,7 +24,7 @@ func NewBackupTerminator(queryRunner *PgQueryRunner, pgVersion int, pgDataDir st
 }
 
 func (t *BackupTerminator) TerminateBackup() {
-	_, _, _, err := t.queryRunner.stopBackup()
+	_, _, _, err := t.queryRunner.StopBackup()
 	if err == nil {
 		tracelog.InfoLogger.Printf("Successfully stopped the running backup")
 		return

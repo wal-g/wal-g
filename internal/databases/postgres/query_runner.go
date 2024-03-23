@@ -211,7 +211,7 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 }
 
 // StartBackup informs the database that we are starting copy of cluster contents
-func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
+func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 	lsnString string, inRecovery bool, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
@@ -231,7 +231,7 @@ func (queryRunner *PgQueryRunner) startBackup(backup string) (backupName string,
 }
 
 // StopBackup informs the database that copy is over
-func (queryRunner *PgQueryRunner) stopBackup() (label string, offsetMap string, lsnStr string, err error) {
+func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 

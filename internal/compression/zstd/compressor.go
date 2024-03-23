@@ -1,6 +1,7 @@
 package zstd
 
 import (
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 
 	"github.com/klauspost/compress/zstd"
@@ -13,7 +14,7 @@ const (
 
 type Compressor struct{}
 
-func (compressor Compressor) NewWriter(writer io.Writer) io.WriteCloser {
+func (compressor Compressor) NewWriter(writer io.Writer) ioextensions.WriteFlushCloser {
 	zw, err := zstd.NewWriter(writer, zstd.WithEncoderLevel(zstd.SpeedDefault))
 	if err != nil {
 		panic(err)

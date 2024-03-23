@@ -1,12 +1,13 @@
 package testtools
 
 import (
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 )
 
 type MockCompressor struct{}
 
-func (compressor *MockCompressor) NewWriter(writer io.Writer) io.WriteCloser {
+func (compressor *MockCompressor) NewWriter(writer io.Writer) ioextensions.WriteFlushCloser {
 	return &NopCloserWriter{
 		writer,
 	}

@@ -30,6 +30,11 @@ type Flusher interface {
 	Flush() error
 }
 
+type WriteFlushCloser interface {
+	io.WriteCloser
+	Flusher
+}
+
 type OnCloseFlusher struct {
 	io.WriteCloser
 	Flusher

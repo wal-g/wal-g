@@ -13,8 +13,9 @@ const pgControlSize = 8192
 
 // PgControlData represents data contained in pg_control file
 type PgControlData struct {
-	systemIdentifier uint64 // systemIdentifier represents system ID of PG cluster (f.e. [0-8] bytes in pg_control)
-	currentTimeline  uint32 // currentTimeline represents current timeline of PG cluster (f.e. [48-52] bytes in pg_control v. 1100+)
+	SystemIdentifier uint64 // SystemIdentifier represents system ID of PG cluster (f.e. [0-8] bytes in pg_control)
+	CurrentTimeline  uint32 // CurrentTimeline represents current timeline of PG cluster (f.e. [48-52] bytes in pg_control v. 1100+)
+	Checkpoint       LSN    //
 	// Any data from pg_control
 }
 
@@ -49,6 +50,7 @@ func extractPgControlData(pgControlReader io.Reader) (*PgControlData, error) {
 	}
 
 	systemID := binary.LittleEndian.Uint64(bytes[0:8])
+	checkpointLSN := LSN(binary.LittleEndian.Uint64(bytes[32:40]))
 	pgControlVersion := binary.LittleEndian.Uint32(bytes[8:12])
 	currentTimeline := uint32(0)
 
@@ -60,15 +62,16 @@ func extractPgControlData(pgControlReader io.Reader) (*PgControlData, error) {
 
 	// Parse bytes from pg_control file and share this data
 	return &PgControlData{
-		systemIdentifier: systemID,
-		currentTimeline:  currentTimeline,
+		SystemIdentifier: systemID,
+		CurrentTimeline:  currentTimeline,
+		Checkpoint:       checkpointLSN,
 	}, nil
 }
 
 func (data *PgControlData) GetSystemIdentifier() uint64 {
-	return data.systemIdentifier
+	return data.SystemIdentifier
 }
 
 func (data *PgControlData) GetCurrentTimeline() uint32 {
-	return data.currentTimeline
+	return data.CurrentTimeline
 }
