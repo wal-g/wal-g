@@ -19,6 +19,7 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
     - [Installing](#installing)
     - [Testing](#testing)
     - [Development on windows](#development-on-windows)
+- [Troubleshooting](#troubleshooting)
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
@@ -358,6 +359,21 @@ This command generates `coverage.out` file and opens HTML representation of the 
 ### Development on Windows
 
 [Information about installing and usage](Windows.md)
+
+
+Troubleshooting
+---------------
+
+A good way to start troubleshooting problems is by setting one or both of these environment variables:
+
+* `WALG_LOG_LEVEL=DEVEL`
+
+Prints out the used configuration of WAL-G and detailed logs of the used command.
+
+* `S3_LOG_LEVEL=DEVEL`
+
+If your commands seem to be stuck it could be that the S3 is not reachable, certificate problems or other S3 related issues.
+With this environment variable set you can see the Requests and Responses from S3.
 
 
 Authors
