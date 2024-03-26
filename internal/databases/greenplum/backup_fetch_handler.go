@@ -226,7 +226,6 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	return nil
 }
 
-// TODO: Unit tests
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
 func (fh *FetchHandler) buildFetchCommand(contentID int) string {
