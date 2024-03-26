@@ -6,10 +6,10 @@ volumes:
 x-s3_common_depends: &s3_common_depends
   depends_on:
     - s3
-    # - graphite
+    - graphite
   links:
     - s3
-    # - graphite
+    - graphite
 
 x-s3_throttling_depends: &s3_throttling_depends
   depends_on:
