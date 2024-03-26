@@ -75,7 +75,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				partialRestoreArgs:  nil,
 			},
 			1,
-			"echo 'skipping contentID 1: disabled in config'",
+			newSkippedSegmentMsg(1),
 		},
 		{
 			&FetchHandler{
@@ -88,7 +88,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				partialRestoreArgs:  nil,
 			},
 			1,
-			"echo 'skipping contentID 1: disabled in config'",
+			newSkippedSegmentMsg(1),
 		},
 		{
 			&FetchHandler{
@@ -127,7 +127,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				"/etc/test/ " +
 				"--content-id=2 " +
 				"--target-user-data=\"{\\\"id\\\":\\\"testing\\\"}\" " +
-				"--config=testConfig >> /wal-g-log-seg1.log 2>&1",
+				"--config=testConfig >> " + formatSegmentLogPath(1) + " 2>&1",
 		},
 		{
 			&FetchHandler{
@@ -170,7 +170,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				"--target-user-data=\"{\\\"id\\\":\\\"other-value-from-testing\\\"}\" " +
 				"--config=testConfig " +
 				"--restore-only=test1,test2 " +
-				">> /wal-g-log-seg1.log 2>&1",
+				">> " + formatSegmentLogPath(1) + " 2>&1",
 		},
 	}
 
