@@ -26,7 +26,8 @@ var checkAOTableLengthMasterCmd = &cobra.Command{
 }
 
 func init() {
-	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&logsDir, "logs", "l", viper.GetString(conf.GPLogsDirectory), `directory to store logs`)
+	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&logsDir, "logs", "l", viper.GetString(conf.GPLogsDirectory),
+		"directory to store logs")
 	checkAOTableLengthMasterCmd.PersistentFlags().BoolVar(&runBackupCheck, "check-backup", false,
 		"if the flag is set, checks backup`s length")
 	checkAOTableLengthMasterCmd.PersistentFlags().StringVarP(&name, "backup-name", "n", internal.LatestString,

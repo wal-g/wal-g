@@ -13,7 +13,6 @@ import (
 )
 
 type AOLengthCheckHandler struct {
-	logsDir     string
 	checkBackup bool
 	backupName  string
 }
@@ -21,7 +20,6 @@ type AOLengthCheckHandler struct {
 func NewAOLengthCheckHandler(logsDir string, checkBackup bool, backupName string) (*AOLengthCheckHandler, error) {
 	initGpLog(logsDir)
 	return &AOLengthCheckHandler{
-		logsDir:     logsDir,
 		checkBackup: checkBackup,
 		backupName:  backupName,
 	}, nil
@@ -71,7 +69,8 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	}
 }
 
-func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupNames map[int]string, globalCluster *cluster.Cluster) string {
+func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupNames map[int]string,
+	globalCluster *cluster.Cluster) string {
 	segment := globalCluster.ByContent[contentID][0]
 	runCheckArgs := []string{
 		fmt.Sprintf("--port=%d", segment.Port),
@@ -91,7 +90,7 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 		fmt.Sprintf("--config=%s", conf.CfgFile),
 		// method
 		"check-ao-aocs-length-segment",
-		// actual arguments to be passed to the backup-push command
+		// actual arguments to be passed to the check-ao command
 		runCheckArgsLine,
 		// forward stdout and stderr to the log file
 		"&>>", formatSegmentLogPath(contentID),
