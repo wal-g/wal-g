@@ -97,7 +97,6 @@ func configureSession(sess *session.Session, config *Config) error {
 	// DefaultRetryer implements basic retry logic using exponential backoff for
 	// most services. If you want to implement custom retry logic, you can implement the
 	// request.Retryer interface.
-
 	awsConfig = request.WithRetryer(awsConfig, NewConnResetRetryer(
 		client.DefaultRetryer{
 			NumMaxRetries:    config.MaxRetries,
