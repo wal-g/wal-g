@@ -5,6 +5,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/config"
+	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -178,4 +180,39 @@ func TestBuildFetchCommand(t *testing.T) {
 		cmdLine := tc.handler.buildFetchCommand(tc.contentID)
 		assert.Equal(t, tc.cmdLine, cmdLine)
 	}
+}
+
+func TestBuildFetchCommandCrushes(t *testing.T) {
+	handler := &FetchHandler{
+		cluster: &cluster.Cluster{
+			ByContent: map[int][]*cluster.SegConfig{
+				1: {
+					{
+						DbID:      1,
+						ContentID: 2,
+						Role:      "controlled",
+						Port:      1234,
+						Hostname:  "test.com",
+						DataDir:   "/etc/test/",
+					},
+				},
+			},
+		},
+		backupIDByContentID: map[int]string{},
+		backup:              internal.Backup{},
+		contentIDsToFetch:   map[int]bool{1: true},
+	}
+
+	if os.Getenv("FROM_TEST_BUILD_FETCH_COMMAND") == "1" {
+		handler.buildFetchCommand(1)
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestBuildFetchCommandCrushes")
+	cmd.Env = append(os.Environ(), "FROM_TEST_BUILD_FETCH_COMMAND=1")
+	err := cmd.Run()
+	if e, ok := err.(*exec.ExitError); ok && !e.Success() {
+		return
+	}
+	t.Fatalf("process ran with err %v, want exit status 1", err)
 }
