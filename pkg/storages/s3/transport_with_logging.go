@@ -20,10 +20,11 @@ func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	tracelog.DebugLogger.Printf("HTTP response code: %d", resp.StatusCode)
 	statistics.WriteStatusCodeMetric(resp.StatusCode)
 	tracelog.DebugLogger.Printf("request %s response: %d request: %d", r.Method, resp.ContentLength, r.ContentLength)
-	if r.Method == "GET" {
+
+	if resp.StatusCode != http.StatusAccepted && r.Method == "GET" {
 		statistics.WalgMetrics.S3BytesRead.Add(float64(resp.ContentLength))
 	}
-	if r.Method == "PUT" || r.Method == "POST" {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 && (r.Method == "PUT" || r.Method == "POST") {
 		statistics.WalgMetrics.S3BytesWritten.Add(float64(r.ContentLength))
 	}
 	return resp, err
