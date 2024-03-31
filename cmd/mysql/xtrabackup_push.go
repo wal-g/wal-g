@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
@@ -35,7 +36,7 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 			err = validateXtrabackupArgs()
 			if err != nil {
-				tracelog.ErrorLogger.Fatalf("invalid command line arguments: %w", err)
+				tracelog.ErrorLogger.Fatalf("invalid command line arguments: %v", err)
 			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {

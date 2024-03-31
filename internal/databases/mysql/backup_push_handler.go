@@ -3,17 +3,19 @@ package mysql
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 
 	"github.com/wal-g/tracelog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"golang.org/x/sync/errgroup"
 )
 
 //nolint:funlen
@@ -166,7 +168,12 @@ func handleXtrabackupBackup(
 			threadUploader := uploader.Clone()
 			fifoFileName := getXtrabackupFifoFileName("/tmp", idx) // FIXME: make configurable
 			file, err := openFifoFile(fifoFileName)
-			tracelog.ErrorLogger.FatalfOnError("failed to open named pipe: %v", err)
+			if err != nil {
+				stdoutStr, _ := io.ReadAll(stdout)
+				tracelog.ErrorLogger.Printf("Backup command output:\n%s", string(stdoutStr))
+				tracelog.ErrorLogger.Printf("Backup command stderr:\n%s", stderr.String())
+				tracelog.ErrorLogger.FatalfOnError("failed to open named pipe: %v", err)
+			}
 
 			errGroup.Go(func() error {
 				// FIXME: SplitStreamUploader and RegularUploader's PushStreamToDestination() method has different understanding of dstPath... that is bug

@@ -15,11 +15,12 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -244,6 +245,7 @@ func detectFifoStreams(backup internal.Backup) (int, error) {
 	// 				<stream content>
 	fifoStreams := 0
 	for _, folder := range folders {
+		// nolint:staticcheck
 		if ok, _ := regexp.MatchString(".*/thread_\\d/", folder.GetPath()); ok {
 			fifoStreams++
 		}
