@@ -1,11 +1,12 @@
 package compression
 
 import (
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
 )
 
 type Compressor interface {
-	NewWriter(writer io.Writer) io.WriteCloser
+	NewWriter(writer io.Writer) ioextensions.WriteFlushCloser
 	FileExtension() string
 }
 
