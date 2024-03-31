@@ -246,7 +246,7 @@ func detectFifoStreams(backup internal.Backup) (int, error) {
 	fifoStreams := 0
 	for _, folder := range folders {
 		// nolint:staticcheck
-		if ok, _ := regexp.MatchString(".*/thread_\\d/", folder.GetPath()); ok {
+		if ok, _ := regexp.MatchString(".*/thread_\\d+/", folder.GetPath()); ok {
 			fifoStreams++
 		}
 	}
