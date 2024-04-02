@@ -47,6 +47,12 @@ archive_command = '/usr/bin/wal-g seg wal-push %p --content-id=-1 --config /etc/
 … 
 ```
 
+#### Add extension gp_pitr
+The Point-in-Time Recovery (PITR) functionality is included as part of the Greenplum Database 6 installation process through the module gp_pitr, which enables recovery to a specific moment in time.
+```sql
+create extension if not exists gp_pitr;
+```
+
 Usage
 -----
 
