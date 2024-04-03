@@ -549,7 +549,8 @@ var (
 	}
 
 	complexSettings = map[string]bool{
-		PgFailoverStorages: true,
+		PgFailoverStorages:     true,
+		StatsdExtraTagsSetting: true,
 	}
 )
 
