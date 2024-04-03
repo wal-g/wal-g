@@ -455,10 +455,15 @@ func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
 	conn := queryRunner.Connection
 	var bytesPerWalSegment uint32
 
-	err = conn.QueryRow("select timeline_id, bytes_per_wal_segment "+
-		"from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
-	if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
-		return 0, newBytesPerWalSegmentError()
+	if queryRunner.Version >= 90600 {
+		err = conn.QueryRow("select timeline_id, bytes_per_wal_segment "+
+			"from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
+		if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
+			return 0, newBytesPerWalSegmentError()
+		}
+	} else {
+		err = conn.QueryRow("SELECT SUBSTR(pg_xlogfile_name(pg_current_xlog_insert_location()), " +
+			"1, 8)::INT AS timeline").Scan(&timeline)
 	}
 	return
 }
