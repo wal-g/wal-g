@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/multistorage"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -168,18 +168,14 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 func newMultiStorageFolder(t *testing.T) storage.Folder {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
-	cacheMock := cache.NewMockStatusCache(mockCtrl)
+	collectorMock := stats.NewMockCollector(mockCtrl)
+	collectorMock.EXPECT().AllAliveStorages().Return([]string{"test_storage"}, nil)
+	collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-	memStorages := []cache.NamedFolder{
-		{
-			Name:   "test_storage",
-			Root:   "",
-			Folder: memory.NewFolder("", memory.NewStorage()),
-		},
+	memStorages := map[string]storage.Folder{
+		"test_storage": memory.NewFolder("", memory.NewKVS()),
 	}
-	cacheMock.EXPECT().AllAliveStorages().Return(memStorages, nil)
-
-	folder := multistorage.NewFolder(cacheMock)
+	folder := multistorage.NewFolder(memStorages, collectorMock)
 	folder, err := multistorage.UseAllAliveStorages(folder)
 	require.NoError(t, err)
 	multistorage.SetPolicies(folder, policies.TakeFirstStorage)

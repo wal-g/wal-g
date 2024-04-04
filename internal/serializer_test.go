@@ -5,6 +5,8 @@ import (
 
 	"testing"
 
+	conf "github.com/wal-g/wal-g/internal/config"
+
 	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal"
 )
@@ -38,7 +40,7 @@ func TestDtoSerializer_NewDtoSerializer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Set(internal.SerializerTypeSetting, tt.serializerTypeSettingValue)
+			viper.Set(conf.SerializerTypeSetting, tt.serializerTypeSettingValue)
 
 			dto, err := internal.NewDtoSerializer()
 

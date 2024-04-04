@@ -6,14 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/jackc/pgconn"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"github.com/pkg/errors"
@@ -49,18 +52,19 @@ func (err backupFromOtherBD) Error() string {
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
-	Uploader              internal.Uploader
-	isPermanent           bool
-	verifyPageChecksums   bool
-	storeAllCorruptBlocks bool
-	userData              interface{}
-	forceIncremental      bool
-	backupsFolder         string
-	pgDataDirectory       string
-	isFullBackup          bool
-	deltaConfigurator     DeltaBackupConfigurator
-	withoutFilesMetadata  bool
-	composerInitFunc      func(handler *BackupHandler) error
+	Uploader                 internal.Uploader
+	isPermanent              bool
+	verifyPageChecksums      bool
+	storeAllCorruptBlocks    bool
+	userData                 interface{}
+	forceIncremental         bool
+	backupsFolder            string
+	pgDataDirectory          string
+	isFullBackup             bool
+	deltaConfigurator        DeltaBackupConfigurator
+	withoutFilesMetadata     bool
+	composerInitFunc         func(handler *BackupHandler) error
+	preventConcurrentBackups bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -98,9 +102,10 @@ type BackupWorkers struct {
 
 // BackupPgInfo holds the PostgreSQL info that the handler queries before running the backup
 type BackupPgInfo struct {
-	pgVersion        int
+	PgVersion        int
 	PgDataDirectory  string
 	systemIdentifier *uint64
+	Timeline         uint32
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -130,7 +135,13 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 		composerInitFunc: func(handler *BackupHandler) error {
 			return configureTarBallComposer(handler, tarBallComposerType)
 		},
+		preventConcurrentBackups: false,
 	}
+}
+
+func (ba *BackupArguments) EnablePreventConcurrentBackups() {
+	ba.preventConcurrentBackups = true
+	tracelog.InfoLogger.Println("Concurrent backups are disabled")
 }
 
 func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
@@ -145,7 +156,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	crypter := internal.ConfigureCrypter()
 	bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
 		bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
-		viper.GetInt64(internal.TarSizeThresholdSetting))
+		viper.GetInt64(conf.TarSizeThresholdSetting))
 
 	err = bh.startBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -165,29 +176,59 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
 }
 
-func (bh *BackupHandler) startBackup() (err error) {
+func (bh *BackupHandler) startBackup() error {
 	// Connect to postgres and start/finish a nonexclusive backup.
 	tracelog.DebugLogger.Println("Connecting to Postgres.")
 	conn, err := Connect()
 	if err != nil {
-		return
+		return err
 	}
 	bh.Workers.QueryRunner, err = NewPgQueryRunner(conn)
 	if err != nil {
 		return fmt.Errorf("failed to build query runner: %v", err)
 	}
 
+	// If preventConcurrentBackups is set to true, we need to ensure that no backups are in progress
+	if bh.Arguments.preventConcurrentBackups {
+		err = bh.Workers.QueryRunner.TryGetLock()
+		if err != nil {
+			tracelog.WarningLogger.Println("Failed to get advisory lock")
+			if strings.Contains(err.Error(), "Lock is already taken") {
+				tracelog.WarningLogger.Println("Another process holds backup lock")
+				pid, err1 := bh.Workers.QueryRunner.GetLockingPID()
+				if err1 != nil {
+					return fmt.Errorf("failed to acquire blocking process id: %v", err)
+				}
+				tracelog.InfoLogger.Printf("Process with id %d holds backup lock\n", pid)
+				command := exec.Command("kill", fmt.Sprintf("%d", pid))
+				_, err1 = command.Output()
+				if err1 != nil {
+					return fmt.Errorf("failed to kill blocking process: %v", err1)
+				}
+				tracelog.InfoLogger.Printf("Successfully killed process with id %d\n", pid)
+
+				err1 = bh.Workers.QueryRunner.TryGetLock()
+				if err1 != nil {
+					return fmt.Errorf("failed to acquire lock: %v", err1)
+				}
+			} else {
+				return fmt.Errorf("failed to acquire lock: %v", err)
+			}
+			tracelog.InfoLogger.Println("Successfully acquired backup lock")
+		}
+	}
+
 	tracelog.DebugLogger.Println("Running StartBackup.")
 	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(
 		bh.Workers.QueryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	if err != nil {
-		return
+		return err
 	}
 	bh.CurBackupInfo.startLSN = backupStartLSN
 	bh.CurBackupInfo.Name = backupName
 	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
 	bh.initBackupTerminator()
-	return
+	return nil
 }
 
 func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
@@ -336,7 +377,7 @@ func (bh *BackupHandler) handleBackupPushRemote(ctx context.Context) {
 	tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
 	tracelog.InfoLogger.Println("Features like delta backup and partial restore are disabled, there might be a performance impact.")
 	tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
-	if bh.PgInfo.pgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
+	if bh.PgInfo.PgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
 		bh.Arguments.verifyPageChecksums = true
 	}
@@ -446,7 +487,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	// and version cannot be read easily using replication connection.
 	// Retrieve both with this helper function which uses a temp connection to postgres.
 
-	pgInfo, err := getPgServerInfo()
+	pgInfo, _, err := GetPgServerInfo(false)
 	if err != nil {
 		return nil, err
 	}
@@ -461,10 +502,10 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 
 func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBackup {
 	var diskLimit int32
-	if viper.IsSet(internal.DiskRateLimitSetting) {
+	if viper.IsSet(conf.DiskRateLimitSetting) {
 		// Note that BASE_BACKUP (pg protocol) allows to limit in kb/sec
 		// Also note that the basebackup class  only enables this when set > 32kb/s
-		diskLimit = int32(viper.GetInt64(internal.DiskRateLimitSetting)) / 1024
+		diskLimit = int32(viper.GetInt64(conf.DiskRateLimitSetting)) / 1024
 		if diskLimit > 32 {
 			tracelog.InfoLogger.Printf("DiskIO limited to %d kb/s", diskLimit)
 		}
@@ -474,7 +515,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(internal.TarSizeThresholdSetting), conn)
+	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), conn)
 	var bundleFiles internal.BundleFiles
 	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}
@@ -500,46 +541,55 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	return baseBackup
 }
 
-func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
+func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunner, err error) {
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tracelog.DebugLogger.Println("Initializing tmp connection to read Postgres info")
 	tmpConn, err := Connect()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 
 	queryRunner, err := NewPgQueryRunner(tmpConn)
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 
 	pgInfo.PgDataDirectory, err = queryRunner.GetDataDir()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 	pgInfo.PgDataDirectory = utility.ResolveSymlink(pgInfo.PgDataDirectory)
 	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.PgDataDirectory)
 
 	err = queryRunner.getVersion()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
-	pgInfo.pgVersion = queryRunner.Version
+	pgInfo.PgVersion = queryRunner.Version
 	tracelog.DebugLogger.Printf("Postgres version: %d", queryRunner.Version)
 
 	err = queryRunner.getSystemIdentifier()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 	pgInfo.systemIdentifier = queryRunner.SystemIdentifier
 	tracelog.DebugLogger.Printf("Postgres SystemIdentifier: %d", queryRunner.Version)
 
-	err = tmpConn.Close()
+	pgInfo.Timeline, err = queryRunner.readTimeline()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
+	}
+	tracelog.DebugLogger.Printf("Timeline: %d", pgInfo.Timeline)
+
+	if !keepRunner {
+		err = tmpConn.Close()
+		if err != nil {
+			return pgInfo, nil, err
+		}
+		return pgInfo, nil, err
 	}
 
-	return pgInfo, err
+	return pgInfo, queryRunner, err
 }
 
 // TODO : unit tests
@@ -581,7 +631,7 @@ func (bh *BackupHandler) initBackupTerminator() {
 	addSignalListener(errCh)
 	addPgIsAliveChecker(bh.Workers.QueryRunner, errCh)
 
-	terminator := NewBackupTerminator(bh.Workers.QueryRunner, bh.PgInfo.pgVersion, bh.PgInfo.PgDataDirectory)
+	terminator := NewBackupTerminator(bh.Workers.QueryRunner, bh.PgInfo.PgVersion, bh.PgInfo.PgDataDirectory)
 
 	go func() {
 		err := <-errCh
@@ -602,10 +652,10 @@ func addSignalListener(errCh chan error) {
 }
 
 func addPgIsAliveChecker(queryRunner *PgQueryRunner, errCh chan error) {
-	if !viper.IsSet(internal.PgAliveCheckInterval) {
+	if !viper.IsSet(conf.PgAliveCheckInterval) {
 		return
 	}
-	stateUpdateInterval, err := internal.GetDurationSetting(internal.PgAliveCheckInterval)
+	stateUpdateInterval, err := conf.GetDurationSetting(conf.PgAliveCheckInterval)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Initializing the PG alive checker (interval=%s)...", stateUpdateInterval)
 	pgWatcher := NewPgWatcher(queryRunner, stateUpdateInterval)

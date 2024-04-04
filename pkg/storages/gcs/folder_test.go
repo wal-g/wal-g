@@ -6,74 +6,18 @@ import (
 	"time"
 
 	gcs "cloud.google.com/go/storage"
-	"github.com/stretchr/testify/require"
-
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewFolder(t *testing.T) {
-	testCases := []struct {
-		bucketHandle    *gcs.BucketHandle
-		bucketName      string
-		path            string
-		timeout         int
-		normalizePrefix bool
-		encryptionKey   []byte
-		folder          *Folder
-		uploaderOptions []UploaderOption
-	}{
-		{
-			bucketName: "bucket",
-			path:       "path",
-			timeout:    10,
-			folder: &Folder{
-				bucketName:     "bucket",
-				path:           "path",
-				contextTimeout: 10,
-				encryptionKey:  []byte{},
-			},
-		},
-		{
-			bucketName:      "bucket",
-			path:            "path",
-			timeout:         10,
-			normalizePrefix: true,
-			encryptionKey:   []byte("test"),
-			folder: &Folder{
-				bucketName:      "bucket",
-				path:            "path",
-				contextTimeout:  10,
-				normalizePrefix: true,
-				encryptionKey:   []byte("test"),
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		newFolder := NewFolder(
-			tc.bucketHandle,
-			tc.bucketName,
-			tc.path,
-			tc.timeout,
-			tc.normalizePrefix,
-			tc.encryptionKey,
-			tc.uploaderOptions,
-		)
-		assert.Equal(t, tc.folder, newFolder)
-	}
-}
-
 func TestGSFolder(t *testing.T) {
 	t.Skip("Credentials needed to run GCP tests")
 
-	storageFolder, err := ConfigureFolder("gs://x4m-test/walg-bucket",
-		nil)
-
+	st, err := ConfigureStorage("gs://x4m-test/walg-bucket", nil)
 	assert.NoError(t, err)
 
-	storage.RunFolderTest(storageFolder, t)
+	storage.RunFolderTest(st.RootFolder(), t)
 }
 
 func TestGSExactFolder(t *testing.T) {
@@ -82,27 +26,26 @@ func TestGSExactFolder(t *testing.T) {
 	//os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/Users/x4mmm/Downloads/mdb-tests-d0uble-0b98813b622b.json")
 	//os.Setenv("GCS_CONTEXT_TIMEOUT", "1024000000")
 
-	storageFolder, err := ConfigureFolder("gs://x4m-test//walg-bucket////strange_folder",
+	st, err := ConfigureStorage("gs://x4m-test//walg-bucket////strange_folder",
 		map[string]string{
-			NormalizePrefix: "false",
+			normalizePrefixSetting: "false",
 		})
-
 	assert.NoError(t, err)
 
-	storage.RunFolderTest(storageFolder, t)
+	storage.RunFolderTest(st.RootFolder(), t)
 }
 
 func TestGSFolderWithEncryptionKey(t *testing.T) {
 	t.Skip("Credentials needed to run GCP tests")
 
-	storageFolder, err := ConfigureFolder("gs://x4m-test/walg-bucket",
+	st, err := ConfigureStorage("gs://x4m-test/walg-bucket",
 		map[string]string{
-			EncryptionKey: "F2F90NxJ2LrC/ujDQVGFfHetdDgjIMyrDkkN1VqGNnw=",
+			encryptionKeySetting: "F2F90NxJ2LrC/ujDQVGFfHetdDgjIMyrDkkN1VqGNnw=",
 		})
 
 	assert.NoError(t, err)
 
-	storage.RunFolderTest(storageFolder, t)
+	storage.RunFolderTest(st.RootFolder(), t)
 }
 
 type fakeReader struct{}
@@ -113,12 +56,17 @@ func (f fakeReader) Read(_ []byte) (int, error) {
 
 func TestUploadingReaderFails(t *testing.T) {
 	folder := Folder{
-		bucket: &gcs.BucketHandle{},
-		path:   "path",
+		bucket:        &gcs.BucketHandle{},
+		path:          "path",
+		encryptionKey: make([]byte, 32),
+		config: &Config{
+			ContextTimeout: time.Hour,
+			Uploader:       &UploaderConfig{MaxRetries: 1, MaxChunkSize: defaultMaxChunkSize},
+		},
 	}
 
 	err := folder.PutObject("name", fakeReader{})
-	assert.EqualError(t, err, "GCS error : Unable to read a chunk of data to upload: failed to fake read")
+	assert.EqualError(t, err, `read a chunk of object "path/name" to upload to GCS: failed to fake read`)
 }
 
 func TestJitterDelay(t *testing.T) {
@@ -155,59 +103,5 @@ func TestMinDuration(t *testing.T) {
 	for _, tc := range testCases {
 		result := minDuration(tc.duration1, tc.duration2)
 		assert.Equal(t, tc.expectedMinDuration, result)
-	}
-}
-
-func TestUploaderOptions(t *testing.T) {
-	testCases := []struct {
-		settings          map[string]string
-		expectedChunkSize int64
-		expectedRetries   int
-	}{
-		{
-			settings:          map[string]string{},
-			expectedChunkSize: 50 << 20,
-			expectedRetries:   16,
-		},
-		{
-			settings: map[string]string{
-				"GCS_MAX_CHUNK_SIZE": "100",
-				"GCS_MAX_RETRIES":    "5",
-			},
-			expectedChunkSize: 100,
-			expectedRetries:   5,
-		},
-	}
-
-	for _, tc := range testCases {
-		uploaderOptions, err := getUploaderOptions(tc.settings)
-		require.Nil(t, err)
-
-		uploader := NewUploader(nil, uploaderOptions...)
-
-		assert.Equal(t, tc.expectedChunkSize, uploader.maxChunkSize)
-		assert.Equal(t, tc.expectedRetries, uploader.maxUploadRetries)
-	}
-}
-
-func TestInvalidUploaderOptions(t *testing.T) {
-	testCases := []struct {
-		settings  map[string]string
-		errString string
-	}{
-		{
-			settings:  map[string]string{"GCS_MAX_CHUNK_SIZE": "invalid"},
-			errString: `invalid maximum chunk size setting: strconv.ParseInt: parsing "invalid": invalid syntax`,
-		},
-		{
-			settings:  map[string]string{"GCS_MAX_RETRIES": "test"},
-			errString: `invalid maximum retries setting: strconv.Atoi: parsing "test": invalid syntax`,
-		},
-	}
-
-	for _, tc := range testCases {
-		uploaderOptions, err := getUploaderOptions(tc.settings)
-		assert.Nil(t, uploaderOptions)
-		assert.EqualError(t, err, tc.errString)
 	}
 }

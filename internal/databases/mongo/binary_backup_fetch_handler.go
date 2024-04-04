@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
@@ -9,7 +10,7 @@ import (
 )
 
 func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigPath, backupName, restoreMongodVersion,
-	rsName string, rsMembers []string, rsMemberIds []int,
+	rsName string, rsMembers []string, rsMemberIds []int, shardName, mongoCfgConnectionString string, shardConnectionStrings []string,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
@@ -40,11 +41,19 @@ func HandleBinaryFetchPush(ctx context.Context, mongodConfigPath, minimalConfigP
 	if err = rsConfig.Validate(); err != nil {
 		return err
 	}
+	shConfig := binary.NewShConfig(shardName, mongoCfgConnectionString)
+	if err = shConfig.Validate(); err != nil {
+		return fmt.Errorf("ShConfig validation failed: %v", err)
+	}
+	mongocfgConfig, err := binary.NewMongoCfgConfig(shardConnectionStrings)
+	if err != nil {
+		return err
+	}
 	// check backup existence and resolve flag LATEST
 	backup, err := internal.GetBackupByName(backupName, "", uploader.Folder())
 	if err != nil {
 		return err
 	}
 
-	return restoreService.DoRestore(backup.Name, restoreMongodVersion, rsConfig)
+	return restoreService.DoRestore(backup.Name, restoreMongodVersion, rsConfig, shConfig, mongocfgConfig)
 }

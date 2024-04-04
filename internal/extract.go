@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
@@ -150,22 +151,26 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	}
 
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := GetMaxDownloadConcurrency()
+	downloadingConcurrency, err := conf.GetMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}
+	retries := conf.GetFetchRetries()
+
 	for currentRun := files; len(currentRun) > 0; {
 		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
-		} else if len(failed) == len(currentRun) {
+		} else if len(failed) == len(currentRun) && retries <= 0 {
 			return errors.Errorf("failed to extract files:\n%s\n",
 				strings.Join(readerMakersToFilePaths(failed), "\n"))
 		}
+		retries--
 		currentRun = failed
 		if len(failed) > 0 {
 			tracelog.WarningLogger.Printf("%d files failed to download: %s. Going to sleep and retry downloading them.\n",
 				len(failed), readerMakersToFilePaths(failed))
+			tracelog.WarningLogger.Printf("retries left: %d", retries)
 			sleeper.Sleep()
 		}
 	}

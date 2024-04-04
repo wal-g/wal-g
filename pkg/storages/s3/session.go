@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -16,17 +17,177 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultPort = "443"
-const HTTP = "http"
+func createSession(config *Config) (*session.Session, error) {
+	sess, err := session.NewSession()
+	if err != nil {
+		return nil, fmt.Errorf("init new default session: %w", err)
+	}
 
-// TODO : unit tests
-// Given an S3 bucket name, attempt to determine its region
-func findBucketRegion(bucket string, config *aws.Config) (string, error) {
+	err = configureSession(sess, config)
+	if err != nil {
+		return nil, fmt.Errorf("configure session: %w", err)
+	}
+
+	if config.CACertFile != "" {
+		file, err := os.Open(config.CACertFile)
+		if err != nil {
+			return nil, err
+		}
+		defer utility.LoggedClose(file, "S3 CA cert file")
+		sess, err = session.NewSessionWithOptions(session.Options{Config: *sess.Config, CustomCABundle: file})
+		return sess, err
+	}
+
+	if config.UseYCSessionToken != "" {
+		useYcSessionToken, err := strconv.ParseBool(config.UseYCSessionToken)
+		if err != nil {
+			return nil, fmt.Errorf("invalid YC session token: %w", err)
+		}
+		if useYcSessionToken {
+			// Yandex Cloud mimic metadata service, so we can use default AWS credentials, but set token to another header
+			cred := credentials.NewCredentials(defaults.RemoteCredProvider(*defaults.Config(), defaults.Handlers()))
+			sess.Config.WithCredentials(cred)
+			sess.Handlers.Send.PushFront(func(r *request.Request) {
+				token := r.HTTPRequest.Header.Get("X-Amz-Security-Token")
+				r.HTTPRequest.Header.Add("X-YaCloud-SubjectToken", token)
+			})
+		}
+	}
+
+	if config.EndpointSource != "" {
+		sess.Handlers.Validate.PushBack(func(request *request.Request) {
+			endpoint := requestEndpointFromSource(config.EndpointSource, config.EndpointPort)
+			if endpoint != nil {
+				tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
+				host := strings.TrimPrefix(*sess.Config.Endpoint, "https://")
+				request.HTTPRequest.Host = host
+				request.HTTPRequest.Header.Add("Host", host)
+				request.HTTPRequest.URL.Host = *endpoint
+				request.HTTPRequest.URL.Scheme = "http"
+			} else {
+				tracelog.DebugLogger.Printf("using S3 endpoint %s", *sess.Config.Endpoint)
+			}
+		})
+	}
+
+	if config.RequestAdditionalHeaders != "" {
+		headers, err := decodeHeaders(config.RequestAdditionalHeaders)
+		if err != nil {
+			return nil, fmt.Errorf("decode additional headers for S3 requests: %w", err)
+		}
+
+		sess.Handlers.Validate.PushBack(func(request *request.Request) {
+			for k, v := range headers {
+				request.HTTPRequest.Header.Add(k, v)
+			}
+		})
+	}
+
+	return sess, err
+}
+
+func configureSession(sess *session.Session, config *Config) error {
+	awsConfig := sess.Config
+
+	// DefaultRetryer implements basic retry logic using exponential backoff for
+	// most services. If you want to implement custom retry logic, you can implement the
+	// request.Retryer interface.
+	awsConfig = request.WithRetryer(awsConfig, NewConnResetRetryer(
+		client.DefaultRetryer{
+			NumMaxRetries:    config.MaxRetries,
+			MinThrottleDelay: config.MinThrottlingRetryDelay,
+			MaxThrottleDelay: config.MaxThrottlingRetryDelay,
+		}))
+
+	awsConfig.HTTPClient.Transport = NewRoundTripperWithLogging(awsConfig.HTTPClient.Transport)
+	accessKey := config.AccessKey
+	secretKey := config.Secrets.SecretKey
+	sessionToken := config.SessionToken
+
+	if config.RoleARN != "" {
+		stsSession := sts.New(sess)
+		assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
+			RoleArn:         aws.String(config.RoleARN),
+			RoleSessionName: aws.String(config.SessionName),
+		})
+		if err != nil {
+			return fmt.Errorf("assume role by ARN: %w", err)
+		}
+		accessKey = *assumedRole.Credentials.AccessKeyId
+		secretKey = *assumedRole.Credentials.SecretAccessKey
+		sessionToken = *assumedRole.Credentials.SessionToken
+	}
+
+	if accessKey != "" && secretKey != "" {
+		provider := &credentials.StaticProvider{Value: credentials.Value{
+			AccessKeyID:     accessKey,
+			SecretAccessKey: secretKey,
+			SessionToken:    sessionToken,
+		}}
+		providers := make([]credentials.Provider, 0)
+		providers = append(providers, provider)
+		providers = append(providers, defaults.CredProviders(awsConfig, defaults.Handlers())...)
+		newCredentials := credentials.NewCredentials(&credentials.ChainProvider{
+			VerboseErrors: aws.BoolValue(awsConfig.CredentialsChainVerboseErrors),
+			Providers:     providers,
+		})
+
+		awsConfig = awsConfig.WithCredentials(newCredentials)
+	}
+
+	if config.LogLevel != "" {
+		awsConfig = awsConfig.WithLogLevel(func(s string) aws.LogLevelType {
+			switch s {
+			case "DEVEL":
+				return aws.LogDebug
+			default:
+				return aws.LogOff
+			}
+		}(config.LogLevel))
+	}
+
+	if config.Endpoint != "" {
+		awsConfig = awsConfig.WithEndpoint(config.Endpoint)
+	}
+
+	awsConfig.S3ForcePathStyle = &config.ForcePathStyle
+
+	if config.Region == "" {
+		region, err := detectAWSRegion(config.Bucket, awsConfig)
+		if err != nil {
+			return fmt.Errorf("AWS region isn't configured explicitly: detect region: %w", err)
+		}
+		awsConfig = awsConfig.WithRegion(region)
+	} else {
+		awsConfig = awsConfig.WithRegion(config.Region)
+	}
+
+	sess.Config = awsConfig
+	return nil
+}
+
+func detectAWSRegion(bucket string, awsConfig *aws.Config) (string, error) {
+	if awsConfig.Endpoint == nil ||
+		*awsConfig.Endpoint == "" ||
+		strings.HasSuffix(*awsConfig.Endpoint, ".amazonaws.com") {
+		region, err := detectAWSRegionByBucket(bucket, awsConfig)
+		if err != nil {
+			return "", fmt.Errorf("detect region by bucket: %w", err)
+		}
+		return region, nil
+	}
+	// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
+	// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
+	return "us-east-1", nil
+}
+
+// detectAWSRegionByBucket attempts to detect the AWS region by the bucket name
+func detectAWSRegionByBucket(bucket string, config *aws.Config) (string, error) {
 	input := s3.GetBucketLocationInput{
 		Bucket: aws.String(bucket),
 	}
@@ -49,33 +210,17 @@ func findBucketRegion(bucket string, config *aws.Config) (string, error) {
 	return *output.LocationConstraint, nil
 }
 
-// TODO : unit tests
-func getAWSRegion(s3Bucket string, config *aws.Config, settings map[string]string) (string, error) {
-	if region, ok := settings[RegionSetting]; ok {
-		return region, nil
-	}
-	if config.Endpoint == nil ||
-		*config.Endpoint == "" ||
-		strings.HasSuffix(*config.Endpoint, ".amazonaws.com") {
-		region, err := findBucketRegion(s3Bucket, config)
-		return region, errors.Wrapf(err, "%s is not set and s3:GetBucketLocation failed", RegionSetting)
-	}
-	// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
-	// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
-	return "us-east-1", nil
-}
-
-func setupReqProxy(endpointSource, port string) *string {
+func requestEndpointFromSource(endpointSource, port string) *string {
 	resp, err := http.Get(endpointSource)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Endpoint source error: %v ", err)
 		return nil
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		tracelog.ErrorLogger.Printf("Endpoint source bad status code: %v ", resp.StatusCode)
 		return nil
 	}
-	defer resp.Body.Close()
 	bytes, err := io.ReadAll(resp.Body)
 	if err == nil {
 		return aws.String(net.JoinHostPort(string(bytes), port))
@@ -84,183 +229,18 @@ func setupReqProxy(endpointSource, port string) *string {
 	return nil
 }
 
-func getFirstSettingOf(settings map[string]string, keys []string) string {
-	for _, key := range keys {
-		if value, ok := settings[key]; ok {
-			return value
-		}
-	}
-	return ""
-}
-
-func configWithSettings(s *session.Session, bucket string, settings map[string]string) (*aws.Config, error) {
-	// DefaultRetryer implements basic retry logic using exponential backoff for
-	// most services. If you want to implement custom retry logic, you can implement the
-	// request.Retryer interface.
-	maxRetriesCount := MaxRetriesDefault
-	if maxRetriesRaw, ok := settings[MaxRetriesSetting]; ok {
-		maxRetriesInt, err := strconv.Atoi(maxRetriesRaw)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse %s", MaxRetriesSetting)
-		}
-
-		maxRetriesCount = maxRetriesInt
-	}
-	config := s.Config
-	config = request.WithRetryer(config, NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: maxRetriesCount}))
-
-	accessKeyID := getFirstSettingOf(settings, []string{AccessKeyIDSetting, AccessKeySetting})
-	secretAccessKey := getFirstSettingOf(settings, []string{SecretAccessKeySetting, SecretKeySetting})
-	sessionToken := settings[SessionTokenSetting]
-
-	roleArn := settings[RoleARN]
-	sessionName := settings[SessionName]
-	if roleArn != "" {
-		stsSession := sts.New(s)
-		assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
-			RoleArn:         aws.String(roleArn),
-			RoleSessionName: aws.String(sessionName),
-		})
-		if err != nil {
-			return nil, err
-		}
-		accessKeyID = *assumedRole.Credentials.AccessKeyId
-		secretAccessKey = *assumedRole.Credentials.SecretAccessKey
-		sessionToken = *assumedRole.Credentials.SessionToken
-	}
-
-	if accessKeyID != "" && secretAccessKey != "" {
-		provider := &credentials.StaticProvider{Value: credentials.Value{
-			AccessKeyID:     accessKeyID,
-			SecretAccessKey: secretAccessKey,
-			SessionToken:    sessionToken,
-		}}
-		providers := make([]credentials.Provider, 0)
-		providers = append(providers, provider)
-		providers = append(providers, defaults.CredProviders(config, defaults.Handlers())...)
-		newCredentials := credentials.NewCredentials(&credentials.ChainProvider{
-			VerboseErrors: aws.BoolValue(config.CredentialsChainVerboseErrors),
-			Providers:     providers,
-		})
-
-		config = config.WithCredentials(newCredentials)
-	}
-
-	if logLevel, ok := settings[LogLevel]; ok {
-		config = config.WithLogLevel(func(s string) aws.LogLevelType {
-			switch s {
-			case "DEVEL":
-				return aws.LogDebug
-			default:
-				return aws.LogOff
-			}
-		}(logLevel))
-	}
-
-	if endpoint, ok := settings[EndpointSetting]; ok {
-		config = config.WithEndpoint(endpoint)
-	}
-
-	if s3ForcePathStyleStr, ok := settings[ForcePathStyleSetting]; ok {
-		s3ForcePathStyle, err := strconv.ParseBool(s3ForcePathStyleStr)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse %s", ForcePathStyleSetting)
-		}
-		config.S3ForcePathStyle = aws.Bool(s3ForcePathStyle)
-	}
-
-	region, err := getAWSRegion(bucket, config, settings)
-	if err != nil {
-		return nil, err
-	}
-	config = config.WithRegion(region)
-
-	return config, nil
-}
-
-// TODO : unit tests
-func createSession(bucket string, settings map[string]string) (*session.Session, error) {
-	s, err := session.NewSession()
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := configWithSettings(s, bucket, settings)
-	if err != nil {
-		return nil, err
-	}
-	s.Config = c
-
-	filePath := settings[s3CertFile]
-	if filePath != "" {
-		if file, err := os.Open(filePath); err == nil {
-			defer file.Close()
-			s, err := session.NewSessionWithOptions(session.Options{Config: *s.Config, CustomCABundle: file})
-			return s, err
-		}
-		return nil, err
-	}
-
-	if settings[S3UseYcSessionToken] != "" {
-		useYcSessionToken, err := strconv.ParseBool(settings[S3UseYcSessionToken])
-		if err != nil {
-			return nil, NewFolderError(err, "Invalid %s setting", S3UseYcSessionToken)
-		}
-		if useYcSessionToken {
-			// yandex cloud mimic metadata service, so we can use default AWS credentials, but set token to another header
-			cred := credentials.NewCredentials(defaults.RemoteCredProvider(*defaults.Config(), defaults.Handlers()))
-			s.Config.WithCredentials(cred)
-			s.Handlers.Send.PushFront(func(r *request.Request) {
-				token := r.HTTPRequest.Header.Get("X-Amz-Security-Token")
-				r.HTTPRequest.Header.Add("X-YaCloud-SubjectToken", token)
-			})
-		}
-	}
-
-	if endpointSource, ok := settings[EndpointSourceSetting]; ok {
-		s.Handlers.Validate.PushBack(func(request *request.Request) {
-			src := setupReqProxy(endpointSource, getEndpointPort(settings))
-			if src != nil {
-				tracelog.DebugLogger.Printf("using endpoint %s", *src)
-				host := strings.TrimPrefix(*s.Config.Endpoint, "https://")
-				request.HTTPRequest.Host = host
-				request.HTTPRequest.Header.Add("Host", host)
-				request.HTTPRequest.URL.Host = *src
-				request.HTTPRequest.URL.Scheme = HTTP
-			} else {
-				tracelog.DebugLogger.Printf("using endpoint %s", *s.Config.Endpoint)
-			}
-		})
-	}
-
-	if encodedHeaders, ok := settings[RequestAdditionalHeaders]; ok {
-		headers, err := getHeaders(encodedHeaders)
-		if err != nil {
-			return nil, err
-		}
-
-		s.Handlers.Validate.PushBack(func(request *request.Request) {
-			for k, v := range headers {
-				request.HTTPRequest.Header.Add(k, v)
-			}
-		})
-	}
-
-	return s, err
-}
-
-func getHeaders(encodedHeaders string) (map[string]string, error) {
+func decodeHeaders(encodedHeaders string) (map[string]string, error) {
 	var data interface{}
 	err := yaml.Unmarshal([]byte(encodedHeaders), &data)
 	if err != nil {
-		return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+		return nil, fmt.Errorf("failed to unmarshal YAML headers: %w", err)
 	}
 
 	interfaces, ok := data.(map[string]interface{})
 	if !ok {
 		headerList, ok := data.([]interface{})
 		if !ok {
-			return nil, NewFolderError(err, "Invalid %s setting", RequestAdditionalHeaders)
+			return nil, fmt.Errorf("headers expected to be a list in YAML: %w", err)
 		}
 		interfaces = reformHeaderListToMap(headerList)
 	}
@@ -283,11 +263,4 @@ func reformHeaderListToMap(headerList []interface{}) map[string]interface{} {
 		}
 	}
 	return headers
-}
-
-func getEndpointPort(settings map[string]string) string {
-	if port, ok := settings[EndpointPortSetting]; ok {
-		return port
-	}
-	return DefaultPort
 }

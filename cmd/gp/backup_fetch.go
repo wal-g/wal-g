@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const (
@@ -47,10 +48,10 @@ var backupFetchCmd = &cobra.Command{
 		}
 
 		if fetchTargetUserData == "" {
-			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
+			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if restorePoint != "" && restorePointTS != "" {
@@ -58,14 +59,14 @@ var backupFetchCmd = &cobra.Command{
 		}
 
 		if restorePointTS != "" {
-			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, folder)
+			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, storage.RootFolder())
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData, restorePoint)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		logsDir := viper.GetString(internal.GPLogsDirectory)
+		logsDir := viper.GetString(conf.GPLogsDirectory)
 
 		if len(*fetchContentIds) > 0 {
 			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIds)
@@ -74,7 +75,7 @@ var backupFetchCmd = &cobra.Command{
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		internal.HandleBackupFetch(folder, targetBackupSelector,
+		internal.HandleBackupFetch(storage.RootFolder(), targetBackupSelector,
 			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint,
 				partialRestoreArgs))
 	},

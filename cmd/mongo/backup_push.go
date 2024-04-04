@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
@@ -36,7 +37,7 @@ var backupPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		mongodbURL, err := internal.GetRequiredSetting(internal.MongoDBUriSetting)
+		mongodbURL, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// set up mongodb client and oplog fetcher
@@ -47,7 +48,7 @@ var backupPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		uplProvider.ChangeDirectory(utility.BaseBackupPath)
 
-		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
+		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		backupCmd.Stderr = os.Stderr
 		uploader := archive.NewStorageUploader(uplProvider)
@@ -57,7 +58,7 @@ var backupPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
+		conf.RequiredSettings[conf.NameStreamCreateCmd] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

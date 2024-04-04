@@ -19,7 +19,8 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
+
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -70,7 +71,7 @@ type DatabaseFile struct {
 }
 
 func getSQLServerConnection() (*sql.DB, error) {
-	connString, err := internal.GetRequiredSetting(internal.SQLServerConnectionString)
+	connString, err := conf.GetRequiredSetting(conf.SQLServerConnectionString)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +307,7 @@ func getDatabaseBackupPath(backupName, dbname string) string {
 }
 
 func getDatabaseBackupURL(backupName, dbname string) string {
-	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
+	hostname, err := conf.GetRequiredSetting(conf.SQLServerBlobHostname)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
@@ -324,7 +325,7 @@ func getLogBackupPath(logBackupName, dbname string) string {
 }
 
 func getLogBackupURL(logBackupName, dbname string) string {
-	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
+	hostname, err := conf.GetRequiredSetting(conf.SQLServerBlobHostname)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
@@ -429,7 +430,7 @@ func runParallel(f func(int) error, cnt int, concurrency int) error {
 }
 
 func getDBConcurrency() int {
-	concurrency, err := internal.GetMaxConcurrency(internal.SQLServerDBConcurrency)
+	concurrency, err := conf.GetMaxConcurrency(conf.SQLServerDBConcurrency)
 	if err != nil {
 		tracelog.WarningLogger.Printf("config error: %v", err)
 		tracelog.WarningLogger.Printf("using default db concurrency: %d", blob.DefaultConcurrency)
@@ -507,10 +508,12 @@ func GetBackupProperties(db *sql.DB,
 	if err != nil {
 		return res, err
 	}
-	defer rows.Close()
-	if err != nil {
-		return nil, err
-	}
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to close connection: %v", err)
+		}
+	}()
 	for rows.Next() {
 		var dbf BackupProperties
 		err = utility.ScanToMap(rows, map[string]interface{}{
@@ -552,7 +555,7 @@ func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder stor
 	if err != nil {
 		return nil, xerrors.Errorf("proxy create error: %v", err)
 	}
-	reuse, _, err := internal.GetBoolSetting(internal.SQLServerReuseProxy)
+	reuse, _, err := conf.GetBoolSetting(conf.SQLServerReuseProxy)
 	if err != nil {
 		return nil, err
 	}

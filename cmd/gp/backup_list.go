@@ -22,12 +22,12 @@ var (
 		Short: backupListShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			folder, err := internal.ConfigureFolder()
+			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
 			if detail {
-				greenplum.HandleDetailedBackupList(folder, pretty, jsonOutput)
+				greenplum.HandleDetailedBackupList(storage.RootFolder(), pretty, jsonOutput)
 			} else {
-				internal.HandleDefaultBackupList(folder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+				internal.HandleDefaultBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
 			}
 		},
 	}

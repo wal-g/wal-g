@@ -19,7 +19,7 @@ func HandleLogPush(dbnames []string, norecovery bool) {
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
 
-	folder, err := internal.ConfigureFolder()
+	folder, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -30,7 +30,7 @@ func HandleLogPush(dbnames []string, norecovery bool) {
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
 
-	lock, err := RunOrReuseProxy(ctx, cancel, folder)
+	lock, err := RunOrReuseProxy(ctx, cancel, folder.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer lock.Close()
 

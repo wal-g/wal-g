@@ -2,16 +2,12 @@ package gcs
 
 import (
 	"context"
-	"encoding/base64"
-	"hash/fnv"
+	"fmt"
 	"io"
-	"math/rand"
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -20,158 +16,30 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-const (
-	ContextTimeout  = "GCS_CONTEXT_TIMEOUT"
-	NormalizePrefix = "GCS_NORMALIZE_PREFIX"
-	EncryptionKey   = "GCS_ENCRYPTION_KEY"
-	MaxChunkSize    = "GCS_MAX_CHUNK_SIZE"
-	MaxRetries      = "GCS_MAX_RETRIES"
+const composeChunkLimit = 32
 
-	defaultContextTimeout = 60 * 60 // 1 hour
-	maxRetryDelay         = 5 * time.Minute
-	composeChunkLimit     = 32
+func NewFolder(bucket *gcs.BucketHandle, path string, encryptionKey []byte, config *Config) *Folder {
+	// Trim leading slash because there's no difference between absolute and relative paths in GCS.
+	path = strings.TrimPrefix(path, "/")
 
-	encryptionKeySize = 32
-)
-
-var (
-	// BaseRetryDelay defines the first delay for retry.
-	BaseRetryDelay = 128 * time.Millisecond
-
-	// SettingList provides a list of GCS folder settings.
-	SettingList = []string{
-		ContextTimeout,
-		NormalizePrefix,
-		EncryptionKey,
-		MaxChunkSize,
-		MaxRetries,
-	}
-)
-
-func NewError(err error, format string, args ...interface{}) storage.Error {
-	return storage.NewError(err, "GCS", format, args...)
-}
-
-func NewFolderError(err error, format string, args ...interface{}) storage.Error {
-	return storage.NewError(err, "GCS", format, args...)
-}
-
-func NewFolder(bucket *gcs.BucketHandle, bucketName, path string, contextTimeout int, normalizePrefix bool,
-	encryptionKey []byte, options []UploaderOption) *Folder {
 	encryptionKeyCopy := make([]byte, len(encryptionKey))
 	copy(encryptionKeyCopy, encryptionKey)
 
-	path = strings.TrimPrefix(path, "/")
-
 	return &Folder{
-		bucket:          bucket,
-		bucketName:      bucketName,
-		path:            path,
-		contextTimeout:  contextTimeout,
-		normalizePrefix: normalizePrefix,
-		encryptionKey:   encryptionKeyCopy,
-		uploaderOptions: options,
+		bucket:        bucket,
+		path:          path,
+		encryptionKey: encryptionKeyCopy,
+		config:        config,
 	}
-}
-
-func ConfigureFolder(prefix string, settings map[string]string) (storage.HashableFolder, error) {
-	normalizePrefix := true
-
-	if normalizePrefixStr, ok := settings[NormalizePrefix]; ok {
-		var err error
-		normalizePrefix, err = strconv.ParseBool(normalizePrefixStr)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to parse %s", NormalizePrefix)
-		}
-	}
-
-	ctx := context.Background()
-
-	client, err := gcs.NewClient(ctx)
-	if err != nil {
-		return nil, NewError(err, "Unable to create client")
-	}
-
-	var bucketName, path string
-	if normalizePrefix {
-		bucketName, path, err = storage.GetPathFromPrefix(prefix)
-	} else {
-		// Special mode for WAL-E compatibility with strange prefixes
-		bucketName, path, err = storage.ParsePrefixAsURL(prefix)
-		if err == nil && path[0] == '/' {
-			path = path[1:]
-		}
-	}
-
-	if err != nil {
-		return nil, NewError(err, "Unable to parse prefix %v", prefix)
-	}
-
-	bucket := client.Bucket(bucketName)
-
-	path = storage.AddDelimiterToPath(path)
-
-	contextTimeout := defaultContextTimeout
-	if contextTimeoutStr, ok := settings[ContextTimeout]; ok {
-		contextTimeout, err = strconv.Atoi(contextTimeoutStr)
-		if err != nil {
-			return nil, NewError(err, "Unable to parse Context Timeout %v", prefix)
-		}
-	}
-
-	encryptionKey := make([]byte, 0)
-	if encodedCSEK, ok := settings[EncryptionKey]; ok {
-		decodedKey, err := base64.StdEncoding.DecodeString(encodedCSEK)
-		if err != nil {
-			return nil, NewError(err, "Unable to parse Customer Supplied Encryption Key %v", encodedCSEK)
-		}
-
-		if len(decodedKey) != encryptionKeySize {
-			return nil, errors.Errorf("Invalid Customer Supplied Encryption Key: not a 32-byte AES-256 key")
-		}
-
-		encryptionKey = decodedKey
-	}
-
-	uploaderOptions, err := getUploaderOptions(settings)
-	if err != nil {
-		return nil, NewError(err, "Unable to parse GCS uploader options")
-	}
-
-	return NewFolder(bucket, bucketName, path, contextTimeout, normalizePrefix, encryptionKey, uploaderOptions), nil
-}
-
-func getUploaderOptions(settings map[string]string) ([]UploaderOption, error) {
-	uploaderOptions := []UploaderOption{}
-
-	if maxChunkSizeSetting, ok := settings[MaxChunkSize]; ok {
-		chunkSize, err := strconv.ParseInt(maxChunkSizeSetting, 10, 64)
-		if err != nil {
-			return nil, errors.Wrap(err, "invalid maximum chunk size setting")
-		}
-		uploaderOptions = append(uploaderOptions, func(uploader *Uploader) { uploader.maxChunkSize = chunkSize })
-	}
-
-	if maxRetriesSetting, ok := settings[MaxRetries]; ok {
-		maxRetries, err := strconv.Atoi(maxRetriesSetting)
-		if err != nil {
-			return nil, errors.Wrap(err, "invalid maximum retries setting")
-		}
-		uploaderOptions = append(uploaderOptions, func(uploader *Uploader) { uploader.maxUploadRetries = maxRetries })
-	}
-
-	return uploaderOptions, nil
 }
 
 // Folder represents folder in GCP
+// TODO: Unit tests
 type Folder struct {
-	bucket          *gcs.BucketHandle
-	bucketName      string
-	path            string
-	contextTimeout  int
-	normalizePrefix bool
-	encryptionKey   []byte
-	uploaderOptions []UploaderOption
+	bucket        *gcs.BucketHandle
+	path          string
+	encryptionKey []byte
+	config        *Config
 }
 
 func (folder *Folder) GetPath() string {
@@ -193,14 +61,14 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	prefix := storage.AddDelimiterToPath(folder.path)
 	ctx, cancel := folder.createTimeoutContext(context.Background())
 	defer cancel()
-	it := folder.bucket.Objects(ctx, &gcs.Query{Delimiter: "/", Prefix: prefix})
+	iter := folder.bucket.Objects(ctx, &gcs.Query{Delimiter: "/", Prefix: prefix})
 	for {
-		objAttrs, err := it.Next()
+		objAttrs, err := iter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return nil, nil, NewError(err, "Unable to iterate %v", folder.path)
+			return nil, nil, fmt.Errorf("iterate GCS folder %q: %w", folder.path, err)
 		}
 		if objAttrs.Prefix != "" {
 			if objAttrs.Prefix != prefix+"/" {
@@ -208,12 +76,9 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				subFolders = append(subFolders,
 					NewFolder(
 						folder.bucket,
-						folder.bucketName,
 						objAttrs.Prefix,
-						folder.contextTimeout,
-						folder.normalizePrefix,
 						folder.encryptionKey,
-						folder.uploaderOptions,
+						folder.config,
 					))
 			}
 		} else {
@@ -228,27 +93,28 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 }
 
 func (folder *Folder) createTimeoutContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, time.Second*time.Duration(folder.contextTimeout))
+	return context.WithTimeout(ctx, folder.config.ContextTimeout)
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
-		path := folder.joinPath(folder.path, objectRelativePath)
-		object := folder.BuildObjectHandle(path)
-		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		ctx, cancel := folder.createTimeoutContext(context.Background())
-		defer cancel()
+		objPath := folder.joinPath(folder.path, objectRelativePath)
+		object := folder.BuildObjectHandle(objPath)
+		tracelog.DebugLogger.Printf("Delete %v\n", objPath)
+		ctx, ctxCancel := folder.createTimeoutContext(context.Background())
 		err := object.Delete(ctx)
 		if err != nil && err != gcs.ErrObjectNotExist {
-			return NewError(err, "Unable to delete object %v", path)
+			ctxCancel()
+			return fmt.Errorf("delete GCS object %q: %w", objPath, err)
 		}
+		ctxCancel()
 	}
 	return nil
 }
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
-	path := folder.joinPath(folder.path, objectRelativePath)
-	object := folder.BuildObjectHandle(path)
+	objPath := folder.joinPath(folder.path, objectRelativePath)
+	object := folder.BuildObjectHandle(objPath)
 	ctx, cancel := folder.createTimeoutContext(context.Background())
 	defer cancel()
 	_, err := object.Attrs(ctx)
@@ -256,7 +122,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		return false, nil
 	}
 	if err != nil {
-		return false, NewError(err, "Unable to stat object %v", path)
+		return false, fmt.Errorf("get GCS object stats %q: %w", objPath, err)
 	}
 	return true, nil
 }
@@ -264,21 +130,18 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
 		folder.bucket,
-		folder.bucketName,
 		folder.joinPath(folder.path, subFolderRelativePath),
-		folder.contextTimeout,
-		folder.normalizePrefix,
 		folder.encryptionKey,
-		folder.uploaderOptions,
+		folder.config,
 	)
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	path := folder.joinPath(folder.path, objectRelativePath)
-	object := folder.BuildObjectHandle(path)
+	objPath := folder.joinPath(folder.path, objectRelativePath)
+	object := folder.BuildObjectHandle(objPath)
 	reader, err := object.NewReader(context.Background())
 	if err == gcs.ErrObjectNotExist {
-		return nil, storage.NewObjectNotFoundError(path)
+		return nil, storage.NewObjectNotFoundError(objPath)
 	}
 	return io.NopCloser(reader), err
 }
@@ -292,7 +155,8 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 
 func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
-	object := folder.BuildObjectHandle(folder.joinPath(folder.path, name))
+	objectPath := folder.joinPath(folder.path, name)
+	object := folder.BuildObjectHandle(objectPath)
 
 	ctx, cancel := folder.createTimeoutContext(ctx)
 	defer cancel()
@@ -303,13 +167,13 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 	for {
 		tmpChunkName := folder.joinPath(name+"_chunks", "chunk"+strconv.Itoa(chunkNum))
 		objectChunk := folder.BuildObjectHandle(folder.joinPath(folder.path, tmpChunkName))
-		chunkUploader := NewUploader(objectChunk, folder.uploaderOptions...)
+		chunkUploader := NewUploader(objectChunk, folder.config.Uploader)
 		dataChunk := chunkUploader.allocateBuffer()
 
 		n, err := fillBuffer(content, dataChunk)
 		if err != nil && err != io.EOF {
-			tracelog.ErrorLogger.Printf("Unable to read content of %s, err: %v", name, err)
-			return NewError(err, "Unable to read a chunk of data to upload")
+			tracelog.ErrorLogger.Printf("Unable to read content of %s, err: %v", objectPath, err)
+			return fmt.Errorf("read a chunk of object %q to upload to GCS: %w", objectPath, err)
 		}
 
 		if n == 0 {
@@ -324,7 +188,7 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 		}
 
 		if err := chunkUploader.UploadChunk(ctx, chunk); err != nil {
-			return NewError(err, "Unable to upload an object chunk")
+			return fmt.Errorf("upload a chunk of object %q to GCS: %w", objectPath, err)
 		}
 
 		tmpChunks = append(tmpChunks, objectChunk)
@@ -342,8 +206,8 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 
 			tracelog.DebugLogger.Printf("Compose temporary chunks into an intermediate chunk %v\n", compositeChunkName)
 
-			if err := composeChunks(ctx, NewUploader(compositeChunk, folder.uploaderOptions...), tmpChunks); err != nil {
-				return NewError(err, "Failed to compose temporary chunks into an intermediate chunk")
+			if err := composeChunks(ctx, NewUploader(compositeChunk, folder.config.Uploader), tmpChunks); err != nil {
+				return fmt.Errorf("compose GCS temporary chunks into an intermediate chunk: %w", err)
 			}
 
 			tmpChunks = []*gcs.ObjectHandle{compositeChunk}
@@ -352,8 +216,8 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 
 	tracelog.DebugLogger.Printf("Compose file %v from chunks\n", object.ObjectName())
 
-	if err := composeChunks(ctx, NewUploader(object, folder.uploaderOptions...), tmpChunks); err != nil {
-		return NewError(err, "Failed to compose temporary chunks into an object")
+	if err := composeChunks(ctx, NewUploader(object, folder.config.Uploader), tmpChunks); err != nil {
+		return fmt.Errorf("compose GCS temporary chunks into an object: %w", err)
 	}
 
 	tracelog.DebugLogger.Printf("Put %v done\n", name)
@@ -366,14 +230,17 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
-		return err
+		return fmt.Errorf("check the existence of %q for copying in GCS: %w", srcPath, err)
 	}
 	source := path.Join(folder.path, srcPath)
 	dst := path.Join(folder.path, dstPath)
 
 	ctx := context.Background()
 	_, err := folder.bucket.Object(dst).CopierFrom(folder.bucket.Object(source)).Run(ctx)
-	return err
+	if err != nil {
+		return fmt.Errorf("copy GCS object %q to %q: %w", srcPath, dstPath, err)
+	}
+	return nil
 }
 
 func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
@@ -401,7 +268,7 @@ func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
 }
 
 func (folder *Folder) joinPath(one string, another string) string {
-	if folder.normalizePrefix {
+	if folder.config.NormalizePrefix {
 		return storage.JoinPath(one, another)
 	}
 	if one[len(one)-1] == '/' {
@@ -413,28 +280,10 @@ func (folder *Folder) joinPath(one string, another string) string {
 	return one + "/" + another
 }
 
-func (folder *Folder) Hash() storage.Hash {
-	hash := fnv.New64a()
-
-	addToHash := func(data []byte) {
-		_, err := hash.Write(data)
-		if err != nil {
-			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
-			panic(err)
-		}
-	}
-
-	addToHash([]byte("gcs"))
-	addToHash([]byte(folder.bucketName))
-	addToHash([]byte(folder.path))
-
-	return storage.Hash(hash.Sum64())
-}
-
 // composeChunks merges uploaded chunks into a new one and cleans up temporary objects.
 func composeChunks(ctx context.Context, uploader *Uploader, chunks []*gcs.ObjectHandle) error {
 	if err := uploader.ComposeObject(ctx, chunks); err != nil {
-		return NewError(err, "Unable to compose object")
+		return fmt.Errorf("compose object %q: %w", uploader.objHandle.ObjectName(), err)
 	}
 
 	tracelog.DebugLogger.Printf("Remove temporary chunks for %v\n", uploader.objHandle.ObjectName())
@@ -460,18 +309,4 @@ func fillBuffer(r io.Reader, b []byte) (int, error) {
 	}
 
 	return offset, err
-}
-
-// getJitterDelay calculates an equal jitter delay.
-func getJitterDelay(delay time.Duration) time.Duration {
-	return time.Duration(rand.Float64()*float64(delay)) + delay
-}
-
-// minDuration returns the minimum value of provided durations.
-func minDuration(a, b time.Duration) time.Duration {
-	if a < b {
-		return a
-	}
-
-	return b
 }

@@ -11,6 +11,7 @@ main/mysql/wal-g
 main/redis/wal-g
 main/mongo/wal-g
 main/gp/wal-g
+main/etcd/wal-g
 
 # tests
 test/testdata/00000*

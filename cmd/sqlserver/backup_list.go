@@ -15,10 +15,10 @@ var backupListCmd = &cobra.Command{
 	Short: backupListShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 		// todo: implement pretty and json logic
-		internal.HandleDefaultBackupList(folder.GetSubFolder(utility.BaseBackupPath), false, false)
+		internal.HandleDefaultBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), false, false)
 	},
 }
 

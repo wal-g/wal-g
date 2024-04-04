@@ -22,13 +22,22 @@ const (
 	RsMembersDescription         = "Comma separated host:port records from wished rs members (like rs.initiate())"
 	RsMemberIdsFlag              = "mongo-rs-member-ids"
 	RsMemberIdsDescription       = "Comma separated integers for replica IDs of corresponding --mongo-rs-members"
+	ShNameFlag                   = "mongo-sh-name"
+	ShNameDescription            = "Name of shard"
+	ShCfgConnStr                 = "mongo-cfg-conn-str"
+	ShCfgConnStrDescription      = "Connection string to mongocfg replicas in sharded cluster"
+	ShShardConnStr               = "mongo-shard-conn-str"
+	ShShardConnStrDescription    = "Connection string to some shard (can be specified multiple times)"
 )
 
 var (
-	minimalConfigPath = ""
-	rsName            = ""
-	rsMembers         []string
-	rsMemberIds       []int
+	minimalConfigPath        = ""
+	rsName                   = ""
+	rsMembers                []string
+	rsMemberIds              []int
+	shardName                = ""
+	mongocfgConnectionString = ""
+	shardConnectionStrings   []string
 )
 
 var binaryBackupFetchCmd = &cobra.Command{
@@ -47,7 +56,7 @@ var binaryBackupFetchCmd = &cobra.Command{
 		mongodVersion := args[2]
 
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion, rsName,
-			rsMembers, rsMemberIds)
+			rsMembers, rsMemberIds, shardName, mongocfgConnectionString, shardConnectionStrings)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -57,5 +66,8 @@ func init() {
 	binaryBackupFetchCmd.Flags().StringVar(&rsName, RsNameFlag, "", RsNameDescription)
 	binaryBackupFetchCmd.Flags().StringSliceVar(&rsMembers, RsMembersFlag, []string{}, RsMembersDescription)
 	binaryBackupFetchCmd.Flags().IntSliceVar(&rsMemberIds, RsMemberIdsFlag, []int{}, RsMemberIdsDescription)
+	binaryBackupFetchCmd.Flags().StringVar(&shardName, ShNameFlag, "", ShNameDescription)
+	binaryBackupFetchCmd.Flags().StringVar(&mongocfgConnectionString, ShCfgConnStr, "", ShCfgConnStrDescription)
+	binaryBackupFetchCmd.Flags().StringArrayVar(&shardConnectionStrings, ShShardConnStr, []string{}, ShShardConnStrDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }

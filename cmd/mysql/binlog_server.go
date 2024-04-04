@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -25,12 +26,12 @@ var (
 		Short: binlogServerShortDescription,
 		Args:  cobra.NoArgs,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			internal.RequiredSettings[internal.MysqlBinlogServerHost] = true
-			internal.RequiredSettings[internal.MysqlBinlogServerPort] = true
-			internal.RequiredSettings[internal.MysqlBinlogServerUser] = true
-			internal.RequiredSettings[internal.MysqlBinlogServerPassword] = true
-			internal.RequiredSettings[internal.MysqlBinlogServerID] = true
-			internal.RequiredSettings[internal.MysqlBinlogServerReplicaSource] = true
+			conf.RequiredSettings[conf.MysqlBinlogServerHost] = true
+			conf.RequiredSettings[conf.MysqlBinlogServerPort] = true
+			conf.RequiredSettings[conf.MysqlBinlogServerUser] = true
+			conf.RequiredSettings[conf.MysqlBinlogServerPassword] = true
+			conf.RequiredSettings[conf.MysqlBinlogServerID] = true
+			conf.RequiredSettings[conf.MysqlBinlogServerReplicaSource] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 		},

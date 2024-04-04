@@ -16,6 +16,7 @@ type Folder interface {
 	GetPath() string
 
 	// ListFolder lists the folder and provides nested objects and folders. Objects must be with relative paths.
+	// If the folder doesn't exist, empty objects and subFolders must be returned without any error.
 	ListFolder() (objects []Object, subFolders []Folder, err error)
 
 	// DeleteObjects deletes objects from the storage if they exist.
@@ -46,13 +47,6 @@ type Folder interface {
 	// if there are storage limitations.
 	MoveObject(srcPath string, dstPath string) error
 }
-
-type HashableFolder interface {
-	Folder
-	Hash() Hash
-}
-
-type Hash uint64
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
 	return ListFolderRecursivelyWithFilter(folder, func(string) bool { return true })

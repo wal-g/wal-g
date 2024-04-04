@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -41,7 +42,7 @@ func handleEventError(err error, s *replication.BinlogStreamer) {
 
 // see: https://dev.mysql.com/doc/dev/mysql-server/latest/classbinary__log_1_1Rotate__event.html
 func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
-	serverID, err := internal.GetRequiredSetting(internal.MysqlBinlogServerID)
+	serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
 	tracelog.ErrorLogger.FatalOnError(err)
 	ServerIDNum, err := strconv.Atoi(serverID)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -89,7 +90,7 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 }
 
 func waitReplicationIsDone() error {
-	replicaSource, err := internal.GetRequiredSetting(internal.MysqlBinlogServerReplicaSource)
+	replicaSource, err := conf.GetRequiredSetting(conf.MysqlBinlogServerReplicaSource)
 	if err != nil {
 		return err
 	}
@@ -143,7 +144,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		err := s.AddEventToStreamer(e)
 		return err
 	}
-	dstDir, _ := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	dstDir, _ := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
 
 	for {
 		logFile, err := logFilesProvider.GetObject()
@@ -172,18 +173,18 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 
 func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.BinlogStreamer) error {
 	// get necessary settings
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return err
 	}
-	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
+	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
 	if err != nil {
 		return err
 	}
 	logFilesProvider := storage.NewLowMemoryObjectProvider()
 	// start sync
 	go sendEventsFromBinlogFiles(logFilesProvider, pos, s)
-	go provideLogs(folder, dstDir, startTS, untilTS, logFilesProvider)
+	go provideLogs(st.RootFolder(), dstDir, startTS, untilTS, logFilesProvider)
 
 	return nil
 }
@@ -199,12 +200,12 @@ func (h Handler) HandleRegisterSlave(data []byte) error {
 func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	s := replication.NewBinlogStreamer()
 
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return nil, err
 	}
 
-	startTime, err := GetBinlogTS(folder, pos.Name)
+	startTime, err := GetBinlogTS(st.RootFolder(), pos.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +233,7 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"CRC32"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.server_id":
-		serverID, err := internal.GetRequiredSetting(internal.MysqlBinlogServerID)
+		serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
 		tracelog.ErrorLogger.FatalOnError(err)
 		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{serverID}})
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -258,16 +259,16 @@ func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
 }
 
 func HandleBinlogServer(since string, until string) {
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
-	startTS, untilTS, _, err = getTimestamps(folder, since, until, "")
+	startTS, untilTS, _, err = getTimestamps(st.RootFolder(), since, until, "")
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Starting binlog server")
 
-	serverAddress, err := internal.GetRequiredSetting(internal.MysqlBinlogServerHost)
+	serverAddress, err := conf.GetRequiredSetting(conf.MysqlBinlogServerHost)
 	tracelog.ErrorLogger.FatalOnError(err)
-	serverPort, err := internal.GetRequiredSetting(internal.MysqlBinlogServerPort)
+	serverPort, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPort)
 	tracelog.ErrorLogger.FatalOnError(err)
 	l, err := net.Listen("tcp", serverAddress+":"+serverPort)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -277,9 +278,9 @@ func HandleBinlogServer(since string, until string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("connection accepted")
 
-	user, err := internal.GetRequiredSetting(internal.MysqlBinlogServerUser)
+	user, err := conf.GetRequiredSetting(conf.MysqlBinlogServerUser)
 	tracelog.ErrorLogger.FatalOnError(err)
-	password, err := internal.GetRequiredSetting(internal.MysqlBinlogServerPassword)
+	password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
 	tracelog.ErrorLogger.FatalOnError(err)
 	conn, err := server.NewConn(c, user, password, Handler{})
 	tracelog.ErrorLogger.FatalOnError(err)

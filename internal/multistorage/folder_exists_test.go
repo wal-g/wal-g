@@ -10,9 +10,10 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestExists(t *testing.T) {
 	t.Run("check folder implementation and provide default name if it is not multistorage", func(t *testing.T) {
-		singleStorageFolder := memory.NewFolder("/test", memory.NewStorage())
+		singleStorageFolder := memory.NewFolder("/test", memory.NewKVS())
 		_ = singleStorageFolder.PutObject("a/b/c", &bytes.Buffer{})
 
 		exists, storage, err := Exists(singleStorageFolder, "a/b/c")
@@ -38,9 +39,9 @@ func TestExists(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.Exists = policies.ExistsPolicyFirst
 
-		_ = folder.storages[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.storages[1].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.storages[1].PutObject("bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject("aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
 
 		exists, storage, err := Exists(folder, "aaa")
 		require.NoError(t, err)
@@ -57,10 +58,10 @@ func TestExists(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Exists = policies.ExistsPolicyAny
 
-		_ = folder.storages[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.storages[1].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.storages[1].PutObject("ccc", &bytes.Buffer{})
-		_ = folder.storages[2].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject("ccc", &bytes.Buffer{})
 
 		exists, storage, err := Exists(folder, "aaa")
 		require.NoError(t, err)
@@ -82,14 +83,14 @@ func TestExists(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Exists = policies.ExistsPolicyAll
 
-		_ = folder.storages[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.storages[0].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject("ccc", &bytes.Buffer{})
 
-		_ = folder.storages[1].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.storages[1].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject("ccc", &bytes.Buffer{})
 
-		_ = folder.storages[2].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.storages[2].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject("bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject("ccc", &bytes.Buffer{})
 
 		exists, storage, err := Exists(folder, "aaa")
 		require.NoError(t, err)

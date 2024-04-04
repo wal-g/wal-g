@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/spf13/viper"
@@ -15,9 +16,9 @@ import (
 )
 
 func init() {
-	internal.ConfigureSettings(internal.PG)
-	internal.InitConfig()
-	internal.Configure()
+	internal.ConfigureSettings(conf.PG)
+	conf.InitConfig()
+	conf.Configure()
 }
 
 func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUploader, *asm.FakeASM, string, string) {
@@ -25,7 +26,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUplo
 	dirName := filepath.Join(dir, "pg_wal")
 	defer testtools.Cleanup(t, dir)
 	addTestDataFile(t, dirName, fileFormat)
-	viper.Set(internal.PgDataSetting, dir)
+	viper.Set(conf.PgDataSetting, dir)
 	testFileName := testFilename(fileFormat)
 	uploader := testtools.NewMockWalDirUploader(false, false)
 	fakeASM := asm.NewFakeASM()
@@ -43,7 +44,7 @@ func TestWalPush_HandleWALPush(t *testing.T) {
 }
 
 func TestWalPush_IndividualMetadataUploader(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, postgres.WalIndividualMetadataLevel)
+	viper.Set(conf.UploadWalMetadata, postgres.WalIndividualMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer testtools.Cleanup(t, dir)
 	_, err := uploader.Folder().ReadObject(testFileName + ".json")
@@ -51,7 +52,7 @@ func TestWalPush_IndividualMetadataUploader(t *testing.T) {
 }
 
 func TestWalPush_BulkMetadataUploader(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, postgres.WalBulkMetadataLevel)
+	viper.Set(conf.UploadWalMetadata, postgres.WalBulkMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer testtools.Cleanup(t, dir)
 	_, err := uploader.Folder().ReadObject(testFileName[0:len(testFileName)-1] + ".json")
@@ -59,7 +60,7 @@ func TestWalPush_BulkMetadataUploader(t *testing.T) {
 }
 
 func TestWalPush_NoMetataNoUploader(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, postgres.WalNoMetadataLevel)
+	viper.Set(conf.UploadWalMetadata, postgres.WalNoMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer testtools.Cleanup(t, dir)
 	_, err := uploader.Folder().ReadObject(testFileName + ".json")
@@ -67,8 +68,8 @@ func TestWalPush_NoMetataNoUploader(t *testing.T) {
 }
 
 func TestWalPush_BulkMetadataUploaderWithUploadConcurrency(t *testing.T) {
-	viper.Set(internal.UploadWalMetadata, postgres.WalBulkMetadataLevel)
-	viper.Set(internal.UploadConcurrencySetting, 4)
+	viper.Set(conf.UploadWalMetadata, postgres.WalBulkMetadataLevel)
+	viper.Set(conf.UploadConcurrencySetting, 4)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer testtools.Cleanup(t, dir)
 	_, err := uploader.Folder().ReadObject(testFileName[0:len(testFileName)-1] + ".json")

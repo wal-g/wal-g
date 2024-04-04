@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/cmd/common"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -39,5 +40,5 @@ func Execute() {
 }
 
 func init() {
-	common.Init(cmd, internal.FDB)
+	common.Init(cmd, conf.FDB)
 }

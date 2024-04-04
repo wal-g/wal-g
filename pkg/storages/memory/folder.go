@@ -3,7 +3,6 @@ package memory
 import (
 	"bytes"
 	"context"
-	"hash/fnv"
 	"io"
 	"path"
 	"path/filepath"
@@ -15,22 +14,19 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+// TODO: Unit tests
 type Folder struct {
-	path    string
-	Storage *Storage
+	path string
+	KVS  *KVS
 }
 
-func NewFolder(path string, storage *Storage) *Folder {
+func NewFolder(path string, kvs *KVS) *Folder {
 	path = strings.TrimPrefix(path, "/")
-	return &Folder{path, storage}
-}
-
-func NewError(err error, format string, args ...interface{}) storage.Error {
-	return storage.NewError(err, "Memory", format, args...)
+	return &Folder{path, kvs}
 }
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
-	_, exists := folder.Storage.Load(path.Join(folder.path, objectRelativePath))
+	_, exists := folder.KVS.Load(path.Join(folder.path, objectRelativePath))
 	return exists, nil
 }
 
@@ -40,7 +36,7 @@ func (folder *Folder) GetPath() string {
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	subFolderNames := sync.Map{}
-	folder.Storage.Range(func(key string, value TimeStampedData) bool {
+	folder.KVS.Range(func(key string, value TimeStampedData) bool {
 		if !strings.HasPrefix(key, folder.path) {
 			return true
 		}
@@ -55,7 +51,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	})
 	subFolderNames.Range(func(iName, _ interface{}) bool {
 		name := iName.(string)
-		subFolders = append(subFolders, NewFolder(path.Join(folder.path, name)+"/", folder.Storage))
+		subFolders = append(subFolders, NewFolder(path.Join(folder.path, name)+"/", folder.KVS))
 		return true
 	})
 	return
@@ -63,18 +59,18 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectName := range objectRelativePaths {
-		folder.Storage.Delete(storage.JoinPath(folder.path, objectName))
+		folder.KVS.Delete(storage.JoinPath(folder.path, objectName))
 	}
 	return nil
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	return NewFolder(path.Join(folder.path, subFolderRelativePath)+"/", folder.Storage)
+	return NewFolder(path.Join(folder.path, subFolderRelativePath)+"/", folder.KVS)
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	objectAbsPath := path.Join(folder.path, objectRelativePath)
-	object, exists := folder.Storage.Load(objectAbsPath)
+	object, exists := folder.KVS.Load(objectAbsPath)
 	if !exists {
 		return nil, storage.NewObjectNotFoundError(objectAbsPath)
 	}
@@ -87,7 +83,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to put '%s' in memory storage", objectPath)
 	}
-	folder.Storage.Store(objectPath, *bytes.NewBuffer(data))
+	folder.KVS.Store(objectPath, *bytes.NewBuffer(data))
 	return nil
 }
 

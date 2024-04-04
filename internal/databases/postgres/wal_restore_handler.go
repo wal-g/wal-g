@@ -24,7 +24,7 @@ func NewTimelineWithSegmentNo(tl uint32, seg uint64) *TimelineWithSegmentNo {
 }
 
 func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegmentNo {
-	return NewTimelineWithSegmentNo(record.timeline, getSegmentNoFromLsn(record.lsn))
+	return NewTimelineWithSegmentNo(record.timeline, GetSegmentNoFromLsn(record.lsn))
 }
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
@@ -66,7 +66,7 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 	walsByTimelines := groupSegmentsByTimelines(getSegmentsFromFiles(folderFilenames))
 
 	filenamesToRestore, err := GetMissingWals(
-		getSegmentNoFromLsn(lastCommonLsn), lastCommonTl,
+		GetSegmentNoFromLsn(lastCommonLsn), lastCommonTl,
 		sourcePgData.GetCurrentTimeline(), mapOfSrcTimelineWithSegNo, walsByTimelines)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get missing source WALs: %v\n", err)
 
@@ -137,7 +137,7 @@ func GetMissingWals(lastSeg uint64, lastTl, currentTl uint32,
 		for ; currentSeg >= tlToSeg[currentTl].segmentNo; currentSeg-- {
 			// Making sure that this wal segment sequence is correct and check for existing segment
 			if !ok || !walSegSeq.WalSegmentNumbers[WalSegmentNo(currentSeg)] {
-				result = append(result, WalSegmentNo(currentSeg).getFilename(currentTl))
+				result = append(result, WalSegmentNo(currentSeg).GetFilename(currentTl))
 			}
 
 			if currentSeg == lastSeg {

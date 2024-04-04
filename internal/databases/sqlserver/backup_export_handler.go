@@ -31,11 +31,13 @@ func HandleBackupExport(externalConfig string, exportPrefixes map[string]string)
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
 
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
+	folder := st.RootFolder()
 
-	externalFolder, err := internal.FolderFromConfig(externalConfig)
+	externalStorage, err := internal.StorageFromConfig(externalConfig)
 	tracelog.ErrorLogger.FatalOnError(err)
+	externalFolder := externalStorage.RootFolder()
 
 	dbnames, exportPrefixes := prepareBackupExportSpec(exportPrefixes)
 	_, err = resolveExternalStorageFiles(externalFolder, nil)

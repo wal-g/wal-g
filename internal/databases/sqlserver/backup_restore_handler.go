@@ -19,8 +19,10 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
 
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	folder := storage.RootFolder()
 
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalOnError(err)

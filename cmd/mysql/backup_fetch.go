@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
@@ -20,22 +21,22 @@ var (
 		Short: backupFetchShortDescription,
 		Args:  cobra.RangeArgs(0, 1),
 		PreRun: func(cmd *cobra.Command, args []string) {
-			internal.RequiredSettings[internal.NameStreamRestoreCmd] = true
+			conf.RequiredSettings[conf.NameStreamRestoreCmd] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
-			folder, err := internal.ConfigureFolder()
+			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
-			restoreCmd, err := internal.GetCommandSetting(internal.NameStreamRestoreCmd)
+			restoreCmd, err := internal.GetCommandSetting(conf.NameStreamRestoreCmd)
 			tracelog.ErrorLogger.FatalOnError(err)
-			prepareCmd, _ := internal.GetCommandSetting(internal.MysqlBackupPrepareCmd)
+			prepareCmd, _ := internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
 
 			targetBackupSelector, err := createTargetBackupSelector(args, fetchTargetUserData)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			mysql.HandleBackupFetch(folder, targetBackupSelector, restoreCmd, prepareCmd)
+			mysql.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd)
 		},
 	}
 	fetchTargetUserData string
@@ -43,7 +44,7 @@ var (
 
 func createTargetBackupSelector(args []string, fetchTargetUserData string) (internal.BackupSelector, error) {
 	if fetchTargetUserData == "" {
-		fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
+		fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 	}
 	fetchTargetBackupName := ""
 	if len(args) >= 1 {

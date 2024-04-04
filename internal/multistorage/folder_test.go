@@ -6,15 +6,15 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func TestSetPolicies(t *testing.T) {
 	t.Run("do nothing if folder is not multistorage", func(t *testing.T) {
-		folder := memory.NewFolder("test/", memory.NewStorage())
+		folder := memory.NewFolder("test/", memory.NewKVS())
 		newFolder, ok := SetPolicies(folder, policies.TakeFirstStorage).(*memory.Folder)
 		assert.True(t, ok)
 		assert.Equal(t, folder, newFolder)
@@ -42,27 +42,21 @@ func TestUseDifferentStorages(t *testing.T) {
 
 	newMockFolder := func(t *testing.T, initialStorages ...string) Folder {
 		folder := newTestFolder(t, initialStorages...)
-		cacheMock := folder.cache.(*cache.MockStatusCache)
-		s3Folder := cache.NamedFolder{
-			Name:   "s3",
-			Root:   "",
-			Folder: memory.NewFolder("", memory.NewStorage()),
-		}
-
-		cacheMock.EXPECT().AllAliveStorages().Return([]cache.NamedFolder{s3Folder}, nil).AnyTimes()
-		cacheMock.EXPECT().FirstAliveStorage().Return(&s3Folder, nil).AnyTimes()
-		cacheMock.EXPECT().SpecificStorage("s3").Return(&s3Folder, nil).AnyTimes()
-
+		collectorMock := folder.statsCollector.(*stats.MockCollector)
+		newAliveStorage := "s3"
+		collectorMock.EXPECT().AllAliveStorages().Return([]string{newAliveStorage}, nil).AnyTimes()
+		collectorMock.EXPECT().FirstAliveStorage().Return(&newAliveStorage, nil).AnyTimes()
+		collectorMock.EXPECT().SpecificStorage(newAliveStorage).Return(true, nil).AnyTimes()
 		return folder
 	}
 
 	newMockFolderWithNoAlive := func(t *testing.T, initialStorages ...string) Folder {
 		folder := newTestFolder(t, initialStorages...)
-		cacheMock := folder.cache.(*cache.MockStatusCache)
+		collectorMock := folder.statsCollector.(*stats.MockCollector)
 
-		cacheMock.EXPECT().AllAliveStorages().Return([]cache.NamedFolder{}, nil).AnyTimes()
-		cacheMock.EXPECT().FirstAliveStorage().Return(nil, nil).AnyTimes()
-		cacheMock.EXPECT().SpecificStorage("s3").Return(nil, nil).AnyTimes()
+		collectorMock.EXPECT().AllAliveStorages().Return(nil, nil).AnyTimes()
+		collectorMock.EXPECT().FirstAliveStorage().Return(nil, nil).AnyTimes()
+		collectorMock.EXPECT().SpecificStorage("s3").Return(false, nil).AnyTimes()
 
 		return folder
 	}
@@ -70,7 +64,7 @@ func TestUseDifferentStorages(t *testing.T) {
 	for funcName, useStorageFunc := range useStorageFuncs {
 		t.Run(funcName, func(t *testing.T) {
 			t.Run("do nothing if folder is not multistorage", func(t *testing.T) {
-				folder := memory.NewFolder("test/", memory.NewStorage())
+				folder := memory.NewFolder("test/", memory.NewKVS())
 				newFolder, err := useStorageFunc(folder)
 				require.NoError(t, err)
 				assert.Equal(t, folder, newFolder)
@@ -82,11 +76,12 @@ func TestUseDifferentStorages(t *testing.T) {
 				newFolder, err := useStorageFunc(folder)
 				require.NoError(t, err)
 
-				assert.Len(t, folder.storages, 2)
-				assert.Equal(t, "s1", folder.storages[0].Name)
-				assert.Equal(t, "s2", folder.storages[1].Name)
+				assert.Len(t, folder.usedFolders, 2)
+				assert.Equal(t, "s1", folder.usedFolders[0].StorageName)
+				assert.Equal(t, "s2", folder.usedFolders[1].StorageName)
+				assert.Equal(t, folder.configuredRootFolders, newFolder.(Folder).configuredRootFolders)
 
-				assert.Len(t, newFolder.(Folder).storages, 1)
+				assert.Len(t, newFolder.(Folder).usedFolders, 1)
 			})
 
 			t.Run("change directory in new storages", func(t *testing.T) {
@@ -95,9 +90,15 @@ func TestUseDifferentStorages(t *testing.T) {
 				newFolder, err := useStorageFunc(folder)
 				require.NoError(t, err)
 
-				for _, st := range newFolder.(Folder).storages {
-					assert.Equal(t, "a/b/c/", st.GetPath())
+				newUsedFolders := newFolder.(Folder).usedFolders
+				newConfiguredRootFolders := newFolder.(Folder).configuredRootFolders
+
+				assert.Len(t, newUsedFolders, 1)
+				assert.Equal(t, "s3/a/b/c/", newUsedFolders[0].GetPath())
+				for sName, root := range newConfiguredRootFolders {
+					assert.Equal(t, root.GetPath(), sName+"/")
 				}
+				assert.Equal(t, "a/b/c/", newFolder.GetPath())
 			})
 
 			t.Run("throw an error if no storages are alive", func(t *testing.T) {
@@ -112,8 +113,8 @@ func TestUseDifferentStorages(t *testing.T) {
 func TestUseSpecificStorage(t *testing.T) {
 	t.Run("do nothing if this storage is already used", func(t *testing.T) {
 		folder := newTestFolder(t, "s2")
-		cacheMock := folder.cache.(*cache.MockStatusCache)
-		cacheMock.EXPECT().SpecificStorage(gomock.Any()).Times(0)
+		collectorMock := folder.statsCollector.(*stats.MockCollector)
+		collectorMock.EXPECT().SpecificStorage(gomock.Any()).Times(0)
 
 		newFolder, err := UseSpecificStorage("s2", folder)
 		require.NoError(t, err, ErrNoAliveStorages)
@@ -129,7 +130,7 @@ func TestUsedStorages(t *testing.T) {
 	})
 
 	t.Run("provide default name if folder is not multistorage", func(t *testing.T) {
-		folder := memory.NewFolder("test/", memory.NewStorage())
+		folder := memory.NewFolder("test/", memory.NewKVS())
 		used := UsedStorages(folder)
 		assert.Equal(t, []string{"default"}, used)
 	})
@@ -150,28 +151,30 @@ func TestEnsureSingleStorageIsUsed(t *testing.T) {
 	})
 
 	t.Run("no error if folder is not multistorage", func(t *testing.T) {
-		folder := memory.NewFolder("test/", memory.NewStorage())
+		folder := memory.NewFolder("test/", memory.NewKVS())
 		err := EnsureSingleStorageIsUsed(folder)
 		require.NoError(t, err)
 	})
 }
 
-func newTestFolder(t *testing.T, storageNames ...string) Folder {
+func newTestFolder(t *testing.T, usedStorages ...string) Folder {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
-	cacheMock := cache.NewMockStatusCache(mockCtrl)
+	statsCollectorMock := stats.NewMockCollector(mockCtrl)
+	statsCollectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-	var memStorages []cache.NamedFolder
-	for _, name := range storageNames {
-		memStorages = append(memStorages, cache.NamedFolder{
-			Name:   name,
-			Root:   "test",
-			Folder: memory.NewFolder("test/", memory.NewStorage()),
+	memFolders := map[string]storage.Folder{
+		"s1": memory.NewFolder("s1/", memory.NewKVS()),
+		"s2": memory.NewFolder("s2/", memory.NewKVS()),
+		"s3": memory.NewFolder("s3/", memory.NewKVS()),
+	}
+	folder := NewFolder(memFolders, statsCollectorMock).(Folder)
+	for _, us := range usedStorages {
+		folder.usedFolders = append(folder.usedFolders, NamedFolder{
+			Folder:      memFolders[us],
+			StorageName: us,
 		})
 	}
-
-	folder := NewFolder(cacheMock).(Folder)
-	folder.storages = memStorages
 
 	return folder
 }

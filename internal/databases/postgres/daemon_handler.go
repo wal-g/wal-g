@@ -14,7 +14,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/daemon"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -70,7 +72,7 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 		return err
 	}
 	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
-	pushTimeout, err := internal.GetDurationSetting(internal.PgDaemonWALUploadTimeout)
+	pushTimeout, err := conf.GetDurationSetting(conf.PgDaemonWALUploadTimeout)
 	if err != nil {
 		return err
 	}
@@ -128,28 +130,22 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	return nil
 }
 
-func NewMessageHandler(messageType daemon.SocketMessageType, c net.Conn) (SocketMessageHandler, error) {
+func NewMessageHandler(
+	messageType daemon.SocketMessageType,
+	c net.Conn,
+	storage storage.Storage,
+) (SocketMessageHandler, error) {
 	switch messageType {
 	case daemon.CheckType:
 		return &CheckMessageHandler{c}, nil
 	case daemon.WalPushType:
-		folder, err := ConfigureMultiStorageFolder(true)
-		if err != nil {
-			return nil, err
-		}
-
-		walUploader, err := PrepareMultiStorageWalUploader(folder, "")
+		walUploader, err := PrepareMultiStorageWalUploader(storage.RootFolder(), "")
 		if err != nil {
 			return nil, err
 		}
 		return &ArchiveMessageHandler{c, walUploader}, nil
 	case daemon.WalFetchType:
-		folder, err := ConfigureMultiStorageFolder(false)
-		if err != nil {
-			return nil, err
-		}
-
-		folderReader, err := internal.PrepareMultiStorageFolderReader(folder, "")
+		folderReader, err := internal.PrepareMultiStorageFolderReader(storage.RootFolder(), "")
 		if err != nil {
 			return nil, err
 		}
@@ -226,18 +222,9 @@ func Listen(ctx context.Context, c net.Conn) {
 			failAndLogError(c, fmt.Errorf("read message from %s, err: %v", c.RemoteAddr(), err))
 			return
 		}
-		messageHandler, err := NewMessageHandler(messageType, c)
+		err = handleMessage(ctx, messageType, messageBody, c)
 		if err != nil {
-			failAndLogError(c, fmt.Errorf("init handler for message type %s: %v", string(messageType), err))
-			return
-		}
-		if messageHandler == nil {
-			failAndLogError(c, fmt.Errorf("unexpected message type: %s", string(messageType)))
-			return
-		}
-		err = messageHandler.Handle(ctx, messageBody)
-		if err != nil {
-			failAndLogError(c, fmt.Errorf("handle message: %w", err))
+			failAndLogError(c, err)
 			return
 		}
 		if messageType == daemon.WalPushType {
@@ -245,9 +232,35 @@ func Listen(ctx context.Context, c net.Conn) {
 			return
 		}
 		if messageType == daemon.WalFetchType {
+			tracelog.DebugLogger.Printf("successfully fetched: %s\n", string(messageBody))
 			return
 		}
 	}
+}
+
+func handleMessage(
+	ctx context.Context,
+	messageType daemon.SocketMessageType,
+	messageBody []byte,
+	conn net.Conn,
+) error {
+	multiSt, err := ConfigureMultiStorage(true)
+	defer utility.LoggedClose(multiSt, "close multi-storage")
+	if err != nil {
+		return fmt.Errorf("configure multi-storage: %w", err)
+	}
+	messageHandler, err := NewMessageHandler(messageType, conn, multiSt)
+	if err != nil {
+		return fmt.Errorf("init handler for message type %s: %v", string(messageType), err)
+	}
+	if messageHandler == nil {
+		return fmt.Errorf("unexpected message type: %s", string(messageType))
+	}
+	err = messageHandler.Handle(ctx, messageBody)
+	if err != nil {
+		return fmt.Errorf("handle message: %w", err)
+	}
+	return nil
 }
 
 func failAndLogError(c net.Conn, err error) {
@@ -266,7 +279,7 @@ func SendSdNotify(c <-chan time.Time) {
 }
 
 func SdNotify(state string) error {
-	socketName, ok := internal.GetSetting(internal.SystemdNotifySocket)
+	socketName, ok := conf.GetSetting(conf.SystemdNotifySocket)
 	if !ok {
 		return nil
 	}
@@ -286,7 +299,7 @@ func SdNotify(state string) error {
 }
 
 func getFullPath(relativePath string) (string, error) {
-	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
+	PgDataSettingString, ok := conf.GetSetting(conf.PgDataSetting)
 	if !ok {
 		return "", fmt.Errorf("PGDATA is not set in the conf")
 	}

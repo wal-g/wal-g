@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestGetSubFolder(t *testing.T) {
 	t.Run("change path in all storages regardless of policies", func(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
@@ -16,20 +17,20 @@ func TestGetSubFolder(t *testing.T) {
 		aSubFolder, ok := subf.(Folder)
 		assert.True(t, ok)
 		assert.Equal(t, "a/", aSubFolder.GetPath())
-		assert.Len(t, aSubFolder.storages, 2)
-		assert.Equal(t, "test/a/", aSubFolder.storages[0].GetPath())
-		assert.Equal(t, "test/a/", aSubFolder.storages[1].GetPath())
+		assert.Len(t, aSubFolder.usedFolders, 2)
+		assert.Equal(t, "s1/a/", aSubFolder.usedFolders[0].GetPath())
+		assert.Equal(t, "s2/a/", aSubFolder.usedFolders[1].GetPath())
 
 		subf = aSubFolder.GetSubFolder("b")
 		bSubFolder, ok := subf.(Folder)
 		assert.True(t, ok)
 		assert.Equal(t, "a/b/", bSubFolder.GetPath())
-		assert.Len(t, bSubFolder.storages, 2)
-		assert.Equal(t, "test/a/b/", bSubFolder.storages[0].GetPath())
-		assert.Equal(t, "test/a/b/", bSubFolder.storages[1].GetPath())
+		assert.Len(t, bSubFolder.usedFolders, 2)
+		assert.Equal(t, "s1/a/b/", bSubFolder.usedFolders[0].GetPath())
+		assert.Equal(t, "s2/a/b/", bSubFolder.usedFolders[1].GetPath())
 	})
 
-	t.Run("copies cache storages and policies to subfolders", func(t *testing.T) {
+	t.Run("copies stats collector storages and policies to subfolders", func(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies = policies.UniteAllStorages
 
@@ -37,9 +38,9 @@ func TestGetSubFolder(t *testing.T) {
 		aSubFolder, ok := subf.(Folder)
 		assert.True(t, ok)
 		assert.Equal(t, policies.UniteAllStorages, aSubFolder.policies)
-		assert.Len(t, aSubFolder.storages, 2)
-		assert.Equal(t, "s1", aSubFolder.storages[0].Name)
-		assert.Equal(t, "s2", aSubFolder.storages[1].Name)
-		assert.Equal(t, folder.cache, aSubFolder.cache)
+		assert.Len(t, aSubFolder.usedFolders, 2)
+		assert.Equal(t, "s1", aSubFolder.usedFolders[0].StorageName)
+		assert.Equal(t, "s2", aSubFolder.usedFolders[1].StorageName)
+		assert.Equal(t, folder.statsCollector, aSubFolder.statsCollector)
 	})
 }

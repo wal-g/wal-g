@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -25,7 +26,7 @@ func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName st
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
-	concurrency, err := internal.GetMaxDownloadConcurrency()
+	concurrency, err := conf.GetMaxDownloadConcurrency()
 	if err != nil {
 		return fmt.Errorf("get max concurrency: %v", err)
 	}
@@ -75,7 +76,7 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, nil, "", &prefaultStartLsn, nil,
-		false, viper.GetInt64(internal.TarSizeThresholdSetting))
+		false, viper.GetInt64(conf.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
 	err = bundle.DownloadDeltaMap(folderReader.SubFolder(utility.WalPath), startLsn)

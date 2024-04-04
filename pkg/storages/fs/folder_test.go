@@ -13,13 +13,11 @@ func TestFSFolder(t *testing.T) {
 	tmpDir := setupTmpDir(t)
 
 	defer os.RemoveAll(tmpDir)
-	var storageFolder storage.Folder
 
-	storageFolder, err := ConfigureFolder(tmpDir, nil)
-
+	st, err := ConfigureStorage(tmpDir, nil)
 	assert.NoError(t, err)
 
-	storage.RunFolderTest(storageFolder, t)
+	storage.RunFolderTest(st.RootFolder(), t)
 }
 
 func setupTmpDir(t *testing.T) string {

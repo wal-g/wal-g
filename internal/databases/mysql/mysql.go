@@ -18,6 +18,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -144,7 +145,7 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 }
 
 func getMySQLConnection() (*sql.DB, error) {
-	datasourceName, err := internal.GetRequiredSetting(internal.MysqlDatasourceNameSetting)
+	datasourceName, err := conf.GetRequiredSetting(conf.MysqlDatasourceNameSetting)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +163,7 @@ func getMySQLConnection() (*sql.DB, error) {
 }
 
 func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
-	if caFile, ok := internal.GetSetting(internal.MysqlSslCaSetting); ok {
+	if caFile, ok := conf.GetSetting(conf.MysqlSslCaSetting); ok {
 		rootCertPool := x509.NewCertPool()
 		pem, err := os.ReadFile(caFile)
 		if err != nil {
@@ -180,7 +181,7 @@ func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 		if strings.Contains(datasourceName, "?tls=") || strings.Contains(datasourceName, "&tls=") {
 			return nil,
 				fmt.Errorf("mySQL datasource string contains tls option. It can't be used with %v option",
-					internal.MysqlSslCaSetting)
+					conf.MysqlSslCaSetting)
 		}
 		if strings.Contains(datasourceName, "?") {
 			datasourceName += "&tls=custom"

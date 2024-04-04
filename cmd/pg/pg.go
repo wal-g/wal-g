@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -26,17 +27,19 @@ var (
 		Short:   WalgShortDescription, // TODO : improve short and long descriptions
 		Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "PostgreSQL"}, "\t"),
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalOnError(err)
+			if _, ok := cmd.Annotations["NoStorage"]; !ok {
+				err := internal.AssertRequiredSettingsSet()
+				tracelog.ErrorLogger.FatalOnError(err)
+			}
 
-			if viper.IsSet(internal.PgWalSize) {
-				postgres.SetWalSize(viper.GetUint64(internal.PgWalSize))
+			if viper.IsSet(conf.PgWalSize) {
+				postgres.SetWalSize(viper.GetUint64(conf.PgWalSize))
 			}
 
 			// In case the --target-storage flag isn't specified (the variable is set in commands' init() funcs),
 			// we take the value from the config.
 			if targetStorage == "" {
-				targetStorage = viper.GetString(internal.PgTargetStorage)
+				targetStorage = viper.GetString(conf.PgTargetStorage)
 			}
 		},
 	}
@@ -56,6 +59,6 @@ func Execute() {
 }
 
 func configureCommand() {
-	common.Init(Cmd, internal.PG)
-	internal.AddTurboFlag(Cmd)
+	common.Init(Cmd, conf.PG)
+	conf.AddTurboFlag(Cmd)
 }

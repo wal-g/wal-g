@@ -2,81 +2,128 @@ package postgres
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/multistorage"
-	"github.com/wal-g/wal-g/internal/multistorage/cache"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
+	"github.com/wal-g/wal-g/utility"
 )
 
-// ConfigureMultiStorageFolder configures the primary storage folder and all the failover ones, if any, and builds a
-// multi-storage folder that aggregates them. It also sets up a cache to keep storage alive check results there.
-// This function doesn't set any specific multi-storage folder policies, so policies.Default are used initially.
+// ConfigureMultiStorage configures the primary storage and all failover ones, if any, and builds a multi-storage that
+// aggregates them. It also sets up a cache to keep storage alive check results there.
+// This function doesn't set any specific multi-storage root folder's policies, so policies.Default are used initially.
 // checkWrite should be true for operations supposes writing to the storage. It affects selecting R/O or R/W aliveness check.
-func ConfigureMultiStorageFolder(checkWrite bool) (storage.Folder, error) {
-	primaryStorage, err := internal.ConfigureFolder()
+func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error) {
+	// errClosers are needed to close already configured storages if a fatal error happens before they are delegated to multi-storage.
+	var errClosers []io.Closer
+	defer func() {
+		if err == nil {
+			return
+		}
+		for _, closer := range errClosers {
+			utility.LoggedClose(closer, "Failed to close storage")
+		}
+	}()
+
+	primary, err := internal.ConfigureStorage()
 	if err != nil {
-		return nil, fmt.Errorf("configure primary folder: %w", err)
+		return nil, fmt.Errorf("configure primary storage: %w", err)
+	}
+	errClosers = append(errClosers, primary)
+
+	failovers, err := internal.ConfigureFailoverStorages()
+	if err != nil {
+		return nil, fmt.Errorf("configure failover storages: %w", err)
+	}
+	for _, fo := range failovers {
+		errClosers = append(errClosers, fo)
 	}
 
-	failoverStorages, err := internal.InitFailoverStorages()
-	if err != nil {
-		return nil, fmt.Errorf("configure failover folders: %w", err)
-	}
+	config := &multistorage.Config{}
 
-	checkForAliveDefault := len(failoverStorages) > 0
-	checkForAlive, err := internal.GetBoolSettingDefault(internal.PgFailoverStoragesCheck, checkForAliveDefault)
+	aliveChecksDefault := len(failovers) > 0
+	config.AliveChecks, err = conf.GetBoolSettingDefault(conf.PgFailoverStoragesCheck, aliveChecksDefault)
 	if err != nil {
 		return nil, fmt.Errorf("get failover storage check setting: %w", err)
 	}
 
-	var statusCache cache.StatusCache
-	if checkForAlive {
-		cacheLifetime, err := internal.GetDurationSetting(internal.PgFailoverStorageCacheLifetime)
+	if config.AliveChecks {
+		config.StatusCache, err = configureStatusCache()
 		if err != nil {
-			return nil, fmt.Errorf("get failover storage cache lifetime setting: %w", err)
+			return nil, fmt.Errorf("configure failover storages status cache: %w", err)
 		}
 
-		aliveChecker, err := configureStorageAliveChecker(checkWrite)
+		config.AliveCheckTimeout, err = conf.GetDurationSetting(conf.PgFailoverStoragesCheckTimeout)
 		if err != nil {
-			return nil, fmt.Errorf("configure storage alive checker: %w", err)
+			return nil, fmt.Errorf("get failover storage check timeout setting: %w", err)
 		}
-		statusCache, err = cache.NewStatusCache(
-			primaryStorage,
-			failoverStorages,
-			cacheLifetime,
-			aliveChecker,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("init cache with storage statuses: %w", err)
-		}
-	} else {
-		statusCache, err = cache.NewStatusCacheNoCheck(primaryStorage, failoverStorages)
-		if err != nil {
-			return nil, fmt.Errorf("init status cache with no checks: %w", err)
+
+		config.CheckWrite = checkWrite
+
+		if config.CheckWrite {
+			config.AliveCheckWriteBytes = viper.GetSizeInBytes(conf.PgFailoverStoragesCheckSize)
 		}
 	}
 
-	return multistorage.NewFolder(statusCache), nil
+	ms, err = multistorage.NewStorage(config, primary, failovers)
+	if err != nil {
+		return nil, err
+	}
+	return ms, nil
 }
 
-func configureStorageAliveChecker(checkWrite bool) (cache.AliveChecker, error) {
-	aliveCheckTimeout, err := internal.GetDurationSetting(internal.PgFailoverStoragesCheckTimeout)
+func configureStatusCache() (*cache.Config, error) {
+	config := &cache.Config{}
+
+	var err error
+	config.TTL, err = conf.GetDurationSetting(conf.PgFailoverStorageCacheLifetime)
 	if err != nil {
-		return cache.AliveChecker{}, fmt.Errorf("get failover storage check timeout setting: %w", err)
+		return nil, fmt.Errorf("get cache lifetime setting: %w", err)
 	}
 
-	if checkWrite {
-		aliveCheckSize := viper.GetSizeInBytes(internal.PgFailoverStoragesCheckSize)
-		return cache.NewRWAliveChecker(aliveCheckTimeout, uint32(aliveCheckSize)), nil
+	emaDefault := cache.DefaultEMAParams
+	ema := &cache.EMAParams{}
+
+	ema.AliveLimit, err = conf.GetFloatSettingDefault(conf.PgFailoverStorageCacheEMAAliveLimit, emaDefault.AliveLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alive limit setting: %w", err)
 	}
 
-	return cache.NewReadAliveChecker(aliveCheckTimeout), nil
+	ema.DeadLimit, err = conf.GetFloatSettingDefault(conf.PgFailoverStorageCacheEMADeadLimit, emaDefault.DeadLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA dead limit setting: %w", err)
+	}
+
+	ema.AlphaAlive.Min, err = conf.GetFloatSettingDefault(conf.PgFailoverStorageCacheEMAAlphaAliveMin, emaDefault.AlphaAlive.Min)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha alive min setting: %w", err)
+	}
+
+	ema.AlphaAlive.Max, err = conf.GetFloatSettingDefault(conf.PgFailoverStorageCacheEMAAlphaAliveMax, emaDefault.AlphaAlive.Max)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha alive max setting: %w", err)
+	}
+
+	ema.AlphaDead.Min, err = conf.GetFloatSettingDefault(conf.PgFailoverStorageCacheEMAAlphaDeadMin, emaDefault.AlphaDead.Min)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha dead min setting: %w", err)
+	}
+
+	ema.AlphaDead.Max, err = conf.GetFloatSettingDefault(conf.PgFailoverStorageCacheEMAAlphaDeadMax, emaDefault.AlphaDead.Max)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha dead max setting: %w", err)
+	}
+
+	config.EMAParams = ema
+
+	return config, nil
 }
 
 // ConfigureWalUploader connects to storage and creates an uploader. It makes sure
@@ -99,7 +146,7 @@ func ConfigureWalUploader(baseUploader internal.Uploader) (uploader *WalUploader
 
 // TODO : unit tests
 func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFolder, err error) {
-	useWalDelta = viper.GetBool(internal.UseWalDeltaSetting)
+	useWalDelta = viper.GetBool(conf.UseWalDeltaSetting)
 	if !useWalDelta {
 		return
 	}
@@ -115,11 +162,11 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFold
 }
 
 func getStopBackupTimeoutSetting() (time.Duration, error) {
-	if !viper.IsSet(internal.PgStopBackupTimeout) {
+	if !viper.IsSet(conf.PgStopBackupTimeout) {
 		return 0, nil
 	}
 
-	timeout, err := internal.GetDurationSetting(internal.PgStopBackupTimeout)
+	timeout, err := conf.GetDurationSetting(conf.PgStopBackupTimeout)
 	if err != nil {
 		return 0, err
 	}

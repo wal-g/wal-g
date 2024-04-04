@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/testtools"
@@ -13,8 +14,8 @@ import (
 
 func init() {
 	internal.ConfigureSettings("")
-	internal.InitConfig()
-	internal.Configure()
+	conf.InitConfig()
+	conf.Configure()
 }
 
 func TestGetBackupByName_Latest(t *testing.T) {

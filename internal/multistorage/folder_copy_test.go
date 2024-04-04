@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestCopyObject(t *testing.T) {
 	t.Run("require at least one storage for first storage policy", func(t *testing.T) {
 		folder := newTestFolder(t)
@@ -24,20 +25,20 @@ func TestCopyObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.Copy = policies.CopyPolicyFirst
 
-		_ = folder.storages[0].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
-		_ = folder.storages[1].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[0].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[1].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
 
 		err := folder.CopyObject("a/b/c/file1", "file2")
 		require.NoError(t, err)
 
 		for _, file := range []string{"a/b/c/file1", "file2"} {
-			reader, err := folder.storages[0].ReadObject(file)
+			reader, err := folder.usedFolders[0].ReadObject(file)
 			require.NoError(t, err)
 			content, _ := io.ReadAll(reader)
 			assert.Equal(t, "abc", string(content))
 		}
 
-		_, err = folder.storages[1].ReadObject("file2")
+		_, err = folder.usedFolders[1].ReadObject("file2")
 		assert.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 	})
 
@@ -45,15 +46,15 @@ func TestCopyObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.Copy = policies.CopyPolicyAll
 
-		_ = folder.storages[0].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
-		_ = folder.storages[1].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[0].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[1].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
 
 		err := folder.CopyObject("a/b/c/file1", "file2")
 		require.NoError(t, err)
 
 		for storageIdx := 0; storageIdx < 2; storageIdx++ {
 			for _, file := range []string{"a/b/c/file1", "file2"} {
-				reader, err := folder.storages[storageIdx].ReadObject(file)
+				reader, err := folder.usedFolders[storageIdx].ReadObject(file)
 				require.NoError(t, err)
 				content, _ := io.ReadAll(reader)
 				assert.Equal(t, "abc", string(content))
@@ -73,7 +74,7 @@ func TestCopyObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.Copy = policies.CopyPolicyAll
 
-		_ = folder.storages[1].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[1].PutObject("a/b/c/file1", bytes.NewBufferString("abc"))
 
 		err := folder.CopyObject("a/b/c/file1", "file2")
 		require.NoError(t, err)

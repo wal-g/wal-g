@@ -2,15 +2,17 @@ package mysql
 
 import (
 	"bytes"
-	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/utility"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -119,7 +121,7 @@ func xtrabackupFetch(
 	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
 
-	incrementalBackupDir := viper.GetString(internal.MysqlIncrementalBackupDst)
+	incrementalBackupDir := viper.GetString(conf.MysqlIncrementalBackupDst)
 	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
 

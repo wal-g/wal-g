@@ -12,9 +12,10 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+// TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
 func TestReadObject(t *testing.T) {
 	t.Run("check folder implementation and provide default name if it is not multistorage", func(t *testing.T) {
-		singleStorageFolder := memory.NewFolder("/test", memory.NewStorage())
+		singleStorageFolder := memory.NewFolder("/test", memory.NewKVS())
 		_ = singleStorageFolder.PutObject("a/b/c", bytes.NewBufferString("abc"))
 
 		reader, storageName, err := ReadObject(singleStorageFolder, "a/b/c")
@@ -40,9 +41,9 @@ func TestReadObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.Read = policies.ReadPolicyFirst
 
-		_ = folder.storages[0].PutObject("aaa", bytes.NewBufferString("abc"))
-		_ = folder.storages[1].PutObject("aaa", bytes.NewBufferString("abc"))
-		_ = folder.storages[1].PutObject("bbb", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[0].PutObject("aaa", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[1].PutObject("aaa", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[1].PutObject("bbb", bytes.NewBufferString("abc"))
 
 		reader, storageName, err := ReadObject(folder, "aaa")
 		require.NoError(t, err)
@@ -60,14 +61,14 @@ func TestReadObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Read = policies.ReadPolicyFoundFirst
 
-		_ = folder.storages[0].PutObject("aaa", bytes.NewBufferString("1"))
+		_ = folder.usedFolders[0].PutObject("aaa", bytes.NewBufferString("1"))
 
-		_ = folder.storages[1].PutObject("aaa", bytes.NewBufferString("2"))
-		_ = folder.storages[1].PutObject("bbb", bytes.NewBufferString("2"))
+		_ = folder.usedFolders[1].PutObject("aaa", bytes.NewBufferString("2"))
+		_ = folder.usedFolders[1].PutObject("bbb", bytes.NewBufferString("2"))
 
-		_ = folder.storages[2].PutObject("aaa", bytes.NewBufferString("3"))
-		_ = folder.storages[2].PutObject("bbb", bytes.NewBufferString("3"))
-		_ = folder.storages[2].PutObject("ccc", bytes.NewBufferString("3"))
+		_ = folder.usedFolders[2].PutObject("aaa", bytes.NewBufferString("3"))
+		_ = folder.usedFolders[2].PutObject("bbb", bytes.NewBufferString("3"))
+		_ = folder.usedFolders[2].PutObject("ccc", bytes.NewBufferString("3"))
 
 		reader, storageName, err := ReadObject(folder, "aaa")
 		require.NoError(t, err)

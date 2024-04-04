@@ -8,76 +8,68 @@ import (
 )
 
 func TestS3FolderCreatesWithoutAdditionalHeaders(t *testing.T) {
-	assert := assert.New(t)
-
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	_, err := ConfigureFolder(waleS3Prefix,
+	_, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
-			EndpointSetting:          "HTTP://s3.kek.lol.net/",
-			UploadConcurrencySetting: "1",
+			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			uploadConcurrencySetting: "1",
 		})
 
-	assert.NoError(err)
+	assert.NoError(t, err)
 }
 
 func TestS3FolderCreatesWithAdditionalHeadersJSON(t *testing.T) {
-	assert := assert.New(t)
-
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	_, err := ConfigureFolder(waleS3Prefix,
+	_, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
-			EndpointSetting:          "HTTP://s3.kek.lol.net/",
-			UploadConcurrencySetting: "1",
-			RequestAdditionalHeaders: `{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}`,
+			endpointSetting:                 "HTTP://s3.kek.lol.net/",
+			uploadConcurrencySetting:        "1",
+			requestAdditionalHeadersSetting: `{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}`,
 		})
 
-	assert.NoError(err)
+	assert.NoError(t, err)
 }
 
 func TestS3FolderCreatesWithAdditionalHeadersYAML(t *testing.T) {
-	assert := assert.New(t)
-
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	_, err := ConfigureFolder(waleS3Prefix,
+	_, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
-			EndpointSetting:          "HTTP://s3.kek.lol.net/",
-			UploadConcurrencySetting: "1",
-			RequestAdditionalHeaders: `- X-Yandex-Prioritypass: "ok"
+			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			uploadConcurrencySetting: "1",
+			requestAdditionalHeadersSetting: `- X-Yandex-Prioritypass: "ok"
 - MyHeader: "32"
 - DROP_TABLE: "true"`,
 		})
 
-	assert.NoError(err)
+	assert.NoError(t, err)
 }
 
 func TestS3Folder(t *testing.T) {
 	t.Skip("Credentials needed to run S3 tests")
 
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	storageFolder, err := ConfigureFolder(waleS3Prefix,
+	st, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
-			EndpointSetting: "HTTP://s3.kek.lol.net/",
+			endpointSetting: "HTTP://s3.kek.lol.net/",
 		})
-
 	assert.NoError(t, err)
 
-	storage.RunFolderTest(storageFolder, t)
+	storage.RunFolderTest(st.RootFolder(), t)
 }
 func TestS3FolderEndpointSource(t *testing.T) {
 	t.Skip("Credentials needed to run S3 tests")
 
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	storageFolder, err := ConfigureFolder(waleS3Prefix,
+	st, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
-			EndpointSetting:          "HTTP://s3.kek.lol.net/",
-			EndpointSourceSetting:    "HTTP://localhost:80/",
-			AccessKeySetting:         "AKIAIOSFODNN7EXAMPLE",
-			SecretKeySetting:         "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-			UploadConcurrencySetting: "1",
-			ForcePathStyleSetting:    "True",
+			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			endpointSourceSetting:    "HTTP://localhost:80/",
+			accessKeySetting:         "AKIAIOSFODNN7EXAMPLE",
+			secretKeySetting:         "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+			uploadConcurrencySetting: "1",
+			forcePathStyleSetting:    "True",
 		})
-
 	assert.NoError(t, err)
 
-	storage.RunFolderTest(storageFolder, t)
+	storage.RunFolderTest(st.RootFolder(), t)
 }

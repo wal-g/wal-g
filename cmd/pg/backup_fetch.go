@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -41,29 +42,29 @@ var backupFetchCmd = &cobra.Command{
 		internal.ConfigureLimiters()
 
 		if fetchTargetUserData == "" {
-			fetchTargetUserData = viper.GetString(internal.FetchTargetUserDataSetting)
+			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder, err := postgres.ConfigureMultiStorageFolder(false)
+		storage, err := postgres.ConfigureMultiStorage(false)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		folder = multistorage.SetPolicies(folder, policies.UniteAllStorages)
+		rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.UniteAllStorages)
 		if targetStorage == "" {
-			folder, err = multistorage.UseAllAliveStorages(folder)
+			rootFolder, err = multistorage.UseAllAliveStorages(rootFolder)
 		} else {
-			folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+			rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 		}
 		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.InfoLogger.Printf("Backup to fetch will be searched in storages: %v", multistorage.UsedStorages(folder))
+		tracelog.InfoLogger.Printf("Backup to fetch will be searched in storages: %v", multistorage.UsedStorages(rootFolder))
 
 		if partialRestoreArgs != nil {
 			skipRedundantTars = true
 			reverseDeltaUnpack = true
 		}
-		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(internal.UseReverseUnpackSetting)
-		skipRedundantTars = skipRedundantTars || viper.GetBool(internal.SkipRedundantTarsSetting)
+		reverseDeltaUnpack = reverseDeltaUnpack || viper.GetBool(conf.UseReverseUnpackSetting)
+		skipRedundantTars = skipRedundantTars || viper.GetBool(conf.SkipRedundantTarsSetting)
 
 		var extractProv postgres.ExtractProvider
 
@@ -80,7 +81,7 @@ var backupFetchCmd = &cobra.Command{
 			pgFetcher = postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
 		}
 
-		internal.HandleBackupFetch(folder, targetBackupSelector, pgFetcher)
+		internal.HandleBackupFetch(rootFolder, targetBackupSelector, pgFetcher)
 	},
 }
 

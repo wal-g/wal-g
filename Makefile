@@ -5,7 +5,8 @@ MAIN_REDIS_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
-DOCKER_COMMON := golang ubuntu s3
+MAIN_ETCD_PATH := main/etcd
+DOCKER_COMMON := golang ubuntu ubuntu_20_04 s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
@@ -35,7 +36,7 @@ endif
 
 .PHONY: unittest fmt lint clean install_tools
 
-test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test
+test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test etcd_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
@@ -56,7 +57,8 @@ pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE_DOCKER_PREFIX}
-	docker save ${IMAGE_UBUNTU} | gzip -c > ${CACHE_FILE_UBUNTU}
+	docker save ${IMAGE_UBUNTU_18_04} | gzip -c > ${CACHE_FILE_UBUNTU_18_04}
+	docker save ${IMAGE_UBUNTU_20_04} | gzip -c > ${CACHE_FILE_UBUNTU_20_04}
 	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
@@ -78,11 +80,14 @@ pg_integration_test: clean_compose
 	docker-compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
 	@if [ "$(TEST)" = "pg_tests" ]; then\
-		docker-compose build pg_pgbackrest ssh swift &&\
+		docker-compose build pg_pgbackrest ssh swift pg_wal_perftest_with_throttling &&\
 		docker-compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
 		docker-compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
 		docker-compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
-		docker-compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test ;\
+		docker-compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
+		docker-compose down &&\
+		sleep 5 &&\
+		docker-compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
 	fi
 	make clean_compose
 
@@ -115,11 +120,12 @@ sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=`git tag -l --points-at HEAD`")
 
 load_docker_common:
-	@if [ "x" = "${CACHE_FILE_UBUNTU}x" ]; then\
+	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
 		echo "Rebuild";\
 		docker-compose build $(DOCKER_COMMON);\
 	else\
-		docker load -i ${CACHE_FILE_UBUNTU};\
+		docker load -i ${CACHE_FILE_UBUNTU_18_04};\
+		docker load -i ${CACHE_FILE_UBUNTU_20_04};\
 		docker load -i ${CACHE_FILE_GOLANG};\
 	fi
 
@@ -195,6 +201,23 @@ clean_redis_features:
 	set -e
 	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
 
+etcd_test: deps etcd_build unlink_brotli etcd_integration_test
+
+etcd_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_ETCD_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=`git tag -l --points-at HEAD`")
+
+etcd_install: etcd_build
+	mv $(MAIN_ETCD_PATH)/wal-g $(GOBIN)/wal-g
+
+etcd_clean:
+	(cd $(MAIN_ETCD_PATH) && go clean)
+	./cleanup.sh
+
+# refactor
+etcd_integration_test: load_docker_common
+	docker-compose build etcd etcd_tests
+	docker-compose up --exit-code-from etcd_tests etcd_tests
+
 gp_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
 
@@ -263,7 +286,7 @@ link_external_deps: link_brotli link_libsodium
 unlink_external_deps: unlink_brotli unlink_libsodium
 
 install:
-	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install... instead."
+	@echo "Nothing to be done. Use pg_install/mysql_install/mongo_install/fdb_install/gp_install/etcd_install... instead."
 
 link_brotli:
 	@if [ -n "${USE_BROTLI}" ]; then ./link_brotli.sh; fi

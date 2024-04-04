@@ -19,6 +19,7 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
     - [Installing](#installing)
     - [Testing](#testing)
     - [Development on windows](#development-on-windows)
+- [Troubleshooting](#troubleshooting)
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
@@ -148,7 +149,13 @@ Similar to `WALG_ENVELOPE_PGP_KEY`, but value is the path to the key on file sys
 
 * `WALG_STATSD_ADDRESS`
 
-To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `9125`.
+To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `8125`.
+
+* `WALG_STATSD_EXTRA_TAGS`
+
+Use this setting to add static tags (`host`, `operation`, `database`, etc) to the metrics WAL-G publishes to statsd.
+
+If you want to make demo for testing purposes, you can use graphite service from docker-compose file.
 
 ### Profiling
 
@@ -266,6 +273,9 @@ Databases
 ### Greenplum [Work in progress]
 [Information about installing, configuration and usage](Greenplum.md)
 
+### ETCD [Work in progress]
+[Information about installing, configuration and usage](ETCD.md)
+
 Development
 -----------
 
@@ -349,6 +359,21 @@ This command generates `coverage.out` file and opens HTML representation of the 
 ### Development on Windows
 
 [Information about installing and usage](Windows.md)
+
+
+Troubleshooting
+---------------
+
+A good way to start troubleshooting problems is by setting one or both of these environment variables:
+
+* `WALG_LOG_LEVEL=DEVEL`
+
+Prints out the used configuration of WAL-G and detailed logs of the used command.
+
+* `S3_LOG_LEVEL=DEVEL`
+
+If your commands seem to be stuck it could be that the S3 is not reachable, certificate problems or other S3 related issues.
+With this environment variable set you can see the Requests and Responses from S3.
 
 
 Authors

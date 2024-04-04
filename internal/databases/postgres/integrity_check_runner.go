@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -69,7 +70,7 @@ func NewIntegrityCheckRunner(
 
 	// uploadingSegmentRangeSize is needed to determine max amount of missing WAL segments
 	// after the last found WAL segment which can be marked as "uploading"
-	uploadingSegmentRangeSize, err := internal.GetMaxUploadConcurrency()
+	uploadingSegmentRangeSize, err := conf.GetMaxUploadConcurrency()
 	if err != nil {
 		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to resolve MaxUploadConcurrency")
 	}
@@ -78,7 +79,7 @@ func NewIntegrityCheckRunner(
 		startWalSegment:           currentWalSegment,
 		stopWalSegmentNo:          stopWalSegmentNo,
 		uploadingSegmentRangeSize: uploadingSegmentRangeSize,
-		delayedSegmentRangeSize:   viper.GetInt(internal.MaxDelayedSegmentsCount),
+		delayedSegmentRangeSize:   viper.GetInt(conf.MaxDelayedSegmentsCount),
 		walFolderFilenames:        walFolderFilenames,
 		timelineSwitchMap:         timelineSwitchMap,
 		noBackupsFound:            noBackupsFound,
@@ -152,8 +153,8 @@ func newIntegrityScanSegmentSequence(sequence *WalSegmentsSequence,
 	status ScannedSegmentStatus) *IntegrityScanSegmentSequence {
 	return &IntegrityScanSegmentSequence{
 		TimelineID:    sequence.TimelineID,
-		StartSegment:  sequence.MinSegmentNo.getFilename(sequence.TimelineID),
-		EndSegment:    sequence.MaxSegmentNo.getFilename(sequence.TimelineID),
+		StartSegment:  sequence.MinSegmentNo.GetFilename(sequence.TimelineID),
+		EndSegment:    sequence.MaxSegmentNo.GetFilename(sequence.TimelineID),
 		Status:        status,
 		SegmentsCount: len(sequence.WalSegmentNumbers),
 	}
@@ -245,7 +246,7 @@ func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*Timelin
 	// switchLsnBySegNo is used for fast lookup of the timeline switch segment
 	switchLsnBySegNo := make(map[uint32]WalSegmentNo, len(timelineSwitchMap))
 	for _, historyRecord := range timelineSwitchMap {
-		switchLsnBySegNo[historyRecord.timeline] = newWalSegmentNo(historyRecord.lsn)
+		switchLsnBySegNo[historyRecord.timeline] = NewWalSegmentNo(historyRecord.lsn)
 	}
 	earliestBackup, earliestBackupSegNo, err :=
 		findEarliestBackup(currentTimeline, backupDetails, switchLsnBySegNo)

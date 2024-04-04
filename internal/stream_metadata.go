@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -31,7 +32,7 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	maxDownloadRetry := viper.GetInt(MysqlBackupDownloadMaxRetry)
+	maxDownloadRetry := viper.GetInt(conf.MysqlBackupDownloadMaxRetry)
 
 	switch metadata.Type {
 	case SplitMergeStreamBackup:

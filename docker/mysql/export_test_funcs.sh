@@ -16,7 +16,7 @@ mysql_set_gtid_purged() {
 }
 
 sysbench() {
-    /usr/bin/sysbench --verbosity=0 /usr/share/sysbench/oltp_insert.lua "$@"
+    /usr/bin/sysbench --verbosity=0 --db-driver=mysql /usr/share/sysbench/oltp_insert.lua "$@"
 }
 
 date3339() {

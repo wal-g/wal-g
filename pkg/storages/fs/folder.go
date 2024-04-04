@@ -2,9 +2,7 @@ package fs
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"os"
 	"path"
@@ -18,45 +16,33 @@ import (
 
 const dirDefaultMode = 0755
 
-func NewError(err error, format string, args ...interface{}) storage.Error {
-	return storage.NewError(err, "FS", format, args...)
-}
-
-// Folder represents folder of file system
+// Folder represents folder on the file system
+// TODO: Unit tests
 type Folder struct {
 	rootPath string
-	subpath  string
+	subPath  string
 }
 
 func NewFolder(rootPath string, subPath string) *Folder {
+	// Trim leading slash because all subPaths are relative.
 	subPath = strings.TrimPrefix(subPath, "/")
 	return &Folder{rootPath, subPath}
 }
 
-func NewFolderError(err error, format string, args ...interface{}) storage.Error {
-	return storage.NewError(err, "GCS", format, args...)
-}
-
-func ConfigureFolder(path string, settings map[string]string) (storage.HashableFolder, error) {
-	if _, err := os.Stat(path); err != nil {
-		return nil, NewError(err, "Folder not exists or is inaccessible")
-	}
-	return NewFolder(path, ""), nil
-}
-
 func (folder *Folder) GetPath() string {
-	return folder.subpath
+	return folder.subPath
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	files, err := os.ReadDir(path.Join(folder.rootPath, folder.subpath))
+	dirPath := path.Join(folder.rootPath, folder.subPath)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
-		return nil, nil, NewError(err, "Unable to read folder")
+		return nil, nil, fmt.Errorf("unable to list FS folder %q: %w", dirPath, err)
 	}
 	for _, fileInfo := range files {
 		if fileInfo.IsDir() {
 			// I do not use GetSubfolder() intentially
-			subPath := path.Join(folder.subpath, fileInfo.Name()) + "/"
+			subPath := path.Join(folder.subPath, fileInfo.Name()) + "/"
 			subFolders = append(subFolders, NewFolder(folder.rootPath, subPath))
 		} else {
 			info, _ := fileInfo.Info()
@@ -73,7 +59,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 			continue
 		}
 		if err != nil {
-			return NewError(err, "Unable to delete object %v", fileName)
+			return fmt.Errorf("unable to delete file %q: %w", fileName, err)
 		}
 	}
 	return nil
@@ -85,13 +71,13 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		return false, nil
 	}
 	if err != nil {
-		return false, NewError(err, "Unable to stat object %v", objectRelativePath)
+		return false, fmt.Errorf("unable to get file stats %v: %w", objectRelativePath, err)
 	}
 	return true, nil
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	sf := NewFolder(folder.rootPath, path.Join(folder.subpath, subFolderRelativePath))
+	sf := NewFolder(folder.rootPath, path.Join(folder.subPath, subFolderRelativePath))
 	_ = sf.EnsureExists()
 
 	// This is something unusual when we cannot be sure that our subfolder exists in FS
@@ -107,17 +93,17 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		return nil, storage.NewObjectNotFoundError(filePath)
 	}
 	if err != nil {
-		return nil, NewError(err, "Unable to read object %v", filePath)
+		return nil, fmt.Errorf("unable to read file %v: %w", filePath, err)
 	}
 	return file, nil
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subpath)
+	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subPath)
 	filePath := folder.GetFilePath(name)
 	file, err := OpenFileWithDir(filePath)
 	if err != nil {
-		return NewError(err, "Unable to open file %v", filePath)
+		return fmt.Errorf("unable to open file %q: %w", filePath, err)
 	}
 	_, err = io.Copy(file, content)
 	if err != nil {
@@ -125,11 +111,11 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		if closerErr != nil {
 			tracelog.InfoLogger.Println("Error during closing failed upload ", closerErr)
 		}
-		return NewError(err, "Unable to copy data to %v", filePath)
+		return fmt.Errorf("unable to copy data to file %q: %w", filePath, err)
 	}
 	err = file.Close()
 	if err != nil {
-		return NewError(err, "Unable to close %v", filePath)
+		return fmt.Errorf("unable to close file %q: %w", filePath, err)
 	}
 	return nil
 }
@@ -146,17 +132,20 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		return storage.NewObjectNotFoundError(srcPath)
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to get file stats %q: %w", srcPath, err)
 	}
 	if !srcStat.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file", srcPath)
+		return fmt.Errorf("unable to copy file: %s is not a regular file", srcPath)
 	}
 	file, err := os.Open(src)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to open file to copy %q: %w", srcPath, err)
 	}
 	err = folder.PutObject(dstPath, file)
-	return err
+	if err != nil {
+		return fmt.Errorf("unable to copy: %w", err)
+	}
+	return nil
 }
 
 func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
@@ -177,9 +166,10 @@ func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
 func OpenFileWithDir(filePath string) (*os.File, error) {
 	file, err := os.Create(filePath)
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(path.Dir(filePath), dirDefaultMode)
+		parentDir := path.Dir(filePath)
+		err = os.MkdirAll(parentDir, dirDefaultMode)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("unable to create a directory %q: %w", parentDir, err)
 		}
 		file, err = os.Create(filePath)
 	}
@@ -187,39 +177,21 @@ func OpenFileWithDir(filePath string) (*os.File, error) {
 }
 
 func (folder *Folder) GetFilePath(objectRelativePath string) string {
-	return path.Join(folder.rootPath, folder.subpath, objectRelativePath)
+	return path.Join(folder.rootPath, folder.subPath, objectRelativePath)
 }
 
 func (folder *Folder) EnsureExists() error {
-	dirname := path.Join(folder.rootPath, folder.subpath)
+	dirname := path.Join(folder.rootPath, folder.subPath)
 	_, err := os.Stat(dirname)
 	if os.IsNotExist(err) {
-		return os.MkdirAll(dirname, dirDefaultMode)
-	}
-	return err
-}
-
-func (folder *Folder) Hash() storage.Hash {
-	hash := fnv.New64a()
-
-	addToHash := func(data []byte) {
-		_, err := hash.Write(data)
+		err = os.MkdirAll(dirname, dirDefaultMode)
 		if err != nil {
-			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
-			panic(err)
+			return fmt.Errorf("unable to recursively create a directory %q: %w", dirname, err)
 		}
+		return nil
 	}
-
-	addToHash([]byte("fs"))
-
-	addToHash([]byte(folder.rootPath))
-
-	addToHash([]byte(folder.subpath))
-
-	userID := os.Getuid()
-	userIDBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(userIDBytes, uint64(userID))
-	addToHash(userIDBytes)
-
-	return storage.Hash(hash.Sum64())
+	if err != nil {
+		return fmt.Errorf("unable to get a directory stats %q: %w", dirname, err)
+	}
+	return nil
 }

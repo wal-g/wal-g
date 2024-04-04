@@ -36,8 +36,8 @@ PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $
 pgbench -i -s 3 postgres
 sleep 1
 
-# make two non-permanent backups
-for _ in 1 2
+# make three non-permanent backups
+for _ in 1 2 3
 do
     pgbench -i -s 2 postgres
     sleep 1
@@ -46,9 +46,12 @@ done
 
 wal-g --config=${TMP_CONFIG} backup-list
 
-# the first non-permanent backup is on line 3: 1st line is header, 2nd is permanent, and 3rd-4th lines are two
+# the first non-permanent backup is on line 3: 1st line is header, 2nd is permanent, and 3rd-5th lines are three
 # non-permanent backups.
 FIRST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==3{print $1}')
+
+# after removing first non-permanent backup the second one becomes the oldest 
+EXPECTED_OLDEST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==4{print $1}')
 
 # backup the first non-permanent backup sentinel and remove it from the storage
 # to emulate some partially deleted backup
@@ -120,6 +123,16 @@ FIRST_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 if [ "$PERMANENT_BACKUP" != "$FIRST_BACKUP" ];
 then
     echo "oh no! delete garbage deleted the permanent backup!"
+    exit 1
+fi
+
+# the first non-permanent backup is on line 3: 1st line is header, 2nd is permanent, and 3rd-4th lines are two
+# non-permanent backups.
+ACTUAL_OLDEST_NON_PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==3{print $1}')
+
+if [ "$EXPECTED_OLDEST_NON_PERMANENT_BACKUP" != "$ACTUAL_OLDEST_NON_PERMANENT_BACKUP" ];
+then
+    echo "oh no! delete garbage deleted some backups that should have stayed!"
     exit 1
 fi
 

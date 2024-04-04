@@ -6,8 +6,18 @@ volumes:
 x-s3_common_depends: &s3_common_depends
   depends_on:
     - s3
+    # - graphite
   links:
     - s3
+    # - graphite
+
+x-s3_throttling_depends: &s3_throttling_depends
+  depends_on:
+    - s3-for-throttling
+    # - graphite
+  links:
+    - s3-for-throttling
+    # - graphite
 
 services:
   golang:
@@ -21,8 +31,15 @@ services:
     build:
       dockerfile: ./docker/ubuntu/Dockerfile
       context: .
-    image: wal-g/ubuntu
+    image: wal-g/ubuntu:18.04
     container_name: wal-g_ubuntu
+
+  ubuntu_20_04:
+    build:
+      dockerfile: ./docker/ubuntu/Dockerfile_20_04
+      context: .
+    image: wal-g/ubuntu:20.04
+    container_name: wal-g_ubuntu_20_04
 
   swift:
     image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"
@@ -30,6 +47,22 @@ services:
     hostname: swift
     ports:
       - "8010:8080"
+
+  # "WALG_STATSD_ADDRESS": "wal-g_graphite:8125"
+  graphite:
+    image: hopsoft/graphite-statsd
+    hostname: wal-g_graphite
+    container_name: wal-g_graphite
+    ports:
+      - "8125:8125"
+      - "8126:8126"
+      - "2003:2003"
+      - "2023:2023"
+      - "2004:2004"
+      - "2024:2024"
+      - "80:80"
+      - "81:81"
+      - "3000:3000"
 
   s3:
     image: minio/minio:RELEASE.2021-06-07T21-40-51Z
@@ -56,6 +89,7 @@ services:
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/deleteretainafterbucket
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
@@ -116,6 +150,7 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpafterfailedbucket
       &&  mkdir -p /export/gpfullserializedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
       &&  mkdir -p /export/gpdeleteretainbucket
@@ -159,6 +194,23 @@ services:
       -c 'mkdir -p /export/mysqlcopybackupto
       &&  /usr/bin/minio server /export'
 
+  s3-for-throttling:
+    image: quay.io/minio/minio:RELEASE.2024-01-18T22-51-28Z
+    container_name: wal-g_s3_3
+    hostname: s3
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    environment:
+      - "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE"
+      - "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      - "MINIO_API_REQUESTS_MAX=0"
+      - "MINIO_API_REQUESTS_DEADLINE=0s"
+    entrypoint: sh
+    command: >
+      -c 'mkdir -p /export/walperftestbucket
+      &&  minio server /export --console-address ":9090"'
+
   ssh:
     build:
       dockerfile: docker/ssh/Dockerfile
@@ -186,6 +238,11 @@ services:
     image: wal-g/docker_prefix
     user: postgres
     <<: *s3_common_depends
+
+  pg_test_throttling: &pg_test_throttling
+    image: wal-g/docker_prefix
+    user: postgres
+    <<: *s3_throttling_depends
 
   pg_tests:
     <<: *pg_test_common
@@ -257,6 +314,11 @@ services:
     container_name: wal-g_pg_wal_perftest
     command: /tmp/tests/wal_perftest.sh
 
+  pg_wal_perftest_with_throttling:
+    <<: *pg_test_throttling
+    container_name: wal-g_pg_wal_perftest_with_throttling
+    command: /tmp/tests/wal_perftest_with_throttling.sh
+
   pg_backup_perftest:
     <<: *pg_test_common
     container_name: wal-g_pg_backup_perftest
@@ -276,6 +338,11 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delete_retain_full_multist_test
     command: /tmp/tests/delete_retain_full_multist_test.sh
+
+  pg_delete_retain_after_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_retain_after_test
+    command: /tmp/tests/delete_retain_after_test.sh
 
   pg_full_backup_test:
     <<: *pg_test_common
@@ -599,6 +666,24 @@ services:
     env_file:
       - docker/common/common_walg.env
     <<: *s3_common_depends
+
+  etcd:
+    build:
+      dockerfile: docker/etcd/Dockerfile
+      context: .
+    image: wal-g/etcd
+    container_name: wal-g_etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+
+  etcd_tests:
+    build:
+      dockerfile: docker/etcd_tests/Dockerfile
+      context: .
+    image: wal-g/etcd_tests
+    container_name: wal-g_etcd_tests
+    depends_on:
+      - etcd
 
   gp:
     build:

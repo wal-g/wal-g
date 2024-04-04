@@ -67,11 +67,13 @@ func HandleBackupImport(externalConfig string, importDatabases map[string]string
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
 
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
+	folder := st.RootFolder()
 
-	externalFolder, err := internal.FolderFromConfig(externalConfig)
+	externalSt, err := internal.StorageFromConfig(externalConfig)
 	tracelog.ErrorLogger.FatalOnError(err)
+	externalFolder := externalSt.RootFolder()
 
 	dbnames, databaseFiles, err := prepareBackupImportSpec(externalFolder, importDatabases)
 	tracelog.ErrorLogger.FatalOnError(err)

@@ -1,9 +1,8 @@
 package internal
 
 import (
-	"strings"
-
 	"github.com/spf13/viper"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/azure"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/gcs"
@@ -14,10 +13,19 @@ import (
 )
 
 type StorageAdapter struct {
-	prefixName         string // actually this is an env key suffix, but all names contains '_PREFIX' word at the end, see StorageAdapters
-	settingNames       []string
-	configureFolder    func(string, map[string]string) (storage.HashableFolder, error)
-	prefixPreprocessor func(string) string
+	storageType  string
+	settingNames []string
+	configure    ConfigureStorageFunc
+}
+
+type ConfigureStorageFunc func(
+	prefix string,
+	settings map[string]string,
+	rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error)
+
+func (adapter *StorageAdapter) PrefixSettingKey() string {
+	return adapter.storageType + "_PREFIX"
 }
 
 func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]string {
@@ -31,9 +39,9 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]stri
 			continue
 		}
 
-		settingValue, ok := getWaleCompatibleSettingFrom(settingName, config)
+		settingValue, ok := conf.GetWaleCompatibleSettingFrom(settingName, config)
 		if !ok {
-			settingValue, ok = GetSetting(settingName)
+			settingValue, ok = conf.GetSetting(settingName)
 		}
 		if ok {
 			settings[settingName] = settingValue
@@ -42,15 +50,11 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]stri
 	return settings
 }
 
-func preprocessFilePrefix(prefix string) string {
-	return strings.TrimPrefix(prefix, WaleFileHost) // WAL-E backward compatibility
-}
-
 var StorageAdapters = []StorageAdapter{
-	{"S3_PREFIX", s3.SettingList, s3.ConfigureFolder, nil},
-	{"FILE_PREFIX", nil, fs.ConfigureFolder, preprocessFilePrefix},
-	{"GS_PREFIX", gcs.SettingList, gcs.ConfigureFolder, nil},
-	{"AZ_PREFIX", azure.SettingList, azure.ConfigureFolder, nil},
-	{"SWIFT_PREFIX", swift.SettingList, swift.ConfigureFolder, nil},
-	{"SSH_PREFIX", sh.SettingsList, sh.ConfigureFolder, nil},
+	{"S3", s3.SettingList, s3.ConfigureStorage},
+	{"FILE", nil, fs.ConfigureStorage},
+	{"GS", gcs.SettingList, gcs.ConfigureStorage},
+	{"AZ", azure.SettingList, azure.ConfigureStorage},
+	{"SWIFT", swift.SettingList, swift.ConfigureStorage},
+	{"SSH", sh.SettingList, sh.ConfigureStorage},
 }

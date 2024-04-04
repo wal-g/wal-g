@@ -89,6 +89,112 @@ func TestFindRestorePointBeforeTS_Correct(t *testing.T) {
 	assert.Equal(t, "expected_restore_point", found)
 }
 
+func TestFindRestorePointWithTS_StartInPast(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	baseBackupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	targetTs := time.Now()
+	restorePoints := []greenplum.RestorePointMetadata{
+		{
+			Name:       "too_old_restore_point",
+			StartTime:  targetTs.Add(-1 * time.Hour),
+			FinishTime: targetTs.Add(-1 * time.Hour),
+		},
+		{
+			Name:       "too_old_restore_point2",
+			StartTime:  targetTs.Add(-11 * time.Second),
+			FinishTime: targetTs.Add(-1 * time.Second),
+		},
+		{
+			Name:       "too_new_restore_point",
+			StartTime:  targetTs.Add(1 * time.Hour),
+			FinishTime: targetTs.Add(1 * time.Hour),
+		}, {
+			Name:       "target_restore_point",
+			StartTime:  targetTs.Add(-11 * time.Second),
+			FinishTime: targetTs.Add(time.Second),
+		}}
+
+	for _, rp := range restorePoints {
+		rpBytes, _ := json.Marshal(rp)
+		_ = baseBackupsFolder.PutObject(rp.Name+greenplum.RestorePointSuffix, bytes.NewBuffer(rpBytes))
+		time.Sleep(time.Microsecond)
+	}
+
+	found, err := greenplum.FindRestorePointWithTS(targetTs.Format(time.RFC3339), folder)
+	assert.NoError(t, err)
+	assert.Equal(t, "target_restore_point", found)
+}
+
+func TestFindRestorePointWithTS_StartInTS(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	baseBackupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	targetTs := time.Now()
+	restorePoints := []greenplum.RestorePointMetadata{
+		{
+			Name:       "too_old_restore_point",
+			StartTime:  targetTs.Add(-1 * time.Hour),
+			FinishTime: targetTs,
+		},
+		{
+			Name:       "too_old_restore_point2",
+			StartTime:  targetTs.Add(-11 * time.Second),
+			FinishTime: targetTs.Add(-1 * time.Second),
+		},
+		{
+			Name:       "too_new_restore_point",
+			StartTime:  targetTs,
+			FinishTime: targetTs.Add(1 * time.Hour),
+		}, {
+			Name:       "target_restore_point",
+			StartTime:  targetTs,
+			FinishTime: targetTs.Add(1 * time.Second),
+		}}
+
+	for _, rp := range restorePoints {
+		rpBytes, _ := json.Marshal(rp)
+		_ = baseBackupsFolder.PutObject(rp.Name+greenplum.RestorePointSuffix, bytes.NewBuffer(rpBytes))
+		time.Sleep(time.Microsecond)
+	}
+
+	found, err := greenplum.FindRestorePointWithTS(targetTs.Format(time.RFC3339), folder)
+	assert.NoError(t, err)
+	assert.Equal(t, "target_restore_point", found)
+}
+
+func TestFindRestorePointWithTS_StartInFuture(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	baseBackupsFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	targetTs := time.Now()
+	restorePoints := []greenplum.RestorePointMetadata{
+		{
+			Name:       "too_old_restore_point",
+			StartTime:  targetTs.Add(-1 * time.Hour),
+			FinishTime: targetTs.Add(-1 * time.Hour),
+		},
+		{
+			Name:       "too_new_restore_point",
+			StartTime:  targetTs.Add(1 * time.Hour),
+			FinishTime: targetTs.Add(1 * time.Hour),
+		}, {
+			Name:       "target_restore_point",
+			StartTime:  targetTs.Add(11 * time.Second),
+			FinishTime: targetTs.Add(12 * time.Second),
+		}}
+
+	for _, rp := range restorePoints {
+		rpBytes, _ := json.Marshal(rp)
+		_ = baseBackupsFolder.PutObject(rp.Name+greenplum.RestorePointSuffix, bytes.NewBuffer(rpBytes))
+		time.Sleep(time.Microsecond)
+	}
+
+	found, err := greenplum.FindRestorePointWithTS(targetTs.Format(time.RFC3339), folder)
+	assert.NoError(t, err)
+	assert.Equal(t, "target_restore_point", found)
+}
+
 func TestFindRestorePointBeforeTS_NoRestorePoints(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	targetTs := time.Now()

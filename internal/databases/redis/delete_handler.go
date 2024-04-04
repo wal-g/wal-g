@@ -56,12 +56,12 @@ func HandlePurge(backupsPath string, setters ...PurgeOption) error {
 		setter(&opts)
 	}
 
-	folder, err := internal.ConfigureFolder()
+	st, err := internal.ConfigureStorage()
 	if err != nil {
 		return err
 	}
 
-	backupFolder := folder.GetSubFolder(backupsPath)
+	backupFolder := st.RootFolder().GetSubFolder(backupsPath)
 
 	backupTimes, garbage, err := internal.GetBackupsAndGarbage(backupFolder)
 	if err != nil {

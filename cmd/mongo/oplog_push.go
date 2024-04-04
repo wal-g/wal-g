@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
@@ -136,29 +137,29 @@ func buildOplogPushRunArgs() (args oplogPushRunArgs, err error) {
 	if err != nil {
 		return
 	}
-	args.archiveTimeout, err = internal.GetDurationSetting(internal.OplogArchiveTimeoutInterval)
+	args.archiveTimeout, err = conf.GetDurationSetting(conf.OplogArchiveTimeoutInterval)
 	if err != nil {
 		return
 	}
 
-	args.mongodbURL, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	args.mongodbURL, err = conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
 		return
 	}
 
-	args.primaryWait, err = internal.GetBoolSettingDefault(internal.OplogPushWaitForBecomePrimary, false)
+	args.primaryWait, err = conf.GetBoolSettingDefault(conf.OplogPushWaitForBecomePrimary, false)
 	if err != nil {
 		return
 	}
 
 	if args.primaryWait {
-		args.primaryWaitTimeout, err = internal.GetDurationSetting(internal.OplogPushPrimaryCheckInterval)
+		args.primaryWaitTimeout, err = conf.GetDurationSetting(conf.OplogPushPrimaryCheckInterval)
 		if err != nil {
 			return
 		}
 	}
 
-	args.lwUpdate, err = internal.GetDurationSetting(internal.MongoDBLastWriteUpdateInterval)
+	args.lwUpdate, err = conf.GetDurationSetting(conf.MongoDBLastWriteUpdateInterval)
 	return
 }
 
@@ -171,22 +172,22 @@ type oplogPushStatsArgs struct {
 }
 
 func buildOplogPushStatsArgs() (args oplogPushStatsArgs, err error) {
-	args.enabled, err = internal.GetBoolSettingDefault(internal.OplogPushStatsEnabled, false)
+	args.enabled, err = conf.GetBoolSettingDefault(conf.OplogPushStatsEnabled, false)
 	if err != nil || !args.enabled {
 		return
 	}
 
-	args.updateInterval, err = internal.GetDurationSetting(internal.OplogPushStatsUpdateInterval)
+	args.updateInterval, err = conf.GetDurationSetting(conf.OplogPushStatsUpdateInterval)
 	if err != nil {
 		return
 	}
 
-	args.logInterval, err = internal.GetDurationSetting(internal.OplogPushStatsLoggingInterval)
+	args.logInterval, err = conf.GetDurationSetting(conf.OplogPushStatsLoggingInterval)
 	if err != nil {
 		return
 	}
 
-	args.exposeHTTP, err = internal.GetBoolSettingDefault(internal.OplogPushStatsExposeHTTP, false)
+	args.exposeHTTP, err = conf.GetBoolSettingDefault(conf.OplogPushStatsExposeHTTP, false)
 	args.httpPrefix = stats.DefaultOplogPushStatsPrefix
 
 	return

@@ -190,17 +190,6 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			wantErr: fmt.Errorf("fromTS '1579002001.1' must be less than untilTS '1579002000.1'"),
 		},
 		{
-			name:   "error:_first_was_not_found_in_first_archive",
-			fields: SetupDownloaderMocks(ops),
-			args: args{
-				ctx:   context.TODO(),
-				from:  models.Timestamp{TS: 1579002000, Inc: 1},
-				until: ops[len(ops)-1].TS,
-			},
-			wantOps:  []*models.Oplog{},
-			wantErrc: fmt.Errorf("'from' timestamp '1579002000.1' was not found in first archive: oplog_0.0_1579002006.1.br"),
-		},
-		{
 			name:   "error:_until_is_not_reached",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{

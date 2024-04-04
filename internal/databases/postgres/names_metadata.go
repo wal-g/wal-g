@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -36,6 +37,35 @@ func (meta DatabasesByNames) Resolve(key string) (uint32, uint32, error) {
 	return 0, 0, newMetaDatabaseNameError(database)
 }
 
+func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, error) {
+	database, table, err := meta.unpackKey(key)
+	if err != nil {
+		return map[uint32][]uint32{}, err
+	}
+	tracelog.DebugLogger.Printf("unpaсked keys  %s %s", database, table)
+	toRestore := map[uint32][]uint32{}
+	database = strings.ReplaceAll(database, "*", ".*")
+	table = strings.ReplaceAll(table, "*", ".*")
+	databaseRegexp := regexp.MustCompile(fmt.Sprintf("^%s$", database))
+	tableRegexp := regexp.MustCompile(fmt.Sprintf("^%s$", table))
+	for db, dbInfo := range meta {
+		if databaseRegexp.MatchString(db) {
+			toRestore[dbInfo.Oid] = []uint32{}
+			if table == "" {
+				tracelog.DebugLogger.Printf("restore all for  %s", db)
+				toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], 0)
+				continue
+			}
+			for name, oid := range dbInfo.Tables {
+				if tableRegexp.MatchString(name) {
+					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], oid)
+				}
+			}
+		}
+	}
+	return toRestore, nil
+}
+
 func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {
 	tokens := strings.Split(table, ".")
 	if len(tokens) == 1 {
@@ -46,21 +76,36 @@ func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {
 	return "", false
 }
 
+/*
+Unpacks key, which can be:
+1. "db" - then we return "db" and empty string for table
+2. "db/table" - then we return "db" and "public.table"
+3. "db/schema.table" - then we return "db" and "schema.table"
+4. "db/schema/table" - then we return "db" and "schema.table"
+*/
 func (meta DatabasesByNames) unpackKey(key string) (string, string, error) {
 	tokens := strings.Split(key, "/")
-	if len(tokens) < 2 {
+	switch len(tokens) {
+	case 1:
 		return tokens[0], "", nil
-	}
-	if len(tokens) > 2 {
+
+	case 2:
+		table, ok := meta.tryFormatTableName(tokens[1])
+		if !ok {
+			return "", "", newMetaIncorrectKeyError(key)
+		}
+		return tokens[0], table, nil
+
+	case 3:
+		table, ok := meta.tryFormatTableName(fmt.Sprintf("%s.%s", tokens[1], tokens[2]))
+		if !ok {
+			return "", "", newMetaIncorrectKeyError(key)
+		}
+		return tokens[0], table, nil
+
+	default:
 		return "", "", newMetaIncorrectKeyError(key)
 	}
-
-	table, ok := meta.tryFormatTableName(tokens[1])
-	if !ok {
-		return "", "", newMetaIncorrectKeyError(key)
-	}
-
-	return tokens[0], table, nil
 }
 
 type metaDatabaseNameError struct {
