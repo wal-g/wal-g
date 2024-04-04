@@ -62,6 +62,18 @@ func (storage *KVS) Delete(key string) {
 	storage.underlying.Delete(key)
 }
 
+func (storage *KVS) Move(oldKey string, newKey string) (success bool) {
+	valueInterface, ok := storage.underlying.Load(oldKey)
+	if !ok {
+		return false
+	}
+
+	storage.underlying.Store(newKey, valueInterface)
+	storage.underlying.CompareAndDelete(oldKey, valueInterface)
+
+	return true
+}
+
 func (storage *KVS) Range(callback func(key string, value TimeStampedData) bool) {
 	storage.underlying.Range(func(iKey, iValue interface{}) bool {
 		return callback(iKey.(string), iValue.(TimeStampedData))

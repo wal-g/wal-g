@@ -214,22 +214,3 @@ func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
 	err = folder.DeleteObjects([]string{srcPath})
 	return err
 }
-
-func (folder *Folder) Hash() storage.Hash {
-	hash := fnv.New64a()
-
-	addToHash := func(data []byte) {
-		_, err := hash.Write(data)
-		if err != nil {
-			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
-			panic(err)
-		}
-	}
-
-	addToHash([]byte("sh"))
-	addToHash([]byte(folder.host))
-	addToHash([]byte(folder.path))
-	addToHash([]byte(folder.user))
-
-	return storage.Hash(hash.Sum64())
-}

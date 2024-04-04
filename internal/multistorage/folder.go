@@ -668,22 +668,22 @@ func (mf Folder) MoveObject(srcPath string, dstPath string) error {
 
 // MoveObjectInFirst moves the object in the first storage.
 func (mf Folder) MoveObjectInFirst(srcPath string, dstPath string) error {
-	if len(mf.storages) == 0 {
+	if len(mf.usedFolders) == 0 {
 		return ErrNoUsedStorages
 	}
-	return mf.storages[0].MoveObject(srcPath, dstPath)
+	return mf.usedFolders[0].MoveObject(srcPath, dstPath)
 }
 
 // MoveObjectInAll moves the object in all used storages. If no storages have the object, an error is returned.
 func (mf Folder) MoveObjectInAll(srcPath string, dstPath string) error {
 	found := false
-	for _, s := range mf.storages {
+	for _, s := range mf.usedFolders {
 		err := s.MoveObject(srcPath, dstPath)
 		if _, ok := err.(storage.ObjectNotFoundError); ok {
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("move object in storage %q: %w", s.Name, err)
+			return fmt.Errorf("move object in storage %q: %w", s.StorageName, err)
 		}
 		found = true
 	}

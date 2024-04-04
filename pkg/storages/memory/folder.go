@@ -118,26 +118,9 @@ func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
 		return err
 	}
 
-	success := folder.Storage.Move(srcPath, dstPath)
+	success := folder.KVS.Move(srcPath, dstPath)
 	if !success {
 		return errors.Errorf("failed to move '%s' in memory storage", srcPath)
 	}
 	return nil
-}
-
-func (folder *Folder) Hash() storage.Hash {
-	hash := fnv.New64a()
-
-	addToHash := func(data []byte) {
-		_, err := hash.Write(data)
-		if err != nil {
-			// Writing to the hash function is always successful, so it mustn't be a problem that we panic here
-			panic(err)
-		}
-	}
-
-	addToHash([]byte("memory"))
-	addToHash([]byte(folder.path))
-
-	return storage.Hash(hash.Sum64())
 }

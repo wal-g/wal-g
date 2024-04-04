@@ -258,10 +258,10 @@ func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
 
 	ctx := context.Background()
 	if _, err := dst.CopierFrom(src).Run(ctx); err != nil {
-		return NewError(err, "Unable to copy an object from source %s to destination %s", sourceFullPath, dstFullPath)
+		return fmt.Errorf("unable to copy an object from source %s to destination %s: %w", sourceFullPath, dstFullPath, err)
 	}
 	if err := src.Delete(ctx); err != nil {
-		return NewError(err, "Unable to delete source object %v", sourceFullPath)
+		return fmt.Errorf("unable to delete source object %v: %w", sourceFullPath, err)
 	}
 
 	return nil

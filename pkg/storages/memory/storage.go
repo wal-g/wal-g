@@ -22,23 +22,6 @@ func (s *Storage) RootFolder() storage.Folder {
 	return s.rootFolder
 }
 
-func (storage *Storage) Move(oldKey string, newKey string) (success bool) {
-	valueInterface, ok := storage.underlying.Load(oldKey)
-	if !ok {
-		return false
-	}
-
-	storage.underlying.Store(newKey, valueInterface)
-	storage.underlying.CompareAndDelete(oldKey, valueInterface)
-
-	return true
-}
-
-func (storage *Storage) Delete(key string) {
-	storage.underlying.Delete(key)
-  return nil
-}
-
 func (s *Storage) Close() error {
 	// Nothing to close
 	return nil
