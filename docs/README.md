@@ -293,7 +293,7 @@ Optional:
 
 ```sh
 # Install latest Go compiler
-sudo add-apt-repository ppa:longsleep/golang-backports 
+sudo add-apt-repository ppa:longsleep/golang-backports
 sudo apt update
 sudo apt install golang-go
 
@@ -301,8 +301,18 @@ sudo apt install golang-go
 sudo apt install libbrotli-dev liblzo2-dev libsodium-dev curl cmake
 
 # Fetch project and build
+# Go 1.15 and below
 go get github.com/wal-g/wal-g
-cd ~/go/src/github.com/wal-g/wal-g
+# Go 1.16+ - just clone repository to $GOPATH
+git clone https://github.com/wal-g/wal-g $(go env GOPATH)/src/github.com/wal-g/wal-g
+
+cd $(go env GOPATH)/src/github.com/wal-g/wal-g
+
+# optional exports (see above)
+export USE_BROTLI=1
+export USE_LIBSODIUM=1
+export USE_LZO=1
+
 make deps
 make pg_build
 main/pg/wal-g --version
