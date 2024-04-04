@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -209,7 +210,8 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 			}
 
 			segment := fh.cluster.ByContent[contentID][0]
-			pathToRestore := path.Join(segment.DataDir, "recovery.conf")
+			relativePathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
+			pathToRestore := path.Join(segment.DataDir, relativePathToRecoveryConf)
 			fileContents := restoreCfgMaker.Make(contentID)
 			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToRestore, fileContents)
 			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
