@@ -240,6 +240,11 @@ func TestGlob(t *testing.T) {
 		},
 		{
 			simpleFiletree,
+			"/a",
+			[]string{"a"},
+		},
+		{
+			simpleFiletree,
 			"subfolder1/b",
 			[]string{"subfolder1/b"},
 		},
@@ -271,7 +276,23 @@ func TestGlob(t *testing.T) {
 		},
 		{
 			simpleFiletree,
+			"/",
+			[]string{
+                "/",
+			},
+		},
+		{
+			simpleFiletree,
 			"*",
+			[]string{
+				"a",
+				"subfolder1/",
+				"subfolder2/",
+			},
+		},
+		{
+			simpleFiletree,
+			"/*",
 			[]string{
 				"a",
 				"subfolder1/",

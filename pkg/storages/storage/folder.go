@@ -123,6 +123,12 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 func Glob(folder Folder, pattern string) (objectPaths []string, folderPaths []string, err error) {
 	objectPaths = make([]string, 0)
 	folderPaths = make([]string, 0)
+
+	if pattern == "/" {
+		return objectPaths, append(folderPaths, pattern), nil
+	}
+	pattern = strings.TrimLeft(pattern, "/")
+
 	type queueItem struct {
 		folder  Folder
 		pattern string
@@ -199,23 +205,6 @@ func filterFoldersWithGlobPattern(folders []Folder, pattern string) ([]Folder, e
 		if matched {
 			result = append(result, folder)
 		}
-	}
-	return result, nil
-}
-
-func listSubfoldersRecursively(folder Folder) ([]Folder, error) {
-	result := make([]Folder, 0)
-	queue := make([]Folder, 0)
-	queue = append(queue, folder)
-	for len(queue) > 0 {
-		folder := queue[0]
-		queue = queue[1:]
-		result = append(result, folder)
-		_, subFolders, err := folder.ListFolder()
-		if err != nil {
-			return nil, err
-		}
-		queue = append(queue, subFolders...)
 	}
 	return result, nil
 }
