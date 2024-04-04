@@ -383,7 +383,8 @@ func TestGlob(t *testing.T) {
 				err := folder.PutObject(relativePath, &bytes.Buffer{})
 				assert.NoError(t, err)
 			}
-			matches, err := storage.Glob(folder, tc.pattern)
+			objects, folders, err := storage.Glob(folder, tc.pattern)
+            matches := append(objects, folders...)
 			sort.Strings(tc.expected)
 			sort.Strings(matches)
 			assert.NoError(t, err)

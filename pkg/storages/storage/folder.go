@@ -120,8 +120,9 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 	return prependPaths(objects, prefix), nil
 }
 
-func Glob(folder Folder, pattern string) (paths []string, err error) {
-	paths = make([]string, 0)
+func Glob(folder Folder, pattern string) (objectPaths []string, folderPaths []string, err error) {
+	objectPaths = make([]string, 0)
+	folderPaths = make([]string, 0)
 	type queueItem struct {
 		folder  Folder
 		pattern string
@@ -141,40 +142,80 @@ func Glob(folder Folder, pattern string) (paths []string, err error) {
 		folderPath := current.folder.GetPath()
 		objects, subfolders, err := current.folder.ListFolder()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		for _, subfolder := range subfolders {
-			subfolderPath := subfolder.GetPath()
-			subfolderName := strings.Trim(strings.TrimPrefix(subfolderPath, folderPath), "/")
-			matched, err := filepath.Match(patternPart, subfolderName)
-			if err != nil {
-				return nil, err
-			}
-			if matched {
-				if isLast {
-					paths = append(paths, strings.TrimPrefix(subfolderPath, rootPath))
-				} else {
-					queue = append(queue, queueItem{
-						folder:  subfolder,
-						pattern: strings.TrimPrefix(current.pattern, patternPart+"/"),
-					})
-				}
+		matchedSubfolders, err := filterFoldersWithGlobPattern(subfolders, patternPart)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, matchedSubfolder := range matchedSubfolders {
+			if isLast {
+				folderPaths = append(folderPaths, strings.TrimPrefix(matchedSubfolder.GetPath(), rootPath))
+			} else {
+				queue = append(queue, queueItem{
+					folder:  matchedSubfolder,
+					pattern: strings.TrimPrefix(current.pattern, patternPart+"/"),
+				})
 			}
 		}
 
 		if !isLast {
 			continue
 		}
-		for _, object := range objects {
-			objectName := object.GetName()
-			matched, err := filepath.Match(patternPart, objectName)
-			if err != nil {
-				return nil, err
-			}
-			if matched {
-				paths = append(paths, strings.TrimPrefix(folderPath+objectName, rootPath))
-			}
+		matchedObjects, err := filterObjectsWithGlobPattern(objects, patternPart)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, matchedObject := range matchedObjects {
+			objectPaths = append(objectPaths, strings.TrimPrefix(folderPath+matchedObject.GetName(), rootPath))
 		}
 	}
-	return paths, nil
+	return objectPaths, folderPaths, nil
+}
+
+func filterObjectsWithGlobPattern(objects []Object, pattern string) ([]Object, error) {
+	result := make([]Object, 0)
+	for _, object := range objects {
+		objectName := object.GetName()
+		matched, err := filepath.Match(pattern, objectName)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			result = append(result, object)
+		}
+	}
+	return result, nil
+}
+
+func filterFoldersWithGlobPattern(folders []Folder, pattern string) ([]Folder, error) {
+	result := make([]Folder, 0)
+	for _, folder := range folders {
+		folderName := filepath.Base(folder.GetPath())
+		matched, err := filepath.Match(pattern, folderName)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			result = append(result, folder)
+		}
+	}
+	return result, nil
+}
+
+func listSubfoldersRecursively(folder Folder) ([]Folder, error) {
+	result := make([]Folder, 0)
+	queue := make([]Folder, 0)
+	queue = append(queue, folder)
+	for len(queue) > 0 {
+		folder := queue[0]
+		queue = queue[1:]
+		result = append(result, folder)
+		_, subFolders, err := folder.ListFolder()
+		if err != nil {
+			return nil, err
+		}
+		queue = append(queue, subFolders...)
+	}
+	return result, nil
 }
