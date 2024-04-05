@@ -334,11 +334,23 @@ GOBIN=/usr/local/bin make pg_install
 ```sh
 # brew command is Homebrew for Mac OS
 brew install cmake
+
+# Fetch project and build
+# Go 1.15 and below
+go get github.com/wal-g/wal-g
+# Go 1.16+ - just clone repository to $GOPATH
+git clone https://github.com/wal-g/wal-g $(go env GOPATH)/src/github.com/wal-g/wal-g
+
+cd $(go env GOPATH)/src/github.com/wal-g/wal-g
+
 export USE_BROTLI=1
 export USE_LIBSODIUM="true" # since we're linking libsodium later
 ./link_brotli.sh
 ./link_libsodium.sh
 make install_and_build_pg
+
+# if you need to install
+GOBIN=/usr/local/bin make pg_install
 ```
 
 To build on ARM64, set the corresponding `GOOS`/`GOARCH` environment variables:
