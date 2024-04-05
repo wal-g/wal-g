@@ -304,6 +304,7 @@ sudo apt install libbrotli-dev liblzo2-dev libsodium-dev curl cmake
 # Go 1.15 and below
 go get github.com/wal-g/wal-g
 # Go 1.16+ - just clone repository to $GOPATH
+# if you want to save space add --depth=1 or --single-branch
 git clone https://github.com/wal-g/wal-g $(go env GOPATH)/src/github.com/wal-g/wal-g
 
 cd $(go env GOPATH)/src/github.com/wal-g/wal-g
@@ -339,6 +340,7 @@ brew install cmake
 # Go 1.15 and below
 go get github.com/wal-g/wal-g
 # Go 1.16+ - just clone repository to $GOPATH
+# if you want to save space add --depth=1 or --single-branch
 git clone https://github.com/wal-g/wal-g $(go env GOPATH)/src/github.com/wal-g/wal-g
 
 cd $(go env GOPATH)/src/github.com/wal-g/wal-g
