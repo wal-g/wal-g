@@ -443,7 +443,6 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 }
 
 // tablespace map does not exist in < 9.6
-// TODO: Unittest
 func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
 }
