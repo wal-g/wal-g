@@ -6,6 +6,7 @@ import (
 	"path"
 	"time"
 
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 
@@ -15,7 +16,7 @@ import (
 )
 
 func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
-	endTSStr, ok := GetSetting(endTSEnvVar)
+	endTSStr, ok := conf.GetSetting(endTSEnvVar)
 	if ok {
 		t, err := time.Parse(time.RFC3339, endTSStr)
 		if err != nil {
@@ -28,9 +29,9 @@ func ParseTS(endTSEnvVar string) (endTS *time.Time, err error) {
 
 // GetLogsDstSettings reads from the environment variables fetch settings
 func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, err error) {
-	dstFolder, ok := GetSetting(operationLogsDstEnvVariable)
+	dstFolder, ok := conf.GetSetting(operationLogsDstEnvVariable)
 	if !ok {
-		return dstFolder, NewUnsetRequiredSettingError(operationLogsDstEnvVariable)
+		return dstFolder, conf.NewUnsetRequiredSettingError(operationLogsDstEnvVariable)
 	}
 	return dstFolder, nil
 }

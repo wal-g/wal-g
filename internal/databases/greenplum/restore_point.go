@@ -17,6 +17,7 @@ import (
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -117,7 +118,7 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 		Conn:             conn,
 		systemIdentifier: systemIdentifier,
 		gpVersion:        version,
-		logsDir:          viper.GetString(internal.GPLogsDirectory),
+		logsDir:          viper.GetString(conf.GPLogsDirectory),
 	}
 	rpc.Uploader.ChangeDirectory(utility.BaseBackupPath)
 

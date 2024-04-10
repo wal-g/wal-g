@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
@@ -69,18 +70,18 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 	}
 
 	// TODO: fix ugly config
-	if ignoreErrCodesStr, ok := internal.GetSetting(internal.OplogReplayIgnoreErrorCodes); ok {
+	if ignoreErrCodesStr, ok := conf.GetSetting(conf.OplogReplayIgnoreErrorCodes); ok {
 		if err = json.Unmarshal([]byte(ignoreErrCodesStr), &args.ignoreErrCodes); err != nil {
 			return
 		}
 	}
 
-	args.mongodbURL, err = internal.GetRequiredSetting(internal.MongoDBUriSetting)
+	args.mongodbURL, err = conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
 		return
 	}
 
-	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := internal.GetBoolSetting(internal.OplogReplayOplogAlwaysUpsert)
+	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := conf.GetBoolSetting(conf.OplogReplayOplogAlwaysUpsert)
 	if err != nil {
 		return
 	}
@@ -88,8 +89,8 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 		args.oplogAlwaysUpsert = &oplogAlwaysUpsert
 	}
 
-	if oplogApplicationMode, hasOplogApplicationMode := internal.GetSetting(
-		internal.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
+	if oplogApplicationMode, hasOplogApplicationMode := conf.GetSetting(
+		conf.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
 		args.oplogApplicationMode = &oplogApplicationMode
 	}
 

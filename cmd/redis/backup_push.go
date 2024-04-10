@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/utility"
@@ -42,10 +43,10 @@ var backupPushCmd = &cobra.Command{
 		// Configure folder
 		uploader.ChangeDirectory(utility.BaseBackupPath)
 
-		backupCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamCreateCmd)
+		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		redisPassword, ok := internal.GetSetting(internal.RedisPassword)
+		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
 		if ok && redisPassword != "" { // special hack for redis-cli
 			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
 		}
@@ -56,7 +57,7 @@ var backupPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.NameStreamCreateCmd] = true
+		conf.RequiredSettings[conf.NameStreamCreateCmd] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

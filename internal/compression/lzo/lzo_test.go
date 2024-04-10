@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	walg_lzo "github.com/wal-g/wal-g/internal/compression/lzo"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -147,6 +148,6 @@ func (b *BufferReaderMaker) Mode() int64                    { return 0 }
 
 func init() {
 	internal.ConfigureSettings("")
-	internal.InitConfig()
-	internal.Configure()
+	conf.InitConfig()
+	conf.Configure()
 }

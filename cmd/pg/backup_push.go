@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const (
@@ -67,21 +68,21 @@ var (
 				dataDirectory = args[0]
 			}
 
-			verifyPageChecksums = verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting)
-			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting)
+			verifyPageChecksums = verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting)
+			storeAllCorruptBlocks = storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting)
 
 			tarBallComposerType := chooseTarBallComposer()
 
 			if deltaFromName == "" {
-				deltaFromName = viper.GetString(internal.DeltaFromNameSetting)
+				deltaFromName = viper.GetString(conf.DeltaFromNameSetting)
 			}
 			if deltaFromUserData == "" {
-				deltaFromUserData = viper.GetString(internal.DeltaFromUserDataSetting)
+				deltaFromUserData = viper.GetString(conf.DeltaFromUserDataSetting)
 			}
 			if userDataRaw == "" {
-				userDataRaw = viper.GetString(internal.SentinelUserDataSetting)
+				userDataRaw = viper.GetString(conf.SentinelUserDataSetting)
 			}
-			withoutFilesMetadata = withoutFilesMetadata || viper.GetBool(internal.WithoutFilesMetadataSetting)
+			withoutFilesMetadata = withoutFilesMetadata || viper.GetBool(conf.WithoutFilesMetadataSetting)
 			if withoutFilesMetadata {
 				// files metadata tracking is required for delta backups and copy/rating composers
 				if tarBallComposerType != postgres.RegularComposer {
@@ -106,8 +107,8 @@ var (
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
-				permanent, verifyPageChecksums || viper.GetBool(internal.VerifyPageChecksumsSetting),
-				fullBackup, storeAllCorruptBlocks || viper.GetBool(internal.StoreAllCorruptBlocksSetting),
+				permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
+				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata)
 
@@ -132,17 +133,17 @@ var (
 func chooseTarBallComposer() postgres.TarBallComposerType {
 	tarBallComposerType := postgres.RegularComposer
 
-	useRatingComposer = useRatingComposer || viper.GetBool(internal.UseRatingComposerSetting)
+	useRatingComposer = useRatingComposer || viper.GetBool(conf.UseRatingComposerSetting)
 	if useRatingComposer {
 		tarBallComposerType = postgres.RatingComposer
 	}
 
-	useDatabaseComposer = useDatabaseComposer || viper.GetBool(internal.UseDatabaseComposerSetting)
+	useDatabaseComposer = useDatabaseComposer || viper.GetBool(conf.UseDatabaseComposerSetting)
 	if useDatabaseComposer {
 		tarBallComposerType = postgres.DatabaseComposer
 	}
 
-	useCopyComposer = useCopyComposer || viper.GetBool(internal.UseCopyComposerSetting)
+	useCopyComposer = useCopyComposer || viper.GetBool(conf.UseCopyComposerSetting)
 	if useCopyComposer {
 		fullBackup = true
 		tarBallComposerType = postgres.CopyComposer

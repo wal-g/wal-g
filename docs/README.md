@@ -19,6 +19,7 @@ WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4
     - [Installing](#installing)
     - [Testing](#testing)
     - [Development on windows](#development-on-windows)
+- [Troubleshooting](#troubleshooting)
 - [Authors](#authors)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
@@ -148,7 +149,13 @@ Similar to `WALG_ENVELOPE_PGP_KEY`, but value is the path to the key on file sys
 
 * `WALG_STATSD_ADDRESS`
 
-To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `9125`.
+To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [statsd_exporter](https://github.com/prometheus/statsd_exporter). Metrics will be sent on a best-effort basis via UDP. The default port for statsd is `8125`.
+
+* `WALG_STATSD_EXTRA_TAGS`
+
+Use this setting to add static tags (`host`, `operation`, `database`, etc) to the metrics WAL-G publishes to statsd.
+
+If you want to make demo for testing purposes, you can use graphite service from docker-compose file.
 
 ### Profiling
 
@@ -286,7 +293,7 @@ Optional:
 
 ```sh
 # Install latest Go compiler
-sudo add-apt-repository ppa:longsleep/golang-backports 
+sudo add-apt-repository ppa:longsleep/golang-backports
 sudo apt update
 sudo apt install golang-go
 
@@ -294,8 +301,19 @@ sudo apt install golang-go
 sudo apt install libbrotli-dev liblzo2-dev libsodium-dev curl cmake
 
 # Fetch project and build
+# Go 1.15 and below
 go get github.com/wal-g/wal-g
-cd ~/go/src/github.com/wal-g/wal-g
+# Go 1.16+ - just clone repository to $GOPATH
+# if you want to save space add --depth=1 or --single-branch
+git clone https://github.com/wal-g/wal-g $(go env GOPATH)/src/github.com/wal-g/wal-g
+
+cd $(go env GOPATH)/src/github.com/wal-g/wal-g
+
+# optional exports (see above)
+export USE_BROTLI=1
+export USE_LIBSODIUM=1
+export USE_LZO=1
+
 make deps
 make pg_build
 main/pg/wal-g --version
@@ -317,11 +335,24 @@ GOBIN=/usr/local/bin make pg_install
 ```sh
 # brew command is Homebrew for Mac OS
 brew install cmake
+
+# Fetch project and build
+# Go 1.15 and below
+go get github.com/wal-g/wal-g
+# Go 1.16+ - just clone repository to $GOPATH
+# if you want to save space add --depth=1 or --single-branch
+git clone https://github.com/wal-g/wal-g $(go env GOPATH)/src/github.com/wal-g/wal-g
+
+cd $(go env GOPATH)/src/github.com/wal-g/wal-g
+
 export USE_BROTLI=1
 export USE_LIBSODIUM="true" # since we're linking libsodium later
 ./link_brotli.sh
 ./link_libsodium.sh
 make install_and_build_pg
+
+# if you need to install
+GOBIN=/usr/local/bin make pg_install
 ```
 
 To build on ARM64, set the corresponding `GOOS`/`GOARCH` environment variables:
@@ -352,6 +383,21 @@ This command generates `coverage.out` file and opens HTML representation of the 
 ### Development on Windows
 
 [Information about installing and usage](Windows.md)
+
+
+Troubleshooting
+---------------
+
+A good way to start troubleshooting problems is by setting one or both of these environment variables:
+
+* `WALG_LOG_LEVEL=DEVEL`
+
+Prints out the used configuration of WAL-G and detailed logs of the used command.
+
+* `S3_LOG_LEVEL=DEVEL`
+
+If your commands seem to be stuck it could be that the S3 is not reachable, certificate problems or other S3 related issues.
+With this environment variable set you can see the Requests and Responses from S3.
 
 
 Authors

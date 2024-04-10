@@ -74,6 +74,14 @@ Set this setting to `true` to use [ListObjects](https://docs.aws.amazon.com/Amaz
 
 Overrides the default request retry limit while interacting with S3. Default is 15.
 
+* `S3_MIN_THROTTLING_RETRY_DELAY`
+
+Overrides the default minimum time between retries when throttled in milliseconds. Default is 500ms.
+
+* `S3_MAX_THROTTLING_RETRY_DELAY`
+
+Overrides the default minimum time between retries when throttled in milliseconds. Default is 300000ms.
+
 GCS
 -----------
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:

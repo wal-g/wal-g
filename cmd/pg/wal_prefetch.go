@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -42,7 +43,7 @@ func init() {
 // wal-prefetch (WalPrefetchCmd) is internal tool, so to avoid confusion about errors in restoration process
 // we reconfigure loggers specially for internal use. All logs having PREFETCH prefix can be safely ignored
 func reconfigureLoggers() {
-	if viper.Get(internal.LogLevelSetting) == tracelog.DevelLogLevel {
+	if viper.Get(conf.LogLevelSetting) == tracelog.DevelLogLevel {
 		addPrefetchPrefixToAllLoggers()
 		return
 	}

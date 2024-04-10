@@ -63,11 +63,11 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	return folder.uploader.upload(context.Background(), *folder.bucket, folder.path+name, content)
+	return folder.uploader.upload(context.Background(), *folder.bucket, folder.path+name, content) //TODO
 }
 
 func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	return folder.uploader.upload(ctx, *folder.bucket, folder.path+name, content)
+	return folder.uploader.upload(ctx, *folder.bucket, folder.path+name, content) //TODO
 }
 
 func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
@@ -81,10 +81,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	dst := path.Join(folder.path, dstPath)
 	input := &s3.CopyObjectInput{CopySource: &source, Bucket: folder.bucket, Key: &dst}
 	_, err := folder.s3API.CopyObject(input)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
@@ -150,6 +147,12 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	}
 
 	if err != nil {
+		// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+		// which don't yet exist.
+		if isAwsNotExist(err) {
+			return objects, subFolders, nil
+		}
+
 		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 	}
 	return objects, subFolders, nil
@@ -162,10 +165,12 @@ func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
-	return folder.s3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
+
+	err := folder.s3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
 		listFunc(files.CommonPrefixes, files.Contents)
 		return true
 	})
+	return err
 }
 
 func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
@@ -175,10 +180,11 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
-	return folder.s3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := folder.s3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
 		listFunc(files.CommonPrefixes, files.Contents)
 		return true
 	})
+	return err
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {

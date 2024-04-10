@@ -62,7 +62,7 @@ jobs:
         run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64.tar.gz.sha256
 
       - name: Upload WAL-G binary
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             wal-g-${{ matrix.db }}-${{ matrix.os }}-amd64
@@ -132,7 +132,7 @@ jobs:
         run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload WAL-G binary
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}

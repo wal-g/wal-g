@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
@@ -17,7 +18,7 @@ var (
 		Use:   "binlog-find",
 		Short: findBinlogShortDescription,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
+			conf.RequiredSettings[conf.MysqlDatasourceNameSetting] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 		},

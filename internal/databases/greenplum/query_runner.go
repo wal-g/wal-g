@@ -168,6 +168,21 @@ SELECT pg_is_in_backup(), -1;
 `
 }
 
+// TryGetLock tries to take advisory lock
+func (queryRunner *GpQueryRunner) TryGetLock() (err error) {
+	conn := queryRunner.Connection
+	var lockFree bool
+	err = conn.QueryRow("SELECT pg_try_advisory_lock(hashtext('gp_backup'))").Scan(&lockFree)
+	if err != nil {
+		return err
+	}
+
+	if !lockFree {
+		return fmt.Errorf("lock is already taken")
+	}
+	return nil
+}
+
 // buildAbortBackupSegments aborts the running backup on the segments
 func (queryRunner *GpQueryRunner) buildAbortBackupSegments() string {
 	return `SELECT pg_stop_backup(), gp_segment_id FROM gp_dist_random('gp_id');`
@@ -220,11 +235,13 @@ func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: segment backups stop error"))
 	}
+	tracelog.DebugLogger.Println("Stopped backups on segments")
 
 	_, err = conn.Exec(queryRunner.buildAbortBackupMaster())
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: master backup stop error"))
 	}
+	tracelog.DebugLogger.Println("Stopped backups on master")
 
 	var finalErr error
 	for i := range errs {

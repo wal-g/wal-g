@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 )
 
@@ -144,7 +145,7 @@ func checkWalMetadataLevel(walMetadataLevel string) error {
 }
 
 func uploadLocalWalMetadata(ctx context.Context, walFilePath string, uploader internal.Uploader) error {
-	walMetadataSetting := viper.GetString(internal.UploadWalMetadata)
+	walMetadataSetting := viper.GetString(conf.UploadWalMetadata)
 	if walMetadataSetting == WalNoMetadataLevel {
 		return nil
 	}
@@ -165,7 +166,7 @@ func uploadLocalWalMetadata(ctx context.Context, walFilePath string, uploader in
 }
 
 func uploadRemoteWalMetadata(ctx context.Context, walFileName string, uploader internal.Uploader) error {
-	walMetadataSetting := viper.GetString(internal.UploadWalMetadata)
+	walMetadataSetting := viper.GetString(conf.UploadWalMetadata)
 	if walMetadataSetting == WalNoMetadataLevel {
 		return nil
 	}

@@ -1,7 +1,8 @@
-package internal
+package statistics
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/cactus/go-statsd-client/v5/statsd"
@@ -10,28 +11,51 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 type metrics struct {
-	uploadedFilesTotal       prometheus.Counter
-	uploadedFilesFailedTotal prometheus.Counter
+	UploadedFilesTotal       prometheus.Counter
+	UploadedFilesFailedTotal prometheus.Counter
+
+	S3Codes        prometheus.GaugeVec
+	S3BytesWritten prometheus.Gauge
+	S3BytesRead    prometheus.Gauge
 }
 
 var (
 	WalgMetricsPrefix = "walg_"
 
 	WalgMetrics = metrics{
-		uploadedFilesTotal: prometheus.NewCounter(
+		UploadedFilesTotal: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_total",
 				Help: "Number of uploaded files.",
 			},
 		),
-
-		uploadedFilesFailedTotal: prometheus.NewCounter(
+		UploadedFilesFailedTotal: prometheus.NewCounter(
 			prometheus.CounterOpts{
 				Name: WalgMetricsPrefix + "uploader_uploaded_files_failed_total",
 				Help: "Number of file upload failures.",
+			},
+		),
+		S3Codes: *prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: WalgMetricsPrefix + "s3_response_",
+				Help: "S3 response codes.",
+			},
+			[]string{"code"},
+		),
+		S3BytesWritten: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: WalgMetricsPrefix + "s3_bytes_written",
+				Help: "Amount of bytes written to S3.",
+			},
+		),
+		S3BytesRead: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: WalgMetricsPrefix + "s3_bytes_read",
+				Help: "Amount of bytes read from S3.",
 			},
 		),
 	}
@@ -43,23 +67,32 @@ func init() {
 	prometheus.Unregister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	prometheus.Unregister(collectors.NewGoCollector())
 
-	prometheus.MustRegister(WalgMetrics.uploadedFilesTotal)
-	prometheus.MustRegister(WalgMetrics.uploadedFilesFailedTotal)
+	prometheus.MustRegister(WalgMetrics.UploadedFilesTotal)
+	prometheus.MustRegister(WalgMetrics.UploadedFilesFailedTotal)
+	prometheus.MustRegister(WalgMetrics.S3Codes)
+	prometheus.MustRegister(WalgMetrics.S3BytesWritten)
+	prometheus.MustRegister(WalgMetrics.S3BytesRead)
 }
 
 func PushMetrics() {
-	address := viper.GetString(StatsdAddressSetting)
+	address := viper.GetString(conf.StatsdAddressSetting)
 	if address == "" {
 		return
 	}
 
-	err := pushMetrics(address)
+	extraTags := viper.GetStringMapString(conf.StatsdExtraTagsSetting)
+
+	err := pushMetrics(address, extraTags)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Pushing metrics failed: %v", err)
 	}
 }
 
-func pushMetrics(address string) error {
+func WriteStatusCodeMetric(code int) {
+	WalgMetrics.S3Codes.WithLabelValues(strconv.Itoa(code)).Inc()
+}
+
+func pushMetrics(address string, extraTags map[string]string) error {
 	config := &statsd.ClientConfig{
 		Address:       address,
 		UseBuffered:   true,
@@ -80,7 +113,7 @@ func pushMetrics(address string) error {
 		return err
 	}
 	for _, mf := range mfs {
-		if err := writeMetricFamilyToStatsd(client, mf); err != nil {
+		if err := writeMetricFamilyToStatsd(client, mf, extraTags); err != nil {
 			return err
 		}
 	}
@@ -88,14 +121,17 @@ func pushMetrics(address string) error {
 	return nil
 }
 
-func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily) error {
+func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extraTags map[string]string) error {
 	name := in.GetName()
 	metricType := in.GetType()
 
 	for _, metric := range in.Metric {
-		var tags []statsd.Tag
+		tags := make([]statsd.Tag, 0, len(metric.Label)+len(extraTags))
 		for _, lp := range metric.Label {
 			tags = append(tags, statsd.Tag{lp.GetName(), lp.GetValue()})
+		}
+		for k, v := range extraTags {
+			tags = append(tags, statsd.Tag{k, v})
 		}
 
 		switch metricType {
@@ -111,6 +147,7 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily) erro
 			if metric.Gauge == nil {
 				return fmt.Errorf("expected gauge in metric %s %s", name, metric)
 			}
+			tracelog.DebugLogger.Printf("writing metric: %s", metric.String())
 			err := client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
 			if err != nil {
 				return err

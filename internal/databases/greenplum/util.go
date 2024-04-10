@@ -5,7 +5,7 @@ import (
 	"path"
 
 	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/wal-g/wal-g/utility"
 )
@@ -18,7 +18,7 @@ func FormatSegmentStoragePrefix(contentID int) string {
 }
 
 func formatSegmentLogPath(contentID int) string {
-	logsDir := viper.GetString(internal.GPLogsDirectory)
+	logsDir := viper.GetString(conf.GPLogsDirectory)
 	return fmt.Sprintf("%s/%s-seg%d.log", logsDir, SegBackupLogPrefix, contentID)
 }
 

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 var ErrNoLease = errors.New("no lease")
@@ -69,6 +69,6 @@ func (r *SkipReader) Read(s []byte) (int, error) {
 const SQLServerCompressionMethod = "sqlserver"
 
 func UseBuiltinCompression() bool {
-	method, _ := internal.GetSetting(internal.CompressionMethodSetting)
+	method, _ := conf.GetSetting(conf.CompressionMethodSetting)
 	return strings.EqualFold(method, SQLServerCompressionMethod)
 }

@@ -7,21 +7,21 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 
 	"github.com/spf13/viper"
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 func SetSegmentStoragePrefix(contentID int) {
-	viper.Set(internal.StoragePrefixSetting, FormatSegmentStoragePrefix(contentID))
+	viper.Set(conf.StoragePrefixSetting, FormatSegmentStoragePrefix(contentID))
 }
 
 func ConfigureSegContentID(contentIDFlag string) (int, error) {
 	var rawContentID string
 	if contentIDFlag != "" {
 		rawContentID = contentIDFlag
-	} else if contentIDSetting, ok := internal.GetSetting(internal.GPSegContentID); ok {
+	} else if contentIDSetting, ok := conf.GetSetting(conf.GPSegContentID); ok {
 		rawContentID = contentIDSetting
 	} else {
-		return 0, fmt.Errorf("segment content ID is not specified, add the --content-id flag or use the %s setting", internal.GPSegContentID)
+		return 0, fmt.Errorf("segment content ID is not specified, add the --content-id flag or use the %s setting", conf.GPSegContentID)
 	}
 
 	contentID, err := strconv.Atoi(rawContentID)

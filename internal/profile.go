@@ -4,6 +4,8 @@ import (
 	"math/rand"
 	"time"
 
+	conf "github.com/wal-g/wal-g/internal/config"
+
 	"github.com/pkg/profile"
 	"github.com/spf13/viper"
 )
@@ -13,11 +15,11 @@ type ProfileStopper interface {
 }
 
 func Profile() (ProfileStopper, error) {
-	if !viper.IsSet(ProfileSamplingRatio) {
+	if !viper.IsSet(conf.ProfileSamplingRatio) {
 		return nil, nil
 	}
 
-	samplingRatio := viper.GetFloat64(ProfileSamplingRatio)
+	samplingRatio := viper.GetFloat64(conf.ProfileSamplingRatio)
 
 	// sample profiling invoked commands
 	rand.Seed(time.Now().UnixNano())
@@ -27,7 +29,7 @@ func Profile() (ProfileStopper, error) {
 
 	var opts []func(*profile.Profile)
 
-	profileMode := viper.GetString(ProfileMode)
+	profileMode := viper.GetString(conf.ProfileMode)
 	switch profileMode {
 	case "cpu":
 		opts = append(opts, profile.CPUProfile)
@@ -45,7 +47,7 @@ func Profile() (ProfileStopper, error) {
 		opts = append(opts, profile.GoroutineProfile)
 	}
 
-	profilePath := viper.GetString(ProfilePath)
+	profilePath := viper.GetString(conf.ProfilePath)
 	if profilePath != "" {
 		opts = append(opts, profile.ProfilePath(profilePath))
 	}

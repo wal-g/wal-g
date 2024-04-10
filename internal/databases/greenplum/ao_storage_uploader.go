@@ -76,6 +76,12 @@ func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 		return u.regularAoUpload(cfi, aoMeta, location)
 	}
 
+	if !u.isIncremental && remoteFile.IsIncremented {
+		tracelog.DebugLogger.Printf("%s: backup isIncremental: %t, remote file isIncremented: %t, will perform a regular upload",
+			cfi.Header.Name, u.isIncremental, remoteFile.IsIncremented)
+		return u.regularAoUpload(cfi, aoMeta, location)
+	}
+
 	if aoMeta.modCount != remoteFile.ModCount {
 		if !u.isIncremental || aoMeta.modCount == 0 {
 			tracelog.DebugLogger.Printf("%s: isIncremental: %t, modCount: %d, will perform a regular upload",

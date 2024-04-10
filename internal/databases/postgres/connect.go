@@ -41,13 +41,35 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		}
 	}
 
+	err = checkArchiveCommand(conn)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func checkArchiveCommand(conn *pgx.Conn) error {
+	// TODO: Move this logic to queryRunner
+
+	var standby bool
+
+	err := conn.QueryRow("select pg_is_in_recovery()").Scan(&standby)
+	if err != nil {
+		return errors.Wrap(err, "Connect: postgres standby test failed")
+	}
+
+	if standby {
+		// archive_mode may be configured on primary
+		return nil
+	}
+
 	var archiveMode string
 
-	// TODO: Move this logic to queryRunner
 	err = conn.QueryRow("show archive_mode").Scan(&archiveMode)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
+		return errors.Wrap(err, "Connect: postgres archive_mode test failed")
 	}
 
 	if archiveMode != "on" && archiveMode != "always" {
@@ -60,7 +82,7 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		err = conn.QueryRow("show archive_command").Scan(&archiveCommand)
 
 		if err != nil {
-			return nil, errors.Wrap(err, "Connect: postgres archive_mode test failed")
+			return errors.Wrap(err, "Connect: postgres archive_mode test failed")
 		}
 
 		if len(archiveCommand) == 0 || archiveCommand == "(disabled)" {
@@ -69,8 +91,7 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 					" Please consider configuring WAL archiving.")
 		}
 	}
-
-	return conn, nil
+	return nil
 }
 
 // nolint:gocritic

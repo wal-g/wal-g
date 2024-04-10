@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"time"
 
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto/yckms"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -35,13 +37,11 @@ const (
 	WaleFileHost              = "file://localhost"
 )
 
-const MinAllowedConcurrency = 1
-
 var DeprecatedExternalGpgMessage = fmt.Sprintf(
 	`You are using deprecated functionality that uses an external gpg library.
 It will be removed in next major version.
 Please set GPG key using environment variables %s or %s.
-`, PgpKeySetting, PgpKeyPathSetting)
+`, conf.PgpKeySetting, conf.PgpKeyPathSetting)
 
 type UnconfiguredStorageError struct {
 	error
@@ -71,32 +71,6 @@ func (err UnknownCompressionMethodError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-type UnsetRequiredSettingError struct {
-	error
-}
-
-func NewUnsetRequiredSettingError(settingName string) UnsetRequiredSettingError {
-	return UnsetRequiredSettingError{errors.Errorf("%v is required to be set, but it isn't", settingName)}
-}
-
-func (err UnsetRequiredSettingError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-type InvalidConcurrencyValueError struct {
-	error
-}
-
-func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidConcurrencyValueError {
-	return InvalidConcurrencyValueError{
-		errors.Errorf("%v value is expected to be positive but is: %v",
-			concurrencyType, value)}
-}
-
-func (err InvalidConcurrencyValueError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
 type UnmarshallingError struct {
 	error
 }
@@ -111,17 +85,17 @@ func (err UnmarshallingError) Error() string {
 
 // TODO : unit tests
 func ConfigureLimiters() {
-	if Turbo {
+	if conf.Turbo {
 		return
 	}
-	if viper.IsSet(DiskRateLimitSetting) {
-		diskLimit := viper.GetInt64(DiskRateLimitSetting)
+	if viper.IsSet(conf.DiskRateLimitSetting) {
+		diskLimit := viper.GetInt64(conf.DiskRateLimitSetting)
 		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit),
 			int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
-	if viper.IsSet(NetworkRateLimitSetting) {
-		netLimit := viper.GetInt64(NetworkRateLimitSetting)
+	if viper.IsSet(conf.NetworkRateLimitSetting) {
+		netLimit := viper.GetInt64(conf.NetworkRateLimitSetting)
 		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit),
 			int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
@@ -146,7 +120,7 @@ func ConfigureStorage() (storage.HashableStorage, error) {
 }
 
 func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
-	prefix := viper.GetString(StoragePrefixSetting)
+	prefix := viper.GetString(conf.StoragePrefixSetting)
 	if prefix != "" {
 		folder = folder.GetSubFolder(prefix)
 	}
@@ -163,7 +137,7 @@ func ConfigureStorageForSpecificConfig(
 ) (storage.HashableStorage, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
-		prefix, ok := getWaleCompatibleSettingFrom(adapter.PrefixSettingKey(), config)
+		prefix, ok := conf.GetWaleCompatibleSettingFrom(adapter.PrefixSettingKey(), config)
 		if !ok {
 			skippedPrefixes = append(skippedPrefixes, "WALG_"+adapter.PrefixSettingKey())
 			continue
@@ -180,10 +154,10 @@ func ConfigureStorageForSpecificConfig(
 }
 
 func getWalFolderPath() string {
-	if !viper.IsSet(PgDataSetting) {
+	if !viper.IsSet(conf.PgDataSetting) {
 		return DefaultDataFolderPath
 	}
-	return getRelativeWalFolderPath(viper.GetString(PgDataSetting))
+	return getRelativeWalFolderPath(viper.GetString(conf.PgDataSetting))
 }
 
 func getRelativeWalFolderPath(pgdata string) string {
@@ -202,7 +176,7 @@ func GetDataFolderPath() string {
 
 // GetPgSlotName reads the slot name from the environment
 func GetPgSlotName() (pgSlotName string) {
-	pgSlotName = viper.GetString(PgSlotName)
+	pgSlotName = viper.GetString(conf.PgSlotName)
 	if pgSlotName == "" {
 		pgSlotName = "walg"
 	}
@@ -210,18 +184,11 @@ func GetPgSlotName() (pgSlotName string) {
 }
 
 func ConfigureCompressor() (compression.Compressor, error) {
-	compressionMethod := viper.GetString(CompressionMethodSetting)
+	compressionMethod := viper.GetString(conf.CompressionMethodSetting)
 	if _, ok := compression.Compressors[compressionMethod]; !ok {
 		return nil, newUnknownCompressionMethodError(compressionMethod)
 	}
 	return compression.Compressors[compressionMethod], nil
-}
-
-func ConfigureLogging() error {
-	if viper.IsSet(LogLevelSetting) {
-		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
-	}
-	return nil
 }
 
 func getPGArchiveStatusFolderPath() string {
@@ -284,9 +251,9 @@ func ConfigureSplitUploader() (Uploader, error) {
 		return nil, err
 	}
 
-	var partitions = viper.GetInt(StreamSplitterPartitions)
-	var blockSize = viper.GetSizeInBytes(StreamSplitterBlockSize)
-	var maxFileSize = viper.GetInt(StreamSplitterMaxFileSize)
+	var partitions = viper.GetInt(conf.StreamSplitterPartitions)
+	var blockSize = viper.GetSizeInBytes(conf.StreamSplitterBlockSize)
+	var maxFileSize = viper.GetInt(conf.StreamSplitterMaxFileSize)
 
 	splitStreamUploader := NewSplitStreamUploader(uploader, partitions, int(blockSize), maxFileSize)
 	return splitStreamUploader, nil
@@ -302,9 +269,9 @@ func ConfigureCrypter() crypto.Crypter {
 
 func CrypterFromConfig(configFile string) crypto.Crypter {
 	var config = viper.New()
-	SetDefaultValues(config)
-	ReadConfigFromFile(config, configFile)
-	CheckAllowedSettings(config)
+	conf.SetDefaultValues(config)
+	conf.ReadConfigFromFile(config, configFile)
+	conf.CheckAllowedSettings(config)
 
 	crypter, err := ConfigureCrypterForSpecificConfig(config)
 	if err != nil {
@@ -316,15 +283,15 @@ func CrypterFromConfig(configFile string) crypto.Crypter {
 // ConfigureCrypter uses environment variables to create and configure a crypter.
 // In case no configuration in environment variables found, return `<nil>` crypter.
 func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, error) {
-	pgpKey := config.IsSet(PgpKeySetting)
-	pgpKeyPath := config.IsSet(PgpKeyPathSetting)
-	legacyGpg := config.IsSet(GpgKeyIDSetting)
+	pgpKey := config.IsSet(conf.PgpKeySetting)
+	pgpKeyPath := config.IsSet(conf.PgpKeyPathSetting)
+	legacyGpg := config.IsSet(conf.GpgKeyIDSetting)
 
-	envelopePgpKey := config.IsSet(PgpEnvelopKeyPathSetting)
-	envelopePgpKeyPath := config.IsSet(PgpEnvelopeKeySetting)
+	envelopePgpKey := config.IsSet(conf.PgpEnvelopKeyPathSetting)
+	envelopePgpKeyPath := config.IsSet(conf.PgpEnvelopeKeySetting)
 
-	libsodiumKey := config.IsSet(LibsodiumKeySetting)
-	libsodiumKeyPath := config.IsSet(LibsodiumKeySetting)
+	libsodiumKey := config.IsSet(conf.LibsodiumKeySetting)
+	libsodiumKeyPath := config.IsSet(conf.LibsodiumKeySetting)
 
 	isPgpKey := pgpKey || pgpKeyPath || legacyGpg
 	isEnvelopePgpKey := envelopePgpKey || envelopePgpKeyPath
@@ -339,10 +306,10 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, err
 		return configurePgpCrypter(config)
 	case isEnvelopePgpKey:
 		return configureEnvelopePgpCrypter(config)
-	case config.IsSet(CseKmsIDSetting):
-		return awskms.CrypterFromKeyID(config.GetString(CseKmsIDSetting), config.GetString(CseKmsRegionSetting)), nil
-	case config.IsSet(YcKmsKeyIDSetting):
-		return yckms.YcCrypterFromKeyIDAndCredential(config.GetString(YcKmsKeyIDSetting), config.GetString(YcSaKeyFileSetting)), nil
+	case config.IsSet(conf.CseKmsIDSetting):
+		return awskms.CrypterFromKeyID(config.GetString(conf.CseKmsIDSetting), config.GetString(conf.CseKmsRegionSetting)), nil
+	case config.IsSet(conf.YcKmsKeyIDSetting):
+		return yckms.YcCrypterFromKeyIDAndCredential(config.GetString(conf.YcKmsKeyIDSetting), config.GetString(conf.YcSaKeyFileSetting)), nil
 	case isLibsodium:
 		return configureLibsodiumCrypter(config)
 	default:
@@ -352,19 +319,19 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, err
 
 func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	loadPassphrase := func() (string, bool) {
-		return GetSetting(PgpKeyPassphraseSetting)
+		return conf.GetSetting(conf.PgpKeyPassphraseSetting)
 	}
 	// key can be either private (for download) or public (for upload)
-	if config.IsSet(PgpKeySetting) {
-		return openpgp.CrypterFromKey(config.GetString(PgpKeySetting), loadPassphrase), nil
+	if config.IsSet(conf.PgpKeySetting) {
+		return openpgp.CrypterFromKey(config.GetString(conf.PgpKeySetting), loadPassphrase), nil
 	}
 
 	// key can be either private (for download) or public (for upload)
-	if config.IsSet(PgpKeyPathSetting) {
-		return openpgp.CrypterFromKeyPath(config.GetString(PgpKeyPathSetting), loadPassphrase), nil
+	if config.IsSet(conf.PgpKeyPathSetting) {
+		return openpgp.CrypterFromKeyPath(config.GetString(conf.PgpKeyPathSetting), loadPassphrase), nil
 	}
 
-	if keyRingID, ok := getWaleCompatibleSetting(GpgKeyIDSetting); ok {
+	if keyRingID, ok := conf.GetWaleCompatibleSetting(conf.GpgKeyIDSetting); ok {
 		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase), nil
 	}
@@ -372,85 +339,50 @@ func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 }
 
 func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
-	if !config.IsSet(PgpEnvelopeYcKmsKeyIDSetting) {
+	if !config.IsSet(conf.PgpEnvelopeYcKmsKeyIDSetting) {
 		return nil, errors.New("yandex cloud KMS key for client-side encryption and decryption must be configured")
 	}
 
 	yckmsEnveloper, err := yckmsenvlpr.EnveloperFromKeyIDAndCredential(
-		config.GetString(PgpEnvelopeYcKmsKeyIDSetting),
-		config.GetString(PgpEnvelopeYcSaKeyFileSetting),
-		config.GetString(PgpEnvelopeYcEndpointSetting),
+		config.GetString(conf.PgpEnvelopeYcKmsKeyIDSetting),
+		config.GetString(conf.PgpEnvelopeYcSaKeyFileSetting),
+		config.GetString(conf.PgpEnvelopeYcEndpointSetting),
 	)
 	if err != nil {
 		return nil, err
 	}
-	expiration, err := GetDurationSetting(PgpEnvelopeCacheExpiration)
+	expiration, err := conf.GetDurationSetting(conf.PgpEnvelopeCacheExpiration)
 	if err != nil {
 		return nil, err
 	}
 	enveloper := cachenvlpr.EnveloperWithCache(yckmsEnveloper, expiration)
 
-	if config.IsSet(PgpEnvelopKeyPathSetting) {
-		return envopenpgp.CrypterFromKeyPath(viper.GetString(PgpEnvelopKeyPathSetting), enveloper), nil
+	if config.IsSet(conf.PgpEnvelopKeyPathSetting) {
+		return envopenpgp.CrypterFromKeyPath(viper.GetString(conf.PgpEnvelopKeyPathSetting), enveloper), nil
 	}
-	if config.IsSet(PgpEnvelopeKeySetting) {
-		return envopenpgp.CrypterFromKey(viper.GetString(PgpEnvelopeKeySetting), enveloper), nil
+	if config.IsSet(conf.PgpEnvelopeKeySetting) {
+		return envopenpgp.CrypterFromKey(viper.GetString(conf.PgpEnvelopeKeySetting), enveloper), nil
 	}
 	return nil, errors.New("there is no any supported envelope gpg crypter configuration")
 }
 
-func GetMaxDownloadConcurrency() (int, error) {
-	return GetMaxConcurrency(DownloadConcurrencySetting)
-}
-
-func GetMaxUploadConcurrency() (int, error) {
-	return GetMaxConcurrency(UploadConcurrencySetting)
-}
-
-// This setting is intentionally undocumented in README. Effectively, this configures how many prepared tar Files there
-// may be in uploading state during backup-push.
-func getMaxUploadQueue() (int, error) {
-	return GetMaxConcurrency(UploadQueueSetting)
-}
-
 // TODO : unit tests
 func GetDeltaConfig() (maxDeltas int, fromFull bool) {
-	maxDeltas = viper.GetInt(DeltaMaxStepsSetting)
-	if origin, hasOrigin := GetSetting(DeltaOriginSetting); hasOrigin {
+	maxDeltas = viper.GetInt(conf.DeltaMaxStepsSetting)
+	if origin, hasOrigin := conf.GetSetting(conf.DeltaOriginSetting); hasOrigin {
 		switch origin {
 		case LatestString:
 		case "LATEST_FULL":
 			fromFull = true
 		default:
-			tracelog.ErrorLogger.Fatalf("Unknown %s: %s\n", DeltaOriginSetting, origin)
+			tracelog.ErrorLogger.Fatalf("Unknown %s: %s\n", conf.DeltaOriginSetting, origin)
 		}
 	}
 	return
 }
 
-func GetMaxUploadDiskConcurrency() (int, error) {
-	if Turbo {
-		return 4, nil
-	}
-	return GetMaxConcurrency(UploadDiskConcurrencySetting)
-}
-
-func GetMaxConcurrency(concurrencyType string) (int, error) {
-	concurrency := viper.GetInt(concurrencyType)
-
-	if concurrency < MinAllowedConcurrency {
-		return MinAllowedConcurrency, newInvalidConcurrencyValueError(concurrencyType, concurrency)
-	}
-	return concurrency, nil
-}
-
-func GetFetchRetries() int {
-	concurrency := viper.GetInt(DownloadFileRetriesSetting)
-	return concurrency
-}
-
 func GetSentinelUserData() (interface{}, error) {
-	dataStr, ok := GetSetting(SentinelUserDataSetting)
+	dataStr, ok := conf.GetSetting(conf.SentinelUserDataSetting)
 	if !ok {
 		return nil, nil
 	}
@@ -471,7 +403,7 @@ func UnmarshalSentinelUserData(userDataStr string) (interface{}, error) {
 }
 
 func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.Cmd, error) {
-	dataStr, ok := GetSetting(variableName)
+	dataStr, ok := conf.GetSetting(variableName)
 	if !ok {
 		tracelog.InfoLogger.Printf("command %s not configured", variableName)
 		return nil, errors.New("command not configured")
@@ -495,78 +427,160 @@ func GetCommandSetting(variableName string) (*exec.Cmd, error) {
 }
 
 func GetOplogArchiveAfterSize() (int, error) {
-	oplogArchiveAfterSizeStr, _ := GetSetting(OplogArchiveAfterSize)
+	oplogArchiveAfterSizeStr, _ := conf.GetSetting(conf.OplogArchiveAfterSize)
 	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
 	if err != nil {
 		return 0,
 			fmt.Errorf("integer expected for %s setting but given '%s': %w",
-				OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
+				conf.OplogArchiveAfterSize, oplogArchiveAfterSizeStr, err)
 	}
 	return oplogArchiveAfterSize, nil
 }
 
-func GetDurationSetting(setting string) (time.Duration, error) {
-	intervalStr, ok := GetSetting(setting)
-	if !ok {
-		return 0, NewUnsetRequiredSettingError(setting)
+// nolint: gocyclo
+func ConfigureSettings(currentType string) {
+	if len(conf.DefaultConfigValues) == 0 {
+		conf.DefaultConfigValues = conf.CommonDefaultConfigValues
+		dbSpecificDefaultSettings := map[string]string{}
+		switch currentType {
+		case conf.PG:
+			dbSpecificDefaultSettings = conf.PGDefaultSettings
+		case conf.MONGO:
+			dbSpecificDefaultSettings = conf.MongoDefaultSettings
+		case conf.MYSQL:
+			dbSpecificDefaultSettings = conf.MysqlDefaultSettings
+		case conf.SQLSERVER:
+			dbSpecificDefaultSettings = conf.SQLServerDefaultSettings
+		case conf.GP:
+			dbSpecificDefaultSettings = conf.GPDefaultSettings
+		}
+
+		for k, v := range dbSpecificDefaultSettings {
+			conf.DefaultConfigValues[k] = v
+		}
 	}
-	interval, err := time.ParseDuration(intervalStr)
-	if err != nil {
-		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+
+	if len(conf.AllowedSettings) == 0 {
+		conf.AllowedSettings = conf.CommonAllowedSettings
+		dbSpecificSettings := map[string]bool{}
+		switch currentType {
+		case conf.PG:
+			dbSpecificSettings = conf.PGAllowedSettings
+		case conf.GP:
+			for setting := range conf.PGAllowedSettings {
+				conf.GPAllowedSettings[setting] = true
+			}
+			dbSpecificSettings = conf.GPAllowedSettings
+		case conf.MONGO:
+			dbSpecificSettings = conf.MongoAllowedSettings
+		case conf.MYSQL:
+			dbSpecificSettings = conf.MysqlAllowedSettings
+		case conf.SQLSERVER:
+			dbSpecificSettings = conf.SQLServerAllowedSettings
+		case conf.REDIS:
+			dbSpecificSettings = conf.RedisAllowedSettings
+		}
+
+		for k, v := range dbSpecificSettings {
+			conf.AllowedSettings[k] = v
+		}
+
+		for _, adapter := range StorageAdapters {
+			for _, setting := range adapter.settingNames {
+				conf.AllowedSettings[setting] = true
+			}
+			conf.AllowedSettings["WALG_"+adapter.PrefixSettingKey()] = true
+		}
 	}
-	return interval, nil
 }
 
-func GetOplogPITRDiscoveryIntervalSetting() (*time.Duration, error) {
-	durStr, ok := GetSetting(OplogPITRDiscoveryInterval)
-	if !ok {
+// StorageFromConfig prefers the config parameters instead of the current environment variables
+func StorageFromConfig(configFile string) (storage.Storage, error) {
+	var config = viper.New()
+	conf.SetDefaultValues(config)
+	conf.ReadConfigFromFile(config, configFile)
+	conf.CheckAllowedSettings(config)
+
+	folder, err := ConfigureStorageForSpecificConfig(config)
+
+	if err != nil {
+		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
+		tracelog.ErrorLogger.FatalError(err)
+	}
+	return folder, err
+}
+
+func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, err error) {
+	storageConfigs := viper.GetStringMap(conf.PgFailoverStorages)
+
+	if len(storageConfigs) == 0 {
 		return nil, nil
 	}
-	dur, err := time.ParseDuration(durStr)
-	if err != nil {
-		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogPITRDiscoveryInterval, durStr, err)
+
+	// errClosers are needed to close already configured storages if failed to configure all of them.
+	var errClosers []io.Closer
+	defer func() {
+		if err == nil {
+			return
+		}
+		for _, closer := range errClosers {
+			utility.LoggedClose(closer, "Failed to close storage")
+		}
+	}()
+
+	storages := make(map[string]storage.HashableStorage, len(storageConfigs))
+	for name := range storageConfigs {
+		if name == "default" {
+			return nil, fmt.Errorf("'%s' storage name is reserved", name)
+		}
+
+		cfg := viper.Sub(conf.PgFailoverStorages + "." + name)
+
+		var rootWraps []storage.WrapRootFolder
+		if limiters.NetworkLimiter != nil {
+			rootWraps = append(rootWraps, func(prevFolder storage.Folder) (newFolder storage.Folder) {
+				return NewLimitedFolder(prevFolder, limiters.NetworkLimiter)
+			})
+		}
+		rootWraps = append(rootWraps, ConfigureStoragePrefix)
+
+		st, err := ConfigureStorageForSpecificConfig(cfg, rootWraps...)
+		if err != nil {
+			return nil, fmt.Errorf("failover storage %s: %v", name, err)
+		}
+		errClosers = append(errClosers, st)
+
+		storages[name] = st
 	}
-	return &dur, nil
+
+	return storages, nil
 }
 
-func GetRequiredSetting(setting string) (string, error) {
-	val, ok := GetSetting(setting)
-	if !ok {
-		return "", NewUnsetRequiredSettingError(setting)
+func AssertRequiredSettingsSet() error {
+	if !isAnyStorageSet() {
+		return errors.New("Failed to find any configured storage")
 	}
-	return val, nil
+
+	for setting, required := range conf.RequiredSettings {
+		isSet := viper.IsSet(setting)
+
+		if !isSet && required {
+			message := "Required variable " + setting + " is not set. You can set is using --" + conf.ToFlagName(setting) +
+				" flag or variable " + setting
+			return errors.New(message)
+		}
+	}
+
+	return nil
 }
 
-func GetBoolSettingDefault(setting string, def bool) (bool, error) {
-	val, ok := GetSetting(setting)
-	if !ok {
-		return def, nil
+func isAnyStorageSet() bool {
+	for _, adapter := range StorageAdapters {
+		_, exists := conf.GetWaleCompatibleSetting(adapter.PrefixSettingKey())
+		if exists {
+			return true
+		}
 	}
-	return strconv.ParseBool(val)
-}
 
-func GetBoolSetting(setting string) (val bool, ok bool, err error) {
-	valstr, ok := GetSetting(setting)
-	if !ok {
-		return false, false, nil
-	}
-	val, err = strconv.ParseBool(valstr)
-	return val, true, err
-}
-
-func GetFloatSettingDefault(setting string, def float64) (float64, error) {
-	val, ok := GetSetting(setting)
-	if !ok {
-		return def, nil
-	}
-	return strconv.ParseFloat(val, 64)
-}
-
-func GetFloatSetting(setting string) (val float64, ok bool, err error) {
-	valstr, ok := GetSetting(setting)
-	if !ok {
-		return 0, false, nil
-	}
-	val, err = strconv.ParseFloat(valstr, 64)
-	return val, true, err
+	return false
 }

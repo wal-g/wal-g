@@ -6,14 +6,18 @@ volumes:
 x-s3_common_depends: &s3_common_depends
   depends_on:
     - s3
+    # - graphite
   links:
     - s3
+    # - graphite
 
 x-s3_throttling_depends: &s3_throttling_depends
   depends_on:
     - s3-for-throttling
+    # - graphite
   links:
     - s3-for-throttling
+    # - graphite
 
 services:
   golang:
@@ -27,8 +31,15 @@ services:
     build:
       dockerfile: ./docker/ubuntu/Dockerfile
       context: .
-    image: wal-g/ubuntu
+    image: wal-g/ubuntu:18.04
     container_name: wal-g_ubuntu
+
+  ubuntu_20_04:
+    build:
+      dockerfile: ./docker/ubuntu/Dockerfile_20_04
+      context: .
+    image: wal-g/ubuntu:20.04
+    container_name: wal-g_ubuntu_20_04
 
   swift:
     image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"
@@ -36,6 +47,22 @@ services:
     hostname: swift
     ports:
       - "8010:8080"
+
+  # "WALG_STATSD_ADDRESS": "wal-g_graphite:8125"
+  graphite:
+    image: hopsoft/graphite-statsd
+    hostname: wal-g_graphite
+    container_name: wal-g_graphite
+    ports:
+      - "8125:8125"
+      - "8126:8126"
+      - "2003:2003"
+      - "2023:2023"
+      - "2004:2004"
+      - "2024:2024"
+      - "80:80"
+      - "81:81"
+      - "3000:3000"
 
   s3:
     image: minio/minio:RELEASE.2021-06-07T21-40-51Z
@@ -123,6 +150,7 @@ services:
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpafterfailedbucket
       &&  mkdir -p /export/gpfullserializedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
       &&  mkdir -p /export/gpdeleteretainbucket
@@ -167,7 +195,7 @@ services:
       &&  /usr/bin/minio server /export'
 
   s3-for-throttling:
-    image: quay.io/minio/minio
+    image: quay.io/minio/minio:RELEASE.2024-01-18T22-51-28Z
     container_name: wal-g_s3_3
     hostname: s3
     ports:

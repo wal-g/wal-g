@@ -8,8 +8,10 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -198,7 +200,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", internal.CfgFile, recoveryTarget)
+	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", conf.CfgFile, recoveryTarget)
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
@@ -208,7 +210,8 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 			}
 
 			segment := fh.cluster.ByContent[contentID][0]
-			pathToRestore := path.Join(segment.DataDir, "recovery.conf")
+			relativePathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
+			pathToRestore := path.Join(segment.DataDir, relativePathToRecoveryConf)
 			fileContents := restoreCfgMaker.Make(contentID)
 			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToRestore, fileContents)
 			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
@@ -225,7 +228,6 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	return nil
 }
 
-// TODO: Unit tests
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
 func (fh *FetchHandler) buildFetchCommand(contentID int) string {
@@ -247,7 +249,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		fmt.Sprint(segment.DataDir),
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
-		fmt.Sprintf("--config=%s", internal.CfgFile),
+		fmt.Sprintf("--config=%s", conf.CfgFile),
 	}
 	if fh.partialRestoreArgs != nil {
 		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))

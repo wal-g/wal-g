@@ -9,11 +9,13 @@ on:
 
 env:
   CACHE_FOLDER: ~/docker-images-${{ github.sha }}
-  CACHE_FILE_UBUNTU: ~/docker-images-${{ github.sha }}/wal-g_ubuntu.tgz
+  CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tgz
+  CACHE_FILE_UBUNTU_20_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-20.04.tgz
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tgz
   CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tgz
   IMAGE: wal-g/docker_prefix
-  IMAGE_UBUNTU: wal-g/ubuntu
+  IMAGE_UBUNTU_18_04: wal-g/ubuntu:18.04
+  IMAGE_UBUNTU_20_04: wal-g/ubuntu:20.04
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.20.5" # until this will be resolved https://github.com/golang/go/issues/61431
@@ -30,7 +32,8 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
-            ${{ env.CACHE_FILE_UBUNTU }}
+            ${{ env.CACHE_FILE_UBUNTU_18_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_20_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
@@ -105,7 +108,8 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
-            ${{ env.CACHE_FILE_UBUNTU }}
+            ${{ env.CACHE_FILE_UBUNTU_18_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_20_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 

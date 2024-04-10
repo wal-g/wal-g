@@ -7,12 +7,12 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
 
 type AOLengthCheckHandler struct {
-	logsDir     string
 	checkBackup bool
 	backupName  string
 }
@@ -20,7 +20,6 @@ type AOLengthCheckHandler struct {
 func NewAOLengthCheckHandler(logsDir string, checkBackup bool, backupName string) (*AOLengthCheckHandler, error) {
 	initGpLog(logsDir)
 	return &AOLengthCheckHandler{
-		logsDir:     logsDir,
 		checkBackup: checkBackup,
 		backupName:  backupName,
 	}, nil
@@ -43,15 +42,18 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 		tracelog.ErrorLogger.FatalfOnError("could not get cluster info %v", err)
 	}
 
-	segmentsBaccups, err := getSegmentBackupNames(checker.backupName)
-	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
+	segmentsBackups := make(map[int]string)
+	if checker.checkBackup {
+		segmentsBackups, err = getSegmentBackupNames(checker.backupName)
+		if err != nil {
+			tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
+		}
 	}
 
 	remoteOutput := globalCluster.GenerateAndExecuteCommand("Run ao/aocs length check",
 		cluster.ON_SEGMENTS,
 		func(contentID int) string {
-			return checker.buildCheckAOLengthCmd(contentID, segmentsBaccups[contentID], globalCluster)
+			return checker.buildCheckAOLengthCmd(contentID, segmentsBackups, globalCluster)
 		})
 
 	for _, command := range remoteOutput.Commands {
@@ -67,16 +69,16 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	}
 }
 
-func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupName string, globalCluster *cluster.Cluster) string {
+func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backupNames map[int]string,
+	globalCluster *cluster.Cluster) string {
 	segment := globalCluster.ByContent[contentID][0]
-
 	runCheckArgs := []string{
 		fmt.Sprintf("--port=%d", segment.Port),
 		fmt.Sprintf("--segnum=%d", segment.ContentID),
 	}
 
 	if checker.checkBackup {
-		runCheckArgs = append(runCheckArgs, "--check-backup", fmt.Sprintf("--backup-name=%s", backupName))
+		runCheckArgs = append(runCheckArgs, "--check-backup", fmt.Sprintf("--backup-name=%s", backupNames[contentID]))
 	}
 
 	runCheckArgsLine := strings.Join(runCheckArgs, " ")
@@ -85,10 +87,10 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 		// nohup to avoid the SIGHUP on SSH session disconnect
 		"nohup", "wal-g",
 		// config for wal-g
-		fmt.Sprintf("--config=%s", internal.CfgFile),
+		fmt.Sprintf("--config=%s", conf.CfgFile),
 		// method
 		"check-ao-aocs-length-segment",
-		// actual arguments to be passed to the backup-push command
+		// actual arguments to be passed to the check-ao command
 		runCheckArgsLine,
 		// forward stdout and stderr to the log file
 		"&>>", formatSegmentLogPath(contentID),

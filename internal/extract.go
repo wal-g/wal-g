@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
@@ -150,11 +151,11 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	}
 
 	// Set maximum number of goroutines spun off by ExtractAll
-	downloadingConcurrency, err := GetMaxDownloadConcurrency()
+	downloadingConcurrency, err := conf.GetMaxDownloadConcurrency()
 	if err != nil {
 		return err
 	}
-	retries := GetFetchRetries()
+	retries := conf.GetFetchRetries()
 
 	for currentRun := files; len(currentRun) > 0; {
 		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)

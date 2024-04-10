@@ -5,6 +5,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -23,8 +24,8 @@ var (
 		Use:   "backup-push",
 		Short: backupPushShortDescription,
 		PreRun: func(cmd *cobra.Command, args []string) {
-			internal.RequiredSettings[internal.NameStreamCreateCmd] = true
-			internal.RequiredSettings[internal.MysqlDatasourceNameSetting] = true
+			conf.RequiredSettings[conf.NameStreamCreateCmd] = true
+			conf.RequiredSettings[conf.MysqlDatasourceNameSetting] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
@@ -35,11 +36,11 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 			folder := uploader.Folder()
 			uploader.ChangeDirectory(utility.BaseBackupPath)
-			backupCmd, err := internal.GetCommandSetting(internal.NameStreamCreateCmd)
+			backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			if userData == "" {
-				userData = viper.GetString(internal.SentinelUserDataSetting)
+				userData = viper.GetString(conf.SentinelUserDataSetting)
 			}
 
 			mysql.HandleBackupPush(

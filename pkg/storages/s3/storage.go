@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -36,6 +37,8 @@ type Config struct {
 	Uploader                 *UploaderConfig
 	RangeBatchEnabled        bool
 	RangeMaxRetries          int
+	MinThrottlingRetryDelay  time.Duration
+	MaxThrottlingRetryDelay  time.Duration
 }
 
 type Secrets struct {

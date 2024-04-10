@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const (
@@ -67,7 +68,7 @@ func TestGetLogsDstSettings_shouldReturnNilOnNoDirectory(t *testing.T) {
 
 func resetToDefaults() {
 	viper.Reset()
-	ConfigureSettings(PG)
-	InitConfig()
-	Configure()
+	ConfigureSettings(conf.PG)
+	conf.InitConfig()
+	conf.Configure()
 }

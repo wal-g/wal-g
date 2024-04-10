@@ -531,6 +531,17 @@ wal-g catchup-fetch /path/to/replica/postgres backup_name
 ```
 
 
+### ``catchup-send`` and ``catchup-recieve``
+
+These commands are used in conjunction to catchup lagging replica. On a standby you should run ``catchup-recieve``, then on a primary ``catchup-send``. Standby Postgres must be stopped during this procedure.
+
+``` bash
+wal-g catchup-receive ${PGDATA_STANDBY} 1337 &
+
+wal-g catchup-send ${PGDATA_PRIMARY} hostname:1337
+```
+
+
 ### ``copy``
 
 This command will help to change the storage and move the set of backups there or write the backups on magnetic tape. For example, `wal-g copy --from=config_from.json --to=config_to.json` will copy all backups.
