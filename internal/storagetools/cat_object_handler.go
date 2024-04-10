@@ -17,15 +17,15 @@ func HandleCatObject(objectPath string, folder storage.Folder, decrypt, decompre
 }
 
 func HandleCatObjectWithGlob(pattern string, folder storage.Folder, decrypt, decompress bool) error {
-    objectPaths, _, err := storage.Glob(folder, pattern)
-    if err != nil {
-        return err
-    }
-    for _, objectPath := range objectPaths {
-        err := HandleCatObject(objectPath, folder, decrypt, decompress)
-        if err != nil {
-            return err
-        }
-    }
-    return nil
+	objectPaths, _, err := storage.Glob(folder, pattern)
+	if err != nil {
+		return err
+	}
+	for _, objectPath := range objectPaths {
+		err := HandleCatObject(objectPath, folder, decrypt, decompress)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

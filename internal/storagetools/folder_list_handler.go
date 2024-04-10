@@ -106,18 +106,18 @@ func WriteObjectsList(objects []ListElement, output io.Writer) error {
 }
 
 func HandleFolderListWithGlob(folder storage.Folder, pattern string, recursive bool) error {
-    _, folderPaths, err := storage.Glob(folder, pattern)
-    if err != nil {
-        return err
-    }
-    for _, folderPath := range folderPaths {
-        subfolder := folder.GetSubFolder(folderPath)
-        fmt.Println(subfolder.GetPath() + ":")
-        err := HandleFolderList(subfolder, recursive)
-        if err != nil {
-            return err
-        }
-        fmt.Println()
-    }
-    return nil
+	_, folderPaths, err := storage.Glob(folder, pattern)
+	if err != nil {
+		return err
+	}
+	for _, folderPath := range folderPaths {
+		subfolder := folder.GetSubFolder(folderPath)
+		fmt.Println(subfolder.GetPath() + ":")
+		err := HandleFolderList(subfolder, recursive)
+		if err != nil {
+			return err
+		}
+		fmt.Println()
+	}
+	return nil
 }

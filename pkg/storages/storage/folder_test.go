@@ -278,7 +278,7 @@ func TestGlob(t *testing.T) {
 			simpleFiletree,
 			"/",
 			[]string{
-                "/",
+				"/",
 			},
 		},
 		{
@@ -405,7 +405,7 @@ func TestGlob(t *testing.T) {
 				assert.NoError(t, err)
 			}
 			objects, folders, err := storage.Glob(folder, tc.pattern)
-            matches := append(objects, folders...)
+			matches := append(objects, folders...)
 			sort.Strings(tc.expected)
 			sort.Strings(matches)
 			assert.NoError(t, err)

@@ -19,11 +19,11 @@ var folderListCmd = &cobra.Command{
 	Args:  cobra.RangeArgs(0, 1),
 	Run: func(cmd *cobra.Command, args []string) {
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
-            if glob {
-                return storagetools.HandleFolderListWithGlob(folder, args[0], recursive)
-            }
-            subfolder := folder.GetSubFolder(args[0])
-            return storagetools.HandleFolderList(subfolder, recursive)
+			if glob {
+				return storagetools.HandleFolderListWithGlob(folder, args[0], recursive)
+			}
+			subfolder := folder.GetSubFolder(args[0])
+			return storagetools.HandleFolderList(subfolder, recursive)
 		})
 		if err != nil {
 			tracelog.ErrorLogger.FatalOnError(err)
