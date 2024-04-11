@@ -338,6 +338,19 @@ type BackupCursorFile struct {
 	FileSize int64  `bson:"fileSize" json:"fileSize"`
 }
 
+type RestoreArgs struct {
+	RsConfig       RsConfig
+	ShConfig       ShConfig
+	MongoCfgConfig MongoCfgConfig
+
+	BackupName     string
+	RestoreVersion string
+
+	SkipBackupDownload   bool
+	SkipChecks        bool
+	SkipMongoReconfig bool
+}
+
 type RsConfig struct {
 	RsName      string
 	RsMembers   []string

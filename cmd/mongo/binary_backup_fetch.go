@@ -28,6 +28,13 @@ const (
 	ShCfgConnStrDescription      = "Connection string to mongocfg replicas in sharded cluster"
 	ShShardConnStr               = "mongo-shard-conn-str"
 	ShShardConnStrDescription    = "Connection string to some shard (can be specified multiple times)"
+
+	SkipBackupDownloadFlag        = "skip-backup-download"
+	SkipBackupDownloadDescription = "Skip backup download"
+	SkipChecksFlag                = "skip-checks"
+	SkipChecksDescription         = "Skip checking mongod file system lock and mongo version on compatibility with backup"
+	SkipMongoReconfigFlag         = "skip-mongo-reconfig"
+	SkipMongoReconfigDescription  = "Skip mongo reconfiguration while restoring"
 )
 
 var (
@@ -38,6 +45,9 @@ var (
 	shardName                = ""
 	mongocfgConnectionString = ""
 	shardConnectionStrings   []string
+	skipMongoReconfigFlag    bool
+	skipBackupDownloadFlag   bool
+	skipCheckFlag            bool
 )
 
 var binaryBackupFetchCmd = &cobra.Command{
@@ -56,7 +66,7 @@ var binaryBackupFetchCmd = &cobra.Command{
 		mongodVersion := args[2]
 
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion, rsName,
-			rsMembers, rsMemberIds, shardName, mongocfgConnectionString, shardConnectionStrings)
+			rsMembers, rsMemberIds, shardName, mongocfgConnectionString, shardConnectionStrings, skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -69,5 +79,8 @@ func init() {
 	binaryBackupFetchCmd.Flags().StringVar(&shardName, ShNameFlag, "", ShNameDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&mongocfgConnectionString, ShCfgConnStr, "", ShCfgConnStrDescription)
 	binaryBackupFetchCmd.Flags().StringArrayVar(&shardConnectionStrings, ShShardConnStr, []string{}, ShShardConnStrDescription)
+	binaryBackupFetchCmd.Flags().BoolVar(&skipBackupDownloadFlag, SkipBackupDownloadFlag, false, SkipBackupDownloadDescription)
+	binaryBackupFetchCmd.Flags().BoolVar(&skipMongoReconfigFlag, SkipMongoReconfigFlag, false, SkipMongoReconfigDescription)
+	binaryBackupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }
