@@ -20,8 +20,8 @@ const (
 	RsNameDescription            = "Name of replicaset (like rs01)"
 	RsMembersFlag                = "mongo-rs-members"
 	RsMembersDescription         = "Comma separated host:port records from wished rs members (like rs.initiate())"
-	RsMemberIdsFlag              = "mongo-rs-member-ids"
-	RsMemberIdsDescription       = "Comma separated integers for replica IDs of corresponding --mongo-rs-members"
+	RsMemberIDsFlag              = "mongo-rs-member-ids"
+	RsMemberIDsDescription       = "Comma separated integers for replica IDs of corresponding --mongo-rs-members"
 	ShNameFlag                   = "mongo-sh-name"
 	ShNameDescription            = "Name of shard"
 	ShCfgConnStr                 = "mongo-cfg-conn-str"
@@ -41,7 +41,7 @@ var (
 	minimalConfigPath        = ""
 	rsName                   = ""
 	rsMembers                []string
-	rsMemberIds              []int
+	rsMemberIDs              []int
 	shardName                = ""
 	mongocfgConnectionString = ""
 	shardConnectionStrings   []string
@@ -65,8 +65,9 @@ var binaryBackupFetchCmd = &cobra.Command{
 		mongodConfigPath := args[1]
 		mongodVersion := args[2]
 
-		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion, rsName,
-			rsMembers, rsMemberIds, shardName, mongocfgConnectionString, shardConnectionStrings, skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag)
+		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
+			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
+			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -75,7 +76,7 @@ func init() {
 	binaryBackupFetchCmd.Flags().StringVar(&minimalConfigPath, MinimalConfigPathFlag, "", MinimalConfigPathDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&rsName, RsNameFlag, "", RsNameDescription)
 	binaryBackupFetchCmd.Flags().StringSliceVar(&rsMembers, RsMembersFlag, []string{}, RsMembersDescription)
-	binaryBackupFetchCmd.Flags().IntSliceVar(&rsMemberIds, RsMemberIdsFlag, []int{}, RsMemberIdsDescription)
+	binaryBackupFetchCmd.Flags().IntSliceVar(&rsMemberIDs, RsMemberIDsFlag, []int{}, RsMemberIDsDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&shardName, ShNameFlag, "", ShNameDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&mongocfgConnectionString, ShCfgConnStr, "", ShCfgConnStrDescription)
 	binaryBackupFetchCmd.Flags().StringArrayVar(&shardConnectionStrings, ShShardConnStr, []string{}, ShShardConnStrDescription)

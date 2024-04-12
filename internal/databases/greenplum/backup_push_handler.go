@@ -98,7 +98,7 @@ type CurrBackupInfo struct {
 type PrevBackupInfo struct {
 	name               string
 	sentinelDto        BackupSentinelDto
-	deltaBaseBackupIds map[int]string
+	deltaBaseBackupIDs map[int]string
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -156,7 +156,7 @@ func (bh *BackupHandler) addSegmentDeltaBaseArg(contentID int, args []string) []
 		return args
 	}
 
-	backupID, ok := bh.prevBackupInfo.deltaBaseBackupIds[contentID]
+	backupID, ok := bh.prevBackupInfo.deltaBaseBackupIDs[contentID]
 	if !ok {
 		tracelog.WarningLogger.Printf(
 			"unable to find the requested contentID %d in metadata of the base backup %s, "+
@@ -724,18 +724,18 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 		return err
 	}
 
-	bh.loadDeltaBaseBackupIds()
+	bh.loadDeltaBaseBackupIDs()
 
 	return nil
 }
 
-func (bh *BackupHandler) loadDeltaBaseBackupIds() {
-	bh.prevBackupInfo.deltaBaseBackupIds = make(map[int]string)
+func (bh *BackupHandler) loadDeltaBaseBackupIDs() {
+	bh.prevBackupInfo.deltaBaseBackupIDs = make(map[int]string)
 
 	for i := range bh.prevBackupInfo.sentinelDto.Segments {
 		backupID := bh.prevBackupInfo.sentinelDto.Segments[i].BackupID
 		contentID := bh.prevBackupInfo.sentinelDto.Segments[i].ContentID
-		bh.prevBackupInfo.deltaBaseBackupIds[contentID] = backupID
+		bh.prevBackupInfo.deltaBaseBackupIDs[contentID] = backupID
 	}
 }
 
