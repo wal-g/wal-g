@@ -30,13 +30,21 @@ var backupFetchCmd = &cobra.Command{
 		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)
+		var cmdArgs []string
+		redisUser, ok := conf.GetSetting(conf.RedisRestoreBackupACLUser)
+		if ok && redisUser != "" {
+			cmdArgs = append(cmdArgs, "--user", redisUser)
+		}
+
+		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd, cmdArgs...)
 		tracelog.ErrorLogger.FatalOnError(err)
+		tracelog.InfoLogger.Print(restoreCmd.String())
 
 		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
 		if ok && redisPassword != "" { // special hack for redis-cli
 			restoreCmd.Env = append(restoreCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
 		}
+
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 

@@ -149,7 +149,9 @@ const (
 	// Deprecated: unused
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
-	RedisPassword = "WALG_REDIS_PASSWORD"
+	RedisPassword             = "WALG_REDIS_PASSWORD"
+	RedisCreateBackupACLUser  = "WALG_CREATE_BACKUP_REDIS_ACL_USER"
+	RedisRestoreBackupACLUser = "WALG_RESTORE_BACKUP_REDIS_ACL_USER"
 
 	GPLogsDirectory            = "WALG_GP_LOGS_DIR"
 	GPSegContentID             = "WALG_GP_SEG_CONTENT_ID"
@@ -506,7 +508,9 @@ var (
 
 	RedisAllowedSettings = map[string]bool{
 		// Redis
-		RedisPassword: true,
+		RedisPassword:             true,
+		RedisCreateBackupACLUser:  true,
+		RedisRestoreBackupACLUser: true,
 	}
 
 	GPAllowedSettings = map[string]bool{

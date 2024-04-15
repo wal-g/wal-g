@@ -17,7 +17,7 @@ MYSQL_TEST := "mysql_base_tests"
 MONGO_MAJOR ?= "4.2"
 MONGO_VERSION ?= "4.2.8"
 GOLANGCI_LINT_VERSION ?= "v1.52.2"
-REDIS_VERSION ?= "5.0.8"
+REDIS_VERSION ?= "6.2.4"
 TOOLS_MOD_DIR := ./internal/tools
 
 BUILD_TAGS:=
