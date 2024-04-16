@@ -83,6 +83,9 @@ const (
 	PgPassfileSetting                      = "PGPASSFILE"
 	PgDatabaseSetting                      = "PGDATABASE"
 	PgSslModeSetting                       = "PGSSLMODE"
+	PgSslKey = "PGSSLKEY"
+	PgSslCert = "PGSSLCERT"
+	PgSslRootCert = "PGSSLROOTCERT"
 	PgSlotName                             = "WALG_SLOTNAME"
 	PgWalSize                              = "WALG_PG_WAL_SIZE"
 	TotalBgUploadedLimit                   = "TOTAL_BG_UPLOADED_LIMIT"
@@ -435,6 +438,9 @@ var (
 		PgPassfileSetting:                      true,
 		PgDatabaseSetting:                      true,
 		PgSslModeSetting:                       true,
+		PgSslCert: true,
+		PgSslKey: true,
+		PgSslRootCert: true,
 		PgSlotName:                             true,
 		PgWalSize:                              true,
 		PrefetchDir:                            true,
