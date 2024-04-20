@@ -26,6 +26,7 @@ type Config struct {
 	AccessKey                string
 	SessionToken             string
 	RoleARN                  string
+	DualStack                bool
 	SessionName              string
 	CACertFile               string
 	SkipValidation           bool
