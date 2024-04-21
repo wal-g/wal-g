@@ -34,14 +34,26 @@ const (
 	WalgXtrabackupTool              BackupTool = "WALG_XTRABACKUP_TOOL"
 )
 
-func getMySQLVersion(db *sql.DB) (string, error) {
-	row := db.QueryRow("SELECT @@version")
-	var version string
-	err := row.Scan(&version)
+func fetchMySQLVariable(db *sql.DB, variable string) (string, error) {
+	row := db.QueryRow("SELECT @@" + variable)
+	var value string
+	err := row.Scan(&value)
 	if err != nil {
 		return "", err
 	}
-	return version, nil
+	return value, nil
+}
+
+func getMySQLVersion(db *sql.DB) (string, error) {
+	return fetchMySQLVariable(db, "version")
+}
+
+func getMySQLArchitecture(db *sql.DB) (string, error) {
+	return fetchMySQLVariable(db, "version_compile_machine")
+}
+
+func getMySQLOS(db *sql.DB) (string, error) {
+	return fetchMySQLVariable(db, "version_compile_os")
 }
 
 func getMySQLFlavor(db *sql.DB) (string, error) {
@@ -225,7 +237,9 @@ type StreamSentinelDto struct {
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
 	Hostname         string `json:"Hostname,omitempty"`
 	ServerUUID       string `json:"ServerUUID,omitempty"`
-	ServerVersion    string `json:"ServerVersion,omitempty"`
+	ServerVersion    string `json:"ServerVersion,omitempty"` // e.g. '8.0.35-27'
+	ServerArch       string `json:"ServerArch,omitempty"`
+	ServerOS         string `json:"ServerOS,omitempty"`
 
 	IsPermanent   bool `json:"IsPermanent"`
 	IsIncremental bool `json:"IsIncremental"`

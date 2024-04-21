@@ -2,12 +2,14 @@ package mysql
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
@@ -34,6 +36,12 @@ func HandleBackupPush(
 	defer utility.LoggedClose(db, "")
 
 	version, err := getMySQLVersion(db)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	serverArch, err := getMySQLArchitecture(db)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	serverOS, err := getMySQLOS(db)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	flavor, err := getMySQLFlavor(db)
@@ -101,6 +109,8 @@ func HandleBackupPush(
 		Hostname:          hostname,
 		ServerUUID:        serverUUID,
 		ServerVersion:     version,
+		ServerArch:        serverArch,
+		ServerOS:          serverOS,
 		IsPermanent:       isPermanent,
 		IsIncremental:     incrementCount != 0,
 		UserData:          userData,
