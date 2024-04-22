@@ -27,3 +27,24 @@ func HandleRemove(prefix string, folder storage.Folder) error {
 	}
 	return nil
 }
+
+func HandleRemoveWithGlobPattern(pattern string, folder storage.Folder) error {
+	objectPaths, folderPaths, err := storage.Glob(folder, pattern)
+	if err != nil {
+		return err
+	}
+	for _, objectPath := range objectPaths {
+		err := HandleRemove(objectPath, folder)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, folderPath := range folderPaths {
+		err := HandleRemove(folderPath, folder)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

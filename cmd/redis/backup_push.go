@@ -43,13 +43,20 @@ var backupPushCmd = &cobra.Command{
 		// Configure folder
 		uploader.ChangeDirectory(utility.BaseBackupPath)
 
-		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd)
+		var cmdArgs []string
+		redisUser, ok := conf.GetSetting(conf.RedisCreateBackupACLUser)
+		if ok && redisUser != "" {
+			cmdArgs = append(cmdArgs, "--user", redisUser)
+		}
+
+		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd, cmdArgs...)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
 		if ok && redisPassword != "" { // special hack for redis-cli
 			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
 		}
+
 		backupCmd.Stderr = os.Stderr
 		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent)
 
