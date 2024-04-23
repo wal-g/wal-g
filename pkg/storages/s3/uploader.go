@@ -51,7 +51,6 @@ func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, s
 	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass}
 }
 
-// TODO : unit tests
 func (uploader *Uploader) createUploadInput(bucket, path string, content io.Reader) *s3manager.UploadInput {
 	uploadInput := &s3manager.UploadInput{
 		Bucket:       aws.String(bucket),
