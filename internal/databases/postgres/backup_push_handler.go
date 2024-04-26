@@ -63,6 +63,7 @@ type BackupArguments struct {
 	isFullBackup             bool
 	deltaConfigurator        DeltaBackupConfigurator
 	withoutFilesMetadata     bool
+	orioledbEnabled          bool
 	composerInitFunc         func(handler *BackupHandler) error
 	preventConcurrentBackups bool
 }
@@ -77,6 +78,7 @@ type CurBackupInfo struct {
 	compressedSize   int64
 	dataCatalogSize  int64
 	incrementCount   int
+	startChkpNum     *uint32
 }
 
 func NewPrevBackupInfo(name string, sentinel BackupSentinelDto, filesMeta FilesMetadataDto) PrevBackupInfo {
@@ -139,6 +141,29 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 	}
 }
 
+// OrioledbNewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
+func OrioledbNewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
+	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
+	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool, orioledbEnabled bool) BackupArguments {
+	return BackupArguments{
+		Uploader:              uploader,
+		pgDataDirectory:       pgDataDirectory,
+		backupsFolder:         backupsFolder,
+		isPermanent:           isPermanent,
+		verifyPageChecksums:   verifyPageChecksums,
+		isFullBackup:          isFullBackup,
+		storeAllCorruptBlocks: storeAllCorruptBlocks,
+		deltaConfigurator:     deltaConfigurator,
+		userData:              userData,
+		withoutFilesMetadata:  withoutFilesMetadata,
+		orioledbEnabled:       orioledbEnabled,
+		composerInitFunc: func(handler *BackupHandler) error {
+			return configureTarBallComposer(handler, tarBallComposerType)
+		},
+		preventConcurrentBackups: false,
+	}
+}
+
 func (ba *BackupArguments) EnablePreventConcurrentBackups() {
 	ba.preventConcurrentBackups = true
 	tracelog.InfoLogger.Println("Concurrent backups are disabled")
@@ -154,12 +179,22 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
-	bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
-		bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
-		viper.GetInt64(conf.TarSizeThresholdSetting))
+	if arguments.orioledbEnabled && bh.prevBackupInfo.sentinelDto.BackupStartChkpNum != nil {
+		bh.Workers.Bundle = OrioledbNewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
+			bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
+			viper.GetInt64(conf.TarSizeThresholdSetting), bh.prevBackupInfo.sentinelDto.BackupStartChkpNum)
+	} else {
+		bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
+			bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
+			viper.GetInt64(conf.TarSizeThresholdSetting))
+	}
 
 	err = bh.startBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
+	if arguments.orioledbEnabled {
+		OrioledbSetStartChkpNum(bh)
+	}
+
 	bh.handleDeltaBackup(folder)
 	tarFileSets := bh.uploadBackup()
 	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)

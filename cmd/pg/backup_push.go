@@ -28,6 +28,7 @@ const (
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
 	withoutFilesMetadataFlag  = "without-files-metadata"
+	withOrioledb              = "with-orioledb"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -106,11 +107,20 @@ var (
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
-			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
-				permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
-				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
-				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
-				userData, withoutFilesMetadata)
+			var arguments postgres.BackupArguments
+			if orioledbEnabled {
+				arguments = postgres.OrioledbNewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
+					permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
+					fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
+					tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
+					userData, withoutFilesMetadata, orioledbEnabled)
+			} else {
+				arguments = postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
+					permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
+					fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
+					tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
+					userData, withoutFilesMetadata)
+			}
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -128,6 +138,7 @@ var (
 	deltaFromUserData     = ""
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
+	orioledbEnabled       = false
 )
 
 func chooseTarBallComposer() postgres.TarBallComposerType {
@@ -177,6 +188,8 @@ func init() {
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().BoolVar(&withoutFilesMetadata, withoutFilesMetadataFlag,
 		false, "Do not track files metadata, significantly reducing memory usage")
+	backupPushCmd.Flags().BoolVar(&orioledbEnabled, withOrioledb,
+		false, "Enable experimental orioledb delta backups support")
 	backupPushCmd.Flags().StringVar(&targetStorage, "target-storage", "",
 		targetStorageDescription)
 }

@@ -42,10 +42,22 @@ func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool
 
 // TarBallFilePackerImpl is used to pack bundle file into tarball.
 type TarBallFilePackerImpl struct {
-	deltaMap         PagedFileDeltaMap
-	incrementFromLsn *LSN
-	files            internal.BundleFiles
-	options          TarBallFilePackerOptions
+	deltaMap             PagedFileDeltaMap
+	incrementFromLsn     *LSN
+	files                internal.BundleFiles
+	options              TarBallFilePackerOptions
+	incrementFromChkpNum *uint32
+}
+
+func OrioledbNewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
+	options TarBallFilePackerOptions, incrementFromChkpNum *uint32) *TarBallFilePackerImpl {
+	return &TarBallFilePackerImpl{
+		deltaMap:             deltaMap,
+		incrementFromLsn:     incrementFromLsn,
+		files:                files,
+		options:              options,
+		incrementFromChkpNum: incrementFromChkpNum,
+	}
 }
 
 func NewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
@@ -130,7 +142,11 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		} else if err != nil {
 			return nil, errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.Path)
 		}
-		fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
+		if p.incrementFromChkpNum != nil && isOrioledbDataFile(cfi.FileInfo, cfi.Path) {
+			fileReadCloser, cfi.Header.Size, err = OrioledbReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromChkpNum, bitmap)
+		} else {
+			fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
+		}
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, internal.NewFileNotExistError(cfi.Path)
 		}
