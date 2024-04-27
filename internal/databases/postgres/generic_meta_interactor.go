@@ -53,7 +53,6 @@ func NewGenericMetaSetter() GenericMetaSetter {
 	return GenericMetaSetter{}
 }
 
-// TODO: Unit tests
 func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
 	modifier := func(dto ExtendedMetadataDto) ExtendedMetadataDto {
 		dto.UserData = userData
