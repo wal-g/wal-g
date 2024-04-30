@@ -69,7 +69,7 @@ func TestFetchMetadata(t *testing.T) {
 	_ = folder.PutObject(b, &bytes.Buffer{})
 
 	// Создание объекта Backup с помощью вспомогательной функции
-	backup, err0 := internal.GetBackupByName("base_321", utility.BaseBackupPath, folder)
+	backup, err0 := internal.GetBackupByName("base_000", utility.BaseBackupPath, folder)
 	t.Logf("" + backup.Folder.GetPath())
 	t.Logf("" + backup.Name)
 	t.Logf("" + utility.MetadataFileName)
