@@ -87,14 +87,11 @@ func TestFetchMetadata(t *testing.T) {
 
 	// Проверка результата
 	assert.NoError(t, err)
-	isEqualBackupName := testLatestBackup.BackupName.Equal(meta.BackupName)
-	assert.True(t, isEqualBackupName)
+	assert.Equal(t, testLatestBackup.BackupName, meta.BackupName)
 
-	isEqualUncompressedSize := testLatestBackup.UncompressedSize.Equal(meta.UncompressedSize)
-	assert.True(t, isEqualUncompressedSize)
+	assert.Equal(t, testLatestBackup.UncompressedSize, meta.UncompressedSize)
 
-	isEqualCompressedSize := testLatestBackup.CompressedSize.Equal(meta.CompressedSize)
-	assert.True(t, isEqualCompressedSize)
+	assert.Equal(t, testLatestBackup.CompressedSize, meta.CompressedSize)
 
 	assert.Equal(t, testLatestBackup, meta)
 }
