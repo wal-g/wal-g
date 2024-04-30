@@ -63,7 +63,7 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 }
 
 func TestFetchMetadata(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
 
 	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName)
 	_ = folder.PutObject(b, &bytes.Buffer{})
@@ -87,13 +87,14 @@ func TestFetchMetadata(t *testing.T) {
 
 	// Проверка результата
 	assert.NoError(t, err)
-	assert.Equal(t, testLatestBackup.BackupName, meta.BackupName)
+	isEqualBackupName := testLatestBackup.BackupName.Equal(meta.BackupName)
+	assert.True(t, isEqualBackupName)
 
-	isEqualTimeStart := testLatestBackup.StartTime.Equal(meta.StartTime)
-	assert.True(t, isEqualTimeStart)
+	isEqualUncompressedSize := testLatestBackup.UncompressedSize.Equal(meta.UncompressedSize)
+	assert.True(t, isEqualUncompressedSize)
 
-	isEqualTimeFinish := testLatestBackup.FinishTime.Equal(meta.FinishTime)
-	assert.True(t, isEqualTimeFinish)
+	isEqualCompressedSize := testLatestBackup.CompressedSize.Equal(meta.CompressedSize)
+	assert.True(t, isEqualCompressedSize)
 
 	assert.Equal(t, testLatestBackup, meta)
 }
