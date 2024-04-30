@@ -63,9 +63,9 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 }
 
 func TestFetchMetadata(t *testing.T) {
-	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	folder := testtools.CreateMockStorageFolder()
 
-	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName)
+	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName+utility.SentinelSuffix)
 	_ = folder.PutObject(b, &bytes.Buffer{})
 
 	// Создание объекта Backup с помощью вспомогательной функции
