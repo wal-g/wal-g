@@ -3,7 +3,6 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"path"
 	"strings"
 	"testing"
@@ -104,21 +103,8 @@ func TestFetchMetadata(t *testing.T) {
 	bytesMeta, _ := json.Marshal(&meta)
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
 
-	t.Logf(b)
-	t.Logf(folder.GetPath())
-	t.Logf(string(bytesMeta))
-
-	backupSelector := internal.NewOldestNonPermanentSelector(greenplum.NewGenericMetaFetcher())
-	backup, err0 := backupSelector.Select(folder)
+	backup, err0 := internal.GetBackupByName("base_123", utility.BaseBackupPath, folder)
 	assert.NoError(t, err0)
-
-	// Создание объекта Backup с помощью вспомогательной функции
-	//backup, err0 := internal.GetBackupByName(utility.BaseBackupPath, utility.BaseBackupPath, folder)
-	t.Logf("" + backup.Folder.GetPath())
-	t.Logf("" + backup.Name)
-	t.Logf("" + utility.MetadataFileName)
-
-	copyMeta := copyMetadata(testBackup)
 
 	err := backup.FetchMetadata(&meta)
 
@@ -126,7 +112,7 @@ func TestFetchMetadata(t *testing.T) {
 	assert.NoError(t, err)
 	bytesMeta2, _ := json.Marshal(&meta)
 	t.Logf(string(bytesMeta2))
-	assert.Equal(t, testBackup.BackupName, copyMeta.BackupName)
+	assert.Equal(t, testBackup.BackupName, meta["BackupName"])
 
 	//assert.Equal(t, testBackup.UncompressedSize, meta.UncompressedSize)
 
