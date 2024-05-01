@@ -101,7 +101,7 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 func TestFetchMetadata(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 
-	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName)
+	b := path.Join(utility.BaseBackupPath, testBackup.BackupName)
 	meta := convertMetadataFetch(testBackup)
 	bytesMeta, _ := json.Marshal(&meta)
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
