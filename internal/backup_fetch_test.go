@@ -3,6 +3,7 @@ package internal_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"path"
 	"strings"
 	"testing"
@@ -48,6 +49,20 @@ func convertMetadataFetch(input internal.GenericMetadata) map[string]interface{}
 	return metadata
 }
 
+func copyMetadata(input internal.GenericMetadata) internal.GenericMetadata {
+	metadata := internal.GenericMetadata{
+		BackupName:       input.BackupName,
+		UncompressedSize: input.UncompressedSize,
+		CompressedSize:   input.CompressedSize,
+		Hostname:         input.Hostname,
+		StartTime:        input.StartTime,
+		FinishTime:       input.FinishTime,
+		IsPermanent:      input.IsPermanent,
+		UserData:         input.UserData,
+	}
+	return metadata
+}
+
 func TestGetBackupByName_Latest(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 	backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
@@ -80,7 +95,7 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 }
 
 func TestFetchMetadata(t *testing.T) {
-	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	folder := testtools.CreateMockStorageFolder()
 
 	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName+utility.SentinelSuffix)
 	meta := convertMetadataFetch(testBackup)
@@ -89,6 +104,7 @@ func TestFetchMetadata(t *testing.T) {
 
 	t.Logf(b)
 	t.Logf(folder.GetPath())
+	t.Logf(string(bytesMeta))
 
 	files, errF := ioutil.ReadDir("./")
 	assert.NoError(t, errF)
@@ -96,26 +112,25 @@ func TestFetchMetadata(t *testing.T) {
 		t.Logf(file.Name(), file.IsDir())
 	}
 
+	backupSelector := internal.NewOldestNonPermanentSelector(greenplum.NewGenericMetaFetcher())
+	backup, err0 := backupSelector.Select(folder)
+
 	// Создание объекта Backup с помощью вспомогательной функции
-	backup, err0 := internal.GetBackupByName(utility.BaseBackupPath, utility.BaseBackupPath, folder)
+	//backup, err0 := internal.GetBackupByName(utility.BaseBackupPath, utility.BaseBackupPath, folder)
 	t.Logf("" + backup.Folder.GetPath())
 	t.Logf("" + backup.Name)
 	t.Logf("" + utility.MetadataFileName)
 	assert.NoError(t, err0)
+	
+	copyMeta := copyMetadata(testBackup)
 
-	files2, errF2 := ioutil.ReadDir("./")
-	assert.NoError(t, errF2)
-	for _, file := range files2 {
-		t.Logf(file.Name(), file.IsDir())
-	}
-
-	err := backup.FetchMetadata(&meta)
+	err := backup.FetchMetadata(&copyMeta)
 
 	// Проверка результата
 	assert.NoError(t, err)
 	bytesMeta2, _ := json.Marshal(&meta)
 	t.Logf(string(bytesMeta2))
-	//assert.Equal(t, testBackup.BackupName, meta.BackupName)
+	assert.Equal(t, testBackup.BackupName, copyMeta.BackupName)
 
 	//assert.Equal(t, testBackup.UncompressedSize, meta.UncompressedSize)
 
