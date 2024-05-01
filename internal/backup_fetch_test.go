@@ -50,16 +50,16 @@ func convertMetadataFetch(input internal.GenericMetadata) map[string]interface{}
 	return metadata
 }
 
-func copyMetadata(input internal.GenericMetadata) internal.GenericMetadata {
+func emptyMetadata() internal.GenericMetadata {
 	metadata := internal.GenericMetadata{
-		BackupName:       input.BackupName,
-		UncompressedSize: input.UncompressedSize,
-		CompressedSize:   input.CompressedSize,
-		Hostname:         input.Hostname,
-		StartTime:        input.StartTime,
-		FinishTime:       input.FinishTime,
-		IsPermanent:      input.IsPermanent,
-		UserData:         input.UserData,
+		BackupName:       "",
+		UncompressedSize: 0,
+		CompressedSize:   0,
+		Hostname:         "",
+		StartTime:        time.Now(),
+		FinishTime:       time.Now(),
+		IsPermanent:      true,
+		UserData:         "",
 	}
 	return metadata
 }
@@ -106,15 +106,12 @@ func TestFetchMetadata(t *testing.T) {
 	backup, err0 := internal.GetBackupByName("base_123", utility.BaseBackupPath, folder)
 	assert.NoError(t, err0)
 
-	err := backup.FetchMetadata(&meta)
-
-	// Проверка результата
+	empMeta := emptyMetadata()
+	err := backup.FetchMetadata(&empMeta)
 	assert.NoError(t, err)
-	bytesMeta2, _ := json.Marshal(&meta)
-	t.Logf(string(bytesMeta2))
-	assert.Equal(t, testBackup.BackupName, meta["BackupName"])
 
-	//assert.Equal(t, testBackup.UncompressedSize, meta.UncompressedSize)
+	assert.Equal(t, testBackup.BackupName, empMeta.BackupName)
+	assert.Equal(t, testBackup.UncompressedSize, empMeta.UncompressedSize)
 
 	//assert.Equal(t, testBackup.CompressedSize, meta.CompressedSize)
 
