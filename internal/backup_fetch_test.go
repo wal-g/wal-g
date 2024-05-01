@@ -2,14 +2,15 @@ package internal_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"path"
 	"strings"
 	"testing"
 	"time"
-	"encoding/json"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"io/ioutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/testtools"
@@ -34,15 +35,15 @@ var testBackup = internal.GenericMetadata{
 }
 
 func convertMetadataFetch(input internal.GenericMetadata) map[string]interface{} {
-	metadata := map[string]interface{}{		
-		"BackupName":  input.BackupName,
-		"UncompressedSize":  input.UncompressedSize,
+	metadata := map[string]interface{}{
+		"BackupName":       input.BackupName,
+		"UncompressedSize": input.UncompressedSize,
 		"CompressedSize":   input.CompressedSize,
-		"Hostname": input.Hostname,
-		"StartTime":   input.StartTime,
-		"FinishTime":    input.FinishTime,
-		"IsPermanent": input.IsPermanent,
-		"UserData":    input.UserData,
+		"Hostname":         input.Hostname,
+		"StartTime":        input.StartTime,
+		"FinishTime":       input.FinishTime,
+		"IsPermanent":      input.IsPermanent,
+		"UserData":         input.UserData,
 	}
 	return metadata
 }
@@ -81,7 +82,7 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 func TestFetchMetadata(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 
-	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName+utility.SentinelSuffix)	
+	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName+utility.SentinelSuffix)
 	meta := convertMetadataFetch(testBackup)
 	bytesMeta, _ := json.Marshal(&meta)
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
@@ -91,7 +92,14 @@ func TestFetchMetadata(t *testing.T) {
 	t.Logf("" + backup.Folder.GetPath())
 	t.Logf("" + backup.Name)
 	t.Logf("" + utility.MetadataFileName)
-	assert.NoError(t, err0)	
+	assert.NoError(t, err0)
+
+	files, errF := ioutil.ReadDir(backup.Folder.GetPath());
+	assert.NoError(t, errF)
+	for _, file := range files {
+		t.Logf(file.Name(), file.IsDir())
+	}
+	
 
 	err := backup.FetchMetadata(&meta)
 
