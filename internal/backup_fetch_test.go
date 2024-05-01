@@ -88,6 +88,7 @@ func TestFetchMetadata(t *testing.T) {
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
 
 	t.Logf(b)
+	t.Logf(folder.GetPath())
 
 	files, errF := ioutil.ReadDir("./")
 	assert.NoError(t, errF)
@@ -102,7 +103,7 @@ func TestFetchMetadata(t *testing.T) {
 	t.Logf("" + utility.MetadataFileName)
 	assert.NoError(t, err0)
 
-	files2, errF2 := ioutil.ReadDir(backup.Folder.GetPath())
+	files2, errF2 := ioutil.ReadDir("./")
 	assert.NoError(t, errF2)
 	for _, file := range files2 {
 		t.Logf(file.Name(), file.IsDir())
