@@ -99,7 +99,7 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 }
 
 func TestFetchMetadata(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
 
 	b := path.Join(utility.BaseBackupPath, testBackup.BackupName)
 	meta := convertMetadataFetch(testBackup)
