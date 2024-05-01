@@ -9,11 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"io/ioutil"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -101,7 +99,7 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 func TestFetchMetadata(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 
-	b := path.Join(utility.BaseBackupPath, testBackup.BackupName)
+	b := path.Join(utility.BaseBackupPath, testBackup.BackupName+utility.SentinelSuffix)
 	meta := convertMetadataFetch(testBackup)
 	bytesMeta, _ := json.Marshal(&meta)
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
@@ -110,21 +108,15 @@ func TestFetchMetadata(t *testing.T) {
 	t.Logf(folder.GetPath())
 	t.Logf(string(bytesMeta))
 
-	files, errF := ioutil.ReadDir("./")
-	assert.NoError(t, errF)
-	for _, file := range files {
-		t.Logf(file.Name(), file.IsDir())
-	}
-
 	backupSelector := internal.NewOldestNonPermanentSelector(greenplum.NewGenericMetaFetcher())
 	backup, err0 := backupSelector.Select(folder)
+	assert.NoError(t, err0)
 
 	// Создание объекта Backup с помощью вспомогательной функции
 	//backup, err0 := internal.GetBackupByName(utility.BaseBackupPath, utility.BaseBackupPath, folder)
 	t.Logf("" + backup.Folder.GetPath())
 	t.Logf("" + backup.Name)
 	t.Logf("" + utility.MetadataFileName)
-	assert.NoError(t, err0)
 
 	copyMeta := copyMetadata(testBackup)
 
