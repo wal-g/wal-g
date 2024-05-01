@@ -85,11 +85,11 @@ func (reader *Reader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (reader *Reader) readNextChunk() (err error) {
+func (reader *Reader) readNextChunk() error {
 	n, err := io.ReadFull(reader.Reader, reader.in)
 
 	if err != nil && err != io.ErrUnexpectedEOF {
-		return
+		return err
 	}
 
 	var outLen C.ulonglong

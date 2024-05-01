@@ -13,7 +13,7 @@ func HandleBinaryFetchPush(
 	ctx context.Context,
 	mongodConfigPath, minimalConfigPath, backupName, restoreMongodVersion, rsName string,
 	rsMembers []string,
-	rsMemberIds []int,
+	rsMemberIDs []int,
 	shardName, mongoCfgConnectionString string,
 	shardConnectionStrings []string,
 	skipBackupDownload, skipReconfig, skipChecks bool,
@@ -43,7 +43,7 @@ func HandleBinaryFetchPush(
 		return err
 	}
 
-	rsConfig := binary.NewRsConfig(rsName, rsMembers, rsMemberIds)
+	rsConfig := binary.NewRsConfig(rsName, rsMembers, rsMemberIDs)
 	if err = rsConfig.Validate(); err != nil {
 		return err
 	}
