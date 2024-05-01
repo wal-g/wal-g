@@ -87,7 +87,7 @@ func TestFetchMetadata(t *testing.T) {
 	bytesMeta, _ := json.Marshal(&meta)
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
 
-	files, errF := ioutil.ReadDir("basebackups_005/")
+	files, errF := ioutil.ReadDir(b)
 	assert.NoError(t, errF)
 	for _, file := range files {
 		t.Logf(file.Name(), file.IsDir())
@@ -100,7 +100,7 @@ func TestFetchMetadata(t *testing.T) {
 	t.Logf("" + utility.MetadataFileName)
 	assert.NoError(t, err0)
 
-	files2, errF2 := ioutil.ReadDir("basebackups_005/")
+	files2, errF2 := ioutil.ReadDir(b)
 	assert.NoError(t, errF2)
 	for _, file := range files2 {
 		t.Logf(file.Name(), file.IsDir())
