@@ -97,9 +97,9 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 }
 
 func TestFetchMetadata(t *testing.T) {
-	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	folder := testtools.CreateMockStorageFolder()
 
-	b := path.Join(utility.BaseBackupPath, testBackup.BackupName+utility.SentinelSuffix)
+	b := path.Join(utility.BaseBackupPath, testBackup.BackupName+".json")
 	meta := convertMetadataFetch(testBackup)
 	bytesMeta, _ := json.Marshal(&meta)
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
@@ -120,7 +120,7 @@ func TestFetchMetadata(t *testing.T) {
 
 	copyMeta := copyMetadata(testBackup)
 
-	err := backup.FetchMetadata(&copyMeta)
+	err := backup.FetchMetadata(&meta)
 
 	// Проверка результата
 	assert.NoError(t, err)
