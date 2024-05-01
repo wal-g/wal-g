@@ -112,8 +112,6 @@ func TestFetchMetadata(t *testing.T) {
 
 	assert.Equal(t, testBackup.BackupName, empMeta.BackupName)
 	assert.Equal(t, testBackup.UncompressedSize, empMeta.UncompressedSize)
-
-	//assert.Equal(t, testBackup.CompressedSize, meta.CompressedSize)
-
-	//assert.Equal(t, testBackup, meta)
+	assert.Equal(t, testBackup.CompressedSize, empMeta.CompressedSize)
+	assert.Equal(t, testBackup, empMeta)
 }
