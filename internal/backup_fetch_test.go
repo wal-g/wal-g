@@ -25,7 +25,7 @@ func init() {
 }
 
 var testBackup = internal.GenericMetadata{
-	BackupName:       "stream_20231118T140000Z",
+	BackupName:       "metadata",
 	UncompressedSize: int64(10),
 	CompressedSize:   int64(100),
 	Hostname:         "TestHost",
@@ -45,6 +45,10 @@ func convertMetadataFetch(input internal.GenericMetadata) map[string]interface{}
 		"FinishTime":       input.FinishTime,
 		"IsPermanent":      input.IsPermanent,
 		"UserData":         input.UserData,
+		"start_time":       input.StartTime,
+		"backup_name":      input.BackupName,
+		"is_permanent":     input.IsPermanent,
+		"user_data":        input.UserData,
 	}
 	return metadata
 }
@@ -97,7 +101,7 @@ func TestGetBackupByName_NotExists(t *testing.T) {
 func TestFetchMetadata(t *testing.T) {
 	folder := testtools.CreateMockStorageFolder()
 
-	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName+utility.SentinelSuffix)
+	b := path.Join(utility.BaseBackupPath, testLatestBackup.BackupName)
 	meta := convertMetadataFetch(testBackup)
 	bytesMeta, _ := json.Marshal(&meta)
 	_ = folder.PutObject(b, strings.NewReader(string(bytesMeta)))
@@ -121,7 +125,7 @@ func TestFetchMetadata(t *testing.T) {
 	t.Logf("" + backup.Name)
 	t.Logf("" + utility.MetadataFileName)
 	assert.NoError(t, err0)
-	
+
 	copyMeta := copyMetadata(testBackup)
 
 	err := backup.FetchMetadata(&copyMeta)
