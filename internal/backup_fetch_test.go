@@ -42,10 +42,6 @@ func convertMetadataFetch(input internal.GenericMetadata) map[string]interface{}
 		"FinishTime":       input.FinishTime,
 		"IsPermanent":      input.IsPermanent,
 		"UserData":         input.UserData,
-		"start_time":       input.StartTime,
-		"backup_name":      input.BackupName,
-		"is_permanent":     input.IsPermanent,
-		"user_data":        input.UserData,
 	}
 	return metadata
 }
@@ -113,5 +109,8 @@ func TestFetchMetadata(t *testing.T) {
 	assert.Equal(t, testBackup.BackupName, empMeta.BackupName)
 	assert.Equal(t, testBackup.UncompressedSize, empMeta.UncompressedSize)
 	assert.Equal(t, testBackup.CompressedSize, empMeta.CompressedSize)
+	assert.Equal(t, testBackup.StartTime, empMeta.StartTime)
+	assert.Equal(t, testBackup.FinishTime, empMeta.FinishTime)
+	assert.Equal(t, testBackup.UserData, empMeta.UserData)
 	assert.Equal(t, testBackup, empMeta)
 }
