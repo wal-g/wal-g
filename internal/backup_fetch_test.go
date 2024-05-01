@@ -100,7 +100,7 @@ func TestFetchMetadata(t *testing.T) {
 	t.Logf("" + utility.MetadataFileName)
 	assert.NoError(t, err0)
 
-	files2, errF2 := ioutil.ReadDir("")
+	files2, errF2 := ioutil.ReadDir("in_memory")
 	assert.NoError(t, errF2)
 	for _, file := range files2 {
 		t.Logf(file.Name(), file.IsDir())
