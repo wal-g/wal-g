@@ -15,8 +15,9 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 
 	gomysql "github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/go-sql-driver/mysql"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -172,7 +173,7 @@ func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 		if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
 			return nil, fmt.Errorf("failed to load certificate from %s", caFile)
 		}
-		err = mysql.RegisterTLSConfig("custom", &tls.Config{
+		err = mysqldriver.RegisterTLSConfig("custom", &tls.Config{
 			RootCAs: rootCertPool,
 		})
 		if err != nil {
@@ -188,6 +189,10 @@ func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 		} else {
 			datasourceName += "?tls=custom"
 		}
+	}
+	_, err := mysqldriver.ParseDSN(datasourceName)
+	if err != nil {
+		return nil, err
 	}
 	db, err := sql.Open("mysql", datasourceName)
 	return db, err
