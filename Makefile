@@ -285,3 +285,9 @@ unlink_libsodium:
 build_client:
 	cd cmd/daemonclient && \
 	go build -o ../../bin/walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=`git rev-parse --short HEAD` -X main.version=`git tag -l --points-at HEAD`"
+
+
+update: mongo_build
+	docker build --tag walg:2.0 /home/sayed/go/src/kubedb.dev/wal-g/main/mongo
+	docker tag walg:2.0 sayedppqq/walg:2.0
+	docker push sayedppqq/walg:2.0

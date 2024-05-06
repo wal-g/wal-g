@@ -3,9 +3,6 @@ package mongo
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -16,6 +13,8 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
+	"os"
+	"syscall"
 )
 
 const LatestBackupString = "LATEST_BACKUP"
@@ -91,24 +90,24 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 	return args, nil
 }
 
-func processArg(arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
-	switch arg {
-	case internal.LatestString:
-		return downloader.LastKnownArchiveTS()
-	case LatestBackupString:
-		lastBackupName, err := downloader.LastBackupName()
-		if err != nil {
-			return models.Timestamp{}, err
-		}
-		backupMeta, err := downloader.BackupMeta(lastBackupName)
-		if err != nil {
-			return models.Timestamp{}, err
-		}
-		return models.TimestampFromBson(backupMeta.MongoMeta.BackupLastTS), nil
-	default:
-		return models.TimestampFromStr(arg)
-	}
-}
+//func processArg(arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
+//	switch arg {
+//	case internal.LatestString:
+//		return downloader.LastKnownArchiveTS()
+//	case LatestBackupString:
+//		lastBackupName, err := downloader.LastBackupName()
+//		if err != nil {
+//			return models.Timestamp{}, err
+//		}
+//		backupMeta, err := downloader.BackupMeta(lastBackupName)
+//		if err != nil {
+//			return models.Timestamp{}, err
+//		}
+//		return models.TimestampFromBson(backupMeta.MongoMeta.BackupLastTS), nil
+//	default:
+//		return models.TimestampFromStr(arg)
+//	}
+//}
 
 func runOplogReplay(ctx context.Context, replayArgs oplogReplayRunArgs) error {
 	tracelog.DebugLogger.Printf("starting replay with arguments: %+v", replayArgs)

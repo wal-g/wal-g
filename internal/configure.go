@@ -523,6 +523,11 @@ func GetRequiredSetting(setting string) (string, error) {
 	return val, nil
 }
 
+func GetNonRequiredSetting(setting string) string {
+	val, _ := GetSetting(setting)
+	return val
+}
+
 func GetBoolSettingDefault(setting string, def bool) (bool, error) {
 	val, ok := GetSetting(setting)
 	if !ok {

@@ -112,7 +112,7 @@ func getTimestamps(folder storage.Folder, backupName, untilTS, untilBinlogLastMo
 	return startTS, endTS, endBinlogTS, nil
 }
 
-func getEndTimestamps(folder storage.Folder, untilTS, untilBinlogLastModifiedTS string) (time.Time, time.Time, time.Time, error) {
+func getEndTimestamps(untilTS, untilBinlogLastModifiedTS string) (time.Time, time.Time, time.Time, error) {
 	endTS, err := utility.ParseUntilTS(untilTS)
 	if err != nil {
 		return time.Time{}, time.Time{}, time.Time{}, err

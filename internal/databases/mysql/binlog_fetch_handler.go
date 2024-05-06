@@ -47,11 +47,11 @@ func HandleBinlogFetch(folder storage.Folder, backupName string, untilTS string,
 	tracelog.ErrorLogger.FatalOnError(err)
 	var startTS, endTS, endBinlogTS time.Time
 	if skipStartTime {
-		startTS, endTS, endBinlogTS, err = getEndTimestamps(folder, untilTS, untilBinlogLastModifiedTS)
+		startTS, endTS, endBinlogTS, err = getEndTimestamps(untilTS, untilBinlogLastModifiedTS)
 	} else {
 		startTS, endTS, endBinlogTS, err = getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
-		tracelog.ErrorLogger.FatalOnError(err)
 	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newIndexHandler(dstDir)
 
