@@ -87,7 +87,6 @@ func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 	return FetchDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
 }
 
-// TODO : unit tests
 func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
 	return FetchDto(backup.Folder, metadataDto, backup.getMetadataPath())
 }
