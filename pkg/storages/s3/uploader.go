@@ -8,13 +8,11 @@ import (
 	"io"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/statistics"
 )
 
 type UploaderConfig struct {
@@ -53,7 +51,6 @@ func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, s
 	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass}
 }
 
-// TODO : unit tests
 func (uploader *Uploader) createUploadInput(bucket, path string, content io.Reader) *s3manager.UploadInput {
 	uploadInput := &s3manager.UploadInput{
 		Bucket:       aws.String(bucket),
@@ -85,13 +82,6 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 func (uploader *Uploader) upload(ctx context.Context, bucket, path string, content io.Reader) error {
 	input := uploader.createUploadInput(bucket, path, content)
 	_, err := uploader.uploaderAPI.UploadWithContext(ctx, input)
-	if err != nil {
-		if reqErr, ok := err.(awserr.RequestFailure); ok {
-			statistics.WriteStatusCodeMetric(reqErr.StatusCode())
-		}
-	} else {
-		statistics.WriteStatusCodeMetric(200)
-	}
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
 }
 

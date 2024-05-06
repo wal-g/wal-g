@@ -301,7 +301,7 @@ func makeBsonRsMembers(rsConfig RsConfig) bson.A {
 	bsonMembers := bson.A{}
 
 	for i := 0; i != len(rsConfig.RsMembers); i++ {
-		bsonMembers = append(bsonMembers, bson.M{"_id": rsConfig.RsMemberIds[i], "host": rsConfig.RsMembers[i]})
+		bsonMembers = append(bsonMembers, bson.M{"_id": rsConfig.RsMemberIDs[i], "host": rsConfig.RsMembers[i]})
 	}
 
 	return bsonMembers
@@ -338,10 +338,23 @@ type BackupCursorFile struct {
 	FileSize int64  `bson:"fileSize" json:"fileSize"`
 }
 
+type RestoreArgs struct {
+	RsConfig       RsConfig
+	ShConfig       ShConfig
+	MongoCfgConfig MongoCfgConfig
+
+	BackupName     string
+	RestoreVersion string
+
+	SkipBackupDownload bool
+	SkipChecks         bool
+	SkipMongoReconfig  bool
+}
+
 type RsConfig struct {
 	RsName      string
 	RsMembers   []string
-	RsMemberIds []int
+	RsMemberIDs []int
 }
 
 type ShConfig struct {
@@ -353,17 +366,17 @@ type MongoCfgConfig struct {
 	Shards map[string]string
 }
 
-func NewRsConfig(rsName string, rsMembers []string, rsMemberIds []int) RsConfig {
-	if len(rsMemberIds) == 0 {
-		rsMemberIds = make([]int, len(rsMembers))
+func NewRsConfig(rsName string, rsMembers []string, rsMemberIDs []int) RsConfig {
+	if len(rsMemberIDs) == 0 {
+		rsMemberIDs = make([]int, len(rsMembers))
 		for i := 0; i < len(rsMembers); i++ {
-			rsMemberIds[i] = i
+			rsMemberIDs[i] = i
 		}
 	}
 	return RsConfig{
 		RsName:      rsName,
 		RsMembers:   rsMembers,
-		RsMemberIds: rsMemberIds,
+		RsMemberIDs: rsMemberIDs,
 	}
 }
 
@@ -404,10 +417,10 @@ func (rsConfig RsConfig) Validate() error {
 	if rsConfig.RsName == "" && len(rsConfig.RsMembers) > 0 || rsConfig.RsName != "" && len(rsConfig.RsMembers) == 0 {
 		return errors.Errorf("rsConfig should be all empty or full populated, but rsConfig = %+v", rsConfig)
 	}
-	if len(rsConfig.RsMembers) > len(rsConfig.RsMemberIds) {
+	if len(rsConfig.RsMembers) > len(rsConfig.RsMemberIDs) {
 		return errors.Errorf("not all replica set members have corresponding ID")
 	}
-	if len(rsConfig.RsMembers) < len(rsConfig.RsMemberIds) {
+	if len(rsConfig.RsMembers) < len(rsConfig.RsMemberIDs) {
 		return errors.Errorf("excessive number of replica set IDs")
 	}
 	return nil

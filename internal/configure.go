@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto/yckms"
@@ -402,7 +403,7 @@ func UnmarshalSentinelUserData(userDataStr string) (interface{}, error) {
 	return out, nil
 }
 
-func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.Cmd, error) {
+func GetCommandSettingContext(ctx context.Context, variableName string, args ...string) (*exec.Cmd, error) {
 	dataStr, ok := conf.GetSetting(variableName)
 	if !ok {
 		tracelog.InfoLogger.Printf("command %s not configured", variableName)
@@ -415,6 +416,9 @@ func GetCommandSettingContext(ctx context.Context, variableName string) (*exec.C
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		shell = "/bin/sh"
+	}
+	if args != nil { //trick to add args to command
+		dataStr = fmt.Sprintf("%s %s", dataStr, strings.Join(args, " "))
 	}
 	cmd := exec.CommandContext(ctx, shell, "-c", dataStr)
 	// do not shut up subcommands by default

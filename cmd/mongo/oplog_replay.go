@@ -54,7 +54,8 @@ type oplogReplayRunArgs struct {
 	oplogApplicationMode *string
 }
 
-func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err error) {
+func buildOplogReplayRunArgs(cmdargs []string) (oplogReplayRunArgs, error) {
+	var args oplogReplayRunArgs
 	// resolve archiving settings
 	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 	if err != nil {
@@ -62,28 +63,28 @@ func buildOplogReplayRunArgs(cmdargs []string) (args oplogReplayRunArgs, err err
 	}
 	args.since, err = processArg(cmdargs[0], downloader)
 	if err != nil {
-		return
+		return args, err
 	}
 	args.until, err = processArg(cmdargs[1], downloader)
 	if err != nil {
-		return
+		return args, err
 	}
 
 	// TODO: fix ugly config
 	if ignoreErrCodesStr, ok := conf.GetSetting(conf.OplogReplayIgnoreErrorCodes); ok {
 		if err = json.Unmarshal([]byte(ignoreErrCodesStr), &args.ignoreErrCodes); err != nil {
-			return
+			return args, err
 		}
 	}
 
 	args.mongodbURL, err = conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
-		return
+		return args, err
 	}
 
 	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := conf.GetBoolSetting(conf.OplogReplayOplogAlwaysUpsert)
 	if err != nil {
-		return
+		return args, err
 	}
 	if hasOplogAlwaysUpsert {
 		args.oplogAlwaysUpsert = &oplogAlwaysUpsert

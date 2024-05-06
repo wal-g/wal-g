@@ -18,7 +18,9 @@ type metrics struct {
 	UploadedFilesTotal       prometheus.Counter
 	UploadedFilesFailedTotal prometheus.Counter
 
-	S3Codes prometheus.GaugeVec
+	S3Codes        prometheus.GaugeVec
+	S3BytesWritten prometheus.Gauge
+	S3BytesRead    prometheus.Gauge
 }
 
 var (
@@ -44,6 +46,18 @@ var (
 			},
 			[]string{"code"},
 		),
+		S3BytesWritten: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: WalgMetricsPrefix + "s3_bytes_written",
+				Help: "Amount of bytes written to S3.",
+			},
+		),
+		S3BytesRead: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: WalgMetricsPrefix + "s3_bytes_read",
+				Help: "Amount of bytes read from S3.",
+			},
+		),
 	}
 )
 
@@ -56,6 +70,8 @@ func init() {
 	prometheus.MustRegister(WalgMetrics.UploadedFilesTotal)
 	prometheus.MustRegister(WalgMetrics.UploadedFilesFailedTotal)
 	prometheus.MustRegister(WalgMetrics.S3Codes)
+	prometheus.MustRegister(WalgMetrics.S3BytesWritten)
+	prometheus.MustRegister(WalgMetrics.S3BytesRead)
 }
 
 func PushMetrics() {

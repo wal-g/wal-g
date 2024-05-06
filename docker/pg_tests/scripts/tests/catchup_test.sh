@@ -4,6 +4,7 @@ set -e -x
 PGDATA="/var/lib/postgresql/10/main"
 PGDATA_ALPHA="${PGDATA}_alpha"
 PGDATA_BETA="${PGDATA}_beta"
+PGDATA_BETA_1="${PGDATA}_beta_1"
 ALPHA_DUMP="/tmp/alpha_dump"
 ALPHA_PORT=5432
 BETA_DUMP="/tmp/beta_dump"
@@ -36,6 +37,9 @@ popd
 
 # init beta cluster (replica of alpha)
 /usr/lib/postgresql/10/bin/pg_basebackup --wal-method=stream -D ${PGDATA_BETA} -U repl -h 127.0.0.1 -p ${ALPHA_PORT}
+
+cp -r ${PGDATA_BETA} ${PGDATA_BETA_1}
+
 pushd ${PGDATA_BETA}
 echo "port = ${BETA_PORT}" >> postgresql.conf
 echo "hot_standby = on" >> postgresql.conf
@@ -83,7 +87,36 @@ popd
 
 /usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w restart
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w stop
+
+diff ${ALPHA_DUMP} ${BETA_DUMP}
+
+# test catchup-send and catchup-receive
+rm -rf ${PGDATA_BETA}
+
+mv ${PGDATA_BETA_1} ${PGDATA_BETA}
+
+wal-g catchup-receive ${PGDATA_BETA} 1337 &
+
+wal-g --config=${TMP_CONFIG} catchup-send ${PGDATA_ALPHA} localhost:1337
+
+
+pushd ${PGDATA_BETA}
+echo "port = ${BETA_PORT}" >> postgresql.conf
+echo "hot_standby = on" >> postgresql.conf
+cat > recovery.conf << EOF
+standby_mode = 'on'
+primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
+restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
+trigger_file = '/tmp/postgresql.trigger.${BETA_PORT}'
+EOF
+popd
+
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w start
+
+/usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
+
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w stop
 
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 

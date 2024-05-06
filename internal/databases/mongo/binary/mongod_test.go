@@ -11,7 +11,7 @@ func TestMakeBsonRsMembers(t *testing.T) {
 	assert.Equal(t, bson.A{}, makeBsonRsMembers(RsConfig{}))
 	assert.Equal(t, bson.A{bson.M{"_id": 0, "host": "localhost:1234"}}, makeBsonRsMembers(RsConfig{
 		RsMembers:   []string{"localhost:1234"},
-		RsMemberIds: []int{0},
+		RsMemberIDs: []int{0},
 	}))
 	assert.Equal(t,
 		bson.A{
@@ -22,7 +22,7 @@ func TestMakeBsonRsMembers(t *testing.T) {
 		makeBsonRsMembers(RsConfig{
 			RsName:      "",
 			RsMembers:   []string{"localhost:1234", "localhost:5678", "remotehost:9876"},
-			RsMemberIds: []int{0, 1, 2},
+			RsMemberIDs: []int{0, 1, 2},
 		}))
 	assert.Equal(t,
 		bson.A{
@@ -33,6 +33,6 @@ func TestMakeBsonRsMembers(t *testing.T) {
 		makeBsonRsMembers(RsConfig{
 			RsName:      "",
 			RsMembers:   []string{"localhost:1234", "localhost:5678", "remotehost:9876"},
-			RsMemberIds: []int{4, 5, 0},
+			RsMemberIDs: []int{4, 5, 0},
 		}))
 }

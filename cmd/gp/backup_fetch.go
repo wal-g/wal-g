@@ -18,7 +18,7 @@ const (
 	restorePointDescription      = "Fetch storage backup w/ restore point specified by name"
 	restorePointTSDescription    = "Fetch storage backup w/ restore point time less or equal to the provided timestamp"
 	restoreConfigPathDescription = "Path to the cluster restore configuration"
-	fetchContentIdsDescription   = "If set, WAL-G will fetch only the specified segments"
+	fetchContentIDsDescription   = "If set, WAL-G will fetch only the specified segments"
 	fetchModeDescription         = "Backup fetch mode. default: do the backup unpacking " +
 		"and prepare the configs [unpack+prepare], unpack: backup unpacking only, prepare: config preparation only."
 	inPlaceFlagDescription = "Perform the backup fetch in-place (without the restore config)"
@@ -30,7 +30,7 @@ var fetchTargetUserData string
 var restorePointTS string
 var restorePoint string
 var restoreConfigPath string
-var fetchContentIds *[]int
+var fetchContentIDs *[]int
 var fetchModeStr string
 var inPlaceRestore bool
 var partialRestoreArgs []string
@@ -68,15 +68,15 @@ var backupFetchCmd = &cobra.Command{
 
 		logsDir := viper.GetString(conf.GPLogsDirectory)
 
-		if len(*fetchContentIds) > 0 {
-			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIds)
+		if len(*fetchContentIDs) > 0 {
+			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIDs)
 		}
 
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		internal.HandleBackupFetch(storage.RootFolder(), targetBackupSelector,
-			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIds, fetchMode, restorePoint,
+			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIDs, fetchMode, restorePoint,
 				partialRestoreArgs))
 	},
 }
@@ -113,7 +113,7 @@ func init() {
 	backupFetchCmd.Flags().StringVar(&restoreConfigPath, "restore-config",
 		"", restoreConfigPathDescription)
 	backupFetchCmd.Flags().BoolVar(&inPlaceRestore, "in-place", false, inPlaceFlagDescription)
-	fetchContentIds = backupFetchCmd.Flags().IntSlice("content-ids", []int{}, fetchContentIdsDescription)
+	fetchContentIDs = backupFetchCmd.Flags().IntSlice("content-ids", []int{}, fetchContentIDsDescription)
 	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 
 	backupFetchCmd.Flags().StringVar(&fetchModeStr, "mode", "default", fetchModeDescription)

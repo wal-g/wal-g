@@ -83,6 +83,9 @@ const (
 	PgPassfileSetting                      = "PGPASSFILE"
 	PgDatabaseSetting                      = "PGDATABASE"
 	PgSslModeSetting                       = "PGSSLMODE"
+	PgSslKey = "PGSSLKEY"
+	PgSslCert = "PGSSLCERT"
+	PgSslRootCert = "PGSSLROOTCERT"
 	PgSlotName                             = "WALG_SLOTNAME"
 	PgWalSize                              = "WALG_PG_WAL_SIZE"
 	TotalBgUploadedLimit                   = "TOTAL_BG_UPLOADED_LIMIT"
@@ -117,21 +120,20 @@ const (
 	ProfileMode          = "PROFILE_MODE"
 	ProfilePath          = "PROFILE_PATH"
 
-	MongoDBUriSetting                = "MONGODB_URI"
-	MongoDBLastWriteUpdateInterval   = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
-	MongoDBRestoreDisableHostResetup = "MONGODB_RESTORE_DISABLE_HOST_RESETUP"
-	OplogArchiveAfterSize            = "OPLOG_ARCHIVE_AFTER_SIZE"
-	OplogArchiveTimeoutInterval      = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
-	OplogPITRDiscoveryInterval       = "OPLOG_PITR_DISCOVERY_INTERVAL"
-	OplogPushStatsEnabled            = "OPLOG_PUSH_STATS_ENABLED"
-	OplogPushStatsLoggingInterval    = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
-	OplogPushStatsUpdateInterval     = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHTTP         = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
-	OplogPushWaitForBecomePrimary    = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
-	OplogPushPrimaryCheckInterval    = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
-	OplogReplayOplogAlwaysUpsert     = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
-	OplogReplayOplogApplicationMode  = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
-	OplogReplayIgnoreErrorCodes      = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	MongoDBUriSetting               = "MONGODB_URI"
+	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
+	OplogArchiveAfterSize           = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutInterval     = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
+	OplogPITRDiscoveryInterval      = "OPLOG_PITR_DISCOVERY_INTERVAL"
+	OplogPushStatsEnabled           = "OPLOG_PUSH_STATS_ENABLED"
+	OplogPushStatsLoggingInterval   = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
+	OplogPushStatsUpdateInterval    = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
+	OplogPushStatsExposeHTTP        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushWaitForBecomePrimary   = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
+	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
+	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
+	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
+	OplogReplayIgnoreErrorCodes     = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -150,17 +152,20 @@ const (
 	// Deprecated: unused
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
-	RedisPassword = "WALG_REDIS_PASSWORD"
+	RedisPassword             = "WALG_REDIS_PASSWORD"
+	RedisCreateBackupACLUser  = "WALG_CREATE_BACKUP_REDIS_ACL_USER"
+	RedisRestoreBackupACLUser = "WALG_RESTORE_BACKUP_REDIS_ACL_USER"
 
-	GPLogsDirectory           = "WALG_GP_LOGS_DIR"
-	GPSegContentID            = "WALG_GP_SEG_CONTENT_ID"
-	GPSegmentsPollInterval    = "WALG_GP_SEG_POLL_INTERVAL"
-	GPSegmentsPollRetries     = "WALG_GP_SEG_POLL_RETRIES"
-	GPSegmentsUpdInterval     = "WALG_GP_SEG_UPD_INTERVAL"
-	GPSegmentStatesDir        = "WALG_GP_SEG_STATES_DIR"
-	GPDeleteConcurrency       = "WALG_GP_DELETE_CONCURRENCY"
-	GPAoSegSizeThreshold      = "WALG_GP_AOSEG_SIZE_THRESHOLD"
-	GPAoDeduplicationAgeLimit = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
+	GPLogsDirectory            = "WALG_GP_LOGS_DIR"
+	GPSegContentID             = "WALG_GP_SEG_CONTENT_ID"
+	GPSegmentsPollInterval     = "WALG_GP_SEG_POLL_INTERVAL"
+	GPSegmentsPollRetries      = "WALG_GP_SEG_POLL_RETRIES"
+	GPSegmentsUpdInterval      = "WALG_GP_SEG_UPD_INTERVAL"
+	GPSegmentStatesDir         = "WALG_GP_SEG_STATES_DIR"
+	GPDeleteConcurrency        = "WALG_GP_DELETE_CONCURRENCY"
+	GPAoSegSizeThreshold       = "WALG_GP_AOSEG_SIZE_THRESHOLD"
+	GPAoDeduplicationAgeLimit  = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
+	GPRelativeRecoveryConfPath = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
 
 	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
 	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
@@ -276,15 +281,16 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory:           "/var/log",
-		PgWalSize:                 "64",
-		GPSegmentsPollInterval:    "5m",
-		GPSegmentsUpdInterval:     "10s",
-		GPSegmentsPollRetries:     "5",
-		GPSegmentStatesDir:        "/tmp",
-		GPDeleteConcurrency:       "1",
-		GPAoSegSizeThreshold:      "1048576", // (1 << 20)
-		GPAoDeduplicationAgeLimit: "720h",    // 30 days
+		GPLogsDirectory:            "/var/log",
+		PgWalSize:                  "64",
+		GPSegmentsPollInterval:     "5m",
+		GPSegmentsUpdInterval:      "10s",
+		GPSegmentsPollRetries:      "5",
+		GPSegmentStatesDir:         "/tmp",
+		GPDeleteConcurrency:        "1",
+		GPAoSegSizeThreshold:       "1048576", // (1 << 20)
+		GPAoDeduplicationAgeLimit:  "720h",    // 30 days
+		GPRelativeRecoveryConfPath: "recovery.conf",
 	}
 
 	AllowedSettings map[string]bool
@@ -433,6 +439,9 @@ var (
 		PgPassfileSetting:                      true,
 		PgDatabaseSetting:                      true,
 		PgSslModeSetting:                       true,
+		PgSslCert: true,
+		PgSslKey: true,
+		PgSslRootCert: true,
 		PgSlotName:                             true,
 		PgWalSize:                              true,
 		PrefetchDir:                            true,
@@ -505,19 +514,22 @@ var (
 
 	RedisAllowedSettings = map[string]bool{
 		// Redis
-		RedisPassword: true,
+		RedisPassword:             true,
+		RedisCreateBackupACLUser:  true,
+		RedisRestoreBackupACLUser: true,
 	}
 
 	GPAllowedSettings = map[string]bool{
-		GPLogsDirectory:           true,
-		GPSegContentID:            true,
-		GPSegmentsPollRetries:     true,
-		GPSegmentsPollInterval:    true,
-		GPSegmentsUpdInterval:     true,
-		GPSegmentStatesDir:        true,
-		GPDeleteConcurrency:       true,
-		GPAoSegSizeThreshold:      true,
-		GPAoDeduplicationAgeLimit: true,
+		GPLogsDirectory:            true,
+		GPSegContentID:             true,
+		GPSegmentsPollRetries:      true,
+		GPSegmentsPollInterval:     true,
+		GPSegmentsUpdInterval:      true,
+		GPSegmentStatesDir:         true,
+		GPDeleteConcurrency:        true,
+		GPAoSegSizeThreshold:       true,
+		GPAoDeduplicationAgeLimit:  true,
+		GPRelativeRecoveryConfPath: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -549,7 +561,8 @@ var (
 	}
 
 	complexSettings = map[string]bool{
-		PgFailoverStorages: true,
+		PgFailoverStorages:     true,
+		StatsdExtraTagsSetting: true,
 	}
 )
 

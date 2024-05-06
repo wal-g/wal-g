@@ -2,6 +2,7 @@ package storage_test
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -217,4 +218,198 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 		assert.NoError(t, err)
 		assertFiles(t, files, []string{"a/111", "a/b/222"})
 	})
+}
+
+func TestGlob(t *testing.T) {
+	simpleFiletree := []string{
+		"a",
+		"subfolder1/b",
+		"subfolder1/c",
+		"subfolder2/d",
+		"subfolder2/subfolder3/e",
+	}
+	testCases := []struct {
+		paths    []string
+		pattern  string
+		expected []string
+	}{
+		{
+			simpleFiletree,
+			"a",
+			[]string{"a"},
+		},
+		{
+			simpleFiletree,
+			"/a",
+			[]string{"a"},
+		},
+		{
+			simpleFiletree,
+			"subfolder1/b",
+			[]string{"subfolder1/b"},
+		},
+		{
+			simpleFiletree,
+			"subfolder2/*",
+			[]string{
+				"subfolder2/d",
+				"subfolder2/subfolder3/",
+			},
+		},
+		{
+			simpleFiletree,
+			"sub*/",
+			[]string{
+				"subfolder1/",
+				"subfolder2/",
+			},
+		},
+		{
+			simpleFiletree,
+			"sub*/*",
+			[]string{
+				"subfolder1/b",
+				"subfolder1/c",
+				"subfolder2/d",
+				"subfolder2/subfolder3/",
+			},
+		},
+		{
+			simpleFiletree,
+			"/",
+			[]string{
+				"/",
+			},
+		},
+		{
+			simpleFiletree,
+			"*",
+			[]string{
+				"a",
+				"subfolder1/",
+				"subfolder2/",
+			},
+		},
+		{
+			simpleFiletree,
+			"/*",
+			[]string{
+				"a",
+				"subfolder1/",
+				"subfolder2/",
+			},
+		},
+		{
+			simpleFiletree,
+			"*/*",
+			[]string{
+				"subfolder1/b",
+				"subfolder1/c",
+				"subfolder2/d",
+				"subfolder2/subfolder3/",
+			},
+		},
+		{
+			simpleFiletree,
+			"*/*/*",
+			[]string{
+				"subfolder2/subfolder3/e",
+			},
+		},
+		{
+			simpleFiletree,
+			"subfolder?/",
+			[]string{
+				"subfolder1/",
+				"subfolder2/",
+			},
+		},
+		{
+			simpleFiletree,
+			"sub*/?",
+			[]string{
+				"subfolder1/b",
+				"subfolder1/c",
+				"subfolder2/d",
+			},
+		},
+		{
+			simpleFiletree,
+			"something-else",
+			[]string{},
+		},
+		{
+			[]string{},
+			"*",
+			[]string{},
+		},
+		{
+			[]string{},
+			"",
+			[]string{},
+		},
+		{
+			[]string{
+				"file-with-*-in-name",
+				"file-without-star-in-name",
+			},
+			"file-with-\\*-in-name",
+			[]string{
+				"file-with-*-in-name",
+			},
+		},
+		{
+			[]string{
+				"file-with-?-in-name",
+				"file-without-star-in-name",
+			},
+			"file-with-\\?-in-name",
+			[]string{
+				"file-with-?-in-name",
+			},
+		},
+		{
+			[]string{
+				"this/is/a/path/with/a/name/that/is/not/so/short",
+			},
+			"this/is/a/path/with/a/name/that/is/not/so/*",
+			[]string{
+				"this/is/a/path/with/a/name/that/is/not/so/short",
+			},
+		},
+		{
+			[]string{
+				"a",
+				"b",
+				"c",
+				"abc",
+				"1",
+				"2",
+				"3",
+				"123",
+			},
+			"[a-z]*",
+			[]string{
+				"a",
+				"abc",
+				"b",
+				"c",
+			},
+		},
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			var folder = memory.NewFolder("", memory.NewKVS())
+			for _, relativePath := range tc.paths {
+				err := folder.PutObject(relativePath, &bytes.Buffer{})
+				assert.NoError(t, err)
+			}
+			objects, folders, err := storage.Glob(folder, tc.pattern)
+			matches := append(objects, folders...)
+			sort.Strings(tc.expected)
+			sort.Strings(matches)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, matches)
+		})
+	}
 }

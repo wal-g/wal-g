@@ -104,6 +104,7 @@ func configureSession(sess *session.Session, config *Config) error {
 			MaxThrottleDelay: config.MaxThrottlingRetryDelay,
 		}))
 
+	awsConfig.HTTPClient.Transport = NewRoundTripperWithLogging(awsConfig.HTTPClient.Transport)
 	accessKey := config.AccessKey
 	secretKey := config.Secrets.SecretKey
 	sessionToken := config.SessionToken

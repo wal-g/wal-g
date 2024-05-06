@@ -105,6 +105,7 @@ type BackupPgInfo struct {
 	PgVersion        int
 	PgDataDirectory  string
 	systemIdentifier *uint64
+	Timeline         uint32
 }
 
 // BackupHandler is the main struct which is handling the backup process
@@ -486,7 +487,7 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	// and version cannot be read easily using replication connection.
 	// Retrieve both with this helper function which uses a temp connection to postgres.
 
-	pgInfo, err := getPgServerInfo()
+	pgInfo, _, err := GetPgServerInfo(false)
 	if err != nil {
 		return nil, err
 	}
@@ -540,46 +541,55 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	return baseBackup
 }
 
-func getPgServerInfo() (pgInfo BackupPgInfo, err error) {
+func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunner, err error) {
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tracelog.DebugLogger.Println("Initializing tmp connection to read Postgres info")
 	tmpConn, err := Connect()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 
 	queryRunner, err := NewPgQueryRunner(tmpConn)
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 
 	pgInfo.PgDataDirectory, err = queryRunner.GetDataDir()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 	pgInfo.PgDataDirectory = utility.ResolveSymlink(pgInfo.PgDataDirectory)
 	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.PgDataDirectory)
 
 	err = queryRunner.getVersion()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 	pgInfo.PgVersion = queryRunner.Version
 	tracelog.DebugLogger.Printf("Postgres version: %d", queryRunner.Version)
 
 	err = queryRunner.getSystemIdentifier()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
 	}
 	pgInfo.systemIdentifier = queryRunner.SystemIdentifier
 	tracelog.DebugLogger.Printf("Postgres SystemIdentifier: %d", queryRunner.Version)
 
-	err = tmpConn.Close()
+	pgInfo.Timeline, err = queryRunner.readTimeline()
 	if err != nil {
-		return pgInfo, err
+		return pgInfo, nil, err
+	}
+	tracelog.DebugLogger.Printf("Timeline: %d", pgInfo.Timeline)
+
+	if !keepRunner {
+		err = tmpConn.Close()
+		if err != nil {
+			return pgInfo, nil, err
+		}
+		return pgInfo, nil, err
 	}
 
-	return pgInfo, err
+	return pgInfo, queryRunner, err
 }
 
 // TODO : unit tests

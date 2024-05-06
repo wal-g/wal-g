@@ -355,6 +355,10 @@ type NopCloserWriter struct {
 	io.Writer
 }
 
+func (w NopCloserWriter) Flush() error {
+	return nil
+}
+
 func (NopCloserWriter) Close() error {
 	return nil
 }
