@@ -15,8 +15,10 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/go-mysql-org/go-mysql/server"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -262,6 +264,12 @@ func HandleBinlogServer(since string, until string) {
 	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 	startTS, untilTS, _, err = getTimestamps(st.RootFolder(), since, until, "")
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	// validate WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE
+	replicaSource, err := conf.GetRequiredSetting(conf.MysqlBinlogServerReplicaSource)
+	tracelog.ErrorLogger.FatalOnError(err)
+	_, err = mysqldriver.ParseDSN(replicaSource)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Starting binlog server")

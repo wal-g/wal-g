@@ -135,9 +135,8 @@ func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 		return &walparser.RelFileNode{SpcNode: walparser.Oid(spcNode),
 			DBNode:  walparser.Oid(dbNode),
 			RelNode: walparser.Oid(relNode)}, nil
-	} else {
-		return nil, newUnknownTableSpaceError()
 	}
+	return nil, newUnknownTableSpaceError()
 }
 
 func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(reader internal.StorageFolderReader,

@@ -9,7 +9,7 @@ Configuration
 
 * `WALG_MYSQL_DATASOURCE_NAME`
 
-To configure the connection string for MySQL. Required. Format ```user:password@host/dbname```
+To configure the connection string for MySQL. Required. [DSN format](https://github.com/go-sql-driver/mysql#dsn-data-source-name) ```user:password@tcp(host)/dbname```
 
 * `WALG_MYSQL_SSL_CA`
 
@@ -63,7 +63,7 @@ To configure the server id of the binlog server. Should be unique for each repli
 
 * `WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE`
 
-To configure the connection string that will be used by `binlog-server` to connect to your MySQL. [DSN format](https://github.com/go-sql-driver/mysql#dsn-data-source-name): ```user:password@host/dbname```
+To configure the connection string that will be used by `binlog-server` to connect to your MySQL. [DSN format](https://github.com/go-sql-driver/mysql#dsn-data-source-name): ```user:password@tcp(host)/dbname```
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
@@ -256,7 +256,7 @@ In that case MySQL backup is a plain SQL script.
 Here's typical wal-g configuration for that case:
 
 ```bash
- WALG_MYSQL_DATASOURCE_NAME=user:pass@localhost/mysql                                                                                                               
+ WALG_MYSQL_DATASOURCE_NAME=user:pass@tcp(localhost)/mysql                                                                                                               
  WALG_STREAM_CREATE_COMMAND="mysqldump --all-databases --single-transaction --set-gtid-purged=ON"                                                                                                                               
  WALG_STREAM_RESTORE_COMMAND="mysql"
  WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
@@ -277,7 +277,7 @@ wal-g can work as replication source to do fast PiTR. In this case it will serve
  WALG_MYSQL_BINLOG_SERVER_PASSWORD="walgpwd"
  WALG_MYSQL_BINLOG_SERVER_ID=99
 
- WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="user:password@127.0.0.1:3306/db"
+ WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="user:password@tcp(127.0.0.1:3306)/db"
 ```
 
 Restore procedure is straightforward:

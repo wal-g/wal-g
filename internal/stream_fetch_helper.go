@@ -123,10 +123,9 @@ func downloadAndDecompressFile(backup Backup, decompressor compression.Decompres
 			return nil, fmt.Errorf("failed to dowload file %v: %w", fileName, err)
 		} else if !exists {
 			return nil, io.EOF
-		} else {
-			tracelog.DebugLogger.Printf("Found file: %s", fileName)
-			return archiveReader, nil
 		}
+		tracelog.DebugLogger.Printf("Found file: %s", fileName)
+		return archiveReader, nil
 	}
 
 	var archiveReader io.ReadCloser

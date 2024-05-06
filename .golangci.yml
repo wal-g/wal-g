@@ -28,8 +28,7 @@ linters-settings:
   lll:
     line-length: 140
   staticcheck:
-    # SA1019 is disabled until WAL-G has migrated from the deprecated package golang.org/x/crypto/openpgp
-    checks: [ "all", "-SA1019" ]
+    checks: ["all", "-SA1019"]
   revive:
     rules:
       - name: blank-imports
@@ -84,12 +83,14 @@ run:
   go: "1.20"
   timeout: 5m
   modules-download-mode: readonly
-  skip-dirs:
+
+issues:
+  exclude-dirs:
     - "tests_func"
     - "tmp"
     - "submodules"
     - "testtools"
-  skip-files:
+  exclude-files:
     - ".*_test.go$"
 
 severity:
