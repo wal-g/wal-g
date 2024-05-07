@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/cmd/etcd"
 	"github.com/wal-g/wal-g/cmd/fdb"
-	"github.com/wal-g/wal-g/cmd/gp"
 	"github.com/wal-g/wal-g/cmd/mongo"
 	"github.com/wal-g/wal-g/cmd/mysql"
 	"github.com/wal-g/wal-g/cmd/pg"
@@ -37,10 +36,6 @@ func init() {
 	fdbCmd := fdb.GetCmd()
 	fdbCmd.Use = "fdb"
 	universalCmd.AddCommand(fdbCmd)
-
-	gpCmd := gp.GetCmd()
-	gpCmd.Use = "gp"
-	universalCmd.AddCommand(gpCmd)
 
 	mongoCmd := mongo.GetCmd()
 	mongoCmd.Use = "mongo"

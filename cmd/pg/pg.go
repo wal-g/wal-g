@@ -59,9 +59,7 @@ func Execute() {
 }
 
 func GetCmd() *cobra.Command {
-	cp := *Cmd
-
-	return &cp
+	return Cmd
 }
 
 func configureCommand() {

@@ -59,7 +59,7 @@ func init() {
 
 	_ = cmd.MarkFlagRequired("config") // config is required for Greenplum WAL-G
 	// wrap the Postgres command so it can be used in the same binary
-	wrappedPgCmd := pg.GetCmd()
+	wrappedPgCmd := pg.Cmd
 	wrappedPgCmd.Use = "seg"
 	wrappedPgCmd.Short = "PostgreSQL command series to run on segments (use with caution)"
 	wrappedPreRun := wrappedPgCmd.PersistentPreRun
