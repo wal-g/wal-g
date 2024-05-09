@@ -238,8 +238,8 @@ type StreamSentinelDto struct {
 	Hostname         string `json:"Hostname,omitempty"`
 	ServerUUID       string `json:"ServerUUID,omitempty"`
 	ServerVersion    string `json:"ServerVersion,omitempty"` // e.g. '8.0.35-27'
-	ServerArch       string `json:"ServerArch,omitempty"`
-	ServerOS         string `json:"ServerOS,omitempty"`
+	ServerArch       string `json:"ServerArch,omitempty"`    // e.g 'x86_64' / 'aarch64' / 'arm64'
+	ServerOS         string `json:"ServerOS,omitempty"`      // e.g. 'Linux' / 'macos14.2'
 
 	IsPermanent   bool `json:"IsPermanent"`
 	IsIncremental bool `json:"IsIncremental"`
