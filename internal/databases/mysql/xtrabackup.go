@@ -2,13 +2,21 @@ package mysql
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"syscall"
 
+	"github.com/cenkalti/backoff"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -88,7 +96,7 @@ func readXtrabackupInfo(xtrabackupExtraDirectory string) (XtrabackupInfo, error)
 	return NewXtrabackupInfo(string(raw)), nil
 }
 
-func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, prevBackupInfo *PrevBackupInfo) {
+func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, fifoStreams int, prevBackupInfo *PrevBackupInfo) {
 	if prevBackupInfo == nil {
 		tracelog.ErrorLogger.Fatalf("PrevBackupInfo is null")
 	}
@@ -98,6 +106,13 @@ func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFu
 	if !isFullBackup && (*prevBackupInfo != PrevBackupInfo{} && prevBackupInfo.sentinel.LSN != nil) {
 		// –-incremental-lsn=LSN
 		injectCommandArgument(backupCmd, "--incremental-lsn="+prevBackupInfo.sentinel.LSN.String())
+	}
+
+	if fifoStreams > 1 {
+		injectCommandArgument(backupCmd, fmt.Sprintf("--fifo-streams=%v", fifoStreams))
+		// when --fifo-stream specified, --fifo-dir must be configured as well
+		injectCommandArgument(backupCmd, "--fifo-dir=/tmp") // FIXME: make configurable
+		injectCommandArgument(backupCmd, "--fifo-timeout=60")
 	}
 }
 
@@ -153,6 +168,27 @@ func xtrabackupFetch(
 		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
 	}
 
+	fifoStreams, err := detectFifoStreams(backup)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to detect backup format: %v\n", err)
+		return err
+	}
+
+	fifoDir := ""
+	if fifoStreams > 1 {
+		tmpDirRoot := "/tmp" // FIXME: make configurable
+		fifoDir, err = prepareTemporaryDirectory(tmpDirRoot)
+		if err != nil {
+			return err
+		}
+		defer removeTemporaryDirectory(fifoDir)
+
+		injectCommandArgument(restoreCmd, fmt.Sprintf("--fifo-streams=%v", fifoStreams))
+		// when --fifo-stream specified, --fifo-dir must be configured as well
+		injectCommandArgument(restoreCmd, fmt.Sprintf("--fifo-dir=%s", fifoDir))
+		injectCommandArgument(restoreCmd, "--fifo-timeout=60")
+	}
+
 	stdin, err := restoreCmd.StdinPipe()
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
 	stderr := &bytes.Buffer{}
@@ -163,9 +199,8 @@ func xtrabackupFetch(
 	if err != nil {
 		return err
 	}
-	fetcher, err := internal.GetBackupStreamFetcher(backup)
+	fetcher, err := getBackupStreamFetcher(backup, fifoDir, fifoStreams)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to detect backup format: %v\n", err)
 		return err
 	}
 	err = fetcher(backup, stdin)
@@ -190,4 +225,100 @@ func xtrabackupFetch(
 	}
 
 	return os.RemoveAll(tempDeltaDir)
+}
+
+func detectFifoStreams(backup internal.Backup) (int, error) {
+	_, folders, err := backup.Folder.GetSubFolder(backup.Name).ListFolder()
+	if err != nil {
+		return 0, fmt.Errorf("cannot list files in backup folder '%s' due to: %w", backup.Folder.GetPath(), err)
+	}
+
+	// There are 2 backup layouts for xtrabackup:
+	// single-stream:
+	//   /basebackups_005
+	//  	/stream_20240228T115512Z
+	//			<stream content>
+	// multi-stream backups:
+	//   /basebackups_005
+	//  	/stream_20240228T115512Z
+	// 			/thread_N   (where N in range 0..fifoStreams)
+	// 				<stream content>
+	fifoStreams := 0
+	for _, folder := range folders {
+		// nolint:staticcheck
+		if ok, _ := regexp.MatchString(".*/thread_\\d+/", folder.GetPath()); ok {
+			fifoStreams++
+		}
+	}
+	return fifoStreams, nil
+}
+
+func getBackupStreamFetcher(backup internal.Backup, fifoDir string, fifoStreams int) (internal.StreamFetcher, error) {
+	if fifoStreams > 0 {
+		return FifoMultiStreamFetcher(fifoDir, fifoStreams), nil // FIXME: fail fast?
+	} else {
+		return internal.GetBackupStreamFetcher(backup)
+	}
+}
+
+func FifoMultiStreamFetcher(fifoDir string, fifoStreams int) internal.StreamFetcher {
+	return func(backup internal.Backup, writeCloser io.WriteCloser) error {
+		defer utility.LoggedClose(writeCloser, "")
+
+		errGroup := new(errgroup.Group)
+		for i := 0; i < fifoStreams; i++ {
+			subBackup, err := internal.NewBackup(backup.Folder, path.Join(backup.Name, fmt.Sprintf("thread_%v", i)))
+			if err != nil {
+				return err
+			}
+			fetcher, err := internal.GetBackupStreamFetcher(subBackup)
+			if err != nil {
+				return err
+			}
+
+			fifoFileName := getXtrabackupFifoFileName(fifoDir, i) // FIXME: new file dir?
+			err = syscall.Mkfifo(fifoFileName, 0640)
+			if err != nil {
+				return err
+			}
+			// FIXME: delete fifos
+
+			pipe, err := os.OpenFile(fifoFileName, os.O_WRONLY, os.ModeNamedPipe)
+			if err != nil {
+				return err
+			}
+
+			errGroup.Go(func() error {
+				return fetcher(subBackup, pipe)
+			})
+		}
+
+		return errGroup.Wait()
+	}
+}
+
+func getXtrabackupFifoFileName(fifoDir string, idx int) string {
+	// fifo name format is hardcoded in xtrabackup source code:
+	// https://github.com/percona/percona-xtrabackup/blob/percona-xtrabackup-8.0.35-30/storage/innobase/xtrabackup/src/xbstream.cc#L728
+	return path.Join(fifoDir, fmt.Sprintf("thread_%v", idx))
+}
+
+func openFifoFile(fifoFileName string) (*os.File, error) {
+	tracelog.DebugLogger.Printf("Openning %s", fifoFileName)
+	var file *os.File
+	err := retry(10, func() (err error) {
+		file, err = os.OpenFile(fifoFileName, os.O_RDONLY, os.ModeNamedPipe)
+		if err != nil {
+			tracelog.DebugLogger.Printf("failed to open named pipe: %v", err)
+		}
+		return err
+	})
+	return file, err
+}
+
+func retry(maxRetries uint64, op func() error) error {
+	var b backoff.BackOff
+	b = backoff.NewExponentialBackOff()
+	b = backoff.WithMaxRetries(b, maxRetries)
+	return backoff.Retry(op, b)
 }

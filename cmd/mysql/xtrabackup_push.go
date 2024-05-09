@@ -1,9 +1,12 @@
 package mysql
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
@@ -14,6 +17,7 @@ const (
 	xtrabackupPushShortDescription = "Creates new backup and pushes it to storage"
 
 	fullBackupFlag        = "full"
+	fifoStreamsFlag       = "fifo-streams"
 	deltaFromUserDataFlag = "delta-from-user-data"
 	deltaFromNameFlag     = "delta-from-name"
 
@@ -30,6 +34,10 @@ var (
 			conf.RequiredSettings[conf.MysqlDatasourceNameSetting] = true
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
+			err = validateXtrabackupArgs()
+			if err != nil {
+				tracelog.ErrorLogger.Fatalf("invalid command line arguments: %v", err)
+			}
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
@@ -63,12 +71,14 @@ var (
 				backupCmd,
 				permanent,
 				fullBackup,
+				fifoStreams,
 				userData,
 				mysql.NewRegularDeltaBackupConfigurator(folder, deltaBaseSelector),
 			)
 		},
 	}
 	fullBackup        = true
+	fifoStreams       = 1
 	deltaFromName     = ""
 	deltaFromUserData = ""
 )
@@ -82,10 +92,19 @@ func init() {
 		false, "Pushes permanent backup")
 	xtrabackupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
 		true, "Make full backup-push")
+	xtrabackupPushCmd.Flags().IntVar(&fifoStreams, fifoStreamsFlag,
+		1, "Use xtrabackup --fifo-streams=X for parallel data stream")
 	xtrabackupPushCmd.Flags().StringVar(&deltaFromName, deltaFromNameFlag,
 		"", "Select the backup specified by name as the target for the delta backup")
 	xtrabackupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,
 		"", "Select the backup specified by UserData as the target for the delta backup")
 	xtrabackupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
+}
+
+func validateXtrabackupArgs() error {
+	if fifoStreams < 0 {
+		return fmt.Errorf("fifoStreams should be 1 (STDOUT) or greater (fifo streams)")
+	}
+	return nil
 }

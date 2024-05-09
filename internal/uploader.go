@@ -213,8 +213,9 @@ func (uploader *RegularUploader) Failed() bool {
 
 func (uploader *SplitStreamUploader) Clone() Uploader {
 	return &SplitStreamUploader{
-		Uploader:   uploader.Uploader.Clone(),
-		partitions: uploader.partitions,
-		blockSize:  uploader.blockSize,
+		Uploader:    uploader.Uploader.Clone(),
+		partitions:  uploader.partitions,
+		blockSize:   uploader.blockSize,
+		maxFileSize: uploader.maxFileSize,
 	}
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # common wal-g settings
+# export MYSQLDATA=/var/lib/mysql
 export WALG_MYSQL_DATASOURCE_NAME=sbtest:@/sbtest
 export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
     --stream=xbstream \
