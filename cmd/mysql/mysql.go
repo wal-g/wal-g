@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/cmd/mysql/xb"
 	"os"
 	"strings"
 
@@ -46,4 +47,5 @@ func Execute() {
 func init() {
 	common.Init(cmd, conf.MYSQL)
 	conf.AddTurboFlag(cmd)
+	cmd.AddCommand(xb.XBToolsCmd)
 }
