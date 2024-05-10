@@ -21,6 +21,7 @@ const (
 	sessionTokenSetting             = "AWS_SESSION_TOKEN"
 	sessionNameSetting              = "AWS_ROLE_SESSION_NAME"
 	roleARNSetting                  = "AWS_ROLE_ARN"
+	dualStackSetting                = "AWS_DUAL_STACK"
 	useYcSessionTokenSetting        = "S3_USE_YC_SESSION_TOKEN"
 	sseSetting                      = "S3_SSE"
 	sseCSetting                     = "S3_SSE_C"
@@ -55,6 +56,7 @@ var SettingList = []string{
 	sessionTokenSetting,
 	sessionNameSetting,
 	roleARNSetting,
+	dualStackSetting,
 	useYcSessionTokenSetting,
 	sseSetting,
 	sseCSetting,
@@ -75,6 +77,7 @@ var SettingList = []string{
 
 const (
 	defaultPort                    = "443"
+	defaultDualStack               = false
 	defaultForcePathStyle          = false
 	defaultUseListObjectsV1        = false
 	defaultMaxRetries              = 15
@@ -100,6 +103,10 @@ func ConfigureStorage(
 	port := defaultPort
 	if p, ok := settings[endpointPortSetting]; ok {
 		port = p
+	}
+	dualStack, err := setting.BoolOptional(settings, dualStackSetting, defaultDualStack)
+	if err != nil {
+		return nil, err
 	}
 	forcePathStyle, err := setting.BoolOptional(settings, forcePathStyleSetting, defaultForcePathStyle)
 	if err != nil {
@@ -155,6 +162,7 @@ func ConfigureStorage(
 		AccessKey:                setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting),
 		SessionToken:             settings[sessionTokenSetting],
 		RoleARN:                  settings[roleARNSetting],
+		DualStack:                dualStack,
 		SessionName:              settings[sessionNameSetting],
 		CACertFile:               settings[caCertFileSetting],
 		UseYCSessionToken:        settings[useYcSessionTokenSetting],

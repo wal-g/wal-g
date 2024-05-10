@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/defaults"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -155,6 +156,9 @@ func configureSession(sess *session.Session, config *Config) error {
 		awsConfig = awsConfig.WithEndpoint(config.Endpoint)
 	}
 
+	if config.DualStack {
+		awsConfig.UseDualStackEndpoint = endpoints.DualStackEndpointStateEnabled
+	}
 	awsConfig.S3ForcePathStyle = &config.ForcePathStyle
 
 	if config.Region == "" {
