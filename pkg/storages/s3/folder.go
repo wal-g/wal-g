@@ -84,6 +84,15 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return err
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	err := folder.CopyObject(srcPath, dstPath)
+	if err != nil {
+		return err
+	}
+	err = folder.DeleteObjects([]string{srcPath})
+	return err
+}
+
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	objectPath := folder.path + objectRelativePath
 	input := &s3.GetObjectInput{

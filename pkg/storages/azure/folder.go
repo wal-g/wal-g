@@ -166,6 +166,49 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return err
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	var exists bool
+	var err error
+	if exists, err = folder.Exists(srcPath); !exists {
+		if err == nil {
+			return storage.NewObjectNotFoundError(srcPath)
+		}
+		return err
+	}
+
+	srcFullPath := storage.JoinPath(folder.path, srcPath)
+	dstFullPath := storage.JoinPath(folder.path, dstPath)
+
+	var srcClient, dstClient *azblob.BlockBlobClient
+	srcClient, err = folder.containerClient.NewBlockBlobClient(srcFullPath)
+	if err != nil {
+		return fmt.Errorf("unable to init Azure Blob client for copy source %s: %w", srcPath, err)
+	}
+	dstClient, err = folder.containerClient.NewBlockBlobClient(dstFullPath)
+	if err != nil {
+		return fmt.Errorf("unable to init Azure Blob client for copy destination %s: %w", dstFullPath, err)
+	}
+	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(),
+		&azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
+	if err != nil {
+		return fmt.Errorf("unable to copy an object from source %s to destination %s: %w",
+			srcFullPath, dstFullPath, err)
+	}
+
+	tracelog.DebugLogger.Printf("Delete source object %v\n", srcPath)
+	_, err = srcClient.Delete(context.Background(),
+		&azblob.BlobDeleteOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
+	if err == nil {
+		return nil
+	}
+	var stgErr *azblob.StorageError
+	if errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
+		return nil
+	}
+
+	return fmt.Errorf("unable to delete source object %v: %w", srcPath, err)
+}
+
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		//Delete blob using blobClient obtained from full path to blob

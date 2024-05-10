@@ -205,3 +205,12 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	return nil
 }
+
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	err := folder.CopyObject(srcPath, dstPath)
+	if err != nil {
+		return err
+	}
+	err = folder.DeleteObjects([]string{srcPath})
+	return err
+}

@@ -148,6 +148,21 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return nil
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	src := path.Join(folder.rootPath, srcPath)
+	srcStat, err := os.Stat(src)
+	if errors.Is(err, os.ErrNotExist) {
+		return storage.NewObjectNotFoundError(srcPath)
+	}
+	if err != nil {
+		return err
+	}
+	if !srcStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", srcPath)
+	}
+	return os.Rename(src, dstPath)
+}
+
 func OpenFileWithDir(filePath string) (*os.File, error) {
 	file, err := os.Create(filePath)
 	if os.IsNotExist(err) {

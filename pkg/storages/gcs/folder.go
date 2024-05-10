@@ -243,6 +243,30 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return nil
 }
 
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return storage.NewObjectNotFoundError(srcPath)
+		}
+		return err
+	}
+	sourceFullPath := path.Join(folder.path, srcPath)
+	dstFullPath := path.Join(folder.path, dstPath)
+
+	src := folder.bucket.Object(sourceFullPath)
+	dst := folder.bucket.Object(dstFullPath)
+
+	ctx := context.Background()
+	if _, err := dst.CopierFrom(src).Run(ctx); err != nil {
+		return fmt.Errorf("unable to copy an object from source %s to destination %s: %w", sourceFullPath, dstFullPath, err)
+	}
+	if err := src.Delete(ctx); err != nil {
+		return fmt.Errorf("unable to delete source object %v: %w", sourceFullPath, err)
+	}
+
+	return nil
+}
+
 func (folder *Folder) joinPath(one string, another string) string {
 	if folder.config.NormalizePrefix {
 		return storage.JoinPath(one, another)

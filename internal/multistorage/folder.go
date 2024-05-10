@@ -653,6 +653,46 @@ func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
 	return nil
 }
 
+// MoveObject moves the object in multiple storages. A specific implementation is selected using FolderPolicies.Move.
+func (mf Folder) MoveObject(srcPath string, dstPath string) error {
+	switch mf.policies.Move {
+	case policies.MovePolicyFirst:
+		return mf.MoveObjectInFirst(srcPath, dstPath)
+	case policies.MovePolicyAll:
+		return mf.MoveObjectInAll(srcPath, dstPath)
+	default:
+		panic(fmt.Sprintf("unknown copy policy %d", mf.policies.Copy))
+	}
+	return nil
+}
+
+// MoveObjectInFirst moves the object in the first storage.
+func (mf Folder) MoveObjectInFirst(srcPath string, dstPath string) error {
+	if len(mf.usedFolders) == 0 {
+		return ErrNoUsedStorages
+	}
+	return mf.usedFolders[0].MoveObject(srcPath, dstPath)
+}
+
+// MoveObjectInAll moves the object in all used storages. If no storages have the object, an error is returned.
+func (mf Folder) MoveObjectInAll(srcPath string, dstPath string) error {
+	found := false
+	for _, s := range mf.usedFolders {
+		err := s.MoveObject(srcPath, dstPath)
+		if _, ok := err.(storage.ObjectNotFoundError); ok {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("move object in storage %q: %w", s.StorageName, err)
+		}
+		found = true
+	}
+	if !found {
+		return storage.NewObjectNotFoundError(srcPath)
+	}
+	return nil
+}
+
 var (
 	ErrNoUsedStorages  = fmt.Errorf("no storages are used")
 	ErrNoAliveStorages = fmt.Errorf("no alive storages")

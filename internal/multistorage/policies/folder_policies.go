@@ -11,6 +11,7 @@ var MergeAllStorages = Policies{
 	Put:    PutPolicyUpdateFirstFound,
 	Delete: DeletePolicyAll,
 	Copy:   CopyPolicyAll,
+	Move:   MovePolicyAll,
 }
 
 // UniteAllStorages implies uniting all storages into one so that multiple files with the same path could exist.
@@ -21,6 +22,7 @@ var UniteAllStorages = Policies{
 	Put:    PutPolicyUpdateAllFound,
 	Delete: DeletePolicyAll,
 	Copy:   CopyPolicyAll,
+	Move:   MovePolicyAll,
 }
 
 // TakeFirstStorage implies that only the first storage is used, as if it is not a multi-storage at all.
@@ -31,6 +33,7 @@ var TakeFirstStorage = Policies{
 	Put:    PutPolicyFirst,
 	Delete: DeletePolicyFirst,
 	Copy:   CopyPolicyFirst,
+	Move:   MovePolicyFirst,
 }
 
 // Policies define the behavior of the multi-storage folder in terms of selecting which underlying storages should be
@@ -42,6 +45,7 @@ type Policies struct {
 	Put    PutPolicy
 	Delete DeletePolicy
 	Copy   CopyPolicy
+	Move   MovePolicy
 }
 
 type ExistsPolicy int
@@ -88,4 +92,11 @@ type CopyPolicy int
 const (
 	CopyPolicyFirst CopyPolicy = iota
 	CopyPolicyAll
+)
+
+type MovePolicy int
+
+const (
+	MovePolicyFirst MovePolicy = iota
+	MovePolicyAll
 )

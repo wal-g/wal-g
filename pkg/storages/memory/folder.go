@@ -109,3 +109,18 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	return nil
 }
+
+func (folder *Folder) MoveObject(srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(srcPath); !exists {
+		if err == nil {
+			return storage.NewObjectNotFoundError(srcPath)
+		}
+		return err
+	}
+
+	success := folder.KVS.Move(srcPath, dstPath)
+	if !success {
+		return errors.Errorf("failed to move '%s' in memory storage", srcPath)
+	}
+	return nil
+}
