@@ -49,11 +49,13 @@ func getMySQLVersion(db *sql.DB) (string, error) {
 	return fetchMySQLVariable(db, "version")
 }
 
+// nolint:unused
 func getMySQLArchitecture(db *sql.DB) (string, error) {
 	// e.g 'x86_64' / 'aarch64' / 'arm64'
 	return fetchMySQLVariable(db, "version_compile_machine")
 }
 
+// nolint:unused
 func getMySQLOS(db *sql.DB) (string, error) {
 	// e.g. 'Linux' / 'macos14.2'
 	return fetchMySQLVariable(db, "version_compile_os")
