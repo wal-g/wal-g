@@ -45,14 +45,17 @@ func fetchMySQLVariable(db *sql.DB, variable string) (string, error) {
 }
 
 func getMySQLVersion(db *sql.DB) (string, error) {
+	// e.g. '8.0.35-27'
 	return fetchMySQLVariable(db, "version")
 }
 
 func getMySQLArchitecture(db *sql.DB) (string, error) {
+	// e.g 'x86_64' / 'aarch64' / 'arm64'
 	return fetchMySQLVariable(db, "version_compile_machine")
 }
 
 func getMySQLOS(db *sql.DB) (string, error) {
+	// e.g. 'Linux' / 'macos14.2'
 	return fetchMySQLVariable(db, "version_compile_os")
 }
 
@@ -238,8 +241,8 @@ type StreamSentinelDto struct {
 	Hostname         string `json:"Hostname,omitempty"`
 	ServerUUID       string `json:"ServerUUID,omitempty"`
 	ServerVersion    string `json:"ServerVersion,omitempty"` // e.g. '8.0.35-27'
-	ServerArch       string `json:"ServerArch,omitempty"`    // e.g 'x86_64' / 'aarch64' / 'arm64'
-	ServerOS         string `json:"ServerOS,omitempty"`      // e.g. 'Linux' / 'macos14.2'
+	ServerArch       string `json:"ServerArch,omitempty"`    // e.g '386' / 'amd64' / 'arm64' / 'arm'
+	ServerOS         string `json:"ServerOS,omitempty"`      // e.g. 'linux' / 'darwin' / 'windows'
 
 	IsPermanent   bool `json:"IsPermanent"`
 	IsIncremental bool `json:"IsIncremental"`
