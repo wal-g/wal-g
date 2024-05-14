@@ -58,13 +58,12 @@ var (
 			verifyPageChecksums := false
 			storeAllCorruptBlocks := false
 			tarBallComposerType := postgres.RegularComposer
-			withoutFilesMetadata := false
 
 			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums,
 				fullBackup, storeAllCorruptBlocks,
 				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),
-				userData, withoutFilesMetadata)
+				userData, viper.GetBool(conf.WithoutFilesMetadataSetting))
 
 			backupHandler, err := greenplum.NewSegBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
