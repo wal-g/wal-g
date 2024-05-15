@@ -99,7 +99,6 @@ func init() {
 	pagedFilenameRegexp = regexp.MustCompile(`^(\d+)([.]\d+)?$`)
 }
 
-// TODO : unit tests
 // isPagedFile checks basic expectations for paged file
 func isPagedFile(info os.FileInfo, filePath string) bool {
 	// For details on which file is paged see

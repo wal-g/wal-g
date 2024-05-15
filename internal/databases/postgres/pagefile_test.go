@@ -54,6 +54,47 @@ var allBlocksTestIncrement = newTestIncrement(smallLSN)
 // so created increment consists of zero blocks
 var zeroBlocksTestIncrement = newTestIncrement(bigLSN)
 
+func TestIsPagedFile_Directory(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles", false)
+}
+
+func TestIsPagedFile_NotInTablespace(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles/not_in_tablespace", false)
+}
+
+func TestIsPagedFile_EmptyFile(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles/base/empty", false)
+}
+
+func TestIsPagedFile_BadSize(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles/base/bad_size", false)
+}
+
+func TestIsPagedFile_StartsWithLetter(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles/base/a.123", false)
+}
+
+func TestIsPagedFile_StartsWithDot(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles/base/.123", false)
+}
+
+func TestIsPagedFile_ContainsDigitsOnly(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles/base/123", true)
+}
+
+func TestIsPagedFile_ContainsDigitsSeparatedByDot(t *testing.T) {
+	isPagedFileTest(t, "../../../test/testdata/pagefiles/base/123.123", true)
+}
+
+func isPagedFileTest(t *testing.T, filePath string, expected bool) {
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		fmt.Print(err.Error())
+	}
+	isPagedFile := isPagedFile(fileInfo, filePath)
+	assert.Equal(t, expected, isPagedFile)
+}
+
 // In this test series we use actual postgres paged file which
 // We compute increment with LSN taken from the middle of a file
 // Resulting increment is than applied to copy of the same file partially wiped
