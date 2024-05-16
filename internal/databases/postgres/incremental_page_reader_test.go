@@ -16,6 +16,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const (
+	pagedFileName              = "../../../test/testdata/base_paged_file.bin"
+	sampleLSN     postgres.LSN = 0xc6bd4600
+)
+
 func TestDeltaBitmapInitialize(t *testing.T) {
 	pageReader := postgres.IncrementalPageReader{
 		FileSize: postgres.DatabasePageSize * 5,
