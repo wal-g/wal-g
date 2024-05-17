@@ -159,9 +159,9 @@ func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKey
 	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
 	var err error
 	if folder.config.UseListObjectsV1 {
-		err = folder.listObjectsPagesV1(prefix, delimiter, nil, listFunc)
+		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, listFunc)
 	} else {
-		err = folder.listObjectsPagesV2(prefix, delimiter, nil, listFunc)
+		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, listFunc)
 	}
 	return err
 }
