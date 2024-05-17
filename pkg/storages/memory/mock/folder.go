@@ -19,6 +19,7 @@ type Folder struct {
 	ReadObjectMock    func(objectRelativePath string) (io.ReadCloser, error)
 	PutObjectMock     func(ctx context.Context, name string, content io.Reader) error
 	CopyObjectMock    func(srcPath string, dstPath string) error
+	ValidateMock      func() error
 }
 
 func NewFolder(memFolder *memory.Folder) *Folder {
@@ -88,4 +89,11 @@ func (f *Folder) CopyObject(srcPath string, dstPath string) error {
 		return f.CopyObjectMock(srcPath, dstPath)
 	}
 	return f.MemFolder.CopyObject(srcPath, dstPath)
+}
+
+func (f *Folder) Validate() error {
+	if f.ValidateMock != nil {
+		return f.ValidateMock()
+	}
+	return f.MemFolder.Validate()
 }

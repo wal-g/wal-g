@@ -43,6 +43,8 @@ type Folder interface {
 	// CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
 	// an error if the source object doesn't exist.
 	CopyObject(srcPath string, dstPath string) error
+
+	Validate() error
 }
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {

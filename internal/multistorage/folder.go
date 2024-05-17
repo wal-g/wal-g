@@ -3,6 +3,7 @@ package multistorage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -651,6 +652,17 @@ func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
 		return storage.NewObjectNotFoundError(srcPath)
 	}
 	return nil
+}
+
+func (mf Folder) Validate() error {
+	errs := make([]error, 0)
+	for _, folder := range mf.usedFolders {
+		err := folder.Validate()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 var (

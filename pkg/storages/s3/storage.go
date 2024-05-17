@@ -65,6 +65,11 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 		folder = wrap(folder)
 	}
 
+	err = folder.Validate()
+	if err != nil {
+		return nil, err
+	}
+
 	hash, err := storage.ComputeConfigHash("s3", config)
 	if err != nil {
 		return nil, fmt.Errorf("compute config hash: %w", err)
