@@ -12,6 +12,7 @@ func TestS3FolderCreatesWithoutAdditionalHeaders(t *testing.T) {
 	_, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
 			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:    "true",
 			uploadConcurrencySetting: "1",
 		})
 
@@ -23,6 +24,7 @@ func TestS3FolderCreatesWithAdditionalHeadersJSON(t *testing.T) {
 	_, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
 			endpointSetting:                 "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:           "true",
 			uploadConcurrencySetting:        "1",
 			requestAdditionalHeadersSetting: `{"X-Yandex-Prioritypass":"ok", "MyHeader":"32", "DROP_TABLE":"true"}`,
 		})
@@ -35,6 +37,7 @@ func TestS3FolderCreatesWithAdditionalHeadersYAML(t *testing.T) {
 	_, err := ConfigureStorage(waleS3Prefix,
 		map[string]string{
 			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:    "true",
 			uploadConcurrencySetting: "1",
 			requestAdditionalHeadersSetting: `- X-Yandex-Prioritypass: "ok"
 - MyHeader: "32"

@@ -28,6 +28,7 @@ type Config struct {
 	RoleARN                  string
 	SessionName              string
 	CACertFile               string
+	SkipValidation           bool
 	UseYCSessionToken        string
 	ForcePathStyle           bool
 	RequestAdditionalHeaders string
@@ -65,9 +66,11 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 		folder = wrap(folder)
 	}
 
-	err = folder.Validate()
-	if err != nil {
-		return nil, err
+	if !config.SkipValidation {
+		err = folder.Validate()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	hash, err := storage.ComputeConfigHash("s3", config)

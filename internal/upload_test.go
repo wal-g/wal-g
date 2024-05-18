@@ -52,6 +52,7 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	os.Setenv("WALE_S3_PREFIX", "gs://abc.com")
 	os.Setenv("AWS_ENDPOINT", "http://127.0.0.1:9000")
 	os.Setenv("AWS_REGION", "")
+	os.Setenv("S3_SKIP_VALIDATION", "true")
 	_, err = internal.ConfigureUploader()
 	assert.NoError(t, err)
 	os.Setenv("WALE_S3_PREFIX", "test_fail:")
