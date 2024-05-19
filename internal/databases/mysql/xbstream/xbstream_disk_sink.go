@@ -76,7 +76,6 @@ func newDecompressFileSink(file *os.File, decompressor compression.Decompressor)
 		}
 		utility.LoggedClose(file, "datasink.Close()")
 		close(fileCloseChan)
-
 	}()
 
 	return &decompressFileSink{
