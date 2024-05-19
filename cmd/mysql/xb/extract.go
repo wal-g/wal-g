@@ -9,6 +9,8 @@ import (
 
 const (
 	extractXBStreamShortDescription = "Extract xbstream to folder"
+	decompressFlag                  = "decompress"
+	decompressShorthand             = "d"
 )
 
 var (
@@ -33,11 +35,15 @@ var (
 			tracelog.ErrorLogger.FatalfOnError("Cannot create destination folder: %v", err)
 
 			streamReader := xbstream.NewReader(src, false)
-			xbstream.DiskSink(streamReader, dst)
+			xbstream.DiskSink(streamReader, dst, decompress)
 		},
 	}
+	decompress bool
 )
 
 func init() {
+	extractXBStreamCmd.Flags().BoolVarP(&decompress, decompressFlag, decompressShorthand,
+		false, "Decompress files")
+
 	XBToolsCmd.AddCommand(extractXBStreamCmd)
 }

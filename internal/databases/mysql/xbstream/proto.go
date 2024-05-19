@@ -53,9 +53,11 @@ type Chunk struct {
 }
 
 type ChunkHeader struct {
-	Magic      []uint8
-	Flags      ChunkFlag
-	Type       ChunkType
+	Magic []uint8
+	Flags ChunkFlag
+	Type  ChunkType
+	// compression/encryption are xtrabackup primitives, xbstream knows nothing about it.
+	// so, all other fields - just instructions how to write chunk's content to disk (without any knowledge of the content)
 	Path       string
 	PayloadLen uint64 // payload len
 	Offset     uint64 // offset in file
