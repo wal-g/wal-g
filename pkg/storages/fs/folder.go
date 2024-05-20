@@ -180,3 +180,7 @@ func (folder *Folder) EnsureExists() error {
 	}
 	return nil
 }
+
+func (folder *Folder) Validate() error {
+	return nil
+}

@@ -205,3 +205,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	return nil
 }
+
+func (folder *Folder) Validate() error {
+	return nil
+}
