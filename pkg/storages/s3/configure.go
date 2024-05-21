@@ -95,6 +95,8 @@ const (
 )
 
 // TODO: Unit tests
+//
+//nolint:funlen,gocyclo
 func ConfigureStorage(
 	prefix string,
 	settings map[string]string,
