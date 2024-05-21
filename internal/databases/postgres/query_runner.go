@@ -461,8 +461,18 @@ func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
 			return 0, newBytesPerWalSegmentError()
 		}
 	} else {
+		var hex string
 		err = conn.QueryRow("SELECT SUBSTR(pg_xlogfile_name(pg_current_xlog_insert_location()), " +
-			"1, 8)::INT AS timeline").Scan(&timeline)
+			"1, 8) AS timeline").Scan(&hex)
+		if err != nil {
+			return
+		}
+		var time64 uint64
+		time64, err = strconv.ParseUint(hex, 16, 64)
+		if err != nil {
+			return
+		}
+		timeline = uint32(time64)
 	}
 	return
 }
