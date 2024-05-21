@@ -37,6 +37,8 @@ const (
 	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
 	rangeQueriesMaxRetriesSetting   = "S3_RANGE_MAX_RETRIES"
 	requestAdditionalHeadersSetting = "S3_REQUEST_ADDITIONAL_HEADERS"
+	retentionPeriodSetting          = "S3_RETENTION_PERIOD"
+	retentionModeSetting            = "S3_RETENTION_MODE"
 	// limiters for retry policy during interaction with S3
 	maxRetriesSetting              = "S3_MAX_RETRIES"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
@@ -73,6 +75,8 @@ var SettingList = []string{
 	requestAdditionalHeadersSetting,
 	minThrottlingRetryDelaySetting,
 	maxThrottlingRetryDelaySetting,
+	retentionPeriodSetting,
+	retentionModeSetting,
 }
 
 const (
@@ -87,9 +91,12 @@ const (
 	defaultStorageClass            = "STANDARD"
 	defaultRangeBatchEnabled       = false
 	defaultRangeMaxRetries         = 10
+	defaultDisabledRetentionPeriod = -1
 )
 
 // TODO: Unit tests
+//
+//nolint:funlen,gocyclo
 func ConfigureStorage(
 	prefix string,
 	settings map[string]string,
@@ -148,6 +155,10 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	retentionPeriod, err := setting.IntOptional(settings, retentionPeriodSetting, defaultDisabledRetentionPeriod)
+	if err != nil {
+		return nil, err
+	}
 
 	config := &Config{
 		Secrets: &Secrets{
@@ -178,6 +189,8 @@ func ConfigureStorage(
 			ServerSideEncryption:         settings[sseSetting],
 			ServerSideEncryptionCustomer: settings[sseCSetting],
 			ServerSideEncryptionKMSID:    settings[sseKmsIDSetting],
+			RetentionPeriod:              retentionPeriod,
+			RetentionMode:                settings[retentionModeSetting],
 		},
 		RangeBatchEnabled:       rangeBatchEnabled,
 		RangeMaxRetries:         rangeMaxRetries,

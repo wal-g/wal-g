@@ -82,6 +82,14 @@ Overrides the default minimum time between retries when throttled in millisecond
 
 Overrides the default minimum time between retries when throttled in milliseconds. Default is 300000ms.
 
+* `S3_RETENTION_PERIOD`
+
+Sets retention period in seconds to files, uploaded to s3. Default is disabled with value -1.
+
+* `S3_RETENTION_MODE`
+
+Sets mode of retention (GOVERNANCE/COMPLIANCE). Default is GOVERNANCE, which means, that files can still be deleted if user has special permissions.
+
 GCS
 -----------
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:
