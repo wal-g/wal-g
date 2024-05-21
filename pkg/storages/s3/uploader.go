@@ -54,11 +54,18 @@ type Uploader struct {
 	RetentionPeriod      time.Duration
 }
 
-func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass, retentionMode string, retentionPeriod int) *Uploader {
+func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass,
+	retentionMode string, retentionPeriod int) *Uploader {
 	if retentionMode == "" {
 		retentionMode = "GOVERNANCE"
 	}
-	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass, retentionMode, time.Duration(retentionPeriod)}
+	return &Uploader{uploaderAPI,
+		serverSideEncryption,
+		sseCustomerKey,
+		sseKmsKeyID,
+		storageClass,
+		retentionMode,
+		time.Duration(retentionPeriod)}
 }
 
 func (uploader *Uploader) createUploadInput(bucket, path string, content io.Reader) *s3manager.UploadInput {
