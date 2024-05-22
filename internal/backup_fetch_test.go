@@ -2,7 +2,12 @@ package internal_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"github.com/golang/mock/gomock"
+	"github.com/wal-g/wal-g/test/mocks"
+	mock_internal "github.com/wal-g/wal-g/testtools/mocks"
+
 	"path"
 	"strings"
 	"testing"
@@ -19,6 +24,10 @@ func init() {
 	internal.ConfigureSettings("")
 	conf.InitConfig()
 	conf.Configure()
+}
+
+type streamSentinelDto struct {
+	StartLocalTime time.Time
 }
 
 var testBackup = internal.GenericMetadata{
@@ -113,4 +122,24 @@ func TestFetchMetadata(t *testing.T) {
 	assert.Equal(t, testBackup.FinishTime, empMeta.FinishTime)
 	assert.Equal(t, testBackup.UserData, empMeta.UserData)
 	assert.Equal(t, testBackup, empMeta)
+}
+
+func TestUploadSentinel(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	folder := mocks.NewMockFolder(mockCtrl)
+	defer mockCtrl.Finish()
+
+	uploaderProv := mock_internal.NewMockUploader(mockCtrl)
+	uploaderProv.EXPECT().PushStream(gomock.Any(), gomock.Any()).Return("test_file_name", nil)
+	uploaderProv.EXPECT().Folder().Return(folder)
+
+	sentinel := streamSentinelDto{StartLocalTime: utility.TimeNowCrossPlatformLocal()}
+	fileName, err := uploaderProv.PushStream(context.Background(), bytes.NewReader(getByteSampleArray(51)))
+	if err != nil {
+		t.Errorf("Error pushing stream: %v", err)
+	}
+	folder.EXPECT().PutObject(gomock.Any(), gomock.Any()).Return(nil)
+	uploadDto := internal.UploadSentinel(uploaderProv, &sentinel, fileName)
+
+	assert.NoError(t, uploadDto)
 }

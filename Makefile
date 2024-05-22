@@ -19,6 +19,8 @@ MONGO_VERSION ?= "4.2.8"
 GOLANGCI_LINT_VERSION ?= "v1.57"
 REDIS_VERSION ?= "6.2.4"
 TOOLS_MOD_DIR := ./internal/tools
+MOCKS_DESTINATION := ./testtools/mocks
+FILE_TO_MOCKS := ./internal/uploader.go ##перечисление путей до интерфейсов
 
 BUILD_TAGS:=
 
@@ -308,3 +310,11 @@ unlink_libsodium:
 build_client:
 	cd cmd/daemonclient && \
 	go build -o ../../bin/walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=`git rev-parse --short HEAD` -X main.version=`git tag -l --points-at HEAD`"
+
+.PHONY: mocks
+# put the files with interfaces you'd like to mock in prerequisites
+# wildcards are allowed
+mocks: $(FILE_TO_MOCKS)
+	@echo "Generating mocks..."
+	@rm -rf $(MOCKS_DESTINATION)
+	@for file in $^; do mockgen -source=$$file -destination=$(MOCKS_DESTINATION)/$$(basename $$file); done
