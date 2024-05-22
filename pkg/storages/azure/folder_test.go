@@ -16,6 +16,27 @@ func TestAzureFolder(t *testing.T) {
 	storage.RunFolderTest(st.RootFolder(), t)
 }
 
+func TestConfigureStorage_WithoutAccountNameSetting(t *testing.T) {
+	settings := map[string]string{}
+	prefix := "azure://test-container/test-folder/Sub0"
+
+	_, err := ConfigureStorage(prefix, settings)
+
+	assert.Error(t, err)
+}
+
+func TestConfigureStorage_WithValidInput(t *testing.T) {
+	settings := map[string]string{
+		"AZURE_STORAGE_ACCOUNT": "test-account",
+	}
+	prefix := "azure://test-container/test-folder/Sub0"
+
+	storage, err := ConfigureStorage(prefix, settings)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, storage)
+}
+
 var ConfigureAuthType = configureAuthType
 
 func TestConfigureAccessKeyAuthType(t *testing.T) {
