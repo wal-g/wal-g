@@ -153,7 +153,6 @@ func (backup *Backup) GetStorageName() string {
 	return multistorage.UsedStorages(backup.Folder)[0]
 }
 
-// TODO : unit tests
 func UploadSentinel(uploader Uploader, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 	return UploadDto(uploader.Folder(), sentinelDto, sentinelName)
