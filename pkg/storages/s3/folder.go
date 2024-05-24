@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -220,7 +221,10 @@ func (folder *Folder) Validate() error {
 		MaxKeys:   &int64One,
 	}
 	_, err := folder.s3API.ListObjects(input)
-	return err
+	if err != nil {
+		return fmt.Errorf("bad credentials: %v", err)
+	}
+	return nil
 }
 
 func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
