@@ -22,7 +22,7 @@ var folderListCmd = &cobra.Command{
 		if len(args) > 0 {
 			path = args[0]
 		} else {
-			path = "/"
+			path = ""
 		}
 
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
