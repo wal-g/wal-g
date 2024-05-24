@@ -37,6 +37,8 @@ const BlockReadCacheSize = 16
 
 const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
 
+const InternalPingURL = "/__walg_g_ping__"
+
 type Server struct {
 	folder       storage.Folder
 	certFile     string
@@ -149,7 +151,7 @@ func (bs *Server) RunBackground(ctx context.Context, cancel context.CancelFunc) 
 func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
 	sctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	url := fmt.Sprintf("https://%s/", bs.endpoint)
+	url := fmt.Sprintf("https://%s%s", bs.endpoint, InternalPingURL)
 	c := http.Client{Timeout: 100 * time.Millisecond}
 	t := time.NewTicker(200 * time.Millisecond)
 	for {
@@ -206,6 +208,10 @@ func (bs *Server) ServeHTTP2(w http.ResponseWriter, req *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}()
+	if req.URL.Path == InternalPingURL {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	// default headers
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Length", "0")
