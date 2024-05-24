@@ -2,7 +2,6 @@ package s3
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -157,12 +157,17 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int64,
 	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
+
+	tracelog.DebugLogger.Printf("list pages start\n")
 	var err error
 	if folder.config.UseListObjectsV1 {
+		tracelog.DebugLogger.Printf("list pages v1\n")
 		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, listFunc)
 	} else {
+		tracelog.DebugLogger.Printf("list pages v2\n")
 		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, listFunc)
 	}
+	tracelog.DebugLogger.Printf("list pages end\n")
 	return err
 }
 
@@ -212,11 +217,18 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *Folder) Validate() error {
-	err := folder.listObjectsPages(nil, nil, aws.Int64(1),
-		func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {})
-	if err != nil {
-		return fmt.Errorf("bad credentials: %w", err)
+	tracelog.DebugLogger.Printf("validation start inside folder\n")
+	prefix := aws.String(folder.path)
+	delimiter := aws.String("/")
+	b := int64(1)
+	a := &s3.ListObjectsInput{
+		Bucket:    folder.bucket,
+		Prefix:    prefix,
+		Delimiter: delimiter,
+		MaxKeys:   &b,
 	}
+	_, err := folder.s3API.ListObjects(a)
+	tracelog.DebugLogger.Printf("validation end inside folder\n")
 	return err
 }
 

@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
@@ -656,12 +657,15 @@ func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
 
 func (mf Folder) Validate() error {
 	errs := make([]error, 0)
+	tracelog.DebugLogger.Printf("validation start\n")
+	tracelog.DebugLogger.Printf("validate folders: %d\n", len(mf.usedFolders))
 	for _, folder := range mf.usedFolders {
 		err := folder.Validate()
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
+	tracelog.DebugLogger.Printf("validation end\n")
 	return errors.Join(errs...)
 }
 
