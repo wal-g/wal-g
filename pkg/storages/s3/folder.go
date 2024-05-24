@@ -155,14 +155,13 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 }
 
 func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int64,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
-	var err error
+	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) (err error) {
 	if folder.config.UseListObjectsV1 {
 		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, listFunc)
 	} else {
 		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, listFunc)
 	}
-	return err
+	return
 }
 
 func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string, maxKeys *int64,
