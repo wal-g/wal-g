@@ -217,18 +217,16 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *Folder) Validate() error {
-	tracelog.DebugLogger.Printf("validation start inside folder\n")
 	prefix := aws.String(folder.path)
 	delimiter := aws.String("/")
-	b := int64(1)
-	a := &s3.ListObjectsInput{
+	int64One := int64(1)
+	input := &s3.ListObjectsInput{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
 		Delimiter: delimiter,
-		MaxKeys:   &b,
+		MaxKeys:   &int64One,
 	}
-	_, err := folder.s3API.ListObjects(a)
-	tracelog.DebugLogger.Printf("validation end inside folder\n")
+	_, err := folder.s3API.ListObjects(input)
 	return err
 }
 

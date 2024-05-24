@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -68,12 +67,10 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 	}
 
 	if !config.SkipValidation {
-		tracelog.DebugLogger.Printf("validation start s3\n")
 		err = folder.Validate()
 		if err != nil {
 			return nil, err
 		}
-		tracelog.DebugLogger.Printf("validation end s3\n")
 	}
 
 	hash, err := storage.ComputeConfigHash("s3", config)
