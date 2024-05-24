@@ -93,7 +93,7 @@ COMPLIANCE mode prohibits deletion for everyone before retention period is over.
 
 * `S3_SKIP_VALIDATION`
 
-By default wal-g validates s3 credentials before work. If you want to desable validation, set this setting to false.
+By default wal-g validates s3 credentials before work. If you want to desable validation, set this setting to true.
 
 GCS
 -----------
