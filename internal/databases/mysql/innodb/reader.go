@@ -59,6 +59,9 @@ func (r *PageReader) ReadRaw(pn PageNumber) (RawPage, error) {
 
 	page := make([]byte, r.PageSize)
 	_, err = r.file.Read(page)
+	if err == io.EOF {
+		return RawPage{}, err
+	}
 	tracelog.ErrorLogger.FatalfOnError("read page: %v", err) // FIXME: is it ok for compressed pages?
 
 	return RawPage{
