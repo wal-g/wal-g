@@ -124,7 +124,6 @@ func (header FILHeader) GetCompressedData() CompressedMeta {
 	}
 }
 
-// FILTrailer is used to detect page corruptions. InnoDB checks it on every read from disk.
 type FILTrailer struct {
 	OldStyleChecksum uint32 // deprecated
 	LowLSN           uint32 // low 32 bytes of LastModifiedLSN
@@ -133,7 +132,9 @@ type FILTrailer struct {
 const FILTrailerSize = 8
 
 func readTrailer(page []byte) FILTrailer {
-	return FILTrailer{} // FIXME: who cares?
+	// FILTrailer is used to detect page corruptions. InnoDB checks it on every read from disk.
+	// We don't
+	return FILTrailer{}
 }
 
 // Space is a container for pages (up to 2**32 pages). PageNumber just an offset in Space (measured in pages, not bytes).
@@ -178,35 +179,14 @@ func readTrailer(page []byte) FILTrailer {
 // 1 bit  at offset 14: SDI
 type FSPFlags uint32
 
-// FSP_HDR - PageTypeFileSpaceHeader
-// 112 bytes
-type FileSpaceHeader struct {
-	SpaceID                      SpaceID
-	HighestPageNumberInFile      PageNumber // size
-	HighestPageNumberInitialized PageNumber // free_limit
-	Flags                        FSPFlags
-	// other fields
-}
-
-func readFileSpaceHeader(page []byte) FileSpaceHeader {
-	return FileSpaceHeader{
-		SpaceID: SpaceID(binary.BigEndian.Uint32(page[38:42])),
-		// unused 4 bytes
-		HighestPageNumberInFile:      PageNumber(binary.BigEndian.Uint32(page[46:50])),
-		HighestPageNumberInitialized: PageNumber(binary.BigEndian.Uint32(page[50:54])),
-		Flags:                        FSPFlags(binary.BigEndian.Uint32(page[54:58])),
-		// other fields
-	}
-}
-
 // nolint:unused
 func (flags FSPFlags) compressedPageSize() uint16 {
-	return 512 * uint16((uint32(flags)&uint32(0b00000000_00011110))>>1) // FIXME: 512?
+	return 512 * uint16((uint32(flags)&uint32(0b00000000_00011110))>>1)
 }
 
 // nolint:unused
 func (flags FSPFlags) pageSize() uint16 {
-	return 512 * uint16((uint32(flags)&uint32(0b00011_11000000))>>6) // FIXME: 512?
+	return 512 * uint16((uint32(flags)&uint32(0b00011_11000000))>>6)
 }
 
 // nolint:unused
@@ -227,4 +207,25 @@ func (flags FSPFlags) isTemporary() bool {
 // nolint:unused
 func (flags FSPFlags) isEncrypted() bool {
 	return (uint32(flags) & uint32(0b00010000_00000000)) != 0
+}
+
+// FSP_HDR - PageTypeFileSpaceHeader
+// 112 bytes
+type FileSpaceHeader struct {
+	SpaceID                      SpaceID
+	HighestPageNumberInFile      PageNumber // size
+	HighestPageNumberInitialized PageNumber // free_limit
+	Flags                        FSPFlags
+	// other fields
+}
+
+func readFileSpaceHeader(page []byte) FileSpaceHeader {
+	return FileSpaceHeader{
+		SpaceID: SpaceID(binary.BigEndian.Uint32(page[38:42])),
+		// unused 4 bytes
+		HighestPageNumberInFile:      PageNumber(binary.BigEndian.Uint32(page[46:50])),
+		HighestPageNumberInitialized: PageNumber(binary.BigEndian.Uint32(page[50:54])),
+		Flags:                        FSPFlags(binary.BigEndian.Uint32(page[54:58])),
+		// other fields
+	}
 }
