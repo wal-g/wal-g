@@ -199,21 +199,32 @@ func readFileSpaceHeader(page []byte) FileSpaceHeader {
 	}
 }
 
+// nolint:unused
 func (flags FSPFlags) compressedPageSize() uint16 {
 	return 512 * uint16((uint32(flags)&uint32(0b00000000_00011110))>>1) // FIXME: 512?
 }
+
+// nolint:unused
 func (flags FSPFlags) pageSize() uint16 {
 	return 512 * uint16((uint32(flags)&uint32(0b00011_11000000))>>6) // FIXME: 512?
 }
+
+// nolint:unused
 func (flags FSPFlags) isDataDir() bool {
 	return (uint32(flags) & uint32(0b00000010_00000000)) != 0
 }
+
+// nolint:unused
 func (flags FSPFlags) isShared() bool {
 	return (uint32(flags) & uint32(0b00000100_00000000)) != 0
 }
+
+// nolint:unused
 func (flags FSPFlags) isTemporary() bool {
 	return (uint32(flags) & uint32(0b00001000_00000000)) != 0
 }
+
+// nolint:unused
 func (flags FSPFlags) isEncrypted() bool {
 	return (uint32(flags) & uint32(0b00010000_00000000)) != 0
 }

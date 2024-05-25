@@ -130,7 +130,7 @@ func (sink *decompressFileSink) repairSparse() error {
 		if err == io.EOF {
 			return nil
 		}
-		pageNumber += 1
+		pageNumber++
 		tracelog.ErrorLogger.FatalOnError(err) // FIXME: in future we can ignore such errors
 
 		if page.Header.PageType == innodb.PageTypeCompressed {
@@ -147,7 +147,6 @@ func (sink *decompressFileSink) repairSparse() error {
 			}
 		}
 	}
-	return nil
 }
 
 type dataSinkFactory struct {
