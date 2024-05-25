@@ -3,6 +3,7 @@ package xbstream
 import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 	"github.com/wal-g/wal-g/utility"
@@ -14,6 +15,7 @@ import (
 
 type dataSink interface {
 	io.Closer
+	// Process should read all data in `chunk` before returning from method
 	Process(chunk *Chunk)
 }
 
@@ -63,26 +65,27 @@ func newDecompressFileSink(file *os.File, decompressor compression.Decompressor)
 	// xbstream is a simple archive format. Compression / encryption / delta-files are xtrabackup features.
 	// so, all chunks of one compressed file is a _single_ stream
 	// we should combine data from all file chunks in a single io.Reader before passing to Decompressor:
-	writeHere := make(chan []byte)
-	fileCloseChan := make(chan struct{})
-	reader := splitmerge.NewChannelReader(writeHere)
+	sink := decompressFileSink{
+		file:          file,
+		writeHere:     make(chan []byte),
+		fileCloseChan: make(chan struct{}),
+	}
+	reader := splitmerge.NewChannelReader(sink.writeHere)
 	readHere, err := decompressor.Decompress(reader)
 	tracelog.ErrorLogger.FatalfOnError("Cannot decompress: %v", err)
 
 	go func() {
 		_, err := io.Copy(file, readHere)
+		tracelog.ErrorLogger.FatalfOnError("Cannot copy data: %v", err)
+		err = sink.repairSparse()
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("Cannot copy data: %v", err)
+			tracelog.WarningLogger.Printf("Error during repairSparse(): %v", err)
 		}
 		utility.LoggedClose(file, "datasink.Close()")
-		close(fileCloseChan)
+		close(sink.fileCloseChan)
 	}()
 
-	return &decompressFileSink{
-		file:          file,
-		writeHere:     writeHere,
-		fileCloseChan: fileCloseChan,
-	}
+	return &sink
 }
 
 func (sink *decompressFileSink) Close() error {
@@ -92,7 +95,6 @@ func (sink *decompressFileSink) Close() error {
 }
 
 func (sink *decompressFileSink) Process(chunk *Chunk) {
-	// FIXME: check whether encrypted or compressed fields doesn't support Sparse writes
 	if len(chunk.SparseMap) != 0 {
 		tracelog.ErrorLogger.Fatalf("Found compressed file %v with sparse map", chunk.Path)
 	}
@@ -106,6 +108,40 @@ func (sink *decompressFileSink) Process(chunk *Chunk) {
 	_, err := io.ReadFull(chunk, buffer)
 	tracelog.ErrorLogger.FatalfOnError("ReadFull %v", err)
 	sink.writeHere <- buffer
+}
+
+func (sink *decompressFileSink) repairSparse() error {
+	if !strings.HasSuffix(sink.file.Name(), "idb") {
+		return nil
+	}
+	_, err := sink.file.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	// FIXME: we should open file for read!
+	pageReader := innodb.NewPageReader(sink.file)
+	pageNumber := 1
+	for {
+		page, err := pageReader.ReadRaw(innodb.PageNumber(pageNumber))
+		if err == io.EOF {
+			return nil
+		}
+		pageNumber += 1
+
+		tracelog.ErrorLogger.FatalOnError(err) // FIXME: warning only?
+		if page.Header.PageType == innodb.PageTypeCompressed {
+			// do punch hole, if possible
+			meta := page.Header.GetCompressedData()
+			if meta.CompressedSize < pageReader.PageSize {
+				offset := int64(page.Header.PageNumber)*int64(pageReader.PageSize) + int64(meta.CompressedSize)
+				size := int64(pageReader.PageSize - meta.CompressedSize)
+				err = ioextensions.PunchHole(sink.file, offset, size)
+				tracelog.ErrorLogger.FatalfOnError("fallocate: %v", err)
+			}
+		}
+	}
+	return nil
 }
 
 type dataSinkFactory struct {

@@ -3,9 +3,8 @@ package xbstream
 import (
 	"bytes"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/testutils"
 	"io"
-	"strconv"
-	"strings"
 	"testing"
 )
 
@@ -24,7 +23,7 @@ func TestXBStreamReader(t *testing.T) {
 	00000070  61 38 dd 77 6f 72 6c 64  0a 58 42 53 54 43 4b 30  |a8.world.XBSTCK0|
 	00000080  31 00 45 09 00 00 00 74  65 73 74 32 2e 74 78 74  |1.E....test2.txt|`
 
-	xbBytes := hexToBytes(hexFile)
+	xbBytes := testutils.HexToBytes(hexFile)
 	reader := NewReader(bytes.NewReader(xbBytes), true)
 
 	// test1.txt
@@ -135,7 +134,7 @@ func TestXBStreamReader_with_sparse(t *testing.T) {
 		00c882e1  53 54 43 4b 30 31 00 45  10 00 00 00 73 75 70 65  |STCK01.E....supe|
 		00c882f1  72 64 62 2f 74 65 73 74  2e 69 62 64              |rdb/test.ibd|`
 
-	xbBytes := hexToBytes(hexFile)
+	xbBytes := testutils.HexToBytes(hexFile)
 	reader := NewReader(bytes.NewReader(xbBytes), true)
 
 	// superdb/test.ibd
@@ -178,53 +177,4 @@ func TestXBStreamReader_with_sparse(t *testing.T) {
 
 	_, err = reader.Next()
 	assert.Equal(t, err, io.EOF)
-}
-
-func hexToBytes(hex string) []byte {
-	result := make([]byte, 0)
-	lastOffset := int64(0)
-	currentOffset := int64(0)
-	gapObserved := false
-	for _, line := range strings.Split(hex, "\n") {
-		line = strings.Trim(line, " \t")
-		if len(line) == 0 {
-			continue
-		}
-
-		if line == "*" {
-			if gapObserved {
-				panic("two lines of gap in hex")
-			}
-			gapObserved = true
-			continue
-		}
-
-		runes := []rune(line)
-		currentOffset, _ = strconv.ParseInt(string(runes[:8]), 16, 0)
-		line = string(runes[10:58])
-
-		if gapObserved {
-			// add N rows of zeroes:
-			zeroes := make([]byte, 16)
-			rows := (currentOffset - (lastOffset + 16)) / 16
-			for i := 0; i < int(rows); i++ {
-				result = append(result, zeroes...)
-			}
-			gapObserved = false
-		}
-		lastOffset = currentOffset
-
-		for _, num := range strings.Split(line, " ") {
-			if len(num) == 0 {
-				continue
-			}
-			// parse as int16 because FF doesn't fit signed int8
-			num, err := strconv.ParseInt(num, 16, 16)
-			if err != nil {
-				panic(err)
-			}
-			result = append(result, byte(num))
-		}
-	}
-	return result
 }
