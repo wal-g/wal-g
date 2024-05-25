@@ -173,6 +173,10 @@ func (dsf *dataSinkFactory) NewDataSink(path string) dataSink {
 	path = dsf.MapDataSinkPath(path)
 
 	filePath := filepath.Join(dsf.output, path)
+	if !utility.IsInDirectory(filePath, dsf.output) {
+		tracelog.ErrorLogger.Fatalf("xbstream tries to create file outside destination directory: %v", path)
+	}
+
 	err = os.MkdirAll(filepath.Dir(filePath), 0777)
 	tracelog.ErrorLogger.FatalfOnError("Cannot create new file: %v", err)
 
