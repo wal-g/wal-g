@@ -70,11 +70,13 @@ func TestFILHeader_Compressed(t *testing.T) {
 	assert.Equal(t, expected, header)
 
 	meta := expected.GetCompressedData()
+	// 0x020100053fda0035
 	assert.Equal(t, CompressedMeta{
-		Version:         53,
-		CompressionAlgo: 0,
-		OrigPageType:    PageTypeAllocated,
-		OrigDataSize:    0,
-		CompressedSize:  0},
+		Version:         0x02,
+		CompressionAlgo: 0x01,
+		OrigPageType:    PageTypeIBufBitmap,
+		OrigDataSize:    16346,
+		CompressedSize:  53,
+	},
 		meta)
 }

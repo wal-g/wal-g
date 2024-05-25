@@ -55,22 +55,33 @@ const (
 	PageTypeZLOBIndex            PageType = 27
 	PageTypeZLOBFragment         PageType = 28
 	PageTypeZLOBFragmentEntry    PageType = 29
-	PageTypeMAX                  PageType = PageTypeZLOBFragmentEntry
+	PageTypeSDI                  PageType = 17853 // Tablespace SDI Index page
+	PageTypeRtree                PageType = 17854
+	PageTypeIndex                PageType = 17855
 )
 
 // Documentation: https://dev.mysql.com/doc/internals/en/innodb-fil-header.html
 // ruby: https://blog.jcole.us/innodb/
 // java: https://github.com/alibaba/innodb-java-reader/blob/master/innodb-java-reader
+// go:   https://github.com/jemuelmiao/parseibd
 
 type FILHeader struct {
-	Checksum        uint32
-	PageNumber      PageNumber
-	PreviousPage    uint32 // logical link to same-level Index pages // SRV_VERSION for 0-page
-	NextPage        uint32 // logical link to same-level Index pages // SPACE_VERSION for 0-page
+	Checksum   uint32
+	PageNumber PageNumber
+	// logical link to same-level Index pages
+	// SRV_VERSION for 0-page
+	PreviousPage uint32
+	// logical link to same-level Index pages
+	// SPACE_VERSION for 0-page
+	NextPage        uint32
 	LastModifiedLSN LSN
 	PageType        PageType
-	FlushLSN        LSN // used as LSN in page (0:0), As multiple values in FIL_PAGE_COMPRESSED, and somehow in FIL_RTREE_SPLIT_SEQ_NUM
-	SpaceID         SpaceID
+	// LSN in 0-page (0:0)
+	// set of flags in FIL_PAGE_COMPRESSED pages
+	// something values IL_RTREE_SPLIT_SEQ_NUM
+	// 0/unused for all other pages
+	FlushLSN LSN
+	SpaceID  SpaceID
 }
 
 const FILHeaderSize = 38
@@ -89,7 +100,7 @@ func readHeader(page []byte) FILHeader {
 }
 
 type CompressedMeta struct {
-	Version         uint8
+	Version         uint8 // values 1 and 2 are supported by Innodb
 	CompressionAlgo uint8
 	OrigPageType    PageType
 	OrigDataSize    uint16
@@ -100,15 +111,20 @@ func (header FILHeader) GetCompressedData() CompressedMeta {
 	if header.PageType != PageTypeCompressed {
 		return CompressedMeta{}
 	}
+	// write it to 64-bit as it was on disk
+	raw := [8]byte{}
+	binary.BigEndian.PutUint64(raw[:], uint64(header.FlushLSN))
+	// read it 'from disk':
 	return CompressedMeta{
-		Version:         uint8(header.FlushLSN & 0x00000000_000000FF),
-		CompressionAlgo: uint8((header.FlushLSN & 0x00000000_0000FF00) >> 2),
-		OrigPageType:    PageType(uint16((header.FlushLSN & 0x00000000_FFFF0000) >> 6)),
-		OrigDataSize:    uint16((header.FlushLSN & 0x0000FFFF_00000000) >> 8),
-		CompressedSize:  uint16((header.FlushLSN & 0xFFFF0000_00000000) >> 12),
+		Version:         raw[0],
+		CompressionAlgo: raw[1],
+		OrigPageType:    PageType(binary.BigEndian.Uint16(raw[2:])),
+		OrigDataSize:    binary.BigEndian.Uint16(raw[4:]),
+		CompressedSize:  binary.BigEndian.Uint16(raw[6:]),
 	}
 }
 
+// FILTrailer is used to detect page corruptions. InnoDB checks it on every read from disk.
 type FILTrailer struct {
 	OldStyleChecksum uint32 // deprecated
 	LowLSN           uint32 // low 32 bytes of LastModifiedLSN
@@ -132,22 +148,22 @@ func readTrailer(page []byte) FILTrailer {
 // One (Table)Space can contain multiple 'files' that called 'segments'
 // Segment grows: 32pages at first, then by 1-4 extents.
 
-// System (Table)Space always starts from pages:
-// #0 - FSP_HDR (File Space Header)
-// #1 - IBUF_BITMAP
-// #2 - INODE page - lists of related segments (files)
-// #3 - SYS
-// #4 - INDEX
-// #5 - TRX_SYS
-// #6 - SYS
-// #7 - SYS
+// System (Table)Space always starts from following pages:
+// page #0 - FSP_HDR (File Space Header)
+// page #1 - IBUF_BITMAP
+// page #2 - INODE page - lists of related segments (files)
+// page #3 - SYS
+// page #4 - INDEX
+// page #5 - TRX_SYS
+// page #6 - SYS
+// page #7 - SYS
 // ...
-// #64..$192 DoubleWrite Buffer blocks (1st and 2nd)
-// ..
+// page  #64..$192 DoubleWrite Buffer blocks (1st and 2nd)
+// ...
 
 // Per-Table Space:
-// #1 - FSP_HDR
-// #2 - IBUF_BITMAP
+// page  #1 - FSP_HDR
+// page  #2 - IBUF_BITMAP
 // ...
 
 // FSPFlags is a bit set:

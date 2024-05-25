@@ -115,7 +115,7 @@ func (sink *decompressFileSink) Process(chunk *Chunk) {
 }
 
 func (sink *decompressFileSink) repairSparse() error {
-	if !strings.HasSuffix(sink.file.Name(), "idb") {
+	if !strings.HasSuffix(sink.file.Name(), "ibd") {
 		return nil
 	}
 	_, err := sink.file.Seek(0, io.SeekStart)
@@ -123,7 +123,6 @@ func (sink *decompressFileSink) repairSparse() error {
 		return err
 	}
 
-	// FIXME: we should open file for read!
 	pageReader := innodb.NewPageReader(sink.file)
 	pageNumber := 1
 	for {
@@ -132,8 +131,8 @@ func (sink *decompressFileSink) repairSparse() error {
 			return nil
 		}
 		pageNumber += 1
+		tracelog.ErrorLogger.FatalOnError(err) // FIXME: in future we can ignore such errors
 
-		tracelog.ErrorLogger.FatalOnError(err) // FIXME: warning only?
 		if page.Header.PageType == innodb.PageTypeCompressed {
 			// do punch hole, if possible
 			meta := page.Header.GetCompressedData()
@@ -178,7 +177,7 @@ func (dsf *dataSinkFactory) NewDataSink(path string) dataSink {
 	err = os.MkdirAll(filepath.Dir(filePath), 0777)
 	tracelog.ErrorLogger.FatalfOnError("Cannot create new file: %v", err)
 
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
 	tracelog.ErrorLogger.FatalfOnError("Cannot open new file for write: %v", err)
 
 	if dsf.decompress {
