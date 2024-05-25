@@ -15,7 +15,7 @@ type RawPage struct {
 
 type PageReader struct {
 	file     *os.File
-	SpaceId  SpaceID
+	SpaceID  SpaceID
 	PageSize uint16
 }
 
@@ -47,7 +47,7 @@ func NewPageReader(f *os.File) *PageReader {
 
 	return &PageReader{
 		file:     f,
-		SpaceId:  header.SpaceID,
+		SpaceID:  header.SpaceID,
 		PageSize: pageSize,
 	}
 }
