@@ -62,7 +62,8 @@ func (r *PageReader) ReadRaw(pn PageNumber) (RawPage, error) {
 	if err == io.EOF {
 		return RawPage{}, err
 	}
-	tracelog.ErrorLogger.FatalfOnError("read page: %v", err) // FIXME: is it ok for compressed pages?
+	// we don't expect UnexpectedEOF here (even compressed pages are always PageSize bytes)
+	tracelog.ErrorLogger.FatalfOnError("read page: %v", err)
 
 	return RawPage{
 		Header:  readHeader(page),
