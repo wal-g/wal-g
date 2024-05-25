@@ -180,7 +180,7 @@ func (dsf *dataSinkFactory) NewDataSink(path string) dataSink {
 	err = os.MkdirAll(filepath.Dir(filePath), 0777)
 	tracelog.ErrorLogger.FatalfOnError("Cannot create new file: %v", err)
 
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0666)
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_RDWR|syscall.O_NOFOLLOW, 0666)
 	tracelog.ErrorLogger.FatalfOnError("Cannot open new file for write: %v", err)
 
 	if dsf.decompress {
