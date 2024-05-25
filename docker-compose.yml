@@ -132,6 +132,7 @@ services:
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay
       &&  mkdir -p /export/mysqlpermanentbackupbucket
+      &&  mkdir -p /export/mysqlxtrabackupextractbucket
       &&  mkdir -p /export/mariadb_binlog_push_fetch
       &&  mkdir -p /export/mariadb_binlog_push_with_gtids_check
       &&  mkdir -p /export/mariadb_full_mysqldump
