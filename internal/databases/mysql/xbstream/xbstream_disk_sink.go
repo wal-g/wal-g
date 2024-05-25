@@ -1,6 +1,7 @@
 package xbstream
 
 import (
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 type dataSink interface {
@@ -45,7 +47,9 @@ func (sink *simpleFileSink) Process(chunk *Chunk) {
 			off, err := sink.file.Seek(int64(schunk.SkipBytes), io.SeekCurrent)
 			tracelog.ErrorLogger.FatalfOnError("seek: %v", err)
 			err = ioextensions.PunchHole(sink.file, off-int64(schunk.SkipBytes), int64(schunk.SkipBytes))
-			tracelog.ErrorLogger.FatalfOnError("fallocate: %v", err)
+			if !errors.Is(err, syscall.EOPNOTSUPP) {
+				tracelog.ErrorLogger.FatalfOnError("fallocate: %v", err)
+			}
 			_, err = io.CopyN(sink.file, chunk, int64(schunk.WriteBytes))
 			tracelog.ErrorLogger.FatalfOnError("copyN: %v", err)
 		}
@@ -137,6 +141,9 @@ func (sink *decompressFileSink) repairSparse() error {
 				offset := int64(page.Header.PageNumber)*int64(pageReader.PageSize) + int64(meta.CompressedSize)
 				size := int64(pageReader.PageSize - meta.CompressedSize)
 				err = ioextensions.PunchHole(sink.file, offset, size)
+				if errors.Is(err, syscall.EOPNOTSUPP) {
+					return nil // ok
+				}
 				tracelog.ErrorLogger.FatalfOnError("fallocate: %v", err)
 			}
 		}
