@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
@@ -662,7 +663,11 @@ func (mf Folder) Validate() error {
 			errs = append(errs, err)
 		}
 	}
-	return errors.Join(errs...)
+	if len(errs) == len(mf.usedFolders) {
+		return ErrNoAliveStorages
+	}
+	tracelog.WarningLogger.Printf("Some storages can`t be accessed %v", errors.Join(errs...))
+	return nil
 }
 
 var (
