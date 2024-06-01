@@ -28,6 +28,7 @@ const (
 	BufferSizeSetting = "AZURE_BUFFER_SIZE"
 	MaxBuffersSetting = "AZURE_MAX_BUFFERS"
 	TryTimeoutSetting = "AZURE_TRY_TIMEOUT"
+	ClientIDSetting   = "AZURE_CLIENT_ID"
 	minBufferSize     = 1024
 	defaultBufferSize = 8 * 1024 * 1024
 	minBuffers        = 1
@@ -40,8 +41,9 @@ const (
 type AzureAuthType string
 
 const (
-	AzureAccessKeyAuth AzureAuthType = "AzureAccessKeyAuth"
-	AzureSASTokenAuth  AzureAuthType = "AzureSASTokenAuth"
+	AzureAccessKeyAuth       AzureAuthType = "AzureAccessKeyAuth"
+	AzureSASTokenAuth        AzureAuthType = "AzureSASTokenAuth"
+	AzureManagedIdentityAuth AzureAuthType = "AzureManagedIdentityAuth"
 )
 
 var SettingList = []string{
@@ -52,6 +54,7 @@ var SettingList = []string{
 	EndpointSuffix,
 	BufferSizeSetting,
 	MaxBuffersSetting,
+	ClientIDSetting,
 }
 
 func NewFolderError(err error, format string, args ...interface{}) storage.Error {
@@ -76,6 +79,31 @@ func NewFolder(
 		timeout,
 		path,
 	}
+}
+
+func getContainerClientWithManagedIndetity(
+	accountName string,
+	storageEndpointSuffix string,
+	containerName string,
+	timeout time.Duration,
+	clientID string) (*azblob.ContainerClient, error) {
+	cred, err := azidentity.NewManagedIdentityCredential(&azidentity.ManagedIdentityCredentialOptions{
+		ID: azidentity.ClientID(clientID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	containerURLString := fmt.Sprintf("https://%s.blob.%s/%s", accountName, storageEndpointSuffix, containerName)
+	_, err = url.Parse(containerURLString)
+	if err != nil {
+		return nil, NewFolderError(err, "Unable to parse service URL")
+	}
+
+	containerClient, err := azblob.NewContainerClient(containerURLString, cred, &azblob.ClientOptions{
+		Retry: policy.RetryOptions{TryTimeout: timeout},
+	})
+	return containerClient, err
 }
 
 func getContainerClientWithSASToken(
@@ -136,9 +164,9 @@ func getContainerClient(
 	return containerClient, err
 }
 
-func configureAuthType(settings map[string]string) (AzureAuthType, string, string) {
+func configureAuthType(settings map[string]string) (AzureAuthType, string, string, string) {
 	var ok bool
-	var accountToken, accessKey string
+	var accountToken, accessKey, clientID string
 	var authType AzureAuthType
 
 	if accessKey, ok = settings[AccessKeySetting]; ok {
@@ -149,9 +177,11 @@ func configureAuthType(settings map[string]string) (AzureAuthType, string, strin
 		if !strings.HasPrefix(accountToken, "?") {
 			accountToken = "?" + accountToken
 		}
+	} else if clientID, ok = settings[ClientIDSetting]; ok {
+		authType = AzureManagedIdentityAuth
 	}
 
-	return authType, accountToken, accessKey
+	return authType, accountToken, accessKey, clientID
 }
 
 func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder, error) {
@@ -161,7 +191,7 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		return nil, NewCredentialError(AccountSetting)
 	}
 
-	authType, accountToken, accountKey := configureAuthType(settings)
+	authType, accountToken, accountKey, clientID := configureAuthType(settings)
 
 	var credential *azblob.SharedKeyCredential
 	var err error
@@ -201,6 +231,8 @@ func ConfigureFolder(prefix string, settings map[string]string) (storage.Folder,
 		containerClient, err = getContainerClientWithSASToken(accountName, storageEndpointSuffix, containerName, timeout, accountToken)
 	} else if authType == AzureAccessKeyAuth {
 		containerClient, err = getContainerClientWithAccessKey(accountName, storageEndpointSuffix, containerName, timeout, credential)
+	} else if authType == AzureManagedIdentityAuth {
+		containerClient, err = getContainerClientWithManagedIndetity(accountName, storageEndpointSuffix, containerName, timeout, clientID)
 	} else {
 		// No explicitly configured auth method, try the default credential chain
 		containerClient, err = getContainerClient(accountName, storageEndpointSuffix, containerName, timeout)
