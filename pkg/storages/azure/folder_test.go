@@ -2,6 +2,7 @@ package azure
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -22,24 +23,47 @@ var ConfigureAuthType = configureAuthType
 
 func TestConfigureAccessKeyAuthType(t *testing.T) {
 	settings := map[string]string{AccessKeySetting: "foo"}
-	authType, accountToken, accessKey := ConfigureAuthType(settings)
+	authType, accountToken, accessKey, clientID := ConfigureAuthType(settings)
 	assert.Equal(t, authType, AzureAccessKeyAuth)
 	assert.Empty(t, accountToken)
 	assert.Equal(t, accessKey, "foo")
+	assert.Empty(t, clientID)
 }
 
 func TestConfigureSASTokenAuth(t *testing.T) {
 	settings := map[string]string{SasTokenSetting: "foo"}
-	authType, accountToken, accessKey := ConfigureAuthType(settings)
+	authType, accountToken, accessKey, clientID := ConfigureAuthType(settings)
 	assert.Equal(t, authType, AzureSASTokenAuth)
 	assert.Equal(t, accountToken, "?foo")
 	assert.Empty(t, accessKey)
+	assert.Empty(t, clientID)
 }
 
 func TestConfigureDefaultAuth(t *testing.T) {
 	settings := make(map[string]string)
-	authType, accountToken, accessKey := ConfigureAuthType(settings)
+	authType, accountToken, accessKey, clientID := ConfigureAuthType(settings)
 	assert.Empty(t, authType)
 	assert.Empty(t, accountToken)
 	assert.Empty(t, accessKey)
+	assert.Empty(t, clientID)
+}
+
+func TestConfigureManagedIdentityAuth(t *testing.T) {
+	settings := map[string]string{ClientIDSetting: "foo"}
+	authType, accountToken, accessKey, clientID := ConfigureAuthType(settings)
+	assert.Equal(t, authType, AzureManagedIdentityAuth)
+	assert.Empty(t, accountToken)
+	assert.Empty(t, accessKey)
+	assert.Equal(t, clientID, "foo")
+}
+func TestGetContainerClientWithManagedIdentity(t *testing.T) {
+	accountName := "test-account"
+	storageEndpointSuffix := "test-endpoint"
+	containerName := "test-container"
+	timeout := time.Minute
+	clientID := "test-client-id"
+
+	containerClient, err := getContainerClientWithManagedIndetity(accountName, storageEndpointSuffix, containerName, timeout, clientID)
+	assert.NoError(t, err)
+	assert.NotNil(t, containerClient)
 }
