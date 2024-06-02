@@ -59,7 +59,7 @@ func (cl *S3Client) List(path string) ([]string, error) {
 		return nil, fmt.Errorf("error listing bucket: %v", err)
 	}
 
-	var keys []string
+	keys := make([]string, 0)
 	for _, object := range resp.Contents {
 		keys = append(keys, *object.Key)
 	}

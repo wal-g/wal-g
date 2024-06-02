@@ -100,7 +100,7 @@ func UsedStorages(folder storage.Folder) []string {
 		return []string{consts.DefaultStorage}
 	}
 
-	var storageNames []string
+	storageNames := make([]string, 0)
 	for _, s := range mf.usedFolders {
 		storageNames = append(storageNames, s.StorageName)
 	}
