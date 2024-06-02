@@ -522,7 +522,7 @@ func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, 
 	}
 
 	// errClosers are needed to close already configured storages if failed to configure all of them.
-	errClosers := make([]io.Closer, 0)
+	var errClosers []io.Closer
 	defer func() {
 		if err == nil {
 			return

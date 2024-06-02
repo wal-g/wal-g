@@ -256,7 +256,7 @@ install_tools:
 	cd $(TOOLS_MOD_DIR) && go install golang.org/x/tools/cmd/goimports
 	$(warning Please run make docker_lint for lint. It is unreliable to use self-compiled golangci-lint. \
 		https://golangci-lint.run/usage/install/#install-from-source)
-	cd $(TOOLS_MOD_DIR) && go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.0
+	cd $(TOOLS_MOD_DIR) && go install github.com/golangci/golangci-lint/cmd/golangci-lint
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)

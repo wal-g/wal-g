@@ -60,7 +60,7 @@ func (ld *ListDirectory) Type() ListElementType {
 }
 
 func HandleFolderList(folder storage.Folder, recursive bool) error {
-	list := make([]ListElement, 0)
+	var list []ListElement
 	var folderObjects []storage.Object
 	var err error
 

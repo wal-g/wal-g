@@ -3,6 +3,11 @@ package postgres
 import (
 	"encoding/gob"
 	"fmt"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/fs"
 	"net"
@@ -10,12 +15,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleCatchupSend(pgDataDirectory string, destination string) {
@@ -165,7 +164,7 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 }
 
 func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool) {
-	filesToDelete := make([]string, 0)
+	var filesToDelete []string
 	for k := range list {
 		if _, ok := seenFiles[k]; ok {
 			continue

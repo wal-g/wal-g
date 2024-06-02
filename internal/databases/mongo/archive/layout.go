@@ -175,7 +175,7 @@ func OldestBackupAfterTime(backups []*models.Backup, after time.Time) (*models.B
 func SelectPurgingOplogArchives(archives []models.Archive,
 	backups []*models.Backup,
 	retainAfterTS *models.Timestamp) []models.Archive {
-	purgeArchives := make([]models.Archive, 0)
+	var purgeArchives []models.Archive
 	var arch models.Archive
 	for i := range archives {
 		arch = archives[i]

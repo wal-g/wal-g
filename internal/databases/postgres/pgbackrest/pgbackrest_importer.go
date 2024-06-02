@@ -90,7 +90,7 @@ func GetBackupList(backupsFolder storage.Folder, stanza string) ([]internal.Back
 		return nil, err
 	}
 
-	backupTimes := make([]internal.BackupTime, 0)
+	var backupTimes []internal.BackupTime
 	for i := range backupsSettings {
 		backupTimes = append(backupTimes, internal.BackupTime{
 			BackupName:  backupsSettings[i].Name,

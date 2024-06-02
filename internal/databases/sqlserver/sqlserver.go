@@ -230,7 +230,7 @@ func buildRestoreUrlsList(baseURL string, blobNames []string) []string {
 		// old-style single blob backup
 		return []string{baseURL}
 	}
-	res := make([]string, 0)
+	var res []string
 	for _, blobName := range blobNames {
 		res = append(res, fmt.Sprintf("%s/%s", baseURL, blobName))
 	}
@@ -382,13 +382,13 @@ func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Ti
 	if err != nil {
 		return nil, err
 	}
-	allLogNames := make([]string, 0)
+	var allLogNames []string
 	for _, logBackup := range logBackups {
 		allLogNames = append(allLogNames, path.Base(logBackup.GetPath()))
 	}
 	sort.Strings(allLogNames)
 
-	logNames := make([]string, 0)
+	var logNames []string
 	for _, name := range allLogNames {
 		logTS := name[len(LogNamePrefix):]
 		if logTS < startTS {

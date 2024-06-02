@@ -39,7 +39,7 @@ func WriteEnv(env map[string]string, w io.Writer) error {
 }
 
 func EnvToList(env map[string]string) []string {
-	result := make([]string, 0)
+	var result []string
 	for key, value := range env {
 		result = append(result, fmt.Sprintf("%s=%s", key, value))
 	}

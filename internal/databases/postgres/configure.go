@@ -22,7 +22,7 @@ import (
 // checkWrite should be true for operations supposes writing to the storage. It affects selecting R/O or R/W aliveness check.
 func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error) {
 	// errClosers are needed to close already configured storages if a fatal error happens before they are delegated to multi-storage.
-	errClosers := make([]io.Closer, 0)
+	var errClosers []io.Closer
 	defer func() {
 		if err == nil {
 			return
