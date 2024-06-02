@@ -64,7 +64,7 @@ func NewTxnOp(rawOp RawMongoOp) (*TxnOp, error) {
 	}
 
 	// Build exec functions for all transaction's operations
-	var fns []func(ctx context.Context, client *mongo.Client) OpInfo
+	fns := make([]func(ctx context.Context, client *mongo.Client) OpInfo, 0)
 	for _, opCmd := range op.Cmds {
 		cmd := opCmd
 		command := func(ctx context.Context, client *mongo.Client) OpInfo {

@@ -157,7 +157,7 @@ func LoadBackupsSettings(folder storage.Folder, stanza string) ([]BackupSettings
 		return nil, err
 	}
 
-	var backupsSettings []BackupSettings
+	backupsSettings := make([]BackupSettings, 0)
 	for _, key := range backupSection.Keys() {
 		settings := BackupSettings{
 			Name: key.Name(),

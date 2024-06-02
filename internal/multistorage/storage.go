@@ -109,7 +109,7 @@ func (ce *CloseError) Add(err error) {
 }
 
 func (ce *CloseError) Error() string {
-	errMsgs := make([]string, len(ce.specificStorageErrs))
+	errMsgs := make([]string, 0)
 	for _, e := range ce.specificStorageErrs {
 		errMsgs = append(errMsgs, e.Error())
 	}

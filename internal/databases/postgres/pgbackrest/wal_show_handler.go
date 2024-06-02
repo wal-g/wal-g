@@ -28,7 +28,7 @@ func HandleWalShow(rootFolder storage.Folder, stanza string, outputWriter postgr
 	}
 	walSequencesByTimelines := getWalSequencesByTimelines(walSegments)
 
-	var timelineInfos []*postgres.TimelineInfo
+	timelineInfos := make([]*postgres.TimelineInfo, 0)
 	for _, segmentsSequence := range walSequencesByTimelines {
 		historyRecords, err := postgres.GetTimeLineHistoryRecords(segmentsSequence.TimelineID, archiveFolder)
 		if err != nil {
@@ -62,7 +62,7 @@ func getWalSequencesByTimelines(segments []postgres.WalSegmentDescription) map[u
 }
 
 func getWalSegments(filenames []string) ([]postgres.WalSegmentDescription, error) {
-	var segments []postgres.WalSegmentDescription
+	segments := make([]postgres.WalSegmentDescription, 0)
 	for _, filename := range filenames {
 		extension := path.Ext(filename)
 		if extension == ".backup" || extension == ".history" {
