@@ -156,14 +156,13 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 }
 
 func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int64,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
-	var err error
+	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) (err error) {
 	if folder.config.UseListObjectsV1 {
 		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, listFunc)
 	} else {
 		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, listFunc)
 	}
-	return err
+	return
 }
 
 func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string, maxKeys *int64,
@@ -212,12 +211,20 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 func (folder *Folder) Validate() error {
-	err := folder.listObjectsPages(nil, nil, aws.Int64(1),
-		func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {})
-	if err != nil {
-		return fmt.Errorf("bad credentials: %w", err)
+	prefix := aws.String(folder.path)
+	delimiter := aws.String("/")
+	int64One := int64(1)
+	input := &s3.ListObjectsInput{
+		Bucket:    folder.bucket,
+		Prefix:    prefix,
+		Delimiter: delimiter,
+		MaxKeys:   &int64One,
 	}
-	return err
+	_, err := folder.s3API.ListObjects(input)
+	if err != nil {
+		return fmt.Errorf("bad credentials: %v", err)
+	}
+	return nil
 }
 
 func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {

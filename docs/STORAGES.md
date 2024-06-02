@@ -89,6 +89,11 @@ Sets retention period in seconds to files, uploaded to s3. Default is disabled w
 * `S3_RETENTION_MODE`
 
 Sets mode of retention (GOVERNANCE/COMPLIANCE). Default is GOVERNANCE, which means, that files can still be deleted if user has special permissions.
+COMPLIANCE mode prohibits deletion for everyone before retention period is over.
+
+* `S3_SKIP_VALIDATION`
+
+By default wal-g validates s3 credentials before work. If you want to desable validation, set this setting to true.
 
 GCS
 -----------
