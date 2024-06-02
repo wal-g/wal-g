@@ -53,6 +53,7 @@ func TestTryFindHighestTimelineID(t *testing.T) {
 		{
 			[]string{
 				"XXXXXXXX" + stub,
+				"5092RRRR" + stub,
 			},
 			uint32(0x0),
 		},
@@ -64,6 +65,13 @@ func TestTryFindHighestTimelineID(t *testing.T) {
 				"00000000" + stub,
 			},
 			uint32(0xaaaaaaaa),
+		},
+
+		{
+			[]string{
+				"50922468" + stub,
+			},
+			uint32(0x50922468),
 		},
 	}
 	for i, tc := range testCases {
