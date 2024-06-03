@@ -18,7 +18,6 @@ RUN git clone https://github.com/greenplum-db/gpdb-archive.git gpdb_src --single
 
 WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
- && ls \
  && sed -i 's/apt-get install/DEBIAN_FRONTEND=noninteractive apt-get install/g' README.Ubuntu.bash \
  && ./README.Ubuntu.bash \
  && wget -c https://archive.apache.org/dist/xerces/c/3/sources/xerces-c-3.2.0.tar.gz -O - | tar -xz \
