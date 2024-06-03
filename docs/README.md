@@ -155,7 +155,7 @@ To enable metrics publishing to [statsd](https://github.com/statsd/statsd) or [s
 
 Use this setting to add static tags (`host`, `operation`, `database`, etc) to the metrics WAL-G publishes to statsd.
 
-If you want to make demo for testing purposes, you can use graphite service from docker-compose file.
+If you want to make demo for testing purposes, you can use graphite service from docker-.compose file.
 
 ### Profiling
 

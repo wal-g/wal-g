@@ -95,7 +95,7 @@ func CreateTestContex(database string) (tctx *TestContext, err error) {
 
 	envFilePath := path.Join(stagingDir, envFile)
 
-	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
+	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker compose
 	Env["DOCKER_FILE"] = "Dockerfile." + database
 	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
 	Env["WALG_S3_PREFIX"] = strings.ReplaceAll(Env["WALG_S3_PREFIX"], "DBNAME", database)

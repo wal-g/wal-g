@@ -51,9 +51,9 @@ pg_build_image:
 	# There are dependencies between container images.
 	# Running in one command leads to using outdated images and fails on clean system.
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
-	docker-compose build $(DOCKER_COMMON)
-	docker-compose build pg
-	docker-compose build pg_build_docker_prefix
+	docker compose build $(DOCKER_COMMON)
+	docker compose build pg
+	docker compose build pg_build_docker_prefix
 
 pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
@@ -73,37 +73,37 @@ pg_integration_test: clean_compose
 		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
-		docker-compose build pg_pgbackrest;\
+		docker compose build pg_pgbackrest;\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pg_ssh_"; then\
-		docker-compose build ssh;\
+		docker compose build ssh;\
 	fi
 
-	docker-compose up --exit-code-from $(TEST) $(TEST)
+	docker compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
 	@if [ "$(TEST)" = "pg_tests" ]; then\
-		docker-compose build pg_pgbackrest ssh swift pg_wal_perftest_with_throttling &&\
-		docker-compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
-		docker-compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
-		docker-compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
-		docker-compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
-		docker-compose down &&\
+		docker compose build pg_pgbackrest ssh swift pg_wal_perftest_with_throttling &&\
+		docker compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
+		docker compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
+		docker compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
+		docker compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
+		docker compose down &&\
 		sleep 5 &&\
-		docker-compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
+		docker compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
 	fi
 	make clean_compose
 
 .PHONY: clean_compose
 clean_compose:
-	services=$$(docker-compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -w -f 2); \
-		if [ "$$services" ]; then docker-compose down $$services; fi
+	services=$$(docker compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -w -f 2); \
+		if [ "$$services" ]; then docker compose down $$services; fi
 
 all_unittests: deps unittest
 
 # todo Should we remove this target as a duplicate of pg_integration_test?
 pg_int_tests_only:
-	docker-compose build pg_tests
-	docker-compose up --exit-code-from pg_tests pg_tests
+	docker compose build pg_tests
+	docker compose up --exit-code-from pg_tests pg_tests
 
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)
@@ -124,7 +124,7 @@ sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 load_docker_common:
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
 		echo "Rebuild";\
-		docker-compose build $(DOCKER_COMMON);\
+		docker compose build $(DOCKER_COMMON);\
 	else\
 		docker load -i ${CACHE_FILE_UBUNTU_18_04};\
 		docker load -i ${CACHE_FILE_UBUNTU_20_04};\
@@ -133,8 +133,8 @@ load_docker_common:
 
 mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
 	./link_brotli.sh
-	docker-compose build mysql $(MYSQL_TEST)
-	docker-compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
+	docker compose build mysql $(MYSQL_TEST)
+	docker compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)
@@ -147,8 +147,8 @@ mariadb_test: deps mysql_build unlink_brotli mariadb_integration_test
 
 mariadb_integration_test: unlink_brotli load_docker_common
 	./link_brotli.sh
-	docker-compose build mariadb mariadb_tests
-	docker-compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
+	docker compose build mariadb mariadb_tests
+	docker compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
 
 mongo_test: deps mongo_build unlink_brotli
 
@@ -174,9 +174,9 @@ fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
 
 fdb_integration_test: load_docker_common
-	docker-compose down -v
-	docker-compose build fdb_tests
-	docker-compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
+	docker compose down -v
+	docker compose build fdb_tests
+	docker compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
 
 redis_test: deps redis_build unlink_brotli redis_integration_test
 
@@ -184,8 +184,8 @@ redis_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.walgVersion=`git tag -l --points-at HEAD`")
 
 redis_integration_test: load_docker_common
-	docker-compose build redis redis_tests
-	docker-compose up --exit-code-from redis_tests redis_tests
+	docker compose build redis redis_tests
+	docker compose up --exit-code-from redis_tests redis_tests
 
 redis_clean:
 	(cd $(MAIN_REDIS_PATH) && go clean)
@@ -217,8 +217,8 @@ etcd_clean:
 
 # refactor
 etcd_integration_test: load_docker_common
-	docker-compose build etcd etcd_tests
-	docker-compose up --exit-code-from etcd_tests etcd_tests
+	docker compose build etcd etcd_tests
+	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
@@ -233,14 +233,14 @@ gp_install: gp_build
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	docker-compose build gp gp_tests
-	docker-compose up --exit-code-from gp_tests gp_tests
+	docker compose build gp gp_tests
+	docker compose up --exit-code-from gp_tests gp_tests
 
 st_test: deps pg_build unlink_brotli st_integration_test
 
 st_integration_test: load_docker_common
-	docker-compose build st_tests
-	docker-compose up --exit-code-from st_tests st_tests
+	docker compose build st_tests
+	docker compose up --exit-code-from st_tests st_tests
 
 unittest:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go vet

@@ -1,4 +1,4 @@
-FROM wal-g/ubuntu:18.04
+FROM wal-g/ubuntu:20.04
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests locales iputils-ping ssh python-dev iproute2 less sudo \
@@ -13,15 +13,16 @@ RUN apt-get update && \
 ADD docker/gp/run_greenplum.sh /home/gpadmin/run_greenplum.sh
 
 WORKDIR /usr/local
-RUN git clone https://github.com/greenplum-db/gpdb.git gpdb_src --single-branch --branch 6X_STABLE --depth 1 \
+RUN git clone https://github.com/greenplum-db/gpdb-archive.git gpdb_src --single-branch --depth 1 \
  && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
 
 WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
- && sed -i 's/apt-get install/DEBIAN_FRONTEND=noninteractive apt-get install/g' README.ubuntu.bash \
- && ./README.ubuntu.bash \
- && wget -c https://archive.apache.org/dist/xerces/c/3/sources/xerces-c-3.1.1.tar.gz -O - | tar -xz \
- && cd xerces-c-3.1.1 && ./configure && make -j8 > /dev/null && make -j8 install && cd .. \
+ && ls \
+ && sed -i 's/apt-get install/DEBIAN_FRONTEND=noninteractive apt-get install/g' README.Ubuntu.bash \
+ && ./README.Ubuntu.bash \
+ && wget -c https://archive.apache.org/dist/xerces/c/3/sources/xerces-c-3.2.0.tar.gz -O - | tar -xz \
+ && cd xerces-c-3.2.0 && ./configure && make -j8 > /dev/null && make -j8 install && cd .. \
  && ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src > /dev/null \
  && make -j8 > /dev/null \
  && make -j8 install > /dev/null \
