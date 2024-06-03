@@ -286,7 +286,7 @@ func CreateWalPageWithContinuation() []byte {
 		Info:             walparser.XlpFirstIsContRecord,
 		RemainingDataLen: 12312,
 	}
-	data := make([]byte, 0)
+	data := make([]byte, 20) //nolint:makezero
 	binary.LittleEndian.PutUint16(data, pageHeader.Magic)
 	binary.LittleEndian.PutUint16(data, pageHeader.Info)
 	binary.LittleEndian.PutUint32(data, uint32(pageHeader.TimeLineID))
