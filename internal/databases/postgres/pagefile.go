@@ -176,10 +176,16 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 
 	var fileSize uint64
 	var diffBlockCount uint32
-	err = parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
+	pageSize := uint16(DatabasePageSize)
+	fields_to_parse := []parsingutil.FieldToParse{
 		{Field: &fileSize, Name: "fileSize"},
-		{Field: &diffBlockCount, Name: "diffBlockCount"},
-	}, increment)
+	}
+	if isOrioledbDataPath(fileName) {
+		fields_to_parse = append(fields_to_parse, parsingutil.FieldToParse{Field: &pageSize, Name: "pageSize"})
+	}
+	fields_to_parse = append(fields_to_parse, parsingutil.FieldToParse{Field: &diffBlockCount, Name: "diffBlockCount"})
+
+	err = parsingutil.ParseMultipleFieldsFromReader(fields_to_parse, increment)
 	if err != nil {
 		return err
 	}
@@ -211,7 +217,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 		return err
 	}
 
-	page := make([]byte, DatabasePageSize)
+	page := make([]byte, pageSize)
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		_, err = io.ReadFull(increment, page)
@@ -219,7 +225,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 			return err
 		}
 
-		_, err = file.WriteAt(page, int64(blockNo)*DatabasePageSize)
+		_, err = file.WriteAt(page, int64(blockNo)*int64(pageSize))
 		if err != nil {
 			return err
 		}

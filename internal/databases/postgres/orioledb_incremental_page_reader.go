@@ -19,6 +19,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const CompressedPageSize = 512
+
 // IncrementFileHeader contains "wi" at the head which stands for "wal-g increment"
 // format version "1", signature magic number
 // var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
@@ -26,11 +28,12 @@ import (
 // OrioledbIncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map may consist of 1Gb/PostgresBlockSize elements == 512Kb
 type OrioledbIncrementalPageReader struct {
-	PagedFile ioextensions.ReadSeekCloser
-	FileSize  int64
-	ChkpNum   uint32
-	Next      []byte
-	Blocks    []uint32
+	PagedFile  ioextensions.ReadSeekCloser
+	FileSize   int64
+	Compressed bool
+	ChkpNum    uint32
+	Next       []byte
+	Blocks     []uint32
 }
 
 func (pageReader *OrioledbIncrementalPageReader) Read(p []byte) (n int, err error) {
@@ -64,10 +67,14 @@ func (pageReader *OrioledbIncrementalPageReader) DrainMoreData() (succeed bool, 
 }
 
 func (pageReader *OrioledbIncrementalPageReader) AdvanceFileReader() error {
-	pageBytes := make([]byte, DatabasePageSize)
+	pageSize := DatabasePageSize
+	if pageReader.Compressed {
+		pageSize = CompressedPageSize
+	}
+	pageBytes := make([]byte, pageSize)
 	blockNo := pageReader.Blocks[0]
 	pageReader.Blocks = pageReader.Blocks[1:]
-	offset := int64(blockNo) * DatabasePageSize
+	offset := int64(blockNo) * pageSize
 	// TODO : possible race condition - page was deleted between blocks extraction and seek
 	_, err := pageReader.PagedFile.Seek(offset, io.SeekStart)
 	if err != nil {
@@ -92,7 +99,13 @@ func (pageReader *OrioledbIncrementalPageReader) initialize(deltaBitmap *roaring
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
 	headerBuffer.Write(utility.ToBytes(uint64(fileSize)))
-	pageReader.Blocks = make([]uint32, 0, fileSize/DatabasePageSize)
+	pageReader.Compressed = fileSize%DatabasePageSize != 0
+	pageSize := DatabasePageSize
+	if pageReader.Compressed {
+		pageSize = CompressedPageSize
+	}
+	headerBuffer.Write(utility.ToBytes(uint16(pageSize)))
+	pageReader.Blocks = make([]uint32, 0, fileSize/pageSize)
 
 	if deltaBitmap == nil {
 		err := pageReader.FullScanInitialize()
@@ -105,16 +118,20 @@ func (pageReader *OrioledbIncrementalPageReader) initialize(deltaBitmap *roaring
 
 	pageReader.WriteDiffMapToHeader(&headerBuffer)
 	pageReader.Next = headerBuffer.Bytes()
-	pageDataSize := int64(len(pageReader.Blocks)) * DatabasePageSize
+	pageDataSize := int64(len(pageReader.Blocks)) * pageSize
 	size = int64(headerBuffer.Len()) + pageDataSize
 	return
 }
 
 func (pageReader *OrioledbIncrementalPageReader) DeltaBitmapInitialize(deltaBitmap *roaring.Bitmap) {
 	it := deltaBitmap.Iterator()
+	pageSize := DatabasePageSize
+	if pageReader.Compressed {
+		pageSize = CompressedPageSize
+	}
 	for it.HasNext() { // TODO : do something with file truncation during reading
 		blockNo := it.Next()
-		if pageReader.FileSize >= int64(blockNo+1)*DatabasePageSize { // whole block fits into file
+		if pageReader.FileSize >= int64(blockNo+1)*pageSize { // whole block fits into file
 			pageReader.Blocks = append(pageReader.Blocks, blockNo)
 		} else {
 			break
@@ -123,22 +140,62 @@ func (pageReader *OrioledbIncrementalPageReader) DeltaBitmapInitialize(deltaBitm
 }
 
 func (pageReader *OrioledbIncrementalPageReader) FullScanInitialize() error {
-	pageBytes := make([]byte, DatabasePageSize)
+	if !pageReader.Compressed {
+		pageBytes := make([]byte, DatabasePageSize)
+		for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
+			_, err := io.ReadFull(pageReader.PagedFile, pageBytes)
 
-	for currentBlockNumber := uint32(0); ; currentBlockNumber++ {
-		_, err := io.ReadFull(pageReader.PagedFile, pageBytes)
-
-		if err != nil {
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				return nil
+			if err != nil {
+				if err == io.EOF || err == io.ErrUnexpectedEOF {
+					return nil
+				}
+				return err
 			}
-			return err
-		}
 
-		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
-		if !valid {
-			tracelog.WarningLogger.Printf("NOT VALID!")
-			return newInvalidBlockError(currentBlockNumber)
+			valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
+			if !valid {
+				return newInvalidBlockError(currentBlockNumber)
+			}
+		}
+	} else {
+		readBytes := uint32(0)
+		const sizeOfHeader = 8
+		for {
+			header := make([]byte, sizeOfHeader)
+
+			_, err := io.ReadFull(pageReader.PagedFile, header)
+
+			if err != nil {
+				if err == io.EOF || err == io.ErrUnexpectedEOF {
+					return nil
+				}
+				return err
+			}
+			pageSize := binary.LittleEndian.Uint16(header)
+			// because pageSize is aligned to 4 bytes
+			chkpNum := binary.LittleEndian.Uint32(header[4:])
+			blocksTotal := (pageSize + sizeOfHeader + CompressedPageSize - 1) / CompressedPageSize
+			full_size := blocksTotal*CompressedPageSize - sizeOfHeader
+
+			pageBytes := make([]byte, full_size)
+			_, err = io.ReadFull(pageReader.PagedFile, pageBytes)
+
+			if err != nil {
+				if err == io.EOF || err == io.ErrUnexpectedEOF {
+					return nil
+				}
+				return err
+			}
+
+			if chkpNum >= pageReader.ChkpNum {
+				currentBlockNumber := readBytes / CompressedPageSize
+				for blockNumber := uint32(0); blockNumber < uint32(blocksTotal); blockNumber++ {
+					pageReader.Blocks = append(pageReader.Blocks, currentBlockNumber+blockNumber)
+				}
+			} else {
+				return newInvalidBlockError(readBytes / CompressedPageSize)
+			}
+			readBytes = readBytes + sizeOfHeader + uint32(full_size)
 		}
 	}
 }
@@ -257,12 +314,18 @@ func (pageReader *OrioledbIncrementalPageReader) SelectNewValidPage(pageBytes []
 	return
 }
 
+func isOrioledbDataPath(filePath string) bool {
+	if !strings.Contains(filePath, "orioledb_data") ||
+		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
+		return false
+	}
+	return true
+}
+
 func isOrioledbDataFile(info os.FileInfo, filePath string) bool {
 	if info.IsDir() ||
-		!strings.Contains(filePath, "orioledb_data") ||
 		info.Size() == 0 ||
-		info.Size()%DatabasePageSize != 0 ||
-		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
+		!isOrioledbDataPath(filePath) {
 		return false
 	}
 	return true
@@ -283,7 +346,7 @@ func OrioledbReadIncrementalFile(filePath string,
 		Closer: file,
 	}
 
-	pageReader := &OrioledbIncrementalPageReader{fileReadSeekCloser, fileSize, chkpNum, nil, nil}
+	pageReader := &OrioledbIncrementalPageReader{fileReadSeekCloser, fileSize, false, chkpNum, nil, nil}
 	incrementSize, err := pageReader.initialize(deltaBitmap)
 	if err != nil {
 		utility.LoggedClose(file, "")
