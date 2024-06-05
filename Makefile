@@ -147,7 +147,7 @@ mariadb_test: deps mysql_build unlink_brotli mariadb_integration_test
 
 mariadb_integration_test: unlink_brotli load_docker_common
 	./link_brotli.sh
-	docker compose build mariadb mariadb_tests
+	docker compose build mariadb && docker compose build mariadb_tests
 	docker compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
 
 mongo_test: deps mongo_build unlink_brotli
@@ -184,7 +184,7 @@ redis_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.walgVersion=`git tag -l --points-at HEAD`")
 
 redis_integration_test: load_docker_common
-	docker compose build redis redis_tests
+	docker compose build redis && docker compose build redis_tests
 	docker compose up --exit-code-from redis_tests redis_tests
 
 redis_clean:
