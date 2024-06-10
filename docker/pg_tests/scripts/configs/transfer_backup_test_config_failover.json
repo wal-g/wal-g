@@ -9,4 +9,5 @@
     "WALE_S3_PREFIX": "s3://transferbackupbucket/failover"
   }
 },
-"WALG_FAILOVER_STORAGES_CHECK_TIMEOUT": "5s"
+"WALG_FAILOVER_STORAGES_CHECK_TIMEOUT": "5s",
+"S3_SKIP_VALIDATION": "true"
