@@ -63,7 +63,6 @@ type BackupArguments struct {
 	isFullBackup             bool
 	deltaConfigurator        DeltaBackupConfigurator
 	withoutFilesMetadata     bool
-	orioledbEnabled          bool
 	composerInitFunc         func(handler *BackupHandler) error
 	preventConcurrentBackups bool
 }
@@ -141,29 +140,6 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 	}
 }
 
-// OrioledbNewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func OrioledbNewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
-	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool, orioledbEnabled bool) BackupArguments {
-	return BackupArguments{
-		Uploader:              uploader,
-		pgDataDirectory:       pgDataDirectory,
-		backupsFolder:         backupsFolder,
-		isPermanent:           isPermanent,
-		verifyPageChecksums:   verifyPageChecksums,
-		isFullBackup:          isFullBackup,
-		storeAllCorruptBlocks: storeAllCorruptBlocks,
-		deltaConfigurator:     deltaConfigurator,
-		userData:              userData,
-		withoutFilesMetadata:  withoutFilesMetadata,
-		orioledbEnabled:       orioledbEnabled,
-		composerInitFunc: func(handler *BackupHandler) error {
-			return configureTarBallComposer(handler, tarBallComposerType)
-		},
-		preventConcurrentBackups: false,
-	}
-}
-
 func (ba *BackupArguments) EnablePreventConcurrentBackups() {
 	ba.preventConcurrentBackups = true
 	tracelog.InfoLogger.Println("Concurrent backups are disabled")
@@ -176,10 +152,19 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	// I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 	bh.Arguments.Uploader.ChangeDirectory(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Arguments.Uploader.Folder())
+	_, err = os.Stat(bh.PgInfo.PgDataDirectory + "/orioledb_data")
+	orioledbEnabled := false
+	if err == nil {
+		orioledbEnabled = true
+	} else if os.IsNotExist(err) {
+		orioledbEnabled = false
+	} else {
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
-	if arguments.orioledbEnabled && bh.prevBackupInfo.sentinelDto.BackupStartChkpNum != nil {
+	if orioledbEnabled && bh.prevBackupInfo.sentinelDto.BackupStartChkpNum != nil {
 		bh.Workers.Bundle = OrioledbNewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
 			bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
 			viper.GetInt64(conf.TarSizeThresholdSetting), bh.prevBackupInfo.sentinelDto.BackupStartChkpNum)
@@ -191,7 +176,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 	err = bh.startBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
-	if arguments.orioledbEnabled {
+	if orioledbEnabled {
 		OrioledbSetStartChkpNum(bh)
 	}
 
