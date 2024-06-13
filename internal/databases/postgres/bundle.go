@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
@@ -95,30 +96,6 @@ func NewBundle(
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
 		DataCatalogSize:    new(int64),
-	}
-}
-
-// TODO: use DiskDataFolder
-func OrioledbNewBundle(
-	directory string, crypter crypto.Crypter,
-	incrementFromName string, incrementFromLsn *LSN, incrementFromFiles internal.BackupFileList,
-	forceIncremental bool, tarSizeThreshold int64,
-	incrementFromChkpNum *uint32,
-) *Bundle {
-	return &Bundle{
-		Bundle: internal.Bundle{
-			Directory:         directory,
-			Crypter:           crypter,
-			TarSizeThreshold:  tarSizeThreshold,
-			ExcludedFilenames: ExcludedFilenames,
-		},
-		IncrementFromLsn:     incrementFromLsn,
-		IncrementFromFiles:   incrementFromFiles,
-		IncrementFromName:    incrementFromName,
-		TablespaceSpec:       NewTablespaceSpec(directory),
-		forceIncremental:     forceIncremental,
-		DataCatalogSize:      new(int64),
-		IncrementFromChkpNum: incrementFromChkpNum,
 	}
 }
 
@@ -302,11 +279,8 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 			return nil
 		}
 		incrementBaseLsn := bundle.getIncrementBaseLsn()
-		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && (isPagedFile(info, path))
-
-		if !isIncremented && bundle.IncrementFromChkpNum != nil {
-			isIncremented = wasInBase && isOrioledbDataFile(info, path)
-		}
+		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
+		isIncremented = isIncremented || (bundle.IncrementFromChkpNum != nil && wasInBase && orioledb.IsOrioledbDataFile(info, path))
 		bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)

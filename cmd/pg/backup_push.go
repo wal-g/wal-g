@@ -28,7 +28,6 @@ const (
 	deltaFromNameFlag         = "delta-from-name"
 	addUserDataFlag           = "add-user-data"
 	withoutFilesMetadataFlag  = "without-files-metadata"
-	withOrioledb              = "with-orioledb"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -107,8 +106,7 @@ var (
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
-			var arguments postgres.BackupArguments
-			arguments = postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
+			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),

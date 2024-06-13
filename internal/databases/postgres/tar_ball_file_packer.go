@@ -11,6 +11,8 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	pg_errors "github.com/wal-g/wal-g/internal/databases/postgres/errors"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/errgroup"
@@ -46,18 +48,7 @@ type TarBallFilePackerImpl struct {
 	incrementFromLsn     *LSN
 	files                internal.BundleFiles
 	options              TarBallFilePackerOptions
-	incrementFromChkpNum *uint32
-}
-
-func OrioledbNewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
-	options TarBallFilePackerOptions, incrementFromChkpNum *uint32) *TarBallFilePackerImpl {
-	return &TarBallFilePackerImpl{
-		deltaMap:             deltaMap,
-		incrementFromLsn:     incrementFromLsn,
-		files:                files,
-		options:              options,
-		incrementFromChkpNum: incrementFromChkpNum,
-	}
+	IncrementFromChkpNum *uint32
 }
 
 func NewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
@@ -142,8 +133,8 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		} else if err != nil {
 			return nil, errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.Path)
 		}
-		if p.incrementFromChkpNum != nil && isOrioledbDataFile(cfi.FileInfo, cfi.Path) {
-			fileReadCloser, cfi.Header.Size, err = OrioledbReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromChkpNum, bitmap)
+		if p.IncrementFromChkpNum != nil && orioledb.IsOrioledbDataFile(cfi.FileInfo, cfi.Path) {
+			fileReadCloser, cfi.Header.Size, err = orioledb.OrioledbReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.IncrementFromChkpNum, bitmap)
 		} else {
 			fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
 		}
@@ -159,7 +150,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 				},
 				Closer: fileReadCloser,
 			}
-		case InvalidBlockError: // fallback to full file backup
+		case pg_errors.InvalidBlockError: // fallback to full file backup
 			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.Header.Name)
 			cfi.IsIncremented = false
 			fileReadCloser, err = internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)

@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"github.com/pkg/errors"
@@ -77,7 +78,7 @@ type CurBackupInfo struct {
 	compressedSize   int64
 	dataCatalogSize  int64
 	incrementCount   int
-	startChkpNum     *uint32
+	StartChkpNum     *uint32
 }
 
 func NewPrevBackupInfo(name string, sentinel BackupSentinelDto, filesMeta FilesMetadataDto) PrevBackupInfo {
@@ -152,32 +153,22 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	// I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 	bh.Arguments.Uploader.ChangeDirectory(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Arguments.Uploader.Folder())
-	_, err = os.Stat(bh.PgInfo.PgDataDirectory + "/orioledb_data")
-	orioledbEnabled := false
-	if err == nil {
-		orioledbEnabled = true
-	} else if os.IsNotExist(err) {
-		orioledbEnabled = false
-	} else {
-		tracelog.ErrorLogger.FatalOnError(err)
-	}
+	orioledbEnabled := orioledb.IsEnabled(bh.PgInfo.PgDataDirectory)
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
+	bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
+		bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
+		viper.GetInt64(conf.TarSizeThresholdSetting))
 	if orioledbEnabled && bh.prevBackupInfo.sentinelDto.BackupStartChkpNum != nil {
-		bh.Workers.Bundle = OrioledbNewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
-			bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
-			viper.GetInt64(conf.TarSizeThresholdSetting), bh.prevBackupInfo.sentinelDto.BackupStartChkpNum)
-	} else {
-		bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
-			bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
-			viper.GetInt64(conf.TarSizeThresholdSetting))
+		bh.Workers.Bundle.IncrementFromChkpNum = bh.prevBackupInfo.sentinelDto.BackupStartChkpNum
 	}
 
 	err = bh.startBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
 	if orioledbEnabled {
-		OrioledbSetStartChkpNum(bh)
+		chkpNum := orioledb.GetChkpNum(bh.PgInfo.PgDataDirectory)
+		bh.CurBackupInfo.StartChkpNum = &chkpNum
 	}
 
 	bh.handleDeltaBackup(folder)

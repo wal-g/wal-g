@@ -43,7 +43,7 @@ func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSent
 		IncrementFromLSN:     bh.prevBackupInfo.sentinelDto.BackupStartLSN,
 		PgVersion:            bh.PgInfo.PgVersion,
 		TablespaceSpec:       tbsSpec,
-		BackupStartChkpNum:   bh.CurBackupInfo.startChkpNum,
+		BackupStartChkpNum:   bh.CurBackupInfo.StartChkpNum,
 		IncrementFromChkpNum: bh.prevBackupInfo.sentinelDto.BackupStartChkpNum,
 	}
 	if bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {

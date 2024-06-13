@@ -59,14 +59,10 @@ func NewRegularTarBallComposerMaker(
 func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
-	var tarBallFilePacker *TarBallFilePackerImpl
+	tarBallFilePacker := NewTarBallFilePacker(bundle.DeltaMap,
+		bundle.IncrementFromLsn, bundleFiles, maker.filePackerOptions)
 	if bundle.IncrementFromChkpNum != nil {
-		tarBallFilePacker = OrioledbNewTarBallFilePacker(bundle.DeltaMap,
-			bundle.IncrementFromLsn, bundleFiles, maker.filePackerOptions, bundle.IncrementFromChkpNum)
-	} else {
-
-		tarBallFilePacker = NewTarBallFilePacker(bundle.DeltaMap,
-			bundle.IncrementFromLsn, bundleFiles, maker.filePackerOptions)
+		tarBallFilePacker.IncrementFromChkpNum = bundle.IncrementFromChkpNum
 	}
 	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
 }

@@ -1,29 +1,30 @@
-package postgres
+package orioledb
 
 import (
 	"bytes"
 	"encoding/binary"
 	"io"
 	"os"
-	"path"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"github.com/wal-g/wal-g/utility"
 )
 
-const CompressedPageSize = 512
+const (
+	DatabasePageSize          = int64(walparser.BlockSize)
+	CompressedPageSize        = 512
+	SignatureMagicNumber byte = 0x55
+)
 
 // IncrementFileHeader contains "wi" at the head which stands for "wal-g increment"
 // format version "1", signature magic number
-// var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
+var IncrementFileHeader = []byte{'w', 'i', '1', SignatureMagicNumber}
 
 // OrioledbIncrementalPageReader constructs difference map during initialization and than re-read file
 // Diff map may consist of 1Gb/PostgresBlockSize elements == 512Kb
@@ -154,7 +155,7 @@ func (pageReader *OrioledbIncrementalPageReader) FullScanInitialize() error {
 
 			valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 			if !valid {
-				return newInvalidBlockError(currentBlockNumber)
+				return errors.NewInvalidBlockError(currentBlockNumber)
 			}
 		}
 	} else {
@@ -193,7 +194,7 @@ func (pageReader *OrioledbIncrementalPageReader) FullScanInitialize() error {
 					pageReader.Blocks = append(pageReader.Blocks, currentBlockNumber+blockNumber)
 				}
 			} else {
-				return newInvalidBlockError(readBytes / CompressedPageSize)
+				return errors.NewInvalidBlockError(readBytes / CompressedPageSize)
 			}
 			readBytes = readBytes + sizeOfHeader + uint32(full_size)
 		}
@@ -210,42 +211,6 @@ func (pageReader *OrioledbIncrementalPageReader) WriteDiffMapToHeader(headerWrit
 	}
 }
 
-//  typedef struct
-//  {
-// 	 pg_atomic_uint32 state;
-// 	 pg_atomic_uint32 usageCount;
-// 	 uint32		pageChangeCount;
-//  } OrioleDBPageHeader;
-
-// typedef struct
-// {
-// 	OrioleDBPageHeader o_header;
-// 	uint32		flags:6,
-// 				field1:11,
-// 				field2:15;
-
-// 	UndoLocation undoLocation;
-// 	CommitSeqNo csn;
-
-// 	uint64		rightLink;
-// 	uint32		checkpointNum;
-// 	LocationIndex maxKeyLen;
-// 	OffsetNumber prevInsertOffset;
-// 	OffsetNumber chunksCount;
-// 	OffsetNumber itemsCount;
-// 	OffsetNumber hikeysEnd;
-// 	LocationIndex dataSize;
-// 	BTreePageChunkDesc chunkDesc[1];
-// } BTreePageHeader;
-
-// typedef struct
-// {
-// 	uint32		shortLocation:12,
-// 				offset:10,
-// 				hikeyShortLocation:8,
-// 				hikeyFlags:2;
-// } BTreePageChunkDesc;
-
 type OrioledbPageHeader struct {
 	state               uint32
 	usageCount          uint32
@@ -261,7 +226,6 @@ type OrioledbPageHeader struct {
 	itemsCount          uint16
 	hikeysEnd           uint16
 	dataSize            uint16
-	// chunkDesc           []uint32
 }
 
 func (header *OrioledbPageHeader) isValid() bool {
@@ -288,7 +252,6 @@ func parseOrioledbPageHeader(reader io.Reader) (*OrioledbPageHeader, error) {
 		{Field: &pageHeader.itemsCount, Name: "itemsCount"},
 		{Field: &pageHeader.hikeysEnd, Name: "hikeysEnd"},
 		{Field: &pageHeader.dataSize, Name: "dataSize"},
-		// {Field: &pageHeader.chunkDesc, Name: "chunkDesc"},
 	}
 	err := parsingutil.ParseMultipleFieldsFromReader(fields, reader)
 	if err != nil {
@@ -314,23 +277,6 @@ func (pageReader *OrioledbIncrementalPageReader) SelectNewValidPage(pageBytes []
 	return
 }
 
-func isOrioledbDataPath(filePath string) bool {
-	if !strings.Contains(filePath, "orioledb_data") ||
-		!pagedFilenameRegexp.MatchString(path.Base(filePath)) {
-		return false
-	}
-	return true
-}
-
-func isOrioledbDataFile(info os.FileInfo, filePath string) bool {
-	if info.IsDir() ||
-		info.Size() == 0 ||
-		!isOrioledbDataPath(filePath) {
-		return false
-	}
-	return true
-}
-
 func OrioledbReadIncrementalFile(filePath string,
 	fileSize int64,
 	chkpNum uint32,
@@ -353,35 +299,4 @@ func OrioledbReadIncrementalFile(filePath string,
 		return nil, 0, err
 	}
 	return pageReader, incrementSize, nil
-}
-
-func OrioledbSetStartChkpNum(bh *BackupHandler) {
-	OrioledbDataDirectory := bh.PgInfo.PgDataDirectory + "/orioledb_data"
-	xidRegEx, err := regexp.Compile(`^.+\.(xid)$`)
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Cannot compile xid regex")
-	}
-
-	chkpNum := uint32(0)
-	err = filepath.Walk(OrioledbDataDirectory, func(path string, info os.FileInfo, err error) error {
-		if err == nil && xidRegEx.MatchString(info.Name()) {
-			xid := strings.Split(info.Name(), ".")[0]
-			tempChkpNum, err := strconv.Atoi(xid)
-			if err != nil {
-				tracelog.ErrorLogger.Fatalf("Cannot parse chkpNum: %s", xid)
-			}
-			chkpNum = uint32(tempChkpNum)
-			return filepath.SkipAll
-		}
-		if info.IsDir() && filepath.Base(info.Name()) != "orioledb_data" {
-			return filepath.SkipDir
-		} else {
-			return nil
-		}
-	})
-	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Cannot find any xid file")
-	}
-
-	bh.CurBackupInfo.startChkpNum = &chkpNum
 }

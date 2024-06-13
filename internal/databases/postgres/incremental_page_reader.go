@@ -7,6 +7,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -128,7 +129,7 @@ func (pageReader *IncrementalPageReader) FullScanInitialize() error {
 
 		valid := pageReader.SelectNewValidPage(pageBytes, currentBlockNumber) // TODO : torn page possibility
 		if !valid {
-			return newInvalidBlockError(currentBlockNumber)
+			return errors.NewInvalidBlockError(currentBlockNumber)
 		}
 	}
 }

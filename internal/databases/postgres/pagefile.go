@@ -22,6 +22,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -43,19 +44,6 @@ const (
 	GlobalTablespace     = "global"
 	NonDefaultTablespace = "pg_tblspc"
 )
-
-// InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
-type InvalidBlockError struct {
-	error
-}
-
-func newInvalidBlockError(blockNo uint32) InvalidBlockError {
-	return InvalidBlockError{errors.Errorf("block %d is invalid", blockNo)}
-}
-
-func (err InvalidBlockError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
 
 type InvalidIncrementFileHeaderError struct {
 	error
@@ -180,7 +168,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 	fields_to_parse := []parsingutil.FieldToParse{
 		{Field: &fileSize, Name: "fileSize"},
 	}
-	if isOrioledbDataPath(fileName) {
+	if orioledb.IsOrioledbDataPath(fileName) {
 		fields_to_parse = append(fields_to_parse, parsingutil.FieldToParse{Field: &pageSize, Name: "pageSize"})
 	}
 	fields_to_parse = append(fields_to_parse, parsingutil.FieldToParse{Field: &diffBlockCount, Name: "diffBlockCount"})
