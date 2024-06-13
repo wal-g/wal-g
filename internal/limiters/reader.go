@@ -2,6 +2,7 @@ package limiters
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/wal-g/tracelog"
@@ -24,6 +25,10 @@ func NewReader(ctx context.Context, reader io.Reader, limiter *rate.Limiter) *Re
 }
 
 func (r *Reader) Read(buf []byte) (int, error) {
+	if len(buf) == 0 {
+		return 0, fmt.Errorf("empty buffer passed")
+	}
+
 	end := len(buf)
 	if r.limiter.Burst() < end {
 		end = r.limiter.Burst()

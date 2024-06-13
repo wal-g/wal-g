@@ -11,10 +11,11 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/utility"
 )
 
-const backupFetchShortDescription = "Fetches desired backup from storage"
+const backupFetchShortDescription = "Fetches desired rdb backup from storage"
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch backup-name",
@@ -48,11 +49,21 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
-		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd)
+		dataPath, _ := conf.GetSetting(conf.RedisDataPath)
+		dataDir := archive.CreateFolder(dataPath, os.FileMode(0750))
+		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd, dataDir)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
 func init() {
 	cmd.AddCommand(backupFetchCmd)
+
+	rdbBackupFetchCmd := &cobra.Command{
+		Use:   "rdb-backup-fetch backup-name",
+		Short: backupFetchCmd.Short,
+		Args:  backupFetchCmd.Args,
+		Run:   backupFetchCmd.Run,
+	}
+	cmd.AddCommand(rdbBackupFetchCmd)
 }

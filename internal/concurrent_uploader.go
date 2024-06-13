@@ -1,34 +1,33 @@
-package binary
+package internal
 
 import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/utility"
 )
 
 type ConcurrentUploader struct {
-	uploader internal.Uploader
-	bundle   *internal.Bundle
+	uploader Uploader
+	bundle   *Bundle
 
 	UncompressedSize int64
 	CompressedSize   int64
 }
 
-func CreateConcurrentUploader(uploader internal.Uploader, backupName, directory string) (*ConcurrentUploader, error) {
-	crypter := internal.ConfigureCrypter()
+func CreateConcurrentUploader(uploader Uploader, backupName, directory string) (*ConcurrentUploader, error) {
+	crypter := ConfigureCrypter()
 	tarSizeThreshold := viper.GetInt64(conf.TarSizeThresholdSetting)
-	bundle := internal.NewBundle(directory, crypter, tarSizeThreshold, map[string]utility.Empty{})
+	bundle := NewBundle(directory, crypter, tarSizeThreshold, map[string]utility.Empty{})
 
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
-	tarBallMaker := internal.NewStorageTarBallMaker(backupName, uploader)
+	tarBallMaker := NewStorageTarBallMaker(backupName, uploader)
 	err := bundle.StartQueue(tarBallMaker)
 	if err != nil {
 		return nil, err
 	}
 
-	tarBallComposerMaker := internal.NewRegularTarBallComposerMaker(&internal.RegularBundleFiles{}, internal.NewRegularTarFileSets())
+	tarBallComposerMaker := NewRegularTarBallComposerMaker(&RegularBundleFiles{}, NewRegularTarFileSets())
 	err = bundle.SetupComposer(tarBallComposerMaker)
 	if err != nil {
 		return nil, err
@@ -71,4 +70,8 @@ func (concurrentUploader *ConcurrentUploader) Finalize() error {
 	concurrentUploader.UncompressedSize = *concurrentUploader.bundle.TarBallQueue.AllTarballsSize
 	concurrentUploader.CompressedSize, err = concurrentUploader.uploader.UploadedDataSize()
 	return err
+}
+
+func (concurrentUploader *ConcurrentUploader) UploadSentinel(sentinelDto interface{}, backupName string) error {
+	return UploadSentinel(concurrentUploader.uploader, sentinelDto, backupName)
 }

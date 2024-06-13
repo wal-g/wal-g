@@ -23,5 +23,6 @@ FROM wal-g/redis:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/redis/wal-g /usr/bin
 
 COPY docker/redis_tests/scripts/ /tmp
+COPY redis_cli.sh /usr/bin/redis_cli.sh
 
 CMD /tmp/run_integration_tests.sh

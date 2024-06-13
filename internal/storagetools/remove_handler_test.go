@@ -77,10 +77,10 @@ func TestHandleRemove(t *testing.T) {
 		folder := memory.NewFolder("test/", memory.NewKVS())
 
 		targetFiles := []string{
-            "a/b/c/target",
+			"a/b/c/target",
 			"a/b/c/target/1",
 			"a/b/c/target/1/2",
-        }
+		}
 		targetFolder := []string{
 			"a/b/c/target/3",
 			"a/b/c/target/3a/4",
@@ -95,13 +95,13 @@ func TestHandleRemove(t *testing.T) {
 		require.NoError(t, err)
 
 		for _, f := range targetFiles {
-            exists, err := folder.Exists(f)
+			exists, err := folder.Exists(f)
 			require.NoError(t, err)
 			assert.True(t, exists)
 		}
 
 		for _, f := range targetFolder {
-            exists, err := folder.Exists(f)
+			exists, err := folder.Exists(f)
 			require.NoError(t, err)
 			assert.False(t, exists)
 		}
