@@ -69,7 +69,7 @@ func RunTestFeatures() (status int, err error) {
 		}
 	}
 
-	tctx, err := CreateTestContex(testOpts.database)
+	tctx, err := CreateTestContext(testOpts.database)
 	if err != nil {
 		return -1, err
 	}
