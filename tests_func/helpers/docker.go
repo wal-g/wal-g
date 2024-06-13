@@ -274,7 +274,7 @@ func (inf *Infra) Setup() error {
 		return fmt.Errorf("can not build base image: %v", err)
 	}
 
-	actions := []string{"--verbose", "--log-level", "WARNING", "build"}
+	actions := []string{"--verbose", "build", "--no-cache"}
 	if err := inf.callCompose(actions); err != nil {
 		return fmt.Errorf("can not build images: %v", err)
 	}
@@ -283,11 +283,11 @@ func (inf *Infra) Setup() error {
 }
 
 func (inf *Infra) RecreateContainers() error {
-	actions := []string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}
+	actions := []string{"--verbose", "down", "--volumes", "--timeout", "0"}
 	if err := inf.callCompose(actions); err != nil {
 		return err
 	}
-	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
+	return inf.callCompose([]string{"--verbose", "up", "--detach"})
 }
 
 func (inf *Infra) Shutdown() error {
