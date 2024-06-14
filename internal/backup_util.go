@@ -199,13 +199,28 @@ func FolderSize(folder storage.Folder, path string) (int64, error) {
 // SplitPurgingBackups partitions backups to delete and retain, if no retains policy than retain all backups
 func SplitPurgingBackups(backups []TimedBackup,
 	retainCount *int,
-	retainAfter *time.Time) (purge, retain map[string]bool, err error) {
+	retainAfter *time.Time,
+	target *string,
+) (purge, retain map[string]bool, err error) {
 	retain = make(map[string]bool)
 	purge = make(map[string]bool)
-	retainAll := retainCount == nil && retainAfter == nil
+	retainAll := retainCount == nil && retainAfter == nil && target == nil
 	retainedCount := 0
+	deleteTarget := target != nil
 	for i := range backups {
 		backup := backups[i]
+
+		if deleteTarget {
+			if backup.Name() == *target {
+				purge[backup.Name()] = true
+			} else {
+				tracelog.DebugLogger.Printf("Preserving backup due to target policy: %s", backup.Name())
+				retain[backup.Name()] = true
+			}
+
+			continue
+		}
+
 		if backup.IsPermanent() {
 			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.Name())
 			retain[backup.Name()] = true

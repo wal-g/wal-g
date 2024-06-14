@@ -426,11 +426,16 @@ func TimestampPtr(ts models.Timestamp) *models.Timestamp {
 	return &ts
 }
 
+func StrPtr(s string) *string {
+	return &s
+}
+
 func TestSplitPurgingBackups(t *testing.T) {
 	type args struct {
 		backups     []*models.Backup
 		retainCount *int
 		retainAfter *time.Time
+		target      *string
 	}
 	tests := []struct {
 		name       string
@@ -603,12 +608,98 @@ func TestSplitPurgingBackups(t *testing.T) {
 			},
 			err: nil,
 		},
+		{
+			name: "Purge_1,target",
+			args: args{
+				backups: SplitBackupsPermanent,
+				target:  StrPtr(MockBackup4.Name()),
+			},
+			wantPurge: []*models.Backup{
+				MockBackup4,
+			},
+			wantRetain: []*models.Backup{
+				MockBackup1,
+				MockBackup2,
+				MockBackup3,
+				MockBackup5Perm,
+				MockBackup6,
+				MockBackup7,
+				MockBackup8Perm,
+			},
+			err: nil,
+		},
+		{
+			name: "Purge_1,permanent_target",
+			args: args{
+				backups: SplitBackupsPermanent,
+				target:  StrPtr(MockBackup5Perm.Name()),
+			},
+			wantPurge: []*models.Backup{
+				MockBackup5Perm,
+			},
+			wantRetain: []*models.Backup{
+				MockBackup1,
+				MockBackup2,
+				MockBackup3,
+				MockBackup4,
+				MockBackup6,
+				MockBackup7,
+				MockBackup8Perm,
+			},
+			err: nil,
+		},
+		{
+			name: "Purge_1,target,retain_options",
+			args: args{
+				backups:     SplitBackupsPermanent,
+				retainCount: IntPtr(2),
+				retainAfter: TimePtr(SplitBackups[3].StartLocalTime.Add(time.Second)),
+				target:      StrPtr(MockBackup3.Name()),
+			},
+			wantPurge: []*models.Backup{
+				MockBackup3,
+			},
+			wantRetain: []*models.Backup{
+				MockBackup1,
+				MockBackup2,
+				MockBackup4,
+				MockBackup5Perm,
+				MockBackup6,
+				MockBackup7,
+				MockBackup8Perm,
+			},
+			err: nil,
+		},
+		{
+			name: "Purge_none,target_not_exists",
+			args: args{
+				backups: SplitBackupsPermanent,
+				target:  StrPtr("not-exits"),
+			},
+			wantPurge: nil,
+			wantRetain: []*models.Backup{
+				MockBackup1,
+				MockBackup2,
+				MockBackup3,
+				MockBackup4,
+				MockBackup5Perm,
+				MockBackup6,
+				MockBackup7,
+				MockBackup8Perm,
+			},
+			err: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			backups := MongoModelToTimedBackup(tt.args.backups)
 			internal.SortTimedBackup(backups)
-			purgeList, retainList, err := internal.SplitPurgingBackups(backups, tt.args.retainCount, tt.args.retainAfter)
+			purgeList, retainList, err := internal.SplitPurgingBackups(
+				backups,
+				tt.args.retainCount,
+				tt.args.retainAfter,
+				tt.args.target,
+			)
 			if tt.err != nil {
 				assert.EqualError(t, err, tt.err.Error())
 			} else {

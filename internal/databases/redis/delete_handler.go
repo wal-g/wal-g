@@ -15,8 +15,17 @@ import (
 type PurgeSettings struct {
 	retainCount  *int
 	retainAfter  *time.Time
+	target       *string
 	purgeGarbage bool
 	dryRun       bool
+}
+
+func (s *PurgeSettings) validate() error {
+	if s.target != nil && (s.retainCount != nil || s.retainAfter != nil) {
+		return fmt.Errorf("target and retain options cannot be used together")
+	}
+
+	return nil
 }
 
 type PurgeOption func(*PurgeSettings)
@@ -32,6 +41,12 @@ func PurgeRetainAfter(retainAfter time.Time) PurgeOption {
 func PurgeRetainCount(retainCount int) PurgeOption {
 	return func(args *PurgeSettings) {
 		args.retainCount = &retainCount
+	}
+}
+
+func PurgeTarget(target string) PurgeOption {
+	return func(args *PurgeSettings) {
+		args.target = &target
 	}
 }
 
@@ -54,6 +69,10 @@ func HandlePurge(backupsPath string, setters ...PurgeOption) error {
 	opts := PurgeSettings{dryRun: true}
 	for _, setter := range setters {
 		setter(&opts)
+	}
+
+	if err := opts.validate(); err != nil {
+		return fmt.Errorf("invalid purge options: %w", err)
 	}
 
 	st, err := internal.ConfigureStorage()
@@ -102,7 +121,12 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 	timedBackup := archive.RedisModelToTimedBackup(backups)
 
 	internal.SortTimedBackup(timedBackup)
-	purgeBackups, retainBackups, err := internal.SplitPurgingBackups(timedBackup, opts.retainCount, opts.retainAfter)
+	purgeBackups, retainBackups, err := internal.SplitPurgingBackups(
+		timedBackup,
+		opts.retainCount,
+		opts.retainAfter,
+		opts.target,
+	)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -14,6 +14,7 @@ import (
 const (
 	retainAfterFlag  = "retain-after"
 	retainCountFlag  = "retain-count"
+	targetFlag       = "target"
 	purgeGarbageFlag = "purge-garbage"
 )
 
@@ -22,6 +23,7 @@ var (
 	purgeGarbage bool
 	retainAfter  string
 	retainCount  uint
+	target       string
 )
 
 // deleteCmd represents the delete command
@@ -50,6 +52,13 @@ func runDelete(cmd *cobra.Command, args []string) {
 		opts = append(opts, redis.PurgeRetainCount(int(retainCount)))
 	}
 
+	if cmd.Flags().Changed(targetFlag) {
+		if retainCount != 0 || retainAfter != "" {
+			tracelog.ErrorLogger.Fatalln("Target and retain options cannot be used together")
+		}
+		opts = append(opts, redis.PurgeTarget(target))
+	}
+
 	err := redis.HandlePurge(utility.BaseBackupPath, opts...)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
@@ -60,4 +69,5 @@ func init() {
 	deleteCmd.Flags().BoolVar(&purgeGarbage, purgeGarbageFlag, false, "Delete garbage in backup folder")
 	deleteCmd.Flags().StringVar(&retainAfter, retainAfterFlag, "", "Keep backups newer")
 	deleteCmd.Flags().UintVar(&retainCount, retainCountFlag, 0, "Keep minimum count, except permanent backups")
+	deleteCmd.Flags().StringVar(&target, targetFlag, "", "Delete backup by name")
 }

@@ -57,7 +57,7 @@ wal-g backup-fetch example_backup
 
 Deletes backups from storage, keeps N backups.
 
-User should specify time or date to keep.
+User should specify time or date to keep or backup name.
 
 Dry-run remove retain all after specific date
 ```bash
@@ -82,6 +82,11 @@ wal-g delete --retain-count 10 --retain-after 2020-10-28T12:11:10+03:00
 Perform delete
 ```bash
 wal-g delete --retain-count 10 --retain-after 2020-10-28T12:11:10+03:00 --confirm
+```
+
+Delete specific backup
+```bash
+wal-g delete --target stream_20240612T180125Z --confirm
 ```
 
 Typical configurations
