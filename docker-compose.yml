@@ -132,7 +132,7 @@ services:
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay
       &&  mkdir -p /export/mysqlpermanentbackupbucket
-      &&  mkdir -p /export/mysqlxtrabackupextractbucket
+      &&  mkdir -p /export/mysqlxtrabackupextract
       &&  mkdir -p /export/mariadb_binlog_push_fetch
       &&  mkdir -p /export/mariadb_binlog_push_with_gtids_check
       &&  mkdir -p /export/mariadb_full_mysqldump
@@ -572,6 +572,13 @@ services:
     image: wal-g/mysql
     container_name: wal-g_mysql
 
+  mysql8:
+    build:
+      dockerfile: docker/mysql8/Dockerfile
+      context: .
+    image: wal-g/mysql8
+    container_name: wal-g_mysql8
+
   mysql_base_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile_base
@@ -612,6 +619,18 @@ services:
     links:
       - s3
       - s3-another
+
+  mysql8_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_v8
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql8_tests
+    container_name: wal-g_mysql8_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends
 
   mariadb:
     build:
