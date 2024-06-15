@@ -37,4 +37,7 @@ var Env = map[string]string{
 	// Redis specific
 	"REDIS_EXPOSE_PORT": "6379",
 	"REDIS_PASSWORD":    "password",
+
+	// MySQL specific:
+	"MYSQL_EXPOSE_PORT": "3306",
 }

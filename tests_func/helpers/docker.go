@@ -307,7 +307,7 @@ func (inf *Infra) callCompose(actions []string) error {
 	baseArgs = append(baseArgs, actions...)
 	// lookup the full path before exec.CommandContext call
 	// (fixes https://github.com/docker/compose/issues/1135)
-	fullPath, err := exec.LookPath("docker-compose")
+	fullPath, err := exec.LookPath("docker")
 	if err != nil {
 		return err
 	}

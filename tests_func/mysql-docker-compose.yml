@@ -1,0 +1,36 @@
+networks:
+    test_net:
+        external:
+            name: test_net_${TEST_ID}
+services:
+    minio01:
+        build: staging/images/minio
+        container_name: minio01.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        hostname: minio01
+        image: minio:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${S3_PORT}
+        env_file:
+            - ${ENV_FILE}
+    mysql01:
+        build:
+            dockerfile: ${DOCKER_FILE}
+            context: .
+            args:
+                - MYSQL_MAJOR=${MYSQL_MAJOR}
+        container_name: mysql01.test_net_${TEST_ID}
+        domainname: test_net_${TEST_ID}
+        external_links:
+            - minio01.test_net_${TEST_ID}:minio
+        hostname: mysql01
+        image: mysql:test_net_${TEST_ID}
+        networks:
+            - test_net
+        ports:
+            - ${MYSQL_EXPOSE_PORT}
+            - ${EXPOSE_SSH_PORT}
+        env_file:
+            - ${ENV_FILE}

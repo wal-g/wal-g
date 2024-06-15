@@ -12,8 +12,9 @@ const xbToolsLongDescription = "xbstream tools allows to interact with local xbs
 
 var (
 	XBToolsCmd = &cobra.Command{
-		Use:   "xb",
-		Short: xbToolsShortDescription,
-		Long:  xbToolsLongDescription,
+		Use:    "xb",
+		Short:  xbToolsShortDescription,
+		Long:   xbToolsLongDescription,
+		Hidden: true,
 	}
 )

@@ -145,6 +145,16 @@ mysql_clean:
 mysql_install: mysql_build
 	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
 
+mysql_features:
+	set -e
+	make go_deps
+	cd tests_func/ && MYSQL_MAJOR=$(MYSQL_MAJOR) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mysql
+
+clean_mysql_features:
+	set -e
+	cd tests_func/ && MYSQL_MAJOR=$(MYSQL_MAJOR) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mysql
+
+
 mariadb_test: deps mysql_build unlink_brotli mariadb_integration_test
 
 mariadb_integration_test: unlink_brotli load_docker_common
