@@ -1,7 +1,7 @@
-FROM minio/mc:RELEASE.2021-06-08T01-29-37Z
-FROM minio/minio:RELEASE.2021-06-07T21-40-51Z
+FROM quay.io/minio/mc:RELEASE.2024-06-12T14-34-03Z as minio_client
+FROM quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
 
-COPY --from=0 /usr/bin/mc /usr/bin/mc
+COPY --from=minio_client /usr/bin/mc /usr/bin/mc
 
 ENV MINIO_ACCESS_KEY S3_ACCESS_KEY
 ENV MINIO_SECRET_KEY S3_SECRET_KEY
