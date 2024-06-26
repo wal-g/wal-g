@@ -629,19 +629,18 @@ func TestSplitPurgingBackups(t *testing.T) {
 			err: nil,
 		},
 		{
-			name: "Purge_1,permanent_target",
+			name: "Purge_none,permanent_target",
 			args: args{
 				backups: SplitBackupsPermanent,
 				target:  StrPtr(MockBackup5Perm.Name()),
 			},
-			wantPurge: []*models.Backup{
-				MockBackup5Perm,
-			},
+			wantPurge: nil,
 			wantRetain: []*models.Backup{
 				MockBackup1,
 				MockBackup2,
 				MockBackup3,
 				MockBackup4,
+				MockBackup5Perm,
 				MockBackup6,
 				MockBackup7,
 				MockBackup8Perm,

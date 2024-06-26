@@ -210,6 +210,12 @@ func SplitPurgingBackups(backups []TimedBackup,
 	for i := range backups {
 		backup := backups[i]
 
+		if backup.IsPermanent() {
+			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.Name())
+			retain[backup.Name()] = true
+			continue
+		}
+
 		if deleteTarget {
 			if backup.Name() == *target {
 				purge[backup.Name()] = true
@@ -218,12 +224,6 @@ func SplitPurgingBackups(backups []TimedBackup,
 				retain[backup.Name()] = true
 			}
 
-			continue
-		}
-
-		if backup.IsPermanent() {
-			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.Name())
-			retain[backup.Name()] = true
 			continue
 		}
 
