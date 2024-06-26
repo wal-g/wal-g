@@ -14,8 +14,10 @@ PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
 MYSQL_TEST := "mysql_base_tests"
-MONGO_MAJOR ?= "4.2"
-MONGO_VERSION ?= "4.2.8"
+MONGO_MAJOR ?= "5.0"
+MONGO_VERSION ?= "5.0.21"
+MONGO_PACKAGE ?= "mongodb-org"
+MONGO_REPO ?= "repo.mongodb.org"
 GOLANGCI_LINT_VERSION ?= "v1.57"
 REDIS_VERSION ?= "6.2.4"
 TOOLS_MOD_DIR := ./internal/tools
@@ -161,11 +163,11 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 clean_mongo_features:
 	set -e
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
