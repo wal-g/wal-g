@@ -89,5 +89,8 @@ jobs:
         "make gp_test",
         "make st_test",
         "make TEST=\"pg_pgbackrest_backup_fetch_test\" pg_integration_test",
-        "make etcd_test"
+        "make etcd_test",
+        "make TEST=\"orioledb_compatibility_test\" pg_integration_test",
+        "make TEST=\"orioledb_simple_test\" pg_integration_test",
+        "make TEST=\"orioledb_compressed_test\" pg_integration_test",
         ]

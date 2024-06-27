@@ -77,6 +77,9 @@ pg_integration_test: clean_compose
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
 	fi
+	@if echo "$(TEST)" | grep -Fqe "orioledb"; then\
+		docker-compose build orioledb;\
+	fi
 	@if echo "$(TEST)" | grep -Fqe "pg_ssh_"; then\
 		docker compose build ssh;\
 	fi

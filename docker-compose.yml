@@ -177,6 +177,9 @@ services:
       &&  mkdir -p /export/receivewalbucket
       &&  mkdir -p /export/severaldeltabackupsbucket
       &&  mkdir -p /export/walperftestbucket
+      &&  mkdir -p /export/orioledb_compatibility
+      &&  mkdir -p /export/orioledb_simple
+      &&  mkdir -p /export/orioledb_compressed
       &&  /usr/bin/minio server /export'
 
   s3-another:
@@ -476,6 +479,8 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delta_backup_fullscan_test
     command: /tmp/tests/delta_backup_fullscan_test.sh
+    env_file:
+      - docker/common/common_walg.env
 
   pg_several_delta_backups_test:
     <<: *pg_test_common
@@ -564,6 +569,33 @@ services:
     command: /tmp/tests/pgbackrest_backup_fetch_test.sh
     <<: *s3_common_depends
 
+  orioledb:
+    build:
+      dockerfile: docker/orioledb/Dockerfile
+      context: .
+    image: wal-g/orioledb
+
+  orioledb_compatibility_test:
+    image: wal-g/orioledb
+    user: postgres
+    container_name: wal-g_orioledb_compatibility_test
+    command: /tmp/tests/compatibility_test.sh
+    <<: *s3_common_depends
+
+  orioledb_simple_test:
+    image: wal-g/orioledb
+    user: postgres
+    container_name: wal-g_orioledb_simple_test
+    command: /tmp/tests/simple_test.sh
+    <<: *s3_common_depends
+
+  orioledb_compressed_test:
+    image: wal-g/orioledb
+    user: postgres
+    container_name: wal-g_orioledb_compressed_test
+    command: /tmp/tests/compressed_test.sh
+    <<: *s3_common_depends
+
   mysql:
     build:
       dockerfile: docker/mysql/Dockerfile
@@ -582,7 +614,7 @@ services:
     env_file:
       - docker/common/common_walg.env
     <<: *s3_common_depends
-  
+
   mysql_delete_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile_delete

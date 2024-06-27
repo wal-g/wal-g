@@ -5,6 +5,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -35,6 +36,9 @@ func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN)
 		false, false, false,
 		RegularComposer, NewCatchupDeltaBackupConfigurator(fakePreviousBackupSentinelDto),
 		userData, false)
+	if orioledb.IsEnabled(pgDataDirectory) {
+		tracelog.InfoLogger.Printf("Full backup of orioledb data will be performed, because catchup incremental backup is not implemented for now.")
+	}
 
 	backupConfig, err := NewBackupHandler(backupArguments)
 	tracelog.ErrorLogger.FatalOnError(err)

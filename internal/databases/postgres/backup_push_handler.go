@@ -154,6 +154,9 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	bh.Arguments.Uploader.ChangeDirectory(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Arguments.Uploader.Folder())
 	orioledbEnabled := orioledb.IsEnabled(bh.PgInfo.PgDataDirectory)
+	if orioledbEnabled {
+		tracelog.InfoLogger.Printf("Orioledb support enabled")
+	}
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
