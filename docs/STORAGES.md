@@ -182,7 +182,9 @@ To store backups via ssh, WAL-G requires that these variables be set:
 * `SSH_USERNAME` connect with username
 * `SSH_PASSWORD` connect with password
 * `SSH_PRIVATE_KEY_PATH` or connect with a SSH KEY by specifying its full path
-
+* `SSH_JUMP_HOST` use ssh jump server host (optional)
+* `SSH_JUMP_PORT` port for the ssh jump server (optional)
+  
 Examples
 -----------
 ***Example: Using Minio.io S3-compatible storage***
