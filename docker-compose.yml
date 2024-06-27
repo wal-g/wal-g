@@ -479,8 +479,6 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_delta_backup_fullscan_test
     command: /tmp/tests/delta_backup_fullscan_test.sh
-    env_file:
-      - docker/common/common_walg.env
 
   pg_several_delta_backups_test:
     <<: *pg_test_common

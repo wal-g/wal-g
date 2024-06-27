@@ -78,7 +78,7 @@ pg_integration_test: clean_compose
 		docker compose build pg_pgbackrest;\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "orioledb"; then\
-		docker-compose build orioledb;\
+		docker compose build orioledb;\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pg_ssh_"; then\
 		docker compose build ssh;\
@@ -100,7 +100,7 @@ pg_integration_test: clean_compose
 
 .PHONY: clean_compose
 clean_compose:
-	services=$$(docker compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -w -f 2); \
+	services=$$(docker compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -d' ' -f 2); \
 		if [ "$$services" ]; then docker compose down $$services; fi
 
 all_unittests: deps unittest

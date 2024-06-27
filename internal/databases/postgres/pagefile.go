@@ -165,15 +165,15 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 	var fileSize uint64
 	var diffBlockCount uint32
 	pageSize := uint16(DatabasePageSize)
-	fields_to_parse := []parsingutil.FieldToParse{
+	fieldsToParse := []parsingutil.FieldToParse{
 		{Field: &fileSize, Name: "fileSize"},
 	}
 	if orioledb.IsOrioledbDataPath(fileName) {
-		fields_to_parse = append(fields_to_parse, parsingutil.FieldToParse{Field: &pageSize, Name: "pageSize"})
+		fieldsToParse = append(fieldsToParse, parsingutil.FieldToParse{Field: &pageSize, Name: "pageSize"})
 	}
-	fields_to_parse = append(fields_to_parse, parsingutil.FieldToParse{Field: &diffBlockCount, Name: "diffBlockCount"})
+	fieldsToParse = append(fieldsToParse, parsingutil.FieldToParse{Field: &diffBlockCount, Name: "diffBlockCount"})
 
-	err = parsingutil.ParseMultipleFieldsFromReader(fields_to_parse, increment)
+	err = parsingutil.ParseMultipleFieldsFromReader(fieldsToParse, increment)
 	if err != nil {
 		return err
 	}

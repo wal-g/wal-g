@@ -36,11 +36,7 @@ func IsOrioledbDataFile(info os.FileInfo, filePath string) bool {
 
 func IsEnabled(PgDataDirectory string) bool {
 	_, err := os.Stat(PgDataDirectory + "/orioledb_data")
-	if err == nil {
-		return true
-	} else {
-		return false
-	}
+	return err == nil
 }
 
 func GetChkpNum(PgDataDirectory string) (chkpNum uint32) {
@@ -63,9 +59,8 @@ func GetChkpNum(PgDataDirectory string) (chkpNum uint32) {
 		}
 		if info.IsDir() && filepath.Base(info.Name()) != "orioledb_data" {
 			return filepath.SkipDir
-		} else {
-			return nil
 		}
+		return nil
 	})
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Cannot find any xid file")

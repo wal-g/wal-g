@@ -134,7 +134,8 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 			return nil, errors.Wrapf(err, "PackFileIntoTar: failed to find corresponding bitmap '%s'\n", cfi.Path)
 		}
 		if p.IncrementFromChkpNum != nil && orioledb.IsOrioledbDataFile(cfi.FileInfo, cfi.Path) {
-			fileReadCloser, cfi.Header.Size, err = orioledb.OrioledbReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.IncrementFromChkpNum, bitmap)
+			fileReadCloser, cfi.Header.Size, err =
+				orioledb.ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.IncrementFromChkpNum, bitmap)
 		} else {
 			fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
 		}
