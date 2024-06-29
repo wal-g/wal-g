@@ -38,3 +38,11 @@ RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/scrip
 COPY testdata/ /testdata/
 COPY images/mysql/scripts/export_common.sh /usr/local/export_common.sh
 COPY images/mysql/scripts/export_test_funcs.sh /usr/local/export_test_funcs.sh
+
+RUN apt-get install --yes --no-install-recommends --no-install-suggests \
+  supervisor
+
+COPY images/base/config/supervisor /etc/supervisor
+COPY images/mongodb/config /config
+
+CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]

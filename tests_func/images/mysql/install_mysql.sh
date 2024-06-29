@@ -5,6 +5,8 @@ set -e -x
 
 apt-get update
 apt-get install --yes --no-install-recommends --no-install-suggests \
+  ca-certificates
+apt-get install --yes --no-install-recommends --no-install-suggests \
   lsb-release \
   gnupg \
   wget \
