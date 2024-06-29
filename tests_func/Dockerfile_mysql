@@ -1,8 +1,24 @@
-FROM walg-func-test-base
+FROM walg-func-test-base as build
 
 ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
+
+# Build WAL-G
+COPY staging/wal-g ${WALG_REPO}/
+WORKDIR ${WALG_REPO}
+
+# we test wal-g logic, not our deps. So, no brotli in these tests.
+RUN cd main/mysql && \
+    go build -mod vendor -race -o wal-g -ldflags "-s -w" && \
+    cp wal-g /usr/bin/wal-g
+
+
+FROM ubuntu:focal
+
 ARG MYSQL_MAJOR="8.0"
 
+COPY --from=build /usr/bin/wal-g /usr/bin/wal-g
+
+ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
 ENV MYSQLDATA /var/lib/mysql
 
 # Install MySQL & Co
@@ -14,16 +30,9 @@ COPY images/mysql/conf/client.cnf /root/.my.cnf
 COPY images/mysql/conf/client.cnf /etc/mysql/debian.cnf
 COPY images/mysql/conf/init.sql /etc/mysql/init.sql
 
-RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
+RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && \
+    apt -y install sysbench
 
-# Build WAL-G
-COPY staging/wal-g ${WALG_REPO}/
-WORKDIR ${WALG_REPO}
-
-# we test wal-g logic, not our deps. So, no brotli in these tests.
-RUN cd main/mysql && \
-    go build -mod vendor -race -o wal-g -ldflags "-s -w" && \
-    cp wal-g /usr/bin/wal-g
 
 # copy testdata:
 COPY testdata/ /testdata/
