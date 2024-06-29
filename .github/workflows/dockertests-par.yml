@@ -85,7 +85,7 @@ jobs:
         "make MYSQL_TEST=mysql_base_tests mysql_integration_test",
         "make MYSQL_TEST=mysql_delete_tests mysql_integration_test",
         "make MYSQL_TEST=mysql_copy_tests mysql_integration_test",
-        "make MYSQL_TEST=mysql8_tests mysql8_integration_test",
+        "make USE_BROTL=0 USE_LZO=0 USE_LIBSODIUM=0 MYSQL_TEST=mysql8_tests mysql8_integration_test",
         "make mariadb_test",
         "make gp_test",
         "make st_test",
