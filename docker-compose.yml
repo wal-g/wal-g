@@ -574,7 +574,7 @@ services:
 
   mysql8:
     build:
-      dockerfile: docker/mysql8/Dockerfile
+      dockerfile: docker/mysql/Dockerfile_v8
       context: .
     image: wal-g/mysql8
     container_name: wal-g_mysql8
