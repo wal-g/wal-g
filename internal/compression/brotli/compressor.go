@@ -4,8 +4,9 @@
 package brotli
 
 import (
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/ioextensions"
 
 	"github.com/google/brotli/go/cbrotli"
 )

@@ -2,10 +2,11 @@ package mysql
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsXtrabackup(t *testing.T) {

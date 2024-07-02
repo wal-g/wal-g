@@ -3,11 +3,6 @@ package postgres
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/fs"
 	"net"
@@ -15,6 +10,12 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleCatchupSend(pgDataDirectory string, destination string) {
