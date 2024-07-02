@@ -77,9 +77,6 @@ pg_integration_test: clean_compose
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
 	fi
-	@if echo "$(TEST)" | grep -Fqe "orioledb"; then\
-		docker compose build orioledb;\
-	fi
 	@if echo "$(TEST)" | grep -Fqe "pg_ssh_"; then\
 		docker compose build ssh;\
 	fi
@@ -96,6 +93,11 @@ pg_integration_test: clean_compose
 		sleep 5 &&\
 		docker compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
 	fi
+	make clean_compose
+
+orioledb_integration_test: install_and_build_pg clean_compose load_docker_common
+	docker compose build orioledb
+	docker compose up --exit-code-from $(TEST) $(TEST)
 	make clean_compose
 
 .PHONY: clean_compose
