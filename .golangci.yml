@@ -78,6 +78,9 @@ linters:
     - stylecheck
     - gosimple
     - whitespace
+    - prealloc
+    - makezero
+    - asciicheck
 
 run:
   go: "1.20"
