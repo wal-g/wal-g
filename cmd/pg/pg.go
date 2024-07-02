@@ -58,6 +58,10 @@ func Execute() {
 	}
 }
 
+func GetCmd() *cobra.Command {
+	return Cmd
+}
+
 func configureCommand() {
 	common.Init(Cmd, conf.PG)
 	conf.AddTurboFlag(Cmd)
