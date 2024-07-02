@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"github.com/pkg/errors"
@@ -77,6 +78,7 @@ type CurBackupInfo struct {
 	compressedSize   int64
 	dataCatalogSize  int64
 	incrementCount   int
+	StartChkpNum     *uint32
 }
 
 func NewPrevBackupInfo(name string, sentinel BackupSentinelDto, filesMeta FilesMetadataDto) PrevBackupInfo {
@@ -151,15 +153,27 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	// I think typed storage folders could be better (i.e. interface BasebackupStorageFolder, WalStorageFolder etc)
 	bh.Arguments.Uploader.ChangeDirectory(bh.Arguments.backupsFolder)
 	tracelog.DebugLogger.Printf("Uploading folder: %s", bh.Arguments.Uploader.Folder())
+	orioledbEnabled := orioledb.IsEnabled(bh.PgInfo.PgDataDirectory)
+	if orioledbEnabled {
+		tracelog.InfoLogger.Printf("Orioledb support enabled")
+	}
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
 	bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
 		bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
 		viper.GetInt64(conf.TarSizeThresholdSetting))
+	if orioledbEnabled && bh.prevBackupInfo.sentinelDto.BackupStartChkpNum != nil {
+		bh.Workers.Bundle.IncrementFromChkpNum = bh.prevBackupInfo.sentinelDto.BackupStartChkpNum
+	}
 
 	err = bh.startBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
+	if orioledbEnabled {
+		chkpNum := orioledb.GetChkpNum(bh.PgInfo.PgDataDirectory)
+		bh.CurBackupInfo.StartChkpNum = &chkpNum
+	}
+
 	bh.handleDeltaBackup(folder)
 	tarFileSets := bh.uploadBackup()
 	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
