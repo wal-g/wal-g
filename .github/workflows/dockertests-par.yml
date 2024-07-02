@@ -26,6 +26,7 @@ jobs:
         "make TEST=\"pg_remote_backup_test\" pg_integration_test",
         "make TEST=\"pg_remote_backup_without_files_metadata_test\" pg_integration_test",
         "make TEST=\"pg_ssh_backup_test\" pg_integration_test",
+        "make TEST=\"pg_transfer_backup_test\" pg_integration_test",
         "make TEST=\"pg_receive_wal_test\" pg_integration_test",
         "make TEST=\"pg_full_backup_copy_composer_test\" pg_integration_test",
         "make TEST=\"pg_full_backup_rating_composer_test\" pg_integration_test",
