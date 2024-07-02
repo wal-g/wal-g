@@ -1,6 +1,9 @@
 package postgres_test
 
 import (
+	"testing"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -11,8 +14,6 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
-	"testing"
-	"time"
 )
 
 func TestFetch(t *testing.T) {

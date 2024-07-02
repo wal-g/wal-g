@@ -1,8 +1,9 @@
 package testtools
 
 import (
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
 type MockCompressor struct{}
