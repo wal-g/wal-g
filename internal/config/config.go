@@ -83,9 +83,9 @@ const (
 	PgPassfileSetting                      = "PGPASSFILE"
 	PgDatabaseSetting                      = "PGDATABASE"
 	PgSslModeSetting                       = "PGSSLMODE"
-	PgSslKey = "PGSSLKEY"
-	PgSslCert = "PGSSLCERT"
-	PgSslRootCert = "PGSSLROOTCERT"
+	PgSslKey                               = "PGSSLKEY"
+	PgSslCert                              = "PGSSLCERT"
+	PgSslRootCert                          = "PGSSLROOTCERT"
 	PgSlotName                             = "WALG_SLOTNAME"
 	PgWalSize                              = "WALG_PG_WAL_SIZE"
 	TotalBgUploadedLimit                   = "TOTAL_BG_UPLOADED_LIMIT"
@@ -213,6 +213,8 @@ const (
 	SSHPassword       = "SSH_PASSWORD"
 	SSHUsername       = "SSH_USERNAME"
 	SSHPrivateKeyPath = "SSH_PRIVATE_KEY_PATH"
+	SSHJumpHost       = "SSH_JUMP_HOST"
+	SSHJumpPort       = "SSH_JUMP_PORT"
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
 )
@@ -416,6 +418,8 @@ var (
 		SSHPassword:       true,
 		SSHUsername:       true,
 		SSHPrivateKeyPath: true,
+		SSHJumpHost:       true,
+		SSHJumpPort:       true,
 
 		//File
 		"WALG_FILE_PREFIX": true,
@@ -439,9 +443,9 @@ var (
 		PgPassfileSetting:                      true,
 		PgDatabaseSetting:                      true,
 		PgSslModeSetting:                       true,
-		PgSslCert: true,
-		PgSslKey: true,
-		PgSslRootCert: true,
+		PgSslCert:                              true,
+		PgSslKey:                               true,
+		PgSslRootCert:                          true,
 		PgSlotName:                             true,
 		PgWalSize:                              true,
 		PrefetchDir:                            true,
