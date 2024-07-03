@@ -270,7 +270,7 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 		decoder = gob.NewDecoder(reader)
 		encoder = gob.NewEncoder(writer)
 	}
-	sendControlAndFileList(pgDataDirectory, err, encoder)
+	sendControlAndFileList(pgDataDirectory, encoder)
 	err = writer.Flush()
 	tracelog.ErrorLogger.FatalOnError(err)
 	for {
@@ -365,9 +365,9 @@ type CatchupCommandDto struct {
 	FilesToDelete  []string
 }
 
-func sendControlAndFileList(pgDataDirectory string, err error, encoder *gob.Encoder) {
-	tracelog.ErrorLogger.FatalOnError(err)
+func sendControlAndFileList(pgDataDirectory string, encoder *gob.Encoder) {
 	control, err := ExtractPgControl(pgDataDirectory)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Our system id %v, need catchup from %v",
 		control.SystemIdentifier, control.Checkpoint)
 	tracelog.ErrorLogger.FatalOnError(err)

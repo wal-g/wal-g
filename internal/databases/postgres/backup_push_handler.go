@@ -582,10 +582,7 @@ func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunne
 	tracelog.DebugLogger.Printf("Timeline: %d", pgInfo.Timeline)
 
 	if !keepRunner {
-		err = tmpConn.Close()
-		if err != nil {
-			return pgInfo, nil, err
-		}
+		utility.LoggedClose(tmpConn, "")
 		return pgInfo, nil, err
 	}
 
