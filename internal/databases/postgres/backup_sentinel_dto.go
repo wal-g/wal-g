@@ -32,15 +32,19 @@ type BackupSentinelDto struct {
 
 	UserData interface{} `json:"UserData,omitempty"`
 
-	FilesMetadataDisabled bool `json:"FilesMetadataDisabled,omitempty"`
+	FilesMetadataDisabled bool    `json:"FilesMetadataDisabled,omitempty"`
+	BackupStartChkpNum    *uint32 `json:"ChkpNum"`
+	IncrementFromChkpNum  *uint32 `json:"DeltaChkpNum,omitempty"`
 }
 
 func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {
 	sentinel := BackupSentinelDto{
-		BackupStartLSN:   &bh.CurBackupInfo.startLSN,
-		IncrementFromLSN: bh.prevBackupInfo.sentinelDto.BackupStartLSN,
-		PgVersion:        bh.PgInfo.PgVersion,
-		TablespaceSpec:   tbsSpec,
+		BackupStartLSN:       &bh.CurBackupInfo.startLSN,
+		IncrementFromLSN:     bh.prevBackupInfo.sentinelDto.BackupStartLSN,
+		PgVersion:            bh.PgInfo.PgVersion,
+		TablespaceSpec:       tbsSpec,
+		BackupStartChkpNum:   bh.CurBackupInfo.StartChkpNum,
+		IncrementFromChkpNum: bh.prevBackupInfo.sentinelDto.BackupStartChkpNum,
 	}
 	if bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
 		sentinel.IncrementFrom = &bh.prevBackupInfo.name

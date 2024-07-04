@@ -95,9 +95,14 @@ pg_integration_test: clean_compose
 	fi
 	make clean_compose
 
+orioledb_integration_test: install_and_build_pg clean_compose load_docker_common
+	docker compose build orioledb
+	docker compose up --exit-code-from $(TEST) $(TEST)
+	make clean_compose
+
 .PHONY: clean_compose
 clean_compose:
-	services=$$(docker compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -w -f 2); \
+	services=$$(docker compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -d' ' -f 2); \
 		if [ "$$services" ]; then docker compose down $$services; fi
 
 all_unittests: deps unittest
