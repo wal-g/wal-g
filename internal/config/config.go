@@ -83,9 +83,9 @@ const (
 	PgPassfileSetting                      = "PGPASSFILE"
 	PgDatabaseSetting                      = "PGDATABASE"
 	PgSslModeSetting                       = "PGSSLMODE"
-	PgSslKey = "PGSSLKEY"
-	PgSslCert = "PGSSLCERT"
-	PgSslRootCert = "PGSSLROOTCERT"
+	PgSslKey                               = "PGSSLKEY"
+	PgSslCert                              = "PGSSLCERT"
+	PgSslRootCert                          = "PGSSLROOTCERT"
 	PgSlotName                             = "WALG_SLOTNAME"
 	PgWalSize                              = "WALG_PG_WAL_SIZE"
 	TotalBgUploadedLimit                   = "TOTAL_BG_UPLOADED_LIMIT"
@@ -134,6 +134,7 @@ const (
 	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
 	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes     = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	OplogRecoverTimeout             = "OPLOG_RECOVER_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -439,9 +440,9 @@ var (
 		PgPassfileSetting:                      true,
 		PgDatabaseSetting:                      true,
 		PgSslModeSetting:                       true,
-		PgSslCert: true,
-		PgSslKey: true,
-		PgSslRootCert: true,
+		PgSslCert:                              true,
+		PgSslKey:                               true,
+		PgSslRootCert:                          true,
 		PgSlotName:                             true,
 		PgWalSize:                              true,
 		PrefetchDir:                            true,
@@ -914,6 +915,18 @@ func GetDurationSetting(setting string) (time.Duration, error) {
 	intervalStr, ok := GetSetting(setting)
 	if !ok {
 		return 0, NewUnsetRequiredSettingError(setting)
+	}
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
+}
+
+func GetDurationSettingDefault(setting string, def time.Duration) (time.Duration, error) {
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
 	}
 	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {

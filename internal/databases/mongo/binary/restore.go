@@ -2,6 +2,7 @@ package binary
 
 import (
 	"context"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"time"
 
 	"github.com/pkg/errors"
@@ -120,12 +121,16 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	}
 
 	defer mongodProcess.Close()
+	recoverTimeout, err := conf.GetDurationSettingDefault(conf.OplogRecoverTimeout, ComputeMongoStartTimeout(sentinel.UncompressedSize))
+	if err != nil {
+		return err
+	}
 
 	mongodService, err := CreateMongodService(
 		restoreService.Context,
 		"wal-g restore",
 		mongodProcess.GetURI(),
-		ComputeMongoStartTimeout(sentinel.UncompressedSize),
+		recoverTimeout,
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")
