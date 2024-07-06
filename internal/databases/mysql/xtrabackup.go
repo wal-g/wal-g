@@ -2,6 +2,8 @@ package mysql
 
 import (
 	"bytes"
+	"github.com/wal-g/wal-g/internal/databases/mysql/xbstream"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,9 +109,9 @@ func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFu
 	}
 }
 
-func GetXtrabackupFetcher(restoreCmd, prepareCmd *exec.Cmd) func(folder storage.Folder, backup internal.Backup) {
+func GetXtrabackupFetcher(restoreCmd, prepareCmd *exec.Cmd, inplaceDiffBackupRestore bool) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
-		err := xtrabackupFetch(backup.Name, folder, restoreCmd, prepareCmd, true)
+		err := xtrabackupFetch(backup.Name, folder, restoreCmd, prepareCmd, inplaceDiffBackupRestore, true)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
 	}
 }
@@ -119,6 +121,7 @@ func xtrabackupFetch(
 	folder storage.Folder,
 	restoreCmd *exec.Cmd,
 	prepareCmd *exec.Cmd,
+	inplaceDiffBackupRestore bool,
 	isLast bool) error {
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
@@ -127,25 +130,46 @@ func xtrabackupFetch(
 	err = backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
 
-	incrementalBackupDir := viper.GetString(conf.MysqlIncrementalBackupDst)
-	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
-
-	// common procedure:
-	// xbstream -x -C /var/lib/mysql
-	// xbstream -x -C /data/inc1 < INC1.xbstream
-	// xbstream -x -C /data/inc2 < INC2.xbstream
-	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql
-	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql --incremental-dir=/data/inc1
-	// xtrabackup --prepare                  --target-dir=/var/lib/mysql --incremental-dir=/data/inc2
-
+	// common procedure: start from base backup & apply diffs one by one
+	// recursively, find base backup and start from it:
 	if sentinel.IsIncremental {
+		// check required configs earlier:
+		_, err = internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
+		tracelog.ErrorLogger.FatalfOnError("%v", err)
+
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinel.IncrementFrom, *sentinel.IncrementFromLSN)
-		err = xtrabackupFetch(*sentinel.IncrementFrom, folder, restoreCmd, prepareCmd, false)
+		err = xtrabackupFetch(*sentinel.IncrementFrom, folder, restoreCmd, prepareCmd, inplaceDiffBackupRestore, false)
 		if err != nil {
 			return err
 		}
 	}
+
+	if inplaceDiffBackupRestore {
+		return xtrabackupFetchInplace(backup, prepareCmd, isLast)
+	} else {
+		return xtrabackupFetchWithExtraSpace(backup, restoreCmd, prepareCmd, isLast)
+	}
+}
+
+func xtrabackupFetchWithExtraSpace(backup internal.Backup, restoreCmd *exec.Cmd, prepareCmd *exec.Cmd, isLast bool) error {
+	// Manually we will do the following:
+	//
+	// xbstream -x -C /var/lib/mysql
+	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql
+	//
+	// xbstream -x -C /data/inc1 < INC1.xbstream
+	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql --incremental-dir=/data/inc1
+	//
+	// xbstream -x -C /data/inc2 < INC2.xbstream
+	// xtrabackup --prepare                  --target-dir=/var/lib/mysql --incremental-dir=/data/inc2
+
+	var sentinel StreamSentinelDto
+	err := backup.FetchSentinel(&sentinel)
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
+
+	incrementalBackupDir := viper.GetString(conf.MysqlIncrementalBackupDst)
+	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
+	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
 
 	if sentinel.IsIncremental {
 		restoreCmd = cloneCommand(restoreCmd)
@@ -164,7 +188,7 @@ func xtrabackupFetch(
 	stderr := &bytes.Buffer{}
 	restoreCmd.Stderr = stderr
 
-	tracelog.InfoLogger.Printf("Restoring %s with cmd %v", backupName, restoreCmd.Args)
+	tracelog.InfoLogger.Printf("Restoring %s with cmd %v", backup.Name, restoreCmd.Args)
 	err = restoreCmd.Start()
 	if err != nil {
 		return err
@@ -183,17 +207,64 @@ func xtrabackupFetch(
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("Restored %s", backupName)
+	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
 
 	if prepareCmd != nil {
-		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backupName, prepareCmd.Args)
+		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args)
 		err = prepareCmd.Run()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
 			return err
 		}
-		tracelog.InfoLogger.Printf("Prepared %s", backupName)
+		tracelog.InfoLogger.Printf("Prepared %s", backup.Name)
 	}
 
 	return os.RemoveAll(tempDeltaDir)
+}
+
+func xtrabackupFetchInplace(backup internal.Backup, prepareCmd *exec.Cmd, isLast bool) error {
+	var sentinel StreamSentinelDto
+	err := backup.FetchSentinel(&sentinel)
+	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
+
+	dataDir, err := internal.GetLogsDstSettings(conf.MysqlDataDir)
+	tracelog.ErrorLogger.FatalfOnError("Failed to get config value: %v", err)
+
+	//incrementalBackupDir := viper.GetString(conf.MysqlIncrementalBackupDst)
+	//tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
+	//tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
+
+	if sentinel.IsIncremental {
+		// FIXME: do we need `--incremental-dir` ???
+		//prepareCmd = cloneCommand(prepareCmd)
+		//injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
+	}
+	if !isLast {
+		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
+	}
+
+	fetcher, err := internal.GetBackupStreamFetcher(backup)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to detect backup format: %v\n", err)
+		return err
+	}
+
+	reader, writer := io.Pipe()
+	streamReader := xbstream.NewReader(reader, false)
+	go xbstream.DiskSink(streamReader, dataDir, true) // FIXME: concurrency!
+
+	err = fetcher(backup, writer)
+	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
+
+	if prepareCmd != nil {
+		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args)
+		err = prepareCmd.Run()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
+			return err
+		}
+		tracelog.InfoLogger.Printf("Prepared %s", backup.Name)
+	}
+
+	return nil
 }

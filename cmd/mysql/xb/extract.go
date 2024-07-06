@@ -31,7 +31,7 @@ var (
 				tracelog.ErrorLogger.FatalfOnError("Cannot open input file: %v", err)
 			}
 
-			err = os.MkdirAll(dst, 0777)
+			err = os.MkdirAll(dst, 0777) // FIXME: 0777? use UMASK?
 			tracelog.ErrorLogger.FatalfOnError("Cannot create destination folder: %v", err)
 
 			streamReader := xbstream.NewReader(src, false)

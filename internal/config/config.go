@@ -149,6 +149,7 @@ const (
 	MysqlBinlogServerReplicaSource = "WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE"
 	MysqlBackupDownloadMaxRetry    = "WALG_BACKUP_DOWNLOAD_MAX_RETRY"
 	MysqlIncrementalBackupDst      = "WALG_MYSQL_INCREMENTAL_BACKUP_DST"
+	MysqlDataDir                   = "WALG_MYSQL_DATA_DIR"
 	// Deprecated: unused
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
@@ -510,6 +511,7 @@ var (
 		MysqlBinlogServerReplicaSource: true,
 		MysqlBackupDownloadMaxRetry:    true,
 		MysqlIncrementalBackupDst:      true,
+		MysqlDataDir:                   true,
 	}
 
 	RedisAllowedSettings = map[string]bool{

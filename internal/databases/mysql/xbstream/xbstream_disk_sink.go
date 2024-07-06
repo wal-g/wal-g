@@ -196,7 +196,7 @@ func (dsf *dataSinkFactory) NewDataSink(path string) dataSink {
 // xbstream Disk Sink will unpack archive to disk.
 // Note: files may be compressed(quicklz,lz4,zstd) / encrypted("NONE", "AES128", "AES192","AES256")
 func DiskSink(stream *Reader, output string, decompress bool) {
-	err := os.MkdirAll(output, 0777)
+	err := os.MkdirAll(output, 0777) // FIXME: permission & UMASK
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	factory := dataSinkFactory{output, decompress}
