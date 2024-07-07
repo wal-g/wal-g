@@ -146,9 +146,8 @@ func xtrabackupFetch(
 
 	if useXbtoolExtract {
 		return xtrabackupFetchInhouse(backup, prepareCmd, isLast)
-	} else {
-		return xtrabackupFetchClassic(backup, restoreCmd, prepareCmd, isLast)
 	}
+	return xtrabackupFetchClassic(backup, restoreCmd, prepareCmd, isLast)
 }
 
 func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepareCmd *exec.Cmd, isLast bool) error {
@@ -268,6 +267,10 @@ func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, isLast
 	go xbstream.DiskSink(streamReader, destinationDir, true) // FIXME: concurrency!
 
 	err = fetcher(backup, writer)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Restore failed: %v", err)
+		return err
+	}
 	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
 
 	if prepareCmd != nil {

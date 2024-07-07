@@ -3,15 +3,18 @@ set -e -x
 
 . /usr/local/export_common.sh
 
+
 export WALE_S3_PREFIX=s3://mysql8_full_xtrabackup_xbtool_bucket
 export WALG_COMPRESSION_METHOD=zstd
+export WALG_MYSQL_DATA_DIR="${MYSQLDATA}"
+
 export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
     --stream=xbstream \
     --user=sbtest \
     --host=localhost \
     --parallel=2 \
     --datadir=${MYSQLDATA}"
-export WALG_MYSQL_DATA_DIR="${MYSQLDATA}"
+unset WALG_STREAM_RESTORE_COMMAND
 export WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=${MYSQLDATA}"
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
