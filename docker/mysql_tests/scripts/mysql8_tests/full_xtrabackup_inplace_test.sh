@@ -29,7 +29,7 @@ wal-g backup-push
 
 mysql_kill_and_clean_data
 
-wal-g backup-fetch LATEST --inplace-diff-backup-restore
+wal-g backup-fetch LATEST --use-xbtool-extract
 
 chown -R mysql:mysql $MYSQLDATA
 

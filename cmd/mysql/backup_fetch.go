@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	backupFetchShortDescription         = "Fetch desired backup from storage"
-	targetUserDataDescription           = "Fetch storage backup which has the specified user data"
-	inplaceDiffBackupRestoreDescription = "Restore diff-backups in place (without extra space)"
+	backupFetchShortDescription = "Fetch desired backup from storage"
+	targetUserDataDescription   = "Fetch storage backup which has the specified user data"
+	useXbtoolExtractDescription = "Use internal xbtool to extract data from xbstream"
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
 			restoreCmd, err := internal.GetCommandSetting(conf.NameStreamRestoreCmd)
-			if !inplaceDiffBackupRestore {
+			if !useXbtoolExtract {
 				tracelog.ErrorLogger.FatalOnError(err)
 			}
 			prepareCmd, _ := internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
@@ -34,11 +34,11 @@ var (
 			targetBackupSelector, err := createTargetBackupSelector(args, fetchTargetUserData)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			mysql.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd, inplaceDiffBackupRestore)
+			mysql.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd, useXbtoolExtract)
 		},
 	}
-	fetchTargetUserData      string
-	inplaceDiffBackupRestore bool
+	fetchTargetUserData string
+	useXbtoolExtract    bool
 )
 
 func createTargetBackupSelector(args []string, fetchTargetUserData string) (internal.BackupSelector, error) {
@@ -56,7 +56,7 @@ func init() {
 	cmd.AddCommand(backupFetchCmd)
 	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data",
 		"", targetUserDataDescription)
-	backupFetchCmd.Flags().BoolVar(&inplaceDiffBackupRestore, "inplace-diff-backup-restore",
-		false, inplaceDiffBackupRestoreDescription)
-	_ = backupFetchCmd.Flags().MarkHidden("inplace-diff-backup-restore")
+	backupFetchCmd.Flags().BoolVar(&useXbtoolExtract, "use-xbtool-extract",
+		false, useXbtoolExtractDescription)
+	_ = backupFetchCmd.Flags().MarkHidden("use-xbtool-extract")
 }

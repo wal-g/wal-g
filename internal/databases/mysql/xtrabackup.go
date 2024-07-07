@@ -109,9 +109,9 @@ func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFu
 	}
 }
 
-func GetXtrabackupFetcher(restoreCmd, prepareCmd *exec.Cmd, inplaceDiffBackupRestore bool) func(folder storage.Folder, backup internal.Backup) {
+func GetXtrabackupFetcher(restoreCmd, prepareCmd *exec.Cmd, useXbtoolExtract bool) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
-		err := xtrabackupFetch(backup.Name, folder, restoreCmd, prepareCmd, inplaceDiffBackupRestore, true)
+		err := xtrabackupFetch(backup.Name, folder, restoreCmd, prepareCmd, useXbtoolExtract, true)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
 	}
 }
@@ -121,7 +121,7 @@ func xtrabackupFetch(
 	folder storage.Folder,
 	restoreCmd *exec.Cmd,
 	prepareCmd *exec.Cmd,
-	inplaceDiffBackupRestore bool,
+	useXbtoolExtract bool,
 	isLast bool) error {
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
@@ -138,20 +138,20 @@ func xtrabackupFetch(
 		tracelog.ErrorLogger.FatalfOnError("%v", err)
 
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinel.IncrementFrom, *sentinel.IncrementFromLSN)
-		err = xtrabackupFetch(*sentinel.IncrementFrom, folder, restoreCmd, prepareCmd, inplaceDiffBackupRestore, false)
+		err = xtrabackupFetch(*sentinel.IncrementFrom, folder, restoreCmd, prepareCmd, useXbtoolExtract, false)
 		if err != nil {
 			return err
 		}
 	}
 
-	if inplaceDiffBackupRestore {
-		return xtrabackupFetchInplace(backup, prepareCmd, isLast)
+	if useXbtoolExtract {
+		return xtrabackupFetchInhouse(backup, prepareCmd, isLast)
 	} else {
-		return xtrabackupFetchWithExtraSpace(backup, restoreCmd, prepareCmd, isLast)
+		return xtrabackupFetchClassic(backup, restoreCmd, prepareCmd, isLast)
 	}
 }
 
-func xtrabackupFetchWithExtraSpace(backup internal.Backup, restoreCmd *exec.Cmd, prepareCmd *exec.Cmd, isLast bool) error {
+func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepareCmd *exec.Cmd, isLast bool) error {
 	// Manually we will do the following:
 	//
 	// xbstream -x -C /var/lib/mysql
@@ -222,7 +222,18 @@ func xtrabackupFetchWithExtraSpace(backup internal.Backup, restoreCmd *exec.Cmd,
 	return os.RemoveAll(tempDeltaDir)
 }
 
-func xtrabackupFetchInplace(backup internal.Backup, prepareCmd *exec.Cmd, isLast bool) error {
+func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, isLast bool) error {
+	// This is equivalent to:
+	//
+	// wal-g xb extract --decompress /var/lib/mysql  < BASE.xbstream
+	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql
+	//
+	// wal-g xb extract --decompress /data/inc1  < INC1.xbstream
+	// xtrabackup --prepare --apply-log-only --target-dir=/var/lib/mysql --incremental-dir=/data/inc1
+	//
+	// wal-g xb extract --decompress /data/inc2  < INC2.xbstream
+	// xtrabackup --prepare                  --target-dir=/var/lib/mysql --incremental-dir=/data/inc2
+
 	var sentinel StreamSentinelDto
 	err := backup.FetchSentinel(&sentinel)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
@@ -230,14 +241,13 @@ func xtrabackupFetchInplace(backup internal.Backup, prepareCmd *exec.Cmd, isLast
 	dataDir, err := internal.GetLogsDstSettings(conf.MysqlDataDir)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get config value: %v", err)
 
-	//incrementalBackupDir := viper.GetString(conf.MysqlIncrementalBackupDst)
-	//tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
-	//tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
+	incrementalBackupDir := viper.GetString(conf.MysqlIncrementalBackupDst)
+	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
+	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
 
 	if sentinel.IsIncremental {
-		// FIXME: do we need `--incremental-dir` ???
-		//prepareCmd = cloneCommand(prepareCmd)
-		//injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
+		prepareCmd = cloneCommand(prepareCmd)
+		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
 	if !isLast {
 		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
@@ -249,9 +259,13 @@ func xtrabackupFetchInplace(backup internal.Backup, prepareCmd *exec.Cmd, isLast
 		return err
 	}
 
+	destinationDir := tempDeltaDir
+	if !sentinel.IsIncremental {
+		destinationDir = dataDir
+	}
 	reader, writer := io.Pipe()
 	streamReader := xbstream.NewReader(reader, false)
-	go xbstream.DiskSink(streamReader, dataDir, true) // FIXME: concurrency!
+	go xbstream.DiskSink(streamReader, destinationDir, true) // FIXME: concurrency!
 
 	err = fetcher(backup, writer)
 	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
@@ -266,5 +280,5 @@ func xtrabackupFetchInplace(backup internal.Backup, prepareCmd *exec.Cmd, isLast
 		tracelog.InfoLogger.Printf("Prepared %s", backup.Name)
 	}
 
-	return nil
+	return os.RemoveAll(tempDeltaDir)
 }
