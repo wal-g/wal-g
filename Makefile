@@ -8,7 +8,7 @@ MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
 DOCKER_COMMON := golang ubuntu ubuntu_20_04 s3
 CMD_FILES = $(wildcard cmd/**/*.go)
-PKG_FILES = $(wildcard internal/**/*.go internal/**/**/*.go internal/*.go)
+PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
@@ -267,6 +267,7 @@ install_tools:
 	cd $(TOOLS_MOD_DIR) && go install github.com/golangci/golangci-lint/cmd/golangci-lint
 
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
+	go fmt ./...
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
 goimports: install_tools $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)

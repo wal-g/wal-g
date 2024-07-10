@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	"golang.org/x/net/html/charset"
 	"io"
+
+	"golang.org/x/net/html/charset"
 
 	"strings"
 )

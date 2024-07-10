@@ -11,19 +11,19 @@ import (
 
 type BackupFilesListProvider struct {
 	ManifestPath string
-	AOFFolder string
+	AOFFolder    string
 }
 
 func NewBackupFilesListProvider(path string) *BackupFilesListProvider {
 	return &BackupFilesListProvider{
 		ManifestPath: path,
-		AOFFolder: filepath.Dir(path),
+		AOFFolder:    filepath.Dir(path),
 	}
 }
 
 func (p *BackupFilesListProvider) Get() []string {
 	lines := readManifest(p.ManifestPath)
-    res := parseManifest(lines, p.AOFFolder)
+	res := parseManifest(lines, p.AOFFolder)
 	res = append(res, p.ManifestPath)
 	return res
 }
@@ -36,15 +36,15 @@ func readManifest(manifestPath string) []string {
 	defer manifest.Close()
 
 	scanner := bufio.NewScanner(manifest)
-		var res []string
-		for scanner.Scan() {
+	var res []string
+	for scanner.Scan() {
 		res = append(res, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
 		tracelog.ErrorLogger.Fatalf("error scanning manifest file %s: %v", manifestPath, err)
 	}
 	if len(res) == 0 {
-			tracelog.ErrorLogger.Fatalf("no records in manifest file %s: %v", manifestPath, err)
+		tracelog.ErrorLogger.Fatalf("no records in manifest file %s: %v", manifestPath, err)
 	}
 
 	return res
@@ -57,7 +57,7 @@ func parseManifest(lines []string, folder string) []string {
 	for _, line := range lines {
 		chunks := strings.Fields(line)
 		if len(chunks) != 6 {
-				tracelog.ErrorLogger.Fatalf("unexpected line format in manifest file: %s", line)
+			tracelog.ErrorLogger.Fatalf("unexpected line format in manifest file: %s", line)
 		}
 		res = append(res, filepath.Join(folder, chunks[1]))
 	}

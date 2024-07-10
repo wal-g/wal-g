@@ -10,26 +10,26 @@ import (
 )
 
 type RestoreService struct {
-	Context      context.Context
-	Folder *archive.Folder
-	Uploader     internal.Uploader
+	Context       context.Context
+	Folder        *archive.Folder
+	Uploader      internal.Uploader
 	versionParser *archive.VersionParser
 }
 
 type RestoreArgs struct {
-	BackupName string
+	BackupName     string
 	RestoreVersion string
 
-	SkipChecks bool
+	SkipChecks         bool
 	SkipBackupDownload bool
 }
 
 func CreateRestoreService(ctx context.Context, folder *archive.Folder, uploader internal.Uploader, versionParser *archive.VersionParser,
-	) (*RestoreService, error) {
+) (*RestoreService, error) {
 	return &RestoreService{
-		Context:           ctx,
-		Folder:      folder,
-		Uploader:          uploader,
+		Context:       ctx,
+		Folder:        folder,
+		Uploader:      uploader,
 		versionParser: versionParser,
 	}, nil
 }

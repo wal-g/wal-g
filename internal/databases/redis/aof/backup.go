@@ -15,21 +15,20 @@ import (
 )
 
 type BackupService struct {
-	Context       context.Context
-	DiskWatcher *diskwatcher.DiskWatcher
+	Context                 context.Context
+	DiskWatcher             *diskwatcher.DiskWatcher
 	concurrentUploader      *internal.ConcurrentUploader
-	metaConstructor internal.MetaConstructor
+	metaConstructor         internal.MetaConstructor
 	backupFilesListProvider *BackupFilesListProvider
-	filesPinner *FilesPinner
+	filesPinner             *FilesPinner
 }
-
 
 func GenerateNewBackupName() string {
 	return "aof_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
 type Fobj struct {
-	fobj *os.File
+	fobj     *os.File
 	isClosed bool
 }
 
@@ -77,19 +76,19 @@ func (p *FilesPinner) Unpin() {
 	p.fobjs = nil
 }
 
-func CreateBackupService(ctx context.Context, diskWatcher *diskwatcher.DiskWatcher, uploader *internal.ConcurrentUploader, 
+func CreateBackupService(ctx context.Context, diskWatcher *diskwatcher.DiskWatcher, uploader *internal.ConcurrentUploader,
 	metaConstructor internal.MetaConstructor, backupFilesListProvider *BackupFilesListProvider, filesPinner *FilesPinner,
-	) (*BackupService, error) {
+) (*BackupService, error) {
 	return &BackupService{
-		Context:       ctx,
-		DiskWatcher: diskWatcher,
+		Context:                 ctx,
+		DiskWatcher:             diskWatcher,
 		concurrentUploader:      uploader,
 		backupFilesListProvider: backupFilesListProvider,
-		filesPinner: filesPinner,
-		metaConstructor: metaConstructor,
+		filesPinner:             filesPinner,
+		metaConstructor:         metaConstructor,
 	}, nil
 }
-	
+
 func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
 	// ToDo
 	// 1. [ER] no manifest file
@@ -138,11 +137,11 @@ func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
 	defer bs.DiskWatcher.Stop()
 
 	select {
-	case err := <- uploadErrChan:
+	case err := <-uploadErrChan:
 		if err != nil {
 			return err
 		}
-	case <- bs.DiskWatcher.Signaling:
+	case <-bs.DiskWatcher.Signaling:
 		return fmt.Errorf("disk is filled above limit, exiting")
 	}
 

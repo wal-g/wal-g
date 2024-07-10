@@ -2,8 +2,9 @@ package binary
 
 import (
 	"context"
-	conf "github.com/wal-g/wal-g/internal/config"
 	"time"
+
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"

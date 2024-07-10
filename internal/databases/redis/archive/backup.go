@@ -27,8 +27,8 @@ type Backup struct {
 	Permanent       bool        `json:"Permanent"`
 	DataSize        int64       `json:"DataSize,omitempty"`
 	BackupSize      int64       `json:"BackupSize,omitempty"`
-	BackupType		string		`json:"BackupType,omitempty"`
-	Version			string		`json:"Version,omitempty"`
+	BackupType      string      `json:"BackupType,omitempty"`
+	Version         string      `json:"Version,omitempty"`
 }
 
 func (b Backup) Name() string {
@@ -150,16 +150,16 @@ type BackupMeta struct {
 	User           interface{}
 	StartTime      time.Time
 	FinishTime     time.Time
-	BackupType	   string
-	Version 	string
+	BackupType     string
+	Version        string
 }
 
 type RedisMetaConstructor struct {
-	ctx       context.Context
-	folder    storage.Folder
-	meta      BackupMeta
-	permanent bool
-	backupType string
+	ctx           context.Context
+	folder        storage.Folder
+	meta          BackupMeta
+	permanent     bool
+	backupType    string
 	versionParser *VersionParser
 }
 
@@ -170,9 +170,9 @@ func (m *RedisMetaConstructor) Init() error {
 		return err
 	}
 	m.meta = BackupMeta{
-		Permanent: m.permanent,
-		User:      userData,
-		StartTime: utility.TimeNowCrossPlatformLocal(),
+		Permanent:  m.permanent,
+		User:       userData,
+		StartTime:  utility.TimeNowCrossPlatformLocal(),
 		BackupType: m.backupType,
 	}
 	if m.versionParser != nil {
@@ -191,8 +191,8 @@ func (m *RedisMetaConstructor) MetaInfo() interface{} {
 		UserData:        meta.User,
 		StartLocalTime:  meta.StartTime,
 		FinishLocalTime: meta.FinishTime,
-		BackupType: meta.BackupType,
-		Version: meta.Version,
+		BackupType:      meta.BackupType,
+		Version:         meta.Version,
 	}
 }
 

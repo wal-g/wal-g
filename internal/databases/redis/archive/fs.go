@@ -6,13 +6,13 @@ import (
 )
 
 type Folder struct {
-	Path string
+	Path     string
 	fileMode fs.FileMode
 }
 
 func CreateFolder(path string, fileMode fs.FileMode) *Folder {
 	return &Folder{
-		Path: path,
+		Path:     path,
 		fileMode: fileMode,
 	}
 }
