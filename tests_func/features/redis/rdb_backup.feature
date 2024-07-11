@@ -1,5 +1,5 @@
 #noinspection CucumberUndefinedStep
-Feature: Redis backups check
+Feature: Redis RDB backups check
 
   Background: Wait for working infrastructure
     Given prepared infrastructure

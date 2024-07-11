@@ -57,6 +57,7 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 
 	defer utility.LoggedClose(fileReadCloser, "")
 	packedFileSize, err := PackFileTo(tarBall, cfi.Header, fileReadCloser)
+
 	if err != nil {
 		return errors.Wrap(err, "PackFileIntoTar: operation failed")
 	}

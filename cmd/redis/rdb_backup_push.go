@@ -20,7 +20,7 @@ var (
 )
 
 const (
-	backupPushShortDescription = "Makes backup and uploads it to storage"
+	backupPushShortDescription = "Makes rdb backup and uploads it to storage"
 	PermanentFlag              = "permanent"
 	PermanentShorthand         = "p"
 )
@@ -58,9 +58,9 @@ var backupPushCmd = &cobra.Command{
 		}
 
 		backupCmd.Stderr = os.Stderr
-		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent)
+		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil)
 
-		err = redis.HandleBackupPush(uploader, backupCmd, metaConstructor)
+		err = redis.HandleRDBBackupPush(uploader, backupCmd, metaConstructor)
 		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
@@ -71,6 +71,16 @@ var backupPushCmd = &cobra.Command{
 }
 
 func init() {
-	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes backup with 'permanent' flag")
+	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes rdb backup with 'permanent' flag")
 	cmd.AddCommand(backupPushCmd)
+
+	rdbBackupPushCmd := &cobra.Command{
+		Use:    "rdb-backup-push",
+		Short:  backupPushCmd.Short,
+		Args:   backupPushCmd.Args,
+		Run:    backupPushCmd.Run,
+		PreRun: backupPushCmd.PreRun,
+	}
+	rdbBackupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes rdb backup with 'permanent' flag")
+	cmd.AddCommand(rdbBackupPushCmd)
 }

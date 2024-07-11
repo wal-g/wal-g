@@ -2,8 +2,9 @@ package binary
 
 import (
 	"context"
-	conf "github.com/wal-g/wal-g/internal/config"
 	"time"
+
+	conf "github.com/wal-g/wal-g/internal/config"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -80,7 +81,7 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
-	downloader := CreateConcurrentDownloader(restoreService.Uploader)
+	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader)
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
 }
 

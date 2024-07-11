@@ -156,6 +156,12 @@ const (
 	RedisPassword             = "WALG_REDIS_PASSWORD"
 	RedisCreateBackupACLUser  = "WALG_CREATE_BACKUP_REDIS_ACL_USER"
 	RedisRestoreBackupACLUser = "WALG_RESTORE_BACKUP_REDIS_ACL_USER"
+	RedisDataPath             = "WALG_REDIS_DATA_PATH"
+	RedisAppendonlyPath       = "WALG_REDIS_APPENDONLY_PATH"
+	RedisAppendonlyManifest   = "WALG_REDIS_APPENDONLY_MANIFEST"
+	RedisDataThreshold        = "WALG_REDIS_DATA_THRESHOLD"
+	RedisDataTimeout          = "WALG_REDIS_DATA_TIMEOUT"
+	RedisServerProcessName    = "WALG_REDIS_SERVER_PROCESS_NAME"
 
 	GPLogsDirectory            = "WALG_GP_LOGS_DIR"
 	GPSegContentID             = "WALG_GP_SEG_CONTENT_ID"
@@ -261,6 +267,15 @@ var (
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
 		StreamSplitterBlockSize:        "1048576",
+	}
+
+	RedisDefaultSettings = map[string]string{
+		RedisDataPath:           "/var/lib/redis",
+		RedisAppendonlyPath:     "/var/lib/redis/appendonlydir",
+		RedisAppendonlyManifest: "/var/lib/redis/appendonlydir/appendonly.aof.manifest",
+		RedisDataThreshold:      "90",
+		RedisDataTimeout:        "1",
+		RedisServerProcessName:  "redis-server",
 	}
 
 	MysqlDefaultSettings = map[string]string{
@@ -518,6 +533,12 @@ var (
 		RedisPassword:             true,
 		RedisCreateBackupACLUser:  true,
 		RedisRestoreBackupACLUser: true,
+		RedisDataPath:             true,
+		RedisAppendonlyPath:       true,
+		RedisAppendonlyManifest:   true,
+		RedisDataThreshold:        true,
+		RedisDataTimeout:          true,
+		RedisServerProcessName:    true,
 	}
 
 	GPAllowedSettings = map[string]bool{

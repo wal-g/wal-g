@@ -1,13 +1,14 @@
 package greenplum
 
 import (
+	"os"
+	"os/exec"
+	"testing"
+
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/config"
-	"os"
-	"os/exec"
-	"testing"
 )
 
 func TestPrepareContentIDsToFetch(t *testing.T) {

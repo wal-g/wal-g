@@ -1,11 +1,10 @@
-package binary
+package internal
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -14,14 +13,14 @@ type ConcurrentDownloader struct {
 	folder storage.Folder
 }
 
-func CreateConcurrentDownloader(uploader internal.Uploader) *ConcurrentDownloader {
+func CreateConcurrentDownloader(uploader Uploader) *ConcurrentDownloader {
 	return &ConcurrentDownloader{
 		folder: uploader.Folder(),
 	}
 }
 
 func (downloader *ConcurrentDownloader) Download(backupName, localDirectory string) error {
-	tarsFolder := downloader.folder.GetSubFolder(strings.Trim(backupName+internal.TarPartitionFolderName, "/"))
+	tarsFolder := downloader.folder.GetSubFolder(strings.Trim(backupName+TarPartitionFolderName, "/"))
 	tarsToExtract, err := downloader.getTarsToExtract(tarsFolder)
 	if err != nil {
 		return err
@@ -35,11 +34,11 @@ func (downloader *ConcurrentDownloader) Download(backupName, localDirectory stri
 		return fmt.Errorf("directory '%s' should be empty", localDirectory)
 	}
 
-	tarInterpreter := internal.NewFileTarInterpreter(localDirectory)
-	return internal.ExtractAll(tarInterpreter, tarsToExtract)
+	tarInterpreter := NewFileTarInterpreter(localDirectory)
+	return ExtractAll(tarInterpreter, tarsToExtract)
 }
 
-func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Folder) ([]internal.ReaderMaker, error) {
+func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Folder) ([]ReaderMaker, error) {
 	tarObjects, subFolders, err := tarsFolder.ListFolder()
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to list '%s'", tarsFolder.GetPath())
@@ -48,10 +47,10 @@ func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Fold
 		return nil, errors.Wrapf(err, "unknown subfolders in '%s'", tarsFolder.GetPath())
 	}
 
-	tarsToExtract := make([]internal.ReaderMaker, 0, len(tarObjects))
+	tarsToExtract := make([]ReaderMaker, 0, len(tarObjects))
 
 	for _, tarObject := range tarObjects {
-		tarToExtract := internal.NewStorageReaderMaker(tarsFolder, tarObject.GetName())
+		tarToExtract := NewStorageReaderMaker(tarsFolder, tarObject.GetName())
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}
 

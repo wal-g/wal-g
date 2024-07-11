@@ -92,5 +92,13 @@ func DynConf(env map[string]string, osEnviron map[string]string) map[string]stri
 		}
 	}
 
+	if redisPersistenceType, ok := osEnviron["REDIS_PERSISTENCE_TYPE"]; ok {
+		if redisPersistenceType == "aof" {
+			res["REDIS_CONF_FILE"] = "redis-aof.conf"
+		} else {
+			res["REDIS_CONF_FILE"] = "redis-rdb.conf"
+		}
+	}
+
 	return res
 }

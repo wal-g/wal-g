@@ -52,7 +52,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath)
+	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (backupService *BackupService) InitializeMongodBackupMeta(backupName string
 	return nil
 }
 
-func (backupService *BackupService) Finalize(uploader *ConcurrentUploader, backupCursorMeta *BackupCursorMeta) error {
+func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta) error {
 	sentinel := &backupService.Sentinel
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uploader.UncompressedSize
