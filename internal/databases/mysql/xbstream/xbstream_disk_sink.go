@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -230,4 +231,9 @@ func DiskSink(stream *Reader, output string, decompress bool) {
 		tracelog.WarningLogger.Printf("File %v wasn't clossed properly. Probably xbstream is broken", path)
 		utility.LoggedClose(sink, "datasink.Close()")
 	}
+}
+
+func AsyncDiskSink(wg *sync.WaitGroup, stream *Reader, output string, decompress bool) {
+	defer wg.Done()
+	DiskSink(stream, output, decompress)
 }

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -262,15 +263,18 @@ func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, isLast
 	if !sentinel.IsIncremental {
 		destinationDir = dataDir
 	}
+	var wg sync.WaitGroup
 	reader, writer := io.Pipe()
 	streamReader := xbstream.NewReader(reader, false)
-	go xbstream.DiskSink(streamReader, destinationDir, true) // FIXME: concurrency!
+	wg.Add(1)
+	go xbstream.AsyncDiskSink(&wg, streamReader, destinationDir, true)
 
 	err = fetcher(backup, writer)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Restore failed: %v", err)
 		return err
 	}
+	wg.Wait()
 	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
 
 	if prepareCmd != nil {
