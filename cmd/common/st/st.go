@@ -14,7 +14,6 @@ import (
 
 const StorageToolsShortDescription = "(DANGEROUS) Storage tools"
 
-
 var (
 	StorageToolsCmd = &cobra.Command{
 		Use:   "st",
@@ -24,12 +23,12 @@ var (
 	}
 	targetStorage string
 
-    glob bool
+	glob bool
 )
 
 func init() {
 	StorageToolsCmd.PersistentFlags().StringVarP(&targetStorage, "target", "t", consts.DefaultStorage,
 		"execute for specific failover storage (Postgres only)")
 	StorageToolsCmd.PersistentFlags().BoolVarP(&glob, "glob", "g", false,
-        "use a glob pattern for file paths")
+		"use a glob pattern for file paths")
 }

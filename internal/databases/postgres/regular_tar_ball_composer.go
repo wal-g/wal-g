@@ -61,6 +61,9 @@ func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBall
 	tarFileSets := maker.tarFileSets
 	tarBallFilePacker := NewTarBallFilePacker(bundle.DeltaMap,
 		bundle.IncrementFromLsn, bundleFiles, maker.filePackerOptions)
+	if bundle.IncrementFromChkpNum != nil {
+		tarBallFilePacker.IncrementFromChkpNum = bundle.IncrementFromChkpNum
+	}
 	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 

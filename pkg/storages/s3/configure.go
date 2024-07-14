@@ -2,8 +2,8 @@ package s3
 
 import (
 	"fmt"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/storage/setting"
@@ -82,7 +82,7 @@ var SettingList = []string{
 
 const (
 	defaultPort                    = "443"
-	defaultSkipValidation          = false
+	defaultSkipValidation          = true
 	defaultForcePathStyle          = false
 	defaultUseListObjectsV1        = false
 	defaultMaxRetries              = 15

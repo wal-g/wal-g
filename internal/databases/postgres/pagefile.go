@@ -22,6 +22,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -43,19 +44,6 @@ const (
 	GlobalTablespace     = "global"
 	NonDefaultTablespace = "pg_tblspc"
 )
-
-// InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
-type InvalidBlockError struct {
-	error
-}
-
-func newInvalidBlockError(blockNo uint32) InvalidBlockError {
-	return InvalidBlockError{errors.Errorf("block %d is invalid", blockNo)}
-}
-
-func (err InvalidBlockError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
 
 type InvalidIncrementFileHeaderError struct {
 	error
@@ -176,10 +164,16 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 
 	var fileSize uint64
 	var diffBlockCount uint32
-	err = parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
+	pageSize := uint16(DatabasePageSize)
+	fieldsToParse := []parsingutil.FieldToParse{
 		{Field: &fileSize, Name: "fileSize"},
-		{Field: &diffBlockCount, Name: "diffBlockCount"},
-	}, increment)
+	}
+	if orioledb.IsOrioledbDataPath(fileName) {
+		fieldsToParse = append(fieldsToParse, parsingutil.FieldToParse{Field: &pageSize, Name: "pageSize"})
+	}
+	fieldsToParse = append(fieldsToParse, parsingutil.FieldToParse{Field: &diffBlockCount, Name: "diffBlockCount"})
+
+	err = parsingutil.ParseMultipleFieldsFromReader(fieldsToParse, increment)
 	if err != nil {
 		return err
 	}
@@ -211,7 +205,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 		return err
 	}
 
-	page := make([]byte, DatabasePageSize)
+	page := make([]byte, pageSize)
 	for i := uint32(0); i < diffBlockCount; i++ {
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		_, err = io.ReadFull(increment, page)
@@ -219,7 +213,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrement
 			return err
 		}
 
-		_, err = file.WriteAt(page, int64(blockNo)*DatabasePageSize)
+		_, err = file.WriteAt(page, int64(blockNo)*int64(pageSize))
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	conf "github.com/wal-g/wal-g/internal/config"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -79,7 +81,7 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
-	downloader := CreateConcurrentDownloader(restoreService.Uploader)
+	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader)
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
 }
 
@@ -120,12 +122,16 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	}
 
 	defer mongodProcess.Close()
+	recoverTimeout, err := conf.GetDurationSettingDefault(conf.OplogRecoverTimeout, ComputeMongoStartTimeout(sentinel.UncompressedSize))
+	if err != nil {
+		return err
+	}
 
 	mongodService, err := CreateMongodService(
 		restoreService.Context,
 		"wal-g restore",
 		mongodProcess.GetURI(),
-		ComputeMongoStartTimeout(sentinel.UncompressedSize),
+		recoverTimeout,
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")

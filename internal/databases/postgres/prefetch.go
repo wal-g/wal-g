@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
+	pg_errors "github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -171,7 +172,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 			}
 			tracelog.InfoLogger.Println("Prefaulting ", path)
 			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
-			if _, ok := err.(InvalidBlockError); ok {
+			if _, ok := err.(pg_errors.InvalidBlockError); ok {
 				return nil
 			} else if err != nil {
 				return errors.Wrapf(err, "packFileIntoTar: failed reading incremental file '%s'\n", path)

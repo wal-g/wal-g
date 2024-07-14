@@ -1,8 +1,9 @@
 package lz4
 
 import (
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/ioextensions"
 
 	"github.com/pierrec/lz4/v4"
 )

@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -177,21 +178,23 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 		meta := sentinel.Segments[i]
 		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
 
-		segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args, delType)
-		if err != nil {
-			return err
-		}
-
-		segBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
-		if err != nil {
-			return err
-		}
-
 		errorGroup.Go(func() error {
 			deleteSem <- struct{}{}
+			defer func() { <-deleteSem }()
+
+			segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args, delType)
+			if err != nil {
+				return err
+			}
+			segBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
+			if err != nil {
+				return err
+			}
 			deleteErr := segHandler.Delete(segBackup)
-			<-deleteSem
-			return deleteErr
+			if deleteErr != nil {
+				return deleteErr
+			}
+			return nil
 		})
 	}
 

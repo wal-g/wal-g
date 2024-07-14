@@ -60,7 +60,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 
 		_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: writeCloser}, decompressedReader)
 		if err != nil {
-			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
+			return fmt.Errorf("failed to write decompressed and decrypted archive: %w", err)
 		}
 		return nil
 	}

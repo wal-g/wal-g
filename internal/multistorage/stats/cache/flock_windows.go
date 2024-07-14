@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package cache
@@ -9,13 +10,13 @@ import (
 )
 
 var (
-	kernel32, _         = syscall.LoadLibrary("kernel32.dll")
-	procLockFileEx, _   = syscall.GetProcAddress(kernel32, "LockFileEx")
+	kernel32, _       = syscall.LoadLibrary("kernel32.dll")
+	procLockFileEx, _ = syscall.GetProcAddress(kernel32, "LockFileEx")
 )
 
 const (
-	winLockfileExclusiveLock   = 0x00000003
-	winLockfileSharedLock      = 0x00000001
+	winLockfileExclusiveLock = 0x00000003
+	winLockfileSharedLock    = 0x00000001
 )
 
 func lockFile(file *os.File, exclusive bool) (err error) {
@@ -41,4 +42,3 @@ func lockFile(file *os.File, exclusive bool) (err error) {
 
 	return err
 }
-
