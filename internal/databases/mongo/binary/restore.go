@@ -4,10 +4,11 @@ import (
 	"context"
 	"time"
 
+	conf "github.com/wal-g/wal-g/internal/config"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -30,57 +31,57 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 	}, nil
 }
 
-func (restoreService *RestoreService) DoRestore(
-	backupName, restVersion string,
-	rsConf RsConfig,
-	shConf ShConfig,
-	cfgConf MongoCfgConfig,
-) error {
-	disableHostResetup, err := conf.GetBoolSettingDefault(conf.MongoDBRestoreDisableHostResetup, false)
+func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
+	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), args.BackupName)
 	if err != nil {
 		return err
 	}
 
-	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), backupName)
-	if err != nil {
-		return err
+	if !args.SkipChecks {
+		//todo maybe delete all checks?
+		err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, args.RestoreVersion)
+		if err != nil {
+			return err
+		}
+		err = restoreService.LocalStorage.EnsureMongodFsLockFileIsEmpty()
+		if err != nil {
+			return err
+		}
+	} else {
+		tracelog.InfoLogger.Println("Skipped restore mongodb checks")
 	}
 
-	err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, restVersion)
-	if err != nil {
-		return err
+	if !args.SkipBackupDownload {
+		err = restoreService.LocalStorage.CleanupMongodDBPath()
+		if err != nil {
+			return err
+		}
+
+		tracelog.InfoLogger.Println("Download backup files to dbPath")
+		err = restoreService.downloadFromTarArchives(args.BackupName)
+		if err != nil {
+			return err
+		}
+	} else {
+		tracelog.InfoLogger.Println("Skipped download mongodb backup files")
 	}
 
-	err = restoreService.LocalStorage.EnsureMongodFsLockFileIsEmpty()
-	if err != nil {
-		return err
-	}
-
-	err = restoreService.LocalStorage.CleanupMongodDBPath()
-	if err != nil {
-		return err
-	}
-
-	tracelog.InfoLogger.Println("Download backup files to dbPath")
-	err = restoreService.downloadFromTarArchives(backupName)
-	if err != nil {
-		return err
-	}
-
-	if !disableHostResetup {
-		if err = restoreService.fixSystemData(rsConf, shConf, cfgConf); err != nil {
+	if !args.SkipMongoReconfig {
+		if err = restoreService.fixSystemData(args.RsConfig, args.ShConfig, args.MongoCfgConfig); err != nil {
 			return err
 		}
 		if err = restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
 			return err
 		}
+	} else {
+		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
 	}
 
 	return nil
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
-	downloader := CreateConcurrentDownloader(restoreService.Uploader)
+	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader)
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
 }
 
@@ -121,12 +122,16 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	}
 
 	defer mongodProcess.Close()
+	recoverTimeout, err := conf.GetDurationSettingDefault(conf.OplogRecoverTimeout, ComputeMongoStartTimeout(sentinel.UncompressedSize))
+	if err != nil {
+		return err
+	}
 
 	mongodService, err := CreateMongodService(
 		restoreService.Context,
 		"wal-g restore",
 		mongodProcess.GetURI(),
-		ComputeMongoStartTimeout(sentinel.UncompressedSize),
+		recoverTimeout,
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")

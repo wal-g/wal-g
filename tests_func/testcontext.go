@@ -90,7 +90,7 @@ type TestContext struct {
 	PreviousBackupTime time.Time
 }
 
-func CreateTestContex(database string) (tctx *TestContext, err error) {
+func CreateTestContext(database string) (tctx *TestContext, err error) {
 	environ := utils.ParseEnvLines(os.Environ())
 
 	envFilePath := path.Join(stagingDir, envFile)

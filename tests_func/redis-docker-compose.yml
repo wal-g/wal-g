@@ -1,7 +1,7 @@
 networks:
     test_net:
-        external:
-            name: test_net_${TEST_ID}
+        name: test_net_${TEST_ID}
+        external: true
 services:
     minio01:
         build: staging/images/minio
@@ -24,6 +24,7 @@ services:
             context: .
             args:
                 - REDIS_VERSION=${REDIS_VERSION}
+                - REDIS_PERSISTENCE_TYPE=${REDIS_PERSISTENCE_TYPE}
         container_name: redis01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
@@ -46,6 +47,7 @@ services:
             context: .
             args:
                 - REDIS_VERSION=${REDIS_VERSION}
+                - REDIS_PERSISTENCE_TYPE=${REDIS_PERSISTENCE_TYPE}
         container_name: redis02.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
@@ -60,4 +62,5 @@ services:
         tmpfs: /var/run
         volumes:
             - ./images/redis/config:/config:ro
-version: '2'
+        env_file:
+            - ${ENV_FILE}

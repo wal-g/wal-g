@@ -28,6 +28,12 @@ type XtrabackupInfo struct {
 	LastLSN *LSN
 }
 
+type XtrabackupExtInfo struct {
+	XtrabackupInfo
+	ServerOS   string
+	ServerArch string
+}
+
 func NewXtrabackupInfo(content string) XtrabackupInfo {
 	result := XtrabackupInfo{}
 	for _, line := range strings.Split(content, "\n") {

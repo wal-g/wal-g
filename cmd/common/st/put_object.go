@@ -19,10 +19,9 @@ const (
 	noCompressFlag     = "no-compress"
 	overwriteFlag      = "force"
 	overwriteShorthand = "f"
-	readStdinFlag 	   = "read-stdin"
+	readStdinFlag      = "read-stdin"
 	readStdinShorthand = "s"
 )
-
 
 // putObjectCmd represents the putObject command
 var putObjectCmd = &cobra.Command{
@@ -77,5 +76,5 @@ func init() {
 	putObjectCmd.Flags().BoolVarP(&overwrite, overwriteFlag, overwriteShorthand,
 		false, "Overwrite the existing object")
 	putObjectCmd.Flags().BoolVarP(&readStdin, readStdinFlag, readStdinShorthand,
-			false, "Read file content from STDIN")
+		false, "Read file content from STDIN")
 }

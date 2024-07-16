@@ -3,11 +3,13 @@ package multistorage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
 	"strings"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
@@ -650,6 +652,21 @@ func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
 	if !found {
 		return storage.NewObjectNotFoundError(srcPath)
 	}
+	return nil
+}
+
+func (mf Folder) Validate() error {
+	errs := make([]error, 0)
+	for _, folder := range mf.usedFolders {
+		err := folder.Validate()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) == len(mf.usedFolders) {
+		return ErrNoAliveStorages
+	}
+	tracelog.WarningLogger.Printf("Some storages can`t be accessed %v", errors.Join(errs...))
 	return nil
 }
 

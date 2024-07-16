@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -21,6 +22,7 @@ const (
 	sessionTokenSetting             = "AWS_SESSION_TOKEN"
 	sessionNameSetting              = "AWS_ROLE_SESSION_NAME"
 	roleARNSetting                  = "AWS_ROLE_ARN"
+	skipValidationSetting           = "S3_SKIP_VALIDATION"
 	useYcSessionTokenSetting        = "S3_USE_YC_SESSION_TOKEN"
 	sseSetting                      = "S3_SSE"
 	sseCSetting                     = "S3_SSE_C"
@@ -36,6 +38,8 @@ const (
 	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
 	rangeQueriesMaxRetriesSetting   = "S3_RANGE_MAX_RETRIES"
 	requestAdditionalHeadersSetting = "S3_REQUEST_ADDITIONAL_HEADERS"
+	retentionPeriodSetting          = "S3_RETENTION_PERIOD"
+	retentionModeSetting            = "S3_RETENTION_MODE"
 	// limiters for retry policy during interaction with S3
 	maxRetriesSetting              = "S3_MAX_RETRIES"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
@@ -55,6 +59,7 @@ var SettingList = []string{
 	sessionTokenSetting,
 	sessionNameSetting,
 	roleARNSetting,
+	skipValidationSetting,
 	useYcSessionTokenSetting,
 	sseSetting,
 	sseCSetting,
@@ -71,10 +76,13 @@ var SettingList = []string{
 	requestAdditionalHeadersSetting,
 	minThrottlingRetryDelaySetting,
 	maxThrottlingRetryDelaySetting,
+	retentionPeriodSetting,
+	retentionModeSetting,
 }
 
 const (
 	defaultPort                    = "443"
+	defaultSkipValidation          = true
 	defaultForcePathStyle          = false
 	defaultUseListObjectsV1        = false
 	defaultMaxRetries              = 15
@@ -84,9 +92,12 @@ const (
 	defaultStorageClass            = "STANDARD"
 	defaultRangeBatchEnabled       = false
 	defaultRangeMaxRetries         = 10
+	defaultDisabledRetentionPeriod = -1
 )
 
 // TODO: Unit tests
+//
+//nolint:funlen,gocyclo
 func ConfigureStorage(
 	prefix string,
 	settings map[string]string,
@@ -100,6 +111,10 @@ func ConfigureStorage(
 	port := defaultPort
 	if p, ok := settings[endpointPortSetting]; ok {
 		port = p
+	}
+	skipValidation, err := setting.BoolOptional(settings, skipValidationSetting, defaultSkipValidation)
+	if err != nil {
+		return nil, err
 	}
 	forcePathStyle, err := setting.BoolOptional(settings, forcePathStyleSetting, defaultForcePathStyle)
 	if err != nil {
@@ -141,10 +156,14 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	retentionPeriod, err := setting.IntOptional(settings, retentionPeriodSetting, defaultDisabledRetentionPeriod)
+	if err != nil {
+		return nil, err
+	}
 
 	config := &Config{
 		Secrets: &Secrets{
-			SecretKey: setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting),
+			SecretKey: strings.TrimSpace(setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting)),
 		},
 		Region:                   settings[regionSetting],
 		Endpoint:                 settings[endpointSetting],
@@ -152,11 +171,12 @@ func ConfigureStorage(
 		EndpointPort:             port,
 		Bucket:                   bucket,
 		RootPath:                 rootPath,
-		AccessKey:                setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting),
+		AccessKey:                strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
 		SessionToken:             settings[sessionTokenSetting],
 		RoleARN:                  settings[roleARNSetting],
 		SessionName:              settings[sessionNameSetting],
 		CACertFile:               settings[caCertFileSetting],
+		SkipValidation:           skipValidation,
 		UseYCSessionToken:        settings[useYcSessionTokenSetting],
 		ForcePathStyle:           forcePathStyle,
 		RequestAdditionalHeaders: settings[requestAdditionalHeadersSetting],
@@ -170,6 +190,8 @@ func ConfigureStorage(
 			ServerSideEncryption:         settings[sseSetting],
 			ServerSideEncryptionCustomer: settings[sseCSetting],
 			ServerSideEncryptionKMSID:    settings[sseKmsIDSetting],
+			RetentionPeriod:              retentionPeriod,
+			RetentionMode:                settings[retentionModeSetting],
 		},
 		RangeBatchEnabled:       rangeBatchEnabled,
 		RangeMaxRetries:         rangeMaxRetries,

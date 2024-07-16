@@ -1,8 +1,9 @@
 package zstd
 
 import (
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/ioextensions"
 
 	"github.com/klauspost/compress/zstd"
 )

@@ -13,7 +13,7 @@ import (
 
 const (
 	EnvDirPerm  os.FileMode = 0755
-	EnvFilePerv os.FileMode = 0644
+	EnvFilePerm os.FileMode = 0644
 )
 
 func EnvExists(path string) bool {
@@ -31,7 +31,7 @@ func SetupNewEnv(fromEnv map[string]string, osEnviron map[string]string, envFile
 		return nil, fmt.Errorf("can not create staging dir: %v", err)
 	}
 	env := utils.MergeEnvs(fromEnv, DynConf(fromEnv, osEnviron))
-	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, EnvFilePerv)
+	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, EnvFilePerm)
 	if err != nil {
 		return nil, fmt.Errorf("can not open database file for writing: %v", err)
 	}
@@ -45,7 +45,7 @@ func SetupNewEnv(fromEnv map[string]string, osEnviron map[string]string, envFile
 }
 
 func ReadEnv(path string) (map[string]string, error) {
-	file, err := os.OpenFile(path, os.O_RDONLY, EnvFilePerv)
+	file, err := os.OpenFile(path, os.O_RDONLY, EnvFilePerm)
 	if err != nil {
 		return nil, fmt.Errorf("can not open database file: %v", err)
 	}
@@ -89,6 +89,14 @@ func DynConf(env map[string]string, osEnviron map[string]string) map[string]stri
 			res["MONGO_CONF_FILE"] = "mongod-4.4-6.0.conf"
 		} else {
 			res["MONGO_CONF_FILE"] = "mongod-6.1-7.0.conf"
+		}
+	}
+
+	if redisPersistenceType, ok := osEnviron["REDIS_PERSISTENCE_TYPE"]; ok {
+		if redisPersistenceType == "aof" {
+			res["REDIS_CONF_FILE"] = "redis-aof.conf"
+		} else {
+			res["REDIS_CONF_FILE"] = "redis-rdb.conf"
 		}
 	}
 

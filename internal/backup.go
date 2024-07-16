@@ -87,7 +87,6 @@ func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 	return FetchDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
 }
 
-// TODO : unit tests
 func (backup *Backup) FetchMetadata(metadataDto interface{}) error {
 	return FetchDto(backup.Folder, metadataDto, backup.getMetadataPath())
 }
@@ -154,7 +153,6 @@ func (backup *Backup) GetStorageName() string {
 	return multistorage.UsedStorages(backup.Folder)[0]
 }
 
-// TODO : unit tests
 func UploadSentinel(uploader Uploader, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 	return UploadDto(uploader.Folder(), sentinelDto, sentinelName)

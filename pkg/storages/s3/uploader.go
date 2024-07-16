@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -22,6 +23,8 @@ type UploaderConfig struct {
 	ServerSideEncryption         string
 	ServerSideEncryptionCustomer string
 	ServerSideEncryptionKMSID    string
+	RetentionPeriod              int
+	RetentionMode                string
 }
 
 func createUploader(s3Client *s3.S3, config *UploaderConfig) (*Uploader, error) {
@@ -36,6 +39,8 @@ func createUploader(s3Client *s3.S3, config *UploaderConfig) (*Uploader, error) 
 		config.ServerSideEncryptionCustomer,
 		config.ServerSideEncryptionKMSID,
 		config.StorageClass,
+		config.RetentionMode,
+		config.RetentionPeriod,
 	), nil
 }
 
@@ -45,19 +50,35 @@ type Uploader struct {
 	SSECustomerKey       string
 	SSEKMSKeyID          string
 	StorageClass         string
+	RetentionMode        string
+	RetentionPeriod      time.Duration
 }
 
-func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass string) *Uploader {
-	return &Uploader{uploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass}
+func NewUploader(uploaderAPI s3manageriface.UploaderAPI, serverSideEncryption, sseCustomerKey, sseKmsKeyID, storageClass,
+	retentionMode string, retentionPeriod int) *Uploader {
+	if retentionMode == "" {
+		retentionMode = "GOVERNANCE"
+	}
+	return &Uploader{uploaderAPI,
+		serverSideEncryption,
+		sseCustomerKey,
+		sseKmsKeyID,
+		storageClass,
+		retentionMode,
+		time.Duration(retentionPeriod)}
 }
 
-// TODO : unit tests
 func (uploader *Uploader) createUploadInput(bucket, path string, content io.Reader) *s3manager.UploadInput {
 	uploadInput := &s3manager.UploadInput{
 		Bucket:       aws.String(bucket),
 		Key:          aws.String(path),
 		Body:         content,
 		StorageClass: aws.String(uploader.StorageClass),
+	}
+	if uploader.RetentionPeriod != defaultDisabledRetentionPeriod {
+		mytime := time.Now().Add(time.Second * uploader.RetentionPeriod)
+		uploadInput.ObjectLockMode = &uploader.RetentionMode
+		uploadInput.ObjectLockRetainUntilDate = &mytime
 	}
 
 	if uploader.serverSideEncryption != "" {

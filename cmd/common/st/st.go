@@ -22,9 +22,13 @@ var (
 			"Be aware that this command can do potentially harmful operations and make sure that you know what you're doing.",
 	}
 	targetStorage string
+
+	glob bool
 )
 
 func init() {
 	StorageToolsCmd.PersistentFlags().StringVarP(&targetStorage, "target", "t", consts.DefaultStorage,
 		"execute for specific failover storage (Postgres only)")
+	StorageToolsCmd.PersistentFlags().BoolVarP(&glob, "glob", "g", false,
+		"use a glob pattern for file paths")
 }

@@ -72,4 +72,38 @@ func TestHandleRemove(t *testing.T) {
 			assert.False(t, exists)
 		}
 	})
+
+	t.Run("remove files that match glob pattern", func(t *testing.T) {
+		folder := memory.NewFolder("test/", memory.NewKVS())
+
+		targetFiles := []string{
+			"a/b/c/target",
+			"a/b/c/target/1",
+			"a/b/c/target/1/2",
+		}
+		targetFolder := []string{
+			"a/b/c/target/3",
+			"a/b/c/target/3a/4",
+			"a/b/c/target/3b/5/6",
+		}
+		for _, f := range append(targetFolder, targetFiles...) {
+			err := folder.PutObject(f, bytes.NewBufferString("123"))
+			require.NoError(t, err)
+		}
+
+		err := HandleRemoveWithGlobPattern("a/b/c/target/3*", folder)
+		require.NoError(t, err)
+
+		for _, f := range targetFiles {
+			exists, err := folder.Exists(f)
+			require.NoError(t, err)
+			assert.True(t, exists)
+		}
+
+		for _, f := range targetFolder {
+			exists, err := folder.Exists(f)
+			require.NoError(t, err)
+			assert.False(t, exists)
+		}
+	})
 }

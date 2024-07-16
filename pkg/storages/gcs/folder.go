@@ -286,3 +286,7 @@ func fillBuffer(r io.Reader, b []byte) (int, error) {
 
 	return offset, err
 }
+
+func (folder *Folder) Validate() error {
+	return nil
+}

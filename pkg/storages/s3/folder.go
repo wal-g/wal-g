@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -140,11 +141,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 	prefix := aws.String(folder.path)
 	delimiter := aws.String("/")
-	if folder.config.UseListObjectsV1 {
-		err = folder.listObjectsPagesV1(prefix, delimiter, listFunc)
-	} else {
-		err = folder.listObjectsPagesV2(prefix, delimiter, listFunc)
-	}
+	err = folder.listObjectsPages(prefix, delimiter, nil, listFunc)
 
 	if err != nil {
 		// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
@@ -158,12 +155,23 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return objects, subFolders, nil
 }
 
-func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string,
+func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int64,
+	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) (err error) {
+	if folder.config.UseListObjectsV1 {
+		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, listFunc)
+	} else {
+		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, listFunc)
+	}
+	return
+}
+
+func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string, maxKeys *int64,
 	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
 	s3Objects := &s3.ListObjectsInput{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
 		Delimiter: delimiter,
+		MaxKeys:   maxKeys,
 	}
 
 	err := folder.s3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
@@ -173,12 +181,13 @@ func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string,
 	return err
 }
 
-func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string,
+func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxKeys *int64,
 	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
 	s3Objects := &s3.ListObjectsV2Input{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
 		Delimiter: delimiter,
+		MaxKeys:   maxKeys,
 	}
 	err := folder.s3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
 		listFunc(files.CommonPrefixes, files.Contents)
@@ -197,6 +206,23 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
 		}
+	}
+	return nil
+}
+
+func (folder *Folder) Validate() error {
+	prefix := aws.String(folder.path)
+	delimiter := aws.String("/")
+	int64One := int64(1)
+	input := &s3.ListObjectsInput{
+		Bucket:    folder.bucket,
+		Prefix:    prefix,
+		Delimiter: delimiter,
+		MaxKeys:   &int64One,
+	}
+	_, err := folder.s3API.ListObjects(input)
+	if err != nil {
+		return fmt.Errorf("bad credentials: %v", err)
 	}
 	return nil
 }

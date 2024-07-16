@@ -2,12 +2,15 @@ package mysql
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
@@ -52,7 +55,7 @@ func HandleBackupPush(
 	var backupName string
 	var prevBackupInfo PrevBackupInfo
 	var incrementCount int
-	var xtrabackupInfo XtrabackupInfo
+	var xtrabackupInfo XtrabackupExtInfo
 	if isXtrabackup(backupCmd) {
 		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
 		tracelog.ErrorLogger.FatalfOnError("failed to get previous backup for delta backup: %v", err)
@@ -101,6 +104,8 @@ func HandleBackupPush(
 		Hostname:          hostname,
 		ServerUUID:        serverUUID,
 		ServerVersion:     version,
+		ServerArch:        xtrabackupInfo.ServerArch,
+		ServerOS:          xtrabackupInfo.ServerOS,
 		IsPermanent:       isPermanent,
 		IsIncremental:     incrementCount != 0,
 		UserData:          userData,
@@ -135,7 +140,7 @@ func handleXtrabackupBackup(
 	backupCmd *exec.Cmd,
 	isFullBackup bool,
 	prevBackupInfo *PrevBackupInfo,
-) (backupName string, backupInfo XtrabackupInfo, err error) {
+) (backupName string, backupExtInfo XtrabackupExtInfo, err error) {
 	if prevBackupInfo == nil {
 		tracelog.ErrorLogger.Fatalf("PrevBackupInfo is null")
 	}
@@ -158,9 +163,15 @@ func handleXtrabackupBackup(
 		tracelog.ErrorLogger.Printf("Backup command output:\n%s", stderr.String())
 	}
 
-	backupInfo, err = readXtrabackupInfo(xtrabackupExtraDirectory)
+	backupInfo, err := readXtrabackupInfo(xtrabackupExtraDirectory)
 	if err != nil {
 		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
+	}
+	backupExtInfo = XtrabackupExtInfo{
+		XtrabackupInfo: backupInfo,
+		// it is hard to run `wal-g xtrabackup-push` on remote host. So, expect that local OS/Arch is ok.
+		ServerOS:   runtime.GOOS,
+		ServerArch: runtime.GOARCH,
 	}
 
 	err = removeTemporaryDirectory(xtrabackupExtraDirectory)
@@ -169,5 +180,5 @@ func handleXtrabackupBackup(
 		err = nil // don't crash an app
 	}
 
-	return backupName, backupInfo, err
+	return backupName, backupExtInfo, err
 }

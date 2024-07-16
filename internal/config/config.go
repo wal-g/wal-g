@@ -83,6 +83,9 @@ const (
 	PgPassfileSetting                      = "PGPASSFILE"
 	PgDatabaseSetting                      = "PGDATABASE"
 	PgSslModeSetting                       = "PGSSLMODE"
+	PgSslKey                               = "PGSSLKEY"
+	PgSslCert                              = "PGSSLCERT"
+	PgSslRootCert                          = "PGSSLROOTCERT"
 	PgSlotName                             = "WALG_SLOTNAME"
 	PgWalSize                              = "WALG_PG_WAL_SIZE"
 	TotalBgUploadedLimit                   = "TOTAL_BG_UPLOADED_LIMIT"
@@ -117,22 +120,22 @@ const (
 	ProfileMode          = "PROFILE_MODE"
 	ProfilePath          = "PROFILE_PATH"
 
-	MongoDBUriSetting                = "MONGODB_URI"
-	MongoDBLastWriteUpdateInterval   = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
-	MongoDBRestoreDisableHostResetup = "MONGODB_RESTORE_DISABLE_HOST_RESETUP"
-	MongoDBExtendBackupCursor        = "MONGODB_EXTEND_BACKUP_CURSOR"
-	OplogArchiveAfterSize            = "OPLOG_ARCHIVE_AFTER_SIZE"
-	OplogArchiveTimeoutInterval      = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
-	OplogPITRDiscoveryInterval       = "OPLOG_PITR_DISCOVERY_INTERVAL"
-	OplogPushStatsEnabled            = "OPLOG_PUSH_STATS_ENABLED"
-	OplogPushStatsLoggingInterval    = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
-	OplogPushStatsUpdateInterval     = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHTTP         = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
-	OplogPushWaitForBecomePrimary    = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
-	OplogPushPrimaryCheckInterval    = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
-	OplogReplayOplogAlwaysUpsert     = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
-	OplogReplayOplogApplicationMode  = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
-	OplogReplayIgnoreErrorCodes      = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	MongoDBUriSetting               = "MONGODB_URI"
+	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
+  MongoDBExtendBackupCursor       = "MONGODB_EXTEND_BACKUP_CURSOR"
+	OplogArchiveAfterSize           = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutInterval     = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
+	OplogPITRDiscoveryInterval      = "OPLOG_PITR_DISCOVERY_INTERVAL"
+	OplogPushStatsEnabled           = "OPLOG_PUSH_STATS_ENABLED"
+	OplogPushStatsLoggingInterval   = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
+	OplogPushStatsUpdateInterval    = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
+	OplogPushStatsExposeHTTP        = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushWaitForBecomePrimary   = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
+	OplogPushPrimaryCheckInterval   = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
+	OplogReplayOplogAlwaysUpsert    = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
+	OplogReplayOplogApplicationMode = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
+	OplogReplayIgnoreErrorCodes     = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	OplogRecoverTimeout             = "OPLOG_RECOVER_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -151,7 +154,15 @@ const (
 	// Deprecated: unused
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
-	RedisPassword = "WALG_REDIS_PASSWORD"
+	RedisPassword             = "WALG_REDIS_PASSWORD"
+	RedisCreateBackupACLUser  = "WALG_CREATE_BACKUP_REDIS_ACL_USER"
+	RedisRestoreBackupACLUser = "WALG_RESTORE_BACKUP_REDIS_ACL_USER"
+	RedisDataPath             = "WALG_REDIS_DATA_PATH"
+	RedisAppendonlyPath       = "WALG_REDIS_APPENDONLY_PATH"
+	RedisAppendonlyManifest   = "WALG_REDIS_APPENDONLY_MANIFEST"
+	RedisDataThreshold        = "WALG_REDIS_DATA_THRESHOLD"
+	RedisDataTimeout          = "WALG_REDIS_DATA_TIMEOUT"
+	RedisServerProcessName    = "WALG_REDIS_SERVER_PROCESS_NAME"
 
 	GPLogsDirectory            = "WALG_GP_LOGS_DIR"
 	GPSegContentID             = "WALG_GP_SEG_CONTENT_ID"
@@ -257,6 +268,15 @@ var (
 		OplogArchiveAfterSize:          "16777216", // 32 << (10 * 2)
 		MongoDBLastWriteUpdateInterval: "3s",
 		StreamSplitterBlockSize:        "1048576",
+	}
+
+	RedisDefaultSettings = map[string]string{
+		RedisDataPath:           "/var/lib/redis",
+		RedisAppendonlyPath:     "/var/lib/redis/appendonlydir",
+		RedisAppendonlyManifest: "/var/lib/redis/appendonlydir/appendonly.aof.manifest",
+		RedisDataThreshold:      "90",
+		RedisDataTimeout:        "1",
+		RedisServerProcessName:  "redis-server",
 	}
 
 	MysqlDefaultSettings = map[string]string{
@@ -436,6 +456,9 @@ var (
 		PgPassfileSetting:                      true,
 		PgDatabaseSetting:                      true,
 		PgSslModeSetting:                       true,
+		PgSslCert:                              true,
+		PgSslKey:                               true,
+		PgSslRootCert:                          true,
 		PgSlotName:                             true,
 		PgWalSize:                              true,
 		PrefetchDir:                            true,
@@ -508,7 +531,15 @@ var (
 
 	RedisAllowedSettings = map[string]bool{
 		// Redis
-		RedisPassword: true,
+		RedisPassword:             true,
+		RedisCreateBackupACLUser:  true,
+		RedisRestoreBackupACLUser: true,
+		RedisDataPath:             true,
+		RedisAppendonlyPath:       true,
+		RedisAppendonlyManifest:   true,
+		RedisDataThreshold:        true,
+		RedisDataTimeout:          true,
+		RedisServerProcessName:    true,
 	}
 
 	GPAllowedSettings = map[string]bool{
@@ -906,6 +937,18 @@ func GetDurationSetting(setting string) (time.Duration, error) {
 	intervalStr, ok := GetSetting(setting)
 	if !ok {
 		return 0, NewUnsetRequiredSettingError(setting)
+	}
+	interval, err := time.ParseDuration(intervalStr)
+	if err != nil {
+		return 0, fmt.Errorf("duration expected for %s setting but given '%s': %w", setting, intervalStr, err)
+	}
+	return interval, nil
+}
+
+func GetDurationSettingDefault(setting string, def time.Duration) (time.Duration, error) {
+	intervalStr, ok := GetSetting(setting)
+	if !ok {
+		return def, nil
 	}
 	interval, err := time.ParseDuration(intervalStr)
 	if err != nil {

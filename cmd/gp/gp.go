@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 
 	"github.com/spf13/viper"
+
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/wal-g/wal-g/cmd/common"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 )
@@ -35,6 +37,8 @@ var cmd = &cobra.Command{
 		// Greenplum uses the 64MB WAL segment size by default
 		postgres.SetWalSize(viper.GetUint64(conf.PgWalSize))
 		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
+		err = conf.ConfigureAndRunDefaultWebServer()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

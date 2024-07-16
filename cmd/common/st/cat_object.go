@@ -21,10 +21,11 @@ var catObjectCmd = &cobra.Command{
 	Short: catObjectShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		objectPath := args[0]
-
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
-			return storagetools.HandleCatObject(objectPath, folder, decrypt, decompress)
+			if glob {
+				return storagetools.HandleCatObjectWithGlob(args[0], folder, decrypt, decompress)
+			}
+			return storagetools.HandleCatObject(args[0], folder, decrypt, decompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

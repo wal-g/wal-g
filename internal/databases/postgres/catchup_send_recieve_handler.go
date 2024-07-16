@@ -3,11 +3,6 @@ package postgres
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/ioextensions"
-	"github.com/wal-g/wal-g/utility"
 	"io"
 	"io/fs"
 	"net"
@@ -15,6 +10,13 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/databases/postgres/errors"
+	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func HandleCatchupSend(pgDataDirectory string, destination string) {
@@ -204,7 +206,7 @@ func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
 	} else {
 		fd, size, err = ReadIncrementalFile(path, info.Size(), checkpoint, nil)
 
-		if _, ok := err.(*InvalidBlockError); ok {
+		if _, ok := err.(*errors.InvalidBlockError); ok {
 			fd, err = os.Open(path)
 			if os.IsNotExist(err) {
 				return
@@ -270,7 +272,7 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 		decoder = gob.NewDecoder(reader)
 		encoder = gob.NewEncoder(writer)
 	}
-	sendControlAndFileList(pgDataDirectory, err, encoder)
+	sendControlAndFileList(pgDataDirectory, encoder)
 	err = writer.Flush()
 	tracelog.ErrorLogger.FatalOnError(err)
 	for {
@@ -365,9 +367,9 @@ type CatchupCommandDto struct {
 	FilesToDelete  []string
 }
 
-func sendControlAndFileList(pgDataDirectory string, err error, encoder *gob.Encoder) {
-	tracelog.ErrorLogger.FatalOnError(err)
+func sendControlAndFileList(pgDataDirectory string, encoder *gob.Encoder) {
 	control, err := ExtractPgControl(pgDataDirectory)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Our system id %v, need catchup from %v",
 		control.SystemIdentifier, control.Checkpoint)
 	tracelog.ErrorLogger.FatalOnError(err)

@@ -73,7 +73,7 @@ func RunCommandStrict(ctx context.Context, container string, command []string) (
 		cmdLine := strings.Join(command, " ")
 		tracelog.ErrorLogger.Printf("'%s' failed with %d\nstdout:\n%s\nstderr:\n%s\n",
 			cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
-		return exc, fmt.Errorf("%s exit code: %d", cmdLine, exc.ExitCode)
+		return exc, fmt.Errorf("%s exit code: %d, err: %s", cmdLine, exc.ExitCode, exc.Stderr())
 	}
 	return exc, nil
 }
@@ -274,7 +274,7 @@ func (inf *Infra) Setup() error {
 		return fmt.Errorf("can not build base image: %v", err)
 	}
 
-	actions := []string{"--verbose", "--log-level", "WARNING", "build"}
+	actions := []string{"--verbose", "build"}
 	if err := inf.callCompose(actions); err != nil {
 		return fmt.Errorf("can not build images: %v", err)
 	}
@@ -283,11 +283,11 @@ func (inf *Infra) Setup() error {
 }
 
 func (inf *Infra) RecreateContainers() error {
-	actions := []string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}
+	actions := []string{"--verbose", "down", "--volumes", "--timeout", "0"}
 	if err := inf.callCompose(actions); err != nil {
 		return err
 	}
-	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
+	return inf.callCompose([]string{"--verbose", "up", "--detach"})
 }
 
 func (inf *Infra) Shutdown() error {

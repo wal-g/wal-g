@@ -15,8 +15,9 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 
 	gomysql "github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/go-sql-driver/mysql"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -34,14 +35,31 @@ const (
 	WalgXtrabackupTool              BackupTool = "WALG_XTRABACKUP_TOOL"
 )
 
-func getMySQLVersion(db *sql.DB) (string, error) {
-	row := db.QueryRow("SELECT @@version")
-	var version string
-	err := row.Scan(&version)
+func fetchMySQLVariable(db *sql.DB, variable string) (string, error) {
+	row := db.QueryRow("SELECT @@" + variable)
+	var value string
+	err := row.Scan(&value)
 	if err != nil {
 		return "", err
 	}
-	return version, nil
+	return value, nil
+}
+
+func getMySQLVersion(db *sql.DB) (string, error) {
+	// e.g. '8.0.35-27'
+	return fetchMySQLVariable(db, "version")
+}
+
+// nolint:unused
+func getMySQLArchitecture(db *sql.DB) (string, error) {
+	// e.g 'x86_64' / 'aarch64' / 'arm64'
+	return fetchMySQLVariable(db, "version_compile_machine")
+}
+
+// nolint:unused
+func getMySQLOS(db *sql.DB) (string, error) {
+	// e.g. 'Linux' / 'macos14.2'
+	return fetchMySQLVariable(db, "version_compile_os")
 }
 
 func getMySQLFlavor(db *sql.DB) (string, error) {
@@ -172,7 +190,7 @@ func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 		if ok := rootCertPool.AppendCertsFromPEM(pem); !ok {
 			return nil, fmt.Errorf("failed to load certificate from %s", caFile)
 		}
-		err = mysql.RegisterTLSConfig("custom", &tls.Config{
+		err = mysqldriver.RegisterTLSConfig("custom", &tls.Config{
 			RootCAs: rootCertPool,
 		})
 		if err != nil {
@@ -188,6 +206,10 @@ func getMySQLConnectionFromDatasource(datasourceName string) (*sql.DB, error) {
 		} else {
 			datasourceName += "?tls=custom"
 		}
+	}
+	_, err := mysqldriver.ParseDSN(datasourceName)
+	if err != nil {
+		return nil, err
 	}
 	db, err := sql.Open("mysql", datasourceName)
 	return db, err
@@ -225,7 +247,9 @@ type StreamSentinelDto struct {
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
 	Hostname         string `json:"Hostname,omitempty"`
 	ServerUUID       string `json:"ServerUUID,omitempty"`
-	ServerVersion    string `json:"ServerVersion,omitempty"`
+	ServerVersion    string `json:"ServerVersion,omitempty"` // e.g. '8.0.35-27'
+	ServerArch       string `json:"ServerArch,omitempty"`    // e.g '386' / 'amd64' / 'arm64' / 'arm'
+	ServerOS         string `json:"ServerOS,omitempty"`      // e.g. 'linux' / 'darwin' / 'windows'
 
 	IsPermanent   bool `json:"IsPermanent"`
 	IsIncremental bool `json:"IsIncremental"`

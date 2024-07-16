@@ -83,4 +83,3 @@ func (sf *SharedFile) write(content storageStatuses) error {
 
 	return nil
 }
-

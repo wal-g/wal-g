@@ -188,3 +188,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	}
 	return nil
 }
+
+func (folder *Folder) Validate() error {
+	return nil
+}

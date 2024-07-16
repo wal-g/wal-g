@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -42,6 +43,8 @@ type Folder interface {
 	// CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
 	// an error if the source object doesn't exist.
 	CopyObject(srcPath string, dstPath string) error
+
+	Validate() error
 }
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
@@ -117,4 +120,93 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 		return nil, fmt.Errorf("can't list folder %q: %w", prefix, err)
 	}
 	return prependPaths(objects, prefix), nil
+}
+
+func Glob(folder Folder, pattern string) (objectPaths []string, folderPaths []string, err error) {
+	objectPaths = make([]string, 0)
+	folderPaths = make([]string, 0)
+
+	if pattern == "/" {
+		return objectPaths, append(folderPaths, pattern), nil
+	}
+	pattern = strings.TrimLeft(pattern, "/")
+
+	type queueItem struct {
+		folder  Folder
+		pattern string
+	}
+	queue := make([]queueItem, 0)
+	queue = append(queue, queueItem{folder: folder, pattern: pattern})
+	rootPath := folder.GetPath()
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		patternParts := strings.Split(current.pattern, "/")
+		patternPart := patternParts[0]
+		isLast := len(patternParts) == 1 || (len(patternParts) == 2 && patternParts[1] == "")
+
+		folderPath := current.folder.GetPath()
+		objects, subfolders, err := current.folder.ListFolder()
+		if err != nil {
+			return nil, nil, err
+		}
+		matchedSubfolders, err := filterFoldersWithGlobPattern(subfolders, patternPart)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, matchedSubfolder := range matchedSubfolders {
+			if isLast {
+				folderPaths = append(folderPaths, strings.TrimPrefix(matchedSubfolder.GetPath(), rootPath))
+			} else {
+				queue = append(queue, queueItem{
+					folder:  matchedSubfolder,
+					pattern: strings.TrimPrefix(current.pattern, patternPart+"/"),
+				})
+			}
+		}
+
+		if !isLast {
+			continue
+		}
+		matchedObjects, err := filterObjectsWithGlobPattern(objects, patternPart)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, matchedObject := range matchedObjects {
+			objectPaths = append(objectPaths, strings.TrimPrefix(folderPath+matchedObject.GetName(), rootPath))
+		}
+	}
+	return objectPaths, folderPaths, nil
+}
+
+func filterObjectsWithGlobPattern(objects []Object, pattern string) ([]Object, error) {
+	result := make([]Object, 0)
+	for _, object := range objects {
+		objectName := object.GetName()
+		matched, err := filepath.Match(pattern, objectName)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			result = append(result, object)
+		}
+	}
+	return result, nil
+}
+
+func filterFoldersWithGlobPattern(folders []Folder, pattern string) ([]Folder, error) {
+	result := make([]Folder, 0)
+	for _, folder := range folders {
+		folderName := filepath.Base(folder.GetPath())
+		matched, err := filepath.Match(pattern, folderName)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
+			result = append(result, folder)
+		}
+	}
+	return result, nil
 }

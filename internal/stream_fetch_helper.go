@@ -60,7 +60,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 
 		_, err = utility.FastCopy(&utility.EmptyWriteIgnorer{Writer: writeCloser}, decompressedReader)
 		if err != nil {
-			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
+			return fmt.Errorf("failed to write decompressed and decrypted archive: %w", err)
 		}
 		return nil
 	}
@@ -71,8 +71,6 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 // DownloadAndDecompressSplittedStream downloads, decompresses and writes stream to stdout
 func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension string,
 	writeCloser io.WriteCloser, maxDownloadRetry int) error {
-	defer utility.LoggedClose(writeCloser, "")
-
 	decompressor := compression.FindDecompressor(extension)
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
@@ -125,10 +123,9 @@ func downloadAndDecompressFile(backup Backup, decompressor compression.Decompres
 			return nil, fmt.Errorf("failed to dowload file %v: %w", fileName, err)
 		} else if !exists {
 			return nil, io.EOF
-		} else {
-			tracelog.DebugLogger.Printf("Found file: %s", fileName)
-			return archiveReader, nil
 		}
+		tracelog.DebugLogger.Printf("Found file: %s", fileName)
+		return archiveReader, nil
 	}
 
 	var archiveReader io.ReadCloser
