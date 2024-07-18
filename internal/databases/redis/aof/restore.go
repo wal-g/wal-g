@@ -11,7 +11,7 @@ import (
 
 type RestoreService struct {
 	Context       context.Context
-	Folder        *archive.Folder
+	Folder        *archive.FolderInfo
 	Uploader      internal.Uploader
 	versionParser *archive.VersionParser
 }
@@ -24,7 +24,7 @@ type RestoreArgs struct {
 	SkipBackupDownload bool
 }
 
-func CreateRestoreService(ctx context.Context, folder *archive.Folder, uploader internal.Uploader, versionParser *archive.VersionParser,
+func CreateRestoreService(ctx context.Context, folder *archive.FolderInfo, uploader internal.Uploader, versionParser *archive.VersionParser,
 ) (*RestoreService, error) {
 	return &RestoreService{
 		Context:       ctx,

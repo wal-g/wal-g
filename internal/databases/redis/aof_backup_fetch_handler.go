@@ -17,7 +17,7 @@ func HandleAofFetchPush(
 	skipBackupDownload, skipChecks bool,
 ) error {
 	aofPath, _ := conf.GetSetting(conf.RedisAppendonlyPath)
-	folder := archive.CreateFolder(aofPath, os.FileMode(0750))
+	folder := archive.CreateFolderInfo(aofPath, os.FileMode(0750))
 
 	uploader, err := internal.ConfigureUploader()
 	if err != nil {

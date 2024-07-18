@@ -10,15 +10,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupFetch(ctx context.Context, folder storage.Folder, backupName string, restoreCmd *exec.Cmd, _ *archive.Folder) error {
+func HandleBackupFetch(ctx context.Context, folder storage.Folder, backupName string, restoreCmd *exec.Cmd, _ *archive.FolderInfo) error {
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return err
 	}
-	// err = dataDir.Clean()
-	// if err != nil {
-	// 	return err
-	// }
 
 	return internal.StreamBackupToCommandStdin(restoreCmd, backup)
 }
