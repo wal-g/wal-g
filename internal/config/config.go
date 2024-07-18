@@ -122,6 +122,7 @@ const (
 
 	MongoDBUriSetting               = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval  = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
+  	MongoDBExtendBackupCursor       = "MONGODB_EXTEND_BACKUP_CURSOR"
 	OplogArchiveAfterSize           = "OPLOG_ARCHIVE_AFTER_SIZE"
 	OplogArchiveTimeoutInterval     = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
 	OplogPITRDiscoveryInterval      = "OPLOG_PITR_DISCOVERY_INTERVAL"
