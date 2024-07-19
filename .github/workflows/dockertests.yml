@@ -18,7 +18,7 @@ env:
   IMAGE_UBUNTU_20_04: wal-g/ubuntu:20.04
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: "1.21.12"
+  GO_VERSION: "1.22.5"
 
 jobs:
   buildimages:

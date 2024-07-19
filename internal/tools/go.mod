@@ -1,6 +1,6 @@
 module github.com/jaegertracing/jaeger-clickhouse/internal/tools
 
-go 1.21
+go 1.22
 
 require (
 	github.com/golangci/golangci-lint v1.41.1
