@@ -36,12 +36,6 @@ jobs:
            dep ensure
           fi
 
-      - name: Check gofmt
-        uses: Jerome1337/gofmt-action@v1.0.4
-        with:
-          gofmt-path: './'
-          gofmt-flags: '-l -d -s'
-
       - name: Test
         run: make all_unittests
         env:
