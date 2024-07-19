@@ -5,19 +5,19 @@ import (
 	"os"
 )
 
-type Folder struct {
+type FolderInfo struct {
 	Path     string
 	fileMode fs.FileMode
 }
 
-func CreateFolder(path string, fileMode fs.FileMode) *Folder {
-	return &Folder{
+func CreateFolderInfo(path string, fileMode fs.FileMode) *FolderInfo {
+	return &FolderInfo{
 		Path:     path,
 		fileMode: fileMode,
 	}
 }
 
-func (f *Folder) Clean() error {
+func (f *FolderInfo) Clean() error {
 	err := os.RemoveAll(f.Path)
 	if err != nil {
 		return err
