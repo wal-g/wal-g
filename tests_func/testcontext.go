@@ -97,6 +97,9 @@ func CreateTestContext(database string) (tctx *TestContext, err error) {
 
 	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
 	Env["DOCKER_FILE"] = "Dockerfile." + database
+	if imageType, ok := environ["IMAGE_TYPE"]; ok && imageType != "" {
+		Env["DOCKER_FILE"] += "." + imageType
+	}
 	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
 	Env["WALG_S3_PREFIX"] = strings.ReplaceAll(Env["WALG_S3_PREFIX"], "DBNAME", database)
 	tracelog.DebugLogger.Printf("Database name %s\nEnv: %s\n", database, Env)
