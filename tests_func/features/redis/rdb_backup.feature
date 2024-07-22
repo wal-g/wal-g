@@ -9,19 +9,19 @@ Feature: Redis RDB backups check
 
   Scenario: Backups, restores and deletes were done successfully
     When redis01 has test redis data test1
-    And we create redis01 redis-backup
+    And we create redis01 rdb-redis-backup
     Then we got 1 backup entries of redis01
 
     When redis01 has test redis data test2
-    And we create redis01 redis-backup
+    And we create redis01 rdb-redis-backup
     Then we got 2 backup entries of redis01
 
     When redis01 has test redis data test3
-    And we create redis01 redis-backup
+    And we create redis01 rdb-redis-backup
     Then we got 3 backup entries of redis01
 
     When redis01 has test redis data test4
-    And we create redis01 redis-backup
+    And we create redis01 rdb-redis-backup
     Then we got 4 backup entries of redis01
 
     When we put empty backup via minio01 to redisdump.archive
@@ -53,5 +53,5 @@ Feature: Redis RDB backups check
 
     # Fifth backup was done successfully
     Given redis01 has test redis data test5
-    When we create redis01 redis-backup
+    When we create redis01 rdb-redis-backup
     Then we got 4 backup entries of redis01

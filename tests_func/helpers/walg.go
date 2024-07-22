@@ -92,7 +92,7 @@ func TimestampFromStr(s string) (OpTimestamp, error) {
 }
 
 func BackupNamesFromListing(output string) []string {
-	re := regexp.MustCompile(`(stream|binary)_\d{8}T\d{6}Z`)
+	re := regexp.MustCompile(`(stream|binary|aof)_\d{8}T\d{6}Z`)
 	return re.FindAllString(output, -1)
 }
 

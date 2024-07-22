@@ -14,10 +14,32 @@ import (
 func SetupRedisSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
 	ctx.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
-	ctx.Step(`^we create ([^\s]*) redis-backup$`, tctx.createRedisBackup)
+	ctx.Step(`^we create ([^\s]*) ([^\s]*)-redis-backup$`, tctx.createRedisBackup)
 	ctx.Step(`^we delete redis backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteRedisBackupsRetainViaRedis)
 	ctx.Step(`^we restart redis-server at ([^\s]*)$`, tctx.weRestartRedisServerAt)
 	ctx.Step(`^we got same redis data at ([^\s]*) ([^\s]*)$`, tctx.testEqualRedisDataAtHosts)
+	ctx.Step(`^([^\s]*) manifest is not empty`, tctx.manifestInitiated)
+}
+
+func (tctx *TestContext) manifestInitiated(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+		cmd := []string{"stat", "--printf=\"%s\"", "/data/appendonlydir/appendonly.aof.manifest"}
+		res, err := helpers.RunCommandStrict(tctx.Context, host, cmd)
+		if err != nil {
+			return fmt.Errorf("mainfest is missing")
+		}
+		if res.Stdout() == "0" {
+			return fmt.Errorf("manifest is empty")
+		}
+
+		return nil
+	})
 }
 
 func (tctx *TestContext) isWorkingRedis(hostName string) error {
@@ -56,7 +78,7 @@ func (tctx *TestContext) redisHasTestRedisDataTest(host string, testId int) erro
 	return nil
 }
 
-func (tctx *TestContext) createRedisBackup(host string) error {
+func (tctx *TestContext) createRedisBackup(host, backupType string) error {
 	rc, err := GetRedisCtlFromTestContext(tctx, host)
 	if err != nil {
 		return nil
@@ -75,8 +97,8 @@ func (tctx *TestContext) createRedisBackup(host string) error {
 		}
 	}
 
-	tracelog.DebugLogger.Println("Push redis backup")
-	backupId, err := rc.PushBackup()
+	tracelog.DebugLogger.Printf("Push redis %s backup\n", backupType)
+	backupId, err := rc.PushBackup(backupType)
 	if err != nil {
 		return err
 	}

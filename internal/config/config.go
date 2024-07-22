@@ -158,7 +158,7 @@ const (
 	RedisCreateBackupACLUser  = "WALG_CREATE_BACKUP_REDIS_ACL_USER"
 	RedisRestoreBackupACLUser = "WALG_RESTORE_BACKUP_REDIS_ACL_USER"
 	RedisDataPath             = "WALG_REDIS_DATA_PATH"
-	RedisAppendonlyPath       = "WALG_REDIS_APPENDONLY_PATH"
+	RedisAppendonlyFolder     = "WALG_REDIS_APPENDONLY_PATH"
 	RedisAppendonlyManifest   = "WALG_REDIS_APPENDONLY_MANIFEST"
 	RedisDataThreshold        = "WALG_REDIS_DATA_THRESHOLD"
 	RedisDataTimeout          = "WALG_REDIS_DATA_TIMEOUT"
@@ -272,8 +272,8 @@ var (
 
 	RedisDefaultSettings = map[string]string{
 		RedisDataPath:           "/var/lib/redis",
-		RedisAppendonlyPath:     "/var/lib/redis/appendonlydir",
-		RedisAppendonlyManifest: "/var/lib/redis/appendonlydir/appendonly.aof.manifest",
+		RedisAppendonlyFolder:   "appendonlydir",
+		RedisAppendonlyManifest: "appendonly.aof.manifest",
 		RedisDataThreshold:      "90",
 		RedisDataTimeout:        "1",
 		RedisServerProcessName:  "redis-server",
@@ -535,7 +535,7 @@ var (
 		RedisCreateBackupACLUser:  true,
 		RedisRestoreBackupACLUser: true,
 		RedisDataPath:             true,
-		RedisAppendonlyPath:       true,
+		RedisAppendonlyFolder:     true,
 		RedisAppendonlyManifest:   true,
 		RedisDataThreshold:        true,
 		RedisDataTimeout:          true,

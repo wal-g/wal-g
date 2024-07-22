@@ -9,5 +9,6 @@ Feature: Redis AOF backups check
 
   Scenario: Backups, restores and deletes were done successfully
     When redis01 has test redis data test1
-    And we create redis01 redis-backup
+    And redis01 manifest is not empty
+    And we create redis01 aof-redis-backup
     Then we got 1 backup entries of redis01
