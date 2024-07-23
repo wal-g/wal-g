@@ -1,6 +1,6 @@
 # WAL-G for MySQL
 
-**Interface of MySQL and MariaDB now is unstable**
+**Interface of MariaDB now is unstable**
 
 You can use wal-g as a tool for encrypting, compressing MySQL backups and push/fetch them to/from storage without saving it on your filesystem.
 
@@ -295,6 +295,8 @@ Restore procedure is straightforward:
 * wait until wal-g exit (it will wait until binlogs will be applied)
 * in case of errors use classic approach
 
+[Complete guide on PiTR MySQL](MySQL-PiTR.md)
+
 ### MariaDB - using with `mariabackup`
 
 It's recommended to use wal-g with `mariabackup` tool in case of MariaDB for creating lock-less backups.
@@ -307,7 +309,7 @@ Here's typical wal-g configuration for that case:
  WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 ```
 
-For the restore procedure you have to do similar things to [what the offical docs says about full backup and restore](https://mariadb.com/kb/en/full-backup-and-restore-with-mariabackup/):
+For the restore procedure you have to do similar things to [what the official docs says about full backup and restore](https://mariadb.com/kb/en/full-backup-and-restore-with-mariabackup/):
 * stop mariadb
 * clean a datadir (typically `/var/lib/mysql`)
 * fetch and prepare desired backup using `wal-g backup-fetch "backup_name"`
