@@ -222,11 +222,11 @@ type pageHeader struct {
 	state             uint32
 	usageCount        uint32
 	pageChangeCount   uint32
-	flagsField1Field2 uint32
+	checkpointNum     uint32
 	undoLocation      uint64
 	csn               uint64
 	rightLink         uint64
-	checkpointNum     uint32
+	flagsField1Field2 uint32
 	maxKeyLen         uint16
 	prevInsertOffset  uint16
 	chunksCount       uint16
@@ -248,11 +248,11 @@ func parsePageHeader(reader io.Reader) (*pageHeader, error) {
 		{Field: &pageHeader.usageCount, Name: "usageCount"},
 		{Field: &pageHeader.pageChangeCount, Name: "pageChangeCount"},
 
-		{Field: &pageHeader.flagsField1Field2, Name: "flagsField1Field2"},
+		{Field: &pageHeader.checkpointNum, Name: "checkpointNum"},
 		{Field: &pageHeader.undoLocation, Name: "undoLocation"},
 		{Field: &pageHeader.csn, Name: "csn"},
 		{Field: &pageHeader.rightLink, Name: "rightLink"},
-		{Field: &pageHeader.checkpointNum, Name: "checkpointNum"},
+		{Field: &pageHeader.flagsField1Field2, Name: "flagsField1Field2"},
 		{Field: &pageHeader.maxKeyLen, Name: "maxKeyLen"},
 		{Field: &pageHeader.prevInsertOffset, Name: "prevInsertOffset"},
 		{Field: &pageHeader.chunksCount, Name: "chunksCount"},
