@@ -165,17 +165,22 @@ func (tctx *TestContext) LoadEnv() (err error) {
 }
 
 func GetRedisCtlFromTestContext(tctx *TestContext, hostName string) (*helpers.RedisCtl, error) {
+	return GetRedisCtlFromTestContextTyped(tctx, hostName, "")
+}
+
+func GetRedisCtlFromTestContextTyped(tctx *TestContext, hostName, configType string) (*helpers.RedisCtl, error) {
 	host := tctx.ContainerFQDN(hostName)
 	port, err := strconv.Atoi(tctx.Env["REDIS_EXPOSE_PORT"])
 	if err != nil {
 		return nil, err
 	}
+	config := tctx.Env["WALG_CONF_PATH"] + configType
 	return helpers.NewRedisCtl(
 		tctx.Context,
 		host,
 		port,
 		tctx.Env["REDIS_PASSWORD"],
 		tctx.Env["WALG_CLIENT_PATH"],
-		tctx.Env["WALG_CONF_PATH"],
+		config,
 	)
 }

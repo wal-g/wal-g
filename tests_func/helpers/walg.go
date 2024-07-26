@@ -173,7 +173,7 @@ func (w *WalgUtil) FetchAofBackupByNum(backupNum int, version string) error {
 		return err
 	}
 
-	cmd := []string{"chown", "-R", "redis:redis", "/tmp/data"}
+	cmd := []string{"chown", "-R", "redis:redis", "/data"}
 	_, err = RunCommandStrict(w.ctx, w.host, cmd)
 	return err
 }

@@ -21,9 +21,7 @@ Feature: Redis AOF backups check
     Then we got 2 backup entries of redis01
 
     # Backup could not be created if disk is full above limit
-    When we fill disk on redis01
-    And we create redis01 aof-redis-backup with error
-    And we clean disk on redis01
+    And we create redis01 aof-redis-backup with threshold
     Then we got 2 backup entries of redis01
 
     When redis01 has test redis data test3

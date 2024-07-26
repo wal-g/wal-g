@@ -22,9 +22,10 @@ func NewBackupFilesListProvider(path string) *BackupFilesListProvider {
 }
 
 func (p *BackupFilesListProvider) Get() []string {
+	res := []string{p.ManifestPath}
 	lines := readManifest(p.ManifestPath)
-	res := parseManifest(lines, p.AOFFolder)
-	res = append(res, p.ManifestPath)
+	addon := parseManifest(lines, p.AOFFolder)
+	res = append(res, addon...)
 	return res
 }
 

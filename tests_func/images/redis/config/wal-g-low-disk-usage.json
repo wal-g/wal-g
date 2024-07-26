@@ -6,7 +6,7 @@
   "AWS_S3_FORCE_PATH_STYLE": "true",
 
   "WALG_STREAM_CREATE_COMMAND": "/usr/bin/redis_cli.sh --rdb /dev/stdout",
-  "WALG_STREAM_RESTORE_COMMAND": "cat > /tmp/data/dump.rdb",
+  "WALG_STREAM_RESTORE_COMMAND": "cat > /data/dump.rdb",
 
   "WALG_SENTINEL_USER_DATA":    "{\"key\": \"value\"}",
 
@@ -19,5 +19,7 @@
 
   "WALG_REDIS_PASSWORD": "1234",
   "WALG_CREATE_BACKUP_REDIS_ACL_USER": "acl-test",
-  "WALG_REDIS_DATA_PATH": "/tmp/data"
+  "WALG_REDIS_DATA_PATH": "/data",
+
+  "WALG_REDIS_DATA_THRESHOLD": 1
 }
