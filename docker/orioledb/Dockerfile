@@ -42,7 +42,7 @@ WORKDIR /usr/src/postgresql/contrib/orioledb
 RUN set -eux; \
 	git init; \
 	git remote add origin https://github.com/orioledb/orioledb.git; \
-	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +69c83423532f995ef58d52ac8c614f6630c5dc2c:refs/remotes/origin/main; \
+	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +466738fe9d9a0f225ee5e5c776182ad426ae2008:refs/remotes/origin/main; \
 	git checkout --progress --force -B main refs/remotes/origin/main;
 
 WORKDIR /
