@@ -46,7 +46,7 @@ COPY staging/wal-g/redis_cli.sh /usr/bin/redis_cli.sh
 COPY images/base/config/supervisor /etc/supervisor
 COPY images/redis/config /config
 
-RUN mkdir -p /data && chown $USERGROUP /data && \
+RUN mkdir -p /tmp/data && chown $USERGROUP /tmp/data && \
     mkdir -p /var/log/wal-g/ ${TMP_DIR} && \
     ln --force -s /config/supervisor/conf.d/redis.conf /etc/supervisor/conf.d/redis.conf && \
     mkdir -p ${WALG_REPO} ${WALG_CONF_DIR} && \

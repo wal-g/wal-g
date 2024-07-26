@@ -22,7 +22,10 @@ import (
 
 var Docker *client.Client
 
-const envDockerMachineName = "DOCKER_MACHINE_NAME"
+const (
+	envDockerMachineName = "DOCKER_MACHINE_NAME"
+	shell                = "bash"
+)
 
 type ExecResult struct {
 	ExitCode     int
@@ -128,6 +131,18 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 		cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
 
 	return exc, nil
+}
+
+func RunAsyncCommand(ctx context.Context, container, cmd string) error {
+	execCfg := types.ExecConfig{
+		Detach: true,
+		Cmd:    []string{shell, "-c", cmd},
+	}
+	execResp, err := Docker.ContainerExecCreate(ctx, container, execCfg)
+	if err != nil {
+		return err
+	}
+	return Docker.ContainerExecStart(ctx, execResp.ID, types.ExecStartCheck{})
 }
 
 func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {

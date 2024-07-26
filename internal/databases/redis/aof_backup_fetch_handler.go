@@ -14,7 +14,7 @@ import (
 
 func HandleAofFetchPush(
 	ctx context.Context,
-	backupName, restoreMongodVersion string,
+	backupName, restoreVersion string,
 	skipBackupDownload, skipChecks bool,
 ) error {
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
@@ -43,7 +43,7 @@ func HandleAofFetchPush(
 
 	return restoreService.DoRestore(aof.RestoreArgs{
 		BackupName:     backup.Name,
-		RestoreVersion: restoreMongodVersion,
+		RestoreVersion: restoreVersion,
 
 		SkipChecks:         skipChecks,
 		SkipBackupDownload: skipBackupDownload,

@@ -48,6 +48,11 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 		if !ok {
 			return fmt.Errorf("backup of version %s could not be restored to version %s", sentinel.Version, args.RestoreVersion)
 		}
+
+		err = archive.EnsureRedisStopped()
+		if err != nil {
+			return err
+		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped restore redis checks")
 	}

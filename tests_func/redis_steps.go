@@ -2,6 +2,8 @@ package functests
 
 import (
 	"fmt"
+	"math"
+	"syscall"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -11,17 +13,133 @@ import (
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
+const (
+	tmpFile = "/tmp/data/t.tmp"
+)
+
 func SetupRedisSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+	ctx.Step(`^redis stopped on ([^\s]*)$`, tctx.redisStoppedOn)
 	ctx.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
 	ctx.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
-	ctx.Step(`^we create ([^\s]*) ([^\s]*)-redis-backup$`, tctx.createRedisBackup)
+	ctx.Step(`^we create ([^\s]*) ([^\s]*)-redis-backup with ([^\s]*)$`, tctx.createRedisBackup)
 	ctx.Step(`^we delete redis backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteRedisBackupsRetainViaRedis)
 	ctx.Step(`^we restart redis-server at ([^\s]*)$`, tctx.weRestartRedisServerAt)
+	ctx.Step(`^we stop redis-server at ([^\s]*)$`, tctx.weStopRedisServerAt)
+	ctx.Step(`^we start redis-server at ([^\s]*)$`, tctx.weStartRedisServerAt)
 	ctx.Step(`^we got same redis data at ([^\s]*) ([^\s]*)$`, tctx.testEqualRedisDataAtHosts)
-	ctx.Step(`^([^\s]*) manifest is not empty`, tctx.manifestInitiated)
+	ctx.Step(`^([^\s]*) manifest is not empty$`, tctx.manifestIsNotEmpty)
+	ctx.Step(`^([^\s]*) has heavy write$`, tctx.hasHeavyWrite)
+	ctx.Step(`^we stop heavy write on ([^\s]*)$`, tctx.weStopHeavyWriteOn)
+	ctx.Step(`^we fill disk on ([^\s]*)$`, tctx.weFillDiskOn)
+	ctx.Step(`^we clean disk on ([^\s]*)$`, tctx.weCleanDiskOn)
+	ctx.Step(`^we restore #(\d+) aof ([^\s]*) version backup to ([^\s]*)$`, tctx.weRestoreAofBackupToRedis)
 }
 
-func (tctx *TestContext) manifestInitiated(hostName string) error {
+func (tctx *TestContext) weRestoreAofBackupToRedis(backupNum int, matchVersion string, container string) error {
+	var version string
+	if matchVersion == "same" {
+		version = tctx.Version.Full
+	} else if matchVersion == "wrong" {
+		version = "5.50.50"
+	} else {
+		return fmt.Errorf("known options for matchVersion are same and wrong")
+	}
+	walg := WalgUtilFromTestContext(tctx, container)
+	err := walg.FetchAofBackupByNum(backupNum, version)
+	if matchVersion == "same" && err != nil {
+		return err
+	}
+	if matchVersion == "wrong" && err == nil {
+		return fmt.Errorf("expected error on wrong version")
+	}
+	return nil
+}
+
+func getFilledGigabytes() (int, error) {
+	fs := syscall.Statfs_t{}
+	err := syscall.Statfs("/tmp", &fs)
+	if err != nil {
+		return 0, err
+	}
+
+	all := fs.Blocks * uint64(fs.Bsize)
+	free := fs.Bfree * uint64(fs.Bsize)
+	used := all - free
+
+	curUsed := float64(used) / float64(all)
+	neccessaryUsed := float64(used) * 0.91 / curUsed
+	resInGigabytes := int(neccessaryUsed / math.Pow(2, 30))
+	return resInGigabytes, nil
+}
+
+func (tctx *TestContext) weFillDiskOn(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	filledGigabytes, err := getFilledGigabytes()
+	if err != nil {
+		return err
+	}
+
+	cmd := []string{"fallocate", "-l", fmt.Sprintf("%dG", filledGigabytes), tmpFile}
+	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
+	if err != nil {
+		return fmt.Errorf("error creating large file: %+v", err)
+	}
+	return nil
+}
+
+func (tctx *TestContext) weCleanDiskOn(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	cmd := []string{"rm", "-rf", tmpFile}
+	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
+	if err != nil {
+		return fmt.Errorf("removing large file: %+v", err)
+	}
+	return nil
+}
+
+func (tctx *TestContext) hasHeavyWrite(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	cmd := "redis-benchmark -a password -t set -n 100000 -d 100000"
+	err = helpers.RunAsyncCommand(tctx.Context, host, cmd)
+	if err != nil {
+		return fmt.Errorf("heavy write cmd err: %+v", err)
+	}
+
+	return nil
+}
+
+func (tctx *TestContext) weStopHeavyWriteOn(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	cmd := []string{"pkill", "redis-benchmark"}
+	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
+	if err != nil {
+		return fmt.Errorf("heavy write stop err: %+v", err)
+	}
+
+	return nil
+}
+
+func (tctx *TestContext) manifestIsNotEmpty(hostName string) error {
 	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
@@ -29,10 +147,10 @@ func (tctx *TestContext) manifestInitiated(hostName string) error {
 	host := rc.Host()
 
 	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
-		cmd := []string{"stat", "--printf=\"%s\"", "/data/appendonlydir/appendonly.aof.manifest"}
+		cmd := []string{"stat", "--printf=\"%s\"", "/tmp/data/appendonlydir/appendonly.aof.manifest"}
 		res, err := helpers.RunCommandStrict(tctx.Context, host, cmd)
 		if err != nil {
-			return fmt.Errorf("mainfest is missing")
+			return fmt.Errorf("manifest is missing")
 		}
 		if res.Stdout() == "0" {
 			return fmt.Errorf("manifest is empty")
@@ -40,6 +158,22 @@ func (tctx *TestContext) manifestInitiated(hostName string) error {
 
 		return nil
 	})
+}
+
+func (tctx *TestContext) redisStoppedOn(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	cmd := []string{"bash", "-c", "ps aux | grep [r]edis-server"}
+	res, err := helpers.RunCommandStrict(tctx.Context, host, cmd)
+	if err != nil && res.ExitCode == 1 && res.Stdout() == "" && res.Stderr() == "" {
+		return nil
+	}
+
+	return fmt.Errorf("unexpected result of checking running redis: %+v, %d: %s: %s", err, res.ExitCode, res.Stdout(), res.Stderr())
 }
 
 func (tctx *TestContext) isWorkingRedis(hostName string) error {
@@ -78,7 +212,11 @@ func (tctx *TestContext) redisHasTestRedisDataTest(host string, testId int) erro
 	return nil
 }
 
-func (tctx *TestContext) createRedisBackup(host, backupType string) error {
+func (tctx *TestContext) createRedisBackup(host, backupType, resultType string) error {
+	if resultType != "success" && resultType != "error" {
+		return fmt.Errorf("undefined resultType: use success or error")
+	}
+
 	rc, err := GetRedisCtlFromTestContext(tctx, host)
 	if err != nil {
 		return nil
@@ -99,9 +237,13 @@ func (tctx *TestContext) createRedisBackup(host, backupType string) error {
 
 	tracelog.DebugLogger.Printf("Push redis %s backup\n", backupType)
 	backupId, err := rc.PushBackup(backupType)
-	if err != nil {
+	if err != nil && resultType == "success" {
 		return err
 	}
+	if err == nil && resultType == "error" {
+		return fmt.Errorf("no expected error occurred")
+	}
+
 	time.Sleep(1 * time.Second)
 	tracelog.DebugLogger.Println("Backup created: ", backupId)
 	return nil
@@ -125,6 +267,38 @@ func (tctx *TestContext) weRestartRedisServerAt(host string) error {
 	if cmd.Err() != nil {
 		return cmd.Err()
 	}
+	return nil
+}
+
+func (tctx *TestContext) weStopRedisServerAt(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	cmd := []string{"supervisorctl", "stop", "redis"}
+	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
+	if err != nil {
+		return fmt.Errorf("stop redis failed: %+v", err)
+	}
+
+	return nil
+}
+
+func (tctx *TestContext) weStartRedisServerAt(hostName string) error {
+	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	if err != nil {
+		return err
+	}
+	host := rc.Host()
+
+	cmd := []string{"supervisorctl", "start", "redis"}
+	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
+	if err != nil {
+		return fmt.Errorf("start redis failed: %+v", err)
+	}
+
 	return nil
 }
 

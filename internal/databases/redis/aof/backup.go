@@ -90,20 +90,6 @@ func CreateBackupService(ctx context.Context, diskWatcher *diskwatcher.DiskWatch
 }
 
 func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
-	// ToDo
-	// 1. [ER] no manifest file
-	// 2. [ER] empty manifest file
-	// 3. [OK] manifest with only base file
-	// 4. [OK] manifest with base + 1 incr
-	// 5. [OK] manifest with base + 2 incr
-	// 6. [OK] manifest with base + 2 incr, last changing during backup - check that file backed up only to the initial limit
-	// [last file size seems to be unnecessary to remember (see LimitedReader in tar_ball_file_packer.go?)]
-	// 7. [ER] manifest with base + some incr, fill disk during backup
-	//
-	// for fetch:
-	// 1. [ER] check version mismatch
-	// 2. [OK] kill redis if started
-	// 3. [OK] clean data if exists before
 	err := bs.metaConstructor.Init()
 	if err != nil {
 		return errors.Wrapf(err, "can not init meta provider")

@@ -75,7 +75,7 @@ type AuxData struct {
 	OplogPushEnabled   bool
 }
 
-type MongoVersion struct {
+type DBVersion struct {
 	Major string
 	Full  string
 }
@@ -86,7 +86,7 @@ type TestContext struct {
 	Env                map[string]string
 	Context            context.Context
 	AuxData            AuxData
-	Version            MongoVersion
+	Version            DBVersion
 	PreviousBackupTime time.Time
 }
 
@@ -97,9 +97,6 @@ func CreateTestContext(database string) (tctx *TestContext, err error) {
 
 	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
 	Env["DOCKER_FILE"] = "Dockerfile." + database
-	if imageType, ok := environ["IMAGE_TYPE"]; ok && imageType != "" {
-		Env["DOCKER_FILE"] += "." + imageType
-	}
 	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
 	Env["WALG_S3_PREFIX"] = strings.ReplaceAll(Env["WALG_S3_PREFIX"], "DBNAME", database)
 	tracelog.DebugLogger.Printf("Database name %s\nEnv: %s\n", database, Env)
@@ -118,14 +115,29 @@ func CreateTestContext(database string) (tctx *TestContext, err error) {
 		}
 	}
 
+	var version DBVersion
+	if database == "mongodb" {
+		version = DBVersion{
+			Major: environ["MONGO_MAJOR"],
+			Full:  environ["MONGO_VERSION"],
+		}
+	} else if database == "redis" {
+		full := environ["REDIS_VERSION"]
+		parts := strings.Split(full, ".")
+		major := strings.Join(parts[:2], ".")
+		version = DBVersion{
+			Major: major,
+			Full:  full,
+		}
+	} else {
+		return nil, fmt.Errorf("database %s is not expected here", database)
+	}
+
 	tctx = &TestContext{
 		EnvFilePath: envFilePath,
 		Context:     context.Background(),
-		Version: MongoVersion{
-			Major: environ["MONGO_MAJOR"],
-			Full:  environ["MONGO_VERSION"],
-		},
-		Env: env,
+		Version:     version,
+		Env:         env,
 	}
 	return tctx, tctx.LoadEnv()
 }
