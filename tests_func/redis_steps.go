@@ -161,7 +161,7 @@ func (tctx *TestContext) createRedisBackup(host, backupType, resultType string) 
 
 	configType := ""
 	if resultType == "threshold" {
-		configType = "_low_disk_usage"
+		configType = "-low-disk-usage"
 	}
 	rc, err := GetRedisCtlFromTestContextTyped(tctx, host, configType)
 	if err != nil {

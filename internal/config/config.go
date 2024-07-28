@@ -160,6 +160,7 @@ const (
 	RedisDataPath             = "WALG_REDIS_DATA_PATH"
 	RedisAppendonlyFolder     = "WALG_REDIS_APPENDONLY_PATH"
 	RedisAppendonlyManifest   = "WALG_REDIS_APPENDONLY_MANIFEST"
+	RedisAppendonlyTmpFolder  = "WALG_REDIS_APPENDONLY_TEMP_MANIFEST"
 	RedisDataThreshold        = "WALG_REDIS_DATA_THRESHOLD"
 	RedisDataTimeout          = "WALG_REDIS_DATA_TIMEOUT"
 	RedisServerProcessName    = "WALG_REDIS_SERVER_PROCESS_NAME"
@@ -271,12 +272,13 @@ var (
 	}
 
 	RedisDefaultSettings = map[string]string{
-		RedisDataPath:           "/var/lib/redis",
-		RedisAppendonlyFolder:   "appendonlydir",
-		RedisAppendonlyManifest: "appendonly.aof.manifest",
-		RedisDataThreshold:      "90",
-		RedisDataTimeout:        "1",
-		RedisServerProcessName:  "redis-server",
+		RedisDataPath:            "/var/lib/redis",
+		RedisAppendonlyFolder:    "appendonlydir",
+		RedisAppendonlyManifest:  "appendonly.aof.manifest",
+		RedisAppendonlyTmpFolder: "/var/run/wal-g/",
+		RedisDataThreshold:       "90",
+		RedisDataTimeout:         "1",
+		RedisServerProcessName:   "redis-server",
 	}
 
 	MysqlDefaultSettings = map[string]string{
@@ -537,6 +539,7 @@ var (
 		RedisDataPath:             true,
 		RedisAppendonlyFolder:     true,
 		RedisAppendonlyManifest:   true,
+		RedisAppendonlyTmpFolder:  true,
 		RedisDataThreshold:        true,
 		RedisDataTimeout:          true,
 		RedisServerProcessName:    true,

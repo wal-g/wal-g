@@ -86,7 +86,7 @@ func NewBundle(
 ) *Bundle {
 	return &Bundle{
 		Bundle: internal.Bundle{
-			Directory:         directory,
+			Directories:       []string{directory},
 			Crypter:           crypter,
 			TarSizeThreshold:  tarSizeThreshold,
 			ExcludedFilenames: ExcludedFilenames,

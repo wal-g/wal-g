@@ -10,23 +10,47 @@ import (
 )
 
 type BackupFilesListProvider struct {
-	ManifestPath string
-	AOFFolder    string
+	ReadManifestPath   string
+	UploadManifestPath string
+	AOFFolder          string
 }
 
-func NewBackupFilesListProvider(path string) *BackupFilesListProvider {
+func NewBackupFilesListProvider(readFolder, uploadFolder, name string) *BackupFilesListProvider {
 	return &BackupFilesListProvider{
-		ManifestPath: path,
-		AOFFolder:    filepath.Dir(path),
+		AOFFolder:          readFolder,
+		ReadManifestPath:   filepath.Join(readFolder, name),
+		UploadManifestPath: filepath.Join(uploadFolder, name),
 	}
 }
 
 func (p *BackupFilesListProvider) Get() []string {
-	res := []string{p.ManifestPath}
-	lines := readManifest(p.ManifestPath)
+	res := []string{p.UploadManifestPath}
+	lines := readManifest(p.ReadManifestPath)
+	copyManifestToUpload(lines, p.UploadManifestPath)
 	addon := parseManifest(lines, p.AOFFolder)
 	res = append(res, addon...)
 	return res
+}
+
+func copyManifestToUpload(lines []string, path string) {
+	folder := filepath.Dir(path)
+	err := os.MkdirAll(folder, 0644)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("error creating temp folder %s: %v", folder, err)
+	}
+
+	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		tracelog.ErrorLogger.Fatalf("error creating temp manifest %s: %v", path, err)
+	}
+	defer file.Close()
+
+	for _, line := range lines {
+		_, err := file.Write([]byte(line + "\n"))
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("error writing line %s to temp manifest %s: %v", line, path, err)
+		}
+	}
 }
 
 func readManifest(manifestPath string) []string {

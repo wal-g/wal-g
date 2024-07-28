@@ -42,7 +42,7 @@ func NewCommonDirectoryUploader(
 }
 
 func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
-	bundle := NewBundle(path, u.crypter, u.tarSizeThreshold, u.excludedFiles)
+	bundle := NewBundle([]string{path}, u.crypter, u.tarSizeThreshold, u.excludedFiles)
 
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")

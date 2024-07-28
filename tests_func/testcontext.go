@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -174,7 +175,11 @@ func GetRedisCtlFromTestContextTyped(tctx *TestContext, hostName, configType str
 	if err != nil {
 		return nil, err
 	}
-	config := tctx.Env["WALG_CONF_PATH"] + configType
+	config := tctx.Env["WALG_CONF_PATH"]
+	if configType != "" {
+		ext := filepath.Ext(config)
+		config = strings.Join([]string{strings.TrimSuffix(config, ext), configType, ext}, "")
+	}
 	return helpers.NewRedisCtl(
 		tctx.Context,
 		host,
