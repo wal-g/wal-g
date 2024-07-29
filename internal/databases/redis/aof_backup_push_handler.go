@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -22,8 +23,11 @@ func HandleAOFBackupPush(ctx context.Context, permanent bool, appName string) er
 	}
 
 	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
-	aofPath, _ := conf.GetSetting(conf.RedisAppendonlyPath)
-	concurrentUploader, err := internal.CreateConcurrentUploader(uploader, backupName, aofPath)
+	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
+	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
+	aofPath := filepath.Join(dataFolder, aofFolder)
+	tmpPath, _ := conf.GetSetting(conf.RedisAppendonlyTmpFolder)
+	concurrentUploader, err := internal.CreateConcurrentUploader(uploader, backupName, []string{aofPath, tmpPath})
 	if err != nil {
 		return err
 	}
@@ -39,8 +43,8 @@ func HandleAOFBackupPush(ctx context.Context, permanent bool, appName string) er
 		return err
 	}
 
-	manifest, _ := conf.GetSetting(conf.RedisAppendonlyManifest)
-	backupFilesListProvider := aof.NewBackupFilesListProvider(manifest)
+	manifestName, _ := conf.GetSetting(conf.RedisAppendonlyManifest)
+	backupFilesListProvider := aof.NewBackupFilesListProvider(aofPath, tmpPath, manifestName)
 
 	filesPinner := aof.NewFilesPinner()
 

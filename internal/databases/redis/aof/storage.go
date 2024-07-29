@@ -1,6 +1,8 @@
 package aof
 
 import (
+	"fmt"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -20,6 +22,9 @@ func DownloadSentinel(folder storage.Folder, backupName string) (*archive.Backup
 	}
 	if sentinel.BackupType == "" {
 		sentinel.BackupType = archive.RDBBackupType
+	}
+	if sentinel.Version == "" {
+		return nil, fmt.Errorf("expecting sentinel file for aof backup with always filled version: %+v", sentinel)
 	}
 	return &sentinel, nil
 }

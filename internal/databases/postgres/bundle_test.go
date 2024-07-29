@@ -32,7 +32,7 @@ func TestEmptyBundleQueue(t *testing.T) {
 
 	bundle := &postgres.Bundle{
 		Bundle: internal.Bundle{
-			Directory:        "",
+			Directories:      []string{""},
 			TarSizeThreshold: 100,
 		},
 	}
@@ -64,7 +64,7 @@ func TestBundleQueueLowConcurrency(t *testing.T) {
 func queueTest(t *testing.T) {
 	bundle := &postgres.Bundle{
 		Bundle: internal.Bundle{
-			Directory:        "",
+			Directories:      []string{""},
 			TarSizeThreshold: 100,
 		},
 	}

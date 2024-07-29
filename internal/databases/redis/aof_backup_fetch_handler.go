@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"os"
+	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -13,10 +14,12 @@ import (
 
 func HandleAofFetchPush(
 	ctx context.Context,
-	backupName, restoreMongodVersion string,
+	backupName, restoreVersion string,
 	skipBackupDownload, skipChecks bool,
 ) error {
-	aofPath, _ := conf.GetSetting(conf.RedisAppendonlyPath)
+	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
+	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
+	aofPath := filepath.Join(dataFolder, aofFolder)
 	folder := archive.CreateFolderInfo(aofPath, os.FileMode(0750))
 
 	uploader, err := internal.ConfigureUploader()
@@ -40,7 +43,7 @@ func HandleAofFetchPush(
 
 	return restoreService.DoRestore(aof.RestoreArgs{
 		BackupName:     backup.Name,
-		RestoreVersion: restoreMongodVersion,
+		RestoreVersion: restoreVersion,
 
 		SkipChecks:         skipChecks,
 		SkipBackupDownload: skipBackupDownload,

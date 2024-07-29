@@ -74,12 +74,16 @@ func (rc *RedisCtl) WriteTestData(mark string, docsCount int) error {
 	return nil
 }
 
-func (rc *RedisCtl) PushBackup() (string, error) {
-	exec, err := rc.runCmd([]string{"backup-push"})
+func (rc *RedisCtl) PushBackup(backupType string) (string, error) {
+	cmd := fmt.Sprintf("%s-backup-push", backupType)
+	exec, err := rc.runCmd([]string{cmd})
 	if err != nil {
 		return "", err
 	}
-	return BackupNameFromCreate(exec.Combined()), nil
+	if backupType == "rdb" {
+		return BackupNameFromCreate(exec.Combined()), nil
+	}
+	return "", nil
 }
 
 func (rc *RedisCtl) runCmd(run []string) (ExecResult, error) {

@@ -3,8 +3,9 @@ package archive
 import (
 	"fmt"
 	"os/exec"
-	"strconv"
 	"strings"
+
+	"github.com/hashicorp/go-version"
 )
 
 type VersionParser struct {
@@ -34,54 +35,25 @@ func (p *VersionParser) Get() (string, error) {
 	return "", fmt.Errorf("version not found in %s", data)
 }
 
-type Version struct {
-	Major int
-	Minor int
-	Patch int
-}
-
-func NewVersion(s string) (*Version, error) {
-	partsStr := strings.Split(s, ".")
-	if len(partsStr) != 3 {
-		return nil, fmt.Errorf("unexpected version string format: %s", s)
-	}
-
-	var partsInt []int
-	for _, partStr := range partsStr {
-		partInt, err := strconv.Atoi(partStr)
-		if err != nil {
-			return nil, fmt.Errorf("unexpected version string part format: %s", s)
-		}
-
-		partsInt = append(partsInt, partInt)
-	}
-	return &Version{
-		Major: partsInt[0],
-		Minor: partsInt[1],
-		Patch: partsInt[2],
-	}, nil
-}
-
-func (v *Version) LessOrEqual(other *Version) bool {
-	if v.Major <= other.Major {
-		return true
-	}
-	if v.Minor <= other.Minor {
-		return true
-	}
-	return v.Patch <= other.Patch
-}
-
 func EnsureRestoreCompatibility(backupVersion, restoreVersion string) (bool, error) {
-	b, err := NewVersion(backupVersion)
+	b, err := version.NewVersion(backupVersion)
 	if err != nil {
 		return false, fmt.Errorf("backup version error: %v", err)
 	}
 
-	r, err := NewVersion(restoreVersion)
+	r, err := version.NewVersion(restoreVersion)
 	if err != nil {
 		return false, fmt.Errorf("restore version error: %v", err)
 	}
 
-	return b.LessOrEqual(r), nil
+	return b.LessThanOrEqual(r), nil
+}
+
+func EnsureRedisStopped() error {
+	outErr, err := exec.Command("bash", "-c", "ps aux | grep [r]edis-server").CombinedOutput()
+	if _, ok := err.(*exec.ExitError); ok && err.Error() == "exit status 1" && len(outErr) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("unexpected result of checking running redis: %T: %v: %s", err, err, outErr)
 }
