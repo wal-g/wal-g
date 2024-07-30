@@ -58,7 +58,7 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 	}
 
 	if !args.SkipBackupDownload {
-		err = restoreService.Folder.Clean()
+		err = restoreService.Folder.CleanParent()
 		if err != nil {
 			return err
 		}
