@@ -3,6 +3,7 @@ package archive
 import (
 	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 type FolderInfo struct {
@@ -17,8 +18,9 @@ func CreateFolderInfo(path string, fileMode fs.FileMode) *FolderInfo {
 	}
 }
 
-func (f *FolderInfo) Clean() error {
-	err := os.RemoveAll(f.Path)
+func (f *FolderInfo) CleanParent() error {
+	parent := filepath.Dir(f.Path)
+	err := os.RemoveAll(parent)
 	if err != nil {
 		return err
 	}
