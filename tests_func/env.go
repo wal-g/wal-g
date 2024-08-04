@@ -30,7 +30,14 @@ func SetupNewEnv(fromEnv map[string]string, osEnviron map[string]string, envFile
 	} else if err := os.Mkdir(stagingDir, EnvDirPerm); err != nil {
 		return nil, fmt.Errorf("can not create staging dir: %v", err)
 	}
-	env := utils.MergeEnvs(fromEnv, DynConf(fromEnv, osEnviron))
+
+	dynConf, err := DynConf(fromEnv, osEnviron)
+	if err != nil {
+		return nil, fmt.Errorf("can not get dynamic config: %v", err)
+	}
+
+	env := utils.MergeEnvs(fromEnv, dynConf)
+
 	file, err := os.OpenFile(envFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, EnvFilePerm)
 	if err != nil {
 		return nil, fmt.Errorf("can not open database file for writing: %v", err)
@@ -74,7 +81,7 @@ func SetupStaging(imagesDir, stagingDir string) error {
 	return nil
 }
 
-func DynConf(env map[string]string, osEnviron map[string]string) map[string]string {
+func DynConf(env map[string]string, osEnviron map[string]string) (map[string]string, error) {
 	portFactor := env["TEST_ID"]
 	netName := fmt.Sprintf("test_net_%s", portFactor)
 
@@ -92,13 +99,15 @@ func DynConf(env map[string]string, osEnviron map[string]string) map[string]stri
 		}
 	}
 
-	if redisPersistenceType, ok := osEnviron["REDIS_PERSISTENCE_TYPE"]; ok {
-		if redisPersistenceType == "aof" {
+	if imageType, ok := osEnviron["IMAGE_TYPE"]; ok {
+		if imageType == "aof" {
 			res["REDIS_CONF_FILE"] = "redis-aof.conf"
-		} else {
+		} else if imageType == "rdb" {
 			res["REDIS_CONF_FILE"] = "redis-rdb.conf"
+		} else {
+			return nil, fmt.Errorf("unknown IMAGE_TYPE env value")
 		}
 	}
 
-	return res
+	return res, nil
 }

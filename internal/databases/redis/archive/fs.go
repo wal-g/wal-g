@@ -3,22 +3,24 @@ package archive
 import (
 	"io/fs"
 	"os"
+	"path/filepath"
 )
 
-type Folder struct {
+type FolderInfo struct {
 	Path     string
 	fileMode fs.FileMode
 }
 
-func CreateFolder(path string, fileMode fs.FileMode) *Folder {
-	return &Folder{
+func CreateFolderInfo(path string, fileMode fs.FileMode) *FolderInfo {
+	return &FolderInfo{
 		Path:     path,
 		fileMode: fileMode,
 	}
 }
 
-func (f *Folder) Clean() error {
-	err := os.RemoveAll(f.Path)
+func (f *FolderInfo) CleanParent() error {
+	parent := filepath.Dir(f.Path)
+	err := os.RemoveAll(parent)
 	if err != nil {
 		return err
 	}

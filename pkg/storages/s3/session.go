@@ -23,24 +23,24 @@ import (
 )
 
 func createSession(config *Config) (*session.Session, error) {
-	sess, err := session.NewSession()
-	if err != nil {
-		return nil, fmt.Errorf("init new default session: %w", err)
-	}
-
-	err = configureSession(sess, config)
-	if err != nil {
-		return nil, fmt.Errorf("configure session: %w", err)
-	}
-
+	sessOpts := session.Options{}
 	if config.CACertFile != "" {
 		file, err := os.Open(config.CACertFile)
 		if err != nil {
 			return nil, err
 		}
 		defer utility.LoggedClose(file, "S3 CA cert file")
-		sess, err = session.NewSessionWithOptions(session.Options{Config: *sess.Config, CustomCABundle: file})
-		return sess, err
+		sessOpts.CustomCABundle = file
+	}
+
+	sess, err := session.NewSessionWithOptions(sessOpts)
+	if err != nil {
+		return nil, fmt.Errorf("init new session: %w", err)
+	}
+
+	err = configureSession(sess, config)
+	if err != nil {
+		return nil, fmt.Errorf("configure session: %w", err)
 	}
 
 	if config.UseYCSessionToken != "" {

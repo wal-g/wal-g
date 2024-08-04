@@ -11,7 +11,7 @@ import (
 
 type RestoreService struct {
 	Context       context.Context
-	Folder        *archive.Folder
+	Folder        *archive.FolderInfo
 	Uploader      internal.Uploader
 	versionParser *archive.VersionParser
 }
@@ -24,7 +24,7 @@ type RestoreArgs struct {
 	SkipBackupDownload bool
 }
 
-func CreateRestoreService(ctx context.Context, folder *archive.Folder, uploader internal.Uploader, versionParser *archive.VersionParser,
+func CreateRestoreService(ctx context.Context, folder *archive.FolderInfo, uploader internal.Uploader, versionParser *archive.VersionParser,
 ) (*RestoreService, error) {
 	return &RestoreService{
 		Context:       ctx,
@@ -48,12 +48,17 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 		if !ok {
 			return fmt.Errorf("backup of version %s could not be restored to version %s", sentinel.Version, args.RestoreVersion)
 		}
+
+		err = archive.EnsureRedisStopped()
+		if err != nil {
+			return err
+		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped restore redis checks")
 	}
 
 	if !args.SkipBackupDownload {
-		err = restoreService.Folder.Clean()
+		err = restoreService.Folder.CleanParent()
 		if err != nil {
 			return err
 		}

@@ -15,10 +15,10 @@ type ConcurrentUploader struct {
 	CompressedSize   int64
 }
 
-func CreateConcurrentUploader(uploader Uploader, backupName, directory string) (*ConcurrentUploader, error) {
+func CreateConcurrentUploader(uploader Uploader, backupName string, directories []string) (*ConcurrentUploader, error) {
 	crypter := ConfigureCrypter()
 	tarSizeThreshold := viper.GetInt64(conf.TarSizeThresholdSetting)
-	bundle := NewBundle(directory, crypter, tarSizeThreshold, map[string]utility.Empty{})
+	bundle := NewBundle(directories, crypter, tarSizeThreshold, map[string]utility.Empty{})
 
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
 	tarBallMaker := NewStorageTarBallMaker(backupName, uploader)

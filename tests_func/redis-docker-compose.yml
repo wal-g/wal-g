@@ -24,7 +24,7 @@ services:
             context: .
             args:
                 - REDIS_VERSION=${REDIS_VERSION}
-                - REDIS_PERSISTENCE_TYPE=${REDIS_PERSISTENCE_TYPE}
+                - IMAGE_TYPE=${IMAGE_TYPE}
         container_name: redis01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
@@ -47,7 +47,7 @@ services:
             context: .
             args:
                 - REDIS_VERSION=${REDIS_VERSION}
-                - REDIS_PERSISTENCE_TYPE=${REDIS_PERSISTENCE_TYPE}
+                - IMAGE_TYPE=${IMAGE_TYPE}
         container_name: redis02.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:

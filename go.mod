@@ -1,6 +1,6 @@
 module github.com/wal-g/wal-g
 
-go 1.21
+go 1.22
 
 require (
 	cloud.google.com/go/storage v1.10.0
@@ -46,7 +46,7 @@ require (
 	github.com/yandex-cloud/go-genproto v0.0.0-20230918115514-93a99045c9de
 	github.com/yandex-cloud/go-sdk v0.0.0-20230918120620-9e95f0816d79
 	go.mongodb.org/mongo-driver v1.9.1
-	golang.org/x/crypto v0.24.0
+	golang.org/x/crypto v0.25.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
@@ -63,9 +63,9 @@ require (
 	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
-	golang.org/x/mod v0.17.0
-	golang.org/x/net v0.26.0
-	golang.org/x/sys v0.21.0
+	golang.org/x/mod v0.19.0
+	golang.org/x/net v0.27.0
+	golang.org/x/sys v0.22.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -107,6 +107,7 @@ require (
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-memdb v1.3.0 // indirect
 	github.com/hashicorp/go-multierror v1.0.0 // indirect
+	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -149,9 +150,9 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/term v0.21.0 // indirect
+	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
-	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
+	golang.org/x/tools v0.23.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20211021150943-2b146023228c // indirect
 	google.golang.org/grpc v1.64.0 // indirect

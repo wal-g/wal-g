@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -20,8 +21,8 @@ func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 }
 
 type Bundle struct {
-	Directory string
-	Sentinel  *Sentinel
+	Directories []string
+	Sentinel    *Sentinel
 
 	TarBallComposer TarBallComposer
 	TarBallQueue    *TarBallQueue
@@ -36,10 +37,10 @@ type Bundle struct {
 }
 
 func NewBundle(
-	directory string, crypter crypto.Crypter,
+	directories []string, crypter crypto.Crypter,
 	tarSizeThreshold int64, excludedFilenames map[string]utility.Empty) *Bundle {
 	return &Bundle{
-		Directory:         directory,
+		Directories:       directories,
 		Crypter:           crypter,
 		TarSizeThreshold:  tarSizeThreshold,
 		ExcludedFilenames: excludedFilenames,
@@ -108,7 +109,12 @@ func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
 }
 
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
-	return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
+	for _, directory := range bundle.Directories {
+		if strings.HasPrefix(fileAbsPath, directory) {
+			return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, directory)
+		}
+	}
+	return fileAbsPath
 }
 
 func (bundle *Bundle) createTarFileInfoHeader(path string, info os.FileInfo) (header *tar.Header, err error) {
