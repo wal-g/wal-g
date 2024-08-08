@@ -52,6 +52,10 @@ func Execute() {
 	}
 }
 
+func GetCmd() *cobra.Command {
+	return cmd
+}
+
 var SegContentID string
 
 func init() {
