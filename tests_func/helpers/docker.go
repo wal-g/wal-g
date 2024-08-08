@@ -318,11 +318,9 @@ func (inf *Infra) Shutdown() error {
 }
 
 func (inf *Infra) callCompose(actions []string) error {
-	baseArgs := []string{"--file", inf.config, "-p", "test"}
+	baseArgs := []string{"compose", "--file", inf.config, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
-	// lookup the full path before exec.CommandContext call
-	// (fixes https://github.com/docker/compose/issues/1135)
-	fullPath, err := exec.LookPath("docker-compose")
+	fullPath, err := exec.LookPath("docker")
 	if err != nil {
 		return err
 	}
