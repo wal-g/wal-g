@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 
 	"github.com/wal-g/wal-g/internal"
@@ -20,7 +19,7 @@ func HandleAofFetchPush(
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)
-	folder := archive.CreateFolderInfo(aofPath, os.FileMode(0750))
+	folder := archive.CreateFolderInfo(aofPath)
 
 	uploader, err := internal.ConfigureUploader()
 	if err != nil {
