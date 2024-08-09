@@ -1,29 +1,33 @@
 package archive
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 )
 
 type FolderInfo struct {
-	Path     string
-	fileMode fs.FileMode
+	Path string
 }
 
-func CreateFolderInfo(path string, fileMode fs.FileMode) *FolderInfo {
+func CreateFolderInfo(path string) *FolderInfo {
 	return &FolderInfo{
-		Path:     path,
-		fileMode: fileMode,
+		Path: path,
 	}
 }
 
-func (f *FolderInfo) CleanParent() error {
+func (f *FolderInfo) CleanParent() (err error) {
 	parent := filepath.Dir(f.Path)
-	err := os.RemoveAll(parent)
+	starred := filepath.Join(parent, "*")
+	contents, err := filepath.Glob(starred)
 	if err != nil {
-		return err
+		return
 	}
 
-	return os.MkdirAll(f.Path, f.fileMode)
+	for _, item := range contents {
+		err = os.RemoveAll(item)
+		if err != nil {
+			return
+		}
+	}
+	return
 }

@@ -50,7 +50,7 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd.Stderr = os.Stderr
 
 		dataPath, _ := conf.GetSetting(conf.RedisDataPath)
-		dataDir := archive.CreateFolderInfo(dataPath, os.FileMode(0750))
+		dataDir := archive.CreateFolderInfo(dataPath)
 		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd, dataDir)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
