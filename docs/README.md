@@ -270,7 +270,7 @@ Databases
 ### Redis [Beta]
 [Information about installing, configuration and usage](Redis.md)
 
-### Greenplum [Work in progress]
+### Greenplum [Production ready]
 [Information about installing, configuration and usage](Greenplum.md)
 
 ### ETCD [Work in progress]
