@@ -198,9 +198,11 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	parts := partitionStrings(objectRelativePaths, 1000)
+	needsVersioning := folder.isVersioningEnabled()
+
 	for _, part := range parts {
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
-			Objects: folder.partitionToObjects(part),
+			Objects: folder.partitionToObjects(part, needsVersioning),
 		}}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
@@ -208,6 +210,38 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		}
 	}
 	return nil
+}
+
+func (folder *Folder) getObjectVersions(key string) ([]*s3.ObjectIdentifier, error) {
+	inp := &s3.ListObjectVersionsInput{
+		Bucket: folder.bucket,
+		Prefix: aws.String(folder.path + key),
+	}
+
+	out, err := folder.s3API.ListObjectVersions(inp)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]*s3.ObjectIdentifier, 0)
+	for _, version := range out.Versions {
+		list = append(list, &s3.ObjectIdentifier{Key: version.Key, VersionId: version.VersionId})
+	}
+
+	return list, nil
+}
+
+func (folder *Folder) isVersioningEnabled() bool {
+	result, err := folder.s3API.GetBucketVersioning(&s3.GetBucketVersioningInput{
+		Bucket: folder.bucket,
+	})
+	if err != nil {
+		return false
+	}
+
+	if result.Status != nil && *result.Status == s3.BucketVersioningStatusEnabled {
+		return true
+	}
+	return false
 }
 
 func (folder *Folder) Validate() error {
@@ -227,9 +261,13 @@ func (folder *Folder) Validate() error {
 	return nil
 }
 
-func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
-	objects := make([]*s3.ObjectIdentifier, len(keys))
+func (folder *Folder) partitionToObjects(keys []string, versioningEnabled bool) []*s3.ObjectIdentifier {
+	objects := make([]*s3.ObjectIdentifier, 0, len(keys))
 	for id, key := range keys {
+		if versioningEnabled{
+			objects = append(objects, folder.getObjectVersions(folder.path + key))
+		}
+		objects = append(objects, folder.getObjectVersions(folder.path + key))
 		objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.path + key)}
 	}
 	return objects
@@ -243,3 +281,5 @@ func isAwsNotExist(err error) bool {
 	}
 	return false
 }
+
+786883 786975 787102 787488 787691 787966 787968 788004 788371 788543 788946 789316 789731 790086 790088 790145 790629 790955 791333 791839 792201 792203 792263 792670 793025 793255 793408 793606 793715 794062 794305 794552
