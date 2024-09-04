@@ -11,7 +11,7 @@ import (
 
 type RestoreService struct {
 	Context       context.Context
-	Folder        *archive.FolderInfo
+	Folder        *archive.AofFolderInfo
 	Uploader      internal.Uploader
 	versionParser *archive.VersionParser
 }
@@ -24,8 +24,8 @@ type RestoreArgs struct {
 	SkipBackupDownload bool
 }
 
-func CreateRestoreService(ctx context.Context, folder *archive.FolderInfo, uploader internal.Uploader, versionParser *archive.VersionParser,
-) (*RestoreService, error) {
+func CreateRestoreService(ctx context.Context, folder *archive.AofFolderInfo, uploader internal.Uploader,
+	versionParser *archive.VersionParser) (*RestoreService, error) {
 	return &RestoreService{
 		Context:       ctx,
 		Folder:        folder,
@@ -58,7 +58,7 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 	}
 
 	if !args.SkipBackupDownload {
-		err = restoreService.Folder.CleanParent()
+		err = restoreService.Folder.CleanData()
 		if err != nil {
 			return err
 		}
