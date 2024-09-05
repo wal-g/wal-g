@@ -11,7 +11,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
-	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -49,9 +48,7 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
-		dataPath, _ := conf.GetSetting(conf.RedisDataPath)
-		dataDir := archive.CreateFolderInfo(dataPath)
-		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd, dataDir)
+		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

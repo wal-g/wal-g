@@ -19,7 +19,7 @@ func HandleAofFetchPush(
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)
-	folder := archive.CreateFolderInfo(aofPath)
+	folder := archive.CreateAofFolderInfo(aofPath)
 
 	uploader, err := internal.ConfigureUploader()
 	if err != nil {
