@@ -25,7 +25,8 @@ RUN apt-get update && \
         mysql-client \
         s3cmd \
         jq \
-        lsb-release && \
+        lsb-release \
+        gnupg2 && \
     wget https://repo.percona.com/apt/percona-release_latest.focal_all.deb && \
     dpkg -i percona-release_latest.focal_all.deb && \
     percona-release enable tools release && \
