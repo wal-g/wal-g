@@ -133,7 +133,9 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 	}
 	valid := pageHeader.isValid()
 	if !valid {
+		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
 		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
+		return true, nil
 	}
 
 	// We only calculate the checksum for properly-initialized pages
@@ -201,20 +203,25 @@ func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader)
 // verifyPageBlocks verifies provided page blocks from the pagedBlocks reader
 func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 	blockNumbers []uint32) (corruptBlockNumbers []uint32, err error) {
-	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored || !isPagedFile(fileInfo, path) {
+	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored || !isChecksumValidatableFile(fileInfo, path) {
 		_, err = io.Copy(io.Discard, pageBlocks)
 		return nil, err
 	}
 	for _, blockNo := range blockNumbers {
 		corrupted, err := verifySinglePage(path, blockNo, pageBlocks)
+		if corrupted {
+			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
+		}
 		if err == io.EOF {
+			break
+		}
+		if err == io.ErrUnexpectedEOF {
+			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
+			tracelog.WarningLogger.Printf("verifyPageBlocks: %s invalid file size %d\n", path, fileInfo.Size())
 			break
 		}
 		if err != nil {
 			return nil, err
-		}
-		if corrupted {
-			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
 		}
 	}
 	// check if some extra delta blocks left in increment

@@ -98,6 +98,16 @@ func isPagedFile(info os.FileInfo, filePath string) bool {
 		pagedFilenameRegexp.MatchString(path.Base(filePath))
 }
 
+// isChecksumValidatableFile checks if the file meets the expectations for checksum validation.
+func isChecksumValidatableFile(info os.FileInfo, filePath string) bool {
+	// For details on which file is paged see
+	//nolint:lll    // https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
+	return !info.IsDir() &&
+		(strings.Contains(filePath, DefaultTablespace) || strings.Contains(filePath, NonDefaultTablespace)) &&
+		info.Size() > 0 &&
+		pagedFilenameRegexp.MatchString(path.Base(filePath))
+}
+
 func ReadIncrementalFile(filePath string,
 	fileSize int64,
 	lsn LSN,

@@ -172,7 +172,16 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 }
 
 func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {
-	if !isPagedFile(fileInfo, path) {
+	if !isChecksumValidatableFile(fileInfo, path) {
+		tracelog.DebugLogger.Printf("verifyFile: %s does not meet the criteria for checksum validation. File will be copied without checksum verification.\n", path)
+		_, err := io.Copy(io.Discard, fileReader)
+		return nil, err
+	}
+
+	// if files don’t meet the size standard. The standard is that the file size divided by the block size should be an integer
+	// then skip the block check and copy the file directly with a warning message
+	if fileInfo.Size()%DatabasePageSize != 0 {
+		tracelog.WarningLogger.Printf("verifyFile: %s invalid file size %d. File copied without validation. The file may be corrupted.\n", path, fileInfo.Size())
 		_, err := io.Copy(io.Discard, fileReader)
 		return nil, err
 	}

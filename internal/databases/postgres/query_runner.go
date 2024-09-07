@@ -599,3 +599,18 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {
 
 	return tables, nil
 }
+
+// GetDataChecksums checks if data checksums are enabled
+func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var dataChecksums string
+	conn := queryRunner.Connection
+	err := conn.QueryRow("SHOW data_checksums").Scan(&dataChecksums)
+	if err != nil {
+		return "", errors.Wrap(err, "GetDataChecksums: failed to check data_checksums")
+	}
+
+	return dataChecksums, nil
+}
