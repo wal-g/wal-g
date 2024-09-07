@@ -1,4 +1,4 @@
-package internal
+package internal_test
 
 import (
 	"bytes"
@@ -11,11 +11,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/testtools"
 )
 
 func TestHandleDefaultBackupList(t *testing.T) {
@@ -27,18 +29,29 @@ func TestHandleDefaultBackupList(t *testing.T) {
 	t.Run("print correct backups in correct order", func(t *testing.T) {
 		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
 		curTime = time.Unix(1690000000, 0)
+		metaMap := make(map[string]internal.GenericMetadata, 3)
+
 		_ = folder.PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		metaMap["base_111"] = internal.GenericMetadata{StartTime: curTime}
 		curTime = curTime.Add(time.Second)
+
 		_ = folder.PutObject("base_222_backup_stop_sentinel.json", &bytes.Buffer{})
+		metaMap["base_222"] = internal.GenericMetadata{StartTime: curTime}
 		curTime = curTime.Add(time.Second)
+
 		_ = folder.PutObject("base_333_backup_stop_sentinel.json", &bytes.Buffer{})
+		metaMap["base_333"] = internal.GenericMetadata{StartTime: curTime}
+
+		metaFetcher := testtools.MockGenericMetaFetcher{
+			MockMeta: metaMap,
+		}
 
 		rescueStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDefaultBackupList(folder, true, true)
+		internal.HandleDefaultBackupList(folder, &metaFetcher, true, true)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -74,6 +87,8 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		collectorMock.EXPECT().AllAliveStorages().Return([]string{"storage_1", "storage_2"}, nil)
 		collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
+		var metaFetcher testtools.MockGenericMetaFetcher
+
 		memStorages := map[string]storage.Folder{
 			"storage_1": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
 			"storage_2": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
@@ -92,7 +107,7 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDefaultBackupList(multiFolder, true, true)
+		internal.HandleDefaultBackupList(multiFolder, &metaFetcher, true, true)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -128,7 +143,7 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDefaultBackupList(folder, true, false)
+		internal.HandleDefaultBackupList(folder, nil, true, false)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
