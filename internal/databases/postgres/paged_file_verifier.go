@@ -192,7 +192,7 @@ func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Re
 // VerifyPagedFileBase verifies pages of a standard paged file
 func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader) ([]uint32, error) {
 	size := fileInfo.Size()
-	filePageCount := uint32(size / DatabasePageSize)
+	filePageCount := uint32((size + DatabasePageSize - 1) / DatabasePageSize)
 	blockNumbers := make([]uint32, 0, filePageCount)
 	for i := uint32(0); i < filePageCount; i++ {
 		blockNumbers = append(blockNumbers, i)
