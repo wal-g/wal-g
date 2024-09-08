@@ -665,12 +665,16 @@ func (bh *BackupHandler) checkDataChecksums() error {
 		}
 
 		if dataChecksums != "on" {
-			tracelog.WarningLogger.Println("data_checksum is disabled in the database. Skipping checksum validation, which may result in undetected data corruption.")
+			tracelog.WarningLogger.Println(
+				"data_checksum is disabled in the database. " +
+					"Skipping checksum validation, which may result in undetected data corruption.")
 		} else {
 			tracelog.InfoLogger.Println("data_checksums is enabled in DB.")
 		}
 	} else {
-		tracelog.DebugLogger.Println("checkDataChecksums: Checking if data_checksums is enabled in DB is skipped because the --verify parameter is not set.")
+		tracelog.DebugLogger.Println(
+			"checkDataChecksums: Checking if data_checksums is enabled in DB is skipped " +
+				"because the --verify parameter is not set.")
 	}
 	return nil
 }
