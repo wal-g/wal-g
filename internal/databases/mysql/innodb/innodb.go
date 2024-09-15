@@ -16,7 +16,7 @@ type PageType uint16
 
 type SpaceID uint32
 
-const SPACE_ID_UNKNOWN SpaceID = math.MaxUint32
+const SpaceIDUnknown SpaceID = math.MaxUint32
 
 // Each page within a space is assigned a 32-bit integer page number, often called “offset”,
 // which is actually just the page’s offset from the beginning of the space

@@ -22,7 +22,7 @@ func TestMetadataParser(t *testing.T) {
 			expected: diffMetadata{
 				pageSize:   16 * 1024,
 				zipSize:    0,
-				spaceId:    8,
+				spaceID:    8,
 				spaceFlags: 33,
 			},
 		},
@@ -37,7 +37,7 @@ func TestMetadataParser(t *testing.T) {
 			expected: diffMetadata{
 				pageSize:   16 * 1024,
 				zipSize:    0,
-				spaceId:    4294967278,
+				spaceID:    4294967278,
 				spaceFlags: 0,
 			},
 		},

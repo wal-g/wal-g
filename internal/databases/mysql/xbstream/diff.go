@@ -24,7 +24,7 @@ import (
 type diffMetadata struct {
 	pageSize   uint16
 	zipSize    uint64
-	spaceId    innodb.SpaceID
+	spaceID    innodb.SpaceID
 	spaceFlags uint32
 }
 
@@ -36,7 +36,7 @@ func parseDiffMetadata(rows string) (diffMetadata, error) {
 		}
 		pair := strings.SplitN(row, "=", 2)
 		if len(pair) != 2 {
-			return diffMetadata{}, fmt.Errorf("Invalid metadata format: cannot parse row '%v'", row)
+			return diffMetadata{}, fmt.Errorf("invalid metadata format: cannot parse row '%v'", row)
 		}
 		key := strings.TrimSpace(pair[0])
 		value := strings.TrimSpace(pair[1])
@@ -58,11 +58,11 @@ func parseDiffMetadata(rows string) (diffMetadata, error) {
 			}
 			result.zipSize = size
 		case "space_id":
-			spaceId, err := strconv.ParseUint(value, 10, 32)
+			spaceID, err := strconv.ParseUint(value, 10, 32)
 			if err != nil {
 				return diffMetadata{}, err
 			}
-			result.spaceId = innodb.SpaceID(spaceId)
+			result.spaceID = innodb.SpaceID(spaceID)
 		case "space_flags":
 			spaceFlags, err := strconv.ParseUint(value, 10, 32)
 			if err != nil {
@@ -72,7 +72,6 @@ func parseDiffMetadata(rows string) (diffMetadata, error) {
 		default:
 			tracelog.WarningLogger.Printf("Unknown metadata key observerd: %v = %v", key, value)
 		}
-
 	}
 
 	return result, nil
