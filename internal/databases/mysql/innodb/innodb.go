@@ -1,6 +1,9 @@
 package innodb
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"math"
+)
 
 const (
 	// minimal possible compressed page size
@@ -12,6 +15,8 @@ const (
 type PageType uint16
 
 type SpaceID uint32
+
+const SPACE_ID_UNKNOWN SpaceID = math.MaxUint32
 
 // Each page within a space is assigned a 32-bit integer page number, often called “offset”,
 // which is actually just the page’s offset from the beginning of the space
@@ -47,17 +52,17 @@ const (
 	PageTypeZSDIBlob             PageType = 19 // Compressed SDI BLOB page
 	PageTypeDoubleWrite          PageType = 20 // Legacy doublewrite buffer page
 	PageTypeRollbackSegmentArray PageType = 21
-	PageTypeLOBIndex             PageType = 22
-	PageTypeLOBData              PageType = 23
+	PageTypeLOBIndex             PageType = 22 // Index for Large Objects (e.g. JSON)
+	PageTypeLOBData              PageType = 23 // LOB - Large Object (e.g. JSON, TEXT, BLOB)
 	PageTypeLOBFirstPage         PageType = 24
 	PageTypeZLOBFirstPage        PageType = 25
 	PageTypeZLOBData             PageType = 26
 	PageTypeZLOBIndex            PageType = 27
 	PageTypeZLOBFragment         PageType = 28
 	PageTypeZLOBFragmentEntry    PageType = 29
-	PageTypeSDI                  PageType = 17853 // Tablespace SDI Index page
-	PageTypeRtree                PageType = 17854
-	PageTypeIndex                PageType = 17855
+	PageTypeSDI                  PageType = 17853 // Tablespace SDI (Serialized Dictionary Information) Index page
+	PageTypeRtree                PageType = 17854 // R-tree index
+	PageTypeIndex                PageType = 17855 // B+Tree index
 )
 
 // Documentation: https://dev.mysql.com/doc/internals/en/innodb-fil-header.html
@@ -101,7 +106,7 @@ func readHeader(page []byte) FILHeader {
 
 type CompressedMeta struct {
 	Version         uint8 // values 1 and 2 are supported by Innodb
-	CompressionAlgo uint8
+	CompressionAlgo uint8 // None=0, ZLIB=1, LZ4=2
 	OrigPageType    PageType
 	OrigDataSize    uint16
 	CompressedSize  uint16
