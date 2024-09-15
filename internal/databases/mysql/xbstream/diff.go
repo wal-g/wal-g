@@ -70,7 +70,7 @@ func parseDiffMetadata(rows string) (diffMetadata, error) {
 			}
 			result.spaceFlags = uint32(spaceFlags)
 		default:
-			tracelog.WarningLogger.Printf("Unknown metadata key observerd: %v = %v", key, value)
+			tracelog.WarningLogger.Printf("Unknown metadata key observed: %v = %v", key, value)
 		}
 	}
 
