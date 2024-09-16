@@ -38,7 +38,7 @@ func parseDiffMetadata(rows []byte) (diffMetadata, error) {
 		return diffMetadata{}, err
 	}
 
-	if uint32(result.PageSize) > 64*1024 {
+	if result.PageSize > 64*1024 {
 		tracelog.ErrorLogger.Fatalf("page_size in diff is greater than supported. page_size = %v", result.PageSize)
 	}
 	return result, nil
