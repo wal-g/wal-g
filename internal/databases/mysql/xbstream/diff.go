@@ -1,11 +1,9 @@
 package xbstream
 
 import (
-	"fmt"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
-	"strconv"
-	"strings"
+	"gopkg.in/ini.v1"
 )
 
 // data format for IBD file:
@@ -22,57 +20,26 @@ import (
 //	space_id = 4294967279  // 0xffffffef, however it is not constant
 //	space_flags = 0
 type diffMetadata struct {
-	pageSize   uint16
-	zipSize    uint64
-	spaceID    innodb.SpaceID
-	spaceFlags uint32
+	PageSize   uint32         `ini:"page_size"`
+	ZipSize    uint64         `ini:"zip_size"`
+	SpaceID    innodb.SpaceID `ini:"space_id"`
+	SpaceFlags uint32         `ini:"space_flags"`
 }
 
-func parseDiffMetadata(rows string) (diffMetadata, error) {
+func parseDiffMetadata(rows []byte) (diffMetadata, error) {
 	result := diffMetadata{}
-	for _, row := range strings.Split(rows, "\n") {
-		if row == "" {
-			continue
-		}
-		pair := strings.SplitN(row, "=", 2)
-		if len(pair) != 2 {
-			return diffMetadata{}, fmt.Errorf("invalid metadata format: cannot parse row '%v'", row)
-		}
-		key := strings.TrimSpace(pair[0])
-		value := strings.TrimSpace(pair[1])
 
-		switch key {
-		case "page_size":
-			size, err := strconv.ParseUint(value, 10, 16)
-			if err != nil {
-				return diffMetadata{}, err
-			}
-			if size > 64*1024 {
-				tracelog.ErrorLogger.Fatalf("page_size in diff is greater than supported. page_size = %v", size)
-			}
-			result.pageSize = uint16(size)
-		case "zip_size":
-			size, err := strconv.ParseUint(value, 10, 64)
-			if err != nil {
-				return diffMetadata{}, err
-			}
-			result.zipSize = size
-		case "space_id":
-			spaceID, err := strconv.ParseUint(value, 10, 32)
-			if err != nil {
-				return diffMetadata{}, err
-			}
-			result.spaceID = innodb.SpaceID(spaceID)
-		case "space_flags":
-			spaceFlags, err := strconv.ParseUint(value, 10, 32)
-			if err != nil {
-				return diffMetadata{}, err
-			}
-			result.spaceFlags = uint32(spaceFlags)
-		default:
-			tracelog.WarningLogger.Printf("Unknown metadata key observed: %v = %v", key, value)
-		}
+	cfg, err := ini.Load(rows)
+	if err != nil {
+		return diffMetadata{}, err
+	}
+	err = cfg.MapTo(&result)
+	if err != nil {
+		return diffMetadata{}, err
 	}
 
+	if uint32(result.PageSize) > 64*1024 {
+		tracelog.ErrorLogger.Fatalf("page_size in diff is greater than supported. page_size = %v", result.PageSize)
+	}
 	return result, nil
 }
