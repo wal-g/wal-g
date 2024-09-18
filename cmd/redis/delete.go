@@ -31,7 +31,7 @@ var backupDeleteCmd = &cobra.Command{
 		backupName := args[0]
 
 		storage, err := internal.ConfigureStorage()
-
+		tracelog.ErrorLogger.FatalOnError(err)
 		err = redis.HandleBackupDelete(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), backupName, !confirmedBackupDelete)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
