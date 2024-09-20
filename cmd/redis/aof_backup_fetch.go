@@ -36,10 +36,16 @@ var aofBackupFetchCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
+		uploader, err := internal.ConfigureUploader()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		sourceStorageFolder := uploader.Folder()
+		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
+
 		backupName := args[0]
 		redisVersion := args[1]
 
-		err := redis.HandleAofFetchPush(ctx, backupName, redisVersion, skipBackupDownloadFlag, skipCheckFlag)
+		err = redis.HandleAofFetchPush(ctx, sourceStorageFolder, uploader, backupName, redisVersion, skipBackupDownloadFlag, skipCheckFlag)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

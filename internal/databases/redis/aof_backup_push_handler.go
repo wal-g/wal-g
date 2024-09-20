@@ -9,20 +9,13 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/redis/aof"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/internal/diskwatcher"
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/viper"
 )
 
-func HandleAOFBackupPush(ctx context.Context, permanent bool, appName string) error {
+func HandleAOFBackupPush(ctx context.Context, permanent bool, uploader internal.Uploader) error {
 	backupName := aof.GenerateNewBackupName()
 
-	uploader, err := internal.ConfigureUploader()
-	if err != nil {
-		return err
-	}
-
-	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)

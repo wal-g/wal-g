@@ -12,12 +12,12 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const aofBackupPushCommandName = "aof-backup-push"
+var tag string
 
-var aofBackupPushCmd = &cobra.Command{
-	Use:   aofBackupPushCommandName,
-	Short: "Creates redis aof backup and pushes it to storage without local disk",
-	Args:  cobra.NoArgs,
+var backupInfoCmd = &cobra.Command{
+	Use:   "backup-info",
+	Short: "Prints redis backup info",
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
@@ -25,17 +25,15 @@ var aofBackupPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		uploader, err := internal.ConfigureUploader()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
-
-		err = redis.HandleAOFBackupPush(ctx, permanent, uploader)
-		tracelog.ErrorLogger.FatalOnError(err)
+		backupName := args[0]
+		redis.HandleBackupInfo(storage.RootFolder(), backupName, os.Stdout, tag)
 	},
 }
 
 func init() {
-	aofBackupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
-	cmd.AddCommand(aofBackupPushCmd)
+	backupInfoCmd.PersistentFlags().StringVar(&tag, "tag", "", "print specified field value only")
+	cmd.AddCommand(backupInfoCmd)
 }

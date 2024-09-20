@@ -16,6 +16,8 @@ expected_output=$(redis-cli get key)
 mkdir $WALG_FILE_PREFIX
 wal-g rdb-backup-push
 
+ensure rdb $(wal-g backup-info --tag BackupType LATEST)
+
 test_cleanup; sleep $REDIS_TIMEOUT
 
 wal-g rdb-backup-fetch LATEST
@@ -35,6 +37,7 @@ expected_output=$(redis-cli get key)
 
 mkdir $WALG_FILE_PREFIX
 wal-g backup-push
+wal-g backup-info LATEST
 
 test_cleanup; sleep $REDIS_TIMEOUT
 
