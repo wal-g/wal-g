@@ -11,12 +11,17 @@ test_cleanup() {
 }
 
 ensure() {
-    expected_output=$1
-    actual_output=$(redis-cli get key)
-    if [ "$actual_output" != "$expected_output" ]; then
+    _expected_output=$1
+    if [ $# -eq 2 ]; then
+        _actual_output=$2
+    else
+        _actual_output=$(redis-cli get key)
+    fi
+
+    if [ "$_actual_output" != "$_expected_output" ]; then
         echo "Error: actual output doesn't match expected output"
-        echo "Expected output: $expected_output"
-        echo "Actual output: $actual_output"
+        echo "Expected output: $_expected_output"
+        echo "Actual output: $_actual_output"
         exit 1
     fi
 }

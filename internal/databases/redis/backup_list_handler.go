@@ -33,25 +33,11 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]archive.Backup, error) {
 	backupsDetails := make([]archive.Backup, 0, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		details, err := GetBackupDetails(folder, backups[i])
+		details, err := archive.SentinelWithoutExistenceCheck(folder, backups[i].BackupName)
 		if err != nil {
 			return nil, err
 		}
 		backupsDetails = append(backupsDetails, details)
 	}
 	return backupsDetails, nil
-}
-
-func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (archive.Backup, error) {
-	backup, err := internal.NewBackup(folder, backupTime.BackupName)
-	if err != nil {
-		return archive.Backup{}, err
-	}
-
-	metaData := archive.Backup{}
-	err = backup.FetchSentinel(&metaData)
-	if err != nil {
-		return archive.Backup{}, err
-	}
-	return metaData, nil
 }

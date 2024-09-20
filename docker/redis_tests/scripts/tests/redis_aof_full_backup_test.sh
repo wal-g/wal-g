@@ -16,6 +16,8 @@ expected_output=$(redis-cli get key)
 mkdir $WALG_FILE_PREFIX
 wal-g aof-backup-push
 
+ensure aof $(wal-g backup-info --tag BackupType LATEST)
+
 test_cleanup; sleep $REDIS_TIMEOUT
 
 wal-g aof-backup-fetch LATEST 7.2.5

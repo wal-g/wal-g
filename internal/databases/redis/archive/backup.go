@@ -109,6 +109,13 @@ func (b Backup) PrintableFields() []printlist.TableField {
 	}
 }
 
+func (b Backup) ToInternal(folder storage.Folder) internal.Backup {
+	return internal.Backup{
+		Folder: folder.GetSubFolder(utility.BaseBackupPath),
+		Name:   b.BackupName,
+	}
+}
+
 func marshalUserData(userData interface{}) string {
 	rawUserData, err := json.Marshal(userData)
 	if err != nil {
@@ -204,4 +211,36 @@ func (m *RedisMetaConstructor) Finalize(backupName string) error {
 func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, permanent bool, backupType string,
 	versionParser *VersionParser) internal.MetaConstructor {
 	return &RedisMetaConstructor{ctx: ctx, folder: folder, permanent: permanent, backupType: backupType, versionParser: versionParser}
+}
+
+func SentinelWithExistenceCheck(folder storage.Folder, backupName string) (Backup, error) {
+	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	if err != nil {
+		return Backup{}, err
+	}
+
+	return fetchSentinel(backup, backupName)
+}
+
+func SentinelWithoutExistenceCheck(folder storage.Folder, backupName string) (Backup, error) {
+	backup, err := internal.NewBackup(folder, backupName)
+	if err != nil {
+		return Backup{}, err
+	}
+
+	return fetchSentinel(backup, backupName)
+}
+
+func fetchSentinel(backup internal.Backup, backupName string) (Backup, error) {
+	var sentinel Backup
+	if err := backup.FetchSentinel(&sentinel); err != nil {
+		return Backup{}, err
+	}
+	if sentinel.BackupName == "" {
+		sentinel.BackupName = backupName
+	}
+	if sentinel.BackupType == "" {
+		sentinel.BackupType = RDBBackupType
+	}
+	return sentinel, nil
 }
