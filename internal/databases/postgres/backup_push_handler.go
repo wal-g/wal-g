@@ -668,6 +668,9 @@ func (bh *BackupHandler) checkDataChecksums() error {
 			tracelog.WarningLogger.Println(
 				"data_checksum is disabled in the database. " +
 					"Skipping checksum validation, which may result in undetected data corruption.")
+
+			// Set verifyPageChecksums to false if dataChecksums is not enable on DB
+			bh.Arguments.verifyPageChecksums = false
 		} else {
 			tracelog.InfoLogger.Println("data_checksums is enabled in DB.")
 		}
