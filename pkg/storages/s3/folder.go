@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -135,7 +136,8 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				continue
 			}
 			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
+
+			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size)) //TODO add here listing versions
 		}
 	}
 
@@ -198,7 +200,7 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	parts := partitionStrings(objectRelativePaths, 1000)
-	needsVersioning := folder.isVersioningEnabled()
+	needsVersioning := folder.isVersioningEnabled() //TODO add manyal deletion
 
 	for _, part := range parts {
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
@@ -225,6 +227,10 @@ func (folder *Folder) getObjectVersions(key string) ([]*s3.ObjectIdentifier, err
 	list := make([]*s3.ObjectIdentifier, 0)
 	for _, version := range out.Versions {
 		list = append(list, &s3.ObjectIdentifier{Key: version.Key, VersionId: version.VersionId})
+	}
+
+	for _, deleteMarker := range out.DeleteMarkers {
+		list = append(list, &s3.ObjectIdentifier{Key: deleteMarker.Key, VersionId: deleteMarker.VersionId})
 	}
 
 	return list, nil
@@ -263,12 +269,18 @@ func (folder *Folder) Validate() error {
 
 func (folder *Folder) partitionToObjects(keys []string, versioningEnabled bool) []*s3.ObjectIdentifier {
 	objects := make([]*s3.ObjectIdentifier, 0, len(keys))
-	for id, key := range keys {
-		if versioningEnabled{
-			objects = append(objects, folder.getObjectVersions(folder.path + key))
+	for _, key := range keys {
+		if versioningEnabled {
+			versions, err := folder.getObjectVersions(key)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("failed to list versions: %v", err)
+				//TODO to error or not to error
+			}
+			objects = append(objects, versions...)
+		} else {
+			objects = append(objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + key)})
 		}
-		objects = append(objects, folder.getObjectVersions(folder.path + key))
-		objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.path + key)}
+		//objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.path + key)}
 	}
 	return objects
 }
@@ -281,5 +293,3 @@ func isAwsNotExist(err error) bool {
 	}
 	return false
 }
-
-786883 786975 787102 787488 787691 787966 787968 788004 788371 788543 788946 789316 789731 790086 790088 790145 790629 790955 791333 791839 792201 792203 792263 792670 793025 793255 793408 793606 793715 794062 794305 794552
