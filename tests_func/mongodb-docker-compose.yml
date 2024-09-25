@@ -24,6 +24,8 @@ services:
                 - MONGO_VERSION=${MONGO_VERSION}
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
                 - MONGO_REPO=${MONGO_REPO}
+        depends_on:
+          - minio01
         container_name: mongodb01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
@@ -46,6 +48,8 @@ services:
                 - MONGO_VERSION=${MONGO_VERSION}
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
                 - MONGO_REPO=${MONGO_REPO}
+        depends_on:
+          - minio01
         container_name: mongodb02.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
         external_links:
