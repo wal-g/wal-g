@@ -526,7 +526,7 @@ func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQue
 func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
-		return fmt.Sprintf("SELECT pg_class.relfilenode, pg_class.relname, pg_namespace.nspname FROM pg_class "+
+		return fmt.Sprintf("SELECT pg_class.relfilenode, pg_class.oid, pg_class.relname, pg_namespace.nspname FROM pg_class "+
 			"JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid WHERE pg_class.oid >= %d", systemIDLimit), nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
@@ -566,7 +566,7 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 	return pid, nil
 }
 
-func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {
+func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) { //TODO reformat tables
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
@@ -582,15 +582,16 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {
 	}
 	defer rows.Close()
 
-	tables := make(map[string]uint32)
+	tables := make(map[string]TableInfo)
 	for rows.Next() {
 		var relFileNode uint32
+		var oid uint32
 		var tableName string
 		var namespaceName string
-		if err := rows.Scan(&relFileNode, &tableName, &namespaceName); err != nil {
+		if err := rows.Scan(&relFileNode, &oid, &tableName, &namespaceName); err != nil {
 			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
 		}
-		tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = relFileNode
+		tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode}
 	}
 
 	if rows.Err() != nil {

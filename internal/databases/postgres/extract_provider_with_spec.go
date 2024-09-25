@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"fmt"
 	"path"
 	"strconv"
 	"strings"
@@ -15,29 +16,31 @@ const (
 	systemIDLimit     = 16384
 )
 
-type RestoreDesc map[uint32]map[uint32]bool
+type RestoreDesc map[uint32]map[uint32]uint32
 
-func (desc RestoreDesc) Add(database, table uint32) {
+func (desc RestoreDesc) Add(database, filenode, oid uint32) {
 	if _, ok := desc[database]; !ok {
-		desc[database] = make(map[uint32]bool)
+		desc[database] = make(map[uint32]uint32)
 	}
-	desc[database][table] = true
+	desc[database][filenode] = oid
 }
 
 func (desc RestoreDesc) IsFull(database uint32) bool {
 	if _, ok := desc[database]; ok {
-		return desc[database][0]
+		_, ok1 := desc[database][0]
+		return ok1
 	}
 	return false
 }
 
 func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
-	if database < systemIDLimit || desc.IsFull(database) {
+	if database < systemIDLimit || desc.IsFull(database) { //TODO not db, but check table oid (now we check relfilenode)
 		return false
 	}
+	//SELECT tablename, partitiontablename FROM pg_partitions WHERE tablename='t3';
 	if _, ok := desc[database]; ok {
-		_, found := desc[database][table]
-		return table >= systemIDLimit && !found
+		oid, found := desc[database][table]
+		return oid >= systemIDLimit && !found
 	}
 	return true
 }
@@ -88,7 +91,11 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 			return nil, err
 		}
 
-		restoredDatabases.Add(dbID, tableID)
+		if tableID == 0 {
+			restoredDatabases.Add(dbID, tableID, 0)
+		} else {
+			restoredDatabases.Add(dbID, tableID, names[fmt.Sprintf("%d", dbID)].Tables[fmt.Sprintf("%d", tableID)].Oid)
+		}
 	}
 
 	return restoredDatabases, nil
@@ -106,8 +113,12 @@ func (m RegexpRestoreDescMaker) Make(restoreParameters []string, names Databases
 		}
 
 		for db, tables := range oids {
-			for _, oid := range tables {
-				restoredDatabases.Add(db, oid)
+			for _, reloid := range tables {
+				if reloid == 0 {
+					restoredDatabases.Add(db, reloid, 0)
+				} else {
+					restoredDatabases.Add(db, reloid, names[fmt.Sprintf("%d", db)].Tables[fmt.Sprintf("%d", reloid)].Oid)
+				}
 			}
 		}
 	}

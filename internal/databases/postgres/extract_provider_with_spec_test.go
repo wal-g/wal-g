@@ -72,36 +72,36 @@ func TestTryGetOidPair_BaseRoot(t *testing.T) {
 
 func TestRestoreDesc_OrdinarySkip(t *testing.T) {
 	restoreDesc := make(postgres.RestoreDesc)
-	restoreDesc.Add(20000, 30000)
+	restoreDesc.Add(20000, 30000, 1)
 	assert.Equal(t, true, restoreDesc.IsSkipped(20000, 40000))
 }
 
 func TestRestoreDesc_NotSpecifiedDatabaseSkip(t *testing.T) {
 	restoreDesc := make(postgres.RestoreDesc)
-	restoreDesc.Add(20000, 30000)
+	restoreDesc.Add(20000, 30000, 1)
 	assert.Equal(t, true, restoreDesc.IsSkipped(30000, 10000))
 }
 
 func TestRestoreDesc_NoTableSkip(t *testing.T) {
 	restoreDesc := make(postgres.RestoreDesc)
-	restoreDesc.Add(20000, 30000)
+	restoreDesc.Add(20000, 30000, 1)
 	assert.Equal(t, false, restoreDesc.IsSkipped(20000, 30000))
 }
 
 func TestRestoreDesc_NoSystemSkip(t *testing.T) {
 	restoreDesc := make(postgres.RestoreDesc)
-	restoreDesc.Add(20000, 30000)
+	restoreDesc.Add(20000, 30000, 1)
 	assert.Equal(t, false, restoreDesc.IsSkipped(20000, 10000))
 }
 
 func TestRestoreDesc_NoDatabaseSkip(t *testing.T) {
 	restoreDesc := make(postgres.RestoreDesc)
-	restoreDesc.Add(20000, 0)
+	restoreDesc.Add(20000, 0, 1)
 	assert.Equal(t, false, restoreDesc.IsSkipped(20000, 30000))
 }
 
 func TestRestoreDesc_NoSystemDatabaseSkip(t *testing.T) {
 	restoreDesc := make(postgres.RestoreDesc)
-	restoreDesc.Add(20000, 30000)
+	restoreDesc.Add(20000, 30000, 1)
 	assert.Equal(t, false, restoreDesc.IsSkipped(10000, 40000))
 }

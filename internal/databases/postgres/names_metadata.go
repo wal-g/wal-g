@@ -12,12 +12,17 @@ import (
 type DatabasesByNames map[string]DatabaseObjectsInfo
 
 type DatabaseObjectsInfo struct {
-	Oid    uint32            `json:"oid"`
-	Tables map[string]uint32 `json:"tables,omitempty"`
+	Oid    uint32               `json:"oid"`
+	Tables map[string]TableInfo `json:"tables,omitempty"`
+}
+
+type TableInfo struct {
+	Oid         uint32 `json:"oid"`
+	Relfilenode uint32 `json:"relfilenode"`
 }
 
 func NewDatabaseObjectsInfo(oid uint32) *DatabaseObjectsInfo {
-	return &DatabaseObjectsInfo{Oid: oid, Tables: make(map[string]uint32)}
+	return &DatabaseObjectsInfo{Oid: oid, Tables: make(map[string]TableInfo)}
 }
 
 func (meta DatabasesByNames) Resolve(key string) (uint32, uint32, error) {
@@ -29,8 +34,8 @@ func (meta DatabasesByNames) Resolve(key string) (uint32, uint32, error) {
 		if table == "" {
 			return data.Oid, 0, nil
 		}
-		if tableFile, tblFound := data.Tables[table]; tblFound {
-			return data.Oid, tableFile, nil
+		if tableInfo, tblFound := data.Tables[table]; tblFound {
+			return data.Oid, tableInfo.Relfilenode, nil
 		}
 		return 0, 0, newMetaTableNameError(database, table)
 	}
@@ -56,9 +61,9 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 				toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], 0)
 				continue
 			}
-			for name, oid := range dbInfo.Tables {
+			for name, tableInfo := range dbInfo.Tables {
 				if tableRegexp.MatchString(name) {
-					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], oid)
+					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], tableInfo.Relfilenode)
 				}
 			}
 		}
