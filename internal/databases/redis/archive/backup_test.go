@@ -78,6 +78,18 @@ func TestBackup_PrintableFields(t *testing.T) {
 			Value:       "4.5.4",
 			PrettyValue: nil,
 		},
+		{
+			Name:        "used_memory",
+			PrettyName:  "Used memory (limited by maxmemory)",
+			Value:       "0",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "used_memory_rss",
+			PrettyName:  "Used memory (as seen by OS))",
+			Value:       "0",
+			PrettyValue: nil,
+		},
 	}
 	assert.Equal(t, want, got)
 }

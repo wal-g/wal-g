@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
+	client "github.com/wal-g/wal-g/internal/databases/redis/client"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -29,6 +30,8 @@ type Backup struct {
 	BackupSize      int64       `json:"BackupSize,omitempty"`
 	BackupType      string      `json:"BackupType,omitempty"`
 	Version         string      `json:"Version,omitempty"`
+	UsedMemory      int64       `json:"UsedMemory,omitempty"`
+	UsedMemoryRss   int64       `json:"UsedMemoryRss,omitempty"`
 }
 
 func (b Backup) Name() string {
@@ -106,6 +109,16 @@ func (b Backup) PrintableFields() []printlist.TableField {
 			PrettyName: "Backup version",
 			Value:      b.Version,
 		},
+		{
+			Name:       "used_memory",
+			PrettyName: "Used memory (limited by maxmemory)",
+			Value:      strconv.FormatInt(b.UsedMemory, 10),
+		},
+		{
+			Name:       "used_memory_rss",
+			PrettyName: "Used memory (as seen by OS))",
+			Value:      strconv.FormatInt(b.UsedMemoryRss, 10),
+		},
 	}
 }
 
@@ -159,15 +172,18 @@ type BackupMeta struct {
 	FinishTime     time.Time
 	BackupType     string
 	Version        string
+	UsedMemory     int64
+	UsedMemoryRss  int64
 }
 
 type RedisMetaConstructor struct {
-	ctx           context.Context
-	folder        storage.Folder
-	meta          BackupMeta
-	permanent     bool
-	backupType    string
-	versionParser *VersionParser
+	ctx              context.Context
+	folder           storage.Folder
+	meta             BackupMeta
+	permanent        bool
+	backupType       string
+	versionParser    *VersionParser
+	memoryDataGetter client.MemoryDataGetter
 }
 
 // Init - required for internal.MetaConstructor
@@ -176,11 +192,14 @@ func (m *RedisMetaConstructor) Init() error {
 	if err != nil {
 		return err
 	}
+	memData := m.memoryDataGetter.Get()
 	m.meta = BackupMeta{
-		Permanent:  m.permanent,
-		User:       userData,
-		StartTime:  utility.TimeNowCrossPlatformLocal(),
-		BackupType: m.backupType,
+		Permanent:     m.permanent,
+		User:          userData,
+		StartTime:     utility.TimeNowCrossPlatformLocal(),
+		BackupType:    m.backupType,
+		UsedMemory:    memData.UsedMemory,
+		UsedMemoryRss: memData.UsedMemoryRss,
 	}
 	if m.versionParser != nil {
 		m.meta.Version, err = m.versionParser.Get()
@@ -200,6 +219,8 @@ func (m *RedisMetaConstructor) MetaInfo() interface{} {
 		FinishLocalTime: meta.FinishTime,
 		BackupType:      meta.BackupType,
 		Version:         meta.Version,
+		UsedMemory:      meta.UsedMemory,
+		UsedMemoryRss:   meta.UsedMemoryRss,
 	}
 }
 
@@ -209,8 +230,14 @@ func (m *RedisMetaConstructor) Finalize(backupName string) error {
 }
 
 func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, permanent bool, backupType string,
-	versionParser *VersionParser) internal.MetaConstructor {
-	return &RedisMetaConstructor{ctx: ctx, folder: folder, permanent: permanent, backupType: backupType, versionParser: versionParser}
+	versionParser *VersionParser, memoryDataGetter client.MemoryDataGetter) internal.MetaConstructor {
+	return &RedisMetaConstructor{
+		ctx: ctx, folder: folder,
+		permanent:        permanent,
+		backupType:       backupType,
+		versionParser:    versionParser,
+		memoryDataGetter: memoryDataGetter,
+	}
 }
 
 func SentinelWithExistenceCheck(folder storage.Folder, backupName string) (Backup, error) {

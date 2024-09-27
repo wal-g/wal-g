@@ -8,7 +8,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	client "github.com/wal-g/wal-g/internal/databases/redis/client"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -30,7 +33,21 @@ var aofBackupPushCmd = &cobra.Command{
 
 		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
-		err = redis.HandleAOFBackupPush(ctx, permanent, uploader)
+		memoryDataGetter := client.NewMemoryDataGetter()
+
+		processName, _ := conf.GetSetting(conf.RedisServerProcessName)
+		versionParser := archive.NewVersionParser(processName)
+
+		metaConstructor := archive.NewBackupRedisMetaConstructor(
+			ctx,
+			uploader.Folder(),
+			permanent,
+			archive.AOFBackupType,
+			versionParser,
+			memoryDataGetter,
+		)
+
+		err = redis.HandleAOFBackupPush(ctx, permanent, uploader, metaConstructor)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
