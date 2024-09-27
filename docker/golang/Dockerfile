@@ -12,5 +12,5 @@ COPY submodules/ tmp/
 
 RUN cd tmp/brotli && \
     mkdir out && cd out && \
-    cmake -DBUILD_SHARED_LIBS=0 .. \
+    cmake -DBUILD_SHARED_LIBS=0 .. && \
     make && make install
