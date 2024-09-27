@@ -39,7 +39,7 @@ jobs:
 
       - name: Install deps
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: sudo apt-get install liblzo2-dev brotli
+        run: sudo apt-get install liblzo2-dev libbrotli-dev
 
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
