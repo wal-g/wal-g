@@ -18,7 +18,7 @@ type DatabaseObjectsInfo struct {
 
 type TableInfo struct {
 	Oid         uint32 `json:"oid"`
-	Relfilenode uint32 `json:"relfilenode"`
+	Relfilenode uint32 `json:"relfilenode"` //TODO add ierarcy
 }
 
 func NewDatabaseObjectsInfo(oid uint32) *DatabaseObjectsInfo {

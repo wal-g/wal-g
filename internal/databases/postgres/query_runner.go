@@ -523,18 +523,6 @@ func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQue
 	return function(runner, db)
 }
 
-func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
-	switch {
-	case queryRunner.Version >= 90000:
-		return fmt.Sprintf("SELECT pg_class.relfilenode, pg_class.oid, pg_class.relname, pg_namespace.nspname FROM pg_class "+
-			"JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid WHERE pg_class.oid >= %d", systemIDLimit), nil
-	case queryRunner.Version == 0:
-		return "", NewNoPostgresVersionError()
-	default:
-		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
-	}
-}
-
 func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
@@ -566,6 +554,19 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 	return pid, nil
 }
 
+func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		return "SELECT c.relfilenode, c.oid, c.relname, pg_namespace.nspname FROM pg_class " +
+			"AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid " +
+			"WHERE NOT EXISTS (SELECT 1 FROM pg_inherits AS i WHERE i.inhrelid = c.oid)", nil
+	case queryRunner.Version == 0:
+		return "", NewNoPostgresVersionError()
+	default:
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
 func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) { //TODO reformat tables
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
@@ -582,7 +583,15 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) { //
 	}
 	defer rows.Close()
 
+	// check 0 relfilenode
+
+	// check partitions
+
+	// 	SELECT c.relname FROM pg_class AS c WHERE NOT EXISTS (SELECT 1 FROM pg_inherits AS i WHERE i.inhrelid = c.oid) AND c.relkind IN ('r', 'p');
+
 	tables := make(map[string]TableInfo)
+
+	//SELECT tablename, partitiontablename FROM pg_partitions WHERE tablename='t3';
 	for rows.Next() {
 		var relFileNode uint32
 		var oid uint32

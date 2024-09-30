@@ -33,13 +33,12 @@ func (desc RestoreDesc) IsFull(database uint32) bool {
 	return false
 }
 
-func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
+func (desc RestoreDesc) IsSkipped(database, tableFile uint32) bool {
 	if database < systemIDLimit || desc.IsFull(database) { //TODO not db, but check table oid (now we check relfilenode)
 		return false
 	}
-	//SELECT tablename, partitiontablename FROM pg_partitions WHERE tablename='t3';
 	if _, ok := desc[database]; ok {
-		oid, found := desc[database][table]
+		oid, found := desc[database][tableFile] //seems wrong check
 		return oid >= systemIDLimit && !found
 	}
 	return true
@@ -47,9 +46,9 @@ func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
 
 func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 	for file := range filesToUnwrap {
-		isDB, dbID, tableID := TryGetOidPair(file)
+		isDB, dbID, tableFileID := TryGetOidPair(file)
 
-		if isDB && desc.IsSkipped(dbID, tableID) {
+		if isDB && desc.IsSkipped(dbID, tableFileID) {
 			delete(filesToUnwrap, file)
 		}
 	}
