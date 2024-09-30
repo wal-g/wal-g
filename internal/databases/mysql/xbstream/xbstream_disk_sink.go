@@ -153,6 +153,7 @@ func (sink *decompressFileSink) repairSparse() error {
 type dataSinkFactory struct {
 	output     string
 	decompress bool
+	spaceIDCollector
 }
 
 func (dsf *dataSinkFactory) MapDataSinkPath(path string) string {
@@ -200,7 +201,7 @@ func DiskSink(stream *Reader, output string, decompress bool) {
 	err := os.MkdirAll(output, 0777) // FIXME: permission & UMASK
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	factory := dataSinkFactory{output, decompress}
+	factory := dataSinkFactory{output, decompress, innodb.NewSpaceIDCollector(output)}
 
 	sinks := make(map[string]dataSink)
 	for {

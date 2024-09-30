@@ -56,8 +56,8 @@ const (
 	PageTypeZLOBFragment         PageType = 28
 	PageTypeZLOBFragmentEntry    PageType = 29
 	PageTypeSDI                  PageType = 17853 // Tablespace SDI Index page
-	PageTypeRtree                PageType = 17854
-	PageTypeIndex                PageType = 17855
+	PageTypeRtree                PageType = 17854 // R-tree index
+	PageTypeIndex                PageType = 17855 // B+Tree index
 )
 
 // Documentation: https://dev.mysql.com/doc/internals/en/innodb-fil-header.html
@@ -101,7 +101,7 @@ func readHeader(page []byte) FILHeader {
 
 type CompressedMeta struct {
 	Version         uint8 // values 1 and 2 are supported by Innodb
-	CompressionAlgo uint8
+	CompressionAlgo uint8 // None=0, ZLIB=1, LZ4=2
 	OrigPageType    PageType
 	OrigDataSize    uint16
 	CompressedSize  uint16
