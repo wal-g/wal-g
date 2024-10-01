@@ -4,18 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -89,7 +88,7 @@ type CurrBackupInfo struct {
 	startTime            time.Time
 	finishTime           time.Time
 	systemIdentifier     *uint64
-	gpVersion            semver.Version
+	gpVersion            Version
 	segmentsMetadata     map[string]PgSegmentSentinelDto
 	backupPidByContentID map[int]int
 	incrementCount       int
@@ -450,34 +449,28 @@ func (bh *BackupHandler) disconnect() {
 	}
 }
 
-func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version semver.Version, systemIdentifier *uint64, err error) {
+func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version Version, systemIdentifier *uint64, err error) {
 	queryRunner, err := NewGpQueryRunner(conn)
 	if err != nil {
-		return globalCluster, semver.Version{}, nil, err
+		return globalCluster, Version{}, nil, err
 	}
 
 	versionStr, err := queryRunner.GetGreenplumVersion()
 	if err != nil {
-		return globalCluster, semver.Version{}, nil, err
+		return globalCluster, Version{}, nil, err
 	}
 	tracelog.InfoLogger.Printf("Greenplum version: %s", versionStr)
-	versionStart := strings.Index(versionStr, "(Greenplum Database ") + len("(Greenplum Database ")
-	versionEnd := strings.Index(versionStr, ")")
-	versionStr = versionStr[versionStart:versionEnd]
-	pattern := regexp.MustCompile(`\d+\.\d+\.\d+`)
-	threeDigitVersion := pattern.FindStringSubmatch(versionStr)[0]
-	semVer, err := semver.Make(threeDigitVersion)
+	version, err = parseGreenplumVersion(versionStr)
 	if err != nil {
-		return globalCluster, semver.Version{}, nil, err
+		return globalCluster, Version{}, nil, err
 	}
-
-	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(semVer)
+	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(version.Version)
 	if err != nil {
-		return globalCluster, semver.Version{}, nil, err
+		return globalCluster, Version{}, nil, err
 	}
 	globalCluster = cluster.NewCluster(segConfigs)
 
-	return globalCluster, semVer, queryRunner.SystemIdentifier, nil
+	return globalCluster, version, queryRunner.SystemIdentifier, nil
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup

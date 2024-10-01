@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/blang/semver"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
 
@@ -87,7 +86,7 @@ type RestorePointCreator struct {
 	pointName        string
 	startTime        time.Time
 	systemIdentifier *uint64
-	gpVersion        semver.Version
+	gpVersion        Version
 
 	Uploader internal.Uploader
 	Conn     *pgx.Conn
