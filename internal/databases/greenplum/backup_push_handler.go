@@ -467,7 +467,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
-	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(version.Version)
+	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(version)
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
