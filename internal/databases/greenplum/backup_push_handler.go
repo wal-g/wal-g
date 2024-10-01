@@ -245,7 +245,8 @@ func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) 
 		StartTime:        bh.currBackupInfo.startTime,
 		FinishTime:       bh.currBackupInfo.finishTime,
 		Hostname:         hostname,
-		GpVersion:        bh.currBackupInfo.gpVersion.String(),
+		GpVersion:        bh.currBackupInfo.gpVersion.Version.String(),
+		GpFlavor:         bh.currBackupInfo.gpVersion.Flavor.String(),
 		SystemIdentifier: bh.currBackupInfo.systemIdentifier,
 		LsnBySegment:     restoreLSNs,
 	}
@@ -382,8 +383,10 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 func (bh *BackupHandler) checkPrerequisites() (err error) {
 	tracelog.InfoLogger.Println("Checking backup prerequisites")
 
-	if bh.currBackupInfo.gpVersion.Major >= 7 {
-		// GP7+ allows the non-exclusive backups
+	version := bh.currBackupInfo.gpVersion
+	if version.Flavor == Cloudberry ||
+		(version.Flavor == Greenplum && version.Major >= 7) {
+		// CB & GP7+ allows the non-exclusive backups
 		tracelog.InfoLogger.Println("Checking backup prerequisites: OK")
 		return nil
 	}
@@ -599,8 +602,10 @@ func (bh *BackupHandler) abortBackup() {
 
 func (bh *BackupHandler) terminateRunningBackups() error {
 	// Abort the non-finished exclusive backups on the segments.
-	// WAL-G in GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
-	if bh.currBackupInfo.gpVersion.Major >= 7 {
+	// WAL-G in CB&GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
+	version := bh.currBackupInfo.gpVersion
+	if version.Flavor == Cloudberry ||
+		(version.Flavor == Greenplum && version.Major >= 7) {
 		return nil
 	}
 

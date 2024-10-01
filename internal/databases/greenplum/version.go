@@ -9,6 +9,10 @@ import (
 
 type Flavor string
 
+func (f Flavor) String() string {
+	return string(f)
+}
+
 const (
 	Greenplum  Flavor = "greenplum"
 	Cloudberry Flavor = "cloudberry"
@@ -16,13 +20,13 @@ const (
 
 type Version struct {
 	semver.Version
-	flavour Flavor
+	Flavor Flavor
 }
 
-func NewVersion(version semver.Version, flavour Flavor) Version {
+func NewVersion(version semver.Version, flavor Flavor) Version {
 	return Version{
 		Version: version,
-		flavour: flavour,
+		Flavor:  flavor,
 	}
 }
 
