@@ -49,7 +49,7 @@ die_with_cb_logs() {
     for elem in "${SEGMENTS_DIRS[@]}"; do
       read -a arr <<< "$elem"
       echo "*** ${arr[1]} ***"
-      cat "${arr[1]}/log/startup.log"
+      cat "${arr[1]}/log/startup.log" || true
     done
     exit 1
 }
