@@ -369,7 +369,7 @@ func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDa
 	return nil
 }
 
-const GP_AO_RELATION_PG_CLASS_QUERY = `
+const gpAoRelationPgClassQuery = `
 SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
 FROM pg_class aoseg_c
@@ -393,7 +393,7 @@ JOIN (
 	) seg ON aoseg_c.oid = seg.segrelid;
 `
 
-const CB_AO_RELATION_PG_CLASS_QUERY = `
+const cbAoRelationPgClassQuery = `
 SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
 FROM pg_class aoseg_c
@@ -434,7 +434,7 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
 		{
 			switch {
 			case queryRunner.Version >= 90000:
-				return GP_AO_RELATION_PG_CLASS_QUERY, nil
+				return gpAoRelationPgClassQuery, nil
 			case queryRunner.Version == 0:
 				return "", postgres.NewNoPostgresVersionError()
 			default:
@@ -442,11 +442,10 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
 			}
 		}
 	case Cloudberry:
-		return CB_AO_RELATION_PG_CLASS_QUERY, nil
+		return cbAoRelationPgClassQuery, nil
 	default:
 		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.Flavor.String())
 	}
-
 }
 
 func (queryRunner *GpQueryRunner) buildAOCSMetadataQuery() (string, error) {
