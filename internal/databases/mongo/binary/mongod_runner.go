@@ -15,21 +15,29 @@ import (
 type MongodProcess struct {
 	minimalConfigPath string
 	parameters        []string
+	replsetID         string
+	isMongoCfg        bool
 	port              int
 	cancel            context.CancelFunc
 	cmd               *exec.Cmd
 }
 
 func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, "disableLogicalSessionCacheRefresh=true")
+	return StartMongo(minimalConfigPath, "", false,
+		"disableLogicalSessionCacheRefresh=true", "skipShardingConfigurationChecks=true")
 }
 
 func StartMongodWithRecoverFromOplogAsStandalone(minimalConfigPath string) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath,
+	return StartMongo(minimalConfigPath, "", false,
 		"recoverFromOplogAsStandalone=true", "takeUnstableCheckpointOnShutdown=true")
 }
 
-func StartMongo(minimalConfigPath string, parameters ...string) (*MongodProcess, error) {
+func StartMongodWithReplyOplogAsStandalone(minimalConfigPath string, replsetID string, isMongoCfg bool) (*MongodProcess, error) {
+	return StartMongo(minimalConfigPath, replsetID, isMongoCfg,
+		"disableLogicalSessionCacheRefresh=true", "takeUnstableCheckpointOnShutdown=true")
+}
+
+func StartMongo(minimalConfigPath string, replsetID string, isMongoCfg bool, parameters ...string) (*MongodProcess, error) {
 	mongodProcess := &MongodProcess{
 		minimalConfigPath: minimalConfigPath,
 		parameters:        parameters,
@@ -74,6 +82,12 @@ func (mongodProcess *MongodProcess) start() (err error) {
 	cliArgs := []string{"--port", strconv.Itoa(mongodProcess.port), "--config", mongodProcess.minimalConfigPath}
 	for _, parameter := range mongodProcess.parameters {
 		cliArgs = append(cliArgs, "--setParameter", parameter)
+	}
+	if len(mongodProcess.replsetID) != 0 {
+		cliArgs = append(cliArgs, "--replSet", mongodProcess.replsetID)
+	}
+	if mongodProcess.isMongoCfg {
+		cliArgs = append(cliArgs, "--configsvr")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
