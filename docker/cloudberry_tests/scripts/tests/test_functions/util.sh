@@ -45,12 +45,21 @@ cleanup() {
   pkill -9 wal-g || true
 }
 
+die_with_cb_logs() {
+    for elem in "${SEGMENTS_DIRS[@]}"; do
+      read -a arr <<< "$elem"
+      echo "*** ${arr[1]} ***"
+      cat "${arr[1]}/log/startup.log"
+    done
+    exit 1
+}
+
 stop_cluster() {
   /usr/local/gpdb_src/bin/gpstop -a -M fast
 }
 
 start_cluster() {
-  /usr/local/gpdb_src/bin/gpstart -a
+  /usr/local/gpdb_src/bin/gpstart -a || die_with_cb_logs
 }
 
 setup_wal_archiving() {
