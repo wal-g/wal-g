@@ -14,8 +14,6 @@ COPY Makefile Makefile
 RUN cd main/gp && \
     go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
-RUN make cloudberry_build
-
 FROM wal-g/cloudberry:latest
 
 USER root

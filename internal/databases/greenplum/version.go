@@ -49,3 +49,16 @@ func parseGreenplumVersion(version string) (Version, error) {
 
 	return NewVersion(semVer, flavor), nil
 }
+
+func (v Version) EstimatePostgreSQLVersion() int {
+	if v.Flavor == Cloudberry {
+		return 140000
+	}
+	if v.Version.Major == 7 {
+		return 120000
+	}
+	if v.Version.Major == 6 {
+		return 90400
+	}
+	return 0
+}

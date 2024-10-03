@@ -46,7 +46,7 @@ type BackupDetail struct {
 	DatetimeFormat   string    `json:"date_fmt,omitempty"`
 	Hostname         string    `json:"hostname"`
 	GpVersion        string    `json:"gp_version"`
-	GpFlavor         string    `json:"gp_flavor"`
+	GpFlavor         Flavor    `json:"gp_flavor"`
 	IsPermanent      bool      `json:"is_permanent"`
 	SystemIdentifier *uint64   `json:"system_identifier,omitempty"`
 
