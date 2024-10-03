@@ -388,7 +388,7 @@ JOIN (
 			c.reltablespace 
 		FROM pg_class c
 		JOIN pg_namespace n ON c.relnamespace = n.oid
-		WHERE relstorage IN ( 'ao', 'co' ) AND relpersistence='p'
+		WHERE relstorage IN ( 'a', 'c' ) AND relpersistence='p'
 		) aotables ON pg_ao.relid = aotables.oid
 	) seg ON aoseg_c.oid = seg.segrelid;
 `
@@ -406,7 +406,7 @@ JOIN (
             SELECT 
                 c.oid,
                 quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn,
-                CASE WHEN am.amname = 'ao_row' THEN 'ao' WHEN am.amname = 'ao_column' THEN 'co' ELSE 'unknown' END as relstorage,
+                CASE WHEN am.amname = 'ao_row' THEN 'a' WHEN am.amname = 'ao_column' THEN 'c' ELSE 'unknown' END as relstorage,
                 c.relnatts,
                 c.relfilenode,
                 c.reltablespace
