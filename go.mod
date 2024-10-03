@@ -26,7 +26,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pglogrepl v0.0.0-20210109153808-a78a685a0bff
-	github.com/jackc/pgproto3/v2 v2.3.3
+	github.com/jackc/pgproto3/v2 v2.3.2
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/minio/sio v0.2.0
