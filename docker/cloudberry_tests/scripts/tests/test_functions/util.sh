@@ -59,7 +59,7 @@ stop_cluster() {
 }
 
 start_cluster() {
-  /usr/local/gpdb_src/bin/gpstart -a || die_with_cb_logs
+  /usr/local/gpdb_src/bin/gpstart -a -t 180 || die_with_cb_logs
 }
 
 setup_wal_archiving() {

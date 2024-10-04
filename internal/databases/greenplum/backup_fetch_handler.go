@@ -216,9 +216,10 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	if pgVersion > 120000 && pathToRecoveryConf == "recovery.conf" {
 		// Starting from PostgreSQL 12.0 - the server will not start if a recovery.conf exists.
 		tracelog.ErrorLogger.Print(
-			"WALG_GP_RELATIVE_RECOVERY_CONF_PATH is ste to 'recovery.conf'. " +
+			"WALG_GP_RELATIVE_RECOVERY_CONF_PATH is set to 'recovery.conf'. " +
 				"PostgreSQL 12+ will not start in this configuration. " +
-				"Set WALG_GP_RELATIVE_RECOVERY_CONF_PATH to `conf.d/recovery.conf` and restart wal-g with `--mode prepare` to finish this recovery")
+				"Set WALG_GP_RELATIVE_RECOVERY_CONF_PATH to `conf.d/recovery.conf`, " +
+				"remove 'recovery.conf' & 'recovery.signal' and restart wal-g with `--mode prepare` to finish this recovery")
 	}
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
@@ -231,7 +232,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 			segment := fh.cluster.ByContent[contentID][0]
 			absPathToRestore := path.Join(segment.DataDir, pathToRecoveryConf)
 			absPathToPostgresqlConf := path.Join(segment.DataDir, pathToPostgresqlConf)
-			fileContents := restoreCfgMaker.Make(contentID)
+			fileContents := restoreCfgMaker.Make(contentID, pgVersion)
 			var cmds []string
 			cmds = append(cmds,
 				fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToRestore),
