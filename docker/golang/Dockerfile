@@ -1,4 +1,4 @@
-FROM golang:buster
+FROM golang:bullseye
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV TERM xterm-256color
@@ -12,5 +12,5 @@ COPY submodules/ tmp/
 
 RUN cd tmp/brotli && \
     mkdir out && cd out && \
-    ../configure-cmake --disable-debug && \
+    cmake -DBUILD_SHARED_LIBS=0 .. && \
     make && make install
