@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/blang/semver"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"

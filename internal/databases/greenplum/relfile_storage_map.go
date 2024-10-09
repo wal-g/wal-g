@@ -1,7 +1,7 @@
 package greenplum
 
 import (
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
