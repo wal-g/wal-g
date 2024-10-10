@@ -3,6 +3,7 @@ package pg
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/pgbackrest"
 )
 
@@ -12,7 +13,7 @@ var pgbackrestBackupListCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, stanza := configurePgbackrestSettings()
-		err := pgbackrest.HandleBackupList(folder, stanza, detail, pretty, json)
+		err := pgbackrest.HandleBackupList(folder, postgres.NewGenericMetaInteractor(), stanza, detail, pretty, json)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
