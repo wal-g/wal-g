@@ -21,7 +21,7 @@ type MongodProcess struct {
 }
 
 func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, "disableLogicalSessionCacheRefresh=true")
+	return StartMongo(minimalConfigPath, "disableLogicalSessionCacheRefresh=true", "skipShardingConfigurationChecks=true")
 }
 
 func StartMongodWithRecoverFromOplogAsStandalone(minimalConfigPath string) (*MongodProcess, error) {

@@ -155,6 +155,7 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig,
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
+	//todo maybe simplify
 	if err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil); err != nil {
 		return errors.Wrap(err, "unable to fix data in local.replset.election")
 	}
@@ -203,9 +204,18 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig,
 		}
 	}
 
+	configDatabase := mongodService.MongoClient.Database("config")
+
 	if !mongocfgConfig.Empty() {
-		configDatabase := mongodService.MongoClient.Database("config")
-		_, err := configDatabase.Collection("shards").DeleteMany(ctx, bson.D{})
+		_, err := configDatabase.Collection("mongos").DeleteMany(ctx, bson.D{})
+		if err != nil {
+			return errors.Wrap(err, "failed to drop config.mongos collection")
+		}
+		_, err = configDatabase.Collection("lockpings").DeleteMany(ctx, bson.D{})
+		if err != nil {
+			return errors.Wrap(err, "failed to drop config.lockpings collection")
+		}
+		_, err = configDatabase.Collection("shards").DeleteMany(ctx, bson.D{})
 		if err != nil {
 			return errors.Wrap(err, "failed to drop config.shards collection")
 		}
@@ -218,6 +228,29 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig,
 		tracelog.InfoLogger.Printf("Successfully updated config.shards collection")
 	}
 
+	colls, err := configDatabase.ListCollectionNames(ctx, bson.D{{"name", bson.M{"$regex": `^cache\.`}}})
+	if err != nil {
+		return errors.Wrap(err, "failed to list config.cache.* collections")
+	}
+	for _, coll := range colls {
+		_, err := configDatabase.Collection(coll).DeleteMany(ctx, bson.D{})
+		if err != nil {
+			return errors.Wrapf(err, "failed to drop %s collection", coll)
+		}
+	}
+
+	const retry = 5
+	for i := 0; i < retry; i++ {
+		_, err = configDatabase.Collection("system.sessions").DeleteMany(ctx, bson.D{})
+		if err == nil || !strings.Contains(err.Error(), "(BackgroundOperationInProgressForNamespace)") {
+			break
+		}
+		tracelog.DebugLogger.Printf("drop config.system.sessions: BackgroundOperationInProgressForNamespace, retrying")
+		time.Sleep(time.Second * time.Duration(i+1))
+	}
+	if err != nil {
+		return errors.Wrap(err, "drop config.system.sessions")
+	}
 	return nil
 }
 
