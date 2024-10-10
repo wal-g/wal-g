@@ -32,6 +32,12 @@ func HandleBackupPush(
 		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname")
 	}
 
+	lastSentinel, err := getLastUploadedBackupSentinel(folder)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to find the last backup: %v", err)
+		return
+	}
+
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
@@ -70,6 +76,11 @@ func HandleBackupPush(
 	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog (after): %v", err)
 	timeStop := utility.TimeNowCrossPlatformLocal()
 
+	err = internal.AddJournalSizeToPreviousBackup(folder, BinlogPath, utility.BaseBackupPath, lastSentinel.GetName(), lastSentinel.GetLastModified(), timeStop)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to push journal size to the previous backup: %v", err)
+	}
+
 	uploadedSize, err := uploader.UploadedDataSize()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to calc uploaded data size: %v", err)
@@ -99,6 +110,7 @@ func HandleBackupPush(
 		BinLogEnd:         binlogEnd,
 		StartLocalTime:    timeStart,
 		StopLocalTime:     timeStop,
+		JournalSize:       0,
 		CompressedSize:    uploadedSize,
 		UncompressedSize:  rawSize,
 		Hostname:          hostname,

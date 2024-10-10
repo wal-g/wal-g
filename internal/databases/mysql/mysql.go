@@ -137,6 +137,24 @@ func getLastUploadedBinlog(folder storage.Folder) (string, error) {
 	return name, nil
 }
 
+func getLastUploadedBackupSentinel(folder storage.Folder) (storage.Object, error) {
+	logFiles, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	if err != nil {
+		return nil, err
+	}
+	if len(logFiles) == 0 {
+		tracelog.InfoLogger.Printf("can not find backup sentinels")
+		return nil, nil
+	}
+	oldest := logFiles[0]
+	for i := 1; i < len(logFiles); i++ {
+		if logFiles[i].GetLastModified().After(oldest.GetLastModified()) {
+			oldest = logFiles[i]
+		}
+	}
+	return oldest, nil
+}
+
 func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet, flavor string) (string, error) {
 	folder = folder.GetSubFolder(BinlogPath)
 	logFiles, _, err := folder.ListFolder()
@@ -243,6 +261,7 @@ type StreamSentinelDto struct {
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
 
+	JournalSize      int64  `json:"JournalSize,omitempty"`
 	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
 	Hostname         string `json:"Hostname,omitempty"`
