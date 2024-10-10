@@ -35,7 +35,6 @@ func HandleBackupPush(
 	lastSentinel, err := getLastUploadedBackupSentinel(folder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to find the last backup: %v", err)
-		return
 	}
 
 	db, err := getMySQLConnection()
