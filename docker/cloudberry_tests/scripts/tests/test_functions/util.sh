@@ -10,28 +10,23 @@ declare -a SEGMENTS_DIRS=(
 
 insert_data() {
   echo "Inserting sample data..."
-  psql -p 6000 -c "DROP DATABASE IF EXISTS test"
-  psql -p 6000 -c "CREATE DATABASE test"
-	psql -p 6000 -d test -c "CREATE TABLE heap AS SELECT a FROM generate_series(1,10) AS a;"
-	psql -p 6000 -d test -c "CREATE TABLE ao(a int, b int) WITH (appendoptimized = true) DISTRIBUTED BY (a);"
-	psql -p 6000 -d test -c "CREATE TABLE co(a int, b int) WITH (appendoptimized = true, orientation = column) DISTRIBUTED BY (a);"
-	psql -p 6000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,10)i;"
-	psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,10)i;"
+  psql -p 7000 -c "DROP DATABASE IF EXISTS test"
+  psql -p 7000 -c "CREATE DATABASE test"
+	psql -p 7000 -d test -c "CREATE TABLE heap AS SELECT a FROM generate_series(1,10) AS a;"
+	psql -p 7000 -d test -c "CREATE TABLE ao(a int, b int) WITH (appendoptimized = true) DISTRIBUTED BY (a);"
+	psql -p 7000 -d test -c "CREATE TABLE co(a int, b int) WITH (appendoptimized = true, orientation = column) DISTRIBUTED BY (a);"
+	psql -p 7000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,10)i;"
+	psql -p 7000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,10)i;"
 }
 
 insert_a_lot_of_data() {
-  psql -p 6000 -c "DROP DATABASE IF EXISTS test"
-  psql -p 6000 -c "CREATE DATABASE test"
-	psql -p 6000 -d test -c "CREATE TABLE heap AS SELECT a FROM generate_series(1,100000) AS a;"
-	psql -p 6000 -d test -c "CREATE TABLE ao(a int, b int) WITH (appendoptimized = true) DISTRIBUTED BY (a);"
-	psql -p 6000 -d test -c "CREATE TABLE co(a int, b int) WITH (appendoptimized = true, orientation = column) DISTRIBUTED BY (a);"
-	psql -p 6000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,100000)i;"
-	psql -p 6000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,100000)i;"
-}
-
-enable_pitr_extension() {
-  echo "Enabling gp_pitr extension..."
-  psql -p 6000 -d postgres -c "create extension gp_pitr"
+  psql -p 7000 -c "DROP DATABASE IF EXISTS test"
+  psql -p 7000 -c "CREATE DATABASE test"
+	psql -p 7000 -d test -c "CREATE TABLE heap AS SELECT a FROM generate_series(1,100000) AS a;"
+	psql -p 7000 -d test -c "CREATE TABLE ao(a int, b int) WITH (appendoptimized = true) DISTRIBUTED BY (a);"
+	psql -p 7000 -d test -c "CREATE TABLE co(a int, b int) WITH (appendoptimized = true, orientation = column) DISTRIBUTED BY (a);"
+	psql -p 7000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,100000)i;"
+	psql -p 7000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,100000)i;"
 }
 
 bootstrap_gp_cluster() {
@@ -50,7 +45,7 @@ cleanup() {
   pkill -9 wal-g || true
 }
 
-die_with_gp_logs() {
+die_with_cb_logs() {
     for elem in "${SEGMENTS_DIRS[@]}"; do
       read -a arr <<< "$elem"
       echo "*** ${arr[1]} ***"
@@ -64,7 +59,7 @@ stop_cluster() {
 }
 
 start_cluster() {
-  /usr/local/gpdb_src/bin/gpstart -a || die_with_gp_logs
+  /usr/local/gpdb_src/bin/gpstart -a -t 180 || die_with_cb_logs
 }
 
 setup_wal_archiving() {

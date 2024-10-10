@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/blang/semver"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
 
@@ -30,6 +29,7 @@ type RestorePointMetadata struct {
 	FinishTime       time.Time      `json:"finish_time"`
 	Hostname         string         `json:"hostname"`
 	GpVersion        string         `json:"gp_version"`
+	GpFlavor         string         `json:"gp_flavor"`
 	SystemIdentifier *uint64        `json:"system_identifier"`
 	LsnBySegment     map[int]string `json:"lsn_by_segment"`
 }
@@ -87,7 +87,7 @@ type RestorePointCreator struct {
 	pointName        string
 	startTime        time.Time
 	systemIdentifier *uint64
-	gpVersion        semver.Version
+	gpVersion        Version
 
 	Uploader internal.Uploader
 	Conn     *pgx.Conn
@@ -179,7 +179,8 @@ func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string) (err 
 		StartTime:        rpc.startTime,
 		FinishTime:       utility.TimeNowCrossPlatformUTC(),
 		Hostname:         hostname,
-		GpVersion:        rpc.gpVersion.String(),
+		GpVersion:        rpc.gpVersion.Version.String(),
+		GpFlavor:         rpc.gpVersion.Flavor.String(),
 		SystemIdentifier: rpc.systemIdentifier,
 		LsnBySegment:     restoreLSNs,
 	}

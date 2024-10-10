@@ -114,6 +114,8 @@ services:
       &&  mkdir -p /export/delete-garbage-multist-fo-bucket
       &&  mkdir -p /export/gpdeletetargetbucket
       &&  mkdir -p /export/gpdeletegarbagebucket
+      &&  mkdir -p /export/cloudberry-delete-target-bucket
+      &&  mkdir -p /export/cloudberry-delete-garbage-bucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
       &&  mkdir -p /export/mysqlincrementalxtrabackupbucket
       &&  mkdir -p /export/mysqlsplitfilesizebucket
@@ -152,17 +154,24 @@ services:
       &&  mkdir -p /export/archivereadyrename
       &&  mkdir -p /export/gpfullbucket
       &&  mkdir -p /export/gpafterfailedbucket
-      &&  mkdir -p /export/gpfullserializedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
       &&  mkdir -p /export/gpdeleteretainbucket
-      &&  mkdir -p /export/gpdeleteendtoendbucket
       &&  mkdir -p /export/gpdeletebeforepermanentbucket
       &&  mkdir -p /export/gpdeletebeforenamebucket
       &&  mkdir -p /export/gpdeletebeforetimebucket
       &&  mkdir -p /export/gpaostoragetestbucket
       &&  mkdir -p /export/gpdeltabackuptestbucket
-      &&  mkdir -p /export/gppartialdatabasebucket
       &&  mkdir -p /export/gppartialtablebucket
+      &&  mkdir -p /export/cloudberry-full-bucket
+      &&  mkdir -p /export/cloudberry-after-failed-bucket
+      &&  mkdir -p /export/cloudberry-delete-without-confirm
+      &&  mkdir -p /export/cloudberry-delete-retain-bucket
+      &&  mkdir -p /export/cloudberry-delete-before-permanent-bucket
+      &&  mkdir -p /export/cloudberry-delete-before-name-bucket
+      &&  mkdir -p /export/cloudberry-delete-before-time-bucket
+      &&  mkdir -p /export/cloudberry-aostorage-test-bucket
+      &&  mkdir -p /export/cloudberry-delta-backup-test-bucket
+      &&  mkdir -p /export/cloudberry-partial-table-bucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
       &&  mkdir -p /export/storagetoolsbucket_target
@@ -750,6 +759,25 @@ services:
     container_name: wal-g_gp_tests
     depends_on:
       - gp
+      - s3
+    links:
+      - s3
+
+  cloudberry:
+    build:
+      dockerfile: docker/cloudberry/Dockerfile
+      context: .
+    image: wal-g/cloudberry
+    container_name: wal-g_cloudberry
+
+  cloudberry_tests:
+    build:
+      dockerfile: docker/cloudberry_tests/Dockerfile
+      context: .
+    image: wal-g/cloudberry_tests
+    container_name: wal-g_cloudberry_tests
+    depends_on:
+      - cloudberry
       - s3
     links:
       - s3
