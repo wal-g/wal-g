@@ -76,16 +76,18 @@ func HandleBackupPush(
 	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog (after): %v", err)
 	timeStop := utility.TimeNowCrossPlatformLocal()
 
-	err = internal.AddJournalSizeToPreviousBackup(
-		folder,
-		BinlogPath,
-		utility.BaseBackupPath,
-		lastSentinel.GetName(),
-		lastSentinel.GetLastModified(),
-		timeStop,
-	)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Failed to push journal size to the previous backup: %v", err)
+	if lastSentinel != nil {
+		err = internal.AddJournalSizeToPreviousBackup(
+			folder,
+			BinlogPath,
+			utility.BaseBackupPath,
+			lastSentinel.GetName(),
+			lastSentinel.GetLastModified(),
+			timeStop,
+		)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to push journal size to the previous backup: %v", err)
+		}
 	}
 
 	uploadedSize, err := uploader.UploadedDataSize()
