@@ -16,7 +16,14 @@ const (
 	JournalSize = "JournalSize"
 )
 
-func AddJournalSizeToPreviousBackup(root storage.Folder, journalPath string, sentinelPath string, sentinelName string, oldBackupTime, newBackupTime time.Time) error {
+func AddJournalSizeToPreviousBackup(
+	root storage.Folder,
+	journalPath string,
+	sentinelPath string,
+	sentinelName string,
+	oldBackupTime time.Time,
+	newBackupTime time.Time,
+) error {
 	if len(sentinelName) == 0 {
 		return fmt.Errorf("sentinel name is empty")
 	}
@@ -44,12 +51,12 @@ func AddJournalSizeToPreviousBackup(root storage.Folder, journalPath string, sen
 	}
 
 	sentinel[JournalSize] = journalSize
-	sentinelJson, err := json.Marshal(sentinel)
+	sentinelJSON, err := json.Marshal(sentinel)
 	if err != nil {
 		return err
 	}
 
-	r := bytes.NewReader(sentinelJson)
+	r := bytes.NewReader(sentinelJSON)
 	err = folder.PutObject(sentinelName, r)
 	if err != nil {
 		return err
