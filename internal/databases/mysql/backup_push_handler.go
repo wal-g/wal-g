@@ -81,8 +81,15 @@ func HandleBackupPush(
 			BinlogPath,
 			utility.BaseBackupPath,
 			lastSentinel.GetName(),
-			lastSentinel.GetLastModified(),
-			timeStop,
+			func(sentinel map[string]interface{}) (firstBackupJournal string, lastBackupJournal string) {
+				firstBackupJournal = sentinel["BinLogEnd"].(string)
+				lastBackupJournal = binlogEnd
+				tracelog.InfoLogger.Printf("We take in account binlogs in the semi interval (%s;%s]", firstBackupJournal, lastBackupJournal)
+				return firstBackupJournal, lastBackupJournal
+			},
+			func(a, b string) bool {
+				return a < b
+			},
 		)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to push journal size to the previous backup: %v", err)

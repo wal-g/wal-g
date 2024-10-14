@@ -146,13 +146,13 @@ func getLastUploadedBackupSentinel(folder storage.Folder) (storage.Object, error
 		tracelog.InfoLogger.Printf("can not find backup sentinels")
 		return nil, nil
 	}
-	oldest := logFiles[0]
+	latestSentinel := logFiles[0]
 	for i := 1; i < len(logFiles); i++ {
-		if logFiles[i].GetLastModified().After(oldest.GetLastModified()) {
-			oldest = logFiles[i]
+		if logFiles[i].GetLastModified().After(latestSentinel.GetLastModified()) {
+			latestSentinel = logFiles[i]
 		}
 	}
-	return oldest, nil
+	return latestSentinel, nil
 }
 
 func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet, flavor string) (string, error) {

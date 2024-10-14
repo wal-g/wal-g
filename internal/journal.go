@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -21,8 +21,8 @@ func AddJournalSizeToPreviousBackup(
 	journalPath string,
 	sentinelPath string,
 	sentinelName string,
-	oldBackupTime time.Time,
-	newBackupTime time.Time,
+	journalExtractor func(sentinel map[string]interface{}) (firstBackupJournal, lastBackupJournal string),
+	journalNameLess func(a, b string) bool,
 ) error {
 	if len(sentinelName) == 0 {
 		return fmt.Errorf("sentinel name is empty")
@@ -44,8 +44,15 @@ func AddJournalSizeToPreviousBackup(
 	if err != nil {
 		return err
 	}
+	firstBackupJournal, lastBackupJournal := journalExtractor(sentinel)
 
-	journalSize, err := GetJournalSizeInSemiInterval(root, journalPath, oldBackupTime, newBackupTime)
+	journalSize, err := GetJournalSizeInSemiInterval(
+		root,
+		journalPath,
+		journalNameLess,
+		firstBackupJournal,
+		lastBackupJournal,
+	)
 	if err != nil {
 		return err
 	}
@@ -66,7 +73,12 @@ func AddJournalSizeToPreviousBackup(
 }
 
 // (start;end]
-func GetJournalSizeInSemiInterval(folder storage.Folder, journalPath string, start, end time.Time) (int64, error) {
+func GetJournalSizeInSemiInterval(
+	folder storage.Folder,
+	journalPath string,
+	journalCmpLess func(a, b string) bool,
+	start, end string,
+) (int64, error) {
 	folder = folder.GetSubFolder(journalPath)
 	journalFiles, _, err := folder.ListFolder()
 	if err != nil {
@@ -78,8 +90,11 @@ func GetJournalSizeInSemiInterval(folder storage.Folder, journalPath string, sta
 
 	sum := int64(0)
 	for i := 0; i < len(journalFiles); i++ {
-		jt := journalFiles[i].GetLastModified()
-		if start.Before(jt) && (end.After(jt) || end.Equal(jt)) {
+		jt := utility.TrimFileExtension(journalFiles[i].GetName())
+
+		isEqual := !journalCmpLess(jt, end) && !journalCmpLess(end, jt)
+
+		if journalCmpLess(start, jt) && (journalCmpLess(jt, end) || isEqual) {
 			sum += journalFiles[i].GetSize()
 		}
 	}
