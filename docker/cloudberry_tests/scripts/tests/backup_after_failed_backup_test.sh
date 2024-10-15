@@ -17,9 +17,8 @@ setup_wal_archiving
 # init tables heap, ao, co
 insert_data
 
-# FIXME:
 # imitate failed backup (label='abc', fast=true, exclusive=true)
-#psql -p 7000 -c "SELECT pg_start_backup('abc', true, true);"
+psql -p 7000 -c "SELECT pg_start_backup('abc', true, true);"
 
 # run backup
 run_backup_logged ${TMP_CONFIG} ${PGDATA}
@@ -32,7 +31,9 @@ wal-g backup-list --config=${TMP_CONFIG}
 # show the storage objects (useful for debug)
 wal-g st ls -r --config=${TMP_CONFIG}
 
-wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
+# it looks like a bug in `tryExtractFiles` - it can override files when WALG_DOWNLOAD_CONCURRENCY != 1
+# https://github.com/wal-g/wal-g/blob/master/internal/extract.go#L201-L253
+WALG_DOWNLOAD_CONCURRENCY=1  wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
 prepare_cluster
 start_cluster
 cleanup
