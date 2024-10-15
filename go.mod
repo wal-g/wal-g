@@ -73,6 +73,7 @@ require (
 	github.com/hpcloud/tail v1.0.0 // indirect
 	github.com/jackc/pgtype v1.14.0 // indirect
 	github.com/jackc/pgx/v4 v4.18.2 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/onsi/ginkgo v1.6.0 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
