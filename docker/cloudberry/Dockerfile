@@ -72,7 +72,7 @@ RUN git clone https://github.com/cloudberrydb/cloudberrydb.git gpdb_src --single
 
 WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
- && ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src > /dev/null \
+ && ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src --enable-debug --disable-pxf > /dev/null \
  && make -j8 > /dev/null \
  && make -j8 install > /dev/null \
  && chown gpadmin:gpadmin /home/gpadmin/run_greenplum.sh \
