@@ -74,7 +74,7 @@ run_backup_logged ${TMP_CONFIG} ${PGDATA}
 stop_and_delete_cluster_dir
 
 wal-g --config=${TMP_CONFIG} backup-fetch LATEST --in-place --restore-only=db/*to_restore,restore*
-
+prepare_cluster
 start_cluster
 
 if [ "$(psql -p 7000 -t -c "SELECT count(*) FROM heap_to_restore;" -d db -A)" != $n ]; then

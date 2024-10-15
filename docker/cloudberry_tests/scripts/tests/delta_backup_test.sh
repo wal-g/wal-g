@@ -46,6 +46,7 @@ wal-g st ls -r --config=${TMP_CONFIG}
 stop_and_delete_cluster_dir
 
 wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
+prepare_cluster
 start_cluster
 
 psql -p 7000 -d test -c "SELECT COUNT(*) FROM ao;" | grep 30 && EXIT_STATUS=$? || EXIT_STATUS=$?
@@ -78,6 +79,7 @@ wal-g --config=${TMP_CONFIG} delete before FIND_FULL $backup_name --confirm
 
 # should successfully restore the second delta chain
 wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
+prepare_cluster
 start_cluster
 
 psql -p 7000 -d test -c "SELECT COUNT(*) FROM ao;" | grep 50 && EXIT_STATUS=$? || EXIT_STATUS=$?

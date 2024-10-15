@@ -88,6 +88,7 @@ stop_and_delete_cluster_dir
 sleep 1
 # should successfully restore the second delta chain
 wal-g backup-fetch $PERMANENT_BACKUP --in-place --config=${TMP_CONFIG}
+prepare_cluster
 start_cluster
 
 psql -p 7000 -d test -c "SELECT COUNT(*) FROM ao;" && EXIT_STATUS=$? || EXIT_STATUS=$?

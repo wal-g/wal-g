@@ -49,7 +49,7 @@ run_backup_logged ${TMP_CONFIG} ${PGDATA}
 stop_and_delete_cluster_dir
 
 wal-g --config=${TMP_CONFIG} backup-fetch LATEST --in-place --restore-only=db/restore*/*,db/partial.table2
-
+prepare_cluster
 start_cluster
 
 if [ "$(psql -p 7000 -t -c "SELECT count(*) FROM restore1.table1;" -d db -A)" != $($n * 2) ]; then

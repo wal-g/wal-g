@@ -46,7 +46,7 @@ psql -p 7000 -d to_skip -c "INSERT INTO co select i, i FROM generate_series(3,4)
 stop_and_delete_cluster_dir
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --in-place --restore-only=to_restore
-
+prepare_cluster
 start_cluster
 
 if [ "$(psql -p 7000 -t -c "select a from heap order by a;" -d to_restore -A)" != "$(printf '1\n2')" ]; then

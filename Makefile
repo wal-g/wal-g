@@ -258,7 +258,7 @@ cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
 	docker compose build cloudberry cloudberry_tests
-	docker compose up --force-recreate --exit-code-from cloudberry_tests cloudberry_tests
+	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 
 st_test: deps pg_build unlink_brotli st_integration_test
 

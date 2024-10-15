@@ -47,6 +47,7 @@ wal-g st ls -r --config=${TMP_CONFIG}
 stop_and_delete_cluster_dir
 
 wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
+prepare_cluster
 start_cluster
 
 psql -p 7000 -d test -c "SELECT COUNT(*) FROM ao;" | grep 20 && EXIT_STATUS=$? || EXIT_STATUS=$?

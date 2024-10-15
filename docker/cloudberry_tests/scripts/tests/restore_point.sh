@@ -13,6 +13,7 @@ source /tmp/tests/test_functions/util.sh
 bootstrap_gp_cluster
 sleep 3
 setup_wal_archiving
+insert_data
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
@@ -66,7 +67,7 @@ delete_cluster_dirs
 
 # should not fail
 wal-g backup-fetch --restore-point after_backup --in-place --config=${TMP_CONFIG}
-
+prepare_cluster
 start_cluster
 
 cleanup

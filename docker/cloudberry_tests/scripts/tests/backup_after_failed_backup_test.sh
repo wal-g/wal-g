@@ -32,7 +32,7 @@ wal-g backup-list --config=${TMP_CONFIG}
 wal-g st ls -r --config=${TMP_CONFIG}
 
 wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
-
+prepare_cluster
 start_cluster
 cleanup
 
