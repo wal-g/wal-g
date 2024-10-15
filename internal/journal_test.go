@@ -3,10 +3,7 @@ package internal_test
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -26,7 +23,7 @@ var (
 	MaximalJournalNumber = "999999999"
 )
 
-func GenerateS3SetAndTest(t *testing.T, recordCount, recordSize int, beginJournalID, endJournalID string, expectedSum int) {
+func GenerateS3SetAndTest(t *testing.T, recordCount, recordSize int, beginJournalID, endJournalID string, expectedSum int64) {
 	root, mockUploader := initTestS3()
 
 	generateAndUploadData(mockUploader, recordCount, recordSize)
@@ -41,32 +38,37 @@ func GenerateS3SetAndTest(t *testing.T, recordCount, recordSize int, beginJourna
 		endJournalID,
 	)
 	assert.NoError(t, err)
-	assert.Equal(t, int64(expectedSum), journalSize)
+	assert.Equal(t, expectedSum, journalSize)
 }
 
-func GenerateS3SetAndAddJournalToOldBackup(t *testing.T, recordCount, recordSize int, beginJournalID, endJournalID string, expectedSum int) {
+func GenerateS3SetAndAddJournalToOldBackup(t *testing.T, recordCount, recordSize int, beginJournalID, endJournalID string, expectedSum int64) {
 	root, mockUploader := initTestS3()
 
 	generateAndUploadData(mockUploader, recordCount, recordSize)
 
 	createEmptySentinel(t, root)
 
-	err := internal.AddJournalSizeToPreviousBackup(
+	backupInfo, err := internal.GetBackupInfo(root, SentinelFilePath)
+	assert.Error(t, err)
+	assert.Equal(t, backupInfo, internal.BackupAndJournalInfo{})
+
+	backupInfo.JournalSize, err = internal.GetJournalSizeInSemiInterval(
 		root,
 		utility.WalPath,
-		"",
-		SentinelFilePath,
-		func(sentinel map[string]interface{}) (firstBackupJournal string, lastBackupJournal string) {
-			return beginJournalID, endJournalID
-		},
 		func(a, b string) bool {
 			return a < b
 		},
+		beginJournalID,
+		endJournalID,
 	)
+	err = internal.UploadBackupInfo(root, SentinelFilePath, backupInfo)
 	assert.NoError(t, err)
 
-	journalSize := readJournalSizeFromSentinel(t, root)
-	assert.Equal(t, int64(expectedSum), journalSize)
+	backupInfo, err = internal.GetBackupInfo(root, SentinelFilePath)
+	assert.NoError(t, err)
+	assert.Equal(t, backupInfo, internal.BackupAndJournalInfo{
+		JournalSize: int64(expectedSum),
+	})
 }
 
 func initTestS3() (*memory.Folder, internal.Uploader) {
@@ -99,29 +101,12 @@ func createEmptySentinel(t *testing.T, root storage.Folder) {
 	assert.NoError(t, err)
 }
 
-func readJournalSizeFromSentinel(t *testing.T, root storage.Folder) int64 {
-	var sentinel map[string]json.RawMessage
-	sentinelReader, err := root.ReadObject(SentinelFilePath)
-	assert.NoError(t, err)
-
-	rawSentinel, err := io.ReadAll(sentinelReader)
-	assert.NoError(t, err)
-
-	err = json.Unmarshal(rawSentinel, &sentinel)
-	assert.NoError(t, err)
-
-	journalSize, err := strconv.ParseInt(string(sentinel[internal.JournalSize]), 10, 64)
-	assert.NoError(t, err)
-
-	return journalSize
-}
-
 func TestEmptyFolder(t *testing.T) {
 	recordCount := 0
 	recordSize := 0
 	begin := MinimalJournalNumber
 	end := MaximalJournalNumber
-	expectedSize := 0
+	expectedSize := int64(0)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -132,7 +117,7 @@ func TestOneJournal(t *testing.T) {
 	recordSize := 8
 	begin := MinimalJournalNumber
 	end := MaximalJournalNumber
-	expectedSize := 8
+	expectedSize := int64(8)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -143,7 +128,7 @@ func TestManyJournals(t *testing.T) {
 	recordSize := 8
 	begin := MinimalJournalNumber
 	end := MaximalJournalNumber
-	expectedSize := 800
+	expectedSize := int64(800)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -154,7 +139,7 @@ func TestSimpleFrom(t *testing.T) {
 	recordSize := 8
 	begin := toJournalNumber(2)
 	end := MaximalJournalNumber
-	expectedSize := 8
+	expectedSize := int64(8)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -165,7 +150,7 @@ func TestSimpleTo(t *testing.T) {
 	recordSize := 8
 	begin := MinimalJournalNumber
 	end := toJournalNumber(2)
-	expectedSize := 16
+	expectedSize := int64(16)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -176,7 +161,7 @@ func TestHalfFrom(t *testing.T) {
 	recordSize := 8
 	begin := toJournalNumber(50)
 	end := MaximalJournalNumber
-	expectedSize := 400
+	expectedSize := int64(400)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -187,7 +172,7 @@ func TestHalfTo(t *testing.T) {
 	recordSize := 8
 	begin := MinimalJournalNumber
 	end := toJournalNumber(50)
-	expectedSize := 400
+	expectedSize := int64(400)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -198,7 +183,7 @@ func TestEmptySetOnTheRightSide(t *testing.T) {
 	recordSize := 8
 	begin := toJournalNumber(100)
 	end := MaximalJournalNumber
-	expectedSize := 0
+	expectedSize := int64(0)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -209,7 +194,7 @@ func TestEmptySetOnTheLeftSide(t *testing.T) {
 	recordSize := 8
 	begin := MinimalJournalNumber
 	end := MinimalJournalNumber
-	expectedSize := 0
+	expectedSize := int64(0)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
@@ -220,7 +205,7 @@ func TestOnlyFirstRecord(t *testing.T) {
 	recordSize := 8
 	begin := MinimalJournalNumber
 	end := toJournalNumber(1)
-	expectedSize := 8
+	expectedSize := int64(8)
 
 	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)

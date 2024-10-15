@@ -14,57 +14,92 @@ import (
 
 const (
 	JournalSize = "JournalSize"
+	BackupsInfo = "backups.json"
 )
 
-func AddJournalSizeToPreviousBackup(
-	root storage.Folder,
-	journalPath string,
-	sentinelPath string,
-	sentinelName string,
-	journalExtractor func(sentinel map[string]interface{}) (firstBackupJournal, lastBackupJournal string),
-	journalNameLess func(a, b string) bool,
-) error {
-	if len(sentinelName) == 0 {
-		return fmt.Errorf("sentinel name is empty")
+type BackupAndJournalInfo struct {
+	JournalStart     string `json:"JournalStart"`
+	JournalEnd       string `json:"JournalEnd"`
+	JournalSize      int64  `json:"JournalSize"`
+	CompressedSize   int64  `json:"CompressedSize"`
+	UncompressedSize int64  `json:"UncompressedSize"`
+	IsPermanent      bool   `json:"IsPermanent"`
+}
+
+func GetBackupInfo(folder storage.Folder, sentinelName string) (BackupAndJournalInfo, error) {
+	backupsInfo, err := GetBackupsInfo(folder)
+	if err != nil {
+		return BackupAndJournalInfo{}, err
 	}
 
-	folder := root.GetSubFolder(sentinelPath)
-	sentinelReader, err := folder.ReadObject(sentinelName)
+	if _, ok := backupsInfo[sentinelName]; !ok {
+		return BackupAndJournalInfo{}, fmt.Errorf("%s isn't contained in backups.json", sentinelName)
+	}
+
+	return backupsInfo[sentinelName], nil
+}
+
+func UploadBackupInfo(folder storage.Folder, sentinelName string, info BackupAndJournalInfo) error {
+	backupsInfo, err := GetBackupsInfo(folder)
 	if err != nil {
 		return err
 	}
 
-	rawSentinel, err := io.ReadAll(sentinelReader)
+	backupsInfo[sentinelName] = info
+
+	err = UpdateBackupsInfo(folder, backupsInfo)
 	if err != nil {
 		return err
 	}
 
-	var sentinel map[string]interface{}
-	err = json.Unmarshal(rawSentinel, &sentinel)
+	return nil
+}
+
+func GetBackupsInfo(folder storage.Folder) (map[string]BackupAndJournalInfo, error) {
+	ok, err := folder.Exists(BackupsInfo)
+	if !ok {
+		tracelog.InfoLogger.Printf("can not find backups.json, creating it...")
+		err := folder.PutObject(BackupsInfo, bytes.NewBuffer([]byte("{}")))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	backupsInfo, err := readBackupsInfo(folder)
+	if err != nil {
+		return nil, err
+	}
+
+	return backupsInfo, nil
+}
+
+func readBackupsInfo(folder storage.Folder) (map[string]BackupAndJournalInfo, error) {
+	backupsInfoReader, err := folder.ReadObject(BackupsInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	backupsInfoBytes, err := io.ReadAll(backupsInfoReader)
+	if err != nil {
+		return nil, err
+	}
+
+	var backupsInfo map[string]BackupAndJournalInfo
+	err = json.Unmarshal(backupsInfoBytes, &backupsInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return backupsInfo, nil
+}
+
+func UpdateBackupsInfo(folder storage.Folder, backupsInfo map[string]BackupAndJournalInfo) error {
+	rawBackupsInfo, err := json.Marshal(backupsInfo)
 	if err != nil {
 		return err
 	}
-	firstBackupJournal, lastBackupJournal := journalExtractor(sentinel)
 
-	journalSize, err := GetJournalSizeInSemiInterval(
-		root,
-		journalPath,
-		journalNameLess,
-		firstBackupJournal,
-		lastBackupJournal,
-	)
-	if err != nil {
-		return err
-	}
-
-	sentinel[JournalSize] = journalSize
-	sentinelJSON, err := json.Marshal(sentinel)
-	if err != nil {
-		return err
-	}
-
-	r := bytes.NewReader(sentinelJSON)
-	err = folder.PutObject(sentinelName, r)
+	err = folder.PutObject(BackupsInfo, bytes.NewBuffer(rawBackupsInfo))
 	if err != nil {
 		return err
 	}

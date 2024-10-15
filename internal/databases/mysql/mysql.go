@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"sort"
@@ -137,22 +138,38 @@ func getLastUploadedBinlog(folder storage.Folder) (string, error) {
 	return name, nil
 }
 
-func getLastUploadedBackupSentinel(folder storage.Folder) (storage.Object, error) {
-	logFiles, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+func getLastUploadedBackupSentinel(folder storage.Folder) (string, StreamSentinelDto, error) {
+	folder = folder.GetSubFolder(utility.BaseBackupPath)
+	logFiles, _, err := folder.ListFolder()
 	if err != nil {
-		return nil, err
+		return "", StreamSentinelDto{}, err
 	}
+
 	if len(logFiles) == 0 {
 		tracelog.InfoLogger.Printf("can not find backup sentinels")
-		return nil, nil
+		return "", StreamSentinelDto{}, nil
 	}
+
 	latestSentinel := logFiles[0]
 	for i := 1; i < len(logFiles); i++ {
 		if logFiles[i].GetLastModified().After(latestSentinel.GetLastModified()) {
 			latestSentinel = logFiles[i]
 		}
 	}
-	return latestSentinel, nil
+
+	rawSentinelReader, err := folder.ReadObject(latestSentinel.GetName())
+	if err != nil {
+		return "", StreamSentinelDto{}, err
+	}
+
+	rawSentinel, err := io.ReadAll(rawSentinelReader)
+	if err != nil {
+		return "", StreamSentinelDto{}, err
+	}
+
+	var sentinel StreamSentinelDto
+	err = json.Unmarshal(rawSentinel, &sentinel)
+	return latestSentinel.GetName(), sentinel, err
 }
 
 func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet, flavor string) (string, error) {
@@ -261,7 +278,6 @@ type StreamSentinelDto struct {
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
 
-	JournalSize      int64  `json:"JournalSize,omitempty"`
 	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
 	Hostname         string `json:"Hostname,omitempty"`
