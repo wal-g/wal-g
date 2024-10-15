@@ -406,7 +406,7 @@ JOIN (
             SELECT 
                 c.oid,
                 quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn,
-                CASE WHEN am.amname = 'ao_row' THEN 'a' WHEN am.amname = 'ao_column' THEN 'c' ELSE 'unknown' END as relstorage,
+                ASCII(CASE WHEN am.amname = 'ao_row' THEN 'a' WHEN am.amname = 'ao_column' THEN 'c' ELSE 'unknown' END) as relstorage,
                 c.relnatts,
                 c.relfilenode,
                 c.reltablespace
