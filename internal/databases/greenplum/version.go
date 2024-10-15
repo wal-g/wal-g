@@ -20,7 +20,7 @@ const (
 
 type Version struct {
 	semver.Version
-	Flavor Flavor
+	Flavor Flavor // Note: can be '' for old backups
 }
 
 func NewVersion(version semver.Version, flavor Flavor) Version {

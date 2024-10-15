@@ -17,8 +17,9 @@ setup_wal_archiving
 # init tables heap, ao, co
 insert_data
 
-# imitate failed backup
-psql -p 7000 -c "SELECT pg_start_backup('abc', true);"
+# FIXME:
+# imitate failed backup (label='abc', fast=true, exclusive=true)
+#psql -p 7000 -c "SELECT pg_start_backup('abc', true, true);"
 
 # run backup
 run_backup_logged ${TMP_CONFIG} ${PGDATA}

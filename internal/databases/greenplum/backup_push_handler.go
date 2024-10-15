@@ -387,7 +387,7 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	if version.Flavor == Cloudberry ||
 		(version.Flavor == Greenplum && version.Major >= 7) {
 		// CB & GP7+ allows the non-exclusive backups
-		tracelog.InfoLogger.Println("Checking backup prerequisites: OK")
+		tracelog.InfoLogger.Println("Checking backup prerequisites: SKIP - non-exclusive backups used")
 		return nil
 	}
 
