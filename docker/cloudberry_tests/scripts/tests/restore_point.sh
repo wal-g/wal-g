@@ -13,7 +13,6 @@ source /tmp/tests/test_functions/util.sh
 bootstrap_gp_cluster
 sleep 3
 setup_wal_archiving
-insert_data
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 

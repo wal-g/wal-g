@@ -65,7 +65,7 @@ prepare_cluster() {
   # start Coordinator only... it will fail
   /usr/local/gpdb_src/bin/gpstart -c -a -t 180 || true
   # then wait until coordinator recovery finished & it will start accepting connections:
-  for i in {1..180}; do psql -p 7000 -d test -c " select 1;" && break || sleep 1; done
+  for i in {1..180}; do psql -p 7000 -d postgres -c " select 1;" && break || sleep 1; done
   # here we can do all we need to fix cluster configuration
   # e.g. update gp_segment_configuration... however we don't need to do it in this tests
   # stop cluster...
