@@ -21,7 +21,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			storage, err := internal.ConfigureStorage()
 			tracelog.ErrorLogger.FatalOnError(err)
-			greenplum.HandleRestorePointList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+			greenplum.HandleRestorePointList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), greenplum.NewGenericMetaInteractor(), pretty, jsonOutput)
 		},
 	}
 )

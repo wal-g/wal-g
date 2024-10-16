@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -211,5 +212,102 @@ func TestDeleteGarbage_recursive(t *testing.T) {
 	assert.Equal(t, 1, len(folders))
 	assert.Equal(t, objects[0].GetName(), "meta_b2.json")
 	assert.Equal(t, folders[0].GetPath(), "in_memory/backup2/folder1/")
+}
 
+func TestSortBackupTimeWithMetadataSlices_ByCreationTimeWhenCreationTimeIsNotDefault(t *testing.T) {
+	backups := []internal.BackupTimeWithMetadata{
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "fBackup",
+				Time:        time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "fWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2020, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "sBackup",
+				Time:        time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "sWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	expectedBackups := []internal.BackupTimeWithMetadata{
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "sBackup",
+				Time:        time.Date(2022, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "sWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+		{
+			BackupTime: internal.BackupTime{
+				BackupName:  "fBackup",
+				Time:        time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC),
+				WalFileName: "fWalFileName",
+			},
+			GenericMetadata: internal.GenericMetadata{
+				StartTime: time.Date(2020, 3, 21, 0, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+
+	internal.SortBackupTimeWithMetadataSlices(backups)
+	assert.Equal(t, expectedBackups, backups)
+}
+
+func TestGetBackupsWithMetadata(t *testing.T) {
+	fBackup := internal.BackupTime{
+		BackupName:  "fSentinelBackup",
+		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+		StorageName: "default",
+	}
+	sBackup := internal.BackupTime{
+		BackupName:  "sSentinelBackup",
+		WalFileName: "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+		StorageName: "default",
+	}
+
+	metadata := map[string]internal.GenericMetadata{
+		fBackup.BackupName: {StartTime: time.Date(2021, 3, 21, 0, 0, 0, 0, time.UTC)},
+		sBackup.BackupName: {StartTime: time.Date(2016, 3, 21, 0, 0, 0, 0, time.UTC)},
+	}
+
+	expected := []internal.BackupTimeWithMetadata{
+		{fBackup, metadata[fBackup.BackupName]},
+		{sBackup, metadata[sBackup.BackupName]},
+	}
+
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	marshaller, err := internal.NewDtoSerializer()
+	require.NoError(t, err)
+	fFile, err := marshaller.Marshal(fBackup)
+	require.NoError(t, err)
+	sFile, err := marshaller.Marshal(sBackup)
+	require.NoError(t, err)
+
+	err = folder.PutObject(internal.SentinelNameFromBackup(fBackup.BackupName), fFile)
+	require.NoError(t, err)
+	err = folder.PutObject(internal.SentinelNameFromBackup(sBackup.BackupName), sFile)
+	require.NoError(t, err)
+
+	actual, err := internal.GetBackupsWithMetadata(folder, &testtools.MockGenericMetaFetcher{MockMeta: metadata})
+	require.NoError(t, err)
+
+	// ignore time difference
+	for i := range expected {
+		expected[i].Time = actual[i].Time
+	}
+
+	assert.Equal(t, expected, actual)
 }
