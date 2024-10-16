@@ -32,12 +32,6 @@ func HandleBackupPush(
 		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname")
 	}
 
-	latestSentinelName, latestSentinel, err := getLastUploadedBackupSentinel(folder)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to find the last backup: %v", err)
-	}
-	tracelog.InfoLogger.Printf("latest sentinel is %+v", latestSentinelName)
-
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
@@ -126,69 +120,41 @@ func HandleBackupPush(
 	err = internal.UploadSentinel(uploader, &sentinel, backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = internal.UploadBackupInfo(folder, backupName+utility.SentinelSuffix, internal.BackupAndJournalInfo{
-		JournalStart:     latestSentinel.BinLogEnd,
-		JournalEnd:       sentinel.BinLogEnd,
+	latestSentinelName, latestSentinel, err := internal.GetLastNotPermanentBackupInfo(folder)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to find the last backup: %v", err)
+	} else {
+		tracelog.InfoLogger.Printf("latest sentinel is %+v", latestSentinelName)
+	}
+
+	newBackupInfo := internal.BackupInfo{
+		JournalStart:     latestSentinel.JournalEnd,
+		JournalEnd:       binlogEnd,
 		JournalSize:      0,
-		CompressedSize:   sentinel.CompressedSize,
-		UncompressedSize: sentinel.UncompressedSize,
-		IsPermanent:      sentinel.IsPermanent,
-	})
+		CompressedSize:   uploadedSize,
+		UncompressedSize: rawSize,
+		IsPermanent:      isPermanent,
+		StopLocalTime:    timeStop,
+	}
+
+	// permanent backups can live longer than binlogs; they should not take part in binlog counting
+	if !isPermanent && err == nil {
+		err = internal.UpdatePreviousBackupInfoJournal(folder, BinlogPath, newBackupInfo.JournalEnd)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("can not update previous backup info for %s: %s", backupName, err)
+		} else {
+			tracelog.InfoLogger.Printf("Backup info for %s was updated", backupName)
+		}
+	} else {
+		tracelog.InfoLogger.Printf("not updating last backup's journal, new is permanent or there is an error %s", err)
+	}
+
+	err = internal.UploadBackupInfo(folder, backupName+utility.SentinelSuffix, newBackupInfo)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("can not upload backup info for %s: %s", backupName, err)
 		return
 	}
 	tracelog.InfoLogger.Printf("backup info has been uploaded for %s", backupName)
-
-	journalSize, err := internal.GetJournalSizeInSemiInterval(
-		folder,
-		BinlogPath,
-		func(a, b string) bool {
-			return a < b
-		},
-		latestSentinel.BinLogEnd,
-		sentinel.BinLogEnd,
-	)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("can not evaluate journal sum for %s: %s", latestSentinelName, err)
-		return
-	}
-	tracelog.InfoLogger.Printf(
-		"journal size for %s in the semi interval (%s; %s] is equal to %d",
-		latestSentinelName,
-		latestSentinel.BinLogEnd,
-		sentinel.BinLogEnd,
-		journalSize,
-	)
-
-	latestBackupInfo, err := internal.GetBackupInfo(folder, latestSentinelName)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("can not find journal sum in backups.json for %s: %s", latestSentinelName, err)
-		return
-	}
-
-	if latestBackupInfo.JournalSize != 0 {
-		tracelog.WarningLogger.Printf(
-			"previous backup info contains non-zero journal size '%d', its values will be updated to '%d'",
-			latestBackupInfo.JournalSize,
-			journalSize,
-		)
-	}
-
-	err = internal.UploadBackupInfo(folder, latestSentinelName, internal.BackupAndJournalInfo{
-		JournalStart:     latestSentinel.BinLogStart,
-		JournalEnd:       latestSentinel.BinLogEnd,
-		JournalSize:      journalSize,
-		CompressedSize:   latestSentinel.CompressedSize,
-		UncompressedSize: latestSentinel.UncompressedSize,
-		IsPermanent:      latestSentinel.IsPermanent,
-	})
-	if err != nil {
-		tracelog.ErrorLogger.Printf("can not update journal info for %s: %s", latestSentinelName, err)
-		return
-	}
-
-	tracelog.ErrorLogger.Printf("journal info has been updated for %s", latestSentinelName)
 }
 
 func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backupName string, err error) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/wal-g/tracelog"
 
@@ -17,37 +18,38 @@ const (
 	BackupsInfo = "backups.json"
 )
 
-type BackupAndJournalInfo struct {
-	JournalStart     string `json:"JournalStart"`
-	JournalEnd       string `json:"JournalEnd"`
-	JournalSize      int64  `json:"JournalSize"`
-	CompressedSize   int64  `json:"CompressedSize"`
-	UncompressedSize int64  `json:"UncompressedSize"`
-	IsPermanent      bool   `json:"IsPermanent"`
+type BackupInfo struct {
+	JournalStart     string    `json:"JournalStart"`
+	JournalEnd       string    `json:"JournalEnd"`
+	JournalSize      int64     `json:"JournalSize"`
+	CompressedSize   int64     `json:"CompressedSize"`
+	UncompressedSize int64     `json:"UncompressedSize"`
+	IsPermanent      bool      `json:"IsPermanent"`
+	StopLocalTime    time.Time `json:"StopLocalTime"`
 }
 
-func GetBackupInfo(folder storage.Folder, sentinelName string) (BackupAndJournalInfo, error) {
-	backupsInfo, err := GetBackupsInfo(folder)
+func GetBackupInfo(folder storage.Folder, sentinelName string) (BackupInfo, error) {
+	backupsInfo, err := GetAllBackupsInfo(folder)
 	if err != nil {
-		return BackupAndJournalInfo{}, err
+		return BackupInfo{}, err
 	}
 
 	if _, ok := backupsInfo[sentinelName]; !ok {
-		return BackupAndJournalInfo{}, fmt.Errorf("%s isn't contained in backups.json", sentinelName)
+		return BackupInfo{}, fmt.Errorf("%s isn't contained in backups.json", sentinelName)
 	}
 
 	return backupsInfo[sentinelName], nil
 }
 
-func UploadBackupInfo(folder storage.Folder, sentinelName string, info BackupAndJournalInfo) error {
-	backupsInfo, err := GetBackupsInfo(folder)
+func UploadBackupInfo(folder storage.Folder, sentinelName string, info BackupInfo) error {
+	allBackupsInfo, err := GetAllBackupsInfo(folder)
 	if err != nil {
 		return err
 	}
 
-	backupsInfo[sentinelName] = info
+	allBackupsInfo[sentinelName] = info
 
-	err = UpdateBackupsInfo(folder, backupsInfo)
+	err = UpdateBackupsInfo(folder, allBackupsInfo)
 	if err != nil {
 		return err
 	}
@@ -55,8 +57,94 @@ func UploadBackupInfo(folder storage.Folder, sentinelName string, info BackupAnd
 	return nil
 }
 
-func GetBackupsInfo(folder storage.Folder) (map[string]BackupAndJournalInfo, error) {
+func UpdatePreviousBackupInfoJournal(folder storage.Folder, journalPath string, newJournalEnd string) error {
+	latestSentinelName, latestSentinel, err := GetLastNotPermanentBackupInfo(folder)
+	if err != nil {
+		return err
+	}
+
+	if len(latestSentinelName) == 0 {
+		tracelog.WarningLogger.Printf("latest sentinel was not found, we can not evaluate journal size")
+		return nil
+	}
+
+	journalSize, err := GetJournalSizeInSemiInterval(
+		folder,
+		journalPath,
+		func(a, b string) bool {
+			return a < b
+		},
+		latestSentinel.JournalEnd,
+		newJournalEnd,
+	)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("can not evaluate journal sum for %s: %s", latestSentinelName, err)
+		return err
+	}
+	tracelog.InfoLogger.Printf(
+		"journal size for %s in the semi interval (%s; %s] is equal to %d",
+		latestSentinelName,
+		latestSentinel.JournalEnd,
+		newJournalEnd,
+		journalSize,
+	)
+
+	latestBackupInfo, err := GetBackupInfo(folder, latestSentinelName)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("can not find journal sum in backups.json for %s: %s", latestSentinelName, err)
+		return err
+	}
+
+	if latestBackupInfo.JournalSize != 0 {
+		tracelog.WarningLogger.Printf(
+			"previous backup info contains non-zero journal size '%d', its values will be updated to '%d'",
+			latestBackupInfo.JournalSize,
+			journalSize,
+		)
+	}
+
+	err = UploadBackupInfo(folder, latestSentinelName, BackupInfo{
+		JournalStart:     latestSentinel.JournalStart,
+		JournalEnd:       latestSentinel.JournalEnd,
+		JournalSize:      journalSize,
+		CompressedSize:   latestSentinel.CompressedSize,
+		UncompressedSize: latestSentinel.UncompressedSize,
+		IsPermanent:      latestSentinel.IsPermanent,
+		StopLocalTime:    latestSentinel.StopLocalTime,
+	})
+	if err != nil {
+		tracelog.ErrorLogger.Printf("can not update journal info for %s: %s", latestSentinelName, err)
+		return err
+	}
+
+	tracelog.ErrorLogger.Printf("journal info has been updated for %s", latestSentinelName)
+	return nil
+}
+
+func GetLastNotPermanentBackupInfo(folder storage.Folder) (string, BackupInfo, error) {
+	allBackupsInfo, err := GetAllBackupsInfo(folder)
+	if err != nil {
+		return "", BackupInfo{}, err
+	}
+
+	lastestBackupInfo := BackupInfo{}
+	lastestBackupName := ""
+
+	for k, v := range allBackupsInfo {
+		if !v.IsPermanent && v.StopLocalTime.After(lastestBackupInfo.StopLocalTime) {
+			lastestBackupName = k
+			lastestBackupInfo = v
+		}
+	}
+
+	return lastestBackupName, lastestBackupInfo, nil
+}
+
+func GetAllBackupsInfo(folder storage.Folder) (map[string]BackupInfo, error) {
 	ok, err := folder.Exists(BackupsInfo)
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		tracelog.InfoLogger.Printf("can not find backups.json, creating it...")
 		err := folder.PutObject(BackupsInfo, bytes.NewBuffer([]byte("{}")))
@@ -73,7 +161,7 @@ func GetBackupsInfo(folder storage.Folder) (map[string]BackupAndJournalInfo, err
 	return backupsInfo, nil
 }
 
-func readBackupsInfo(folder storage.Folder) (map[string]BackupAndJournalInfo, error) {
+func readBackupsInfo(folder storage.Folder) (map[string]BackupInfo, error) {
 	backupsInfoReader, err := folder.ReadObject(BackupsInfo)
 	if err != nil {
 		return nil, err
@@ -84,7 +172,7 @@ func readBackupsInfo(folder storage.Folder) (map[string]BackupAndJournalInfo, er
 		return nil, err
 	}
 
-	var backupsInfo map[string]BackupAndJournalInfo
+	var backupsInfo map[string]BackupInfo
 	err = json.Unmarshal(backupsInfoBytes, &backupsInfo)
 	if err != nil {
 		return nil, err
@@ -93,7 +181,7 @@ func readBackupsInfo(folder storage.Folder) (map[string]BackupAndJournalInfo, er
 	return backupsInfo, nil
 }
 
-func UpdateBackupsInfo(folder storage.Folder, backupsInfo map[string]BackupAndJournalInfo) error {
+func UpdateBackupsInfo(folder storage.Folder, backupsInfo map[string]BackupInfo) error {
 	rawBackupsInfo, err := json.Marshal(backupsInfo)
 	if err != nil {
 		return err

@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"sort"
@@ -136,40 +135,6 @@ func getLastUploadedBinlog(folder storage.Folder) (string, error) {
 		name = strings.TrimSuffix(name, ext)
 	}
 	return name, nil
-}
-
-func getLastUploadedBackupSentinel(folder storage.Folder) (string, StreamSentinelDto, error) {
-	folder = folder.GetSubFolder(utility.BaseBackupPath)
-	logFiles, _, err := folder.ListFolder()
-	if err != nil {
-		return "", StreamSentinelDto{}, err
-	}
-
-	if len(logFiles) == 0 {
-		tracelog.InfoLogger.Printf("can not find backup sentinels")
-		return "", StreamSentinelDto{}, nil
-	}
-
-	latestSentinel := logFiles[0]
-	for i := 1; i < len(logFiles); i++ {
-		if logFiles[i].GetLastModified().After(latestSentinel.GetLastModified()) {
-			latestSentinel = logFiles[i]
-		}
-	}
-
-	rawSentinelReader, err := folder.ReadObject(latestSentinel.GetName())
-	if err != nil {
-		return "", StreamSentinelDto{}, err
-	}
-
-	rawSentinel, err := io.ReadAll(rawSentinelReader)
-	if err != nil {
-		return "", StreamSentinelDto{}, err
-	}
-
-	var sentinel StreamSentinelDto
-	err = json.Unmarshal(rawSentinel, &sentinel)
-	return latestSentinel.GetName(), sentinel, err
 }
 
 func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet, flavor string) (string, error) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -23,7 +24,24 @@ var (
 	MaximalJournalNumber = "999999999"
 )
 
-func GenerateS3SetAndTest(t *testing.T, recordCount, recordSize int, beginJournalID, endJournalID string, expectedSum int64) {
+func GenerateDataAndTest(
+	t *testing.T,
+	recordCount, recordSize int,
+	beginJournalID, endJournalID string,
+	expectedSum int64,
+) {
+	GenerateS3SetAndTest(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
+	GenerateS3SetAndUpdateBackupsInfo(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
+	GenerateS3SetAndUpdateBackupsInfoManyTimes(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
+	GenerateS3AndUpdateLastBackup(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
+}
+
+func GenerateS3SetAndTest(
+	t *testing.T,
+	recordCount, recordSize int,
+	beginJournalID, endJournalID string,
+	expectedSum int64,
+) {
 	root, mockUploader := initTestS3()
 
 	generateAndUploadData(mockUploader, recordCount, recordSize)
@@ -41,7 +59,12 @@ func GenerateS3SetAndTest(t *testing.T, recordCount, recordSize int, beginJourna
 	assert.Equal(t, expectedSum, journalSize)
 }
 
-func GenerateS3SetAndAddJournalToOldBackup(t *testing.T, recordCount, recordSize int, beginJournalID, endJournalID string, expectedSum int64) {
+func GenerateS3SetAndUpdateBackupsInfo(
+	t *testing.T,
+	recordCount, recordSize int,
+	beginJournalID, endJournalID string,
+	expectedSum int64,
+) {
 	root, mockUploader := initTestS3()
 
 	generateAndUploadData(mockUploader, recordCount, recordSize)
@@ -50,7 +73,7 @@ func GenerateS3SetAndAddJournalToOldBackup(t *testing.T, recordCount, recordSize
 
 	backupInfo, err := internal.GetBackupInfo(root, SentinelFilePath)
 	assert.Error(t, err)
-	assert.Equal(t, backupInfo, internal.BackupAndJournalInfo{})
+	assert.Equal(t, backupInfo, internal.BackupInfo{})
 
 	backupInfo.JournalSize, err = internal.GetJournalSizeInSemiInterval(
 		root,
@@ -61,14 +84,92 @@ func GenerateS3SetAndAddJournalToOldBackup(t *testing.T, recordCount, recordSize
 		beginJournalID,
 		endJournalID,
 	)
+	assert.NoError(t, err)
+
 	err = internal.UploadBackupInfo(root, SentinelFilePath, backupInfo)
 	assert.NoError(t, err)
 
 	backupInfo, err = internal.GetBackupInfo(root, SentinelFilePath)
 	assert.NoError(t, err)
-	assert.Equal(t, backupInfo, internal.BackupAndJournalInfo{
-		JournalSize: int64(expectedSum),
+	assert.Equal(t, backupInfo, internal.BackupInfo{
+		JournalSize: expectedSum,
 	})
+}
+
+func GenerateS3AndUpdateLastBackup(
+	t *testing.T,
+	recordCount, recordSize int,
+	beginJournalID, endJournalID string,
+	expectedSum int64,
+) {
+	root, mockUploader := initTestS3()
+
+	generateAndUploadData(mockUploader, recordCount, recordSize)
+
+	createEmptySentinel(t, root)
+
+	backupInfo, err := internal.GetBackupInfo(root, SentinelFilePath)
+	assert.Error(t, err)
+	assert.Equal(t, backupInfo, internal.BackupInfo{})
+
+	err = internal.UploadBackupInfo(root, SentinelFilePath, internal.BackupInfo{
+		JournalStart:  beginJournalID,
+		JournalEnd:    beginJournalID,
+		StopLocalTime: time.Now().Add(-time.Hour),
+	})
+	assert.NoError(t, err)
+
+	err = internal.UpdatePreviousBackupInfoJournal(root, utility.WalPath, endJournalID)
+	assert.NoError(t, err)
+
+	backupInfo, err = internal.GetBackupInfo(root, SentinelFilePath)
+	assert.NoError(t, err)
+
+	assert.Equal(t, backupInfo.JournalSize, expectedSum)
+}
+
+func GenerateS3SetAndUpdateBackupsInfoManyTimes(
+	t *testing.T,
+	recordCount, recordSize int,
+	beginJournalID, endJournalID string,
+	expectedSum int64,
+) {
+	times := 10
+	root, mockUploader := initTestS3()
+
+	generateAndUploadData(mockUploader, recordCount, recordSize)
+
+	createEmptySentinel(t, root)
+
+	for i := 0; i < times; i++ {
+		var backupInfo internal.BackupInfo
+		var err error
+
+		backupInfo.JournalSize, err = internal.GetJournalSizeInSemiInterval(
+			root,
+			utility.WalPath,
+			func(a, b string) bool {
+				return a < b
+			},
+			beginJournalID,
+			endJournalID,
+		)
+		assert.NoError(t, err)
+
+		sentinel := fmt.Sprintf("%s%d", SentinelFilePath, i)
+		err = internal.UploadBackupInfo(root, sentinel, backupInfo)
+		assert.NoError(t, err)
+
+		backupInfo, err = internal.GetBackupInfo(root, sentinel)
+		assert.NoError(t, err)
+		assert.Equal(t, backupInfo, internal.BackupInfo{
+			JournalSize: expectedSum,
+		})
+	}
+
+	allBackupsInfo, err := internal.GetAllBackupsInfo(root)
+	assert.NoError(t, err)
+	assert.Equal(t, len(allBackupsInfo), times)
 }
 
 func initTestS3() (*memory.Folder, internal.Uploader) {
@@ -108,8 +209,7 @@ func TestEmptyFolder(t *testing.T) {
 	end := MaximalJournalNumber
 	expectedSize := int64(0)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestOneJournal(t *testing.T) {
@@ -119,8 +219,7 @@ func TestOneJournal(t *testing.T) {
 	end := MaximalJournalNumber
 	expectedSize := int64(8)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestManyJournals(t *testing.T) {
@@ -130,8 +229,7 @@ func TestManyJournals(t *testing.T) {
 	end := MaximalJournalNumber
 	expectedSize := int64(800)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestSimpleFrom(t *testing.T) {
@@ -141,8 +239,7 @@ func TestSimpleFrom(t *testing.T) {
 	end := MaximalJournalNumber
 	expectedSize := int64(8)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestSimpleTo(t *testing.T) {
@@ -152,8 +249,7 @@ func TestSimpleTo(t *testing.T) {
 	end := toJournalNumber(2)
 	expectedSize := int64(16)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestHalfFrom(t *testing.T) {
@@ -163,8 +259,7 @@ func TestHalfFrom(t *testing.T) {
 	end := MaximalJournalNumber
 	expectedSize := int64(400)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestHalfTo(t *testing.T) {
@@ -174,8 +269,7 @@ func TestHalfTo(t *testing.T) {
 	end := toJournalNumber(50)
 	expectedSize := int64(400)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestEmptySetOnTheRightSide(t *testing.T) {
@@ -185,8 +279,7 @@ func TestEmptySetOnTheRightSide(t *testing.T) {
 	end := MaximalJournalNumber
 	expectedSize := int64(0)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestEmptySetOnTheLeftSide(t *testing.T) {
@@ -196,8 +289,7 @@ func TestEmptySetOnTheLeftSide(t *testing.T) {
 	end := MinimalJournalNumber
 	expectedSize := int64(0)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
 
 func TestOnlyFirstRecord(t *testing.T) {
@@ -207,6 +299,5 @@ func TestOnlyFirstRecord(t *testing.T) {
 	end := toJournalNumber(1)
 	expectedSize := int64(8)
 
-	GenerateS3SetAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-	GenerateS3SetAndAddJournalToOldBackup(t, recordCount, recordSize, begin, end, expectedSize)
+	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
 }
