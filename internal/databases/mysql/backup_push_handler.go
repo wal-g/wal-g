@@ -120,15 +120,15 @@ func HandleBackupPush(
 	err = internal.UploadSentinel(uploader, &sentinel, backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	latestSentinelName, latestSentinel, err := internal.GetLastNotPermanentBackupInfo(folder)
+	lastSentinelName, lastSentinel, err := internal.GetLastNotPermanentBackupInfo(folder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to find the last backup: %v", err)
 	} else {
-		tracelog.InfoLogger.Printf("latest sentinel is %+v", latestSentinelName)
+		tracelog.InfoLogger.Printf("last sentinel is %+v", lastSentinelName)
 	}
 
 	newBackupInfo := internal.BackupInfo{
-		JournalStart:     latestSentinel.JournalEnd,
+		JournalStart:     lastSentinel.JournalEnd,
 		JournalEnd:       binlogEnd,
 		JournalSize:      0,
 		CompressedSize:   uploadedSize,
@@ -141,20 +141,20 @@ func HandleBackupPush(
 	if !isPermanent && err == nil {
 		err = internal.UpdatePreviousBackupInfoJournal(folder, BinlogPath, newBackupInfo.JournalEnd)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("can not update previous backup info for %s: %s", backupName, err)
+			tracelog.ErrorLogger.Printf("unable to update previous backup info for %s: %s", backupName, err)
 		} else {
-			tracelog.InfoLogger.Printf("Backup info for %s was updated", backupName)
+			tracelog.InfoLogger.Printf("updated backup info for %s", backupName)
 		}
 	} else {
-		tracelog.InfoLogger.Printf("not updating last backup's journal, new is permanent or there is an error %s", err)
+		tracelog.InfoLogger.Printf("skipping update of last backup's journal, due to either the new backup being permanent or an error: %s", err)
 	}
 
 	err = internal.UploadBackupInfo(folder, backupName+utility.SentinelSuffix, newBackupInfo)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("can not upload backup info for %s: %s", backupName, err)
+		tracelog.ErrorLogger.Printf("failed to upload backup info for %s: %s", backupName, err)
 		return
 	}
-	tracelog.InfoLogger.Printf("backup info has been uploaded for %s", backupName)
+	tracelog.InfoLogger.Printf("uploaded backup info for %s", backupName)
 }
 
 func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backupName string, err error) {

@@ -30,13 +30,13 @@ func GenerateDataAndTest(
 	beginJournalID, endJournalID string,
 	expectedSum int64,
 ) {
-	GenerateS3SetAndTest(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
+	GenerateS3SetAndCheckJournalSizes(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
 	GenerateS3SetAndUpdateBackupsInfo(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
 	GenerateS3SetAndUpdateBackupsInfoManyTimes(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
 	GenerateS3AndUpdateLastBackup(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
 }
 
-func GenerateS3SetAndTest(
+func GenerateS3SetAndCheckJournalSizes(
 	t *testing.T,
 	recordCount, recordSize int,
 	beginJournalID, endJournalID string,

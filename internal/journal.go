@@ -58,13 +58,13 @@ func UploadBackupInfo(folder storage.Folder, sentinelName string, info BackupInf
 }
 
 func UpdatePreviousBackupInfoJournal(folder storage.Folder, journalPath string, newJournalEnd string) error {
-	latestSentinelName, latestSentinel, err := GetLastNotPermanentBackupInfo(folder)
+	lastSentinelName, lastSentinel, err := GetLastNotPermanentBackupInfo(folder)
 	if err != nil {
 		return err
 	}
 
-	if len(latestSentinelName) == 0 {
-		tracelog.WarningLogger.Printf("latest sentinel was not found, we can not evaluate journal size")
+	if len(lastSentinelName) == 0 {
+		tracelog.WarningLogger.Printf("last sentinel was not found, we can not evaluate journal size")
 		return nil
 	}
 
@@ -74,50 +74,50 @@ func UpdatePreviousBackupInfoJournal(folder storage.Folder, journalPath string, 
 		func(a, b string) bool {
 			return a < b
 		},
-		latestSentinel.JournalEnd,
+		lastSentinel.JournalEnd,
 		newJournalEnd,
 	)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("can not evaluate journal sum for %s: %s", latestSentinelName, err)
+		tracelog.ErrorLogger.Printf("can not evaluate journal sum for %s: %s", lastSentinelName, err)
 		return err
 	}
 	tracelog.InfoLogger.Printf(
 		"journal size for %s in the semi interval (%s; %s] is equal to %d",
-		latestSentinelName,
-		latestSentinel.JournalEnd,
+		lastSentinelName,
+		lastSentinel.JournalEnd,
 		newJournalEnd,
 		journalSize,
 	)
 
-	latestBackupInfo, err := GetBackupInfo(folder, latestSentinelName)
+	lastBackupInfo, err := GetBackupInfo(folder, lastSentinelName)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("can not find journal sum in backups.json for %s: %s", latestSentinelName, err)
+		tracelog.ErrorLogger.Printf("can not find journal sum in backups.json for %s: %s", lastSentinelName, err)
 		return err
 	}
 
-	if latestBackupInfo.JournalSize != 0 {
+	if lastBackupInfo.JournalSize != 0 {
 		tracelog.WarningLogger.Printf(
 			"previous backup info contains non-zero journal size '%d', its values will be updated to '%d'",
-			latestBackupInfo.JournalSize,
+			lastBackupInfo.JournalSize,
 			journalSize,
 		)
 	}
 
-	err = UploadBackupInfo(folder, latestSentinelName, BackupInfo{
-		JournalStart:     latestSentinel.JournalStart,
-		JournalEnd:       latestSentinel.JournalEnd,
+	err = UploadBackupInfo(folder, lastSentinelName, BackupInfo{
+		JournalStart:     lastSentinel.JournalStart,
+		JournalEnd:       lastSentinel.JournalEnd,
 		JournalSize:      journalSize,
-		CompressedSize:   latestSentinel.CompressedSize,
-		UncompressedSize: latestSentinel.UncompressedSize,
-		IsPermanent:      latestSentinel.IsPermanent,
-		StopLocalTime:    latestSentinel.StopLocalTime,
+		CompressedSize:   lastSentinel.CompressedSize,
+		UncompressedSize: lastSentinel.UncompressedSize,
+		IsPermanent:      lastSentinel.IsPermanent,
+		StopLocalTime:    lastSentinel.StopLocalTime,
 	})
 	if err != nil {
-		tracelog.ErrorLogger.Printf("can not update journal info for %s: %s", latestSentinelName, err)
+		tracelog.ErrorLogger.Printf("can not update journal info for %s: %s", lastSentinelName, err)
 		return err
 	}
 
-	tracelog.ErrorLogger.Printf("journal info has been updated for %s", latestSentinelName)
+	tracelog.ErrorLogger.Printf("journal info has been updated for %s", lastSentinelName)
 	return nil
 }
 
@@ -127,17 +127,17 @@ func GetLastNotPermanentBackupInfo(folder storage.Folder) (string, BackupInfo, e
 		return "", BackupInfo{}, err
 	}
 
-	lastestBackupInfo := BackupInfo{}
-	lastestBackupName := ""
+	lastBackupInfo := BackupInfo{}
+	lastBackupName := ""
 
 	for k, v := range allBackupsInfo {
-		if !v.IsPermanent && v.StopLocalTime.After(lastestBackupInfo.StopLocalTime) {
-			lastestBackupName = k
-			lastestBackupInfo = v
+		if !v.IsPermanent && v.StopLocalTime.After(lastBackupInfo.StopLocalTime) {
+			lastBackupName = k
+			lastBackupInfo = v
 		}
 	}
 
-	return lastestBackupName, lastestBackupInfo, nil
+	return lastBackupName, lastBackupInfo, nil
 }
 
 func GetAllBackupsInfo(folder storage.Folder) (map[string]BackupInfo, error) {
