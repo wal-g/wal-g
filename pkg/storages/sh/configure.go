@@ -13,6 +13,8 @@ const (
 	passwordSetting       = "SSH_PASSWORD"
 	usernameSetting       = "SSH_USERNAME"
 	privateKeyPathSetting = "SSH_PRIVATE_KEY_PATH"
+	jumpHostSetting       = "SSH_JUMP_HOST"
+	jumpPortSetting       = "SSH_JUMP_PORT"
 )
 
 var SettingList = []string{
@@ -20,6 +22,8 @@ var SettingList = []string{
 	passwordSetting,
 	usernameSetting,
 	privateKeyPathSetting,
+	jumpHostSetting,
+	jumpPortSetting,
 }
 
 const defaultPort = "22"
@@ -49,6 +53,8 @@ func ConfigureStorage(
 		RootPath:       folderPath,
 		User:           settings[usernameSetting],
 		PrivateKeyPath: settings[privateKeyPathSetting],
+		JumpHost:       settings[jumpHostSetting],
+		JumpPort:       settings[jumpPortSetting],
 	}
 
 	st, err := NewStorage(config, rootWraps...)
