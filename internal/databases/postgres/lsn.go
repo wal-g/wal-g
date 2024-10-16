@@ -1,15 +1,17 @@
 package postgres
 
-import "github.com/jackc/pgx"
+import (
+	"github.com/jackc/pglogrepl"
+)
 
-type LSN uint64
+type LSN pglogrepl.LSN
 
 func (lsn LSN) String() string {
-	return pgx.FormatLSN(uint64(lsn))
+	return pglogrepl.LSN(lsn).String()
 }
 
 func ParseLSN(s string) (LSN, error) {
-	lsn, err := pgx.ParseLSN(s)
+	lsn, err := pglogrepl.ParseLSN(s)
 	if err != nil {
 		return 0, err
 	}
