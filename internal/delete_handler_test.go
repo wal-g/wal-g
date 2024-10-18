@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -24,6 +25,12 @@ func CreateMockStorageFolder() storage.Folder {
 	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{})
 	subFolder.PutObject("base_456/some_folder/3", &bytes.Buffer{})
 	return folder
+}
+
+func CreateMockDeleteHandler(backups []BackupObject, folder storage.Folder) *DeleteHandler {
+	lessFunction := func(object1, object2 storage.Object) bool { return object1.GetName() < object2.GetName() }
+	deleteHandler := NewDeleteHandler(folder, backups, lessFunction)
+	return deleteHandler
 }
 
 func TestDeleteOldObjects(t *testing.T) {
@@ -59,4 +66,53 @@ func TestDeleteOldObjectsWithFilter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(savedObjects))
 	assert.Equal(t, expectedOnlyOneSavedObjectName, savedObjects[0].GetName())
+}
+
+func TestFindTargetByName(t *testing.T) {
+	mockFolder := CreateMockStorageFolder()
+	objects, _, _ := mockFolder.GetSubFolder("basebackups_005/").ListFolder()
+	backupObjects := []BackupObject{NewDefaultBackupObject(objects[0])}
+	deleteHandler := CreateMockDeleteHandler(backupObjects, mockFolder)
+
+	testCases := []struct {
+		target   string
+		expected string
+	}{
+		{
+			"",
+			backupObjects[0].GetName(),
+		},
+		{
+			backupObjects[0].GetName(),
+			backupObjects[0].GetName(),
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("Case %d", i), func(t *testing.T) {
+			actual, err := deleteHandler.FindTargetByName(tc.target)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, actual.GetName())
+		})
+	}
+}
+
+func TestFindTargetByNameNotContains(t *testing.T) {
+	mockFolder := CreateMockStorageFolder()
+	objects, _, _ := mockFolder.GetSubFolder("basebackups_005/").ListFolder()
+	backupObjects := []BackupObject{NewDefaultBackupObject(objects[0])}
+	deleteHandler := CreateMockDeleteHandler(backupObjects, mockFolder)
+
+	notExistTarget := "base_567_backup_stop_sentinel.json"
+	actual, err := deleteHandler.FindTargetByName(notExistTarget)
+	assert.Error(t, err)
+	assert.Equal(t, nil, actual)
+}
+
+func TestFindTargetByNameEmpty(t *testing.T) {
+	mockFolder := CreateMockStorageFolder()
+	deleteHandler := CreateMockDeleteHandler([]BackupObject{}, mockFolder)
+	actual, err := deleteHandler.FindTargetByName("base_123312")
+	assert.Error(t, err)
+	assert.Equal(t, nil, actual)
 }

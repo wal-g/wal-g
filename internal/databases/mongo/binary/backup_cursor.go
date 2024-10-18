@@ -9,6 +9,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -20,7 +22,7 @@ type BackupCursor struct {
 	mongodService         *MongodService
 	keepAliveStopFunction func()
 	closeBackupCursorWg   sync.WaitGroup
-	visited               map[string]*BackupFileMeta
+	visited               map[string]*internal.BackupFileMeta
 }
 
 func CreateBackupCursor(mongodService *MongodService) (*BackupCursor, error) {
@@ -32,7 +34,7 @@ func CreateBackupCursor(mongodService *MongodService) (*BackupCursor, error) {
 	backupCursor := &BackupCursor{
 		Cursor:        mongoBackupCursor,
 		mongodService: mongodService,
-		visited:       map[string]*BackupFileMeta{},
+		visited:       map[string]*internal.BackupFileMeta{},
 	}
 
 	err = backupCursor.loadMetadata()
@@ -64,7 +66,7 @@ func (backupCursor *BackupCursor) StartKeepAlive() {
 	}()
 }
 
-func (backupCursor *BackupCursor) LoadBackupCursorFiles() (backupFiles []*BackupFileMeta, err error) {
+func (backupCursor *BackupCursor) LoadBackupCursorFiles() (backupFiles []*internal.BackupFileMeta, err error) {
 	for backupCursor.TryNext(backupCursor.mongodService.Context) {
 		var backupFile BackupCursorFile
 		err = backupCursor.Decode(&backupFile)
@@ -83,7 +85,7 @@ func (backupCursor *BackupCursor) LoadBackupCursorFiles() (backupFiles []*Backup
 	return backupFiles, nil
 }
 
-func (backupCursor *BackupCursor) LoadExtendedBackupCursorFiles() (backupFiles []*BackupFileMeta, err error) {
+func (backupCursor *BackupCursor) LoadExtendedBackupCursorFiles() (backupFiles []*internal.BackupFileMeta, err error) {
 	extendedBackupCursor, err := backupCursor.mongodService.GetBackupCursorExtended(backupCursor.BackupCursorMeta)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to take extended backup cursor with '%+v'", backupCursor.BackupCursorMeta)
@@ -145,7 +147,7 @@ func (backupCursor *BackupCursor) loadMetadata() error {
 	return nil
 }
 
-func (backupCursor *BackupCursor) createBackupFileMeta(backupFile *BackupCursorFile) (*BackupFileMeta, error) {
+func (backupCursor *BackupCursor) createBackupFileMeta(backupFile *BackupCursorFile) (*internal.BackupFileMeta, error) {
 	backupFilePath := backupFile.FileName
 
 	if previousBackupFileMeta, ok := backupCursor.visited[backupFilePath]; ok {
@@ -158,7 +160,7 @@ func (backupCursor *BackupCursor) createBackupFileMeta(backupFile *BackupCursorF
 		return nil, err
 	}
 
-	backupFileMeta := &BackupFileMeta{
+	backupFileMeta := &internal.BackupFileMeta{
 		Path:     backupFilePath,
 		FileMode: backupFileInfo.Mode(),
 		FileSize: backupFile.FileSize,

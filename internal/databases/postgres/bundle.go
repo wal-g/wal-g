@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
@@ -72,6 +74,8 @@ type Bundle struct {
 	DataCatalogSize    *int64
 
 	forceIncremental bool
+
+	IncrementFromChkpNum *uint32
 }
 
 // TODO: use DiskDataFolder
@@ -82,7 +86,7 @@ func NewBundle(
 ) *Bundle {
 	return &Bundle{
 		Bundle: internal.Bundle{
-			Directory:         directory,
+			Directories:       []string{directory},
 			Crypter:           crypter,
 			TarSizeThreshold:  tarSizeThreshold,
 			ExcludedFilenames: ExcludedFilenames,
@@ -275,8 +279,7 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 			bundle.TarBallComposer.SkipFile(fileInfoHeader, info)
 			return nil
 		}
-		incrementBaseLsn := bundle.getIncrementBaseLsn()
-		isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
+		isIncremented := bundle.isIncremented(path, wasInBase, info)
 		bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
@@ -289,6 +292,14 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 	}
 
 	return nil
+}
+
+// isPagedFile checks basic expectations for paged file
+func (bundle *Bundle) isIncremented(path string, wasInBase bool, info fs.FileInfo) bool {
+	incrementBaseLsn := bundle.getIncrementBaseLsn()
+	isIncremented := incrementBaseLsn != nil && (wasInBase || bundle.forceIncremental) && isPagedFile(info, path)
+	isIncremented = isIncremented || (bundle.IncrementFromChkpNum != nil && wasInBase && orioledb.IsOrioledbDataFile(info, path))
+	return isIncremented
 }
 
 // TODO : unit tests

@@ -33,7 +33,7 @@ func (t FilesToExtractProviderImpl) Get(backup SegBackup, filesToUnwrap map[stri
 	} else {
 		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
 		for extractPath, meta := range aoMeta.Files {
-			if !filesToUnwrap[extractPath] {
+			if filesToUnwrap != nil && !filesToUnwrap[extractPath] {
 				tracelog.InfoLogger.Printf("Don't need to unwrap the %s AO segment file, skipping it...", extractPath)
 				continue
 			}

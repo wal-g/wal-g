@@ -24,14 +24,14 @@ var (
 	retainCount  uint
 )
 
-// deleteCmd represents the delete command
-var deleteCmd = &cobra.Command{
+// purgeCmd represents the command for purging old backups (for deleting separate backup see deleteCmd)
+var purgeCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "Delete old backups",
-	Run:   runDelete,
+	Short: "Purge old backups",
+	Run:   runPurge,
 }
 
-func runDelete(cmd *cobra.Command, args []string) {
+func runPurge(cmd *cobra.Command, args []string) {
 	opts := []redis.PurgeOption{
 		redis.PurgeDryRun(!confirmed),
 		redis.PurgeGarbage(purgeGarbage),
@@ -50,14 +50,19 @@ func runDelete(cmd *cobra.Command, args []string) {
 		opts = append(opts, redis.PurgeRetainCount(int(retainCount)))
 	}
 
-	err := redis.HandlePurge(utility.BaseBackupPath, opts...)
+	st, err := internal.ConfigureStorage()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	backupFolder := st.RootFolder().GetSubFolder(utility.BaseBackupPath)
+
+	err = redis.HandlePurge(backupFolder, opts...)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func init() {
-	cmd.AddCommand(deleteCmd)
-	deleteCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup and garbage deletion")
-	deleteCmd.Flags().BoolVar(&purgeGarbage, purgeGarbageFlag, false, "Delete garbage in backup folder")
-	deleteCmd.Flags().StringVar(&retainAfter, retainAfterFlag, "", "Keep backups newer")
-	deleteCmd.Flags().UintVar(&retainCount, retainCountFlag, 0, "Keep minimum count, except permanent backups")
+	cmd.AddCommand(purgeCmd)
+	purgeCmd.Flags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup and garbage purge")
+	purgeCmd.Flags().BoolVar(&purgeGarbage, purgeGarbageFlag, false, "Purge garbage in backup folder")
+	purgeCmd.Flags().StringVar(&retainAfter, retainAfterFlag, "", "Keep backups newer")
+	purgeCmd.Flags().UintVar(&retainCount, retainCountFlag, 0, "Keep minimum count, except permanent backups")
 }

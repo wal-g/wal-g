@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
@@ -52,7 +53,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath)
+	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, []string{mongodDBPath})
 	if err != nil {
 		return err
 	}
@@ -62,14 +63,21 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		return errors.Wrapf(err, "unable to upload backup files")
 	}
 
-	extendedBackupFiles, err := backupCursor.LoadExtendedBackupCursorFiles()
+	extendBackupCursor, err := conf.GetBoolSettingDefault(conf.MongoDBExtendBackupCursor, true)
 	if err != nil {
-		return errors.Wrapf(err, "unable to load data from backup cursor")
+		return nil
 	}
 
-	err = concurrentUploader.UploadBackupFiles(extendedBackupFiles)
-	if err != nil {
-		return errors.Wrapf(err, "unable to upload backup files")
+	if extendBackupCursor {
+		extendedBackupFiles, err := backupCursor.LoadExtendedBackupCursorFiles()
+		if err != nil {
+			return errors.Wrapf(err, "unable to load data from backup cursor")
+		}
+
+		err = concurrentUploader.UploadBackupFiles(extendedBackupFiles)
+		if err != nil {
+			return errors.Wrapf(err, "unable to upload backup files")
+		}
 	}
 
 	err = concurrentUploader.Finalize()
@@ -107,7 +115,7 @@ func (backupService *BackupService) InitializeMongodBackupMeta(backupName string
 	return nil
 }
 
-func (backupService *BackupService) Finalize(uploader *ConcurrentUploader, backupCursorMeta *BackupCursorMeta) error {
+func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta) error {
 	sentinel := &backupService.Sentinel
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uploader.UncompressedSize

@@ -92,7 +92,7 @@ func TimestampFromStr(s string) (OpTimestamp, error) {
 }
 
 func BackupNamesFromListing(output string) []string {
-	re := regexp.MustCompile(`(stream|binary)_\d{8}T\d{6}Z`)
+	re := regexp.MustCompile(`(stream|binary|aof)_\d{8}T\d{6}Z`)
 	return re.FindAllString(output, -1)
 }
 
@@ -101,15 +101,15 @@ func BackupNameFromCreate(output string) string {
 }
 
 type WalgUtil struct {
-	ctx      context.Context
-	host     string
-	cliPath  string
-	confPath string
-	mongoMaj string
+	ctx            context.Context
+	host           string
+	cliPath        string
+	confPath       string
+	dbMajorVersion string
 }
 
-func NewWalgUtil(ctx context.Context, host, cliPath, confPath, mongoMaj string) *WalgUtil {
-	return &WalgUtil{ctx, host, cliPath, confPath, mongoMaj}
+func NewWalgUtil(ctx context.Context, host, cliPath, confPath, dbMajorVersion string) *WalgUtil {
+	return &WalgUtil{ctx, host, cliPath, confPath, dbMajorVersion}
 }
 
 func (w *WalgUtil) runCmd(run ...string) (ExecResult, error) {
@@ -160,6 +160,21 @@ func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
 		return err
 	}
 	_, err = w.runCmd("backup-fetch", backup)
+	return err
+}
+
+func (w *WalgUtil) FetchAofBackupByNum(backupNum int, version string) error {
+	backup, err := w.GetBackupByNumber(backupNum)
+	if err != nil {
+		return err
+	}
+	_, err = w.runCmd("aof-backup-fetch", backup, version)
+	if err != nil {
+		return err
+	}
+
+	cmd := []string{"chown", "-R", "redis:redis", "/data"}
+	_, err = RunCommandStrict(w.ctx, w.host, cmd)
 	return err
 }
 

@@ -32,7 +32,7 @@ const (
 var (
 	fromConfigFile string
 	toConfigFile   string
-	prefix string
+	prefix         string
 
 	decryptSource bool
 	encryptTarget bool
@@ -40,11 +40,11 @@ var (
 
 // copyObjectCmd represents the catObject command
 // Storage tool that provides cross-storage objects copying.
-// Additional argument --prefix allow to filter only objects 
-// with names having specific prefix in them. 
+// Additional argument --prefix allow to filter only objects
+// with names having specific prefix in them.
 // This comes in handy when only some folders need to be copied.
-// Copy command has feature to decrypt files from source storage and encrypt files 
-// before putting them into target folder, 
+// Copy command has feature to decrypt files from source storage and encrypt files
+// before putting them into target folder,
 // because source and target config may contain different encryption settings.
 var copyObjectCmd = &cobra.Command{
 	Use:   "copy",

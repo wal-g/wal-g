@@ -1,6 +1,9 @@
 package postgres_test
 
 import (
+	"testing"
+	"time"
+
 	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -11,8 +14,6 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
-	"testing"
-	"time"
 )
 
 func TestFetch(t *testing.T) {
@@ -141,4 +142,23 @@ func TestSetUserDataReturnErrorWhenFolderIsMultiStorage(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.IsType(t, "failed to modify metadata", err.Error())
+}
+
+func TestSetIsPermanent(t *testing.T) {
+	folder := testtools.CreateMockStorageFolder()
+	backupName := "test"
+	testObject := postgres.ExtendedMetadataDto{
+		IsPermanent: false,
+	}
+
+	marshaller, _ := internal.NewDtoSerializer()
+	file, _ := marshaller.Marshal(testObject)
+	_ = folder.PutObject(internal.MetadataNameFromBackup(backupName), file)
+
+	setErr := postgres.NewGenericMetaInteractor().SetIsPermanent(backupName, folder, true)
+	actualResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
+
+	assert.NoError(t, setErr)
+	assert.NoError(t, fetchErr)
+	assert.Equal(t, true, actualResult.IsPermanent)
 }

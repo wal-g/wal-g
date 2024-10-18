@@ -2,6 +2,7 @@ package s3
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -81,7 +82,7 @@ var SettingList = []string{
 
 const (
 	defaultPort                    = "443"
-	defaultSkipValidation          = false
+	defaultSkipValidation          = true
 	defaultForcePathStyle          = false
 	defaultUseListObjectsV1        = false
 	defaultMaxRetries              = 15
@@ -162,7 +163,7 @@ func ConfigureStorage(
 
 	config := &Config{
 		Secrets: &Secrets{
-			SecretKey: setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting),
+			SecretKey: strings.TrimSpace(setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting)),
 		},
 		Region:                   settings[regionSetting],
 		Endpoint:                 settings[endpointSetting],
@@ -170,7 +171,7 @@ func ConfigureStorage(
 		EndpointPort:             port,
 		Bucket:                   bucket,
 		RootPath:                 rootPath,
-		AccessKey:                setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting),
+		AccessKey:                strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
 		SessionToken:             settings[sessionTokenSetting],
 		RoleARN:                  settings[roleARNSetting],
 		SessionName:              settings[sessionNameSetting],

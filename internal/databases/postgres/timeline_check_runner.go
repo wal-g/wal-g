@@ -72,7 +72,6 @@ func newTimelineCheckResult(currentTimeline, highestTimeline uint32) WalVerifyCh
 	return result
 }
 
-// TODO: Unit tests
 func tryFindHighestTimelineID(filenames []string) (highestTimelineID uint32) {
 	for _, name := range filenames {
 		fileTimeline, ok := tryParseTimelineID(name)

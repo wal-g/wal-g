@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
@@ -50,18 +49,11 @@ func PurgeDryRun(dryRun bool) PurgeOption {
 }
 
 // HandlePurge delete backups and oplog archives according to settings
-func HandlePurge(backupsPath string, setters ...PurgeOption) error {
+func HandlePurge(backupFolder storage.Folder, setters ...PurgeOption) error {
 	opts := PurgeSettings{dryRun: true}
 	for _, setter := range setters {
 		setter(&opts)
 	}
-
-	st, err := internal.ConfigureStorage()
-	if err != nil {
-		return err
-	}
-
-	backupFolder := st.RootFolder().GetSubFolder(backupsPath)
 
 	backupTimes, garbage, err := internal.GetBackupsAndGarbage(backupFolder)
 	if err != nil {
@@ -127,7 +119,7 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 func LoadBackups(folder storage.Folder, names []string) ([]archive.Backup, error) {
 	backups := make([]archive.Backup, 0, len(names))
 	for _, name := range names {
-		backup, err := BackupMeta(folder, name)
+		backup, err := archive.SentinelWithoutExistenceCheck(folder, name)
 		if err != nil {
 			return nil, err
 		}
@@ -137,22 +129,6 @@ func LoadBackups(folder storage.Folder, names []string) ([]archive.Backup, error
 		return backups[i].FinishLocalTime.After(backups[j].FinishLocalTime)
 	})
 	return backups, nil
-}
-
-func BackupMeta(folder storage.Folder, name string) (archive.Backup, error) {
-	backup, err := internal.NewBackup(folder, name)
-	if err != nil {
-		return archive.Backup{}, err
-	}
-	var sentinel archive.Backup
-	err = backup.FetchSentinel(&sentinel)
-	if err != nil {
-		return archive.Backup{}, fmt.Errorf("can not fetch stream sentinel: %w", err)
-	}
-	if sentinel.BackupName == "" {
-		sentinel.BackupName = name
-	}
-	return sentinel, nil
 }
 
 // BackupNamesFromBackupTimes forms list of backup names from BackupTime
@@ -168,7 +144,7 @@ func BackupNamesFromBackupTimes(backups []internal.BackupTime) []string {
 func BackupNamesFromBackups(backups []archive.Backup) []string {
 	names := make([]string, 0, len(backups))
 	for idx := range backups {
-		names = append(names, backups[idx].BackupName)
+		names = append(names, backups[idx].Name())
 	}
 	return names
 }

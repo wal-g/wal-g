@@ -1,8 +1,9 @@
 package compression
 
 import (
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"io"
+
+	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
 type Compressor interface {

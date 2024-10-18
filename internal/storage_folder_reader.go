@@ -34,7 +34,7 @@ func PrepareMultiStorageFolderReader(folder storage.Folder, targetStorage string
 	} else {
 		folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
 	}
-	tracelog.InfoLogger.Printf("Files will be read from storages: %v", multistorage.UsedStorages(folder))
+	tracelog.DebugLogger.Printf("Files will be read from storages: %v", multistorage.UsedStorages(folder))
 	if err != nil {
 		return nil, err
 	}

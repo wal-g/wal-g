@@ -17,6 +17,8 @@ func TestBackup_PrintableFields(t *testing.T) {
 		BackupSize:      200000,
 		Permanent:       true,
 		UserData:        []string{"a", "b", "c"},
+		Version:         "4.5.4",
+		BackupType:      "rdb",
 	}
 	got := b.PrintableFields()
 	prettyStartTime := "Wednesday, 23-Aug-23 17:18:31 UTC"
@@ -62,6 +64,30 @@ func TestBackup_PrintableFields(t *testing.T) {
 			Name:        "permanent",
 			PrettyName:  "Permanent",
 			Value:       "true",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "backup_type",
+			PrettyName:  "Backup type",
+			Value:       "rdb",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "version",
+			PrettyName:  "Backup version",
+			Value:       "4.5.4",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "used_memory",
+			PrettyName:  "Used memory (limited by maxmemory)",
+			Value:       "0",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "used_memory_rss",
+			PrettyName:  "Used memory (as seen by OS))",
+			Value:       "0",
 			PrettyValue: nil,
 		},
 	}

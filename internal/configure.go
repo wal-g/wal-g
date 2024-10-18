@@ -451,6 +451,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = conf.PGDefaultSettings
 		case conf.MONGO:
 			dbSpecificDefaultSettings = conf.MongoDefaultSettings
+		case conf.REDIS:
+			dbSpecificDefaultSettings = conf.RedisDefaultSettings
 		case conf.MYSQL:
 			dbSpecificDefaultSettings = conf.MysqlDefaultSettings
 		case conf.SQLSERVER:

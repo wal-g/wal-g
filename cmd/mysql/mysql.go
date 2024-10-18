@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"fmt"
+	"github.com/wal-g/wal-g/cmd/mysql/xb"
 	"os"
 	"strings"
 
@@ -25,11 +26,13 @@ var cmd = &cobra.Command{
 	Short:   ShortDescription, // TODO : improve description
 	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "MySQL"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		err := internal.AssertRequiredSettingsSet()
-		if err != nil {
-			tracelog.WarningLogger.PrintError(err)
+		if cmd.Use != "xb" {
+			err := internal.AssertRequiredSettingsSet()
+			if err != nil {
+				tracelog.WarningLogger.PrintError(err)
+			}
 		}
-		err = conf.ConfigureAndRunDefaultWebServer()
+		err := conf.ConfigureAndRunDefaultWebServer()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -43,7 +46,12 @@ func Execute() {
 	}
 }
 
+func GetCmd() *cobra.Command {
+	return cmd
+}
+
 func init() {
 	common.Init(cmd, conf.MYSQL)
 	conf.AddTurboFlag(cmd)
+	cmd.AddCommand(xb.XBToolsCmd)
 }

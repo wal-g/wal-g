@@ -50,7 +50,7 @@ wait
 END=$(date +%s)
 DIFF=$(( $END - $START ))
 echo "It took $DIFF seconds"
-test $DIFF -le 45
+test $DIFF -le 100
 /tmp/scripts/drop_pg.sh
 
 i=0

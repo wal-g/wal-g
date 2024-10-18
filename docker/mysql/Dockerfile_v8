@@ -1,0 +1,50 @@
+FROM wal-g/ubuntu:20.04
+
+# istall golang:
+RUN apt-get update && \
+    apt-get -y install \
+        build-essential cmake \
+        iputils-ping \
+        net-tools dnsutils
+
+RUN wget -O - "https://golang.org/dl/go1.20.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
+	export PATH="/usr/local/go/bin:$PATH" && \
+	go version
+
+ENV GOPATH /go
+ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+
+RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
+
+# install mysql
+ENV MYSQLDATA /var/lib/mysql
+
+RUN apt-get update && \
+    apt-get install --yes \
+        mysql-server \
+        mysql-client \
+        s3cmd \
+        jq \
+        lsb-release \
+        gnupg2 && \
+    wget https://repo.percona.com/apt/percona-release_latest.focal_all.deb && \
+    dpkg -i percona-release_latest.focal_all.deb && \
+    percona-release enable tools release && \
+    apt-get update && \
+    apt-get install --yes \
+      percona-xtrabackup-80
+
+
+RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
+RUN rm -rf $MYSQLDATA
+
+COPY docker/mysql/client.cnf /root/.my.cnf
+COPY docker/mysql/client.cnf /etc/mysql/debian.cnf
+COPY docker/mysql/init.sql /etc/mysql/init.sql
+COPY docker/mysql/export_common.sh /usr/local/export_common.sh
+COPY docker/mysql/export_test_funcs.sh /usr/local/export_test_funcs.sh
+COPY docker/common/s3cfg /root/.s3cfg
+
+# append
+COPY docker/mysql/my.cnf /tmp/my.cnf
+RUN cat /tmp/my.cnf >> /etc/mysql/my.cnf; rm /tmp/my.cnf

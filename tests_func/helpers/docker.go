@@ -22,7 +22,10 @@ import (
 
 var Docker *client.Client
 
-const envDockerMachineName = "DOCKER_MACHINE_NAME"
+const (
+	envDockerMachineName = "DOCKER_MACHINE_NAME"
+	shell                = "bash"
+)
 
 type ExecResult struct {
 	ExitCode     int
@@ -73,7 +76,7 @@ func RunCommandStrict(ctx context.Context, container string, command []string) (
 		cmdLine := strings.Join(command, " ")
 		tracelog.ErrorLogger.Printf("'%s' failed with %d\nstdout:\n%s\nstderr:\n%s\n",
 			cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
-		return exc, fmt.Errorf("%s exit code: %d", cmdLine, exc.ExitCode)
+		return exc, fmt.Errorf("%s exit code: %d, err: %s", cmdLine, exc.ExitCode, exc.Stderr())
 	}
 	return exc, nil
 }
@@ -128,6 +131,18 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 		cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
 
 	return exc, nil
+}
+
+func RunAsyncCommand(ctx context.Context, container, cmd string) error {
+	execCfg := types.ExecConfig{
+		Detach: true,
+		Cmd:    []string{shell, "-c", cmd},
+	}
+	execResp, err := Docker.ContainerExecCreate(ctx, container, execCfg)
+	if err != nil {
+		return err
+	}
+	return Docker.ContainerExecStart(ctx, execResp.ID, types.ExecStartCheck{})
 }
 
 func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
@@ -274,7 +289,7 @@ func (inf *Infra) Setup() error {
 		return fmt.Errorf("can not build base image: %v", err)
 	}
 
-	actions := []string{"--verbose", "--log-level", "WARNING", "build"}
+	actions := []string{"--verbose", "build"}
 	if err := inf.callCompose(actions); err != nil {
 		return fmt.Errorf("can not build images: %v", err)
 	}
@@ -283,11 +298,11 @@ func (inf *Infra) Setup() error {
 }
 
 func (inf *Infra) RecreateContainers() error {
-	actions := []string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}
+	actions := []string{"--verbose", "down", "--volumes", "--timeout", "0"}
 	if err := inf.callCompose(actions); err != nil {
 		return err
 	}
-	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
+	return inf.callCompose([]string{"--verbose", "up", "--detach"})
 }
 
 func (inf *Infra) Shutdown() error {
@@ -303,11 +318,9 @@ func (inf *Infra) Shutdown() error {
 }
 
 func (inf *Infra) callCompose(actions []string) error {
-	baseArgs := []string{"--file", inf.config, "-p", "test"}
+	baseArgs := []string{"compose", "--file", inf.config, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
-	// lookup the full path before exec.CommandContext call
-	// (fixes https://github.com/docker/compose/issues/1135)
-	fullPath, err := exec.LookPath("docker-compose")
+	fullPath, err := exec.LookPath("docker")
 	if err != nil {
 		return err
 	}

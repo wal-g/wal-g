@@ -204,27 +204,32 @@ func NewNoRestorePointsFoundError() NoRestorePointsFoundError {
 	return NoRestorePointsFoundError{fmt.Errorf("no restore points found")}
 }
 
-// FindRestorePointBeforeTS finds restore point that was created before the provided timestamp
-// and finish time closest to the provided timestamp
-func FindRestorePointBeforeTS(timestampStr string, folder storage.Folder) (string, error) {
-	ts, err := time.Parse(time.RFC3339, timestampStr)
-	if err != nil {
-		return "", fmt.Errorf("timestamp parse error: %v", err)
-	}
+func FetchAllRestorePoints(folder storage.Folder) ([]RestorePointMetadata, error) {
+	restorePointMetas := make([]RestorePointMetadata, 0)
 
 	restorePointTimes, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
-		return "", err
+		return restorePointMetas, err
 	}
 
-	restorePointMetas := make([]RestorePointMetadata, 0)
 	for _, rp := range restorePointTimes {
 		meta, err := FetchRestorePointMetadata(folder, rp.Name)
 		if err != nil {
-			return "", fmt.Errorf("fetch restore point %s metadata: %v", rp.Name, err)
+			return restorePointMetas, fmt.Errorf("fetch restore point %s metadata: %v", rp.Name, err)
 		}
 
 		restorePointMetas = append(restorePointMetas, meta)
+	}
+
+	return restorePointMetas, nil
+}
+
+// FindRestorePointBeforeTS finds restore point that was created before the provided timestamp
+// and finish time closest to the provided timestamp
+func FindRestorePointBeforeTS(timestampStr string, restorePointMetas []RestorePointMetadata) (string, error) {
+	ts, err := time.Parse(time.RFC3339, timestampStr)
+	if err != nil {
+		return "", fmt.Errorf("timestamp parse error: %v", err)
 	}
 
 	var targetPoint *RestorePointMetadata
@@ -251,28 +256,13 @@ func FindRestorePointBeforeTS(timestampStr string, folder storage.Folder) (strin
 }
 
 // Finds restore point that contains timestamp
-func FindRestorePointWithTS(timestampStr string, folder storage.Folder) (string, error) {
+func FindRestorePointWithTS(timestampStr string, restorePointMetas []RestorePointMetadata) (string, error) {
 	ts, err := time.Parse(time.RFC3339, timestampStr)
 	if err != nil {
 		return "", fmt.Errorf("timestamp parse error: %v", err)
 	}
 	// add second because we round down when formatting
 	ts = ts.Add(time.Second)
-
-	restorePointTimes, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
-	if err != nil {
-		return "", err
-	}
-
-	restorePointMetas := make([]RestorePointMetadata, 0)
-	for _, rp := range restorePointTimes {
-		meta, err := FetchRestorePointMetadata(folder, rp.Name)
-		if err != nil {
-			return "", fmt.Errorf("fetch restore point %s metadata: %v", rp.Name, err)
-		}
-
-		restorePointMetas = append(restorePointMetas, meta)
-	}
 
 	var targetPoint *RestorePointMetadata
 	for i := range restorePointMetas {
