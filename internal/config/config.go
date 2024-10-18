@@ -485,19 +485,21 @@ var (
 
 	MongoAllowedSettings = map[string]bool{
 		// MongoDB
-		MongoDBUriSetting:              true,
-		MongoDBLastWriteUpdateInterval: true,
-		OplogArchiveTimeoutInterval:    true,
-		OplogArchiveAfterSize:          true,
-		OplogPushStatsEnabled:          true,
-		OplogPushStatsLoggingInterval:  true,
-		OplogPushStatsUpdateInterval:   true,
-		OplogPushStatsExposeHTTP:       true,
-		OplogPushWaitForBecomePrimary:  true,
-		OplogPushPrimaryCheckInterval:  true,
-		OplogPITRDiscoveryInterval:     true,
-		StreamSplitterBlockSize:        true,
-		StreamSplitterPartitions:       true,
+		MongoDBUriSetting:                  true,
+		MongoDBLastWriteUpdateInterval:     true,
+		MongoDBExtendBackupCursor:          true,
+		MongoDBDeletionProtectionWhitelist: true,
+		OplogArchiveTimeoutInterval:        true,
+		OplogArchiveAfterSize:              true,
+		OplogPushStatsEnabled:              true,
+		OplogPushStatsLoggingInterval:      true,
+		OplogPushStatsUpdateInterval:       true,
+		OplogPushStatsExposeHTTP:           true,
+		OplogPushWaitForBecomePrimary:      true,
+		OplogPushPrimaryCheckInterval:      true,
+		OplogPITRDiscoveryInterval:         true,
+		StreamSplitterBlockSize:            true,
+		StreamSplitterPartitions:           true,
 	}
 
 	SQLServerAllowedSettings = map[string]bool{
