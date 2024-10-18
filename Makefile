@@ -41,7 +41,7 @@ endif
 
 .PHONY: unittest fmt lint clean install_tools
 
-test: deps unittest pg_build mysql_build redis_build mongo_build gp_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test etcd_integration_test
+test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
@@ -247,6 +247,18 @@ gp_test: deps gp_build unlink_brotli gp_integration_test
 gp_integration_test: load_docker_common
 	docker compose build gp gp_tests
 	docker compose up --exit-code-from gp_tests gp_tests
+
+cloudberry_build: gp_build
+
+cloudberry_clean: gp_clean
+
+cloudberry_install: gp_install
+
+cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
+
+cloudberry_integration_test: load_docker_common
+	docker compose build cloudberry cloudberry_tests
+	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 
 st_test: deps pg_build unlink_brotli st_integration_test
 

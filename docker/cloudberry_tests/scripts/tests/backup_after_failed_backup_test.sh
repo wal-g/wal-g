@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e -x
+
+CONFIG_FILE="/tmp/configs/backup_after_failed_config.json"
+COMMON_CONFIG="/tmp/configs/common_config.json"
+TMP_CONFIG="/tmp/configs/tmp_config.json"
+cat ${CONFIG_FILE} > ${TMP_CONFIG}
+echo "," >> ${TMP_CONFIG}
+cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
+/tmp/pg_scripts/wrap_config_file.sh ${TMP_CONFIG}
+source /tmp/tests/test_functions/util.sh
+
+bootstrap_gp_cluster
+sleep 3
+setup_wal_archiving
+
+# init tables heap, ao, co
+insert_data
+
+# imitate failed backup (label='abc', fast=true, exclusive=true)
+psql -p 7000 -c "SELECT pg_start_backup('abc', true, true);"
+
+# run backup
+run_backup_logged ${TMP_CONFIG} ${PGDATA}
+
+stop_and_delete_cluster_dir
+
+# show the backup list
+wal-g backup-list --config=${TMP_CONFIG}
+
+# show the storage objects (useful for debug)
+wal-g st ls -r --config=${TMP_CONFIG}
+
+# it looks like a bug in `tryExtractFiles` - it can override files when WALG_DOWNLOAD_CONCURRENCY != 1
+# https://github.com/wal-g/wal-g/blob/master/internal/extract.go#L201-L253
+WALG_DOWNLOAD_CONCURRENCY=1  wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
+prepare_cluster
+start_cluster
+cleanup
+
+echo "Greenplum backup-push test was successful"
