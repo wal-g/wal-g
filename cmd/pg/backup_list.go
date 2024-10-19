@@ -40,7 +40,7 @@ var (
 			if detail {
 				postgres.HandleDetailedBackupList(backupsFolder, pretty, json)
 			} else {
-				internal.HandleDefaultBackupList(backupsFolder, pretty, json)
+				internal.HandleDefaultBackupList(backupsFolder, postgres.NewGenericMetaInteractor(), pretty, json)
 			}
 		},
 	}
