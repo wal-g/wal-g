@@ -348,7 +348,9 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	tracelog.DebugLogger.Println("Stop backup and upload backup_label and tablespace_map")
-	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(bh.Workers.QueryRunner, bh.Arguments.Uploader.Compression().FileExtension())
+	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(
+		bh.Workers.QueryRunner,
+		bh.Arguments.Uploader.Compression().FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.CurBackupInfo.endLSN = finishLsn
 	bh.CurBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
