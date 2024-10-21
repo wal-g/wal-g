@@ -5,7 +5,6 @@ set -e -x
 
 pushd /tmp
 for i in tests/*.sh; do
-  if [ "$i" != "tests/partial_table_restore_test.sh" ]; then continue ;fi
 
   echo
   echo "===== RUNNING $i ====="

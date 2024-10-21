@@ -598,7 +598,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) { //
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
 	}
-	defer rows.Close()
+	//defer rows.Close()
 
 	tables := make(map[string]TableInfo)
 
@@ -621,74 +621,134 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) { //
 			relFileNode = uint32(chis)
 		}
 		tracelog.DebugLogger.Printf("adding %s", tableName)
-		tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode}
+		tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
 	}
 
 	if rows.Err() != nil {
 		return nil, rows.Err()
 	}
 	tracelog.DebugLogger.Println("got regular tables")
+	rows.Close()
 
-	// getTablesQuery2, err := queryRunner.BuildGetTablesQuery(true)
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
-	// }
+	getTablesQuery2, err := queryRunner.BuildGetTablesQuery(true)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+	}
 
-	// rows2, err := conn.Query(getTablesQuery2)
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
-	// }
-	// defer rows2.Close()
-	// tracelog.DebugLogger.Println("executed get partitioned tables query")
+	rows2, err := conn.Query(getTablesQuery2)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
+	}
+	//defer rows2.Close()
+	tracelog.DebugLogger.Println("executed get partitioned tables query")
 
-	// //SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, p.partitionschemaname FROM pg_partitions p JOIN pg_class c ON c.relname = p.partitiontablename WHERE tablename='t3';
-	// for rows2.Next() {
-	// 	var relFileNode uint32
-	// 	var oid uint32
-	// 	var tableName string
-	// 	var namespaceName string
-	// 	var path pgtype.Text
-	// 	if err := rows2.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName); err != nil {
-	// 		tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
-	// 	}
-	// 	if relFileNode == 0 {
-	// 		parts := strings.Split(path.String, "/")
-	// 		chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
-	// 		if err != nil {
-	// 			tracelog.WarningLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
-	// 		}
-	// 		relFileNode = uint32(chis)
-	// 	}
-	// 	parentTable := fmt.Sprintf("%s.%s", namespaceName, tableName)
-	// 	tracelog.DebugLogger.Printf("adding %s", tableName)
-	// 	tables[parentTable] = TableInfo{Oid: oid, Relfilenode: relFileNode}
+	//SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid  WHERE EXISTS (SELECT 1 FROM pg_inherits AS i WHERE i.inhparent = 17971 AND i.inhrelid = c.oid);
 
-	// 	tracelog.DebugLogger.Println("got regular tables")
+	//SELECT count(*) FROM pg_class c JOIN pg_inherits i ON c.oid = i.inhrelid JOIN pg_class parent ON i.inhparent = parent.oid WHERE parent.relname = 't3';
 
-	// 	rows3, err := conn.Query(fmt.Sprintf("SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, p.partitionschemaname FROM pg_partitions p JOIN pg_class c ON c.relname = p.partitiontablename WHERE tablename='%s'", tableName))
-	// 	if err != nil {
-	// 		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
-	// 	}
-	// 	defer rows3.Close()
+	// WITH RECURSIVE partition_hierarchy AS (
+	// 	SELECT c.oid AS child_oid, c.relname AS partition_name, parent.oid AS parent_oid, parent.relname AS parent_name
+	// 	FROM pg_class c
+	// 	JOIN pg_inherits i ON c.oid = i.inhrelid
+	// 	JOIN pg_class parent ON i.inhparent = parent.oid
+	// 	WHERE parent.relname = 't3'
+	// 	UNION ALL
+	// 	SELECT c.oid, c.relname, ph.child_oid, ph.partition_name
+	// 	FROM pg_class c
+	// 	JOIN pg_inherits i ON c.oid = i.inhrelid
+	// 	JOIN partition_hierarchy ph ON i.inhparent = ph.child_oid
+	// )
+	// SELECT
+	// 	child_oid,
+	// 	partition_name,
+	// 	parent_oid,
+	// 	parent_name
+	// FROM	partition_hierarchy;
 
-	// 	if err := rows3.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName); err != nil {
-	// 		tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
-	// 	}
-	// 	if relFileNode == 0 {
-	// 		parts := strings.Split(path.String, "/")
-	// 		chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
-	// 		if err != nil {
-	// 			tracelog.WarningLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
-	// 		}
-	// 		relFileNode = uint32(chis)
-	// 	}
-	// 	tracelog.DebugLogger.Printf("adding %s", tableName)
-	// 	tables[parentTable].SubTables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode}
-	// }
+	// SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class
+	// 		AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid
+	// 		JOIN partition_hierarchy ON c.oid = partition_hierarchy.child_oid;
 
-	// if rows2.Err() != nil {
-	// 	return nil, rows2.Err()
-	// }
+	//SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, p.partitionschemaname FROM pg_partitions p JOIN pg_class c ON c.relname = p.partitiontablename WHERE tablename='t3';
+	parentTableNames := make([]string, 0)
+	for rows2.Next() {
+		var relFileNode uint32
+		var oid uint32
+		var tableName string
+		var namespaceName string
+		var path pgtype.Text
+		if err := rows2.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName); err != nil {
+			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
+		}
+		if relFileNode == 0 {
+			parts := strings.Split(path.String, "/")
+			chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
+			if err != nil {
+				tracelog.WarningLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
+			}
+			relFileNode = uint32(chis)
+		}
+		parentTable := fmt.Sprintf("%s.%s", namespaceName, tableName)
+		tracelog.DebugLogger.Printf("adding %s", tableName)
+		tables[parentTable] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
+
+		tracelog.DebugLogger.Println("got partitioned tables") // TODO save table names to list and then query more
+		parentTableNames = append(parentTableNames, tableName)
+	}
+	rows2.Close()
+
+	for _, parTabNam := range parentTableNames {
+		tracelog.DebugLogger.Printf("getting subtables for %s", parTabNam)
+		var relFileNode uint32
+		var oid uint32
+		var tableName string
+		var namespaceName string
+		var path pgtype.Text
+		q11 := fmt.Sprintf("WITH RECURSIVE partition_hierarchy AS ( "+
+			"SELECT c.oid AS child_oid, c.relname AS partition_name, parent.oid AS parent_oid, parent.relname AS parent_name "+
+			"FROM pg_class c "+
+			"JOIN pg_inherits i ON c.oid = i.inhrelid "+
+			"JOIN pg_class parent ON i.inhparent = parent.oid "+
+			"WHERE parent.relname = '%s' "+
+			"UNION ALL "+
+			"SELECT c.oid, c.relname, ph.child_oid, ph.partition_name "+
+			"FROM pg_class c "+
+			"JOIN pg_inherits i ON c.oid = i.inhrelid "+
+			"JOIN partition_hierarchy ph ON i.inhparent = ph.child_oid "+
+			") "+
+			"SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class "+
+			"AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid "+
+			"JOIN partition_hierarchy ON c.oid = partition_hierarchy.child_oid; ", parTabNam)
+
+		rows3, err := conn.Query(q11)
+		if err != nil {
+			return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
+		}
+		//defer rows3.Close()
+		for rows3.Next() {
+			if err := rows3.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName); err != nil {
+				tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
+			}
+			tracelog.DebugLogger.Printf("get partition %s", tableName)
+			if relFileNode == 0 {
+				parts := strings.Split(path.String, "/")
+				chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
+				if err != nil {
+					tracelog.WarningLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
+				}
+				relFileNode = uint32(chis)
+			}
+			tracelog.DebugLogger.Printf("adding %s", tableName)
+			parentTable := fmt.Sprintf("%s.%s", namespaceName, parTabNam) // not that schema
+			tables[parentTable].SubTables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode}
+		}
+		tracelog.DebugLogger.Println("finished getting partitions")
+		rows3.Close()
+	}
+
+	if rows2.Err() != nil {
+		return nil, rows2.Err()
+	}
 	return tables, nil
 }
 
