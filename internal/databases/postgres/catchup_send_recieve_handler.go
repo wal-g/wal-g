@@ -166,7 +166,7 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 }
 
 func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool) {
-	var filesToDelete []string
+	filesToDelete := make([]string, 0)
 	for k := range list {
 		if _, ok := seenFiles[k]; ok {
 			continue
