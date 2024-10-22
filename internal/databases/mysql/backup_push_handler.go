@@ -22,6 +22,7 @@ func HandleBackupPush(
 	uploader internal.Uploader,
 	backupCmd *exec.Cmd,
 	isPermanent bool,
+	countJournals bool,
 	isFullBackup bool,
 	userDataRaw string,
 	deltaBackupConfigurator DeltaBackupConfigurator,
@@ -120,36 +121,43 @@ func HandleBackupPush(
 	err = internal.UploadSentinel(uploader, &sentinel, backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	lastSentinelName, lastSentinel, err := internal.GetLastNotPermanentBackupInfo(folder)
+	if !countJournals {
+		tracelog.InfoLogger.Printf("binlog counting mode is disabled: option is disabled")
+		return
+	}
+
+	// permanent backups can live longer than binlogs; they should not take part in binlog counting
+	if isPermanent {
+		tracelog.InfoLogger.Printf("binlog counting mode is disabled: the backup is permanent")
+		return
+	}
+
+	lastSentinelName, lastSentinel, err := internal.GetLastBackupInfo(folder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to find the last backup: %v", err)
 	} else {
 		tracelog.InfoLogger.Printf("last sentinel is %+v", lastSentinelName)
 	}
 
-	newBackupInfo := internal.BackupInfo{
-		JournalStart:     lastSentinel.JournalEnd,
-		JournalEnd:       binlogEnd,
-		JournalSize:      0,
-		CompressedSize:   uploadedSize,
-		UncompressedSize: rawSize,
-		IsPermanent:      isPermanent,
-		StopLocalTime:    timeStop,
+	newBackupInfo := internal.JournalInfo{
+		JournalStart: lastSentinel.JournalEnd,
+		JournalEnd:   binlogEnd,
+		JournalSize:  0,
 	}
 
-	// permanent backups can live longer than binlogs; they should not take part in binlog counting
-	if !isPermanent && err == nil {
-		err = internal.UpdatePreviousBackupInfoJournal(folder, BinlogPath, newBackupInfo.JournalEnd)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("unable to update previous backup info for %s: %s", backupName, err)
-		} else {
-			tracelog.InfoLogger.Printf("updated backup info for %s", backupName)
-		}
+	err = internal.UpdatePreviousBackupInfo(
+		folder,
+		BinlogPath,
+		func(a, b string) bool { return a < b },
+		newBackupInfo.JournalEnd,
+	)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("unable to update previous backup info for %s: %s", backupName, err)
 	} else {
-		tracelog.InfoLogger.Printf("skipping update of last backup's journal, due to either the new backup being permanent or an error: %s", err)
+		tracelog.InfoLogger.Printf("updated backup info for %s", backupName)
 	}
 
-	err = internal.UploadBackupInfo(folder, backupName+utility.SentinelSuffix, newBackupInfo)
+	err = internal.UploadBackupInfo(folder, backupName, newBackupInfo)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to upload backup info for %s: %s", backupName, err)
 		return

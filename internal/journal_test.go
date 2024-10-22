@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -19,7 +18,8 @@ import (
 
 var (
 	JournalFmt           = "%09d"
-	SentinelFilePath     = "sentinel"
+	SentinelName         = "sentinel"
+	SentinelS3Name       = internal.JournalPrefix + "sentinel"
 	MinimalJournalNumber = "000000000"
 	MaximalJournalNumber = "999999999"
 )
@@ -69,11 +69,15 @@ func GenerateS3SetAndUpdateBackupsInfo(
 
 	generateAndUploadData(mockUploader, recordCount, recordSize)
 
+	backupInfo, err := internal.GetBackupInfo(root, SentinelS3Name)
+	assert.Error(t, err)
+	assert.Equal(t, backupInfo, internal.JournalInfo{})
+
 	createEmptySentinel(t, root)
 
-	backupInfo, err := internal.GetBackupInfo(root, SentinelFilePath)
-	assert.Error(t, err)
-	assert.Equal(t, backupInfo, internal.BackupInfo{})
+	backupInfo, err = internal.GetBackupInfo(root, SentinelS3Name)
+	assert.NoError(t, err)
+	assert.Equal(t, backupInfo, internal.JournalInfo{})
 
 	backupInfo.JournalSize, err = internal.GetJournalSizeInSemiInterval(
 		root,
@@ -84,14 +88,17 @@ func GenerateS3SetAndUpdateBackupsInfo(
 		beginJournalID,
 		endJournalID,
 	)
+	assert.Equal(t, backupInfo, internal.JournalInfo{
+		JournalSize: expectedSum,
+	})
 	assert.NoError(t, err)
 
-	err = internal.UploadBackupInfo(root, SentinelFilePath, backupInfo)
+	err = internal.UploadBackupInfo(root, SentinelName, backupInfo)
 	assert.NoError(t, err)
 
-	backupInfo, err = internal.GetBackupInfo(root, SentinelFilePath)
+	backupInfo, err = internal.GetBackupInfo(root, SentinelS3Name)
 	assert.NoError(t, err)
-	assert.Equal(t, backupInfo, internal.BackupInfo{
+	assert.Equal(t, backupInfo, internal.JournalInfo{
 		JournalSize: expectedSum,
 	})
 }
@@ -108,21 +115,26 @@ func GenerateS3AndUpdateLastBackup(
 
 	createEmptySentinel(t, root)
 
-	backupInfo, err := internal.GetBackupInfo(root, SentinelFilePath)
-	assert.Error(t, err)
-	assert.Equal(t, backupInfo, internal.BackupInfo{})
+	backupInfo, err := internal.GetBackupInfo(root, SentinelS3Name)
+	assert.NoError(t, err)
+	assert.Equal(t, backupInfo, internal.JournalInfo{})
 
-	err = internal.UploadBackupInfo(root, SentinelFilePath, internal.BackupInfo{
-		JournalStart:  beginJournalID,
-		JournalEnd:    beginJournalID,
-		StopLocalTime: time.Now().Add(-time.Hour),
+	err = internal.UploadBackupInfo(root, SentinelName, internal.JournalInfo{
+		JournalStart: beginJournalID,
+		JournalEnd:   beginJournalID,
+		JournalSize:  0,
 	})
 	assert.NoError(t, err)
 
-	err = internal.UpdatePreviousBackupInfoJournal(root, utility.WalPath, endJournalID)
+	err = internal.UpdatePreviousBackupInfo(
+		root,
+		utility.WalPath,
+		func(a, b string) bool { return a < b },
+		endJournalID,
+	)
 	assert.NoError(t, err)
 
-	backupInfo, err = internal.GetBackupInfo(root, SentinelFilePath)
+	backupInfo, err = internal.GetBackupInfo(root, SentinelS3Name)
 	assert.NoError(t, err)
 
 	assert.Equal(t, backupInfo.JournalSize, expectedSum)
@@ -139,10 +151,8 @@ func GenerateS3SetAndUpdateBackupsInfoManyTimes(
 
 	generateAndUploadData(mockUploader, recordCount, recordSize)
 
-	createEmptySentinel(t, root)
-
 	for i := 0; i < times; i++ {
-		var backupInfo internal.BackupInfo
+		var backupInfo internal.JournalInfo
 		var err error
 
 		backupInfo.JournalSize, err = internal.GetJournalSizeInSemiInterval(
@@ -156,25 +166,21 @@ func GenerateS3SetAndUpdateBackupsInfoManyTimes(
 		)
 		assert.NoError(t, err)
 
-		sentinel := fmt.Sprintf("%s%d", SentinelFilePath, i)
+		sentinel := fmt.Sprintf("%s%d", SentinelName, i)
 		err = internal.UploadBackupInfo(root, sentinel, backupInfo)
 		assert.NoError(t, err)
 
+		sentinel = fmt.Sprintf("%s%d", SentinelS3Name, i)
 		backupInfo, err = internal.GetBackupInfo(root, sentinel)
 		assert.NoError(t, err)
-		assert.Equal(t, backupInfo, internal.BackupInfo{
+		assert.Equal(t, backupInfo, internal.JournalInfo{
 			JournalSize: expectedSum,
 		})
 	}
-
-	allBackupsInfo, err := internal.GetAllBackupsInfo(root)
-	assert.NoError(t, err)
-	assert.Equal(t, len(allBackupsInfo), times)
 }
 
-func initTestS3() (*memory.Folder, internal.Uploader) {
-	storage := memory.NewKVS()
-	root := memory.NewFolder("", storage)
+func initTestS3() (storage.Folder, internal.Uploader) {
+	root := memory.NewFolder("", memory.NewKVS())
 	mockUploader := internal.NewRegularUploader(
 		&testtools.MockCompressor{},
 		root.GetSubFolder(utility.WalPath),
@@ -198,7 +204,7 @@ func generateAndUploadData(mockUploader internal.Uploader, recordCount, recordSi
 }
 
 func createEmptySentinel(t *testing.T, root storage.Folder) {
-	err := root.PutObject(SentinelFilePath, bytes.NewReader([]byte("{}")))
+	err := internal.UploadBackupInfo(root, SentinelName, internal.JournalInfo{})
 	assert.NoError(t, err)
 }
 
