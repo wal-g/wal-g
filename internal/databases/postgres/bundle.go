@@ -17,6 +17,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -49,6 +50,9 @@ func init() {
 		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
 		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
 		"standby.signal", // Signal files
+		// We don't rely on `backup_label` and `tablespace_map` from datadir because we create fictional files
+		// from `pg_stop_backup()`. Don't archive them - so we won't have data race during recovery.
+		BackupLabelFilename, TablespaceMapFilename,
 	}
 
 	for _, filename := range filesToExclude {
