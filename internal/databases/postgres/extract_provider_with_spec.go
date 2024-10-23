@@ -33,12 +33,12 @@ func (desc RestoreDesc) IsFull(database uint32) bool {
 	return false
 }
 
-func (desc RestoreDesc) IsSkipped(database, tableFile uint32) bool { // we need to get metadata here not only desc
-	if database < systemIDLimit || desc.IsFull(database) { //TODO what to do with full db
+func (desc RestoreDesc) IsSkipped(database, tableFile uint32) bool {
+	if database < systemIDLimit || desc.IsFull(database) {
 		return false
 	}
-	if db, ok := desc[database]; ok { // database should always exist
-		_, found := db[tableFile] //seems wrong check , actually ok
+	if db, ok := desc[database]; ok { // database should always exist, so this check is just in case
+		_, found := db[tableFile]
 		return !found
 	}
 	return true
@@ -94,7 +94,7 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 		}
 
 		if tableID == 0 {
-			restoredDatabases.Add(dbID, tableID, 0) // what if more than full
+			restoredDatabases.Add(dbID, tableID, 0) // should never happen
 		} else {
 			restoredDatabases.Add(dbID, tableID, names[fmt.Sprintf("%d", dbID)].Tables[fmt.Sprintf("%d", tableID)].Oid)
 		}
@@ -115,12 +115,8 @@ func (m RegexpRestoreDescMaker) Make(restoreParameters []string, names Databases
 		}
 
 		for db, tables := range oids {
-			for _, relfilenode := range tables { //TODO somehow add restore all
-				// if relfilenode == 0 {
-				// 	restoredDatabases.Add(db, relfilenode, 0)
-				// } else {
+			for _, relfilenode := range tables {
 				restoredDatabases.Add(db, relfilenode, names[fmt.Sprintf("%d", db)].Tables[fmt.Sprintf("%d", relfilenode)].Oid)
-				//}
 			}
 		}
 	}

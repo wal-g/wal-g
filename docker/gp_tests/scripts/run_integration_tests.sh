@@ -5,7 +5,6 @@ set -e -x
 
 pushd /tmp
 for i in tests/*.sh; do
-
   echo
   echo "===== RUNNING $i ====="
   set -x

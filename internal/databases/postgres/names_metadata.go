@@ -16,7 +16,7 @@ type DatabaseObjectsInfo struct {
 }
 type TableInfo struct {
 	Oid         uint32               `json:"oid"`
-	Relfilenode uint32               `json:"relfilenode"` //TODO add ierarcy
+	Relfilenode uint32               `json:"relfilenode"`
 	SubTables   map[string]TableInfo `json:"subtables,omitempty"`
 }
 
@@ -57,8 +57,6 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 			toRestore[dbInfo.Oid] = []uint32{}
 			if table == "" {
 				tracelog.InfoLogger.Printf("restore all for  %s", db)
-				// toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], 0)
-				// continue
 			}
 			for name, tableInfo := range dbInfo.Tables {
 				if table == "" || tableRegexp.MatchString(name) {
