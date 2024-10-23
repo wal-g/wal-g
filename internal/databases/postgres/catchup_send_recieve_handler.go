@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/postgres/errors"
@@ -20,6 +21,7 @@ import (
 )
 
 func HandleCatchupSend(pgDataDirectory string, destination string) {
+	fileFilter := NewPgCatchupFilesFilter()
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Sending %v to %v\n", pgDataDirectory, destination)
 	info, runner, err := GetPgServerInfo(true)
@@ -57,7 +59,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	label, offsetMap, _, err := runner.StopBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	sendFileCommands(encoder, pgDataDirectory, fileList, control.Checkpoint)
+	sendFileCommands(encoder, pgDataDirectory, fileList, control.Checkpoint, fileFilter)
 
 	err = encoder.Encode(
 		CatchupCommandDto{BinaryContents: []byte(label), FileName: BackupLabelFilename, IsBinContents: true})
@@ -118,8 +120,7 @@ func chooseCompression() (compression.Compressor, compression.Decompressor) {
 	return c, d
 }
 
-func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
-	extendExcludedFiles()
+func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN, fileFilter internal.FilesFilter) {
 	seenFiles := make(map[string]bool)
 	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
 		fullFileName := utility.GetSubdirectoryRelativePath(path, directory)
@@ -135,7 +136,7 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 			return nil
 		}
 		fileName := info.Name()
-		_, excluded := ExcludedFilenames[fileName]
+		excluded := !fileFilter.ShouldUploadFile(fileName)
 		isDir := info.IsDir()
 		if isDir && excluded {
 			return filepath.SkipDir
@@ -162,10 +163,10 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 	})
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("Filepath walk done")
-	sendDeletedFiles(encoder, list, seenFiles)
+	sendDeletedFiles(encoder, list, seenFiles, fileFilter)
 }
 
-func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool) {
+func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFiles map[string]bool, fileFilter internal.FilesFilter) {
 	var filesToDelete []string
 	for k := range list {
 		if _, ok := seenFiles[k]; ok {
@@ -173,7 +174,7 @@ func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFi
 		}
 		excluded := false
 		for _, e := range strings.Split(k, string(os.PathSeparator)) {
-			if _, ok := ExcludedFilenames[e]; ok {
+			if !fileFilter.ShouldUploadFile(e) {
 				excluded = true
 				break
 			}
@@ -244,6 +245,7 @@ func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
 }
 
 func HandleCatchupReceive(pgDataDirectory string, port int) {
+	fileFilter := NewPgCatchupFilesFilter()
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Receiving %v on port %v\n", pgDataDirectory, port)
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
@@ -272,7 +274,7 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 		decoder = gob.NewDecoder(reader)
 		encoder = gob.NewEncoder(writer)
 	}
-	sendControlAndFileList(pgDataDirectory, encoder)
+	sendControlAndFileList(pgDataDirectory, encoder, fileFilter)
 	err = writer.Flush()
 	tracelog.ErrorLogger.FatalOnError(err)
 	for {
@@ -367,7 +369,7 @@ type CatchupCommandDto struct {
 	FilesToDelete  []string
 }
 
-func sendControlAndFileList(pgDataDirectory string, encoder *gob.Encoder) {
+func sendControlAndFileList(pgDataDirectory string, encoder *gob.Encoder, fileFilter internal.FilesFilter) {
 	control, err := ExtractPgControl(pgDataDirectory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Our system id %v, need catchup from %v",
@@ -375,12 +377,12 @@ func sendControlAndFileList(pgDataDirectory string, encoder *gob.Encoder) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = encoder.Encode(control)
 	tracelog.ErrorLogger.FatalOnError(err)
-	rcvFileList := receiveFileList(pgDataDirectory)
+	rcvFileList := receiveFileList(pgDataDirectory, fileFilter)
 	err = encoder.Encode(rcvFileList)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func receiveFileList(directory string) internal.BackupFileList {
+func receiveFileList(directory string, fileFilter internal.FilesFilter) internal.BackupFileList {
 	var result = make(internal.BackupFileList)
 	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -391,7 +393,7 @@ func receiveFileList(directory string) internal.BackupFileList {
 			return nil
 		}
 		fileName := info.Name()
-		_, excluded := ExcludedFilenames[fileName]
+		excluded := !fileFilter.ShouldUploadFile(fileName)
 		isDir := info.IsDir()
 		if isDir && excluded {
 			return filepath.SkipDir

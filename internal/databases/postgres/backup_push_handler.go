@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgconn"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
@@ -23,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -160,9 +162,16 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
-	bh.Workers.Bundle = NewBundle(bh.PgInfo.PgDataDirectory, crypter, bh.prevBackupInfo.name,
-		bh.prevBackupInfo.sentinelDto.BackupStartLSN, bh.prevBackupInfo.filesMetadataDto.Files, arguments.forceIncremental,
-		viper.GetInt64(conf.TarSizeThresholdSetting))
+	bh.Workers.Bundle = NewBundle(
+		bh.PgInfo.PgDataDirectory,
+		crypter,
+		bh.prevBackupInfo.name,
+		bh.prevBackupInfo.sentinelDto.BackupStartLSN,
+		bh.prevBackupInfo.filesMetadataDto.Files,
+		arguments.forceIncremental,
+		viper.GetInt64(conf.TarSizeThresholdSetting),
+		NewPgFilesFilter(bh.PgInfo.PgVersion),
+	)
 	if orioledbEnabled && bh.prevBackupInfo.sentinelDto.BackupStartChkpNum != nil {
 		bh.Workers.Bundle.IncrementFromChkpNum = bh.prevBackupInfo.sentinelDto.BackupStartChkpNum
 	}

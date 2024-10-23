@@ -8,10 +8,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
@@ -195,7 +197,7 @@ func extract(t *testing.T, dir string) string {
 // and ModTimes. If initial comparison returns true, compares first
 // 4KB of file content and will only compute sha256 for both files if the
 // initial bytes are the same.
-func compare(t *testing.T, dir1, dir2 string) bool {
+func compare(t *testing.T, dir1, dir2 string, fileFilter internal.FilesFilter) bool {
 	// ReadDir returns directory by filename.
 	files1, err := os.ReadDir(dir1)
 	if err != nil {
@@ -210,10 +212,18 @@ func compare(t *testing.T, dir1, dir2 string) bool {
 	// Compares os.FileInfo without syscall.Stat_t fields or ModTimes.
 	var shallowEqual bool
 	var deepEqual bool
-	for i, f2 := range files2 {
+	for _, f2 := range files2 {
+		info2, _ := f2.Info()
+
+		i := slices.IndexFunc(files1, func(f os.DirEntry) bool {
+			return f.Name() == f2.Name()
+		})
+		if i < 0 {
+			t.Logf("walk: unexpected file found: \t%s\t %d\t %d\t %v", f2.Name(), info2.Size(), info2.Mode(), f2.IsDir())
+		}
 		f1 := files1[i]
 		info1, _ := f1.Info()
-		info2, _ := f2.Info()
+
 		name := f1.Name() == f2.Name()
 		size := info1.Size() == info2.Size()
 		mode := info1.Mode() == info2.Mode()
@@ -221,8 +231,7 @@ func compare(t *testing.T, dir1, dir2 string) bool {
 
 		// If directory is in ExcludedFilenames list, make sure it exists but is empty.
 		if f2.IsDir() {
-			_, ok := postgres.ExcludedFilenames[f2.Name()]
-			if ok {
+			if !fileFilter.ShouldUploadFile(f2.Name()) {
 				size = isEmpty(t, filepath.Join(dir2, f2.Name()))
 			}
 		}
@@ -351,8 +360,9 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
+	fileFilter := postgres.NewPgFilesFilter(12000)
 	// Bundle and compress files to `compressed`.
-	bundle := postgres.NewBundle(data, nil, "", nil, nil, false, tarSizeThreshold)
+	bundle := postgres.NewBundle(data, nil, "", nil, nil, false, tarSizeThreshold, fileFilter)
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
 	size := int64(0)
 	tarBallMaker := &testtools.FileTarBallMaker{
@@ -419,7 +429,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 
 	// Extracts compressed directory to `extracted`.
 	extracted := extract(t, compressed)
-	if compare(t, data, extracted) {
+	if compare(t, data, extracted, fileFilter) {
 		// Clean up only if the test succeeds.
 		defer os.RemoveAll(data)
 		defer os.RemoveAll(compressed)

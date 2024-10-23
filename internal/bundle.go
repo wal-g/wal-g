@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -31,20 +32,17 @@ type Bundle struct {
 
 	TarSizeThreshold int64
 
-	ExcludedFilenames map[string]utility.Empty
-
 	FilesFilter FilesFilter
 }
 
 func NewBundle(
 	directories []string, crypter crypto.Crypter,
-	tarSizeThreshold int64, excludedFilenames map[string]utility.Empty) *Bundle {
+	tarSizeThreshold int64, fileFilter FilesFilter) *Bundle {
 	return &Bundle{
-		Directories:       directories,
-		Crypter:           crypter,
-		TarSizeThreshold:  tarSizeThreshold,
-		ExcludedFilenames: excludedFilenames,
-		FilesFilter:       &CommonFilesFilter{},
+		Directories:      directories,
+		Crypter:          crypter,
+		TarSizeThreshold: tarSizeThreshold,
+		FilesFilter:      fileFilter,
 	}
 }
 
@@ -76,7 +74,7 @@ func (bundle *Bundle) AddToBundle(path string, info os.FileInfo, err error) erro
 	}
 
 	fileName := info.Name()
-	_, excluded := bundle.ExcludedFilenames[fileName]
+	excluded := !bundle.FilesFilter.ShouldUploadFile(fileName)
 	isDir := info.IsDir()
 
 	if excluded && !isDir {
