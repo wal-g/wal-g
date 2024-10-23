@@ -120,7 +120,12 @@ func chooseCompression() (compression.Compressor, compression.Decompressor) {
 	return c, d
 }
 
-func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN, fileFilter internal.FilesFilter) {
+func sendFileCommands(encoder *gob.Encoder,
+	directory string,
+	list internal.BackupFileList,
+	checkpoint LSN,
+	fileFilter internal.FilesFilter,
+) {
 	seenFiles := make(map[string]bool)
 	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
 		fullFileName := utility.GetSubdirectoryRelativePath(path, directory)
