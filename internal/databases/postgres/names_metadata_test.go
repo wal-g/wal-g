@@ -15,17 +15,17 @@ func genDatabasesByNames() postgres.DatabasesByNames {
 	databasesByNames["db1"] = *postgres.NewDatabaseObjectsInfo(20001)
 	databasesByNames["db2"] = *postgres.NewDatabaseObjectsInfo(20002)
 
-	databasesByNames["my_database"].Tables["public.my_table"] = 30000
-	databasesByNames["my_database"].Tables["namespace.other_table"] = 31000
+	databasesByNames["my_database"].Tables["public.my_table"] = postgres.TableInfo{Oid: 30000, Relfilenode: 30000}
+	databasesByNames["my_database"].Tables["namespace.other_table"] = postgres.TableInfo{Oid: 31000, Relfilenode: 31000}
 
-	databasesByNames["db1"].Tables["public.table1"] = 40000
-	databasesByNames["db1"].Tables["public.table2"] = 40001
-	databasesByNames["db1"].Tables["public.tab1"] = 40002
+	databasesByNames["db1"].Tables["public.table1"] = postgres.TableInfo{Oid: 40000, Relfilenode: 40000}
+	databasesByNames["db1"].Tables["public.table2"] = postgres.TableInfo{Oid: 40001, Relfilenode: 40001}
+	databasesByNames["db1"].Tables["public.tab1"] = postgres.TableInfo{Oid: 40002, Relfilenode: 40002}
 
-	databasesByNames["db2"].Tables["my1.table1"] = 40100
-	databasesByNames["db2"].Tables["my2.table2"] = 40101
-	databasesByNames["db2"].Tables["nomy.tab3"] = 40102
-	databasesByNames["db2"].Tables["nomy.tab4"] = 40103
+	databasesByNames["db2"].Tables["my1.table1"] = postgres.TableInfo{Oid: 40100, Relfilenode: 40100}
+	databasesByNames["db2"].Tables["my2.table2"] = postgres.TableInfo{Oid: 40101, Relfilenode: 40101}
+	databasesByNames["db2"].Tables["nomy.tab3"] = postgres.TableInfo{Oid: 40102, Relfilenode: 40102}
+	databasesByNames["db2"].Tables["nomy.tab4"] = postgres.TableInfo{Oid: 40103, Relfilenode: 40103}
 
 	return databasesByNames
 }

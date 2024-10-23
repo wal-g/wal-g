@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"fmt"
 	"path"
 	"strconv"
 	"strings"
@@ -15,39 +16,43 @@ const (
 	systemIDLimit     = 16384
 )
 
-type RestoreDesc map[uint32]map[uint32]bool
+type RestoreDesc map[uint32]map[uint32]uint32
 
-func (desc RestoreDesc) Add(database, table uint32) {
+func (desc RestoreDesc) Add(database, filenode, oid uint32) {
 	if _, ok := desc[database]; !ok {
-		desc[database] = make(map[uint32]bool)
+		desc[database] = make(map[uint32]uint32)
 	}
-	desc[database][table] = true
+	desc[database][filenode] = oid
 }
 
 func (desc RestoreDesc) IsFull(database uint32) bool {
 	if _, ok := desc[database]; ok {
-		return desc[database][0]
+		_, ok1 := desc[database][0]
+		return ok1
 	}
 	return false
 }
 
-func (desc RestoreDesc) IsSkipped(database, table uint32) bool {
+func (desc RestoreDesc) IsSkipped(database, tableFile uint32) bool {
 	if database < systemIDLimit || desc.IsFull(database) {
 		return false
 	}
-	if _, ok := desc[database]; ok {
-		_, found := desc[database][table]
-		return table >= systemIDLimit && !found
+	if db, ok := desc[database]; ok { // database should always exist, so this check is just in case
+		_, found := db[tableFile]
+		return !found
 	}
 	return true
 }
 
 func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 	for file := range filesToUnwrap {
-		isDB, dbID, tableID := TryGetOidPair(file)
+		isDB, dbID, tableFileID := TryGetOidPair(file)
 
-		if isDB && desc.IsSkipped(dbID, tableID) {
+		if isDB && desc.IsSkipped(dbID, tableFileID) && tableFileID != 0 {
+			tracelog.DebugLogger.Printf("will skip  %s ", file)
 			delete(filesToUnwrap, file)
+		} else {
+			tracelog.DebugLogger.Printf("will restore  %s ", file)
 		}
 	}
 }
@@ -88,7 +93,11 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 			return nil, err
 		}
 
-		restoredDatabases.Add(dbID, tableID)
+		if tableID == 0 {
+			restoredDatabases.Add(dbID, tableID, 0)
+		} else {
+			restoredDatabases.Add(dbID, tableID, names[fmt.Sprintf("%d", dbID)].Tables[fmt.Sprintf("%d", tableID)].Oid)
+		}
 	}
 
 	return restoredDatabases, nil
@@ -97,7 +106,7 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 type RegexpRestoreDescMaker struct{}
 
 func (m RegexpRestoreDescMaker) Make(restoreParameters []string, names DatabasesByNames) (RestoreDesc, error) {
-	restoredDatabases := make(RestoreDesc)
+	restoredDatabases := names.GetSystemTables()
 
 	for _, parameter := range restoreParameters {
 		oids, err := names.ResolveRegexp(parameter)
@@ -106,8 +115,8 @@ func (m RegexpRestoreDescMaker) Make(restoreParameters []string, names Databases
 		}
 
 		for db, tables := range oids {
-			for _, oid := range tables {
-				restoredDatabases.Add(db, oid)
+			for _, relfilenode := range tables {
+				restoredDatabases.Add(db, relfilenode, names[fmt.Sprintf("%d", db)].Tables[fmt.Sprintf("%d", relfilenode)].Oid)
 			}
 		}
 	}
