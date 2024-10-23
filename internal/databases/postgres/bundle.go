@@ -17,6 +17,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -38,22 +39,6 @@ func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 
 func (err TarSizeError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
-}
-
-// ExcludedFilenames is a list of excluded members from the bundled backup.
-var ExcludedFilenames = make(map[string]utility.Empty)
-
-func init() {
-	filesToExclude := []string{
-		"log", "pg_log", "pg_xlog", "pg_wal", // Directories
-		"pgsql_tmp", "postgresql.auto.conf.tmp", "postmaster.pid", "postmaster.opts", "recovery.conf", // Files
-		"pg_dynshmem", "pg_notify", "pg_replslot", "pg_serial", "pg_stat_tmp", "pg_snapshots", "pg_subtrans", // Directories
-		"standby.signal", // Signal files
-	}
-
-	for _, filename := range filesToExclude {
-		ExcludedFilenames[filename] = utility.Empty{}
-	}
 }
 
 // A Bundle represents the directory to
@@ -83,13 +68,14 @@ func NewBundle(
 	directory string, crypter crypto.Crypter,
 	incrementFromName string, incrementFromLsn *LSN, incrementFromFiles internal.BackupFileList,
 	forceIncremental bool, tarSizeThreshold int64,
+	fileFilter internal.FilesFilter,
 ) *Bundle {
 	return &Bundle{
 		Bundle: internal.Bundle{
-			Directories:       []string{directory},
-			Crypter:           crypter,
-			TarSizeThreshold:  tarSizeThreshold,
-			ExcludedFilenames: ExcludedFilenames,
+			Directories:      []string{directory},
+			Crypter:          crypter,
+			TarSizeThreshold: tarSizeThreshold,
+			FilesFilter:      fileFilter,
 		},
 		IncrementFromLsn:   incrementFromLsn,
 		IncrementFromFiles: incrementFromFiles,
@@ -248,7 +234,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 // but their contents are not written to local disk.
 func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 	fileName := info.Name()
-	_, excluded := ExcludedFilenames[fileName]
+	excluded := !bundle.FilesFilter.ShouldUploadFile(fileName)
 	isDir := info.IsDir()
 
 	if excluded && !isDir {
