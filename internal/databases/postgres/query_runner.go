@@ -584,42 +584,10 @@ func (queryRunner *PgQueryRunner) BuildGetTablesQuery(getPartitioned bool) (stri
 	}
 }
 
-func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
-	queryRunner.Mu.Lock()
-	defer queryRunner.Mu.Unlock()
-
-	tables := make(map[string]TableInfo)
-
-	getTablesQuery, err := queryRunner.BuildGetTablesQuery(false)
-	if err != nil {
-		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
-	}
-	queryRunner.genericQuerryTables(queryRunner.Connection, getTablesQuery,
-		func(relFileNode, oid uint32, tableName, namespaceName string) {
-			tracelog.DebugLogger.Printf("adding %s", tableName)
-			tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
-		})
-	tracelog.DebugLogger.Println("got regular tables")
-
-	getPartitionedTablesQuery, err := queryRunner.BuildGetTablesQuery(true)
-	if err != nil {
-		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
-	}
-	parentTableNames := make(map[string]string, 0)
-	queryRunner.genericQuerryTables(queryRunner.Connection, getPartitionedTablesQuery,
-		func(relFileNode, oid uint32, tableName, namespaceName string) {
-			parentTable := fmt.Sprintf("%s.%s", namespaceName, tableName)
-			tracelog.DebugLogger.Printf("adding %s", tableName)
-			tables[parentTable] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
-
-			parentTableNames[tableName] = parentTable
-		})
-
-	tracelog.DebugLogger.Println("got partitioned tables` root partitions")
-
-	for parTabNam, parTabFullNam := range parentTableNames {
-		tracelog.DebugLogger.Printf("getting subtables for %s", parTabNam)
-		getSubtablesQuery := fmt.Sprintf("WITH RECURSIVE partition_hierarchy AS ( "+
+func (queryRunner *PgQueryRunner) BuildGetPartitionsForTableQuery(tablename string) (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		query := fmt.Sprintf("WITH RECURSIVE partition_hierarchy AS ( "+
 			"SELECT c.oid AS child_oid, c.relname AS partition_name, parent.oid AS parent_oid, parent.relname AS parent_name "+
 			"FROM pg_class c "+
 			"JOIN pg_inherits i ON c.oid = i.inhrelid "+
@@ -633,9 +601,55 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 			") "+
 			"SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class "+
 			"AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid "+
-			"JOIN partition_hierarchy ON c.oid = partition_hierarchy.child_oid; ", parTabNam)
+			"JOIN partition_hierarchy ON c.oid = partition_hierarchy.child_oid; ", tablename)
+		return query, nil
+	case queryRunner.Version == 0:
+		return "", NewNoPostgresVersionError()
+	default:
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
 
-		queryRunner.genericQuerryTables(queryRunner.Connection, getSubtablesQuery,
+func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	tables := make(map[string]TableInfo)
+
+	getTablesQuery, err := queryRunner.BuildGetTablesQuery(false)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+	}
+	queryRunner.processTables(queryRunner.Connection, getTablesQuery,
+		func(relFileNode, oid uint32, tableName, namespaceName string) {
+			tracelog.DebugLogger.Printf("adding %s", tableName)
+			tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
+		})
+	tracelog.DebugLogger.Println("got regular tables")
+
+	getPartitionedTablesQuery, err := queryRunner.BuildGetTablesQuery(true)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+	}
+	parentTableNames := make(map[string]string, 0)
+	queryRunner.processTables(queryRunner.Connection, getPartitionedTablesQuery,
+		func(relFileNode, oid uint32, tableName, namespaceName string) {
+			parentTable := fmt.Sprintf("%s.%s", namespaceName, tableName)
+			tracelog.DebugLogger.Printf("adding %s", tableName)
+			tables[parentTable] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
+
+			parentTableNames[tableName] = parentTable
+		})
+
+	tracelog.DebugLogger.Println("got partitioned tables` root partitions")
+
+	for parTabNam, parTabFullNam := range parentTableNames {
+		tracelog.DebugLogger.Printf("getting subtables for %s", parTabNam)
+		getSubtablesQuery, err := queryRunner.BuildGetPartitionsForTableQuery(parTabNam)
+		if err != nil {
+			return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+		}
+		queryRunner.processTables(queryRunner.Connection, getSubtablesQuery,
 			func(relFileNode, oid uint32, tableName, namespaceName string) {
 				tracelog.DebugLogger.Printf("adding %s", tableName)
 				tables[parTabFullNam].SubTables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode}
@@ -647,7 +661,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 	return tables, nil
 }
 
-func (queryRunner *PgQueryRunner) genericQuerryTables(conn *pgx.Conn, getTablesQuery string, dowork func(relFileNode, oid uint32, tableName, namespaceName string)) (map[string]TableInfo, error) {
+func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn, getTablesQuery string, process func(relFileNode, oid uint32, tableName, namespaceName string)) (map[string]TableInfo, error) {
 	rows, err := conn.Query(getTablesQuery)
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
@@ -673,12 +687,8 @@ func (queryRunner *PgQueryRunner) genericQuerryTables(conn *pgx.Conn, getTablesQ
 			}
 			relFileNode = uint32(chis)
 		}
-		dowork(relFileNode, oid, tableName, namespaceName)
-		//tracelog.DebugLogger.Printf("adding %s", tableName)
-		//tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
+		process(relFileNode, oid, tableName, namespaceName)
 	}
-
-	//tracelog.DebugLogger.Println("got tables")
 
 	return tables, nil
 }

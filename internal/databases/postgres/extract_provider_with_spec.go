@@ -94,7 +94,7 @@ func (m DefaultRestoreDescMaker) Make(restoreParameters []string, names Database
 		}
 
 		if tableID == 0 {
-			restoredDatabases.Add(dbID, tableID, 0) // should never happen
+			restoredDatabases.Add(dbID, tableID, 0)
 		} else {
 			restoredDatabases.Add(dbID, tableID, names[fmt.Sprintf("%d", dbID)].Tables[fmt.Sprintf("%d", tableID)].Oid)
 		}
