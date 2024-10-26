@@ -433,6 +433,8 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
 	case Greenplum:
 		{
 			switch {
+			case queryRunner.Version >= 120000:
+				return cbAoRelationPgClassQuery, nil
 			case queryRunner.Version >= 90000:
 				return gpAoRelationPgClassQuery, nil
 			case queryRunner.Version == 0:
