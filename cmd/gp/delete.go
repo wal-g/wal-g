@@ -3,6 +3,7 @@ package gp
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 )
@@ -56,6 +57,7 @@ var deleteGarbageCmd = &cobra.Command{
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
+	internal.ConfigureLimiters()
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -67,6 +69,7 @@ func runDeleteBefore(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
+	internal.ConfigureLimiters()
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -78,6 +81,7 @@ func runDeleteRetain(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
+	internal.ConfigureLimiters()
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -89,6 +93,7 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
+	internal.ConfigureLimiters()
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -112,6 +117,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
+	internal.ConfigureLimiters()
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
