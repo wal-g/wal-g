@@ -46,7 +46,7 @@ func (desc RestoreDesc) IsSkipped(database, tableFile uint32) bool {
 
 func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 	filesToDelete := make([]string, 0)
-	for file, _ := range filesToUnwrap {
+	for file := range filesToUnwrap {
 		isDB, dbID, tableFileID := TryGetOidPair(file)
 
 		if isDB && desc.IsSkipped(dbID, tableFileID) && tableFileID != 0 {
