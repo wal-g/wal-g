@@ -20,7 +20,15 @@ ensure rdb $(wal-g backup-info --tag BackupType LATEST)
 
 test_cleanup; sleep $REDIS_TIMEOUT
 
+touch /var/lib/redis/fake.aof
+touch /var/lib/redis/fake.rdb
+mkdir /var/lib/redis/appendonlydir
+touch /var/lib/redis/appendonlydir/fake.tmp
 wal-g rdb-backup-fetch LATEST
+ensure no $(test -e /var/lib/redis/fake.aof && echo "yes" || echo "no")
+ensure no $(test -e /var/lib/redis/fake.rdb && echo "yes" || echo "no")
+ensure no $(test -e /var/lib/redis/appendonlydir/fake.tmp && echo "yes" || echo "no")
+
 redis-server --save "900 0" --appendonly "no" --dir "/var/lib/redis" &
 sleep $REDIS_TIMEOUT
 
@@ -41,7 +49,12 @@ wal-g backup-info LATEST
 
 test_cleanup; sleep $REDIS_TIMEOUT
 
+touch /var/lib/redis/fake.aof
+touch /var/lib/redis/fake.rdb
 wal-g backup-fetch LATEST
+ensure no $(test -e /var/lib/redis/fake.aof && echo "yes" || echo "no")
+ensure no $(test -e /var/lib/redis/fake.rdb && echo "yes" || echo "no")
+
 redis-server --save "900 0" --appendonly "no" --dir "/var/lib/redis" &
 sleep $REDIS_TIMEOUT
 
