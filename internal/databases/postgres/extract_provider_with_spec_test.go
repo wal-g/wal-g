@@ -96,8 +96,8 @@ func TestRestoreDesc_NoSystemSkip(t *testing.T) {
 
 func TestRestoreDesc_NoDatabaseSkip(t *testing.T) {
 	restoreDesc := make(postgres.RestoreDesc)
-	restoreDesc.Add(20000, 0, 0)
-	assert.Equal(t, false, restoreDesc.IsSkipped(20000, 30000))
+	restoreDesc.Add(20000, 10000, 10000)
+	assert.Equal(t, true, restoreDesc.IsSkipped(20000, 30000))
 }
 
 func TestRestoreDesc_NoSystemDatabaseSkip(t *testing.T) {
