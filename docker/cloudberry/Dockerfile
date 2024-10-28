@@ -57,6 +57,7 @@ RUN apt-get install --yes --no-install-recommends --no-install-suggests \
     openssl \
     python3-dev \
     python3-pip \
+    python3-psycopg2 \
     python3-psutil \
     python3-yaml \
     python3-pygresql \
@@ -67,6 +68,12 @@ RUN apt-get install --yes --no-install-recommends --no-install-suggests \
 ADD docker/cloudberry/run_greenplum.sh /home/gpadmin/run_greenplum.sh
 
 WORKDIR /usr/local
+
+# You can run these tests with Greenplum 7.
+# open-gpdb/gpdb doesn't have 7 branch... so, we can use adb-7:
+#RUN git clone https://github.com/arenadata/gpdb.git gpdb_src --single-branch --branch adb-7.2.0 --depth 1 \
+# && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
+
 RUN git clone https://github.com/cloudberrydb/cloudberrydb.git gpdb_src --single-branch --branch main --depth 1 \
  && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
 
