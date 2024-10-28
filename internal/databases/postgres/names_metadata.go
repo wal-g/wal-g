@@ -46,7 +46,7 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 	if err != nil {
 		return map[uint32][]uint32{}, err
 	}
-	tracelog.DebugLogger.Printf("unpaсked keys  %s %s", database, table)
+	tracelog.InfoLogger.Printf("unpaсked keys  %s %s", database, table)
 	toRestore := map[uint32][]uint32{}
 	database = strings.ReplaceAll(database, "*", ".*")
 	table = strings.ReplaceAll(table, "*", ".*")
@@ -60,10 +60,10 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 			}
 			for name, tableInfo := range dbInfo.Tables {
 				if table == "" || tableRegexp.MatchString(name) {
-					tracelog.DebugLogger.Printf("table to restore through key  %d %s", tableInfo.Relfilenode, table)
+					tracelog.InfoLogger.Printf("table to restore through key  %d %s", tableInfo.Relfilenode, table)
 					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], tableInfo.Relfilenode)
 					for _, tableInfo2 := range tableInfo.SubTables {
-						tracelog.DebugLogger.Printf("subtanble for the table table to restore through key  %d %s", tableInfo2.Relfilenode, table)
+						tracelog.InfoLogger.Printf("subtanble for the table table to restore through key  %d %s", tableInfo2.Relfilenode, table)
 						toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], tableInfo2.Relfilenode)
 					}
 				}
@@ -79,6 +79,7 @@ func (meta DatabasesByNames) GetSystemTables() RestoreDesc {
 		toRestore[dbInfo.Oid] = map[uint32]uint32{}
 		for _, tableInfo := range dbInfo.Tables {
 			if tableInfo.Oid < systemIDLimit {
+				tracelog.DebugLogger.Printf("chose table %d to restore as system one", tableInfo.Oid)
 				toRestore[dbInfo.Oid][tableInfo.Relfilenode] = tableInfo.Oid
 			}
 		}

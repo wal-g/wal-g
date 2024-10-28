@@ -34,7 +34,7 @@ func (desc RestoreDesc) IsFull(database uint32) bool {
 }
 
 func (desc RestoreDesc) IsSkipped(database, tableFile uint32) bool {
-	if database < systemIDLimit || desc.IsFull(database) {
+	if database < systemIDLimit /*|| desc.IsFull(database)*/ {
 		return false
 	}
 	if db, ok := desc[database]; ok { // database should always exist, so this check is just in case
@@ -45,15 +45,27 @@ func (desc RestoreDesc) IsSkipped(database, tableFile uint32) bool {
 }
 
 func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
-	for file := range filesToUnwrap {
+	filesToDelete := make([]string, 0)
+	for file, _ := range filesToUnwrap {
 		isDB, dbID, tableFileID := TryGetOidPair(file)
 
 		if isDB && desc.IsSkipped(dbID, tableFileID) && tableFileID != 0 {
-			tracelog.DebugLogger.Printf("will skip  %s ", file)
-			delete(filesToUnwrap, file)
+			tracelog.InfoLogger.Printf("will skip  %s ", file)
+			//delete(filesToUnwrap, file)
+			filesToDelete = append(filesToDelete, file)
+			_, ok := filesToUnwrap[file]
+			tracelog.InfoLogger.Printf("skipped  %t ", ok)
 		} else {
-			tracelog.DebugLogger.Printf("will restore  %s ", file)
+			tracelog.DebugLogger.Printf("will restore  %s because %t %t %t", file, isDB, desc.IsSkipped(dbID, tableFileID), tableFileID != 0)
 		}
+	}
+
+	for _, file := range filesToDelete {
+		_, ok := filesToUnwrap[file]
+		tracelog.InfoLogger.Printf("deleting %s %t ", file, ok)
+		delete(filesToUnwrap, file)
+		_, ok = filesToUnwrap[file]
+		tracelog.InfoLogger.Printf("skipped %s %t ", file, ok)
 	}
 }
 
@@ -130,7 +142,7 @@ type ExtractProviderDBSpec struct {
 }
 
 func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{restoreParameters, DefaultRestoreDescMaker{}}
+	return &ExtractProviderDBSpec{restoreParameters, RegexpRestoreDescMaker{}}
 }
 
 func (p ExtractProviderDBSpec) Get(

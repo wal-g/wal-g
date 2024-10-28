@@ -34,6 +34,9 @@ psql -p 7000 -d db -c "INSERT INTO ao_to_skip SELECT i, i FROM generate_series(1
 psql -p 7000 -d db -c "INSERT INTO co_to_restore SELECT i, i FROM generate_series(1,$n)i;"
 psql -p 7000 -d db -c "INSERT INTO co_to_skip SELECT i, i FROM generate_series(1,$n)i;"
 
+psql -p 7000 -d db -c "CREATE TABLE partition_to_restore(a int, b int) WITH (appendoptimized = true) DISTRIBUTED BY (a) PARTITION BY RANGE (a) (START (0) END (1000001) EVERY (50000), DEFAULT PARTITION extra);"
+psql -p 7000 -d db -c "INSERT INTO partition_to_restore SELECT i, i FROM generate_series(1,$n)i;"
+
 # check aovisimap
 insert_10_delete_5() {
   start_val=$1
@@ -43,11 +46,13 @@ insert_10_delete_5() {
   psql -p 7000 -d db -c "INSERT INTO ao_to_skip SELECT i, i FROM generate_series($start_val,$stop_val)i;"
   psql -p 7000 -d db -c "INSERT INTO co_to_restore SELECT i, i FROM generate_series($start_val,$stop_val)i;"
   psql -p 7000 -d db -c "INSERT INTO co_to_skip SELECT i, i FROM generate_series($start_val,$stop_val)i;"
+  psql -p 7000 -d db -c "INSERT INTO partition_to_restore SELECT i, i FROM generate_series($start_val,$stop_val)i;"
 
   psql -p 7000 -d db -c "DELETE FROM ao_to_restore WHERE a >= $start_val and a <= $stop_val_d;"
   psql -p 7000 -d db -c "DELETE FROM ao_to_skip WHERE a >= $start_val and a <= $stop_val_d;"
   psql -p 7000 -d db -c "DELETE FROM co_to_restore WHERE a >= $start_val and a <= $stop_val_d;"
   psql -p 7000 -d db -c "DELETE FROM co_to_skip WHERE a >= $start_val and a <= $stop_val_d;"
+  psql -p 7000 -d db -c "DELETE FROM partition_to_restore WHERE a >= $start_val and a <= $stop_val_d;"
 }
 
 for i in $(seq 1 $it);

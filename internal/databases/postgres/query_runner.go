@@ -620,11 +620,14 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
 	}
-	queryRunner.processTables(queryRunner.Connection, getTablesQuery,
+	err = queryRunner.processTables(queryRunner.Connection, getTablesQuery,
 		func(relFileNode, oid uint32, tableName, namespaceName string) {
-			tracelog.DebugLogger.Printf("adding %s", tableName)
+			tracelog.DebugLogger.Printf("adding %s as %d with filenode %d", tableName, oid, relFileNode)
 			tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
 		})
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: getting regular tables failed")
+	}
 	tracelog.DebugLogger.Println("got regular tables")
 
 	getPartitionedTablesQuery, err := queryRunner.BuildGetTablesQuery(true)
@@ -632,7 +635,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
 	}
 	parentTableNames := make(map[string]string, 0)
-	queryRunner.processTables(queryRunner.Connection, getPartitionedTablesQuery,
+	err = queryRunner.processTables(queryRunner.Connection, getPartitionedTablesQuery,
 		func(relFileNode, oid uint32, tableName, namespaceName string) {
 			parentTable := fmt.Sprintf("%s.%s", namespaceName, tableName)
 			tracelog.DebugLogger.Printf("adding %s", tableName)
@@ -640,6 +643,9 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 			parentTableNames[tableName] = parentTable
 		})
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: getting parrtitioned tables failed")
+	}
 
 	tracelog.DebugLogger.Println("got partitioned tables` root partitions")
 
@@ -649,11 +655,14 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 		if err != nil {
 			return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
 		}
-		queryRunner.processTables(queryRunner.Connection, getSubtablesQuery,
+		err = queryRunner.processTables(queryRunner.Connection, getSubtablesQuery,
 			func(relFileNode, oid uint32, tableName, namespaceName string) {
 				tracelog.DebugLogger.Printf("adding %s", tableName)
 				tables[parTabFullNam].SubTables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode}
 			})
+		if err != nil {
+			return nil, errors.Wrap(err, "QueryRunner GetTables: getting partitioned subtables failed")
+		}
 	}
 
 	tracelog.DebugLogger.Println("got partitioned tables` partitions")
@@ -661,14 +670,13 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 	return tables, nil
 }
 
-func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn, getTablesQuery string, process func(relFileNode, oid uint32, tableName, namespaceName string)) (map[string]TableInfo, error) {
+func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
+	getTablesQuery string, process func(relFileNode, oid uint32, tableName, namespaceName string)) error {
 	rows, err := conn.Query(getTablesQuery)
 	if err != nil {
-		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
+		return errors.Wrap(err, "QueryRunner GetTables: Query failed")
 	}
 	defer rows.Close()
-
-	tables := make(map[string]TableInfo)
 
 	for rows.Next() {
 		var relFileNode uint32
@@ -690,7 +698,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn, getTablesQuery s
 		process(relFileNode, oid, tableName, namespaceName)
 	}
 
-	return tables, nil
+	return nil
 }
 
 // GetDataChecksums checks if data checksums are enabled

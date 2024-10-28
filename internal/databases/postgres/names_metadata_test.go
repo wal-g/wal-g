@@ -104,8 +104,11 @@ func TestResolveRegexp_RestoreAllForDatabase(t *testing.T) {
 	assert.False(t, ok2)
 	assert.False(t, ok3)
 
-	assert.Equal(t, 1, len(db1))
-	assert.Equal(t, uint32(0), db1[0])
+	assert.Equal(t, 3, len(db1))
+	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	assert.Equal(t, uint32(40000), db1[0])
+	assert.Equal(t, uint32(40001), db1[1])
+	assert.Equal(t, uint32(40002), db1[2])
 	assert.NoError(t, err)
 }
 
@@ -120,10 +123,17 @@ func TestResolveRegexp_RestoreSomeDatabase(t *testing.T) {
 	assert.True(t, ok2)
 	assert.False(t, ok3)
 
-	assert.Equal(t, 1, len(db1))
-	assert.Equal(t, uint32(0), db1[0])
-	assert.Equal(t, 1, len(db2))
-	assert.Equal(t, uint32(0), db2[0])
+	assert.Equal(t, 3, len(db1))
+	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	assert.Equal(t, uint32(40000), db1[0])
+	assert.Equal(t, uint32(40001), db1[1])
+	assert.Equal(t, uint32(40002), db1[2])
+	assert.Equal(t, 4, len(db2))
+	sort.Slice(db2, func(i, j int) bool { return db2[i] < db2[j] })
+	assert.Equal(t, uint32(40100), db2[0])
+	assert.Equal(t, uint32(40101), db2[1])
+	assert.Equal(t, uint32(40102), db2[2])
+	assert.Equal(t, uint32(40103), db2[3])
 	assert.NoError(t, err)
 }
 
