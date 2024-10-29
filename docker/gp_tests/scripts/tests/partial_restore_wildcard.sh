@@ -119,11 +119,11 @@ elif ! echo $aocs_output | grep -q "$EXPECTED_AO_ERROR_MSG"; then
   exit 1
 fi
 
-if ! psql -p 6000 -t -c "select * from table1;" -d skip1 -A 2>&1 | grep -q "is not a valid data directory"; then
+if ! psql -p 6000 -t -c "select * from table1;" -d skip1 -A 2>&1 | grep -q "$EXPECTED_HEAP_ERROR_MSG"; then
   echo "Error: skip1 database directory must be emtpy after partial fetch"
   echo "$(psql -p 6000 -t -c "select * from table1;" -d skip1 -A)"
   exit 1
-elif ! psql -p 6000 -t -c "select * from table1;" -d skip2 -A 2>&1 | grep "is not a valid data directory"; then
+elif ! psql -p 6000 -t -c "select * from table1;" -d skip2 -A 2>&1 | grep "$EXPECTED_HEAP_ERROR_MSG"; then
   echo "Error: skip2 database directory must be emtpy after partial fetch"
   echo "$(psql -p 6000 -t -c "select * from table1;" -d skip2 -A)"
   exit 1

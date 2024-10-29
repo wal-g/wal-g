@@ -15,17 +15,17 @@ func genDatabasesByNames() postgres.DatabasesByNames {
 	databasesByNames["db1"] = *postgres.NewDatabaseObjectsInfo(20001)
 	databasesByNames["db2"] = *postgres.NewDatabaseObjectsInfo(20002)
 
-	databasesByNames["my_database"].Tables["public.my_table"] = 30000
-	databasesByNames["my_database"].Tables["namespace.other_table"] = 31000
+	databasesByNames["my_database"].Tables["public.my_table"] = postgres.TableInfo{Oid: 30000, Relfilenode: 30000}
+	databasesByNames["my_database"].Tables["namespace.other_table"] = postgres.TableInfo{Oid: 31000, Relfilenode: 31000}
 
-	databasesByNames["db1"].Tables["public.table1"] = 40000
-	databasesByNames["db1"].Tables["public.table2"] = 40001
-	databasesByNames["db1"].Tables["public.tab1"] = 40002
+	databasesByNames["db1"].Tables["public.table1"] = postgres.TableInfo{Oid: 40000, Relfilenode: 40000}
+	databasesByNames["db1"].Tables["public.table2"] = postgres.TableInfo{Oid: 40001, Relfilenode: 40001}
+	databasesByNames["db1"].Tables["public.tab1"] = postgres.TableInfo{Oid: 40002, Relfilenode: 40002}
 
-	databasesByNames["db2"].Tables["my1.table1"] = 40100
-	databasesByNames["db2"].Tables["my2.table2"] = 40101
-	databasesByNames["db2"].Tables["nomy.tab3"] = 40102
-	databasesByNames["db2"].Tables["nomy.tab4"] = 40103
+	databasesByNames["db2"].Tables["my1.table1"] = postgres.TableInfo{Oid: 40100, Relfilenode: 40100}
+	databasesByNames["db2"].Tables["my2.table2"] = postgres.TableInfo{Oid: 40101, Relfilenode: 40101}
+	databasesByNames["db2"].Tables["nomy.tab3"] = postgres.TableInfo{Oid: 40102, Relfilenode: 40102}
+	databasesByNames["db2"].Tables["nomy.tab4"] = postgres.TableInfo{Oid: 40103, Relfilenode: 40103}
 
 	return databasesByNames
 }
@@ -104,8 +104,11 @@ func TestResolveRegexp_RestoreAllForDatabase(t *testing.T) {
 	assert.False(t, ok2)
 	assert.False(t, ok3)
 
-	assert.Equal(t, 1, len(db1))
-	assert.Equal(t, uint32(0), db1[0])
+	assert.Equal(t, 3, len(db1))
+	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	assert.Equal(t, uint32(40000), db1[0])
+	assert.Equal(t, uint32(40001), db1[1])
+	assert.Equal(t, uint32(40002), db1[2])
 	assert.NoError(t, err)
 }
 
@@ -120,10 +123,17 @@ func TestResolveRegexp_RestoreSomeDatabase(t *testing.T) {
 	assert.True(t, ok2)
 	assert.False(t, ok3)
 
-	assert.Equal(t, 1, len(db1))
-	assert.Equal(t, uint32(0), db1[0])
-	assert.Equal(t, 1, len(db2))
-	assert.Equal(t, uint32(0), db2[0])
+	assert.Equal(t, 3, len(db1))
+	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	assert.Equal(t, uint32(40000), db1[0])
+	assert.Equal(t, uint32(40001), db1[1])
+	assert.Equal(t, uint32(40002), db1[2])
+	assert.Equal(t, 4, len(db2))
+	sort.Slice(db2, func(i, j int) bool { return db2[i] < db2[j] })
+	assert.Equal(t, uint32(40100), db2[0])
+	assert.Equal(t, uint32(40101), db2[1])
+	assert.Equal(t, uint32(40102), db2[2])
+	assert.Equal(t, uint32(40103), db2[3])
 	assert.NoError(t, err)
 }
 

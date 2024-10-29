@@ -10,14 +10,18 @@ import (
 )
 
 type DatabasesByNames map[string]DatabaseObjectsInfo
-
 type DatabaseObjectsInfo struct {
-	Oid    uint32            `json:"oid"`
-	Tables map[string]uint32 `json:"tables,omitempty"`
+	Oid    uint32               `json:"oid"`
+	Tables map[string]TableInfo `json:"tables,omitempty"`
+}
+type TableInfo struct {
+	Oid         uint32               `json:"oid"`
+	Relfilenode uint32               `json:"relfilenode"`
+	SubTables   map[string]TableInfo `json:"subtables,omitempty"`
 }
 
 func NewDatabaseObjectsInfo(oid uint32) *DatabaseObjectsInfo {
-	return &DatabaseObjectsInfo{Oid: oid, Tables: make(map[string]uint32)}
+	return &DatabaseObjectsInfo{Oid: oid, Tables: make(map[string]TableInfo)}
 }
 
 func (meta DatabasesByNames) Resolve(key string) (uint32, uint32, error) {
@@ -29,8 +33,8 @@ func (meta DatabasesByNames) Resolve(key string) (uint32, uint32, error) {
 		if table == "" {
 			return data.Oid, 0, nil
 		}
-		if tableFile, tblFound := data.Tables[table]; tblFound {
-			return data.Oid, tableFile, nil
+		if tableInfo, tblFound := data.Tables[table]; tblFound {
+			return data.Oid, tableInfo.Relfilenode, nil
 		}
 		return 0, 0, newMetaTableNameError(database, table)
 	}
@@ -42,7 +46,7 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 	if err != nil {
 		return map[uint32][]uint32{}, err
 	}
-	tracelog.DebugLogger.Printf("unpaсked keys  %s %s", database, table)
+	tracelog.InfoLogger.Printf("unpaсked keys  %s %s", database, table)
 	toRestore := map[uint32][]uint32{}
 	database = strings.ReplaceAll(database, "*", ".*")
 	table = strings.ReplaceAll(table, "*", ".*")
@@ -52,18 +56,35 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 		if databaseRegexp.MatchString(db) {
 			toRestore[dbInfo.Oid] = []uint32{}
 			if table == "" {
-				tracelog.DebugLogger.Printf("restore all for  %s", db)
-				toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], 0)
-				continue
+				tracelog.InfoLogger.Printf("restore all for  %s", db)
 			}
-			for name, oid := range dbInfo.Tables {
-				if tableRegexp.MatchString(name) {
-					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], oid)
+			for name, tableInfo := range dbInfo.Tables {
+				if table == "" || tableRegexp.MatchString(name) {
+					tracelog.InfoLogger.Printf("table to restore through key  %d %s", tableInfo.Relfilenode, table)
+					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], tableInfo.Relfilenode)
+					for _, tableInfo2 := range tableInfo.SubTables {
+						tracelog.InfoLogger.Printf("subtanble for the table table to restore through key  %d %s", tableInfo2.Relfilenode, table)
+						toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], tableInfo2.Relfilenode)
+					}
 				}
 			}
 		}
 	}
 	return toRestore, nil
+}
+
+func (meta DatabasesByNames) GetSystemTables() RestoreDesc {
+	toRestore := make(RestoreDesc)
+	for _, dbInfo := range meta {
+		toRestore[dbInfo.Oid] = map[uint32]uint32{}
+		for _, tableInfo := range dbInfo.Tables {
+			if tableInfo.Oid < systemIDLimit {
+				tracelog.DebugLogger.Printf("chose table %d to restore as system one", tableInfo.Oid)
+				toRestore[dbInfo.Oid][tableInfo.Relfilenode] = tableInfo.Oid
+			}
+		}
+	}
+	return toRestore
 }
 
 func (meta DatabasesByNames) tryFormatTableName(table string) (string, bool) {
@@ -88,21 +109,18 @@ func (meta DatabasesByNames) unpackKey(key string) (string, string, error) {
 	switch len(tokens) {
 	case 1:
 		return tokens[0], "", nil
-
 	case 2:
 		table, ok := meta.tryFormatTableName(tokens[1])
 		if !ok {
 			return "", "", newMetaIncorrectKeyError(key)
 		}
 		return tokens[0], table, nil
-
 	case 3:
 		table, ok := meta.tryFormatTableName(fmt.Sprintf("%s.%s", tokens[1], tokens[2]))
 		if !ok {
 			return "", "", newMetaIncorrectKeyError(key)
 		}
 		return tokens[0], table, nil
-
 	default:
 		return "", "", newMetaIncorrectKeyError(key)
 	}
@@ -115,7 +133,6 @@ type metaDatabaseNameError struct {
 func newMetaDatabaseNameError(databaseName string) metaDatabaseNameError {
 	return metaDatabaseNameError{errors.Errorf("Can't find database in meta with name: '%s'", databaseName)}
 }
-
 func (err metaDatabaseNameError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
@@ -128,7 +145,6 @@ func newMetaTableNameError(databaseName, tableName string) metaTableNameError {
 	return metaTableNameError{
 		errors.Errorf("Can't find table in meta for '%s' database and name: '%s'", databaseName, tableName)}
 }
-
 func (err metaTableNameError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
@@ -142,7 +158,6 @@ func newMetaIncorrectKeyError(key string) metaIncorrectKeyError {
 		errors.Errorf("Unexpected format of database or table to restore: '%s'. "+
 			"Use 'dat', 'dat/rel' or 'dat/nmsp.rel'", key)}
 }
-
 func (err metaIncorrectKeyError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
