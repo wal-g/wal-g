@@ -13,6 +13,7 @@ import (
 const (
 	backupPushShortDescription = "Creates new backup and pushes it to storage"
 	permanentFlag              = "permanent"
+	countJournalsFlag          = "count-journals"
 	addUserDataFlag            = "add-user-data"
 
 	permanentShorthand = "p"
@@ -48,14 +49,16 @@ var (
 				uploader,
 				backupCmd,
 				permanent,
+				countJournals,
 				true,
 				userData,
 				mysql.NewNoDeltaBackupConfigurator(),
 			)
 		},
 	}
-	permanent = false
-	userData  = ""
+	permanent     = false
+	countJournals = false
+	userData      = ""
 )
 
 func init() {
@@ -67,4 +70,6 @@ func init() {
 		false, "Pushes permanent backup")
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
+	backupPushCmd.Flags().BoolVar(&countJournals, countJournalsFlag,
+		false, "Create 'backups.json' file in the bucket and maintain the binlog sizes required to get from one backup to the next one")
 }
