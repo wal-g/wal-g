@@ -31,10 +31,7 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
 	defer func() {
-		err := conn.Close()
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to close connection %v", err)
-		}
+		conn.Close()
 	}()
 
 	globalCluster, _, _, err := getGpClusterInfo(conn)
