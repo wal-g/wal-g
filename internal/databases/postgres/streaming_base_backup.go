@@ -14,8 +14,8 @@ import (
 	"github.com/wal-g/wal-g/internal"
 
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"

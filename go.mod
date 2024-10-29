@@ -26,7 +26,6 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pglogrepl v0.0.0-20240307033717-828fbfe908e9
-	github.com/jackc/pgproto3/v2 v2.3.3
 	github.com/jackc/pgx v3.6.0+incompatible
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
