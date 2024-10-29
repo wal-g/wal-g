@@ -14,7 +14,15 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const backupFetchShortDescription = "Fetches desired rdb backup from storage"
+const (
+	backupFetchShortDescription = "Fetches desired rdb backup from storage"
+	SkipCleanFlag               = "skip-clean"
+	SkipCleanShorthand          = "s"
+)
+
+var (
+	skipClean bool
+)
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch backup-name",
@@ -48,7 +56,7 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
-		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd)
+		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd, skipClean)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -62,5 +70,6 @@ func init() {
 		Args:  backupFetchCmd.Args,
 		Run:   backupFetchCmd.Run,
 	}
+	rdbBackupFetchCmd.Flags().BoolVarP(&skipClean, SkipCleanFlag, SkipCleanShorthand, false, "Skip data folder clean check")
 	cmd.AddCommand(rdbBackupFetchCmd)
 }

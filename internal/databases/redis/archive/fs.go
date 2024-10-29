@@ -16,7 +16,7 @@ func CreateAofFolderInfo(path string) *AofFolderInfo {
 	}
 }
 
-func (f *AofFolderInfo) CleanData() error {
+func (f *AofFolderInfo) CleanPathAndParent() error {
 	path := filepath.Clean(f.Path)
 	err := os.RemoveAll(path)
 	if err != nil {
@@ -24,16 +24,24 @@ func (f *AofFolderInfo) CleanData() error {
 	}
 
 	parent := filepath.Dir(path)
+
 	starred := filepath.Join(parent, "*.rdb")
 	contents, err := filepath.Glob(starred)
 	if err != nil {
 		return fmt.Errorf("failed to create glob for rdb files: %v", err)
 	}
 
+	starred = filepath.Join(parent, "*.aof")
+	aofContents, err := filepath.Glob(starred)
+	if err != nil {
+		return fmt.Errorf("failed to create glob for aof files: %v", err)
+	}
+
+	contents = append(contents, aofContents...)
 	for _, item := range contents {
 		err = os.RemoveAll(item)
 		if err != nil {
-			return fmt.Errorf("failed to remove rdb file: %v", err)
+			return fmt.Errorf("failed to remove %s path: %v", item, err)
 		}
 	}
 
