@@ -166,7 +166,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 // and creates compressed tar members labeled as `part_00i.tar.*`, where '*' is compressor file extension.
 //
 // To see which files and directories are Skipped, please consult
-// ExcludedFilenames. Excluded directories will be created but their
+// FilesFilter. Excluded directories will be created but their
 // contents will not be included in the tar bundle.
 func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err error) error {
 	if err != nil {
@@ -229,7 +229,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 
 // TODO : unit tests
 // addToBundle handles one given file.
-// Does not follow symlinks (it seems like it does). If file is in ExcludedFilenames, will not be included
+// Does not follow symlinks (it seems like it does). If file doesn't pass FilesFilter, will not be included
 // in the final tarball. EXCLUDED directories are created
 // but their contents are not written to local disk.
 func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {

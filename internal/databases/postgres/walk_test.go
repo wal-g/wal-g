@@ -229,7 +229,7 @@ func compare(t *testing.T, dir1, dir2 string, fileFilter internal.FilesFilter) b
 		mode := info1.Mode() == info2.Mode()
 		isDir := f1.IsDir() == f2.IsDir()
 
-		// If directory is in ExcludedFilenames list, make sure it exists but is empty.
+		// If directory doesn't pass FilesFilter, make sure it exists but is empty.
 		if f2.IsDir() {
 			if !fileFilter.ShouldUploadFile(f2.Name()) {
 				size = isEmpty(t, filepath.Join(dir2, f2.Name()))
