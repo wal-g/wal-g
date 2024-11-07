@@ -166,6 +166,8 @@ func configureSession(sess *session.Session, config *Config) error {
 	} else {
 		awsConfig = awsConfig.WithRegion(config.Region)
 	}
+	tracelog.DebugLogger.Printf("disable 100 continue %t", config.Disable100Continue)
+	awsConfig.S3Disable100Continue = aws.Bool(config.Disable100Continue)
 
 	sess.Config = awsConfig
 	return nil

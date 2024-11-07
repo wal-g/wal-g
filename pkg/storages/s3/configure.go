@@ -44,6 +44,7 @@ const (
 	maxRetriesSetting              = "S3_MAX_RETRIES"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
+	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
 )
 
 var SettingList = []string{
@@ -78,6 +79,7 @@ var SettingList = []string{
 	maxThrottlingRetryDelaySetting,
 	retentionPeriodSetting,
 	retentionModeSetting,
+	disable100ContinueSetting,
 }
 
 const (
@@ -93,6 +95,7 @@ const (
 	defaultRangeBatchEnabled       = false
 	defaultRangeMaxRetries         = 10
 	defaultDisabledRetentionPeriod = -1
+	defaultDisable100Continue      = false
 )
 
 // TODO: Unit tests
@@ -160,6 +163,10 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	disable100Continue, err := setting.BoolOptional(settings, disable100ContinueSetting, defaultDisable100Continue)
+	if err != nil {
+		return nil, err
+	}
 
 	config := &Config{
 		Secrets: &Secrets{
@@ -197,6 +204,7 @@ func ConfigureStorage(
 		RangeMaxRetries:         rangeMaxRetries,
 		MinThrottlingRetryDelay: time.Duration(minThrottlingRetryDelay) * time.Millisecond,
 		MaxThrottlingRetryDelay: time.Duration(maxThrottlingRetryDelay) * time.Millisecond,
+		Disable100Continue:      disable100Continue,
 	}
 
 	st, err := NewStorage(config, rootWraps...)
