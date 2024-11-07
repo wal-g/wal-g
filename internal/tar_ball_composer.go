@@ -5,6 +5,7 @@ import (
 	"os"
 )
 
+// TarBallComposer works as multiplexer: it saves files to different tar-files depending on its strategy.
 type TarBallComposer interface {
 	AddFile(info *ComposeFileInfo)
 	AddHeader(header *tar.Header, fileInfo os.FileInfo) error

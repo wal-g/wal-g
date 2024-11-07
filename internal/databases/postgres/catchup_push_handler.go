@@ -40,7 +40,7 @@ func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN)
 		tracelog.InfoLogger.Printf("Catchup incremental backup is not implemented for orioledb. Full backup will be performed.")
 	}
 
-	backupConfig, err := NewBackupHandler(backupArguments)
+	backupHandler, err := NewBackupHandler(backupArguments)
 	tracelog.ErrorLogger.FatalOnError(err)
-	backupConfig.HandleBackupPush(ctx)
+	backupHandler.HandleBackupPush(ctx)
 }

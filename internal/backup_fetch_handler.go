@@ -81,7 +81,6 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 
 type Fetcher func(rootFolder storage.Folder, backup Backup)
 
-// TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher Fetcher) {
 	backup, err := targetBackupSelector.Select(folder)

@@ -22,7 +22,7 @@ func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 
 type Bundle struct {
 	Directories []string
-	Sentinel    *Sentinel
+	Sentinel    *Sentinel // structure that points to important file e.g. pg_control in Postgres
 
 	TarBallComposer TarBallComposer
 	TarBallQueue    *TarBallQueue

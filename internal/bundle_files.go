@@ -13,6 +13,7 @@ type BundleFiles interface {
 	AddFileDescription(name string, backupFileDescription BackupFileDescription)
 	AddFileWithCorruptBlocks(tarHeader *tar.Header, fileInfo os.FileInfo, isIncremented bool,
 		corruptedBlocks []uint32, storeAllBlocks bool)
+	// GetUnderlyingMap returns map: name -> BackupFileDescription
 	GetUnderlyingMap() *sync.Map
 }
 
