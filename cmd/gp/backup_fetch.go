@@ -52,6 +52,14 @@ var backupFetchCmd = &cobra.Command{
 			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 
+		concurrency := viper.GetInt(conf.DownloadConcurrencySetting)
+		if concurrency != 1 {
+			// it looks like a bug in `tryExtractFiles` - it can override backup_label when WALG_DOWNLOAD_CONCURRENCY != 1
+			// https://github.com/wal-g/wal-g/blob/v3.0.4/internal/extract.go#L201-L253
+			tracelog.WarningLogger.Print("In order to avoid concurrency issue WALG_DOWNLOAD_CONCURRENCY set to 1")
+			viper.Set(conf.DownloadConcurrencySetting, 1)
+		}
+
 		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
 		tracelog.ErrorLogger.FatalOnError(err)
 
