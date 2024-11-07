@@ -360,7 +360,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	// Generate random data and write to tmp dir `data...`.
 	data := generateData(t)
 	tarSizeThreshold := int64(10)
-	fileFilter := postgres.NewPgFilesFilter(12000)
+	fileFilter := postgres.NewRegularPgFilesFilter(12000)
 	// Bundle and compress files to `compressed`.
 	bundle := postgres.NewBundle(data, nil, "", nil, nil, false, tarSizeThreshold, fileFilter)
 	compressed := filepath.Join(filepath.Dir(data), "compressed")

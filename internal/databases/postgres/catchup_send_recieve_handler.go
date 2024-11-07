@@ -21,7 +21,7 @@ import (
 )
 
 func HandleCatchupSend(pgDataDirectory string, destination string) {
-	fileFilter := NewPgCatchupFilesFilter()
+	fileFilter := NewCatchupPgFilesFilter()
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Sending %v to %v\n", pgDataDirectory, destination)
 	info, runner, err := GetPgServerInfo(true)
@@ -250,7 +250,7 @@ func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
 }
 
 func HandleCatchupReceive(pgDataDirectory string, port int) {
-	fileFilter := NewPgCatchupFilesFilter()
+	fileFilter := NewCatchupPgFilesFilter()
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Receiving %v on port %v\n", pgDataDirectory, port)
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", port))

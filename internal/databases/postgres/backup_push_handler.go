@@ -68,6 +68,7 @@ type BackupArguments struct {
 	withoutFilesMetadata     bool
 	composerInitFunc         func(handler *BackupHandler) error
 	preventConcurrentBackups bool
+	filesFilterType          PgFilesFilterType
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process

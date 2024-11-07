@@ -1,6 +1,9 @@
 package postgres
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -12,13 +15,31 @@ var filesToExclude = []string{
 	"standby.signal", // Signal files
 }
 
-type PgFilesFilter struct {
+type PgFilesFilterType int
+
+const (
+	RegularPgFileFilter PgFilesFilterType = iota + 1
+	CatchupPgFilesFilter
+)
+
+func SelectPgFilesFilter(ffType PgFilesFilterType, pgVersion int) (internal.FilesFilter, error) {
+	switch ffType {
+	case RegularPgFileFilter:
+		return NewRegularPgFilesFilter(pgVersion), nil
+	case CatchupPgFilesFilter:
+		return NewCatchupPgFilesFilter(), nil
+	default:
+		return nil, errors.New(fmt.Sprintf("PgFilesFilterFactory: Unknown PgFilesFilterType: %v", ffType))
+	}
+}
+
+type RegularPgFilesFilter struct {
 	excludedFilenames map[string]utility.Empty
 }
 
-var _ internal.FilesFilter = &PgFilesFilter{}
+var _ internal.FilesFilter = &RegularPgFilesFilter{}
 
-func NewPgFilesFilter(version int) internal.FilesFilter {
+func NewRegularPgFilesFilter(version int) internal.FilesFilter {
 	var excludedFilenames = make(map[string]utility.Empty)
 	for _, filename := range filesToExclude {
 		excludedFilenames[filename] = utility.Empty{}
@@ -31,12 +52,12 @@ func NewPgFilesFilter(version int) internal.FilesFilter {
 		excludedFilenames[TablespaceMapFilename] = utility.Empty{}
 	}
 
-	return &PgFilesFilter{
+	return &RegularPgFilesFilter{
 		excludedFilenames: excludedFilenames,
 	}
 }
 
-func NewPgCatchupFilesFilter() internal.FilesFilter {
+func NewCatchupPgFilesFilter() internal.FilesFilter {
 	var excludedFilenames = make(map[string]utility.Empty)
 
 	for _, filename := range filesToExclude {
@@ -47,12 +68,12 @@ func NewPgCatchupFilesFilter() internal.FilesFilter {
 		excludedFilenames[fname] = utility.Empty{}
 	}
 
-	return &PgFilesFilter{
+	return &RegularPgFilesFilter{
 		excludedFilenames: excludedFilenames,
 	}
 }
 
-func (ff *PgFilesFilter) ShouldUploadFile(path string) bool {
+func (ff *RegularPgFilesFilter) ShouldUploadFile(path string) bool {
 	_, ok := ff.excludedFilenames[path]
 	return !ok
 }

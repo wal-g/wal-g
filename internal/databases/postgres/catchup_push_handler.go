@@ -28,7 +28,9 @@ func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN)
 		uploader, pgDataDirectory, utility.CatchupPath, false,
 		false, false, false,
 		RegularComposer, NewCatchupDeltaBackupConfigurator(fakePreviousBackupSentinelDto),
-		userData, false)
+		userData, false,
+		CatchupPgFilesFilter,
+	)
 	if orioledb.IsEnabled(pgDataDirectory) {
 		tracelog.InfoLogger.Printf("Catchup incremental backup is not implemented for orioledb. Full backup will be performed.")
 	}
