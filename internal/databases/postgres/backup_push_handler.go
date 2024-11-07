@@ -125,7 +125,9 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
 	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool) BackupArguments {
+	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool,
+	filterType PgFilesFilterType,
+) BackupArguments {
 	return BackupArguments{
 		Uploader:              uploader,
 		pgDataDirectory:       pgDataDirectory,
@@ -141,6 +143,7 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 			return configureTarBallComposer(handler, tarBallComposerType)
 		},
 		preventConcurrentBackups: false,
+		filesFilterType:          filterType,
 	}
 }
 
@@ -163,6 +166,9 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 	arguments := bh.Arguments
 	crypter := internal.ConfigureCrypter()
+	fileFilter, err := SelectPgFilesFilter(arguments.filesFilterType, bh.PgInfo.PgVersion)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	bh.Workers.Bundle = NewBundle(
 		bh.PgInfo.PgDataDirectory,
 		crypter,
@@ -171,7 +177,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 		bh.prevBackupInfo.filesMetadataDto.Files,
 		arguments.forceIncremental,
 		viper.GetInt64(conf.TarSizeThresholdSetting),
-		NewPgFilesFilter(bh.PgInfo.PgVersion),
+		fileFilter,
 	)
 	if orioledbEnabled && bh.prevBackupInfo.sentinelDto.BackupStartChkpNum != nil {
 		bh.Workers.Bundle.IncrementFromChkpNum = bh.prevBackupInfo.sentinelDto.BackupStartChkpNum
