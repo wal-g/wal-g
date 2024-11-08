@@ -135,7 +135,7 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 	if !valid {
 		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
 		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
-		return true, nil
+		return false, nil
 	}
 
 	// We only calculate the checksum for properly-initialized pages
