@@ -303,6 +303,7 @@ deps: go_deps link_external_deps
 
 go_deps:
 	git submodule update --init
+	cp CMakeLists-brotli.txt submodules/brotli/CMakeLists.txt
 	go mod vendor
 ifdef USE_LZO
 	sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' vendor/github.com/cyberdelia/lzo/lzo.go
