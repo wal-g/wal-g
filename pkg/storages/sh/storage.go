@@ -24,6 +24,8 @@ type Config struct {
 	RootPath       string
 	User           string
 	PrivateKeyPath string
+	JumpHost       string
+	JumpPort       string
 }
 
 type Secrets struct {
@@ -57,7 +59,12 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 	address := fmt.Sprint(config.Host, ":", config.Port)
-	client := NewSFTPLazy(address, sshConfig)
+	jump := ""
+	if config.JumpHost != "" {
+		jump = fmt.Sprint(config.JumpHost, ":", config.JumpPort)
+	}
+
+	client := NewSFTPLazy(address, jump, sshConfig)
 
 	path := storage.AddDelimiterToPath(config.RootPath)
 	var folder storage.Folder = NewFolder(client, path)

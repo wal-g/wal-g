@@ -226,6 +226,8 @@ const (
 	SSHPassword       = "SSH_PASSWORD"
 	SSHUsername       = "SSH_USERNAME"
 	SSHPrivateKeyPath = "SSH_PRIVATE_KEY_PATH"
+	SSHJumpHost       = "SSH_JUMP_HOST"
+	SSHJumpPort       = "SSH_JUMP_PORT"
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
 )
@@ -440,6 +442,8 @@ var (
 		SSHPassword:       true,
 		SSHUsername:       true,
 		SSHPrivateKeyPath: true,
+		SSHJumpHost:       true,
+		SSHJumpPort:       true,
 
 		//File
 		"WALG_FILE_PREFIX": true,
