@@ -78,6 +78,40 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 	return utility.WriteLocalFile(fileReader, fileInfo, file, fsync)
 }
 
+// handleSymlink will follow all required logic to properly handle symlinks.
+// Logic depends on which unwrap implementation is uses, wether the file was already extracted before
+// and other file stat information on the target file
+func handleSymlink(sourcePath string, targetPath string) error {
+	// In some edge cases symlinks end up in the delta backups multiple times.
+	// os.Symlink cannot replace symlinks that already exist, and we want the latest symlink in our final restore.
+	// Therefore, we check symlinks in the tar file to see if the already exist and already are symlinks in the
+	// restore in which case we replace it (remove before creation).
+	if fi, err := os.Lstat(targetPath); os.IsNotExist(err) {
+		tracelog.DebugLogger.Printf("%s does not yet exist", targetPath)
+	} else if err != nil {
+		tracelog.ErrorLogger.Printf("failed to stat %s: %s", targetPath, err.Error())
+		return err
+	} else if fi.Mode()&fs.ModeSymlink != 0 {
+		if useNewUnwrapImplementation {
+			tracelog.DebugLogger.Println("New unwrap implementation, so this is an older version than the one we found before.", targetPath)
+			return nil
+		} else if err = os.Remove(targetPath); err == nil {
+			// target exists and is symlink and using old unwrap implementation. Replace (remove before create)
+			tracelog.DebugLogger.Println("Symlink already existed. Removed so we can replace.", targetPath)
+		} else if err != os.ErrNotExist {
+			return fmt.Errorf("symlink %s already exists, and could not be removed", targetPath)
+		}
+	} else {
+		// if is exists and is no symlink we could remove data
+		// this probably is coming from an earlier tar from this restore, but let's not take any chances
+		return fmt.Errorf("%s exists and is no symlink", targetPath)
+	}
+	if err := os.Symlink(sourcePath, targetPath); err != nil {
+		return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
+	}
+	return nil
+}
+
 // Interpret extracts a tar file to disk and creates needed directories.
 // Returns the first error encountered. Calls fsync after each file
 // is written successfully.
@@ -109,25 +143,8 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 		// os.Symlink cannot replace symlinks that already exist, and we want the latest symlink in our final restore.
 		// Therefore, we check symlinks in the tar file to see if the already exist and already are symlinks in the
 		// restore in which case we replace it (remove before creation).
-		if fi, err := os.Lstat(targetPath); os.IsNotExist(err) {
-			tracelog.DebugLogger.Printf("%s does not yet exist", targetPath)
-		} else if err != nil {
-			tracelog.ErrorLogger.Printf("failed to stat %s: %s", targetPath, err.Error())
+		if err := handleSymlink(fileInfo.Name, targetPath); err != nil {
 			return err
-		} else if fi.Mode()&fs.ModeSymlink != 0 {
-			// target exists and is symlink. Replace (remove before create)
-			if err = os.Remove(targetPath); err == nil {
-				tracelog.DebugLogger.Println("Symlink already existed. Removed so we can replace.", targetPath)
-			} else if err != os.ErrNotExist {
-				return fmt.Errorf("symlink %s already exists, and could not be removed", targetPath)
-			}
-		} else {
-			// if is exists and is no symlink we could remove data
-			// this probably is coming from an earlier tar from this restore, but let's not take any chances
-			return fmt.Errorf("%s exists and is no symlink", targetPath)
-		}
-		if err := os.Symlink(fileInfo.Name, targetPath); err != nil {
-			return errors.Wrapf(err, "Interpret: failed to create symlink %s", targetPath)
 		}
 	}
 	return nil
