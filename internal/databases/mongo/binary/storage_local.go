@@ -68,7 +68,6 @@ func (localStorage *LocalStorage) CleanupMongodDBPath() error {
 		return nil
 	}
 	for _, name := range names {
-
 		fullPath := filepath.Join(localStorage.MongodDBPath, name)
 		if localStorage.whitelist != nil && localStorage.whitelist.MatchString(fullPath) {
 			tracelog.InfoLogger.Printf("skip remove %s", filepath.Join(localStorage.MongodDBPath, name))
