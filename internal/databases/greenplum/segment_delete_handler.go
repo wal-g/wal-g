@@ -140,7 +140,13 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 	folder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
-		tracelog.WarningLogger.Println("Error while time")
+		tracelog.WarningLogger.Println("Error while fetching backups")
+		return map[postgres.PermanentObject]bool{}, map[postgres.PermanentObject]bool{}
+	}
+
+	restorePointMetas, err := FetchAllRestorePoints(rootFolder)
+	if err != nil {
+		tracelog.WarningLogger.Println("Error while fetching restore points")
 		return map[postgres.PermanentObject]bool{}, map[postgres.PermanentObject]bool{}
 	}
 
@@ -161,7 +167,7 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 			continue
 		}
 
-		restorePoint, err := FindRestorePointWithTS(meta.StartTime.Format(time.RFC3339), rootFolder)
+		restorePoint, err := FindRestorePointWithTS(meta.StartTime.Format(time.RFC3339), restorePointMetas)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue

@@ -22,6 +22,7 @@ import (
 type DeleteArgs struct {
 	Confirmed bool
 	FindFull  bool
+	Garbage   bool
 }
 
 type DeleteHandler struct {
@@ -164,30 +165,30 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 		return fmt.Errorf("failed to load backup %s sentinel: %v", backup.Name, err)
 	}
 
-	errorGroup, _ := errgroup.WithContext(context.Background())
-
 	deleteConcurrency, err := conf.GetMaxConcurrency(conf.GPDeleteConcurrency)
 	if err != nil {
 		tracelog.WarningLogger.Printf("config error: %v", err)
 	}
 
-	deleteSem := make(chan struct{}, deleteConcurrency)
+	errorGroup, _ := errgroup.WithContext(context.Background())
+	errorGroup.SetLimit(deleteConcurrency)
 
 	// clean the segments
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
-		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)\n", meta.ContentID, meta.BackupID)
+		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)", meta.ContentID, meta.BackupID)
 
 		errorGroup.Go(func() error {
-			deleteSem <- struct{}{}
-			defer func() { <-deleteSem }()
-
 			segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args, delType)
 			if err != nil {
 				return err
 			}
 			segBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
 			if err != nil {
+				if h.args.Garbage {
+					tracelog.ErrorLogger.Printf("Processing segment %d (backupId=%s): %v", meta.ContentID, meta.BackupID, err)
+					return nil // skip non-critical errors in garbage deletion
+				}
 				return err
 			}
 			deleteErr := segHandler.Delete(segBackup)

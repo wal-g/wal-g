@@ -125,7 +125,7 @@ func (sink *decompressFileSink) repairSparse() error {
 	}
 
 	pageReader := innodb.NewPageReader(sink.file)
-	pageNumber := 1
+	pageNumber := 1 // Never compress/decompress the first page (FSP_HDR)
 	for {
 		page, err := pageReader.ReadRaw(innodb.PageNumber(pageNumber))
 		if err == io.EOF {

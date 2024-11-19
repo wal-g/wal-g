@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/webserver"
 )
 
@@ -167,16 +168,17 @@ const (
 	RedisDataTimeout          = "WALG_REDIS_DATA_TIMEOUT"
 	RedisServerProcessName    = "WALG_REDIS_SERVER_PROCESS_NAME"
 
-	GPLogsDirectory            = "WALG_GP_LOGS_DIR"
-	GPSegContentID             = "WALG_GP_SEG_CONTENT_ID"
-	GPSegmentsPollInterval     = "WALG_GP_SEG_POLL_INTERVAL"
-	GPSegmentsPollRetries      = "WALG_GP_SEG_POLL_RETRIES"
-	GPSegmentsUpdInterval      = "WALG_GP_SEG_UPD_INTERVAL"
-	GPSegmentStatesDir         = "WALG_GP_SEG_STATES_DIR"
-	GPDeleteConcurrency        = "WALG_GP_DELETE_CONCURRENCY"
-	GPAoSegSizeThreshold       = "WALG_GP_AOSEG_SIZE_THRESHOLD"
-	GPAoDeduplicationAgeLimit  = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
-	GPRelativeRecoveryConfPath = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
+	GPLogsDirectory              = "WALG_GP_LOGS_DIR"
+	GPSegContentID               = "WALG_GP_SEG_CONTENT_ID"
+	GPSegmentsPollInterval       = "WALG_GP_SEG_POLL_INTERVAL"
+	GPSegmentsPollRetries        = "WALG_GP_SEG_POLL_RETRIES"
+	GPSegmentsUpdInterval        = "WALG_GP_SEG_UPD_INTERVAL"
+	GPSegmentStatesDir           = "WALG_GP_SEG_STATES_DIR"
+	GPDeleteConcurrency          = "WALG_GP_DELETE_CONCURRENCY"
+	GPAoSegSizeThreshold         = "WALG_GP_AOSEG_SIZE_THRESHOLD"
+	GPAoDeduplicationAgeLimit    = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
+	GPRelativeRecoveryConfPath   = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
+	GPRelativePostgresqlConfPath = "WALG_GP_RELATIVE_POSTGRESQL_CONF_PATH"
 
 	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
 	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
@@ -302,16 +304,17 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory:            "/var/log",
-		PgWalSize:                  "64",
-		GPSegmentsPollInterval:     "5m",
-		GPSegmentsUpdInterval:      "10s",
-		GPSegmentsPollRetries:      "5",
-		GPSegmentStatesDir:         "/tmp",
-		GPDeleteConcurrency:        "1",
-		GPAoSegSizeThreshold:       "1048576", // (1 << 20)
-		GPAoDeduplicationAgeLimit:  "720h",    // 30 days
-		GPRelativeRecoveryConfPath: "recovery.conf",
+		GPLogsDirectory:              "/var/log",
+		PgWalSize:                    "64",
+		GPSegmentsPollInterval:       "5m",
+		GPSegmentsUpdInterval:        "10s",
+		GPSegmentsPollRetries:        "5",
+		GPSegmentStatesDir:           "/tmp",
+		GPDeleteConcurrency:          "1",
+		GPAoSegSizeThreshold:         "1048576", // (1 << 20)
+		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
+		GPRelativeRecoveryConfPath:   "recovery.conf",
+		GPRelativePostgresqlConfPath: "postgresql.conf",
 	}
 
 	AllowedSettings map[string]bool
@@ -551,16 +554,17 @@ var (
 	}
 
 	GPAllowedSettings = map[string]bool{
-		GPLogsDirectory:            true,
-		GPSegContentID:             true,
-		GPSegmentsPollRetries:      true,
-		GPSegmentsPollInterval:     true,
-		GPSegmentsUpdInterval:      true,
-		GPSegmentStatesDir:         true,
-		GPDeleteConcurrency:        true,
-		GPAoSegSizeThreshold:       true,
-		GPAoDeduplicationAgeLimit:  true,
-		GPRelativeRecoveryConfPath: true,
+		GPLogsDirectory:              true,
+		GPSegContentID:               true,
+		GPSegmentsPollRetries:        true,
+		GPSegmentsPollInterval:       true,
+		GPSegmentsUpdInterval:        true,
+		GPSegmentStatesDir:           true,
+		GPDeleteConcurrency:          true,
+		GPAoSegSizeThreshold:         true,
+		GPAoDeduplicationAgeLimit:    true,
+		GPRelativeRecoveryConfPath:   true,
+		GPRelativePostgresqlConfPath: true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -638,7 +642,9 @@ func isAllowedSetting(setting string, AllowedSettings map[string]bool) (exists b
 // GetSetting extract setting by key if key is set, return empty string otherwise
 func GetSetting(key string) (value string, ok bool) {
 	if viper.IsSet(key) {
-		return viper.GetString(key), true
+		value := viper.GetString(key)
+		value = strings.TrimRight(value, "\r\n")
+		return value, true
 	}
 	return "", false
 }

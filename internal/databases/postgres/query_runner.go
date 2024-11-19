@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/pgtype"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -523,18 +525,6 @@ func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQue
 	return function(runner, db)
 }
 
-func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
-	switch {
-	case queryRunner.Version >= 90000:
-		return fmt.Sprintf("SELECT pg_class.relfilenode, pg_class.relname, pg_namespace.nspname FROM pg_class "+
-			"JOIN pg_namespace ON pg_class.relnamespace = pg_namespace.oid WHERE pg_class.oid >= %d", systemIDLimit), nil
-	case queryRunner.Version == 0:
-		return "", NewNoPostgresVersionError()
-	default:
-		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
-	}
-}
-
 func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
@@ -566,36 +556,162 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 	return pid, nil
 }
 
-func (queryRunner *PgQueryRunner) getTables() (map[string]uint32, error) {
+// builds query to list tables.
+//
+// Parameters:
+//   - getPartitioned (bool): If set to true, returns only root partitions of partitioned tables.
+//     Othervise returns all tables except partitioned.
+//
+// Returns:
+// - string: SQL query
+// - error: An error if faces problems, otherwise nil.
+func (queryRunner *PgQueryRunner) BuildGetTablesQuery(getPartitioned bool) (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		query := "SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class " +
+			"AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid " +
+			"WHERE NOT EXISTS (SELECT 1 FROM pg_inherits AS i WHERE i.inhrelid = c.oid) "
+		if getPartitioned {
+			query = query + "AND EXISTS (SELECT 1 FROM pg_inherits AS i WHERE i.inhparent = c.oid)"
+		} else {
+			query = query + "AND NOT EXISTS (SELECT 1 FROM pg_inherits AS i WHERE i.inhparent = c.oid)"
+		}
+		return query, nil
+	case queryRunner.Version == 0:
+		return "", NewNoPostgresVersionError()
+	default:
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *PgQueryRunner) BuildGetPartitionsForTableQuery(tablename string) (string, error) {
+	switch {
+	case queryRunner.Version >= 90000:
+		query := fmt.Sprintf("WITH RECURSIVE partition_hierarchy AS ( "+
+			"SELECT c.oid AS child_oid, c.relname AS partition_name, parent.oid AS parent_oid, parent.relname AS parent_name "+
+			"FROM pg_class c "+
+			"JOIN pg_inherits i ON c.oid = i.inhrelid "+
+			"JOIN pg_class parent ON i.inhparent = parent.oid "+
+			"WHERE parent.relname = '%s' "+
+			"UNION ALL "+
+			"SELECT c.oid, c.relname, ph.child_oid, ph.partition_name "+
+			"FROM pg_class c "+
+			"JOIN pg_inherits i ON c.oid = i.inhrelid "+
+			"JOIN partition_hierarchy ph ON i.inhparent = ph.child_oid "+
+			") "+
+			"SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class "+
+			"AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid "+
+			"JOIN partition_hierarchy ON c.oid = partition_hierarchy.child_oid; ", tablename)
+		return query, nil
+	case queryRunner.Version == 0:
+		return "", NewNoPostgresVersionError()
+	default:
+		return "", NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+}
+
+func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
-	getTablesQuery, err := queryRunner.BuildGetTablesQuery()
-	conn := queryRunner.Connection
+	tables := make(map[string]TableInfo)
+
+	getTablesQuery, err := queryRunner.BuildGetTablesQuery(false)
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
 	}
+	err = queryRunner.processTables(queryRunner.Connection, getTablesQuery,
+		func(relFileNode, oid uint32, tableName, namespaceName string) {
+			tracelog.DebugLogger.Printf("adding %s as %d with filenode %d", tableName, oid, relFileNode)
+			tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
+		})
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: getting regular tables failed")
+	}
+	tracelog.DebugLogger.Println("got regular tables")
 
+	getPartitionedTablesQuery, err := queryRunner.BuildGetTablesQuery(true)
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+	}
+	parentTableNames := make(map[string]string, 0)
+	err = queryRunner.processTables(queryRunner.Connection, getPartitionedTablesQuery,
+		func(relFileNode, oid uint32, tableName, namespaceName string) {
+			parentTable := fmt.Sprintf("%s.%s", namespaceName, tableName)
+			tracelog.DebugLogger.Printf("adding %s", tableName)
+			tables[parentTable] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
+
+			parentTableNames[tableName] = parentTable
+		})
+	if err != nil {
+		return nil, errors.Wrap(err, "QueryRunner GetTables: getting parrtitioned tables failed")
+	}
+
+	tracelog.DebugLogger.Println("got partitioned tables` root partitions")
+
+	for parTabNam, parTabFullNam := range parentTableNames {
+		tracelog.DebugLogger.Printf("getting subtables for %s", parTabNam)
+		getSubtablesQuery, err := queryRunner.BuildGetPartitionsForTableQuery(parTabNam)
+		if err != nil {
+			return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
+		}
+		err = queryRunner.processTables(queryRunner.Connection, getSubtablesQuery,
+			func(relFileNode, oid uint32, tableName, namespaceName string) {
+				tracelog.DebugLogger.Printf("adding %s", tableName)
+				tables[parTabFullNam].SubTables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = TableInfo{Oid: oid, Relfilenode: relFileNode}
+			})
+		if err != nil {
+			return nil, errors.Wrap(err, "QueryRunner GetTables: getting partitioned subtables failed")
+		}
+	}
+
+	tracelog.DebugLogger.Println("got partitioned tables` partitions")
+
+	return tables, nil
+}
+
+func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
+	getTablesQuery string, process func(relFileNode, oid uint32, tableName, namespaceName string)) error {
 	rows, err := conn.Query(getTablesQuery)
 	if err != nil {
-		return nil, errors.Wrap(err, "QueryRunner GetTables: Query failed")
+		return errors.Wrap(err, "QueryRunner GetTables: Query failed")
 	}
 	defer rows.Close()
 
-	tables := make(map[string]uint32)
 	for rows.Next() {
 		var relFileNode uint32
+		var oid uint32
 		var tableName string
 		var namespaceName string
-		if err := rows.Scan(&relFileNode, &tableName, &namespaceName); err != nil {
+		var path pgtype.Text
+		if err := rows.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName); err != nil {
 			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
 		}
-		tables[fmt.Sprintf("%s.%s", namespaceName, tableName)] = relFileNode
+		if relFileNode == 0 {
+			parts := strings.Split(path.String, "/")
+			chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
+			if err != nil {
+				tracelog.WarningLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
+			}
+			relFileNode = uint32(chis)
+		}
+		process(relFileNode, oid, tableName, namespaceName)
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
+	return nil
+}
+
+// GetDataChecksums checks if data checksums are enabled
+func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var dataChecksums string
+	conn := queryRunner.Connection
+	err := conn.QueryRow("SHOW data_checksums").Scan(&dataChecksums)
+	if err != nil {
+		return "", errors.Wrap(err, "GetDataChecksums: failed to check data_checksums")
 	}
 
-	return tables, nil
+	return dataChecksums, nil
 }

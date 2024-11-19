@@ -61,7 +61,6 @@ func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.
 	return modifyBackupMetadata(backupName, backupFolder, modifier)
 }
 
-// TODO: Unit tests
 func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error {
 	modifier := func(dto ExtendedMetadataDto) ExtendedMetadataDto {
 		dto.IsPermanent = isPermanent

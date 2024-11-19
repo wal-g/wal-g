@@ -90,7 +90,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
-	if err := ap.shouldSkip(op.Operation, op.Namespace); err != nil {
+	if err := ap.shouldSkip(&op); err != nil {
 		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
 		return nil
 	}
@@ -123,13 +123,12 @@ func (ap *DBApplier) Close(ctx context.Context) error {
 	return nil
 }
 
-func (ap *DBApplier) shouldSkip(op, ns string) error {
-	if op == "n" {
+func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
+	if oplog.Namespace == "n" {
 		return fmt.Errorf("noop op")
 	}
 
-	// sharded clusters are not supported yet
-	if strings.HasPrefix(ns, "config.") {
+	if !isOpAllowed(oplog) {
 		return fmt.Errorf("config database op")
 	}
 
@@ -153,6 +152,67 @@ func (ap *DBApplier) shouldIgnore(op string, err error) bool {
 			return true
 		}
 	}
+	return false
+}
+
+var ConfigCollectionsToKeep = []string{
+	"chunks",
+	"collections",
+	"databases",
+	"settings",
+	"shards",
+	"tags",
+	"version",
+}
+
+var selectedNSSupportedCommands = map[string]struct{}{
+	"create":           {},
+	"drop":             {},
+	"createIndexes":    {},
+	"deleteIndex":      {},
+	"deleteIndexes":    {},
+	"dropIndex":        {},
+	"dropIndexes":      {},
+	"collMod":          {},
+	"commitIndexBuild": {},
+}
+
+func Index[S ~[]E, E comparable](s S, v E) int {
+	for i := range s {
+		if v == s[i] {
+			return i
+		}
+	}
+	return -1
+}
+
+func Contains[S ~[]E, E comparable](s S, v E) bool {
+	return Index(s, v) >= 0
+}
+
+func isOpAllowed(oe *db.Oplog) bool {
+	coll, ok := strings.CutPrefix(oe.Namespace, "config.")
+	if !ok {
+		return true // OK: not a "config" database. allow any ops
+	}
+
+	if Contains(ConfigCollectionsToKeep, coll) {
+		return true // OK: create/update/delete a doc
+	}
+
+	if coll != "$cmd" || len(oe.Object) == 0 {
+		return false // other collections are not allowed
+	}
+
+	op := oe.Object[0].Key
+	if op == "applyOps" {
+		return true // internal ops of applyOps are checked one by one later
+	}
+	if _, ok := selectedNSSupportedCommands[op]; ok {
+		s, _ := oe.Object[0].Value.(string)
+		return Contains(ConfigCollectionsToKeep, s)
+	}
+
 	return false
 }
 

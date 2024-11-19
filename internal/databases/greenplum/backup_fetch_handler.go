@@ -5,11 +5,13 @@ import (
 	"path"
 	"strings"
 
+	"github.com/blang/semver"
 	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -55,6 +57,7 @@ type FetchHandler struct {
 	fetchMode           BackupFetchMode
 	restorePoint        string
 	partialRestoreArgs  []string
+	sentinel            BackupSentinelDto
 }
 
 // nolint:gocritic
@@ -95,6 +98,7 @@ func NewFetchHandler(
 		fetchMode:           mode,
 		restorePoint:        restorePoint,
 		partialRestoreArgs:  partialRestoreArgs,
+		sentinel:            sentinel,
 	}
 }
 
@@ -201,6 +205,22 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
 	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", conf.CfgFile, recoveryTarget)
+	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
+	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
+
+	semVer, err := semver.Make(fh.sentinel.GpVersion)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to parse GP version: %s,  %s", fh.sentinel.GpVersion, err)
+	}
+	pgVersion := NewVersion(semVer, fh.sentinel.GpFlavor).EstimatePostgreSQLVersion()
+	if pgVersion > 120000 && pathToRecoveryConf == "recovery.conf" {
+		// Starting from PostgreSQL 12.0 - the server will not start if a recovery.conf exists.
+		tracelog.ErrorLogger.Print(
+			"WALG_GP_RELATIVE_RECOVERY_CONF_PATH is set to 'recovery.conf'. " +
+				"PostgreSQL 12+ will not start in this configuration. " +
+				"Set WALG_GP_RELATIVE_RECOVERY_CONF_PATH to `conf.d/recovery.conf`, " +
+				"remove 'recovery.conf' & 'recovery.signal' and restart wal-g with `--mode prepare` to finish this recovery")
+	}
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
@@ -210,10 +230,21 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 			}
 
 			segment := fh.cluster.ByContent[contentID][0]
-			relativePathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
-			pathToRestore := path.Join(segment.DataDir, relativePathToRecoveryConf)
-			fileContents := restoreCfgMaker.Make(contentID)
-			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToRestore, fileContents)
+			absPathToRestore := path.Join(segment.DataDir, pathToRecoveryConf)
+			absPathToPostgresqlConf := path.Join(segment.DataDir, pathToPostgresqlConf)
+			fileContents := restoreCfgMaker.Make(contentID, pgVersion)
+			var cmds []string
+			cmds = append(cmds,
+				fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToRestore),
+				fmt.Sprintf("cat > %s << EOF\n%s\nEOF\n", absPathToRestore, fileContents),
+			)
+			if pgVersion >= 120000 {
+				cmds = append(cmds,
+					fmt.Sprintf("touch %s\n", path.Join(segment.DataDir, "recovery.signal")),
+					fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToPostgresqlConf),
+					fmt.Sprintf("echo 'include_if_exists=%s' >> %s", pathToRecoveryConf, absPathToPostgresqlConf))
+			}
+			cmd := strings.Join(cmds, "")
 			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
 			return cmd
 		})
@@ -277,7 +308,8 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs).Fetch()
+		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs)
+		err = handler.Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 }

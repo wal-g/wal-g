@@ -79,6 +79,8 @@ linters:
     - stylecheck
     - gosimple
     - whitespace
+    - makezero
+    - asciicheck
 
 run:
   go: "1.22"

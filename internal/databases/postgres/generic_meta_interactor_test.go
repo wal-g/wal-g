@@ -143,3 +143,22 @@ func TestSetUserDataReturnErrorWhenFolderIsMultiStorage(t *testing.T) {
 	assert.Error(t, err)
 	assert.IsType(t, "failed to modify metadata", err.Error())
 }
+
+func TestSetIsPermanent(t *testing.T) {
+	folder := testtools.CreateMockStorageFolder()
+	backupName := "test"
+	testObject := postgres.ExtendedMetadataDto{
+		IsPermanent: false,
+	}
+
+	marshaller, _ := internal.NewDtoSerializer()
+	file, _ := marshaller.Marshal(testObject)
+	_ = folder.PutObject(internal.MetadataNameFromBackup(backupName), file)
+
+	setErr := postgres.NewGenericMetaInteractor().SetIsPermanent(backupName, folder, true)
+	actualResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
+
+	assert.NoError(t, setErr)
+	assert.NoError(t, fetchErr)
+	assert.Equal(t, true, actualResult.IsPermanent)
+}

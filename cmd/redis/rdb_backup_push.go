@@ -12,6 +12,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	client "github.com/wal-g/wal-g/internal/databases/redis/client"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -57,9 +58,11 @@ var backupPushCmd = &cobra.Command{
 			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
 		}
 
-		backupCmd.Stderr = os.Stderr
-		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil)
+		memoryDataGetter := client.NewMemoryDataGetter()
 
+		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
+
+		backupCmd.Stderr = os.Stderr
 		err = redis.HandleRDBBackupPush(uploader, backupCmd, metaConstructor)
 		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
 	},

@@ -9,11 +9,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/jackc/pgx"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -83,9 +83,9 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName s
 }
 
 // BuildGetGreenplumSegmentsInfo formats a query to retrieve information about segments
-func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(semVer semver.Version) string {
+func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(version Version) string {
 	validRange := dbconn.StringToSemVerRange("<6")
-	if validRange(semVer) {
+	if version.Flavor == Greenplum && validRange(version.Version) {
 		return `
 SELECT
 	s.dbid,
@@ -114,9 +114,9 @@ ORDER BY content, role DESC;`
 }
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(semVer semver.Version) (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(version Version) (segments []cluster.SegConfig, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(queryRunner.buildGetGreenplumSegmentsInfo(semVer))
+	rows, err := conn.Query(queryRunner.buildGetGreenplumSegmentsInfo(version))
 	if err != nil {
 		return nil, err
 	}
@@ -369,10 +369,7 @@ func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDa
 	return nil
 }
 
-func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
-	switch {
-	case queryRunner.Version >= 90000:
-		return `
+const gpAoRelationPgClassQuery = `
 SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
 FROM pg_class aoseg_c
@@ -382,18 +379,74 @@ JOIN (
 			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
 	FROM pg_appendonly pg_ao
 	JOIN (
-		SELECT c.oid, quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn, 
-				c.relstorage, c.relnatts, c.relfilenode, c.reltablespace 
+		SELECT
+		    c.oid,
+		    quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn, 
+			c.relstorage,
+			c.relnatts,
+			c.relfilenode,
+			c.reltablespace 
 		FROM pg_class c
 		JOIN pg_namespace n ON c.relnamespace = n.oid
-		WHERE relstorage IN ( 'ao', 'co' ) AND relpersistence='p'
+		WHERE relstorage IN ( 'a', 'c' ) AND relpersistence='p'
 		) aotables ON pg_ao.relid = aotables.oid
 	) seg ON aoseg_c.oid = seg.segrelid;
-`, nil
-	case queryRunner.Version == 0:
-		return "", postgres.NewNoPostgresVersionError()
+`
+
+const cbAoRelationPgClassQuery = `
+SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
+	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
+FROM pg_class aoseg_c
+JOIN (
+	SELECT pg_ao.relid AS aooid, pg_ao.segrelid, 
+			aotables.aotablefqn, aotables.relstorage, 
+			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
+	FROM pg_appendonly pg_ao
+	JOIN (
+            SELECT 
+                c.oid,
+                quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn,
+                ASCII(CASE WHEN am.amname = 'ao_row' THEN 'a' WHEN am.amname = 'ao_column' THEN 'c' ELSE 'unknown' END) as relstorage,
+                c.relnatts,
+                c.relfilenode,
+                c.reltablespace
+            FROM pg_class c
+                JOIN pg_namespace n ON c.relnamespace = n.oid
+                JOIN pg_am am ON c.relam = am.oid
+            WHERE
+                am.amname in ('ao_row', 'ao_column') AND relpersistence='p'
+		) aotables ON pg_ao.relid = aotables.oid
+	) seg ON aoseg_c.oid = seg.segrelid;
+`
+
+func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
+	versionStr, err := queryRunner.GetGreenplumVersion()
+	if err != nil {
+		return "", err
+	}
+	version, err := parseGreenplumVersion(versionStr)
+	if err != nil {
+		return "", err
+	}
+
+	switch version.Flavor {
+	case Greenplum:
+		{
+			switch {
+			case queryRunner.Version >= 120000:
+				return cbAoRelationPgClassQuery, nil
+			case queryRunner.Version >= 90000:
+				return gpAoRelationPgClassQuery, nil
+			case queryRunner.Version == 0:
+				return "", postgres.NewNoPostgresVersionError()
+			default:
+				return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+			}
+		}
+	case Cloudberry:
+		return cbAoRelationPgClassQuery, nil
 	default:
-		return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.Flavor.String())
 	}
 }
 

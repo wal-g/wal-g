@@ -2,9 +2,12 @@
 
 package ioextensions
 
-import "os"
-import "syscall"
-import "golang.org/x/sys/unix"
+import (
+	"os"
+	"syscall"
+
+	"golang.org/x/sys/unix"
+)
 
 func PunchHole(f *os.File, offset int64, size int64) error {
 	return syscall.Fallocate(

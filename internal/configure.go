@@ -292,7 +292,7 @@ func ConfigureCrypterForSpecificConfig(config *viper.Viper) (crypto.Crypter, err
 	envelopePgpKeyPath := config.IsSet(conf.PgpEnvelopeKeySetting)
 
 	libsodiumKey := config.IsSet(conf.LibsodiumKeySetting)
-	libsodiumKeyPath := config.IsSet(conf.LibsodiumKeySetting)
+	libsodiumKeyPath := config.IsSet(conf.LibsodiumKeyPathSetting)
 
 	isPgpKey := pgpKey || pgpKeyPath || legacyGpg
 	isEnvelopePgpKey := envelopePgpKey || envelopePgpKeyPath

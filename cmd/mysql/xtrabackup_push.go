@@ -62,6 +62,7 @@ var (
 				uploader,
 				backupCmd,
 				permanent,
+				countJournals,
 				fullBackup,
 				userData,
 				mysql.NewRegularDeltaBackupConfigurator(folder, deltaBaseSelector),
@@ -88,4 +89,6 @@ func init() {
 		"", "Select the backup specified by UserData as the target for the delta backup")
 	xtrabackupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
+	xtrabackupPushCmd.Flags().BoolVar(&countJournals, countJournalsFlag,
+		false, "Create 'backups.json' file in the bucket and maintain the binlog sizes required to get from one backup to the next one")
 }

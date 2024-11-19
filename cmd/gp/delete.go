@@ -115,7 +115,7 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, Garbage: true}
 	deleteHandler, err := greenplum.NewDeleteHandler(storage.RootFolder(), delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 

@@ -31,7 +31,13 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 	}, nil
 }
 
-func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
+func (restoreService *RestoreService) DoRestore(
+	rsConfig RsConfig,
+	shConfig ShConfig,
+	mongoCfgConfig MongoCfgConfig,
+	replyOplogConfig ReplyOplogConfig,
+	args RestoreArgs,
+) error {
 	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), args.BackupName)
 	if err != nil {
 		return err
@@ -67,11 +73,17 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 	}
 
 	if !args.SkipMongoReconfig {
-		if err = restoreService.fixSystemData(args.RsConfig, args.ShConfig, args.MongoCfgConfig); err != nil {
+		if err = restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig); err != nil {
 			return err
 		}
 		if err = restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
 			return err
+		}
+
+		if replyOplogConfig.HasPitr {
+			if err = restoreService.oplogReply(rsConfig, replyOplogConfig); err != nil {
+				return err
+			}
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
@@ -102,8 +114,19 @@ func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig, shConfig 
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	err = mongodService.FixSystemDataAfterRestore(rsConfig, shConfig, mongocfgConfig)
-	if err != nil {
+	if err = mongodService.FixReplset(rsConfig); err != nil {
+		return err
+	}
+
+	if err = mongodService.FixShardIdentity(shConfig); err != nil {
+		return err
+	}
+
+	if err = mongodService.FixMongoCfg(mongocfgConfig); err != nil {
+		return err
+	}
+
+	if err = mongodService.CleanCacheAndSessions(shConfig); err != nil {
 		return err
 	}
 
@@ -135,6 +158,37 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")
+	}
+
+	err = mongodService.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	return mongodProcess.Wait()
+}
+
+func (restoreService *RestoreService) oplogReply(rsConfig RsConfig, replayOplogConfig ReplyOplogConfig) error {
+	mongodProcess, err := StartMongodWithReplyOplogAsStandalone(restoreService.minimalConfigPath, rsConfig.RsName, false)
+	if err != nil {
+		return errors.Wrap(err, "unable to start mongod in special mode")
+	}
+
+	defer mongodProcess.Close()
+
+	mongodService, err := CreateMongodService(
+		restoreService.Context,
+		"wal-g restore",
+		mongodProcess.GetURI(),
+		10*time.Minute,
+	)
+	if err != nil {
+		return errors.Wrap(err, "unable to create mongod service")
+	}
+
+	err = RunOplogReplay(restoreService.Context, mongodProcess.GetURI(), replayOplogConfig)
+	if err != nil {
+		return err
 	}
 
 	err = mongodService.Shutdown()

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -59,6 +60,7 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
         "date_fmt": "%Y-%m-%dT%H:%M:%S.%fZ",
         "hostname": "some.host.name",
         "gp_version": "6.19.3",
+        "gp_flavor": "greenplum",
         "is_permanent": false,
         "uncompressed_size": 2139586909,
         "compressed_size": 91217782,
@@ -75,6 +77,7 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
         "date_fmt": "%Y-%m-%dT%H:%M:%S.%fZ",
         "hostname": "some.host.name",
         "gp_version": "6.19.3",
+        "gp_flavor": "greenplum",
         "is_permanent": false,
         "uncompressed_size": 36283663,
         "compressed_size": 2532570,
@@ -127,6 +130,7 @@ func CreateMockStorageFolder(t *testing.T) storage.Folder {
 			"date_fmt":          "%Y-%m-%dT%H:%M:%S.%fZ",
 			"hostname":          "some.host.name",
 			"gp_version":        "6.19.3",
+			"gp_flavor":         "greenplum",
 			"is_permanent":      false,
 			"uncompressed_size": 2139586909,
 			"compressed_size":   91217782,
@@ -147,6 +151,7 @@ func CreateMockStorageFolder(t *testing.T) storage.Folder {
 			"date_fmt":            "%Y-%m-%dT%H:%M:%S.%fZ",
 			"hostname":            "some.host.name",
 			"gp_version":          "6.19.3",
+			"gp_flavor":           "greenplum",
 			"is_permanent":        false,
 			"uncompressed_size":   36283663,
 			"compressed_size":     2532570,
@@ -164,6 +169,7 @@ func CreateMockStorageFolder(t *testing.T) storage.Folder {
 			"finish_time": "2022-12-13T09:00:01.710603Z",
 			"hostname":    "some.host.name",
 			"gp_version":  "6.19.3",
+			"gp_flavor":   "greenplum",
 			"lsn_by_segment": map[string]interface{}{
 				"0":  "A/B00C8318",
 				"1":  "A/B00C3300",

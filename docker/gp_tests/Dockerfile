@@ -2,9 +2,6 @@ FROM wal-g/golang:latest as build
 
 WORKDIR /go/src/github.com/wal-g/wal-g
 
-RUN apt-get update && \
-    apt-get install --yes --no-install-recommends --no-install-suggests
-
 COPY go.mod go.mod
 COPY vendor/ vendor/
 COPY internal/ internal/
@@ -15,12 +12,8 @@ COPY utility/ utility/
 COPY Makefile Makefile
 ENV USE_BROTLI 1
 
-RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
-        vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
-    cd main/gp && \
+RUN cd main/gp && \
     go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
-
-RUN make gp_build
 
 FROM wal-g/gp:latest
 

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"os"
+	"sort"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -19,7 +20,7 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	backupDetails, err := GetBackupsDetails(folder, backups)
+	backupDetails, err := GetBackupDetails(folder, backups)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	printableEntities := make([]printlist.Entity, len(backupDetails))
@@ -30,28 +31,19 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
 }
 
-func GetBackupsDetails(folder storage.Folder, backups []internal.BackupTime) ([]archive.Backup, error) {
-	backupsDetails := make([]archive.Backup, 0, len(backups))
+func GetBackupDetails(folder storage.Folder, backups []internal.BackupTime) ([]archive.Backup, error) {
+	backupDetails := make([]archive.Backup, 0, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		details, err := GetBackupDetails(folder, backups[i])
+		details, err := archive.SentinelWithoutExistenceCheck(folder, backups[i].BackupName)
 		if err != nil {
 			return nil, err
 		}
-		backupsDetails = append(backupsDetails, details)
-	}
-	return backupsDetails, nil
-}
-
-func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (archive.Backup, error) {
-	backup, err := internal.NewBackup(folder, backupTime.BackupName)
-	if err != nil {
-		return archive.Backup{}, err
+		backupDetails = append(backupDetails, details)
 	}
 
-	metaData := archive.Backup{}
-	err = backup.FetchSentinel(&metaData)
-	if err != nil {
-		return archive.Backup{}, err
-	}
-	return metaData, nil
+	sort.Slice(backupDetails, func(i, j int) bool {
+		return backupDetails[i].FinishLocalTime.Before(backupDetails[j].FinishLocalTime)
+	})
+
+	return backupDetails, nil
 }

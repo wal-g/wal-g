@@ -8,7 +8,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	client "github.com/wal-g/wal-g/internal/databases/redis/client"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -25,7 +28,26 @@ var aofBackupPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		err := redis.HandleAOFBackupPush(ctx, permanent, "wal-g-redis "+aofBackupPushCommandName)
+		uploader, err := internal.ConfigureUploader()
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
+
+		memoryDataGetter := client.NewMemoryDataGetter()
+
+		processName, _ := conf.GetSetting(conf.RedisServerProcessName)
+		versionParser := archive.NewVersionParser(processName)
+
+		metaConstructor := archive.NewBackupRedisMetaConstructor(
+			ctx,
+			uploader.Folder(),
+			permanent,
+			archive.AOFBackupType,
+			versionParser,
+			memoryDataGetter,
+		)
+
+		err = redis.HandleAOFBackupPush(ctx, permanent, uploader, metaConstructor)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

@@ -59,7 +59,9 @@ var backupFetchCmd = &cobra.Command{
 		}
 
 		if restorePointTS != "" {
-			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, storage.RootFolder())
+			restorePoints, err := greenplum.FetchAllRestorePoints(storage.RootFolder())
+			tracelog.ErrorLogger.FatalOnError(err)
+			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, restorePoints)
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 
