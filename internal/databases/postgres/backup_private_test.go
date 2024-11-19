@@ -1,8 +1,10 @@
 package postgres
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +30,7 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryIsEmpty(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(dir)
 
-	actual, _ := utility.IsDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir, nil)
 
 	assert.True(t, actual)
 }
@@ -42,7 +44,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenOneFileIsInDirectory(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(file.Name())
 
-	actual, _ := utility.IsDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir, nil)
 
 	assert.False(t, actual)
 }
@@ -58,7 +60,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenSeveralFilesAreInDirectory(t *testing
 		defer os.Remove(file.Name())
 	}
 
-	actual, _ := utility.IsDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir, nil)
 
 	assert.False(t, actual)
 }
@@ -72,7 +74,7 @@ func TestIsDirectoryEmpty_ReturnsFalse_WhenNestedDirectoryIsInDirectory(t *testi
 	assert.NoError(t, err)
 	defer os.Remove(nested)
 
-	actual, _ := utility.IsDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir, nil)
 
 	assert.False(t, actual)
 }
@@ -84,7 +86,25 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenDirectoryDoesntExist(t *testing.T) {
 	err = os.Remove(dir)
 	assert.NoError(t, err)
 
-	actual, _ := utility.IsDirectoryEmpty(dir)
+	actual, _ := utility.IsDirectoryEmpty(dir, nil)
+
+	assert.True(t, actual)
+}
+
+func TestIsDirectoryEmpty_ReturnsTrue_WhenWhitelistFilesInDirectory(t *testing.T) {
+	dir, err := createTempDir("whitelisted_dir")
+	assert.NoError(t, err)
+	defer os.Remove(dir)
+
+	for i := 0; i < 3; i++ {
+		file, err := os.CreateTemp(dir, "whitelist_file")
+		assert.NoError(t, err)
+		defer os.Remove(file.Name())
+	}
+
+	whitelistRegexp := regexp.MustCompile(fmt.Sprintf(`%s/%s`, dir, "whitelist_file"))
+
+	actual, _ := utility.IsDirectoryEmpty(dir, whitelistRegexp)
 
 	assert.True(t, actual)
 }

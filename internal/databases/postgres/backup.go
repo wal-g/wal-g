@@ -195,7 +195,7 @@ func getFilesMetadataPath(backupName string) string {
 
 func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentinelDto, filesMeta FilesMetadataDto) error {
 	if !sentinelDto.IsIncremental() {
-		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
+		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory, nil)
 		if err != nil {
 			return err
 		}

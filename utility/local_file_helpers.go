@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -81,11 +82,11 @@ func WriteLocalFile(fileReader io.Reader, header *tar.Header, localFile *os.File
 	return nil
 }
 
-func IsDirectoryEmpty(directoryPath string) (bool, error) {
+func IsDirectoryEmpty(directoryPath string, whitelistRegexp *regexp.Regexp) (bool, error) {
 	var isEmpty = true
 
 	searchLambda := func(path string, info os.FileInfo, err error) error {
-		if path != directoryPath {
+		if path != directoryPath && (whitelistRegexp == nil || !whitelistRegexp.MatchString(path)) {
 			isEmpty = false
 			tracelog.InfoLogger.Printf("found file '%s' in directory: '%s'\n", path, directoryPath)
 		}

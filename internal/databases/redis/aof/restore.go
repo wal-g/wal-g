@@ -76,6 +76,6 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
-	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader)
+	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader, nil)
 	return downloader.Download(backupName, restoreService.Folder.Path)
 }

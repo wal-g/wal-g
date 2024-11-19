@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -10,12 +11,14 @@ import (
 )
 
 type ConcurrentDownloader struct {
-	folder storage.Folder
+	folder    storage.Folder
+	whitelist *regexp.Regexp
 }
 
-func CreateConcurrentDownloader(uploader Uploader) *ConcurrentDownloader {
+func CreateConcurrentDownloader(uploader Uploader, whitelist *regexp.Regexp) *ConcurrentDownloader {
 	return &ConcurrentDownloader{
-		folder: uploader.Folder(),
+		folder:    uploader.Folder(),
+		whitelist: whitelist,
 	}
 }
 
@@ -26,7 +29,7 @@ func (downloader *ConcurrentDownloader) Download(backupName, localDirectory stri
 		return err
 	}
 
-	isEmpty, err := utility.IsDirectoryEmpty(localDirectory)
+	isEmpty, err := utility.IsDirectoryEmpty(localDirectory, downloader.whitelist)
 	if err != nil {
 		return err
 	}

@@ -35,7 +35,7 @@ func (downloader *CommonDirectoryDownloader) DownloadDirectory(pathToRestore str
 		return err
 	}
 
-	isEmpty, err := utility.IsDirectoryEmpty(pathToRestore)
+	isEmpty, err := utility.IsDirectoryEmpty(pathToRestore, nil)
 	if err != nil {
 		return err
 	}

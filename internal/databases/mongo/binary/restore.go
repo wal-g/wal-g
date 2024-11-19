@@ -81,7 +81,7 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 }
 
 func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
-	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader)
+	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader, restoreService.LocalStorage.whitelist)
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
 }
 
