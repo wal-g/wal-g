@@ -10,6 +10,9 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -151,7 +154,7 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *Ba
 	})
 }
 
-func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig) error {
+func (mongodService *MongodService) FixReplset(rsConfig RsConfig) error {
 	ctx := mongodService.Context
 	localDatabase := mongodService.MongoClient.Database("local")
 
@@ -169,6 +172,11 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig,
 		}
 	}
 
+	return nil
+}
+
+func (mongodService *MongodService) FixShardIdentity(shConfig ShConfig) error {
+	ctx := mongodService.Context
 	adminDatabase := mongodService.MongoClient.Database(adminDB)
 
 	if shConfig.Empty() {
@@ -202,22 +210,67 @@ func (mongodService *MongodService) FixSystemDataAfterRestore(rsConfig RsConfig,
 			tracelog.InfoLogger.Printf("Successfully fixed admin.system.version document with proper shardIdentity")
 		}
 	}
+	return nil
+}
 
-	if !mongocfgConfig.Empty() {
-		configDatabase := mongodService.MongoClient.Database("config")
-		_, err := configDatabase.Collection("shards").DeleteMany(ctx, bson.D{})
-		if err != nil {
-			return errors.Wrap(err, "failed to drop config.shards collection")
-		}
-		for shardName, connStr := range mongocfgConfig.Shards {
-			_, err := configDatabase.Collection("shards").InsertOne(ctx, bson.D{{Key: "_id", Value: shardName}, {Key: "host", Value: connStr}})
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("unable to insert shard info for name '%s'", shardName))
-			}
-		}
-		tracelog.InfoLogger.Printf("Successfully updated config.shards collection")
+func (mongodService *MongodService) FixMongoCfg(mongocfgConfig MongoCfgConfig) error {
+	if mongocfgConfig.Empty() {
+		return nil
 	}
 
+	ctx := mongodService.Context
+	configDatabase := mongodService.MongoClient.Database("config")
+
+	_, err := configDatabase.Collection("mongos").DeleteMany(ctx, bson.D{})
+	if err != nil {
+		return errors.Wrap(err, "failed to drop config.mongos collection")
+	}
+	_, err = configDatabase.Collection("lockpings").DeleteMany(ctx, bson.D{})
+	if err != nil {
+		return errors.Wrap(err, "failed to drop config.lockpings collection")
+	}
+	_, err = configDatabase.Collection("shards").DeleteMany(ctx, bson.D{})
+	if err != nil {
+		return errors.Wrap(err, "failed to drop config.shards collection")
+	}
+	for shardName, connStr := range mongocfgConfig.Shards {
+		_, err := configDatabase.Collection("shards").InsertOne(ctx, bson.D{{Key: "_id", Value: shardName}, {Key: "host", Value: connStr}})
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("unable to insert shard info for name '%s'", shardName))
+		}
+	}
+	tracelog.InfoLogger.Printf("Successfully updated config.shards collection")
+
+	return nil
+}
+
+func (mongodService *MongodService) CleanCacheAndSessions(shConfig ShConfig) error {
+	ctx := mongodService.Context
+	configDatabase := mongodService.MongoClient.Database("config")
+
+	colls, err := configDatabase.ListCollectionNames(ctx, bson.D{{Key: "name", Value: bson.M{"$regex": `^cache\.`}}})
+	if err != nil {
+		return errors.Wrap(err, "failed to list config.cache.* collections")
+	}
+	for _, coll := range colls {
+		_, err := configDatabase.Collection(coll).DeleteMany(ctx, bson.D{})
+		if err != nil {
+			return errors.Wrapf(err, "failed to drop %s collection", coll)
+		}
+	}
+
+	const retry = 5
+	for i := 0; i < retry; i++ {
+		_, err = configDatabase.Collection("system.sessions").DeleteMany(ctx, bson.D{})
+		if err == nil || !strings.Contains(err.Error(), "(BackgroundOperationInProgressForNamespace)") {
+			break
+		}
+		tracelog.DebugLogger.Printf("drop config.system.sessions: BackgroundOperationInProgressForNamespace, retrying")
+		time.Sleep(time.Second * time.Duration(i+1))
+	}
+	if err != nil {
+		return errors.Wrap(err, "drop config.system.sessions")
+	}
 	return nil
 }
 
@@ -339,10 +392,6 @@ type BackupCursorFile struct {
 }
 
 type RestoreArgs struct {
-	RsConfig       RsConfig
-	ShConfig       ShConfig
-	MongoCfgConfig MongoCfgConfig
-
 	BackupName     string
 	RestoreVersion string
 
@@ -355,6 +404,18 @@ type RsConfig struct {
 	RsName      string
 	RsMembers   []string
 	RsMemberIDs []int
+}
+
+type ReplyOplogConfig struct {
+	Since models.Timestamp
+	Until models.Timestamp
+
+	IgnoreErrCodes map[string][]int32
+
+	OplogAlwaysUpsert    *bool
+	OplogApplicationMode *string
+
+	HasPitr bool
 }
 
 type ShConfig struct {
@@ -385,6 +446,40 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 		ShardName:                shardName,
 		MongoCfgConnectionString: connectionString,
 	}
+}
+
+func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (roConfig ReplyOplogConfig, err error) {
+	if sincePitrStr == "" || untilPitrStr == "" {
+		return roConfig, err
+	}
+	roConfig.HasPitr = true
+	roConfig.Since, err = models.TimestampFromStr(sincePitrStr)
+	if err != nil {
+		return roConfig, err
+	}
+	roConfig.Until, err = models.TimestampFromStr(untilPitrStr)
+	if err != nil {
+		return roConfig, err
+	}
+	if ignoreErrCodesStr, ok := conf.GetSetting(conf.OplogReplayIgnoreErrorCodes); ok {
+		if err = json.Unmarshal([]byte(ignoreErrCodesStr), &roConfig.IgnoreErrCodes); err != nil {
+			return roConfig, err
+		}
+	}
+
+	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := conf.GetBoolSetting(conf.OplogReplayOplogAlwaysUpsert)
+	if err != nil {
+		return roConfig, err
+	}
+	if hasOplogAlwaysUpsert {
+		roConfig.OplogAlwaysUpsert = &oplogAlwaysUpsert
+	}
+
+	if oplogApplicationMode, hasOplogApplicationMode := conf.GetSetting(
+		conf.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
+		roConfig.OplogApplicationMode = &oplogApplicationMode
+	}
+	return roConfig, err
 }
 
 func NewMongoCfgConfig(shardConnectionStrings []string) (MongoCfgConfig, error) {

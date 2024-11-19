@@ -17,6 +17,7 @@ func HandleBinaryFetchPush(
 	shardName, mongoCfgConnectionString string,
 	shardConnectionStrings []string,
 	skipBackupDownload, skipReconfig, skipChecks bool,
+	pitrSince, pitrUntil string,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
@@ -61,15 +62,23 @@ func HandleBinaryFetchPush(
 		return err
 	}
 
-	return restoreService.DoRestore(binary.RestoreArgs{
-		RsConfig:       rsConfig,
-		ShConfig:       shConfig,
-		MongoCfgConfig: mongocfgConfig,
-		BackupName:     backup.Name,
-		RestoreVersion: restoreMongodVersion,
+	replyOplogConfig, err := binary.NewReplyOplogConfig(pitrSince, pitrUntil)
+	if err != nil {
+		return err
+	}
 
-		SkipChecks:         skipChecks,
-		SkipBackupDownload: skipBackupDownload,
-		SkipMongoReconfig:  skipReconfig,
-	})
+	return restoreService.DoRestore(
+		rsConfig,
+		shConfig,
+		mongocfgConfig,
+		replyOplogConfig,
+		binary.RestoreArgs{
+			BackupName:     backup.Name,
+			RestoreVersion: restoreMongodVersion,
+
+			SkipChecks:         skipChecks,
+			SkipBackupDownload: skipBackupDownload,
+			SkipMongoReconfig:  skipReconfig,
+		},
+	)
 }
