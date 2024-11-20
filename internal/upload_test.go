@@ -1,6 +1,8 @@
 package internal_test
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -9,6 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
+	"github.com/wal-g/wal-g/utility"
+
+	"github.com/golang/mock/gomock"
+	"github.com/wal-g/wal-g/test/mocks"
+	mock_internal "github.com/wal-g/wal-g/testtools/mocks"
 )
 
 func TestConfigure(t *testing.T) {
@@ -68,4 +76,60 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	os.Setenv("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
 	_, err = internal.ConfigureUploader()
 	assert.NoError(t, err)
+}
+
+func TestUpload(t *testing.T) {
+	reader := bytes.NewReader([]byte("some text"))
+	compressor, errComp := internal.ConfigureCompressor()
+	assert.NoError(t, errComp)
+	kvs := memory.NewKVS()
+	st := memory.NewStorage("gs://x4m-test/walg-bucket", kvs)
+	folder := st.RootFolder()
+
+	uploader := internal.NewRegularUploader(compressor, folder)
+
+	err := uploader.Upload(context.Background(), "", reader)
+
+	assert.NoError(t, err)
+
+	_, objErr := uploader.UploadingFolder.ReadObject("")
+
+	assert.NoError(t, objErr)
+}
+
+func TestUploadMock(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	folder := mocks.NewMockFolder(mockCtrl)
+	defer mockCtrl.Finish()
+
+	uploaderProv := mock_internal.NewMockUploader(mockCtrl)
+	uploaderProv.EXPECT().PushStream(gomock.Any(), gomock.Any()).Return("test_file_name", nil)
+	uploaderProv.EXPECT().Folder().Return(folder)
+
+	sentinel := streamSentinelDto{StartLocalTime: utility.TimeNowCrossPlatformLocal()}
+	fileName, err := uploaderProv.PushStream(context.Background(), bytes.NewReader(getByteSampleArray(51)))
+	if err != nil {
+		t.Errorf("Error pushing stream: %v", err)
+	}
+	folder.EXPECT().PutObject(gomock.Any(), gomock.Any()).Return(nil)
+	uploadDto := internal.UploadSentinel(uploaderProv, &sentinel, fileName)
+
+	assert.NoError(t, uploadDto)
+
+	reader := bytes.NewReader([]byte("some text"))
+	compressor, errComp := internal.ConfigureCompressor()
+	assert.NoError(t, errComp)
+	kvs := memory.NewKVS()
+	st := memory.NewStorage("gs://x4m-test/walg-bucket", kvs)
+	folder := st.RootFolder()
+
+	uploader := internal.NewRegularUploader(compressor, folder)
+
+	err := uploader.Upload(context.Background(), "", reader)
+
+	assert.NoError(t, err)
+
+	_, objErr := uploader.UploadingFolder.ReadObject("")
+
+	assert.NoError(t, objErr)
 }
