@@ -12,11 +12,9 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
-	"github.com/wal-g/wal-g/utility"
 
 	"github.com/golang/mock/gomock"
 	"github.com/wal-g/wal-g/test/mocks"
-	mock_internal "github.com/wal-g/wal-g/testtools/mocks"
 )
 
 func TestConfigure(t *testing.T) {
@@ -102,34 +100,20 @@ func TestUploadMock(t *testing.T) {
 	folder := mocks.NewMockFolder(mockCtrl)
 	defer mockCtrl.Finish()
 
-	uploaderProv := mock_internal.NewMockUploader(mockCtrl)
-	uploaderProv.EXPECT().PushStream(gomock.Any(), gomock.Any()).Return("test_file_name", nil)
-	uploaderProv.EXPECT().Folder().Return(folder)
-
-	sentinel := streamSentinelDto{StartLocalTime: utility.TimeNowCrossPlatformLocal()}
-	fileName, err := uploaderProv.PushStream(context.Background(), bytes.NewReader(getByteSampleArray(51)))
-	if err != nil {
-		t.Errorf("Error pushing stream: %v", err)
-	}
-	folder.EXPECT().PutObject(gomock.Any(), gomock.Any()).Return(nil)
-	uploadDto := internal.UploadSentinel(uploaderProv, &sentinel, fileName)
-
-	assert.NoError(t, uploadDto)
-
-	reader := bytes.NewReader([]byte("some text"))
 	compressor, errComp := internal.ConfigureCompressor()
 	assert.NoError(t, errComp)
-	kvs := memory.NewKVS()
-	st := memory.NewStorage("gs://x4m-test/walg-bucket", kvs)
-	folder := st.RootFolder()
-
 	uploader := internal.NewRegularUploader(compressor, folder)
 
-	err := uploader.Upload(context.Background(), "", reader)
+	reader := bytes.NewReader([]byte("some text"))
 
-	assert.NoError(t, err)
+	folder.EXPECT().PutObjectWithContext(gomock.Any(), "some/path", gomock.Any()).Return(nil)
+	folder.EXPECT().PutObjectWithContext(gomock.Any(), "path/to/incorrect/file", gomock.Any()).Return(errors.New("some error"))
 
-	_, objErr := uploader.UploadingFolder.ReadObject("")
+	uploadWithoutErr := uploader.Upload(context.Background(), "some/path", reader)
 
-	assert.NoError(t, objErr)
+	assert.NoError(t, uploadWithoutErr)
+
+	uploadWithErr := uploader.Upload(context.Background(), "path/to/incorrect/file", reader)
+
+	assert.Error(t, uploadWithErr)
 }

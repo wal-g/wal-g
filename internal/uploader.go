@@ -166,7 +166,6 @@ func (uploader *RegularUploader) Compression() compression.Compressor {
 	return uploader.Compressor
 }
 
-// TODO : unit tests
 func (uploader *RegularUploader) Upload(ctx context.Context, path string, content io.Reader) error {
 	uploader.waitGroup.Add(1)
 	defer uploader.waitGroup.Done()
