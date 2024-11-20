@@ -31,18 +31,24 @@ type TarBallFilePacker interface {
 }
 
 type RegularTarBallFilePacker struct {
-	files BundleFiles
+	files             BundleFiles
+	skipFileNotExists bool
 }
 
-func NewRegularTarBallFilePacker(files BundleFiles) *RegularTarBallFilePacker {
+func NewRegularTarBallFilePacker(files BundleFiles, skipFileNotExists bool) *RegularTarBallFilePacker {
 	return &RegularTarBallFilePacker{
-		files: files,
+		files:             files,
+		skipFileNotExists: skipFileNotExists,
 	}
 }
 
 func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
 	fileReadCloser, err := StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
+		if !p.skipFileNotExists {
+			return err
+		}
+
 		switch err.(type) {
 		case FileNotExistError:
 			// File was deleted before opening.

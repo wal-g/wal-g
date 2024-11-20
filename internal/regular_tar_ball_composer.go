@@ -41,19 +41,22 @@ func NewRegularTarBallComposer(
 type RegularTarBallComposerMaker struct {
 	files       BundleFiles
 	tarFileSets TarFileSets
+
+	skipFileNotExists bool
 }
 
-func NewRegularTarBallComposerMaker(files BundleFiles, tarFileSets TarFileSets) *RegularTarBallComposerMaker {
+func NewRegularTarBallComposerMaker(files BundleFiles, tarFileSets TarFileSets, skipFileNotExists bool) *RegularTarBallComposerMaker {
 	return &RegularTarBallComposerMaker{
-		files:       files,
-		tarFileSets: tarFileSets,
+		files:             files,
+		tarFileSets:       tarFileSets,
+		skipFileNotExists: skipFileNotExists,
 	}
 }
 
 func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
-	packer := NewRegularTarBallFilePacker(bundleFiles)
+	packer := NewRegularTarBallFilePacker(bundleFiles, maker.skipFileNotExists)
 	return NewRegularTarBallComposer(bundle.TarBallQueue, packer, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 
