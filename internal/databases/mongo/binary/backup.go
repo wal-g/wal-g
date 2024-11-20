@@ -53,7 +53,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, []string{mongodDBPath})
+	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, []string{mongodDBPath}, false)
 	if err != nil {
 		return err
 	}
