@@ -1,21 +1,5 @@
 FROM wal-g/ubuntu:20.04
 
-# istall golang:
-RUN apt-get update && \
-    apt-get -y install \
-        build-essential cmake \
-        iputils-ping \
-        net-tools dnsutils
-
-RUN wget -O - "https://golang.org/dl/go1.20.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
-	export PATH="/usr/local/go/bin:$PATH" && \
-	go version
-
-ENV GOPATH /go
-ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
-
-RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
-
 # install mysql
 ENV MYSQLDATA /var/lib/mysql
 
