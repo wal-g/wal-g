@@ -25,7 +25,7 @@ type LocalStorage struct {
 func CreateLocalStorage(mongodDBPath string) *LocalStorage {
 	return &LocalStorage{
 		MongodDBPath: mongodDBPath,
-		whitelist:    CreateWhiteList(mongodDBPath),
+		whitelist:    CreateWhiteList(),
 	}
 }
 
@@ -108,13 +108,13 @@ func (localStorage *LocalStorage) EnsureEmptyDBPath() error {
 	return nil
 }
 
-func CreateWhiteList(dirPath string) *regexp.Regexp {
-	filesRegexp, ok := conf.GetSetting(conf.MongoDBDeletionProtectionWhitelist)
-	_, err := regexp.Compile(filesRegexp)
+func CreateWhiteList() *regexp.Regexp {
+	val, ok := conf.GetSetting(conf.MongoDBDeletionProtectionWhitelist)
+	re, err := regexp.Compile(val)
 
 	if !ok || err != nil {
-		filesRegexp = `lost\+found`
+		return regexp.MustCompile(`lost\+found`)
 	}
 
-	return regexp.MustCompile(filepath.Join(regexp.QuoteMeta(dirPath), filesRegexp))
+	return re
 }

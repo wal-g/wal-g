@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -102,7 +101,7 @@ func TestIsDirectoryEmpty_ReturnsTrue_WhenWhitelistFilesInDirectory(t *testing.T
 		defer os.Remove(file.Name())
 	}
 
-	whitelistRegexp := regexp.MustCompile(fmt.Sprintf(`%s/%s`, dir, "whitelist_file"))
+	whitelistRegexp := regexp.MustCompile(`^whitelist_file`)
 
 	actual, _ := utility.IsDirectoryEmpty(dir, whitelistRegexp)
 

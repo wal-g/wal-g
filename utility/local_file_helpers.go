@@ -86,7 +86,8 @@ func IsDirectoryEmpty(directoryPath string, whitelistRegexp *regexp.Regexp) (boo
 	var isEmpty = true
 
 	searchLambda := func(path string, info os.FileInfo, err error) error {
-		if path != directoryPath && (whitelistRegexp == nil || !whitelistRegexp.MatchString(path)) {
+		relativePath, _ := filepath.Rel(directoryPath, path)
+		if path != directoryPath && (whitelistRegexp == nil || !whitelistRegexp.MatchString(relativePath)) {
 			isEmpty = false
 			tracelog.InfoLogger.Printf("found file '%s' in directory: '%s'\n", path, directoryPath)
 		}
