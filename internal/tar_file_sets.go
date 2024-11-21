@@ -1,5 +1,6 @@
 package internal
 
+// TarFileSets - a collector for metadata info: tarName -> list of files in it
 type TarFileSets interface {
 	AddFile(name string, file string)
 	AddFiles(name string, files []string)
