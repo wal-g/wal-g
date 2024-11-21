@@ -26,7 +26,7 @@ func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedund
 		}
 
 		// directory must be empty before starting a deltaFetch
-		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory)
+		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory, nil)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 		if !isEmpty {

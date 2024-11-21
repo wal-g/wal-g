@@ -17,17 +17,15 @@ const (
 	mongoFsLock = "mongod.lock"
 )
 
-var (
-	deletionProtectionWhitelist = CreateWhiteList()
-)
-
 type LocalStorage struct {
 	MongodDBPath string
+	whitelist    *regexp.Regexp
 }
 
 func CreateLocalStorage(mongodDBPath string) *LocalStorage {
 	return &LocalStorage{
 		MongodDBPath: mongodDBPath,
+		whitelist:    CreateWhiteList(),
 	}
 }
 
@@ -70,12 +68,13 @@ func (localStorage *LocalStorage) CleanupMongodDBPath() error {
 		return nil
 	}
 	for _, name := range names {
-		if deletionProtectionWhitelist.MatchString(name) {
-			tracelog.InfoLogger.Printf("skip remove %s", filepath.Join(localStorage.MongodDBPath, name))
+		fullPath := filepath.Join(localStorage.MongodDBPath, name)
+		if localStorage.whitelist != nil && localStorage.whitelist.MatchString(name) {
+			tracelog.InfoLogger.Printf("skip remove %s", fullPath)
 			continue
 		}
 
-		err = os.RemoveAll(filepath.Join(localStorage.MongodDBPath, name))
+		err = os.RemoveAll(fullPath)
 		if err != nil {
 			return errors.Wrapf(err, "unable to remove '%s' in '%s'", name, localStorage.MongodDBPath)
 		}
@@ -101,7 +100,7 @@ func (localStorage *LocalStorage) EnsureEmptyDBPath() error {
 	}
 
 	for _, name := range names {
-		if !deletionProtectionWhitelist.MatchString(name) {
+		if localStorage.whitelist == nil || !localStorage.whitelist.MatchString(name) {
 			return fmt.Errorf("directory '%v' is not empty", localStorage.MongodDBPath)
 		}
 	}
@@ -111,11 +110,11 @@ func (localStorage *LocalStorage) EnsureEmptyDBPath() error {
 
 func CreateWhiteList() *regexp.Regexp {
 	val, ok := conf.GetSetting(conf.MongoDBDeletionProtectionWhitelist)
-	exp, err := regexp.Compile(val)
+	re, err := regexp.Compile(val)
 
 	if !ok || err != nil {
 		return regexp.MustCompile(`^lost\+found$`)
 	}
 
-	return exp
+	return re
 }
