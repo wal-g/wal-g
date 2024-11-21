@@ -14,9 +14,19 @@ type SharedFile struct {
 }
 
 func NewSharedFile(path string) *SharedFile {
+	info, err := os.Stat(path)
+	var updated time.Time
+	if err == nil {
+		atime := info.Sys().(*syscall.Stat_t).Atim
+		updated = time.Unix(atime.Sec, atime.Nsec)
+	} else {
+		// File does not exist or is not available
+		// Set very low time, so any comparison with timeout will return True
+		updated = time.Time{}
+	}
 	return &SharedFile{
 		Path:    path,
-		Updated: time.Now(),
+		Updated: updated,
 	}
 }
 
