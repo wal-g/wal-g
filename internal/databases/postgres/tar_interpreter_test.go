@@ -155,6 +155,31 @@ func TestInterpretTypeSymlink(t *testing.T) {
 	assert.True(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
 }
 
+func TestMultiInterpretTypeSymlink(t *testing.T) {
+	fileName := "test_file"
+	dbDataDirectory := os.TempDir()
+	createFile(fileName)
+	defer os.Remove(fileName)
+	// Since we pass a noop for delete, we need to remove outside testInterpret
+	defer os.Remove(path.Join(dbDataDirectory, fileName))
+	for i := 1; i < 5; i++ {
+		_, dstFileInfo := testInterpret(t,
+			os.TempDir(),
+
+			"test_file",
+			tar.TypeSymlink,
+			func(s string) error {
+				return nil
+			},
+			func(s string) error {
+				return nil
+			},
+		)
+		assert.True(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
+	}
+
+}
+
 func TestPrepareDirsForLocalDirectory(t *testing.T) {
 	err := postgres.PrepareDirs("filename", "filename")
 	assert.NoError(t, err)
