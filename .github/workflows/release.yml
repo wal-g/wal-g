@@ -35,10 +35,7 @@ jobs:
       - name: Get dependencies
         run: |
           go get -v -t -d ./...
-          if [ -f Gopkg.toml ]; then
-           curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-           dep ensure
-          fi
+
       - name: Make deps
         run: make deps
 
@@ -102,12 +99,7 @@ jobs:
             export GOPATH=$HOME/go          
             export PATH=$GOPATH/bin:$GOROOT/bin:$PATH
             
-            
             go get -v -t -d ./...
-            if [ -f Gopkg.toml ]; then
-              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-              dep ensure
-            fi
             
             git config --global --add safe.directory /home/runner/work/wal-g/wal-g
             git config --global --add safe.directory /home/runner/work/wal-g/wal-g/submodules/brotli
