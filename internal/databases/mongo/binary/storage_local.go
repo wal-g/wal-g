@@ -113,7 +113,7 @@ func CreateWhiteList() *regexp.Regexp {
 	re, err := regexp.Compile(val)
 
 	if !ok || err != nil {
-		return regexp.MustCompile(`lost\+found`)
+		return regexp.MustCompile(`^lost\+found$`)
 	}
 
 	return re
