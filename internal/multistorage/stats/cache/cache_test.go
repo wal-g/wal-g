@@ -309,7 +309,6 @@ func Test_cache_ApplyOperationResult(t *testing.T) {
 
     t.Run("apply operation result to file if file does not exist", func(t *testing.T) {
 		c := newTestCache(t, 1, true)
-		c.shFile.Updated = time.Now()
 		WithCustomFlushTimeout(time.Hour)(c)
 
 		c.ApplyOperationResult("fo1", true, 100)
@@ -322,6 +321,7 @@ func Test_cache_ApplyOperationResult(t *testing.T) {
 
 	t.Run("does not apply operation result to file if flush timeout did not exceed", func(t *testing.T) {
 		c := newTestCache(t, 1, true)
+        c.shFile.Updated = time.Now()
 		WithCustomFlushTimeout(time.Hour)(c)
 		err := c.shFile.write(nil)
 		require.NoError(t, err)
