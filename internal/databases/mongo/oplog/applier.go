@@ -217,23 +217,19 @@ func isOpAllowed(oe *db.Oplog) bool {
 }
 
 // handleNonTxnOp tries to apply given oplog record.
-func (ap *DBApplier) handleNonTxnOp(ctx context.Context, _op *db.Oplog) error {
-	// TODO: Probably we need to properly work with pointer here instead of copying it
-	var op db.Oplog
+func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 	if !ap.preserveUUID {
 		var err error
-		op, err = filterUUIDs(_op)
+		_, err = filterUUIDs(op)
 		if err != nil {
 			return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
 		}
-	} else {
-		op = *_op
 	}
 
 	// TODO: wait for index building
 	// TODO: if we wait for index building, we can stop ignoring a BackgroundOperation... error in DropIndexes
 	if op.Operation == "c" && op.Object[0].Key == "commitIndexBuild" {
-		collName, indexes, err := indexSpecFromCommitIndexBuilds(&op)
+		collName, indexes, err := indexSpecFromCommitIndexBuilds(op)
 		if err != nil {
 			return NewOpHandleError(op, err)
 		}
@@ -241,9 +237,9 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, _op *db.Oplog) error {
 		return ap.db.CreateIndexes(ctx, dbName, collName, indexes)
 	}
 	if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
-		collName, indexes, err := indexSpecsFromCreateIndexes(&op)
+		collName, indexes, err := indexSpecsFromCreateIndexes(op)
 		if err != nil {
-			return NewOpHandleError(op, err)
+			return NewOpHandleError(*op, err)
 		}
 		dbName, _ := util.SplitNamespace(op.Namespace)
 		return ap.db.CreateIndexes(ctx, dbName, collName,
@@ -254,14 +250,14 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, _op *db.Oplog) error {
 		return ap.db.DropIndexes(ctx, dbName, op.Object)
 	}
 
-	//tracelog.DebugLogger.Printf("applying op: %+v", op)
-	if err := ap.db.ApplyOp(ctx, &op); err != nil {
+	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
+	if err := ap.db.ApplyOp(ctx, op); err != nil {
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
 		if !ap.shouldIgnore(op.Operation, err) {
-			return NewOpHandleError(op, err)
+			return NewOpHandleError(*op, err)
 		}
-		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, op)
+		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)
 	}
 	return nil
 }
