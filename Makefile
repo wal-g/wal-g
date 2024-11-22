@@ -14,6 +14,7 @@ PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
 MYSQL_TEST := "mysql_base_tests"
+MYSQL8_TEST := "mysql8_tests"
 MONGO_MAJOR ?= "5.0"
 MONGO_VERSION ?= "5.0.21"
 MONGO_PACKAGE ?= "mongodb-org"
@@ -145,8 +146,8 @@ mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
 	docker compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
 
 mysql8_integration_test: go_deps unlink_brotli load_docker_common
-	docker compose build mysql8 && docker compose build $(MYSQL_TEST)
-	docker compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
+	docker compose build mysql8 && docker compose build $(MYSQL8_TEST)
+	docker compose up --force-recreate --exit-code-from $(MYSQL8_TEST) $(MYSQL8_TEST)
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)
