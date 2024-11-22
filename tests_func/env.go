@@ -95,7 +95,7 @@ func DynConf(env map[string]string, osEnviron map[string]string) (map[string]str
 		if semver.Compare(fmt.Sprintf("v%s", mongoVersion), "v6.1") < 0 {
 			res["MONGO_CONF_FILE"] = "mongod-4.4-6.0.conf"
 		} else {
-			res["MONGO_CONF_FILE"] = "mongod-6.1-7.0.conf"
+			res["MONGO_CONF_FILE"] = "mongod-6.1-plus.conf"
 		}
 	}
 
