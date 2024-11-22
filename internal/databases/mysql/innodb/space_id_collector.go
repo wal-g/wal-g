@@ -51,7 +51,9 @@ func NewSpaceIDCollector(dataDir string) (SpaceIDCollector, error) {
 func (c *spaceIDCollectorImpl) collect(filePath string) error {
 	// read first FPS page (always first page in the file)
 	file, err := os.OpenFile(filePath, os.O_RDONLY|syscall.O_NOFOLLOW, 0) // FIXME: test performance with O_SYNC
-	tracelog.ErrorLogger.FatalfOnError("Cannot open file: %v", err)
+	if err != nil {
+		return fmt.Errorf("error opening file %v: %w", filePath, err)
+	}
 
 	reader := NewPageReader(file)
 	if reader == nil {
