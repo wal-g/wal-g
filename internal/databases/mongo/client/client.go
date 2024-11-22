@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"

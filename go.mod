@@ -31,7 +31,6 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/minio/sio v0.2.0
-	github.com/mongodb/mongo-tools-common v2.0.1+incompatible
 	github.com/pierrec/lz4/v4 v4.1.21
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
@@ -39,7 +38,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.9.0
 	github.com/ulikunitz/xz v0.5.11
 	github.com/wal-g/json v0.3.1
 	github.com/wal-g/tracelog v0.0.0-20231219102105-60dcd9126592
@@ -58,7 +57,7 @@ require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230426101702-58e86b294756
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v0.0.0-20220110100810-f4153a09f87c
-	github.com/klauspost/compress v1.15.12
+	github.com/klauspost/compress v1.17.8
 	github.com/ncw/swift/v2 v2.0.2
 	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.12.1
@@ -67,6 +66,16 @@ require (
 	golang.org/x/net v0.27.0
 	golang.org/x/sys v0.23.0
 	gopkg.in/yaml.v3 v3.0.1
+)
+
+require (
+	github.com/3rf/mongo-lint v0.0.0-20140604191638-3550fdcf1f43 // indirect
+	github.com/craiggwilson/goke v0.0.0-20240206162536-b1c58122d943 // indirect
+	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
+	github.com/mongodb/mongo-tools v0.0.0-20240724183527-6d4f001be3fc // indirect
 )
 
 require (
@@ -114,13 +123,13 @@ require (
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
-	github.com/jessevdk/go-flags v1.4.0 // indirect
+	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jmoiron/sqlx v1.3.3 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/mattn/go-runewidth v0.0.8 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/mschoch/smat v0.0.0-20160514031455-90eadee771ae // indirect
@@ -138,7 +147,7 @@ require (
 	github.com/siddontang/go-log v0.0.0-20180807004314-8d05993dda07 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.0 // indirect
-	github.com/stretchr/objx v0.5.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/willf/bitset v1.1.10 // indirect

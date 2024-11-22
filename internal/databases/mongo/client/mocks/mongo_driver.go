@@ -7,7 +7,7 @@ import (
 
 	client "github.com/wal-g/wal-g/internal/databases/mongo/client"
 
-	db "github.com/mongodb/mongo-tools-common/db"
+	db "github.com/mongodb/mongo-tools/common/db"
 
 	mock "github.com/stretchr/testify/mock"
 
