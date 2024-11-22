@@ -24,7 +24,6 @@ import (
 
 func createSession(config *Config) (*session.Session, error) {
 	sessOpts := session.Options{}
-	tracelog.DebugLogger.Printf("Creating S3 session")
 	if config.CACertFile != "" {
 		file, err := os.Open(config.CACertFile)
 		if err != nil {
