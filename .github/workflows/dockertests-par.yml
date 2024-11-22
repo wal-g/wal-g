@@ -64,7 +64,7 @@ jobs:
         "make MONGO_VERSION=\"6.0.19\" MONGO_MAJOR=\"6.0\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_features",
         "make MONGO_VERSION=\"6.0.19\" MONGO_MAJOR=\"6.0\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_features",
         "make MONGO_VERSION=\"5.0.30\" MONGO_MAJOR=\"5.0\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_features",
-        "make MONGO_VERSION=\"5.0.30\" MONGO_MAJOR=\"5.0\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_features",
+        "make MONGO_VERSION=\"5.0.21\" MONGO_MAJOR=\"5.0\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_features",
         "make MONGO_VERSION=\"4.4.17\" MONGO_MAJOR=\"4.4\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_features",
         "make MONGO_VERSION=\"4.4.17\" MONGO_MAJOR=\"4.4\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_features",
         "make redis_test",
