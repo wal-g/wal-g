@@ -22,11 +22,11 @@ type MongoDriver struct {
 }
 
 // ApplyOp provides a mock function with given fields: ctx, op
-func (_m *MongoDriver) ApplyOp(ctx context.Context, op db.Oplog) error {
+func (_m *MongoDriver) ApplyOp(ctx context.Context, op *db.Oplog) error {
 	ret := _m.Called(ctx, op)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, db.Oplog) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *db.Oplog) error); ok {
 		r0 = rf(ctx, op)
 	} else {
 		r0 = ret.Error(0)

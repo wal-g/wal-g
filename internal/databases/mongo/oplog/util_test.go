@@ -18,7 +18,6 @@ func TestFilterUUIDs(t *testing.T) {
 		{
 			withUUIDs: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "config.$cmd",
@@ -34,7 +33,6 @@ func TestFilterUUIDs(t *testing.T) {
 			},
 			withoutUUIDsExpected: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "config.$cmd",
@@ -51,7 +49,6 @@ func TestFilterUUIDs(t *testing.T) {
 		{
 			withUUIDs: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "admin.$cmd",
@@ -74,7 +71,6 @@ func TestFilterUUIDs(t *testing.T) {
 			},
 			withoutUUIDsExpected: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "admin.$cmd",
@@ -105,7 +101,7 @@ func TestFilterUUIDs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		withoutUUIDsActual, err := filterUUIDs(tt.withUUIDs)
+		withoutUUIDsActual, err := filterUUIDs(&tt.withUUIDs)
 		assert.NoError(t, err)
 
 		assert.Equal(t, tt.withoutUUIDsExpected, withoutUUIDsActual)
