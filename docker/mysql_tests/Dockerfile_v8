@@ -1,4 +1,4 @@
-FROM wal-g/mysql8:latest
+FROM wal-g/golang:latest as build
 
 WORKDIR /go/src/github.com/wal-g/wal-g
 
@@ -12,9 +12,11 @@ COPY utility/ utility/
 
 # we test wal-g logic, not our deps. So, no brotli in these tests.
 RUN cd main/mysql && \
-    go build -mod vendor -race -o wal-g -ldflags "-s -w" && \
-    cp wal-g /usr/bin/wal-g
+    go build -mod vendor -race -o wal-g -ldflags "-s -w"
 
+FROM wal-g/mysql8:latest
+
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
 
 RUN mkdir /root/testtools
 
