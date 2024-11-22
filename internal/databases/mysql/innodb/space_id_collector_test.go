@@ -100,8 +100,7 @@ func TestSpaceIDCollector(t *testing.T) {
 	tempDir := generateData(t)
 	defer os.RemoveAll(tempDir)
 
-	collector := NewSpaceIDCollector(tempDir)
-	err := collector.Collect()
+	collector, err := NewSpaceIDCollector(tempDir)
 	assert.NoError(t, err)
 
 	raw := collector.(*spaceIDCollectorImpl).collected

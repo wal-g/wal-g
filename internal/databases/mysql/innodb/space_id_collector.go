@@ -15,7 +15,7 @@ import (
 var ErrSpaceIDNotFound = errors.New("SpaceID not found")
 
 type SpaceIDCollector interface {
-	Collect() error
+	// GetFileForSpaceID locates InnoDB file (path relative to dataDir) for requested SpaceID
 	GetFileForSpaceID(spaceID SpaceID) (string, error)
 }
 
@@ -26,24 +26,26 @@ type spaceIDCollectorImpl struct {
 
 var _ SpaceIDCollector = &spaceIDCollectorImpl{}
 
-func NewSpaceIDCollector(dataDir string) SpaceIDCollector {
-	return &spaceIDCollectorImpl{dataDir: dataDir}
-}
+func NewSpaceIDCollector(dataDir string) (SpaceIDCollector, error) {
+	result := &spaceIDCollectorImpl{dataDir: dataDir}
+	result.collected = make(map[SpaceID]string)
 
-func (c *spaceIDCollectorImpl) Collect() error {
-	c.collected = make(map[SpaceID]string)
-
-	err := filepath.WalkDir(c.dataDir, func(path string, info fs.DirEntry, walkErr error) error {
-		tracelog.ErrorLogger.FatalfOnError("Error encountered during datadir traverse", walkErr)
+	err := filepath.WalkDir(dataDir, func(path string, info fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return fmt.Errorf("error encountered during dataDir traverse %v: %w", path, walkErr)
+		}
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".ibd") {
-			err := c.collect(path)
+			err := result.collect(path)
 			if err != nil {
 				return err
 			}
 		}
 		return nil
 	})
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (c *spaceIDCollectorImpl) collect(filePath string) error {
@@ -64,9 +66,6 @@ func (c *spaceIDCollectorImpl) collect(filePath string) error {
 }
 
 func (c *spaceIDCollectorImpl) GetFileForSpaceID(spaceID SpaceID) (string, error) {
-	if c.collected == nil {
-		return "", fmt.Errorf("spaceIDCollectorImpl not initialized")
-	}
 	result, ok := c.collected[spaceID]
 	if ok {
 		return result, nil
