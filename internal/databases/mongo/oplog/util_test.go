@@ -101,10 +101,11 @@ func TestFilterUUIDs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		withoutUUIDsActual, err := filterUUIDs(&tt.withUUIDs)
+		withUids := tt.withUUIDs
+		withoutUUIDsActual, err := filterUUIDs(&withUids)
 		assert.NoError(t, err)
 
-		assert.Equal(t, tt.withoutUUIDsExpected, withoutUUIDsActual)
+		assert.Equal(t, tt.withoutUUIDsExpected, *withoutUUIDsActual)
 	}
 }
 
