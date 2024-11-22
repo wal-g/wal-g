@@ -2,9 +2,11 @@ package innodb
 
 import (
 	"bytes"
-	"github.com/wal-g/tracelog"
+	"fmt"
 	"io"
 	"os"
+
+	"github.com/wal-g/tracelog"
 )
 
 type RawPage struct {
@@ -22,16 +24,16 @@ type PageReader struct {
 func NewPageReader(f *os.File) *PageReader {
 	// read basic info:
 	_, err := f.Seek(0, io.SeekStart)
-	tracelog.ErrorLogger.FatalfOnError("seek: %v", err)
+	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("seek on file: %v", f.Name()), err)
 
 	// We need first 58 bytes of innodb file to get FSP_HDR...
 	page := make([]byte, 64)
 	_, err = io.ReadFull(f, page)
-	tracelog.ErrorLogger.FatalfOnError("ReadFull %v", err)
+	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("cannot read first innodb page on file %v", f.Name()), err)
 
 	// reset file position:
 	_, err = f.Seek(0, io.SeekStart)
-	tracelog.ErrorLogger.FatalfOnError("seek: %v", err)
+	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("seek on file: %v", f.Name()), err)
 
 	// Parse first page:
 	header := readHeader(page)
@@ -55,7 +57,7 @@ func NewPageReader(f *os.File) *PageReader {
 func (r *PageReader) ReadRaw(pn PageNumber) (RawPage, error) {
 	var offset = int64(r.PageSize) * int64(pn)
 	_, err := r.file.Seek(offset, io.SeekStart)
-	tracelog.ErrorLogger.FatalfOnError("seek: %v", err)
+	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("seek on file: %v", r.file.Name()), err)
 
 	page := make([]byte, r.PageSize)
 	_, err = r.file.Read(page)
@@ -63,7 +65,7 @@ func (r *PageReader) ReadRaw(pn PageNumber) (RawPage, error) {
 		return RawPage{}, err
 	}
 	// we don't expect UnexpectedEOF here (even compressed pages are always PageSize bytes)
-	tracelog.ErrorLogger.FatalfOnError("read page: %v", err)
+	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("read page on file: %v", r.file.Name()), err)
 
 	return RawPage{
 		Header:  readHeader(page),
