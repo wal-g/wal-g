@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"syscall"
 	"time"
 )
 
@@ -18,8 +17,7 @@ func NewSharedFile(path string) *SharedFile {
 	info, err := os.Stat(path)
 	var updated time.Time
 	if err == nil {
-		atime := info.Sys().(*syscall.Stat_t).Atim
-		updated = time.Unix(atime.Sec, atime.Nsec)
+		updated = info.ModTime()
 	} else {
 		// File does not exist or is not available
 		// Set very low time, so any comparison with timeout will return True
