@@ -8,7 +8,9 @@ import (
 )
 
 // filterUUIDs recursively removes 'ui' entries from ops, including nested applyOps ops.
-func filterUUIDs(op db.Oplog) (db.Oplog, error) {
+func filterUUIDs(_op *db.Oplog) (db.Oplog, error) {
+	// TODO: Probably we need to add version with inplace changing of op
+	op := *_op
 	// Remove UUIDs from oplog entries
 	op.UI = nil
 
@@ -34,7 +36,7 @@ func newFilteredApplyOps(cmd bson.D) (bson.D, error) {
 
 	filtered := make([]db.Oplog, len(ops))
 	for i := range ops {
-		filtered[i], err = filterUUIDs(ops[i])
+		filtered[i], err = filterUUIDs(&ops[i])
 		if err != nil {
 			return nil, err
 		}

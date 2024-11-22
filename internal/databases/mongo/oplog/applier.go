@@ -101,9 +101,9 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	}
 
 	if meta.IsTxn() {
-		err = ap.handleTxnOp(ctx, meta, op)
+		err = ap.handleTxnOp(ctx, meta, &op)
 	} else {
-		err = ap.handleNonTxnOp(ctx, op)
+		err = ap.handleNonTxnOp(ctx, &op)
 	}
 
 	if err != nil {
@@ -217,19 +217,23 @@ func isOpAllowed(oe *db.Oplog) bool {
 }
 
 // handleNonTxnOp tries to apply given oplog record.
-func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
+func (ap *DBApplier) handleNonTxnOp(ctx context.Context, _op *db.Oplog) error {
+	// TODO: Probably we need to properly work with pointer here instead of copying it
+	var op db.Oplog
 	if !ap.preserveUUID {
 		var err error
-		op, err = filterUUIDs(op)
+		op, err = filterUUIDs(_op)
 		if err != nil {
 			return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
 		}
+	} else {
+		op = *_op
 	}
 
 	// TODO: wait for index building
 	// TODO: if we wait for index building, we can stop ignoring a BackgroundOperation... error in DropIndexes
 	if op.Operation == "c" && op.Object[0].Key == "commitIndexBuild" {
-		collName, indexes, err := indexSpecFromCommitIndexBuilds(op)
+		collName, indexes, err := indexSpecFromCommitIndexBuilds(&op)
 		if err != nil {
 			return NewOpHandleError(op, err)
 		}
@@ -237,7 +241,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 		return ap.db.CreateIndexes(ctx, dbName, collName, indexes)
 	}
 	if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
-		collName, indexes, err := indexSpecsFromCreateIndexes(op)
+		collName, indexes, err := indexSpecsFromCreateIndexes(&op)
 		if err != nil {
 			return NewOpHandleError(op, err)
 		}
@@ -251,7 +255,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 	}
 
 	//tracelog.DebugLogger.Printf("applying op: %+v", op)
-	if err := ap.db.ApplyOp(ctx, op); err != nil {
+	if err := ap.db.ApplyOp(ctx, &op); err != nil {
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
 		if !ap.shouldIgnore(op.Operation, err) {
@@ -262,7 +266,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 	return nil
 }
 
-func indexSpecsFromCreateIndexes(op db.Oplog) (string, client.IndexDocument, error) {
+func indexSpecsFromCreateIndexes(op *db.Oplog) (string, client.IndexDocument, error) {
 	index := client.IndexDocument{Options: bson.M{}}
 	var collName string
 	var elem bson.E
@@ -286,7 +290,7 @@ func indexSpecsFromCreateIndexes(op db.Oplog) (string, client.IndexDocument, err
 	return collName, index, nil
 }
 
-func indexSpecFromCommitIndexBuilds(op db.Oplog) (string, []client.IndexDocument, error) {
+func indexSpecFromCommitIndexBuilds(op *db.Oplog) (string, []client.IndexDocument, error) {
 	var collName string
 	var ok bool
 	var elemE bson.E
@@ -334,13 +338,13 @@ func indexSpecFromCommitIndexBuilds(op db.Oplog) (string, []client.IndexDocument
 
 // handleTxnOp handles oplog record with transaction attributes.
 // TODO: unit test
-func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op db.Oplog) error {
+func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op *db.Oplog) error {
 	if meta.IsAbort() {
 		if err := ap.txnBuffer.PurgeTxn(meta); err != nil {
 			return fmt.Errorf("can not clean txn buffer after rollback cmd: %w", err)
 		}
 	}
-	if err := ap.txnBuffer.AddOp(meta, op); err != nil {
+	if err := ap.txnBuffer.AddOp(meta, *op); err != nil {
 		return fmt.Errorf("can not append command to txn buffer: %w", err)
 	}
 
@@ -367,7 +371,7 @@ func (ap *DBApplier) applyTxn(ctx context.Context, meta txn.Meta) error {
 			if !ok {
 				return nil
 			}
-			if err := ap.handleNonTxnOp(ctx, op); err != nil {
+			if err := ap.handleNonTxnOp(ctx, &op); err != nil {
 				return err
 			}
 		case err, ok := <-errc:
