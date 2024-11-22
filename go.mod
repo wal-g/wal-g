@@ -58,6 +58,7 @@ require (
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v0.0.0-20220110100810-f4153a09f87c
 	github.com/klauspost/compress v1.17.8
+	github.com/mongodb/mongo-tools v0.0.0-20240724183527-6d4f001be3fc
 	github.com/ncw/swift/v2 v2.0.2
 	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.12.1
@@ -69,13 +70,8 @@ require (
 )
 
 require (
-	github.com/3rf/mongo-lint v0.0.0-20140604191638-3550fdcf1f43 // indirect
-	github.com/craiggwilson/goke v0.0.0-20240206162536-b1c58122d943 // indirect
-	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
-	github.com/mongodb/mongo-tools v0.0.0-20240724183527-6d4f001be3fc // indirect
+	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 )
 
 require (
@@ -103,7 +99,6 @@ require (
 	github.com/glycerine/go-unsnap-stream v0.0.0-20190901134440-81cf024a9e0a // indirect
 	github.com/go-openapi/errors v0.19.3 // indirect
 	github.com/go-openapi/strfmt v0.19.4 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
 	github.com/golang-jwt/jwt v3.2.1+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
