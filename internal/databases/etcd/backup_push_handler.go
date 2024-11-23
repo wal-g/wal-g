@@ -10,8 +10,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type streamSentinelDto struct {
+type StreamSentinelDto struct {
 	StartLocalTime time.Time
+	IsPermanent    bool
+	UserData       any
 }
 
 // HandleBackupPush starts backup procedure.
@@ -30,7 +32,7 @@ func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
 		tracelog.ErrorLogger.Fatalf("backup create command failed: %v", err)
 	}
 
-	sentinel := streamSentinelDto{StartLocalTime: timeStart}
+	sentinel := StreamSentinelDto{StartLocalTime: timeStart}
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)

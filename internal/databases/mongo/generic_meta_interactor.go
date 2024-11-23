@@ -1,8 +1,10 @@
-package mysql
+package mongo
 
 import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -29,9 +31,8 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 	if err != nil {
 		return internal.GenericMetadata{}, err
 	}
-	var sentinel StreamSentinelDto
-	err = backup.FetchSentinel(&sentinel)
-	if err != nil {
+	var sentinel models.Backup
+	if err = backup.FetchSentinel(&sentinel); err != nil {
 		return internal.GenericMetadata{}, err
 	}
 
@@ -41,9 +42,9 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 		CompressedSize:   sentinel.CompressedSize,
 		Hostname:         sentinel.Hostname,
 		StartTime:        sentinel.StartLocalTime,
-		FinishTime:       sentinel.StopLocalTime,
-		IsPermanent:      sentinel.IsPermanent,
-		IncrementDetails: NewIncrementDetailsFetcher(&sentinel),
+		FinishTime:       sentinel.FinishLocalTime,
+		IsPermanent:      sentinel.Permanent,
+		IncrementDetails: &internal.NopIncrementDetailsFetcher{},
 		UserData:         sentinel.UserData,
 	}, nil
 }
@@ -54,8 +55,8 @@ func NewGenericMetaSetter() GenericMetaSetter {
 	return GenericMetaSetter{}
 }
 
-func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
-	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
+func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData any) error {
+	modifier := func(dto archive.Backup) archive.Backup {
 		dto.UserData = userData
 		return dto
 	}
@@ -63,47 +64,26 @@ func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.
 }
 
 func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error {
-	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
-		dto.IsPermanent = isPermanent
+	modifier := func(dto archive.Backup) archive.Backup {
+		dto.Permanent = isPermanent
 		return dto
 	}
 	return modifyBackupSentinel(backupName, backupFolder, modifier)
 }
 
-func modifyBackupSentinel(backupName string, backupFolder storage.Folder, modifier func(StreamSentinelDto) StreamSentinelDto) error {
+func modifyBackupSentinel(backupName string, backupFolder storage.Folder, modifier func(archive.Backup) archive.Backup) error {
 	backup, err := internal.NewBackup(backupFolder, backupName)
 	if err != nil {
 		return err
 	}
-	var sentinel StreamSentinelDto
-	err = backup.FetchSentinel(&sentinel)
-	if err != nil {
+
+	var sentinel archive.Backup
+	if err = backup.FetchSentinel(&sentinel); err != nil {
 		return errors.Wrap(err, "failed to fetch the existing backup metadata for modifying")
 	}
 	sentinel = modifier(sentinel)
-	err = backup.UploadSentinel(sentinel)
-	if err != nil {
+	if err = backup.UploadSentinel(sentinel); err != nil {
 		return errors.Wrap(err, "failed to upload the modified metadata to the storage")
 	}
 	return nil
-}
-
-type IncrementDetailsFetcher struct {
-	sentinel *StreamSentinelDto
-}
-
-func NewIncrementDetailsFetcher(sentinel *StreamSentinelDto) *IncrementDetailsFetcher {
-	return &IncrementDetailsFetcher{sentinel}
-}
-
-func (idf *IncrementDetailsFetcher) Fetch() (bool, internal.IncrementDetails, error) {
-	if !idf.sentinel.IsIncremental {
-		return false, internal.IncrementDetails{}, nil
-	}
-
-	return true, internal.IncrementDetails{
-		IncrementFrom:     *idf.sentinel.IncrementFrom,
-		IncrementFullName: *idf.sentinel.IncrementFullName,
-		IncrementCount:    *idf.sentinel.IncrementCount,
-	}, nil
 }

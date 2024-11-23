@@ -11,30 +11,29 @@ import (
 )
 
 // TODO: unit tests
-func HandleBackupList(folder storage.Folder, stanza string, detailed bool, pretty bool, json bool) error {
-	backupTimes, err := GetBackupList(folder, stanza)
-
-	if len(backupTimes) == 0 {
-		tracelog.InfoLogger.Println("No backups found")
-		return nil
-	}
-
+func HandleBackupList(folder storage.Folder, metaFetcher internal.GenericMetaFetcher, stanza string, detailed bool, pretty bool, json bool) error {
+	backupTimesWithMeta, err := GetBackupListWithMetadata(folder, metaFetcher, stanza)
 	if err != nil {
 		return err
 	}
 
-	internal.SortBackupTimeSlices(backupTimes)
+	if len(backupTimesWithMeta) == 0 {
+		tracelog.InfoLogger.Println("No backups found")
+		return nil
+	}
 
-	printableEntities := make([]printlist.Entity, len(backupTimes))
-	for i := range backupTimes {
+	internal.SortBackupTimeWithMetadataSlices(backupTimesWithMeta)
+
+	printableEntities := make([]printlist.Entity, len(backupTimesWithMeta))
+	for i := range backupTimesWithMeta {
 		if detailed {
-			details, err := GetBackupDetails(folder, stanza, backupTimes[i].BackupName)
+			details, err := GetBackupDetails(folder, stanza, backupTimesWithMeta[i].BackupTime.BackupName)
 			if err != nil {
 				return fmt.Errorf("get backup details: %w", err)
 			}
 			printableEntities[i] = details
 		} else {
-			printableEntities[i] = backupTimes[i]
+			printableEntities[i] = backupTimesWithMeta[i]
 		}
 	}
 

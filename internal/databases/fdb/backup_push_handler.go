@@ -11,8 +11,10 @@ import (
 )
 
 // TODO: add more metadata
-type streamSentinelDto struct {
+type StreamSentinelDto struct {
 	StartLocalTime time.Time
+	IsPermanent    bool
+	UserData       any
 }
 
 func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
@@ -30,7 +32,7 @@ func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
 		tracelog.ErrorLogger.Fatalf("backup create command failed: %v", err)
 	}
 
-	sentinel := streamSentinelDto{StartLocalTime: timeStart}
+	sentinel := StreamSentinelDto{StartLocalTime: timeStart}
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)

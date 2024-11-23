@@ -27,7 +27,7 @@ var (
 			if detail {
 				mysql.HandleDetailedBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), pretty, json)
 			} else {
-				internal.HandleDefaultBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), pretty, json)
+				internal.HandleDefaultBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), mysql.NewGenericMetaInteractor(), pretty, json)
 			}
 		},
 	}

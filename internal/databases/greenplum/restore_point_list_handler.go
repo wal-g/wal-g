@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"errors"
 	"os"
 
 	"github.com/wal-g/tracelog"
@@ -11,28 +12,38 @@ import (
 )
 
 // TODO: unit tests
-func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
+func HandleRestorePointList(folder storage.Folder, metaFetcher internal.GenericMetaFetcher, pretty, json bool) {
 	restorePoints, err := GetRestorePoints(folder)
 	if _, ok := err.(NoRestorePointsFoundError); ok {
 		err = nil
 	}
 	tracelog.ErrorLogger.FatalfOnError("Get restore points from folder: %v", err)
 
+	var errs []error
 	// TODO: remove this ugly hack to make current restore-point-list work
-	backupTimes := make([]internal.BackupTime, 0)
+	backupTimesWithMeta := make([]internal.BackupTimeWithMetadata, 0, len(restorePoints))
 	for _, rpt := range restorePoints {
-		backupTimes = append(backupTimes, internal.BackupTime{
-			BackupName:  rpt.Name,
-			Time:        rpt.Time,
-			WalFileName: utility.StripWalFileName(rpt.Name),
+		metadata, err := metaFetcher.Fetch(rpt.Name, folder)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		backupTimesWithMeta = append(backupTimesWithMeta, internal.BackupTimeWithMetadata{
+			BackupTime: internal.BackupTime{
+				BackupName:  rpt.Name,
+				Time:        rpt.Time,
+				WalFileName: utility.StripWalFileName(rpt.Name),
+			},
+			GenericMetadata: metadata,
 		})
 	}
+	tracelog.ErrorLogger.FatalfOnError("Fetch metadata for restore points: %v", errors.Join(errs...))
 
-	internal.SortBackupTimeSlices(backupTimes)
+	internal.SortBackupTimeWithMetadataSlices(backupTimesWithMeta)
 
-	printableEntities := make([]printlist.Entity, len(backupTimes))
-	for i := range backupTimes {
-		printableEntities[i] = backupTimes[i]
+	printableEntities := make([]printlist.Entity, len(backupTimesWithMeta))
+	for i := range backupTimesWithMeta {
+		printableEntities[i] = backupTimesWithMeta[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
 	tracelog.ErrorLogger.FatalfOnError("Print restore points: %v", err)
