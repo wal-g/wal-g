@@ -8,6 +8,5 @@ RUN apt-get update && \
     git ca-certificates \
     htop \
     nano \
-    liblzo2-2 \
-    libbrotli1 && \
+    liblzo2-2 && \
     rm -rf /var/lib/apt/lists/*

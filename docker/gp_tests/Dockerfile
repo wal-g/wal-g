@@ -12,6 +12,9 @@ COPY utility/ utility/
 COPY Makefile Makefile
 ENV USE_BROTLI 1
 
+RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
+        vendor/github.com/google/brotli/go/cbrotli/cgo.go
+
 RUN cd main/gp && \
     go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 

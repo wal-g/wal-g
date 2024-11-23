@@ -15,11 +15,21 @@ COPY utility/ utility/
 COPY Makefile Makefile
 ENV USE_BROTLI 1
 
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-x86_64.tar.gz && \
+    tar xf cmake-3.31.0-linux-x86_64.tar.gz -C /usr --strip-components=1
+
+COPY submodules/ tmp/
+
+RUN cd tmp/brotli && \
+    mkdir out && cd out && \
+    cmake .. && \
+    make && make install
+
 RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
         cd main/etcd && \
         go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
-    
+
 RUN make etcd_build
 
 FROM wal-g/etcd:latest
