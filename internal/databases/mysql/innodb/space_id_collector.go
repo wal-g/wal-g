@@ -59,6 +59,7 @@ func (c *spaceIDCollectorImpl) collect(filePath string) error {
 	if reader == nil {
 		return fmt.Errorf("canot read innodb file %v", filePath)
 	}
+	// FIXME: use os.Root [go 1.24] https://github.com/golang/go/issues/67002
 	if !strings.HasPrefix(filePath, c.dataDir) {
 		tracelog.ErrorLogger.Fatalf("File %v is out of data dir %v", filePath, c.dataDir)
 	}
