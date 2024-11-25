@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -18,7 +18,6 @@ func TestFilterUUIDs(t *testing.T) {
 		{
 			withUUIDs: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "config.$cmd",
@@ -34,7 +33,6 @@ func TestFilterUUIDs(t *testing.T) {
 			},
 			withoutUUIDsExpected: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "config.$cmd",
@@ -51,7 +49,6 @@ func TestFilterUUIDs(t *testing.T) {
 		{
 			withUUIDs: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "admin.$cmd",
@@ -74,17 +71,16 @@ func TestFilterUUIDs(t *testing.T) {
 			},
 			withoutUUIDsExpected: db.Oplog{
 				Timestamp: primitive.Timestamp{T: 4242, I: 1},
-				HistoryID: 0,
 				Version:   2,
 				Operation: "c",
 				Namespace: "admin.$cmd",
 				Object: bson.D{
 					{Key: "applyOps", Value: bson.A{
-						// We're getting some extra fields here (ts, h, v), but it's ok:
-						// operation is valid, parent's (ts, h, v) have priority
+						// We're getting some extra fields here (ts, v), but it's ok:
+						// operation is valid, parent's (ts, v) have priority
 						bson.D{
 							{Key: "ts", Value: primitive.Timestamp{T: 0, I: 0}},
-							{Key: "h", Value: int64(0)},
+							{Key: "t", Value: nil},
 							{Key: "v", Value: int32(0)},
 							{Key: "op", Value: "d"},
 							{Key: "ns", Value: "test.coll"},
@@ -92,7 +88,7 @@ func TestFilterUUIDs(t *testing.T) {
 						},
 						bson.D{
 							{Key: "ts", Value: primitive.Timestamp{T: 0, I: 0}},
-							{Key: "h", Value: int64(0)},
+							{Key: "t", Value: nil},
 							{Key: "v", Value: int32(0)},
 							{Key: "op", Value: "d"},
 							{Key: "ns", Value: "test.coll"},
@@ -105,10 +101,11 @@ func TestFilterUUIDs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		withoutUUIDsActual, err := filterUUIDs(tt.withUUIDs)
+		withUids := tt.withUUIDs
+		withoutUUIDsActual, err := filterUUIDs(&withUids)
 		assert.NoError(t, err)
 
-		assert.Equal(t, tt.withoutUUIDsExpected, withoutUUIDsActual)
+		assert.Equal(t, tt.withoutUUIDsExpected, *withoutUUIDsActual)
 	}
 }
 

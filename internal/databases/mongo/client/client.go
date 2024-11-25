@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
@@ -79,7 +79,7 @@ type MongoDriver interface {
 	IsMaster(ctx context.Context) (models.IsMaster, error)
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
-	ApplyOp(ctx context.Context, op db.Oplog) error
+	ApplyOp(ctx context.Context, op *db.Oplog) error
 	Close(ctx context.Context) error
 }
 
@@ -332,8 +332,11 @@ func (mc *MongoClient) getApplyOpsCmd() bson.D {
 }
 
 // ApplyOp calls applyOps and check response
-func (mc *MongoClient) ApplyOp(ctx context.Context, dbop db.Oplog) error {
+func (mc *MongoClient) ApplyOp(ctx context.Context, dbop *db.Oplog) error {
 	// mongod complains if 'ts' or 'history' are passed to applyOps
+	if dbop == nil {
+		return fmt.Errorf("MongoClient:ApplyOp: dbop is nil, it should not happen")
+	}
 	op := ApplyOplog{
 		Operation:  dbop.Operation,
 		Namespace:  dbop.Namespace,
