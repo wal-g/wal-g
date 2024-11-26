@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	conf "github.com/wal-g/wal-g/internal/config"
 	pg_errors "github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/fsutil"
@@ -77,7 +78,8 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	archiveDirectory = filepath.Dir(archiveDirectory)
 	bundle := NewBundle(archiveDirectory, nil, "", &prefaultStartLsn, nil,
-		false, viper.GetInt64(conf.TarSizeThresholdSetting))
+		false, viper.GetInt64(conf.TarSizeThresholdSetting), internal.NewCommonFilesFilter(),
+	)
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
 	err = bundle.DownloadDeltaMap(folderReader.SubFolder(utility.WalPath), startLsn)
@@ -123,7 +125,7 @@ func (bundle *Bundle) prefaultWalkedFSObject(path string, info os.FileInfo, err 
 // TODO : unit tests
 func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 	fileName := info.Name()
-	_, excluded := ExcludedFilenames[fileName]
+	excluded := !bundle.FilesFilter.ShouldUploadFile(fileName)
 	isDir := info.IsDir()
 
 	if excluded && !isDir {

@@ -3,8 +3,8 @@ package internal
 import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/utility"
 )
 
 type ConcurrentUploader struct {
@@ -23,7 +23,7 @@ func CreateConcurrentUploader(
 ) (*ConcurrentUploader, error) {
 	crypter := ConfigureCrypter()
 	tarSizeThreshold := viper.GetInt64(conf.TarSizeThresholdSetting)
-	bundle := NewBundle(directories, crypter, tarSizeThreshold, map[string]utility.Empty{})
+	bundle := NewBundle(directories, crypter, tarSizeThreshold, NewCommonFilesFilter())
 
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
 	tarBallMaker := NewStorageTarBallMaker(backupName, uploader)

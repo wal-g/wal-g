@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 )
@@ -63,7 +64,9 @@ var (
 				permanent, verifyPageChecksums,
 				fullBackup, storeAllCorruptBlocks,
 				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),
-				userData, viper.GetBool(conf.WithoutFilesMetadataSetting))
+				userData, viper.GetBool(conf.WithoutFilesMetadataSetting),
+				postgres.RegularPgFileFilter,
+			)
 
 			backupHandler, err := greenplum.NewSegBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
