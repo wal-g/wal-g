@@ -251,7 +251,7 @@ func (bh *BackupHandler) startBackup() error {
 func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 	if len(bh.prevBackupInfo.name) > 0 && bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
 		tracelog.InfoLogger.Println("Delta backup enabled")
-		tracelog.DebugLogger.Printf("Previous backup: %s\nBackup start LSN: %d", bh.prevBackupInfo.name,
+		tracelog.DebugLogger.Printf("Previous backup: %s\nBackup start LSN: %s", bh.prevBackupInfo.name,
 			bh.prevBackupInfo.sentinelDto.BackupStartLSN)
 		if *bh.prevBackupInfo.sentinelDto.BackupFinishLSN > bh.CurBackupInfo.startLSN {
 			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(bh.prevBackupInfo.name))
