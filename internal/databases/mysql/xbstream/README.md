@@ -59,7 +59,15 @@ space_id = 8
 space_flags = 33
 ```
 
-And file with InnoDB pages `xxx.delta`. Unarchiver should leverage InnoDB page format knowledge to unarchive file properly: it should put page at correct offset (by looking at PageSize and PageNumber)
+`xxx.delta` files contains list of following blocks:
+```
+* Header - page_size bytes (page_size - from '.meta' file)
+   (4 bytes) 'xtra' or 'XTRA' (for last block)
+   (N * 4 bytes) N * page_number  - list of page_number (up to page_size/4 entries OR  0xFFFFFFFF-terminated-list)
+* Body
+   N * <page content>
+```
+Unarchiver places pages to its correct place in the file (at page_size * page_number offset).
 
 It is Ok to expect that `.meta` file will precede `.delta` file in archive.
 

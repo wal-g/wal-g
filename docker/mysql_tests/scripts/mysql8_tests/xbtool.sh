@@ -49,7 +49,7 @@ cat <<EOF
 ##########
 EOF
 mkdir -p wout
-wal-g xb extract stream.xb wout/
+wal-g xb extract stream.xb --data-dir wout/
 find wout -type f | sort -u | xargs cat | md5sum > wout.sum
 
 mkdir -p xout
@@ -67,7 +67,7 @@ cat <<EOF
 EOF
 rm -rf wout
 mkdir -p wout
-wal-g xb extract stream.xb wout/ --decompress
+wal-g xb extract stream.xb --data-dir wout/ --decompress
 find wout -type f | sort -u | xargs cat | md5sum > wout.sum
 
 rm -rf xout
@@ -85,7 +85,7 @@ EOF
 
 
 #
-# Unfortunately, docker's file system doesn't support holes... so it is useless to check it here
+# Unfortunately, docker's file system doesn't support punch holes... so it is useless to check it here
 #
 
 #cat > list_holes.py << EOF

@@ -10,14 +10,37 @@ RUN apt-get update && \
         s3cmd \
         jq \
         lsb-release \
-        gnupg2 && \
-    wget https://repo.percona.com/apt/percona-release_latest.focal_all.deb && \
-    dpkg -i percona-release_latest.focal_all.deb && \
-    percona-release enable tools release && \
-    apt-get update && \
-    apt-get install --yes \
-      percona-xtrabackup-80
+        bsdmainutils \
+        gnupg2
 
+# Install xtrabackup
+#
+# for some unknown[1] reason there is no xtrabackup for ARM... compile it [2]
+# [1] https://www.percona.com/blog/percona-server-for-mysql-and-percona-xtrabackup-now-available-for-arm64/
+# [2] https://www.percona.com/blog/compiling-percona-xtrabackup-for-arm/
+#
+# ARM upgrade instructions:
+# firstly - test whether percona built it for ARM
+# if not - update version =/
+ARG TARGETARCH
+RUN if   [ "$TARGETARCH" = "amd64" ]; then \
+        wget https://repo.percona.com/apt/percona-release_latest.focal_all.deb && \
+        dpkg -i percona-release_latest.focal_all.deb && \
+        percona-release enable tools release && \
+        apt-get update && \
+        apt-get install --yes percona-xtrabackup-80 ; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get install --yes dirmngr cmake lsb-release wget build-essential flex bison automake autoconf libtool libaio-dev mysql-client libncurses-dev zlib1g-dev libev-dev libcurl4-gnutls-dev vim-common git devscripts libnuma-dev openssl libssl-dev libgcrypt20-dev libudev-dev libprocps-dev && \
+        mkdir -p /compile_xtrabackup && \
+        cd /compile_xtrabackup/ && \
+        git clone -b release-8.0.33-28 --single-branch --depth 1 --recurse-submodules https://github.com/percona/percona-xtrabackup.git && \
+        cd /compile_xtrabackup/percona-xtrabackup && \
+        mkdir build && cd build && \
+        mkdir /boost && \
+        cmake .. -DDOWNLOAD_BOOST=1 -DWITH_BOOST=/boost -DWITH_NUMA=1 -DCMAKE_INSTALL_PREFIX=/compile_xtrabackup/percona-xtrabackup/build && \
+        make -j 4 && make install ; \
+    else echo "No target for $TARGETARCH" && exit 1; \
+    fi;
 
 RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
 RUN rm -rf $MYSQLDATA
