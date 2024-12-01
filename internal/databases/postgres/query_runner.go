@@ -568,7 +568,7 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 func (queryRunner *PgQueryRunner) BuildGetTablesQuery(getPartitioned bool) (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
-		query := "SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class " +
+		query := "SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname, c.relkind FROM pg_class " +
 			"AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid " +
 			"WHERE NOT EXISTS (SELECT 1 FROM pg_inherits AS i WHERE i.inhrelid = c.oid) "
 		if getPartitioned {
@@ -599,7 +599,7 @@ func (queryRunner *PgQueryRunner) BuildGetPartitionsForTableQuery(tablename stri
 			"JOIN pg_inherits i ON c.oid = i.inhrelid "+
 			"JOIN partition_hierarchy ph ON i.inhparent = ph.child_oid "+
 			") "+
-			"SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname FROM pg_class "+
+			"SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname, c.relkind FROM pg_class "+
 			"AS c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid "+
 			"JOIN partition_hierarchy ON c.oid = partition_hierarchy.child_oid; ", tablename)
 		return query, nil
@@ -684,14 +684,40 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 		var tableName string
 		var namespaceName string
 		var path pgtype.Text
-		if err := rows.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName); err != nil {
+		var relKind rune
+		if err := rows.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName, &relKind); err != nil {
 			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
+			continue
 		}
+
+		if relKind == 'p' {
+			// Although partitioned tables have relfilenode=0 (no physical storage) and theoretically
+			// don't need to be added to the tables map, we still process them here.
+			// This is because we need the parent partitioned table information to locate and process
+			// all its child partition tables later in DatabasesByNames.ResolveRegexp function.
+			process(relFileNode, oid, tableName, namespaceName)
+			continue
+		}
+
+		// If relFileNode is 0, we need to check the actual storage situation
 		if relFileNode == 0 {
+			// Case 1: Empty path indicates a relation with no physical storage
+			// This happens for:
+			// partitioned indexes, views, foreign tables
+			if path.String == "" {
+				tracelog.DebugLogger.Printf("Skipping relation '%s.%s' (relkind=%c) due to no physical storage", namespaceName, tableName, relKind)
+				continue
+			}
+
+			// Case 2: Non-empty path with relfilenode=0 indicates a mapped catalog
+			// This happens for:
+			// pg_class itself and other critical system catalogs, shared catalogs
+			// These tables use a separate mapping file to track their actual file locations
 			parts := strings.Split(path.String, "/")
 			chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
 			if err != nil {
-				tracelog.DebugLogger.Printf("Failed to get relfilenode for relation %s\n", tableName)
+				tracelog.DebugLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
+				continue
 			}
 			relFileNode = uint32(chis)
 		}
