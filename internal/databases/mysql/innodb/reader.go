@@ -2,11 +2,10 @@ package innodb
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/wal-g/tracelog"
 )
 
 type RawPage struct {
@@ -21,24 +20,31 @@ type PageReader struct {
 	PageSize uint16
 }
 
-func NewPageReader(f *os.File) *PageReader {
+func NewPageReader(f *os.File) (*PageReader, error) {
 	// read basic info:
 	_, err := f.Seek(0, io.SeekStart)
-	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("seek on file: %v", f.Name()), err)
+	if err != nil {
+		return nil, fmt.Errorf("seek on file %v: %w", f.Name(), err)
+	}
 
 	// We need first 58 bytes of innodb file to get FSP_HDR...
 	page := make([]byte, 64)
 	_, err = io.ReadFull(f, page)
-	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("cannot read first innodb page on file %v", f.Name()), err)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read first innodb page on file %v: %w", f.Name(), err)
+	}
 
 	// reset file position:
 	_, err = f.Seek(0, io.SeekStart)
-	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("seek on file: %v", f.Name()), err)
+	if err != nil {
+		return nil, fmt.Errorf("seek on file %v: %w", f.Name(), err)
+	}
 
 	// Parse first page:
 	header := readHeader(page)
 	if header.PageType != PageTypeFileSpaceHeader {
-		tracelog.ErrorLogger.Fatalf("0-page in file %v is not FSP_HDR. Actual type: %v", nil, header.PageType)
+		return nil, fmt.Errorf("0-page in file %v is not FSP_HDR. Actual type: %v\n%v",
+			f.Name(), header.PageType, hex.EncodeToString(page))
 	}
 	fsp := readFileSpaceHeader(page)
 
@@ -51,13 +57,15 @@ func NewPageReader(f *os.File) *PageReader {
 		file:     f,
 		SpaceID:  header.SpaceID,
 		PageSize: pageSize,
-	}
+	}, nil
 }
 
 func (r *PageReader) ReadRaw(pn PageNumber) (RawPage, error) {
 	var offset = int64(r.PageSize) * int64(pn)
 	_, err := r.file.Seek(offset, io.SeekStart)
-	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("seek on file: %v", r.file.Name()), err)
+	if err != nil {
+		return RawPage{}, fmt.Errorf("seek on file %v: %w", r.file.Name(), err)
+	}
 
 	page := make([]byte, r.PageSize)
 	_, err = r.file.Read(page)
@@ -65,7 +73,9 @@ func (r *PageReader) ReadRaw(pn PageNumber) (RawPage, error) {
 		return RawPage{}, err
 	}
 	// we don't expect UnexpectedEOF here (even compressed pages are always PageSize bytes)
-	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("read page on file: %v", r.file.Name()), err)
+	if err != nil {
+		return RawPage{}, fmt.Errorf("read page %v: %w", r.file.Name(), err)
+	}
 
 	return RawPage{
 		Header:  readHeader(page),
