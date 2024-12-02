@@ -691,7 +691,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 			parts := strings.Split(path.String, "/")
 			chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
 			if err != nil {
-				tracelog.WarningLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
+				tracelog.DebugLogger.Printf("Failed to get relfilenode for relation %s\n", tableName)
 			}
 			relFileNode = uint32(chis)
 		}
