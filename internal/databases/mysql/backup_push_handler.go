@@ -202,8 +202,8 @@ func handleXtrabackupBackup(
 	backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
-	err = backupCmd.Wait()
-	if err != nil {
+	cmdErr := backupCmd.Wait()
+	if cmdErr != nil {
 		tracelog.ErrorLogger.Printf("Backup command output:\n%s", stderr.String())
 	}
 
@@ -221,8 +221,7 @@ func handleXtrabackupBackup(
 	err = removeTemporaryDirectory(xtrabackupExtraDirectory)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to remove tmp directory from diff-backup: %v", err)
-		err = nil // don't crash an app
 	}
 
-	return backupName, backupExtInfo, err
+	return backupName, backupExtInfo, cmdErr
 }
