@@ -207,9 +207,9 @@ func handleXtrabackupBackup(
 		tracelog.ErrorLogger.Printf("Backup command output:\n%s", stderr.String())
 	}
 
-	backupInfo, err := readXtrabackupInfo(xtrabackupExtraDirectory)
-	if err != nil {
-		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
+	backupInfo, extraErr := readXtrabackupInfo(xtrabackupExtraDirectory)
+	if extraErr != nil {
+		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", extraErr)
 	}
 	backupExtInfo = XtrabackupExtInfo{
 		XtrabackupInfo: backupInfo,
@@ -218,10 +218,9 @@ func handleXtrabackupBackup(
 		ServerArch: runtime.GOARCH,
 	}
 
-	err = removeTemporaryDirectory(xtrabackupExtraDirectory)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to remove tmp directory from diff-backup: %v", err)
-		err = nil // don't crash an app
+	extraErr = removeTemporaryDirectory(xtrabackupExtraDirectory)
+	if extraErr != nil {
+		tracelog.ErrorLogger.Printf("failed to remove tmp directory from diff-backup: %v", extraErr)
 	}
 
 	return backupName, backupExtInfo, err
