@@ -202,14 +202,14 @@ func handleXtrabackupBackup(
 	backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
-	err = backupCmd.Wait()
-	if err != nil {
+	cmdErr := backupCmd.Wait()
+	if cmdErr != nil {
 		tracelog.ErrorLogger.Printf("Backup command output:\n%s", stderr.String())
 	}
 
-	backupInfo, extraErr := readXtrabackupInfo(xtrabackupExtraDirectory)
-	if extraErr != nil {
-		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", extraErr)
+	backupInfo, err := readXtrabackupInfo(xtrabackupExtraDirectory)
+	if err != nil {
+		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
 	}
 	backupExtInfo = XtrabackupExtInfo{
 		XtrabackupInfo: backupInfo,
@@ -218,10 +218,10 @@ func handleXtrabackupBackup(
 		ServerArch: runtime.GOARCH,
 	}
 
-	extraErr = removeTemporaryDirectory(xtrabackupExtraDirectory)
-	if extraErr != nil {
-		tracelog.ErrorLogger.Printf("failed to remove tmp directory from diff-backup: %v", extraErr)
+	err = removeTemporaryDirectory(xtrabackupExtraDirectory)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("failed to remove tmp directory from diff-backup: %v", err)
 	}
 
-	return backupName, backupExtInfo, err
+	return backupName, backupExtInfo, cmdErr
 }
