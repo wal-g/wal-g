@@ -73,6 +73,7 @@ jobs:
         include:
           - arch: aarch64
             distro: ubuntu20.04
+            label: ubuntu-20.04
       fail-fast: false
 
     steps:
@@ -83,7 +84,7 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: ${{ matrix.arch }}
-          distro: ubuntu20.04
+          distro: ${{ matrix.distro }}
           env: |
             USE_BROTLI: ${{ env.USE_BROTLI }}
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
@@ -108,24 +109,24 @@ jobs:
             
             make ${{ matrix.db }}_build
       - name: Rename WAL-G binary
-        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}
+        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}
 
       - name: Compress WAL-G binary
-        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}
+        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}
 
       - name: Calculate checksum
-        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.sha256
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.sha256
 
       - name: Calculate checksum for the compressed binary
-        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz.sha256
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload WAL-G binary
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}
-            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz
-            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.sha256
-            wal-g-${{ matrix.db }}-${{ matrix.distro }}-${{ matrix.arch }}.tar.gz.sha256
+            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}
+            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz
+            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.sha256
+            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
