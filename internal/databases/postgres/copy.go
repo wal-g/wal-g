@@ -12,13 +12,13 @@ import (
 )
 
 // HandleCopy copy specific or all backups from one storage to another
-func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withoutHistory bool) {
+func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withAllHistory bool) {
 	var from, fromError = internal.StorageFromConfig(fromConfigFile)
 	var to, toError = internal.StorageFromConfig(toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := getCopyingInfos(backupName, from.RootFolder(), to.RootFolder(), withoutHistory)
+	infos, err := getCopyingInfos(backupName, from.RootFolder(), to.RootFolder(), withAllHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = copy.Infos(infos)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -48,7 +48,7 @@ func BackupCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) ([
 func getCopyingInfos(backupName string,
 	from storage.Folder,
 	to storage.Folder,
-	withoutHistory bool) ([]copy.InfoProvider, error) {
+	withAllHistory bool) ([]copy.InfoProvider, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
 		return WildcardInfo(from, to)
@@ -64,24 +64,27 @@ func getCopyingInfos(backupName string,
 	if err != nil {
 		return nil, err
 	}
-	if !withoutHistory {
-		var history, err = HistoryCopyingInfo(pgBackup, from, to)
-		if err != nil {
-			return nil, err
-		}
-		infos = append(infos, history...)
+	history, err := HistoryCopyingInfo(pgBackup, from, to, withAllHistory)
+	if err != nil {
+		return nil, err
 	}
+	infos = append(infos, history...)
 	return infos, nil
 }
 
-func HistoryCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+func HistoryCopyingInfo(backup Backup, from storage.Folder, to storage.Folder, withAllHistory bool) ([]copy.InfoProvider, error) {
 	tracelog.DebugLogger.Print("Collecting history files... ")
 
 	var fromWalFolder = from.GetSubFolder(utility.WalPath)
 
 	var lastWalFilename, err = GetLastWalFilename(backup)
 	if err != nil {
-		return make([]copy.InfoProvider, 0), nil
+		return make([]copy.InfoProvider, 0), err
+	}
+
+	firstWalFilename, err := GetFirstWalFilename(backup)
+	if err != nil {
+		return make([]copy.InfoProvider, 0), err
 	}
 
 	tracelog.DebugLogger.Print("getLastWalFilename not failed!")
@@ -91,15 +94,25 @@ func HistoryCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) (
 		return nil, err
 	}
 
-	var older = func(object storage.Object) bool { return lastWalFilename <= object.GetName() }
+	var match = func(object storage.Object) bool {
+		return GetWalFileName(object.GetName()) >= firstWalFilename &&
+			(withAllHistory || GetWalFileName(object.GetName()) <= lastWalFilename)
+	}
 	return copy.BuildCopyingInfos(
 		fromWalFolder,
-		to,
+		to.GetSubFolder(utility.WalPath),
 		objects,
-		older,
+		match,
 		copy.NoopRenameFunc,
 		copy.NoopSourceTransformer,
 	), nil
+}
+
+func GetWalFileName(filename string) string {
+	if !strings.Contains(filename, ".") {
+		return filename
+	}
+	return strings.Split(filename, ".")[0]
 }
 
 func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {

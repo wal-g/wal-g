@@ -551,7 +551,7 @@ Flags:
 - `-b, --backup-name string` Copy specific backup
 - `-f, --from string` Storage config from where should copy backup
 - `-t, --to string` Storage config to where should copy backup
-- `-w, --without-history` Copy backup without history (wal files)
+- `-w, --with-history` If set - copy WALs older than backup finish_lsn. If not - copy only WALs from start_lsn to finish_lsn
 
 ### ``delete garbage``
 
