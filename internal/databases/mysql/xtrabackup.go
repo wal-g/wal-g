@@ -180,6 +180,7 @@ func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepar
 		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
 	if !isLast {
+		prepareCmd = cloneCommand(prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
 	}
 
@@ -211,12 +212,16 @@ func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepar
 
 	if prepareCmd != nil {
 		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args)
+		prepareCmd.Stdout = os.Stdout
+		prepareCmd.Stderr = os.Stderr
 		err = prepareCmd.Run()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
 			return err
 		}
 		tracelog.InfoLogger.Printf("Prepared %s", backup.Name)
+	} else {
+		tracelog.InfoLogger.Printf("WALG_MYSQL_BACKUP_PREPARE_COMMAND not configured. Skipping prepare phase")
 	}
 
 	return os.RemoveAll(tempDeltaDir)
@@ -250,6 +255,7 @@ func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, isLast
 		injectCommandArgument(prepareCmd, XtrabackupIncrementalDir+"="+tempDeltaDir)
 	}
 	if !isLast {
+		prepareCmd = cloneCommand(prepareCmd)
 		injectCommandArgument(prepareCmd, XtrabackupApplyLogOnly)
 	}
 
@@ -279,12 +285,16 @@ func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, isLast
 
 	if prepareCmd != nil {
 		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args)
+		prepareCmd.Stdout = os.Stdout
+		prepareCmd.Stderr = os.Stderr
 		err = prepareCmd.Run()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
 			return err
 		}
 		tracelog.InfoLogger.Printf("Prepared %s", backup.Name)
+	} else {
+		tracelog.InfoLogger.Printf("WALG_MYSQL_BACKUP_PREPARE_COMMAND not configured. Skipping prepare phase")
 	}
 
 	return os.RemoveAll(tempDeltaDir)
