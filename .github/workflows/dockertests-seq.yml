@@ -10,6 +10,7 @@ on:
 
 jobs:
   sequiential:
+    if: ${{ github.repository_owner == 'wal-g' }}
     uses: ./.github/workflows/dockertests.yml
     with:
       command-json-array: >
