@@ -40,7 +40,7 @@ wal-g --config=${TMP_CONFIG} backup-list
 
 # copy backup with backup-name
 backup_name=$(wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
-wal-g copy --backup-name=${backup_name} --from=${TMP_CONFIG} --to=${TO_TMP_CONFIG} --without-history
+wal-g copy --backup-name=${backup_name} --from=${TMP_CONFIG} --to=${TO_TMP_CONFIG}
 copied_backup_name=$(wal-g --config=${TO_TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
 
 if [ $backup_name != $copied_backup_name ];

@@ -23,16 +23,16 @@ const (
 	toShorthand   = "t"
 	toDescription = "Storage config to where should copy backup"
 
-	withoutHistoryFlag        = "without-history"
-	withoutHistoryShorthand   = "w"
-	withoutHistoryDescription = "Copy backup without history"
+	withAllHistoryFlag        = "with-history"
+	withAllHistoryShorthand   = "w"
+	withAllHistoryDescription = "If set - copy WALs older than backup finish_lsn. If not - copy only WALs from start_lsn to finish_lsn"
 )
 
 var (
 	backupName     string
 	fromConfigFile string
 	toConfigFile   string
-	withoutHistory = false
+	withAllHistory = false
 
 	backupCopyCmd = &cobra.Command{
 		Use:   backupCopyUsage,
@@ -48,7 +48,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	postgres.HandleCopy(fromConfigFile, toConfigFile, backupName, withoutHistory)
+	postgres.HandleCopy(fromConfigFile, toConfigFile, backupName, withAllHistory)
 }
 
 func init() {
@@ -57,11 +57,11 @@ func init() {
 	backupCopyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	backupCopyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
-	backupCopyCmd.Flags().BoolVarP(&withoutHistory,
-		withoutHistoryFlag,
-		withoutHistoryShorthand,
+	backupCopyCmd.Flags().BoolVarP(&withAllHistory,
+		withAllHistoryFlag,
+		withAllHistoryShorthand,
 		false,
-		withoutHistoryDescription)
+		withAllHistoryDescription)
 
 	_ = backupCopyCmd.MarkFlagRequired(toFlag)
 	_ = backupCopyCmd.MarkFlagRequired(fromFlag)

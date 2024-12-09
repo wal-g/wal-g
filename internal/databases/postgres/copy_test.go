@@ -1,6 +1,8 @@
 package postgres_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func TestStartCopy_WhenThereAreNoObjectsToCopy(t *testing.T) {
@@ -62,8 +65,8 @@ func TestGetHistoryCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000002")
 	assert.NoError(t, err)
-	infos, err := postgres.HistoryCopyingInfo(backup, from, to)
-	assert.NoError(t, err)
+	infos, err := postgres.HistoryCopyingInfo(backup, from, to, true)
+	assert.Error(t, err)
 	assert.Empty(t, infos)
 }
 
@@ -72,9 +75,63 @@ func TestGetHistoryCopyingInfo_WhenThereIsNoHistoryObjects(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000002")
 	assert.NoError(t, err)
-	infos, err := postgres.HistoryCopyingInfo(backup, from, to)
+	metadata := map[string]interface{}{"finish_lsn": postgres.WalSegmentSize * 4, "start_lsn": postgres.WalSegmentSize * 2}
+	bytesMetadata, err := json.Marshal(&metadata)
+	assert.NoError(t, err)
+	from.PutObject("base_000000010000000000000002/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+	infos, err := postgres.HistoryCopyingInfo(backup, from, to, true)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
+}
+
+func TestGetHistoryCopyingInfo_WithAllHistory(t *testing.T) {
+	var from = testtools.CreateMockStorageFolder()
+	var to = testtools.MakeDefaultInMemoryStorageFolder()
+	var backup, err = postgres.NewBackup(from, "base_000000010000000000000004")
+	metadata := map[string]interface{}{"finish_lsn": postgres.WalSegmentSize * 4, "start_lsn": postgres.WalSegmentSize * 2}
+	bytesMetadata, err := json.Marshal(&metadata)
+	assert.NoError(t, err)
+	from.PutObject("base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+	subFolderWals := from.GetSubFolder(utility.WalPath)
+	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})         //nolint:errcheck
+	assert.NoError(t, err)
+	infos, err := postgres.HistoryCopyingInfo(backup, from, to, true)
+	assert.NoError(t, err)
+	// from 1 to 6 (with walg backup info file)
+	assert.Equal(t, 7, len(infos))
+	assert.NotEmpty(t, infos)
+}
+
+func TestGetHistoryCopyingInfo_WithoutAllHistory(t *testing.T) {
+	var from = testtools.CreateMockStorageFolder()
+	var to = testtools.MakeDefaultInMemoryStorageFolder()
+	var backup, err = postgres.NewBackup(from, "base_000000010000000000000004")
+	metadata := map[string]interface{}{"finish_lsn": postgres.WalSegmentSize * 4, "start_lsn": postgres.WalSegmentSize * 2}
+	bytesMetadata, err := json.Marshal(&metadata)
+	assert.NoError(t, err)
+	from.PutObject("base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+	subFolderWals := from.GetSubFolder(utility.WalPath)
+	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})         //nolint:errcheck
+	assert.NoError(t, err)
+	infos, err := postgres.HistoryCopyingInfo(backup, from, to, false)
+	assert.NoError(t, err)
+	// from 1 to 4 (with walg backup info file)
+	assert.Equal(t, 5, len(infos))
+	assert.NotEmpty(t, infos)
 }
 
 func TestGetAllCopyingInfo_WhenFromFolderIsEmpty(t *testing.T) {
