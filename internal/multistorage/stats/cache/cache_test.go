@@ -182,8 +182,26 @@ func Test_cache_ApplyExplicitCheckResult(t *testing.T) {
 		assert.Equal(t, checkRes, fileStatuses.aliveMap(c.emaParams))
 	})
 
+	t.Run("applies check result to file if file does not exist", func(t *testing.T) {
+		c := newTestCache(t, 2, true)
+		WithCustomFlushTimeout(time.Hour)(c)
+		checkRes := AliveMap{
+			"def": true,
+			"fo1": false,
+			"fo2": true,
+		}
+		_, err := c.ApplyExplicitCheckResult(checkRes, time.Now())
+		require.NoError(t, err)
+
+		fileStatuses, err := c.shFile.read()
+		require.NoError(t, err)
+
+		assert.Equal(t, checkRes, fileStatuses.aliveMap(c.emaParams))
+	})
+
 	t.Run("does not apply check result to file if flush timeout did not exceed", func(t *testing.T) {
 		c := newTestCache(t, 2, true)
+		c.shFile.Updated = time.Now()
 		WithCustomFlushTimeout(time.Hour)(c)
 
 		err := c.shFile.write(nil)
@@ -289,8 +307,21 @@ func Test_cache_ApplyOperationResult(t *testing.T) {
 		assert.True(t, fileStatuses[key("fo1")].alive(c.emaParams))
 	})
 
+	t.Run("apply operation result to file if file does not exist", func(t *testing.T) {
+		c := newTestCache(t, 1, true)
+		WithCustomFlushTimeout(time.Hour)(c)
+
+		c.ApplyOperationResult("fo1", true, 100)
+
+		fileStatuses, err := c.shFile.read()
+		require.NoError(t, err)
+
+		assert.True(t, fileStatuses[key("fo1")].alive(c.emaParams))
+	})
+
 	t.Run("does not apply operation result to file if flush timeout did not exceed", func(t *testing.T) {
 		c := newTestCache(t, 1, true)
+		c.shFile.Updated = time.Now()
 		WithCustomFlushTimeout(time.Hour)(c)
 		err := c.shFile.write(nil)
 		require.NoError(t, err)
