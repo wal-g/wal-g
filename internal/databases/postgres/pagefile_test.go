@@ -68,6 +68,16 @@ func TestIsPagedFile(t *testing.T) {
 		{"name starts with dot", "../../../test/testdata/pagefiles/base/.123", false},
 		{"name contains digits only", "../../../test/testdata/pagefiles/base/123", true},
 		{"name contains digits separated by dot", "../../../test/testdata/pagefiles/base/123.123", true},
+
+		// For the following special file types:
+		// - pg_xact: transaction status files
+		// - pg_multixact/members: multitransaction member files
+		// - pg_multixact/offsets: multitransaction offset files
+		// We determine they are not page files purely based on their path patterns,
+		// without actually reading the files
+		{"pg_xact file", "~/DemoDb/pg_xact/0000", false},
+		{"pg_multixact members file", "~/DemoDb/pg_multixact/members/0000", false},
+		{"pg_multixact offsets file", "~/DemoDb/pg_multixact/offsets/0000", false},
 	}
 
 	for _, tc := range testCases {
