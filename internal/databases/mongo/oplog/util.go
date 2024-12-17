@@ -3,20 +3,21 @@ package oplog
 import (
 	"fmt"
 
-	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools/common/db"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 // filterUUIDs recursively removes 'ui' entries from ops, including nested applyOps ops.
-func filterUUIDs(op db.Oplog) (db.Oplog, error) {
+func filterUUIDs(op *db.Oplog) (*db.Oplog, error) {
 	// Remove UUIDs from oplog entries
 	op.UI = nil
 
 	// Check for and filter nested applyOps ops
 	if op.Operation == "c" && isApplyOpsCmd(op.Object) {
-		filtered, err := newFilteredApplyOps(op.Object)
+		filtered, err := newFilteredApplyOps(&op.Object)
 		if err != nil {
-			return db.Oplog{}, err
+			ret := db.Oplog{}
+			return &ret, err
 		}
 		op.Object = filtered
 	}
@@ -26,21 +27,20 @@ func filterUUIDs(op db.Oplog) (db.Oplog, error) {
 
 // newFilteredApplyOps iterates over nested ops in an applyOps document and
 // returns a new applyOps document that omits the 'ui' field from nested ops.
-func newFilteredApplyOps(cmd bson.D) (bson.D, error) {
+func newFilteredApplyOps(cmd *bson.D) (bson.D, error) {
 	ops, err := unwrapNestedApplyOps(cmd)
 	if err != nil {
 		return nil, err
 	}
 
-	filtered := make([]db.Oplog, len(ops))
 	for i := range ops {
-		filtered[i], err = filterUUIDs(ops[i])
+		_, err = filterUUIDs(&ops[i])
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	doc, err := wrapNestedApplyOps(filtered)
+	doc, err := wrapNestedApplyOps(ops)
 	if err != nil {
 		return nil, err
 	}
@@ -63,9 +63,9 @@ type nestedApplyOps struct {
 }
 
 // unwrapNestedApplyOps converts a bson.D to a typed data structure.
-func unwrapNestedApplyOps(doc bson.D) ([]db.Oplog, error) {
+func unwrapNestedApplyOps(doc *bson.D) ([]db.Oplog, error) {
 	// Doc to bytes
-	bs, err := bson.Marshal(doc)
+	bs, err := bson.Marshal(&doc)
 	if err != nil {
 		return nil, fmt.Errorf("remarshal nested applyOps: %w", err)
 	}

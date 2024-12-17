@@ -6,9 +6,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/mongodb/mongo-tools-common/db"
-	"github.com/mongodb/mongo-tools-common/txn"
-	"github.com/mongodb/mongo-tools-common/util"
+	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/txn"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -101,9 +101,9 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	}
 
 	if meta.IsTxn() {
-		err = ap.handleTxnOp(ctx, meta, op)
+		err = ap.handleTxnOp(ctx, meta, &op)
 	} else {
-		err = ap.handleNonTxnOp(ctx, op)
+		err = ap.handleNonTxnOp(ctx, &op)
 	}
 
 	if err != nil {
@@ -217,10 +217,10 @@ func isOpAllowed(oe *db.Oplog) bool {
 }
 
 // handleNonTxnOp tries to apply given oplog record.
-func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
+func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 	if !ap.preserveUUID {
 		var err error
-		op, err = filterUUIDs(op)
+		_, err = filterUUIDs(op)
 		if err != nil {
 			return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
 		}
@@ -239,7 +239,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 	if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
 		collName, indexes, err := indexSpecsFromCreateIndexes(op)
 		if err != nil {
-			return NewOpHandleError(op, err)
+			return NewOpHandleError(*op, err)
 		}
 		dbName, _ := util.SplitNamespace(op.Namespace)
 		return ap.db.CreateIndexes(ctx, dbName, collName,
@@ -250,19 +250,19 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
 		return ap.db.DropIndexes(ctx, dbName, op.Object)
 	}
 
-	//tracelog.DebugLogger.Printf("applying op: %+v", op)
+	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
 	if err := ap.db.ApplyOp(ctx, op); err != nil {
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
 		if !ap.shouldIgnore(op.Operation, err) {
-			return NewOpHandleError(op, err)
+			return NewOpHandleError(*op, err)
 		}
-		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, op)
+		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)
 	}
 	return nil
 }
 
-func indexSpecsFromCreateIndexes(op db.Oplog) (string, client.IndexDocument, error) {
+func indexSpecsFromCreateIndexes(op *db.Oplog) (string, client.IndexDocument, error) {
 	index := client.IndexDocument{Options: bson.M{}}
 	var collName string
 	var elem bson.E
@@ -286,7 +286,7 @@ func indexSpecsFromCreateIndexes(op db.Oplog) (string, client.IndexDocument, err
 	return collName, index, nil
 }
 
-func indexSpecFromCommitIndexBuilds(op db.Oplog) (string, []client.IndexDocument, error) {
+func indexSpecFromCommitIndexBuilds(op *db.Oplog) (string, []client.IndexDocument, error) {
 	var collName string
 	var ok bool
 	var elemE bson.E
@@ -334,13 +334,13 @@ func indexSpecFromCommitIndexBuilds(op db.Oplog) (string, []client.IndexDocument
 
 // handleTxnOp handles oplog record with transaction attributes.
 // TODO: unit test
-func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op db.Oplog) error {
+func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op *db.Oplog) error {
 	if meta.IsAbort() {
 		if err := ap.txnBuffer.PurgeTxn(meta); err != nil {
 			return fmt.Errorf("can not clean txn buffer after rollback cmd: %w", err)
 		}
 	}
-	if err := ap.txnBuffer.AddOp(meta, op); err != nil {
+	if err := ap.txnBuffer.AddOp(meta, *op); err != nil {
 		return fmt.Errorf("can not append command to txn buffer: %w", err)
 	}
 
@@ -367,7 +367,7 @@ func (ap *DBApplier) applyTxn(ctx context.Context, meta txn.Meta) error {
 			if !ok {
 				return nil
 			}
-			if err := ap.handleNonTxnOp(ctx, op); err != nil {
+			if err := ap.handleNonTxnOp(ctx, &op); err != nil {
 				return err
 			}
 		case err, ok := <-errc:

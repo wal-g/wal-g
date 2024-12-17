@@ -42,3 +42,6 @@ venv/
 # Ignore all local history of files
 .history
 .ionide
+
+#Ctags tags file
+tags
