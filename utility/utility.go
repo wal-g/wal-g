@@ -47,6 +47,7 @@ const (
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	CatchupPath      = "catchup_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
+	SegmentsPath     = "segments_" + VersionStr
 	BackupNamePrefix = "base_"
 	BackupTimeFormat = "20060102T150405Z" // timestamps in that format should be lexicographically sorted
 
