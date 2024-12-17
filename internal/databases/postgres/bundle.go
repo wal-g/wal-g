@@ -17,6 +17,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -354,7 +355,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // TODO : unit tests
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner) (string, []string, LSN, error) {
+func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner, compressorFileExtension string) (string, []string, LSN, error) {
 	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
@@ -370,7 +371,7 @@ func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner) (string, []st
 	}
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter)
+	tarBall.SetUp(bundle.Crypter, "backup_label.tar."+compressorFileExtension)
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,

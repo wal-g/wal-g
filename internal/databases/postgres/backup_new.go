@@ -76,7 +76,7 @@ func (backup *Backup) unwrapNew(
 		return nil, err
 	}
 
-	tarInterpreter, tarsToExtract, pgControlKey, err := extractProv.Get(
+	tarInterpreter, concurrentTarsToExtract, sequentialTarsToExtract, err := extractProv.Get(
 		*backup, filesToUnwrap, skipRedundantTars, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
 		return nil, err
@@ -85,11 +85,11 @@ func (backup *Backup) unwrapNew(
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	needPgControl := IsPgControlRequired(*backup)
 
-	if pgControlKey == "" && needPgControl {
+	if len(sequentialTarsToExtract) == 0 && needPgControl {
 		return nil, newPgControlNotFoundError()
 	}
 
-	err = internal.ExtractAll(tarInterpreter, tarsToExtract)
+	err = internal.ExtractAll(tarInterpreter, concurrentTarsToExtract)
 	if _, ok := err.(internal.NoFilesToExtractError); ok {
 		// in case of no tars to extract, just ignore this backup and proceed to the next
 		tracelog.InfoLogger.Println("Skipping backup: no useful files found.")
@@ -100,8 +100,7 @@ func (backup *Backup) unwrapNew(
 	}
 
 	if needPgControl {
-		readerMakers := []internal.ReaderMaker{internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)}
-		err = internal.ExtractAll(tarInterpreter, readerMakers)
+		err = internal.ExtractAll(tarInterpreter, sequentialTarsToExtract)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to extract pg_control")
 		}
