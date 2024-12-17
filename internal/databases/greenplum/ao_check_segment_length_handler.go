@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type dbInfo struct {
@@ -270,7 +271,8 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 
 	var backup internal.Backup
 
-	backup, err = internal.GetBackupByName(backupName, fmt.Sprintf("segments_005/seg%s/basebackups_005/", checker.segnum), rootFolder)
+	backup, err = internal.GetBackupByName(backupName,
+		fmt.Sprintf("%s/seg%s/%s", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath), rootFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get backup with name: %s", backupName)
 		return nil, err
@@ -297,7 +299,7 @@ func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData() (map[string]i
 		return nil, err
 	}
 	rootFolder := storage.RootFolder()
-	aoFolder := rootFolder.GetSubFolder(fmt.Sprintf("segments_005/seg%s/basebackups_005/aosegments/", checker.segnum))
+	aoFolder := rootFolder.GetSubFolder(fmt.Sprintf("%s/seg%s/%s/aosegments/", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath))
 
 	files, _, err := aoFolder.ListFolder()
 	if err != nil {
