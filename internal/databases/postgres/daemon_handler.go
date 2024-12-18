@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/config"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/daemon"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -202,6 +203,8 @@ func HandleDaemon(options DaemonOptions) {
 	sdNotifyTicker := time.NewTicker(30 * time.Second)
 	defer sdNotifyTicker.Stop()
 	go SendSdNotify(sdNotifyTicker.C)
+
+	config.SetupSignalListener()
 
 	for {
 		fd, err := l.Accept()
