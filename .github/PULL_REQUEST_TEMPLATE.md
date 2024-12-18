@@ -3,7 +3,7 @@ Wal-g provides support for many databases, please write down name of database yo
 
 # Pull request description
 
-### Describe what this PR fix
+### Describe what this PR fixes
 // problem is ...
 
 ### Please provide steps to reproduce (if it's a bug)
