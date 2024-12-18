@@ -748,7 +748,7 @@ func SetupSignalListener() {
 	go func() {
 		<-sigCh
 		if err := ConfigureLogging(); err != nil {
-			tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error)
+			tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
 		}
 	}()
 }

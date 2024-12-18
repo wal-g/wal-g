@@ -49,7 +49,16 @@ func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	viper.Set(config.LogLevelSetting, "someOtherLevel")
 	err := config.ConfigureLogging()
 
-	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(config.LogLevelSetting)), err)
+	assert.Error(t, err)
+	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(config.LogLevelSetting)))
+	resetToDefaults()
+}
+
+func TestConfigureLogging_WhenLogDestinationSettingIsSet(t *testing.T) {
+	viper.Set(config.LogLevelSetting, "/some/nonexistent/file")
+	err := config.ConfigureLogging()
+
+	assert.Error(t, err)
 	resetToDefaults()
 }
 
