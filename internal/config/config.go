@@ -746,9 +746,11 @@ func SetupSignalListener() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGUSR1)
 	go func() {
-		<-sigCh
-		if err := ConfigureLogging(); err != nil {
-			tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
+		for {
+			<-sigCh
+			if err := ConfigureLogging(); err != nil {
+				tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
+			}
 		}
 	}()
 }
