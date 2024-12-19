@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"os/signal"
 	"os/user"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -17,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/webserver"
 )
 
@@ -57,6 +60,7 @@ const (
 	DeltaFromUserDataSetting      = "WALG_DELTA_FROM_USER_DATA"
 	FetchTargetUserDataSetting    = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting               = "WALG_LOG_LEVEL"
+	LogDestinationSetting         = "WALG_LOG_DESTINATION"
 	TarSizeThresholdSetting       = "WALG_TAR_SIZE_THRESHOLD"
 	TarDisableFsyncSetting        = "WALG_TAR_DISABLE_FSYNC"
 	CseKmsIDSetting               = "WALG_CSE_KMS_ID"
@@ -262,6 +266,7 @@ var (
 		PgFailoverStoragesCheckTimeout: "30s",
 		PgFailoverStorageCacheLifetime: "15m",
 		PgpEnvelopeCacheExpiration:     "0",
+		LogLevelSetting:                "NORMAL",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -337,6 +342,7 @@ var (
 		NetworkRateLimitSetting:       true,
 		UseWalDeltaSetting:            true,
 		LogLevelSetting:               true,
+		LogDestinationSetting:         true,
 		TarSizeThresholdSetting:       true,
 		TarDisableFsyncSetting:        true,
 		"WALG_" + GpgKeyIDSetting:     true,
@@ -674,8 +680,33 @@ func GetWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string
 }
 
 func ConfigureLogging() error {
+	var logFile *os.File
+	logLevel := CommonDefaultConfigValues[LogLevelSetting]
+	var err error
+
 	if viper.IsSet(LogLevelSetting) {
-		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
+		logLevel = viper.GetString(LogLevelSetting)
+	}
+
+	if viper.IsSet(LogDestinationSetting) && viper.GetString(LogDestinationSetting) != "stderr" {
+		logFileName := viper.GetString(LogDestinationSetting)
+		logFile, err = os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+		if err != nil {
+			return fmt.Errorf("could not open log file: %s", err)
+		}
+	} else {
+		logFile = os.Stderr
+	}
+
+	if err := tracelog.Setup(logFile, logLevel); err != nil {
+		return fmt.Errorf("failed to setup logging: %s", err)
+	}
+
+	if logging.LogFile != nil {
+		_ = logging.LogFile.Close()
+	}
+	if logFile != os.Stderr {
+		logging.LogFile = logFile
 	}
 	return nil
 }
@@ -713,6 +744,19 @@ func Configure() {
 
 		tracelog.DebugLogger.Print(buff.String())
 	}
+}
+
+func SetupSignalListener() {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGUSR1)
+	go func() {
+		for {
+			<-sigCh
+			if err := ConfigureLogging(); err != nil {
+				tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
+			}
+		}
+	}()
 }
 
 // ConfigureAndRunDefaultWebServer configures and runs web server

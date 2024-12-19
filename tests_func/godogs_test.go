@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 
 func RunTestFeatures() (status int, err error) {
 	if testOpts.debug {
-		err := tracelog.UpdateLogLevel(tracelog.DevelLogLevel)
+		err := tracelog.Setup(os.Stderr, tracelog.DevelLogLevel)
 		if err != nil {
 			return -1, err
 		}

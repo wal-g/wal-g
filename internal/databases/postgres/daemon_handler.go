@@ -203,6 +203,8 @@ func HandleDaemon(options DaemonOptions) {
 	defer sdNotifyTicker.Stop()
 	go SendSdNotify(sdNotifyTicker.C)
 
+	conf.SetupSignalListener()
+
 	for {
 		fd, err := l.Accept()
 		if err != nil {
