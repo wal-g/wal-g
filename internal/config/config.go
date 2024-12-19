@@ -679,7 +679,7 @@ func GetWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string
 }
 
 func ConfigureLogging() error {
-	if viper.IsSet(LogDestinationSetting) {
+	if viper.IsSet(LogDestinationSetting) && viper.GetString(LogDestinationSetting) != "stderr" {
 		logFileName := viper.GetString(LogDestinationSetting)
 		file, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
