@@ -266,6 +266,7 @@ var (
 		PgFailoverStoragesCheckTimeout: "30s",
 		PgFailoverStorageCacheLifetime: "15m",
 		PgpEnvelopeCacheExpiration:     "0",
+		LogLevelSetting:                "NORMAL",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -679,30 +680,33 @@ func GetWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string
 }
 
 func ConfigureLogging() error {
+	var logFile *os.File
+	logLevel := CommonDefaultConfigValues[LogLevelSetting]
+	var err error
+
+	if viper.IsSet(LogLevelSetting) {
+		logLevel = viper.GetString(LogLevelSetting)
+	}
+
 	if viper.IsSet(LogDestinationSetting) && viper.GetString(LogDestinationSetting) != "stderr" {
 		logFileName := viper.GetString(LogDestinationSetting)
-		file, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+		logFile, err = os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
 			return fmt.Errorf("could not open log file: %s", err)
 		}
-		tracelog.SetInfoOutput(file)
-		tracelog.SetWarningOutput(file)
-		tracelog.SetErrorOutput(file)
-		if logging.LogFile != nil {
-			_ = logging.LogFile.Close()
-		}
-		logging.LogFile = file
 	} else {
-		tracelog.SetInfoOutput(os.Stderr)
-		tracelog.SetWarningOutput(os.Stderr)
-		tracelog.SetErrorOutput(os.Stderr)
-		if logging.LogFile != nil {
-			_ = logging.LogFile.Close()
-		}
-		logging.LogFile = nil
+		logFile = os.Stderr
 	}
-	if viper.IsSet(LogLevelSetting) {
-		return tracelog.UpdateLogLevel(viper.GetString(LogLevelSetting))
+
+	if err := tracelog.Setup(logFile, logLevel); err != nil {
+		return fmt.Errorf("failed to setup logging: %s", err)
+	}
+
+	if logging.LogFile != nil {
+		_ = logging.LogFile.Close()
+	}
+	if logFile != os.Stderr {
+		logging.LogFile = logFile
 	}
 	return nil
 }

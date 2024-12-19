@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"os"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -50,7 +51,7 @@ func TestConfigureLogging_WhenLogLevelSettingIsSet(t *testing.T) {
 	err := config.ConfigureLogging()
 
 	assert.Error(t, err)
-	assert.Error(t, tracelog.UpdateLogLevel(viper.GetString(config.LogLevelSetting)))
+	assert.Error(t, tracelog.Setup(os.Stderr, viper.GetString(config.LogLevelSetting)))
 	resetToDefaults()
 }
 
