@@ -43,6 +43,10 @@ const (
 	DefaultTablespace    = "base"
 	GlobalTablespace     = "global"
 	NonDefaultTablespace = "pg_tblspc"
+
+	XactDir      = "pg_xact"      // Transaction status
+	ClogDir      = "pg_clog"      // Legacy name for transaction status
+	MultiXactDir = "pg_multixact" // Multi-transaction status
 )
 
 type InvalidIncrementFileHeaderError struct {
@@ -87,8 +91,29 @@ func init() {
 	pagedFilenameRegexp = regexp.MustCompile(`^(\d+)([.]\d+)?$`)
 }
 
+// List of special directories that should not be treated as regular page files
+var transactionStateDirectories = []string{
+	XactDir,
+	ClogDir,
+	MultiXactDir,
+}
+
+// isTransactionStatePath checks if the given path contains any transaction state related directories
+func isTransactionStatePath(filePath string) bool {
+	for _, dir := range transactionStateDirectories {
+		if strings.Contains(filePath, dir) {
+			return true
+		}
+	}
+	return false
+}
+
 // isPagedFile checks basic expectations for paged file
 func isPagedFile(info os.FileInfo, filePath string) bool {
+	if isTransactionStatePath(filePath) {
+		return false
+	}
+
 	// For details on which file is paged see
 	//nolint:lll    // https://www.postgresql.org/message-id/flat/F0627DEB-7D0D-429B-97A9-D321450365B4%40yandex-team.ru#F0627DEB-7D0D-429B-97A9-D321450365B4@yandex-team.ru
 	return !info.IsDir() &&
