@@ -1,2 +1,0 @@
-# requirements.txt
-mkdocs==1.4.0
