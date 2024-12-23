@@ -74,7 +74,21 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	backupSelector, err := internal.NewBackupNameSelector(backupName, true) //todo: add selection by userdata
 	tracelog.ErrorLogger.PrintOnError(err)
 
+	journalInfo, err := internal.NewJournalInfo(
+		backupName,
+		storage.RootFolder(),
+		mysql.BinlogPath,
+		internal.DefaultLessCmp,
+	)
+	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+
 	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, findFullBackup)
+
+	if confirmed {
+		err := journalInfo.Delete(storage.RootFolder())
+		tracelog.ErrorLogger.PrintOnError(err)
+	}
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {

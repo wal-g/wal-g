@@ -132,37 +132,36 @@ func HandleBackupPush(
 		return
 	}
 
-	lastSentinelName, lastSentinel, err := internal.GetLastBackupInfo(folder)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to find the last backup: %v", err)
-	} else {
-		tracelog.InfoLogger.Printf("last sentinel is %+v", lastSentinelName)
-	}
-
-	newBackupInfo := internal.JournalInfo{
-		JournalStart: lastSentinel.JournalEnd,
-		JournalEnd:   binlogEnd,
-		JournalSize:  0,
-	}
-
-	err = internal.UpdatePreviousBackupInfo(
+	previousJournalInfo, err := internal.GetLastJournalInfo(
 		folder,
 		BinlogPath,
-		func(a, b string) bool { return a < b },
-		newBackupInfo.JournalEnd,
+		internal.DefaultLessCmp,
 	)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("unable to update previous backup info for %s: %s", backupName, err)
-	} else {
-		tracelog.InfoLogger.Printf("updated backup info for %s", backupName)
+		// there can be no backups on S3
+		tracelog.WarningLogger.Printf("can not find the last journal info: %s", err.Error())
 	}
 
-	err = internal.UploadBackupInfo(folder, backupName, newBackupInfo)
+	journalInfo := internal.NewEmptyJournalInfo(
+		backupName,
+		previousJournalInfo.JournalEnd, binlogEnd,
+		BinlogPath,
+		internal.DefaultLessCmp,
+	)
+
+	err = journalInfo.Upload(folder)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to upload backup info for %s: %s", backupName, err)
+		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
 		return
 	}
-	tracelog.InfoLogger.Printf("uploaded backup info for %s", backupName)
+
+	err = journalInfo.Calculate(folder)
+	if err != nil {
+		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
+		return
+	}
+
+	tracelog.InfoLogger.Printf("uploaded journal info for %s", backupName)
 }
 
 func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backupName string, err error) {
