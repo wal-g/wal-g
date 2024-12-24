@@ -246,7 +246,7 @@ func handleMessage(
 	messageBody []byte,
 	conn net.Conn,
 ) error {
-	multiSt, err := ConfigureMultiStorage(true)
+	multiSt, err := internal.ConfigureMultiStorage(true)
 	defer utility.LoggedClose(multiSt, "close multi-storage")
 	if err != nil {
 		return fmt.Errorf("configure multi-storage: %w", err)

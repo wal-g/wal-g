@@ -24,7 +24,7 @@ var WalPrefetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		reconfigureLoggers()
 
-		storage, err := postgres.ConfigureMultiStorage(false)
+		storage, err := internal.ConfigureMultiStorage(false)
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 		folderReader, err := internal.PrepareMultiStorageFolderReader(storage.RootFolder(), targetStorage)

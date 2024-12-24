@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
 const (
@@ -29,7 +30,10 @@ var (
 
 			greenplum.SetSegmentStoragePrefix(contentID)
 
-			uploader, err := internal.ConfigureUploader()
+			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			dataDirectory := args[0]

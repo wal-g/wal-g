@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -27,14 +28,16 @@ type relNames struct {
 }
 
 type AOLengthCheckSegmentHandler struct {
-	port   string
-	segnum string
+	port       string
+	segnum     string
+	rootFolder storage.Folder
 }
 
-func NewAOLengthCheckSegmentHandler(port, segnum string) (*AOLengthCheckSegmentHandler, error) {
+func NewAOLengthCheckSegmentHandler(port, segnum string, rootFolder storage.Folder) (*AOLengthCheckSegmentHandler, error) {
 	return &AOLengthCheckSegmentHandler{
-		port:   port,
-		segnum: segnum}, nil
+		port:       port,
+		segnum:     segnum,
+		rootFolder: rootFolder}, nil
 }
 
 func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
@@ -262,16 +265,11 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 }
 
 func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (BackupAOFiles, error) {
-	storage, err := internal.ConfigureStorage()
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to configure folder")
-		return nil, err
-	}
-	rootFolder := storage.RootFolder()
+	rootFolder := checker.rootFolder
 
 	var backup internal.Backup
 
-	backup, err = internal.GetBackupByName(backupName,
+	backup, err := internal.GetBackupByName(backupName,
 		fmt.Sprintf("%s/seg%s/%s", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath), rootFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get backup with name: %s", backupName)
@@ -293,12 +291,7 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 }
 
 func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData() (map[string]int64, error) {
-	storage, err := internal.ConfigureStorage()
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to configure folder")
-		return nil, err
-	}
-	rootFolder := storage.RootFolder()
+	rootFolder := checker.rootFolder
 	aoFolder := rootFolder.GetSubFolder(fmt.Sprintf("%s/seg%s/%s/aosegments/", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath))
 
 	files, _, err := aoFolder.ListFolder()
