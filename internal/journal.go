@@ -256,8 +256,8 @@ func GetLastJournalInfo(
 	return backupInfo, nil
 }
 
-// Calculate calculates the size of the JournalInfo in the semi-interval (JournalStart; JournalEnd] using journal files on JournalDirectoryName
-// and save it for the previous JournalInfo
+// Calculate calculates the size of the JournalInfo in the semi-interval (JournalStart; JournalEnd]
+// using journal files on JournalDirectoryName and save it for the previous JournalInfo
 func (ji *JournalInfo) Calculate(folder storage.Folder) error {
 	journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder()
 	if err != nil {
