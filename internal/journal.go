@@ -194,10 +194,21 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 	nextJi, err := ji.GetNext(folder)
 	if err != nil {
 		// We could delete last backup or there could be just one backups on S3
-		if err.Error() == cantFindJournal {
+		if err.Error() != cantFindJournal {
+			return err
+		}
+
+		// We should update previous journal to zero value if there is no journals after that
+		prevJi, err := ji.GetPrevious(folder)
+		if err != nil {
+			if err.Error() != cantFindJournal {
+				return err
+			}
 			return nil
 		}
-		return err
+
+		prevJi.JournalSize = 0
+		return prevJi.Upload(folder)
 	}
 	tracelog.InfoLogger.Printf("found the next journal %+v", nextJi)
 
