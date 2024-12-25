@@ -40,11 +40,8 @@ type Config struct {
 	RangeMaxRetries          int
 	MinThrottlingRetryDelay  time.Duration
 	MaxThrottlingRetryDelay  time.Duration
-<<<<<<< HEAD
 	Disable100Continue       bool
-=======
 	DeleteAllVersions        bool
->>>>>>> 11ab367c (added delete markers)
 }
 
 type Secrets struct {
