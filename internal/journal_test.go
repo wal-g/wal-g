@@ -147,7 +147,7 @@ func TestDeleteJournalInEnd(t *testing.T) {
 	assert.NoError(t, ji1.Read(folder))
 	assert.NoError(t, ji2.Read(folder))
 	assert.Equal(t, int64(33), ji1.JournalSize)
-	assert.Equal(t, int64(33), ji2.JournalSize)
+	assert.Equal(t, int64(0), ji2.JournalSize)
 }
 
 func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
