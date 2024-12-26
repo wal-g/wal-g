@@ -51,7 +51,6 @@ func generateAndUploadData(t *testing.T, mockUploader internal.Uploader) {
 	recordSize := 1
 
 	record := strings.Repeat("a", recordSize)
-	// numerate journal names from 1 to make "MinimalJournalNumber" the minimal journal
 	for i := 1; i <= recordCount; i++ {
 		journalPath := fmt.Sprintf("%s/"+JournalFmt, DefaultJournalDirectory, i)
 

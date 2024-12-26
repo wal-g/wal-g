@@ -193,12 +193,11 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 
 	nextJi, err := ji.GetNext(folder)
 	if err != nil {
-		// We could delete last backup or there could be just one backups on S3
 		if err.Error() != cantFindJournal {
 			return err
 		}
 
-		// We should update previous journal to zero value if there is no journals after that
+		// We should update previous JournalInfo to zero value if there are no JournalInfo after that
 		prevJi, err := ji.GetPrevious(folder)
 		if err != nil {
 			if err.Error() != cantFindJournal {
@@ -294,7 +293,7 @@ func (ji *JournalInfo) Calculate(folder storage.Folder) error {
 
 	prevJi, err := ji.GetPrevious(folder)
 	if err != nil {
-		// We could delete the oldest backup or there could be just one backups on S3
+		// There can only be one backup on S3 or we can delete the oldest one
 		if err.Error() == cantFindJournal {
 			return nil
 		}
