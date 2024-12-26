@@ -11,7 +11,6 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-// TODO : unit tests
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
 	if len(backups) == 0 {
