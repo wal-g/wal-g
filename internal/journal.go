@@ -197,7 +197,8 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 			return err
 		}
 
-		// We should update previous JournalInfo to zero value if there are no JournalInfo after that
+		// JournalSize is the sum in bytes of binlogs between two backups.
+		// If there are no backups next to the current one, the JournalSize of it should be equal to zero.
 		prevJi, err := ji.GetPrevious(folder)
 		if err != nil {
 			if err.Error() != cantFindJournal {
@@ -218,7 +219,7 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 	}
 	tracelog.InfoLogger.Printf("the next journal updated %+v", nextJi)
 
-	err = nextJi.Calculate(folder)
+	err = nextJi.UpdateIntervalSize(folder)
 	if err != nil {
 		return err
 	}
@@ -266,9 +267,9 @@ func GetLastJournalInfo(
 	return backupInfo, nil
 }
 
-// Calculate calculates the size of the JournalInfo in the semi-interval (JournalStart; JournalEnd]
+// UpdateIntervalSize calculates the size of the JournalInfo in the semi-interval (JournalStart; JournalEnd]
 // using journal files on JournalDirectoryName and save it for the previous JournalInfo
-func (ji *JournalInfo) Calculate(folder storage.Folder) error {
+func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder) error {
 	journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder()
 	if err != nil {
 		return err

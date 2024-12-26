@@ -3,7 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mysqlfullxtrabackupbucket
+export WALE_S3_PREFIX=s3://mysql_journal_test_bucket
 
 get_journal_count() {
     wal-g st ls basebackups_005/ 2>&1 | grep journal_ | awk '{ printf $7 "\n" }' | wc -l
@@ -23,10 +23,7 @@ get_journal_size() {
     wal-g st cat basebackups_005/$JOURNAL_NAME | jq '.JournalSize'
 }
 
-# Clear S3 storage
-wal-g delete everything FORCE --confirm
 mysqld --initialize --init-file=/etc/mysql/init.sql
-
 service mysql start
 sysbench --table-size=10 prepare
 
@@ -92,6 +89,3 @@ test "0" -eq $(get_journal_size 1)
 # We can sucessfully delete the single backup
 wal-g delete target $(get_backup_name 1) --confirm
 test "0" -eq $(get_journal_count)
-
-# Clear S3 storage
-wal-g delete everything FORCE --confirm
