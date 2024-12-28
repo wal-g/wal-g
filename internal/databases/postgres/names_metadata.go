@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -10,10 +11,42 @@ import (
 )
 
 type DatabasesByNames map[string]DatabaseObjectsInfo
+
+// Depricated struct
+type DatabaseObjectsInfoV1 struct {
+	Oid    uint32            `json:"oid"`
+	Tables map[string]uint32 `json:"tables,omitempty"`
+}
+
+// Currentlu used structure to hold database objects info
+type DatabaseObjectsInfoV2 struct {
+	Oid    uint32               `json:"oid"`
+	Tables map[string]TableInfo `json:"tables,omitempty"`
+}
+
 type DatabaseObjectsInfo struct {
 	Oid    uint32               `json:"oid"`
 	Tables map[string]TableInfo `json:"tables,omitempty"`
 }
+
+// Create our own unmarshal json method to handle old metadata
+func (objectsInfo *DatabaseObjectsInfo) UnmarshalJSON(data []byte) error {
+	v2ObjectInfo := DatabaseObjectsInfoV2{}
+	err := json.Unmarshal(data, &v2ObjectInfo)
+	if err != nil {
+		v2ObjectInfo := DatabaseObjectsInfoV1{}
+		err1 := json.Unmarshal(data, &v2ObjectInfo)
+		if err1 != nil {
+			return err
+		}
+		objectsInfo.Oid = v2ObjectInfo.Oid
+	} else {
+		objectsInfo.Oid = v2ObjectInfo.Oid
+		objectsInfo.Tables = v2ObjectInfo.Tables
+	}
+	return nil
+}
+
 type TableInfo struct {
 	Oid         uint32               `json:"oid"`
 	Relfilenode uint32               `json:"relfilenode"`
