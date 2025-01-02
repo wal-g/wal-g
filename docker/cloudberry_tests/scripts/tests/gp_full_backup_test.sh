@@ -11,7 +11,6 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 source /tmp/tests/test_functions/util.sh
 
 bootstrap_gp_cluster
-sleep 3
 setup_wal_archiving
 
 # 1st backup (init tables heap, ao, co)
