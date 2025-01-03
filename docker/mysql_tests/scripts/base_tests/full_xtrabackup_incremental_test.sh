@@ -8,6 +8,7 @@ set -e -x
 #
 
 export WALE_S3_PREFIX=s3://mysqlincrementalxtrabackupbucket
+export WALG_MYSQL_INCREMENTAL_BACKUP_DST=/var/lib/mysql
 
 # Required configuration:
 export WALG_DELTA_MAX_STEPS=5
