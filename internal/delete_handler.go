@@ -299,6 +299,13 @@ func (h *DeleteHandler) FindTargetRetainAfterName(
 		return nil, err
 	}
 
+	if target1 == nil {
+		return target2, nil
+	}
+	if target2 == nil {
+		return target1, nil
+	}
+
 	if h.greater(target2, target1) {
 		return target1, nil
 	}
