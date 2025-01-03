@@ -81,8 +81,8 @@ WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
  && git log -1 \
  && ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src --enable-debug --disable-pxf > /dev/null \
- && make -j8 > /dev/null \
- && make -j8 install > /dev/null \
+ && make -j$(nproc) > /dev/null \
+ && make -j$(nproc) install > /dev/null \
  && chown gpadmin:gpadmin /home/gpadmin/run_greenplum.sh \
  && chmod a+x /home/gpadmin/run_greenplum.sh \
  && echo "export MASTER_DATA_DIRECTORY=/usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1" > /home/gpadmin/.bash_profile \

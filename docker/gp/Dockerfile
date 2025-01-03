@@ -21,10 +21,10 @@ RUN locale-gen en_US.utf8 \
  && sed -i 's/apt-get install/DEBIAN_FRONTEND=noninteractive apt-get install/g' README.ubuntu.bash \
  && ./README.ubuntu.bash \
  && wget -c https://archive.apache.org/dist/xerces/c/3/sources/xerces-c-3.1.1.tar.gz -O - | tar -xz \
- && cd xerces-c-3.1.1 && ./configure && make -j8 > /dev/null && make -j8 install && cd .. \
+ && cd xerces-c-3.1.1 && ./configure && make -j$(nproc) > /dev/null && make -j$(nproc) install && cd .. \
  && ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src > /dev/null \
- && make -j8 > /dev/null \
- && make -j8 install > /dev/null \
+ && make -j$(nproc) > /dev/null \
+ && make -j$(nproc) install > /dev/null \
  && chown gpadmin:gpadmin /home/gpadmin/run_greenplum.sh \
  && chmod a+x /home/gpadmin/run_greenplum.sh \
  && echo "export MASTER_DATA_DIRECTORY=/usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1" > /home/gpadmin/.bash_profile \
