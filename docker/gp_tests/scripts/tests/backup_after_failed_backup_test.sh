@@ -11,7 +11,6 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 source /tmp/tests/test_functions/util.sh
 
 bootstrap_gp_cluster
-sleep 3
 enable_pitr_extension
 setup_wal_archiving
 

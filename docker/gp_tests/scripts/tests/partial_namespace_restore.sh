@@ -13,7 +13,6 @@ source /tmp/tests/test_functions/util.sh
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 bootstrap_gp_cluster
-sleep 3
 enable_pitr_extension
 setup_wal_archiving
 
