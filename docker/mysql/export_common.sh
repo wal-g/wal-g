@@ -16,4 +16,6 @@ export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQ
 export WALG_MYSQL_BINLOG_DST=/tmp
 #export WALG_LOG_LEVEL=DEVEL
 
+export WALG_MYSQL_INCREMENTAL_BACKUP_DST=/var/lib/mysql
+
 . /usr/local/export_test_funcs.sh
