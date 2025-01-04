@@ -18,7 +18,6 @@ wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 for i in 1 2 3 4
 do
     insert_data
-    sleep 1
     wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 

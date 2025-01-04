@@ -16,20 +16,17 @@ enable_pitr_extension
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 insert_data
-sleep 1
 wal-g --config=${TMP_CONFIG} backup-push --permanent
 
 PERMANENT_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 
 # add some WALs
 insert_a_lot_of_data
-sleep 1
 
 # make three non-permanent backups
 for _ in 1 2 3
 do
     insert_data
-    sleep 1
     wal-g --config=${TMP_CONFIG} backup-push
 done
 
@@ -85,7 +82,6 @@ fi
 # try to restore the permanent backup
 stop_and_delete_cluster_dir
 
-sleep 1
 # should successfully restore the second delta chain
 wal-g backup-fetch $PERMANENT_BACKUP --in-place --config=${TMP_CONFIG}
 start_cluster
