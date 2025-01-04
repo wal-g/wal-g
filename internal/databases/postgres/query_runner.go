@@ -741,3 +741,42 @@ func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
 
 	return dataChecksums, nil
 }
+
+// GetArchiveMode retrieves the current archive_mode setting.
+func (queryRunner *PgQueryRunner) GetArchiveMode() (string, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var archiveMode string
+	err := queryRunner.Connection.QueryRow(context.TODO(), "SHOW archive_mode").Scan(&archiveMode)
+	if err != nil {
+		return "", errors.Wrap(err, "GetArchiveMode: failed to retrieve archive_mode")
+	}
+	return archiveMode, nil
+}
+
+// GetArchiveCommand retrieves the current archive_command setting.
+func (queryRunner *PgQueryRunner) GetArchiveCommand() (string, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var archiveCommand string
+	err := queryRunner.Connection.QueryRow(context.TODO(), "SHOW archive_command").Scan(&archiveCommand)
+	if err != nil {
+		return "", errors.Wrap(err, "GetArchiveCommand: failed to retrieve archive_command")
+	}
+	return archiveCommand, nil
+}
+
+// IsStandby checks if the PostgreSQL server is in recovery mode (standby).
+func (queryRunner *PgQueryRunner) IsStandby() (bool, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var standby bool
+	err := queryRunner.Connection.QueryRow(context.TODO(), "SELECT pg_is_in_recovery()").Scan(&standby)
+	if err != nil {
+		return false, errors.Wrap(err, "IsStandby: failed to determine recovery mode")
+	}
+	return standby, nil
+}
