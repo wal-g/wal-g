@@ -12,7 +12,7 @@ import (
 type DatabasesByNames map[string]DatabaseObjectsInfo
 type DatabaseObjectsInfo struct {
 	Oid    uint32               `json:"oid"`
-	Tables map[string]TableInfo `json:"tables,omitempty"`
+	Tables map[string]TableInfo `json:"tables_new,omitempty"`
 }
 type TableInfo struct {
 	Oid         uint32               `json:"oid"`

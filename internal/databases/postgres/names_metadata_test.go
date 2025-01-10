@@ -1,12 +1,16 @@
 package postgres_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
 )
 
 func genDatabasesByNames() postgres.DatabasesByNames {
@@ -240,4 +244,40 @@ func TestResolveRegexp_RestoreTableInNamespace(t *testing.T) {
 	assert.Equal(t, 1, len(db2))
 	assert.Equal(t, uint32(40102), db2[0])
 	assert.NoError(t, err)
+}
+
+func TestFetchDtoWithFilesMetadata(t *testing.T) {
+	var folder = memory.NewFolder("in_memory/", memory.NewKVS())
+
+	// Depricated struct
+	type DatabaseObjectsInfoOld struct {
+		Oid    uint32            `json:"oid"`
+		Tables map[string]uint32 `json:"tables,omitempty"`
+	}
+
+	oldObjects := DatabaseObjectsInfoOld{Oid: 12, Tables: map[string]uint32{"t1": 1, "t2": 2}}
+	newObjects := postgres.DatabaseObjectsInfo{Oid: 12, Tables: map[string]postgres.TableInfo{"t1": postgres.TableInfo{Oid: 1, Relfilenode: 2}, "t2": postgres.TableInfo{Oid: 3, Relfilenode: 4}}}
+
+	bytesOld, _ := json.Marshal(oldObjects)
+	bytesNew, _ := json.Marshal(newObjects)
+
+	folder.PutObject("files_metadata_old.json", bytes.NewReader(bytesOld))
+	folder.PutObject("files_metadata_new.json", bytes.NewReader(bytesNew))
+	ansV1 := postgres.DatabaseObjectsInfo{}
+	err := internal.FetchDto(folder, &ansV1, "files_metadata_old.json")
+	assert.NoError(t, err)
+	assert.Equal(t, uint32(12), ansV1.Oid)
+	assert.Equal(t, uint32(0), ansV1.Tables["t1"].Oid)
+	assert.Equal(t, uint32(0), ansV1.Tables["t1"].Relfilenode)
+	assert.Equal(t, uint32(0), ansV1.Tables["t2"].Oid)
+	assert.Equal(t, uint32(0), ansV1.Tables["t2"].Relfilenode)
+
+	ansV2 := postgres.DatabaseObjectsInfo{}
+	err = internal.FetchDto(folder, &ansV2, "files_metadata_new.json")
+	assert.NoError(t, err)
+	assert.Equal(t, uint32(12), ansV2.Oid)
+	assert.Equal(t, uint32(1), ansV2.Tables["t1"].Oid)
+	assert.Equal(t, uint32(2), ansV2.Tables["t1"].Relfilenode)
+	assert.Equal(t, uint32(3), ansV2.Tables["t2"].Oid)
+	assert.Equal(t, uint32(4), ansV2.Tables["t2"].Relfilenode)
 }
