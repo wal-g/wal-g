@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -270,7 +271,7 @@ func (backup *Backup) unwrapOld(
 	dbDataDirectory string, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 	extractProv ExtractProvider,
 ) error {
-	tarInterpreter, tarsToExtract, pgControlKey, err := extractProv.Get(
+	tarInterpreter, concurrentTarsToExtract, sequentialTarsToExtract, err := extractProv.Get(
 		*backup, filesToUnwrap, false, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
 		return err
@@ -279,18 +280,17 @@ func (backup *Backup) unwrapOld(
 	// Check name for backwards compatibility. Will check for `pg_control` if WALG version of backup.
 	needPgControl := IsPgControlRequired(*backup)
 
-	if pgControlKey == "" && needPgControl {
+	if len(sequentialTarsToExtract) == 0 && needPgControl {
 		return newPgControlNotFoundError()
 	}
 
-	err = internal.ExtractAll(tarInterpreter, tarsToExtract)
+	err = internal.ExtractAll(tarInterpreter, concurrentTarsToExtract)
 	if err != nil {
 		return err
 	}
 
 	if needPgControl {
-		err = internal.ExtractAll(tarInterpreter, []internal.ReaderMaker{
-			internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), pgControlKey)})
+		err = internal.ExtractAll(tarInterpreter, sequentialTarsToExtract)
 		if err != nil {
 			return errors.Wrap(err, "failed to extract pg_control")
 		}
@@ -301,8 +301,8 @@ func (backup *Backup) unwrapOld(
 }
 
 func IsPgControlRequired(backup Backup) bool {
-	re := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
-	walgBasebackupName := re.FindString(backup.Name) == ""
+	walleRe := regexp.MustCompile(`^([^_]+._{1}[^_]+._{1})`)
+	walgBasebackupName := walleRe.FindString(backup.Name) == ""
 	needPgControl := walgBasebackupName || backup.SentinelDto.IsIncremental()
 	return needPgControl
 }

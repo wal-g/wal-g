@@ -15,16 +15,16 @@ func (t ExtractProviderImpl) Get(
 	skipRedundantTars bool,
 	dbDataDir string,
 	createNewIncrementalFiles bool,
-) (postgres.IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
+) (postgres.IncrementalTarInterpreter, []internal.ReaderMaker, []internal.ReaderMaker, error) {
 	segBackup := ToGpSegBackup(backup)
 
 	interpreter, err := t.getTarInterpreter(dbDataDir, segBackup, filesToUnwrap, createNewIncrementalFiles)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, nil, err
 	}
 
-	tarsToExtract, pgControlKey, err := t.FilesToExtractProviderImpl.Get(segBackup, filesToUnwrap, skipRedundantTars)
-	return interpreter, tarsToExtract, pgControlKey, err
+	concurrentTarsToExtract, sequentialTarsToExtract, err := t.FilesToExtractProviderImpl.Get(segBackup, filesToUnwrap, skipRedundantTars)
+	return interpreter, concurrentTarsToExtract, sequentialTarsToExtract, err
 }
 
 func (t ExtractProviderImpl) getTarInterpreter(dbDataDir string, backup SegBackup,

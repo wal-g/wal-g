@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -151,7 +152,7 @@ func (p ExtractProviderDBSpec) Get(
 	skipRedundantTars bool,
 	dbDataDir string,
 	createNewIncrementalFiles bool,
-) (IncrementalTarInterpreter, []internal.ReaderMaker, string, error) {
+) (IncrementalTarInterpreter, []internal.ReaderMaker, []internal.ReaderMaker, error) {
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
