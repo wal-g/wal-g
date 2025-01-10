@@ -30,9 +30,9 @@ type JournalInfo struct {
 	JournalDirectoryName      string                 `json:"-"`
 	JournalNameLessComparator func(a, b string) bool `json:"-"`
 	JournalName               string                 `json:"-"`
-	PriorBackupEnd            string                 `json:"JournalStart"`
-	CurrentBackupEnd          string                 `json:"JournalEnd"`
-	SizeToNextBackup          int64                  `json:"JournalSize"`
+	PriorBackupEnd            string                 `json:"PriorBackupEnd"`
+	CurrentBackupEnd          string                 `json:"CurrentBackupEnd"`
+	SizeToNextBackup          int64                  `json:"SizeToNextBackup"`
 }
 
 // NewEmptyJournalInfo creates instance of JournalInfo without sync with S3
@@ -154,7 +154,7 @@ func (ji *JournalInfo) GetNextNewer(folder storage.Folder) (JournalInfo, error) 
 	}
 
 	var newerJournalInfoObject storage.Object
-	less := ji.JournalNameLessComparator
+	less := DefaultLessCmp
 	for _, obj := range objs {
 		isJournal := strings.HasPrefix(obj.GetName(), JournalPrefix)
 		isOlderThenCurrentJournal := less(obj.GetName(), ji.JournalName)
@@ -255,7 +255,7 @@ func GetLastJournalInfo(
 	var lastJournalInfo storage.Object
 	for _, v := range objs {
 		if strings.HasPrefix(v.GetName(), JournalPrefix) &&
-			(lastJournalInfo == nil || journalLessComparator(lastJournalInfo.GetName(), v.GetName())) {
+			(lastJournalInfo == nil || DefaultLessCmp(lastJournalInfo.GetName(), v.GetName())) {
 			lastJournalInfo = v
 		}
 	}

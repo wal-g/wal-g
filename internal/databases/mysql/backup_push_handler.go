@@ -135,7 +135,7 @@ func HandleBackupPush(
 	previousJournalInfo, err := internal.GetLastJournalInfo(
 		folder,
 		BinlogPath,
-		internal.DefaultLessCmp,
+		BinlogFilenameComparator,
 	)
 	if err != nil {
 		// there can be no backups on S3
@@ -146,7 +146,7 @@ func HandleBackupPush(
 		backupName,
 		previousJournalInfo.CurrentBackupEnd, binlogEnd,
 		BinlogPath,
-		internal.DefaultLessCmp,
+		BinlogFilenameComparator,
 	)
 
 	err = journalInfo.Upload(folder)

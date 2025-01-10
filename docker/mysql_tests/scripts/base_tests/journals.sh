@@ -20,7 +20,7 @@ get_backup_name() {
 
 get_journal_size() {
     JOURNAL_NAME=$(get_journal_name $1)
-    wal-g st cat basebackups_005/$JOURNAL_NAME | jq '.JournalSize'
+    wal-g st cat basebackups_005/$JOURNAL_NAME | jq '.SizeToNextBackup'
 }
 
 mysqld --initialize --init-file=/etc/mysql/init.sql

@@ -80,7 +80,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 		backupName,
 		storage.RootFolder(),
 		mysql.BinlogPath,
-		internal.DefaultLessCmp,
+		mysql.BinlogFilenameComparator,
 	)
 	// Backup could be created without journal
 	if err != nil {
