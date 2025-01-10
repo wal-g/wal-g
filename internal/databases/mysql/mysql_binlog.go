@@ -193,12 +193,12 @@ func BinlogPrefix(filename string) string {
 }
 
 func BinlogFilenameComparator(a, b string) bool {
-	a_int, b_int := 0, 0
+	aInt, bInt := 0, 0
 	if a != "" {
-		a_int = BinlogNum(a)
+		aInt = BinlogNum(a)
 	}
 	if b != "" {
-		b_int = BinlogNum(b)
+		bInt = BinlogNum(b)
 	}
-	return a_int < b_int
+	return aInt < bInt
 }
