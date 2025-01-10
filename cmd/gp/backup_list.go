@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -22,12 +23,12 @@ var (
 		Short: backupListShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			storage, err := internal.ConfigureStorage()
+			rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
 			tracelog.ErrorLogger.FatalOnError(err)
 			if detail {
-				greenplum.HandleDetailedBackupList(storage.RootFolder(), pretty, jsonOutput)
+				greenplum.HandleDetailedBackupList(rootFolder, pretty, jsonOutput)
 			} else {
-				internal.HandleDefaultBackupList(storage.RootFolder().GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+				internal.HandleDefaultBackupList(rootFolder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
 			}
 		},
 	}
@@ -44,4 +45,6 @@ func init() {
 	backupListCmd.Flags().BoolVar(&pretty, PrettyFlag, false, "Prints more readable output")
 	backupListCmd.Flags().BoolVar(&jsonOutput, JSONFlag, false, "Prints output in json format")
 	backupListCmd.Flags().BoolVar(&detail, DetailFlag, false, "Prints extra backup details")
+	backupListCmd.Flags().StringVar(&targetStorage, "target-storage", "",
+		targetStorageDescription)
 }

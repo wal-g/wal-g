@@ -30,6 +30,7 @@ const (
 
 // BackupArguments holds all arguments parsed from cmd to this handler class
 type BackupArguments struct {
+	Uploader       internal.Uploader
 	isPermanent    bool
 	isFull         bool
 	userData       interface{}
@@ -478,10 +479,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
 func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) {
-	uploader, err := internal.ConfigureUploader()
-	if err != nil {
-		return nil, err
-	}
+	uploader := arguments.Uploader
 
 	conn, err := postgres.Connect()
 	if err != nil {
@@ -510,9 +508,10 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 }
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
-func NewBackupArguments(isPermanent, isFull bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
+func NewBackupArguments(uploader internal.Uploader, isPermanent, isFull bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
 	segPollInterval time.Duration, segPollRetries int, deltaBaseSelector internal.BackupSelector) BackupArguments {
 	return BackupArguments{
+		Uploader:          uploader,
 		isPermanent:       isPermanent,
 		isFull:            isFull,
 		userData:          userData,

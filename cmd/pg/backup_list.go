@@ -24,7 +24,7 @@ var (
 		Short: backupListShortDescription,
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			storage, err := postgres.ConfigureMultiStorage(false)
+			storage, err := internal.ConfigureMultiStorage(false)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.UniteAllStorages)

@@ -27,6 +27,8 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"golang.org/x/time/rate"
 )
@@ -517,7 +519,7 @@ func StorageFromConfig(configFile string) (storage.Storage, error) {
 }
 
 func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, err error) {
-	storageConfigs := viper.GetStringMap(conf.PgFailoverStorages)
+	storageConfigs := viper.GetStringMap(conf.FailoverStorages)
 
 	if len(storageConfigs) == 0 {
 		return nil, nil
@@ -540,7 +542,7 @@ func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, 
 			return nil, fmt.Errorf("'%s' storage name is reserved", name)
 		}
 
-		cfg := viper.Sub(conf.PgFailoverStorages + "." + name)
+		cfg := viper.Sub(conf.FailoverStorages + "." + name)
 
 		var rootWraps []storage.WrapRootFolder
 		if limiters.NetworkLimiter != nil {
@@ -589,4 +591,118 @@ func isAnyStorageSet() bool {
 	}
 
 	return false
+}
+
+// ConfigureMultiStorage is responsible for configuring the primary storage along with any failover storages.
+// It creates a multi-storage that combines them.
+//
+// Key details:
+//   - It also initializes a cache to store the results of storage aliveness checks.
+//   - The function does not set any specific policies for the root folder of the multi-storage. Initially, the policies.Default are used.
+//   - If operations involve writing to the storage, the `checkWrite` parameter should be set to `true`.
+//     This determines whether the health check is read-only (R/O) or read-write (R/W).
+func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error) {
+	// errClosers are needed to close already configured storages if a fatal error happens before they are delegated to multi-storage.
+	var errClosers []io.Closer
+	defer func() {
+		if err == nil {
+			return
+		}
+		for _, closer := range errClosers {
+			utility.LoggedClose(closer, "Failed to close storage")
+		}
+	}()
+
+	primary, err := ConfigureStorage()
+	if err != nil {
+		return nil, fmt.Errorf("configure primary storage: %w", err)
+	}
+	errClosers = append(errClosers, primary)
+
+	failovers, err := ConfigureFailoverStorages()
+	if err != nil {
+		return nil, fmt.Errorf("configure failover storages: %w", err)
+	}
+	for _, fo := range failovers {
+		errClosers = append(errClosers, fo)
+	}
+
+	config := &multistorage.Config{}
+
+	aliveChecksDefault := len(failovers) > 0
+	config.AliveChecks, err = conf.GetBoolSettingDefault(conf.FailoverStoragesCheck, aliveChecksDefault)
+	if err != nil {
+		return nil, fmt.Errorf("get failover storage check setting: %w", err)
+	}
+
+	if config.AliveChecks {
+		config.StatusCache, err = configureStatusCache()
+		if err != nil {
+			return nil, fmt.Errorf("configure failover storages status cache: %w", err)
+		}
+
+		config.AliveCheckTimeout, err = conf.GetDurationSetting(conf.FailoverStoragesCheckTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("get failover storage check timeout setting: %w", err)
+		}
+
+		config.CheckWrite = checkWrite
+
+		if config.CheckWrite {
+			config.AliveCheckWriteBytes = viper.GetSizeInBytes(conf.FailoverStoragesCheckSize)
+		}
+	}
+
+	ms, err = multistorage.NewStorage(config, primary, failovers)
+	if err != nil {
+		return nil, err
+	}
+	return ms, nil
+}
+
+func configureStatusCache() (*cache.Config, error) {
+	config := &cache.Config{}
+
+	var err error
+	config.TTL, err = conf.GetDurationSetting(conf.FailoverStorageCacheLifetime)
+	if err != nil {
+		return nil, fmt.Errorf("get cache lifetime setting: %w", err)
+	}
+
+	emaDefault := cache.DefaultEMAParams
+	ema := &cache.EMAParams{}
+
+	ema.AliveLimit, err = conf.GetFloatSettingDefault(conf.FailoverStorageCacheEMAAliveLimit, emaDefault.AliveLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alive limit setting: %w", err)
+	}
+
+	ema.DeadLimit, err = conf.GetFloatSettingDefault(conf.FailoverStorageCacheEMADeadLimit, emaDefault.DeadLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA dead limit setting: %w", err)
+	}
+
+	ema.AlphaAlive.Min, err = conf.GetFloatSettingDefault(conf.FailoverStorageCacheEMAAlphaAliveMin, emaDefault.AlphaAlive.Min)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha alive min setting: %w", err)
+	}
+
+	ema.AlphaAlive.Max, err = conf.GetFloatSettingDefault(conf.FailoverStorageCacheEMAAlphaAliveMax, emaDefault.AlphaAlive.Max)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha alive max setting: %w", err)
+	}
+
+	ema.AlphaDead.Min, err = conf.GetFloatSettingDefault(conf.FailoverStorageCacheEMAAlphaDeadMin, emaDefault.AlphaDead.Min)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha dead min setting: %w", err)
+	}
+
+	ema.AlphaDead.Max, err = conf.GetFloatSettingDefault(conf.FailoverStorageCacheEMAAlphaDeadMax, emaDefault.AlphaDead.Max)
+	if err != nil {
+		return nil, fmt.Errorf("get EMA alpha dead max setting: %w", err)
+	}
+
+	config.EMAParams = ema
+
+	return config, nil
 }

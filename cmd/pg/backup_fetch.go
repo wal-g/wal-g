@@ -47,7 +47,7 @@ var backupFetchCmd = &cobra.Command{
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		storage, err := postgres.ConfigureMultiStorage(false)
+		storage, err := internal.ConfigureMultiStorage(false)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.UniteAllStorages)
