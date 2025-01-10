@@ -96,9 +96,9 @@ func CreateThreeJournals(
 	assert.NoError(t, ji2.Read(folder))
 	assert.NoError(t, ji1.Read(folder))
 
-	assert.Equal(t, int64(33), ji1.JournalSize)
-	assert.Equal(t, int64(33), ji2.JournalSize)
-	assert.Equal(t, int64(0), ji3.JournalSize)
+	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 
 	return ji1, ji2, ji3
 }
@@ -119,8 +119,8 @@ func TestDeleteJournalInMiddle(t *testing.T) {
 	assert.NoError(t, ji2.Delete(folder))
 	assert.NoError(t, ji1.Read(folder))
 	assert.NoError(t, ji3.Read(folder))
-	assert.Equal(t, int64(66), ji1.JournalSize)
-	assert.Equal(t, int64(0), ji3.JournalSize)
+	assert.Equal(t, int64(66), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }
 
 func TestDeleteJournalInBegin(t *testing.T) {
@@ -132,8 +132,8 @@ func TestDeleteJournalInBegin(t *testing.T) {
 	assert.NoError(t, ji1.Delete(folder))
 	assert.NoError(t, ji2.Read(folder))
 	assert.NoError(t, ji3.Read(folder))
-	assert.Equal(t, int64(33), ji2.JournalSize)
-	assert.Equal(t, int64(0), ji3.JournalSize)
+	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }
 
 func TestDeleteJournalInEnd(t *testing.T) {
@@ -145,8 +145,8 @@ func TestDeleteJournalInEnd(t *testing.T) {
 	assert.NoError(t, ji3.Delete(folder))
 	assert.NoError(t, ji1.Read(folder))
 	assert.NoError(t, ji2.Read(folder))
-	assert.Equal(t, int64(33), ji1.JournalSize)
-	assert.Equal(t, int64(0), ji2.JournalSize)
+	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji2.SizeToNextBackup)
 }
 
 func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
@@ -168,7 +168,7 @@ func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
 		assert.NoError(t, ji1.Read(folder))
 	}
 
-	assert.Equal(t, int64(33), ji1.JournalSize)
-	assert.Equal(t, int64(33), ji2.JournalSize)
-	assert.Equal(t, int64(0), ji3.JournalSize)
+	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }

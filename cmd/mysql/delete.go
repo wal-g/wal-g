@@ -74,24 +74,30 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	backupSelector, err := internal.NewBackupNameSelector(backupName, true) //todo: add selection by userdata
 	tracelog.ErrorLogger.PrintOnError(err)
 
+	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, findFullBackup)
+
 	journalInfo, err := internal.NewJournalInfo(
 		backupName,
 		storage.RootFolder(),
 		mysql.BinlogPath,
 		internal.DefaultLessCmp,
 	)
+	// Backup could be created without journal
 	if err != nil {
 		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
-	} else {
-		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+		return
 	}
 
-	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, findFullBackup)
+	if !confirmed {
+		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+		return
+	}
 
-	// Backup could be created without journal
-	if confirmed && err == nil {
-		err := journalInfo.Delete(storage.RootFolder())
-		tracelog.ErrorLogger.PrintOnError(err)
+	err = journalInfo.Delete(storage.RootFolder())
+	if err != nil {
+		tracelog.ErrorLogger.Print(err)
+	} else {
+		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
 	}
 }
 

@@ -144,7 +144,7 @@ func HandleBackupPush(
 
 	journalInfo := internal.NewEmptyJournalInfo(
 		backupName,
-		previousJournalInfo.JournalEnd, binlogEnd,
+		previousJournalInfo.CurrentBackupEnd, binlogEnd,
 		BinlogPath,
 		internal.DefaultLessCmp,
 	)
