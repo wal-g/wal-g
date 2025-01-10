@@ -28,7 +28,7 @@ service mysql start
 sysbench --table-size=10 prepare
 
 # Create backup #1 with journals
-sysbench --time=5 run
+sysbench --time=1 run
 mysql -e 'FLUSH LOGS'
 wal-g binlog-push
 wal-g backup-push --count-journals
@@ -39,7 +39,7 @@ test "1" -eq $(get_journal_count)
 test "0" -eq $(get_journal_size 1)
 
 # Create backup #2 with journals
-sysbench --time=5 run
+sysbench --time=1 run
 mysql -e 'FLUSH LOGS'
 wal-g binlog-push
 wal-g backup-push --count-journals
@@ -51,7 +51,7 @@ test "0" -ne $(get_journal_size 1)
 test "0" -eq $(get_journal_size 2)
 
 # Create backup #3 with journals
-sysbench --time=5 run
+sysbench --time=1 run
 mysql -e 'FLUSH LOGS'
 wal-g binlog-push
 wal-g backup-push --count-journals
