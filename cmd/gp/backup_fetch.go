@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
 const (
@@ -51,7 +52,7 @@ var backupFetchCmd = &cobra.Command{
 			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 
-		storage, err := internal.ConfigureStorage()
+		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if restorePoint != "" && restorePointTS != "" {
@@ -59,7 +60,7 @@ var backupFetchCmd = &cobra.Command{
 		}
 
 		if restorePointTS != "" {
-			restorePoints, err := greenplum.FetchAllRestorePoints(storage.RootFolder())
+			restorePoints, err := greenplum.FetchAllRestorePoints(rootFolder)
 			tracelog.ErrorLogger.FatalOnError(err)
 			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, restorePoints)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -77,7 +78,7 @@ var backupFetchCmd = &cobra.Command{
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		internal.HandleBackupFetch(storage.RootFolder(), targetBackupSelector,
+		internal.HandleBackupFetch(rootFolder, targetBackupSelector,
 			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIDs, fetchMode, restorePoint,
 				partialRestoreArgs))
 	},

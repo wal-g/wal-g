@@ -9,19 +9,27 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
 type AOLengthCheckHandler struct {
 	checkBackup bool
 	backupName  string
+	rootFolder  storage.Folder
 }
 
-func NewAOLengthCheckHandler(logsDir string, checkBackup bool, backupName string) (*AOLengthCheckHandler, error) {
+func NewAOLengthCheckHandler(
+	logsDir string,
+	checkBackup bool,
+	backupName string,
+	rootFolder storage.Folder,
+) (*AOLengthCheckHandler, error) {
 	initGpLog(logsDir)
 	return &AOLengthCheckHandler{
 		checkBackup: checkBackup,
 		backupName:  backupName,
+		rootFolder:  rootFolder,
 	}, nil
 }
 
@@ -44,7 +52,7 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 
 	segmentsBackups := make(map[int]string)
 	if checker.checkBackup {
-		segmentsBackups, err = getSegmentBackupNames(checker.backupName)
+		segmentsBackups, err = getSegmentBackupNames(checker.backupName, checker.rootFolder)
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
 		}
@@ -100,14 +108,7 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 	return cmdLine
 }
 
-func getSegmentBackupNames(name string) (map[int]string, error) {
-	storage, err := internal.ConfigureStorage()
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to configure folder")
-		return nil, err
-	}
-	rootFolder := storage.RootFolder()
-
+func getSegmentBackupNames(name string, rootFolder storage.Folder) (map[int]string, error) {
 	backup, err := internal.GetBackupByName(name, utility.BaseBackupPath, rootFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get latest backup")

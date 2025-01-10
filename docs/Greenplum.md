@@ -11,6 +11,8 @@ To configure the backups, the user needs to do two things on each segment host:
 1. Create the [configuration file](Greenplum.md#configuration-file)
 2. Configure the [WAL archiving](Greenplum.md#wal-archiving)
 
+[Information about failover storages configuration](FailoverStorages.md)
+
 #### Configuration file
 Unlike the WAL-G for Postgres, a config file is a must. It must be placed in the same location on each cluster host, for example, `/etc/wal-g/wal-g.yaml`. Sample configuration file:
 

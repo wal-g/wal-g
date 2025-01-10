@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
 const (
@@ -57,7 +58,13 @@ var (
 
 			segPollRetries := viper.GetInt(conf.GPSegmentsPollRetries)
 
-			arguments := greenplum.NewBackupArguments(permanent, fullBackup, userData, prepareSegmentFwdArgs(), logsDir,
+			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			arguments := greenplum.NewBackupArguments(uploader, permanent, fullBackup, userData, prepareSegmentFwdArgs(), logsDir,
 				segPollInterval, segPollRetries, deltaBaseSelector)
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
