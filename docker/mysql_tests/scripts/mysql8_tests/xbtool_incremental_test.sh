@@ -5,7 +5,7 @@ set -e -x
 
 #
 # In this test we check that wal-g can create incremental backups & restore them
-#
+# (without applying delta-s by wal-g)
 
 export WALE_S3_PREFIX=s3://mysql8_full_xtrabackup_xbtool_incremental_bucket
 export WALG_COMPRESSION_METHOD=zstd
@@ -57,6 +57,7 @@ wal-g st cat "basebackups_005/${SECOND_BACKUP}_backup_stop_sentinel.json"
 wal-g st cat "basebackups_005/${LATEST_BACKUP}_backup_stop_sentinel.json"
 
 # restore full backup
+export WALG_LOG_LEVEL=DEVEL
 mysql_kill_and_clean_data
 wal-g backup-fetch $FIRST_BACKUP --use-xbtool-extract
 chown -R mysql:mysql $MYSQLDATA
