@@ -5,7 +5,7 @@ set -e -x
 
 export WALG_LOG_LEVEL=DEVEL
 export WALG_COMPRESSION_METHOD=zstd
-export WALE_S3_PREFIX=s3://mysql8_xbtool_extract_bucket
+export WALE_S3_PREFIX=s3://mysql8_xbtool_bucket
 
 
 export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \

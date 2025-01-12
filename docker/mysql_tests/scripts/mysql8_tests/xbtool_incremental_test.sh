@@ -7,7 +7,7 @@ set -e -x
 # In this test we check that wal-g can create incremental backups & restore them
 # (without applying delta-s by wal-g)
 
-export WALE_S3_PREFIX=s3://mysql8_full_xtrabackup_xbtool_incremental_bucket
+export WALE_S3_PREFIX=s3://mysql8_xbtool_incremental_bucket
 export WALG_COMPRESSION_METHOD=zstd
 export WALG_MYSQL_DATA_DIR="${MYSQLDATA}"
 

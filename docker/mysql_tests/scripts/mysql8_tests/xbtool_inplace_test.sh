@@ -8,7 +8,7 @@ set -e -x
 # using inhouse xbstream & xtrabackup parsers.
 #
 
-export WALE_S3_PREFIX=s3://mysql8_full_xtrabackup_xbtool_incremental_bucket
+export WALE_S3_PREFIX=s3://mysql8_xbtool_inplace_bucket
 export WALG_COMPRESSION_METHOD=zstd
 export WALG_MYSQL_DATA_DIR="${MYSQLDATA}"
 
