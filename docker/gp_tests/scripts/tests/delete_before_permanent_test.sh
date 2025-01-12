@@ -17,8 +17,7 @@ enable_pitr_extension
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 # push first backup as permanent
-insert_data &
-sleep 1
+insert_data
 wal-g --config=${TMP_CONFIG} backup-push --permanent ${PGDATA}
 wal-g --config=${TMP_CONFIG} backup-list
 permanent_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
@@ -26,8 +25,7 @@ permanent_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cu
 # push a few more impermanent backups
 for i in 2 3 4
 do
-    insert_data &
-    sleep 1
+    insert_data
     wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 done
 wal-g --config=${TMP_CONFIG} backup-list
