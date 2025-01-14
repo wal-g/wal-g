@@ -145,7 +145,6 @@ func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (Jour
 		return JournalInfo{}, err
 	}
 	return newerJournalInfo, err
-
 }
 
 // Delete deletes the current JournalInfo from S3,
