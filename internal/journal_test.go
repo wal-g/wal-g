@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -18,9 +20,10 @@ var (
 	JournalFmt              = "%09d"
 	BackupName              = "stream"
 	SentinelName            = "sentinel"
-	MinimalJournalNumber    = "000000000"
-	MaximalJournalNumber    = "999999999"
+	MinimalJournalNumber    = time.Now()
+	MaximalJournalNumber    = time.Now().Add(time.Hour * 24 * 365)
 	DefaultJournalDirectory = "journals_005"
+	journalTimestamps       = map[int]time.Time{}
 )
 
 func NewEmptyTestJournal(
@@ -28,8 +31,7 @@ func NewEmptyTestJournal(
 	start, end string,
 ) internal.JournalInfo {
 	return internal.JournalInfo{
-		JournalNameLessComparator: internal.DefaultLessCmp,
-		JournalDirectoryName:      DefaultJournalDirectory,
+		JournalDirectoryName: DefaultJournalDirectory,
 	}
 }
 
@@ -42,8 +44,8 @@ func initTestS3() (storage.Folder, internal.Uploader) {
 	return root, mockUploader
 }
 
-func numberToJournalName(num int) string {
-	return fmt.Sprintf(JournalFmt, num)
+func numberToJournalTimestamp(num int) time.Time {
+	return journalTimestamps[num]
 }
 
 func generateAndUploadData(t *testing.T, mockUploader internal.Uploader) {
@@ -57,6 +59,17 @@ func generateAndUploadData(t *testing.T, mockUploader internal.Uploader) {
 		r := bytes.NewReader([]byte(record))
 		err := mockUploader.Upload(context.Background(), journalPath, r)
 		assert.NoError(t, err)
+
+		time.Sleep(time.Millisecond)
+	}
+
+	objs, _, err := mockUploader.Folder().GetSubFolder(DefaultJournalDirectory).ListFolder()
+	assert.NoError(t, err)
+	for _, obj := range objs {
+		value, err := strconv.Atoi(obj.GetName())
+		assert.NoError(t, err)
+
+		journalTimestamps[value] = obj.GetLastModified()
 	}
 }
 
@@ -65,19 +78,30 @@ func CreateThreeJournals(
 	folder storage.Folder,
 ) (internal.JournalInfo, internal.JournalInfo, internal.JournalInfo) {
 	ji1 := internal.NewEmptyJournalInfo(
-		BackupName+"0",
+		fmt.Sprintf(
+			"%s_%s",
+			BackupName,
+			time.
+				Now().
+				Add(time.Second*5).
+				Format(internal.JournalTimeLayout),
+		),
 		MinimalJournalNumber, MinimalJournalNumber,
 		DefaultJournalDirectory,
-		internal.DefaultLessCmp,
 	)
-
 	assert.NoError(t, ji1.Upload(folder))
 
 	ji2 := internal.NewEmptyJournalInfo(
-		BackupName+"1",
-		MinimalJournalNumber, numberToJournalName(33),
+		fmt.Sprintf(
+			"%s_%s",
+			BackupName,
+			time.
+				Now().
+				Add(time.Second*10).
+				Format(internal.JournalTimeLayout),
+		),
+		MinimalJournalNumber, numberToJournalTimestamp(33),
 		DefaultJournalDirectory,
-		internal.DefaultLessCmp,
 	)
 
 	assert.NoError(t, ji2.Upload(folder))
@@ -85,10 +109,16 @@ func CreateThreeJournals(
 	assert.NoError(t, ji1.Read(folder))
 
 	ji3 := internal.NewEmptyJournalInfo(
-		BackupName+"2",
-		numberToJournalName(33), numberToJournalName(66),
+		fmt.Sprintf(
+			"%s_%s",
+			BackupName,
+			time.
+				Now().
+				Add(time.Second*15).
+				Format(internal.JournalTimeLayout),
+		),
+		numberToJournalTimestamp(33), numberToJournalTimestamp(66),
 		DefaultJournalDirectory,
-		internal.DefaultLessCmp,
 	)
 
 	assert.NoError(t, ji3.Upload(folder))
@@ -147,6 +177,7 @@ func TestDeleteJournalInEnd(t *testing.T) {
 	assert.NoError(t, ji2.Read(folder))
 	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
 	assert.Equal(t, int64(0), ji2.SizeToNextBackup)
+	fmt.Println(ji1.JournalName, ji2.JournalName, ji3.JournalName)
 }
 
 func TestSafetyOfRepeatingMethodCalls(t *testing.T) {

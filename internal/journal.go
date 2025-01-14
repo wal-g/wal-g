@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"golang.org/x/xerrors"
@@ -15,53 +17,55 @@ import (
 )
 
 const (
-	JournalSize     = "JournalSize"
-	JournalPrefix   = "journal_"
-	cantFindJournal = "can not find appropriate journal on S3"
+	JournalSize             = "JournalSize"
+	JournalPrefix           = "journal_"
+	JournalTimeLayout       = "20060102T150405Z"
+	cantFindJournal         = "can not find appropriate journal on S3"
+	fullJournalPrefixLength = len(JournalPrefix) + len(StreamPrefix)
 )
 
-var (
-	DefaultLessCmp = func(a, b string) bool { return a < b }
+type direction = int
+
+const (
+	older direction = 0
+	newer direction = 1
 )
 
 // JournalInfo is a projection of the S3 journal info object.
 // When a JournalInfo instance was changed, it should be synced with S3 using the upload/read method.
 type JournalInfo struct {
-	JournalDirectoryName      string                 `json:"-"`
-	JournalNameLessComparator func(a, b string) bool `json:"-"`
-	JournalName               string                 `json:"-"`
-	PriorBackupEnd            string                 `json:"PriorBackupEnd"`
-	CurrentBackupEnd          string                 `json:"CurrentBackupEnd"`
-	SizeToNextBackup          int64                  `json:"SizeToNextBackup"`
+	JournalDirectoryName string    `json:"-"`
+	JournalName          string    `json:"-"`
+	PriorBackupEnd       time.Time `json:"PriorBackupEnd"`
+	CurrentBackupEnd     time.Time `json:"CurrentBackupEnd"`
+	SizeToNextBackup     int64     `json:"SizeToNextBackup"`
 }
 
 // NewEmptyJournalInfo creates instance of JournalInfo without sync with S3
 func NewEmptyJournalInfo(
 	backupName string,
-	currentBackupEnd, priorBackupEnd string,
+	currentBackupEnd time.Time,
+	priorBackupEnd time.Time,
 	journalDir string,
-	journalLessComparator func(a, b string) bool,
 ) JournalInfo {
 	return JournalInfo{
-		JournalName:               fmt.Sprintf("%s%s", JournalPrefix, backupName),
-		JournalNameLessComparator: journalLessComparator,
-		JournalDirectoryName:      journalDir,
-		PriorBackupEnd:            currentBackupEnd,
-		CurrentBackupEnd:          priorBackupEnd,
-		SizeToNextBackup:          0,
+		JournalName:          fmt.Sprintf("%s%s", JournalPrefix, backupName),
+		JournalDirectoryName: journalDir,
+		PriorBackupEnd:       currentBackupEnd,
+		CurrentBackupEnd:     priorBackupEnd,
+		SizeToNextBackup:     0,
 	}
 }
 
+// NewJournalInfo creates instance of JournalInfo and reads its content from S3
 func NewJournalInfo(
 	backupName string,
 	folder storage.Folder,
 	journalDir string,
-	journalLessComparator func(a, b string) bool,
 ) (JournalInfo, error) {
 	ji := JournalInfo{
-		JournalName:               fmt.Sprintf("%s%s", JournalPrefix, backupName),
-		JournalDirectoryName:      journalDir,
-		JournalNameLessComparator: journalLessComparator,
+		JournalName:          fmt.Sprintf("%s%s", JournalPrefix, backupName),
+		JournalDirectoryName: journalDir,
 	}
 
 	err := ji.Read(folder)
@@ -88,7 +92,7 @@ func (ji *JournalInfo) Read(folder storage.Folder) error {
 	return json.Unmarshal(journalInfoRaw, ji)
 }
 
-// Upload syncs Journalinfo by uploading the structure as a file on S3
+// Upload syncs JournalInfo by uploading the structure as a file on S3
 func (ji *JournalInfo) Upload(folder storage.Folder) error {
 	folder = folder.GetSubFolder(utility.BaseBackupPath)
 	rawJournalInfo, err := json.Marshal(ji)
@@ -99,103 +103,54 @@ func (ji *JournalInfo) Upload(folder storage.Folder) error {
 	return folder.PutObject(ji.JournalName, bytes.NewBuffer(rawJournalInfo))
 }
 
-// GetNextOlder retrieves the JournalInfo that is immediately older than the current one from S3, using the JournalNameLessComparator.
-func (ji *JournalInfo) GetNextOlder(folder storage.Folder) (JournalInfo, error) {
+// GetNext retrieves the JournalInfo that is immediately older/newer than the current one from S3
+func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (JournalInfo, error) {
 	objs, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
 		return JournalInfo{}, err
 	}
+	currentJournalTimestamp := getJournalTimestamp(ji.JournalName)
 
-	var olderJournalInfoObject storage.Object
-	less := ji.JournalNameLessComparator
-	for _, obj := range objs {
-		isJournal := strings.HasPrefix(obj.GetName(), JournalPrefix)
-		isNewerThenCurrentJournal := less(ji.JournalName, obj.GetName())
-		isCurrentJournal := obj.GetName() == ji.JournalName
-		if !isJournal || isNewerThenCurrentJournal || isCurrentJournal {
-			continue
-		}
-
-		isNothingFound := olderJournalInfoObject == nil
-		if isNothingFound {
-			olderJournalInfoObject = obj
-		}
-
-		isYoungerThenFound := less(olderJournalInfoObject.GetName(), obj.GetName())
-		if isYoungerThenFound {
-			olderJournalInfoObject = obj
-		}
+	objs = filterJournalsInfoFiles(objs)
+	switch direction {
+	case older:
+		objs = filterJournalsInfoOlderThen(objs, currentJournalTimestamp)
+	case newer:
+		objs = filterJournalsInfoNewerThen(objs, currentJournalTimestamp)
 	}
-	if olderJournalInfoObject == nil {
+	objs = sortJournalsInfo(objs)
+
+	if len(objs) == 0 {
 		return JournalInfo{}, xerrors.New(cantFindJournal)
 	}
 
-	olderBackupName := strings.TrimPrefix(
-		olderJournalInfoObject.GetName(),
-		JournalPrefix,
-	)
-	olderJournalInfo, err := NewJournalInfo(
-		olderBackupName,
-		folder,
-		ji.JournalDirectoryName,
-		ji.JournalNameLessComparator,
-	)
-	if err != nil {
-		return JournalInfo{}, err
-	}
-	return olderJournalInfo, err
-}
-
-// GetNextNewer retrieves the JournalInfo that is immediately newer than the current one from S3, using the JournalNameLessComparator.
-func (ji *JournalInfo) GetNextNewer(folder storage.Folder) (JournalInfo, error) {
-	objs, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
-	if err != nil {
-		return JournalInfo{}, err
+	var journalName string
+	switch direction {
+	case older:
+		journalName = objs[len(objs)-1].GetName()
+	case newer:
+		journalName = objs[0].GetName()
 	}
 
-	var newerJournalInfoObject storage.Object
-	less := DefaultLessCmp
-	for _, obj := range objs {
-		isJournal := strings.HasPrefix(obj.GetName(), JournalPrefix)
-		isOlderThenCurrentJournal := less(obj.GetName(), ji.JournalName)
-		isCurrentJournal := obj.GetName() == ji.JournalName
-		if !isJournal || isOlderThenCurrentJournal || isCurrentJournal {
-			continue
-		}
-
-		isNothingFound := newerJournalInfoObject == nil
-		if isNothingFound {
-			newerJournalInfoObject = obj
-		}
-
-		isOlderThenFound := less(obj.GetName(), newerJournalInfoObject.GetName())
-		if isOlderThenFound {
-			newerJournalInfoObject = obj
-		}
-	}
-	if newerJournalInfoObject == nil {
-		return JournalInfo{}, xerrors.New(cantFindJournal)
-	}
-
-	newerBackupName := strings.TrimPrefix(
-		newerJournalInfoObject.GetName(),
+	backupName := strings.TrimPrefix(
+		journalName,
 		JournalPrefix,
 	)
 	newerJournalInfo, err := NewJournalInfo(
-		newerBackupName,
+		backupName,
 		folder,
 		ji.JournalDirectoryName,
-		ji.JournalNameLessComparator,
 	)
 	if err != nil {
 		return JournalInfo{}, err
 	}
 	return newerJournalInfo, err
+
 }
 
 // Delete deletes the current JournalInfo from S3,
-// update the JournalStart of a newer JournalInfo with the JournalStart of the current one,
-// updates the older one with the journal size of the deleted one
+// updates the PriorBackupEnd of a newer JournalInfo with the PriorBackupEnd of the current one,
+// updates the older one journal size.
 func (ji *JournalInfo) Delete(folder storage.Folder) error {
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
@@ -204,15 +159,16 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 		return err
 	}
 
-	newerJi, err := ji.GetNextNewer(folder)
+	newerJi, err := ji.GetNext(folder, newer)
 	if err != nil {
 		if err.Error() != cantFindJournal {
 			return err
 		}
 
-		// JournalSize is the sum in bytes of binlogs between two backups.
-		// If the current backup was the newest one, the older one will be the newest then, and the JournalSize of it should be equal to zero.
-		olderJi, err := ji.GetNextOlder(folder)
+		// SizeToNextBackup is the sum in bytes of binlogs between two backups.
+		// If the current backup was the newest one, the older one will be the newest then,
+		// and the SizeToNextBackup of it should be equal to zero.
+		olderJi, err := ji.GetNext(folder, older)
 		if err != nil {
 			if err.Error() != cantFindJournal {
 				return err
@@ -242,7 +198,6 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 func GetLastJournalInfo(
 	folder storage.Folder,
 	journalDir string,
-	journalLessComparator func(a, b string) bool,
 ) (JournalInfo, error) {
 	objs, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
 	if err != nil {
@@ -252,24 +207,22 @@ func GetLastJournalInfo(
 		return JournalInfo{}, nil
 	}
 
-	var lastJournalInfo storage.Object
-	for _, v := range objs {
-		if strings.HasPrefix(v.GetName(), JournalPrefix) &&
-			(lastJournalInfo == nil || DefaultLessCmp(lastJournalInfo.GetName(), v.GetName())) {
-			lastJournalInfo = v
-		}
+	objs = filterJournalsInfoFiles(objs)
+	objs = sortJournalsInfo(objs)
+	for _, obj := range objs {
+		tracelog.InfoLogger.Println(obj.GetName(), obj.GetLastModified())
 	}
 
-	if lastJournalInfo == nil {
+	if len(objs) == 0 {
 		return JournalInfo{}, xerrors.New("there are no journals on the S3")
 	}
 
+	lastJournalInfo := objs[len(objs)-1]
 	lastBackupName := strings.TrimPrefix(lastJournalInfo.GetName(), JournalPrefix)
 	backupInfo, err := NewJournalInfo(
 		lastBackupName,
 		folder,
 		journalDir,
-		journalLessComparator,
 	)
 	if err != nil {
 		return JournalInfo{}, err
@@ -278,7 +231,7 @@ func GetLastJournalInfo(
 	return backupInfo, nil
 }
 
-// UpdateIntervalSize calculates the size of the JournalInfo in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
+// UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
 // using journal files on JournalDirectoryName and save it for the previous JournalInfo
 func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder) error {
 	journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder()
@@ -290,20 +243,19 @@ func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder) error {
 	}
 
 	sum := int64(0)
-	cmp := ji.JournalNameLessComparator
-	for i := 0; i < len(journalFiles); i++ {
-		jf := utility.TrimFileExtension(journalFiles[i].GetName())
+	for _, journal := range journalFiles {
+		timestamp := journal.GetLastModified()
 
-		isEqual := !cmp(jf, ji.CurrentBackupEnd) && !cmp(ji.CurrentBackupEnd, jf)
+		isInInterval := timestamp.After(ji.PriorBackupEnd) && timestamp.Before(ji.CurrentBackupEnd)
+		isEqualToCurrentBackupEnd := timestamp.Equal(ji.CurrentBackupEnd)
 
-		if cmp(ji.PriorBackupEnd, jf) && (cmp(jf, ji.CurrentBackupEnd) || isEqual) {
-			tracelog.DebugLogger.Printf("Taking into account: %s\n", jf)
-			sum += journalFiles[i].GetSize()
+		if isInInterval || isEqualToCurrentBackupEnd {
+			tracelog.DebugLogger.Printf("Taking into account: %s (%s)", journal.GetName(), journal.GetLastModified())
+			sum += journal.GetSize()
 		}
 	}
-	tracelog.InfoLogger.Printf("Journal Sum of %s: %d\n", ji.JournalName, sum)
 
-	prevJi, err := ji.GetNextOlder(folder)
+	prevJi, err := ji.GetNext(folder, older)
 	if err != nil {
 		// There can only be one backup on S3 or we can delete the oldest one
 		if err.Error() == cantFindJournal {
@@ -311,7 +263,6 @@ func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder) error {
 		}
 		return err
 	}
-
 	prevJi.SizeToNextBackup = sum
 
 	err = prevJi.Upload(folder)
@@ -320,4 +271,59 @@ func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder) error {
 	}
 
 	return nil
+}
+
+func getJournalTimestamp(journal string) time.Time {
+	if journal == "" {
+		return time.Time{}
+	}
+
+	timestampStr := journal[fullJournalPrefixLength:]
+	timestamp, err := time.Parse(JournalTimeLayout, timestampStr)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Error during parsing timestamp '%s': %s", journal, err)
+	}
+
+	return timestamp
+}
+
+func filterJournalsInfoFiles(objects []storage.Object) []storage.Object {
+	newObjects := make([]storage.Object, 0, len(objects))
+	for _, obj := range objects {
+		if strings.HasPrefix(obj.GetName(), JournalPrefix) {
+			newObjects = append(newObjects, obj)
+		}
+	}
+	return newObjects
+}
+
+func filterJournalsInfoOlderThen(objects []storage.Object, timestamp time.Time) []storage.Object {
+	newObjects := make([]storage.Object, 0, len(objects))
+	for _, obj := range objects {
+		objTimestamp := getJournalTimestamp(obj.GetName())
+		if objTimestamp.Before(timestamp) {
+			newObjects = append(newObjects, obj)
+		}
+	}
+	return newObjects
+}
+
+func filterJournalsInfoNewerThen(objects []storage.Object, timestamp time.Time) []storage.Object {
+	newObjects := make([]storage.Object, 0, len(objects))
+	for _, obj := range objects {
+		objTimestamp := getJournalTimestamp(obj.GetName())
+		if objTimestamp.After(timestamp) {
+			newObjects = append(newObjects, obj)
+		}
+	}
+	return newObjects
+}
+
+func sortJournalsInfo(objects []storage.Object) []storage.Object {
+	sort.Slice(objects, func(i, j int) bool {
+		ti := getJournalTimestamp(objects[i].GetName())
+		tj := getJournalTimestamp(objects[j].GetName())
+		return ti.Before(tj)
+	})
+	return objects
 }
