@@ -191,14 +191,3 @@ func BinlogPrefix(filename string) string {
 	}
 	return filename[:p]
 }
-
-func BinlogFilenameComparator(a, b string) bool {
-	aInt, bInt := 0, 0
-	if a != "" {
-		aInt = BinlogNum(a)
-	}
-	if b != "" {
-		bInt = BinlogNum(b)
-	}
-	return aInt < bInt
-}

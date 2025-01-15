@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	JournalSize             = "JournalSize"
 	JournalPrefix           = "journal_"
 	JournalTimeLayout       = "20060102T150405Z"
 	cantFindJournal         = "can not find appropriate journal on S3"
