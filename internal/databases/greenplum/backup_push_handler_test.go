@@ -206,8 +206,6 @@ func TestBuildBackupPushCommand(t *testing.T) {
 		},
 	}
 
-	//aboba
-	//aboba
 	for _, tc := range testcases {
 		cmdLine := tc.handler.buildBackupPushCommand(tc.contentID)
 
