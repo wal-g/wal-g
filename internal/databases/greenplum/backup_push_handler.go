@@ -110,7 +110,6 @@ type BackupHandler struct {
 	prevBackupInfo PrevBackupInfo
 }
 
-// TODO: unit tests
 // buildBackupPushCommand builds a command to be executed on specific segment
 func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
