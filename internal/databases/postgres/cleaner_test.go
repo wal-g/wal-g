@@ -53,26 +53,6 @@ var (
 	inputWALFileWithTooMuchLogSegNoLo = "0000000100000001FFFFFFFF"
 )
 
-type MockCleaner struct {
-	files   []string
-	deleted []string
-	err     error
-}
-
-func (cl *MockCleaner) GetFiles(directory string) (files []string, err error) {
-	return cl.files, cl.err
-}
-
-func (cl *MockCleaner) Remove(file string) {
-	cl.deleted = append(cl.deleted, file)
-}
-
-func (cl *MockCleaner) setFilesAndErrorAndClearDeleted(newFiles []string, err error) {
-	cl.files = newFiles
-	cl.err = err
-	cl.deleted = []string{}
-}
-
 func TestCleanupSimpleFiles(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
