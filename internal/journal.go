@@ -192,8 +192,8 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 	return nil
 }
 
-// GetLastJournalInfo receives the most recently created JournalInfo on S3
-func GetLastJournalInfo(
+// GetMostRecentJournalInfo receives the most recently created JournalInfo on S3
+func GetMostRecentJournalInfo(
 	folder storage.Folder,
 	journalDir string,
 ) (JournalInfo, error) {
@@ -207,18 +207,14 @@ func GetLastJournalInfo(
 
 	objs = filterJournalsInfoFiles(objs)
 	objs = sortJournalsInfo(objs)
-	for _, obj := range objs {
-		tracelog.InfoLogger.Println(obj.GetName(), obj.GetLastModified())
-	}
-
 	if len(objs) == 0 {
 		return JournalInfo{}, xerrors.New("there are no journals on the S3")
 	}
 
-	lastJournalInfo := objs[len(objs)-1]
-	lastBackupName := strings.TrimPrefix(lastJournalInfo.GetName(), JournalPrefix)
+	theMostRecentJournalObject := objs[len(objs)-1]
+	theMostRecentBackupName := strings.TrimPrefix(theMostRecentJournalObject.GetName(), JournalPrefix)
 	backupInfo, err := NewJournalInfo(
-		lastBackupName,
+		theMostRecentBackupName,
 		folder,
 		journalDir,
 	)

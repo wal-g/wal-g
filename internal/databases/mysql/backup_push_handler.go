@@ -132,7 +132,7 @@ func HandleBackupPush(
 		return
 	}
 
-	previousJournalInfo, err := internal.GetLastJournalInfo(
+	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(
 		folder,
 		BinlogPath,
 	)
@@ -143,7 +143,7 @@ func HandleBackupPush(
 
 	journalInfo := internal.NewEmptyJournalInfo(
 		backupName,
-		previousJournalInfo.CurrentBackupEnd, timeStop,
+		mostRecentJournalInfo.CurrentBackupEnd, timeStop,
 		BinlogPath,
 	)
 

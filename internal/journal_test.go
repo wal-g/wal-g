@@ -19,9 +19,7 @@ import (
 var (
 	JournalFmt              = "%09d"
 	BackupName              = "stream"
-	SentinelName            = "sentinel"
 	MinimalJournalNumber    = time.Now()
-	MaximalJournalNumber    = time.Now().Add(time.Hour * 24 * 365)
 	DefaultJournalDirectory = "journals_005"
 	journalTimestamps       = map[int]time.Time{}
 )
