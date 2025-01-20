@@ -30,6 +30,20 @@ func LoggedClose(c io.Closer, errmsg string) {
 	}
 }
 
+type ContextCloser interface {
+	Close(ctx context.Context) error
+}
+
+func LoggedCloseContext(c ContextCloser, errmsg string) {
+	err := c.Close(context.TODO())
+	if errmsg == "" {
+		errmsg = "Problem with closing object"
+	}
+	if err != nil {
+		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+	}
+}
+
 func LoggedSync(file *os.File, errmsg string, fsync bool) {
 	if fsync {
 		err := file.Sync()

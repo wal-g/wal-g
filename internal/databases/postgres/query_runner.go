@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgtype"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -182,7 +182,7 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	defer queryRunner.Mu.Unlock()
 
 	conn := queryRunner.Connection
-	err = conn.QueryRow(queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
+	err = conn.QueryRow(context.TODO(), queryRunner.buildGetVersion()).Scan(&queryRunner.Version)
 	return errors.Wrap(err, "GetVersion: getting Postgres version failed")
 }
 
@@ -192,7 +192,7 @@ func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
 	defer queryRunner.Mu.Unlock()
 
 	conn := queryRunner.Connection
-	err = conn.QueryRow(queryRunner.buildGetCurrentLsn()).Scan(&lsn)
+	err = conn.QueryRow(context.TODO(), queryRunner.buildGetCurrentLsn()).Scan(&lsn)
 	if err != nil {
 		return "", errors.Wrap(err, "GetCurrentLsn: getting current LSN of the cluster failed")
 	}
@@ -208,7 +208,7 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 		return nil
 	}
 	conn := queryRunner.Connection
-	err = conn.QueryRow(queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
+	err = conn.QueryRow(context.TODO(), queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
 	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
 }
 
@@ -225,7 +225,7 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
 	}
 
-	if err = conn.QueryRow(startBackupQuery, backup).Scan(&backupName, &lsnString, &inRecovery); err != nil {
+	if err = conn.QueryRow(context.TODO(), startBackupQuery, backup).Scan(&backupName, &lsnString, &inRecovery); err != nil {
 		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: pg_start_backup() failed")
 	}
 
@@ -240,16 +240,16 @@ func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, 
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
 	conn := queryRunner.Connection
 
-	tx, err := conn.Begin()
+	tx, err := conn.Begin(context.TODO())
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: transaction begin failed")
 	}
 	defer func() {
 		// ignore the possible error, it's ok
-		_ = tx.Rollback()
+		_ = tx.Rollback(context.TODO())
 	}()
 
-	_, err = tx.Exec(fmt.Sprintf("SET statement_timeout=%d;", queryRunner.stopBackupTimeout.Milliseconds()))
+	_, err = tx.Exec(context.TODO(), fmt.Sprintf("SET statement_timeout=%d;", queryRunner.stopBackupTimeout.Milliseconds()))
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: failed setting statement timeout in transaction")
 	}
@@ -259,12 +259,12 @@ func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, 
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: Building stop backup query failed")
 	}
 
-	err = tx.QueryRow(stopBackupQuery).Scan(&label, &offsetMap, &lsnStr)
+	err = tx.QueryRow(context.TODO(), stopBackupQuery).Scan(&label, &offsetMap, &lsnStr)
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: stop backup failed")
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(context.TODO())
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "QueryRunner StopBackup: commit failed")
 	}
@@ -302,7 +302,7 @@ func (queryRunner *PgQueryRunner) getStatistics(
 		return nil, errors.Wrap(err, "QueryRunner GetStatistics: Building get statistics query failed")
 	}
 
-	rows, err := conn.Query(getStatQuery)
+	rows, err := conn.Query(context.TODO(), getStatQuery)
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetStatistics: pg_stat_all_tables query failed")
 	}
@@ -357,7 +357,7 @@ func (queryRunner *PgQueryRunner) GetDatabaseInfos() ([]PgDatabaseInfo, error) {
 		return nil, errors.Wrap(err, "QueryRunner GetDatabases: Building db names query failed")
 	}
 
-	rows, err := conn.Query(getDBInfoQuery)
+	rows, err := conn.Query(context.TODO(), getDBInfoQuery)
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetDatabases: pg_database query failed")
 	}
@@ -391,7 +391,7 @@ func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, er
 
 	var value string
 	conn := queryRunner.Connection
-	err := conn.QueryRow(queryRunner.buildGetParameter(), parameterName).Scan(&value)
+	err := conn.QueryRow(context.TODO(), queryRunner.buildGetParameter(), parameterName).Scan(&value)
 	return value, err
 }
 
@@ -420,7 +420,7 @@ func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
 	defer queryRunner.Mu.Unlock()
 
 	conn := queryRunner.Connection
-	err = conn.QueryRow("show data_directory").Scan(&dataDir)
+	err = conn.QueryRow(context.TODO(), "show data_directory").Scan(&dataDir)
 	return dataDir, err
 }
 
@@ -434,7 +434,7 @@ func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (Physical
 	var restartLSN string
 
 	conn := queryRunner.Connection
-	err := conn.QueryRow(queryRunner.buildGetPhysicalSlotInfo(), slotName).Scan(&active, &restartLSN)
+	err := conn.QueryRow(context.TODO(), queryRunner.buildGetPhysicalSlotInfo(), slotName).Scan(&active, &restartLSN)
 	if err == pgx.ErrNoRows {
 		// slot does not exist.
 		return PhysicalSlot{Name: slotName}, nil
@@ -457,14 +457,14 @@ func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
 	var bytesPerWalSegment uint32
 
 	if queryRunner.Version >= 90600 {
-		err = conn.QueryRow("select timeline_id, bytes_per_wal_segment "+
+		err = conn.QueryRow(context.TODO(), "select timeline_id, bytes_per_wal_segment "+
 			"from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
 		if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
 			return 0, newBytesPerWalSegmentError()
 		}
 	} else {
 		var hex string
-		err = conn.QueryRow("SELECT SUBSTR(pg_xlogfile_name(pg_current_xlog_insert_location()), " +
+		err = conn.QueryRow(context.TODO(), "SELECT SUBSTR(pg_xlogfile_name(pg_current_xlog_insert_location()), "+
 			"1, 8) AS timeline").Scan(&hex)
 		if err != nil {
 			return
@@ -515,7 +515,7 @@ func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQue
 		tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
 		return nil
 	}
-	defer utility.LoggedClose(dbConn, "")
+	defer utility.LoggedCloseContext(dbConn, "")
 
 	runner, err := NewPgQueryRunner(dbConn)
 	if err != nil {
@@ -531,7 +531,7 @@ func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
 
 	conn := queryRunner.Connection
 	var lockFree bool
-	err = conn.QueryRow("SELECT pg_try_advisory_lock(hashtext('pg_backup'))").Scan(&lockFree)
+	err = conn.QueryRow(context.TODO(), "SELECT pg_try_advisory_lock(hashtext('pg_backup'))").Scan(&lockFree)
 	if err != nil {
 		return err
 	}
@@ -548,7 +548,7 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 
 	conn := queryRunner.Connection
 	var pid int
-	err := conn.QueryRow("SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid = hashtext('pg_backup')").Scan(&pid)
+	err := conn.QueryRow(context.TODO(), "SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid = hashtext('pg_backup')").Scan(&pid)
 	if err != nil {
 		return 0, err
 	}
@@ -672,7 +672,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 	getTablesQuery string, process func(relFileNode, oid uint32, tableName, namespaceName string)) error {
-	rows, err := conn.Query(getTablesQuery)
+	rows, err := conn.Query(context.TODO(), getTablesQuery)
 	if err != nil {
 		return errors.Wrap(err, "QueryRunner GetTables: Query failed")
 	}
@@ -734,7 +734,7 @@ func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
 
 	var dataChecksums string
 	conn := queryRunner.Connection
-	err := conn.QueryRow("SHOW data_checksums").Scan(&dataChecksums)
+	err := conn.QueryRow(context.TODO(), "SHOW data_checksums").Scan(&dataChecksums)
 	if err != nil {
 		return "", errors.Wrap(err, "GetDataChecksums: failed to check data_checksums")
 	}

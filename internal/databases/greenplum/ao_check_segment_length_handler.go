@@ -1,13 +1,13 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/jackc/pgx"
-	"github.com/jackc/pgx/pgtype"
+	"github.com/jackc/pgx/v5"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -17,11 +17,11 @@ import (
 
 type dbInfo struct {
 	DBName string
-	Oid    pgtype.OID
+	Oid    uint32
 }
 
 type relNames struct {
-	FileName   pgtype.OID
+	FileName   uint32
 	TableName  string
 	SegRelName string
 	Size       int64
@@ -90,7 +90,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 			tracelog.ErrorLogger.Fatalf("ao table length check failed, tables files are too short:\n%s\n", strings.Join(errors, "\n"))
 		}
 
-		err = conn.Close()
+		err = conn.Close(context.TODO())
 		if err != nil {
 			tracelog.WarningLogger.Println("failed to close connection")
 		}
@@ -179,8 +179,8 @@ func (checker *AOLengthCheckSegmentHandler) connect(db string) (*pgx.Conn, error
 	})
 }
 
-func (checker *AOLengthCheckSegmentHandler) getTablesSizes(conn *pgx.Conn, dbOID pgtype.OID) (map[string]relNames, error) {
-	rows, err := conn.Query(`SELECT a.relfilenode file, a.relname tname, b.relname segname 
+func (checker *AOLengthCheckSegmentHandler) getTablesSizes(conn *pgx.Conn, dbOID uint32) (map[string]relNames, error) {
+	rows, err := conn.Query(context.TODO(), `SELECT a.relfilenode file, a.relname tname, b.relname segname 
 	FROM (SELECT relname, relid, segrelid, relpersistence, relfilenode FROM pg_class JOIN pg_appendonly ON oid = relid) a,
 	(SELECT relname, segrelid FROM pg_class JOIN pg_appendonly ON oid = segrelid) b
 	WHERE a.relpersistence = 'p' AND a.segrelid = b.segrelid;`)
@@ -216,12 +216,12 @@ func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo() ([]dbInfo, error)
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
 	defer func() {
-		if err := conn.Close(); err != nil {
+		if err := conn.Close(context.TODO()); err != nil {
 			tracelog.WarningLogger.Println("failed close conn")
 		}
 	}()
 
-	rows, err := conn.Query("SELECT datname, oid FROM pg_database WHERE datallowconn")
+	rows, err := conn.Query(context.TODO(), "SELECT datname, oid FROM pg_database WHERE datallowconn")
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(row relNames, co
 		query = fmt.Sprintf("SELECT sum(eof) FROM gp_toolkit.__gp_aocsseg('\"%s\"')", row.TableName)
 	}
 
-	size, err := conn.Query(query)
+	size, err := conn.Query(context.TODO(), query)
 	if err != nil {
 		return 0, err
 	}

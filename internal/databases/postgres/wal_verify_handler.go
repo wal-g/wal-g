@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -98,7 +99,7 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 
 	tracelog.InfoLogger.Printf("Current WAL segment: %s\n", currentSegmentNo.GetFilename(currentTimeline))
 
-	err = conn.Close()
+	err = conn.Close(context.TODO())
 	tracelog.WarningLogger.PrintOnError(err)
 
 	// currentSegment is the current WAL segment of the cluster
