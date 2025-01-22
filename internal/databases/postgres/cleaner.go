@@ -1,5 +1,7 @@
 package postgres
 
+//go:generate mockgen -destination=./mocks/cleaner.go -package=mocks . Cleaner
+
 import (
 	"path"
 
@@ -27,7 +29,12 @@ func CleanupPrefetchDirectories(walFileName string, location string, cleaner Cle
 func cleanupPrefetchDirectory(directory string, timelineID uint32, logSegNo uint64, cleaner Cleaner) {
 	files, err := cleaner.GetFiles(directory)
 	if err != nil {
-		tracelog.WarningLogger.Println("WAL-prefetch cleanup failed, : ", err, " cannot enumerate files in dir: ", directory)
+		tracelog.WarningLogger.Println(
+			"WAL-prefetch cleanup failed, : ",
+			err,
+			" cannot enumerate files in dir: ",
+			directory,
+		)
 		return
 	}
 
