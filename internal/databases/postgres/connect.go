@@ -2,9 +2,7 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -53,32 +51,6 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 	}
 
 	return conn, nil
-}
-
-func ConvertPgConnConfigToString(config *pgconn.Config) string {
-	if config == nil {
-		return ""
-	}
-
-	// Build the connection string manually
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
-		config.User,
-		config.Password,
-		config.Host,
-		config.Port,
-		config.Database)
-
-	// Append any additional parameters to the connection string
-	if len(config.RuntimeParams) > 0 {
-		params := "?"
-		for key, value := range config.RuntimeParams {
-			params += fmt.Sprintf("%s=%s&", key, value)
-		}
-		// Remove the trailing "&" if any runtime parameters exist
-		connStr += params[:len(params)-1]
-	}
-
-	return connStr
 }
 
 func checkArchiveCommand(conn *pgx.Conn) error {
