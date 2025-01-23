@@ -314,8 +314,7 @@ func indexSpecFromCommitIndexBuilds(op *db.Oplog) (string, []client.IndexDocumen
 				if !ok {
 					return "", nil, NewTypeAssertionError("bson.D", fmt.Sprintf("indexes[%d]", i), elemE.Value)
 				}
-				for i := range elements {
-					elemE = elements[i]
+				for _, elemE := range elements {
 					if elemE.Key == "key" {
 						if indexSpecs[i].Key, ok = elemE.Value.(bson.D); !ok {
 							return "", nil, NewTypeAssertionError("bson.D", "key", elemE.Value)
