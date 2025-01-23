@@ -1,7 +1,9 @@
 package greenplum
 
 import (
-	"github.com/jackc/pgx"
+	"context"
+
+	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -93,7 +95,7 @@ func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, er
 		for relFileLoc, metadata := range rows {
 			result[relFileLoc] = metadata
 		}
-		err = dbConn.Close()
+		err = dbConn.Close(context.TODO())
 		tracelog.WarningLogger.PrintOnError(err)
 	}
 	return result, nil

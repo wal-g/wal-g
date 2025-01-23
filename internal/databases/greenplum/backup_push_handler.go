@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v5"
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
@@ -446,7 +447,7 @@ func (bh *BackupHandler) connect() (err error) {
 
 func (bh *BackupHandler) disconnect() {
 	tracelog.InfoLogger.Println("Disconnecting from the Greenplum master.")
-	err := bh.workers.Conn.Close()
+	err := bh.workers.Conn.Close(context.TODO())
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to disconnect: %v", err)
 	}
