@@ -2,10 +2,10 @@ package testtools
 
 import (
 	"bytes"
-	"fmt"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -292,21 +292,21 @@ func CreateMockStorageFolderWithPermanentGPBackups(t *testing.T) storage.Folder 
 	backups := map[int]map[string]interface{}{
 		-1: {
 			"backup_name": "base_00000001000000040000001D",
-			"wal_name": "00000001000000040000001D",
-			"start_lsn": 19126026280,
-			"finish_lsn": 19126315816,
+			"wal_name":    "00000001000000040000001D",
+			"start_lsn":   19126026280,
+			"finish_lsn":  19126315816,
 		},
 		0: {
 			"backup_name": "base_00000001000000040000001C",
-			"wal_name": "00000001000000040000001C",
-			"start_lsn": 19058917416,
-			"finish_lsn": 19058966944,
+			"wal_name":    "00000001000000040000001C",
+			"start_lsn":   19058917416,
+			"finish_lsn":  19058966944,
 		},
 		1: {
 			"backup_name": "base_00000001000000040000001C",
-			"wal_name": "00000001000000040000001C",
-			"start_lsn": 19058917416,
-			"finish_lsn": 19058967936,
+			"wal_name":    "00000001000000040000001C",
+			"start_lsn":   19058917416,
+			"finish_lsn":  19058967936,
 		},
 	}
 
@@ -316,29 +316,29 @@ func CreateMockStorageFolderWithPermanentGPBackups(t *testing.T) storage.Folder 
 
 	for backupId, meta := range backups {
 		backupSentinelData["segments"] = append(backupSentinelData["segments"], map[string]interface{}{
-			"content_id": backupId,
+			"content_id":  backupId,
 			"backup_name": meta["backup_name"],
 		})
 		segmentBackupMetadata := map[string]interface{}{
-			"start_lsn": meta["start_lsn"],
+			"start_lsn":  meta["start_lsn"],
 			"finish_lsn": meta["finish_lsn"],
 		}
 		bytesSegmentBackupMetadata, err := json.Marshal(segmentBackupMetadata)
 		assert.NoError(t, err)
 		stringSegmentBackupMetadata := string(bytesSegmentBackupMetadata)
-		
+
 		err = segmentsFolder.PutObject(
 			fmt.Sprintf("seg%d/%s%s/metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]),
 			strings.NewReader(stringSegmentBackupMetadata))
 		assert.NoError(t, err)
 
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s%s", backupId, utility.BaseBackupPath, meta["backup_name"], utility.SentinelSuffix), &bytes.Buffer{})         //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/ao_files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})         //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})         //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/tar_partitions/part_001.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})         //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/tar_partitions/pg_control.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})         //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s.00000028.backup.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})         //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})         //nolint:errcheck
+		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s%s", backupId, utility.BaseBackupPath, meta["backup_name"], utility.SentinelSuffix), &bytes.Buffer{})        //nolint:errcheck
+		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/ao_files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})           //nolint:errcheck
+		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})              //nolint:errcheck
+		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/tar_partitions/part_001.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})   //nolint:errcheck
+		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/tar_partitions/pg_control.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{}) //nolint:errcheck
+		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s.00000028.backup.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})                         //nolint:errcheck
+		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})                                         //nolint:errcheck
 	}
 
 	bytesBackupSentinelData, err := json.Marshal(backupSentinelData)
