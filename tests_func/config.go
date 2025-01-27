@@ -37,4 +37,5 @@ var Env = map[string]string{
 	// Redis specific
 	"REDIS_EXPOSE_PORT": "6379",
 	"REDIS_PASSWORD":    "password",
+	"REDIS_USERNAME":    "default",
 }

@@ -125,8 +125,7 @@ func (tctx *TestContext) isWorkingRedis(hostName string) error {
 
 	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		tracelog.DebugLogger.Printf("Redis client connect to host '%s'", redisCtl.Addr())
-
-		status := redisCtl.Ping()
+		status := redisCtl.Ping(tctx.Context)
 		err = status.Err()
 		if err != nil {
 			return fmt.Errorf("Client on ping returned err: %v\n", err)
@@ -209,10 +208,7 @@ func (tctx *TestContext) weRestartRedisServerAt(host string) error {
 	if err != nil {
 		return err
 	}
-	cmd := rc.ShutdownNoSave()
-	if cmd.Err() != nil {
-		return cmd.Err()
-	}
+	rc.ShutdownNoSave(tctx.Context)
 	return nil
 }
 
@@ -259,11 +255,11 @@ func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
 		return err
 	}
 
-	dbsize1 := rc1.DBSize()
+	dbsize1 := rc1.DBSize(tctx.Context)
 	if dbsize1.Err() != nil {
 		return errors.Wrapf(dbsize1.Err(), "Host %s doesn't return 'dbsize'", host1)
 	}
-	dbsize2 := rc2.DBSize()
+	dbsize2 := rc2.DBSize(tctx.Context)
 	if dbsize2.Err() != nil {
 		return errors.Wrapf(dbsize1.Err(), "Host %s doesn't return 'dbsize'", host2)
 	}
@@ -271,12 +267,12 @@ func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
 		return fmt.Errorf("hosts %s and %s have not equal keys count %d != %d", host1, host2, dbsize1.Val(), dbsize2.Val())
 	}
 
-	keys1 := rc1.Keys("*")
+	keys1 := rc1.Keys(tctx.Context, "*")
 	if keys1.Err() != nil {
 		return keys1.Err()
 	}
 
-	keys2 := rc2.Keys("*")
+	keys2 := rc2.Keys(tctx.Context, "*")
 	if keys2.Err() != nil {
 		return keys2.Err()
 	}
@@ -288,8 +284,8 @@ func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
 	if !utils.IsArraysEqual(keys1.Val(), keys2.Val()) {
 		return fmt.Errorf("keys from redis1/redis2 aren't equal")
 	}
-	values1 := rc1.MGet(keys1.Val()...)
-	values2 := rc1.MGet(keys2.Val()...)
+	values1 := rc1.MGet(tctx.Context, keys1.Val()...)
+	values2 := rc1.MGet(tctx.Context, keys2.Val()...)
 	vals1 := make([]string, len(values1.Val()))
 	vals2 := make([]string, len(values1.Val()))
 
