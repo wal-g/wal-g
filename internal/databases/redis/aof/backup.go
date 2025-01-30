@@ -83,7 +83,6 @@ func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
 	}
 
 	backupFiles := bs.backupFilesListProvider.Get()
-	defer bs.backupFilesListProvider.Cleanup()
 
 	pinnedBackupFiles, err := bs.filesPinner.Pin(backupFiles)
 	defer bs.filesPinner.Unpin()
