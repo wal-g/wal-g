@@ -32,14 +32,6 @@ func (p *BackupFilesListProvider) Get() []string {
 	return res
 }
 
-func (p *BackupFilesListProvider) Cleanup() {
-	folder := filepath.Dir(p.UploadManifestPath)
-	err := os.RemoveAll(folder)
-	if err != nil {
-		tracelog.WarningLogger.Printf("failed to remove folder %s: %v", folder, err)
-	}
-}
-
 func copyManifestToUpload(lines []string, path string) {
 	folder := filepath.Dir(path)
 	err := os.MkdirAll(folder, 0644)
