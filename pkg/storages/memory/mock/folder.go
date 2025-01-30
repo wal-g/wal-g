@@ -99,4 +99,4 @@ func (f *Folder) Validate() error {
 }
 
 // NOT IMPLEMENTED
-func (folder *Folder) SetVersioningEnabled(enable bool) {}
+func (f *Folder) SetVersioningEnabled(enable bool) {}
