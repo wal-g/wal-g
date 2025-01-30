@@ -283,7 +283,7 @@ var (
 		RedisDataPath:            "/var/lib/redis",
 		RedisAppendonlyFolder:    "appendonlydir",
 		RedisAppendonlyManifest:  "appendonly.aof.manifest",
-		RedisAppendonlyTmpFolder: "/var/run/wal-g/",
+		RedisAppendonlyTmpFolder: "/var/lib/redis/wal-g/",
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
 		RedisServerProcessName:   "redis-server",

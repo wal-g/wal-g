@@ -19,7 +19,7 @@ func HandleAOFBackupPush(ctx context.Context, permanent bool, uploader internal.
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)
 	tmpPath, _ := conf.GetSetting(conf.RedisAppendonlyTmpFolder)
-	concurrentUploader, err := internal.CreateConcurrentUploader(uploader, backupName, []string{aofPath, tmpPath}, true)
+	concurrentUploader, err := internal.CreateConcurrentUploader(uploader, backupName, []string{tmpPath}, false)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func HandleAOFBackupPush(ctx context.Context, permanent bool, uploader internal.
 	manifestName, _ := conf.GetSetting(conf.RedisAppendonlyManifest)
 	backupFilesListProvider := aof.NewBackupFilesListProvider(aofPath, tmpPath, manifestName)
 
-	filesPinner := aof.NewFilesPinner()
+	filesPinner := aof.NewFilesPinner(tmpPath)
 
 	backupService, err := aof.CreateBackupService(ctx, diskWatcher, concurrentUploader, metaConstructor, backupFilesListProvider, filesPinner)
 	if err != nil {
