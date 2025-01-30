@@ -139,8 +139,20 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			if *object.Key == folder.path {
 				continue
 			}
+
+			if folder.isVersioningEnabled() {
+				versions, err := folder.getObjectVersions(*object.Key)
+				if err != nil {
+					tracelog.ErrorLogger.Printf("failed to list versions: %v", err)
+					//TODO to error or not to error
+				}
+				for _, version := range versions {
+					objects = append(objects, storage.NewLocalObject(strings.TrimPrefix(*version.Key, folder.path), *object.LastModified, *object.Size))
+				}
+			}
+
 			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size)) //TODO also list versions
+			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
 		}
 	}
 
@@ -203,15 +215,7 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	parts := partitionStrings(objectRelativePaths, 1000)
-	needsVersioning := false
-	switch folder.config.EnableVersioning {
-	case VersioningEnabled:
-		needsVersioning = true
-	case VersioningDisabled:
-		needsVersioning = false
-	case VersioningDefault:
-		needsVersioning = folder.isVersioningEnabledOnServer()
-	}
+	needsVersioning := folder.isVersioningEnabled()
 
 	for _, part := range parts {
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
@@ -247,16 +251,25 @@ func (folder *Folder) getObjectVersions(key string) ([]*s3.ObjectIdentifier, err
 	return list, nil
 }
 
-func (folder *Folder) isVersioningEnabledOnServer() bool {
-	result, err := folder.s3API.GetBucketVersioning(&s3.GetBucketVersioningInput{
-		Bucket: folder.bucket,
-	})
-	if err != nil {
-		return false
-	}
-
-	if result.Status != nil && *result.Status == s3.BucketVersioningStatusEnabled {
+func (folder *Folder) isVersioningEnabled() bool {
+	switch folder.config.EnableVersioning {
+	case VersioningEnabled:
 		return true
+	case VersioningDisabled:
+		return false
+	case VersioningDefault:
+		result, err := folder.s3API.GetBucketVersioning(&s3.GetBucketVersioningInput{
+			Bucket: folder.bucket,
+		})
+		if err != nil {
+			return false
+		}
+
+		if result.Status != nil && *result.Status == s3.BucketVersioningStatusEnabled {
+			folder.config.EnableVersioning = VersioningEnabled
+			return true
+		}
+		folder.config.EnableVersioning = VersioningDisabled
 	}
 	return false
 }
@@ -279,7 +292,7 @@ func (folder *Folder) Validate() error {
 }
 
 func (folder *Folder) SetVersioningEnabled(enable bool) {
-	if enable && folder.isVersioningEnabledOnServer() {
+	if enable && folder.isVersioningEnabled() {
 		folder.config.EnableVersioning = VersioningEnabled
 	} else {
 		folder.config.EnableVersioning = VersioningDisabled
