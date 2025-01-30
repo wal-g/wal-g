@@ -45,6 +45,9 @@ type Folder interface {
 	CopyObject(srcPath string, dstPath string) error
 
 	Validate() error
+
+	// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
+	SetVersioningEnabled(enable bool)
 }
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {

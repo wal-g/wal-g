@@ -184,3 +184,6 @@ func (folder *Folder) EnsureExists() error {
 func (folder *Folder) Validate() error {
 	return nil
 }
+
+// NOT IMPLEMENTED
+func (folder *Folder) SetVersioningEnabled(enable bool) {}

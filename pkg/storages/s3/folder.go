@@ -12,12 +12,17 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
 	NotFoundAWSErrorCode  = "NotFound"
 	NoSuchKeyAWSErrorCode = "NoSuchKey"
+
+	VersioningDefault  = ""
+	VersioningEnabled  = "enabled"
+	VersioningDisabled = "disabled"
 )
 
 // TODO: Unit tests
@@ -135,7 +140,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				continue
 			}
 			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))//TODO also list versions
+			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size)) //TODO also list versions
 		}
 	}
 
@@ -198,7 +203,15 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	parts := partitionStrings(objectRelativePaths, 1000)
-	needsVersioning := folder.isVersioningEnabled() //TODO add manyal deletion
+	needsVersioning := false
+	switch folder.config.EnableVersioning {
+	case VersioningEnabled:
+		needsVersioning = true
+	case VersioningDisabled:
+		needsVersioning = false
+	case VersioningDefault:
+		needsVersioning = folder.isVersioningEnabledOnServer()
+	}
 
 	for _, part := range parts {
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
@@ -234,7 +247,7 @@ func (folder *Folder) getObjectVersions(key string) ([]*s3.ObjectIdentifier, err
 	return list, nil
 }
 
-func (folder *Folder) isVersioningEnabled() bool {
+func (folder *Folder) isVersioningEnabledOnServer() bool {
 	result, err := folder.s3API.GetBucketVersioning(&s3.GetBucketVersioningInput{
 		Bucket: folder.bucket,
 	})
@@ -263,6 +276,14 @@ func (folder *Folder) Validate() error {
 		return fmt.Errorf("bad credentials: %v", err)
 	}
 	return nil
+}
+
+func (folder *Folder) SetVersioningEnabled(enable bool) {
+	if enable && folder.isVersioningEnabledOnServer() {
+		folder.config.EnableVersioning = VersioningEnabled
+	} else {
+		folder.config.EnableVersioning = VersioningDisabled
+	}
 }
 
 func (folder *Folder) partitionToObjects(keys []string, versioningEnabled bool) []*s3.ObjectIdentifier {

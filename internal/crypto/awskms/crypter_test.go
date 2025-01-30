@@ -29,7 +29,8 @@ func NewMockSymmetricKey(kmsKeyID string, keyLen int, encryptedKeyLen int) *Mock
 }
 
 func MockCrypterFromKeyID(CseKmsID string) crypto.Crypter {
-	return &Crypter{SymmetricKey: NewMockSymmetricKey(CseKmsID, 32, 184)}
+	//return &Crypter{SymmetricKey: NewMockSymmetricKey(CseKmsID, 32, 184)}
+	return &Crypter{SymmetricKey: crypto.SymmetricKey{SymmetricKeyLen: 32, EncryptedSymmetricKeyLen: 184, KeyID: CseKmsID}}
 }
 
 func TestEncryptionCycle(t *testing.T) {
