@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -15,6 +16,11 @@ import (
 
 const (
 	backupPushShortDescription = "Creates new backup and pushes it to storage"
+
+	addUserDataFlag = "add-user-data"
+	permanentFlag   = "permanent"
+
+	permanentShorthand = "p"
 )
 
 var backupPushCmd = &cobra.Command{
@@ -38,10 +44,25 @@ var backupPushCmd = &cobra.Command{
 
 		backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
-		etcd.HandleBackupPush(uploader, backupCmd)
+
+		if userDataRaw == "" {
+			userDataRaw = viper.GetString(conf.SentinelUserDataSetting)
+		}
+
+		etcd.HandleBackupPush(uploader, backupCmd, permanent, userDataRaw)
 	},
 }
 
+var (
+	userDataRaw = ""
+	permanent   = false
+)
+
 func init() {
 	cmd.AddCommand(backupPushCmd)
+
+	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
+		false, "Pushes permanent backup")
+	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
+		"", "Write the provided user data to the backup sentinel and metadata files.")
 }
