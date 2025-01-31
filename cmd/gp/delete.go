@@ -11,7 +11,6 @@ import (
 
 var confirmed = false
 var forceDelete = false
-var forceDeleteShortDescription = "force delete (ignore missing segments)"
 
 var deleteTargetUserData = ""
 
