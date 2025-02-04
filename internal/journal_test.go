@@ -4,178 +4,32 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
-	"github.com/wal-g/wal-g/utility"
 )
 
 var (
-	JournalFmt           = "%09d"
-	SentinelName         = "sentinel"
-	SentinelS3Name       = internal.JournalPrefix + "sentinel"
-	MinimalJournalNumber = "000000000"
-	MaximalJournalNumber = "999999999"
+	JournalFmt              = "%09d"
+	BackupName              = "stream"
+	MinimalJournalNumber    = time.Now()
+	DefaultJournalDirectory = "journals_005"
+	journalTimestamps       = map[int]time.Time{}
 )
 
-func GenerateDataAndTest(
-	t *testing.T,
-	recordCount, recordSize int,
-	beginJournalID, endJournalID string,
-	expectedSum int64,
-) {
-	GenerateS3SetAndCheckJournalSizes(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
-	GenerateS3SetAndUpdateBackupsInfo(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
-	GenerateS3SetAndUpdateBackupsInfoManyTimes(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
-	GenerateS3AndUpdateLastBackup(t, recordCount, recordSize, beginJournalID, endJournalID, expectedSum)
-}
-
-func GenerateS3SetAndCheckJournalSizes(
-	t *testing.T,
-	recordCount, recordSize int,
-	beginJournalID, endJournalID string,
-	expectedSum int64,
-) {
-	root, mockUploader := initTestS3()
-
-	generateAndUploadData(mockUploader, recordCount, recordSize)
-
-	journalSize, err := internal.GetJournalSizeInSemiInterval(
-		root,
-		utility.WalPath,
-		func(a, b string) bool {
-			return a < b
-		},
-		beginJournalID,
-		endJournalID,
-	)
-	assert.NoError(t, err)
-	assert.Equal(t, expectedSum, journalSize)
-}
-
-func GenerateS3SetAndUpdateBackupsInfo(
-	t *testing.T,
-	recordCount, recordSize int,
-	beginJournalID, endJournalID string,
-	expectedSum int64,
-) {
-	root, mockUploader := initTestS3()
-
-	generateAndUploadData(mockUploader, recordCount, recordSize)
-
-	backupInfo, err := internal.GetBackupInfo(root, SentinelS3Name)
-	assert.Error(t, err)
-	assert.Equal(t, backupInfo, internal.JournalInfo{})
-
-	createEmptySentinel(t, root)
-
-	backupInfo, err = internal.GetBackupInfo(root, SentinelS3Name)
-	assert.NoError(t, err)
-	assert.Equal(t, backupInfo, internal.JournalInfo{})
-
-	backupInfo.JournalSize, err = internal.GetJournalSizeInSemiInterval(
-		root,
-		utility.WalPath,
-		func(a, b string) bool {
-			return a < b
-		},
-		beginJournalID,
-		endJournalID,
-	)
-	assert.Equal(t, backupInfo, internal.JournalInfo{
-		JournalSize: expectedSum,
-	})
-	assert.NoError(t, err)
-
-	err = internal.UploadBackupInfo(root, SentinelName, backupInfo)
-	assert.NoError(t, err)
-
-	backupInfo, err = internal.GetBackupInfo(root, SentinelS3Name)
-	assert.NoError(t, err)
-	assert.Equal(t, backupInfo, internal.JournalInfo{
-		JournalSize: expectedSum,
-	})
-}
-
-func GenerateS3AndUpdateLastBackup(
-	t *testing.T,
-	recordCount, recordSize int,
-	beginJournalID, endJournalID string,
-	expectedSum int64,
-) {
-	root, mockUploader := initTestS3()
-
-	generateAndUploadData(mockUploader, recordCount, recordSize)
-
-	createEmptySentinel(t, root)
-
-	backupInfo, err := internal.GetBackupInfo(root, SentinelS3Name)
-	assert.NoError(t, err)
-	assert.Equal(t, backupInfo, internal.JournalInfo{})
-
-	err = internal.UploadBackupInfo(root, SentinelName, internal.JournalInfo{
-		JournalStart: beginJournalID,
-		JournalEnd:   beginJournalID,
-		JournalSize:  0,
-	})
-	assert.NoError(t, err)
-
-	err = internal.UpdatePreviousBackupInfo(
-		root,
-		utility.WalPath,
-		func(a, b string) bool { return a < b },
-		endJournalID,
-	)
-	assert.NoError(t, err)
-
-	backupInfo, err = internal.GetBackupInfo(root, SentinelS3Name)
-	assert.NoError(t, err)
-
-	assert.Equal(t, backupInfo.JournalSize, expectedSum)
-}
-
-func GenerateS3SetAndUpdateBackupsInfoManyTimes(
-	t *testing.T,
-	recordCount, recordSize int,
-	beginJournalID, endJournalID string,
-	expectedSum int64,
-) {
-	times := 10
-	root, mockUploader := initTestS3()
-
-	generateAndUploadData(mockUploader, recordCount, recordSize)
-
-	for i := 0; i < times; i++ {
-		var backupInfo internal.JournalInfo
-		var err error
-
-		backupInfo.JournalSize, err = internal.GetJournalSizeInSemiInterval(
-			root,
-			utility.WalPath,
-			func(a, b string) bool {
-				return a < b
-			},
-			beginJournalID,
-			endJournalID,
-		)
-		assert.NoError(t, err)
-
-		sentinel := fmt.Sprintf("%s%d", SentinelName, i)
-		err = internal.UploadBackupInfo(root, sentinel, backupInfo)
-		assert.NoError(t, err)
-
-		sentinel = fmt.Sprintf("%s%d", SentinelS3Name, i)
-		backupInfo, err = internal.GetBackupInfo(root, sentinel)
-		assert.NoError(t, err)
-		assert.Equal(t, backupInfo, internal.JournalInfo{
-			JournalSize: expectedSum,
-		})
+func NewEmptyTestJournal(
+	JournalName string,
+	start, end string,
+) internal.JournalInfo {
+	return internal.JournalInfo{
+		JournalDirectoryName: DefaultJournalDirectory,
 	}
 }
 
@@ -183,127 +37,167 @@ func initTestS3() (storage.Folder, internal.Uploader) {
 	root := memory.NewFolder("", memory.NewKVS())
 	mockUploader := internal.NewRegularUploader(
 		&testtools.MockCompressor{},
-		root.GetSubFolder(utility.WalPath),
+		root,
 	)
 	return root, mockUploader
 }
 
-func toJournalNumber(index int) string {
-	return fmt.Sprintf(JournalFmt, index)
+func numberToJournalTimestamp(num int) time.Time {
+	return journalTimestamps[num]
 }
 
-func generateAndUploadData(mockUploader internal.Uploader, recordCount, recordSize int) {
+func generateAndUploadData(t *testing.T, mockUploader internal.Uploader) {
+	recordCount := 100
+	recordSize := 1
+
 	record := strings.Repeat("a", recordSize)
-	// numerate journal names from 1 to make "MinimalJournalNumber" the minimal journal
 	for i := 1; i <= recordCount; i++ {
-		journalName := fmt.Sprintf(JournalFmt, i)
+		journalPath := fmt.Sprintf("%s/"+JournalFmt, DefaultJournalDirectory, i)
 
 		r := bytes.NewReader([]byte(record))
-		mockUploader.UploadFile(context.Background(), ioextensions.NewNamedReaderImpl(r, journalName))
+		err := mockUploader.Upload(context.Background(), journalPath, r)
+		assert.NoError(t, err)
+
+		time.Sleep(time.Millisecond)
+	}
+
+	objs, _, err := mockUploader.Folder().GetSubFolder(DefaultJournalDirectory).ListFolder()
+	assert.NoError(t, err)
+	for _, obj := range objs {
+		value, err := strconv.Atoi(obj.GetName())
+		assert.NoError(t, err)
+
+		journalTimestamps[value] = obj.GetLastModified()
 	}
 }
 
-func createEmptySentinel(t *testing.T, root storage.Folder) {
-	err := internal.UploadBackupInfo(root, SentinelName, internal.JournalInfo{})
-	assert.NoError(t, err)
+func CreateThreeJournals(
+	t *testing.T,
+	folder storage.Folder,
+) (internal.JournalInfo, internal.JournalInfo, internal.JournalInfo) {
+	ji1 := internal.NewEmptyJournalInfo(
+		fmt.Sprintf(
+			"%s_%s",
+			BackupName,
+			time.
+				Now().
+				Add(time.Second*5).
+				Format(internal.JournalTimeLayout),
+		),
+		MinimalJournalNumber, MinimalJournalNumber,
+		DefaultJournalDirectory,
+	)
+	assert.NoError(t, ji1.Upload(folder))
+
+	ji2 := internal.NewEmptyJournalInfo(
+		fmt.Sprintf(
+			"%s_%s",
+			BackupName,
+			time.
+				Now().
+				Add(time.Second*10).
+				Format(internal.JournalTimeLayout),
+		),
+		MinimalJournalNumber, numberToJournalTimestamp(33),
+		DefaultJournalDirectory,
+	)
+
+	assert.NoError(t, ji2.Upload(folder))
+	assert.NoError(t, ji2.UpdateIntervalSize(folder))
+	assert.NoError(t, ji1.Read(folder))
+
+	ji3 := internal.NewEmptyJournalInfo(
+		fmt.Sprintf(
+			"%s_%s",
+			BackupName,
+			time.
+				Now().
+				Add(time.Second*15).
+				Format(internal.JournalTimeLayout),
+		),
+		numberToJournalTimestamp(33), numberToJournalTimestamp(66),
+		DefaultJournalDirectory,
+	)
+
+	assert.NoError(t, ji3.Upload(folder))
+	assert.NoError(t, ji3.UpdateIntervalSize(folder))
+	assert.NoError(t, ji2.Read(folder))
+	assert.NoError(t, ji1.Read(folder))
+
+	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
+
+	return ji1, ji2, ji3
 }
 
-func TestEmptyFolder(t *testing.T) {
-	recordCount := 0
-	recordSize := 0
-	begin := MinimalJournalNumber
-	end := MaximalJournalNumber
-	expectedSize := int64(0)
+func TestCreateThreeJournals(t *testing.T) {
+	folder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
 
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
+	CreateThreeJournals(t, folder)
 }
 
-func TestOneJournal(t *testing.T) {
-	recordCount := 1
-	recordSize := 8
-	begin := MinimalJournalNumber
-	end := MaximalJournalNumber
-	expectedSize := int64(8)
+func TestDeleteJournalInMiddle(t *testing.T) {
+	folder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
 
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
+	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
+
+	assert.NoError(t, ji2.Delete(folder))
+	assert.NoError(t, ji1.Read(folder))
+	assert.NoError(t, ji3.Read(folder))
+	assert.Equal(t, int64(66), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }
 
-func TestManyJournals(t *testing.T) {
-	recordCount := 100
-	recordSize := 8
-	begin := MinimalJournalNumber
-	end := MaximalJournalNumber
-	expectedSize := int64(800)
+func TestDeleteJournalInBegin(t *testing.T) {
+	folder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
 
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
+	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
+
+	assert.NoError(t, ji1.Delete(folder))
+	assert.NoError(t, ji2.Read(folder))
+	assert.NoError(t, ji3.Read(folder))
+	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }
 
-func TestSimpleFrom(t *testing.T) {
-	recordCount := 3
-	recordSize := 8
-	begin := toJournalNumber(2)
-	end := MaximalJournalNumber
-	expectedSize := int64(8)
+func TestDeleteJournalInEnd(t *testing.T) {
+	folder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
 
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
+	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
+
+	assert.NoError(t, ji3.Delete(folder))
+	assert.NoError(t, ji1.Read(folder))
+	assert.NoError(t, ji2.Read(folder))
+	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji2.SizeToNextBackup)
+	fmt.Println(ji1.JournalName, ji2.JournalName, ji3.JournalName)
 }
 
-func TestSimpleTo(t *testing.T) {
-	recordCount := 3
-	recordSize := 8
-	begin := MinimalJournalNumber
-	end := toJournalNumber(2)
-	expectedSize := int64(16)
+func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
+	folder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
 
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-}
+	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
 
-func TestHalfFrom(t *testing.T) {
-	recordCount := 100
-	recordSize := 8
-	begin := toJournalNumber(50)
-	end := MaximalJournalNumber
-	expectedSize := int64(400)
+	// There are random method calls
+	for i := 0; i < 10; i++ {
+		assert.NoError(t, ji1.UpdateIntervalSize(folder))
+		assert.NoError(t, ji1.Upload(folder))
+		assert.NoError(t, ji3.Read(folder))
+		assert.NoError(t, ji2.Upload(folder))
+		assert.NoError(t, ji2.UpdateIntervalSize(folder))
+		assert.NoError(t, ji3.Upload(folder))
+		assert.NoError(t, ji3.UpdateIntervalSize(folder))
+		assert.NoError(t, ji2.Read(folder))
+		assert.NoError(t, ji1.Read(folder))
+	}
 
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-}
-
-func TestHalfTo(t *testing.T) {
-	recordCount := 100
-	recordSize := 8
-	begin := MinimalJournalNumber
-	end := toJournalNumber(50)
-	expectedSize := int64(400)
-
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-}
-
-func TestEmptySetOnTheRightSide(t *testing.T) {
-	recordCount := 100
-	recordSize := 8
-	begin := toJournalNumber(100)
-	end := MaximalJournalNumber
-	expectedSize := int64(0)
-
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-}
-
-func TestEmptySetOnTheLeftSide(t *testing.T) {
-	recordCount := 100
-	recordSize := 8
-	begin := MinimalJournalNumber
-	end := MinimalJournalNumber
-	expectedSize := int64(0)
-
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
-}
-
-func TestOnlyFirstRecord(t *testing.T) {
-	recordCount := 100
-	recordSize := 8
-	begin := MinimalJournalNumber
-	end := toJournalNumber(1)
-	expectedSize := int64(8)
-
-	GenerateDataAndTest(t, recordCount, recordSize, begin, end, expectedSize)
+	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }

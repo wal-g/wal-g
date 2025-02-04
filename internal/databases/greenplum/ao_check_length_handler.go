@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -39,7 +40,7 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
 	defer func() {
-		err := conn.Close()
+		err := conn.Close(context.TODO())
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to close connection %v", err)
 		}

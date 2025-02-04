@@ -1,11 +1,12 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 )
@@ -24,7 +25,8 @@ func GetSettingWithLocalDefault(key string, defaultValue string) string {
 func getRedisConnection(strict bool) *redis.Client {
 	redisAddr := GetSettingWithLocalDefault("WALG_REDIS_HOST", "localhost")
 	redisPort := GetSettingWithLocalDefault("WALG_REDIS_PORT", "6379")
-	redisPassword := GetSettingWithLocalDefault(conf.RedisPassword, "") // no password set
+	redisUsername := GetSettingWithLocalDefault(conf.RedisUsername, "default") // no user set
+	redisPassword := GetSettingWithLocalDefault(conf.RedisPassword, "")        // no password set
 	redisDBStr, ok := conf.GetSetting("WALG_REDIS_DB")
 	redisDB := 0 // use default DB
 	if ok {
@@ -37,6 +39,7 @@ func getRedisConnection(strict bool) *redis.Client {
 	}
 	return redis.NewClient(&redis.Options{
 		Addr:     redisAddr + ":" + redisPort,
+		Username: redisUsername,
 		Password: redisPassword,
 		DB:       redisDB,
 	})
@@ -71,7 +74,8 @@ const dontPanic = false
 func (m *MemoryDataGetter) Get() (res *MemoryData) {
 	res = &MemoryData{}
 	conn := getRedisConnection(dontPanic)
-	data, err := conn.Info("memory").Result()
+	ctx := context.Background()
+	data, err := conn.Info(ctx, "memory").Result()
 	if err != nil {
 		tracelog.InfoLogger.Printf("memory info getting failed: %v", err)
 		return

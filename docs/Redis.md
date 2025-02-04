@@ -16,6 +16,10 @@ Command to create Redis backup, should return backup as single stream to STDOUT.
 Command to unpack Redis backup, should take backup (created by `WALG_STREAM_CREATE_COMMAND`)
 to STDIN. Required for restore procedure.
 
+* `WALG_REDIS_USERNAME`
+
+Username for 'redis-cli' command. Required for interacting with server if you have password.
+
 * `WALG_REDIS_PASSWORD`
 
 Password for 'redis-cli' command. Required for backup archiving procedure if you have password.

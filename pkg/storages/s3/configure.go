@@ -22,6 +22,7 @@ const (
 	sessionTokenSetting             = "AWS_SESSION_TOKEN"
 	sessionNameSetting              = "AWS_ROLE_SESSION_NAME"
 	roleARNSetting                  = "AWS_ROLE_ARN"
+	dualStackSetting                = "AWS_DUAL_STACK"
 	skipValidationSetting           = "S3_SKIP_VALIDATION"
 	useYcSessionTokenSetting        = "S3_USE_YC_SESSION_TOKEN"
 	sseSetting                      = "S3_SSE"
@@ -60,6 +61,7 @@ var SettingList = []string{
 	sessionTokenSetting,
 	sessionNameSetting,
 	roleARNSetting,
+	dualStackSetting,
 	skipValidationSetting,
 	useYcSessionTokenSetting,
 	sseSetting,
@@ -84,6 +86,7 @@ var SettingList = []string{
 
 const (
 	defaultPort                    = "443"
+	defaultDualStack               = false
 	defaultSkipValidation          = true
 	defaultForcePathStyle          = false
 	defaultUseListObjectsV1        = false
@@ -114,6 +117,10 @@ func ConfigureStorage(
 	port := defaultPort
 	if p, ok := settings[endpointPortSetting]; ok {
 		port = p
+	}
+	dualStack, err := setting.BoolOptional(settings, dualStackSetting, defaultDualStack)
+	if err != nil {
+		return nil, err
 	}
 	skipValidation, err := setting.BoolOptional(settings, skipValidationSetting, defaultSkipValidation)
 	if err != nil {
@@ -181,6 +188,7 @@ func ConfigureStorage(
 		AccessKey:                strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
 		SessionToken:             settings[sessionTokenSetting],
 		RoleARN:                  settings[roleARNSetting],
+		DualStack:                dualStack,
 		SessionName:              settings[sessionNameSetting],
 		CACertFile:               settings[caCertFileSetting],
 		SkipValidation:           skipValidation,

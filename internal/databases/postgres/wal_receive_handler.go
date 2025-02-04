@@ -161,7 +161,7 @@ func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) 
 	if err != nil {
 		return
 	}
-	defer tmpConn.Close()
+	defer tmpConn.Close(context.TODO())
 
 	queryRunner, err := NewPgQueryRunner(tmpConn)
 	if err != nil {

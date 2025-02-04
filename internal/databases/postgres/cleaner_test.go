@@ -3,8 +3,10 @@ package postgres_test
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/postgres/mocks"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -51,147 +53,224 @@ var (
 	inputWALFileWithTooMuchLogSegNoLo = "0000000100000001FFFFFFFF"
 )
 
-type MockCleaner struct {
-	files   []string
-	deleted []string
-	err     error
-}
-
-func (cl *MockCleaner) GetFiles(directory string) (files []string, err error) {
-	return cl.files, cl.err
-}
-
-func (cl *MockCleaner) Remove(file string) {
-	cl.deleted = append(cl.deleted, file)
-}
-
-func (cl *MockCleaner) setFilesAndErrorAndClearDeleted(newFiles []string, err error) {
-	cl.files = newFiles
-	cl.err = err
-	cl.deleted = []string{}
-}
-
 func TestCleanupSimpleFiles(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(inputSimpleFiles, nil)
-	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, len(wantSimpleDeleted), len(cleaner.deleted))
-	for _, delFile := range wantSimpleDeleted {
-		assert.Contains(t, cleaner.deleted, delFile)
-	}
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().GetFiles(gomock.Any()).Return(inputSimpleFiles, nil).AnyTimes()
+
+	var actualDeleted []string
+	cleaner.EXPECT().Remove(gomock.Any()).Do(func(toDelete string) {
+		actualDeleted = append(actualDeleted, toDelete)
+	}).Times(len(wantSimpleDeleted))
+
+	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", cleaner)
+
+	assert.ElementsMatchf(
+		t,
+		wantSimpleDeleted,
+		actualDeleted,
+		"deleted wrong files",
+	)
 }
 
 func TestCleanupByNotWALFile(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(inputSimpleFiles, nil)
-	postgres.CleanupPrefetchDirectories(inputNotWALFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, 0, len(cleaner.deleted))
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().GetFiles(gomock.Any()).Return(inputSimpleFiles, nil).AnyTimes()
+	cleaner.EXPECT().Remove(gomock.Any()).Times(0)
+
+	postgres.CleanupPrefetchDirectories(inputNotWALFile, "/A", cleaner)
 }
 
 func TestCleanupButInFilesNotWALFile(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(append(inputSimpleFiles, inputNotWALFile), nil)
-	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, len(wantSimpleDeleted), len(cleaner.deleted))
-	for _, delFile := range wantSimpleDeleted {
-		assert.Contains(t, cleaner.deleted, delFile)
-	}
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().GetFiles(gomock.Any()).Return(append(inputSimpleFiles, inputNotWALFile), nil).AnyTimes()
+
+	var actualDeleted []string
+	cleaner.EXPECT().Remove(gomock.Any()).Do(func(toDelete string) {
+		actualDeleted = append(actualDeleted, toDelete)
+	}).Times(len(wantSimpleDeleted))
+
+	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", cleaner)
+
+	assert.ElementsMatchf(
+		t,
+		wantSimpleDeleted,
+		actualDeleted,
+		"deleted wrong files",
+	)
 }
 
 func TestCleanupByWALWithIncorrectTimeline(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(inputSimpleFiles, nil)
-	postgres.CleanupPrefetchDirectories(inputWALFileWithIncorrectTimeline, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, 0, len(cleaner.deleted))
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().GetFiles(gomock.Any()).Return(inputSimpleFiles, nil).AnyTimes()
+	cleaner.EXPECT().Remove(gomock.Any()).Times(0)
+
+	postgres.CleanupPrefetchDirectories(inputWALFileWithIncorrectTimeline, "/A", cleaner)
 }
 
 func TestCleanupButInFilesWALWithIncorrectTimeline(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(append(inputSimpleFiles, inputWALFileWithIncorrectTimeline), nil)
-	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, len(wantSimpleDeleted), len(cleaner.deleted))
-	for _, delFile := range wantSimpleDeleted {
-		assert.Contains(t, cleaner.deleted, delFile)
-	}
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().
+		GetFiles(gomock.Any()).
+		Return(append(inputSimpleFiles, inputWALFileWithIncorrectTimeline), nil).AnyTimes()
+
+	var actualDeleted []string
+	cleaner.EXPECT().Remove(gomock.Any()).Do(func(toDelete string) {
+		actualDeleted = append(actualDeleted, toDelete)
+	}).Times(len(wantSimpleDeleted))
+
+	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", cleaner)
+
+	assert.ElementsMatchf(
+		t,
+		wantSimpleDeleted,
+		actualDeleted,
+		"deleted wrong files",
+	)
 }
 
 func TestCleanupByWALWithIncorrectLogSegNoHi(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(inputSimpleFiles, nil)
-	postgres.CleanupPrefetchDirectories(inputWALFileWithIncorrectLogSegNoHi, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, 0, len(cleaner.deleted))
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().GetFiles(gomock.Any()).Return(inputSimpleFiles, nil).AnyTimes()
+	cleaner.EXPECT().Remove(gomock.Any()).Times(0)
+
+	postgres.CleanupPrefetchDirectories(inputWALFileWithIncorrectLogSegNoHi, "/A", cleaner)
 }
 
 func TestCleanupButInFilesWALWithIncorrectLogSegNoHi(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(append(inputSimpleFiles, inputWALFileWithIncorrectLogSegNoHi), nil)
-	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, len(wantSimpleDeleted), len(cleaner.deleted))
-	for _, delFile := range wantSimpleDeleted {
-		assert.Contains(t, cleaner.deleted, delFile)
-	}
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().
+		GetFiles(gomock.Any()).
+		Return(append(inputSimpleFiles, inputWALFileWithIncorrectLogSegNoHi), nil).
+		AnyTimes()
+
+	var actualDeleted []string
+	cleaner.EXPECT().Remove(gomock.Any()).Do(func(toDelete string) {
+		actualDeleted = append(actualDeleted, toDelete)
+	}).Times(len(wantSimpleDeleted))
+
+	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", cleaner)
+
+	assert.ElementsMatchf(
+		t,
+		wantSimpleDeleted,
+		actualDeleted,
+		"deleted wrong files",
+	)
 }
 
 func TestCleanupByWALWithIncorrectLogSegNoLo(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(inputSimpleFiles, nil)
-	postgres.CleanupPrefetchDirectories(inputWALFileWithIncorrectLogSegNoLo, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, 0, len(cleaner.deleted))
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().GetFiles(gomock.Any()).Return(inputSimpleFiles, nil).AnyTimes()
+	cleaner.EXPECT().Remove(gomock.Any()).Times(0)
+
+	postgres.CleanupPrefetchDirectories(inputWALFileWithIncorrectLogSegNoLo, "/A", cleaner)
 }
 
 func TestCleanupButInFilesWALWithIncorrectLogSegNoLo(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(append(inputSimpleFiles, inputWALFileWithIncorrectLogSegNoLo), nil)
-	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, len(wantSimpleDeleted), len(cleaner.deleted))
-	for _, delFile := range wantSimpleDeleted {
-		assert.Contains(t, cleaner.deleted, delFile)
-	}
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().
+		GetFiles(gomock.Any()).
+		Return(append(inputSimpleFiles, inputWALFileWithIncorrectLogSegNoLo), nil).AnyTimes()
+
+	var actualDeleted []string
+	cleaner.EXPECT().Remove(gomock.Any()).Do(func(toDelete string) {
+		actualDeleted = append(actualDeleted, toDelete)
+	}).Times(len(wantSimpleDeleted))
+
+	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", cleaner)
+
+	assert.ElementsMatchf(
+		t,
+		wantSimpleDeleted,
+		actualDeleted,
+		"deleted wrong files",
+	)
 }
 
 func TestCleanupWithErrorOnGetFiles(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(nil, errors.New("some error"))
-	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, 0, len(cleaner.deleted))
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().
+		GetFiles(gomock.Any()).
+		Return(nil, errors.New("some error")).AnyTimes()
+	cleaner.EXPECT().Remove(gomock.Any()).Times(0)
+
+	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", cleaner)
 }
 
 func TestCleanupFilesWithDiffInTimeline(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(inputFilesWithDiffInTimeline, nil)
-	postgres.CleanupPrefetchDirectories(inputFileWithDiffInTimeline, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, len(wantDeletedWithDiffInTimeline), len(cleaner.deleted))
-	for _, delFile := range wantDeletedWithDiffInTimeline {
-		assert.Contains(t, cleaner.deleted, delFile)
-	}
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().
+		GetFiles(gomock.Any()).
+		Return(inputFilesWithDiffInTimeline, nil).AnyTimes()
+
+	var actualDeleted []string
+	cleaner.EXPECT().Remove(gomock.Any()).Do(func(toDelete string) {
+		actualDeleted = append(actualDeleted, toDelete)
+	}).Times(len(wantDeletedWithDiffInTimeline))
+
+	postgres.CleanupPrefetchDirectories(inputFileWithDiffInTimeline, "/A", cleaner)
+
+	assert.ElementsMatchf(
+		t,
+		wantDeletedWithDiffInTimeline,
+		actualDeleted,
+		"deleted wrong files",
+	)
 }
 
 func TestCleanupByWALWithTooMuchLogSegNoLo(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(inputSimpleFiles, nil)
-	postgres.CleanupPrefetchDirectories(inputWALFileWithTooMuchLogSegNoLo, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, 0, len(cleaner.deleted))
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().
+		GetFiles(gomock.Any()).
+		Return(inputSimpleFiles, nil).AnyTimes()
+	cleaner.EXPECT().Remove(gomock.Any()).Times(0)
+
+	postgres.CleanupPrefetchDirectories(inputWALFileWithTooMuchLogSegNoLo, "/A", cleaner)
 }
 
 func TestCleanupButInFilesWALWithTooMuchLogSegNoLo(t *testing.T) {
-	cleaner := MockCleaner{}
-	cleaner.setFilesAndErrorAndClearDeleted(append(inputSimpleFiles, inputWALFileWithTooMuchLogSegNoLo), nil)
-	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", &cleaner)
+	ctrl := gomock.NewController(t)
 
-	assert.Equal(t, len(wantSimpleDeleted), len(cleaner.deleted))
-	for _, delFile := range wantSimpleDeleted {
-		assert.Contains(t, cleaner.deleted, delFile)
-	}
+	cleaner := mocks.NewMockCleaner(ctrl)
+	cleaner.EXPECT().
+		GetFiles(gomock.Any()).
+		Return(append(inputSimpleFiles, inputWALFileWithTooMuchLogSegNoLo), nil).AnyTimes()
+
+	var actualDeleted []string
+	cleaner.EXPECT().Remove(gomock.Any()).Do(func(toDelete string) {
+		actualDeleted = append(actualDeleted, toDelete)
+	}).Times(len(wantSimpleDeleted))
+
+	postgres.CleanupPrefetchDirectories(inputSimpleFile, "/A", cleaner)
+
+	assert.ElementsMatchf(
+		t,
+		wantSimpleDeleted,
+		actualDeleted,
+		"deleted wrong files",
+	)
 }

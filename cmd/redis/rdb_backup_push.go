@@ -45,11 +45,6 @@ var backupPushCmd = &cobra.Command{
 		uploader.ChangeDirectory(utility.BaseBackupPath)
 
 		var cmdArgs []string
-		redisUser, ok := conf.GetSetting(conf.RedisCreateBackupACLUser)
-		if ok && redisUser != "" {
-			cmdArgs = append(cmdArgs, "--user", redisUser)
-		}
-
 		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd, cmdArgs...)
 		tracelog.ErrorLogger.FatalOnError(err)
 

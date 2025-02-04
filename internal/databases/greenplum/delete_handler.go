@@ -22,7 +22,7 @@ import (
 type DeleteArgs struct {
 	Confirmed bool
 	FindFull  bool
-	Garbage   bool
+	Force     bool
 }
 
 type DeleteHandler struct {
@@ -185,7 +185,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 			}
 			segBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
 			if err != nil {
-				if h.args.Garbage {
+				if h.args.Force {
 					tracelog.ErrorLogger.Printf("Processing segment %d (backupId=%s): %v", meta.ContentID, meta.BackupID, err)
 					return nil // skip non-critical errors in garbage deletion
 				}

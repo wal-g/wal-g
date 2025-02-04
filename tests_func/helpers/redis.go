@@ -7,36 +7,48 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/redis/go-redis/v9"
 	"github.com/wal-g/tracelog"
 )
 
 type RedisCtl struct {
-	host     string
-	port     int
+	*redis.Client
+	ctx      context.Context
 	binPath  string
 	confPath string
-	*redis.Client
-	ctx context.Context
+	host     string
+	port     int
 }
 
-func NewRedisCtl(ctx context.Context, host string, port int, password, binPath, confPath string) (*RedisCtl, error) {
-	expHost, expPort, err := ExposedHostPort(ctx, host, port)
+type RedisCtlArgs struct {
+	BinPath  string
+	ConfPath string
+
+	Host string
+	Port int
+
+	Username string
+	Password string
+}
+
+func NewRedisCtl(ctx context.Context, args RedisCtlArgs) (*RedisCtl, error) {
+	expHost, expPort, err := ExposedHostPort(ctx, args.Host, args.Port)
 	if err != nil {
-		return nil, fmt.Errorf("Expose host failed: %v\n", err)
+		return nil, fmt.Errorf("expose host failed: %v", err)
 	}
 	client := redis.NewClient(&redis.Options{
 		Addr:     expHost + ":" + strconv.Itoa(expPort),
-		Password: password,
 		DB:       0,
+		Password: args.Password,
+		Username: args.Username,
 	})
 	return &RedisCtl{
-		host,
-		port,
-		binPath,
-		confPath,
 		client,
 		ctx,
+		args.BinPath,
+		args.ConfPath,
+		args.Host,
+		args.Port,
 	}, nil
 }
 
@@ -66,7 +78,7 @@ func (rc *RedisCtl) WriteTestData(mark string, docsCount int) error {
 		}
 		rows = append(rows, fmt.Sprintf("%s_key_num%d", mark, k), data)
 	}
-	status := rc.MSet(rows...)
+	status := rc.MSet(rc.ctx, rows...)
 	tracelog.DebugLogger.Printf("WriteTestData result: %v", status)
 	if status.Err() != nil {
 		return fmt.Errorf("failed to write test data to redis: %w", status.Err())
