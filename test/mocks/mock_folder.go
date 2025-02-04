@@ -167,15 +167,15 @@ func (mr *MockFolderMockRecorder) ReadObject(objectRelativePath interface{}) *go
 }
 
 // SetVersioningEnabled mocks base method.
-func (m *MockFolder) SetVersioningEnabled(using bool) {
+func (m *MockFolder) SetVersioningEnabled(enable bool) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetVersioningEnabled", using)
+	m.ctrl.Call(m, "SetVersioningEnabled", enable)
 }
 
 // SetVersioningEnabled indicates an expected call of SetVersioningEnabled.
-func (mr *MockFolderMockRecorder) SetVersioningEnabled(using interface{}) *gomock.Call {
+func (mr *MockFolderMockRecorder) SetVersioningEnabled(enable interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVersioningEnabled", reflect.TypeOf((*MockFolder)(nil).SetVersioningEnabled), using)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVersioningEnabled", reflect.TypeOf((*MockFolder)(nil).SetVersioningEnabled), enable)
 }
 
 // Validate mocks base method.
