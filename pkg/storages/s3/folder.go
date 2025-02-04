@@ -131,48 +131,10 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	delimiter := aws.String("/")
 
 	if folder.isVersioningEnabled() {
-		versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
-			for _, prefix := range out.CommonPrefixes {
-				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
-				subFolders = append(subFolders, subFolder)
-			}
-
-			for _, object := range out.Versions {
-				// Some storages return root tar_partitions folder as a Key.
-				if *object.Key == folder.path {
-					continue
-				}
-
-				objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-				if *object.IsLatest {
-					objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-						*object.Size, fmt.Sprintf("%s LATEST", *object.VersionId)))
-				} else {
-					objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified, *object.Size, *object.VersionId))
-				}
-			}
-			for _, object := range out.DeleteMarkers {
-				// Some storages return root tar_partitions folder as a Key.
-				if *object.Key == folder.path {
-					continue
-				}
-
-				objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-				if *object.IsLatest {
-					objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-						0, fmt.Sprintf("%s LATEST", *object.VersionId)))
-				} else {
-					objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified, 0, *object.VersionId))
-				}
-			}
-			return true
+		objects, subFolders, err = folder.listVersions(prefix, delimiter)
+		if err != nil {
+			return nil, nil, err
 		}
-		input := &s3.ListObjectVersionsInput{
-			Bucket:    folder.bucket,
-			Prefix:    prefix,
-			Delimiter: delimiter,
-		}
-		folder.s3API.ListObjectVersionsPages(input, versionsListFunc)
 	} else {
 		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
 			for _, prefix := range commonPrefixes {
@@ -194,17 +156,68 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 		err = folder.listObjectsPages(prefix, delimiter, nil, listFunc)
 
-		if err != nil {
-			// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
-			// which don't yet exist.
-			if isAwsNotExist(err) {
-				return objects, subFolders, nil
-			}
-
+		// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+		// which don't yet exist.
+		if err != nil && !isAwsNotExist(err) {
 			return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 		}
 	}
 
+	return objects, subFolders, nil
+}
+
+func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage.Object, []storage.Folder, error) {
+	objects := []storage.Object{}
+	subFolders := []storage.Folder{}
+	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
+		for _, prefix := range out.CommonPrefixes {
+			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+			subFolders = append(subFolders, subFolder)
+		}
+
+		for _, object := range out.Versions {
+			// Some storages return root tar_partitions folder as a Key.
+			if *object.Key == folder.path {
+				continue
+			}
+
+			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+			if *object.IsLatest {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
+					*object.Size, fmt.Sprintf("%s LATEST", *object.VersionId)))
+			} else {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
+					*object.Size, *object.VersionId))
+			}
+		}
+		for _, object := range out.DeleteMarkers {
+			// Some storages return root tar_partitions folder as a Key.
+			if *object.Key == folder.path {
+				continue
+			}
+
+			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+			if *object.IsLatest {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
+					0, fmt.Sprintf("%s LATEST", *object.VersionId)))
+			} else {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified, 0, *object.VersionId))
+			}
+		}
+		return true
+	}
+	input := &s3.ListObjectVersionsInput{
+		Bucket:    folder.bucket,
+		Prefix:    prefix,
+		Delimiter: delimiter,
+	}
+	err := folder.s3API.ListObjectVersionsPages(input, versionsListFunc)
+
+	// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+	// which don't yet exist.
+	if err != nil && !isAwsNotExist(err) {
+		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
+	}
 	return objects, subFolders, nil
 }
 
