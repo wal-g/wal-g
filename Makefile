@@ -63,8 +63,8 @@ pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
 	docker save ${IMAGE} | gzip -c > ${CACHE_FILE_DOCKER_PREFIX}
-	docker save ${IMAGE_UBUNTU_18_04} | gzip -c > ${CACHE_FILE_UBUNTU_18_04}
-	docker save ${IMAGE_UBUNTU_20_04} | gzip -c > ${CACHE_FILE_UBUNTU_20_04}
+	docker save wal-g/ubuntu:18.04 | gzip -c > ${CACHE_FILE_UBUNTU_18_04}
+	docker save wal-g/ubuntu:20.04 | gzip -c > ${CACHE_FILE_UBUNTU_20_04}
 	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
