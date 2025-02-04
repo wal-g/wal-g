@@ -10,6 +10,8 @@ import (
 
 const removeShortDescription = "Removes objects by the prefix from the specified storage"
 
+var removeAllVersions bool
+
 // removeCmd represents the deleteObject command
 var removeCmd = &cobra.Command{
 	Use:   "rm prefix",
@@ -17,6 +19,7 @@ var removeCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
+			folder.SetVersioningEnabled(removeAllVersions)
 			if glob {
 				return storagetools.HandleRemoveWithGlobPattern(args[0], folder)
 			}
@@ -27,5 +30,6 @@ var removeCmd = &cobra.Command{
 }
 
 func init() {
+	removeCmd.Flags().BoolVar(&removeAllVersions, "all-versions", false, "Remove all file versions if versioning is enabled in storage")
 	StorageToolsCmd.AddCommand(removeCmd)
 }

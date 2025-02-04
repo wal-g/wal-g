@@ -97,3 +97,6 @@ func (f *Folder) Validate() error {
 	}
 	return f.MemFolder.Validate()
 }
+
+// NOT IMPLEMENTED
+func (f *Folder) SetVersioningEnabled(enable bool) {}

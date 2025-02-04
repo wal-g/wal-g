@@ -192,3 +192,6 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 func (folder *Folder) Validate() error {
 	return nil
 }
+
+// NOT IMPLEMENTED
+func (folder *Folder) SetVersioningEnabled(using bool) {}

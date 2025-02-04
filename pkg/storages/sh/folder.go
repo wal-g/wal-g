@@ -209,3 +209,6 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 func (folder *Folder) Validate() error {
 	return nil
 }
+
+// NOT IMPLEMENTED
+func (folder *Folder) SetVersioningEnabled(enable bool) {}
