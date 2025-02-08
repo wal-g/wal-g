@@ -111,17 +111,22 @@ func configureSession(sess *session.Session, config *Config) error {
 	sessionToken := config.SessionToken
 
 	if config.RoleARN != "" {
-		stsSession := sts.New(sess)
-		assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
-			RoleArn:         aws.String(config.RoleARN),
-			RoleSessionName: aws.String(config.SessionName),
-		})
-		if err != nil {
-			return fmt.Errorf("assume role by ARN: %w", err)
+		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != "" && os.Getenv("AWS_ROLE_ARN") != "" {
+			// Skip explicit role assumption when using IRSA
+			tracelog.DebugLogger.Printf("Running with IRSA, skipping explicit role assumption")
+		} else {
+			stsSession := sts.New(sess)
+			assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
+				RoleArn:         aws.String(config.RoleARN),
+				RoleSessionName: aws.String(config.SessionName),
+			})
+			if err != nil {
+				return fmt.Errorf("assume role by ARN: %w", err)
+			}
+			accessKey = *assumedRole.Credentials.AccessKeyId
+			secretKey = *assumedRole.Credentials.SecretAccessKey
+			sessionToken = *assumedRole.Credentials.SessionToken
 		}
-		accessKey = *assumedRole.Credentials.AccessKeyId
-		secretKey = *assumedRole.Credentials.SecretAccessKey
-		sessionToken = *assumedRole.Credentials.SessionToken
 	}
 
 	if accessKey != "" && secretKey != "" {
