@@ -113,7 +113,7 @@ func configureSession(sess *session.Session, config *Config) error {
 	if config.RoleARN != "" {
 		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != "" && os.Getenv("AWS_ROLE_ARN") != "" {
 			// Skip explicit role assumption when using IRSA
-			tracelog.DebugLogger.Printf("Running with IRSA, skipping explicit role assumption")
+			tracelog.InfoLogger.Printf("Running with IRSA, skipping explicit role assumption")
 		} else {
 			stsSession := sts.New(sess)
 			assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
