@@ -16,6 +16,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/daemon"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -205,17 +206,24 @@ func HandleDaemon(options DaemonOptions) {
 
 	conf.SetupSignalListener()
 
+	multiSt, err := internal.ConfigureMultiStorage(true)
+	defer utility.LoggedClose(multiSt, "close multi-storage")
+	if err != nil {
+		tracelog.ErrorLogger.Fatal("configure multi-storage: %w", err)
+		return
+	}
+
 	for {
 		fd, err := l.Accept()
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go Listen(context.Background(), fd)
+		go ProcessConnection(context.Background(), fd, multiSt)
 	}
 }
 
-// Listen is used for listening connection and processing messages
-func Listen(ctx context.Context, c net.Conn) {
+// ProcessConnection is used for listening connection and processing messages
+func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.Storage) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
 	messageReader := NewMessageReader(c)
 	for {
@@ -224,7 +232,7 @@ func Listen(ctx context.Context, c net.Conn) {
 			failAndLogError(c, fmt.Errorf("read message from %s, err: %v", c.RemoteAddr(), err))
 			return
 		}
-		err = handleMessage(ctx, messageType, messageBody, c)
+		err = handleMessage(ctx, messageType, messageBody, c, multiSt)
 		if err != nil {
 			failAndLogError(c, err)
 			return
@@ -245,12 +253,8 @@ func handleMessage(
 	messageType daemon.SocketMessageType,
 	messageBody []byte,
 	conn net.Conn,
+	multiSt *multistorage.Storage,
 ) error {
-	multiSt, err := internal.ConfigureMultiStorage(true)
-	defer utility.LoggedClose(multiSt, "close multi-storage")
-	if err != nil {
-		return fmt.Errorf("configure multi-storage: %w", err)
-	}
 	messageHandler, err := NewMessageHandler(messageType, conn, multiSt)
 	if err != nil {
 		return fmt.Errorf("init handler for message type %s: %v", string(messageType), err)
