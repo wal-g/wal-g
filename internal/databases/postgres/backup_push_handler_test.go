@@ -2,11 +2,12 @@ package postgres
 
 import (
 	"context"
+	"testing"
+
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
-	"testing"
 )
 
 const (
@@ -103,7 +104,9 @@ func initCommand() *BackupHandler {
 	userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
+	tracelog.ErrorLogger.FatalOnError(err)
+	folder := storage.RootFolder()
 	uploader, err := internal.ConfigureUploaderToFolder(folder)
 
 	arguments := NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
