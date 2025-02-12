@@ -85,11 +85,11 @@ func logSizesDifference(sourceFile, targetFile storage.Object) {
 	}
 }
 
-func limitFiles(files map[string]storage.Object, max int) []FilesGroup {
+func limitFiles(files map[string]storage.Object, size int) []FilesGroup {
 	count := 0
-	fileGroups := make([]FilesGroup, 0, utility.Min(max, len(files)))
+	fileGroups := make([]FilesGroup, 0, utility.Min(size, len(files)))
 	for _, file := range files {
-		if count >= max {
+		if count >= size {
 			break
 		}
 		singleFileGroup := FilesGroup{
