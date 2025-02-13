@@ -138,7 +138,7 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 			https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L202
 			for abortIndexBuild details
 			*/
-			return nil
+			return fmt.Errorf("%s operation is not supported in applyOps mode", oplog.Object[0].Key)
 		}
 	}
 
@@ -332,8 +332,9 @@ func indexSpecFromCommitIndexBuilds(op *db.Oplog) (string, []client.IndexDocumen
 				if !ok {
 					return "", nil, NewTypeAssertionError("bson.D", fmt.Sprintf("indexes[%d]", i), elemE.Value)
 				}
-				for i := range elements {
-					elemE = elements[i]
+
+				for j := range elements {
+					elemE = elements[j]
 					if elemE.Key == "key" {
 						if indexSpecs[i].Key, ok = elemE.Value.(bson.D); !ok {
 							return "", nil, NewTypeAssertionError("bson.D", "key", elemE.Value)
