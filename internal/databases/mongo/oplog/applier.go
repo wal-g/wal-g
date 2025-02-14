@@ -128,7 +128,21 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 		return fmt.Errorf("noop op")
 	}
 
-	if !isOpAllowed(oplog) {
+	if oplog.Operation == "c" && len(oplog.Object) > 0 {
+		if oplog.Object[0].Key == "startIndexBuild" ||
+			oplog.Object[0].Key == "abortIndexBuild" {
+			/* See
+			https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L183
+			for startIndexBuild
+			and
+			https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L202
+			for abortIndexBuild details
+			*/
+			return nil
+		}
+	}
+
+	if !isOpAllowedInconfigDB(oplog) {
 		return fmt.Errorf("config database op")
 	}
 
@@ -190,8 +204,8 @@ func Contains[S ~[]E, E comparable](s S, v E) bool {
 	return Index(s, v) >= 0
 }
 
-func isOpAllowed(oe *db.Oplog) bool {
-	coll, ok := strings.CutPrefix(oe.Namespace, "config.")
+func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
+	coll, ok := strings.CutPrefix(oplog.Namespace, "config.")
 	if !ok {
 		return true // OK: not a "config" database. allow any ops
 	}
@@ -200,23 +214,27 @@ func isOpAllowed(oe *db.Oplog) bool {
 		return true // OK: create/update/delete a doc
 	}
 
-	if coll != "$cmd" || len(oe.Object) == 0 {
+	if coll != "$cmd" || len(oplog.Object) == 0 {
 		return false // other collections are not allowed
 	}
 
-	op := oe.Object[0].Key
-	if op == "applyOps" {
-		return true // internal ops of applyOps are checked one by one later
-	}
-	if _, ok := selectedNSSupportedCommands[op]; ok {
-		s, _ := oe.Object[0].Value.(string)
-		return Contains(ConfigCollectionsToKeep, s)
+	if len(oplog.Object) > 0 {
+		op := oplog.Object[0].Key
+		if op == "applyOps" {
+			return true // internal ops of applyOps are checked one by one later
+		}
+		if _, ok := selectedNSSupportedCommands[op]; ok {
+			s, _ := oplog.Object[0].Value.(string)
+			return Contains(ConfigCollectionsToKeep, s)
+		}
 	}
 
 	return false
 }
 
 // handleNonTxnOp tries to apply given oplog record.
+//
+//nolint:gocyclo
 func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 	if !ap.preserveUUID {
 		var err error
@@ -228,7 +246,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 
 	// TODO: wait for index building
 	// TODO: if we wait for index building, we can stop ignoring a BackgroundOperation... error in DropIndexes
-	if op.Operation == "c" && op.Object[0].Key == "commitIndexBuild" {
+	if op.Operation == "c" && len(op.Object) > 0 && op.Object[0].Key == "commitIndexBuild" {
 		collName, indexes, err := indexSpecFromCommitIndexBuilds(op)
 		if err != nil {
 			return NewOpHandleError(op, err)
@@ -236,7 +254,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 		dbName, _ := util.SplitNamespace(op.Namespace)
 		return ap.db.CreateIndexes(ctx, dbName, collName, indexes)
 	}
-	if op.Operation == "c" && op.Object[0].Key == "createIndexes" {
+	if op.Operation == "c" && len(op.Object) > 0 && op.Object[0].Key == "createIndexes" {
 		collName, indexes, err := indexSpecsFromCreateIndexes(op)
 		if err != nil {
 			return NewOpHandleError(*op, err)
@@ -245,7 +263,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 		return ap.db.CreateIndexes(ctx, dbName, collName,
 			[]client.IndexDocument{indexes})
 	}
-	if op.Operation == "c" && op.Object[0].Key == "dropIndexes" {
+	if op.Operation == "c" && len(op.Object) > 0 && op.Object[0].Key == "dropIndexes" {
 		dbName, _ := util.SplitNamespace(op.Namespace)
 		return ap.db.DropIndexes(ctx, dbName, op.Object)
 	}

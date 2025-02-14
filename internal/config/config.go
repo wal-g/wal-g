@@ -161,16 +161,15 @@ const (
 	// Deprecated: unused
 	MysqlTakeBinlogsFromMaster = "WALG_MYSQL_TAKE_BINLOGS_FROM_MASTER"
 
-	RedisPassword             = "WALG_REDIS_PASSWORD"
-	RedisCreateBackupACLUser  = "WALG_CREATE_BACKUP_REDIS_ACL_USER"
-	RedisRestoreBackupACLUser = "WALG_RESTORE_BACKUP_REDIS_ACL_USER"
-	RedisDataPath             = "WALG_REDIS_DATA_PATH"
-	RedisAppendonlyFolder     = "WALG_REDIS_APPENDONLY_PATH"
-	RedisAppendonlyManifest   = "WALG_REDIS_APPENDONLY_MANIFEST"
-	RedisAppendonlyTmpFolder  = "WALG_REDIS_APPENDONLY_TEMP_MANIFEST"
-	RedisDataThreshold        = "WALG_REDIS_DATA_THRESHOLD"
-	RedisDataTimeout          = "WALG_REDIS_DATA_TIMEOUT"
-	RedisServerProcessName    = "WALG_REDIS_SERVER_PROCESS_NAME"
+	RedisUsername            = "WALG_REDIS_USERNAME"
+	RedisPassword            = "WALG_REDIS_PASSWORD"
+	RedisDataPath            = "WALG_REDIS_DATA_PATH"
+	RedisAppendonlyFolder    = "WALG_REDIS_APPENDONLY_PATH"
+	RedisAppendonlyManifest  = "WALG_REDIS_APPENDONLY_MANIFEST"
+	RedisAppendonlyTmpFolder = "WALG_REDIS_APPENDONLY_TEMP_MANIFEST"
+	RedisDataThreshold       = "WALG_REDIS_DATA_THRESHOLD"
+	RedisDataTimeout         = "WALG_REDIS_DATA_TIMEOUT"
+	RedisServerProcessName   = "WALG_REDIS_SERVER_PROCESS_NAME"
 
 	GPLogsDirectory              = "WALG_GP_LOGS_DIR"
 	GPSegContentID               = "WALG_GP_SEG_CONTENT_ID"
@@ -284,7 +283,7 @@ var (
 		RedisDataPath:            "/var/lib/redis",
 		RedisAppendonlyFolder:    "appendonlydir",
 		RedisAppendonlyManifest:  "appendonly.aof.manifest",
-		RedisAppendonlyTmpFolder: "/var/run/wal-g/",
+		RedisAppendonlyTmpFolder: "/var/lib/redis/wal-g/",
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
 		RedisServerProcessName:   "redis-server",
@@ -547,16 +546,15 @@ var (
 
 	RedisAllowedSettings = map[string]bool{
 		// Redis
-		RedisPassword:             true,
-		RedisCreateBackupACLUser:  true,
-		RedisRestoreBackupACLUser: true,
-		RedisDataPath:             true,
-		RedisAppendonlyFolder:     true,
-		RedisAppendonlyManifest:   true,
-		RedisAppendonlyTmpFolder:  true,
-		RedisDataThreshold:        true,
-		RedisDataTimeout:          true,
-		RedisServerProcessName:    true,
+		RedisUsername:            true,
+		RedisPassword:            true,
+		RedisDataPath:            true,
+		RedisAppendonlyFolder:    true,
+		RedisAppendonlyManifest:  true,
+		RedisAppendonlyTmpFolder: true,
+		RedisDataThreshold:       true,
+		RedisDataTimeout:         true,
+		RedisServerProcessName:   true,
 	}
 
 	GPAllowedSettings = map[string]bool{
@@ -605,6 +603,7 @@ var (
 		PgpKeyPassphraseSetting:      true,
 		PgpKeySetting:                true,
 		PgpEnvelopeKeySetting:        true,
+		RedisUsername:                true,
 		RedisPassword:                true,
 		SQLServerConnectionString:    true,
 		SSHPassword:                  true,

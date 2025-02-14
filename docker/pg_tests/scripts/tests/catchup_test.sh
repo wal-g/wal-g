@@ -98,6 +98,9 @@ mv ${PGDATA_BETA_1} ${PGDATA_BETA}
 
 wal-g catchup-receive ${PGDATA_BETA} 1337 &
 
+# wait for wal-g to start
+while netstat -lnt | awk '$4 ~ /:1337$/ {exit 1}'; do sleep 10; done
+
 wal-g --config=${TMP_CONFIG} catchup-send ${PGDATA_ALPHA} localhost:1337
 
 

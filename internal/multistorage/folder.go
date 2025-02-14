@@ -680,6 +680,8 @@ func (mf Folder) Validate() error {
 	return nil
 }
 
+func (mf Folder) SetVersioningEnabled(enable bool) {}
+
 var (
 	ErrNoUsedStorages  = fmt.Errorf("no storages are used")
 	ErrNoAliveStorages = fmt.Errorf("no alive storages")

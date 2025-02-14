@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go
 
 FROM wal-g/pg:latest
 
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y netcat-openbsd && apt-get clean
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y netcat-openbsd net-tools && apt-get clean
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/swift/swift.test /tmp/test_bins/
 COPY --from=build /go/src/github.com/wal-g/wal-g/pkg/storages/sh/sh.test /tmp/test_bins/
