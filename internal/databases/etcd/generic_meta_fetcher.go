@@ -30,3 +30,10 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 		UserData:    sentinel.UserData,
 	}, nil
 }
+
+// TODO implement fetch from storage in etcd
+func (mf GenericMetaFetcher) FetchFromStorage(
+	backupName string, backupFolder storage.Folder, storage string,
+) (internal.GenericMetadata, error) {
+	return mf.Fetch(backupName, backupFolder)
+}
