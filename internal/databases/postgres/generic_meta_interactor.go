@@ -47,6 +47,13 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 	}, nil
 }
 
+// TODO rewrite multistorage pg operations with this method and internal.GetPermanentBackups instead of postgres.GetPermanentBackupsAndWals
+func (mf GenericMetaFetcher) FetchFromStorage(
+	backupName string, backupFolder storage.Folder, storage string,
+) (internal.GenericMetadata, error) {
+	return mf.Fetch(backupName, backupFolder)
+}
+
 type GenericMetaSetter struct{}
 
 func NewGenericMetaSetter() GenericMetaSetter {

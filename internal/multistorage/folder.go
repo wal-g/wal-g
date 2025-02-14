@@ -115,6 +115,16 @@ func EnsureSingleStorageIsUsed(folder storage.Folder) error {
 	return nil
 }
 
+// if one storage used in folder - return its name
+// if not one - return error
+func UsedStorage(folder storage.Folder) (string, error) {
+	err := EnsureSingleStorageIsUsed(folder)
+	if err != nil {
+		return "", err
+	}
+	return UsedStorages(folder)[0], nil
+}
+
 // SetPolicies makes a copy of the Folder that uses new policies.Policies.
 func SetPolicies(folder storage.Folder, policies policies.Policies) storage.Folder {
 	if mf, ok := folder.(Folder); ok {

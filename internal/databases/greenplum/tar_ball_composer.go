@@ -13,12 +13,12 @@ import (
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
-	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -78,7 +78,12 @@ func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (fi
 	var base SegBackup
 	// In case of delta backup, use the provided backup name as the base. Otherwise, use the latest backup.
 	if incrementFromName != "" {
-		base, err = NewSegBackup(maker.uploader.Folder(), incrementFromName)
+		folder := maker.uploader.Folder()
+		storage, err := multistorage.UsedStorage(folder)
+		if err != nil {
+			return nil, err
+		}
+		base, err = NewSegBackup(folder, incrementFromName, storage)
 		if err != nil {
 			return nil, err
 		}
@@ -92,7 +97,11 @@ func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (fi
 
 			return nil, err
 		}
-		base, err = NewSegBackup(maker.uploader.Folder(), backup.Name)
+		storage, err := multistorage.UsedStorage(backup.Folder)
+		if err != nil {
+			return nil, err
+		}
+		base, err = NewSegBackup(maker.uploader.Folder(), backup.Name, storage)
 		if err != nil {
 			return nil, err
 		}

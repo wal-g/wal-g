@@ -52,6 +52,7 @@ type GenericMetaInteractor interface {
 
 type GenericMetaFetcher interface {
 	Fetch(backupName string, backupFolder storage.Folder) (GenericMetadata, error)
+	FetchFromStorage(backupName string, backupFolder storage.Folder, storage string) (GenericMetadata, error)
 }
 
 type GenericMetaSetter interface {
