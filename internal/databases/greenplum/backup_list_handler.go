@@ -116,7 +116,7 @@ func ListStorageBackups(folder storage.Folder) ([]Backup, error) {
 
 	backups := make([]Backup, 0, len(backupObjects))
 	for _, b := range backupObjects {
-		backup, err := NewBackup(folder, b.BackupName)
+		backup, err := NewBackupInStorage(folder, b.BackupName, b.StorageName)
 		if err != nil {
 			return nil, err
 		}

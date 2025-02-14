@@ -25,6 +25,7 @@ func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
 			BackupName:  rpt.Name,
 			Time:        rpt.Time,
 			WalFileName: utility.StripWalFileName(rpt.Name),
+			StorageName: rpt.StorageName,
 		})
 	}
 

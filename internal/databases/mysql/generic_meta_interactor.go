@@ -49,6 +49,13 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 	}, nil
 }
 
+// TODO implement fetch from storage in mysql
+func (mf GenericMetaFetcher) FetchFromStorage(
+	backupName string, backupFolder storage.Folder, storage string,
+) (internal.GenericMetadata, error) {
+	return mf.Fetch(backupName, backupFolder)
+}
+
 type GenericMetaSetter struct{}
 
 func NewGenericMetaSetter() GenericMetaSetter {
