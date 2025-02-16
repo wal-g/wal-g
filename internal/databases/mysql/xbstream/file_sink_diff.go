@@ -43,6 +43,18 @@ type diffFileStrategy struct {
 
 var _ fileSink = &diffFileSink{}
 
+func (s *diffFileStrategy) AsyncRun(sink *diffFileSink) error {
+	switch s.strategy {
+	case simpleCopyStrategy:
+		sink.startSimpleCopyStrategy()
+	case applyDiffStrategy:
+		sink.startApplyDiffStrategy()
+	default:
+		return fmt.Errorf("unknown diff-handling strategy %v for file %v", s.strategy, s.destinationFilePath)
+	}
+	return nil
+}
+
 func newDiffFileSink(
 	dataDir string,
 	incrementalDir string,
@@ -127,14 +139,8 @@ func (sink *diffFileSink) ProcessMeta(chunk *Chunk) error {
 	tracelog.ErrorLogger.FatalfOnError("Cannot create new file: %v", err)
 	sink.file = file
 
-	switch strategy.strategy {
-	case simpleCopyStrategy:
-		sink.startSimpleCopyStrategy()
-	case applyDiffStrategy:
-		sink.startApplyDiffStrategy()
-	default:
-		return fmt.Errorf("unknown diff-handling strategy %v for file %v", strategy.strategy, chunk.Path)
-	}
+	err = strategy.AsyncRun(sink)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	return nil
 }
@@ -144,7 +150,7 @@ func (sink *diffFileSink) startSimpleCopyStrategy() {
 		_, err := io.Copy(sink.file, sink.readHere)
 		tracelog.ErrorLogger.FatalfOnError("Cannot copy data: %v", err)
 		// copying to INCR dir - we don't need to fix Sparse files
-		utility.LoggedClose(sink.file, "datasink.Close()")
+		utility.LoggedClose(sink.file, "sink.Close()")
 		close(sink.fileCloseChan)
 	}()
 }
