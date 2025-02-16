@@ -13,12 +13,12 @@ package xbstream
 */
 
 const (
-	DELTA_STREAM_MAGIC      = uint32(0x78747261) // 'xtra'
-	DELTA_STREAM_MAGIC_LAST = uint32(0x58545241) // 'XTRA'
-	PAGE_LIST_TERMINATOR    = uint32(0xFFFFFFFF)
+	DeltaStreamMagic     = uint32(0x78747261) // 'xtra'
+	DeltaStreamMagicLast = uint32(0x58545241) // 'XTRA'
+	PageListTerminator   = uint32(0xFFFFFFFF)
 )
 
 var (
-	DELTA_STREAM_MAGIC_BYTES      = []byte("xtra")
-	DELTA_STREAM_MAGIC_LAST_BYTES = []byte("XTRA")
+	DeltaStreamMagicBytes     = []byte("xtra")
+	DeltaStreamMagicLastBytes = []byte("XTRA")
 )

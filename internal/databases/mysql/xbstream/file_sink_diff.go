@@ -221,16 +221,16 @@ func (sink *diffFileSink) applyDiff() error {
 	if err != nil {
 		return err
 	}
-	if !slices.Equal(header[0:4], DELTA_STREAM_MAGIC_LAST_BYTES) && !slices.Equal(header[0:4], DELTA_STREAM_MAGIC_BYTES) {
+	if !slices.Equal(header[0:4], DeltaStreamMagicLastBytes) && !slices.Equal(header[0:4], DeltaStreamMagicBytes) {
 		return errors.New("unexpected header in diff file")
 	}
-	isLast := slices.Equal(header[0:4], DELTA_STREAM_MAGIC_LAST_BYTES)
+	isLast := slices.Equal(header[0:4], DeltaStreamMagicLastBytes)
 	isFirst := true
 
 	pageNums := make([]innodb.PageNumber, 0, sink.meta.PageSize/4)
 	for i := uint32(1); i < sink.meta.PageSize/4; i++ {
 		pageNum := innodb.PageNumber(binary.BigEndian.Uint32(header[i*4 : (i+1)*4]))
-		if pageNum == innodb.PageNumber(PAGE_LIST_TERMINATOR) {
+		if pageNum == innodb.PageNumber(PageListTerminator) {
 			break
 		}
 		pageNums = append(pageNums, pageNum)
@@ -316,9 +316,9 @@ func (sink *diffFileSink) buildFakeDelta(header []byte, page []byte) []byte {
 	// xtrabackup will re-apply this page and do all its magic for us
 
 	raw := make([]byte, 2*sink.meta.PageSize)
-	binary.BigEndian.PutUint32(raw[0:4], DELTA_STREAM_MAGIC_LAST)
+	binary.BigEndian.PutUint32(raw[0:4], DeltaStreamMagicLast)
 	binary.BigEndian.PutUint32(raw[4:8], binary.BigEndian.Uint32(header[4:8]))
-	binary.BigEndian.PutUint32(raw[8:12], PAGE_LIST_TERMINATOR)
+	binary.BigEndian.PutUint32(raw[8:12], PageListTerminator)
 	copy(raw[sink.meta.PageSize:], page)
 	return raw
 }
