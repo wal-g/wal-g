@@ -31,7 +31,7 @@ type diffFileSink struct {
 type diffStrategyType int
 
 const (
-	applyDiffStrategy diffStrategyType = iota
+	applyDiffStrategy diffStrategyType = iota + 1
 	simpleCopyStrategy
 )
 
