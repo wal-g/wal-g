@@ -238,6 +238,16 @@ func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, 
 	defer queryRunner.Mu.Unlock()
 
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
+
+	//during long backups conn might break, so we check if connection is still alive
+	errPing := queryRunner.Connection.Ping(context.TODO())
+	if errPing != nil {
+		queryRunner.Connection, err = Connect()
+		if err != nil {
+			return "", "", "", fmt.Errorf("QueryRunner StopBackup: connection is dead: %w %w", errPing, err)
+		}
+	}
+
 	conn := queryRunner.Connection
 
 	tx, err := conn.Begin(context.TODO())
