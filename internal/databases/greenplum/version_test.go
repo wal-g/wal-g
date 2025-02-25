@@ -23,6 +23,11 @@ func TestParseGreenplumVersion(t *testing.T) {
 			input:  "PostgreSQL 14.4 (Cloudberry Database 1.6.0 build dev) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, 64-bit compiled on Sep 13 2024 07:33:38",
 			result: NewVersion(semver.MustParse("1.6.0"), Cloudberry),
 		},
+		{
+			name:   "apache cloudberry dev",
+			input:  "PostgreSQL 14.4 (Apache Cloudberry 1.0.0+00da831 build dev) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0, 64-bit compiled on Feb 25 2025 10:24:41",
+			result: NewVersion(semver.MustParse("1.0.0"), Cloudberry),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
