@@ -19,10 +19,6 @@ type NoBackupsFoundError struct {
 	error
 }
 
-var (
-	ErrNoBackupsFound = NewNoBackupsFoundError()
-)
-
 type TimedBackup interface {
 	Name() string
 	StartTime() time.Time
@@ -42,7 +38,7 @@ func NewNoBackupsFoundError() NoBackupsFoundError {
 }
 
 func FilterOutNoBackupFoundError(err error, json bool) error {
-	if errors.Is(err, ErrNoBackupsFound) {
+	if _, isNoBackupsErr := err.(NoBackupsFoundError); isNoBackupsErr {
 		// Having zero backups is not an error that should be handled in most cases.
 		if !json {
 			tracelog.InfoLogger.Println("No backups found")
