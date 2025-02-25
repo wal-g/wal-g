@@ -11,7 +11,7 @@ import (
 
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
-	err = internal.CheckIsNoBackupFoundError(err, json)
+	err = internal.FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
 
 	backupDetails, err := GetBackupsDetails(folder, backups)

@@ -41,7 +41,7 @@ func NewNoBackupsFoundError() NoBackupsFoundError {
 	return NoBackupsFoundError{errors.New("No backups found")}
 }
 
-func CheckIsNoBackupFoundError(err error, json bool) error {
+func FilterOutNoBackupFoundError(err error, json bool) error {
 	if errors.Is(err, ErrNoBackupsFound) {
 		// Having zero backups is not an error that should be handled in most cases.
 		if !json {
