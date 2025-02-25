@@ -44,6 +44,10 @@ func NewBackupDetail(backupTime internal.BackupTime, sentinel *models.Backup) *B
 // TODO: unit tests
 func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, json bool) error {
 	backupTimes, err := internal.GetBackups(folder)
+	if errors.Is(err, internal.ErrNoBackupsFound) {
+		// Having zero backups is not an error that should be handled.
+		err = nil
+	}
 	if err != nil {
 		return err
 	}
