@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -115,8 +116,7 @@ func NewBackupDetail(backupTime internal.BackupTime, sentinel StreamSentinelDto)
 // TODO: unit tests
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backupTimes, err := internal.GetBackups(folder)
-	_, isNoBackupsErr := err.(internal.NoBackupsFoundError)
-	if isNoBackupsErr {
+	if errors.Is(err, internal.ErrNoBackupsFound) {
 		// Having zero backups is not an error that should be handled.
 		err = nil
 	}

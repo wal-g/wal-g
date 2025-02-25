@@ -19,6 +19,10 @@ type NoBackupsFoundError struct {
 	error
 }
 
+var (
+	ErrNoBackupsFound = NewNoBackupsFoundError()
+)
+
 type TimedBackup interface {
 	Name() string
 	StartTime() time.Time

@@ -3,6 +3,7 @@ package postgres
 import (
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/printlist"
@@ -11,9 +12,9 @@ import (
 
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
-	if len(backups) == 0 {
-		tracelog.InfoLogger.Println("No backups found")
-		return
+	if errors.Is(err, internal.ErrNoBackupsFound) {
+		// Having zero backups is not an error that should be handled.
+		err = nil
 	}
 	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
 
