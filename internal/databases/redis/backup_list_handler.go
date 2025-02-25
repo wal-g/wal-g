@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"errors"
 	"os"
 	"sort"
 
@@ -14,13 +13,7 @@ import (
 
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
-	if errors.Is(err, internal.ErrNoBackupsFound) {
-		// Having zero backups is not an error that should be handled.
-		if !json {
-			tracelog.InfoLogger.Println("No backups found")
-		}
-		err = nil
-	}
+	err = internal.CheckIsNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	backupDetails, err := GetBackupDetails(folder, backups)

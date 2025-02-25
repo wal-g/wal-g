@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -45,13 +44,7 @@ func NewBackupDetail(backupTime internal.BackupTime, sentinel *models.Backup) *B
 // TODO: unit tests
 func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, json bool) error {
 	backupTimes, err := internal.GetBackups(folder)
-	if errors.Is(err, internal.ErrNoBackupsFound) {
-		// Having zero backups is not an error that should be handled.
-		if !json {
-			tracelog.InfoLogger.Println("No backups found")
-		}
-		err = nil
-	}
+	err = internal.CheckIsNoBackupFoundError(err, json)
 	if err != nil {
 		return err
 	}

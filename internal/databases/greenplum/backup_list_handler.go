@@ -1,7 +1,6 @@
 package greenplum
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -148,13 +147,7 @@ func MakeBackupDetails(backups []Backup) []BackupDetail {
 // TODO: unit tests (table output)
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backups, err := ListStorageBackups(folder)
-	if errors.Is(err, internal.ErrNoBackupsFound) {
-		// Having zero backups is not an error that should be handled.
-		if !json {
-			tracelog.InfoLogger.Println("No backups found")
-		}
-		err = nil
-	}
+	err = internal.CheckIsNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	backupDetails := MakeBackupDetails(backups)
