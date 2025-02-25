@@ -118,6 +118,9 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backupTimes, err := internal.GetBackups(folder)
 	if errors.Is(err, internal.ErrNoBackupsFound) {
 		// Having zero backups is not an error that should be handled.
+		if !json {
+			tracelog.InfoLogger.Println("No backups found")
+		}
 		err = nil
 	}
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch list of backups in storage: %s", err)

@@ -150,6 +150,9 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backups, err := ListStorageBackups(folder)
 	if errors.Is(err, internal.ErrNoBackupsFound) {
 		// Having zero backups is not an error that should be handled.
+		if !json {
+			tracelog.InfoLogger.Println("No backups found")
+		}
 		err = nil
 	}
 	tracelog.ErrorLogger.FatalOnError(err)

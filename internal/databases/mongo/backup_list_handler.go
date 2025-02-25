@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -46,6 +47,9 @@ func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, j
 	backupTimes, err := internal.GetBackups(folder)
 	if errors.Is(err, internal.ErrNoBackupsFound) {
 		// Having zero backups is not an error that should be handled.
+		if !json {
+			tracelog.InfoLogger.Println("No backups found")
+		}
 		err = nil
 	}
 	if err != nil {
