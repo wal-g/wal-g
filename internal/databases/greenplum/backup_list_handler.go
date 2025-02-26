@@ -147,11 +147,7 @@ func MakeBackupDetails(backups []Backup) []BackupDetail {
 // TODO: unit tests (table output)
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backups, err := ListStorageBackups(folder)
-
-	if len(backups) == 0 {
-		tracelog.InfoLogger.Println("No backups found")
-		return
-	}
+	err = internal.FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	backupDetails := MakeBackupDetails(backups)

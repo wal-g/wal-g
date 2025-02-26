@@ -37,6 +37,17 @@ func NewNoBackupsFoundError() NoBackupsFoundError {
 	return NoBackupsFoundError{errors.New("No backups found")}
 }
 
+func FilterOutNoBackupFoundError(err error, json bool) error {
+	if _, isNoBackupsErr := err.(NoBackupsFoundError); isNoBackupsErr {
+		// Having zero backups is not an error that should be handled in most cases.
+		if !json {
+			tracelog.InfoLogger.Println("No backups found")
+		}
+		return nil
+	}
+	return err
+}
+
 func (err NoBackupsFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
