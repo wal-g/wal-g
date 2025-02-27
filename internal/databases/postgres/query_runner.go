@@ -604,11 +604,13 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 			parent := fmt.Sprintf("%s.%s", namespaceName, parentTableName)
 			child := fmt.Sprintf("%s.%s", namespaceName, tableName)
 
-			_, ok := tables[child]
+			entry, ok := tables[child]
 			if !ok {
 				tables[child] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
 			} else {
-				tables[child] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: tables[child].SubTables}
+				entry.Oid = oid
+				entry.Relfilenode = relFileNode
+				tables[child] = entry
 			}
 
 			if parentTableName == "" {
@@ -628,20 +630,22 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 	}
 
 	formatedTables := make(map[string]TableInfo)
-	vis := make([]string, 0)
+	stack := make([]string, 0)
 
 	for _, val := range parentTables {
 		formatedTables[val] = TableInfo{Oid: tables[val].Oid, Relfilenode: tables[val].Relfilenode, SubTables: map[string]TableInfo{}}
-		vis = append(vis, val)
-		for len(vis) > 0 {
-			cur := vis[len(vis)-1]
-			vis = vis[:len(vis)-1]
+		stack = append(stack, val)
+		for len(stack) > 0 {
+			cur := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
 			if tables[cur].SubTables == nil {
 				continue
 			}
+
 			for k, _ := range tables[cur].SubTables {
-				formatedTables[val].SubTables[k] = TableInfo{Oid: formatedTables[val].SubTables[k].Oid, Relfilenode: formatedTables[val].SubTables[k].Relfilenode}
-				vis = append(vis, k)
+				formatedTables[val].SubTables[k] = TableInfo{Oid: tables[k].Oid, Relfilenode: tables[k].Relfilenode}
+				stack = append(stack, k)
 			}
 		}
 
@@ -666,7 +670,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 		var namespaceName string
 		var path pgtype.Text
 		var relKind rune
-		var parentTableName string
+		var parentTableName pgtype.Text
 		if err := rows.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName, &relKind, &parentTableName); err != nil {
 			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
 			continue
@@ -677,7 +681,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 			// don't need to be added to the tables map, we still process them here.
 			// This is because we need the parent partitioned table information to locate and process
 			// all its child partition tables later in DatabasesByNames.ResolveRegexp function.
-			process(relFileNode, oid, tableName, namespaceName, parentTableName)
+			process(relFileNode, oid, tableName, namespaceName, parentTableName.String)
 			continue
 		}
 
@@ -703,7 +707,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 			}
 			relFileNode = uint32(chis)
 		}
-		process(relFileNode, oid, tableName, namespaceName, parentTableName)
+		process(relFileNode, oid, tableName, namespaceName, parentTableName.String)
 	}
 
 	return nil
