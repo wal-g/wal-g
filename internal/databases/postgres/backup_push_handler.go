@@ -291,7 +291,9 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 	sentinelDto = NewBackupSentinelDto(bh, tablespaceSpec)
 	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
-	filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata()
+	if !(viper.IsSet(conf.DisablePartialRestore) && viper.GetBool(conf.DisablePartialRestore)) {
+		filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata()
+	}
 	return sentinelDto, filesMeta, err
 }
 

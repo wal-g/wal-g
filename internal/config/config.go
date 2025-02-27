@@ -120,6 +120,7 @@ const (
 	FailoverStoragesCheckSize            = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
 	PgDaemonWALUploadTimeout             = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
 	PgTargetStorage                      = "WALG_TARGET_STORAGE"
+	DisablePartialRestore                = "WALG_DISABLE_PARTIAL_RESTORE"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -489,6 +490,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
+		DisablePartialRestore:                true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -579,6 +581,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMax:  true,
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
+		DisablePartialRestore:                true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
