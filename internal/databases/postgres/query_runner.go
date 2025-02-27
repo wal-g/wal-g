@@ -574,7 +574,8 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
-		query := "SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname, c.relkind, parent.relname AS parent_name " +
+		query := "SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname, " +
+			"c.relkind, parent.relname AS parent_name " +
 			"FROM pg_class c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid " +
 			"LEFT JOIN pg_inherits i ON c.oid = i.inhrelid LEFT JOIN pg_class parent ON i.inhparent = parent.oid;"
 		return query, nil
@@ -599,7 +600,6 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 	err = queryRunner.processTables(queryRunner.Connection, getTablesQuery,
 		func(relFileNode, oid uint32, tableName, namespaceName, parentTableName string) {
-
 			tracelog.DebugLogger.Printf("adding %s as %d with filenode %d", tableName, oid, relFileNode)
 			parent := fmt.Sprintf("%s.%s", namespaceName, parentTableName)
 			child := fmt.Sprintf("%s.%s", namespaceName, tableName)
@@ -620,7 +620,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 			_, ok = tables[parent]
 			if !ok {
-				tables[parent] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{child: TableInfo{}}}
+				tables[parent] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{child: {}}}
 			} else {
 				tables[parent].SubTables[child] = TableInfo{}
 			}
@@ -643,12 +643,11 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 				continue
 			}
 
-			for k, _ := range tables[cur].SubTables {
+			for k := range tables[cur].SubTables {
 				formatedTables[val].SubTables[k] = TableInfo{Oid: tables[k].Oid, Relfilenode: tables[k].Relfilenode}
 				stack = append(stack, k)
 			}
 		}
-
 	}
 
 	return formatedTables, nil
