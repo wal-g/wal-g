@@ -53,7 +53,7 @@ var backupPushCmd = &cobra.Command{
 			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
 		}
 
-		memoryDataGetter := client.NewMemoryDataGetter()
+		memoryDataGetter := client.NewServerDataGetter()
 
 		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
 

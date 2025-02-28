@@ -32,7 +32,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		curTime := time.Unix(1690000000, 0)
 
 		backups := []archive.Backup{
-			archive.Backup{
+			{
 				BackupName:      "b0",
 				StartLocalTime:  curTime.Add(4 * time.Second).UTC(),
 				FinishLocalTime: curTime.Add(5 * time.Second).UTC(),
@@ -43,7 +43,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 				Version:         "4.5.4",
 				BackupType:      "rdb",
 			},
-			archive.Backup{
+			{
 				BackupName:      "b1",
 				StartLocalTime:  curTime.Add(0 * time.Second).UTC(),
 				FinishLocalTime: curTime.Add(time.Second).UTC(),
@@ -54,7 +54,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 				Version:         "4.5.4",
 				BackupType:      "rdb",
 			},
-			archive.Backup{
+			{
 				BackupName:      "b2",
 				StartLocalTime:  curTime.Add(2 * time.Second).UTC(),
 				FinishLocalTime: curTime.Add(3 * time.Second).UTC(),
