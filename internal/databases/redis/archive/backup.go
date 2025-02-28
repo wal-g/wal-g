@@ -32,7 +32,7 @@ type Backup struct {
 	Version         string      `json:"Version,omitempty"`
 	UsedMemory      int64       `json:"UsedMemory,omitempty"`
 	UsedMemoryRss   int64       `json:"UsedMemoryRss,omitempty"`
-	MaxDBNumber     int64       `json:"MaxDBNumber,omitempty"`
+	MaxDBNumber     int64       `json:"MaxDBNumber"`
 }
 
 func (b Backup) Name() string {
