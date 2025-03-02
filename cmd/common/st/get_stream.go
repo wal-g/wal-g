@@ -15,7 +15,8 @@ import (
 
 const (
 	getStreamShortDescription = "Download the backup as single stream"
-	getStreamLongDescription  = "Download, decrypt (if encrypted), decompress (if compressed) and assemble (if stream where split) single-stream backups to single stream."
+	getStreamLongDescription  = "Download, decrypt (if encrypted), decompress (if compressed) and assemble " +
+		"(if stream where split) single-stream backups to single stream."
 )
 
 // getObjectCmd represents the getObject command
