@@ -21,7 +21,7 @@ const (
 
 // getObjectCmd represents the getObject command
 var getStreamCmd = &cobra.Command{
-	Use:   "get backup_name destination_path",
+	Use:   "get-stream backup_name destination_path",
 	Short: getStreamShortDescription,
 	Long:  getStreamLongDescription,
 	Args:  cobra.RangeArgs(1, 2),
