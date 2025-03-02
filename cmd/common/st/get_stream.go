@@ -23,10 +23,18 @@ var getStreamCmd = &cobra.Command{
 	Use:   "get backup_name destination_path",
 	Short: getStreamShortDescription,
 	Long:  getStreamLongDescription,
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		backupName := args[0]
-		dstPath := args[1]
+		outStream := os.Stdout
+
+		if len(args) == 2 {
+			dstPath := args[1]
+			file, err := os.Create(dstPath)
+			tracelog.ErrorLogger.FatalOnError(err)
+			defer utility.LoggedClose(file, "got an error during stream-file close()")
+			outStream = file
+		}
 
 		if targetStorage == "all" {
 			tracelog.ErrorLogger.Fatalf("'all' target is not supported for st get command")
@@ -35,16 +43,13 @@ var getStreamCmd = &cobra.Command{
 		backupSelector, err := internal.NewTargetBackupSelector("", backupName, mysql.NewGenericMetaFetcher())
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		file, err := os.Create(dstPath)
-		defer utility.LoggedClose(file, "got an error during stream-file close()")
-
 		err = exec.OnStorage(targetStorage, func(folder storage.Folder) error {
 			backup, err := backupSelector.Select(folder)
 			tracelog.ErrorLogger.FatalOnError(err)
 			fetcher, err := internal.GetBackupStreamFetcher(backup)
 			tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
 
-			return fetcher(backup, file)
+			return fetcher(backup, outStream)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
