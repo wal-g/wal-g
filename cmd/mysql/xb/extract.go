@@ -24,7 +24,7 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error
 			var src *os.File
-			if len(args) == 1 {
+			if len(args) == 0 {
 				src = os.Stdin
 			} else {
 				src, err = os.Open(args[0])
