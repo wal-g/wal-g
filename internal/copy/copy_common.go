@@ -98,7 +98,7 @@ func (ch *InfoProvider) copyObject() error {
 	}
 
 	tracelog.InfoLogger.Printf(
-		"Copied '%s' from folder '%s' to '%s' in fodler '%s'.",
+		"Copied '%s' from folder '%s' to '%s' in folder '%s'.",
 		ch.SrcObj.GetName(), ch.From.GetPath(), ch.targetName, ch.To.GetPath())
 	return nil
 }
