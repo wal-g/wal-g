@@ -27,6 +27,22 @@ func TestBuildFakeDiff(t *testing.T) {
 		meta: &deltaMetadata{PageSize: uint32(pageSize)},
 	}
 	actual := sink.buildFakeDelta(header, page)
+	assert.Equal(t, 2*pageSize, len(actual))
+	assert.Equal(t, expected, actual)
+
+	// it is possible that delta-file doesn't contain page:
+	// hexdump -C bk20/mysql/migration.ibd.delta
+	// 00000000  58 54 52 41 ff ff ff ff  00 00 00 00 00 00 00 00  |XTRA............|
+	// 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+	// *
+	// 00004000
+	expected = testutils.HexToBytes(`
+				00000000  58 54 52 41 00 00 00 03  ff ff ff ff 00 00 00 00  |XTRA............|
+				00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|`)
+	expected = append(expected, make([]byte, pageSize-32)...)
+
+	actual = sink.buildFakeDelta(header, nil)
+	assert.Equal(t, pageSize, len(actual))
 	assert.Equal(t, expected, actual)
 }
 
