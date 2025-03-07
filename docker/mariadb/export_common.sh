@@ -23,7 +23,7 @@ mariadb_kill_and_clean_data() {
 }
 
 mariadb_installdb() {
-    mysql_install_db > /dev/null && chown -R mysql:mysql $MYSQLDATA
+    /usr/bin/mariadb-install-db > /dev/null && chown -R mysql:mysql $MYSQLDATA
 }
 
 sysbench() {
