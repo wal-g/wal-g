@@ -25,7 +25,6 @@ func HandleOplogPush(ctx context.Context, fetcher stages.Fetcher, applier stages
 	errs = append(errs, errc)
 
 	for _, errc := range errs {
-		errc := errc
 		errgrp.Go(func() error {
 			return <-errc
 		})

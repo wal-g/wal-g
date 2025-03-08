@@ -8,7 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/wal-g/internal/abool"
 	"github.com/wal-g/wal-g/internal/statistics"
 
 	"github.com/wal-g/tracelog"
@@ -42,7 +41,7 @@ type RegularUploader struct {
 	UploadingFolder storage.Folder
 	Compressor      compression.Compressor
 	waitGroup       *sync.WaitGroup
-	failed          *abool.AtomicBool
+	failed          atomic.Bool
 	tarSize         *int64
 	dataSize        *int64
 }
@@ -77,7 +76,7 @@ func NewRegularUploader(
 		waitGroup:       &sync.WaitGroup{},
 		tarSize:         new(int64),
 		dataSize:        new(int64),
-		failed:          abool.New(),
+		failed:          atomic.Bool{},
 	}
 	return uploader
 }
@@ -121,21 +120,23 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 // prints alert to stderr.
 func (uploader *RegularUploader) Finish() {
 	uploader.waitGroup.Wait()
-	if uploader.failed.IsSet() {
+	if uploader.failed.Load() {
 		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
 	}
 }
 
 // Clone creates similar Uploader with new WaitGroup
 func (uploader *RegularUploader) Clone() Uploader {
-	return &RegularUploader{
+	clone := &RegularUploader{
 		UploadingFolder: uploader.UploadingFolder,
 		Compressor:      uploader.Compressor,
 		waitGroup:       &sync.WaitGroup{},
-		failed:          abool.NewBool(uploader.Failed()),
+		failed:          atomic.Bool{},
 		tarSize:         uploader.tarSize,
 		dataSize:        uploader.dataSize,
 	}
+	clone.failed.Store(uploader.Failed())
+	return clone
 }
 
 // TODO : unit tests
@@ -177,7 +178,7 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
-		uploader.failed.Set()
+		uploader.failed.Load()
 		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 		return err
 	}
@@ -207,7 +208,7 @@ func (uploader *RegularUploader) Folder() storage.Folder {
 }
 
 func (uploader *RegularUploader) Failed() bool {
-	return uploader.failed.IsSet()
+	return uploader.failed.Load()
 }
 
 func (uploader *SplitStreamUploader) Clone() Uploader {

@@ -225,11 +225,7 @@ func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
 	reader := io.MultiReader(fd, &ioextensions.ZeroReader{})
 
 	for size != 0 {
-		min := 8192
-		if int64(min) > size {
-			min = int(size)
-		}
-		var bytes = make([]byte, min)
+		var bytes = make([]byte, int(min(size, 8192)))
 		_, err := io.ReadFull(reader, bytes)
 		tracelog.ErrorLogger.FatalOnError(err)
 		size -= int64(len(bytes))

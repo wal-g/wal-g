@@ -3,11 +3,11 @@ package diskwatcher
 import (
 	"fmt"
 	"os"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/abool"
 )
 
 type DiskWatcher struct {
@@ -15,7 +15,7 @@ type DiskWatcher struct {
 	Threshold int    // percents of disk usage
 	Timeout   int    // sleep between checks
 	Signaling chan bool
-	closed    *abool.AtomicBool
+	closed    atomic.Bool
 }
 
 func NewDiskWatcher(threshold int, path string, timeout int) (*DiskWatcher, error) {
@@ -30,14 +30,14 @@ func NewDiskWatcher(threshold int, path string, timeout int) (*DiskWatcher, erro
 		Threshold: threshold,
 		Timeout:   timeout,
 		Signaling: make(chan bool, 1),
-		closed:    abool.New(),
+		closed:    atomic.Bool{},
 	}, nil
 }
 
 func (w *DiskWatcher) Start() {
 	go func() {
 		for {
-			if w.closed.IsSet() {
+			if w.closed.Load() {
 				return
 			}
 			w.CheckUpperLimit()
@@ -48,7 +48,7 @@ func (w *DiskWatcher) Start() {
 
 func (w *DiskWatcher) Stop() {
 	close(w.Signaling)
-	w.closed.Set()
+	w.closed.Store(true)
 }
 
 func (w *DiskWatcher) CheckUpperLimit() {
