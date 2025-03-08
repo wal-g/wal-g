@@ -63,7 +63,7 @@ services:
       - "3000:3000"
 
   s3:
-    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    image: quay.io/minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
     hostname: s3
     ports:
@@ -209,7 +209,7 @@ services:
       &&  /usr/bin/minio server /export'
 
   s3-for-throttling:
-    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    image: quay.io/minio/minio:RELEASE.2024-01-18T22-51-28Z
     container_name: wal-g_s3_3
     hostname: s3
     ports:
