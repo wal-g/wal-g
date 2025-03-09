@@ -14,6 +14,8 @@ env:
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tgz
   CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tgz
   IMAGE: wal-g/docker_prefix
+  IMAGE_UBUNTU_18_04: wal-g/ubuntu:18.04
+  IMAGE_UBUNTU_20_04: wal-g/ubuntu:20.04
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.22.8"
