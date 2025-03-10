@@ -1,6 +1,11 @@
 name: Unit tests
 
-on: [ workflow_dispatch, push, pull_request ]
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
 
 env:
   GO_VERSION: "1.22"
