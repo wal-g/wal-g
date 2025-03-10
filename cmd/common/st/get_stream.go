@@ -7,7 +7,7 @@ import (
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -41,7 +41,8 @@ var getStreamCmd = &cobra.Command{
 			tracelog.ErrorLogger.Fatalf("'all' target is not supported for st get command")
 		}
 
-		backupSelector, err := internal.NewTargetBackupSelector("", backupName, mysql.NewGenericMetaFetcher())
+		//_ = mysql.BinlogPath
+		backupSelector, err := internal.NewTargetBackupSelector("", backupName, postgres.NewGenericMetaFetcher())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		err = exec.OnStorage(targetStorage, func(folder storage.Folder) error {
