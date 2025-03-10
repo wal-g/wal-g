@@ -12,7 +12,7 @@ service mariadb start
 
 sysbench --table-size=10 prepare
 sysbench --time=3 run
-mysql -e "FLUSH LOGS"
+mariadb -e "FLUSH LOGS"
 
 export WALG_MYSQL_CHECK_GTIDS=True
 if wal-g binlog-push; then

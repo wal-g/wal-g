@@ -47,3 +47,21 @@ func TestReadXtrabackupInfo(t *testing.T) {
 	assert.Equal(t, uint64(3738001), uint64(*info.ToLSN))
 	assert.Equal(t, uint64(3738068), uint64(*info.LastLSN))
 }
+
+/*
+Test data from: Mariadb documentation
+https://mariadb.com/kb/en/files-created-by-mariabackup/#xtrabackup_checkpoints
+*/
+const xtrabackup_checkpoints_example_2 = `
+backup_type = full-backuped
+from_lsn = 0
+to_lsn = 1635102
+last_lsn = 1635102
+recover_binlog_info = 0`
+
+func TestReadXtrabackupInfoForMariaDB(t *testing.T) {
+	info := NewXtrabackupInfo(xtrabackup_checkpoints_example_2)
+	assert.Equal(t, uint64(0), uint64(*info.FromLSN))
+	assert.Equal(t, uint64(1635102), uint64(*info.ToLSN))
+	assert.Equal(t, uint64(1635102), uint64(*info.LastLSN))
+}

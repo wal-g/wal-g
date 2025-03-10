@@ -13,9 +13,9 @@ sysbench --table-size=10 prepare
 
 sysbench --time=5 run
 
-mysql -e 'FLUSH LOGS'
+mariadb -e 'FLUSH LOGS'
 
-mysqldump sbtest > /tmp/dump_before_backup
+mariadb-dump sbtest > /tmp/dump_before_backup
 
 wal-g backup-push
 
@@ -28,6 +28,6 @@ chown -R mysql:mysql $MYSQLDATA
 mariadb_installdb
 service mariadb start || (cat /var/log/mysql/error.log && false)
 
-mysqldump sbtest > /tmp/dump_after_restore
+mariadb-dump sbtest > /tmp/dump_after_restore
 
 diff /tmp/dump_before_backup /tmp/dump_after_restore
