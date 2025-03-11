@@ -46,7 +46,6 @@ func HandleOplogPurge(downloader archive.Downloader, purger archive.Purger, reta
 
 	tracelog.DebugLogger.Printf("Oldest backup in PITR interval is %+v\n", pitrBackup)
 	tracelog.DebugLogger.Printf("Oplog archives newer than %+v will be retained\n", retainArchivesAfterTS)
-	tracelog.DebugLogger.Printf("Oplog archives included into backups time interval will be retained: %v\n", backups)
 
 	purgeArchives := archive.SelectPurgingOplogArchives(archives, backups, &retainArchivesAfterTS)
 	tracelog.DebugLogger.Printf("Oplog archives selected to be deleted: %v", purgeArchives)
