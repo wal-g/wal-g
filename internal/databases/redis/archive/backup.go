@@ -32,6 +32,7 @@ type Backup struct {
 	Version         string      `json:"Version,omitempty"`
 	UsedMemory      int64       `json:"UsedMemory,omitempty"`
 	UsedMemoryRss   int64       `json:"UsedMemoryRss,omitempty"`
+	MaxDBNumber     int64       `json:"MaxDBNumber"`
 }
 
 func (b Backup) Name() string {
@@ -174,6 +175,7 @@ type BackupMeta struct {
 	Version        string
 	UsedMemory     int64
 	UsedMemoryRss  int64
+	MaxDBNumber    int64
 }
 
 type RedisMetaConstructor struct {
@@ -183,7 +185,7 @@ type RedisMetaConstructor struct {
 	permanent        bool
 	backupType       string
 	versionParser    *VersionParser
-	memoryDataGetter client.MemoryDataGetter
+	serverDataGetter client.ServerDataGetter
 }
 
 // Init - required for internal.MetaConstructor
@@ -192,14 +194,15 @@ func (m *RedisMetaConstructor) Init() error {
 	if err != nil {
 		return err
 	}
-	memData := m.memoryDataGetter.Get()
+	serverData := m.serverDataGetter.Get()
 	m.meta = BackupMeta{
 		Permanent:     m.permanent,
 		User:          userData,
 		StartTime:     utility.TimeNowCrossPlatformLocal(),
 		BackupType:    m.backupType,
-		UsedMemory:    memData.UsedMemory,
-		UsedMemoryRss: memData.UsedMemoryRss,
+		UsedMemory:    serverData.UsedMemory,
+		UsedMemoryRss: serverData.UsedMemoryRss,
+		MaxDBNumber:   serverData.MaxDBNumber,
 	}
 	if m.versionParser != nil {
 		m.meta.Version, err = m.versionParser.Get()
@@ -221,6 +224,7 @@ func (m *RedisMetaConstructor) MetaInfo() interface{} {
 		Version:         meta.Version,
 		UsedMemory:      meta.UsedMemory,
 		UsedMemoryRss:   meta.UsedMemoryRss,
+		MaxDBNumber:     meta.MaxDBNumber,
 	}
 }
 
@@ -230,13 +234,13 @@ func (m *RedisMetaConstructor) Finalize(backupName string) error {
 }
 
 func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, permanent bool, backupType string,
-	versionParser *VersionParser, memoryDataGetter client.MemoryDataGetter) internal.MetaConstructor {
+	versionParser *VersionParser, memoryDataGetter client.ServerDataGetter) internal.MetaConstructor {
 	return &RedisMetaConstructor{
 		ctx: ctx, folder: folder,
 		permanent:        permanent,
 		backupType:       backupType,
 		versionParser:    versionParser,
-		memoryDataGetter: memoryDataGetter,
+		serverDataGetter: memoryDataGetter,
 	}
 }
 

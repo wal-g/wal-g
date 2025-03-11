@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -27,53 +28,39 @@ func GenerateNewBackupName() string {
 	return "aof_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-type Fobj struct {
-	fobj     *os.File
-	isClosed bool
-}
-
-func (f *Fobj) Close() error {
-	if f.isClosed {
-		return nil
-	}
-	f.isClosed = true
-	return f.fobj.Close()
-}
-
-func (f *Fobj) Name() string {
-	return f.fobj.Name()
-}
-
 type FilesPinner struct {
-	fobjs []Fobj
+	pinFolder   string
+	pinnedPaths []string
 }
 
-func NewFilesPinner() *FilesPinner {
-	return &FilesPinner{}
-}
-
-func (p *FilesPinner) Pin(paths []string) error {
-	for _, path := range paths {
-		fobj, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		p.fobjs = append(p.fobjs, Fobj{fobj, false})
+func NewFilesPinner(path string) *FilesPinner {
+	return &FilesPinner{
+		pinFolder: path,
 	}
-	return nil
+}
+
+func (p *FilesPinner) Pin(paths []string) ([]string, error) {
+	for _, path := range paths {
+		filename := filepath.Base(path)
+		pinnedPath := filepath.Join(p.pinFolder, filename)
+		if path != pinnedPath {
+			err := os.Link(path, pinnedPath)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to pin file %s", path)
+			}
+		}
+		p.pinnedPaths = append(p.pinnedPaths, pinnedPath)
+	}
+	return p.pinnedPaths, nil
 }
 
 func (p *FilesPinner) Unpin() {
-	for _, fobj := range p.fobjs {
-		if fobj.isClosed {
-			continue
-		}
-		err := fobj.Close()
+	for _, path := range p.pinnedPaths {
+		err := os.Remove(path)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to close file %s: %v", fobj.Name(), err)
+			tracelog.ErrorLogger.Printf("failed to remove pinned file %s: %v", path, err)
 		}
 	}
-	p.fobjs = nil
 }
 
 func CreateBackupService(ctx context.Context, diskWatcher *diskwatcher.DiskWatcher, uploader *internal.ConcurrentUploader,
@@ -97,13 +84,13 @@ func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
 
 	backupFiles := bs.backupFilesListProvider.Get()
 
-	err = bs.filesPinner.Pin(backupFiles)
+	pinnedBackupFiles, err := bs.filesPinner.Pin(backupFiles)
 	defer bs.filesPinner.Unpin()
 	if err != nil {
 		return errors.Wrapf(err, "unable to prevent files list from removal")
 	}
 
-	backupMetas, err := internal.GetBackupFileMetas(backupFiles)
+	backupMetas, err := internal.GetBackupFileMetas(pinnedBackupFiles)
 	if err != nil {
 		return err
 	}

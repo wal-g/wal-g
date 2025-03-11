@@ -135,9 +135,9 @@ services:
       &&  mkdir -p /export/mysqllivereplay
       &&  mkdir -p /export/mysqlpermanentbackupbucket
       &&  mkdir -p /export/mysql_journal_test_bucket
-      &&  mkdir -p /export/mysql8_xbtool_extract_bucket
-      &&  mkdir -p /export/mysql8_full_xtrabackup_xbtool_bucket
-      &&  mkdir -p /export/mysql8_full_xtrabackup_xbtool_incremental_bucket
+      &&  mkdir -p /export/mysql8_xbtool_bucket
+      &&  mkdir -p /export/mysql8_xbtool_incremental_bucket
+      &&  mkdir -p /export/mysql8_xbtool_inplace_bucket
       &&  mkdir -p /export/mariadb_binlog_push_fetch
       &&  mkdir -p /export/mariadb_binlog_push_with_gtids_check
       &&  mkdir -p /export/mariadb_full_mysqldump
@@ -209,7 +209,7 @@ services:
       &&  /usr/bin/minio server /export'
 
   s3-for-throttling:
-    image: quay.io/minio/minio:RELEASE.2024-01-18T22-51-28Z
+    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
     container_name: wal-g_s3_3
     hostname: s3
     ports:

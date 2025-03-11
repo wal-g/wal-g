@@ -81,7 +81,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build on arch
-        uses: uraimo/run-on-arch-action@v2
+        uses: uraimo/run-on-arch-action@v3
         with:
           arch: ${{ matrix.arch }}
           distro: ${{ matrix.distro }}

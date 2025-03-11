@@ -25,8 +25,16 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 }
 
 // TODO: Unit tests
-func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
-	backup, err := internal.NewBackup(backupFolder, backupName)
+func (mf GenericMetaFetcher) fetch(
+	backupName string, backupFolder storage.Folder, specificStorage bool, storage string,
+) (internal.GenericMetadata, error) {
+	var backup internal.Backup
+	var err error
+	if specificStorage {
+		backup, err = internal.NewBackupInStorage(backupFolder, backupName, storage)
+	} else {
+		backup, err = internal.NewBackup(backupFolder, backupName)
+	}
 	if err != nil {
 		return internal.GenericMetadata{}, err
 	}
@@ -47,6 +55,15 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 		IncrementDetails: &internal.NopIncrementDetailsFetcher{},
 		UserData:         sentinel.UserData,
 	}, nil
+}
+
+func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
+	return mf.fetch(backupName, backupFolder, false, "")
+}
+
+func (mf GenericMetaFetcher) FetchFromStorage(
+	backupName string, backupFolder storage.Folder, storage string) (internal.GenericMetadata, error) {
+	return mf.fetch(backupName, backupFolder, true, storage)
 }
 
 type GenericMetaSetter struct{}

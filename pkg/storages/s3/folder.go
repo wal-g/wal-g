@@ -12,12 +12,17 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
 	NotFoundAWSErrorCode  = "NotFound"
 	NoSuchKeyAWSErrorCode = "NoSuchKey"
+
+	VersioningDefault  = ""
+	VersioningEnabled  = "enabled"
+	VersioningDisabled = "disabled"
 )
 
 // TODO: Unit tests
@@ -122,34 +127,95 @@ func (folder *Folder) GetPath() string {
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
-		for _, prefix := range commonPrefixes {
-			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
-			subFolders = append(subFolders, subFolder)
+	prefix := aws.String(folder.path)
+	delimiter := aws.String("/")
+
+	if folder.isVersioningEnabled() {
+		objects, subFolders, err = folder.listVersions(prefix, delimiter)
+		if err != nil {
+			return nil, nil, err
 		}
-		for _, object := range contents {
-			// Some storages return root tar_partitions folder as a Key.
-			// We do not want to fail restoration due to this fact.
-			// Keep in mind that skipping files is very dangerous and any decision here must be weighted.
-			if *object.Key == folder.path {
-				continue
+	} else {
+		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
+			for _, prefix := range commonPrefixes {
+				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+				subFolders = append(subFolders, subFolder)
 			}
-			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
+			for _, object := range contents {
+				// Some storages return root tar_partitions folder as a Key.
+				// We do not want to fail restoration due to this fact.
+				// Keep in mind that skipping files is very dangerous and any decision here must be weighted.
+				if *object.Key == folder.path {
+					continue
+				}
+
+				objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+				objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
+			}
+		}
+
+		err = folder.listObjectsPages(prefix, delimiter, nil, listFunc)
+
+		// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+		// which don't yet exist.
+		if err != nil && !isAwsNotExist(err) {
+			return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 		}
 	}
 
-	prefix := aws.String(folder.path)
-	delimiter := aws.String("/")
-	err = folder.listObjectsPages(prefix, delimiter, nil, listFunc)
+	return objects, subFolders, nil
+}
 
-	if err != nil {
-		// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
-		// which don't yet exist.
-		if isAwsNotExist(err) {
-			return objects, subFolders, nil
+func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage.Object, []storage.Folder, error) {
+	objects := []storage.Object{}
+	subFolders := []storage.Folder{}
+	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
+		for _, prefix := range out.CommonPrefixes {
+			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+			subFolders = append(subFolders, subFolder)
 		}
 
+		for _, object := range out.Versions {
+			// Some storages return root tar_partitions folder as a Key.
+			if *object.Key == folder.path {
+				continue
+			}
+
+			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+			if *object.IsLatest {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
+					*object.Size, fmt.Sprintf("%s LATEST", *object.VersionId)))
+			} else {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
+					*object.Size, *object.VersionId))
+			}
+		}
+		for _, object := range out.DeleteMarkers {
+			// Some storages return root tar_partitions folder as a Key.
+			if *object.Key == folder.path {
+				continue
+			}
+
+			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+			if *object.IsLatest {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
+					0, fmt.Sprintf("%s LATEST", *object.VersionId)))
+			} else {
+				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified, 0, *object.VersionId))
+			}
+		}
+		return true
+	}
+	input := &s3.ListObjectVersionsInput{
+		Bucket:    folder.bucket,
+		Prefix:    prefix,
+		Delimiter: delimiter,
+	}
+	err := folder.s3API.ListObjectVersionsPages(input, versionsListFunc)
+
+	// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+	// which don't yet exist.
+	if err != nil && !isAwsNotExist(err) {
 		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 	}
 	return objects, subFolders, nil
@@ -198,9 +264,11 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	parts := partitionStrings(objectRelativePaths, 1000)
+	needsVersioning := folder.isVersioningEnabled()
+
 	for _, part := range parts {
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
-			Objects: folder.partitionToObjects(part),
+			Objects: folder.partitionToObjects(part, needsVersioning),
 		}}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
@@ -208,6 +276,51 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		}
 	}
 	return nil
+}
+
+func (folder *Folder) getObjectVersions(key string) ([]*s3.ObjectIdentifier, error) {
+	inp := &s3.ListObjectVersionsInput{
+		Bucket: folder.bucket,
+		Prefix: aws.String(folder.path + key),
+	}
+
+	out, err := folder.s3API.ListObjectVersions(inp)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]*s3.ObjectIdentifier, 0)
+	for _, version := range out.Versions {
+		list = append(list, &s3.ObjectIdentifier{Key: version.Key, VersionId: version.VersionId})
+	}
+
+	for _, deleteMarker := range out.DeleteMarkers {
+		list = append(list, &s3.ObjectIdentifier{Key: deleteMarker.Key, VersionId: deleteMarker.VersionId})
+	}
+
+	return list, nil
+}
+
+func (folder *Folder) isVersioningEnabled() bool {
+	switch folder.config.EnableVersioning {
+	case VersioningEnabled:
+		return true
+	case VersioningDisabled:
+		return false
+	case VersioningDefault:
+		result, err := folder.s3API.GetBucketVersioning(&s3.GetBucketVersioningInput{
+			Bucket: folder.bucket,
+		})
+		if err != nil {
+			return false
+		}
+
+		if result.Status != nil && *result.Status == s3.BucketVersioningStatusEnabled {
+			folder.config.EnableVersioning = VersioningEnabled
+			return true
+		}
+		folder.config.EnableVersioning = VersioningDisabled
+	}
+	return false
 }
 
 func (folder *Folder) Validate() error {
@@ -227,10 +340,28 @@ func (folder *Folder) Validate() error {
 	return nil
 }
 
-func (folder *Folder) partitionToObjects(keys []string) []*s3.ObjectIdentifier {
-	objects := make([]*s3.ObjectIdentifier, len(keys))
-	for id, key := range keys {
-		objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.path + key)}
+func (folder *Folder) SetVersioningEnabled(enable bool) {
+	if enable && folder.isVersioningEnabled() {
+		folder.config.EnableVersioning = VersioningEnabled
+	} else {
+		folder.config.EnableVersioning = VersioningDisabled
+	}
+}
+
+func (folder *Folder) partitionToObjects(keys []string, versioningEnabled bool) []*s3.ObjectIdentifier {
+	objects := make([]*s3.ObjectIdentifier, 0, len(keys))
+	for _, key := range keys {
+		if versioningEnabled {
+			versions, err := folder.getObjectVersions(key)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("failed to list versions: %v", err)
+				//TODO to error or not to error
+			}
+			objects = append(objects, versions...)
+		} else {
+			objects = append(objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + key)})
+		}
+		//objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.path + key)}
 	}
 	return objects
 }

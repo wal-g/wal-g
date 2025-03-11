@@ -6,6 +6,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -26,8 +27,11 @@ func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent
 		return postgres.PrevBackupInfo{}, 0,
 			fmt.Errorf("couldn't find the requested base backup: %w", err)
 	}
-
-	previousSegBackup, err := NewSegBackup(baseBackupFolder, previousBackup.Name)
+	storage, err := multistorage.UsedStorage(previousBackup.Folder)
+	if err != nil {
+		return postgres.PrevBackupInfo{}, 0, err
+	}
+	previousSegBackup, err := NewSegBackup(baseBackupFolder, previousBackup.Name, storage)
 	tracelog.ErrorLogger.FatalOnError(err)
 	prevBackupSentinelDto, err := previousSegBackup.GetSentinel()
 	tracelog.ErrorLogger.FatalOnError(err)

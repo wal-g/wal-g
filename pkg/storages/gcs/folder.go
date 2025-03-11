@@ -290,3 +290,6 @@ func fillBuffer(r io.Reader, b []byte) (int, error) {
 func (folder *Folder) Validate() error {
 	return nil
 }
+
+// NOT IMPLEMENTED
+func (folder *Folder) SetVersioningEnabled(enable bool) {}

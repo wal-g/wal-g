@@ -5,9 +5,10 @@ set -e -x
 
 #
 # In this test we check that wal-g can create incremental backups & restore them
+# using inhouse xbstream & xtrabackup parsers.
 #
 
-export WALE_S3_PREFIX=s3://mysql8_full_xtrabackup_xbtool_incremental_bucket
+export WALE_S3_PREFIX=s3://mysql8_xbtool_inplace_bucket
 export WALG_COMPRESSION_METHOD=zstd
 export WALG_MYSQL_DATA_DIR="${MYSQLDATA}"
 
@@ -56,22 +57,11 @@ wal-g st cat "basebackups_005/${FIRST_BACKUP}_backup_stop_sentinel.json"
 wal-g st cat "basebackups_005/${SECOND_BACKUP}_backup_stop_sentinel.json"
 wal-g st cat "basebackups_005/${LATEST_BACKUP}_backup_stop_sentinel.json"
 
-# restore full backup
-mysql_kill_and_clean_data
-wal-g backup-fetch $FIRST_BACKUP --use-xbtool-extract
-chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
-
-mysqldump sbtest > /tmp/dump_after_restore
-grep -w 'testpitr01' /tmp/dump_after_restore
-! grep -w 'testpitr02' /tmp/dump_after_restore
-! grep -w 'testpitr03' /tmp/dump_after_restore
-! grep -w 'testpitr04' /tmp/dump_after_restore
-
-
 # restore all incremental backups
+export WALG_LOG_LEVEL=DEVEL
 mysql_kill_and_clean_data
-wal-g backup-fetch LATEST --use-xbtool-extract
+wal-g backup-fetch LATEST --use-xbtool-extract --inplace
+
 chown -R mysql:mysql $MYSQLDATA
 service mysql start || (cat /var/log/mysql/error.log && false)
 

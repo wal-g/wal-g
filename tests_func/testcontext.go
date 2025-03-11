@@ -175,17 +175,20 @@ func GetRedisCtlFromTestContextTyped(tctx *TestContext, hostName, configType str
 	if err != nil {
 		return nil, err
 	}
-	config := tctx.Env["WALG_CONF_PATH"]
+	confPath := tctx.Env["WALG_CONF_PATH"]
 	if configType != "" {
-		ext := filepath.Ext(config)
-		config = strings.Join([]string{strings.TrimSuffix(config, ext), configType, ext}, "")
+		ext := filepath.Ext(confPath)
+		confPath = strings.Join([]string{strings.TrimSuffix(confPath, ext), configType, ext}, "")
 	}
 	return helpers.NewRedisCtl(
 		tctx.Context,
-		host,
-		port,
-		tctx.Env["REDIS_PASSWORD"],
-		tctx.Env["WALG_CLIENT_PATH"],
-		config,
+		helpers.RedisCtlArgs{
+			BinPath:  tctx.Env["WALG_CLIENT_PATH"],
+			ConfPath: confPath,
+			Host:     host,
+			Port:     port,
+			Username: tctx.Env["REDIS_USERNAME"],
+			Password: tctx.Env["REDIS_PASSWORD"],
+		},
 	)
 }

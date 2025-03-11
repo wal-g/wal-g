@@ -83,6 +83,8 @@ func init() {
 		wrappedPreRun(cmd, args)
 	}
 	wrappedPgCmd.PersistentFlags().StringVar(&SegContentID, "content-id", "", "segment content ID")
+	wrappedPgCmd.Flags().StringVar(&targetStorage, "target-storage",
+		"", targetStorageDescription)
 	cmd.AddCommand(wrappedPgCmd)
 
 	// Add the hidden prefetch command to the root command
@@ -101,18 +103,19 @@ func getMultistorageRootFolder(checkWrite bool, policy policies.Policies) (stora
 	}
 
 	rootFolder := multistorage.SetPolicies(storage.RootFolder(), policy)
-	if targetStorage == "" {
-		rootFolder, err = multistorage.UseAllAliveStorages(rootFolder)
-	} else {
+
+	if targetStorage != "" {
 		rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
+		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder)[0])
+	} else if policy == policies.TakeFirstStorage {
+		rootFolder, err = multistorage.UseFirstAliveStorage(rootFolder)
+		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder)[0])
+	} else if policy == policies.UniteAllStorages {
+		rootFolder, err = multistorage.UseAllAliveStorages(rootFolder)
+		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder))
 	}
 	if err != nil {
 		return nil, err
-	}
-	if policy == policies.TakeFirstStorage {
-		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder)[0])
-	} else if policy == policies.UniteAllStorages {
-		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder))
 	}
 	return rootFolder, nil
 }

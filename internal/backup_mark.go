@@ -188,15 +188,27 @@ func newBackupHasPermanentBackupInFutureError(backupName string) BackupHasPerman
 }
 
 func GetPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher) map[string]bool {
+	return getPermanentBackups(folder, metaFetcher, false)
+}
+
+func GetPermanentBackupsFromStorage(folder storage.Folder, metaFetcher GenericMetaFetcher) map[string]bool {
+	return getPermanentBackups(folder, metaFetcher, true)
+}
+
+func getPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher, fromStorage bool) map[string]bool {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
 	backupTimes, err := GetBackups(folder)
 	if err != nil {
 		return map[string]bool{}
 	}
-
+	var meta GenericMetadata
 	permanentBackups := map[string]bool{}
 	for _, backupTime := range backupTimes {
-		meta, err := metaFetcher.Fetch(backupTime.BackupName, folder)
+		if fromStorage {
+			meta, err = metaFetcher.FetchFromStorage(backupTime.BackupName, folder, backupTime.StorageName)
+		} else {
+			meta, err = metaFetcher.Fetch(backupTime.BackupName, folder)
+		}
 		if err != nil {
 			FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue

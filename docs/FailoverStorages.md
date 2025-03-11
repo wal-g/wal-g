@@ -36,6 +36,8 @@ WALG_FAILOVER_STORAGES:
         WALG_FILE_PREFIX: "/some/prefix"
 ```
 
+You can explicitly specify storage using `--target-storage` option.
+
 #### Storage aliveness checking
 
 WAL-G maintains a list of all storage statuses at any given moment, and uses only alive storages during command executions.

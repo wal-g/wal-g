@@ -360,6 +360,11 @@ To build on ARM64, set the corresponding `GOOS`/`GOARCH` environment variables:
 env GOOS=darwin GOARCH=arm64 make install_and_build_pg
 ```
 
+To build linux build on ARM MacOS:
+```
+GOOS=linux GOARCH=amd64 make mysql_build
+```
+
 The compiled binary to run is `main/pg/wal-g`
 
 ### Testing

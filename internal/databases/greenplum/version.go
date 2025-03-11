@@ -31,8 +31,11 @@ func NewVersion(version semver.Version, flavor Flavor) Version {
 }
 
 func parseGreenplumVersion(version string) (Version, error) {
-	pattern := regexp.MustCompile(`(Greenplum Database|Cloudberry Database) (\d+\.\d+\.\d+)`)
+	pattern := regexp.MustCompile(`(Greenplum Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
 	groups := pattern.FindStringSubmatch(version)
+	if groups == nil {
+		return Version{}, fmt.Errorf("unknown flavor: %s", version)
+	}
 	semVer, err := semver.Make(groups[2])
 	if err != nil {
 		return Version{}, err
@@ -41,7 +44,7 @@ func parseGreenplumVersion(version string) (Version, error) {
 	var flavor Flavor
 	if groups[1] == "Greenplum Database" {
 		flavor = Greenplum
-	} else if groups[1] == "Cloudberry Database" {
+	} else if groups[1] == "Cloudberry Database" || groups[1] == "Apache Cloudberry" {
 		flavor = Cloudberry
 	} else {
 		return Version{}, fmt.Errorf("unknown flavor: %s", groups[1])

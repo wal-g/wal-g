@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"golang.org/x/sync/errgroup"
 
@@ -22,7 +23,7 @@ import (
 type DeleteArgs struct {
 	Confirmed bool
 	FindFull  bool
-	Garbage   bool
+	Force     bool
 }
 
 type DeleteHandler struct {
@@ -47,7 +48,7 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 		return obj1.GetLastModified().Before(obj2.GetLastModified())
 	}
 
-	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath),
+	permanentBackups := internal.GetPermanentBackupsFromStorage(folder.GetSubFolder(utility.BaseBackupPath),
 		NewGenericMetaFetcher())
 	permanentBackupNames := make([]string, 0, len(permanentBackups))
 	for name := range permanentBackups {
@@ -156,7 +157,7 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelecto
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {
-	backup, err := NewBackup(h.Folder, target.GetBackupName())
+	backup, err := NewBackupInStorage(h.Folder, target.GetBackupName(), multistorage.GetStorage(target))
 	if err != nil {
 		return err
 	}
@@ -185,7 +186,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 			}
 			segBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
 			if err != nil {
-				if h.args.Garbage {
+				if h.args.Force {
 					tracelog.ErrorLogger.Printf("Processing segment %d (backupId=%s): %v", meta.ContentID, meta.BackupID, err)
 					return nil // skip non-critical errors in garbage deletion
 				}

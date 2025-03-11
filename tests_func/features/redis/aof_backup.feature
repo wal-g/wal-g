@@ -50,21 +50,16 @@ Feature: Redis AOF backups check
 
     # Last backup restored with wrong version fails
     When we stop redis-server at redis02
-    And we restore #0 aof wrong version backup to redis02
+    And we restore #1 aof wrong version backup to redis02
     Then redis stopped on redis02
     When we start redis-server at redis02
     And a working redis on redis02
     Then we got same redis data at redis01 redis02
 
     # Pre-last backup restored successfully
-    When we stop redis-server at redis01
-    And we restore #0 aof same version backup to redis01
-    Then redis stopped on redis01
     When we stop redis-server at redis02
     And we restore #0 aof same version backup to redis02
     Then redis stopped on redis02
-    When we start redis-server at redis01
-    And we start redis-server at redis02
-    And a working redis on redis01
+    When we start redis-server at redis02
     And a working redis on redis02
-    Then we got same redis data at redis01 redis02
+    # we have nothing to compare with as #0 backup was made under load

@@ -10,12 +10,15 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-type streamSentinelDto struct {
-	StartLocalTime time.Time
+type StreamSentinelDto struct {
+	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
+	IsPermanent    bool      `json:"IsPermanent"`
+
+	UserData interface{} `json:"UserData,omitempty"`
 }
 
 // HandleBackupPush starts backup procedure.
-func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
+func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd, permanent bool, userDataRaw string) {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
@@ -30,7 +33,14 @@ func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
 		tracelog.ErrorLogger.Fatalf("backup create command failed: %v", err)
 	}
 
-	sentinel := streamSentinelDto{StartLocalTime: timeStart}
+	userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
+	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
+
+	sentinel := StreamSentinelDto{
+		StartLocalTime: timeStart,
+		IsPermanent:    permanent,
+		UserData:       userData,
+	}
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)

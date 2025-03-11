@@ -42,6 +42,7 @@ type Config struct {
 	MinThrottlingRetryDelay  time.Duration
 	MaxThrottlingRetryDelay  time.Duration
 	Disable100Continue       bool
+	EnableVersioning         string
 }
 
 type Secrets struct {

@@ -17,7 +17,18 @@ func NewEtcdDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error
 		backupObjects = append(backupObjects, internal.NewDefaultBackupObject(object))
 	}
 
-	return internal.NewDeleteHandler(folder, backupObjects, makeLessFunc()), nil
+	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
+
+	isPermanentFunc := func(object storage.Object) bool {
+		return internal.IsPermanent(object.GetName(), permanentBackups, internal.StreamBackupNameLength)
+	}
+
+	return internal.NewDeleteHandler(
+			folder,
+			backupObjects,
+			makeLessFunc(),
+			internal.IsPermanentFunc(isPermanentFunc)),
+		nil
 }
 
 func makeLessFunc() func(object1, object2 storage.Object) bool {

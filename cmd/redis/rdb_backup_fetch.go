@@ -39,11 +39,6 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		var cmdArgs []string
-		redisUser, ok := conf.GetSetting(conf.RedisRestoreBackupACLUser)
-		if ok && redisUser != "" {
-			cmdArgs = append(cmdArgs, "--user", redisUser)
-		}
-
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd, cmdArgs...)
 		tracelog.ErrorLogger.FatalOnError(err)
 		tracelog.InfoLogger.Print(restoreCmd.String())

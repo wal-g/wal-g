@@ -115,6 +115,7 @@ func NewBackupDetail(backupTime internal.BackupTime, sentinel StreamSentinelDto)
 // TODO: unit tests
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backupTimes, err := internal.GetBackups(folder)
+	err = internal.FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch list of backups in storage: %s", err)
 
 	backupDetails := make([]BackupDetail, 0, len(backupTimes))

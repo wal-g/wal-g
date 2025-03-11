@@ -5,7 +5,7 @@ set -e -x
 
 export WALG_LOG_LEVEL=DEVEL
 export WALG_COMPRESSION_METHOD=zstd
-export WALE_S3_PREFIX=s3://mysql8_xbtool_extract_bucket
+export WALE_S3_PREFIX=s3://mysql8_xbtool_bucket
 
 
 export WALG_STREAM_CREATE_COMMAND="xtrabackup --backup \
@@ -41,7 +41,7 @@ wal-g xtrabackup-push
 mysql_kill_and_clean_data
 
 FIRST_BACKUP=$(wal-g backup-list | awk 'NR==2{print $1}')
-wal-g st get "basebackups_005/${FIRST_BACKUP}/stream.zst" stream.xb
+wal-g st get-stream "${FIRST_BACKUP}" stream.xb
 
 cat <<EOF
 ##########
@@ -49,7 +49,7 @@ cat <<EOF
 ##########
 EOF
 mkdir -p wout
-wal-g xb extract stream.xb wout/
+wal-g xb extract stream.xb --data-dir wout/
 find wout -type f | sort -u | xargs cat | md5sum > wout.sum
 
 mkdir -p xout
@@ -67,7 +67,7 @@ cat <<EOF
 EOF
 rm -rf wout
 mkdir -p wout
-wal-g xb extract stream.xb wout/ --decompress
+wal-g xb extract stream.xb --data-dir wout/ --decompress
 find wout -type f | sort -u | xargs cat | md5sum > wout.sum
 
 rm -rf xout
@@ -85,7 +85,7 @@ EOF
 
 
 #
-# Unfortunately, docker's file system doesn't support holes... so it is useless to check it here
+# Unfortunately, docker's file system doesn't support punch holes... so it is useless to check it here
 #
 
 #cat > list_holes.py << EOF
