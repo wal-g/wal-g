@@ -62,20 +62,6 @@ Example:
 
 ``wal-g st put path/to/local_file path/to/remote_file`` upload the local file to the storage.
 
-
-### ``get-stream``
-Download the specified backup as single stream (when backup is stream-based backup). This command will:
-* decrypt backup
-* decompress backup
-* assemble parts of backups (when `WALG_STREAM_SPLITTER_*` used)
-* save to file
-
-Example:
-
-``wal-g st get-stream BACKUP_NAME path/to/local_file`` upload the local file to the storage.
-
-``wal-g st get-stream BACKUP_NAME | xbstream --extract`` upload the local file to the storage.
-
 ### `transfer`
 Transfer files from one configured storage to another. Is usually used to move files from a failover storage to the primary one when it becomes alive.
 
