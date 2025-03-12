@@ -21,8 +21,6 @@ linters-settings:
         sizeThreshold: 170 # temporary, default is 80
   gocyclo:
     min-complexity: 15
-  govet:
-    check-shadowing: false
   misspell:
     locale: US
   lll:
@@ -60,7 +58,7 @@ linters:
     - bodyclose
     - dupl
     - errcheck
-    - exportloopref
+    - copyloopvar
     - funlen
     - gocritic
     - gocyclo
