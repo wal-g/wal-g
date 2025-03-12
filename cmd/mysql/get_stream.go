@@ -1,4 +1,4 @@
-package st
+package mysql
 
 import (
 	"os"
@@ -7,11 +7,14 @@ import (
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
+
+var targetStorage string
 
 const (
 	getStreamShortDescription = "Download the backup as single stream"
@@ -41,8 +44,7 @@ var getStreamCmd = &cobra.Command{
 			tracelog.ErrorLogger.Fatalf("'all' target is not supported for st get command")
 		}
 
-		//_ = mysql.BinlogPath
-		backupSelector, err := internal.NewTargetBackupSelector("", backupName, postgres.NewGenericMetaFetcher())
+		backupSelector, err := internal.NewTargetBackupSelector("", backupName, mysql.NewGenericMetaFetcher())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		err = exec.OnStorage(targetStorage, func(folder storage.Folder) error {
@@ -58,5 +60,8 @@ var getStreamCmd = &cobra.Command{
 }
 
 func init() {
-	StorageToolsCmd.AddCommand(getStreamCmd)
+	cmd.PersistentFlags().StringVarP(&targetStorage, "target", "t", consts.DefaultStorage,
+		"execute for specific failover storage (Postgres only)")
+
+	cmd.AddCommand(getStreamCmd)
 }
