@@ -60,7 +60,7 @@ var getStreamCmd = &cobra.Command{
 }
 
 func init() {
-	cmd.PersistentFlags().StringVarP(&targetStorage, "target", "t", consts.DefaultStorage,
+	cmd.PersistentFlags().StringVarP(&targetStorage, "target", "", consts.DefaultStorage,
 		"execute for specific failover storage (Postgres only)")
 
 	cmd.AddCommand(getStreamCmd)
