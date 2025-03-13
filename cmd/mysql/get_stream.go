@@ -1,4 +1,4 @@
-package st
+package mysql
 
 import (
 	"os"
@@ -8,10 +8,13 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
+
+var targetStorage string
 
 const (
 	getStreamShortDescription = "Download the backup as single stream"
@@ -57,5 +60,8 @@ var getStreamCmd = &cobra.Command{
 }
 
 func init() {
-	StorageToolsCmd.AddCommand(getStreamCmd)
+	cmd.PersistentFlags().StringVarP(&targetStorage, "target", "", consts.DefaultStorage,
+		"execute for specific failover storage (Postgres only)")
+
+	cmd.AddCommand(getStreamCmd)
 }

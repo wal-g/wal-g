@@ -135,6 +135,19 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch  LATEST
 ```
 
+### ``get-stream``
+Download the specified backup as single stream (when backup is stream-based backup). This command will:
+* decrypt backup
+* decompress backup
+* assemble parts of backups (when `WALG_STREAM_SPLITTER_*` used)
+* save to file
+
+Example:
+
+``wal-g get-stream BACKUP_NAME path/to/local_file`` upload the local file to the storage.
+
+``wal-g get-stream BACKUP_NAME | xbstream --extract`` upload the local file to the storage.
+
 ### ``binlog-push``
 
 Sends (not yet archived) binlogs to storage. Typically run in CRON.

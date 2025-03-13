@@ -41,7 +41,7 @@ wal-g xtrabackup-push
 mysql_kill_and_clean_data
 
 FIRST_BACKUP=$(wal-g backup-list | awk 'NR==2{print $1}')
-wal-g st get-stream "${FIRST_BACKUP}" stream.xb
+wal-g get-stream "${FIRST_BACKUP}" stream.xb
 
 cat <<EOF
 ##########
