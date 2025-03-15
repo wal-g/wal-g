@@ -4,8 +4,8 @@ set -e -x
 . /usr/local/export_common.sh
 
 export WALE_S3_PREFIX=s3://mariadb_pitr_xtrabackup
-export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mariadb-binlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mariadb'
-export WALG_MYSQL_BINLOG_DST=/tmp
+#export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mariadb-binlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" "$WALG_MYSQL_CURRENT_BINLOG" | mariadb'
+#export WALG_MYSQL_BINLOG_DST=/tmp
 
 mariadb_installdb
 service mariadb start

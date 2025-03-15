@@ -4,7 +4,7 @@ set -e -x
 . /usr/local/export_common.sh
 
 export WALE_S3_PREFIX=s3://mariadb_binlog_push_fetch
-export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
+#export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 
 mariadb_installdb
 service mariadb start
