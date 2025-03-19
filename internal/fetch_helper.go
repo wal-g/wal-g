@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -186,25 +187,29 @@ func DownloadAndDecompressStorageFile(reader StorageFolderReader, fileName strin
 }
 
 func findDecompressorAndDownload(reader StorageFolderReader, fileName string) (io.ReadCloser, compression.Decompressor, error) {
-	for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
-		archiveReader, exists, err := TryDownloadFile(reader, fileName+"."+decompressor.FileExtension())
+	for range 5 {
+		exists := false
+		for _, decompressor := range putCachedDecompressorInFirstPlace(compression.Decompressors) {
+			archiveReader, exists, err := TryDownloadFile(reader, fileName+"."+decompressor.FileExtension())
+			if err != nil {
+				return nil, nil, err
+			}
+			if !exists {
+				continue
+			}
+			_ = SetLastDecompressor(decompressor)
+			return archiveReader, decompressor, nil
+		}
+		fileReader, exists, err := TryDownloadFile(reader, fileName)
 		if err != nil {
 			return nil, nil, err
 		}
-		if !exists {
-			continue
+		if exists {
+			return fileReader, nil, nil
 		}
-		_ = SetLastDecompressor(decompressor)
-
-		return archiveReader, decompressor, nil
-	}
-
-	fileReader, exists, err := TryDownloadFile(reader, fileName)
-	if err != nil {
-		return nil, nil, err
-	}
-	if exists {
-		return fileReader, nil, nil
+		/* The wal file may be not uploaded yet, wait for a while */
+		time.Sleep(time.Second * 1)
+		continue
 	}
 
 	return nil, nil, newArchiveNonExistenceError(fileName)
