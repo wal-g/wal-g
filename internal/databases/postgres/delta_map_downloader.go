@@ -26,14 +26,14 @@ func getDeltaMap(reader internal.StorageFolderReader,
 	tracelog.InfoLogger.Printf("First DELTA shouldn't participate in building delta map: %s",
 		firstNotUsedDeltaNo.getFilename(timeline))
 	firstDeltaFile, err := getDeltaFile(reader, firstUsedDeltaNo.getFilename(timeline))
-	var walparser *walparser.WalParser = nil
+	var walparser *walparser.WalParser
 	/* First delta file not found , parse it from wal log
 	 * If the first wal file pushed to the wal-g is not started with xxx0, and the basebackup
 	 * started, then the first delta file will always be missing for that basebackup. For this
 	 * case, we will parse the delta map from wals for the first delta segment
 	 */
 	if err != nil {
-		err, walparser = handlFirstDeltaFileMiss(firstUsedDeltaNo, firstUsedWalSegmentNo, firstNotUsedWalSegmentNo, timeline, reader, deltaMap)
+		walparser, err = handlFirstDeltaFileMiss(firstUsedDeltaNo, firstUsedWalSegmentNo, firstNotUsedWalSegmentNo, timeline, reader, deltaMap)
 		if err != nil {
 			return deltaMap, errors.Wrapf(err, "Error during downloading first delta file.\n")
 		}
@@ -91,7 +91,7 @@ func handlFirstDeltaFileMiss(firstUsedDeltaNo DeltaNo,
 	firstNotUsedWalSegmentNo WalSegmentNo,
 	timeline uint32,
 	reader internal.StorageFolderReader,
-	deltaMap PagedFileDeltaMap) (error, *walparser.WalParser) {
+	deltaMap PagedFileDeltaMap) (*walparser.WalParser, error) {
 	tracelog.InfoLogger.Printf("First delta file is missing, get locations from wals\n")
 	/* The wal file of firstUsedWalSegmentNo should not contain a partitial XLogRecord in the head
 	 * as it is the first wal file after the basebackup
@@ -104,5 +104,5 @@ func handlFirstDeltaFileMiss(firstUsedDeltaNo DeltaNo,
 	err := deltaMap.getLocationsFromWals(reader, timeline, firstUsedWalSegmentNo,
 		lastWalSegmengNo,
 		walparser)
-	return err, walparser
+	return walparser, err
 }
