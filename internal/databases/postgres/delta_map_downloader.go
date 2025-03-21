@@ -64,6 +64,7 @@ func getDeltaMap(reader internal.StorageFolderReader,
 	}
 	deltaMap.AddLocationsToDelta(lastDeltaFile.Locations)
 
+	firstUsedWalSegmentNo, firstNotUsedWalSegmentNo = getWalSegmentRange(firstNotUsedDeltaNo, firstNotUsedLSN)
 	// we handle WAL files from [firstUsedWalSegmentNo, lastUsedWalSegmentNo]
 	err = deltaMap.getLocationsFromWals(reader, timeline, firstUsedWalSegmentNo,
 		firstNotUsedWalSegmentNo, lastDeltaFile.WalParser)
