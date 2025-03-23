@@ -1,0 +1,7 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://wal-g.readthedocs.io/
+    about: Read the official WAL-G documentation
+
+
