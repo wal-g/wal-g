@@ -29,13 +29,31 @@ func TestEnsureRestoreCompatibility(t *testing.T) {
 		{
 			"b":    "6.4.19",
 			"r":    "6.4.18",
-			"res":  false,
+			"res":  true,
 			"errr": nil,
 		},
 		{
 			"b":    "6.4.18",
 			"r":    "6.4.18",
 			"res":  true,
+			"errr": nil,
+		},
+		{
+			"b":    "7.2.5",
+			"r":    "7.2.8",
+			"res":  true,
+			"errr": nil,
+		},
+		{
+			"b":    "7.2.8",
+			"r":    "7.2.5",
+			"res":  true,
+			"errr": nil,
+		},
+		{
+			"b":    "7.2.8",
+			"r":    "7.0.10",
+			"res":  false,
 			"errr": nil,
 		},
 	}

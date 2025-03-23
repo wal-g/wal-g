@@ -36,12 +36,14 @@ func (p *VersionParser) Get() (string, error) {
 }
 
 func EnsureRestoreCompatibility(backupVersion, restoreVersion string) (bool, error) {
-	b, err := version.NewVersion(backupVersion)
+	backupVersionNoPatch := strings.Join(strings.Split(backupVersion, ".")[:2], ".")
+	b, err := version.NewVersion(backupVersionNoPatch)
 	if err != nil {
 		return false, fmt.Errorf("backup version error: %v", err)
 	}
 
-	r, err := version.NewVersion(restoreVersion)
+	restoreVersionNoPatch := strings.Join(strings.Split(restoreVersion, ".")[:2], ".")
+	r, err := version.NewVersion(restoreVersionNoPatch)
 	if err != nil {
 		return false, fmt.Errorf("restore version error: %v", err)
 	}
