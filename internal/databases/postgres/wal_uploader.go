@@ -115,3 +115,49 @@ func PrepareMultiStorageWalUploader(folder storage.Folder, targetStorage string)
 	walUploader.ChangeDirectory(utility.WalPath)
 	return walUploader, nil
 }
+
+// Why we need this:
+//   - Our WAL delta tracking system uses the algorithm logSegNo % WalFileInDelta to map WAL files to WAL part files
+//   - This algorithm inherently causes the "partially filled" WAL part file to be incomplete
+//     For example, if the logSegNo of the first WAL file is 5, then WAL parts 0-4 will be missing in the part file
+//   - By detecting backup history files and properly handling the associated delta files, we ensure:
+//     a) The "partially filled" WAL part file is properly completed with empty entries for missing parts
+//     b) Delta tracking remains consistent despite the inherent limitation of the mapping algorithm
+//     c) Subsequent WAL deltas can be properly tracked
+func (walUploader *WalUploader) HandleBackupHistoryFile(walFilePath string) error {
+	filename := path.Base(walFilePath)
+	if !IsBackupHistoryFilename(filename) {
+		return nil
+	}
+
+	walFilename, err := GetWalFilenameFromBackupHistoryFilename(filename)
+	if err != nil {
+		return err
+	}
+
+	deltaFilename, err := GetDeltaFilenameFor(walFilename)
+	if err != nil {
+		return err
+	}
+
+	partFile, err := walUploader.DeltaFileManager.GetPartFile(deltaFilename)
+	if err != nil {
+		return err
+	}
+
+	partiallyFilled, index, err := partFile.IsPartiallyFilledPartFile()
+	if err != nil {
+		return err
+	}
+
+	if partiallyFilled {
+		// Complete the "partially filled" WAL part file
+		// This step is crucial because:
+		// 1. Delta file can only be uploaded after the part file is completed
+		// 2. Ensures continuity and integrity of delta backups
+		// 3. Prevents delta tracking issues caused by missing early WAL segments
+		partFile.CompletePartFile(index)
+	}
+
+	return nil
+}
