@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -308,6 +309,10 @@ func getFullPath(relativePath string) (string, error) {
 	PgDataSettingString, ok := conf.GetSetting(conf.PgDataSetting)
 	if !ok {
 		return "", fmt.Errorf("PGDATA is not set in the conf")
+	}
+	if strings.Contains(relativePath, PgDataSettingString) {
+		tracelog.InfoLogger.Printf("path %s already contain pgdata", relativePath)
+		return relativePath, nil
 	}
 	return path.Join(PgDataSettingString, relativePath), nil
 }
