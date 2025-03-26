@@ -232,6 +232,9 @@ const (
 	SSHPrivateKeyPath = "SSH_PRIVATE_KEY_PATH"
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
+
+	// For test
+	ForbiddenFallbackToFullbackup = "FORBIDDEN_FALLBACK_TO_FULLBACKUP"
 )
 
 var (
@@ -306,20 +309,22 @@ var (
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
+		ForbiddenFallbackToFullbackup: "false",
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory:              "/var/log",
-		PgWalSize:                    "64",
-		GPSegmentsPollInterval:       "5m",
-		GPSegmentsUpdInterval:        "10s",
-		GPSegmentsPollRetries:        "5",
-		GPSegmentStatesDir:           "/tmp",
-		GPDeleteConcurrency:          "1",
-		GPAoSegSizeThreshold:         "1048576", // (1 << 20)
-		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
-		GPRelativeRecoveryConfPath:   "recovery.conf",
-		GPRelativePostgresqlConfPath: "postgresql.conf",
+		GPLogsDirectory:               "/var/log",
+		PgWalSize:                     "64",
+		GPSegmentsPollInterval:        "5m",
+		GPSegmentsUpdInterval:         "10s",
+		GPSegmentsPollRetries:         "5",
+		GPSegmentStatesDir:            "/tmp",
+		GPDeleteConcurrency:           "1",
+		GPAoSegSizeThreshold:          "1048576", // (1 << 20)
+		GPAoDeduplicationAgeLimit:     "720h",    // 30 days
+		GPRelativeRecoveryConfPath:    "recovery.conf",
+		GPRelativePostgresqlConfPath:  "postgresql.conf",
+		ForbiddenFallbackToFullbackup: "false",
 	}
 
 	AllowedSettings map[string]bool
@@ -491,6 +496,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
 		DisablePartialRestore:                true,
+		ForbiddenFallbackToFullbackup:        true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -582,6 +588,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
+		ForbiddenFallbackToFullbackup:        true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
