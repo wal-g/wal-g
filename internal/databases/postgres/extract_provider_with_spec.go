@@ -51,11 +51,12 @@ func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 		isDB, dbID, tableFileID := TryGetOidPair(file)
 
 		if isDB && desc.IsSkipped(dbID, tableFileID) && tableFileID != 0 {
-			tracelog.InfoLogger.Printf("will skip  %s ", file)
 			//delete(filesToUnwrap, file)
 			filesToDelete = append(filesToDelete, file)
 			_, ok := filesToUnwrap[file]
-			tracelog.InfoLogger.Printf("skipped  %t ", ok)
+			if ok {
+				tracelog.InfoLogger.Printf("will skip  %s", file)
+			}
 		} else {
 			tracelog.DebugLogger.Printf("will restore  %s because %t %t %t", file, isDB, desc.IsSkipped(dbID, tableFileID), tableFileID != 0)
 		}
@@ -63,10 +64,14 @@ func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 
 	for _, file := range filesToDelete {
 		_, ok := filesToUnwrap[file]
-		tracelog.InfoLogger.Printf("deleting %s %t ", file, ok)
+		if ok {
+			tracelog.InfoLogger.Printf("deleting %s", file)
+		}
 		delete(filesToUnwrap, file)
 		_, ok = filesToUnwrap[file]
-		tracelog.InfoLogger.Printf("skipped %s %t ", file, ok)
+		if ok {
+			tracelog.InfoLogger.Printf("skipped %s", file)
+		}
 	}
 }
 
