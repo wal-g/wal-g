@@ -18,7 +18,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/webserver"
 )
@@ -126,23 +125,24 @@ const (
 	ProfileMode          = "PROFILE_MODE"
 	ProfilePath          = "PROFILE_PATH"
 
-	MongoDBUriSetting                  = "MONGODB_URI"
-	MongoDBLastWriteUpdateInterval     = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
-	MongoDBExtendBackupCursor          = "MONGODB_EXTEND_BACKUP_CURSOR"
-	MongoDBDeletionProtectionWhitelist = "MONGODB_DELETION_PROTECTION_WHITELIST"
-	OplogArchiveAfterSize              = "OPLOG_ARCHIVE_AFTER_SIZE"
-	OplogArchiveTimeoutInterval        = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
-	OplogPITRDiscoveryInterval         = "OPLOG_PITR_DISCOVERY_INTERVAL"
-	OplogPushStatsEnabled              = "OPLOG_PUSH_STATS_ENABLED"
-	OplogPushStatsLoggingInterval      = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
-	OplogPushStatsUpdateInterval       = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
-	OplogPushStatsExposeHTTP           = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
-	OplogPushWaitForBecomePrimary      = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
-	OplogPushPrimaryCheckInterval      = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
-	OplogReplayOplogAlwaysUpsert       = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
-	OplogReplayOplogApplicationMode    = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
-	OplogReplayIgnoreErrorCodes        = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
-	OplogRecoverTimeout                = "OPLOG_RECOVER_TIMEOUT"
+	MongoDBUriSetting                   = "MONGODB_URI"
+	MongoDBLastWriteUpdateInterval      = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
+	MongoDBExtendBackupCursor           = "MONGODB_EXTEND_BACKUP_CURSOR"
+	MongoDBDeletionProtectionWhitelist  = "MONGODB_DELETION_PROTECTION_WHITELIST"
+	OplogArchiveAfterSize               = "OPLOG_ARCHIVE_AFTER_SIZE"
+	OplogArchiveTimeoutInterval         = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
+	OplogPITRDiscoveryInterval          = "OPLOG_PITR_DISCOVERY_INTERVAL"
+	OplogBackupAdditionalSavingInterval = "OPLOG_BACKUP_ADDITIONAL_SAVING_INTERVAL"
+	OplogPushStatsEnabled               = "OPLOG_PUSH_STATS_ENABLED"
+	OplogPushStatsLoggingInterval       = "OPLOG_PUSH_STATS_LOGGING_INTERVAL"
+	OplogPushStatsUpdateInterval        = "OPLOG_PUSH_STATS_UPDATE_INTERVAL"
+	OplogPushStatsExposeHTTP            = "OPLOG_PUSH_STATS_EXPOSE_HTTP"
+	OplogPushWaitForBecomePrimary       = "OPLOG_PUSH_WAIT_FOR_BECOME_PRIMARY"
+	OplogPushPrimaryCheckInterval       = "OPLOG_PUSH_PRIMARY_CHECK_INTERVAL"
+	OplogReplayOplogAlwaysUpsert        = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
+	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
+	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -1035,6 +1035,18 @@ func GetOplogPITRDiscoveryIntervalSetting() (*time.Duration, error) {
 	dur, err := time.ParseDuration(durStr)
 	if err != nil {
 		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogPITRDiscoveryInterval, durStr, err)
+	}
+	return &dur, nil
+}
+
+func GetOplogBackupAdditionalSavingTimeSetting() (*time.Duration, error) {
+	durStr, ok := GetSetting(OplogBackupAdditionalSavingInterval)
+	if !ok {
+		return nil, nil
+	}
+	dur, err := time.ParseDuration(durStr)
+	if err != nil {
+		return nil, fmt.Errorf("duration expected for %s setting but given '%s': %w", OplogBackupAdditionalSavingInterval, durStr, err)
 	}
 	return &dur, nil
 }
