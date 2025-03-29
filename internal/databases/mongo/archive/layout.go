@@ -174,7 +174,8 @@ func OldestBackupAfterTime(backups []*models.Backup, after time.Time) (*models.B
 // SelectPurgingOplogArchives builds archive list to be deleted.
 func SelectPurgingOplogArchives(archives []models.Archive,
 	backups []*models.Backup,
-	retainAfterTS *models.Timestamp) []models.Archive {
+	retainAfterTS *models.Timestamp,
+	additionalIntervalAfterBackup *time.Duration) []models.Archive {
 	var purgeArchives []models.Archive
 	var arch models.Archive
 	for i := range archives {
@@ -187,8 +188,8 @@ func SelectPurgingOplogArchives(archives []models.Archive,
 			continue
 		}
 
-		// retain if arch is part of backup
-		if backup := models.FirstOverlappingBackupForArch(arch, backups); backup != nil {
+		// retain if arch is part of [backup.start: backup.end + additionalIntervalAfterBackup]
+		if backup := models.FirstOverlappingBackupForArch(arch, backups, additionalIntervalAfterBackup); backup != nil {
 			tracelog.DebugLogger.Printf(
 				"Keeping oplog archive due to overlapping with backup (%+v): %s", backup, arch.Filename())
 			continue

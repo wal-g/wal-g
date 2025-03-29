@@ -2,22 +2,16 @@ package mongo
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
-	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
 )
-
-const LatestBackupString = "LATEST_BACKUP"
 
 // oplogReplayCmd represents oplog replay procedure
 var oplogReplayCmd = &cobra.Command{
@@ -42,25 +36,9 @@ var oplogReplayCmd = &cobra.Command{
 }
 
 func buildOplogReplayRunArgs(cmdargs []string) (binary.ReplyOplogConfig, string, error) {
-	var args binary.ReplyOplogConfig
-	// resolve archiving settings
-	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1])
 	if err != nil {
 		return args, "", err
-	}
-	args.Since, err = processArg(cmdargs[0], downloader)
-	if err != nil {
-		return args, "", err
-	}
-	args.Until, err = processArg(cmdargs[1], downloader)
-	if err != nil {
-		return args, "", err
-	}
-
-	if ignoreErrCodesStr, ok := conf.GetSetting(conf.OplogReplayIgnoreErrorCodes); ok {
-		if err = json.Unmarshal([]byte(ignoreErrCodesStr), &args.IgnoreErrCodes); err != nil {
-			return args, "", err
-		}
 	}
 
 	mongodbURL, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
@@ -68,39 +46,7 @@ func buildOplogReplayRunArgs(cmdargs []string) (binary.ReplyOplogConfig, string,
 		return args, "", err
 	}
 
-	oplogAlwaysUpsert, hasOplogAlwaysUpsert, err := conf.GetBoolSetting(conf.OplogReplayOplogAlwaysUpsert)
-	if err != nil {
-		return args, "", err
-	}
-	if hasOplogAlwaysUpsert {
-		args.OplogAlwaysUpsert = &oplogAlwaysUpsert
-	}
-
-	if oplogApplicationMode, hasOplogApplicationMode := conf.GetSetting(
-		conf.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
-		args.OplogApplicationMode = &oplogApplicationMode
-	}
-
 	return args, mongodbURL, nil
-}
-
-func processArg(arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
-	switch arg {
-	case internal.LatestString:
-		return downloader.LastKnownArchiveTS()
-	case LatestBackupString:
-		lastBackupName, err := downloader.LastBackupName()
-		if err != nil {
-			return models.Timestamp{}, err
-		}
-		backupMeta, err := downloader.BackupMeta(lastBackupName)
-		if err != nil {
-			return models.Timestamp{}, err
-		}
-		return models.TimestampFromBson(backupMeta.MongoMeta.BackupLastTS), nil
-	default:
-		return models.TimestampFromStr(arg)
-	}
 }
 
 func init() {
