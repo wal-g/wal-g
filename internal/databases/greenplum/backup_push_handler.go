@@ -246,7 +246,7 @@ func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) 
 		StartTime:        bh.currBackupInfo.startTime,
 		FinishTime:       bh.currBackupInfo.finishTime,
 		Hostname:         hostname,
-		GpVersion:        bh.currBackupInfo.gpVersion.Version.String(),
+		GpVersion:        bh.currBackupInfo.gpVersion.String(),
 		GpFlavor:         bh.currBackupInfo.gpVersion.Flavor.String(),
 		SystemIdentifier: bh.currBackupInfo.systemIdentifier,
 		LsnBySegment:     restoreLSNs,

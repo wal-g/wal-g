@@ -406,7 +406,7 @@ func (b *BsonCursor) Next(ctx context.Context) bool {
 		return true
 	}
 
-	b.raw, b.err = bson.NewFromIOReader(b.r)
+	b.raw, b.err = bson.ReadDocument(b.r)
 	return b.err == nil
 }
 

@@ -70,7 +70,7 @@ func (crypter *Crypter) setupPubKey() error {
 
 	switch {
 	case crypter.IsUseArmoredKey:
-		evaluatedKey := strings.Replace(crypter.ArmoredKey, `\n`, "\n", -1)
+		evaluatedKey := strings.ReplaceAll(crypter.ArmoredKey, `\n`, "\n")
 		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(evaluatedKey))
 
 		if err != nil {
@@ -166,7 +166,7 @@ func (crypter *Crypter) loadSecret() error {
 	}
 
 	if crypter.IsUseArmoredKey {
-		evaluatedKey := strings.Replace(crypter.ArmoredKey, `\n`, "\n", -1)
+		evaluatedKey := strings.ReplaceAll(crypter.ArmoredKey, `\n`, "\n")
 		entityList, err := openpgp.ReadArmoredKeyRing(strings.NewReader(evaluatedKey))
 
 		if err != nil {

@@ -3,7 +3,6 @@ package storage
 import (
 	"bytes"
 	"io"
-	"math/rand"
 	"strings"
 	"testing"
 
@@ -15,7 +14,6 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	sub1 := storageFolder.GetSubFolder("Sub1")
 
 	token := make([]byte, 1024*1024) //Send 1 Mb
-	rand.Read(token)
 
 	err := storageFolder.PutObject("file0", bytes.NewBuffer(token))
 	assert.NoError(t, err)

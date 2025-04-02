@@ -84,7 +84,7 @@ func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileIn
 	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
 	fsync := !viper.GetBool(conf.TarDisableFsyncSetting)
 	switch fileInfo.Typeflag {
-	case tar.TypeReg, tar.TypeRegA:
+	case tar.TypeReg:
 		// temporary switch to determine if new unwrap logic should be used
 		if useNewUnwrapImplementation {
 			return tarInterpreter.unwrapRegularFileNew(fileReader, fileInfo, targetPath, fsync)

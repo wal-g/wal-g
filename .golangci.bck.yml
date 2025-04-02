@@ -1,0 +1,103 @@
+# This file contains all available configuration options
+# with their default values.
+
+# all available settings of specific linters
+linters-settings:
+  dupl:
+    threshold: 400
+  funlen:
+    lines: 100
+    statements: 50
+  gocritic:
+    enabled-tags:
+      - performance
+    disabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - style
+    settings:
+      hugeParam:
+        sizeThreshold: 170 # temporary, default is 80
+  gocyclo:
+    min-complexity: 15
+  misspell:
+    locale: US
+  lll:
+    line-length: 140
+  staticcheck:
+    checks: ["all", "-SA1019"]
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+linters:
+  # please, do not use `enable-all`: it's deprecated and will be removed soon.
+  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
+  disable-all: true
+  enable:
+    - bodyclose
+    - dupl
+    - errcheck
+    - exportloopref
+    - funlen
+    - gocritic
+    - gocyclo
+    - gofmt
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - revive
+    - staticcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - lll
+    - stylecheck
+    - gosimple
+    - whitespace
+    - makezero
+    - asciicheck
+
+run:
+  go: "1.22"
+  timeout: 5m
+  modules-download-mode: readonly
+
+issues:
+  exclude-dirs:
+    - "tests_func"
+    - "tmp"
+    - "submodules"
+    - "testtools"
+  exclude-files:
+    - ".*_test.go$"
+
+severity:
+  default-severity: error
+  rules:
+    - linters:
+      - godox
+      - unused
+      severity: info
