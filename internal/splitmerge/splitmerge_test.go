@@ -6,29 +6,28 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
-
-	"github.com/wal-g/wal-g/internal/abool"
 )
 
 type BufferCloser struct {
 	bytes.Buffer
 	io.Closer
-	closed abool.AtomicBool
+	closed atomic.Bool
 }
 
 func (b *BufferCloser) Write(p []byte) (n int, err error) {
-	if b.closed.IsSet() {
+	if b.closed.Load() {
 		return 0, io.ErrClosedPipe
 	}
 	return b.Buffer.Write(p)
 }
 
 func (b *BufferCloser) Close() error {
-	if !b.closed.SetToIf(false, true) {
+	if !b.closed.CompareAndSwap(false, true) {
 		// The behavior of Close after the first call is undefined.
 		// Specific implementations may document their own behavior.
 		panic("UB")

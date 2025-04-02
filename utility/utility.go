@@ -187,9 +187,9 @@ type BytesPool struct {
 }
 
 // NewBytesPool creates new BytesPool.
-func NewBytesPool(max int) *BytesPool {
+func NewBytesPool(size int) *BytesPool {
 	return &BytesPool{
-		pool: make(chan []byte, max),
+		pool: make(chan []byte, size),
 	}
 }
 
