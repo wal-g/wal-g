@@ -7,9 +7,9 @@ linters:
   enable:
     - asciicheck
     - bodyclose
+    - copyloopvar
     - dupl
     - errcheck
-    - copyloopvar
     - funlen
     - gocritic
     - gocyclo
