@@ -35,6 +35,7 @@ func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string,
 	defer prefetcher.Prefetch(baseReader, walFileName, location)
 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
+	tracelog.DebugLogger.Printf("Going to check prefetch in %s", prefetched)
 	seenSize := int64(-1)
 
 	sizeStallInterations := 0
