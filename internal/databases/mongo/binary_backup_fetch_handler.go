@@ -62,9 +62,12 @@ func HandleBinaryFetchPush(
 		return err
 	}
 
-	replyOplogConfig, err := binary.NewReplyOplogConfig(pitrSince, pitrUntil)
-	if err != nil {
-		return err
+	var replyOplogConfig binary.ReplyOplogConfig
+	if pitrSince != "" && pitrUntil != "" {
+		replyOplogConfig, err = binary.NewReplyOplogConfig(pitrSince, pitrUntil)
+		if err != nil {
+			return err
+		}
 	}
 
 	return restoreService.DoRestore(

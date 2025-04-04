@@ -10,7 +10,9 @@ import (
 	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,6 +22,7 @@ import (
 )
 
 const adminDB = "admin"
+const LatestBackupString = "LATEST_BACKUP"
 
 const cursorCreateRetries = 10
 const mongoConnectRetries = 3
@@ -448,16 +451,21 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 	}
 }
 
-func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (roConfig ReplyOplogConfig, err error) {
-	if sincePitrStr == "" || untilPitrStr == "" {
-		return roConfig, err
-	}
+func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (ReplyOplogConfig, error) {
+	var roConfig ReplyOplogConfig
+	var err error
 	roConfig.HasPitr = true
-	roConfig.Since, err = models.TimestampFromStr(sincePitrStr)
+
+	// resolve archiving settings
+	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
 	if err != nil {
 		return roConfig, err
 	}
-	roConfig.Until, err = models.TimestampFromStr(untilPitrStr)
+	roConfig.Since, err = processTimestamp(sincePitrStr, downloader)
+	if err != nil {
+		return roConfig, err
+	}
+	roConfig.Until, err = processTimestamp(untilPitrStr, downloader)
 	if err != nil {
 		return roConfig, err
 	}
@@ -480,6 +488,25 @@ func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (roConfig Rep
 		roConfig.OplogApplicationMode = &oplogApplicationMode
 	}
 	return roConfig, err
+}
+
+func processTimestamp(arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
+	switch arg {
+	case internal.LatestString:
+		return downloader.LastKnownArchiveTS()
+	case LatestBackupString:
+		lastBackupName, err := downloader.LastBackupName()
+		if err != nil {
+			return models.Timestamp{}, err
+		}
+		backupMeta, err := downloader.BackupMeta(lastBackupName)
+		if err != nil {
+			return models.Timestamp{}, err
+		}
+		return models.TimestampFromBson(backupMeta.MongoMeta.BackupLastTS), nil
+	default:
+		return models.TimestampFromStr(arg)
+	}
 }
 
 func NewMongoCfgConfig(shardConnectionStrings []string) (MongoCfgConfig, error) {

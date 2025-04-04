@@ -141,9 +141,9 @@ type BackupMeta struct {
 
 // FirstOverlappingBackupForArch checks if archive overlaps any backup from given list.
 // TODO: build btree to fix ugly complexity here
-func FirstOverlappingBackupForArch(arch Archive, backups []*Backup) *Backup {
+func FirstOverlappingBackupForArch(arch Archive, backups []*Backup, backupAdditionalSavingInterval *time.Duration) *Backup {
 	for _, backup := range backups {
-		if ArchInBackup(arch, backup) {
+		if ArchInBackup(arch, backup, backupAdditionalSavingInterval) {
 			return backup
 		}
 	}
@@ -151,9 +151,12 @@ func FirstOverlappingBackupForArch(arch Archive, backups []*Backup) *Backup {
 }
 
 // ArchInBackup checks if archive and given backup overlaps each over.
-func ArchInBackup(arch Archive, backup *Backup) bool {
+func ArchInBackup(arch Archive, backup *Backup, addInterval *time.Duration) bool {
 	backupStart := backup.MongoMeta.Before.LastMajTS
 	backupEnd := backup.MongoMeta.After.LastMajTS
+	if addInterval != nil {
+		backupEnd.TS += uint32(*addInterval / time.Second)
+	}
 	return TimestampInInterval(arch.Start, backupStart, backupEnd) ||
 		TimestampInInterval(arch.End, backupStart, backupEnd) ||
 		TimestampInInterval(backupStart, arch.Start, arch.End) ||
