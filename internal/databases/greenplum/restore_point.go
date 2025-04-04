@@ -181,7 +181,7 @@ func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string) (err 
 		StartTime:        rpc.startTime,
 		FinishTime:       utility.TimeNowCrossPlatformUTC(),
 		Hostname:         hostname,
-		GpVersion:        rpc.gpVersion.Version.String(),
+		GpVersion:        rpc.gpVersion.String(),
 		GpFlavor:         rpc.gpVersion.Flavor.String(),
 		SystemIdentifier: rpc.systemIdentifier,
 		LsnBySegment:     restoreLSNs,

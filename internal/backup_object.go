@@ -35,7 +35,7 @@ func (o DefaultBackupObject) IsFullBackup() bool {
 }
 
 func (o DefaultBackupObject) GetBackupTime() time.Time {
-	return o.Object.GetLastModified()
+	return o.GetLastModified()
 }
 
 func (o DefaultBackupObject) GetStorage() string {
