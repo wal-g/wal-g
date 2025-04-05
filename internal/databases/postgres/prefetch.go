@@ -213,6 +213,7 @@ func prefetchFile(location string, reader internal.StorageFolderReader, walFileN
 		tracelog.ErrorLogger.Printf("WAL-prefetch %s, make dirs: %v", walFileName, err)
 	}
 
+	tracelog.DebugLogger.Printf("File prefetched to %s", oldPath)
 	err = internal.DownloadFileTo(reader, walFileName, oldPath)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("WAL-prefetch %s, download: %v", walFileName, err)
@@ -237,6 +238,9 @@ func getPrefetchLocations(location string,
 	runningLocation string,
 	runningFile string,
 	fetchedFile string) {
+	if viper.IsSet(conf.PrefetchDir) {
+		location = viper.GetString(conf.PrefetchDir)
+	}
 	prefetchLocation = path.Join(location, ".wal-g", "prefetch")
 	runningLocation = path.Join(prefetchLocation, "running")
 	oldPath := path.Join(runningLocation, walFileName)
