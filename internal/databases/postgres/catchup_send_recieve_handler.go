@@ -54,10 +54,10 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 			lsn, control.Checkpoint)
 	}
 
+	sendFileCommands(encoder, pgDataDirectory, fileList, control.Checkpoint)
+
 	label, offsetMap, _, err := runner.StopBackup()
 	tracelog.ErrorLogger.FatalOnError(err)
-
-	sendFileCommands(encoder, pgDataDirectory, fileList, control.Checkpoint)
 
 	err = encoder.Encode(
 		CatchupCommandDto{BinaryContents: []byte(label), FileName: BackupLabelFilename, IsBinContents: true})
