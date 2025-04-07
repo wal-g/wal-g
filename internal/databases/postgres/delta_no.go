@@ -1,5 +1,9 @@
 package postgres
 
+import (
+	"strings"
+)
+
 type DeltaNo uint64
 
 func newDeltaNoFromWalSegmentNo(walSegmentNo WalSegmentNo) DeltaNo {
@@ -9,6 +13,12 @@ func newDeltaNoFromWalSegmentNo(walSegmentNo WalSegmentNo) DeltaNo {
 
 func newDeltaNoFromLsn(lsn LSN) DeltaNo {
 	return newDeltaNoFromWalSegmentNo(NewWalSegmentNo(lsn))
+}
+
+func newDeltaNoFromFilename(filename string) (DeltaNo, error) {
+	filename = strings.TrimSuffix(filename, DeltaFilenameSuffix)
+	_, no, err := ParseWALFilename(filename)
+	return DeltaNo(no), err
 }
 
 func (deltaNo DeltaNo) next() DeltaNo {
@@ -30,6 +40,10 @@ func (deltaNo DeltaNo) sub(n uint64) DeltaNo {
 
 func (deltaNo DeltaNo) firstWalSegmentNo() WalSegmentNo {
 	return WalSegmentNo(deltaNo)
+}
+
+func (deltaNo DeltaNo) firstLsn() LSN {
+	return deltaNo.firstWalSegmentNo().firstLsn()
 }
 
 func (deltaNo DeltaNo) getFilename(timeline uint32) string {
