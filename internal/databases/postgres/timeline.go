@@ -68,6 +68,7 @@ var (
 	// .history file name regexp. For more details, see
 	// https://doxygen.postgresql.org/backend_2access_2transam_2timeline_8c_source.html
 	timelineHistoryFileRegexp *regexp.Regexp
+	SizeOfXLogLongPHD         = LSN(40)
 )
 
 func init() {
