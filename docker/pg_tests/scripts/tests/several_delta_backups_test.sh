@@ -9,6 +9,9 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
+# Sometimes, files are actually symlinks, and to check that wal-g can operate on that we also add one symlinked file.
+# Below is what Stolon does to disable `ALTER SYSTEM` options and is required to support stolon/wal-g configurations.
+ln -sf /dev/null "${PGDATA}/postgresql.auto.conf"
 
 echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
 echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p && mkdir -p /tmp/deltas/$(basename %p)'" >> /var/lib/postgresql/10/main/postgresql.conf
