@@ -89,6 +89,10 @@ wal-g backup-push --delta-from-name backup_name --config=/path/to/config.yaml
 wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/path/to/config.yaml
 ```
 
+* `WALG_FORBIDDEN_FALLBACK_TO_FULLBACKUP`
+
+To prevent WAL-G from falling back to a full backup if the delta backup fails
+
 ### ``backup-fetch``
 
 When fetching base backups, the user should pass in the cluster restore configuration and the name of the backup.

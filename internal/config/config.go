@@ -233,8 +233,7 @@ const (
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
 
-	// For test
-	ForbiddenFallbackToFullbackup = "FORBIDDEN_FALLBACK_TO_FULLBACKUP"
+	ForbiddenFallbackToFullbackup = "WALG_FORBIDDEN_FALLBACK_TO_FULLBACKUP"
 )
 
 var (
