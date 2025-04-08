@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io"
 	"strings"
 	"testing"
@@ -14,8 +15,10 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	sub1 := storageFolder.GetSubFolder("Sub1")
 
 	token := make([]byte, 1024*1024) //Send 1 Mb
+	_, err := rand.Read(token)
+	assert.NoError(t, err)
 
-	err := storageFolder.PutObject("file0", bytes.NewBuffer(token))
+	err = storageFolder.PutObject("file0", bytes.NewBuffer(token))
 	assert.NoError(t, err)
 
 	readCloser, err := storageFolder.ReadObject("file0")
