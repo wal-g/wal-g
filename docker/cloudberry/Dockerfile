@@ -74,13 +74,16 @@ WORKDIR /usr/local
 #RUN git clone https://github.com/arenadata/gpdb.git gpdb_src --single-branch --branch adb-7.2.0 --depth 1 \
 # && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
 
-RUN git clone https://github.com/cloudberrydb/cloudberrydb.git gpdb_src --single-branch --branch main --depth 1 \
- && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
+RUN git clone https://github.com/cloudberrydb/cloudberrydb.git gpdb_src --single-branch --branch main --depth 1
+
+COPY docker/cloudberry/setup_gpadmin_user.bash /root/setup_gpadmin_user.bash
+RUN chmod +x /root/setup_gpadmin_user.bash \
+    && /root/setup_gpadmin_user.bash
 
 WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
  && git log -1 \
- && ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src --enable-debug --disable-pxf > /dev/null \
+ && ./configure --with-perl --with-python --with-libxml --with-gssapi --enable-debug --disable-pxf --disable-orca --prefix=/usr/local/gpdb_src  > /dev/null \
  && make -j$(nproc) > /dev/null \
  && make -j$(nproc) install > /dev/null \
  && chown gpadmin:gpadmin /home/gpadmin/run_greenplum.sh \
@@ -90,4 +93,5 @@ RUN locale-gen en_US.utf8 \
  && chown gpadmin:gpadmin /home/gpadmin/.bash_profile \
  && echo "gpadmin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers \
  && echo "root ALL=NOPASSWD: ALL" >> /etc/sudoers \
- && echo "/usr/local/lib" >> /etc/ld.so.conf && ldconfig
+ && echo "/usr/local/lib" >> /etc/ld.so.conf \
+ && ldconfig

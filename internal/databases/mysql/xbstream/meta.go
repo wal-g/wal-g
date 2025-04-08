@@ -6,36 +6,36 @@ import (
 	"gopkg.in/ini.v1"
 )
 
-// data format for IBD file:
+// '.meta' file format for IBD file:
 //
 //	page_size = 16384
 //	zip_size = 0
 //	space_id = 0
 //	space_flags = 18432
 //
-// data format for undo log file:
+// '.meta' file format for undo log file:
 //
 //	page_size = 16384
 //	zip_size = 0
 //	space_id = 4294967279  // 0xffffffef, however it is not constant
 //	space_flags = 0
-type diffMetadata struct {
+type deltaMetadata struct {
 	PageSize   uint32         `ini:"page_size"`
 	ZipSize    uint64         `ini:"zip_size"`
 	SpaceID    innodb.SpaceID `ini:"space_id"`
 	SpaceFlags uint32         `ini:"space_flags"`
 }
 
-func parseDiffMetadata(rows []byte) (diffMetadata, error) {
-	result := diffMetadata{}
+func parseDiffMetadata(rows []byte) (deltaMetadata, error) {
+	result := deltaMetadata{}
 
 	cfg, err := ini.Load(rows)
 	if err != nil {
-		return diffMetadata{}, err
+		return deltaMetadata{}, err
 	}
 	err = cfg.MapTo(&result)
 	if err != nil {
-		return diffMetadata{}, err
+		return deltaMetadata{}, err
 	}
 
 	if result.PageSize > 64*1024 {

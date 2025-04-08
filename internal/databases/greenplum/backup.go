@@ -28,6 +28,17 @@ func NewBackup(rootFolder storage.Folder, name string) (Backup, error) {
 	}, nil
 }
 
+func NewBackupInStorage(rootFolder storage.Folder, name, storage string) (Backup, error) {
+	backup, err := internal.NewBackupInStorage(rootFolder.GetSubFolder(utility.BaseBackupPath), name, storage)
+	if err != nil {
+		return Backup{}, err
+	}
+	return Backup{
+		Backup:     backup,
+		rootFolder: rootFolder,
+	}, nil
+}
+
 func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	if backup.SentinelDto != nil {
 		return *backup.SentinelDto, nil
@@ -56,7 +67,8 @@ func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (SegBacku
 			backupID, segBackupsFolder.GetPath(), err)
 	}
 
-	pgBackup, err := postgres.NewBackup(segBackupsFolder.GetSubFolder(utility.BaseBackupPath), segBackup.Name)
+	pgBackup, err := postgres.NewBackupInStorage(
+		segBackupsFolder.GetSubFolder(utility.BaseBackupPath), segBackup.Name, segBackup.GetStorageName())
 	if err != nil {
 		return SegBackup{}, err
 	}

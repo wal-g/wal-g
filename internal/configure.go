@@ -335,7 +335,7 @@ func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	}
 
 	if keyRingID, ok := conf.GetWaleCompatibleSetting(conf.GpgKeyIDSetting); ok {
-		tracelog.WarningLogger.Printf(DeprecatedExternalGpgMessage)
+		tracelog.WarningLogger.Print(DeprecatedExternalGpgMessage)
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase), nil
 	}
 	return nil, errors.New("there is no any supported gpg crypter configuration")

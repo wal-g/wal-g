@@ -1,0 +1,52 @@
+name: 🐞 Bug Report
+description: Found a bug in WAL-G? Let us know.
+title: "[BUG] <short summary>"
+labels: [bug]
+body:
+  - type: input
+    id: db-name
+    attributes:
+      label: Database name
+      description: WAL-G provides support for many databases. Please write the name of the database you use.
+      placeholder: e.g. PostgreSQL, MongoDB, Redis, or all
+    validations:
+      required: true
+
+  - type: input
+    id: walg-version
+    attributes:
+      label: WAL-G Version
+      placeholder: e.g. v2.1.55 or master
+    validations:
+      required: true
+      
+  - type: textarea
+    id: problem
+    attributes:
+      label: Describe your problem
+      description: Describe the issue you are facing
+      placeholder: |
+        // here is your problem
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Help us reproduce the issue
+      placeholder: |
+        1. Run command...
+        2. See error...
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Config and WAL-G logs
+      description: Add config and WAL-G stdout/stderr logs for debugging. You can set WALG_LOG_LEVEL=DEVEL for more details.
+      placeholder: |
+        Paste your config and logs here. You can also drag & drop files.
+    validations:
+      required: false

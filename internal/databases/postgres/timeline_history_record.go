@@ -47,7 +47,7 @@ func NewTimelineHistoryRecord(timeline uint32, lsn LSN, comment string) *Timelin
 
 func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 	matchResult := timelineHistoryRecordRegexp.FindStringSubmatch(row)
-	if matchResult == nil || len(matchResult) < 4 {
+	if len(matchResult) < 4 {
 		return nil, nil
 	}
 	timeline, err := strconv.ParseUint(matchResult[1], 10, sizeofInt32bits)

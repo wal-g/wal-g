@@ -23,7 +23,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.4
 	github.com/hashicorp/golang-lru v0.5.4
-	github.com/jackc/pglogrepl v0.0.0-20240307033717-828fbfe908e9
+	github.com/jackc/pglogrepl v0.0.0-20250325003938-6dfcde87cfc7
 	github.com/jackc/pgx v3.6.0+incompatible // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/magiconair/properties v1.8.1 // indirect

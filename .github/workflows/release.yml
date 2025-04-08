@@ -66,14 +66,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-ubuntu-arm:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
+        os: [ { distro: ubuntu20.04, label: ubuntu-20.04 }, { distro: ubuntu22.04, label: ubuntu-22.04 } ]
         db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
         include:
           - arch: aarch64
-            distro: ubuntu20.04
-            label: ubuntu-20.04
       fail-fast: false
 
     steps:
@@ -81,10 +80,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build on arch
-        uses: uraimo/run-on-arch-action@v2
+        uses: uraimo/run-on-arch-action@v3
         with:
           arch: ${{ matrix.arch }}
-          distro: ${{ matrix.distro }}
+          distro: ${{ matrix.os.distro }}
           env: |
             USE_BROTLI: ${{ env.USE_BROTLI }}
             USE_LIBSODIUM: ${{ env.USE_LIBSODIUM }}
@@ -109,24 +108,24 @@ jobs:
             
             make ${{ matrix.db }}_build
       - name: Rename WAL-G binary
-        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}
+        run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}
 
       - name: Compress WAL-G binary
-        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}
+        run: tar --owner=0 --group=0 -zcvf wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}.tar.gz wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}
 
       - name: Calculate checksum
-        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.sha256
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }} > wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}.sha256
 
       - name: Calculate checksum for the compressed binary
-        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz.sha256
+        run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}.tar.gz.sha256
 
       - name: Upload WAL-G binary
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}
-            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz
-            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.sha256
-            wal-g-${{ matrix.db }}-${{ matrix.label }}-${{ matrix.arch }}.tar.gz.sha256
+            wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}
+            wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}.tar.gz
+            wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}.sha256
+            wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

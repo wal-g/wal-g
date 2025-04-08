@@ -12,8 +12,8 @@ type SegBackup struct {
 	AoFilesMetadataDto *AOFilesMetadataDTO
 }
 
-func NewSegBackup(baseBackupFolder storage.Folder, name string) (SegBackup, error) {
-	pgBackup, err := postgres.NewBackup(baseBackupFolder, name)
+func NewSegBackup(baseBackupFolder storage.Folder, name, storage string) (SegBackup, error) {
+	pgBackup, err := postgres.NewBackupInStorage(baseBackupFolder, name, storage)
 	if err != nil {
 		return SegBackup{}, err
 	}

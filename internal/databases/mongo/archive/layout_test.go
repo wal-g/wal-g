@@ -866,7 +866,7 @@ func TestSelectPurgingOplogArchives(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := SelectPurgingOplogArchives(tt.args.archives, tt.args.backups, tt.args.retainAfterTS)
+			got := SelectPurgingOplogArchives(tt.args.archives, tt.args.backups, tt.args.retainAfterTS, nil)
 			assert.Equal(t, tt.want, got)
 		})
 	}

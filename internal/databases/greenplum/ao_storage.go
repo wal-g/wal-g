@@ -57,7 +57,7 @@ func iterateStorageAoFilesWithFunc(baseBackupsFolder storage.Folder, iterateFunc
 	}
 
 	for _, b := range backupTimes {
-		backup, err := NewSegBackup(baseBackupsFolder, b.BackupName)
+		backup, err := NewSegBackup(baseBackupsFolder, b.BackupName, b.StorageName)
 		if err != nil {
 			return err
 		}

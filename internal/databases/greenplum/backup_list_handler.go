@@ -116,7 +116,7 @@ func ListStorageBackups(folder storage.Folder) ([]Backup, error) {
 
 	backups := make([]Backup, 0, len(backupObjects))
 	for _, b := range backupObjects {
-		backup, err := NewBackup(folder, b.BackupName)
+		backup, err := NewBackupInStorage(folder, b.BackupName, b.StorageName)
 		if err != nil {
 			return nil, err
 		}
@@ -147,11 +147,7 @@ func MakeBackupDetails(backups []Backup) []BackupDetail {
 // TODO: unit tests (table output)
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backups, err := ListStorageBackups(folder)
-
-	if len(backups) == 0 {
-		tracelog.InfoLogger.Println("No backups found")
-		return
-	}
+	err = internal.FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	backupDetails := MakeBackupDetails(backups)

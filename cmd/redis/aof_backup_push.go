@@ -33,7 +33,7 @@ var aofBackupPushCmd = &cobra.Command{
 
 		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
-		memoryDataGetter := client.NewMemoryDataGetter()
+		memoryDataGetter := client.NewServerDataGetter()
 
 		processName, _ := conf.GetSetting(conf.RedisServerProcessName)
 		versionParser := archive.NewVersionParser(processName)

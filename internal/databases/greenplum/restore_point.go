@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/spf13/viper"
@@ -32,6 +33,7 @@ type RestorePointMetadata struct {
 	GpFlavor         string         `json:"gp_flavor"`
 	SystemIdentifier *uint64        `json:"system_identifier"`
 	LsnBySegment     map[int]string `json:"lsn_by_segment"`
+	StorageName      string         `json:"storage_name"`
 }
 
 func (s *RestorePointMetadata) String() string {
@@ -58,8 +60,8 @@ func FetchRestorePointMetadata(folder storage.Folder, pointName string) (Restore
 }
 
 // ValidateMatch checks that restore point is reachable from the provided backup
-func ValidateMatch(folder storage.Folder, backupName string, restorePoint string) error {
-	backup, err := NewBackup(folder, backupName)
+func ValidateMatch(folder storage.Folder, backupName, restorePoint, storage string) error {
+	backup, err := NewBackupInStorage(folder, backupName, storage)
 	if err != nil {
 		return err
 	}
@@ -193,8 +195,9 @@ func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string) (err 
 }
 
 type RestorePointTime struct {
-	Name string    `json:"restore_point_name"`
-	Time time.Time `json:"time"`
+	Name        string    `json:"restore_point_name"`
+	Time        time.Time `json:"time"`
+	StorageName string    `json:"storage_name"`
 }
 
 type NoRestorePointsFoundError struct {
@@ -311,8 +314,10 @@ func GetRestorePointsTimeSlices(restorePoints []storage.Object) []RestorePointTi
 		if !strings.HasSuffix(key, RestorePointSuffix) {
 			continue
 		}
+		storageName := multistorage.GetStorage(object)
 		time := object.GetLastModified()
-		restorePointsTimes = append(restorePointsTimes, RestorePointTime{Name: StripRightmostRestorePointName(key), Time: time})
+		restorePointsTimes = append(restorePointsTimes,
+			RestorePointTime{Name: StripRightmostRestorePointName(key), Time: time, StorageName: storageName})
 	}
 
 	sort.Slice(restorePointsTimes, func(i, j int) bool {

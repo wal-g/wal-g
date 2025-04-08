@@ -79,7 +79,6 @@ func HandleOplogReplay(ctx context.Context,
 	errs = append(errs, errc)
 
 	for _, errc := range errs {
-		errc := errc
 		errgrp.Go(func() error {
 			return <-errc
 		})

@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/wal-g/internal/abool"
 	conf "github.com/wal-g/wal-g/internal/config"
 )
 
@@ -17,7 +16,7 @@ type TarBallQueue struct {
 	parallelTarballs int
 	maxUploadQueue   int
 	mutex            sync.Mutex
-	started          *abool.AtomicBool
+	started          atomic.Bool
 
 	TarSizeThreshold   int64
 	AllTarballsSize    *int64
@@ -30,12 +29,12 @@ func NewTarBallQueue(tarSizeThreshold int64, tarBallMaker TarBallMaker) *TarBall
 		TarSizeThreshold: tarSizeThreshold,
 		TarBallMaker:     tarBallMaker,
 		AllTarballsSize:  new(int64),
-		started:          abool.New(),
+		started:          atomic.Bool{},
 	}
 }
 
 func (tarQueue *TarBallQueue) StartQueue() error {
-	if tarQueue.started.IsSet() {
+	if tarQueue.started.Load() {
 		panic("Trying to start already started Queue")
 	}
 	var err error
@@ -55,14 +54,14 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 		tarQueue.tarsToFillQueue <- tarQueue.LastCreatedTarball
 	}
 
-	tarQueue.started.Set()
+	tarQueue.started.Store(true)
 	return nil
 }
 
 // DequeCtx returns a TarBall from the queue. If the context finishes before it
 // can do so, it returns the result of ctx.Err().
 func (tarQueue *TarBallQueue) DequeCtx(ctx context.Context) (TarBall, error) {
-	if tarQueue.started.IsNotSet() {
+	if !tarQueue.started.Load() {
 		panic("Trying to deque from not started Queue")
 	}
 	select {
@@ -81,10 +80,10 @@ func (tarQueue *TarBallQueue) Deque() TarBall {
 }
 
 func (tarQueue *TarBallQueue) FinishQueue() error {
-	if tarQueue.started.IsNotSet() {
+	if !tarQueue.started.Load() {
 		panic("Trying to stop not started Queue")
 	}
-	tarQueue.started.UnSet()
+	tarQueue.started.Store(false)
 
 	// We have to deque exactly this count of workers
 	for i := 0; i < tarQueue.parallelTarballs; i++ {

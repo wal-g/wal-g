@@ -229,7 +229,7 @@ func TestArchInBackup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ArchInBackup(tt.args.arch, &tt.args.backup)
+			got := ArchInBackup(tt.args.arch, &tt.args.backup, nil)
 			assert.Equal(t, got, tt.want)
 		})
 	}
@@ -313,7 +313,7 @@ func TestFirstOverlappingBackupForArch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FirstOverlappingBackupForArch(tt.args.arch, tt.args.backups)
+			got := FirstOverlappingBackupForArch(tt.args.arch, tt.args.backups, nil)
 			assert.Equal(t, got, tt.want)
 		})
 	}

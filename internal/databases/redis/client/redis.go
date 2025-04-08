@@ -11,6 +11,8 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 )
 
+const dontPanic = false
+
 // DISCUSS: In some cases, we have default values, but we don't want to store it at global default settings.
 // Naming is far from best, if Go allowed overloads, name GetSettingWithDefault would be more appropriate
 func GetSettingWithLocalDefault(key string, defaultValue string) string {
@@ -45,18 +47,24 @@ func getRedisConnection(strict bool) *redis.Client {
 	})
 }
 
-type MemoryData struct {
+type ServerData struct {
 	UsedMemory    int64 `json:"used_memory"`
 	UsedMemoryRss int64 `json:"used_memory_rss"`
+	MaxDBNumber   int64 `json:"max_db_number"`
 }
 
-type MemoryDataGetter struct{}
+type ServerDataGetter struct {
+	conn *redis.Client
+}
 
-func NewMemoryDataGetter() MemoryDataGetter {
-	return MemoryDataGetter{}
+func NewServerDataGetter() ServerDataGetter {
+	return ServerDataGetter{
+		conn: getRedisConnection(dontPanic),
+	}
 }
 
 func parseInfoLine(line, name string) (i int64) {
+	// used_memory:20019376
 	var err error
 	if strings.HasPrefix(line, fmt.Sprintf("%s:", name)) {
 		s := strings.Split(line, ":")[1]
@@ -69,13 +77,9 @@ func parseInfoLine(line, name string) (i int64) {
 	return
 }
 
-const dontPanic = false
-
-func (m *MemoryDataGetter) Get() (res *MemoryData) {
-	res = &MemoryData{}
-	conn := getRedisConnection(dontPanic)
+func (m *ServerDataGetter) fillMemoryData(res *ServerData) {
 	ctx := context.Background()
-	data, err := conn.Info(ctx, "memory").Result()
+	data, err := m.conn.Info(ctx, "memory").Result()
 	if err != nil {
 		tracelog.InfoLogger.Printf("memory info getting failed: %v", err)
 		return
@@ -89,5 +93,42 @@ func (m *MemoryDataGetter) Get() (res *MemoryData) {
 			res.UsedMemoryRss = i
 		}
 	}
+}
+
+func parseInfoLineNumberedName(line, name string) (i int64) {
+	// db0:keys=2,expires=0,avg_ttl=0
+	var err error
+	if strings.HasPrefix(line, name) {
+		numberedName := strings.Split(line, ":")[0]
+		number := strings.Split(numberedName, name)[1]
+		i, err = strconv.ParseInt(number, 10, 64)
+		if err != nil {
+			tracelog.InfoLogger.Printf("%s parsing from %s to int64 failed: %v", name, line, err)
+			return
+		}
+	}
+	return
+}
+
+func (m *ServerDataGetter) fillMaxDBNumData(res *ServerData) {
+	ctx := context.Background()
+	data, err := m.conn.Info(ctx, "keyspace").Result()
+	if err != nil {
+		tracelog.InfoLogger.Printf("keyspace info getting failed: %v", err)
+		return
+	}
+	data = strings.ReplaceAll(data, "\r", "")
+	for _, line := range strings.Split(data, "\n") {
+		i := parseInfoLineNumberedName(line, "db")
+		if i > res.MaxDBNumber {
+			res.MaxDBNumber = i
+		}
+	}
+}
+
+func (m *ServerDataGetter) Get() (res *ServerData) {
+	res = &ServerData{}
+	m.fillMemoryData(res)
+	m.fillMaxDBNumData(res)
 	return
 }

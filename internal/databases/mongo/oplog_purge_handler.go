@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -42,13 +43,16 @@ func HandleOplogPurge(downloader archive.Downloader, purger archive.Purger, reta
 	if err != nil {
 		return err
 	}
+	additionalInterval, err := conf.GetOplogBackupAdditionalSavingTimeSetting()
+	if err != nil {
+		return err
+	}
+
 	retainArchivesAfterTS := pitrBackup.MongoMeta.Before.LastMajTS
 
 	tracelog.DebugLogger.Printf("Oldest backup in PITR interval is %+v\n", pitrBackup)
 	tracelog.DebugLogger.Printf("Oplog archives newer than %+v will be retained\n", retainArchivesAfterTS)
-	tracelog.DebugLogger.Printf("Oplog archives included into backups time interval will be retained: %v\n", backups)
-
-	purgeArchives := archive.SelectPurgingOplogArchives(archives, backups, &retainArchivesAfterTS)
+	purgeArchives := archive.SelectPurgingOplogArchives(archives, backups, &retainArchivesAfterTS, additionalInterval)
 	tracelog.DebugLogger.Printf("Oplog archives selected to be deleted: %v", purgeArchives)
 	if !dryRun {
 		if err := purger.DeleteOplogArchives(purgeArchives); err != nil {

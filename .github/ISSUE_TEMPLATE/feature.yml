@@ -1,0 +1,22 @@
+name: 💡 Feature Request
+description: Suggest an idea or enhancement for WAL-G
+title: "[FEATURE] <what you want> "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What feature would you like?
+      placeholder: |
+        Describe the feature you’d like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this feature useful?
+      placeholder: |
+        Explain why this would be helpful for you or others.
+    validations:
+      required: false
