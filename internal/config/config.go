@@ -121,6 +121,7 @@ const (
 	PgDaemonWALUploadTimeout             = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
 	PgTargetStorage                      = "WALG_TARGET_STORAGE"
 	DisablePartialRestore                = "WALG_DISABLE_PARTIAL_RESTORE"
+	BackupDownloadMaxRetry               = "WALG_BACKUP_DOWNLOAD_MAX_RETRY"
 
 	ProfileSamplingRatio = "PROFILE_SAMPLING_RATIO"
 	ProfileMode          = "PROFILE_MODE"
@@ -156,7 +157,6 @@ const (
 	MysqlBinlogServerPassword      = "WALG_MYSQL_BINLOG_SERVER_PASSWORD"
 	MysqlBinlogServerID            = "WALG_MYSQL_BINLOG_SERVER_ID"
 	MysqlBinlogServerReplicaSource = "WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE"
-	MysqlBackupDownloadMaxRetry    = "WALG_BACKUP_DOWNLOAD_MAX_RETRY"
 	MysqlIncrementalBackupDst      = "WALG_MYSQL_INCREMENTAL_BACKUP_DST"
 	MysqlDataDir                   = "WALG_MYSQL_DATA_DIR"
 	// Deprecated: unused
@@ -291,9 +291,9 @@ var (
 	}
 
 	MysqlDefaultSettings = map[string]string{
-		StreamSplitterBlockSize:     "1048576",
-		MysqlBackupDownloadMaxRetry: "1",
-		MysqlIncrementalBackupDst:   "/tmp",
+		StreamSplitterBlockSize:   "1048576",
+		BackupDownloadMaxRetry:    "1",
+		MysqlIncrementalBackupDst: "/tmp",
 	}
 
 	SQLServerDefaultSettings = map[string]string{
@@ -306,6 +306,7 @@ var (
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
+		BackupDownloadMaxRetry:    "3",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -320,6 +321,7 @@ var (
 		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
 		GPRelativeRecoveryConfPath:   "recovery.conf",
 		GPRelativePostgresqlConfPath: "postgresql.conf",
+		BackupDownloadMaxRetry:       "3",
 	}
 
 	AllowedSettings map[string]bool
@@ -541,7 +543,7 @@ var (
 		MysqlBinlogServerPassword:      true,
 		MysqlBinlogServerID:            true,
 		MysqlBinlogServerReplicaSource: true,
-		MysqlBackupDownloadMaxRetry:    true,
+		BackupDownloadMaxRetry:         true,
 		MysqlIncrementalBackupDst:      true,
 		MysqlDataDir:                   true,
 	}
