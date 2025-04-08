@@ -178,7 +178,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 
 			for {
 				// TODO: benchmark & compare with bson_stream
-				raw, err := bson.NewFromIOReader(buf)
+				raw, err := bson.ReadDocument(buf)
 				if err != nil {
 					if err == io.EOF {
 						break

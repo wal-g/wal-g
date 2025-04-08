@@ -131,7 +131,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 
 	objFilter := func(object storage.Object) bool { return true }
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteHandler.DeleteBeforeTargetWhere(target, h.args.Confirmed, objFilter, folderFilter)
+	return h.DeleteBeforeTargetWhere(target, h.args.Confirmed, objFilter, folderFilter)
 }
 
 func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelector) {
@@ -152,7 +152,7 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelecto
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
 	folderFilter := func(name string) bool { return true }
-	err = h.DeleteHandler.DeleteTarget(target, h.args.Confirmed, h.args.FindFull, folderFilter)
+	err = h.DeleteTarget(target, h.args.Confirmed, h.args.FindFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

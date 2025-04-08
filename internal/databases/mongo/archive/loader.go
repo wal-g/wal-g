@@ -216,7 +216,7 @@ func (su *StorageUploader) UploadOplogArchive(ctx context.Context, stream io.Rea
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Uploader.Compression(), su.crypter))
+	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Compression(), su.crypter))
 	// TODO: warn if read > 2 * models.MaxDocumentSize and shrink buf capacity if it's too high
 	defer su.buf.Reset()
 	if err != nil {
