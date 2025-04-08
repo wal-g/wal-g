@@ -388,6 +388,11 @@ services:
     container_name: wal-g_pg_remote_backup_without_files_metadata_test
     command: /tmp/tests/remote_backup_without_files_metadata_test.sh
 
+  prefetch_test:
+    <<: *pg_test_common
+    container_name: wal-g_prefetch_test
+    command: /tmp/tests/prefetch_test.sh
+
   pg_ssh_backup_test:
     image: wal-g/docker_prefix
     user: postgres
