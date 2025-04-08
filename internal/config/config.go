@@ -233,7 +233,7 @@ const (
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
 
-	ForbiddenFallbackToFullbackup = "WALG_FORBIDDEN_FALLBACK_TO_FULLBACKUP"
+	ForceDelta = "WALG_FORCE_DELTA"
 )
 
 var (
@@ -308,22 +308,22 @@ var (
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
-		ForbiddenFallbackToFullbackup: "false",
+		ForceDelta:                "false",
 	}
 
 	GPDefaultSettings = map[string]string{
-		GPLogsDirectory:               "/var/log",
-		PgWalSize:                     "64",
-		GPSegmentsPollInterval:        "5m",
-		GPSegmentsUpdInterval:         "10s",
-		GPSegmentsPollRetries:         "5",
-		GPSegmentStatesDir:            "/tmp",
-		GPDeleteConcurrency:           "1",
-		GPAoSegSizeThreshold:          "1048576", // (1 << 20)
-		GPAoDeduplicationAgeLimit:     "720h",    // 30 days
-		GPRelativeRecoveryConfPath:    "recovery.conf",
-		GPRelativePostgresqlConfPath:  "postgresql.conf",
-		ForbiddenFallbackToFullbackup: "false",
+		GPLogsDirectory:              "/var/log",
+		PgWalSize:                    "64",
+		GPSegmentsPollInterval:       "5m",
+		GPSegmentsUpdInterval:        "10s",
+		GPSegmentsPollRetries:        "5",
+		GPSegmentStatesDir:           "/tmp",
+		GPDeleteConcurrency:          "1",
+		GPAoSegSizeThreshold:         "1048576", // (1 << 20)
+		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
+		GPRelativeRecoveryConfPath:   "recovery.conf",
+		GPRelativePostgresqlConfPath: "postgresql.conf",
+		ForceDelta:                   "false",
 	}
 
 	AllowedSettings map[string]bool
@@ -495,7 +495,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
 		DisablePartialRestore:                true,
-		ForbiddenFallbackToFullbackup:        true,
+		ForceDelta:                           true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -587,7 +587,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
-		ForbiddenFallbackToFullbackup:        true,
+		ForceDelta:                           true,
 	}
 
 	RequiredSettings       = make(map[string]bool)

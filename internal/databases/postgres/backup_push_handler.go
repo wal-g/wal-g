@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgconn"
 
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/config"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
@@ -269,7 +268,7 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) error {
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if useWalDelta {
-			forbiddenFullbackup, _ := config.GetBoolSettingDefault(conf.ForbiddenFallbackToFullbackup, false)
+			forbiddenFullbackup, _ := conf.GetBoolSettingDefault(conf.ForceDelta, false)
 			err := bh.Workers.Bundle.DownloadDeltaMap(internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)), bh.CurBackupInfo.startLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided " +

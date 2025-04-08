@@ -9,4 +9,4 @@
 "AWS_S3_FORCE_PATH_STYLE": "true",
 "WALG_COMPRESSION_METHOD": "brotli",
 "PGHOST": "/var/run/postgresql",
-"FORBIDDEN_FALLBACK_TO_FULLBACKUP": "true"
+"WALG_FORCE_DELTA": "true"

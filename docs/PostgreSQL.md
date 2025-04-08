@@ -58,7 +58,7 @@ Delta computation is based on ModTime of file system and LSN number of pages in 
 
 To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not exceeded). `WALG_DELTA_ORIGIN` can be LATEST (chaining increments), LATEST_FULL (for bases where volatile part is compact and chaining has no meaning - deltas overwrite each other). Defaults to LATEST.
 
-* `WALG_FORBIDDEN_FALLBACK_TO_FULLBACKUP`
+* `WALG_FORCE_DELTA`
 
 To prevent WAL-G from falling back to a full backup if the delta backup fails
 
