@@ -91,7 +91,7 @@ wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/pa
 
 * `WALG_FORCE_DELTA`
 
-To prevent WAL-G from falling back to a full backup if the delta backup fails
+To prevent WAL-G from falling back to a full backup if the delta backup fails.
 
 ### ``backup-fetch``
 

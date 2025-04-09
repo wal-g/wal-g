@@ -60,7 +60,7 @@ To configure base for next delta backup (only if `WALG_DELTA_MAX_STEPS` is not e
 
 * `WALG_FORCE_DELTA`
 
-To prevent WAL-G from falling back to a full backup if the delta backup fails
+To prevent WAL-G from falling back to a full backup if the delta backup fails.
 
 * `WALG_TAR_SIZE_THRESHOLD`
 
