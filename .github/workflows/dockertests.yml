@@ -16,7 +16,7 @@ env:
   IMAGE: wal-g/docker_prefix
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: "1.22.8"
+  GO_VERSION: "1.24.2"
   LIBSODIUM_VERSION: "1.0.20"
 
 jobs:
