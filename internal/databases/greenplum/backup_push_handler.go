@@ -453,6 +453,58 @@ func (bh *BackupHandler) disconnect() {
 	}
 }
 
+// CheckArchiveCommand verifies the archive_mode and archive_command settings.
+func CheckArchiveCommand(conn *pgx.Conn) error {
+	queryRunner, err := NewGpQueryRunner(conn)
+	if err != nil {
+		return err
+	}
+	// Check if the server is in recovery mode (standby)
+	standby, err := queryRunner.IsStandby()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to determine standby mode: %v", err)
+		return err
+	}
+
+	if standby {
+		// If the server is in standby mode, no further checks are needed
+		tracelog.DebugLogger.Println("Server is in standby mode. Skipping archive settings checks.")
+		return nil
+	}
+
+	// Retrieve the current archive_mode setting
+	archiveMode, err := queryRunner.GetArchiveMode()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_mode: %v", err)
+		return err
+	}
+
+	// Check if archive_mode is enabled
+	if archiveMode != "on" && archiveMode != "always" {
+		tracelog.WarningLogger.Println(
+			"archive_mode is not enabled. This may cause inconsistent backups. " +
+				"Please consider configuring WAL archiving.")
+	} else {
+		// Retrieve the current archive_command setting
+		archiveCommand, err := queryRunner.GetArchiveCommand()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_command: %v", err)
+			return err
+		}
+
+		// Check if archive_command is properly configured
+		if len(archiveCommand) == 0 || archiveCommand == "(disabled)" {
+			tracelog.WarningLogger.Println(
+				"archive_command is not configured. This may cause inconsistent backups. " +
+					"Please consider configuring WAL archiving.")
+		} else {
+			tracelog.DebugLogger.Println("WAL archiving settings are configured.")
+		}
+	}
+
+	return nil
+}
+
 func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version Version, systemIdentifier *uint64, err error) {
 	queryRunner, err := NewGpQueryRunner(conn)
 	if err != nil {
@@ -487,6 +539,11 @@ func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) 
 	}
 
 	globalCluster, version, systemIdentifier, err := getGpClusterInfo(conn)
+	if err != nil {
+		return nil, err
+	}
+
+	err = CheckArchiveCommand(conn)
 	if err != nil {
 		return nil, err
 	}

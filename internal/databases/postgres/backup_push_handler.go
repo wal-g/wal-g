@@ -173,6 +173,8 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bh.checkDataChecksums()
 	tracelog.ErrorLogger.FatalOnError(err)
+	err = bh.CheckArchiveCommand()
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	if orioledbEnabled {
 		chkpNum := orioledb.GetChkpNum(bh.PgInfo.PgDataDirectory)
@@ -685,6 +687,54 @@ func (bh *BackupHandler) checkDataChecksums() error {
 			"checkDataChecksums: Checking if data_checksums is enabled in DB is skipped " +
 				"because the --verify parameter is not set.")
 	}
+	return nil
+}
+
+// CheckArchiveCommand verifies the archive_mode and archive_command settings.
+func (bh *BackupHandler) CheckArchiveCommand() error {
+	// Check if the server is in recovery mode (standby)
+	standby, err := bh.Workers.QueryRunner.IsStandby()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to determine standby mode: %v", err)
+		return err
+	}
+
+	if standby {
+		// If the server is in standby mode, no further checks are needed
+		tracelog.DebugLogger.Println("Server is in standby mode. Skipping archive settings checks.")
+		return nil
+	}
+
+	// Retrieve the current archive_mode setting
+	archiveMode, err := bh.Workers.QueryRunner.GetArchiveMode()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_mode: %v", err)
+		return err
+	}
+
+	// Check if archive_mode is enabled
+	if archiveMode != "on" && archiveMode != "always" {
+		tracelog.WarningLogger.Println(
+			"archive_mode is not enabled. This may cause inconsistent backups. " +
+				"Please consider configuring WAL archiving.")
+	} else {
+		// Retrieve the current archive_command setting
+		archiveCommand, err := bh.Workers.QueryRunner.GetArchiveCommand()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_command: %v", err)
+			return err
+		}
+
+		// Check if archive_command is properly configured
+		if len(archiveCommand) == 0 || archiveCommand == "(disabled)" {
+			tracelog.WarningLogger.Println(
+				"archive_command is not configured. This may cause inconsistent backups. " +
+					"Please consider configuring WAL archiving.")
+		} else {
+			tracelog.DebugLogger.Println("WAL archiving settings are configured.")
+		}
+	}
+
 	return nil
 }
 
