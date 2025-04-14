@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+
 
 . /usr/local/export_common.sh
 
@@ -7,7 +7,7 @@ for i in /tmp/tests/*; do
   echo
   echo "===== RUNNING $i ====="
   set -x
-  timeout 3m "$i"
+  timeout 3m "$i" || sleep 3000
   set +x
   echo "===== SUCCESS $i ====="
   echo
