@@ -132,7 +132,9 @@ jobs:
           exit 1
 
       - name: Run test
-        run: ${{ matrix.command }}
+        run: |
+          git config --global --add safe.directory ${GITHUB_WORKSPACE}
+          ${{ matrix.command }}
     env:
       USE_BROTLI: 1
       USE_LIBSODIUM: 1
