@@ -89,9 +89,9 @@ wal-g backup-push --delta-from-name backup_name --config=/path/to/config.yaml
 wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/path/to/config.yaml
 ```
 
-* `WALG_FORCE_DELTA`
+* `WALG_FORCE_WAL_DELTA`
 
-To prevent WAL-G from falling back to a full backup if the delta backup fails.
+To prevent WAL-G from falling back to a full scan delta backup when it fails to download delta files.
 
 ### ``backup-fetch``
 

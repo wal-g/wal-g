@@ -268,12 +268,12 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) error {
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if useWalDelta {
-			forbiddenFullbackup, _ := conf.GetBoolSettingDefault(conf.ForceDelta, false)
+			ForceWalDetal, _ := conf.GetBoolSettingDefault(conf.ForceWalDetal, false)
 			err := bh.Workers.Bundle.DownloadDeltaMap(internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)), bh.CurBackupInfo.startLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided " +
 					"delta map")
-			} else if forbiddenFullbackup {
+			} else if ForceWalDetal {
 				return errors.Wrapf(err, "Failed to load delta map from previous backup")
 			} else {
 				tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. "+

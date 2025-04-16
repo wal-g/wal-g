@@ -233,7 +233,7 @@ const (
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
 
-	ForceDelta = "WALG_FORCE_DELTA"
+	ForceWalDetal = "WALG_FORCE_WAL_DELTA"
 )
 
 var (
@@ -308,7 +308,7 @@ var (
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
-		ForceDelta:                "false",
+		ForceWalDetal:             "false",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -323,7 +323,7 @@ var (
 		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
 		GPRelativeRecoveryConfPath:   "recovery.conf",
 		GPRelativePostgresqlConfPath: "postgresql.conf",
-		ForceDelta:                   "false",
+		ForceWalDetal:                "false",
 	}
 
 	AllowedSettings map[string]bool
@@ -495,7 +495,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
 		DisablePartialRestore:                true,
-		ForceDelta:                           true,
+		ForceWalDetal:                        true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -587,7 +587,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
-		ForceDelta:                           true,
+		ForceWalDetal:                        true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
