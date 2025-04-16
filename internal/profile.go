@@ -22,8 +22,8 @@ func Profile() (ProfileStopper, error) {
 	samplingRatio := viper.GetFloat64(conf.ProfileSamplingRatio)
 
 	// sample profiling invoked commands
-	rand.Seed(time.Now().UnixNano())
-	if rand.Float64() >= samplingRatio {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if r.Float64() >= samplingRatio {
 		return nil, nil
 	}
 

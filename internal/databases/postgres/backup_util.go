@@ -43,7 +43,7 @@ func GetBackupDetails(folder storage.Folder, backupTime internal.BackupTime) (Ba
 func SortBackupDetails(backupDetails []BackupDetail) {
 	sortOrder := ByCreationTime
 	for i := 0; i < len(backupDetails); i++ {
-		if (backupDetails[i].ExtendedMetadataDto == ExtendedMetadataDto{} || backupDetails[i].StartTime == time.Time{}) {
+		if (backupDetails[i].ExtendedMetadataDto == ExtendedMetadataDto{} || backupDetails[i].StartTime.Equal(time.Time{})) {
 			sortOrder = ByModificationTime
 		}
 	}

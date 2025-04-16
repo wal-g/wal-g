@@ -21,6 +21,7 @@ func (header *PageHeader) lsn() LSN {
 	return LSN(((uint64(header.pdLsnH)) << 32) + uint64(header.pdLsnL))
 }
 
+// nolint : staticcheck
 func (header *PageHeader) isValid() bool {
 	return !((header.pdFlags&validFlags) != header.pdFlags ||
 		header.pdLower < headerSize ||

@@ -76,6 +76,7 @@ func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 }
 
 func TryGetOidPair(file string) (bool, uint32, uint32) {
+	// nolint : staticcheck
 	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
 		return false, 0, 0
 	}

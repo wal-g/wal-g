@@ -110,11 +110,11 @@ func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (fi
 	baseFilesMetadata, err := base.LoadAoFilesMetadata()
 	if err != nil {
 		if _, ok := err.(storage.ObjectNotFoundError); !ok {
-			return nil, fmt.Errorf("failed to fetch AO files metadata for backup %s: %w", base.Backup.Name, err)
+			return nil, fmt.Errorf("failed to fetch AO files metadata for backup %s: %w", base.Name, err)
 		}
 
 		tracelog.WarningLogger.Printf(
-			"AO files metadata was not found for backup %s, leaving the base files empty.", base.Backup.Name)
+			"AO files metadata was not found for backup %s, leaving the base files empty.", base.Name)
 		return BackupAOFiles{}, nil
 	}
 

@@ -42,11 +42,14 @@ func parseGreenplumVersion(version string) (Version, error) {
 	}
 
 	var flavor Flavor
-	if groups[1] == "Greenplum Database" {
+	switch groups[1] {
+	case "Greenplum Database":
 		flavor = Greenplum
-	} else if groups[1] == "Cloudberry Database" || groups[1] == "Apache Cloudberry" {
+	case "Cloudberry Database":
 		flavor = Cloudberry
-	} else {
+	case "Apache Cloudberry":
+		flavor = Cloudberry
+	default:
 		return Version{}, fmt.Errorf("unknown flavor: %s", groups[1])
 	}
 
@@ -57,10 +60,10 @@ func (v Version) EstimatePostgreSQLVersion() int {
 	if v.Flavor == Cloudberry {
 		return 140000
 	}
-	if v.Version.Major == 7 {
+	if v.Major == 7 {
 		return 120000
 	}
-	if v.Version.Major == 6 {
+	if v.Major == 6 {
 		return 90400
 	}
 	return 0

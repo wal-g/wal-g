@@ -5,9 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"hash/crc32"
 	"io"
+
+	"github.com/wal-g/wal-g/utility"
 )
 
 type Reader struct {
@@ -55,6 +56,7 @@ func (xbs *Reader) Next() (*Chunk, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	chunk.Type = validateChunkType(chunk.Type)
+	// nolint : staticcheck
 	if chunk.Type == ChunkTypeUnknown && !(chunk.Flags&StreamFlagIgnorable == 1) {
 		return nil, errors.New("unknown chunk type")
 	}

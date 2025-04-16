@@ -18,6 +18,8 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"golang.org/x/xerrors"
 
 	"github.com/gofrs/flock"
@@ -503,7 +505,8 @@ func (bs *Server) HandleBlockListGet(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	blocklisttype := strings.Title(strings.ToLower(req.Form.Get("blocklisttype")))
+	caser := cases.Title(language.English)
+	blocklisttype := caser.String(strings.ToLower(req.Form.Get("blocklisttype")))
 	xblocklist := idx.GetBlockList(blocklisttype)
 	data, err := SerializeBlocklistXML(xblocklist)
 	if err != nil {
@@ -707,12 +710,12 @@ func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 
 // utils
 func (bs *Server) returnError(w http.ResponseWriter, req *http.Request, err error) {
-	switch {
-	case err == ErrNoLease:
+	switch err {
+	case ErrNoLease:
 		w.WriteHeader(http.StatusPreconditionFailed)
-	case err == ErrNotFound:
+	case ErrNotFound:
 		w.WriteHeader(http.StatusNotFound)
-	case err == ErrBadRequest:
+	case ErrBadRequest:
 		w.WriteHeader(http.StatusBadRequest)
 	default:
 		tracelog.ErrorLogger.Printf("proxy: req: %s %s: error: %v", req.Method, req.URL.Path, err)
