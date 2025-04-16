@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	DatabasePageSize          = int64(walparser.BlockSize)
 	CompressedPageSize        = 512
 	SignatureMagicNumber byte = 0x55
 )
+
+var DatabasePageSize = int64(walparser.BlockSize)
 
 // IncrementFileHeader contains "wi" at the head which stands for "wal-g increment"
 // format version "1", signature magic number
@@ -35,6 +36,10 @@ type incrementalPageReader struct {
 	ChkpNum    uint32
 	Next       []byte
 	Blocks     []uint32
+}
+
+func SetDatabasePageSize(pageSize uint64) {
+	DatabasePageSize = int64(pageSize)
 }
 
 func (pageReader *incrementalPageReader) Read(p []byte) (n int, err error) {

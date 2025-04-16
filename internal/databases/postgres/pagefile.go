@@ -32,8 +32,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+var DatabasePageSize int64 = int64(walparser.BlockSize)
+
 const (
-	DatabasePageSize          = int64(walparser.BlockSize)
 	sizeofInt32               = 4
 	sizeofInt64               = 8
 	SignatureMagicNumber byte = 0x55
@@ -50,6 +51,10 @@ const (
 	ClogDir      = "pg_clog"      // Legacy name for transaction status
 	MultiXactDir = "pg_multixact" // Multi-transaction status
 )
+
+func SetDatabasePageSize(pageSize uint64) {
+	DatabasePageSize = int64(pageSize)
+}
 
 type InvalidIncrementFileHeaderError struct {
 	error

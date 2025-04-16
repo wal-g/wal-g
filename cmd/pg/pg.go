@@ -12,6 +12,8 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 const WalgShortDescription = "PostgreSQL backup tool"
@@ -35,7 +37,14 @@ var (
 			if viper.IsSet(conf.PgWalSize) {
 				postgres.SetWalSize(viper.GetUint64(conf.PgWalSize))
 			}
-
+			if viper.IsSet(conf.PgWalPageSize) {
+				walparser.SetWalPageSize(viper.GetUint64(conf.PgWalPageSize))
+			}
+			if viper.IsSet(conf.PgBlockSize) {
+				walparser.SetBlockSize(viper.GetUint64(conf.PgBlockSize))
+				postgres.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
+				orioledb.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
+			}
 			// In case the --target-storage flag isn't specified (the variable is set in commands' init() funcs),
 			// we take the value from the config.
 			if targetStorage == "" {

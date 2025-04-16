@@ -95,6 +95,8 @@ const (
 	PgAppName                            = "PGAPPNAME"
 	PgSlotName                           = "WALG_SLOTNAME"
 	PgWalSize                            = "WALG_PG_WAL_SIZE"
+	PgWalPageSize                        = "WALG_PG_WAL_PAGE_SIZE"
+	PgBlockSize                          = "WALG_PG_BLOCK_SIZE"
 	TotalBgUploadedLimit                 = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd                  = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd                 = "WALG_STREAM_RESTORE_COMMAND"
@@ -312,6 +314,8 @@ var (
 
 	PGDefaultSettings = map[string]string{
 		PgWalSize:                 "16",
+		PgWalPageSize:             "8192",
+		PgBlockSize:               "8192",
 		PgBackRestStanza:          "main",
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
@@ -323,6 +327,8 @@ var (
 	GPDefaultSettings = map[string]string{
 		GPLogsDirectory:              "/var/log",
 		PgWalSize:                    "64",
+		PgWalPageSize:                "32768",
+		PgBlockSize:                  "32768",
 		GPSegmentsPollInterval:       "5m",
 		GPSegmentsUpdInterval:        "10s",
 		GPSegmentsPollRetries:        "5",
@@ -489,6 +495,8 @@ var (
 		PgSslRootCert:                        true,
 		PgSlotName:                           true,
 		PgWalSize:                            true,
+		PgWalPageSize:                        true,
+		PgBlockSize:                          true,
 		PrefetchDir:                          true,
 		PgReadyRename:                        true,
 		PgBackRestStanza:                     true,

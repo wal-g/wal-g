@@ -15,8 +15,10 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -37,6 +39,10 @@ var (
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			// Greenplum uses the 64MB WAL segment size by default
 			postgres.SetWalSize(viper.GetUint64(conf.PgWalSize))
+			walparser.SetWalPageSize(viper.GetUint64(conf.PgWalPageSize))
+			walparser.SetBlockSize(viper.GetUint64(conf.PgBlockSize))
+			postgres.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
+			orioledb.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
 			err := internal.AssertRequiredSettingsSet()
 			tracelog.ErrorLogger.FatalOnError(err)
 			err = conf.ConfigureAndRunDefaultWebServer()
