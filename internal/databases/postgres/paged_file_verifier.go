@@ -26,16 +26,6 @@ const (
 	PdChecksumLen = 2
 )
 
-// There is an unsafe pointer logic with PgDatabasePage and PgChecksummablePage.
-// Be careful if modifying these data types.
-
-// PgDatabasePage represents single database page
-type PgDatabasePage [DatabasePageSize]byte
-
-// PgChecksummablePage represents single database page divided by NSums blocks
-// for checksum calculation
-type PgChecksummablePage [DatabasePageSize / int64(NSums*sizeofInt32)][NSums]uint32
-
 // Base offsets to initialize each of the parallel FNV hashes into a different initial state
 var checksumBaseOffsets [NSums]uint32
 
@@ -71,7 +61,7 @@ func calculateSum(checksum, value uint32) uint32 {
 // The checksum includes the block number (to detect the case where a page is
 // somehow moved to a different location), the page header (excluding the
 // checksum itself), and the page data.
-func pgChecksumPage(blockNo uint32, pageBytes *PgDatabasePage) uint16 {
+func pgChecksumPage(blockNo uint32, pageBytes []byte) uint16 {
 	// Set pd_checksum to zero, so that the checksum calculation
 	// isn't affected by the checksum stored on the page.
 	for i := PdChecksumOffset; i < PdChecksumOffset+PdChecksumLen; i++ {
@@ -87,11 +77,30 @@ func pgChecksumPage(blockNo uint32, pageBytes *PgDatabasePage) uint16 {
 	return uint16((checksum % 65535) + 1)
 }
 
+func convertPageForChecksum(page []byte) [][]uint32 {
+	if len(page) == 0 {
+		return nil
+	}
+	cols := NSums * sizeofInt32
+	rows := int(DatabasePageSize / int64(cols))
+	result := make([][]uint32, rows)
+	pagePtr := unsafe.Sizeof(page[0])
+	resPtr := unsafe.Pointer(&result[0])
+
+	for i := 0; i < rows; i++ {
+		// compute the start offset of current row
+		offset := uintptr(i*cols) * pagePtr
+		rowPtr := (*[1 << 30]uint32)(unsafe.Pointer(uintptr(resPtr) + offset))
+		result[i] = rowPtr[:cols:cols]
+	}
+	return result
+}
+
 // Block checksum algorithm. The page must be adequately aligned (at least on 4-byte boundary).
-func pgChecksumBlock(page *PgDatabasePage) uint32 {
+func pgChecksumBlock(page []byte) uint32 {
 	// Initialize partial checksums to their corresponding offsets
 	sums := checksumBaseOffsets
-	var pageForChecksum = *(*PgChecksummablePage)(unsafe.Pointer(page))
+	pageForChecksum := convertPageForChecksum(page)
 	hashIterationsCount := DatabasePageSize / int64(NSums*sizeofInt32)
 
 	// main checksum calculation
@@ -126,7 +135,7 @@ func pgChecksumBlock(page *PgDatabasePage) uint32 {
 // checking pages before they are loaded into buffer pool.
 //
 // see:  src/backend/storage/page/bufpage.info
-func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, error) {
+func isPageCorrupted(path string, blockNo uint32, page []byte) (bool, error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {
 		return false, err
@@ -235,10 +244,10 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 
 // verifySinglePage reads and verifies single paged file block
 func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, error) {
-	page := PgDatabasePage{}
+	page := make([]byte, DatabasePageSize)
 	_, err := io.ReadFull(pageBlocks, page[:])
 	if err != nil {
 		return false, err
 	}
-	return isPageCorrupted(path, blockNo, &page)
+	return isPageCorrupted(path, blockNo, page)
 }
