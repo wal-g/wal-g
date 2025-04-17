@@ -379,6 +379,7 @@ var (
 		SerializerTypeSetting:         true,
 		StatsdAddressSetting:          true,
 		StatsdExtraTagsSetting:        true,
+		BackupDownloadMaxRetry:        true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,
