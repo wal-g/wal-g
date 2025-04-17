@@ -32,7 +32,7 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	maxDownloadRetry := viper.GetInt(conf.MysqlBackupDownloadMaxRetry)
+	maxDownloadRetry := viper.GetInt(conf.BackupDownloadMaxRetry)
 
 	switch metadata.Type {
 	case SplitMergeStreamBackup:
