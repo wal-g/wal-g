@@ -180,8 +180,8 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 		chkpNum := orioledb.GetChkpNum(bh.PgInfo.PgDataDirectory)
 		bh.CurBackupInfo.StartChkpNum = &chkpNum
 	}
-
-	bh.handleDeltaBackup(folder)
+	err = bh.handleDeltaBackup(folder)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets := bh.uploadBackup()
 	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -252,7 +252,7 @@ func (bh *BackupHandler) startBackup() error {
 	return nil
 }
 
-func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
+func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) error {
 	if len(bh.prevBackupInfo.name) > 0 && bh.prevBackupInfo.sentinelDto.BackupStartLSN != nil {
 		tracelog.InfoLogger.Println("Delta backup enabled")
 		tracelog.DebugLogger.Printf("Previous backup: %s\nBackup start LSN: %s", bh.prevBackupInfo.name,
@@ -270,10 +270,13 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if useWalDelta {
+			ForceWalDetal, _ := conf.GetBoolSettingDefault(conf.ForceWalDetal, false)
 			err := bh.Workers.Bundle.DownloadDeltaMap(internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)), bh.CurBackupInfo.startLSN)
 			if err == nil {
 				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided " +
 					"delta map")
+			} else if ForceWalDetal {
+				return errors.Wrapf(err, "Failed to load delta map from previous backup")
 			} else {
 				tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. "+
 					"Fallback to full scan delta backup\n", err)
@@ -282,6 +285,7 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) {
 		bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + "_D_" + utility.StripWalFileName(bh.prevBackupInfo.name)
 		tracelog.DebugLogger.Printf("Suffixing Backup name with Delta info: %s", bh.CurBackupInfo.Name)
 	}
+	return nil
 }
 
 func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto,

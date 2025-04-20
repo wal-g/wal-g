@@ -232,6 +232,8 @@ const (
 	SSHPrivateKeyPath = "SSH_PRIVATE_KEY_PATH"
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
+
+	ForceWalDetal = "WALG_FORCE_WAL_DELTA"
 )
 
 var (
@@ -306,6 +308,7 @@ var (
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
+		ForceWalDetal:             "false",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -320,6 +323,7 @@ var (
 		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
 		GPRelativeRecoveryConfPath:   "recovery.conf",
 		GPRelativePostgresqlConfPath: "postgresql.conf",
+		ForceWalDetal:                "false",
 	}
 
 	AllowedSettings map[string]bool
@@ -491,6 +495,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
 		DisablePartialRestore:                true,
+		ForceWalDetal:                        true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -582,6 +587,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
+		ForceWalDetal:                        true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
