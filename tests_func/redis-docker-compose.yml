@@ -18,6 +18,12 @@ services:
             - ./images/minio/config:/config:rw
         env_file:
             - ${ENV_FILE}
+        healthcheck:
+          test: ["CMD", "curl", "-f", "http://localhost:${S3_PORT}/minio/health/live"]
+          interval: 30s
+          timeout: 20s
+          retries: 3
+
     redis01:
         build:
             dockerfile: ${DOCKER_FILE}
