@@ -10,6 +10,7 @@ env:
   USE_BROTLI: 1
   USE_LIBSODIUM: 1
   USE_LZO: 1
+  DEBIAN_FRONTEND: noninteractive
 
 jobs:
   # Prevents race conditions by creating the release only once before uploads.
@@ -38,7 +39,6 @@ jobs:
     steps:
       - name: Install build dependencies
         run: |
-          export DEBIAN_FRONTEND=noninteractive
           apt-get update
           apt-get install -y liblzo2-dev brotli libsodium-dev curl git cmake build-essential tzdata
 
@@ -114,7 +114,6 @@ jobs:
             USE_LZO: ${{ env.USE_LZO }}
           shell: /bin/bash
           run: |            
-            export DEBIAN_FRONTEND=noninteractive
             apt-get update
             apt-get install -y build-essential curl git cmake liblzo2-dev brotli libsodium-dev
             
