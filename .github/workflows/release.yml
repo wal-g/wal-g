@@ -10,18 +10,37 @@ env:
   USE_BROTLI: 1
   USE_LIBSODIUM: 1
   USE_LZO: 1
+  DEBIAN_FRONTEND: noninteractive
 
 jobs:
+  # Prevents race conditions by creating the release only once before uploads.
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release-ubuntu:
+    needs: create-release
     strategy:
       matrix:
-        os: [ ubuntu-20.04, ubuntu-22.04, ubuntu-24.04 ]
-        db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
+        os: [20.04, 22.04, 24.04]
+        db: [pg, mysql, sqlserver, redis, mongo, fdb, gp]
       fail-fast: false
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:${{ matrix.os }}
     steps:
-      - name: Install deps
-        run: sudo apt-get install liblzo2-dev brotli libsodium-dev
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y liblzo2-dev brotli libsodium-dev curl git cmake build-essential tzdata
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,9 +52,13 @@ jobs:
         id: go
 
       - name: Get dependencies
-        run: |
-          go get -v -t -d ./...
+        run: go get -v -t -d ./...
 
+      - name: Mark repo and submodule as safe
+        run: |
+          git config --global --add safe.directory $GITHUB_WORKSPACE
+          git config --global --add safe.directory $GITHUB_WORKSPACE/submodules/brotli
+ 
       - name: Make deps
         run: make deps
 
@@ -66,7 +89,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-ubuntu-arm:
-    runs-on: ubuntu-24.04
+    needs: create-release
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         os: [ { distro: ubuntu20.04, label: ubuntu-20.04 }, { distro: ubuntu22.04, label: ubuntu-22.04 } ]
@@ -101,12 +125,13 @@ jobs:
             
             go get -v -t -d ./...
             
-            git config --global --add safe.directory /home/runner/work/wal-g/wal-g
-            git config --global --add safe.directory /home/runner/work/wal-g/wal-g/submodules/brotli
-            
+            git config --global --add safe.directory $GITHUB_WORKSPACE
+            git config --global --add safe.directory $GITHUB_WORKSPACE/submodules/brotli
+                      
             make deps
             
             make ${{ matrix.db }}_build
+
       - name: Rename WAL-G binary
         run: mv main/${{ matrix.db }}/wal-g wal-g-${{ matrix.db }}-${{ matrix.os.label }}-${{ matrix.arch }}
 
