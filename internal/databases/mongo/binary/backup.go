@@ -1,7 +1,6 @@
 package binary
 
 import (
-	"context"
 	"os"
 
 	"github.com/pkg/errors"
@@ -13,7 +12,6 @@ import (
 )
 
 type BackupService struct {
-	Context       context.Context
 	MongodService *MongodService
 	Uploader      internal.Uploader
 
@@ -24,10 +22,9 @@ func GenerateNewBackupName() string {
 	return common.BinaryBackupType + "_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-func CreateBackupService(ctx context.Context, mongodService *MongodService, uploader internal.Uploader,
+func CreateBackupService(mongodService *MongodService, uploader internal.Uploader,
 ) (*BackupService, error) {
 	return &BackupService{
-		Context:       ctx,
 		MongodService: mongodService,
 		Uploader:      uploader,
 	}, nil

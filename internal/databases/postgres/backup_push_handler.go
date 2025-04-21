@@ -371,8 +371,9 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 
 	// Wait for all uploads to finish.
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
-	bh.Arguments.Uploader.Finish()
-	if bh.Arguments.Uploader.Failed() {
+
+	if err := bh.Arguments.Uploader.Finish(); err != nil {
+		tracelog.ErrorLogger.PrintError(err)
 		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", bh.CurBackupInfo.Name)
 	}
 	if timelineChanged {

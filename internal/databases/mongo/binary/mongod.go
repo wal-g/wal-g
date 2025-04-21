@@ -131,11 +131,9 @@ func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err
 		if !backupCursorErrorIsRetried(err) {
 			return nil, err
 		}
-		if i < cursorCreateRetries {
-			minutes := time.Duration(i + 1)
-			tracelog.WarningLogger.Printf("%v. Sleep %d minutes and retry", err.Error(), minutes)
-			time.Sleep(time.Minute * minutes)
-		}
+		minutes := time.Duration(i + 1)
+		tracelog.WarningLogger.Printf("%v. Sleep %d minutes and retry", err.Error(), minutes)
+		time.Sleep(time.Minute * minutes)
 	}
 
 	return cursor, err

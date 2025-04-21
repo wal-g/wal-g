@@ -22,13 +22,14 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
+	//todo try later SplitUploader
 	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return err
 	}
 	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
-	backupService, err := binary.CreateBackupService(ctx, mongodService, uploader)
+	backupService, err := binary.CreateBackupService(mongodService, uploader)
 	if err != nil {
 		return err
 	}

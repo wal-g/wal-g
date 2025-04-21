@@ -56,7 +56,7 @@ func (concurrentUploader *ConcurrentUploader) UploadBackupFiles(backupFiles []*B
 }
 
 func (concurrentUploader *ConcurrentUploader) Upload(backupFile *BackupFileMeta) error {
-	return concurrentUploader.bundle.AddToBundle(backupFile.Path, backupFile, nil)
+	return concurrentUploader.bundle.AddToBundle(backupFile.Path, backupFile)
 }
 
 func (concurrentUploader *ConcurrentUploader) Finalize() error {
