@@ -1,8 +1,9 @@
 name: Release workflow for tagged versions
 on:
   push:
+    # Sequence of patterns matched against refs/tags
     tags:
-      - 'v*'
+      - 'v*' # Push events to matching v*, i.e. v0.2.19, v0.2.14a
 
 env:
   GO_VERSION: "1.22"
