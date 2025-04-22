@@ -1,0 +1,64 @@
+Source: wal-g
+Maintainer: mdb <mdb-admin@yandex-team.ru>  # CHANGE !!!!
+Section: database
+Priority: extra
+Standards-Version: 4.6.0
+Build-Depends:
+ brotli,
+ cmake,
+ curl,
+ debhelper-compat (= 12),
+ gcc,
+ git,
+ liblzo2-dev,
+ libsodium-dev,
+ make
+Rules-Requires-Root: no
+XS-Go-Import-Path: github.com/wal-g/wal-g
+
+Package: wal-g-pg
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: WAL-G backup tool for PostgreSQL
+ WAL-G is an archival restoration tool for PostgreSQL. This package
+ includes support for PostgreSQL backups and restore with page compression,
+ streaming, and cloud integration.
+
+Package: wal-g-mongo
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: WAL-G backup tool for MongoDB
+ WAL-G is an archival restoration tool for MongoDB. This package
+ includes support for MongoDB backups to cloud storage.
+
+Package: wal-g-redis
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: WAL-G backup tool for Redis
+ WAL-G is an archival restoration tool for Redis. This package
+ includes support for Redis backup and restore functionality.
+
+Package: wal-g-mysql
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: WAL-G backup tool for MySQL
+ WAL-G is an archival restoration tool for MySQL. This package
+ includes support for MySQL backups and restore.
+
+Package: wal-g-sqlserver
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: WAL-G backup tool for SQL Server
+ WAL-G is an archival restoration tool for Microsoft SQL Server backups.
+
+Package: wal-g-fdb
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: WAL-G backup tool for FoundationDB
+ WAL-G is an archival restoration tool for FoundationDB backups.
+
+Package: wal-g-gp
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}
+Description: WAL-G backup tool for Greenplum
+ WAL-G is an archival restoration tool for Greenplum backups. 
