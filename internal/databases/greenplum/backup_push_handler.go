@@ -215,6 +215,21 @@ func (bh *BackupHandler) HandleBackupPush() {
 	restoreLSNs, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	// After completing the full backup, insert a restore point and archive related WAL log segments.
+	// This ensures the new cluster can retrieve complete WAL logs with the restore point for restoration.
+	tracelog.InfoLogger.Println("Switch xlog on cluster")
+	remoteOutput = bh.globalCluster.GenerateAndExecuteCommand("Running wal-g", cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+		func(contentID int) string {
+			seg, ok := bh.globalCluster.ByContent[contentID]
+			if ok {
+				return fmt.Sprintf("PGOPTIONS='-c gp_role=utility' psql -p %d -d postgres -c 'select pg_switch_wal();'", seg[0].Port)
+			}
+			return ""
+		})
+	bh.globalCluster.CheckClusterError(remoteOutput, "Unable to switch xlog on cluster", func(contentID int) string {
+		return "Unable to switch xlog on cluster"
+	}, true)
+
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
 	tracelog.ErrorLogger.FatalOnError(err)
 
