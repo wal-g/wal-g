@@ -26,7 +26,6 @@ GO_DIR := $(CURDIR)/build/go
 override_dh_auto_build:
 	mkdir -p $(GOCACHE) $(GOMODCACHE) $(GO_DIR)
 
-	# Определение архитектуры и распаковка Go
 	if dpkg --print-architecture | grep -q amd64; then \
 		tar -C $(GO_DIR) --strip-components=1 -xzf $(GO_TAR_AMD); \
 	elif dpkg --print-architecture | grep -q arm64; then \
