@@ -252,7 +252,6 @@ jobs:
 
   deploy-to-gh-pages:
     needs: [release-ubuntu-amd64, release-ubuntu-arm64]
-    # needs: [release-ubuntu-amd64]
     if: ${{ inputs.gh_pages == 'true' }}
     runs-on: ubuntu-latest
     steps:

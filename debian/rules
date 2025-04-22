@@ -12,15 +12,13 @@ export USE_LIBSODIUM=1
 export USE_LZO=1
 export GOCACHE := $(CURDIR)/.gocache
 export GOMODCACHE := $(CURDIR)/.gomodcache
+export GOROOT := $(GO_DIR)
+export PATH := $(GOROOT)/bin:$(PATH)
 
-# Переменные Go
 GO_TAR_AMD := $(CURDIR)/build/golang-amd64.tar.gz
 GO_TAR_ARM := $(CURDIR)/build/golang-arm64.tar.gz
 GO_DIR := $(CURDIR)/build/go
 
-# Подключение Go из build/go
-export GOROOT := $(GO_DIR)
-export PATH := $(GOROOT)/bin:$(PATH)
 
 %:
 	dh $@
