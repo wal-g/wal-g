@@ -204,7 +204,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("/usr/bin/wal-g", conf.CfgFile, recoveryTarget)
+	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 
