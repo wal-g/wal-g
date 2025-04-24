@@ -8,5 +8,4 @@
 "PGDATABASE": "postgres",
 "AWS_S3_FORCE_PATH_STYLE": "true",
 "WALG_COMPRESSION_METHOD": "brotli",
-"PGHOST": "/var/run/postgresql",
-"WALG_FORCE_WAL_DELTA": "true"
+"PGHOST": "/var/run/postgresql"
