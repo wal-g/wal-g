@@ -223,7 +223,7 @@ func detectAWSRegionByBucket(bucket string, config *aws.Config) (string, error) 
 
 func requestEndpointFromSource(endpointSource, port string) *string {
 	t := http.DefaultTransport
-	var c := http.DefaultClient
+	c := http.DefaultClient
 	if tr, ok := t.(*http.Transport); ok {
 		tr.DisableKeepAlives = true
 		c = &http.Client{Transport: tr}
