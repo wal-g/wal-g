@@ -222,7 +222,15 @@ func (bh *BackupHandler) HandleBackupPush() {
 		func(contentID int) string {
 			seg, ok := bh.globalCluster.ByContent[contentID]
 			if ok {
-				return fmt.Sprintf("PGOPTIONS='-c gp_role=utility' psql -p %d -d postgres -c 'select pg_switch_wal();'", seg[0].Port)
+				var pgOptions, switchFunction string
+				if bh.currBackupInfo.gpVersion.Flavor == Greenplum && bh.currBackupInfo.gpVersion.Major == 6 {
+					pgOptions = "-c gp_session_role=utility"
+					switchFunction = "pg_switch_xlog()"
+				} else {
+					pgOptions = "-c gp_role=utility"
+					switchFunction = "pg_switch_wal()"
+				}
+				return fmt.Sprintf("PGOPTIONS='%s' psql -p %d -d postgres -c 'select %s;'", pgOptions, seg[0].Port, switchFunction)
 			}
 			return ""
 		})
