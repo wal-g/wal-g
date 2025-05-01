@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
@@ -544,7 +543,8 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), conn)
+	baseBackup, err := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), bh.PgInfo.PgVersion, conn)
+	tracelog.ErrorLogger.FatalOnError(err)
 	var bundleFiles internal.BundleFiles
 	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}
