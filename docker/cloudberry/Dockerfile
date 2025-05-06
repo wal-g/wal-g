@@ -83,7 +83,7 @@ RUN chmod +x /root/setup_gpadmin_user.bash \
 WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
  && git log -1 \
- && ./configure --with-perl --with-python --with-libxml --with-gssapi --enable-debug --disable-pxf --disable-orca --prefix=/usr/local/gpdb_src  > /dev/null \
+ && ./configure --with-perl --with-python --with-libxml --with-gssapi --enable-debug --disable-pxf --disable-orca --disable-pax --prefix=/usr/local/gpdb_src  > /dev/null \
  && make -j$(nproc) > /dev/null \
  && make -j$(nproc) install > /dev/null \
  && chown gpadmin:gpadmin /home/gpadmin/run_greenplum.sh \

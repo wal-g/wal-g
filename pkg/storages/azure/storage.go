@@ -8,6 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -35,7 +36,7 @@ type Secrets struct {
 }
 
 type UploaderConfig struct {
-	BufferSize int
+	BufferSize int64
 	Buffers    int
 }
 
@@ -49,7 +50,7 @@ const (
 
 // TODO: Unit tests
 func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
-	var containerClient *azblob.ContainerClient
+	var containerClient *container.Client
 	var err error
 	switch config.AuthType {
 	case authTypeSASToken:
@@ -65,11 +66,11 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 	}
 
 	uploadStreamOpts := azblob.UploadStreamOptions{
-		BufferSize: config.Uploader.BufferSize,
-		MaxBuffers: config.Uploader.Buffers,
+		BlockSize:   config.Uploader.BufferSize,
+		Concurrency: config.Uploader.Buffers,
 	}
 
-	var folder storage.Folder = NewFolder(config.RootPath, *containerClient, uploadStreamOpts, config.TryTimeout)
+	var folder storage.Folder = NewFolder(config.RootPath, containerClient, uploadStreamOpts, config.TryTimeout)
 
 	for _, wrap := range rootWraps {
 		folder = wrap(folder)
@@ -83,7 +84,7 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 	return &Storage{folder, hash}, nil
 }
 
-func containerClientWithSASToken(config *Config) (*azblob.ContainerClient, error) {
+func containerClientWithSASToken(config *Config) (*container.Client, error) {
 	containerURLString := fmt.Sprintf(
 		"https://%s.blob.%s/%s%s",
 		config.AccountName,
@@ -96,13 +97,15 @@ func containerClientWithSASToken(config *Config) (*azblob.ContainerClient, error
 		return nil, fmt.Errorf("parse service URL with SAS token: %w", err)
 	}
 
-	containerClient, err := azblob.NewContainerClientWithNoCredential(containerURLString, &azblob.ClientOptions{
-		Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+	containerClient, err := container.NewClientWithNoCredential(containerURLString, &container.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+		},
 	})
 	return containerClient, err
 }
 
-func containerClientWithAccessKey(config *Config) (*azblob.ContainerClient, error) {
+func containerClientWithAccessKey(config *Config) (*container.Client, error) {
 	credential, err := azblob.NewSharedKeyCredential(config.AccountName, config.Secrets.AccessKey)
 	if err != nil {
 		return nil, fmt.Errorf("create shared key credentials: %w", err)
@@ -113,18 +116,19 @@ func containerClientWithAccessKey(config *Config) (*azblob.ContainerClient, erro
 		config.EndpointSuffix,
 		config.Container,
 	)
-	_, err = url.Parse(containerURLString)
-	if err != nil {
+	if _, err := url.Parse(containerURLString); err != nil {
 		return nil, fmt.Errorf("parse service URL: %w", err)
 	}
 
-	containerClient, err := azblob.NewContainerClientWithSharedKey(containerURLString, credential, &azblob.ClientOptions{
-		Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+	containerClient, err := container.NewClientWithSharedKeyCredential(containerURLString, credential, &container.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+		},
 	})
 	return containerClient, err
 }
 
-func containerClientWithDefaultAuth(config *Config) (*azblob.ContainerClient, error) {
+func containerClientWithDefaultAuth(config *Config) (*container.Client, error) {
 	defaultCredential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("construct the default Azure credential chain: %w", err)
@@ -141,8 +145,10 @@ func containerClientWithDefaultAuth(config *Config) (*azblob.ContainerClient, er
 		return nil, fmt.Errorf("parse service URL: %w", err)
 	}
 
-	containerClient, err := azblob.NewContainerClient(containerURLString, defaultCredential, &azblob.ClientOptions{
-		Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+	containerClient, err := container.NewClient(containerURLString, defaultCredential, &container.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+		},
 	})
 	return containerClient, err
 }
