@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM golang:1.22.8-bullseye
+FROM golang:1.23-bookworm
 
 ENV DEBIAN_FRONTEND noninteractive
 
