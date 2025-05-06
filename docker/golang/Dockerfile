@@ -1,7 +1,7 @@
 FROM debian:buster
 
 # Note: we used `golang:buster` here... however it provides go 1.20.x, while we upgraded to 1.22+
-# Migration to `golang:bullseye` doesn't work - it incopatible with ubuntu 18.04 (GLIBC version issues).
+# Migration to `golang:bullseye` doesn't work - it incompatible with ubuntu 18.04 (GLIBC version issues).
 # So, install it manually:
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -14,7 +14,7 @@ RUN apt-get update && \
         net-tools dnsutils \
         wget
 
-RUN wget -O - "https://go.dev/dl/go1.22.9.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
+RUN wget -O - "https://go.dev/dl/go1.23.8.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
 	export PATH="/usr/local/go/bin:$PATH" && \
 	go version
 

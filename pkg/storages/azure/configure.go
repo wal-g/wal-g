@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/storage/setting"
 )
@@ -76,7 +75,7 @@ func ConfigureStorage(
 		endpointSuffix = getStorageEndpointSuffix(environmentName)
 	}
 
-	bufferSize, err := setting.IntOptional(settings, BufferSizeSetting, defaultBufferSize)
+	bufferSize, err := setting.Int64Optional(settings, BufferSizeSetting, defaultBufferSize)
 	if err != nil {
 		return nil, err
 	}
@@ -136,13 +135,13 @@ func configureAuthType(settings map[string]string) (authType authType, token, ke
 // the Azure storage account endpoint suffix for AzurePublicCloud.
 func getStorageEndpointSuffix(environmentName string) string {
 	switch environmentName {
-	case azure.USGovernmentCloud.Name:
-		return azure.USGovernmentCloud.StorageEndpointSuffix
-	case azure.ChinaCloud.Name:
-		return azure.ChinaCloud.StorageEndpointSuffix
-	case azure.GermanCloud.Name:
-		return azure.GermanCloud.StorageEndpointSuffix
+	case "AzureUSGovernmentCloud":
+		return "core.usgovcloudapi.net"
+	case "AzureChinaCloud":
+		return "core.chinacloudapi.cn"
+	case "AzureGermanCloud":
+		return "core.cloudapi.de"
 	default:
-		return azure.PublicCloud.StorageEndpointSuffix
+		return "core.windows.net"
 	}
 }
