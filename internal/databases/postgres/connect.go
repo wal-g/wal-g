@@ -28,7 +28,15 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		}
 	}
 
-	conn, err := pgx.ConnectConfig(context.TODO(), config)
+	timeout, err := getPgTimeoutSetting()
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
 		conn, err = tryConnectToGpSegment(config)
 
