@@ -629,15 +629,18 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 	tables := make(map[string]TableInfo, 0)
 	parentTables := make([]string, 0)
+
 	getTablesQuery, err := queryRunner.BuildGetTablesQuery()
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
 	}
+
 	err = queryRunner.processTables(queryRunner.Connection, getTablesQuery,
 		func(relFileNode, oid uint32, tableName, namespaceName, parentTableName string) {
 			tracelog.DebugLogger.Printf("adding %s as %d with filenode %d", tableName, oid, relFileNode)
 			parent := fmt.Sprintf("%s.%s", namespaceName, parentTableName)
 			child := fmt.Sprintf("%s.%s", namespaceName, tableName)
+
 			entry, ok := tables[child]
 			if !ok {
 				tables[child] = TableInfo{Oid: oid, Relfilenode: relFileNode, SubTables: map[string]TableInfo{}}
@@ -646,6 +649,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 				entry.Relfilenode = relFileNode
 				tables[child] = entry
 			}
+
 			if parentTableName == "" {
 				parentTables = append(parentTables, child)
 				return
@@ -664,6 +668,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 	formatedTables := make(map[string]TableInfo)
 	stack := make([]string, 0)
+
 	for _, val := range parentTables {
 		formatedTables[val] = TableInfo{Oid: tables[val].Oid, Relfilenode: tables[val].Relfilenode, SubTables: map[string]TableInfo{}}
 		stack = append(stack, val)
@@ -695,6 +700,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 		return errors.Wrap(err, "QueryRunner GetTables: Query failed")
 	}
 	defer rows.Close()
+
 	for rows.Next() {
 		var relFileNode uint32
 		var oid uint32
@@ -707,6 +713,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
 			continue
 		}
+
 		if relKind == 'p' {
 			// Although partitioned tables have relfilenode=0 (no physical storage) and theoretically
 			// don't need to be added to the tables map, we still process them here.
@@ -725,6 +732,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 				tracelog.DebugLogger.Printf("Skipping relation '%s.%s' (relkind=%c) due to no physical storage", namespaceName, tableName, relKind)
 				continue
 			}
+
 			// Case 2: Non-empty path with relfilenode=0 indicates a mapped catalog
 			// This happens for:
 			// pg_class itself and other critical system catalogs, shared catalogs
@@ -739,6 +747,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 		}
 		process(relFileNode, oid, tableName, namespaceName, parentTableName.String)
 	}
+
 	return nil
 }
 

@@ -102,7 +102,8 @@ Examples:
 * `WALG_STOP_BACKUP_TIMEOUT`
 
 **Deprecated: use WALG_PG_TIMEOUT instead.**
-Previously used as a timeout for the pg_stop_backup() call. Now replaced by a unified WALG_PG_TIMEOUT setting. Will be removed in a future release. By default, there is no timeout.
+Previously used as a timeout for the pg_stop_backup() call. Now replaced by a unified WALG_PG_TIMEOUT setting. Will be removed in a future release. 
+By default, there is no timeout.
 
 Examples:
 - `0` - disable the timeout (default value)
