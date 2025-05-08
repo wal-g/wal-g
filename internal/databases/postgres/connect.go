@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
@@ -33,11 +34,7 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		return nil, err
 	}
 
-	ctx := context.Background()
-	cancel := func() {}
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-	}
+	ctx, cancel := ContextWithPgTimeout(context.Background(), timeout)
 	defer cancel()
 
 	conn, err := pgx.ConnectConfig(ctx, config)
@@ -77,4 +74,13 @@ func tryConnectToGpSegment(config *pgx.ConnConfig) (*pgx.Conn, error) {
 		conn, err = pgx.ConnectConfig(context.TODO(), config)
 	}
 	return conn, err
+}
+
+// ContextWithPgTimeout creates a new context with timeout if timeout > 0,
+// otherwise returns the original context and a no-op cancel function.
+func ContextWithPgTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout > 0 {
+		return context.WithTimeout(ctx, timeout)
+	}
+	return ctx, func() {}
 }

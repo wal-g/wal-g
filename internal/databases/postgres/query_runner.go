@@ -192,7 +192,7 @@ func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
 func (queryRunner *PgQueryRunner) getVersion() (err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	conn := queryRunner.Connection
@@ -204,7 +204,7 @@ func (queryRunner *PgQueryRunner) getVersion() (err error) {
 func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	conn := queryRunner.Connection
@@ -218,7 +218,7 @@ func (queryRunner *PgQueryRunner) getCurrentLsn() (lsn string, err error) {
 func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	if queryRunner.Version < 90600 {
@@ -243,7 +243,7 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 		return "", "", false, errors.Wrap(err, "QueryRunner StartBackup: Building start backup query failed")
 	}
 
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	if err = conn.QueryRow(pgCtx, startBackupQuery, backup).Scan(&backupName, &lsnString, &inRecovery); err != nil {
@@ -257,7 +257,7 @@ func (queryRunner *PgQueryRunner) StartBackup(backup string) (backupName string,
 func (queryRunner *PgQueryRunner) StopBackup() (label string, offsetMap string, lsnStr string, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	tracelog.InfoLogger.Println("Calling pg_stop_backup()")
@@ -327,7 +327,7 @@ func (queryRunner *PgQueryRunner) getStatistics(
 	dbInfo PgDatabaseInfo) (map[walparser.RelFileNode]PgRelationStat, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	tracelog.InfoLogger.Println("Querying pg_stat_all_tables")
@@ -384,7 +384,7 @@ func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
 func (queryRunner *PgQueryRunner) GetDatabaseInfos() ([]PgDatabaseInfo, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	tracelog.InfoLogger.Println("Querying pg_database")
@@ -423,7 +423,7 @@ func (queryRunner *PgQueryRunner) GetDatabaseInfos() ([]PgDatabaseInfo, error) {
 func (queryRunner *PgQueryRunner) GetParameter(parameterName string) (string, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	var value string
@@ -455,7 +455,7 @@ func (queryRunner *PgQueryRunner) GetWalSegmentBytes() (segBlocks uint64, err er
 func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	conn := queryRunner.Connection
@@ -468,7 +468,7 @@ func (queryRunner *PgQueryRunner) GetDataDir() (dataDir string, err error) {
 func (queryRunner *PgQueryRunner) GetPhysicalSlotInfo(slotName string) (PhysicalSlot, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	var active bool
@@ -493,7 +493,7 @@ func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	conn := queryRunner.Connection
@@ -525,7 +525,7 @@ func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
 func (queryRunner *PgQueryRunner) Ping() error {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	return queryRunner.Connection.Ping(pgCtx)
@@ -570,7 +570,7 @@ func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQue
 func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	conn := queryRunner.Connection
@@ -589,7 +589,7 @@ func (queryRunner *PgQueryRunner) TryGetLock() (err error) {
 func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	conn := queryRunner.Connection
@@ -691,8 +691,9 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 	getTablesQuery string, process func(relFileNode, oid uint32, tableName, namespaceName, parentTableName string)) error {
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
+
 	rows, err := conn.Query(pgCtx, getTablesQuery)
 	if err != nil {
 		tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
@@ -754,12 +755,12 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	var dataChecksums string
 	conn := queryRunner.Connection
-
+	time.Sleep(300 * time.Second)
 	err := conn.QueryRow(pgCtx, "SHOW data_checksums").Scan(&dataChecksums)
 	if err != nil {
 		return "", errors.Wrap(err, "GetDataChecksums: failed to check data_checksums")
@@ -772,7 +773,7 @@ func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
 func (queryRunner *PgQueryRunner) GetArchiveMode() (string, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	var archiveMode string
@@ -787,7 +788,7 @@ func (queryRunner *PgQueryRunner) GetArchiveMode() (string, error) {
 func (queryRunner *PgQueryRunner) GetArchiveCommand() (string, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	var archiveCommand string
@@ -802,7 +803,7 @@ func (queryRunner *PgQueryRunner) GetArchiveCommand() (string, error) {
 func (queryRunner *PgQueryRunner) IsStandby() (bool, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
-	pgCtx, cancel := queryRunner.ContextWithPgTimeout()
+	pgCtx, cancel := ContextWithPgTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	defer cancel()
 
 	var standby bool
@@ -811,11 +812,4 @@ func (queryRunner *PgQueryRunner) IsStandby() (bool, error) {
 		return false, errors.Wrap(err, "IsStandby: failed to determine recovery mode")
 	}
 	return standby, nil
-}
-
-func (queryRunner *PgQueryRunner) ContextWithPgTimeout() (context.Context, context.CancelFunc) {
-	if queryRunner.PgTimeout > 0 {
-		return context.WithTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
-	}
-	return queryRunner.Ctx, func() {}
 }
