@@ -531,8 +531,8 @@ func (queryRunner *PgQueryRunner) Ping() error {
 	return queryRunner.Connection.Ping(pgCtx)
 }
 
-func (queryRunner *PgQueryRunner) ForEachDatabase(function func(runner *PgQueryRunner, db PgDatabaseInfo) error) error {
-
+func (queryRunner *PgQueryRunner) ForEachDatabase(
+	function func(runner *PgQueryRunner, db PgDatabaseInfo) error) error {
 	databases, err := queryRunner.GetDatabaseInfos()
 	if err != nil {
 		return errors.Wrap(err, "Failed to get db names.")

@@ -33,11 +33,22 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx := context.Background()
+	cancel := func() {}
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	}
 	defer cancel()
 
 	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to connect normally: %v", err)
+
+		// TODO(greenplum-split):
+		// This fallback calls Greenplum-specific tryConnectToGpSegment()
+		// even in a plain PostgreSQL build. As a result, the PG server
+		// replies with FATAL: unrecognized configuration parameter "gp_role".
+		// We need to separate GP logic from PG.
 		conn, err = tryConnectToGpSegment(config)
 
 		if err != nil && config.Host != "localhost" {
