@@ -531,8 +531,7 @@ func (queryRunner *PgQueryRunner) Ping() error {
 	return queryRunner.Connection.Ping(pgCtx)
 }
 
-func (queryRunner *PgQueryRunner) ForEachDatabase(
-	function func(runner *PgQueryRunner, db PgDatabaseInfo) error) error {
+func (queryRunner *PgQueryRunner) ForEachDatabase(function func(runner *PgQueryRunner, db PgDatabaseInfo) error) error {
 
 	databases, err := queryRunner.GetDatabaseInfos()
 	if err != nil {
@@ -814,9 +813,9 @@ func (queryRunner *PgQueryRunner) IsStandby() (bool, error) {
 	return standby, nil
 }
 
-func (qr *PgQueryRunner) ContextWithPgTimeout() (context.Context, context.CancelFunc) {
-	if qr.PgTimeout > 0 {
-		return context.WithTimeout(qr.Ctx, qr.PgTimeout)
+func (queryRunner *PgQueryRunner) ContextWithPgTimeout() (context.Context, context.CancelFunc) {
+	if queryRunner.PgTimeout > 0 {
+		return context.WithTimeout(queryRunner.Ctx, queryRunner.PgTimeout)
 	}
-	return qr.Ctx, func() {}
+	return queryRunner.Ctx, func() {}
 }
