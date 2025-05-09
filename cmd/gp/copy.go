@@ -7,6 +7,8 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 const (
@@ -42,6 +44,14 @@ var (
 		PersistentPreRun: func(*cobra.Command, []string) {
 			if viper.IsSet(conf.PgWalSize) {
 				postgres.SetWalSize(viper.GetUint64(conf.PgWalSize))
+			}
+			if viper.IsSet(conf.PgWalPageSize) {
+				walparser.SetWalPageSize(viper.GetUint64(conf.PgWalPageSize))
+			}
+			if viper.IsSet(conf.PgBlockSize) {
+				walparser.SetBlockSize(viper.GetUint64(conf.PgBlockSize))
+				postgres.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
+				orioledb.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
 			}
 		},
 	}
