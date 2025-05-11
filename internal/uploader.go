@@ -4,21 +4,18 @@ import (
 	"context"
 	json2 "encoding/json/v2"
 	"fmt"
-	"golang.org/x/sync/errgroup"
-
 	"io"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/wal-g/internal/statistics"
-
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/statistics"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")

@@ -3,7 +3,6 @@ package etcd
 import (
 	"context"
 	"os"
-
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -11,7 +10,6 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/etcd"
-
 	"github.com/wal-g/wal-g/utility"
 )
 

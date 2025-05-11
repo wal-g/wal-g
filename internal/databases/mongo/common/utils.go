@@ -1,8 +1,9 @@
 package common
 
 import (
-	"github.com/wal-g/wal-g/internal/config"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal/config"
 )
 
 func SystemDBs() *map[string]struct{} {

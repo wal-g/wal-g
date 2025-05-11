@@ -1,14 +1,12 @@
 package internal_test
 
 import (
-	"github.com/stretchr/testify/assert"
-
 	"testing"
 
-	conf "github.com/wal-g/wal-g/internal/config"
-
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 func TestDtoSerializer_NewDtoSerializer(t *testing.T) {

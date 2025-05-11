@@ -7,10 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/RoaringBitmap/roaring"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 

@@ -3,9 +3,8 @@ package lzma
 import (
 	"io"
 
-	"github.com/wal-g/wal-g/internal/ioextensions"
-
 	"github.com/ulikunitz/xz/lzma"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
 const (
