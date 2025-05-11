@@ -9,9 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/diskwatcher"
-
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	"github.com/wal-g/wal-g/internal/diskwatcher"
 	"github.com/wal-g/wal-g/utility"
 )
 

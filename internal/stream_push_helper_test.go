@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
-
 	. "github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	functests "github.com/wal-g/wal-g/internal/testutils"

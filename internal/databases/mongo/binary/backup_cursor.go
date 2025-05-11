@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-
 	"go.mongodb.org/mongo-driver/mongo"
 )
 

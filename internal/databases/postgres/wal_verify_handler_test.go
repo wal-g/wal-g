@@ -8,11 +8,10 @@ import (
 	"testing"
 	"time"
 
-	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
 

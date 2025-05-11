@@ -19,9 +19,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/wal-g/tracelog"
-	"gopkg.in/yaml.v3"
-
 	"github.com/wal-g/wal-g/utility"
+	"gopkg.in/yaml.v3"
 )
 
 func createSession(config *Config) (*session.Session, error) {
