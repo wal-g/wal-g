@@ -7,10 +7,9 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 

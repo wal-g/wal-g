@@ -5,10 +5,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 )
 
 // temporary flag is used in tar interpreter to determine if it should use new unwrap logic

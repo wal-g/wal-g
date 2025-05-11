@@ -15,16 +15,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
-
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )

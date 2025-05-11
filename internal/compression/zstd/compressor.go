@@ -3,9 +3,8 @@ package zstd
 import (
 	"io"
 
-	"github.com/wal-g/wal-g/internal/ioextensions"
-
 	"github.com/klauspost/compress/zstd"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
 const (

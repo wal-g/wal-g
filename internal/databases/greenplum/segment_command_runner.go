@@ -10,9 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	conf "github.com/wal-g/wal-g/internal/config"
-
 	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 type SegCmdRunner struct {

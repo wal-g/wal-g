@@ -4,12 +4,11 @@ import (
 	"context"
 	"path/filepath"
 
+	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis/aof"
 	"github.com/wal-g/wal-g/internal/diskwatcher"
-
-	"github.com/spf13/viper"
 )
 
 func HandleAOFBackupPush(ctx context.Context, permanent bool, uploader internal.Uploader, metaConstructor internal.MetaConstructor) error {

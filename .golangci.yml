@@ -99,7 +99,9 @@ severity:
       severity: info
 formatters:
   enable:
+    - gci
     - gofmt
+    - goimports
   exclusions:
     generated: lax
     paths:

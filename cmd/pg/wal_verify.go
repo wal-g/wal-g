@@ -5,12 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (

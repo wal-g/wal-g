@@ -7,11 +7,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/wal-g/tracelog"
-
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/sync/errgroup"

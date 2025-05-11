@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	conf "github.com/wal-g/wal-g/internal/config"
-
 	"github.com/wal-g/wal-g/internal/crypto"
 )
 

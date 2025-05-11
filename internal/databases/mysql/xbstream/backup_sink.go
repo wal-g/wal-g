@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
 )
 
