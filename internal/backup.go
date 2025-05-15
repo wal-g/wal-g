@@ -77,6 +77,10 @@ func (backup *Backup) getMetadataPath() string {
 	return backup.Name + "/" + utility.MetadataFileName
 }
 
+func (backup *Backup) GetTarPartitionFolder() storage.Folder {
+	return backup.Folder.GetSubFolder(backup.Name + TarPartitionFolderName)
+}
+
 // SentinelExists checks that the sentinel file of the specified backup exists.
 func (backup *Backup) SentinelExists() (bool, error) {
 	return backup.Folder.Exists(backup.getStopSentinelPath())
