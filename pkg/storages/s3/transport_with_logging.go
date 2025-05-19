@@ -14,12 +14,19 @@ type loggingTransport struct {
 }
 
 func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
-	n, err := io.Copy(ioutil.Discard, r.Body)
-	tracelog.DebugLogger.Printf("bytes read: %d\n", n)
+	if r.Body != nil {
+		n, _ := io.Copy(ioutil.Discard, r.Body)
+		tracelog.DebugLogger.Printf("bytes read1: %d\n", n)
+	}
 
 	resp, err := s.underlying.RoundTrip(r)
 	if err != nil {
 		return resp, err
+	}
+
+	if r.Body != nil {
+		n, _ := io.Copy(ioutil.Discard, r.Body)
+		tracelog.DebugLogger.Printf("bytes read2: %d\n", n)
 	}
 
 	tracelog.DebugLogger.Printf("HTTP response code: %d", resp.StatusCode)
