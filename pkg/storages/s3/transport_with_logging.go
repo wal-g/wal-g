@@ -22,18 +22,6 @@ func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		return resp, err
 	}
 
-	body, err := r.GetBody()
-	if err != nil {
-		tracelog.DebugLogger.Printf("fail: %v", err)
-	}
-	a := make([]byte, r.ContentLength)
-	n, err := body.Read(a)
-	if err != nil {
-		tracelog.DebugLogger.Printf("fail2: %v", err)
-	}
-	tracelog.DebugLogger.Printf("bytes read: %d\n", n)
-	tracelog.DebugLogger.Printf("bytes body: %d\n", len(a))
-
 	tracelog.DebugLogger.Printf("HTTP response code: %d", resp.StatusCode)
 	statistics.WriteStatusCodeMetric(resp.StatusCode)
 	tracelog.DebugLogger.Printf("request %s response: %d request: %d", r.Method, resp.ContentLength, r.ContentLength)
