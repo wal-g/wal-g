@@ -16,7 +16,7 @@ func HandleBackupInfo(folder storage.Folder, backupName string, output io.Writer
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if tag != "" {
-		v, err := getField(&backupDetails, tag)
+		v, err := getField(folder, &backupDetails, tag)
 		tracelog.ErrorLogger.FatalOnError(err)
 		_, err = fmt.Fprintln(output, v)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -29,7 +29,11 @@ func HandleBackupInfo(folder storage.Folder, backupName string, output io.Writer
 	tracelog.ErrorLogger.FatalfOnError("Print backup info: %v", err)
 }
 
-func getField(v *archive.Backup, field string) (string, error) {
+func getField(folder storage.Folder, v *archive.Backup, field string) (string, error) {
+	if field == "Slots" {
+		return archive.FetchSlotsDataFromStorage(folder, v)
+	}
+
 	r := reflect.ValueOf(v)
 	f := reflect.Indirect(r).FieldByName(field)
 	if f.IsValid() {

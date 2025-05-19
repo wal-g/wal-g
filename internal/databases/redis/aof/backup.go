@@ -1,7 +1,9 @@
 package aof
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -76,7 +78,12 @@ func CreateBackupService(ctx context.Context, diskWatcher *diskwatcher.DiskWatch
 	}, nil
 }
 
-func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
+type DoBackupArgs struct {
+	BackupName string
+	Sharded    bool
+}
+
+func (bs *BackupService) DoBackup(args DoBackupArgs) error {
 	err := bs.metaConstructor.Init()
 	if err != nil {
 		return errors.Wrapf(err, "can not init meta provider")
@@ -123,7 +130,30 @@ func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
 		return err
 	}
 
-	return bs.Finalize(backupName)
+	if args.Sharded {
+		idToSlots, err := archive.GetSlotsMap()
+		if err != nil {
+			return err
+		}
+
+		jsonData, err := json.Marshal(idToSlots)
+		if err != nil {
+			return err
+		}
+		tracelog.InfoLogger.Printf("packing %s", string(jsonData))
+
+		path, err := archive.GetSlotsCompressedFileName()
+		if err != nil {
+			return err
+		}
+
+		err = bs.concurrentUploader.CompressAndUpload(args.BackupName, path, bytes.NewReader(jsonData))
+		if err != nil {
+			return err
+		}
+	}
+
+	return bs.Finalize(args.BackupName)
 }
 
 func (bs *BackupService) Finalize(backupName string) error {

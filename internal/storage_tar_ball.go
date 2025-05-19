@@ -72,6 +72,10 @@ func (tarBall *StorageTarBall) AwaitUploads() {
 	}
 }
 
+func GetBackupTarPath(backupName, fileName string) string {
+	return backupName + TarPartitionFolderName + fileName
+}
+
 // TODO : unit tests
 // startUpload creates a compressing writer and runs upload in the background once
 // a compressed tar member is finished writing.
@@ -79,7 +83,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 
-	path := tarBall.backupName + TarPartitionFolderName + name
+	path := GetBackupTarPath(tarBall.backupName, name)
 
 	tracelog.InfoLogger.Printf("Starting part %d ...\n", tarBall.partNumber)
 

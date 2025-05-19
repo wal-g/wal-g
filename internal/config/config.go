@@ -171,6 +171,8 @@ const (
 	RedisDataThreshold       = "WALG_REDIS_DATA_THRESHOLD"
 	RedisDataTimeout         = "WALG_REDIS_DATA_TIMEOUT"
 	RedisServerProcessName   = "WALG_REDIS_SERVER_PROCESS_NAME"
+	RedisFQDNToIDMap         = "WALG_REDIS_FQDN_TO_ID_MAP"
+	RedisClusterConfPath     = "WALG_REDIS_CLUSTER_CONF_PATH"
 
 	GPLogsDirectory              = "WALG_GP_LOGS_DIR"
 	GPSegContentID               = "WALG_GP_SEG_CONTENT_ID"
@@ -290,6 +292,8 @@ var (
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
 		RedisServerProcessName:   "redis-server",
+		RedisFQDNToIDMap:         "{}",
+		RedisClusterConfPath:     "/etc/redis/cluster.conf",
 	}
 
 	MysqlDefaultSettings = map[string]string{
@@ -562,6 +566,8 @@ var (
 		RedisDataThreshold:       true,
 		RedisDataTimeout:         true,
 		RedisServerProcessName:   true,
+		RedisFQDNToIDMap:         true,
+		RedisClusterConfPath:     true,
 	}
 
 	GPAllowedSettings = map[string]bool{

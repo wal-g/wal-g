@@ -1,6 +1,10 @@
 package internal
 
 import (
+	"bytes"
+	"context"
+	"io"
+
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -18,12 +22,12 @@ type ConcurrentUploader struct {
 func CreateConcurrentUploader(
 	uploader Uploader,
 	backupName string,
-	directories []string,
+	directory string,
 	skipFileNotExists bool,
 ) (*ConcurrentUploader, error) {
 	crypter := ConfigureCrypter()
 	tarSizeThreshold := viper.GetInt64(conf.TarSizeThresholdSetting)
-	bundle := NewBundle(directories, crypter, tarSizeThreshold, map[string]utility.Empty{})
+	bundle := NewBundle(directory, crypter, tarSizeThreshold, map[string]utility.Empty{})
 
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
 	tarBallMaker := NewStorageTarBallMaker(backupName, uploader)
@@ -74,6 +78,24 @@ func (concurrentUploader *ConcurrentUploader) Finalize() error {
 
 	concurrentUploader.UncompressedSize = *concurrentUploader.bundle.TarBallQueue.AllTarballsSize
 	concurrentUploader.CompressedSize, err = concurrentUploader.uploader.UploadedDataSize()
+	return err
+}
+
+func (concurrentUploader *ConcurrentUploader) CompressAndUpload(backupName, archiveName string, b io.Reader) error {
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(CompressAndEncrypt(b, concurrentUploader.uploader.Compression(), ConfigureCrypter()))
+	defer buf.Reset()
+	if err != nil {
+		return err
+	}
+
+	filePath := GetBackupTarPath(backupName, archiveName)
+	compressedBytes := buf.Bytes()
+	err = concurrentUploader.uploader.Upload(context.Background(), filePath, bytes.NewReader(compressedBytes))
+	if err != nil {
+		return err
+	}
+
 	return err
 }
 
