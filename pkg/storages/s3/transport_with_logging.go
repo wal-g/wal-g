@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,8 +16,12 @@ type loggingTransport struct {
 
 func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.Body != nil {
-		n, _ := io.Copy(ioutil.Discard, r.Body)
-		tracelog.DebugLogger.Printf("bytes read1: %d\n", n)
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			tracelog.DebugLogger.Printf("err1: %v\n", err)
+		}
+		tracelog.DebugLogger.Printf("bytes read1: %d\n", len(body))
+		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 	}
 
 	resp, err := s.underlying.RoundTrip(r)
