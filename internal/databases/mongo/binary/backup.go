@@ -2,6 +2,8 @@ package binary
 
 import (
 	"context"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/uploader"
 	"os"
 
 	"github.com/pkg/errors"
@@ -17,7 +19,8 @@ type BackupService struct {
 	MongodService *MongodService
 	Uploader      internal.Uploader
 
-	Sentinel models.Backup
+	Sentinel         models.Backup
+	BackupRoutesInfo models.BackupRoutesInfo
 }
 
 func GenerateNewBackupName() string {
@@ -39,6 +42,10 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		return err
 	}
 
+	backupRoutes, err := CreateBackupRoutesInfo(backupService.MongodService)
+	if err != nil {
+		return err
+	}
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
 		return err
@@ -49,11 +56,12 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	if err != nil {
 		return errors.Wrapf(err, "unable to load data from backup cursor")
 	}
+	backupService.BackupRoutesInfo = *backupRoutes
 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, []string{mongodDBPath})
+	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath, false)
 	if err != nil {
 		return err
 	}
@@ -82,6 +90,11 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 
 	err = concurrentUploader.Finalize()
 	if err != nil {
+		return err
+	}
+
+	if err = backupService.AddMetadata(concurrentUploader); err != nil {
+		tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
 		return err
 	}
 
@@ -115,7 +128,7 @@ func (backupService *BackupService) InitializeMongodBackupMeta(backupName string
 	return nil
 }
 
-func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta) error {
+func (backupService *BackupService) Finalize(uploader *uploader.ManagedUploader, backupCursorMeta *BackupCursorMeta) error {
 	sentinel := &backupService.Sentinel
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uploader.UncompressedSize
@@ -129,4 +142,18 @@ func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUpload
 	sentinel.MongoMeta.After.LastTS = backupLastTS
 
 	return internal.UploadSentinel(backupService.Uploader, sentinel, sentinel.BackupName)
+}
+
+func (backupService *BackupService) AddMetadata(uploader *uploader.ManagedUploader) error {
+	backupRoutes := &backupService.BackupRoutesInfo
+	tarFilesSet, err := uploader.GetFilesSet()
+	if err != nil {
+		return err
+	}
+
+	if err = models.EnrichWithTarPaths(backupRoutes, tarFilesSet); err != nil {
+		return err
+	}
+
+	return internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
 }

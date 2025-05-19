@@ -28,6 +28,19 @@ func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup,
 	return &sentinel, nil
 }
 
+func DownloadMetadata(folder storage.Folder, backupName string) (*models.BackupRoutesInfo, error) {
+	var metadata models.BackupRoutesInfo
+	backup, err := internal.GetBackupByName(backupName, "", folder)
+	if err != nil {
+		return nil, err
+	}
+	if err := backup.FetchMetadata(&metadata); err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
+}
+
 func GetBackupFolder() (backupFolder storage.Folder, err error) {
 	st, err := internal.ConfigureStorage()
 	if err != nil {

@@ -32,10 +32,17 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 }
 
 func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
+	tracelog.InfoLogger.Println("Start")
 	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), args.BackupName)
 	if err != nil {
 		return err
 	}
+	tracelog.InfoLogger.Println("Sentinel, %v", sentinel)
+	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
+	if err != nil {
+		return err
+	}
+	tracelog.InfoLogger.Println("Metadata: %v", metadata)
 
 	if !args.SkipChecks {
 		//todo maybe delete all checks?

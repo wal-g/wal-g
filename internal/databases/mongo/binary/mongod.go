@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"strings"
 	"time"
 
@@ -315,6 +316,129 @@ func (mongodService *MongodService) Shutdown() error {
 		return errors.Wrap(err, "unable to shutdown mongod")
 	}
 	return nil
+}
+
+func (mongodService *MongodService) ListDatabases() ([]string, error) {
+	dbs, err := mongodService.MongoClient.ListDatabaseNames(mongodService.Context, bson.D{})
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to list mongod databases")
+	}
+	return dbs, nil
+}
+
+func (mongodService *MongodService) ListCollections(dbName string) ([]string, error) {
+	var res []string
+
+	listCollectionsOpts := options.ListCollections().SetNameOnly(false)
+	cursor, err := mongodService.MongoClient.Database(dbName).ListCollections(mongodService.Context, bson.D{}, listCollectionsOpts)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("unable to list collections in %v db", dbName))
+	}
+	defer cursor.Close(mongodService.Context)
+
+	for cursor.Next(mongodService.Context) {
+		var result bson.M
+		if err := cursor.Decode(&result); err != nil {
+			return nil, err
+		}
+
+		collType, ok := result["type"].(string)
+		if !ok || collType != "view" {
+			if name, ok := result["name"].(string); ok {
+				res = append(res, name)
+			}
+		}
+	}
+
+	return res, nil
+}
+
+func getFileFromURI(uri string) (string, error) {
+	elems := strings.SplitN(uri, ":", 3)
+	if len(elems) < 3 {
+		return "", errors.New(fmt.Sprintf("wrong URI: %s", uri))
+	}
+	return fmt.Sprintf("/%s.wt", elems[2]), nil
+}
+
+func (mongodService *MongodService) GetCollectionURI(dbName, collectionName string) (string, map[string]string, error) {
+	stats := struct {
+		WiredTiger struct {
+			URI string `bson:"uri"`
+		} `bson:"wiredTiger"`
+		IndexDetails map[string]bson.M `bson:"indexDetails"`
+	}{}
+	err := mongodService.MongoClient.Database(dbName).RunCommand(
+		mongodService.Context,
+		bson.D{{"collStats", collectionName}},
+	).Decode(&stats)
+	if err != nil {
+		return "", nil, errors.Wrap(
+			err, fmt.Sprintf("unable to get collstats for %v.%v", dbName, collectionName),
+		)
+	}
+
+	indexInfo := make(map[string]string, len(stats.IndexDetails))
+	for index, indexStats := range stats.IndexDetails {
+		indexUri, ok := indexStats["uri"].(string)
+		if ok {
+			file, err := getFileFromURI(indexUri)
+			if err != nil {
+				return "", nil, err
+			}
+			indexInfo[index] = file
+		}
+	}
+
+	collFile, err := getFileFromURI(stats.WiredTiger.URI)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return collFile, indexInfo, nil
+}
+
+func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
+	routes := models.BackupRoutesInfo{
+		Databases: make(map[string]models.DbInfo),
+		Service:   make(map[string]string),
+	}
+	dbs, err := mongodService.ListDatabases()
+	if err != nil {
+		return nil, err // mab specify error with error.Wrap
+	}
+
+	for _, db := range dbs {
+		dbInfo := make(models.DbInfo)
+
+		collections, err := mongodService.ListCollections(db)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, coll := range collections {
+			collectionURI, indexesURI, err := mongodService.GetCollectionURI(db, coll)
+			if err != nil {
+				return nil, err
+			}
+
+			indexInfo := make(models.IndexInfo)
+			for index, uri := range indexesURI {
+				indexInfo[index] = models.Paths{DBPath: uri}
+			}
+
+			dbInfo[coll] = models.CollectionInfo{
+				Paths: models.Paths{
+					DBPath: collectionURI,
+				},
+				IndexInfo: indexInfo,
+			}
+		}
+
+		routes.Databases[db] = dbInfo
+	}
+
+	return &routes, nil
 }
 
 type BackupCursorOplogTS struct {

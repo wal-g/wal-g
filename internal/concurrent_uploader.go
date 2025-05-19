@@ -27,8 +27,8 @@ func CreateConcurrentUploader(uploader Uploader, backupName string, directories 
 		return nil, err
 	}
 
-	tarBallComposerMaker := NewRegularTarBallComposerMaker(&RegularBundleFiles{}, NewRegularTarFileSets())
-	err = bundle.SetupComposer(tarBallComposerMaker)
+	tarBallComposer := NewRegularTarBallComposerMaker(&RegularBundleFiles{}, NewRegularTarFileSets())
+	err = bundle.SetupComposer(tarBallComposer)
 	if err != nil {
 		return nil, err
 	}

@@ -158,6 +158,11 @@ func UploadSentinel(uploader Uploader, sentinelDto interface{}, backupName strin
 	return UploadDto(uploader.Folder(), sentinelDto, sentinelName)
 }
 
+func UploadMetadata(uploader Uploader, metadataDto interface{}, backupName string) error {
+	metadataName := MetadataNameFromBackup(backupName)
+	return UploadDto(uploader.Folder(), metadataDto, metadataName)
+}
+
 type ErrWaiter interface {
 	Wait() error
 }
