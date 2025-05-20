@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/wal-g/wal-g/internal"
-
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 

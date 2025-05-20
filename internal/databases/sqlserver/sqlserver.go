@@ -16,14 +16,12 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/xerrors"
-
 	"github.com/wal-g/tracelog"
-
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/xerrors"
 )
 
 const AllDatabases = "ALL"

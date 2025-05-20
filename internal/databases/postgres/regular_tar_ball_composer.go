@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/wal-g/wal-g/internal"
-
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/sync/errgroup"
 )

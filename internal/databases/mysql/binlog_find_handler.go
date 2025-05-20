@@ -2,10 +2,9 @@ package mysql
 
 import (
 	gomysql "github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/tracelog"
 )
 
 func HandleBinlogFind(folder storage.Folder, gtid string) {

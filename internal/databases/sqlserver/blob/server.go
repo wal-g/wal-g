@@ -13,21 +13,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/wal-g/internal/compression"
-	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/crypto"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-	"golang.org/x/xerrors"
-
 	"github.com/gofrs/flock"
 	"github.com/google/uuid"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"golang.org/x/xerrors"
 )
 
 const ProxyStartTimeout = 10 * time.Second
