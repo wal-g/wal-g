@@ -15,11 +15,9 @@ type loggingTransport struct {
 }
 
 func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	var body []byte
 	if r.Body != nil {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			tracelog.DebugLogger.Printf("err1: %v\n", err)
-		}
+		body, _ = ioutil.ReadAll(r.Body)
 		tracelog.DebugLogger.Printf("bytes read1: %d\n", len(body))
 		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
 	}
@@ -37,6 +35,11 @@ func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	tracelog.DebugLogger.Printf("HTTP response code: %d", resp.StatusCode)
 	statistics.WriteStatusCodeMetric(resp.StatusCode)
 	tracelog.DebugLogger.Printf("request %s response: %d request: %d", r.Method, resp.ContentLength, r.ContentLength)
+
+	if resp.StatusCode == 400 {
+		tracelog.DebugLogger.Printf("request %s content: %d, actual length: %d", r.Method, r.ContentLength, len(body))
+
+	}
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 && r.Method == "GET" {
 		statistics.WalgMetrics.S3BytesRead.Add(float64(resp.ContentLength))
