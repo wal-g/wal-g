@@ -20,13 +20,14 @@ import (
 
 const SlotsFileName = "slots.json"
 
-func GetSlotsCompressedFileName() (string, error) {
+func GetSlotsCompressedFileName(backupName string) (string, error) {
 	upl, err := internal.ConfigureUploader()
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s.%s", SlotsFileName, upl.Compression().FileExtension()), nil
+	fileName := fmt.Sprintf("%s.%s", SlotsFileName, upl.Compression().FileExtension())
+	return filepath.Join(backupName, fileName), nil
 }
 
 func getFQDNToIDMap() (map[string]string, error) {
@@ -134,7 +135,7 @@ func FetchSlotsDataFromStorage(folder storage.Folder, backup *Backup) (string, e
 	}
 	defer os.RemoveAll(tmpDir)
 
-	compressedFileName, err := GetSlotsCompressedFileName()
+	compressedFileName, err := GetSlotsCompressedFileName(backup.BackupName)
 	if err != nil {
 		return "", err
 	}
@@ -142,11 +143,12 @@ func FetchSlotsDataFromStorage(folder storage.Folder, backup *Backup) (string, e
 	fileName := utility.TrimFileExtension(compressedFileName)
 	tarInterpreter := internal.NewFileTarInterpreter(tmpDir)
 	intBackup := backup.ToInternal(folder)
-	tarFolder := intBackup.GetTarPartitionFolder()
-	tarToExtract := internal.NewRegularFileStorageReaderMarker(tarFolder, compressedFileName, fileName, 0644)
-	err = internal.ExtractAll(tarInterpreter, []internal.ReaderMaker{tarToExtract})
+	storageFolder := intBackup.Folder.GetSubFolder("")
+
+	pathToExtract := internal.NewRegularFileStorageReaderMarker(storageFolder, compressedFileName, fileName, 0644)
+	err = internal.ExtractAll(tarInterpreter, []internal.ReaderMaker{pathToExtract})
 	if err != nil {
-		return "", errors.Wrapf(err, "file %s in folder %s", compressedFileName, tarFolder.GetPath())
+		return "", errors.Wrapf(err, "file %s in folder %s", compressedFileName, storageFolder.GetPath())
 	}
 
 	localPath := filepath.Join(tmpDir, fileName)

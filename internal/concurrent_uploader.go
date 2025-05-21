@@ -81,7 +81,7 @@ func (concurrentUploader *ConcurrentUploader) Finalize() error {
 	return err
 }
 
-func (concurrentUploader *ConcurrentUploader) CompressAndUpload(backupName, archiveName string, b io.Reader) error {
+func (concurrentUploader *ConcurrentUploader) CompressAndUpload(filePath string, b io.Reader) error {
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(CompressAndEncrypt(b, concurrentUploader.uploader.Compression(), ConfigureCrypter()))
 	defer buf.Reset()
@@ -89,7 +89,6 @@ func (concurrentUploader *ConcurrentUploader) CompressAndUpload(backupName, arch
 		return err
 	}
 
-	filePath := GetBackupTarPath(backupName, archiveName)
 	compressedBytes := buf.Bytes()
 	err = concurrentUploader.uploader.Upload(context.Background(), filePath, bytes.NewReader(compressedBytes))
 	if err != nil {

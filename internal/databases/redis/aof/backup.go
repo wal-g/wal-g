@@ -142,12 +142,12 @@ func (bs *BackupService) DoBackup(args DoBackupArgs) error {
 		}
 		tracelog.InfoLogger.Printf("packing %s", string(jsonData))
 
-		path, err := archive.GetSlotsCompressedFileName()
+		path, err := archive.GetSlotsCompressedFileName(args.BackupName)
 		if err != nil {
 			return err
 		}
 
-		err = bs.concurrentUploader.CompressAndUpload(args.BackupName, path, bytes.NewReader(jsonData))
+		err = bs.concurrentUploader.CompressAndUpload(path, bytes.NewReader(jsonData))
 		if err != nil {
 			return err
 		}
