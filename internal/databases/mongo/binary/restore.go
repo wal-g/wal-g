@@ -39,10 +39,18 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 	}
 	tracelog.InfoLogger.Println("Sentinel, %v", sentinel)
 	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
+	tracelog.InfoLogger.Println("Metadata, %v", metadata)
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Println("Metadata: %v", metadata)
+	partially := len(args.PartiallyRestorePaths) > 0
+	var tarFilter, pathFilter map[string]struct{}
+	if partially {
+		pathFilter, tarFilter, err = models.GetTarFilesFilter(*metadata, models.PartiallyPathsMap(args.PartiallyRestorePaths))
+		if err != nil {
+			return err
+		}
+	}
 
 	if !args.SkipChecks {
 		//todo maybe delete all checks?
@@ -65,7 +73,7 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 		}
 
 		tracelog.InfoLogger.Println("Download backup files to dbPath")
-		err = restoreService.downloadFromTarArchives(args.BackupName)
+		err = restoreService.downloadFromTarArchives(args.BackupName, tarFilter)
 		if err != nil {
 			return err
 		}
@@ -73,7 +81,18 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 		tracelog.InfoLogger.Println("Skipped download mongodb backup files")
 	}
 
+	if partially {
+		if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
+			return err
+		}
+	}
+
 	if !args.SkipMongoReconfig {
+		if partially {
+			if err = restoreService.startMongoWithRestore(sentinel); err != nil {
+				return err
+			}
+		}
 		if err = restoreService.fixSystemData(args.RsConfig, args.ShConfig, args.MongoCfgConfig); err != nil {
 			return err
 		}
@@ -87,9 +106,9 @@ func (restoreService *RestoreService) DoRestore(args RestoreArgs) error {
 	return nil
 }
 
-func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
+func (restoreService *RestoreService) downloadFromTarArchives(backupName string, filter map[string]struct{}) error {
 	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader)
-	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
+	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath, filter)
 }
 
 func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig) error {
@@ -142,6 +161,36 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	)
 	if err != nil {
 		return errors.Wrap(err, "unable to create mongod service")
+	}
+
+	err = mongodService.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	return mongodProcess.Wait()
+}
+
+func (restoreService *RestoreService) startMongoWithRestore(sentinel *models.Backup) error {
+	mongodProcess, err := StartMongoWithRecover(restoreService.minimalConfigPath)
+	if err != nil {
+		return errors.Wrap(err, "unable to start mongod in restore mode")
+	}
+	defer mongodProcess.Close()
+
+	recoverTimeout, err := conf.GetDurationSettingDefault(conf.OplogRecoverTimeout, ComputeMongoStartTimeout(sentinel.UncompressedSize))
+	if err != nil {
+		return err
+	}
+
+	mongodService, err := CreateMongodService(
+		restoreService.Context,
+		"wal-g restore",
+		mongodProcess.GetURI(),
+		recoverTimeout,
+	)
+	if err != nil {
+		return err
 	}
 
 	err = mongodService.Shutdown()

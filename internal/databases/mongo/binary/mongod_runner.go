@@ -15,6 +15,7 @@ import (
 type MongodProcess struct {
 	minimalConfigPath string
 	parameters        []string
+	restore           bool
 	port              int
 	cancel            context.CancelFunc
 	cmd               *exec.Cmd
@@ -27,6 +28,19 @@ func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) 
 func StartMongodWithRecoverFromOplogAsStandalone(minimalConfigPath string) (*MongodProcess, error) {
 	return StartMongo(minimalConfigPath,
 		"recoverFromOplogAsStandalone=true", "takeUnstableCheckpointOnShutdown=true")
+}
+
+func StartMongoWithRecover(minimalConfigPath string) (*MongodProcess, error) {
+	mongodProcess := &MongodProcess{
+		minimalConfigPath: minimalConfigPath,
+		restore:           true,
+	}
+
+	err := mongodProcess.start()
+	if err != nil {
+		return nil, err
+	}
+	return mongodProcess, nil
 }
 
 func StartMongo(minimalConfigPath string, parameters ...string) (*MongodProcess, error) {
@@ -74,6 +88,10 @@ func (mongodProcess *MongodProcess) start() (err error) {
 	cliArgs := []string{"--port", strconv.Itoa(mongodProcess.port), "--config", mongodProcess.minimalConfigPath}
 	for _, parameter := range mongodProcess.parameters {
 		cliArgs = append(cliArgs, "--setParameter", parameter)
+	}
+
+	if mongodProcess.restore {
+		cliArgs = append(cliArgs, "--restore")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

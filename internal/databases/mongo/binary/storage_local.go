@@ -3,6 +3,7 @@ package binary
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -88,4 +89,35 @@ func (localStorage *LocalStorage) EnsureEmptyDBPath() error {
 		return errors.Wrap(err, "readdirnames dir")
 	}
 	return fmt.Errorf("directory '%v' is not empty", localStorage.MongodDBPath)
+}
+
+func (localStorage *LocalStorage) CleanUpExcessFilesOnPartiallyBackup(filter map[string]struct{}) error {
+	tracelog.InfoLogger.Printf("Cleanup excess files after partially backup in dbPath '%v'", localStorage.MongodDBPath)
+
+	openedDBPath, err := os.Open(localStorage.MongodDBPath)
+	if err != nil {
+		return errors.Wrap(err, "open dir")
+	}
+	defer func() { _ = openedDBPath.Close() }()
+
+	err = filepath.Walk(localStorage.MongodDBPath, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(localStorage.MongodDBPath, path)
+		if err != nil {
+			return err
+		}
+		if _, ok := filter[fmt.Sprintf("/%s", rel)]; !ok && !info.IsDir() {
+			abs, err := filepath.Abs(path)
+			err = os.RemoveAll(abs)
+			if err != nil {
+				return errors.Wrapf(err, "unable to remove '%s'", abs)
+			}
+			tracelog.InfoLogger.Printf("remove %s", abs)
+		}
+		return nil
+	})
+
+	return err
 }

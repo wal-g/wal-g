@@ -27,7 +27,7 @@ func HandleAOFBackupPush(ctx context.Context, permanent bool, appName string) er
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)
 	tmpPath, _ := conf.GetSetting(conf.RedisAppendonlyTmpFolder)
-	concurrentUploader, err := internal.CreateConcurrentUploader(uploader, backupName, []string{aofPath, tmpPath})
+	concurrentUploader, err := internal.CreateConcurrentUploader(uploader, backupName, []string{aofPath, tmpPath}, nil)
 	if err != nil {
 		return err
 	}

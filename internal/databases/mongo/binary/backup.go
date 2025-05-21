@@ -2,8 +2,8 @@ package binary
 
 import (
 	"context"
+	"fmt"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/databases/mongo/uploader"
 	"os"
 
 	"github.com/pkg/errors"
@@ -43,6 +43,13 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	}
 
 	backupRoutes, err := CreateBackupRoutesInfo(backupService.MongodService)
+	var t []string
+	for dbName, dbInfo := range backupRoutes.Databases {
+		for colName := range dbInfo {
+			t = append(t, fmt.Sprintf("%s.%s", dbName, colName))
+		}
+	}
+	tracelog.InfoLogger.Printf("PATHS: %s", t)
 	if err != nil {
 		return err
 	}
@@ -61,7 +68,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath, false)
+	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, []string{mongodDBPath}, NewDirDatabaseTarBallComposerMaker())
 	if err != nil {
 		return err
 	}
@@ -88,12 +95,12 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		}
 	}
 
-	err = concurrentUploader.Finalize()
+	tarFileSets, err := concurrentUploader.Finalize()
 	if err != nil {
 		return err
 	}
 
-	if err = backupService.AddMetadata(concurrentUploader); err != nil {
+	if err = backupService.AddMetadata(tarFileSets); err != nil {
 		tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
 		return err
 	}
@@ -128,7 +135,7 @@ func (backupService *BackupService) InitializeMongodBackupMeta(backupName string
 	return nil
 }
 
-func (backupService *BackupService) Finalize(uploader *uploader.ManagedUploader, backupCursorMeta *BackupCursorMeta) error {
+func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta) error {
 	sentinel := &backupService.Sentinel
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uploader.UncompressedSize
@@ -144,14 +151,9 @@ func (backupService *BackupService) Finalize(uploader *uploader.ManagedUploader,
 	return internal.UploadSentinel(backupService.Uploader, sentinel, sentinel.BackupName)
 }
 
-func (backupService *BackupService) AddMetadata(uploader *uploader.ManagedUploader) error {
+func (backupService *BackupService) AddMetadata(tarFilesSet internal.TarFileSets) error {
 	backupRoutes := &backupService.BackupRoutesInfo
-	tarFilesSet, err := uploader.GetFilesSet()
-	if err != nil {
-		return err
-	}
-
-	if err = models.EnrichWithTarPaths(backupRoutes, tarFilesSet); err != nil {
+	if err := models.EnrichWithTarPaths(backupRoutes, tarFilesSet.Get()); err != nil {
 		return err
 	}
 

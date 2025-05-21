@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/wal-g/tracelog"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -19,9 +20,9 @@ func CreateConcurrentDownloader(uploader Uploader) *ConcurrentDownloader {
 	}
 }
 
-func (downloader *ConcurrentDownloader) Download(backupName, localDirectory string) error {
+func (downloader *ConcurrentDownloader) Download(backupName, localDirectory string, filter map[string]struct{}) error {
 	tarsFolder := downloader.folder.GetSubFolder(strings.Trim(backupName+TarPartitionFolderName, "/"))
-	tarsToExtract, err := downloader.getTarsToExtract(tarsFolder)
+	tarsToExtract, err := downloader.getTarsToExtract(tarsFolder, filter)
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,8 @@ func (downloader *ConcurrentDownloader) Download(backupName, localDirectory stri
 	return ExtractAll(tarInterpreter, tarsToExtract)
 }
 
-func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Folder) ([]ReaderMaker, error) {
+func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Folder,
+	filter map[string]struct{}) ([]ReaderMaker, error) {
 	tarObjects, subFolders, err := tarsFolder.ListFolder()
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to list '%s'", tarsFolder.GetPath())
@@ -49,7 +51,18 @@ func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Fold
 
 	tarsToExtract := make([]ReaderMaker, 0, len(tarObjects))
 
+	var t []string
 	for _, tarObject := range tarObjects {
+		t = append(t, tarObject.GetName())
+	}
+
+	tracelog.InfoLogger.Printf("TAR OBJECTS %v", t)
+	for _, tarObject := range tarObjects {
+		if filter != nil && tarObject.GetName() != "part_001.tar.lz4" {
+			if _, ok := filter[tarObject.GetName()]; !ok {
+				continue
+			}
+		}
 		tarToExtract := NewStorageReaderMaker(tarsFolder, tarObject.GetName())
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}

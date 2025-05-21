@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"strings"
 )
 
 type Paths struct {
@@ -81,4 +82,56 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 	backupRoutesInfo.Service = GetSpecialFilesFromTarFilesSet(tarFilesSet)
 	tracelog.InfoLogger.Printf("FINALtarFilesSetFINAL:, %v", tarFilesSet)
 	return nil
+}
+
+func PartiallyPathsMap(paths []string) map[string][]string {
+	res := make(map[string][]string)
+
+	for _, path := range paths {
+		if !strings.Contains(path, ".") {
+			res[path] = []string{}
+		} else {
+			splitted := strings.SplitN(path, ".", 2)
+			db, col := splitted[0], splitted[1]
+
+			if _, ok := res[db]; !ok {
+				res[db] = []string{}
+			}
+			res[db] = append(res[db], col)
+		}
+	}
+
+	return res
+}
+
+func GetTarFilesFilter(routes BackupRoutesInfo, partially map[string][]string) (map[string]struct{}, map[string]struct{}, error) {
+	tarFilter := make(map[string]struct{})
+	pathFilter := make(map[string]struct{})
+
+	for db, cols := range partially {
+		if _, ok := routes.Databases[db]; !ok {
+			return nil, nil, errors.Errorf("No db %s in backup", db)
+		}
+
+		for _, col := range cols {
+			colInfo, ok := routes.Databases[db][col]
+			if !ok {
+				return nil, nil, errors.Errorf("No collection %s in db %s in backup", col, db)
+			}
+
+			tarFilter[colInfo.TarPath] = struct{}{}
+			pathFilter[colInfo.DBPath] = struct{}{}
+			for _, indPaths := range colInfo.IndexInfo {
+				tarFilter[indPaths.TarPath] = struct{}{}
+				pathFilter[indPaths.DBPath] = struct{}{}
+			}
+		}
+	}
+
+	for dbFile, tarFile := range routes.Service {
+		tarFilter[tarFile] = struct{}{}
+		pathFilter[dbFile] = struct{}{}
+	}
+
+	return pathFilter, tarFilter, nil
 }

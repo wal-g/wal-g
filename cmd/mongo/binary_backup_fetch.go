@@ -35,6 +35,9 @@ const (
 	SkipChecksDescription         = "Skip checking mongod file system lock and mongo version on compatibility with backup"
 	SkipMongoReconfigFlag         = "skip-mongo-reconfig"
 	SkipMongoReconfigDescription  = "Skip mongo reconfiguration while restoring"
+
+	PartiallyRestorePathsFlag        = "partially-restore-paths"
+	PartiallyRestorePathsDescription = "Comma separated dbname:colname records from wished databases and collections restored partially. Indexes included"
 )
 
 var (
@@ -48,6 +51,7 @@ var (
 	skipMongoReconfigFlag    bool
 	skipBackupDownloadFlag   bool
 	skipCheckFlag            bool
+	partiallyRestorePaths    []string
 )
 
 var binaryBackupFetchCmd = &cobra.Command{
@@ -67,7 +71,7 @@ var binaryBackupFetchCmd = &cobra.Command{
 
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
 			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
-			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag)
+			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, partiallyRestorePaths)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -83,5 +87,6 @@ func init() {
 	binaryBackupFetchCmd.Flags().BoolVar(&skipBackupDownloadFlag, SkipBackupDownloadFlag, false, SkipBackupDownloadDescription)
 	binaryBackupFetchCmd.Flags().BoolVar(&skipMongoReconfigFlag, SkipMongoReconfigFlag, false, SkipMongoReconfigDescription)
 	binaryBackupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
+	binaryBackupFetchCmd.Flags().StringSliceVar(&partiallyRestorePaths, PartiallyRestorePathsFlag, []string{}, PartiallyRestorePathsDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }

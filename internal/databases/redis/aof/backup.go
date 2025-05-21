@@ -131,7 +131,7 @@ func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
 		return fmt.Errorf("disk is filled above limit, exiting")
 	}
 
-	err = bs.concurrentUploader.Finalize()
+	_, err = bs.concurrentUploader.Finalize()
 	if err != nil {
 		return err
 	}

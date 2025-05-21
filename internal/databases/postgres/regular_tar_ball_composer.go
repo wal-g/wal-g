@@ -110,3 +110,11 @@ func (c *RegularTarBallComposer) FinishComposing() (internal.TarFileSets, error)
 func (c *RegularTarBallComposer) GetFiles() internal.BundleFiles {
 	return c.files
 }
+
+func (c *RegularTarBallComposer) FinishFile() error {
+	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
+	if err != nil {
+		return nil
+	}
+	return c.tarBallQueue.FinishTarBall(tarBall)
+}
