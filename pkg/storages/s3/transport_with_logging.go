@@ -10,6 +10,21 @@ import (
 	"github.com/wal-g/wal-g/internal/statistics"
 )
 
+type MyReadCloser struct {
+	underlying io.ReadCloser
+	sign       string
+}
+
+func (m *MyReadCloser) Close() error {
+	return m.underlying.Close()
+}
+
+func (m *MyReadCloser) Read(p []byte) (int, error) {
+	n, err := m.underlying.Read(p)
+	tracelog.DebugLogger.Printf("%s actually read: %d", m.sign, n)
+	return n, err
+}
+
 type loggingTransport struct {
 	underlying http.RoundTripper
 }
@@ -19,7 +34,7 @@ func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	if r.Body != nil {
 		body, _ = ioutil.ReadAll(r.Body)
 		tracelog.DebugLogger.Printf("bytes read1: %d\n", len(body))
-		r.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+		r.Body = &MyReadCloser{underlying: ioutil.NopCloser(bytes.NewBuffer(body)), sign: r.RequestURI}
 	}
 
 	resp, err := s.underlying.RoundTrip(r)
