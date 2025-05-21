@@ -41,27 +41,28 @@ func getFQDNToIDMap() (map[string]string, error) {
 	return fqdnMap, nil
 }
 
-func getIntervals(line string) [][]string {
+func getIntervals(line string) ([][]string, error) {
 	// 56cac18e538888e2fb81b09b8491e819d2bda1e1 2a02:6b8:c18:3e81:0:1589:4138:e47b:6379@16379 master,nofailover -
 	// 0 1747228909000 44 connected 2731-5460 10923-13653 [10923->3d68e5b49b010564b64c8a4ac26536a8d6a756f8]
 	slotsPart := strings.Split(line, "connected")[1]
-	slotsRaw := strings.Split(slotsPart, "[")[0]
+	if strings.Contains(slotsPart, "[") {
+		return [][]string{}, fmt.Errorf("there are slots migrating: %s", slotsPart)
+	}
+
 	var intervals [][]string
-	for _, part := range strings.Split(slotsRaw, " ") {
-		if strings.TrimSpace(part) == "" {
+	for _, intervalRaw := range strings.Split(slotsPart, " ") {
+		if strings.TrimSpace(intervalRaw) == "" {
 			continue
 		}
 
-		for _, intervalRaw := range strings.Split(part, " ") {
-			if strings.Contains(intervalRaw, "-") {
-				ends := strings.Split(intervalRaw, " ")
-				intervals = append(intervals, []string{ends[0], ends[1]})
-			} else {
-				intervals = append(intervals, []string{intervalRaw, intervalRaw})
-			}
+		if strings.Contains(intervalRaw, "-") {
+			ends := strings.Split(intervalRaw, "-")
+			intervals = append(intervals, []string{ends[0], ends[1]})
+		} else {
+			intervals = append(intervals, []string{intervalRaw, intervalRaw})
 		}
 	}
-	return intervals
+	return intervals, nil
 }
 
 func GetSlotsMap() (map[string][][]string, error) {
@@ -87,7 +88,11 @@ func GetSlotsMap() (map[string][][]string, error) {
 			continue
 		}
 
-		intervals := getIntervals(line)
+		intervals, err := getIntervals(line)
+		if err != nil {
+			return map[string][][]string{}, err
+		}
+
 		ipWithPorts := strings.Split(line, " ")[1]
 		parts := strings.Split(ipWithPorts, ":")
 		ip := strings.Join(parts[:len(parts)-1], ":")
