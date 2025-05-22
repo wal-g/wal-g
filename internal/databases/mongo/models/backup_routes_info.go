@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"strings"
@@ -47,7 +46,6 @@ func GetSpecialFilesFromTarFilesSet(tarFilesSet map[string]map[string]struct{}) 
 }
 
 func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string][]string) error {
-	tracelog.InfoLogger.Printf("tarPaths:, %v", tarPaths)
 	tarFilesSet := map[string]map[string]struct{}{}
 	for tarPath, files := range tarPaths {
 		tarFilesSet[tarPath] = make(map[string]struct{}, len(files))
@@ -60,14 +58,14 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 		for colName, colInfo := range dbInfo {
 			colTarPath, ok := getFromTarFilesSetAndDeleteKey(colInfo.DBPath, tarFilesSet)
 			if !ok {
-				return errors.New(fmt.Sprintf("file %s not found in tar directory", colInfo.DBPath))
+				return errors.Errorf("file %s not found in tar directory", colInfo.DBPath)
 			}
 			colInfo.TarPath = colTarPath
 
 			for indexName, indexInfo := range colInfo.IndexInfo {
 				indTarPath, ok := getFromTarFilesSetAndDeleteKey(indexInfo.DBPath, tarFilesSet)
 				if !ok {
-					return errors.New(fmt.Sprintf("file %s not found in tar directory", indexInfo.DBPath))
+					return errors.Errorf("file %s not found in tar directory", indexInfo.DBPath)
 				}
 				indexInfo.TarPath = indTarPath
 				colInfo.IndexInfo[indexName] = indexInfo
@@ -77,10 +75,7 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 		}
 	}
 
-	tracelog.InfoLogger.Printf("backups, %v", backupRoutesInfo)
-	tracelog.InfoLogger.Printf("ENDtarFilesSetEND:, %v", tarFilesSet)
 	backupRoutesInfo.Service = GetSpecialFilesFromTarFilesSet(tarFilesSet)
-	tracelog.InfoLogger.Printf("FINALtarFilesSetFINAL:, %v", tarFilesSet)
 	return nil
 }
 

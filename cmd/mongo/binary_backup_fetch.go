@@ -40,10 +40,12 @@ const (
 	PitrUntilFlag                 = "pitr-until"
 	PitrUntilDescription          = "Timestamp point in time recovery finish"
 
-	PartiallyRestorePathsFlag                = "partially-restore-paths"
-	PartiallyRestorePathsDescription         = "Comma separated dbname:colname records from wished databases and collections restored partially. Indexes included"
+	PartiallyRestorePathsFlag        = "partially-restore-paths"
+	PartiallyRestorePathsDescription = "Comma separated dbname.colname records from wished databases " +
+		"and collections restored partially. Indexes included"
 	PartiallyRestoreWithSystemDBsFlag        = "with-system-dbs"
-	PartiallyRestoreWithSystemDBsDescription = "Always restore 'admin' and 'local' dbs in partially restore. Restore 'local' also if rs-name flag is set"
+	PartiallyRestoreWithSystemDBsDescription = "Always restore 'admin' and 'local' dbs in partially restore. " +
+		"Restore 'local' also if rs-name flag is set"
 )
 
 var (
@@ -99,7 +101,9 @@ func init() {
 	binaryBackupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrSince, PitrSinceFlag, "", PitrSinceDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrUntil, PitrUntilFlag, "", PitrUntilDescription)
-	binaryBackupFetchCmd.Flags().StringSliceVar(&partiallyRestorePaths, PartiallyRestorePathsFlag, []string{}, PartiallyRestorePathsDescription)
-	binaryBackupFetchCmd.Flags().BoolVar(&partiallyRestoreWithSystemDBs, PartiallyRestoreWithSystemDBsFlag, false, PartiallyRestoreWithSystemDBsDescription)
+	binaryBackupFetchCmd.Flags().StringSliceVar(&partiallyRestorePaths, PartiallyRestorePathsFlag,
+		[]string{}, PartiallyRestorePathsDescription)
+	binaryBackupFetchCmd.Flags().BoolVar(&partiallyRestoreWithSystemDBs, PartiallyRestoreWithSystemDBsFlag,
+		false, PartiallyRestoreWithSystemDBsDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }

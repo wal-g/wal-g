@@ -354,7 +354,7 @@ func (mongodService *MongodService) ListCollections(dbName string) ([]string, er
 func getFileFromURI(uri string) (string, error) {
 	elems := strings.SplitN(uri, ":", 3)
 	if len(elems) < 3 {
-		return "", errors.New(fmt.Sprintf("wrong URI: %s", uri))
+		return "", errors.Errorf("wrong URI: %s", uri)
 	}
 	return fmt.Sprintf("/%s.wt", elems[2]), nil
 }
@@ -371,9 +371,7 @@ func (mongodService *MongodService) GetCollectionURI(dbName, collectionName stri
 		bson.D{{Key: "collStats", Value: collectionName}},
 	).Decode(&stats)
 	if err != nil {
-		return "", nil, errors.Wrap(
-			err, fmt.Sprintf("unable to get collstats for %v.%v", dbName, collectionName),
-		)
+		return "", nil, errors.Wrapf(err, "unable to get collstats for %v.%v", dbName, collectionName)
 	}
 
 	indexInfo := make(map[string]string, len(stats.IndexDetails))
