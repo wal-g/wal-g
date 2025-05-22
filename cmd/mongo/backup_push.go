@@ -19,10 +19,13 @@ const (
 	backupPushShortDescription = "Pushes backup to storage"
 	PermanentFlag              = "permanent"
 	PermanentShorthand         = "p"
+
+	SkipMetadataFlag = "skip-metadata"
 )
 
 var (
-	permanent = false
+	permanent    = false
+	skipMetadata = false
 )
 
 // backupPushCmd represents the backupPush command
