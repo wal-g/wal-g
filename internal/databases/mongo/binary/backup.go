@@ -2,6 +2,7 @@ package binary
 
 import (
 	"context"
+	"github.com/wal-g/tracelog"
 	"os"
 
 	"github.com/pkg/errors"
@@ -17,7 +18,8 @@ type BackupService struct {
 	MongodService *MongodService
 	Uploader      internal.Uploader
 
-	Sentinel models.Backup
+	Sentinel         models.Backup
+	BackupRoutesInfo models.BackupRoutesInfo
 }
 
 func GenerateNewBackupName() string {
@@ -39,6 +41,11 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		return err
 	}
 
+	backupRoutes, err := CreateBackupRoutesInfo(backupService.MongodService)
+	if err != nil {
+		return err
+	}
+
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
 		return err
@@ -49,11 +56,12 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	if err != nil {
 		return errors.Wrapf(err, "unable to load data from backup cursor")
 	}
+	backupService.BackupRoutesInfo = *backupRoutes
 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath, false)
+	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath, false, NewDirDatabaseTarBallComposerMaker())
 	if err != nil {
 		return err
 	}
@@ -80,8 +88,13 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		}
 	}
 
-	err = concurrentUploader.Finalize()
+	tarFileSets, err := concurrentUploader.Finalize()
 	if err != nil {
+		return err
+	}
+
+	if err = backupService.AddMetadata(tarFileSets); err != nil {
+		tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
 		return err
 	}
 
@@ -129,4 +142,13 @@ func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUpload
 	sentinel.MongoMeta.After.LastTS = backupLastTS
 
 	return internal.UploadSentinel(backupService.Uploader, sentinel, sentinel.BackupName)
+}
+
+func (backupService *BackupService) AddMetadata(tarFilesSet internal.TarFileSets) error {
+	backupRoutes := &backupService.BackupRoutesInfo
+	if err := models.EnrichWithTarPaths(backupRoutes, tarFilesSet.Get()); err != nil {
+		return err
+	}
+
+	return internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
 }

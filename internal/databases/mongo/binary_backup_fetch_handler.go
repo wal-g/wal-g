@@ -17,7 +17,7 @@ func HandleBinaryFetchPush(
 	shardName, mongoCfgConnectionString string,
 	shardConnectionStrings []string,
 	skipBackupDownload, skipReconfig, skipChecks bool,
-	pitrSince, pitrUntil string,
+	pitrSince, pitrUntil string, partiallyRestorePaths []string,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
@@ -79,9 +79,10 @@ func HandleBinaryFetchPush(
 			BackupName:     backup.Name,
 			RestoreVersion: restoreMongodVersion,
 
-			SkipChecks:         skipChecks,
-			SkipBackupDownload: skipBackupDownload,
-			SkipMongoReconfig:  skipReconfig,
+			SkipChecks:            skipChecks,
+			SkipBackupDownload:    skipBackupDownload,
+			SkipMongoReconfig:     skipReconfig,
+			PartiallyRestorePaths: partiallyRestorePaths,
 		},
 	)
 }

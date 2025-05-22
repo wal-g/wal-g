@@ -157,6 +157,11 @@ func (backup *Backup) GetStorageName() string {
 	return multistorage.UsedStorages(backup.Folder)[0]
 }
 
+func UploadMetadata(uploader Uploader, metadataDto interface{}, backupName string) error {
+	metadataName := MetadataNameFromBackup(backupName)
+	return UploadDto(uploader.Folder(), metadataDto, metadataName)
+}
+
 func UploadSentinel(uploader Uploader, sentinelDto interface{}, backupName string) error {
 	sentinelName := SentinelNameFromBackup(backupName)
 	return UploadDto(uploader.Folder(), sentinelDto, sentinelName)

@@ -39,6 +39,9 @@ const (
 	PitrSinceDescription          = "Timestamp point in time recovery start"
 	PitrUntilFlag                 = "pitr-until"
 	PitrUntilDescription          = "Timestamp point in time recovery finish"
+
+	PartiallyRestorePathsFlag        = "partially-restore-paths"
+	PartiallyRestorePathsDescription = "Comma separated dbname:colname records from wished databases and collections restored partially. Indexes included"
 )
 
 var (
@@ -54,6 +57,7 @@ var (
 	skipCheckFlag            bool
 	pitrSince                string
 	pitrUntil                string
+	partiallyRestorePaths    []string
 )
 
 var binaryBackupFetchCmd = &cobra.Command{
@@ -73,7 +77,7 @@ var binaryBackupFetchCmd = &cobra.Command{
 
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
 			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
-			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil)
+			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil, partiallyRestorePaths)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -91,5 +95,6 @@ func init() {
 	binaryBackupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrSince, PitrSinceFlag, "", PitrSinceDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrUntil, PitrUntilFlag, "", PitrUntilDescription)
+	binaryBackupFetchCmd.Flags().StringSliceVar(&partiallyRestorePaths, PartiallyRestorePathsFlag, []string{}, PartiallyRestorePathsDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }
