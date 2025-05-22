@@ -37,6 +37,11 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
 
+	ctx.Step(`^([^\s]*) has partial test mongodb data$`, tctx.addPartiallyData)
+	ctx.Step(`^([^\s]*) and ([^\s]*) has same data in db "([^"]*)" and col "([^"]*)"$`,
+		tctx.equalCollectionOnMongoDBHosts)
+	ctx.Step(`^([^\s]*) has only db "([^"]*)" and col "([^"]*)"$`, tctx.onlyOneColOnHost)
+
 	SetupMongodbLogicalSteps(ctx, tctx)
 }
 
@@ -367,4 +372,106 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 
 	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
 	return walg.OplogReplay(from, until)
+}
+
+func (tctx *TestContext) addPartiallyData(host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	if err = mc.AddDataToCollection("part1", "col1", "partially1"); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part1", "col2", "partially2"); err != nil {
+		return err
+	}
+
+	if err = mc.AddDataToCollection("part2", "col3", "partially3"); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part2", "col4", "partially4"); err != nil {
+		return err
+	}
+
+	// we wait for wt checkpoint, which wt does every 60 secs
+	time.Sleep(time.Minute)
+
+	return nil
+}
+
+func (tctx *TestContext) equalCollectionOnMongoDBHosts(host1, host2, db, col string) error {
+	mc1, err := MongoCtlFromTestContext(tctx, host1)
+	if err != nil {
+		return err
+	}
+	mc2, err := MongoCtlFromTestContext(tctx, host2)
+	if err != nil {
+		return err
+	}
+
+	snap1, err := mc1.Snapshot()
+	if err != nil {
+		return err
+	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap1) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host1, snap1)
+	}
+
+	snap2, err := mc2.Snapshot()
+	if err != nil {
+		return err
+	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host2, snap2)
+	}
+
+	var ns1 helpers.NsSnapshot
+	var ns2 helpers.NsSnapshot
+
+	ns := fmt.Sprintf("%s.%s", db, col)
+
+	for _, snap := range snap1 {
+		if snap.NS == ns {
+			ns1 = snap
+		}
+	}
+
+	for _, snap := range snap2 {
+		if snap.NS == ns {
+			ns2 = snap
+		}
+	}
+
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), ns1, ns2) {
+		return fmt.Errorf("expected the same data in snapshot %s at hosts %s and %s", ns, host1, host2)
+	}
+
+	return nil
+}
+
+func (tctx *TestContext) onlyOneColOnHost(host, db, col string) error {
+	mc1, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	ns := fmt.Sprintf("%s.%s", db, col)
+	snap, err := mc1.Snapshot()
+	if err != nil {
+		return err
+	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host, snap)
+	}
+
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), len(snap), 1) {
+		return fmt.Errorf("only one snapshot on host %s expected but was %d", host, len(snap))
+	}
+
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap[0].NS, ns) {
+		return fmt.Errorf("snapshot name on host %s was %s, expected %s", host, snap[0].NS, ns)
+	}
+
+	return nil
 }
