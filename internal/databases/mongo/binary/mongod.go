@@ -368,7 +368,7 @@ func (mongodService *MongodService) GetCollectionURI(dbName, collectionName stri
 	}{}
 	err := mongodService.MongoClient.Database(dbName).RunCommand(
 		mongodService.Context,
-		bson.D{{"collStats", collectionName}},
+		bson.D{{Key: "collStats", Value: collectionName}},
 	).Decode(&stats)
 	if err != nil {
 		return "", nil, errors.Wrap(
