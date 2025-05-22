@@ -3,7 +3,6 @@ package mongo
 import (
 	"context"
 	"fmt"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/utility"
@@ -17,7 +16,8 @@ func HandleBinaryFetchPush(
 	shardName, mongoCfgConnectionString string,
 	shardConnectionStrings []string,
 	skipBackupDownload, skipReconfig, skipChecks bool,
-	pitrSince, pitrUntil string, partiallyRestorePaths []string,
+	pitrSince, pitrUntil string,
+	partiallyRestorePaths []string, restoreSystemDBs bool,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
@@ -79,10 +79,11 @@ func HandleBinaryFetchPush(
 			BackupName:     backup.Name,
 			RestoreVersion: restoreMongodVersion,
 
-			SkipChecks:            skipChecks,
-			SkipBackupDownload:    skipBackupDownload,
-			SkipMongoReconfig:     skipReconfig,
-			PartiallyRestorePaths: partiallyRestorePaths,
+			SkipChecks:                skipChecks,
+			SkipBackupDownload:        skipBackupDownload,
+			SkipMongoReconfig:         skipReconfig,
+			PartiallyRestorePaths:     partiallyRestorePaths,
+			PartiallyRestoreSystemDBs: restoreSystemDBs,
 		},
 	)
 }

@@ -48,9 +48,12 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	partially := len(args.PartiallyRestorePaths) > 0
+	if partially && !args.SkipMongoReconfig && !args.PartiallyRestoreSystemDBs {
+		return errors.New("On partially restore at least one of '--with-system-dbs' or '--skip-mongo-reconfig' required")
+	}
 	var tarFilter, pathFilter map[string]struct{}
 	if partially {
-		pathFilter, tarFilter, err = models.GetTarFilesFilter(*metadata, models.PartiallyPathsMap(args.PartiallyRestorePaths))
+		pathFilter, tarFilter, err = models.GetTarFilesFilter(*metadata, models.PartiallyPathsMap(args.PartiallyRestorePaths, args.PartiallyRestoreSystemDBs, len(rsConfig.RsMembers) > 1))
 		if err != nil {
 			return err
 		}

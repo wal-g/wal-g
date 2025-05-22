@@ -84,7 +84,7 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 	return nil
 }
 
-func PartiallyPathsMap(paths []string) map[string][]string {
+func PartiallyPathsMap(paths []string, addSystemDBs bool, sharded bool) map[string][]string {
 	res := make(map[string][]string)
 
 	for _, path := range paths {
@@ -98,6 +98,14 @@ func PartiallyPathsMap(paths []string) map[string][]string {
 				res[db] = []string{}
 			}
 			res[db] = append(res[db], col)
+		}
+	}
+
+	if addSystemDBs {
+		res["admin"] = []string{}
+		res["local"] = []string{}
+		if sharded {
+			res["config"] = []string{}
 		}
 	}
 
