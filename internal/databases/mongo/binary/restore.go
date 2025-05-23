@@ -48,32 +48,14 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	partially := len(args.PartiallyRestorePaths) > 0
-	if partially && !args.SkipMongoReconfig && !args.PartiallyRestoreSystemDBs {
-		return errors.New(
-			"On partially restore at least one of '--with-system-dbs' or '--skip-mongo-reconfig' required",
-		)
-	}
-	var tarFilter, pathFilter map[string]struct{}
-	if partially {
-		pathMap := models.PartiallyPathsMap(
-			args.PartiallyRestorePaths,
-			args.PartiallyRestoreSystemDBs,
-			len(rsConfig.RsMembers) > 1,
-		)
-		pathFilter, tarFilter, err = models.GetTarFilesFilter(*metadata, pathMap)
-		if err != nil {
-			return err
-		}
+	tarFilter, pathFilter, err := restoreService.getFilters(args, metadata, len(rsConfig.RsMembers) > 1)
+	if err != nil {
+		return err
 	}
 
 	if !args.SkipChecks {
 		//todo maybe delete all checks?
-		err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, args.RestoreVersion)
-		if err != nil {
-			return err
-		}
-		err = restoreService.LocalStorage.EnsureMongodFsLockFileIsEmpty()
-		if err != nil {
+		if err = restoreService.doChecks(sentinel.MongoMeta.Version, args.RestoreVersion); err != nil {
 			return err
 		}
 	} else {
@@ -81,14 +63,7 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		err = restoreService.LocalStorage.CleanupMongodDBPath()
-		if err != nil {
-			return err
-		}
-
-		tracelog.InfoLogger.Println("Download backup files to dbPath")
-		err = restoreService.downloadFromTarArchives(args.BackupName, tarFilter)
-		if err != nil {
+		if err = restoreService.downloadBackup(args.BackupName, tarFilter); err != nil {
 			return err
 		}
 	} else {
@@ -102,27 +77,75 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipMongoReconfig {
-		if partially {
-			if err = restoreService.startMongoWithRestore(sentinel); err != nil {
-				return err
-			}
-		}
-		if err = restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig); err != nil {
+		if err = restoreService.reconfigMongo(
+			rsConfig, shConfig, replyOplogConfig,
+			mongoCfgConfig, sentinel, partially,
+		); err != nil {
 			return err
-		}
-		if err = restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
-			return err
-		}
-
-		if replyOplogConfig.HasPitr {
-			if err = restoreService.oplogReply(rsConfig, replyOplogConfig); err != nil {
-				return err
-			}
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
 	}
 
+	return nil
+}
+
+func (restoreService *RestoreService) downloadBackup(backupName string, tarFilter map[string]struct{}) error {
+	err := restoreService.LocalStorage.CleanupMongodDBPath()
+	if err != nil {
+		return err
+	}
+
+	tracelog.InfoLogger.Println("Download backup files to dbPath")
+	return restoreService.downloadFromTarArchives(backupName, tarFilter)
+}
+
+func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion string) error {
+	err := EnsureCompatibilityToRestoreMongodVersions(mongoVersion, restoreVersion)
+	if err != nil {
+		return err
+	}
+
+	return restoreService.LocalStorage.EnsureMongodFsLockFileIsEmpty()
+}
+
+func (restoreService *RestoreService) getFilters(
+	args RestoreArgs, metadata *models.BackupRoutesInfo, sharded bool,
+) (map[string]struct{}, map[string]struct{}, error) {
+	partially := len(args.PartiallyRestorePaths) > 0
+	if !partially {
+		return nil, nil, nil
+	}
+	if partially && !args.SkipMongoReconfig && !args.PartiallyRestoreSystemDBs {
+		return nil, nil, errors.New(
+			"On partially restore at least one of '--with-system-dbs' or '--skip-mongo-reconfig' required",
+		)
+	}
+	pathMap := models.PartiallyPathsMap(args.PartiallyRestorePaths, args.PartiallyRestoreSystemDBs, sharded)
+	return models.GetTarFilesFilter(metadata, pathMap)
+}
+
+func (restoreService *RestoreService) reconfigMongo(
+	rsConfig RsConfig, shConfig ShConfig, replyOplogConfig ReplyOplogConfig,
+	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, partially bool,
+) error {
+	if partially {
+		if err := restoreService.startMongoWithRestore(sentinel); err != nil {
+			return err
+		}
+	}
+	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig); err != nil {
+		return err
+	}
+	if err := restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
+		return err
+	}
+
+	if replyOplogConfig.HasPitr {
+		if err := restoreService.oplogReply(rsConfig, replyOplogConfig); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -376,9 +376,9 @@ func (mongodService *MongodService) GetCollectionURI(dbName, collectionName stri
 
 	indexInfo := make(map[string]string, len(stats.IndexDetails))
 	for index, indexStats := range stats.IndexDetails {
-		indexUri, ok := indexStats["uri"].(string)
+		indexURI, ok := indexStats["uri"].(string)
 		if ok {
-			file, err := getFileFromURI(indexUri)
+			file, err := getFileFromURI(indexURI)
 			if err != nil {
 				return "", nil, err
 			}
@@ -396,7 +396,7 @@ func (mongodService *MongodService) GetCollectionURI(dbName, collectionName stri
 
 func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
 	routes := models.BackupRoutesInfo{
-		Databases: make(map[string]models.DbInfo),
+		Databases: make(map[string]models.DBInfo),
 		Service:   make(map[string]string),
 	}
 	dbs, err := mongodService.ListDatabases()
@@ -405,7 +405,7 @@ func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesI
 	}
 
 	for _, db := range dbs {
-		dbInfo := make(models.DbInfo)
+		dbInfo := make(models.DBInfo)
 
 		collections, err := mongodService.ListCollections(db)
 		if err != nil {

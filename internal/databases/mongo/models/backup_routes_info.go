@@ -18,10 +18,10 @@ type CollectionInfo struct {
 	IndexInfo `json:"index_info"`
 }
 
-type DbInfo map[string]CollectionInfo
+type DBInfo map[string]CollectionInfo
 
 type BackupRoutesInfo struct {
-	Databases map[string]DbInfo `json:"databases"`
+	Databases map[string]DBInfo `json:"databases"`
 	Service   map[string]string `json:"service"`
 }
 
@@ -107,7 +107,7 @@ func PartiallyPathsMap(paths []string, addSystemDBs bool, sharded bool) map[stri
 	return res
 }
 
-func GetTarFilesFilter(routes BackupRoutesInfo, partially map[string][]string) (map[string]struct{}, map[string]struct{}, error) {
+func GetTarFilesFilter(routes *BackupRoutesInfo, partially map[string][]string) (map[string]struct{}, map[string]struct{}, error) {
 	tarFilter := make(map[string]struct{})
 	pathFilter := make(map[string]struct{})
 
