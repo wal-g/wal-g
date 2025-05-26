@@ -37,7 +37,7 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
 
-	//ctx.Step(`^([^\s]*) has partially test mongodb data`, tctx.createDatabase)
+	ctx.Step(`^([^\s]*) has partially test mongodb data`, tctx.addPartiallyData)
 
 	SetupMongodbLogicalSteps(ctx, tctx)
 }
