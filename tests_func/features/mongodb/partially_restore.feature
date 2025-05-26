@@ -15,6 +15,6 @@ Feature: MongoDB partially restore
     Then we got 1 backup entries of mongodb01
 
     And mongodb initialized on mongodb02
-    When we restore initialized binary mongo-backup #1 to mongodb02 with parts "part1.col1"
+    When we restore initialized binary mongo-backup #0 to mongodb02 with parts "part1.col1"
     Then we got same mongodb data at mongodb01 mongodb02
 
