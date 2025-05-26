@@ -14,7 +14,7 @@ func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext
 	ctx.Step(`^we restore initialized binary mongo-backup #(\d+) to ([^\s]+)`,
 		tctx.restoreMongoBinaryBackupAsInitialized)
 
-	ctx.Step(`^we restore initialized partially binary mongo-backup #(\d+) to ([^\s]+) with parts "([^"]*)"`,
+	ctx.Step(`^we restore initialized partially binary mongo-backup #(\d+) to ([^\s]+) with parts "([^"]*)"$`,
 		tctx.partiallyRestoreMongoDBBinaryBackup)
 }
 
