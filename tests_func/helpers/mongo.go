@@ -206,8 +206,7 @@ func (mc *MongoCtl) CreateCollection(dbName, colName string) error {
 	if err != nil {
 		return err
 	}
-	conn.Database(dbName).Collection(colName)
-	return nil
+	return conn.Database(dbName).CreateCollection(mc.ctx, colName)
 }
 
 func (mc *MongoCtl) AddDataToCollection(dbName, colName, prefix string) error {
