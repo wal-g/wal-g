@@ -37,6 +37,8 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
 
+	//ctx.Step(`^([^\s]*) has partially test mongodb data`, tctx.createDatabase)
+
 	SetupMongodbLogicalSteps(ctx, tctx)
 }
 
@@ -367,4 +369,72 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 
 	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
 	return walg.OplogReplay(from, until)
+}
+
+func (tctx *TestContext) createDatabase(dbName, host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	return mc.CreateDB(dbName)
+}
+
+func (tctx *TestContext) createCollection(colName, dbName, host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	return mc.CreateCollection(dbName, colName)
+}
+
+func (tctx *TestContext) addDataToCollection(prefix, colName, dbName, host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	return mc.AddDataToCollection(dbName, colName, prefix)
+}
+
+func (tctx *TestContext) addPartiallyData(host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	if err = mc.CreateDB("part1"); err != nil {
+		return err
+	}
+	if err = mc.CreateCollection("part1", "col1"); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part1", "col1", "partially1"); err != nil {
+		return err
+	}
+	if err = mc.CreateCollection("part1", "col2"); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part1", "col2", "partially2"); err != nil {
+		return err
+	}
+
+	if err = mc.CreateDB("part2"); err != nil {
+		return err
+	}
+	if err = mc.CreateCollection("part2", "col1"); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part2", "col1", "partially3"); err != nil {
+		return err
+	}
+	if err = mc.CreateCollection("part2", "col2"); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part2", "col2", "partially4"); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -192,6 +192,37 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	return client, nil
 }
 
+func (mc *MongoCtl) CreateDB(dbname string) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	conn.Database(dbname)
+	return nil
+}
+
+func (mc *MongoCtl) CreateCollection(dbName, colName string) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	conn.Database(dbName).Collection(colName)
+	return nil
+}
+
+func (mc *MongoCtl) AddDataToCollection(dbName, colName, prefix string) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	if _, err = conn.Database(dbName).Collection(colName).InsertOne(
+		mc.ctx, generateRecord(1, 1, prefix),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (mc *MongoCtl) WriteTestData(mark string, dbCount, tablesCount, docsCount int) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {

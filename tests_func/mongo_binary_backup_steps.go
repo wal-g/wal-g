@@ -13,6 +13,9 @@ func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext
 	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
 	ctx.Step(`^we restore initialized binary mongo-backup #(\d+) to ([^\s]+)`,
 		tctx.restoreMongoBinaryBackupAsInitialized)
+
+	ctx.Step(`^we restore initialized partially binary mongo-backup #(\d+) to ([^\s]+) with parts "([^"]*)"`,
+		tctx.partiallyRestoreMongoDBBinaryBackup)
 }
 
 func (tctx *TestContext) createMongoBinaryBackup(container string) error {
@@ -34,14 +37,21 @@ func (tctx *TestContext) createMongoBinaryBackup(container string) error {
 }
 
 func (tctx *TestContext) restoreMongoBinaryBackupAsNonInitialized(backupNumber int, container string) error {
-	return tctx.restoreMongoBinaryBackup(backupNumber, container, false)
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, false, "")
 }
 
 func (tctx *TestContext) restoreMongoBinaryBackupAsInitialized(backupNumber int, container string) error {
-	return tctx.restoreMongoBinaryBackup(backupNumber, container, true)
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, true, "")
 }
 
-func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container string, initialized bool) error {
+func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackup(backupNumber int, container, paths string) error {
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, true, paths)
+}
+
+func (tctx *TestContext) restoreMongoBinaryBackup(
+	backupNumber int, container string,
+	initialized bool, partiallyRestorePaths string,
+) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 
 	backup, err := walg.GetBackupByNumber(backupNumber)
@@ -75,7 +85,7 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		rsName = container
 		rsMembers = fmt.Sprintf("%s:%d", container, mc.GetMongodPort())
 	}
-	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsName, rsMembers)
+	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsName, rsMembers, partiallyRestorePaths)
 	if err != nil {
 		return err
 	}
