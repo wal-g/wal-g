@@ -45,7 +45,7 @@ const (
 		"and collections restored partially. Indexes included"
 	PartiallyRestoreWithSystemDBsFlag        = "with-system-dbs"
 	PartiallyRestoreWithSystemDBsDescription = "Always restore 'admin' and 'local' dbs in partially restore. " +
-		"Restore 'local' also if rs-name flag is set"
+		"Restore 'config' also if rs-name flag is set"
 )
 
 var (
