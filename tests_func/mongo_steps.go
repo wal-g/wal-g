@@ -376,18 +376,30 @@ func (tctx *TestContext) addPartiallyData(host string) error {
 	if err != nil {
 		return err
 	}
+	mc2, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	mc3, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	mc4, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
 
 	if err = mc.AddDataToCollection("part1", "col1", "partially1"); err != nil {
 		return err
 	}
-	if err = mc.AddDataToCollection("part1", "col2", "partially2"); err != nil {
+	if err = mc2.AddDataToCollection("part1", "col2", "partially2"); err != nil {
 		return err
 	}
 
-	if err = mc.AddDataToCollection("part2", "col3", "partially3"); err != nil {
+	if err = mc3.AddDataToCollection("part2", "col3", "partially3"); err != nil {
 		return err
 	}
-	if err = mc.AddDataToCollection("part2", "col4", "partially4"); err != nil {
+	if err = mc4.AddDataToCollection("part2", "col4", "partially4"); err != nil {
 		return err
 	}
 
