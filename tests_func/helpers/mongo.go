@@ -192,23 +192,6 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	return client, nil
 }
 
-func (mc *MongoCtl) CreateDB(dbname string) error {
-	conn, err := mc.AdminConnect()
-	if err != nil {
-		return err
-	}
-	conn.Database(dbname)
-	return nil
-}
-
-func (mc *MongoCtl) CreateCollection(dbName, colName string) error {
-	conn, err := mc.AdminConnect()
-	if err != nil {
-		return err
-	}
-	return conn.Database(dbName).CreateCollection(mc.ctx, colName)
-}
-
 func (mc *MongoCtl) AddDataToCollection(dbName, colName, prefix string) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {

@@ -404,35 +404,17 @@ func (tctx *TestContext) addPartiallyData(host string) error {
 		return err
 	}
 
-	if err = mc.CreateDB("part1"); err != nil {
-		return err
-	}
-	if err = mc.CreateCollection("part1", "col1"); err != nil {
-		return err
-	}
 	if err = mc.AddDataToCollection("part1", "col1", "partially1"); err != nil {
-		return err
-	}
-	if err = mc.CreateCollection("part1", "col2"); err != nil {
 		return err
 	}
 	if err = mc.AddDataToCollection("part1", "col2", "partially2"); err != nil {
 		return err
 	}
 
-	if err = mc.CreateDB("part2"); err != nil {
+	if err = mc.AddDataToCollection("part2", "col3", "partially3"); err != nil {
 		return err
 	}
-	if err = mc.CreateCollection("part2", "col1"); err != nil {
-		return err
-	}
-	if err = mc.AddDataToCollection("part2", "col1", "partially3"); err != nil {
-		return err
-	}
-	if err = mc.CreateCollection("part2", "col2"); err != nil {
-		return err
-	}
-	if err = mc.AddDataToCollection("part2", "col2", "partially4"); err != nil {
+	if err = mc.AddDataToCollection("part2", "col4", "partially4"); err != nil {
 		return err
 	}
 
