@@ -371,33 +371,6 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 	return walg.OplogReplay(from, until)
 }
 
-func (tctx *TestContext) createDatabase(dbName, host string) error {
-	mc, err := MongoCtlFromTestContext(tctx, host)
-	if err != nil {
-		return err
-	}
-
-	return mc.CreateDB(dbName)
-}
-
-func (tctx *TestContext) createCollection(colName, dbName, host string) error {
-	mc, err := MongoCtlFromTestContext(tctx, host)
-	if err != nil {
-		return err
-	}
-
-	return mc.CreateCollection(dbName, colName)
-}
-
-func (tctx *TestContext) addDataToCollection(prefix, colName, dbName, host string) error {
-	mc, err := MongoCtlFromTestContext(tctx, host)
-	if err != nil {
-		return err
-	}
-
-	return mc.AddDataToCollection(dbName, colName, prefix)
-}
-
 func (tctx *TestContext) addPartiallyData(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {
