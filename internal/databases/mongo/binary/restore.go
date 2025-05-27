@@ -42,12 +42,13 @@ func (restoreService *RestoreService) DoRestore(
 	if err != nil {
 		return err
 	}
+
+	partially := len(args.PartiallyRestorePaths) > 0
 	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
-	if err != nil {
+	if err != nil && partially {
 		return err
 	}
 
-	partially := len(args.PartiallyRestorePaths) > 0
 	tarFilter, pathFilter, err := restoreService.getFilters(args, metadata, len(rsConfig.RsMembers) > 1)
 	if err != nil {
 		return err

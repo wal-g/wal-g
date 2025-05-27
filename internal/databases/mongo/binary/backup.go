@@ -35,15 +35,18 @@ func CreateBackupService(ctx context.Context, mongodService *MongodService, uplo
 	}, nil
 }
 
-func (backupService *BackupService) DoBackup(backupName string, permanent bool) error {
+func (backupService *BackupService) DoBackup(backupName string, permanent, skipMetadata bool) error {
 	err := backupService.InitializeMongodBackupMeta(backupName, permanent)
 	if err != nil {
 		return err
 	}
 
-	backupRoutes, err := CreateBackupRoutesInfo(backupService.MongodService)
-	if err != nil {
-		return err
+	var backupRoutes *models.BackupRoutesInfo
+	if !skipMetadata {
+		backupRoutes, err = CreateBackupRoutesInfo(backupService.MongodService)
+		if err != nil {
+			return err
+		}
 	}
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
@@ -56,7 +59,10 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	if err != nil {
 		return errors.Wrapf(err, "unable to load data from backup cursor")
 	}
-	backupService.BackupRoutesInfo = *backupRoutes
+
+	if !skipMetadata {
+		backupService.BackupRoutesInfo = *backupRoutes
+	}
 
 	backupCursor.StartKeepAlive()
 
@@ -94,9 +100,11 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		return err
 	}
 
-	if err = backupService.AddMetadata(tarFileSets); err != nil {
-		tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
-		return err
+	if !skipMetadata {
+		if err = backupService.AddMetadata(tarFileSets); err != nil {
+			tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
+			return err
+		}
 	}
 
 	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta)
