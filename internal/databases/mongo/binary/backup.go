@@ -47,6 +47,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent, skipM
 		if err != nil {
 			return err
 		}
+		backupService.BackupRoutesInfo = *backupRoutes
 	}
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
@@ -58,10 +59,6 @@ func (backupService *BackupService) DoBackup(backupName string, permanent, skipM
 	backupFiles, err := backupCursor.LoadBackupCursorFiles()
 	if err != nil {
 		return errors.Wrapf(err, "unable to load data from backup cursor")
-	}
-
-	if !skipMetadata {
-		backupService.BackupRoutesInfo = *backupRoutes
 	}
 
 	backupCursor.StartKeepAlive()
