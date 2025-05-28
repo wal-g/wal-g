@@ -41,14 +41,14 @@ func (backupService *BackupService) DoBackup(backupName string, permanent, skipM
 		return err
 	}
 
-	//var backupRoutes *models.BackupRoutesInfo
-	//if !skipMetadata {
-	//	backupRoutes, err = CreateBackupRoutesInfo(backupService.MongodService)
-	//	if err != nil {
-	//		return err
-	//	}
-	//	backupService.BackupRoutesInfo = *backupRoutes
-	//}
+	var backupRoutes *models.BackupRoutesInfo
+	if !skipMetadata {
+		backupRoutes, err = CreateBackupRoutesInfo(backupService.MongodService)
+		if err != nil {
+			return err
+		}
+		backupService.BackupRoutesInfo = *backupRoutes
+	}
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
