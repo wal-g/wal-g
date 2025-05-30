@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"github.com/wal-g/tracelog"
 	"regexp"
 	"strings"
 
@@ -29,6 +30,7 @@ func (downloader *ConcurrentDownloader) Download(backupName, localDirectory stri
 		return err
 	}
 
+	tracelog.DebugLogger.Printf("Tars to extract: %v", tarsFolder)
 	isEmpty, err := utility.IsDirectoryEmpty(localDirectory, downloader.whitelist)
 	if err != nil {
 		return err
