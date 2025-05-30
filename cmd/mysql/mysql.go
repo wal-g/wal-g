@@ -2,14 +2,13 @@ package mysql
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/cmd/mysql/xb"
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/cmd/common"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/cmd/common"
+	"github.com/wal-g/wal-g/cmd/mysql/xb"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 )

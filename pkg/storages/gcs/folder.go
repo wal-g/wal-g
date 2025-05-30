@@ -8,11 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wal-g/tracelog"
-
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-
 	gcs "cloud.google.com/go/storage"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"google.golang.org/api/iterator"
 )
 
