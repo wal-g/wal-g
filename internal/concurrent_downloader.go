@@ -29,7 +29,6 @@ func (downloader *ConcurrentDownloader) Download(backupName, localDirectory stri
 	if err != nil {
 		return err
 	}
-
 	tracelog.DebugLogger.Printf("Tars to extract: %v", tarsFolder)
 	isEmpty, err := utility.IsDirectoryEmpty(localDirectory, downloader.whitelist)
 	if err != nil {
