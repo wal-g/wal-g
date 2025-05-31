@@ -120,6 +120,14 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 	if err != nil {
 		return err
 	}
+
+	for _, snap := range snap1 {
+		tracelog.DebugLogger.Printf("snap1: %v", snap)
+	}
+
+	for _, snap := range snap2 {
+		tracelog.DebugLogger.Printf("snap2: %v", snap)
+	}
 	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
 		return fmt.Errorf("host %s snapshot is empty: %+v", host2, snap2)
 	}
