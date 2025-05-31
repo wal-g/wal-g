@@ -43,14 +43,20 @@ func (restoreService *RestoreService) DoRestore(
 		return err
 	}
 
+	partially := len(args.PartiallyRestorePaths) > 0
+	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
+	if err != nil && partially {
+		return err
+	}
+
+	pathFilter, tarFilter, err := restoreService.getFilters(args, metadata, len(rsConfig.RsMembers) > 1)
+	if err != nil {
+		return err
+	}
+
 	if !args.SkipChecks {
 		//todo maybe delete all checks?
-		err = EnsureCompatibilityToRestoreMongodVersions(sentinel.MongoMeta.Version, args.RestoreVersion)
-		if err != nil {
-			return err
-		}
-		err = restoreService.LocalStorage.EnsureMongodFsLockFileIsEmpty()
-		if err != nil {
+		if err = restoreService.doChecks(sentinel.MongoMeta.Version, args.RestoreVersion); err != nil {
 			return err
 		}
 	} else {
@@ -58,32 +64,25 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		err = restoreService.LocalStorage.CleanupMongodDBPath()
-		if err != nil {
-			return err
-		}
-
-		tracelog.InfoLogger.Println("Download backup files to dbPath")
-		err = restoreService.downloadFromTarArchives(args.BackupName)
-		if err != nil {
+		if err = restoreService.downloadBackup(args.BackupName, tarFilter); err != nil {
 			return err
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped download mongodb backup files")
 	}
 
-	if !args.SkipMongoReconfig {
-		if err = restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig); err != nil {
+	if partially {
+		if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
 			return err
 		}
-		if err = restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
-			return err
-		}
+	}
 
-		if replyOplogConfig.HasPitr {
-			if err = restoreService.oplogReply(rsConfig, replyOplogConfig); err != nil {
-				return err
-			}
+	if !args.SkipMongoReconfig {
+		if err = restoreService.reconfigMongo(
+			rsConfig, shConfig, replyOplogConfig,
+			mongoCfgConfig, sentinel, partially,
+		); err != nil {
+			return err
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
@@ -92,9 +91,68 @@ func (restoreService *RestoreService) DoRestore(
 	return nil
 }
 
-func (restoreService *RestoreService) downloadFromTarArchives(backupName string) error {
+func (restoreService *RestoreService) downloadBackup(backupName string, tarFilter map[string]struct{}) error {
+	err := restoreService.LocalStorage.CleanupMongodDBPath()
+	if err != nil {
+		return err
+	}
+
+	tracelog.InfoLogger.Println("Download backup files to dbPath")
+	return restoreService.downloadFromTarArchives(backupName, tarFilter)
+}
+
+func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion string) error {
+	err := EnsureCompatibilityToRestoreMongodVersions(mongoVersion, restoreVersion)
+	if err != nil {
+		return err
+	}
+
+	return restoreService.LocalStorage.EnsureMongodFsLockFileIsEmpty()
+}
+
+func (restoreService *RestoreService) getFilters(
+	args RestoreArgs, metadata *models.BackupRoutesInfo, sharded bool,
+) (map[string]struct{}, map[string]struct{}, error) {
+	partially := len(args.PartiallyRestorePaths) > 0
+	if !partially {
+		return nil, nil, nil
+	}
+	if partially && !args.SkipMongoReconfig && !args.PartiallyRestoreSystemDBs {
+		return nil, nil, errors.New(
+			"On partially restore at least one of '--with-system-dbs' or '--skip-mongo-reconfig' required",
+		)
+	}
+	pathMap := models.PartiallyPathsMap(args.PartiallyRestorePaths, args.PartiallyRestoreSystemDBs, sharded)
+	return models.GetTarFilesFilter(metadata, pathMap)
+}
+
+func (restoreService *RestoreService) reconfigMongo(
+	rsConfig RsConfig, shConfig ShConfig, replyOplogConfig ReplyOplogConfig,
+	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, partially bool,
+) error {
+	if partially {
+		if err := restoreService.startMongoWithRestore(sentinel); err != nil {
+			return err
+		}
+	}
+	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig); err != nil {
+		return err
+	}
+	if err := restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
+		return err
+	}
+
+	if replyOplogConfig.HasPitr {
+		if err := restoreService.oplogReply(rsConfig, replyOplogConfig); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (restoreService *RestoreService) downloadFromTarArchives(backupName string, filter map[string]struct{}) error {
 	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader, restoreService.LocalStorage.whitelist)
-	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath)
+	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath, filter)
 }
 
 func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig) error {
@@ -187,6 +245,36 @@ func (restoreService *RestoreService) oplogReply(rsConfig RsConfig, replayOplogC
 	}
 
 	err = RunOplogReplay(restoreService.Context, mongodProcess.GetURI(), replayOplogConfig)
+	if err != nil {
+		return err
+	}
+
+	err = mongodService.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	return mongodProcess.Wait()
+}
+
+func (restoreService *RestoreService) startMongoWithRestore(sentinel *models.Backup) error {
+	mongodProcess, err := StartMongoWithRecover(restoreService.minimalConfigPath)
+	if err != nil {
+		return errors.Wrap(err, "unable to start mongod in restore mode")
+	}
+	defer mongodProcess.Close()
+
+	recoverTimeout, err := conf.GetDurationSettingDefault(conf.OplogRecoverTimeout, ComputeMongoStartTimeout(sentinel.UncompressedSize))
+	if err != nil {
+		return err
+	}
+
+	mongodService, err := CreateMongodService(
+		restoreService.Context,
+		"wal-g restore",
+		mongodProcess.GetURI(),
+		recoverTimeout,
+	)
 	if err != nil {
 		return err
 	}
