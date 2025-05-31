@@ -45,7 +45,7 @@ func (tctx *TestContext) restoreMongoBinaryBackupAsInitialized(backupNumber int,
 }
 
 func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackup(backupNumber int, container, paths string) error {
-	return tctx.restoreMongoBinaryBackup(backupNumber, container, true, paths)
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, false, paths)
 }
 
 func (tctx *TestContext) restoreMongoBinaryBackup(
