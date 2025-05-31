@@ -49,7 +49,7 @@ func (restoreService *RestoreService) DoRestore(
 		return err
 	}
 
-	tarFilter, pathFilter, err := restoreService.getFilters(args, metadata, len(rsConfig.RsMembers) > 1)
+	pathFilter, tarFilter, err := restoreService.getFilters(args, metadata, len(rsConfig.RsMembers) > 1)
 	if err != nil {
 		return err
 	}
