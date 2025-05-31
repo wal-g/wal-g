@@ -26,6 +26,7 @@ func CreateConcurrentDownloader(uploader Uploader, whitelist *regexp.Regexp) *Co
 func (downloader *ConcurrentDownloader) Download(backupName, localDirectory string, filter map[string]struct{}) error {
 	tarsFolder := downloader.folder.GetSubFolder(strings.Trim(backupName+TarPartitionFolderName, "/"))
 	tarsToExtract, err := downloader.getTarsToExtract(tarsFolder, filter)
+	tracelog.DebugLogger.Printf("filter: %v", filter)
 	if err != nil {
 		return err
 	}
