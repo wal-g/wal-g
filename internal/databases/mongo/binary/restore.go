@@ -77,6 +77,25 @@ func (restoreService *RestoreService) DoRestore(
 		}
 	}
 
+	if partially {
+		if err = restoreService.startMongoWithRestore(sentinel); err != nil {
+			return err
+		}
+		mongodProcess, err := StartMongoWithRecover(restoreService.minimalConfigPath)
+		if err != nil {
+			return err
+		}
+		mongodServce, err := CreateMongodService(restoreService.Context, "test", mongodProcess.GetURI(), 10*time.Minute)
+		if err != nil {
+			return err
+		}
+		backupRoutes, err := CreateBackupRoutesInfo(mongodServce)
+		if err != nil {
+			return err
+		}
+		tracelog.DebugLogger.Printf("BACKUP ROUES: %v", backupRoutes)
+	}
+
 	if !args.SkipMongoReconfig {
 		if err = restoreService.reconfigMongo(
 			rsConfig, shConfig, replyOplogConfig,
