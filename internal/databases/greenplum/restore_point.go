@@ -23,6 +23,7 @@ import (
 )
 
 const RestorePointSuffix = "_restore_point.json"
+const RestorePointCreateRetries = 5
 
 type RestorePointMetadata struct {
 	Name             string         `json:"name"`
@@ -152,11 +153,14 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 	if err != nil {
 		return
 	}
-	restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
-	if err != nil {
-		return nil, err
+
+	for retries := 0; retries < RestorePointCreateRetries; retries++ {
+		restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
+		if err == nil {
+			return restoreLSNs, nil
+		}
 	}
-	return restoreLSNs, nil
+	return nil, err
 }
 
 func (rpc *RestorePointCreator) checkExists() error {
