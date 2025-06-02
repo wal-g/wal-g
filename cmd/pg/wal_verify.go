@@ -21,6 +21,12 @@ const (
 	useJSONOutputFlag        = "json"
 	useJSONOutputDescription = "Show output in JSON format."
 
+	useSpecifiedTimelineFlag        = "timeline"
+	useSpecifiedTimelineDescription = "Verify WAL for the specified timeline. Works only in conjunction with the \"--lsn\" flag."
+
+	useSpecifiedLsnFlag        = "lsn"
+	useSpecifiedLsnDescription = "Verify WAL for the specified lsn. Works only in conjunction with the \"--timeline\" flag."
+
 	checkIntegrityArg = "integrity"
 	checkTimelineArg  = "timeline"
 )
@@ -46,11 +52,28 @@ var (
 			outputWriter := postgres.NewWalVerifyOutputWriter(outputType, os.Stdout)
 			checkTypes := parseChecks(checks)
 
-			postgres.HandleWalVerify(checkTypes, storage.RootFolder(), postgres.QueryCurrentWalSegment(), outputWriter)
+			walSegmentDescription := getWalSegmentDescription(cmd, lsnStr, timeline)
+
+			postgres.HandleWalVerify(checkTypes, storage.RootFolder(), walSegmentDescription, outputWriter)
 		},
 	}
 	useJSONOutput bool
+	timeline      uint32
+	lsnStr        string
 )
+
+func getWalSegmentDescription(cmd *cobra.Command, lsnStr string, timeline uint32) postgres.WalSegmentDescription {
+	if !cmd.Flags().Changed(useSpecifiedLsnFlag) {
+		return postgres.QueryCurrentWalSegment()
+	} else {
+		lsn, err := postgres.ParseLSN(lsnStr)
+		tracelog.ErrorLogger.FatalOnError(err)
+		return postgres.WalSegmentDescription{
+			Timeline: timeline,
+			Number:   postgres.NewWalSegmentNo(lsn - 1),
+		}
+	}
+}
 
 func parseChecks(checks []string) []postgres.WalVerifyCheckType {
 	// filter the possible duplicates
@@ -84,10 +107,21 @@ func checkArgs(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid check specified: %s", arg)
 		}
 	}
+	isTimelineSpecified := cmd.Flags().Changed(useSpecifiedTimelineFlag)
+	isLsnSpecified := cmd.Flags().Changed(useSpecifiedLsnFlag)
+
+	if isLsnSpecified == true && isTimelineSpecified == false {
+		return fmt.Errorf("\"--lsn\" flag works only in conjunction with the \"--timeline\" flag")
+	}
+	if isLsnSpecified == false && isTimelineSpecified == true {
+		return fmt.Errorf("\"--timeline\" flag works only in conjunction with the \"--lsn\" flag")
+	}
 	return nil
 }
 
 func init() {
 	Cmd.AddCommand(walVerifyCmd)
 	walVerifyCmd.Flags().BoolVar(&useJSONOutput, useJSONOutputFlag, false, useJSONOutputDescription)
+	walVerifyCmd.Flags().Uint32Var(&timeline, useSpecifiedTimelineFlag, 0, useSpecifiedTimelineDescription)
+	walVerifyCmd.Flags().StringVar(&lsnStr, useSpecifiedLsnFlag, "", useSpecifiedLsnDescription)
 }
