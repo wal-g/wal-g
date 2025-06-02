@@ -598,7 +598,6 @@ var (
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
-		PgAppName:                            true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
