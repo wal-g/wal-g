@@ -94,6 +94,12 @@ func (restoreService *RestoreService) DoRestore(
 			return err
 		}
 		tracelog.DebugLogger.Printf("BACKUP ROUES: %v", backupRoutes)
+		// panic(fmt.Sprintf("BACKUP ROUES: %v", backupRoutes))
+		err = mongodServce.Shutdown()
+		if err != nil {
+			return err
+		}
+		mongodProcess.Close()
 	}
 
 	if !args.SkipMongoReconfig {
