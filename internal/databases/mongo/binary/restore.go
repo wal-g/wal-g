@@ -77,31 +77,6 @@ func (restoreService *RestoreService) DoRestore(
 		}
 	}
 
-	if partially {
-		if err = restoreService.startMongoWithRestore(sentinel); err != nil {
-			return err
-		}
-		mongodProcess, err := StartMongoWithRecover(restoreService.minimalConfigPath)
-		if err != nil {
-			return err
-		}
-		mongodServce, err := CreateMongodService(restoreService.Context, "test", mongodProcess.GetURI(), 10*time.Minute)
-		if err != nil {
-			return err
-		}
-		backupRoutes, err := CreateBackupRoutesInfo(mongodServce)
-		if err != nil {
-			return err
-		}
-		tracelog.DebugLogger.Printf("BACKUP ROUES: %v", backupRoutes)
-		// panic(fmt.Sprintf("BACKUP ROUES: %v", backupRoutes))
-		err = mongodServce.Shutdown()
-		if err != nil {
-			return err
-		}
-		mongodProcess.Close()
-	}
-
 	if !args.SkipMongoReconfig {
 		if err = restoreService.reconfigMongo(
 			rsConfig, shConfig, replyOplogConfig,
@@ -283,7 +258,7 @@ func (restoreService *RestoreService) oplogReply(rsConfig RsConfig, replayOplogC
 }
 
 func (restoreService *RestoreService) startMongoWithRestore(sentinel *models.Backup) error {
-	mongodProcess, err := StartMongoWithRecover(restoreService.minimalConfigPath)
+	mongodProcess, err := StartMongoWithRestore(restoreService.minimalConfigPath)
 	if err != nil {
 		return errors.Wrap(err, "unable to start mongod in restore mode")
 	}

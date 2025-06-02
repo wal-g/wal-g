@@ -23,7 +23,7 @@ type MongodProcess struct {
 	cmd               *exec.Cmd
 }
 
-func StartMongoWithRecover(minimalConfigPath string) (*MongodProcess, error) {
+func StartMongoWithRestore(minimalConfigPath string) (*MongodProcess, error) {
 	mongodProcess := &MongodProcess{
 		minimalConfigPath: minimalConfigPath,
 		restore:           true,
