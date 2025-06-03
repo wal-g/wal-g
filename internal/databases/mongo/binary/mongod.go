@@ -519,11 +519,9 @@ type RestoreArgs struct {
 	BackupName     string
 	RestoreVersion string
 
-	SkipBackupDownload        bool
-	SkipChecks                bool
-	SkipMongoReconfig         bool
-	PartiallyRestorePaths     []string
-	PartiallyRestoreSystemDBs bool
+	SkipBackupDownload bool
+	SkipChecks         bool
+	SkipMongoReconfig  bool
 }
 
 type RsConfig struct {

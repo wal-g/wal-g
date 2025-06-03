@@ -193,6 +193,19 @@ func (w *WalgUtil) FetchBinaryBackup(
 	return err
 }
 
+func (w *WalgUtil) PartialRestore(
+	backup, mongodConfigPath,
+	mongodbVersion, whitelist string,
+) error {
+	cli := []string{
+		"partial-restore", backup, mongodConfigPath,
+		mongodbVersion, "--whitelist", whitelist,
+		"--with-system-dbs",
+	}
+	_, err := w.runCmd(cli...)
+	return err
+}
+
 func (w *WalgUtil) BackupMeta(backupNum int) (Sentinel, error) {
 	backups, err := w.Backups()
 	if err != nil {

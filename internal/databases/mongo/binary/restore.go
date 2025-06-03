@@ -43,17 +43,6 @@ func (restoreService *RestoreService) DoRestore(
 		return err
 	}
 
-	partially := len(args.PartiallyRestorePaths) > 0
-	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
-	if err != nil && partially {
-		return err
-	}
-
-	pathFilter, tarFilter, err := restoreService.getFilters(args, metadata, len(rsConfig.RsMembers) > 1)
-	if err != nil {
-		return err
-	}
-
 	if !args.SkipChecks {
 		//todo maybe delete all checks?
 		if err = restoreService.doChecks(sentinel.MongoMeta.Version, args.RestoreVersion); err != nil {
@@ -64,23 +53,17 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		if err = restoreService.downloadBackup(args.BackupName, tarFilter); err != nil {
+		if err = restoreService.downloadBackup(args.BackupName, nil); err != nil {
 			return err
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped download mongodb backup files")
 	}
 
-	if partially {
-		if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
-			return err
-		}
-	}
-
 	if !args.SkipMongoReconfig {
 		if err = restoreService.reconfigMongo(
 			rsConfig, shConfig, replyOplogConfig,
-			mongoCfgConfig, sentinel, partially,
+			mongoCfgConfig, sentinel,
 		); err != nil {
 			return err
 		}
@@ -111,30 +94,17 @@ func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion stri
 }
 
 func (restoreService *RestoreService) getFilters(
-	args RestoreArgs, metadata *models.BackupRoutesInfo, sharded bool,
+	metadata *models.BackupRoutesInfo, whitelist, blacklist []string, downloadSystemDBs bool,
 ) (map[string]struct{}, map[string]struct{}, error) {
-	partially := len(args.PartiallyRestorePaths) > 0
-	if !partially {
-		return nil, nil, nil
-	}
-	if partially && !args.SkipMongoReconfig && !args.PartiallyRestoreSystemDBs {
-		return nil, nil, errors.New(
-			"On partially restore at least one of '--with-system-dbs' or '--skip-mongo-reconfig' required",
-		)
-	}
-	pathMap := models.PartiallyPathsMap(args.PartiallyRestorePaths, args.PartiallyRestoreSystemDBs, sharded)
-	return models.GetTarFilesFilter(metadata, pathMap)
+	whitelistPathMap := models.PartiallyWhitelistPathsMap(whitelist, downloadSystemDBs)
+	blackListPathMap := models.PartiallyBlacklistPathMap(blacklist)
+	return models.GetTarFilesFilter(metadata, whitelistPathMap, blackListPathMap)
 }
 
 func (restoreService *RestoreService) reconfigMongo(
 	rsConfig RsConfig, shConfig ShConfig, replyOplogConfig ReplyOplogConfig,
-	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, partially bool,
+	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup,
 ) error {
-	if partially {
-		if err := restoreService.startMongoWithRestore(sentinel); err != nil {
-			return err
-		}
-	}
 	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig); err != nil {
 		return err
 	}
@@ -285,4 +255,56 @@ func (restoreService *RestoreService) startMongoWithRestore(sentinel *models.Bac
 	}
 
 	return mongodProcess.Wait()
+}
+
+func (restoreService *RestoreService) PartiallyRestore(
+	whitelist,
+	blacklist []string,
+	downloadSystemDBs bool,
+	args RestoreArgs,
+) error {
+	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), args.BackupName)
+	if err != nil {
+		return err
+	}
+
+	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
+	if err != nil {
+		return err
+	}
+
+	blacklist = append(blacklist, "local.oplog.rs")
+	pathFilter, tarFilter, err := restoreService.getFilters(metadata, whitelist, blacklist, downloadSystemDBs)
+	if err != nil {
+		return err
+	}
+
+	if !args.SkipChecks {
+		if err = restoreService.doChecks(sentinel.MongoMeta.Version, args.RestoreVersion); err != nil {
+			return err
+		}
+	} else {
+		tracelog.InfoLogger.Println("Skipped partial restore mongodb checks")
+	}
+
+	if !args.SkipBackupDownload {
+		if err = restoreService.downloadBackup(args.BackupName, tarFilter); err != nil {
+			return err
+		}
+	} else {
+		tracelog.InfoLogger.Println("Skipped download partial mongodb backup files")
+	}
+
+	if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
+		return err
+	}
+
+	if !args.SkipMongoReconfig {
+		if err = restoreService.startMongoWithRestore(sentinel); err != nil {
+			return err
+		}
+	} else {
+		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
+	}
+	return nil
 }

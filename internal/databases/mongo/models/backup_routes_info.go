@@ -79,7 +79,7 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 	return nil
 }
 
-func PartiallyPathsMap(paths []string, addSystemDBs bool, sharded bool) map[string][]string {
+func PartiallyWhitelistPathsMap(paths []string, addSystemDBs bool) map[string][]string {
 	res := make(map[string][]string)
 
 	for _, path := range paths {
@@ -99,21 +99,42 @@ func PartiallyPathsMap(paths []string, addSystemDBs bool, sharded bool) map[stri
 	if addSystemDBs {
 		res["admin"] = []string{}
 		res["local"] = []string{}
-		if sharded {
-			res["config"] = []string{}
+	}
+
+	return res
+}
+
+func PartiallyBlacklistPathMap(paths []string) map[string]map[string]struct{} {
+	res := make(map[string]map[string]struct{})
+
+	for _, path := range paths {
+		if !strings.Contains(path, ".") {
+			res[path] = map[string]struct{}{}
+		} else {
+			splitted := strings.SplitN(path, ".", 2)
+			db, col := splitted[0], splitted[1]
+
+			if _, ok := res[db]; !ok {
+				res[db] = map[string]struct{}{}
+			}
+			res[db][col] = struct{}{}
 		}
 	}
 
 	return res
 }
 
-func GetTarFilesFilter(routes *BackupRoutesInfo, partially map[string][]string) (map[string]struct{}, map[string]struct{}, error) {
+func GetTarFilesFilter(routes *BackupRoutesInfo, whitelist map[string][]string, blacklist map[string]map[string]struct{}) (map[string]struct{}, map[string]struct{}, error) {
 	tarFilter := make(map[string]struct{})
 	pathFilter := make(map[string]struct{})
 
-	for db, cols := range partially {
+	for db, cols := range whitelist {
 		if _, ok := routes.Databases[db]; !ok {
 			return nil, nil, errors.Errorf("No db %s in backup", db)
+		}
+		blacklistMap, blDbOk := blacklist[db];
+		if blDbOk && len(blacklistMap) == 0 {
+			continue
 		}
 
 		colsToIterate := cols
@@ -126,6 +147,11 @@ func GetTarFilesFilter(routes *BackupRoutesInfo, partially map[string][]string) 
 
 		tracelog.InfoLogger.Printf("COLS TO ITERATE: %v", colsToIterate)
 		for _, col := range colsToIterate {
+			if blDbOk {
+				if _, ok := blacklistMap[col]; ok {
+					continue
+				}
+			}
 			colInfo, ok := routes.Databases[db][col]
 			if !ok {
 				return nil, nil, errors.Errorf("No collection %s in db %s in backup", col, db)
@@ -146,4 +172,13 @@ func GetTarFilesFilter(routes *BackupRoutesInfo, partially map[string][]string) 
 	}
 
 	return pathFilter, tarFilter, nil
+}
+
+func (backupRoutesInfo *BackupRoutesInfo) GetOplogFilePath() string {
+	if _, ok := backupRoutesInfo.Databases["local"]; ok {
+		if _, ok = backupRoutesInfo.Databases["local"]["oplog.rs"]; ok {
+			return backupRoutesInfo.Databases["local"]["oplog.rs"].DBPath
+		}
+	}
+	return ""
 }

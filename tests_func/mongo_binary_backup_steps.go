@@ -45,7 +45,47 @@ func (tctx *TestContext) restoreMongoBinaryBackupAsInitialized(backupNumber int,
 }
 
 func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackup(backupNumber int, container, paths string) error {
-	return tctx.restoreMongoBinaryBackup(backupNumber, container, false, paths)
+	walg := WalgUtilFromTestContext(tctx, container)
+
+	backup, err := walg.GetBackupByNumber(backupNumber)
+	if err != nil {
+		return err
+	}
+
+	mc, err := MongoCtlFromTestContext(tctx, container)
+	if err != nil {
+		return err
+	}
+
+	mongodbVersion, err := mc.GetVersion()
+	if err != nil {
+		return err
+	}
+
+	configPath, err := mc.GetConfigPath()
+	if err != nil {
+		return err
+	}
+
+	err = mc.StopMongod()
+	if err != nil {
+		return err
+	}
+
+	err = walg.PartialRestore(backup, configPath, mongodbVersion, paths)
+	if err != nil {
+		return err
+	}
+
+	if err := mc.ChownDBPath(); err != nil {
+		return err
+	}
+
+	if err := mc.StartMongod(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (tctx *TestContext) restoreMongoBinaryBackup(
