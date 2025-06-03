@@ -302,7 +302,7 @@ func getSpecifiedBackupStartSegmentNo(
 	}
 
 	backupLogSegNo := WalSegmentNo(backupLogSegNoInt)
-	if ok := checkBackupIsCorrect(currentTimeline, &backupDetails, backupTimelineID, backupLogSegNo, switchLsnBySegNo); !ok {
+	if ok := checkBackupIsCorrect(currentTimeline, &backupDetails, backupTimelineID, backupLogSegNo, switchLsnBySegNo, true); !ok {
 		return 0, fmt.Errorf("Backup with specified name %q is incorrect", backupDetails.BackupName)
 	}
 
@@ -337,7 +337,7 @@ func findEarliestBackup(
 		}
 
 		if ok := checkBackupIsCorrect(currentTimeline, currBackup,
-			backupTimelineID, backupLogSegNo, switchSegNoByTimeline); !ok {
+			backupTimelineID, backupLogSegNo, switchSegNoByTimeline, false); !ok {
 			continue
 		}
 
@@ -354,7 +354,7 @@ func findEarliestBackup(
 
 // checkBackupIsCorrect checks that:
 // 1. backup start LSN is valid
-// 2. backup is not permanent
+// 2. backup is not permanent (disabled for specified backup check)
 //
 // Backup start LSN is considered valid if
 // it belongs to range [backup timeline start LSN, backup timeline end LSN]
@@ -364,9 +364,10 @@ func checkBackupIsCorrect(
 	backupTimeline uint32,
 	backupStartSegNo WalSegmentNo,
 	switchSegNoByTimeline map[uint32]WalSegmentNo,
+	isPermanentBackupCorrect bool,
 ) bool {
 	// if backup is permanent, it is not eligible for wal-verify to be selected as the left border
-	if backupDetail.IsPermanent {
+	if backupDetail.IsPermanent && !isPermanentBackupCorrect {
 		tracelog.WarningLogger.Printf(
 			"checkBackupIsCorrect: %s: backup is permanent, it is not eligible to be selected "+
 				"as the earliest backup for wal-verify.\n", backupDetail.BackupName)

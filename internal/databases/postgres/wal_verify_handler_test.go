@@ -681,8 +681,8 @@ func TestWalVerify_ChooseBackupWithSpecificName(t *testing.T) {
 		// since the timeline switch occurred
 		// at the 000000060000000000000005 WAL segment
 		"000000050000000000000005": newMockExtendedMetadataDto(false),
-		// OK: this backup should be selected because we specify its name
-		"000000060000000000000007": newMockExtendedMetadataDto(false),
+		// OK: This backup should be selected because we specified its name, and it may be chosen even if it is marked as permanent
+		"000000060000000000000007": newMockExtendedMetadataDto(true),
 		// CORRECT BUT NOT SELECTED: this backup the earliest, but should not be selected because we select specific named backup
 		"000000060000000000000006": newMockExtendedMetadataDto(false),
 		// INCORRECT: backup has been created before the timeline switch LSN
