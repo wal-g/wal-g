@@ -83,6 +83,11 @@ func (err NoCorrectBackupFoundError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type BackupSearchParams struct {
+	FindEarliestBackup  bool
+	SpecifiedBackupName *string
+}
+
 // QueryCurrentWalSegment() gets start WAL segment from Postgres cluster
 func QueryCurrentWalSegment() WalSegmentDescription {
 	conn, err := Connect()
@@ -111,6 +116,7 @@ func BuildWalVerifyCheckRunner(
 	rootFolder storage.Folder,
 	walFolderFilenames []string,
 	currentWalSegment WalSegmentDescription,
+	backupSearchParams BackupSearchParams,
 ) (WalVerifyCheckRunner, error) {
 	var checkRunner WalVerifyCheckRunner
 	var err error
@@ -118,7 +124,7 @@ func BuildWalVerifyCheckRunner(
 	case WalVerifyTimelineCheck:
 		checkRunner, err = NewTimelineCheckRunner(walFolderFilenames, currentWalSegment)
 	case WalVerifyIntegrityCheck:
-		checkRunner, err = NewIntegrityCheckRunner(rootFolder, walFolderFilenames, currentWalSegment)
+		checkRunner, err = NewIntegrityCheckRunner(rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
 	default:
 		return nil, NewUnknownWalVerifyCheckError(checkType)
 	}
@@ -135,6 +141,7 @@ func HandleWalVerify(
 	checkTypes []WalVerifyCheckType,
 	rootFolder storage.Folder,
 	currentWalSegment WalSegmentDescription,
+	backupSearchParams BackupSearchParams,
 	outputWriter WalVerifyOutputWriter,
 ) {
 	checkResults := make(map[WalVerifyCheckType]WalVerifyCheckResult, len(checkTypes))
@@ -145,7 +152,7 @@ func HandleWalVerify(
 
 	for _, checkType := range checkTypes {
 		tracelog.InfoLogger.Printf("Building check runner: %s\n", checkType)
-		runner, err := BuildWalVerifyCheckRunner(checkType, rootFolder, walFolderFilenames, currentWalSegment)
+		runner, err := BuildWalVerifyCheckRunner(checkType, rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
 		tracelog.ErrorLogger.FatalfOnError(
 			fmt.Sprintf("Failed to build check runner %s:", checkType), err)
 

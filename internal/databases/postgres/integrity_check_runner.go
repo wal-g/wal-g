@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"sort"
 
@@ -51,6 +52,7 @@ func NewIntegrityCheckRunner(
 	rootFolder storage.Folder,
 	walFolderFilenames []string,
 	currentWalSegment WalSegmentDescription,
+	backupSearchParams BackupSearchParams,
 ) (IntegrityCheckRunner, error) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 
@@ -60,12 +62,21 @@ func NewIntegrityCheckRunner(
 	}
 
 	noBackupsFound := false
-	stopWalSegmentNo, err := getEarliestBackupStartSegmentNo(timelineSwitchMap, currentWalSegment.Timeline, rootFolder)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to detect earliest backup WAL segment no: '%v',"+
-			"will scan until the 0000000X0000000000000001 segment.\n", err)
-		stopWalSegmentNo = 1
-		noBackupsFound = true
+
+	var stopWalSegmentNo WalSegmentNo
+	if backupSearchParams.FindEarliestBackup {
+		stopWalSegmentNo, err = getEarliestBackupStartSegmentNo(timelineSwitchMap, currentWalSegment.Timeline, rootFolder)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Failed to detect earliest backup WAL segment no: '%v',"+
+				"will scan until the 0000000X0000000000000001 segment.\n", err)
+			stopWalSegmentNo = 1
+			noBackupsFound = true
+		}
+	} else {
+		stopWalSegmentNo, err = getSpecifiedBackupStartSegmentNo(timelineSwitchMap, currentWalSegment.Timeline, backupSearchParams, rootFolder)
+		if err != nil {
+			return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to find specified backup start segment")
+		}
 	}
 
 	// uploadingSegmentRangeSize is needed to determine max amount of missing WAL segments
@@ -257,6 +268,55 @@ func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*Timelin
 	tracelog.InfoLogger.Printf("Detected earliest available backup: %s\n",
 		earliestBackup.BackupName)
 	return earliestBackupSegNo, nil
+}
+
+// getSpecifiedBackupStartSegmentNo returns the starting segmentNo of the available correct backup with specified name
+func getSpecifiedBackupStartSegmentNo(
+	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
+	currentTimeline uint32,
+	backupSearchParams BackupSearchParams,
+	rootFolder storage.Folder,
+) (WalSegmentNo, error) {
+	backups, err := internal.GetBackups(rootFolder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return 0, err
+	}
+	backup, err := findBackupByName(backups, *backupSearchParams.SpecifiedBackupName)
+	if err != nil {
+		return 0, err
+	}
+	backupDetails, err := GetBackupDetails(rootFolder.GetSubFolder(utility.BaseBackupPath), backup)
+	if err != nil {
+		return 0, err
+	}
+
+	// switchLsnBySegNo is used for fast lookup of the timeline switch segment
+	switchLsnBySegNo := make(map[uint32]WalSegmentNo, len(timelineSwitchMap))
+	for _, historyRecord := range timelineSwitchMap {
+		switchLsnBySegNo[historyRecord.timeline] = NewWalSegmentNo(historyRecord.lsn)
+	}
+
+	backupTimelineID, backupLogSegNoInt, err := ParseWALFilename(backupDetails.WalFileName)
+	if err != nil {
+		return 0, err
+	}
+
+	backupLogSegNo := WalSegmentNo(backupLogSegNoInt)
+	if ok := checkBackupIsCorrect(currentTimeline, &backupDetails, backupTimelineID, backupLogSegNo, switchLsnBySegNo); !ok {
+		return 0, fmt.Errorf("Backup with specified name %q is incorrect", backupDetails.BackupName)
+	}
+
+	tracelog.InfoLogger.Printf("Detected correct backup with specified name: %s\n", backupDetails.BackupName)
+	return backupLogSegNo, nil
+}
+
+func findBackupByName(backups []internal.BackupTime, backupName string) (backup internal.BackupTime, err error) {
+	for _, backup := range backups {
+		if backup.BackupName == backupName {
+			return backup, nil
+		}
+	}
+	return internal.BackupTime{}, fmt.Errorf("Backup with specified name %q was not found", backupName)
 }
 
 // findEarliestBackup finds earliest correct backup available in storage.

@@ -93,13 +93,17 @@ func TestWalVerify_EmptyStorage(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageFiles:           storageFiles,
-		storageSegments:        storageSegments,
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageFiles:           storageFiles,
+			storageSegments:        storageSegments,
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // check that storage garbage doesn't affect the wal-verify command
@@ -153,13 +157,17 @@ func TestWalVerify_OnlyGarbageInStorage(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageFiles:           storageFiles,
-		storageSegments:        storageSegments,
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageFiles:           storageFiles,
+			storageSegments:        storageSegments,
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // check that wal-verify works for single timeline
@@ -194,13 +202,17 @@ func TestWalVerify_SingleTimeline_Ok(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageSegments:        storageSegments,
-		storageFiles:           make(map[string]*bytes.Buffer),
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           make(map[string]*bytes.Buffer),
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // check that wal-verify correctly marks delayed segments
@@ -243,13 +255,17 @@ func TestWalVerify_SingleTimeline_SomeDelayed(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageSegments:        storageSegments,
-		storageFiles:           make(map[string]*bytes.Buffer),
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           make(map[string]*bytes.Buffer),
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // check that wal-verify correctly marks uploading segments
@@ -314,13 +330,17 @@ func TestWalVerify_SingleTimeline_SomeUploading(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageSegments:        storageSegments,
-		storageFiles:           make(map[string]*bytes.Buffer),
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           make(map[string]*bytes.Buffer),
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // check that wal-verify correctly follows timeline switches
@@ -387,13 +407,17 @@ func TestWalVerify_TwoTimelines_Ok(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageSegments:        storageSegments,
-		storageFiles:           map[string]*bytes.Buffer{historyName: historyFile},
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           map[string]*bytes.Buffer{historyName: historyFile},
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // check that wal-verify correctly reports Lost segments
@@ -468,13 +492,17 @@ func TestWalVerify_TwoTimelines_SomeLost(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageSegments:        storageSegments,
-		storageFiles:           map[string]*bytes.Buffer{historyName: historyFile},
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           map[string]*bytes.Buffer{historyName: historyFile},
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // wal-verify timeline check test
@@ -511,13 +539,17 @@ func TestWalVerify_HigherTimelineExists(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageSegments:        storageSegments,
-		storageFiles:           make(map[string]*bytes.Buffer),
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           make(map[string]*bytes.Buffer),
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
 }
 
 // Check that correct backup is chosen for wal-verify range start
@@ -601,13 +633,111 @@ func TestWalVerify_WalkUntilFirstBackup(t *testing.T) {
 		},
 	}
 
-	testWalVerify(t, WalVerifyTestSetup{
-		expectedIntegrityCheck: expectedIntegrityCheck,
-		expectedTimelineCheck:  expectedTimelineCheck,
-		currentWalSegment:      currentSegment,
-		storageSegments:        storageSegments,
-		storageFiles:           storageFiles,
-	})
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           storageFiles,
+		},
+		postgres.BackupSearchParams{true, nil},
+	)
+}
+
+// Check that correct backup with specific name is chosen for wal-verify range start
+func TestWalVerify_ChooseBackupWithSpecificName(t *testing.T) {
+	storageSegments := []string{
+		"000000050000000000000001",
+		"000000050000000000000002",
+		"000000050000000000000003",
+		"000000050000000000000004",
+
+		// These segments should be ignored
+		// because they have higher LSN
+		// than timeline switch LSN
+		// which is specified in the .history file below
+
+		"000000050000000000000005", // should be ignored
+		"000000050000000000000006", // should be ignored
+		"000000050000000000000007", // should be ignored
+		"000000050000000000000008", // should be ignored
+		"000000050000000000000009", // should be ignored
+
+		"000000060000000000000005",
+		"000000060000000000000006",
+		"000000060000000000000007",
+		"000000060000000000000008",
+	}
+
+	storageFiles := make(map[string]*bytes.Buffer, 4)
+
+	// there are a couple of mock backups in storage, but only one
+	// should be selected as the first one
+	backupsWalNames := map[string]postgres.ExtendedMetadataDto{
+		// INCORRECT: this backup should not be selected as the earliest,
+		// because it does not belong to the current timeline history
+		// since the timeline switch occurred
+		// at the 000000060000000000000005 WAL segment
+		"000000050000000000000005": newMockExtendedMetadataDto(false),
+		// OK: this backup should be selected because we specify its name
+		"000000060000000000000007": newMockExtendedMetadataDto(false),
+		// CORRECT BUT NOT SELECTED: this backup the earliest, but should not be selected because we select specific named backup
+		"000000060000000000000006": newMockExtendedMetadataDto(false),
+		// INCORRECT: backup has been created before the timeline switch LSN
+		"000000060000000000000002": newMockExtendedMetadataDto(false),
+		// INCORRECT: backup is marked permanent
+		"000000050000000000000003": newMockExtendedMetadataDto(true),
+	}
+
+	addMockBackupsStorageFiles(backupsWalNames, storageFiles)
+
+	// set switch point to somewhere in the 5th segment
+	switchPointLsn := 5*postgres.WalSegmentSize + 100
+	historyInfo := fmt.Sprintf("%d\t0/%X\tsome comment...\n\n", 5, switchPointLsn)
+	historyName, historyFile, err := newTimelineHistoryFile(historyInfo, 6)
+	// .history file should be stored in wal folder
+	historyName = utility.WalPath + historyName
+	assert.NoError(t, err)
+
+	storageFiles[historyName] = historyFile
+
+	currentSegmentName := "000000060000000000000009"
+	currentSegment, _ := postgres.NewWalSegmentDescription(currentSegmentName)
+
+	expectedIntegrityCheck := postgres.WalVerifyCheckResult{
+		Status: postgres.StatusOk,
+		Details: postgres.IntegrityCheckDetails{
+			{
+				TimelineID:    6,
+				StartSegment:  "000000060000000000000007",
+				EndSegment:    "000000060000000000000008",
+				SegmentsCount: 2,
+				Status:        postgres.Found,
+			},
+		},
+	}
+
+	expectedTimelineCheck := postgres.WalVerifyCheckResult{
+		Status: postgres.StatusOk,
+		Details: postgres.TimelineCheckDetails{
+			CurrentTimelineID:        currentSegment.Timeline,
+			HighestStorageTimelineID: currentSegment.Timeline,
+		},
+	}
+	specificBackupName := "base_000000060000000000000007"
+	testWalVerify(
+		t,
+		WalVerifyTestSetup{
+			expectedIntegrityCheck: expectedIntegrityCheck,
+			expectedTimelineCheck:  expectedTimelineCheck,
+			currentWalSegment:      currentSegment,
+			storageSegments:        storageSegments,
+			storageFiles:           storageFiles,
+		},
+		postgres.BackupSearchParams{false, &specificBackupName},
+	)
 }
 
 func addMockBackupsStorageFiles(backups map[string]postgres.ExtendedMetadataDto, storageFiles map[string]*bytes.Buffer) {
@@ -620,7 +750,7 @@ func addMockBackupsStorageFiles(backups map[string]postgres.ExtendedMetadataDto,
 	}
 }
 
-func testWalVerify(t *testing.T, setup WalVerifyTestSetup) {
+func testWalVerify(t *testing.T, setup WalVerifyTestSetup, backupSearchParams postgres.BackupSearchParams) {
 	expectedResult := map[postgres.WalVerifyCheckType]postgres.WalVerifyCheckResult{
 		postgres.WalVerifyTimelineCheck:  setup.expectedTimelineCheck,
 		postgres.WalVerifyIntegrityCheck: setup.expectedIntegrityCheck,
@@ -629,7 +759,9 @@ func testWalVerify(t *testing.T, setup WalVerifyTestSetup) {
 	result, outputCallsCount := executeWalVerify(
 		setup.storageSegments,
 		setup.storageFiles,
-		setup.currentWalSegment)
+		setup.currentWalSegment,
+		backupSearchParams,
+	)
 
 	assert.Equal(t, 1, outputCallsCount)
 	compareResults(t, expectedResult, result)
@@ -641,6 +773,7 @@ func executeWalVerify(
 	walFilenames []string,
 	storageFiles map[string]*bytes.Buffer,
 	currentWalSegment postgres.WalSegmentDescription,
+	backupSearchParams postgres.BackupSearchParams,
 ) (map[postgres.WalVerifyCheckType]postgres.WalVerifyCheckResult, int) {
 	rootFolder := setupTestStorageFolder()
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
@@ -653,7 +786,7 @@ func executeWalVerify(
 	checkTypes := []postgres.WalVerifyCheckType{
 		postgres.WalVerifyTimelineCheck, postgres.WalVerifyIntegrityCheck}
 
-	postgres.HandleWalVerify(checkTypes, rootFolder, currentWalSegment, mockOutputWriter)
+	postgres.HandleWalVerify(checkTypes, rootFolder, currentWalSegment, backupSearchParams, mockOutputWriter)
 
 	return mockOutputWriter.lastResult, mockOutputWriter.writeCallsCount
 }
