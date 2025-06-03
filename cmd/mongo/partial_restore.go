@@ -20,9 +20,10 @@ const (
 	SkipPartialBackupDownloadFlag        = "skip-partial-backup-download"
 	SkipPartialBackupDownloadDescription = "Skip backup download"
 	SkipPartialChecksFlag                = "skip-partial-checks"
-	SkipPartialChecksDescription         = "Skip checking mongod file system lock and mongo version on compatibility with backup"
-	SkipPartialMongoReconfigFlag         = "skip-partial-mongo-reconfig"
-	SkipPartialMongoReconfigDescription  = "Skip mongo reconfiguration while restoring"
+	SkipPartialChecksDescription         = "Skip checking mongod file system lock and mongo version on compatibility " +
+		"with backup"
+	SkipPartialMongoReconfigFlag        = "skip-partial-mongo-reconfig"
+	SkipPartialMongoReconfigDescription = "Skip mongo reconfiguration while restoring"
 
 	WhitelistFlag        = "whitelist"
 	WhitelistDescription = "Comma separated dbname.colname records from wished databases " +
@@ -68,10 +69,14 @@ var binaryPartialBackupFetchCmd = &cobra.Command{
 }
 
 func init() {
-	binaryPartialBackupFetchCmd.Flags().StringVar(&partialMinimalConfigPath, PartialMinimalConfigPathFlag, "", PartialMinimalConfigPathDescription)
-	binaryPartialBackupFetchCmd.Flags().BoolVar(&skipPartialBackupDownloadFlag, SkipPartialBackupDownloadFlag, false, SkipPartialBackupDownloadDescription)
-	binaryPartialBackupFetchCmd.Flags().BoolVar(&skipPartialMongoReconfig, SkipPartialMongoReconfigFlag, false, SkipPartialMongoReconfigDescription)
-	binaryPartialBackupFetchCmd.Flags().BoolVar(&skipPartialCheckFlag, SkipPartialChecksFlag, false, SkipPartialChecksDescription)
+	binaryPartialBackupFetchCmd.Flags().StringVar(&partialMinimalConfigPath, PartialMinimalConfigPathFlag, "",
+		PartialMinimalConfigPathDescription)
+	binaryPartialBackupFetchCmd.Flags().BoolVar(&skipPartialBackupDownloadFlag, SkipPartialBackupDownloadFlag,
+		false, SkipPartialBackupDownloadDescription)
+	binaryPartialBackupFetchCmd.Flags().BoolVar(&skipPartialMongoReconfig, SkipPartialMongoReconfigFlag,
+		false, SkipPartialMongoReconfigDescription)
+	binaryPartialBackupFetchCmd.Flags().BoolVar(&skipPartialCheckFlag, SkipPartialChecksFlag,
+		false, SkipPartialChecksDescription)
 	binaryPartialBackupFetchCmd.Flags().StringSliceVar(&whitelist, WhitelistFlag,
 		[]string{}, WhitelistDescription)
 	binaryPartialBackupFetchCmd.Flags().StringSliceVar(&blacklist, BlacklistFlag,

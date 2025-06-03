@@ -544,6 +544,15 @@ func (mc *MongoCtl) StopMongod() error {
 
 func (mc *MongoCtl) StartMongod() error {
 	_, err := mc.runCmd("supervisorctl", "start", "mongodb")
+	if err != nil {
+		return mc.GetLogs()
+	}
+	return err
+}
+
+func (mc *MongoCtl) GetLogs() error {
+	t, err := mc.runCmd("cat", "var/log/mongodb/mongodb.log")
+	tracelog.DebugLogger.Println(t)
 	return err
 }
 

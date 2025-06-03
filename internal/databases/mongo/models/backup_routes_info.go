@@ -124,7 +124,11 @@ func PartiallyBlacklistPathMap(paths []string) map[string]map[string]struct{} {
 	return res
 }
 
-func GetTarFilesFilter(routes *BackupRoutesInfo, whitelist map[string][]string, blacklist map[string]map[string]struct{}) (map[string]struct{}, map[string]struct{}, error) {
+func GetTarFilesFilter(
+	routes *BackupRoutesInfo,
+	whitelist map[string][]string,
+	blacklist map[string]map[string]struct{},
+) (map[string]struct{}, map[string]struct{}, error) {
 	tarFilter := make(map[string]struct{})
 	pathFilter := make(map[string]struct{})
 
@@ -132,7 +136,7 @@ func GetTarFilesFilter(routes *BackupRoutesInfo, whitelist map[string][]string, 
 		if _, ok := routes.Databases[db]; !ok {
 			return nil, nil, errors.Errorf("No db %s in backup", db)
 		}
-		blacklistMap, blDbOk := blacklist[db];
+		blacklistMap, blDbOk := blacklist[db]
 		if blDbOk && len(blacklistMap) == 0 {
 			continue
 		}
