@@ -551,7 +551,7 @@ func (mc *MongoCtl) StartMongod() error {
 }
 
 func (mc *MongoCtl) GetLogs() error {
-	t, err := mc.runCmd("cat", "/var/log/mongodb/mongodb.log")
+	t, err := mc.runCmd("cat", "/var/log/mongodb/mongod.log")
 	tracelog.DebugLogger.Println(t)
 	return err
 }
