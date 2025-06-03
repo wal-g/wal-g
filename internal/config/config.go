@@ -90,6 +90,7 @@ const (
 	PgSslKey                             = "PGSSLKEY"
 	PgSslCert                            = "PGSSLCERT"
 	PgSslRootCert                        = "PGSSLROOTCERT"
+	PgAppName                            = "PGAPPNAME"
 	PgSlotName                           = "WALG_SLOTNAME"
 	PgWalSize                            = "WALG_PG_WAL_SIZE"
 	TotalBgUploadedLimit                 = "TOTAL_BG_UPLOADED_LIMIT"
@@ -313,6 +314,7 @@ var (
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
 		ForceWalDetal:             "false",
+		PgAppName:                 "wal-g",
 	}
 
 	GPDefaultSettings = map[string]string{
@@ -328,6 +330,7 @@ var (
 		GPRelativeRecoveryConfPath:   "recovery.conf",
 		GPRelativePostgresqlConfPath: "postgresql.conf",
 		ForceWalDetal:                "false",
+		PgAppName:                    "wal-g",
 	}
 
 	AllowedSettings map[string]bool
@@ -500,6 +503,7 @@ var (
 		PgDaemonWALUploadTimeout:             true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
+		PgAppName:                            true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
