@@ -5,7 +5,6 @@ Feature: MongoDB partially restore
     Given prepared infrastructure
     And a configured s3 on minio01
     And mongodb initialized on mongodb01
-    And mongodb initialized on mongodb02
 
   Scenario: Partially restore works correctly
     When mongodb01 has partially test mongodb data

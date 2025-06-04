@@ -273,7 +273,6 @@ func (restoreService *RestoreService) PartiallyRestore(
 		return err
 	}
 
-	blacklist = append(blacklist, "local.oplog.rs")
 	pathFilter, tarFilter, err := restoreService.getFilters(metadata, whitelist, blacklist, downloadSystemDBs)
 	if err != nil {
 		return err
@@ -298,6 +297,9 @@ func (restoreService *RestoreService) PartiallyRestore(
 	if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
 		return err
 	}
+	if err = restoreService.CleanupOplog(metadata); err != nil {
+		return err
+	}
 
 	if !args.SkipMongoReconfig {
 		if err = restoreService.startMongoWithRestore(sentinel); err != nil {
@@ -307,4 +309,12 @@ func (restoreService *RestoreService) PartiallyRestore(
 		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
 	}
 	return nil
+}
+
+func (restoreService *RestoreService) CleanupOplog(metadata *models.BackupRoutesInfo) error {
+	oplogFile := metadata.GetOplogFilePath()
+	if oplogFile == "" {
+		return nil
+	}
+	return restoreService.LocalStorage.CleanUpOplog(oplogFile)
 }
