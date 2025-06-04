@@ -550,6 +550,13 @@ func (mc *MongoCtl) StartMongod() error {
 	return err
 }
 
+func (mc *MongoCtl) DeleteMongodReplSetSetting() error {
+	_, err := mc.runCmd("sed", "-i",
+		"'s/ --replSet %(host_node_name)s//'", "/config/supervisor/conf.d/mongodb.conf",
+	)
+	return err
+}
+
 func (mc *MongoCtl) GetLogs() error {
 	t, err := mc.runCmd("cat", "/var/log/mongodb/mongod.log")
 	tracelog.DebugLogger.Println(t)
