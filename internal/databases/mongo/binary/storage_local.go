@@ -154,7 +154,7 @@ func (localStorage *LocalStorage) CleanUpExcessFilesOnPartiallyBackup(filter map
 	return err
 }
 
-func (localStorage LocalStorage) CleanUpOplog(path string) error {
+func (localStorage *LocalStorage) CleanUpOplog(path string) error {
 	absPath, err := filepath.Abs(fmt.Sprintf("%s/%s", localStorage.MongodDBPath, path))
 	if err != nil {
 		return err
