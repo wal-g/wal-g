@@ -80,7 +80,7 @@ func init() {
 	binaryPartialBackupFetchCmd.Flags().StringSliceVar(&whitelist, WhitelistFlag,
 		[]string{}, WhitelistDescription)
 	binaryPartialBackupFetchCmd.Flags().StringSliceVar(&blacklist, BlacklistFlag,
-		[]string{"local.oplog.rs"}, BlacklistDescription)
+		[]string{}, BlacklistDescription)
 	binaryPartialBackupFetchCmd.Flags().BoolVar(&partiallyRestoreWithSystemDBs, PartiallyRestoreWithSystemDBsFlag,
 		false, PartiallyRestoreWithSystemDBsDescription)
 	cmd.AddCommand(binaryPartialBackupFetchCmd)
