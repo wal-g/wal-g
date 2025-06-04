@@ -273,6 +273,7 @@ func (restoreService *RestoreService) PartiallyRestore(
 		return err
 	}
 
+	blacklist = append(blacklist, "local.oplog.rs")
 	pathFilter, tarFilter, err := restoreService.getFilters(metadata, whitelist, blacklist, downloadSystemDBs)
 	if err != nil {
 		return err
@@ -295,9 +296,6 @@ func (restoreService *RestoreService) PartiallyRestore(
 	}
 
 	if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
-		return err
-	}
-	if err = restoreService.CleanupOplog(metadata); err != nil {
 		return err
 	}
 

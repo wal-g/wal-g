@@ -550,19 +550,16 @@ func (mc *MongoCtl) StartMongod() error {
 	return err
 }
 
-//func (mc *MongoCtl) DeleteMongodReplSetSetting() error {
-//	_, err := mc.runCmd("bash", "-c",
-//		"sed -i \"s/ --replSet.*//\" /config/supervisor/conf.d/mongodb.conf",
-//	)
-//	if err != nil {
-//		return err
-//	}
-//	if _, err = mc.runCmd("supervisorctl", "reread"); err != nil {
-//		return err
-//	}
-//	_, err = mc.runCmd("supervisorctl", "update")
-//	return err
-//}
+func (mc *MongoCtl) DeleteMongodReplSetSetting() error {
+	_, err := mc.runCmd("bash", "-c",
+		"sed -i \"s/ --replSet.*//\" /config/supervisor/conf.d/mongodb.conf",
+	)
+	if err != nil {
+		return err
+	}
+	_, err = mc.runCmd("supervisorctl", "reread")
+	return err
+}
 
 func (mc *MongoCtl) GetLogs() error {
 	t, err := mc.runCmd("cat", "/var/log/mongodb/mongod.log")

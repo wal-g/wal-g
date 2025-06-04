@@ -61,8 +61,8 @@ var binaryPartialBackupFetchCmd = &cobra.Command{
 		mongodConfigPath := args[1]
 		mongodVersion := args[2]
 
-		err := mongo.HandlePartialBinaryFetch(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
-			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag,
+		err := mongo.HandlePartialBinaryFetch(ctx, mongodConfigPath, partialMinimalConfigPath, backupName, mongodVersion,
+			skipPartialBackupDownloadFlag, skipPartialMongoReconfig, skipPartialCheckFlag,
 			whitelist, blacklist, partiallyRestoreWithSystemDBs)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

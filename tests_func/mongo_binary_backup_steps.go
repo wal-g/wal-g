@@ -81,9 +81,9 @@ func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackup(backupNumber int, c
 		return err
 	}
 
-	//if err = mc.DeleteMongodReplSetSetting(); err != nil {
-	//	return err
-	//}
+	if err = mc.DeleteMongodReplSetSetting(); err != nil {
+		return err
+	}
 
 	if err = mc.StartMongod(); err != nil {
 		return err
