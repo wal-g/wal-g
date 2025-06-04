@@ -551,8 +551,8 @@ func (mc *MongoCtl) StartMongod() error {
 }
 
 func (mc *MongoCtl) DeleteMongodReplSetSetting() error {
-	_, err := mc.runCmd("sed", "-i",
-		"'s/ --replSet %(host_node_name)s//'", "/config/supervisor/conf.d/mongodb.conf",
+	_, err := mc.runCmd("bash", "-c",
+		"sed -i \"s/ --replSet.*//\" /config/supervisor/conf.d/mongodb.conf",
 	)
 	return err
 }
