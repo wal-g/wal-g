@@ -18,6 +18,38 @@ wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 wal-g create-restore-point rp1 --config=${TMP_CONFIG}
 wal-g create-restore-point rp2 --config=${TMP_CONFIG}
 
+# Check whether the WAL log is correctly switched and uploaded to S3 after create-restore-point
+# gpadmin@10f4a227f02b:/usr/local/gpdb_src$ wal-g st ls  segments_005/seg0/wal_005/ --config=${TMP_CONFIG}
+# type size    last modified                     name
+# obj  4624920 2025-05-21 07:17:16.052 +0000 UTC 000000010000000000000001.lz4
+# obj  264275  2025-05-21 07:26:06.265 +0000 UTC 000000010000000000000002.lz4
+
+#wait for wal-g to upload WALs
+sleep 5
+
+check_wal_upload() {
+    local path=$1
+
+    wal-g st ls "$path" --config=${TMP_CONFIG}
+
+    wal-g st ls "$path" --config=${TMP_CONFIG} \
+        | awk '/^obj/ {count++} END {exit !(count >= 2)}'
+}
+
+# Check each segment
+for seg_path in \
+    segments_005/seg-1/wal_005/ \
+    segments_005/seg0/wal_005/ \
+    segments_005/seg1/wal_005/ \
+    segments_005/seg2/wal_005/
+do
+    if ! check_wal_upload "$seg_path"; then
+        echo "Error: WAL files after create-restore-point were not correctly uploaded to S3 for $seg_path"
+        exit 1
+    fi
+done
+
+
 # check verify results to end with 'OK'
 if ! (wal-g st ls basebackups_005 --config=${TMP_CONFIG} | grep -q 'rp1_restore_point.json') then
   echo "Error: restore point rp1 metadata file does not exist"
