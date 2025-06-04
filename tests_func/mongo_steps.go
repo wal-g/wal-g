@@ -37,6 +37,8 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
 
+	ctx.Step(`^([^\s]*) has partially test mongodb data$`, tctx.addPartiallyData)
+
 	SetupMongodbLogicalSteps(ctx, tctx)
 }
 
@@ -117,6 +119,14 @@ func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error 
 	snap2, err := mc2.Snapshot()
 	if err != nil {
 		return err
+	}
+
+	for _, snap := range snap1 {
+		tracelog.DebugLogger.Printf("snap1: %v", snap)
+	}
+
+	for _, snap := range snap2 {
+		tracelog.DebugLogger.Printf("snap2: %v", snap)
 	}
 	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
 		return fmt.Errorf("host %s snapshot is empty: %+v", host2, snap2)
@@ -367,4 +377,39 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 
 	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
 	return walg.OplogReplay(from, until)
+}
+
+func (tctx *TestContext) addPartiallyData(host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	mc2, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	mc3, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	mc4, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	if err = mc.AddDataToCollection("part1", "col1", "partially1"); err != nil {
+		return err
+	}
+	if err = mc2.AddDataToCollection("part1", "col2", "partially2"); err != nil {
+		return err
+	}
+
+	if err = mc3.AddDataToCollection("part2", "col3", "partially3"); err != nil {
+		return err
+	}
+	if err = mc4.AddDataToCollection("part2", "col4", "partially4"); err != nil {
+		return err
+	}
+
+	return nil
 }
