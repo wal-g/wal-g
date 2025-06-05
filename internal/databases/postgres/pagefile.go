@@ -139,7 +139,7 @@ func ReadIncrementalFile(filePath string,
 	fileSize int64,
 	lsn LSN,
 	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
-	file, err := fsutil.NewDirectIOReadSeekCloserReadOnly(filePath)
+	file, err := fsutil.OpenReadOnlyMayBeDirectIO(filePath)
 	if err != nil {
 		return nil, 0, err
 	}

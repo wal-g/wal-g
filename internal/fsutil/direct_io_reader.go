@@ -8,6 +8,9 @@ import (
 	"syscall"
 
 	"github.com/ncw/directio"
+	"github.com/spf13/viper"
+
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const directIOBlockCount = 32
@@ -20,9 +23,12 @@ type reader struct {
 	alignedBlock []byte
 }
 
-// NewDirectIOReadSeekCloserReadOnly returns read-only io.ReadSeekCloser.
-func NewDirectIOReadSeekCloserReadOnly(path string) (io.ReadSeekCloser, error) {
-	return NewDirectIOReadSeekCloser(path, syscall.O_RDONLY, 0)
+// OpenReadOnlyMayBeDirectIO returns read-only io.ReadSeekCloser.
+func OpenReadOnlyMayBeDirectIO(path string) (io.ReadSeekCloser, error) {
+	if viper.GetBool(conf.DirectIO) {
+		return NewDirectIOReadSeekCloser(path, syscall.O_RDONLY, 0)
+	}
+	return os.OpenFile(path, os.O_RDONLY, 0)
 }
 
 // NewDirectIOReadSeekCloser returns io.ReadSeekCloser.

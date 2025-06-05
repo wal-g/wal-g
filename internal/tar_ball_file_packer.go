@@ -78,7 +78,7 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 // TODO : unit tests
 func StartReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadSeekCloser, error) {
 	fileInfoHeader.Size = info.Size()
-	file, err := fsutil.NewDirectIOReadSeekCloserReadOnly(path)
+	file, err := fsutil.OpenReadOnlyMayBeDirectIO(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, NewFileNotExistError(path)

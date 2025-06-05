@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"testing"
 
 	"github.com/ncw/directio"
@@ -16,20 +17,27 @@ import (
 )
 
 func Test_NewDirectIOReadSeekCloser(t *testing.T) {
-	for _, testCase := range []int64{
+	for _, testCaseSize := range []int64{
 		0,
 		8*1024*1024 - 1,
 		directio.BlockSize,
 		32 * directio.BlockSize,
 		32*directio.BlockSize + 1,
 	} {
-		t.Run(fmt.Sprintf("run with file size: %d", testCase), func(t *testing.T) {
-			directNewDirectIOReadSeekCloser(t, testCase)
+		t.Run(fmt.Sprintf("run with file size: %d (seek 0)", testCaseSize), func(t *testing.T) {
+			directNewDirectIOReadSeekCloser(t, testCaseSize, 0)
 		})
+		for _, testCaseSeek := range []int64{0, 1, 8 * 1024} {
+			if testCaseSize > testCaseSeek {
+				t.Run(fmt.Sprintf("run with file size: %d (seek %d)", testCaseSize, testCaseSeek), func(t *testing.T) {
+					directNewDirectIOReadSeekCloser(t, testCaseSize, 0)
+				})
+			}
+		}
 	}
 }
 
-func directNewDirectIOReadSeekCloser(t *testing.T, fileSize int64) {
+func directNewDirectIOReadSeekCloser(t *testing.T, fileSize int64, seek int64) {
 	fd, errFD := os.CreateTemp(os.TempDir(), "directio_read_seek_closer")
 	require.NoError(t, errFD)
 	defer fd.Close()
@@ -49,8 +57,12 @@ func directNewDirectIOReadSeekCloser(t *testing.T, fileSize int64) {
 	}
 	ioFD, errIOFD := os.Open(fd.Name())
 	require.NoError(t, errIOFD)
+	_, errSeek := ioFD.Seek(seek, io.SeekStart)
+	assert.NoError(t, errSeek)
 	defer ioFD.Close()
-	directIOReadSeekCloser, errDirectIOFD := fsutil.NewDirectIOReadSeekCloserReadOnly(fd.Name())
+	directIOReadSeekCloser, errDirectIOFD := fsutil.NewDirectIOReadSeekCloser(fd.Name(), syscall.O_RDONLY, 0)
+	_, errSeek = directIOReadSeekCloser.Seek(seek, io.SeekStart)
+	assert.NoError(t, errSeek)
 	require.NoError(t, errDirectIOFD)
 	defer directIOReadSeekCloser.Close()
 	assert.Equal(t, getSHA256(t, ioFD), getSHA256(t, directIOReadSeekCloser))
