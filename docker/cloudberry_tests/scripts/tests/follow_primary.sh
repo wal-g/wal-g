@@ -35,7 +35,7 @@ wal-g follow-primary rp1 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFI
 sleep 30
 wal-g follow-primary rp2 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 sleep 30
-wal-g follow-primary rp3 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
+wal-g follow-primary LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 sleep 30
 wal-g recovery-action promote --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 prepare_cluster

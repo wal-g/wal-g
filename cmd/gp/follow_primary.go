@@ -2,8 +2,11 @@ package gp
 
 import (
 	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
 )
@@ -21,8 +24,9 @@ var (
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			logsDir := viper.GetString(conf.GPLogsDirectory)
-
-			follower := greenplum.NewFollowPrimaryHandler(logsDir, restoreConfigPath, args[0], timeout)
+			rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
+			tracelog.ErrorLogger.FatalOnError(err)
+			follower := greenplum.NewFollowPrimaryHandler(rootFolder.GetSubFolder(utility.BaseBackupPath), logsDir, restoreConfigPath, args[0], timeout)
 			follower.Follow()
 		},
 	}
