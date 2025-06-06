@@ -77,12 +77,9 @@ func (r *reader) Seek(offset int64, whence int) (int64, error) {
 func (r *reader) Read(p []byte) (n int, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for {
-		if len(r.buff)-r.buffOffset >= len(p) {
-			break
-		}
+	for len(p) > len(r.buff)-r.buffOffset {
 		if errRead := r.readBuff(); errRead != nil {
-			if errors.Is(io.EOF, errRead) {
+			if errors.Is(errRead, io.EOF) {
 				if len(p) > len(r.buff)-r.buffOffset {
 					n = copy(p, r.buff[r.buffOffset:])
 					r.buff = nil
