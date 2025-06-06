@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -17,8 +19,11 @@ type FollowPrimaryHandler struct {
 	timeoutInSeconds   int
 }
 
+const LATEST = "LATEST"
+
 // nolint:gocritic
 func NewFollowPrimaryHandler(
+	folder storage.Folder,
 	logsDir string,
 	restoreCfgPath, stopAtRestorePoint string,
 	timeoutInSeconds int,
@@ -35,6 +40,19 @@ func NewFollowPrimaryHandler(
 
 	globalCluster := cluster.NewCluster(segmentConfigs)
 	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
+
+	if stopAtRestorePoint == LATEST {
+		restorePoints, err := GetRestorePoints(folder)
+		if _, ok := err.(NoRestorePointsFoundError); ok {
+			err = nil
+		}
+		tracelog.ErrorLogger.FatalfOnError("Get restore points from folder: %v", err)
+		sort.Slice(restorePoints, func(i, j int) bool {
+			return restorePoints[i].Time.After(restorePoints[j].Time)
+		})
+		stopAtRestorePoint = restorePoints[0].Name
+		tracelog.InfoLogger.Printf("Selected latest restore point: %s", stopAtRestorePoint)
+	}
 
 	return &FollowPrimaryHandler{
 		cluster:            globalCluster,
