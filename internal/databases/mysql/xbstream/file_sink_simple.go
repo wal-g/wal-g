@@ -7,7 +7,6 @@ import (
 	"syscall"
 
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )

@@ -9,12 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/wal-g/wal-g/internal"
-	conf "github.com/wal-g/wal-g/internal/config"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 type CantOverwriteWalFileError struct {

@@ -6,16 +6,13 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/wal-g/wal-g/internal/walparser"
-
-	"github.com/pkg/errors"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 // GpQueryRunner is implementation for controlling Greenplum

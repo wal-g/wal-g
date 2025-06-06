@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type AoStorageUploader struct {

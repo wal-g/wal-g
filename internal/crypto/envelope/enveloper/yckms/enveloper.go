@@ -6,12 +6,11 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/kms/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
-
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 
 const (

@@ -6,10 +6,9 @@ import (
 	"io"
 	"strings"
 
+	"github.com/ncw/swift/v2"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-
-	"github.com/ncw/swift/v2"
 )
 
 // TODO: Unit tests
