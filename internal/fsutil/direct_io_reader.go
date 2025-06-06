@@ -67,13 +67,17 @@ func (r *reader) copyBuff(p []byte) int {
 }
 
 func (r *reader) Seek(offset int64, whence int) (int64, error) {
+	if offset < 0 {
+		panic(fmt.Errorf("this is programm bug, seek with negative offset is not supported by DirectIOReadSeekCloser"))
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.buffOffset = 0
 	r.buff = nil
 	r.alignedBlock = directio.AlignedBlock(directIOBlockCount * directio.BlockSize)
 	if whence != io.SeekStart {
-		return 0, fmt.Errorf("seek with whence %d currently is not supported by DirectIOReadSeekCloser", whence)
+		panic(fmt.Errorf("this is programm bug, seek with whence %d currently is not supported by DirectIOReadSeekCloser",
+			whence))
 	}
 	blocks := offset / directio.BlockSize
 	if n, errSeek := r.fd.Seek(blocks*directio.BlockSize, io.SeekStart); errSeek != nil {
@@ -82,6 +86,9 @@ func (r *reader) Seek(offset int64, whence int) (int64, error) {
 	nullBytes := make([]byte, offset-blocks*directio.BlockSize)
 	size, errRead := r.read(nullBytes)
 	if errRead != nil {
+		if errors.Is(errRead, io.EOF) && int64(size) < offset {
+			panic(fmt.Errorf("this is program bug, increase with seek is not supported by DirectIOReadSeekCloser"))
+		}
 		return int64(size), errRead
 	}
 	return offset, nil
