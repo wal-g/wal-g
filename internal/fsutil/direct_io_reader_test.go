@@ -27,10 +27,10 @@ func Test_NewDirectIOReadSeekCloser(t *testing.T) {
 		t.Run(fmt.Sprintf("run with file size: %d (seek 0)", testCaseSize), func(t *testing.T) {
 			directNewDirectIOReadSeekCloser(t, testCaseSize, 0)
 		})
-		for _, testCaseSeek := range []int64{0, 1, 8 * 1024} {
+		for _, testCaseSeek := range []int64{0, 8 * 1024, 3 * 8 * 1024, 5 * 8 * 1024} {
 			if testCaseSize > testCaseSeek {
 				t.Run(fmt.Sprintf("run with file size: %d (seek %d)", testCaseSize, testCaseSeek), func(t *testing.T) {
-					directNewDirectIOReadSeekCloser(t, testCaseSize, 0)
+					directNewDirectIOReadSeekCloser(t, testCaseSize, testCaseSeek)
 				})
 			}
 		}
