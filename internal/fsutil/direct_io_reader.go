@@ -70,7 +70,7 @@ func (r *reader) Seek(offset int64, whence int) (int64, error) {
 	defer r.mu.Unlock()
 	r.buffOffset = 0
 	r.buff = nil
-	r.alignedBlock = make([]byte, len(r.alignedBlock))
+	r.alignedBlock = directio.AlignedBlock(directIOBlockCount * directio.BlockSize)
 	return r.fd.Seek(offset, whence)
 }
 
