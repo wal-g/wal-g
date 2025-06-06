@@ -2,6 +2,7 @@ package fsutil
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -71,12 +72,28 @@ func (r *reader) Seek(offset int64, whence int) (int64, error) {
 	r.buffOffset = 0
 	r.buff = nil
 	r.alignedBlock = directio.AlignedBlock(directIOBlockCount * directio.BlockSize)
-	return r.fd.Seek(offset, whence)
+	if whence != io.SeekStart {
+		return 0, fmt.Errorf("seek with whence %d currently is not supported by DirectIOReadSeekCloser", whence)
+	}
+	blocks := offset / directio.BlockSize
+	if n, errSeek := r.fd.Seek(blocks*directio.BlockSize, io.SeekStart); errSeek != nil {
+		return n, errSeek
+	}
+	nullBytes := make([]byte, offset-blocks*directio.BlockSize)
+	size, errRead := r.read(nullBytes)
+	if errRead != nil {
+		return int64(size), errRead
+	}
+	return offset, nil
 }
 
 func (r *reader) Read(p []byte) (n int, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.read(p)
+}
+
+func (r *reader) read(p []byte) (n int, err error) {
 	for len(p) > len(r.buff)-r.buffOffset {
 		if errRead := r.readBuff(); errRead != nil {
 			if errors.Is(errRead, io.EOF) {
