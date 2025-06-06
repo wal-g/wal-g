@@ -26,7 +26,8 @@ var (
 			logsDir := viper.GetString(conf.GPLogsDirectory)
 			rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
 			tracelog.ErrorLogger.FatalOnError(err)
-			follower := greenplum.NewFollowPrimaryHandler(rootFolder.GetSubFolder(utility.BaseBackupPath), logsDir, restoreConfigPath, args[0], timeout)
+			follower := greenplum.NewFollowPrimaryHandler(rootFolder.GetSubFolder(utility.BaseBackupPath),
+				logsDir, restoreConfigPath, args[0], timeout)
 			follower.Follow()
 		},
 	}
