@@ -17,9 +17,10 @@ import (
 
 const (
 	RelFileSizeBound               = 1 << 30
-	BlocksInRelFile                = int(RelFileSizeBound / DatabasePageSize)
 	DefaultSpcNode   walparser.Oid = 1663
 )
+
+var BlocksInRelFile = int(RelFileSizeBound / DatabasePageSize)
 
 type NoBitmapFoundError struct {
 	error
