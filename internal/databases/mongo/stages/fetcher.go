@@ -11,7 +11,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
 	"go.mongodb.org/mongo-driver/bson"
 )
 

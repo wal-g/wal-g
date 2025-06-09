@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"

@@ -22,7 +22,6 @@ MONGO_REPO ?= "repo.mongodb.org"
 GOLANGCI_LINT_VERSION ?= "v2.0"
 REDIS_VERSION ?= "6.2.4"
 IMAGE_TYPE ?= "rdb"
-TOOLS_MOD_DIR := ./internal/tools
 MOCKS_DESTINATION := ./testtools/mocks
 FILE_TO_MOCKS := ./internal/uploader.go .\pkg\storages\memory\folder.go ##перечисление путей до интерфейсов
 
@@ -40,7 +39,7 @@ ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
-.PHONY: unittest fmt lint clean install_tools
+.PHONY: unittest fmt lint clean
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
 
@@ -276,20 +275,11 @@ coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
 	go tool cover -html=$(COVERAGE_FILE)
 
-install_tools:
-	cd $(TOOLS_MOD_DIR) && go install golang.org/x/tools/cmd/goimports
-	$(warning Please run make docker_lint for lint. It is unreliable to use self-compiled golangci-lint. \
-		https://golangci-lint.run/usage/install/#install-from-source)
-	cd $(TOOLS_MOD_DIR) && go install github.com/golangci/golangci-lint/cmd/golangci-lint
-
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	go fmt ./...
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
-goimports: install_tools $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
-	goimports -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
-
-lint: install_tools
+lint:
 	golangci-lint run --allow-parallel-runners ./...
 
 docker_lint:

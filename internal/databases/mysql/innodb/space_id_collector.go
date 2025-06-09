@@ -3,7 +3,6 @@ package innodb
 import (
 	"errors"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"io/fs"
 	"os"
 	"path"
@@ -12,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 var ErrSpaceIDNotFound = errors.New("SpaceID not found")

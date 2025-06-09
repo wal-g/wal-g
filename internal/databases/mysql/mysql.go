@@ -12,13 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/compression"
-
 	gomysql "github.com/go-mysql-org/go-mysql/mysql"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
