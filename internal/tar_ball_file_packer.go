@@ -8,6 +8,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/utility"
@@ -76,7 +78,7 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 // TODO : unit tests
 func StartReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadSeekCloser, error) {
 	fileInfoHeader.Size = info.Size()
-	file, err := os.Open(path)
+	file, err := fsutil.OpenReadOnlyMayBeDirectIO(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, NewFileNotExistError(path)
