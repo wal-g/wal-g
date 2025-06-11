@@ -18,19 +18,8 @@ type RestoreCfgSegMaker struct {
 	restoreCfg ClusterRestoreConfig
 }
 
-func NewRestoreCfgSegMaker(restoreConfigReader io.Reader) (SegConfigMaker, error) {
-	restoreCfgBytes, err := io.ReadAll(restoreConfigReader)
-	if err != nil {
-		return nil, err
-	}
-
-	var restoreCfg ClusterRestoreConfig
-	err = json.Unmarshal(restoreCfgBytes, &restoreCfg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal the provided restore config: %v", err)
-	}
-
-	return &RestoreCfgSegMaker{restoreCfg}, nil
+func NewRestoreCfgSegMaker(restoreCfg ClusterRestoreConfig) SegConfigMaker {
+	return &RestoreCfgSegMaker{restoreCfg}
 }
 
 func (c *RestoreCfgSegMaker) Make(metadata SegmentMetadata) (cluster.SegConfig, error) {
@@ -59,11 +48,31 @@ func NewSegConfigMaker(restoreCfgPath string, inPlaceRestore bool) (SegConfigMak
 		return &InPlaceSegMaker{}, nil
 	}
 
-	file, err := os.Open(restoreCfgPath)
+	restoreCfg, err := readRestoreConfig(restoreCfgPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open the provided restore config file: %v", err)
+		return nil, err
+	}
+
+	return NewRestoreCfgSegMaker(restoreCfg), nil
+}
+
+func readRestoreConfig(path string) (ClusterRestoreConfig, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return ClusterRestoreConfig{}, fmt.Errorf("failed to open the provided restore config file: %v", err)
 	}
 	defer utility.LoggedClose(file, "")
 
-	return NewRestoreCfgSegMaker(file)
+	restoreCfgBytes, err := io.ReadAll(file)
+	if err != nil {
+		return ClusterRestoreConfig{}, err
+	}
+
+	var restoreCfg ClusterRestoreConfig
+	err = json.Unmarshal(restoreCfgBytes, &restoreCfg)
+	if err != nil {
+		return ClusterRestoreConfig{}, fmt.Errorf("failed to unmarshal the provided restore config: %v", err)
+	}
+
+	return restoreCfg, nil
 }
