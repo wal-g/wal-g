@@ -3,11 +3,12 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
 
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -106,7 +106,7 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 		return nil, err
 	}
 
-	conn, err := postgres.Connect()
+	conn, err := Connect()
 	if err != nil {
 		return nil, err
 	}

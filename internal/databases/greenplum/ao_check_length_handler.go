@@ -35,7 +35,7 @@ func NewAOLengthCheckHandler(
 }
 
 func (checker *AOLengthCheckHandler) CheckAOTableLength() {
-	conn, err := postgres.Connect()
+	conn, err := Connect()
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
