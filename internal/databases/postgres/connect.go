@@ -5,7 +5,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 )
 
 // Connect establishes a connection to postgres using
