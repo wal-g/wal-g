@@ -3,7 +3,6 @@ package mongo
 import (
 	"context"
 	"fmt"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/utility"

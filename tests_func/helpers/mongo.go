@@ -192,6 +192,19 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	return client, nil
 }
 
+func (mc *MongoCtl) AddDataToCollection(dbName, colName, prefix string) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	if _, err = conn.Database(dbName).Collection(colName).InsertOne(
+		mc.ctx, generateRecord(1, 1, prefix),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (mc *MongoCtl) WriteTestData(mark string, dbCount, tablesCount, docsCount int) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {
@@ -531,6 +544,26 @@ func (mc *MongoCtl) StopMongod() error {
 
 func (mc *MongoCtl) StartMongod() error {
 	_, err := mc.runCmd("supervisorctl", "start", "mongodb")
+	if err != nil {
+		return mc.GetLogs()
+	}
+	return err
+}
+
+func (mc *MongoCtl) DeleteMongodReplSetSetting() error {
+	_, err := mc.runCmd("bash", "-c",
+		"sed -i \"s/ --replSet.*//\" /config/supervisor/conf.d/mongodb.conf",
+	)
+	if err != nil {
+		return err
+	}
+	_, err = mc.runCmd("supervisorctl", "reread")
+	return err
+}
+
+func (mc *MongoCtl) GetLogs() error {
+	t, err := mc.runCmd("cat", "/var/log/mongodb/mongod.log")
+	tracelog.DebugLogger.Println(t)
 	return err
 }
 
