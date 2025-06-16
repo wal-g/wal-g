@@ -60,9 +60,9 @@ var backupPushCmd = &cobra.Command{
 		backupCmd.Stderr = os.Stderr
 
 		pushArgs := redis.RDBBackupPushArgs{
-			BackupCmd: backupCmd,
-			Sharded: sharded,
-			Uploader: uploader,
+			BackupCmd:       backupCmd,
+			Sharded:         sharded,
+			Uploader:        uploader,
 			MetaConstructor: metaConstructor,
 		}
 		err = redis.HandleRDBBackupPush(pushArgs)

@@ -170,8 +170,8 @@ type FileUploader interface {
 
 type FillSlotsForShardedArgs struct {
 	BackupName string
-	Sharded	bool
-	Uploader FileUploader
+	Sharded    bool
+	Uploader   FileUploader
 }
 
 func FillSlotsForSharded(ctx context.Context, args FillSlotsForShardedArgs) error {

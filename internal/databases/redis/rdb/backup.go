@@ -19,10 +19,10 @@ func NewRedisStorageUploader(upl internal.Uploader) *StorageUploader {
 }
 
 type UploadBackupArgs struct {
-	Cmd internal.ErrWaiter
+	Cmd             internal.ErrWaiter
 	MetaConstructor internal.MetaConstructor
 	Sharded         bool
-	Stream io.Reader
+	Stream          io.Reader
 }
 
 // UploadBackup compresses a stream and uploads it, and uploads meta info
@@ -43,7 +43,7 @@ func (su *StorageUploader) UploadBackup(args UploadBackupArgs) error {
 
 	fillArgs := archive.FillSlotsForShardedArgs{
 		BackupName: dstPath,
-		Sharded:	args.Sharded,
+		Sharded:    args.Sharded,
 		Uploader:   su,
 	}
 	err = archive.FillSlotsForSharded(context.Background(), fillArgs)
