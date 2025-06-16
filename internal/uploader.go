@@ -149,7 +149,11 @@ func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensio
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
-	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
+
+	dstPath := utility.SanitizePath(file.Name())
+	if !file.IsExactPath() {
+		dstPath = utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
+	}
 
 	err := uploader.Upload(ctx, dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)

@@ -1,13 +1,12 @@
 package internal
 
 import (
-	"bytes"
 	"context"
-	"io"
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -59,6 +58,10 @@ func (concurrentUploader *ConcurrentUploader) UploadBackupFiles(backupFiles []*B
 	return nil
 }
 
+func (concurrentUploader *ConcurrentUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
+	return concurrentUploader.uploader.UploadFile(ctx, file)
+}
+
 func (concurrentUploader *ConcurrentUploader) Upload(backupFile *BackupFileMeta) error {
 	return concurrentUploader.bundle.AddToBundle(backupFile.Path, backupFile, nil)
 }
@@ -78,23 +81,6 @@ func (concurrentUploader *ConcurrentUploader) Finalize() error {
 
 	concurrentUploader.UncompressedSize = *concurrentUploader.bundle.TarBallQueue.AllTarballsSize
 	concurrentUploader.CompressedSize, err = concurrentUploader.uploader.UploadedDataSize()
-	return err
-}
-
-func (concurrentUploader *ConcurrentUploader) CompressAndUpload(filePath string, b io.Reader) error {
-	var buf bytes.Buffer
-	_, err := buf.ReadFrom(CompressAndEncrypt(b, concurrentUploader.uploader.Compression(), ConfigureCrypter()))
-	defer buf.Reset()
-	if err != nil {
-		return err
-	}
-
-	compressedBytes := buf.Bytes()
-	err = concurrentUploader.uploader.Upload(context.Background(), filePath, bytes.NewReader(compressedBytes))
-	if err != nil {
-		return err
-	}
-
 	return err
 }
 

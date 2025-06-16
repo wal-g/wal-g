@@ -8,7 +8,8 @@ test_cleanup() {
     redis-cli flushall
     redis-cli shutdown
     rm -rf /var/lib/redis/*
-    rm -rf $WALG_FILE_PREFIX 
+    rm -rf $WALG_FILE_PREFIX
+    rm -rf /tmp/nodes.conf
 }
 
 ensure() {

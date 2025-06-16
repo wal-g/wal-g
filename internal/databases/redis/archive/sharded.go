@@ -2,6 +2,8 @@ package archive
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -12,8 +14,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -158,4 +162,44 @@ func FetchSlotsDataFromStorage(folder storage.Folder, backup *Backup) (string, e
 	}
 
 	return string(f), nil
+}
+
+type FileUploader interface {
+	UploadFile(ctx context.Context, file ioextensions.NamedReader) error
+}
+
+type FillSlotsForShardedArgs struct {
+	BackupName string
+	Sharded	bool
+	Uploader FileUploader
+}
+
+func FillSlotsForSharded(ctx context.Context, args FillSlotsForShardedArgs) error {
+	if !args.Sharded {
+		return nil
+	}
+
+	idToSlots, err := GetSlotsMap()
+	if err != nil {
+		return err
+	}
+
+	jsonData, err := json.Marshal(idToSlots)
+	if err != nil {
+		return err
+	}
+	tracelog.InfoLogger.Printf("packing %s", string(jsonData))
+
+	fullPath, err := GetSlotsCompressedFileName(args.BackupName)
+	if err != nil {
+		return err
+	}
+
+	file := ioextensions.NewNamedReaderExactPathImpl(bytes.NewReader(jsonData), fullPath)
+	err = args.Uploader.UploadFile(ctx, file)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

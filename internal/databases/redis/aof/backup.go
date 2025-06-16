@@ -1,9 +1,7 @@
 package aof
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -130,27 +128,14 @@ func (bs *BackupService) DoBackup(args DoBackupArgs) error {
 		return err
 	}
 
-	if args.Sharded {
-		idToSlots, err := archive.GetSlotsMap()
-		if err != nil {
-			return err
-		}
-
-		jsonData, err := json.Marshal(idToSlots)
-		if err != nil {
-			return err
-		}
-		tracelog.InfoLogger.Printf("packing %s", string(jsonData))
-
-		path, err := archive.GetSlotsCompressedFileName(args.BackupName)
-		if err != nil {
-			return err
-		}
-
-		err = bs.concurrentUploader.CompressAndUpload(path, bytes.NewReader(jsonData))
-		if err != nil {
-			return err
-		}
+	fillArgs := archive.FillSlotsForShardedArgs{
+		BackupName: args.BackupName,
+		Sharded:	args.Sharded,
+		Uploader:   bs.concurrentUploader,
+	}
+	err = archive.FillSlotsForSharded(context.Background(), fillArgs)
+	if err != nil {
+		return err
 	}
 
 	return bs.Finalize(args.BackupName)

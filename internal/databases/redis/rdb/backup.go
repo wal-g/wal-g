@@ -18,23 +18,40 @@ func NewRedisStorageUploader(upl internal.Uploader) *StorageUploader {
 	return &StorageUploader{upl}
 }
 
+type UploadBackupArgs struct {
+	Cmd internal.ErrWaiter
+	MetaConstructor internal.MetaConstructor
+	Sharded         bool
+	Stream io.Reader
+}
+
 // UploadBackup compresses a stream and uploads it, and uploads meta info
-func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
-	err := metaConstructor.Init()
+func (su *StorageUploader) UploadBackup(args UploadBackupArgs) error {
+	err := args.MetaConstructor.Init()
 	if err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
 
-	dstPath, err := su.PushStream(context.Background(), stream)
+	dstPath, err := su.PushStream(context.Background(), args.Stream)
 	if err != nil {
 		return fmt.Errorf("can not upload backup: %+v", err)
 	}
 
-	if err := cmd.Wait(); err != nil {
+	if err := args.Cmd.Wait(); err != nil {
 		return fmt.Errorf("backup command failed: %+v", err)
 	}
 
-	return su.Finalize(metaConstructor, dstPath)
+	fillArgs := archive.FillSlotsForShardedArgs{
+		BackupName: dstPath,
+		Sharded:	args.Sharded,
+		Uploader:   su,
+	}
+	err = archive.FillSlotsForSharded(context.Background(), fillArgs)
+	if err != nil {
+		return err
+	}
+
+	return su.Finalize(args.MetaConstructor, dstPath)
 }
 
 func (su *StorageUploader) Finalize(metaConstructor internal.MetaConstructor, dstPath string) error {

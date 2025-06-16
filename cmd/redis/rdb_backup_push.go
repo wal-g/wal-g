@@ -58,7 +58,14 @@ var backupPushCmd = &cobra.Command{
 		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
 
 		backupCmd.Stderr = os.Stderr
-		err = redis.HandleRDBBackupPush(uploader, backupCmd, metaConstructor)
+
+		pushArgs := redis.RDBBackupPushArgs{
+			BackupCmd: backupCmd,
+			Sharded: sharded,
+			Uploader: uploader,
+			MetaConstructor: metaConstructor,
+		}
+		err = redis.HandleRDBBackupPush(pushArgs)
 		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
@@ -70,6 +77,7 @@ var backupPushCmd = &cobra.Command{
 
 func init() {
 	backupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes rdb backup with 'permanent' flag")
+	backupPushCmd.Flags().BoolVarP(&sharded, shardedFlag, shardedShorthand, false, "Pushes sharded backup")
 	cmd.AddCommand(backupPushCmd)
 
 	rdbBackupPushCmd := &cobra.Command{
@@ -80,5 +88,6 @@ func init() {
 		PreRun: backupPushCmd.PreRun,
 	}
 	rdbBackupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes rdb backup with 'permanent' flag")
+	rdbBackupPushCmd.Flags().BoolVarP(&sharded, shardedFlag, shardedShorthand, false, "Pushes sharded backup")
 	cmd.AddCommand(rdbBackupPushCmd)
 }
