@@ -165,7 +165,7 @@ func FetchSlotsDataFromStorage(folder storage.Folder, backup *Backup) (string, e
 }
 
 type FileUploader interface {
-	UploadFile(ctx context.Context, file ioextensions.NamedReader) error
+	UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error
 }
 
 type FillSlotsForShardedArgs struct {
@@ -195,8 +195,8 @@ func FillSlotsForSharded(ctx context.Context, args FillSlotsForShardedArgs) erro
 		return err
 	}
 
-	file := ioextensions.NewNamedReaderExactPathImpl(bytes.NewReader(jsonData), fullPath)
-	err = args.Uploader.UploadFile(ctx, file)
+	file := ioextensions.NewNamedReaderImpl(bytes.NewReader(jsonData), fullPath)
+	err = args.Uploader.UploadExactFile(ctx, file)
 	if err != nil {
 		return err
 	}

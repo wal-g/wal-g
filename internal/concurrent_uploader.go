@@ -58,8 +58,8 @@ func (concurrentUploader *ConcurrentUploader) UploadBackupFiles(backupFiles []*B
 	return nil
 }
 
-func (concurrentUploader *ConcurrentUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
-	return concurrentUploader.uploader.UploadFile(ctx, file)
+func (concurrentUploader *ConcurrentUploader) UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error {
+	return concurrentUploader.uploader.UploadExactFile(ctx, file)
 }
 
 func (concurrentUploader *ConcurrentUploader) Upload(backupFile *BackupFileMeta) error {

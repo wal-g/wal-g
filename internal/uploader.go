@@ -22,6 +22,7 @@ var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSiz
 type Uploader interface {
 	Upload(ctx context.Context, path string, content io.Reader) error
 	UploadFile(ctx context.Context, file ioextensions.NamedReader) error
+	UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error
 	PushStream(ctx context.Context, stream io.Reader) (string, error)
 	PushStreamToDestination(ctx context.Context, stream io.Reader, dstPath string) error
 	Compression() compression.Compressor
@@ -141,7 +142,7 @@ func (uploader *RegularUploader) Clone() Uploader {
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
-func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
+func (uploader *RegularUploader) uploadFile(ctx context.Context, file ioextensions.NamedReader, isExactPath bool) error {
 	filename := file.Name()
 
 	fileReader := file.(io.Reader)
@@ -150,14 +151,23 @@ func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensio
 	}
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
 
-	dstPath := utility.SanitizePath(file.Name())
-	if !file.IsExactPath() {
+	dstPath := utility.SanitizePath(filename)
+	if !isExactPath {
 		dstPath = utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
 	}
 
 	err := uploader.Upload(ctx, dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
+}
+
+func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
+	return uploader.uploadFile(ctx, file, false)
+}
+
+// UploadFile compresses a file and uploads it by exact path.
+func (uploader *RegularUploader) UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error {
+	return uploader.uploadFile(ctx, file, true)
 }
 
 // DisableSizeTracking stops bandwidth tracking
