@@ -10,7 +10,7 @@ import (
 )
 
 type RDBBackupPushArgs struct {
-	BackupCmd *exec.Cmd
+	BackupCmd       *exec.Cmd
 	Sharded         bool
 	Uploader        internal.Uploader
 	MetaConstructor internal.MetaConstructor
@@ -22,10 +22,10 @@ func HandleRDBBackupPush(args RDBBackupPushArgs) error {
 
 	redisUploader := rdb.NewRedisStorageUploader(args.Uploader)
 	uploadArgs := rdb.UploadBackupArgs{
-		Cmd:			 args.BackupCmd,
+		Cmd:             args.BackupCmd,
 		MetaConstructor: args.MetaConstructor,
-		Sharded:		 args.Sharded,
-		Stream:		 stdout,
+		Sharded:         args.Sharded,
+		Stream:          stdout,
 	}
 
 	return redisUploader.UploadBackup(uploadArgs)
