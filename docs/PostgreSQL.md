@@ -23,6 +23,10 @@ To configure how many goroutines to use during ```backup-fetch``` and ```wal-fet
 
 To configure how many times failed file will be retried during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_FILE_RETRIES`. By default is set to 15.
 
+* `WALG_DIRECT_IO`
+
+An experimental feature that allows you to perform direct_io reads during a ```backup-push``` without flushing the disk cache. To activate it, set the value of the environment variable to `true`.
+
 * `WALG_PREFETCH_DIR`
 
 By default WAL prefetch is storing prefetched data in pg_wal directory. This ensures that WAL can be easily moved from prefetch location to actual WAL consumption directory. But it may have negative consequences if you use it with pg_rewind in PostgreSQL 13.

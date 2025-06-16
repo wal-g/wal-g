@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/webserver"
 )
@@ -77,6 +78,7 @@ const (
 	PgpEnvelopeYcSaKeyFileSetting = "WALG_ENVELOPE_PGP_YC_SERVICE_ACCOUNT_KEY_FILE"
 	PgpEnvelopeYcEndpointSetting  = "WALG_ENVELOPE_PGP_YC_ENDPOINT"
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
+	DirectIO                      = "WALG_DIRECT_IO"
 
 	PgDataSetting                        = "PGDATA"
 	UserSetting                          = "USER" // TODO : do something with it
@@ -271,6 +273,7 @@ var (
 		FailoverStoragesCheckTimeout: "30s",
 		FailoverStorageCacheLifetime: "15m",
 		PgpEnvelopeCacheExpiration:   "0",
+		DirectIO:                     "false",
 		LogLevelSetting:              "NORMAL",
 	}
 
@@ -367,6 +370,7 @@ var (
 		PgpEnvelopeYcKmsKeyIDSetting:  true,
 		PgpEnvelopeYcSaKeyFileSetting: true,
 		PgpEnvelopeYcEndpointSetting:  true,
+		DirectIO:                      false,
 		LibsodiumKeySetting:           true,
 		LibsodiumKeyPathSetting:       true,
 		LibsodiumKeyTransform:         true,
