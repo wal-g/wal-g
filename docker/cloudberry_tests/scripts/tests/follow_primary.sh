@@ -32,11 +32,11 @@ stop_and_delete_cluster_dir
 wal-g backup-fetch LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 wal-g recovery-action shutdown --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 wal-g follow-primary rp1 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
-sleep 30
+wait_postgres_shutdown
 wal-g follow-primary rp2 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
-sleep 30
+wait_postgres_shutdown
 wal-g follow-primary LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
-sleep 30
+wait_postgres_shutdown
 wal-g recovery-action promote --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 prepare_cluster
 start_cluster

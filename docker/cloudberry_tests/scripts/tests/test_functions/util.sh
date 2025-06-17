@@ -125,3 +125,13 @@ run_backup_logged() {
       exit 1
   fi
 }
+
+wait_postgres_shutdown() {
+  while true; do
+    if ! ps -ef | grep -v grep | grep -q postgres; then
+      break
+    else
+      sleep 1
+    fi
+  done
+}

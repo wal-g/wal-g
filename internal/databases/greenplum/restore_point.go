@@ -36,6 +36,7 @@ type RestorePointMetadata struct {
 	SystemIdentifier *uint64        `json:"system_identifier"`
 	LsnBySegment     map[int]string `json:"lsn_by_segment"`
 	StorageName      string         `json:"storage_name"`
+	TimeLine         uint32         `json:"time_line"`
 }
 
 func (s *RestorePointMetadata) String() string {
@@ -137,10 +138,10 @@ func (rpc *RestorePointCreator) Create() {
 	err := rpc.checkExists()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	restoreLSNs, err := createRestorePoint(rpc.Conn, rpc.pointName)
+	restoreLSNs, timeLine, err := createRestorePoint(rpc.Conn, rpc.pointName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = rpc.uploadMetadata(restoreLSNs)
+	err = rpc.uploadMetadata(restoreLSNs, timeLine)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for restore point %s", rpc.pointName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -148,11 +149,16 @@ func (rpc *RestorePointCreator) Create() {
 	tracelog.InfoLogger.Printf("Restore point %s successfully created", rpc.pointName)
 }
 
-func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs map[int]string, err error) {
+func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs map[int]string, timeLine uint32, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
 	queryRunner, err := NewGpQueryRunner(conn)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	timeLine, err = queryRunner.ReadTimeline()
+	if err != nil {
+		return nil, 0, err
 	}
 
 	for retries := 0; retries < RestorePointCreateRetries; retries++ {
@@ -162,7 +168,7 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 			// This ensures the new cluster can retrieve complete WAL logs with the restore point for restoration.
 			globalCluster, gpVersion, _, err := getGpClusterInfo(conn)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 			tracelog.InfoLogger.Println("Switch xlog on cluster")
 			remoteOutput := globalCluster.GenerateAndExecuteCommand("Running wal-g", cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
@@ -184,10 +190,10 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 			globalCluster.CheckClusterError(remoteOutput, "Unable to switch xlog on cluster", func(contentID int) string {
 				return "Unable to switch xlog on cluster"
 			}, true)
-			return restoreLSNs, nil
+			return restoreLSNs, timeLine, nil
 		}
 	}
-	return nil, err
+	return nil, 0, err
 }
 
 func (rpc *RestorePointCreator) checkExists() error {
@@ -201,7 +207,7 @@ func (rpc *RestorePointCreator) checkExists() error {
 	return nil
 }
 
-func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string) (err error) {
+func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string, timeLine uint32) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
@@ -216,6 +222,7 @@ func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string) (err 
 		GpFlavor:         rpc.gpVersion.Flavor.String(),
 		SystemIdentifier: rpc.systemIdentifier,
 		LsnBySegment:     restoreLSNs,
+		TimeLine:         timeLine,
 	}
 
 	metaFileName := RestorePointMetadataFileName(rpc.pointName)

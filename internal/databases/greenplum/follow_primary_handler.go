@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 	"path"
 	"sort"
 	"strings"
@@ -20,6 +22,7 @@ type FollowPrimaryHandler struct {
 }
 
 const LATEST = "LATEST"
+const WalFolder = utility.SegmentsPath + "/seg%d/" + utility.WalPath
 
 // nolint:gocritic
 func NewFollowPrimaryHandler(
@@ -42,7 +45,7 @@ func NewFollowPrimaryHandler(
 	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
 
 	if stopAtRestorePoint == LATEST {
-		restorePoints, err := GetRestorePoints(folder)
+		restorePoints, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
@@ -54,6 +57,8 @@ func NewFollowPrimaryHandler(
 		tracelog.InfoLogger.Printf("Selected latest restore point: %s", stopAtRestorePoint)
 	}
 
+	FatalIfWalLogMissing(stopAtRestorePoint, folder)
+
 	return &FollowPrimaryHandler{
 		cluster:            globalCluster,
 		stopAtRestorePoint: stopAtRestorePoint,
@@ -61,10 +66,47 @@ func NewFollowPrimaryHandler(
 	}
 }
 
+func FatalIfWalLogMissing(restorePoint string, folder storage.Folder) {
+	metadata, err := FetchRestorePointMetadata(folder, restorePoint)
+	if err != nil {
+		tracelog.ErrorLogger.FatalOnError(err)
+	}
+
+	for seg, lsn := range metadata.LsnBySegment {
+		LSN, err := postgres.ParseLSN(lsn)
+		if err != nil {
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+		walSegmentNo := postgres.NewWalSegmentNo(LSN)
+
+		subfolder := folder.GetSubFolder(fmt.Sprintf(WalFolder, seg))
+		folderObjects, _, err := subfolder.ListFolder()
+		if err != nil {
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+
+		// WAL file example: "000000010000000000000003.lz4" -> base name is "000000010000000000000003"
+		found := false
+		for _, obj := range folderObjects {
+			if strings.HasPrefix(obj.GetName(), walSegmentNo.GetFilename(metadata.TimeLine)) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			tracelog.ErrorLogger.Fatalln("WAL file was not uploaded for all segments and master")
+		}
+	}
+}
+
 func (fh *FollowPrimaryHandler) Follow() {
 	tracelog.InfoLogger.Println("Updating recovery.conf on segments and master...")
 	fh.updateRecoveryConfigs()
+	fh.applyXLogInCluster()
+}
 
+func (fh *FollowPrimaryHandler) applyXLogInCluster() {
 	tracelog.InfoLogger.Println("Running recovery on segments and master...")
 	// Run WAL-G to restore the each segment as a single Postgres instance
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
