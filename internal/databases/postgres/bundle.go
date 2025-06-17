@@ -127,7 +127,7 @@ func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
 // checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
 func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 	if bundle.Replica {
-		timeline, err := queryRunner.readTimeline()
+		timeline, err := queryRunner.ReadTimeline()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
@@ -168,7 +168,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 			return "", 0, err
 		}
 	} else {
-		bundle.Timeline, err = queryRunner.readTimeline()
+		bundle.Timeline, err = queryRunner.ReadTimeline()
 		if err != nil {
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
