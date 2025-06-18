@@ -1,7 +1,6 @@
 package binary
 
 import (
-	"context"
 	"os"
 
 	"github.com/pkg/errors"
@@ -13,9 +12,8 @@ import (
 )
 
 type BackupService struct {
-	Context       context.Context
-	MongodService *MongodService
-	Uploader      internal.Uploader
+	*MongodService
+	Uploader internal.Uploader
 
 	Sentinel models.Backup
 }
@@ -24,17 +22,15 @@ func GenerateNewBackupName() string {
 	return common.BinaryBackupType + "_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-func CreateBackupService(ctx context.Context, mongodService *MongodService, uploader internal.Uploader,
-) (*BackupService, error) {
+func CreateBackupService(mongodService *MongodService, uploader internal.Uploader) (*BackupService, error) {
 	return &BackupService{
-		Context:       ctx,
 		MongodService: mongodService,
 		Uploader:      uploader,
 	}, nil
 }
 
-func (backupService *BackupService) DoBackup(backupName string, permanent bool) error {
-	err := backupService.InitializeMongodBackupMeta(backupName, permanent)
+func (backupService *BackupService) DoBackup(backupName string, permanent bool) (err error) {
+	err = backupService.InitializeMongodBackupMeta(backupName, permanent)
 	if err != nil {
 		return err
 	}
@@ -53,7 +49,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath, false)
+	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Context, backupService.Uploader, backupName, mongodDBPath, false)
 	if err != nil {
 		return err
 	}

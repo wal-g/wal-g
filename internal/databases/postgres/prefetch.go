@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -139,7 +140,9 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 
 	if !excluded && info.Mode().IsRegular() {
 		tarBall := bundle.TarBallQueue.Deque()
-		tarBall.SetUp(nil)
+		if err := tarBall.SetUp(context.Background(), nil); err != nil {
+			return err
+		}
 		go func() {
 			err := bundle.prefaultFile(path, info, fileInfoHeader)
 			if err != nil {

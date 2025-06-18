@@ -2,11 +2,12 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"os"
 )
 
 type TarBallComposer interface {
-	AddFile(info *ComposeFileInfo)
+	AddFile(info *ComposeFileInfo) error
 	AddHeader(header *tar.Header, fileInfo os.FileInfo) error
 	SkipFile(tarHeader *tar.Header, fileInfo os.FileInfo)
 	FinishComposing() (TarFileSets, error)
@@ -15,7 +16,7 @@ type TarBallComposer interface {
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
 type TarBallComposerMaker interface {
-	Make(bundle *Bundle) (TarBallComposer, error)
+	Make(ctx context.Context, bundle *Bundle) (TarBallComposer, error)
 }
 
 type ComposeFileInfo struct {

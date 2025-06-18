@@ -41,7 +41,7 @@ func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader inter
 	}, nil
 }
 
-func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.TarBallComposer, error) {
+func (maker *GpTarBallComposerMaker) Make(ctx context.Context, bundle *postgres.Bundle) (internal.TarBallComposer, error) {
 	// checksums verification is not supported in Greenplum (yet)
 	// TODO: Add support for checksum verification
 	filePackerOptions := postgres.NewTarBallFilePackerOptions(false, false)
@@ -62,6 +62,7 @@ func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.Tar
 		maker.uploader, baseFiles, bundle.Crypter, maker.bundleFiles, bundle.IncrementFromName != "", deduplicationAgeLimit, newAoSegFilesID)
 
 	return NewGpTarBallComposer(
+		ctx,
 		bundle.TarBallQueue,
 		bundle.Crypter,
 		maker.relStorageMap,
@@ -142,12 +143,12 @@ type GpTarBallComposer struct {
 	aoSegSizeThreshold int64
 }
 
-func NewGpTarBallComposer(
+func NewGpTarBallComposer(ctx context.Context,
 	tarBallQueue *internal.TarBallQueue, crypter crypto.Crypter, relStorageMap AoRelFileStorageMap,
 	bundleFiles internal.BundleFiles, packer *postgres.TarBallFilePackerImpl, aoStorageUploader *AoStorageUploader,
 	tarFileSets internal.TarFileSets, uploader internal.Uploader, backupName string,
 ) (*GpTarBallComposer, error) {
-	errorGroup, ctx := errgroup.WithContext(context.Background())
+	errorGroup, ctx := errgroup.WithContext(ctx)
 
 	composer := &GpTarBallComposer{
 		backupName:         backupName,
@@ -177,13 +178,13 @@ func NewGpTarBallComposer(
 	return composer, nil
 }
 
-func (c *GpTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
+func (c *GpTarBallComposer) AddFile(info *internal.ComposeFileInfo) error {
 	select {
 	case c.addFileQueue <- info:
-		return
+		return nil
 	case <-c.ctx.Done():
 		tracelog.ErrorLogger.Printf("AddFile: not doing anything, err: %v", c.ctx.Err())
-		return
+		return nil
 	}
 }
 
@@ -192,7 +193,10 @@ func (c *GpTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileIn
 	if err != nil {
 		return c.errorGroup.Wait()
 	}
-	tarBall.SetUp(c.crypter)
+	err = tarBall.SetUp(c.ctx, c.crypter)
+	if err != nil {
+		return err
+	}
 	defer c.tarBallQueue.EnqueueBack(tarBall)
 	c.tarFileSetsMutex.Lock()
 	c.tarFileSets.AddFile(tarBall.Name(), fileInfoHeader.Name)
@@ -258,7 +262,10 @@ func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 	if err != nil {
 		return err
 	}
-	tarBall.SetUp(c.crypter)
+	err = tarBall.SetUp(c.ctx, c.crypter)
+	if err != nil {
+		return err
+	}
 	c.tarFileSetsMutex.Lock()
 	c.tarFileSets.AddFile(tarBall.Name(), cfi.Header.Name)
 	c.tarFileSetsMutex.Unlock()

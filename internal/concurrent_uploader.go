@@ -19,6 +19,7 @@ type ConcurrentUploader struct {
 }
 
 func CreateConcurrentUploader(
+	ctx context.Context,
 	uploader Uploader,
 	backupName string,
 	directory string,
@@ -36,7 +37,7 @@ func CreateConcurrentUploader(
 	}
 
 	tarBallComposerMaker := NewRegularTarBallComposerMaker(&RegularBundleFiles{}, NewRegularTarFileSets(), skipFileNotExists)
-	err = bundle.SetupComposer(tarBallComposerMaker)
+	err = bundle.SetupComposer(ctx, tarBallComposerMaker)
 	if err != nil {
 		return nil, err
 	}

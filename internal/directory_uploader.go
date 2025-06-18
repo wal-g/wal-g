@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"path/filepath"
 	"sync/atomic"
 
@@ -49,7 +50,7 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 	err := bundle.StartQueue(NewStorageTarBallMaker(u.backupName, u.uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = bundle.SetupComposer(u.tarBallComposerMaker)
+	err = bundle.SetupComposer(context.TODO(), u.tarBallComposerMaker)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Walking ...")
@@ -72,8 +73,8 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 
 	// Wait for all uploads to finish.
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
-	u.uploader.Finish()
-	if u.uploader.Failed() {
+
+	if u.uploader.Finish() != nil {
 		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", path)
 	}
 	return tarFileSets

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"io"
 	"sync/atomic"
 
@@ -19,13 +20,14 @@ func (tarBall *NOPTarBall) Name() string {
 	return "NOPTarBall"
 }
 
-func (tarBall *NOPTarBall) SetUp(crypter crypto.Crypter, params ...string) {}
-func (tarBall *NOPTarBall) CloseTar() error                                { return nil }
+func (tarBall *NOPTarBall) SetUp(_ context.Context, _ crypto.Crypter, _ ...string) error { return nil }
+
+func (tarBall *NOPTarBall) CloseTar() error { return nil }
 
 func (tarBall *NOPTarBall) Size() int64            { return atomic.LoadInt64(tarBall.partSize) }
 func (tarBall *NOPTarBall) AddSize(i int64)        { atomic.AddInt64(tarBall.partSize, i) }
 func (tarBall *NOPTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-func (tarBall *NOPTarBall) AwaitUploads()          {}
+func (tarBall *NOPTarBall) AwaitUploads() error    { return nil }
 
 // NOPTarBallMaker creates a new NOPTarBall. Used
 // for testing purposes.

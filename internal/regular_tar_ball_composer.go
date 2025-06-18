@@ -20,13 +20,14 @@ type RegularTarBallComposer struct {
 }
 
 func NewRegularTarBallComposer(
+	ctx context.Context,
 	tarBallQueue *TarBallQueue,
 	tarBallFilePacker TarBallFilePacker,
 	files BundleFiles,
 	tarFileSets TarFileSets,
 	crypter crypto.Crypter,
 ) *RegularTarBallComposer {
-	errorGroup, ctx := errgroup.WithContext(context.Background())
+	errorGroup, ctx := errgroup.WithContext(ctx)
 	return &RegularTarBallComposer{
 		tarBallQueue:  tarBallQueue,
 		tarFilePacker: tarBallFilePacker,
@@ -53,19 +54,21 @@ func NewRegularTarBallComposerMaker(files BundleFiles, tarFileSets TarFileSets, 
 	}
 }
 
-func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (TarBallComposer, error) {
+func (maker *RegularTarBallComposerMaker) Make(ctx context.Context, bundle *Bundle) (TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
 	packer := NewRegularTarBallFilePacker(bundleFiles, maker.skipFileNotExists)
-	return NewRegularTarBallComposer(bundle.TarBallQueue, packer, bundleFiles, tarFileSets, bundle.Crypter), nil
+	return NewRegularTarBallComposer(ctx, bundle.TarBallQueue, packer, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 
-func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) {
+func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) error {
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
-		return
+		return err
 	}
-	tarBall.SetUp(c.crypter)
+	if err := tarBall.SetUp(c.ctx, c.crypter); err != nil {
+		return err
+	}
 	c.tarFileSets.AddFile(tarBall.Name(), info.Header.Name)
 	c.errorGroup.Go(func() error {
 		err := c.tarFilePacker.PackFileIntoTar(info, tarBall)
@@ -74,6 +77,7 @@ func (c *RegularTarBallComposer) AddFile(info *ComposeFileInfo) {
 		}
 		return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
 	})
+	return nil
 }
 
 func (c *RegularTarBallComposer) AddHeader(header *tar.Header, fileInfo os.FileInfo) error {
@@ -81,7 +85,9 @@ func (c *RegularTarBallComposer) AddHeader(header *tar.Header, fileInfo os.FileI
 	if err != nil {
 		return c.errorGroup.Wait()
 	}
-	tarBall.SetUp(c.crypter)
+	if err := tarBall.SetUp(c.ctx, c.crypter); err != nil {
+		return err
+	}
 	defer c.tarBallQueue.EnqueueBack(tarBall)
 	c.tarFileSets.AddFile(tarBall.Name(), header.Name)
 	c.files.AddFile(header, fileInfo, false)

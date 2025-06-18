@@ -32,8 +32,7 @@ type Uploader interface {
 	ChangeDirectory(relativePath string)
 	Folder() storage.Folder
 	Clone() Uploader
-	Failed() bool
-	Finish()
+	Finish() error
 }
 
 // RegularUploader contains fields associated with uploading tarballs.
@@ -119,11 +118,12 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
 // prints alert to stderr.
-func (uploader *RegularUploader) Finish() {
+func (uploader *RegularUploader) Finish() error {
 	uploader.waitGroup.Wait()
 	if uploader.failed.Load() {
-		tracelog.ErrorLogger.Printf("WAL-G could not complete upload.\n")
+		return fmt.Errorf("WAL-G could not complete upload.")
 	}
+	return nil
 }
 
 // Clone creates similar Uploader with new WaitGroup
@@ -136,7 +136,7 @@ func (uploader *RegularUploader) Clone() Uploader {
 		tarSize:         uploader.tarSize,
 		dataSize:        uploader.dataSize,
 	}
-	clone.failed.Store(uploader.Failed())
+	clone.failed.Store(uploader.failed.Load())
 	return clone
 }
 
@@ -192,7 +192,7 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
-		uploader.failed.Load()
+		uploader.failed.Store(true)
 		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 		return err
 	}
@@ -219,10 +219,6 @@ func (uploader *RegularUploader) ChangeDirectory(relativePath string) {
 
 func (uploader *RegularUploader) Folder() storage.Folder {
 	return uploader.UploadingFolder
-}
-
-func (uploader *RegularUploader) Failed() bool {
-	return uploader.failed.Load()
 }
 
 func (uploader *SplitStreamUploader) Clone() Uploader {

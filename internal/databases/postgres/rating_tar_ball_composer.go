@@ -33,10 +33,12 @@ func NewRatingTarBallComposerMaker(relFileStats RelFileStatistics,
 	}, nil
 }
 
-func (maker *RatingTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
+func (maker *RatingTarBallComposerMaker) Make(ctx context.Context, bundle *Bundle) (internal.TarBallComposer, error) {
 	composeRatingEvaluator := internal.NewDefaultComposeRatingEvaluator(bundle.IncrementFromFiles)
 	filePacker := NewTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, maker.filePackerOptions)
-	return NewRatingTarBallComposer(uint64(bundle.TarSizeThreshold),
+	return NewRatingTarBallComposer(
+		ctx,
+		uint64(bundle.TarSizeThreshold),
 		composeRatingEvaluator,
 		bundle.IncrementFromLsn,
 		bundle.DeltaMap,
@@ -102,11 +104,12 @@ type RatingTarBallComposer struct {
 }
 
 func NewRatingTarBallComposer(
+	ctx context.Context,
 	tarSizeThreshold uint64, updateRatingEvaluator internal.ComposeRatingEvaluator,
 	incrementBaseLsn *LSN, deltaMap PagedFileDeltaMap, tarBallQueue *internal.TarBallQueue,
 	crypter crypto.Crypter, fileStats RelFileStatistics, bundleFiles internal.BundleFiles, packer *TarBallFilePackerImpl,
 ) (*RatingTarBallComposer, error) {
-	errorGroup, ctx := errgroup.WithContext(context.Background())
+	errorGroup, ctx := errgroup.WithContext(ctx)
 	deltaMapComplete := true
 	if deltaMap == nil {
 		deltaMapComplete = false
@@ -143,13 +146,13 @@ func NewRatingTarBallComposer(
 	return composer, nil
 }
 
-func (c *RatingTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
+func (c *RatingTarBallComposer) AddFile(info *internal.ComposeFileInfo) error {
 	select {
 	case c.addFileQueue <- info:
-		return
+		return nil
 	case <-c.ctx.Done():
 		tracelog.ErrorLogger.Printf("AddFile: not doing anything, err: %v", c.ctx.Err())
-		return
+		return nil
 	}
 }
 
@@ -182,7 +185,9 @@ func (c *RatingTarBallComposer) FinishComposing() (internal.TarFileSets, error) 
 
 	for _, tarFilesCollection := range tarFilesCollections {
 		tarBall := c.tarBallQueue.Deque()
-		tarBall.SetUp(c.crypter)
+		if err := tarBall.SetUp(c.ctx, c.crypter); err != nil {
+			return nil, err
+		}
 		for _, composeFileInfo := range tarFilesCollection.files {
 			tarFileSets.AddFile(tarBall.Name(), composeFileInfo.Header.Name)
 		}
@@ -318,7 +323,9 @@ func (c *RatingTarBallComposer) scanDeltaMapFor(filePath string, fileSize int64)
 
 func (c *RatingTarBallComposer) writeHeaders(headers []*tar.Header) (string, []string, error) {
 	headersTarBall := c.tarBallQueue.Deque()
-	headersTarBall.SetUp(c.crypter)
+	if err := headersTarBall.SetUp(c.ctx, c.crypter); err != nil {
+		return "", nil, errors.Wrap(err, "addToBundle: failed to set up tarball")
+	}
 	headersNames := make([]string, 0, len(headers))
 	for _, header := range headers {
 		err := headersTarBall.TarWriter().WriteHeader(header)
