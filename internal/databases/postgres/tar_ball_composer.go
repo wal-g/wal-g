@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 
 	"github.com/wal-g/tracelog"
@@ -19,7 +20,7 @@ const (
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
 type TarBallComposerMaker interface {
-	Make(bundle *Bundle) (internal.TarBallComposer, error)
+	Make(ctx context.Context, bundle *Bundle) (internal.TarBallComposer, error)
 }
 
 func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQueryRunner, uploader internal.Uploader,

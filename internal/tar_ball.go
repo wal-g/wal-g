@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"io"
 
 	"github.com/pkg/errors"
@@ -10,12 +11,12 @@ import (
 
 // A TarBall represents one tar file.
 type TarBall interface {
-	SetUp(crypter crypto.Crypter, args ...string)
+	SetUp(ctx context.Context, crypter crypto.Crypter, args ...string) error
 	CloseTar() error
 	Size() int64
 	AddSize(int64)
 	TarWriter() *tar.Writer
-	AwaitUploads()
+	AwaitUploads() error
 	Name() string
 }
 

@@ -3,6 +3,7 @@ package internal_test
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"io"
 	"strings"
 	"testing"
@@ -47,7 +48,9 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	tarBallQueue.NewTarBall(false)
 	tarBall := tarBallQueue.LastCreatedTarball
-	tarBall.SetUp(nil)
+	if err := tarBall.SetUp(context.TODO(), nil); err != nil {
+		t.Errorf("Failed to create tarBall: %v", err)
+	}
 	tarWriter := tarBall.TarWriter()
 
 	mockData := []byte("a")
@@ -90,7 +93,9 @@ func TestPackFileTo(t *testing.T) {
 		Size:          &size,
 	}
 	tarBall := tarBallMaker.Make(false)
-	tarBall.SetUp(nil)
+	if err := tarBall.SetUp(context.TODO(), nil); err != nil {
+		t.Errorf("Failed to create tarBall: %v", err)
+	}
 	size, err := internal.PackFileTo(tarBall, mockHeader, strings.NewReader(mockData))
 	assert.Equal(t, int64(len(mockData)), size)
 	assert.NoError(t, err)

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -102,7 +103,7 @@ func NewBundle(
 }
 
 func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
-	tarBallComposer, err := composerMaker.Make(bundle)
+	tarBallComposer, err := composerMaker.Make(context.TODO(), bundle)
 	if err != nil {
 		return err
 	}
@@ -281,7 +282,10 @@ func (bundle *Bundle) addToBundle(path string, info os.FileInfo) error {
 			return nil
 		}
 		isIncremented := bundle.isIncremented(path, wasInBase, info)
-		bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
+		err = bundle.TarBallComposer.AddFile(internal.NewComposeFileInfo(path, info, wasInBase, isIncremented, fileInfoHeader))
+		if err != nil {
+			return err
+		}
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {
@@ -312,7 +316,9 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	path := bundle.Sentinel.Path
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, "pg_control.tar."+compressorFileExtension)
+	if err := tarBall.SetUp(context.Background(), bundle.Crypter, "pg_control.tar."+compressorFileExtension); err != nil {
+		return errors.Wrap(err, "UploadPgControl: failed to set up tarball")
+	}
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -371,7 +377,9 @@ func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner, compressorFil
 	}
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, "backup_label.tar."+compressorFileExtension)
+	if err := tarBall.SetUp(context.Background(), bundle.Crypter, "backup_label.tar."+compressorFileExtension); err != nil {
+		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to set up tarball")
+	}
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,

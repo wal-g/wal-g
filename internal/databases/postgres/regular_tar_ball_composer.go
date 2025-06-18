@@ -22,13 +22,14 @@ type RegularTarBallComposer struct {
 }
 
 func NewRegularTarBallComposer(
+	ctx context.Context,
 	tarBallQueue *internal.TarBallQueue,
 	tarBallFilePacker *TarBallFilePackerImpl,
 	files internal.BundleFiles,
 	tarFileSets internal.TarFileSets,
 	crypter crypto.Crypter,
 ) *RegularTarBallComposer {
-	errorGroup, ctx := errgroup.WithContext(context.Background())
+	errorGroup, ctx := errgroup.WithContext(ctx)
 	return &RegularTarBallComposer{
 		tarBallQueue:  tarBallQueue,
 		tarFilePacker: tarBallFilePacker,
@@ -56,7 +57,7 @@ func NewRegularTarBallComposerMaker(
 	}
 }
 
-func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
+func (maker *RegularTarBallComposerMaker) Make(ctx context.Context, bundle *Bundle) (internal.TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
 	tarBallFilePacker := NewTarBallFilePacker(bundle.DeltaMap,
@@ -64,15 +65,17 @@ func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBall
 	if bundle.IncrementFromChkpNum != nil {
 		tarBallFilePacker.IncrementFromChkpNum = bundle.IncrementFromChkpNum
 	}
-	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
+	return NewRegularTarBallComposer(ctx, bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 
-func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
+func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) error {
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
-		return
+		return err
 	}
-	tarBall.SetUp(c.crypter)
+	if err := tarBall.SetUp(c.ctx, c.crypter); err != nil {
+		return err
+	}
 	c.tarFileSets.AddFile(tarBall.Name(), info.Header.Name)
 	c.errorGroup.Go(func() error {
 		err := c.tarFilePacker.PackFileIntoTar(info, tarBall)
@@ -81,6 +84,7 @@ func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 		}
 		return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
 	})
+	return nil
 }
 
 func (c *RegularTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
@@ -88,7 +92,9 @@ func (c *RegularTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.F
 	if err != nil {
 		return c.errorGroup.Wait()
 	}
-	tarBall.SetUp(c.crypter)
+	if err := tarBall.SetUp(c.ctx, c.crypter); err != nil {
+		return err
+	}
 	defer c.tarBallQueue.EnqueueBack(tarBall)
 	c.tarFileSets.AddFile(tarBall.Name(), fileInfoHeader.Name)
 	c.files.AddFile(fileInfoHeader, info, false)

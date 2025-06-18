@@ -3,6 +3,7 @@ package testtools
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -30,7 +31,7 @@ func (tarBall *FileTarBall) Name() string {
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
-func (tarBall *FileTarBall) SetUp(crypter crypto.Crypter, names ...string) {
+func (tarBall *FileTarBall) SetUp(_ context.Context, crypter crypto.Crypter, _ ...string) error {
 	if tarBall.tarWriter == nil {
 		name := filepath.Join(tarBall.out, tarBall.Name())
 		file, err := os.Create(name)
@@ -60,6 +61,7 @@ func (tarBall *FileTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 
 		tarBall.tarWriter = tar.NewWriter(tarBall.writeCloser)
 	}
+	return nil
 }
 
 // CloseTar closes the tar writer and file, flushing any
@@ -76,7 +78,7 @@ func (tarBall *FileTarBall) CloseTar() error {
 func (tarBall *FileTarBall) Size() int64            { return atomic.LoadInt64(tarBall.partSize) }
 func (tarBall *FileTarBall) AddSize(i int64)        { atomic.AddInt64(tarBall.partSize, i) }
 func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-func (tarBall *FileTarBall) AwaitUploads()          {}
+func (tarBall *FileTarBall) AwaitUploads() error    { return nil }
 
 // BufferTarBall represents a tarball that is
 // written to buffer.
@@ -91,8 +93,9 @@ func (tarBall *BufferTarBall) Name() string {
 	return "BufferTarBall"
 }
 
-func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
+func (tarBall *BufferTarBall) SetUp(_ context.Context, _ crypto.Crypter, _ ...string) error {
 	tarBall.tarWriter = tar.NewWriter(tarBall.underlying)
+	return nil
 }
 
 func (tarBall *BufferTarBall) CloseTar() error {
@@ -111,4 +114,4 @@ func (tarBall *BufferTarBall) TarWriter() *tar.Writer {
 	return tarBall.tarWriter
 }
 
-func (tarBall *BufferTarBall) AwaitUploads() {}
+func (tarBall *BufferTarBall) AwaitUploads() error { return nil }
