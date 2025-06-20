@@ -23,6 +23,7 @@ func CreateConcurrentUploader(
 	backupName string,
 	directory string,
 	skipFileNotExists bool,
+	tarBallComposerMaker TarBallComposerMaker,
 ) (*ConcurrentUploader, error) {
 	crypter := ConfigureCrypter()
 	tarSizeThreshold := viper.GetInt64(conf.TarSizeThresholdSetting)
@@ -35,7 +36,10 @@ func CreateConcurrentUploader(
 		return nil, err
 	}
 
-	tarBallComposerMaker := NewRegularTarBallComposerMaker(&RegularBundleFiles{}, NewRegularTarFileSets(), skipFileNotExists)
+	if tarBallComposerMaker == nil {
+		tarBallComposerMaker = NewRegularTarBallComposerMaker(&RegularBundleFiles{}, NewRegularTarFileSets(), skipFileNotExists)
+	}
+
 	err = bundle.SetupComposer(tarBallComposerMaker)
 	if err != nil {
 		return nil, err
@@ -66,22 +70,22 @@ func (concurrentUploader *ConcurrentUploader) Upload(backupFile *BackupFileMeta)
 	return concurrentUploader.bundle.AddToBundle(backupFile.Path, backupFile, nil)
 }
 
-func (concurrentUploader *ConcurrentUploader) Finalize() error {
+func (concurrentUploader *ConcurrentUploader) Finalize() (TarFileSets, error) {
 	tracelog.InfoLogger.Println("Packing ...")
-	_, err := concurrentUploader.bundle.FinishComposing()
+	tarFileSets, err := concurrentUploader.bundle.FinishComposing()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tracelog.DebugLogger.Println("Finishing queue ...")
 	err = concurrentUploader.bundle.FinishQueue()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	concurrentUploader.UncompressedSize = *concurrentUploader.bundle.TarBallQueue.AllTarballsSize
 	concurrentUploader.CompressedSize, err = concurrentUploader.uploader.UploadedDataSize()
-	return err
+	return tarFileSets, err
 }
 
 func (concurrentUploader *ConcurrentUploader) UploadSentinel(sentinelDto interface{}, backupName string) error {

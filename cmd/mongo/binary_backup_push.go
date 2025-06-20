@@ -25,12 +25,13 @@ var binaryBackupPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		err := mongo.HandleBinaryBackupPush(ctx, permanent, "wal-g-mongo "+binaryBackupPushCommandName)
+		err := mongo.HandleBinaryBackupPush(ctx, permanent, skipMetadata, "wal-g-mongo "+binaryBackupPushCommandName)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
 func init() {
 	binaryBackupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
+	binaryBackupPushCmd.Flags().BoolVar(&skipMetadata, SkipMetadataFlag, false, "Skip metadata collecting for partial restore")
 	cmd.AddCommand(binaryBackupPushCmd)
 }
