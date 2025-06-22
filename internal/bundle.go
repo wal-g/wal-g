@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,8 +54,8 @@ func (bundle *Bundle) StartQueue(tarBallMaker TarBallMaker) error {
 	return bundle.TarBallQueue.StartQueue()
 }
 
-func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
-	tarBallComposer, err := composerMaker.Make(bundle)
+func (bundle *Bundle) SetupComposer(ctx context.Context, composerMaker TarBallComposerMaker) (err error) {
+	tarBallComposer, err := composerMaker.Make(ctx, bundle)
 	if err != nil {
 		return err
 	}
@@ -90,7 +91,10 @@ func (bundle *Bundle) AddToBundle(path string, info os.FileInfo, err error) erro
 	tracelog.DebugLogger.Println(fileInfoHeader.Name)
 
 	if bundle.FilesFilter.ShouldUploadFile(path) && info.Mode().IsRegular() {
-		bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, false, false, fileInfoHeader))
+		err := bundle.TarBallComposer.AddFile(NewComposeFileInfo(path, info, false, false, fileInfoHeader))
+		if err != nil {
+			return err
+		}
 	} else {
 		err := bundle.TarBallComposer.AddHeader(fileInfoHeader, info)
 		if err != nil {

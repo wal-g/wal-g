@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"os"
 	"path"
 	"strings"
@@ -26,7 +27,7 @@ func NewDirDatabaseTarBallComposerMaker(files internal.BundleFiles, filePackerOp
 	}
 }
 
-func (m DirDatabaseTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
+func (m DirDatabaseTarBallComposerMaker) Make(_ context.Context, bundle *Bundle) (internal.TarBallComposer, error) {
 	tarPacker := NewTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, m.files, m.filePackerOptions)
 	return newDirDatabaseTarBallComposer(
 		m.files,
@@ -65,17 +66,20 @@ func newDirDatabaseTarBallComposer(
 	}
 }
 
-func (d DirDatabaseTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
+func (d DirDatabaseTarBallComposer) AddFile(info *internal.ComposeFileInfo) error {
 	if strings.Contains(info.Path, DefaultTablespace) {
 		d.fileDirCollection[path.Dir(info.Path)] = append(d.fileDirCollection[path.Dir(info.Path)], info)
 	} else {
 		d.fileDirCollection[""] = append(d.fileDirCollection[""], info)
 	}
+	return nil
 }
 
 func (d DirDatabaseTarBallComposer) AddHeader(header *tar.Header, fileInfo os.FileInfo) error {
 	tarBall := d.tarBallQueue.Deque()
-	tarBall.SetUp(d.crypter)
+	if err := tarBall.SetUp(context.Background(), d.crypter); err != nil {
+		return err
+	}
 	defer d.tarBallQueue.EnqueueBack(tarBall)
 	d.tarFileSets.AddFile(tarBall.Name(), header.Name)
 	d.files.AddFile(header, fileInfo, false)
@@ -116,8 +120,9 @@ func (d DirDatabaseTarBallComposer) GetFiles() internal.BundleFiles {
 
 func (d DirDatabaseTarBallComposer) addListToTar(files []*internal.ComposeFileInfo) error {
 	tarBall := d.tarBallQueue.Deque()
-	tarBall.SetUp(d.crypter)
-
+	if err := tarBall.SetUp(context.Background(), d.crypter); err != nil {
+		return err
+	}
 	for _, file := range files {
 		d.tarFileSets.AddFile(tarBall.Name(), file.Header.Name)
 		err := d.tarFilePacker.PackFileIntoTar(file, tarBall)
@@ -131,7 +136,9 @@ func (d DirDatabaseTarBallComposer) addListToTar(files []*internal.ComposeFileIn
 				return err
 			}
 			tarBall = d.tarBallQueue.Deque()
-			tarBall.SetUp(d.crypter)
+			if err := tarBall.SetUp(context.Background(), d.crypter); err != nil {
+				return err
+			}
 		}
 	}
 	return d.tarBallQueue.FinishTarBall(tarBall)
