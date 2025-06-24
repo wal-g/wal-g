@@ -2,8 +2,10 @@ package gp
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
@@ -21,7 +23,8 @@ var checkAOLengthSegmentCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
 		tracelog.ErrorLogger.FatalOnError(err)
-		handler, err := greenplum.NewAOLengthCheckSegmentHandler(port, segnum, rootFolder)
+		dbDir := viper.GetString(conf.GPDatabaseDir)
+		handler, err := greenplum.NewAOLengthCheckSegmentHandler(port, segnum, rootFolder, dbDir)
 		tracelog.ErrorLogger.FatalOnError(err)
 		if checkBackup {
 			handler.CheckAOBackupLengthSegment(backupName)

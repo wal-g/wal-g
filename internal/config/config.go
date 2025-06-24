@@ -190,6 +190,7 @@ const (
 	GPAoDeduplicationAgeLimit    = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
 	GPRelativeRecoveryConfPath   = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
 	GPRelativePostgresqlConfPath = "WALG_GP_RELATIVE_POSTGRESQL_CONF_PATH"
+	GPDatabaseDir                = "WALG_GP_DATABASE_DIR"
 
 	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
 	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
@@ -340,6 +341,7 @@ var (
 		GPRelativePostgresqlConfPath: "postgresql.conf",
 		ForceWalDetal:                "false",
 		PgAppName:                    "wal-g",
+		GPDatabaseDir:                "/var/lib/greenplum/data1",
 	}
 
 	AllowedSettings map[string]bool
@@ -610,6 +612,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
+		GPDatabaseDir:                        true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
