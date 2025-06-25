@@ -17,9 +17,23 @@ type MongodProcess struct {
 	parameters        []string
 	replsetID         string
 	isMongoCfg        bool
+	restore           bool
 	port              int
 	cancel            context.CancelFunc
 	cmd               *exec.Cmd
+}
+
+func StartMongoWithRestore(minimalConfigPath string) (*MongodProcess, error) {
+	mongodProcess := &MongodProcess{
+		minimalConfigPath: minimalConfigPath,
+		restore:           true,
+	}
+
+	err := mongodProcess.start()
+	if err != nil {
+		return nil, err
+	}
+	return mongodProcess, nil
 }
 
 func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) (*MongodProcess, error) {
@@ -86,8 +100,12 @@ func (mongodProcess *MongodProcess) start() (err error) {
 	if len(mongodProcess.replsetID) != 0 {
 		cliArgs = append(cliArgs, "--replSet", mongodProcess.replsetID)
 	}
+
 	if mongodProcess.isMongoCfg {
 		cliArgs = append(cliArgs, "--configsvr")
+	}
+	if mongodProcess.restore {
+		cliArgs = append(cliArgs, "--restore")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

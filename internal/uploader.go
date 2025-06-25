@@ -37,7 +37,7 @@ type Uploader interface {
 }
 
 // RegularUploader contains fields associated with uploading tarballs.
-// Multiple tarballs can share one uploader.
+// Multiple tarballs can share one Uploader.
 type RegularUploader struct {
 	UploadingFolder storage.Folder
 	Compressor      compression.Compressor

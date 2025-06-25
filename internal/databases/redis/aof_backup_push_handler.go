@@ -26,7 +26,12 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)
 	tmpPath, _ := conf.GetSetting(conf.RedisAppendonlyTmpFolder)
-	concurrentUploader, err := internal.CreateConcurrentUploader(args.Uploader, backupName, tmpPath, false)
+	concurrentUploader, err := internal.CreateConcurrentUploader(
+		internal.CreateConcurrentUploaderArgs{
+			Uploader:   args.Uploader,
+			BackupName: backupName,
+			Directory:  tmpPath,
+		})
 	if err != nil {
 		return err
 	}

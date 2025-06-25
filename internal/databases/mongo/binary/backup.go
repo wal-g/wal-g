@@ -2,6 +2,7 @@ package binary
 
 import (
 	"context"
+	"github.com/wal-g/tracelog"
 	"os"
 
 	"github.com/pkg/errors"
@@ -17,7 +18,8 @@ type BackupService struct {
 	MongodService *MongodService
 	Uploader      internal.Uploader
 
-	Sentinel models.Backup
+	Sentinel         models.Backup
+	BackupRoutesInfo models.BackupRoutesInfo
 }
 
 func GenerateNewBackupName() string {
@@ -33,10 +35,19 @@ func CreateBackupService(ctx context.Context, mongodService *MongodService, uplo
 	}, nil
 }
 
-func (backupService *BackupService) DoBackup(backupName string, permanent bool) error {
+func (backupService *BackupService) DoBackup(backupName string, permanent, skipMetadata bool) error {
 	err := backupService.InitializeMongodBackupMeta(backupName, permanent)
 	if err != nil {
 		return err
+	}
+
+	var backupRoutes *models.BackupRoutesInfo
+	if !skipMetadata {
+		backupRoutes, err = CreateBackupRoutesInfo(backupService.MongodService)
+		if err != nil {
+			return err
+		}
+		backupService.BackupRoutesInfo = *backupRoutes
 	}
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
@@ -53,7 +64,13 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 	backupCursor.StartKeepAlive()
 
 	mongodDBPath := backupCursor.BackupCursorMeta.DBPath
-	concurrentUploader, err := internal.CreateConcurrentUploader(backupService.Uploader, backupName, mongodDBPath, false)
+	concurrentUploader, err := internal.CreateConcurrentUploader(
+		internal.CreateConcurrentUploaderArgs{
+			Uploader:             backupService.Uploader,
+			BackupName:           backupName,
+			Directory:            mongodDBPath,
+			TarBallComposerMaker: NewDirDatabaseTarBallComposerMaker(),
+		})
 	if err != nil {
 		return err
 	}
@@ -80,9 +97,16 @@ func (backupService *BackupService) DoBackup(backupName string, permanent bool) 
 		}
 	}
 
-	err = concurrentUploader.Finalize()
+	tarFileSets, err := concurrentUploader.Finalize()
 	if err != nil {
 		return err
+	}
+
+	if !skipMetadata {
+		if err = backupService.AddMetadata(tarFileSets); err != nil {
+			tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
+			return err
+		}
 	}
 
 	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta)
@@ -129,4 +153,13 @@ func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUpload
 	sentinel.MongoMeta.After.LastTS = backupLastTS
 
 	return internal.UploadSentinel(backupService.Uploader, sentinel, sentinel.BackupName)
+}
+
+func (backupService *BackupService) AddMetadata(tarFilesSet internal.TarFileSets) error {
+	backupRoutes := &backupService.BackupRoutesInfo
+	if err := models.EnrichWithTarPaths(backupRoutes, tarFilesSet.Get()); err != nil {
+		return err
+	}
+
+	return internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
 }

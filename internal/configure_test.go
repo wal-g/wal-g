@@ -153,7 +153,7 @@ func prepareDataFolder(t *testing.T, name string) string {
 	if err != nil {
 		t.Log(err)
 	}
-	// Create temp directory.
+	// Create temp Directory.
 	dir, err := os.MkdirTemp(cwd, "test")
 	if err != nil {
 		t.Log(err)
