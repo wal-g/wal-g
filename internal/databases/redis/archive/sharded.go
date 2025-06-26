@@ -87,8 +87,12 @@ func GetSlotsMap() (map[string][][]string, error) {
 	scanner := bufio.NewScanner(clusterConf)
 	for scanner.Scan() {
 		line := scanner.Text()
-		// 56cac18e538888e2fb81b09b8491e819d2bda1e1 2a02:6b8:c18:3e81:0:1589:4138:e47b:6379@16379 master,nofailover -
+		// 1. 56cac18e538888e2fb81b09b8491e819d2bda1e1 <ip>:6379@16379 master,nofailover -
 		// 0 1747228909000 44 connected 2731-5460 10923-13653 [10923->3d68e5b49b010564b64c8a4ac26536a8d6a756f8]
+		// 2. 17b6be48fa511f0adad8c887dc01dd7067e7bfe5 <ip>:6379@16379,<hostname>,tls-port=0,shard-id=078c4272db66981a314129680c33a980ebd2e037
+		// master,fail,nofailover - 1750694758775 1750694758775 419 connected
+		// 3. d36dacb40728f82b6453a611941cded23915d24a <ip>:6379@16379,,tls-port=0,shard-id=3e0c8579c9f33534b4ccaafe168eb9a1d97c116e
+		// master,fail,nofailover - 1750771752642 1750771748000 53 connected
 		if !strings.Contains(line, "master") {
 			continue
 		}
@@ -98,21 +102,27 @@ func GetSlotsMap() (map[string][][]string, error) {
 			return map[string][][]string{}, err
 		}
 
-		ipWithPorts := strings.Split(line, " ")[1]
-		parts := strings.Split(ipWithPorts, ":")
-		ip := strings.Join(parts[:len(parts)-1], ":")
-
 		var fqdns []string
-		if ip == "" {
-			host, err := os.Hostname()
-			if err != nil {
-				return map[string][][]string{}, err
-			}
-			fqdns = append(fqdns, host)
+		ipWithPortsAndTail := strings.Split(line, " ")[1]
+		parts := strings.Split(ipWithPortsAndTail, ",")
+		var ip string
+		if len(parts) > 1 && parts[1] != "" {
+			fqdns = append(fqdns, parts[1])
 		} else {
-			fqdns, err = net.LookupAddr(ip)
-			if err != nil {
-				return map[string][][]string{}, errors.Wrapf(err, "failed to find address %s", ip)
+			ipWithPorts := strings.Split(parts[0], "@")[0]
+			parts := strings.Split(ipWithPorts, ":")
+			ip = strings.Join(parts[:len(parts)-1], ":")
+			if ip == "" {
+				host, err := os.Hostname()
+				if err != nil {
+					return map[string][][]string{}, err
+				}
+				fqdns = append(fqdns, host)
+			} else {
+				fqdns, err = net.LookupAddr(ip)
+				if err != nil {
+					return map[string][][]string{}, errors.Wrapf(err, "failed to find address %s", ip)
+				}
 			}
 		}
 
