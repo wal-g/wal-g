@@ -69,7 +69,7 @@ func (bd *BackupDetail) PrintableFields() []printlist.TableField {
 	return []printlist.TableField{
 		{
 			Name:       "name",
-			PrettyName: "Name time",
+			PrettyName: "Name",
 			Value:      bd.Name,
 		},
 		{
@@ -144,7 +144,6 @@ func MakeBackupDetails(backups []Backup) []BackupDetail {
 	return details
 }
 
-// TODO: unit tests (table output)
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backups, err := ListStorageBackups(folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)

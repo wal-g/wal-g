@@ -3,6 +3,8 @@ package greenplum_test
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -109,6 +111,153 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 	err = json.Unmarshal(buf.Bytes(), &unmarshaledDetails)
 	assert.NoError(t, err)
 	assert.Equal(t, details, unmarshaledDetails)
+}
+
+func TestHandleDetailedBackupListTableOutput_NonJSON(t *testing.T) {
+	const (
+		nonPrettyOutput = `
+name                                       restore_point                              start_time           finish_time          hostname       gp_version is_permanent
+backup_20221212T151258Z                    backup_20221212T151258Z                    2022-12-12T12:12:58Z 2022-12-12T12:18:58Z some.host.name 6.19.3     false
+backup_20221213T011727Z_D_20221212T151258Z backup_20221213T011727Z_D_20221212T151258Z 2022-12-12T22:17:27Z 2022-12-12T22:18:27Z some.host.name 6.19.3     false
+`
+
+		prettyOutput = `
++---+--------------------------------------------+--------------------------------------------+--------------------------------+--------------------------------+----------------+------------+-----------+
+| # | NAME                                       | RESTORE POINT                              | START TIME                     | FINISH TIME                    | HOSTNAME       | GP VERSION | PERMANENT |
++---+--------------------------------------------+--------------------------------------------+--------------------------------+--------------------------------+----------------+------------+-----------+
+| 0 | backup_20221212T151258Z                    | backup_20221212T151258Z                    | Monday, 12-Dec-22 12:12:58 UTC | Monday, 12-Dec-22 12:18:58 UTC | some.host.name | 6.19.3     | false     |
+| 1 | backup_20221213T011727Z_D_20221212T151258Z | backup_20221213T011727Z_D_20221212T151258Z | Monday, 12-Dec-22 22:17:27 UTC | Monday, 12-Dec-22 22:18:27 UTC | some.host.name | 6.19.3     | false     |
++---+--------------------------------------------+--------------------------------------------+--------------------------------+--------------------------------+----------------+------------+-----------+
+`
+	)
+
+	rescueStdout := os.Stdout
+	t.Cleanup(func() {
+		os.Stdout = rescueStdout
+	})
+
+	testCases := []struct {
+		name           string
+		pretty         bool
+		expectedOutput string
+	}{
+		{
+			name:           "non-pretty",
+			pretty:         false,
+			expectedOutput: nonPrettyOutput,
+		},
+		{
+			name:           "pretty",
+			pretty:         true,
+			expectedOutput: prettyOutput,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			folder := CreateMockStorageFolder(t)
+
+			r, w, err := os.Pipe()
+			require.NoError(t, err)
+			os.Stdout = w
+
+			greenplum.HandleDetailedBackupList(folder, tc.pretty, false)
+			w.Close()
+
+			out, err := io.ReadAll(r)
+			require.NoError(t, err)
+
+			stringOutput := string(out)
+			assert.Equal(t, strings.TrimSpace(tc.expectedOutput), strings.TrimSpace(stringOutput))
+		})
+	}
+}
+
+func TestHandleDetailedBackupListTableOutput_JSON(t *testing.T) {
+	// NOTE: non-pretty json output is just a non-indented pretty json
+	const prettyJSONOutput = `
+[
+    {
+        "Name": "backup_20221212T151258Z",
+        "restore_point": "backup_20221212T151258Z",
+        "user_data": {
+            "backup_id": "some_id1"
+        },
+        "start_time": "2022-12-12T12:12:58.287495Z",
+        "finish_time": "2022-12-12T12:18:58.826198Z",
+        "date_fmt": "%Y-%m-%dT%H:%M:%S.%fZ",
+        "hostname": "some.host.name",
+        "gp_version": "6.19.3",
+        "gp_flavor": "greenplum",
+        "is_permanent": false,
+        "uncompressed_size": 2139586909,
+        "compressed_size": 91217782,
+        "data_catalog_size": 20161814071
+    },
+    {
+        "Name": "backup_20221213T011727Z_D_20221212T151258Z",
+        "restore_point": "backup_20221213T011727Z_D_20221212T151258Z",
+        "user_data": {
+            "backup_id": "some_id2"
+        },
+        "start_time": "2022-12-12T22:17:27.196163Z",
+        "finish_time": "2022-12-12T22:18:27.803675Z",
+        "date_fmt": "%Y-%m-%dT%H:%M:%S.%fZ",
+        "hostname": "some.host.name",
+        "gp_version": "6.19.3",
+        "gp_flavor": "greenplum",
+        "is_permanent": false,
+        "uncompressed_size": 36283663,
+        "compressed_size": 2532570,
+        "data_catalog_size": 20161790703,
+        "increment_from": "backup_20221212T151258Z",
+        "increment_full_name": "backup_20221212T151258Z",
+        "increment_count": 1
+    }
+]
+`
+
+	rescueStdout := os.Stdout
+	t.Cleanup(func() {
+		os.Stdout = rescueStdout
+	})
+
+	testCases := []struct {
+		name   string
+		pretty bool
+	}{
+		{
+			name:   "non-pretty",
+			pretty: false,
+		},
+		{
+			name:   "pretty",
+			pretty: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			folder := CreateMockStorageFolder(t)
+
+			r, w, err := os.Pipe()
+			require.NoError(t, err)
+			os.Stdout = w
+
+			greenplum.HandleDetailedBackupList(folder, tc.pretty, true)
+			w.Close()
+
+			out, err := io.ReadAll(r)
+			require.NoError(t, err)
+
+			backups, err := greenplum.ListStorageBackups(folder)
+			require.NoError(t, err)
+			details := greenplum.MakeBackupDetails(backups)
+
+			var unmarshaledDetails []greenplum.BackupDetail
+			err = json.Unmarshal(out, &unmarshaledDetails)
+			require.NoError(t, err)
+			assert.Equal(t, details, unmarshaledDetails)
+		})
+	}
 }
 
 func CreateMockStorageFolder(t *testing.T) storage.Folder {
