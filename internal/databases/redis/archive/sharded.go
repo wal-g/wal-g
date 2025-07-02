@@ -134,6 +134,15 @@ func extractFQDNs(line string, netImpl NetI) ([]string, error) {
 	return fqdns, nil
 }
 
+func validateFqdns(fqdnToIDMap map[string]string, idToSlots map[string][][]string) (map[string][][]string, error) {
+	for _, id := range fqdnToIDMap {
+		if _, exists := idToSlots[id]; !exists {
+			return map[string][][]string{}, fmt.Errorf("failed to find all IDs from %+v\nfound only %+v", fqdnToIDMap, idToSlots)
+		}
+	}
+	return idToSlots, nil
+}
+
 func GetSlotsMap(netImpl NetI) (map[string][][]string, error) {
 	fqdnToIDMap, err := getFQDNToIDMap()
 	if err != nil {
@@ -185,11 +194,7 @@ func GetSlotsMap(netImpl NetI) (map[string][][]string, error) {
 		}
 	}
 
-	if len(fqdnToIDMap) != len(idToSlots) {
-		return map[string][][]string{}, fmt.Errorf("failed to find all IDs from %+v\nfound only %+v", fqdnToIDMap, idToSlots)
-	}
-
-	return idToSlots, nil
+	return validateFqdns(fqdnToIDMap, idToSlots)
 }
 
 func FetchSlotsDataFromStorage(folder storage.Folder, backup *Backup) (string, error) {
