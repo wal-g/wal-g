@@ -120,3 +120,86 @@ d36dacb40728f82b6453a611941cded23915d24a ip2:6379@16379,,tls-port=0,shard-id=3e0
 		})
 	}
 }
+
+func TestValidateFqdns(t *testing.T) {
+	tests := []struct {
+		name          string
+		fqdnToIDMap   map[string]string
+		idToSlots     map[string][][]string
+		expectedError string
+	}{
+		{
+			name: "[success] simple",
+			fqdnToIDMap: map[string]string{
+				"host1": "id1",
+				"host2": "id2",
+			},
+			idToSlots: map[string][][]string{
+				"id1": {{"0", "10000"}},
+				"id2": {{"10001", "16384"}},
+			},
+			expectedError: "",
+		},
+		{
+			name:        "[success] complex",
+			fqdnToIDMap: map[string]string{"host1": "id4", "host2": "id2", "host3": "id3", "host4": "id1", "host5": "id3", "host6": "id2", "host7": "id4", "host8": "id1", "host9": "id1", "host10": "id4", "host11": "id2", "host12": "id3"},
+			idToSlots: map[string][][]string{
+				"id1": {{"0", "5460"}},
+				"id2": {{"5461", "10922"}},
+				"id3": {{"10923", "16383"}},
+				"id4": {{}},
+			},
+			expectedError: "",
+		},
+		{
+			name: "[fail] missing ID case",
+			fqdnToIDMap: map[string]string{
+				"host1": "id1",
+				"host2": "id2",
+			},
+			idToSlots: map[string][][]string{
+				"id1": {{"0", "10000"}},
+			},
+			expectedError: "failed to find all IDs from map[host1:id1 host2:id2]\nfound only map[id1:[[0 10000]]]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := validateFqdns(tt.fqdnToIDMap, tt.idToSlots)
+			if tt.expectedError == "" {
+				if err != nil {
+					t.Errorf("expected no error, but got: %v", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("expected an error, but got nil")
+				} else if err.Error() != tt.expectedError {
+					t.Errorf("error message mismatch. Expected: %s, Got: %s", tt.expectedError, err.Error())
+				}
+			}
+		})
+	}
+}
+
+func TestValidateFqdns_MissingID(t *testing.T) {
+	fqdnToIDMap := map[string]string{
+		"host1": "id1",
+		"host2": "id2",
+	}
+
+	idToSlots := map[string][][]string{
+		"id1": {{"0", "10000"}},
+	}
+
+	_, err := validateFqdns(fqdnToIDMap, idToSlots)
+	if err == nil {
+		t.Errorf("expected an error for missing ID 'id2'")
+		return
+	}
+
+	expectedErrorMessage := "failed to find all IDs from map[host1:id1 host2:id2]\nfound only map[id1:[[0 10000]]]"
+	if err.Error() != expectedErrorMessage {
+		t.Errorf("error message mismatch. Expected: %s, Got: %s", expectedErrorMessage, err.Error())
+	}
+}
