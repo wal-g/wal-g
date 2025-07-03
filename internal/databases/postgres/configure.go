@@ -46,12 +46,26 @@ func configureWalDeltaUsage() (useWalDelta bool, deltaDataFolder fsutil.DataFold
 	return
 }
 
+// deprecated: use conf.getPgTimeoutSetting() instead; will be removed in future
 func getStopBackupTimeoutSetting() (time.Duration, error) {
 	if !viper.IsSet(conf.PgStopBackupTimeout) {
 		return 0, nil
 	}
 
 	timeout, err := conf.GetDurationSetting(conf.PgStopBackupTimeout)
+	if err != nil {
+		return 0, err
+	}
+
+	return timeout, nil
+}
+
+func getPgTimeoutSetting() (time.Duration, error) {
+	if !viper.IsSet(conf.PgTimeout) {
+		return 0, nil
+	}
+
+	timeout, err := conf.GetDurationSetting(conf.PgTimeout)
 	if err != nil {
 		return 0, err
 	}
