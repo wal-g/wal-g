@@ -44,6 +44,16 @@ type SegmentRestoreConfig struct {
 	DataDir  string `json:"data_dir"`
 }
 
+func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
+	return cluster.SegConfig{
+		ContentID: contentID,
+		Role:      string(Primary),
+		Port:      cfg.Port,
+		Hostname:  cfg.Hostname,
+		DataDir:   cfg.DataDir,
+	}
+}
+
 // ClusterRestoreConfig is used to describe the restored cluster
 type ClusterRestoreConfig struct {
 	Segments map[int]SegmentRestoreConfig `json:"segments"`
@@ -204,7 +214,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
+	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 

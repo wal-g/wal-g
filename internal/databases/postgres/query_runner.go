@@ -459,7 +459,7 @@ func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
 }
 
-func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
+func (queryRunner *PgQueryRunner) ReadTimeline() (timeline uint32, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 

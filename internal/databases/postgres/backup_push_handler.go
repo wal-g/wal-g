@@ -604,7 +604,7 @@ func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunne
 	pgInfo.systemIdentifier = queryRunner.SystemIdentifier
 	tracelog.DebugLogger.Printf("Postgres SystemIdentifier: %d", queryRunner.Version)
 
-	pgInfo.Timeline, err = queryRunner.readTimeline()
+	pgInfo.Timeline, err = queryRunner.ReadTimeline()
 	if err != nil {
 		return pgInfo, nil, err
 	}
