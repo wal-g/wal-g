@@ -23,6 +23,10 @@ To configure how many goroutines to use during ```backup-fetch``` and ```wal-fet
 
 To configure how many times failed file will be retried during ```backup-fetch``` and ```wal-fetch```, use `WALG_DOWNLOAD_FILE_RETRIES`. By default is set to 15.
 
+* `WALG_DIRECT_IO`
+
+An experimental feature that allows you to perform direct_io reads during a ```backup-push``` without flushing the disk cache. To activate it, set the value of the environment variable to `true`.
+
 * `WALG_PREFETCH_DIR`
 
 By default WAL prefetch is storing prefetched data in pg_wal directory. This ensures that WAL can be easily moved from prefetch location to actual WAL consumption directory. But it may have negative consequences if you use it with pg_rewind in PostgreSQL 13.
@@ -397,6 +401,8 @@ Run series of checks to ensure that WAL segment storage is healthy. Available ch
 
 #### `integrity`
 Ensure that there is a consistent WAL segment history for the cluster so WAL-G can perform a PITR for the backup. Essentially, it checks that all the WAL segments in the range `[oldest backup start segment, current cluster segment)` are available in storage. If no backups found, `[1, current cluster segment)` range will be scanned.
+Additionally, you can specify your own timeline and LSN using the `--timeline` and `--lsn` flags. This is useful, for example, to ensure that a replica can be restored from the archive.
+You can also specify the name of a particular backup to check using the --backup-name flag. In this case, it checks that all the WAL segments in the range `[backup with specified name start segment, current cluster segment)`."
 
 ![SegmentStatusIllustration](resources/wal_verify_segment_statuses.png)
 

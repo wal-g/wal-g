@@ -180,7 +180,7 @@ func StreamMetadataNameFromBackup(backupName string) string {
 	return backupName + "/" + utility.StreamMetadataFileName
 }
 
-// UnwrapLatestModifier checks if LATEST is provided instead of backupName
+// UnwrapLatestModifier checks if LATEST is provided instead of BackupName
 // if so, replaces it with the name of the latest backup
 func UnwrapLatestModifier(backupName string, folder storage.Folder) (string, error) {
 	if backupName != LatestString {

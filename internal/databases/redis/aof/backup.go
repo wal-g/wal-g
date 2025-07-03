@@ -76,7 +76,12 @@ func CreateBackupService(ctx context.Context, diskWatcher *diskwatcher.DiskWatch
 	}, nil
 }
 
-func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
+type DoBackupArgs struct {
+	BackupName string
+	Sharded    bool
+}
+
+func (bs *BackupService) DoBackup(args DoBackupArgs) error {
 	err := bs.metaConstructor.Init()
 	if err != nil {
 		return errors.Wrapf(err, "can not init meta provider")
@@ -118,12 +123,22 @@ func (bs *BackupService) DoBackup(backupName string, permanent bool) error {
 		return fmt.Errorf("disk is filled above limit, exiting")
 	}
 
-	err = bs.concurrentUploader.Finalize()
+	_, err = bs.concurrentUploader.Finalize()
 	if err != nil {
 		return err
 	}
 
-	return bs.Finalize(backupName)
+	fillArgs := archive.FillSlotsForShardedArgs{
+		BackupName: args.BackupName,
+		Sharded:    args.Sharded,
+		Uploader:   bs.concurrentUploader,
+	}
+	err = archive.FillSlotsForSharded(context.Background(), fillArgs)
+	if err != nil {
+		return err
+	}
+
+	return bs.Finalize(args.BackupName)
 }
 
 func (bs *BackupService) Finalize(backupName string) error {

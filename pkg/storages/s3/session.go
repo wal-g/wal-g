@@ -222,7 +222,13 @@ func detectAWSRegionByBucket(bucket string, config *aws.Config) (string, error) 
 }
 
 func requestEndpointFromSource(endpointSource, port string) *string {
-	resp, err := http.Get(endpointSource)
+	t := http.DefaultTransport
+	c := http.DefaultClient
+	if tr, ok := t.(*http.Transport); ok {
+		tr.DisableKeepAlives = true
+		c = &http.Client{Transport: tr}
+	}
+	resp, err := c.Get(endpointSource)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Endpoint source error: %v ", err)
 		return nil

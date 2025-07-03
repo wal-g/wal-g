@@ -40,7 +40,7 @@ func (t FilesToExtractProviderImpl) Get(backup Backup, filesToUnwrap map[string]
 		// exists: it won't in the case of WAL-E backup
 		// backwards compatibility.
 		if pgControlRe.MatchString(tarName) {
-			tarToExtract := internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+			tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
 			sequentialTarsToExtract = append(sequentialTarsToExtract, tarToExtract)
 			continue
 		}
@@ -51,7 +51,7 @@ func (t FilesToExtractProviderImpl) Get(backup Backup, filesToUnwrap map[string]
 		// We should override it in order to reach correct end of backup point.
 		// so, we should extract our `backup_label` after extracting regular tars.
 		if backupLabelRe.MatchString(tarName) {
-			tarToExtract := internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+			tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
 			sequentialTarsToExtract = append(sequentialTarsToExtract, tarToExtract)
 			continue
 		}
@@ -60,7 +60,7 @@ func (t FilesToExtractProviderImpl) Get(backup Backup, filesToUnwrap map[string]
 			continue
 		}
 
-		tarToExtract := internal.NewStorageReaderMaker(backup.getTarPartitionFolder(), tarName)
+		tarToExtract := internal.NewStorageReaderMaker(backup.GetTarPartitionFolder(), tarName)
 		concurrentTarsToExtract = append(concurrentTarsToExtract, tarToExtract)
 	}
 	return concurrentTarsToExtract, sequentialTarsToExtract, nil

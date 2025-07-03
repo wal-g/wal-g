@@ -22,7 +22,9 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -30,8 +32,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+var DatabasePageSize int64 = int64(walparser.BlockSize)
+
 const (
-	DatabasePageSize          = int64(walparser.BlockSize)
 	sizeofInt32               = 4
 	sizeofInt64               = 8
 	SignatureMagicNumber byte = 0x55
@@ -48,6 +51,10 @@ const (
 	ClogDir      = "pg_clog"      // Legacy name for transaction status
 	MultiXactDir = "pg_multixact" // Multi-transaction status
 )
+
+func SetDatabasePageSize(pageSize uint64) {
+	DatabasePageSize = int64(pageSize)
+}
 
 type InvalidIncrementFileHeaderError struct {
 	error
@@ -137,7 +144,7 @@ func ReadIncrementalFile(filePath string,
 	fileSize int64,
 	lsn LSN,
 	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
-	file, err := os.Open(filePath)
+	file, err := fsutil.OpenReadOnlyMayBeDirectIO(filePath)
 	if err != nil {
 		return nil, 0, err
 	}

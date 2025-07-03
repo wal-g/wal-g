@@ -10,7 +10,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string) error {
+func HandleBinaryBackupPush(ctx context.Context, permanent, skipMetadata bool, appName string) error {
 	backupName := binary.GenerateNewBackupName()
 
 	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
@@ -33,5 +33,5 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
-	return backupService.DoBackup(backupName, permanent)
+	return backupService.DoBackup(backupName, permanent, skipMetadata)
 }

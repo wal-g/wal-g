@@ -9,11 +9,24 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleRDBBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd, metaConstructor internal.MetaConstructor) error {
-	stdout, err := utility.StartCommandWithStdoutPipe(backupCmd)
+type RDBBackupPushArgs struct {
+	BackupCmd       *exec.Cmd
+	Sharded         bool
+	Uploader        internal.Uploader
+	MetaConstructor internal.MetaConstructor
+}
+
+func HandleRDBBackupPush(args RDBBackupPushArgs) error {
+	stdout, err := utility.StartCommandWithStdoutPipe(args.BackupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	redisUploader := rdb.NewRedisStorageUploader(uploader)
+	redisUploader := rdb.NewRedisStorageUploader(args.Uploader)
+	uploadArgs := rdb.UploadBackupArgs{
+		Cmd:             args.BackupCmd,
+		MetaConstructor: args.MetaConstructor,
+		Sharded:         args.Sharded,
+		Stream:          stdout,
+	}
 
-	return redisUploader.UploadBackup(stdout, backupCmd, metaConstructor)
+	return redisUploader.UploadBackup(uploadArgs)
 }

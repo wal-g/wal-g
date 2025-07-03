@@ -24,7 +24,7 @@ REDIS_VERSION ?= "6.2.4"
 IMAGE_TYPE ?= "rdb"
 TOOLS_MOD_DIR := ./internal/tools
 MOCKS_DESTINATION := ./testtools/mocks
-FILE_TO_MOCKS := ./internal/uploader.go .\pkg\storages\memory\folder.go ##перечисление путей до интерфейсов
+FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
 
 BUILD_TAGS:=
 

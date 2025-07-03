@@ -3,6 +3,7 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"os"
 	"sort"
 	"strings"
@@ -23,6 +24,7 @@ import (
 )
 
 const RestorePointSuffix = "_restore_point.json"
+const RestorePointCreateRetries = 5
 
 type RestorePointMetadata struct {
 	Name             string         `json:"name"`
@@ -150,13 +152,42 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
 	queryRunner, err := NewGpQueryRunner(conn)
 	if err != nil {
-		return
-	}
-	restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
-	if err != nil {
 		return nil, err
 	}
-	return restoreLSNs, nil
+
+	for retries := 0; retries < RestorePointCreateRetries; retries++ {
+		restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
+		if err == nil {
+			// After create restore point should archive related WAL log segments.
+			// This ensures the new cluster can retrieve complete WAL logs with the restore point for restoration.
+			globalCluster, gpVersion, _, err := getGpClusterInfo(conn)
+			if err != nil {
+				return nil, err
+			}
+			tracelog.InfoLogger.Println("Switch xlog on cluster")
+			remoteOutput := globalCluster.GenerateAndExecuteCommand("Running wal-g", cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+				func(contentID int) string {
+					seg, ok := globalCluster.ByContent[contentID]
+					if ok {
+						var pgOptions, switchFunction string
+						if gpVersion.Flavor == Greenplum && gpVersion.Major == 6 {
+							pgOptions = "-c gp_session_role=utility"
+							switchFunction = "pg_switch_xlog()"
+						} else {
+							pgOptions = "-c gp_role=utility"
+							switchFunction = "pg_switch_wal()"
+						}
+						return fmt.Sprintf("PGOPTIONS='%s' psql -p %d -d postgres -c 'select %s;'", pgOptions, seg[0].Port, switchFunction)
+					}
+					return ""
+				})
+			globalCluster.CheckClusterError(remoteOutput, "Unable to switch xlog on cluster", func(contentID int) string {
+				return "Unable to switch xlog on cluster"
+			}, true)
+			return restoreLSNs, nil
+		}
+	}
+	return nil, err
 }
 
 func (rpc *RestorePointCreator) checkExists() error {

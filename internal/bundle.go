@@ -21,8 +21,8 @@ func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 }
 
 type Bundle struct {
-	Directories []string
-	Sentinel    *Sentinel
+	Directory string
+	Sentinel  *Sentinel
 
 	TarBallComposer TarBallComposer
 	TarBallQueue    *TarBallQueue
@@ -37,10 +37,10 @@ type Bundle struct {
 }
 
 func NewBundle(
-	directories []string, crypter crypto.Crypter,
+	directory string, crypter crypto.Crypter,
 	tarSizeThreshold int64, excludedFilenames map[string]utility.Empty) *Bundle {
 	return &Bundle{
-		Directories:       directories,
+		Directory:         directory,
 		Crypter:           crypter,
 		TarSizeThreshold:  tarSizeThreshold,
 		ExcludedFilenames: excludedFilenames,
@@ -109,10 +109,8 @@ func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
 }
 
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
-	for _, directory := range bundle.Directories {
-		if strings.HasPrefix(fileAbsPath, directory) {
-			return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, directory)
-		}
+	if strings.HasPrefix(fileAbsPath, bundle.Directory) {
+		return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
 	}
 	return fileAbsPath
 }

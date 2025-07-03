@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/webserver"
 )
@@ -77,6 +78,7 @@ const (
 	PgpEnvelopeYcSaKeyFileSetting = "WALG_ENVELOPE_PGP_YC_SERVICE_ACCOUNT_KEY_FILE"
 	PgpEnvelopeYcEndpointSetting  = "WALG_ENVELOPE_PGP_YC_ENDPOINT"
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
+	DirectIO                      = "WALG_DIRECT_IO"
 
 	PgDataSetting                        = "PGDATA"
 	UserSetting                          = "USER" // TODO : do something with it
@@ -90,8 +92,11 @@ const (
 	PgSslKey                             = "PGSSLKEY"
 	PgSslCert                            = "PGSSLCERT"
 	PgSslRootCert                        = "PGSSLROOTCERT"
+	PgAppName                            = "PGAPPNAME"
 	PgSlotName                           = "WALG_SLOTNAME"
 	PgWalSize                            = "WALG_PG_WAL_SIZE"
+	PgWalPageSize                        = "WALG_PG_WAL_PAGE_SIZE"
+	PgBlockSize                          = "WALG_PG_BLOCK_SIZE"
 	TotalBgUploadedLimit                 = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd                  = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd                 = "WALG_STREAM_RESTORE_COMMAND"
@@ -143,6 +148,7 @@ const (
 	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
+	PartialRestoreTimeout               = "PARTIAL_RESTORE_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -171,6 +177,8 @@ const (
 	RedisDataThreshold       = "WALG_REDIS_DATA_THRESHOLD"
 	RedisDataTimeout         = "WALG_REDIS_DATA_TIMEOUT"
 	RedisServerProcessName   = "WALG_REDIS_SERVER_PROCESS_NAME"
+	RedisFQDNToIDMap         = "WALG_REDIS_FQDN_TO_ID_MAP"
+	RedisClusterConfPath     = "WALG_REDIS_CLUSTER_CONF_PATH"
 
 	GPLogsDirectory              = "WALG_GP_LOGS_DIR"
 	GPSegContentID               = "WALG_GP_SEG_CONTENT_ID"
@@ -268,6 +276,7 @@ var (
 		FailoverStoragesCheckTimeout: "30s",
 		FailoverStorageCacheLifetime: "15m",
 		PgpEnvelopeCacheExpiration:   "0",
+		DirectIO:                     "false",
 		LogLevelSetting:              "NORMAL",
 	}
 
@@ -290,6 +299,8 @@ var (
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
 		RedisServerProcessName:   "redis-server",
+		RedisFQDNToIDMap:         "{}",
+		RedisClusterConfPath:     "/etc/redis/cluster.conf",
 	}
 
 	MysqlDefaultSettings = map[string]string{
@@ -304,16 +315,21 @@ var (
 
 	PGDefaultSettings = map[string]string{
 		PgWalSize:                 "16",
+		PgWalPageSize:             "8192",
+		PgBlockSize:               "8192",
 		PgBackRestStanza:          "main",
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
 		ForceWalDetal:             "false",
+		PgAppName:                 "wal-g",
 	}
 
 	GPDefaultSettings = map[string]string{
 		GPLogsDirectory:              "/var/log",
 		PgWalSize:                    "64",
+		PgWalPageSize:                "32768",
+		PgBlockSize:                  "32768",
 		GPSegmentsPollInterval:       "5m",
 		GPSegmentsUpdInterval:        "10s",
 		GPSegmentsPollRetries:        "5",
@@ -324,6 +340,7 @@ var (
 		GPRelativeRecoveryConfPath:   "recovery.conf",
 		GPRelativePostgresqlConfPath: "postgresql.conf",
 		ForceWalDetal:                "false",
+		PgAppName:                    "wal-g",
 	}
 
 	AllowedSettings map[string]bool
@@ -360,6 +377,7 @@ var (
 		PgpEnvelopeYcKmsKeyIDSetting:  true,
 		PgpEnvelopeYcSaKeyFileSetting: true,
 		PgpEnvelopeYcEndpointSetting:  true,
+		DirectIO:                      false,
 		LibsodiumKeySetting:           true,
 		LibsodiumKeyPathSetting:       true,
 		LibsodiumKeyTransform:         true,
@@ -478,6 +496,8 @@ var (
 		PgSslRootCert:                        true,
 		PgSlotName:                           true,
 		PgWalSize:                            true,
+		PgWalPageSize:                        true,
+		PgBlockSize:                          true,
 		PrefetchDir:                          true,
 		PgReadyRename:                        true,
 		PgBackRestStanza:                     true,
@@ -496,6 +516,7 @@ var (
 		PgDaemonWALUploadTimeout:             true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
+		PgAppName:                            true,
 	}
 
 	MongoAllowedSettings = map[string]bool{
@@ -562,6 +583,8 @@ var (
 		RedisDataThreshold:       true,
 		RedisDataTimeout:         true,
 		RedisServerProcessName:   true,
+		RedisFQDNToIDMap:         true,
+		RedisClusterConfPath:     true,
 	}
 
 	GPAllowedSettings = map[string]bool{

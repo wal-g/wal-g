@@ -371,6 +371,7 @@ The compiled binary to run is `main/pg/wal-g`
 
 WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. Unit tests can be run using
 ```bash
+./link_brotli.sh
 export USE_BROTLI=1
 make unittest
 ```

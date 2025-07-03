@@ -2,12 +2,14 @@ export REDIS_TIMEOUT=5
 export FETCH_TIMEOUT=10
 export WALG_FILE_PREFIX='/tmp/wal-g-test-data'
 export WALE_S3_PREFIX=s3://redisbucket
+export WALG_COMPRESSION_METHOD=lz4
 
 test_cleanup() {
     redis-cli flushall
     redis-cli shutdown
     rm -rf /var/lib/redis/*
-    rm -rf $WALG_FILE_PREFIX 
+    rm -rf $WALG_FILE_PREFIX
+    rm -rf /tmp/nodes.conf
 }
 
 ensure() {

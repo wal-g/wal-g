@@ -12,14 +12,26 @@ import (
 	"github.com/spf13/viper"
 )
 
-func HandleAOFBackupPush(ctx context.Context, permanent bool, uploader internal.Uploader, metaConstructor internal.MetaConstructor) error {
+type AOFBackupPushArgs struct {
+	Sharded         bool
+	Uploader        internal.Uploader
+	MetaConstructor internal.MetaConstructor
+}
+
+// permanent bool, uploader internal.Uploader, metaConstructor internal.MetaConstructor
+func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	backupName := aof.GenerateNewBackupName()
 
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)
 	tmpPath, _ := conf.GetSetting(conf.RedisAppendonlyTmpFolder)
-	concurrentUploader, err := internal.CreateConcurrentUploader(uploader, backupName, []string{tmpPath}, false)
+	concurrentUploader, err := internal.CreateConcurrentUploader(
+		internal.CreateConcurrentUploaderArgs{
+			Uploader:   args.Uploader,
+			BackupName: backupName,
+			Directory:  tmpPath,
+		})
 	if err != nil {
 		return err
 	}
@@ -35,10 +47,22 @@ func HandleAOFBackupPush(ctx context.Context, permanent bool, uploader internal.
 
 	filesPinner := aof.NewFilesPinner(tmpPath)
 
-	backupService, err := aof.CreateBackupService(ctx, diskWatcher, concurrentUploader, metaConstructor, backupFilesListProvider, filesPinner)
+	backupService, err := aof.CreateBackupService(
+		ctx,
+		diskWatcher,
+		concurrentUploader,
+		args.MetaConstructor,
+		backupFilesListProvider,
+		filesPinner,
+	)
 	if err != nil {
 		return err
 	}
 
-	return backupService.DoBackup(backupName, permanent)
+	doBackupArgs := aof.DoBackupArgs{
+		BackupName: backupName,
+		Sharded:    args.Sharded,
+	}
+
+	return backupService.DoBackup(doBackupArgs)
 }

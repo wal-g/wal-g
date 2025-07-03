@@ -226,7 +226,7 @@ func ConfigureUploader() (*RegularUploader, error) {
 	return uploader, err
 }
 
-// ConfigureUploaderToFolder connects to storage with the specified folder and creates an uploader.
+// ConfigureUploaderToFolder connects to storage with the specified folder and creates an Uploader.
 // It makes sure that a valid session has started; if invalid, returns AWS error and `<nil>` value.
 func ConfigureUploaderToFolder(folder storage.Folder) (uploader *RegularUploader, err error) {
 	compressor, err := ConfigureCompressor()

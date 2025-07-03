@@ -22,9 +22,9 @@ func CreateConcurrentDownloader(uploader Uploader, whitelist *regexp.Regexp) *Co
 	}
 }
 
-func (downloader *ConcurrentDownloader) Download(backupName, localDirectory string) error {
+func (downloader *ConcurrentDownloader) Download(backupName, localDirectory string, filter map[string]struct{}) error {
 	tarsFolder := downloader.folder.GetSubFolder(strings.Trim(backupName+TarPartitionFolderName, "/"))
-	tarsToExtract, err := downloader.getTarsToExtract(tarsFolder)
+	tarsToExtract, err := downloader.getTarsToExtract(tarsFolder, filter)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (downloader *ConcurrentDownloader) Download(backupName, localDirectory stri
 	return ExtractAll(tarInterpreter, tarsToExtract)
 }
 
-func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Folder) ([]ReaderMaker, error) {
+func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Folder, filter map[string]struct{}) ([]ReaderMaker, error) {
 	tarObjects, subFolders, err := tarsFolder.ListFolder()
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to list '%s'", tarsFolder.GetPath())
@@ -53,6 +53,11 @@ func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Fold
 	tarsToExtract := make([]ReaderMaker, 0, len(tarObjects))
 
 	for _, tarObject := range tarObjects {
+		if filter != nil {
+			if _, ok := filter[tarObject.GetName()]; !ok {
+				continue
+			}
+		}
 		tarToExtract := NewStorageReaderMaker(tarsFolder, tarObject.GetName())
 		tarsToExtract = append(tarsToExtract, tarToExtract)
 	}

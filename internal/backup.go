@@ -77,6 +77,10 @@ func (backup *Backup) getMetadataPath() string {
 	return backup.Name + "/" + utility.MetadataFileName
 }
 
+func (backup *Backup) GetTarPartitionFolder() storage.Folder {
+	return backup.Folder.GetSubFolder(backup.Name + TarPartitionFolderName)
+}
+
 // SentinelExists checks that the sentinel file of the specified backup exists.
 func (backup *Backup) SentinelExists() (bool, error) {
 	return backup.Folder.Exists(backup.getStopSentinelPath())
@@ -151,6 +155,11 @@ func (backup *Backup) AssureExists() error {
 
 func (backup *Backup) GetStorageName() string {
 	return multistorage.UsedStorages(backup.Folder)[0]
+}
+
+func UploadMetadata(uploader Uploader, metadataDto interface{}, backupName string) error {
+	metadataName := MetadataNameFromBackup(backupName)
+	return UploadDto(uploader.Folder(), metadataDto, metadataName)
 }
 
 func UploadSentinel(uploader Uploader, sentinelDto interface{}, backupName string) error {
