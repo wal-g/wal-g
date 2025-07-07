@@ -8,6 +8,7 @@ import (
 )
 
 var confirmed = false
+var deleteTargetUserData = ""
 
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
@@ -36,6 +37,13 @@ var deleteEverythingCmd = &cobra.Command{
 	ValidArgs: internal.StringModifiersDeleteEverything,
 	Args:      internal.DeleteEverythingArgsValidator,
 	Run:       runDeleteEverything,
+}
+
+var deleteTargetCmd = &cobra.Command{
+	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
+	Example: internal.DeleteTargetExamples,
+	Args:    internal.DeleteTargetArgsValidator,
+	Run:     runDeleteTarget,
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
@@ -68,8 +76,24 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 	deleteHandler.DeleteEverything(confirmed)
 }
 
+func runDeleteTarget(cmd *cobra.Command, args []string) {
+	storage, err := internal.ConfigureStorage()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
+	tracelog.ErrorLogger.FatalOnError(err)
+	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, etcd.NewGenericMetaFetcher())
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	deleteHandler.HandleDeleteTarget(targetBackupSelector, confirmed, false)
+}
+
 func init() {
 	cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
+
+	deleteTargetCmd.Flags().StringVar(
+		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
+
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
