@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: WAL-G
+Source: https://github.com/wal-g/wal-g
+
+Files: *
+Copyright: 2024-2025 WAL-G contributors
+License: Apache-2.0

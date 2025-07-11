@@ -1,0 +1,3 @@
+build/golang-amd64.tar.gz
+build/golang-arm64.tar.gz
+tmp/libsodium/libsodium-1.0.20.tar.gz
