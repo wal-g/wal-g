@@ -504,6 +504,7 @@ var (
 		PgAliveCheckInterval:                 true,
 		PgStopBackupTimeout:                  true,
 		FailoverStorages:                     true,
+		FailoverStoragesCheck:                true,
 		FailoverStoragesCheckTimeout:         true,
 		FailoverStorageCacheLifetime:         true,
 		FailoverStorageCacheEMAAliveLimit:    true,
