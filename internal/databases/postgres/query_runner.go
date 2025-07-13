@@ -760,7 +760,6 @@ func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
 
 	var dataChecksums string
 	conn := queryRunner.Connection
-	time.Sleep(300 * time.Second)
 	err := conn.QueryRow(pgCtx, "SHOW data_checksums").Scan(&dataChecksums)
 	if err != nil {
 		return "", errors.Wrap(err, "GetDataChecksums: failed to check data_checksums")

@@ -65,10 +65,5 @@ func getPgTimeoutSetting() (time.Duration, error) {
 		return 0, nil
 	}
 
-	timeout, err := conf.GetDurationSetting(conf.PgTimeout)
-	if err != nil {
-		return 0, err
-	}
-
-	return timeout, nil
+	return conf.GetDurationSetting(conf.PgTimeout)
 }
