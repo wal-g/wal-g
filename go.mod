@@ -45,14 +45,19 @@ require (
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/crypto v0.37.0
 	golang.org/x/sync v0.13.0
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/time v0.4.0
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/api v0.30.0
-	gopkg.in/ini.v1 v1.51.0
+	gopkg.in/ini.v1 v1.67.0
 )
 
 require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230426101702-58e86b294756
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
+	github.com/alibabacloud-go/sts-20150401/v2 v2.0.4
+	github.com/alibabacloud-go/tea v1.3.9
+	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.3
+	github.com/aliyun/credentials-go v1.4.5
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v0.0.0-20220110100810-f4153a09f87c
 	github.com/klauspost/compress v1.17.8
@@ -70,11 +75,21 @@ require (
 )
 
 require (
+	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.5 // indirect
+	github.com/alibabacloud-go/debug v1.0.1 // indirect
+	github.com/alibabacloud-go/endpoint-util v1.1.0 // indirect
+	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
+	github.com/alibabacloud-go/tea-utils/v2 v2.0.7 // indirect
+	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/tjfoc/gmsm v1.4.1 // indirect
 )
 
 require (
@@ -148,7 +163,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.opencensus.io v0.22.4 // indirect
-	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/term v0.31.0 // indirect
