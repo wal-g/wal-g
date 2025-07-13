@@ -228,6 +228,10 @@ const (
 
 	GoogleApplicationCredentials = "GOOGLE_APPLICATION_CREDENTIALS"
 
+	AliyunAccessKeyID     = "OSS_ACCESS_KEY_ID"
+	AliyunAccessKeySecret = "OSS_ACCESS_KEY_SECRET"
+	AliyunSecurityToken   = "OSS_SESSION_TOKEN"
+
 	SwiftOsAuthURL    = "OS_AUTH_URL"
 	SwiftOsUsername   = "OS_USERNAME"
 	SwiftOsPassword   = "OS_PASSWORD"
@@ -457,6 +461,12 @@ var (
 		// GS
 		"WALG_GS_PREFIX":             true,
 		GoogleApplicationCredentials: true,
+
+		// Aliyun
+		"WALG_OSS_PREFIX":     true,
+		AliyunAccessKeyID:     true,
+		AliyunAccessKeySecret: true,
+		AliyunSecurityToken:   true,
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,

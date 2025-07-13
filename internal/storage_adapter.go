@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/sh"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/swift"
+	"github.com/wal-g/wal-g/pkg/storages/oss"
 )
 
 type StorageAdapter struct {
@@ -51,6 +52,7 @@ func (adapter *StorageAdapter) loadSettings(config *viper.Viper) map[string]stri
 }
 
 var StorageAdapters = []StorageAdapter{
+	{"OSS", oss.SettingList, oss.ConfigureStorage},
 	{"S3", s3.SettingList, s3.ConfigureStorage},
 	{"FILE", nil, fs.ConfigureStorage},
 	{"GS", gcs.SettingList, gcs.ConfigureStorage},
