@@ -14,6 +14,7 @@ const (
 	accessKeyIDSetting     = "OSS_ACCESS_KEY_ID"
 	accessKeySecretSetting = "OSS_ACCESS_KEY_SECRET"
 	securityTokenSetting   = "OSS_SESSION_TOKEN"
+	regionSetting          = "OSS_REGION"
 	roleARNSetting         = "OSS_ROLE_ARN"
 	roleSessionNameSetting = "OSS_ROLE_SESSION_NAME"
 	skipValidationSetting  = "OSS_SKIP_VALIDATION"
@@ -24,6 +25,7 @@ var SettingList = []string{
 	accessKeyIDSetting,
 	accessKeySecretSetting,
 	securityTokenSetting,
+	regionSetting,
 	roleARNSetting,
 	roleSessionNameSetting,
 	skipValidationSetting,
@@ -66,6 +68,7 @@ func ConfigureStorage(
 		RootPath:        rootPath,
 		SkipValidation:  skipValidation,
 		MaxRetries:      maxRetries,
+		Region:          settings[regionSetting],
 	}
 
 	st, err := NewStorage(config, rootWraps...)

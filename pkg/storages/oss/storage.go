@@ -20,16 +20,17 @@ type Storage struct {
 }
 
 type Config struct {
-	AccessKeyId     string
-	AccessKeySecret string
-	SecurityToken   string
-	Region          string
-	Bucket          string
-	RootPath        string
-	RoleARN         string
-	RoleSessionName string
-	SkipValidation  bool
-	MaxRetries      int
+	AccessKeyId      string
+	AccessKeySecret  string
+	SecurityToken    string
+	Region           string
+	Bucket           string
+	RootPath         string
+	RoleARN          string
+	RoleSessionName  string
+	SkipValidation   bool
+	MaxRetries       int
+	EnableVersioning string
 }
 
 func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
@@ -132,7 +133,8 @@ func configureClient(config *Config) (*oss.Client, error) {
 
 	ossConfig := oss.LoadDefaultConfig().
 		WithRegion(config.Region).
-		WithCredentialsProvider(credentialProvider)
+		WithCredentialsProvider(credentialProvider).
+		WithSignatureVersion(oss.SignatureVersionV4)
 
 	return oss.NewClient(ossConfig), nil
 }
