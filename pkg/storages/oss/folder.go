@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"strings"
 
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
@@ -36,7 +37,6 @@ func NewFolder(ossAPI *oss.Client, bucket string, path string, config *Config) *
 	}
 }
 
-// GetPath provides a relative path from the root of the storage. It must always end with '/'.
 func (f *Folder) GetPath() string {
 	if !strings.HasSuffix(f.path, "/") {
 		f.path += "/"
@@ -44,8 +44,6 @@ func (f *Folder) GetPath() string {
 	return f.path
 }
 
-// ListFolder lists the folder and provides nested objects and folders. Objects must be with relative paths.
-// If the folder doesn't exist, empty objects and subFolders must be returned without any error.
 func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
 	prefix := f.GetPath()
 	delimiter := "/"
@@ -88,7 +86,6 @@ func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Fo
 	return objects, subFolders, nil
 }
 
-// DeleteObjects deletes objects from the storage if they exist.
 func (f *Folder) DeleteObjects(objectRelativePaths []string) error {
 	if f.isVersioningEnabled() {
 		return fmt.Errorf("versioning is not supported for oss")
@@ -154,7 +151,6 @@ func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(f.ossAPI, f.bucket, storage.JoinPath(f.path, subFolderRelativePath), f.config)
 }
 
-// ReadObject reads an object from the folder. Must return ObjectNotFoundError in case the object doesn't exist.
 func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	objectPath := f.GetPath() + objectRelativePath
 	result, err := f.ossAPI.GetObject(context.Background(), &oss.GetObjectRequest{
@@ -173,14 +169,10 @@ func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	return result.Body, nil
 }
 
-// PutObject uploads a new object into the folder by a relative path. If an object with the same name already
-// exists, it is overwritten. Please prefer using PutObjectWithContext.
 func (f *Folder) PutObject(name string, content io.Reader) error {
 	return f.PutObjectWithContext(context.Background(), name, content)
 }
 
-// PutObjectWithContext uploads a new object into the folder by a relative path. If an object with the same name
-// already exists, it is overwritten. Operation can be terminated using Context.
 func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	objectPath := f.GetPath() + name
 	_, err := f.ossAPI.PutObject(ctx, &oss.PutObjectRequest{
@@ -194,10 +186,22 @@ func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content 
 	return nil
 }
 
-// CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
-// an error if the source object doesn't exist.
 func (f *Folder) CopyObject(srcPath string, dstPath string) error {
-	return fmt.Errorf("CopyObject not implemented")
+	if exists, err := f.Exists(srcPath); !exists {
+		if err == nil {
+			return storage.NewObjectNotFoundError(srcPath)
+		}
+		return err
+	}
+	src := path.Join(f.GetPath(), srcPath)
+	dst := path.Join(f.GetPath(), dstPath)
+	_, err := f.ossAPI.CopyObject(context.Background(), &oss.CopyObjectRequest{
+		Bucket:       oss.Ptr(f.bucket),
+		Key:          oss.Ptr(dst),
+		SourceBucket: oss.Ptr(f.bucket),
+		SourceKey:    oss.Ptr(src),
+	})
+	return err
 }
 
 func (f *Folder) Validate() error {
@@ -237,8 +241,6 @@ func (folder *Folder) isVersioningEnabled() bool {
 	return false
 }
 
-// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
-// Default versioning is set according to server setting.
 func (f *Folder) SetVersioningEnabled(enable bool) {
 	if enable && f.isVersioningEnabled() {
 		f.config.EnableVersioning = VersioningEnabled
