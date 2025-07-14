@@ -1,6 +1,6 @@
 # WAL-G storage configuration
 
-WAL-G can store backups in S3, Google Cloud Storage, Azure, Swift, remote host (via SSH) or local file system. 
+WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, remote host (via SSH) or local file system. 
 
 S3
 -----------
@@ -155,6 +155,30 @@ Overrides the default `upload buffer size` of 8388608 bytes (8 MB). Note that th
   (e.g. `5`)
 
 Overrides the default `maximum number of upload buffers`. By default, at most 4 buffers are used concurrently.
+
+Alicloud
+-----------
+
+To connect to Alicloud OSS, WAL-G requires that this variable be set:
+
+* `WALG_OSS_PREFIX`
+  (e.g. `oss://bucket/path/to/folder`)
+
+You can set `OSS_ACCESS_KEY_ID` and `OSS_ACCESS_KEY_SECRET` (optionally with `OSS_SESSION_TOKEN`) to access the OSS.
+
+* `OSS_REGION`
+
+Set the region for the OSS bucket.
+
+**Optional variables**
+
+* `OSS_ROLE_ARN`
+
+Set the RAM role ARN for the OSS bucket. This role must have permissions to access the bucket. RAM user should be allowed to assume this role. Set `OSS_ROLE_SESSION_NAME` to specify the session name for the role assumption.
+
+* `OSS_SKIP_VALIDATION`
+
+Whether to skip OSS client validation during initialization. Default is set to `false`, which means it will validate the client by making list request to OSS.
 
 Swift
 -----------
