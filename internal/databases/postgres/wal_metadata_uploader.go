@@ -102,12 +102,19 @@ func (u *WalMetadataUploader) uploadBulkMetadataFile(ctx context.Context, walFil
 	walMetadataArray := make(map[string]WalMetadataDescription)
 
 	for _, walMetadataFile := range walMetadataFiles {
+		// If a metadata file is corrupted after its corresponding WAL file is pushed,
+		// returning the error causes failure in pushing *F WAL file.
+		// Since pushing WALs is more important we can ignore the error and proceed.
+
 		file, err := os.ReadFile(walMetadataFile)
 		if err != nil {
-			return err
+			tracelog.ErrorLogger.Printf("Unable to read walmetadata file %s", walMetadataFile)
+			continue
 		}
+
 		if err = json.Unmarshal(file, &walMetadata); err != nil {
-			return err
+			tracelog.ErrorLogger.Printf("Unable to unmarshal walmetadata file %s into json", walMetadataFile)
+			continue
 		}
 
 		for k := range walMetadata {
