@@ -2,15 +2,23 @@ package oss
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 var _ storage.Folder = &Folder{}
+
+const (
+	VersioningDefault  = ""
+	VersioningEnabled  = "enabled"
+	VersioningDisabled = "disabled"
+)
 
 type Folder struct {
 	ossAPI *oss.Client
@@ -39,51 +47,202 @@ func (f *Folder) GetPath() string {
 // ListFolder lists the folder and provides nested objects and folders. Objects must be with relative paths.
 // If the folder doesn't exist, empty objects and subFolders must be returned without any error.
 func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	return nil, nil, fmt.Errorf("not implemented")
+	prefix := f.GetPath()
+	delimiter := "/"
+
+	if f.isVersioningEnabled() {
+		return nil, nil, fmt.Errorf("versioning is not supported for oss")
+	}
+
+	var continuationToken *string
+	for {
+		result, err := f.ossAPI.ListObjectsV2(context.Background(), &oss.ListObjectsV2Request{
+			Bucket:            oss.Ptr(f.bucket),
+			Prefix:            oss.Ptr(prefix),
+			Delimiter:         oss.Ptr(delimiter),
+			ContinuationToken: continuationToken,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to list oss folder: %w", err)
+		}
+
+		for _, commonPrefix := range result.CommonPrefixes {
+			subFolder := NewFolder(f.ossAPI, f.bucket, *commonPrefix.Prefix, f.config)
+			subFolders = append(subFolders, subFolder)
+		}
+
+		for _, object := range result.Contents {
+			if *object.Key == prefix {
+				continue
+			}
+			objectRelativePath := strings.TrimPrefix(*object.Key, prefix)
+			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, object.Size))
+		}
+
+		if !result.IsTruncated {
+			break
+		}
+		continuationToken = result.NextContinuationToken
+	}
+
+	return objects, subFolders, nil
 }
 
 // DeleteObjects deletes objects from the storage if they exist.
 func (f *Folder) DeleteObjects(objectRelativePaths []string) error {
-	return fmt.Errorf("not implemented")
+	if f.isVersioningEnabled() {
+		return fmt.Errorf("versioning is not supported for oss")
+	}
+
+	for _, part := range partitionObjectKeys(objectRelativePaths, 1000) {
+		var objectsToDelete []oss.DeleteObject
+		for _, key := range part {
+			fullPath := f.GetPath() + key
+			tracelog.DebugLogger.Println("Deleting OSS object:", fullPath)
+			objectsToDelete = append(objectsToDelete, oss.DeleteObject{Key: oss.Ptr(fullPath)})
+		}
+
+		_, err := f.ossAPI.DeleteMultipleObjects(context.Background(), &oss.DeleteMultipleObjectsRequest{
+			Bucket:  oss.Ptr(f.bucket),
+			Objects: objectsToDelete,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete oss objects: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func partitionObjectKeys(keys []string, size int) [][]string {
+	if len(keys) == 0 {
+		return nil
+	}
+	if size <= 0 {
+		size = 1
+	}
+	var parts [][]string
+	for i := 0; i < len(keys); i += size {
+		end := i + size
+		if end > len(keys) {
+			end = len(keys)
+		}
+		parts = append(parts, keys[i:end])
+	}
+	return parts
 }
 
 func (f *Folder) Exists(objectRelativePath string) (bool, error) {
-	return false, fmt.Errorf("not implemented")
+	objectPath := f.GetPath() + objectRelativePath
+	_, err := f.ossAPI.HeadObject(context.Background(), &oss.HeadObjectRequest{
+		Bucket: oss.Ptr(f.bucket),
+		Key:    oss.Ptr(objectPath),
+	})
+
+	if err != nil {
+		var serviceError *oss.ServiceError
+		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check oss object '%s' existence: %w", objectPath, err)
+	}
+
+	return true, nil
 }
 
 func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
-	return nil
+	return NewFolder(f.ossAPI, f.bucket, storage.JoinPath(f.path, subFolderRelativePath), f.config)
 }
 
 // ReadObject reads an object from the folder. Must return ObjectNotFoundError in case the object doesn't exist.
 func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("not implemented")
+	objectPath := f.GetPath() + objectRelativePath
+	result, err := f.ossAPI.GetObject(context.Background(), &oss.GetObjectRequest{
+		Bucket: oss.Ptr(f.bucket),
+		Key:    oss.Ptr(objectPath),
+	})
+
+	if err != nil {
+		var serviceError *oss.ServiceError
+		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
+			return nil, storage.NewObjectNotFoundError(objectPath)
+		}
+		return nil, fmt.Errorf("failed to read oss object '%s': %w", objectPath, err)
+	}
+
+	return result.Body, nil
 }
 
 // PutObject uploads a new object into the folder by a relative path. If an object with the same name already
 // exists, it is overwritten. Please prefer using PutObjectWithContext.
 func (f *Folder) PutObject(name string, content io.Reader) error {
-	return fmt.Errorf("not implemented")
+	return f.PutObjectWithContext(context.Background(), name, content)
 }
 
 // PutObjectWithContext uploads a new object into the folder by a relative path. If an object with the same name
 // already exists, it is overwritten. Operation can be terminated using Context.
 func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	return fmt.Errorf("not implemented")
+	objectPath := f.GetPath() + name
+	_, err := f.ossAPI.PutObject(ctx, &oss.PutObjectRequest{
+		Bucket: oss.Ptr(f.bucket),
+		Key:    oss.Ptr(objectPath),
+		Body:   content,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to put oss object %q: %w", objectPath, err)
+	}
+	return nil
 }
 
 // CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
 // an error if the source object doesn't exist.
 func (f *Folder) CopyObject(srcPath string, dstPath string) error {
-	return fmt.Errorf("not implemented")
+	return fmt.Errorf("CopyObject not implemented")
 }
 
 func (f *Folder) Validate() error {
-	return fmt.Errorf("not implemented")
+	prefix := f.GetPath()
+	delimiter := "/"
+	_, err := f.ossAPI.ListObjectsV2(context.Background(), &oss.ListObjectsV2Request{
+		Bucket:    oss.Ptr(f.bucket),
+		Prefix:    oss.Ptr(prefix),
+		Delimiter: oss.Ptr(delimiter),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list oss folder: %w", err)
+	}
+	return nil
+}
+
+func (folder *Folder) isVersioningEnabled() bool {
+	switch folder.config.EnableVersioning {
+	case VersioningEnabled:
+		return true
+	case VersioningDisabled:
+		return false
+	case VersioningDefault:
+		result, err := folder.ossAPI.GetBucketVersioning(context.Background(), &oss.GetBucketVersioningRequest{
+			Bucket: oss.Ptr(folder.bucket),
+		})
+		if err != nil {
+			return false
+		}
+
+		if result.VersionStatus != nil && *result.VersionStatus == "Enabled" {
+			folder.config.EnableVersioning = VersioningEnabled
+			return true
+		}
+		folder.config.EnableVersioning = VersioningDisabled
+	}
+	return false
 }
 
 // Sets versioning setting. If versioning is disabled on server, sets it to disabled.
 // Default versioning is set according to server setting.
 func (f *Folder) SetVersioningEnabled(enable bool) {
-	// Not implemented
+	if enable && f.isVersioningEnabled() {
+		f.config.EnableVersioning = VersioningEnabled
+	} else {
+		f.config.EnableVersioning = VersioningDisabled
+	}
 }
