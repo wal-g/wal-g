@@ -156,7 +156,7 @@ Overrides the default `upload buffer size` of 8388608 bytes (8 MB). Note that th
 
 Overrides the default `maximum number of upload buffers`. By default, at most 4 buffers are used concurrently.
 
-Alicloud
+Alicloud OSS
 -----------
 
 To connect to Alicloud OSS, WAL-G requires that this variable be set:
