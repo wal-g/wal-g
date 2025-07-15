@@ -6,6 +6,7 @@ import (
 
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 	osscred "github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss/credentials"
+	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss/retry"
 	"github.com/aliyun/credentials-go/credentials/providers"
 )
 
@@ -85,7 +86,11 @@ func configureClient(config *Config) (*oss.Client, error) {
 	ossConfig := oss.LoadDefaultConfig().
 		WithRegion(config.Region).
 		WithCredentialsProvider(cred).
-		WithSignatureVersion(oss.SignatureVersionV4)
+		WithSignatureVersion(oss.SignatureVersionV4).
+		WithRetryMaxAttempts(config.MaxRetries).
+		WithRetryer(retry.NewStandard(func(ro *retry.RetryOptions) {
+			ro.MaxAttempts = config.MaxRetries
+		}))
 
 	return oss.NewClient(ossConfig), nil
 }

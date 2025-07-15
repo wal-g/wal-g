@@ -34,7 +34,7 @@ var SettingList = []string{
 
 const (
 	defaultSkipValidation = false
-	defaultMaxRetries     = 15
+	defaultMaxRetries     = 5
 	defaultLogLevel       = "info"
 )
 
