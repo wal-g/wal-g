@@ -2,13 +2,13 @@ package testtools
 
 import (
 	"bytes"
+	"context"
 	"io"
-	"io/ioutil"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"github.com/wal-g/storages/memory"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
 )
 
 type mockMultiFailureError struct {
@@ -24,20 +24,20 @@ func (err mockMultiFailureError) Error() string {
 	return err.err.Error()
 }
 
-// Mock out uploader client for S3. Includes these methods:
-// Upload(*UploadInput, ...func(*s3manager.Uploader))
-type mockS3Uploader struct {
+// MockS3Uploader client for S3. Must implement UploadWithContext method.
+type MockS3Uploader struct {
 	s3manageriface.UploaderAPI
 	multiErr bool
 	err      bool
-	storage  *memory.Storage
+	storage  *memory.KVS
 }
 
-func NewMockS3Uploader(multiErr, err bool, storage *memory.Storage) *mockS3Uploader {
-	return &mockS3Uploader{multiErr: multiErr, err: err, storage: storage}
+func NewMockS3Uploader(multiErr, err bool, storage *memory.KVS) *MockS3Uploader {
+	return &MockS3Uploader{multiErr: multiErr, err: err, storage: storage}
 }
 
-func (uploader *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
+func (uploader *MockS3Uploader) UploadWithContext(_ context.Context, input *s3manager.UploadInput,
+	_ ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
 	if uploader.err {
 		return nil, awserr.New("UploadFailed", "mock Upload error", nil)
 	}
@@ -57,7 +57,7 @@ func (uploader *mockS3Uploader) Upload(input *s3manager.UploadInput, f ...func(*
 	var err error
 	if uploader.storage == nil {
 		// Discard bytes to unblock pipe.
-		_, err = io.Copy(ioutil.Discard, input.Body)
+		_, err = io.Copy(io.Discard, input.Body)
 	} else {
 		var buf bytes.Buffer
 		_, err = io.Copy(&buf, input.Body)

@@ -1,0 +1,16 @@
+"WALE_S3_PREFIX": "s3://nonexistingbucket",
+"WALG_DELTA_MAX_STEPS": "0",
+"WALG_WITHOUT_FILES_METADATA": "True",
+"WALG_FAILOVER_STORAGES": {
+  "not_working_failover": {
+        "AWS_SECRET_ACCESS_KEY": "useless_access_key",
+        "AWS_ACCESS_KEY_ID": "incorrect_access_key_id",
+        "WALE_S3_PREFIX": "s3://some-useless-s3-prefix"
+  },
+  "good_failover": {
+        "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+        "WALE_S3_PREFIX": "s3://gpfullbucket"
+  }
+},
+"WALG_FAILOVER_STORAGES_CHECK_TIMEOUT": "5s"

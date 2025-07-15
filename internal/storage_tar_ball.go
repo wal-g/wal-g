@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"sync/atomic"
@@ -9,7 +10,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/utility"
 )
+
+const TarPartitionFolderName = "/tar_partitions/"
 
 // StorageTarBall represents a tar file that is
 // going to be uploaded to storage.
@@ -19,7 +23,12 @@ type StorageTarBall struct {
 	partSize    *int64
 	writeCloser io.Closer
 	tarWriter   *tar.Writer
-	uploader    *Uploader
+	uploader    Uploader
+	name        string
+}
+
+func (tarBall *StorageTarBall) Name() string {
+	return tarBall.name
 }
 
 // SetUp creates a new tar writer and starts upload to storage.
@@ -28,13 +37,12 @@ type StorageTarBall struct {
 // the form `part_....tar.[Compressor file extension]`.
 func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
-		var name string
 		if len(names) > 0 {
-			name = names[0]
+			tarBall.name = names[0]
 		} else {
-			name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compressor.FileExtension())
+			tarBall.name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compression().FileExtension())
 		}
-		writeCloser := tarBall.startUpload(name, crypter)
+		writeCloser := tarBall.startUpload(tarBall.name, crypter)
 
 		tarBall.writeCloser = writeCloser
 		tarBall.tarWriter = tar.NewWriter(writeCloser)
@@ -58,10 +66,14 @@ func (tarBall *StorageTarBall) CloseTar() error {
 }
 
 func (tarBall *StorageTarBall) AwaitUploads() {
-	tarBall.uploader.waitGroup.Wait()
-	if tarBall.uploader.Failed.Load().(bool) {
+	tarBall.uploader.Finish()
+	if tarBall.uploader.Failed() {
 		tracelog.ErrorLogger.Fatal("Unable to complete uploads")
 	}
+}
+
+func GetBackupTarPath(backupName, fileName string) string {
+	return backupName + TarPartitionFolderName + fileName
 }
 
 // TODO : unit tests
@@ -71,15 +83,12 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 
-	path := tarBall.backupName + TarPartitionFolderName + name
+	path := GetBackupTarPath(tarBall.backupName, name)
 
 	tracelog.InfoLogger.Printf("Starting part %d ...\n", tarBall.partNumber)
 
-	uploader.waitGroup.Add(1)
 	go func() {
-		defer uploader.waitGroup.Done()
-
-		err := uploader.Upload(path, NewNetworkLimitReader(pipeReader))
+		err := uploader.Upload(context.Background(), path, pipeReader)
 		if compressingError, ok := err.(CompressAndEncryptError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}
@@ -88,6 +97,9 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 			tracelog.ErrorLogger.Printf("%v\n", err)
 			err = pipeReader.Close()
 			tracelog.ErrorLogger.FatalfOnError("Failed to close pipe: %v", err)
+			tracelog.ErrorLogger.Fatalf(
+				"Unable to continue the backup process because of the loss of a part %d.\n",
+				tarBall.partNumber)
 		}
 	}()
 
@@ -100,10 +112,11 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 			tracelog.ErrorLogger.Fatal("upload: encryption error ", err)
 		}
 
-		writerToCompress = &CascadeWriteCloser{encryptedWriter, pipeWriter}
+		writerToCompress = &utility.CascadeWriteCloser{WriteCloser: encryptedWriter, Underlying: pipeWriter}
 	}
 
-	return &CascadeWriteCloser{uploader.Compressor.NewWriter(writerToCompress), writerToCompress}
+	return &utility.CascadeWriteCloser{WriteCloser: uploader.Compression().NewWriter(writerToCompress),
+		Underlying: writerToCompress}
 }
 
 // Size accumulated in this tarball

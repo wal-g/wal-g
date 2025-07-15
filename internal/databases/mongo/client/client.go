@@ -2,12 +2,15 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/wal-g/wal-g/utility"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,6 +27,22 @@ const (
 	driverAppName       = "wal-g-mongo"
 	oplogDatabaseName   = "local"
 	oplogCollectionName = "oplog.rs"
+)
+
+type OplogAppMode string
+
+const (
+	OplogAppModeInitSync   OplogAppMode = "InitialSync"
+	OplogAppModeRecovering OplogAppMode = "Recovering"
+	OplogAppModeSecondary  OplogAppMode = "Secondary"
+)
+
+var (
+	OplogAppModes = map[OplogAppMode]struct{}{
+		OplogAppModeInitSync:   {},
+		OplogAppModeRecovering: {},
+		OplogAppModeSecondary:  {},
+	}
 )
 
 // CmdResponse is used to unmarshal mongodb cmd responses
@@ -51,12 +70,16 @@ type IsMaster struct {
 }
 
 // MongoDriver defines methods to work with mongodb.
+//
+//go:generate mockery --name MongoDriver
 type MongoDriver interface {
+	CreateIndexes(ctx context.Context, dbName, collName string, indexes []IndexDocument) error
+	DropIndexes(ctx context.Context, dbName string, rawCommand bson.D) error
 	EnsureIsMaster(ctx context.Context) error
 	IsMaster(ctx context.Context) (models.IsMaster, error)
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
-	ApplyOp(ctx context.Context, op db.Oplog) error
+	ApplyOp(ctx context.Context, op *db.Oplog) error
 	Close(ctx context.Context) error
 }
 
@@ -104,13 +127,68 @@ func (m *MongoOplogCursor) Next(ctx context.Context) bool {
 	return m.Cursor.Next(ctx)
 }
 
+// ApplyOplog is used to replay oplog entry.
+type ApplyOplog struct {
+	Operation  string            `bson:"op"`
+	Namespace  string            `bson:"ns"`
+	Object     bson.D            `bson:"o"`
+	Query      bson.D            `bson:"o2,omitempty"`
+	UI         *primitive.Binary `bson:"ui,omitempty"`
+	LSID       bson.Raw          `bson:"lsid,omitempty"`
+	TxnNumber  *int64            `bson:"txnNumber,omitempty"`
+	PrevOpTime bson.Raw          `bson:"prevOpTime,omitempty"`
+}
+
 // MongoClient implements MongoDriver
 type MongoClient struct {
-	c *mongo.Client
+	c           *mongo.Client
+	applyOpsCmd bson.D
+}
+
+// Options defines mongo client options
+type Options struct {
+	OplogApplicationMode *OplogAppMode
+	OplogAlwaysUpsert    *bool
+}
+
+type Option func(*Options)
+
+// OplogAlwaysUpsert sets applyOps argument oplogApplicationMode
+func OplogApplicationMode(mode OplogAppMode) Option {
+	return func(args *Options) {
+		args.OplogApplicationMode = &mode
+	}
+}
+
+// OplogAlwaysUpsert sets applyOps argument alwaysUpsert
+func OplogAlwaysUpsert(alwaysUpsert bool) Option {
+	return func(args *Options) {
+		args.OplogAlwaysUpsert = &alwaysUpsert
+	}
 }
 
 // NewMongoClient builds MongoClient
-func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
+func NewMongoClient(ctx context.Context, uri string, setters ...Option) (*MongoClient, error) {
+	// Default Options
+	args := &Options{}
+	for _, setter := range setters {
+		setter(args)
+	}
+
+	applyOpsCmd := bson.D{
+		{Key: "applyOps"},
+	}
+	if args.OplogApplicationMode != nil {
+		oplogApplicationMode := *args.OplogApplicationMode
+		if _, ok := OplogAppModes[oplogApplicationMode]; !ok {
+			return nil, fmt.Errorf("unsupported oplogApplicationMode: %s", oplogApplicationMode)
+		}
+		applyOpsCmd = append(applyOpsCmd, bson.E{Key: "oplogApplicationMode", Value: oplogApplicationMode})
+	}
+	if args.OplogAlwaysUpsert != nil {
+		applyOpsCmd = append(applyOpsCmd, bson.E{Key: "alwaysUpsert", Value: *args.OplogAlwaysUpsert})
+	}
+
 	client, err := mongo.Connect(ctx,
 		options.Client().ApplyURI(uri).
 			SetAppName(driverAppName).
@@ -119,7 +197,52 @@ func NewMongoClient(ctx context.Context, uri string) (*MongoClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &MongoClient{c: client}, client.Ping(ctx, nil)
+
+	return &MongoClient{
+		c:           client,
+		applyOpsCmd: applyOpsCmd,
+	}, client.Ping(ctx, nil)
+}
+
+// IndexDocument holds information about a collection's index.
+type IndexDocument struct {
+	Options                 bson.M `bson:",inline"`
+	Key                     bson.D `bson:"key"`
+	PartialFilterExpression bson.D `bson:"partialFilterExpression,omitempty"`
+}
+
+func (mc *MongoClient) CreateIndexes(ctx context.Context, dbName, collName string, indexes []IndexDocument) error {
+	rawCommand := bson.D{
+		{Key: "createIndexes", Value: collName},
+		{Key: "indexes", Value: indexes},
+	}
+
+	if err := mc.c.Database(dbName).RunCommand(ctx, rawCommand).Err(); err != nil {
+		return fmt.Errorf("createIndexes command %q failed: %w", rawCommand, err)
+	}
+
+	return nil
+}
+
+func (mc *MongoClient) DropIndexes(ctx context.Context, dbName string, rawCommand bson.D) error {
+	if err := mc.c.Database(dbName).RunCommand(ctx, rawCommand).Err(); err != nil {
+		var mongoErr mongo.CommandError
+		isMongoErr := errors.As(err, &mongoErr)
+
+		if isMongoErr && mongoErr.Name == "BackgroundOperationInProgressForNamespace" {
+			// In Mongo versions Prior to 5.2, an attempt to drop an index during an in-progress build of another index
+			// on the same collection results in an error:
+			// https://www.mongodb.com/docs/manual/reference/command/dropIndexes/#behavior
+
+			// We just ignore these error and continue a replay
+			tracelog.WarningLogger.Printf("Unable to drop index, skipped. Error is: %+v\n", err)
+			return nil
+		}
+
+		return fmt.Errorf("dropIndexes command %q failed: %w", rawCommand, err)
+	}
+
+	return nil
 }
 
 func (mc *MongoClient) EnsureIsMaster(ctx context.Context) error {
@@ -204,18 +327,40 @@ func (mc *MongoClient) getOplogCollection(ctx context.Context) (*mongo.Collectio
 	return odb.Collection(oplogCollectionName), nil
 }
 
+func (mc *MongoClient) getApplyOpsCmd() bson.D {
+	return mc.applyOpsCmd
+}
+
 // ApplyOp calls applyOps and check response
-func (mc *MongoClient) ApplyOp(ctx context.Context, op db.Oplog) error {
-	apply := mc.c.Database("admin").RunCommand(ctx, bson.M{"applyOps": []interface{}{op}})
+func (mc *MongoClient) ApplyOp(ctx context.Context, dbop *db.Oplog) error {
+	// mongod complains if 'ts' or 'history' are passed to applyOps
+	if dbop == nil {
+		return fmt.Errorf("MongoClient:ApplyOp: dbop is nil, it should not happen")
+	}
+	op := ApplyOplog{
+		Operation:  dbop.Operation,
+		Namespace:  dbop.Namespace,
+		Object:     dbop.Object,
+		Query:      dbop.Query,
+		UI:         dbop.UI,
+		LSID:       dbop.LSID,
+		TxnNumber:  dbop.TxnNumber,
+		PrevOpTime: dbop.PrevOpTime,
+	}
+
+	// TODO: fix ugly interface after switch to passing pointers
+	cmd := mc.getApplyOpsCmd()
+	cmd[0] = bson.E{Key: "applyOps", Value: []interface{}{op}}
+	apply := mc.c.Database("admin").RunCommand(ctx, cmd)
 	if err := apply.Err(); err != nil {
-		return fmt.Errorf("applyOps command failed: %w\nop:\n%+v", err, op)
+		return err
 	}
 	resp := CmdResponse{}
 	if err := apply.Decode(&resp); err != nil {
-		return fmt.Errorf("can not unmarshall command execution response: %w", err)
+		return fmt.Errorf("can not unmarshall command execution response: %+v\ncommand was:%+v", err, cmd)
 	}
 	if resp.Ok != 1 {
-		return fmt.Errorf("command execution failed with: %s", resp.ErrMsg)
+		return fmt.Errorf("command execution failed with: %s\ncommand was: %+v", resp.ErrMsg, cmd)
 	}
 
 	return nil
@@ -261,7 +406,7 @@ func (b *BsonCursor) Next(ctx context.Context) bool {
 		return true
 	}
 
-	b.raw, b.err = bson.NewFromIOReader(b.r)
+	b.raw, b.err = bson.ReadDocument(b.r)
 	return b.err == nil
 }
 
@@ -272,4 +417,22 @@ func (b *BsonCursor) Push(data []byte) error {
 	}
 	b.pushed = data
 	return nil
+}
+
+// WaitForBecomePrimary waits until mongo client connection node becomes primary
+func WaitForBecomePrimary(ctx context.Context, mc *MongoClient, checkTimeout time.Duration) error {
+	reconnect := time.NewTimer(checkTimeout)
+	for {
+		select {
+		case <-reconnect.C:
+			err := mc.EnsureIsMaster(ctx)
+			if err == nil {
+				return nil
+			}
+			tracelog.InfoLogger.Printf("Waiting: %v", err)
+			utility.ResetTimer(reconnect, checkTimeout)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }

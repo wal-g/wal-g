@@ -3,8 +3,8 @@ package internal
 import "os"
 
 // Sentinel is used to signal completion of a walked
-// directory.
+// Directory.
 type Sentinel struct {
 	Info os.FileInfo
-	path string
+	Path string
 }

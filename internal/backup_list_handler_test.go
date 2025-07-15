@@ -1,196 +1,139 @@
-package internal_test
+package internal
 
 import (
 	"bytes"
-	"errors"
+	"io"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/testtools"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/internal/multistorage/stats"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-type someError struct {
-	error
-}
-
-func TestHandleBackupListWriteBackups(t *testing.T) {
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
-		},
-		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
-		},
+func TestHandleDefaultBackupList(t *testing.T) {
+	curTime := time.Time{}
+	curTimeFunc := func() time.Time {
+		return curTime.UTC()
 	}
 
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
-		return backups, nil
-	}
-	writeBackupListCallsCount := 0
-	var writeBackupListCallArgs []internal.BackupTime
-	writeBackupListFunc := func(backups []internal.BackupTime) {
-		writeBackupListCallsCount++
-		writeBackupListCallArgs = backups
-	}
-	infoLogger, errorLogger := testtools.MockLoggers()
+	t.Run("print correct backups in correct order", func(t *testing.T) {
+		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
+		curTime = time.Unix(1690000000, 0)
+		_ = folder.PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		curTime = curTime.Add(time.Second)
+		_ = folder.PutObject("base_222_backup_stop_sentinel.json", &bytes.Buffer{})
+		curTime = curTime.Add(time.Second)
+		_ = folder.PutObject("base_333_backup_stop_sentinel.json", &bytes.Buffer{})
 
-	internal.HandleBackupList(
-		getBackupsFunc,
-		writeBackupListFunc,
-		internal.Logging{InfoLogger: infoLogger, ErrorLogger: errorLogger},
-	)
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		defer func() { os.Stdout = rescueStdout }()
 
-	assert.Equal(t, 1, writeBackupListCallsCount)
-	assert.Equal(t, backups, writeBackupListCallArgs)
-}
+		HandleDefaultBackupList(folder, true, true)
 
-func TestHandleBackupListLogError(t *testing.T) {
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "wallName0",
-		},
-		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "wallName1",
-		},
-	}
-	someErrorInstance := someError{errors.New("some error")}
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
-		return backups, someErrorInstance
-	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
-	infoLogger, errorLogger := testtools.MockLoggers()
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
 
-	internal.HandleBackupList(
-		getBackupsFunc,
-		writeBackupListFunc,
-		internal.Logging{InfoLogger: infoLogger, ErrorLogger: errorLogger},
-	)
-
-	assert.Equal(t, 1, errorLogger.Stats.FatalOnErrorCallsCount)
-	assert.Equal(t, someErrorInstance, errorLogger.Stats.Err)
-}
-
-func TestHandleBackupListLogNoBackups(t *testing.T) {
-	getBackupsFunc := func() ([]internal.BackupTime, error) {
-		return []internal.BackupTime{}, nil
-	}
-	writeBackupListFunc := func(backups []internal.BackupTime) {}
-	infoLogger, errorLogger := testtools.MockLoggers()
-
-	internal.HandleBackupList(
-		getBackupsFunc,
-		writeBackupListFunc,
-		internal.Logging{InfoLogger: infoLogger, ErrorLogger: errorLogger},
-	)
-
-	assert.Equal(t, 1, infoLogger.Stats.PrintLnCallsCount)
-	assert.Equal(t, "No backups found", infoLogger.Stats.PrintMsg)
-	assert.Equal(t, 0, errorLogger.Stats.FatalOnErrorCallsCount)
-}
-
-func TestWritePrettyBackupList_LongColumnsValues(t *testing.T) {
-	expectedRes := `+---+-----------+--------------------------------+-----------------------------------+
-| # | NAME      | LAST MODIFIED                  | WAL SEGMENT BACKUP START          |
-+---+-----------+--------------------------------+-----------------------------------+
-| 0 | backup000 | Monday, 01-Jan-01 00:00:00 UTC | veryVeryVeryVeryVeryLongWallName0 |
-| 1 | backup001 | Monday, 01-Jan-01 00:00:00 UTC | veryVeryVeryVeryVeryLongWallName1 |
-+---+-----------+--------------------------------+-----------------------------------+
+		want := `[
+    {
+        "backup_name": "base_111",
+        "time": "2023-07-22T04:26:40Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "default"
+    },
+    {
+        "backup_name": "base_222",
+        "time": "2023-07-22T04:26:41Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "default"
+    },
+    {
+        "backup_name": "base_333",
+        "time": "2023-07-22T04:26:42Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "default"
+    }
+]
 `
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "backup000",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName0",
-		},
-		{
-			BackupName:  "backup001",
-			Time:        time.Time{},
-			WalFileName: "veryVeryVeryVeryVeryLongWallName1",
-		},
-	}
+		assert.Equal(t, want, string(captured))
+	})
 
-	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	t.Run("print backups from different storages", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		t.Cleanup(mockCtrl.Finish)
+		collectorMock := stats.NewMockCollector(mockCtrl)
+		collectorMock.EXPECT().AllAliveStorages().Return([]string{"storage_1", "storage_2"}, nil)
+		collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
-	assert.Equal(t, expectedRes, b.String())
-}
+		memStorages := map[string]storage.Folder{
+			"storage_1": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
+			"storage_2": memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc))),
+		}
+		multiFolder := multistorage.NewFolder(memStorages, collectorMock).(storage.Folder)
+		multiFolder = multistorage.SetPolicies(multiFolder, policies.UniteAllStorages)
+		multiFolder, err := multistorage.UseAllAliveStorages(multiFolder)
+		require.NoError(t, err)
 
-func TestWritePrettyBackupList_ShortColumnsValues(t *testing.T) {
-	expectedRes := `+---+------+--------------------------------+--------------------------+
-| # | NAME | LAST MODIFIED                  | WAL SEGMENT BACKUP START |
-+---+------+--------------------------------+--------------------------+
-| 0 | b0   | Monday, 01-Jan-01 00:00:00 UTC | shortWallName0           |
-| 1 | b1   | Monday, 01-Jan-01 00:00:00 UTC | shortWallName1           |
-+---+------+--------------------------------+--------------------------+
+		curTime = time.Unix(1690000000, 0)
+		_ = memStorages["storage_1"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memStorages["storage_2"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		defer func() { os.Stdout = rescueStdout }()
+
+		HandleDefaultBackupList(multiFolder, true, true)
+
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
+
+		want := `[
+    {
+        "backup_name": "base_111",
+        "time": "2023-07-22T04:26:40Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "storage_1"
+    },
+    {
+        "backup_name": "base_111",
+        "time": "2023-07-22T04:26:40Z",
+        "wal_file_name": "ZZZZZZZZZZZZZZZZZZZZZZZZ",
+        "storage_name": "storage_2"
+    }
+]
 `
-	backups := []internal.BackupTime{
-		{
-			BackupName:  "b0",
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName:  "b1",
-			Time:        time.Time{},
-			WalFileName: "shortWallName1",
-		},
-	}
+		assert.Equal(t, want, string(captured))
+	})
 
-	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+	t.Run("handle error with no backups", func(t *testing.T) {
+		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
 
-	assert.Equal(t, expectedRes, b.String())
-}
+		infoOutput := new(bytes.Buffer)
+		rescueInfoOutput := tracelog.InfoLogger.Writer()
+		tracelog.InfoLogger.SetOutput(infoOutput)
+		defer func() { tracelog.InfoLogger.SetOutput(rescueInfoOutput) }()
 
-func TestWritePrettyBackupList_WriteNoBackupList(t *testing.T) {
-	expectedRes := `+---+------+---------------+--------------------------+
-| # | NAME | LAST MODIFIED | WAL SEGMENT BACKUP START |
-+---+------+---------------+--------------------------+
-+---+------+---------------+--------------------------+
-`
-	backups := make([]internal.BackupTime, 0)
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		defer func() { os.Stdout = rescueStdout }()
 
-	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
+		HandleDefaultBackupList(folder, true, false)
 
-	assert.Equal(t, expectedRes, b.String())
-}
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
 
-func TestWritePrettyBackupList_EmptyColumnsValues(t *testing.T) {
-	expectedRes := `+---+------+--------------------------------+--------------------------+
-| # | NAME | LAST MODIFIED                  | WAL SEGMENT BACKUP START |
-+---+------+--------------------------------+--------------------------+
-| 0 |      | Monday, 01-Jan-01 00:00:00 UTC | shortWallName0           |
-| 1 | b1   | Monday, 01-Jan-01 00:00:00 UTC |                          |
-| 2 |      | Monday, 01-Jan-01 00:00:00 UTC |                          |
-+---+------+--------------------------------+--------------------------+
-`
-	backups := []internal.BackupTime{
-		{
-			Time:        time.Time{},
-			WalFileName: "shortWallName0",
-		},
-		{
-			BackupName: "b1",
-			Time:       time.Time{},
-		},
-		{
-			Time: time.Time{},
-		},
-	}
-
-	b := bytes.Buffer{}
-	internal.WritePrettyBackupList(backups, &b)
-
-	assert.Equal(t, expectedRes, b.String())
+		assert.Empty(t, string(captured))
+		assert.Contains(t, infoOutput.String(), "No backups found")
+	})
 }

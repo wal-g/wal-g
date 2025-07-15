@@ -2,13 +2,17 @@ package mysql
 
 import (
 	"fmt"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/utility"
 	"os"
 	"path"
 	"time"
+
+	"github.com/pkg/errors"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const binlogFetchAhead = 2
@@ -16,12 +20,12 @@ const binlogFetchAhead = 2
 type replayHandler struct {
 	logCh chan string
 	errCh chan error
-	endTs string
+	endTS string
 }
 
-func newReplayHandler(endTs time.Time) *replayHandler {
+func newReplayHandler(endTS time.Time) *replayHandler {
 	rh := new(replayHandler)
-	rh.endTs = endTs.Local().Format(TimeMysqlFormat)
+	rh.endTS = endTS.Local().Format(TimeMysqlFormat)
 	rh.logCh = make(chan string, binlogFetchAhead)
 	rh.errCh = make(chan error, 1)
 	go rh.replayLogs()
@@ -43,13 +47,14 @@ func (rh *replayHandler) replayLogs() {
 }
 
 func (rh *replayHandler) replayLog(binlogPath string) error {
-	cmd, err := internal.GetCommandSetting(internal.MysqlBinlogReplayCmd)
+	cmd, err := internal.GetCommandSetting(conf.MysqlBinlogReplayCmd)
 	if err != nil {
 		return err
 	}
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("%s=%s", "WALG_MYSQL_CURRENT_BINLOG", binlogPath))
-	env = append(env, fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_END_TS", rh.endTs))
+	env = append(env,
+		fmt.Sprintf("%s=%s", "WALG_MYSQL_CURRENT_BINLOG", binlogPath),
+		fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_END_TS", rh.endTS))
 	cmd.Env = env
 	return cmd.Run()
 }
@@ -68,25 +73,42 @@ func (rh *replayHandler) handleBinlog(binlogPath string) error {
 	}
 }
 
-func HandleBinlogReplay(folder storage.Folder, backupName string, untilDT string) {
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Unable to get backup %v", err)
-
-	startTs, err := getBinlogStartTs(folder, backup)
+func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
+	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	endTs, err := configureEndTs(untilDT)
+	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	dstDir, err := internal.GetLogsDstSettings(internal.MysqlBinlogDstSetting)
-	tracelog.ErrorLogger.FatalOnError(err)
+	handler := newReplayHandler(endTS)
 
-	handler := newReplayHandler(endTs)
-
-	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTs, endTs)
-	err = fetchLogs(folder, dstDir, startTs, endTs, handler)
+	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
+	err = fetchLogs(folder, dstDir, startTS, endTS, endBinlogTS, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.wait()
 	tracelog.ErrorLogger.FatalfOnError("Failed to apply binlogs: %v", err)
+}
+
+func getTimestamps(folder storage.Folder, backupName, untilTS, untilBinlogLastModifiedTS string) (time.Time, time.Time, time.Time, error) {
+	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	if err != nil {
+		return time.Time{}, time.Time{}, time.Time{}, errors.Wrap(err, "Unable to get backup")
+	}
+
+	startTS, err := getBinlogSinceTS(folder, backup)
+	if err != nil {
+		return time.Time{}, time.Time{}, time.Time{}, err
+	}
+
+	endTS, err := utility.ParseUntilTS(untilTS)
+	if err != nil {
+		return time.Time{}, time.Time{}, time.Time{}, err
+	}
+
+	endBinlogTS, err := utility.ParseUntilTS(untilBinlogLastModifiedTS)
+	if err != nil {
+		return time.Time{}, time.Time{}, time.Time{}, err
+	}
+	return startTS, endTS, endBinlogTS, nil
 }

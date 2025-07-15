@@ -30,11 +30,11 @@ pgbench -i -s 1 postgres &
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push --permanent ${PGDATA}
 wal-g --config=${TMP_CONFIG} backup-list
-backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
-first_backup_status=`wal-g --config=${TMP_CONFIG} backup-list --detail | tail -n 1 | egrep -o -e "true" -e "false"`
+backup_name=$(wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
+first_backup_status=$(wal-g --config=${TMP_CONFIG} backup-list --detail | tail -n 1 | egrep -o -e "true" -e "false")
 
-wal-g --config=${TMP_CONFIG} backup-mark -i $backup_name
-last_backup_status=`wal-g --config=${TMP_CONFIG} backup-list --detail | tail -n 1 | egrep -o -e "true" -e "false"`
+wal-g --config=${TMP_CONFIG} backup-mark -i "$backup_name"
+last_backup_status=$(wal-g --config=${TMP_CONFIG} backup-list --detail | tail -n 1 | egrep -o -e "true" -e "false")
 
 if [ $first_backup_status = $last_backup_status ];
 then
@@ -63,5 +63,3 @@ then
     exit 2
 fi
 /tmp/scripts/drop_pg.sh
-
-echo "Backup mark impermanent test success!!!!!!"

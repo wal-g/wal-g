@@ -1,15 +1,10 @@
 package mysql
 
 import (
-	"path"
-	"strings"
-
 	"github.com/spf13/cobra"
-	"github.com/wal-g/storages/storage"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
-	"github.com/wal-g/wal-g/utility"
 )
 
 var confirmed = false
@@ -43,80 +38,90 @@ var deleteEverythingCmd = &cobra.Command{
 	Run:       runDeleteEverything,
 }
 
+var deleteTargetCmd = &cobra.Command{
+	Use:     internal.DeleteTargetUsageExample, // TODO : improve description
+	Example: internal.DeleteTargetExamples,
+	Args:    internal.DeleteTargetArgsValidator,
+	Run:     runDeleteTarget,
+}
+
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
-	internal.DeleteEverything(folder, confirmed, args)
+
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	deleteHandler.HandleDeleteEverything(args, confirmed)
+}
+
+func runDeleteTarget(cmd *cobra.Command, args []string) {
+	storage, err := internal.ConfigureStorage()
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	findFullBackup := false
+	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
+	if modifier == internal.FindFullDeleteModifier {
+		findFullBackup = true
+		// remove the extracted modifier from args
+		args = args[1:]
+	}
+
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	backupName := args[0]
+	backupSelector, err := internal.NewBackupNameSelector(backupName, true) //todo: add selection by userdata
+	tracelog.ErrorLogger.PrintOnError(err)
+
+	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, findFullBackup)
+
+	journalInfo, err := internal.NewJournalInfo(
+		backupName,
+		storage.RootFolder(),
+		mysql.BinlogPath,
+	)
+	// Backup could be created without journal
+	if err != nil {
+		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
+		return
+	}
+
+	if !confirmed {
+		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+		return
+	}
+
+	err = journalInfo.Delete(storage.RootFolder())
+	if err != nil {
+		tracelog.ErrorLogger.Print(err)
+	} else {
+		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+	}
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
-	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup(folder, object)
-	}
-	internal.HandleDeleteBefore(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	folder, err := internal.ConfigureFolder()
+	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
-	isFullBackup := func(object storage.Object) bool {
-		return IsFullBackup(folder, object)
-	}
-	internal.HandleDeleteRetain(folder, args, confirmed, isFullBackup, GetLessFunc(folder))
+
+	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
 
 func init() {
-	Cmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd)
+	cmd.AddCommand(deleteCmd)
+	deleteCmd.AddCommand(deleteBeforeCmd, deleteRetainCmd, deleteEverythingCmd, deleteTargetCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
-}
-
-func IsFullBackup(folder storage.Folder, object storage.Object) bool {
-	return true
-}
-
-func GetLessFunc(folder storage.Folder) func(object1, object2 storage.Object) bool {
-	return func(object1, object2 storage.Object) bool {
-		time1, ok := utility.TryFetchTimeRFC3999(object1.GetName())
-		if !ok {
-			return binlogLess(folder, object1, object2)
-		}
-		time2, ok := utility.TryFetchTimeRFC3999(object2.GetName())
-		if !ok {
-			return binlogLess(folder, object1, object2)
-		}
-		return time1 < time2
-	}
-}
-
-func binlogLess(folder storage.Folder, object1, object2 storage.Object) bool {
-	binlogName1, ok := tryFetchBinlogName(folder, object1)
-	if !ok {
-		return false
-	}
-	binlogName2, ok := tryFetchBinlogName(folder, object2)
-	if !ok {
-		return false
-	}
-	return binlogName1 < binlogName2
-}
-
-func tryFetchBinlogName(folder storage.Folder, object storage.Object) (string, bool) {
-	name := object.GetName()
-	if strings.HasPrefix(name, mysql.BinlogPath) {
-		_, name = path.Split(name)
-		return name, true
-	}
-	name = strings.Replace(name, utility.SentinelSuffix, "", 1)
-	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	backup := internal.NewBackup(baseBackupFolder, name)
-	var sentinel mysql.StreamSentinelDto
-	err := internal.FetchStreamSentinel(backup, &sentinel)
-	if err != nil {
-		tracelog.InfoLogger.Println("Fail to fetch stream sentinel " + name)
-		return "", false
-	}
-	return sentinel.BinLogStart, true
 }

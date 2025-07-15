@@ -23,7 +23,7 @@ const (
 	RmSeqID
 	RmSPGistID
 	RmBrinID
-	RmCommitTsID
+	RmCommitTSID
 	RmReplOriginID
 	RmGenericID
 	RmLogicalMsgID

@@ -2,13 +2,14 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (
 	backupCopyUsage            = "copy"
 	backupCopyShortDescription = "copy specific or all backups"
-	backupCopyLongDescription  = "Copy backup(s) from one storage to another according to configs (with history by default)"
+	backupCopyLongDescription  = "Copy backup(s) from one storage to another according to configs " +
+		"(with history by default)"
 
 	backupNameFlag        = "backup-name"
 	backupNameShorthand   = "b"
@@ -22,16 +23,16 @@ const (
 	toShorthand   = "t"
 	toDescription = "Storage config to where should copy backup"
 
-	withoutHistoryFlag        = "without-history"
-	withoutHistoryShorthand   = "w"
-	withoutHistoryDescription = "Copy backup without history"
+	withAllHistoryFlag        = "with-history"
+	withAllHistoryShorthand   = "w"
+	withAllHistoryDescription = "If set - copy WALs older than backup finish_lsn. If not - copy only WALs from start_lsn to finish_lsn"
 )
 
 var (
 	backupName     string
 	fromConfigFile string
 	toConfigFile   string
-	withoutHistory = false
+	withAllHistory = false
 
 	backupCopyCmd = &cobra.Command{
 		Use:   backupCopyUsage,
@@ -39,11 +40,15 @@ var (
 		Long:  backupCopyLongDescription,
 		Args:  cobra.ExactArgs(0),
 		Run:   runBackupCopy,
+		PersistentPreRun: func(*cobra.Command, []string) {
+			// do not check for any configured settings because wal-g copy uses the different
+			// settings init process
+		},
 	}
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	internal.HandleCopy(fromConfigFile, toConfigFile, backupName, withoutHistory)
+	postgres.HandleCopy(fromConfigFile, toConfigFile, backupName, withAllHistory)
 }
 
 func init() {
@@ -52,10 +57,12 @@ func init() {
 	backupCopyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	backupCopyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
-	backupCopyCmd.Flags().BoolVarP(&withoutHistory, withoutHistoryFlag, withoutHistoryShorthand, false, withoutHistoryDescription)
+	backupCopyCmd.Flags().BoolVarP(&withAllHistory,
+		withAllHistoryFlag,
+		withAllHistoryShorthand,
+		false,
+		withAllHistoryDescription)
 
-	backupCopyCmd.MarkFlagFilename(toConfigFile)
-	backupCopyCmd.MarkFlagFilename(fromConfigFile)
-	backupCopyCmd.MarkFlagRequired(toConfigFile)
-	backupCopyCmd.MarkFlagRequired(fromConfigFile)
+	_ = backupCopyCmd.MarkFlagRequired(toFlag)
+	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
 }

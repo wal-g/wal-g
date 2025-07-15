@@ -1,11 +1,10 @@
 package stages
 
 import (
-	"io"
-	"testing"
-
 	"fmt"
+	"io"
 	"os"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 )

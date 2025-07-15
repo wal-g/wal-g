@@ -1,4 +1,4 @@
-"WALE_S3_PREFIX": "s3://deletebeforepermanentfullbucket",
+"WALE_S3_PREFIX": "s3://catchupbucket",
 "WALG_USE_WAL_DELTA": "true",
 "WALG_UPLOAD_CONCURRENCY": "1",
 "WALG_UPLOAD_QUEUE": "1",

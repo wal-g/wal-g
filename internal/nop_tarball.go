@@ -2,7 +2,7 @@ package internal
 
 import (
 	"archive/tar"
-	"io/ioutil"
+	"io"
 	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -13,6 +13,10 @@ type NOPTarBall struct {
 	number    int
 	partSize  *int64
 	tarWriter *tar.Writer
+}
+
+func (tarBall *NOPTarBall) Name() string {
+	return "NOPTarBall"
 }
 
 func (tarBall *NOPTarBall) SetUp(crypter crypto.Crypter, params ...string) {}
@@ -36,11 +40,11 @@ func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) TarBall {
 	return &NOPTarBall{
 		number:    tarBallMaker.number,
 		partSize:  tarBallMaker.partSize,
-		tarWriter: tar.NewWriter(ioutil.Discard),
+		tarWriter: tar.NewWriter(io.Discard),
 	}
 }
 
-func newNopTarBallMaker() TarBallMaker {
+func NewNopTarBallMaker() TarBallMaker {
 	size := int64(0)
 	return &NOPTarBallMaker{0, &size}
 }

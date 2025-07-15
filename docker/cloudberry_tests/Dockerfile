@@ -1,0 +1,37 @@
+FROM wal-g/golang:latest as build
+
+WORKDIR /go/src/github.com/wal-g/wal-g
+
+COPY go.mod go.mod
+COPY vendor/ vendor/
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY cmd/ cmd/
+COPY main/ main/
+COPY utility/ utility/
+COPY Makefile Makefile
+
+RUN cd main/gp && \
+    go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+
+FROM wal-g/cloudberry:latest
+
+USER root
+
+COPY docker/pg/PGP_KEY /tmp/PGP_KEY
+COPY docker/pg/gpg.conf /home/gpadmin/.gnupg/gpg.conf
+COPY docker/pg/gpg-agent.conf /home/gpadmin/.gnupg/gpg-agent.conf
+
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/gp/wal-g /usr/bin/
+
+COPY docker/cloudberry_tests/scripts/ /tmp
+COPY docker/pg_tests/scripts/scripts/ /tmp/pg_scripts
+
+RUN chmod 777 /tmp/configs/
+
+RUN mkdir -p /var/log/
+RUN chmod 777 /var/log/
+
+RUN /bin/bash -c 'sudo chmod +x -R /tmp/tests; chmod +x /tmp/run_integration_tests.sh'
+
+CMD su gpadmin bash -c '/tmp/run_integration_tests.sh'

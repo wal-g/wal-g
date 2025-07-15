@@ -2,47 +2,76 @@ package pg
 
 import (
 	"fmt"
-	"github.com/wal-g/tracelog"
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/cmd/common"
+	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/walparser"
 )
 
 const WalgShortDescription = "PostgreSQL backup tool"
 
 var (
 	// These variables are here only to show current version. They are set in makefile during build process
-	WalgVersion = "devel"
-	GitRevision = "devel"
-	BuildDate   = "devel"
+	walgVersion = "devel"
+	gitRevision = "devel"
+	buildDate   = "devel"
 
 	Cmd = &cobra.Command{
 		Use:     "wal-g",
 		Short:   WalgShortDescription, // TODO : improve short and long descriptions
-		Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "PostgreSQL"}, "\t"),
+		Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "PostgreSQL"}, "\t"),
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalOnError(err)
+			if _, ok := cmd.Annotations["NoStorage"]; !ok {
+				err := internal.AssertRequiredSettingsSet()
+				tracelog.ErrorLogger.FatalOnError(err)
+			}
+
+			if viper.IsSet(conf.PgWalSize) {
+				postgres.SetWalSize(viper.GetUint64(conf.PgWalSize))
+			}
+			if viper.IsSet(conf.PgWalPageSize) {
+				walparser.SetWalPageSize(viper.GetUint64(conf.PgWalPageSize))
+			}
+			if viper.IsSet(conf.PgBlockSize) {
+				walparser.SetBlockSize(viper.GetUint64(conf.PgBlockSize))
+				postgres.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
+				orioledb.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
+			}
+			// In case the --target-storage flag isn't specified (the variable is set in commands' init() funcs),
+			// we take the value from the config.
+			if targetStorage == "" {
+				targetStorage = viper.GetString(conf.PgTargetStorage)
+			}
 		},
 	}
+
+	targetStorage            string
+	targetStorageDescription = `Name of the storage to execute the command only for. Use "default" to select the primary one.`
 )
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the PgCmd.
 func Execute() {
+	configureCommand()
 	if err := Cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func init() {
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+func GetCmd() *cobra.Command {
+	return Cmd
+}
 
-	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
-	Cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(Cmd)
+func configureCommand() {
+	common.Init(Cmd, conf.PG)
+	conf.AddTurboFlag(Cmd)
 }

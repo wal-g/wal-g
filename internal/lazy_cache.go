@@ -12,7 +12,7 @@ type WrongTypeError struct {
 	error
 }
 
-func newWrongTypeError(desiredType string) WrongTypeError {
+func NewWrongTypeError(desiredType string) WrongTypeError {
 	return WrongTypeError{errors.Errorf("expected to get '%s', but not found one", desiredType)}
 }
 
@@ -20,21 +20,21 @@ func (err WrongTypeError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-type LazyCache struct {
-	cache      map[interface{}]interface{}
-	load       func(key interface{}) (value interface{}, err error)
+type LazyCache[K comparable, V any] struct {
+	cache      map[K]V
+	load       func(key K) (value V, err error)
 	cacheMutex sync.Mutex
 }
 
-func newLazyCache(load func(key interface{}) (value interface{}, err error)) *LazyCache {
-	return &LazyCache{
-		make(map[interface{}]interface{}),
+func NewLazyCache[K comparable, V any](load func(key K) (value V, err error)) *LazyCache[K, V] {
+	return &LazyCache[K, V]{
+		make(map[K]V),
 		load,
 		sync.Mutex{},
 	}
 }
 
-func (lazyCache *LazyCache) Load(key interface{}) (value interface{}, exists bool, err error) {
+func (lazyCache *LazyCache[K, V]) Load(key K) (value V, exists bool, err error) {
 	lazyCache.cacheMutex.Lock()
 	defer lazyCache.cacheMutex.Unlock()
 	if value, ok := lazyCache.cache[key]; ok {
@@ -47,14 +47,14 @@ func (lazyCache *LazyCache) Load(key interface{}) (value interface{}, exists boo
 	return value, false, err
 }
 
-func (lazyCache *LazyCache) LoadExisting(key interface{}) (value interface{}, exists bool) {
+func (lazyCache *LazyCache[K, V]) LoadExisting(key K) (value V, exists bool) {
 	lazyCache.cacheMutex.Lock()
 	defer lazyCache.cacheMutex.Unlock()
 	value, exists = lazyCache.cache[key]
 	return
 }
 
-func (lazyCache *LazyCache) Store(key, value interface{}) {
+func (lazyCache *LazyCache[K, V]) Store(key K, value V) {
 	lazyCache.cacheMutex.Lock()
 	defer lazyCache.cacheMutex.Unlock()
 	lazyCache.cache[key] = value
@@ -62,7 +62,7 @@ func (lazyCache *LazyCache) Store(key, value interface{}) {
 
 // Range calls reduce sequentially for each key and value present in the cache.
 // If reduce returns false, range stops the iteration.
-func (lazyCache *LazyCache) Range(reduce func(key, value interface{}) bool) {
+func (lazyCache *LazyCache[K, V]) Range(reduce func(key K, value V) bool) {
 	lazyCache.cacheMutex.Lock()
 	defer lazyCache.cacheMutex.Unlock()
 	for key, value := range lazyCache.cache {

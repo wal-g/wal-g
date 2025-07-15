@@ -7,20 +7,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/tests_func/utils"
-
-	"github.com/mongodb/mongo-tools-common/db"
+	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/mod/semver"
 )
 
 const (
 	LocalDB   = "local"
 	OplogColl = "oplog.rs"
 	AdminDB   = "admin"
+
+	MongodPort = 27018
 )
 
 type DatabaseRecord struct {
@@ -69,7 +72,7 @@ type CmdResponse struct {
 	CodeName string `bson:"codeName, omitempty"`
 }
 
-// Optime ...
+// OpTime ...
 type OpTime struct {
 	TS   primitive.Timestamp `bson:"ts" json:"ts"`
 	Term int64               `bson:"t" json:"t"`
@@ -93,7 +96,16 @@ type AuthCreds struct {
 	Username string
 	Password string
 	Database string
+	Restore  bool
 }
+
+type AuthPolicy int64
+
+const (
+	NoneAuth AuthPolicy = iota
+	AdminAuth
+	AutoDetectAuth
+)
 
 func AdminCredsFromEnv(env map[string]string) AuthCreds {
 	return AuthCreds{
@@ -121,9 +133,9 @@ func AdminCreds(creds AuthCreds) MongoCtlOpt {
 	}
 }
 
-func Port(port int) MongoCtlOpt {
+func WithRestore(restore bool) MongoCtlOpt {
 	return func(mc *MongoCtl) {
-		mc.port = port
+		mc.adminCreds.Restore = restore
 	}
 }
 
@@ -131,7 +143,7 @@ func NewMongoCtl(ctx context.Context, host string, setters ...MongoCtlOpt) (*Mon
 	mc := &MongoCtl{
 		ctx:  ctx,
 		host: host,
-		port: 27018,
+		port: MongodPort,
 	}
 	for _, setter := range setters {
 		setter(mc)
@@ -144,6 +156,10 @@ func NewMongoCtl(ctx context.Context, host string, setters ...MongoCtlOpt) (*Mon
 	mc.expPort = expPort
 
 	return mc, nil
+}
+
+func (mc *MongoCtl) GetMongodPort() int {
+	return mc.port
 }
 
 func (mc *MongoCtl) Connect(creds *AuthCreds) (*mongo.Client, error) {
@@ -165,11 +181,17 @@ func (mc *MongoCtl) AdminConnect() (*mongo.Client, error) {
 func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	auth := ""
 	dbase := AdminDB
+	restore := ""
 	if creds != nil {
 		auth = fmt.Sprintf("%s:%s@", creds.Username, creds.Password)
 		dbase = creds.Database
+		if creds.Restore {
+			restore = "&restore=true"
+		}
 	}
-	uri := fmt.Sprintf("mongodb://%s%s:%d/%s?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000", auth, mc.expHost, mc.expPort, dbase)
+	uri := fmt.Sprintf("mongodb://%s%s:%d/%s"+
+		"?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000%s",
+		auth, mc.expHost, mc.expPort, dbase, restore)
 	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("can not create mongo client: %v", err)
@@ -181,18 +203,32 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	return client, nil
 }
 
-func (mc *MongoCtl) WriteTestData(mark string) error {
+func (mc *MongoCtl) AddDataToCollection(dbName, colName, prefix string) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {
 		return err
 	}
-	docsCount := 3
-	for _, dbName := range []string{"test_db_01", "test_db_02"} {
-		for _, tableName := range []string{"test_table_01", "test_table_02"} {
+	if _, err = conn.Database(dbName).Collection(colName).InsertOne(
+		mc.ctx, generateRecord(1, 1, prefix),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (mc *MongoCtl) WriteTestData(mark string, dbCount, tablesCount, docsCount int) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	for dbId := 1; dbId <= dbCount; dbId++ {
+		for tableId := 1; tableId <= tablesCount; tableId++ {
 			var rows []interface{}
 			for k := 1; k <= docsCount; k++ {
 				rows = append(rows, generateRecord(k, 5, mark))
 			}
+			dbName := fmt.Sprintf("test_db_%02d", dbId)
+			tableName := fmt.Sprintf("test_table_%02d", tableId)
 			if _, err := conn.Database(dbName).Collection(tableName).InsertMany(mc.ctx, rows); err != nil {
 				return err
 			}
@@ -373,6 +409,34 @@ func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
 	return OpTimestamp{TS: ts.T, Inc: ts.I}, nil
 }
 
+func (mc *MongoCtl) runMongoShellEval(eval string, auth AuthPolicy, quiet bool, db string) (ExecResult, error) {
+	cmd := []string{"mongosh", "--host", "localhost", "--port", "27018", "--norc"}
+
+	if quiet {
+		cmd = append(cmd, "--quiet")
+	}
+
+	adminCredCliParams := []string{"--username", mc.adminCreds.Username, "--password", mc.adminCreds.Password}
+
+	switch {
+	case auth == AdminAuth:
+		cmd = append(cmd, adminCredCliParams...)
+	case auth == AutoDetectAuth:
+		authedCmd := append(cmd, adminCredCliParams...)
+		if _, err := mc.runCmd(append(authedCmd, "--eval", "quit()", AdminDB)...); err == nil {
+			cmd = authedCmd
+		}
+	}
+
+	cmd = append(cmd, "--eval", eval)
+
+	if db != "" {
+		cmd = append(cmd, db)
+	}
+
+	return mc.runCmd(cmd...)
+}
+
 func (mc *MongoCtl) InitReplSet() error {
 	im, err := mc.runIsMaster()
 	if err != nil {
@@ -381,19 +445,57 @@ func (mc *MongoCtl) InitReplSet() error {
 	if im.SetName != "" {
 		return nil
 	}
-	_, err = mc.runCmd([]string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018", "--eval", "rs.initiate()"})
+	_, err = mc.runMongoShellEval("rs.initiate()", AutoDetectAuth, false, "")
 	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
 
 	return err
 }
 
+func (mc *MongoCtl) GetVersion() (version string, err error) {
+	for attempt := 0; attempt < 5; attempt++ {
+		var result ExecResult
+		result, err = mc.runMongoShellEval("db.version()", NoneAuth, true, "")
+		if err != nil {
+			continue
+		}
+		version := strings.TrimSpace(result.Stdout())
+		if !semver.IsValid(fmt.Sprintf("v%s", version)) {
+			err = fmt.Errorf("invalid version: %v", version)
+			continue
+		}
+
+		return version, err
+	}
+	return "", errors.Wrap(err, "Unable to get version of mongodb")
+}
+
+func (mc *MongoCtl) GetConfigPath() (string, error) {
+	getCmdLineOpts := struct {
+		Parsed struct {
+			Config string `bson:"config"`
+		} `bson:"parsed"`
+	}{}
+	adminConnect, err := mc.AdminConnect()
+	if err != nil {
+		return "", err
+	}
+	err = adminConnect.Database("admin").RunCommand(mc.ctx, bson.M{"getCmdLineOpts": 1}).Decode(&getCmdLineOpts)
+	if err != nil {
+		return "", err
+	}
+	if len(getCmdLineOpts.Parsed.Config) == 0 {
+		return "", errors.New("config path is empty")
+	}
+
+	return getCmdLineOpts.Parsed.Config, nil
+}
+
 func (mc *MongoCtl) EnableAuth() error {
-	cmd := []string{"mongo", "--host", "localhost", "--quiet", "--norc", "--port", "27018",
-		"--eval", fmt.Sprintf("db.createUser({user: '%s', pwd: '%s', roles: ['root']})",
-			mc.adminCreds.Username,
-			mc.adminCreds.Password,
-		), AdminDB}
-	response, err := RunCommand(mc.ctx, mc.host, cmd)
+	eval := fmt.Sprintf("db.createUser({user: '%s', pwd: '%s', roles: ['root']})",
+		mc.adminCreds.Username,
+		mc.adminCreds.Password,
+	)
+	response, err := mc.runMongoShellEval(eval, NoneAuth, true, AdminDB)
 	if err != nil {
 		return err
 	}
@@ -402,10 +504,6 @@ func (mc *MongoCtl) EnableAuth() error {
 		strings.Contains(response.Combined(), "couldn't add user: not authorized on admin to execute command") ||
 		strings.Contains(response.Combined(), "there are no users authenticated") {
 		return nil
-	}
-	if !strings.Contains(response.Combined(), "Successfully added user") {
-		tracelog.ErrorLogger.Printf("can not create admin user: %s", response.Combined())
-		return fmt.Errorf("can not initialize auth")
 	}
 
 	conn, err := mc.AdminConnect()
@@ -440,30 +538,64 @@ func (mc *MongoCtl) EnableAuth() error {
 	return nil
 }
 
-func (mc *MongoCtl) runCmd(run []string) (ExecResult, error) {
-	exc, err := RunCommandStrict(mc.ctx, mc.host, run)
+func (mc *MongoCtl) runCmd(cli ...string) (ExecResult, error) {
+	exc, err := RunCommandStrict(mc.ctx, mc.host, cli)
 
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(run, " "), exc.String())
+		tracelog.ErrorLogger.Printf("Command failed '%s' failed: %v", strings.Join(cli, " "), exc.String())
 		return exc, err
 	}
 	return exc, err
 }
 
+func (mc *MongoCtl) StopMongod() error {
+	_, err := mc.runCmd("supervisorctl", "stop", "mongodb")
+	return err
+}
+
+func (mc *MongoCtl) StartMongod() error {
+	_, err := mc.runCmd("supervisorctl", "start", "mongodb")
+	return err
+}
+
+func (mc *MongoCtl) DeleteMongodReplSetSetting() error {
+	_, err := mc.runCmd("bash", "-c",
+		"sed -i \"s/ --replSet.*//\" /config/supervisor/conf.d/mongodb.conf",
+	)
+	if err != nil {
+		return err
+	}
+	_, err = mc.runCmd("supervisorctl", "reread")
+	if err != nil {
+		return err
+	}
+	_, err = mc.runCmd("supervisorctl", "update")
+	if err != nil {
+		return err
+	}
+	return mc.StopMongod()
+}
+
+func (mc *MongoCtl) GetLogs() error {
+	t, err := mc.runCmd("cat", "/var/log/mongodb/mongod.log")
+	tracelog.InfoLogger.Println(t)
+	return err
+}
+
 func (mc *MongoCtl) PurgeDatadir() error {
-	_, err := mc.runCmd([]string{"supervisorctl", "stop", "mongodb"})
+	err := mc.StopMongod()
 	if err != nil {
 		return err
 	}
-	_, err = mc.runCmd([]string{"bash", "-c", "rm -rf /var/lib/mongodb/*"})
-	if err != nil {
-		return err
-	}
-
-	_, err = mc.runCmd([]string{"supervisorctl", "start", "mongodb"})
+	_, err = mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return mc.StartMongod()
+}
+
+func (mc *MongoCtl) ChownDBPath() error {
+	_, err := mc.runCmd("bash", "-c", "chown -R mongodb.mongodb /var/lib/mongodb/*")
+	return err
 }

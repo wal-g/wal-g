@@ -1,7 +1,21 @@
-version: '3'
-
 volumes:
   fdb_volume:
+
+x-s3_common_depends: &s3_common_depends
+  depends_on:
+    - s3
+    # - graphite
+  links:
+    - s3
+    # - graphite
+
+x-s3_throttling_depends: &s3_throttling_depends
+  depends_on:
+    - s3-for-throttling
+    # - graphite
+  links:
+    - s3-for-throttling
+    # - graphite
 
 services:
   golang:
@@ -15,12 +29,43 @@ services:
     build:
       dockerfile: ./docker/ubuntu/Dockerfile
       context: .
-    image: wal-g/ubuntu
+    image: wal-g/ubuntu:18.04
     container_name: wal-g_ubuntu
 
+  ubuntu_20_04:
+    build:
+      dockerfile: ./docker/ubuntu/Dockerfile_20_04
+      context: .
+    image: wal-g/ubuntu:20.04
+    container_name: wal-g_ubuntu_20_04
+
+  swift:
+    image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"
+    container_name: wal-g_swift
+    hostname: swift
+    ports:
+      - "8010:8080"
+
+  # "WALG_STATSD_ADDRESS": "wal-g_graphite:8125"
+  graphite:
+    image: hopsoft/graphite-statsd
+    hostname: wal-g_graphite
+    container_name: wal-g_graphite
+    ports:
+      - "8125:8125"
+      - "8126:8126"
+      - "2003:2003"
+      - "2023:2023"
+      - "2004:2004"
+      - "2024:2024"
+      - "80:80"
+      - "81:81"
+      - "3000:3000"
+
   s3:
-    image: minio/minio
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
     container_name: wal-g_s3
+    hostname: s3
     ports:
       - "9000:9000"
     environment:
@@ -29,37 +74,164 @@ services:
     entrypoint: sh
     command: >
       -c 'mkdir -p /export/fullbucket
+      &&  mkdir -p /export/fullratingcomposerbucket
+      &&  mkdir -p /export/fulldatabasecomposerbucket
+      &&  mkdir -p /export/fullcopycomposerbucket
+      &&  mkdir -p /export/fullwithoutfilesmetadatabucket
       &&  mkdir -p /export/fullscandeltabucket
+      &&  mkdir -p /export/failoverstoragebucket
+      &&  mkdir -p /export/partialbucket
+      &&  mkdir -p /export/remotebucket
+      &&  mkdir -p /export/remotewithoutfilesmetadatabucket
       &&  mkdir -p /export/cryptobucket
       &&  mkdir -p /export/waldeltabucket
       &&  mkdir -p /export/ghostbucket
       &&  mkdir -p /export/compressionbucket
+      &&  mkdir -p /export/deleteretainafterbucket
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
-      &&  mkdir -p /export/deleteretainfullbucket
-      &&  mkdir -p /export/deleteretainfindfullbucket
-      &&  mkdir -p /export/deletebeforenamefindfullbucket
-      &&  mkdir -p /export/deletebeforetimefindfullbucket
-      &&  mkdir -p /export/deletebeforepermanentfullbucket
-      &&  mkdir -p /export/deletebeforepermanentdeltabucket
-      &&  mkdir -p /export/deletewithoutconfirm
-      &&  mkdir -p /export/deleteendtoendbucket
+      &&  mkdir -p /export/delete-retain-full-bucket
+      &&  mkdir -p /export/delete-retain-full-multist-bucket
+      &&  mkdir -p /export/delete-retain-full-multist-fo-bucket
+      &&  mkdir -p /export/delete-retain-find-full-bucket
+      &&  mkdir -p /export/delete-before-name-find-full-bucket
+      &&  mkdir -p /export/delete-before-time-find-full-bucket
+      &&  mkdir -p /export/delete-before-permanent-full-bucket
+      &&  mkdir -p /export/delete-before-permanent-delta-bucket
+      &&  mkdir -p /export/delete-before-permanent-delta-multist-bucket
+      &&  mkdir -p /export/delete-before-permanent-delta-multist-fo-bucket
+      &&  mkdir -p /export/delete-without-confirm-bucket
+      &&  mkdir -p /export/delete-end-to-end-bucket
+      &&  mkdir -p /export/delete-end-to-end-fo-bucket
+      &&  mkdir -p /export/delete-target-bucket
+      &&  mkdir -p /export/delete-target-delta-find-full-bucket
+      &&  mkdir -p /export/delete-target-delta-bucket
+      &&  mkdir -p /export/delete-target-delta-multist-bucket
+      &&  mkdir -p /export/delete-target-delta-multist-fo-bucket
+      &&  mkdir -p /export/delete-garbage-bucket
+      &&  mkdir -p /export/delete-garbage-multist-bucket
+      &&  mkdir -p /export/delete-garbage-multist-fo-bucket
+      &&  mkdir -p /export/gpdeletetargetbucket
+      &&  mkdir -p /export/gpdeletegarbagebucket
+      &&  mkdir -p /export/cloudberry-delete-target-bucket
+      &&  mkdir -p /export/cloudberry-delete-garbage-bucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
+      &&  mkdir -p /export/mysqlincrementalxtrabackupbucket
+      &&  mkdir -p /export/mysqlsplitfilesizebucket
+      &&  mkdir -p /export/mysqlfullxtrabackupwithrangesbucket
       &&  mkdir -p /export/mysqlfullmysqldumpbucket
       &&  mkdir -p /export/mysqlbinlogpushfetchbucket
       &&  mkdir -p /export/mysqldeleteendtoendbucket
+      &&  mkdir -p /export/mysqldeleteeverythingpermanent
+      &&  mkdir -p /export/mysqldeleteincrementalxtrabackupbucket
+      &&  mkdir -p /export/mysqlmarkbucket
+      &&  mkdir -p /export/mysqlmarknoerrorbucket
+      &&  mkdir -p /export/mysqlmarkincrementalbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
+      &&  mkdir -p /export/mysql_pitr_binlogserver_bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
-      &&  mkdir -p /export/mariadbfullmysqldumpbucket
-      &&  mkdir -p /export/mariadbfullmariabackupbucket
+      &&  mkdir -p /export/mysqllivereplay
+      &&  mkdir -p /export/mysqlpermanentbackupbucket
+      &&  mkdir -p /export/mysql_journal_test_bucket
+      &&  mkdir -p /export/mysql8_xbtool_bucket
+      &&  mkdir -p /export/mysql8_xbtool_incremental_bucket
+      &&  mkdir -p /export/mysql8_xbtool_inplace_bucket
+      &&  mkdir -p /export/mariadb_binlog_push_fetch
+      &&  mkdir -p /export/mariadb_binlog_push_with_gtids_check
+      &&  mkdir -p /export/mariadb_full_mysqldump
+      &&  mkdir -p /export/mariadb_full_maria_backup
+      &&  mkdir -p /export/mariadb_pitr_xtrabackup
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
       &&  mkdir -p /export/mongodeleteretainbucket
       &&  mkdir -p /export/redisbucket
+      &&  mkdir -p /export/mysqlcopybackupfrom
+      &&  mkdir -p /export/mysqlcopybackupto
+      &&  mkdir -p /export/mysqlconfonly
+      &&  mkdir -p /export/mysqldeletebinlogs
+      &&  mkdir -p /export/archivereadyrename
+      &&  mkdir -p /export/gpfullbucket
+      &&  mkdir -p /export/gpafterfailedbucket
+      &&  mkdir -p /export/gpdeletewithoutconfirm
+      &&  mkdir -p /export/gpdeleteretainbucket
+      &&  mkdir -p /export/gpdeletebeforepermanentbucket
+      &&  mkdir -p /export/gpdeletebeforenamebucket
+      &&  mkdir -p /export/gpdeletebeforetimebucket
+      &&  mkdir -p /export/gpaostoragetestbucket
+      &&  mkdir -p /export/gpdeltabackuptestbucket
+      &&  mkdir -p /export/gppartialtablebucket
+      &&  mkdir -p /export/cloudberry-full-bucket
+      &&  mkdir -p /export/cloudberry-after-failed-bucket
+      &&  mkdir -p /export/cloudberry-delete-without-confirm
+      &&  mkdir -p /export/cloudberry-delete-retain-bucket
+      &&  mkdir -p /export/cloudberry-delete-before-permanent-bucket
+      &&  mkdir -p /export/cloudberry-delete-before-name-bucket
+      &&  mkdir -p /export/cloudberry-delete-before-time-bucket
+      &&  mkdir -p /export/cloudberry-aostorage-test-bucket
+      &&  mkdir -p /export/cloudberry-delta-backup-test-bucket
+      &&  mkdir -p /export/cloudberry-partial-table-bucket
+      &&  mkdir -p /export/createrestorepointbucket
+      &&  mkdir -p /export/storagetoolsbucket
+      &&  mkdir -p /export/storagetoolsbucket_target
+      &&  mkdir -p /export/sttransferfilesbucket
+      &&  mkdir -p /export/sttransferfilesfailoverbucket
+      &&  mkdir -p /export/transferbackupbucket
+      &&  mkdir -p /export/walrestorebucket
+      &&  mkdir -p /export/daemonbucket
+      &&  mkdir -p /export/backupmarkimpermanentbucket
+      &&  mkdir -p /export/backupmarkpermanentnoerrorbucket
+      &&  mkdir -p /export/backupmarkpermanentbucket
+      &&  mkdir -p /export/backupperftestbucket
+      &&  mkdir -p /export/catchupbucket
+      &&  mkdir -p /export/fullstreamedbucket
+      &&  mkdir -p /export/receivewalbucket
+      &&  mkdir -p /export/severaldeltabackupsbucket
+      &&  mkdir -p /export/walperftestbucket
+      &&  mkdir -p /export/orioledb_compatibility
+      &&  mkdir -p /export/orioledb_simple
+      &&  mkdir -p /export/orioledb_compressed
       &&  /usr/bin/minio server /export'
+
+  s3-another:
+    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
+    container_name: wal-g_s32
+    ports:
+      - "9001:9001"
+    environment:
+      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLEBUTANOHER"
+      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYBUTANOTHERTOO"
+    entrypoint: sh
+    command: >
+      -c 'mkdir -p /export/mysqlcopybackupto
+      &&  /usr/bin/minio server /export'
+
+  s3-for-throttling:
+    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    container_name: wal-g_s3_3
+    hostname: s3
+    ports:
+      - "9000:9000"
+      - "9090:9090"
+    environment:
+      - "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE"
+      - "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      - "MINIO_API_REQUESTS_MAX=0"
+      - "MINIO_API_REQUESTS_DEADLINE=0s"
+    entrypoint: sh
+    command: >
+      -c 'mkdir -p /export/walperftestbucket
+      &&  minio server /export --console-address ":9090"'
+
+  ssh:
+    build:
+      dockerfile: docker/ssh/Dockerfile
+      context: .
+    container_name: wal-g_ssh
+    ports:
+      - "6942:6942"
 
   pg:
     build:
@@ -68,294 +240,377 @@ services:
     image: wal-g/pg
     container_name: wal-g_pg
 
-  pg_tests:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile
-      context: .
-    image: wal-g/pg_tests
-    container_name: wal-g_pg_tests
-
   pg_build_docker_prefix:
     build:
       dockerfile: docker/pg_tests/Dockerfile_prefix
       context: .
     image: wal-g/docker_prefix
     container_name: wal-g_pg_docker_prefix
+    <<: *s3_common_depends
+
+  pg_test_common: &pg_test_common
+    image: wal-g/docker_prefix
+    user: postgres
+    <<: *s3_common_depends
+
+  pg_test_throttling: &pg_test_throttling
+    image: wal-g/docker_prefix
+    user: postgres
+    <<: *s3_throttling_depends
+
+  pg_tests:
+    <<: *pg_test_common
+    container_name: wal-g_pg_tests
+    command: /tmp/run_integration_tests.sh
+
+  pg_storage_swift_test:
+    image: wal-g/docker_prefix
+    container_name: wal-g_pg_storage_swift_test
+    command: /tmp/test_bins/swift.test -test.v
     depends_on:
-      - s3
+      - swift
     links:
-      - s3
+      - swift
+    environment:
+      - "PG_TEST_STORAGE=swift"
+      - "OS_USERNAME=test:tester"
+      - "OS_PASSWORD=testing"
+      - "OS_AUTH_URL=http://swift:8080/auth/v1.0"
+
+  pg_storage_ssh_test:
+    image: wal-g/docker_prefix
+    container_name: wal-g_pg_storage_ssh_test
+    command: /tmp/test_bins/sh.test -test.v
+    depends_on:
+      - ssh
+    links:
+      - ssh
+    environment:
+      - "PG_TEST_STORAGE=ssh"
+
+  pg_ready_rename_test:
+    <<: *pg_test_common
+    container_name: archiving_ready_rename_test
+    command: /tmp/tests/archiving_ready_rename.sh
 
   pg_delete_before_permanent_full_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_full_test
-      context: .
-    image: wal-g/delete_before_permanent_full_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_before_permanent_full_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_before_permanent_full_test.sh
 
   pg_backup_mark_permanent_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_backup_mark_permanent_test
-      context: .
-    image: wal-g/backup_mark_permanent_test
+    <<: *pg_test_common
     container_name: wal-g_pg_backup_mark_permanent_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/backup_mark_permanent_test.sh
+
+  pg_backup_mark_permanent_no_error_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_backup_mark_permanent_no_error_test
+    command: /tmp/tests/backup_mark_permanent_no_error_test.sh
 
   pg_backup_mark_impermanent_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_backup_mark_impermanent_test
-      context: .
-    image: wal-g/backup_mark_impermanent_test
+    <<: *pg_test_common
     container_name: wal-g_pg_backup_mark_impermanent_test
-    depends_on:
-      - s3
-    links:
-      - s3
-
+    command: /tmp/tests/backup_mark_impermanent_test.sh
 
   pg_delete_before_permanent_delta_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_before_permanent_delta_test
-      context: .
-    image: wal-g/delete_before_permanent_delta_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_before_permanent_delta_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_before_permanent_delta_test.sh
+
+  pg_delete_before_permanent_delta_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_before_permanent_delta_multist_test
+    command: /tmp/tests/delete_before_permanent_delta_multist_test.sh
 
   pg_wal_perftest:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_wal_perftest
-      context: .
-    image: wal-g/wal_perftest
+    <<: *pg_test_common
     container_name: wal-g_pg_wal_perftest
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/wal_perftest.sh
+
+  pg_wal_perftest_with_throttling:
+    <<: *pg_test_throttling
+    container_name: wal-g_pg_wal_perftest_with_throttling
+    command: /tmp/tests/wal_perftest_with_throttling.sh
 
   pg_backup_perftest:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_backup_perftest
-      context: .
-    image: wal-g/backup_perftest
+    <<: *pg_test_common
     container_name: wal-g_pg_backup_perftest
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/backup_perftest.sh
 
   pg_delete_before_name_find_full_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_before_name_find_full_test
-      context: .
-    image: wal-g/delete_before_name_find_full_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_before_name_find_full_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_before_name_find_full_test.sh
 
   pg_delete_retain_full_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_retain_full_test
-      context: .
-    image: wal-g/delete_retain_full_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_retain_full_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_retain_full_test.sh
+
+  pg_delete_retain_full_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_retain_full_multist_test
+    command: /tmp/tests/delete_retain_full_multist_test.sh
+
+  pg_delete_retain_after_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_retain_after_test
+    command: /tmp/tests/delete_retain_after_test.sh
 
   pg_full_backup_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_full_backup_test
-      context: .
-    image: wal-g/full_backup_test
+    <<: *pg_test_common
     container_name: wal-g_pg_full_backup_test
+    command: /tmp/tests/full_backup_test.sh
+
+  pg_full_backup_failover_storage_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_full_backup_failover_storage_test
+    command: /tmp/tests/full_backup_failover_storages_test.sh
+
+  pg_full_backup_streamed_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_full_backup_streamed_test
+    command: /tmp/tests/full_backup_streamed_test.sh
+
+  pg_partial_restore_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_partial_restore_test
+    command: /tmp/tests/partial_restore_test.sh
+
+  pg_remote_backup_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_remote_backup_test
+    command: /tmp/tests/remote_backup_test.sh
+
+  pg_remote_backup_without_files_metadata_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_remote_backup_without_files_metadata_test
+    command: /tmp/tests/remote_backup_without_files_metadata_test.sh
+
+  prefetch_test:
+    <<: *pg_test_common
+    container_name: wal-g_prefetch_test
+    command: /tmp/tests/prefetch_test.sh
+
+  pg_ssh_backup_test:
+    image: wal-g/docker_prefix
+    user: postgres
+    container_name: wal-g_pg_ssh_backup_test
+    command: /tmp/tests/ssh_backup_test.sh
     depends_on:
-      - s3
+      - ssh
     links:
-      - s3
+      - ssh
+
+  pg_receive_wal_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_receive_wal_test
+    command: /tmp/tests/receive_wal_test.sh
+
+  pg_full_backup_copy_composer_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_full_backup_copy_composer_test
+    command: /tmp/tests/full_backup_copy_composer_test.sh
+
+  pg_full_backup_rating_composer_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_full_backup_rating_composer_test
+    command: /tmp/tests/full_backup_rating_composer_test.sh
+
+  pg_full_backup_database_composer_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_full_backup_database_composer_test
+    command: /tmp/tests/full_backup_database_composer_test.sh
+
+  pg_full_backup_without_files_metadata_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_full_backup_without_files_metadata_test
+    command: /tmp/tests/full_backup_without_files_metadata_test.sh
 
   pg_delete_before_time_find_full_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_before_time_find_full_test
-      context: .
-    image: wal-g/delete_before_time_find_full_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_before_time_find_full_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_before_time_find_full_test.sh
 
   pg_delete_without_confirm_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_without_confirm_test
-      context: .
-    image: wal-g/delete_without_confirm_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_without_confirm_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_without_confirm_test.sh
+
+  pg_delete_garbage_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_garbage_test
+    command: /tmp/tests/delete_garbage_test.sh
+
+  pg_delete_garbage_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_garbage_multist_test
+    command: /tmp/tests/delete_garbage_multist_test.sh
+
+  pg_delete_target_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_target_test
+    command: /tmp/tests/delete_target_test.sh
+
+  pg_delete_target_delta_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_target_delta_test
+    command: /tmp/tests/delete_target_delta_test.sh
+
+  pg_delete_target_delta_multist_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_target_delta_multist_test
+    command: /tmp/tests/delete_target_delta_multist_test.sh
+
+  pg_delete_target_delta_find_full_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delete_target_delta_find_full_test
+    command: /tmp/tests/delete_target_delta_find_full_test.sh
 
   pg_ghost_table_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_ghost_table_test
-      context: .
-    image: wal-g/ghost_table_test
+    <<: *pg_test_common
     container_name: wal-g_pg_ghost_table_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/ghost_table_test.sh
 
   pg_config_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_config_test
-      context: .
-    image: wal-g/config_test
+    <<: *pg_test_common
     container_name: wal-g_pg_config_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/config_test.sh
+
+  pg_copy_all_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_copy_all_test
+    command: /tmp/tests/copy_all_test.sh
+
+  pg_copy_backup_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_copy_backup_test
+    command: /tmp/tests/copy_backup_test.sh
 
   pg_delete_end_to_end_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_end_to_end_test
-      context: .
-    image: wal-g/delete_end_to_end_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_end_to_end_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_end_to_end_test.sh
 
   pg_delta_backup_fullscan_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delta_backup_fullscan_test
-      context: .
-    image: wal-g/delta_backup_fullscan_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delta_backup_fullscan_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delta_backup_fullscan_test.sh
 
   pg_several_delta_backups_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_several_delta_backups_test
-      context: .
-    image: wal-g/several_delta_backups_test
+    <<: *pg_test_common
     container_name: wal-g_pg_several_delta_backups_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/several_delta_backups_test.sh
 
   pg_several_delta_backups_reverse_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_several_delta_backups_reverse_test
-      context: .
-    image: wal-g/several_delta_backups_reverse_test
+    <<: *pg_test_common
     container_name: wal-g_pg_several_delta_backups_reverse_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/several_delta_backups_reverse_test.sh
 
   pg_crypto_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_crypto_test
-      context: .
-    image: wal-g/crypto_test
+    <<: *pg_test_common
     container_name: wal-g_pg_crypto_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/crypto_test.sh
 
   pg_delete_retain_find_full_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delete_retain_find_full_test
-      context: .
-    image: wal-g/delete_retain_find_full_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delete_retain_find_full_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delete_retain_find_full_test.sh
 
   pg_delta_backup_wal_delta_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_delta_backup_wal_delta_test
-      context: .
-    image: wal-g/delta_backup_wal_delta_test
+    <<: *pg_test_common
     container_name: wal-g_pg_delta_backup_wal_delta_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/delta_backup_wal_delta_test.sh
 
   pg_wale_compatibility_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_wale_compatibility_test
-      context: .
-    image: wal-g/wale_compatibility_test
+    <<: *pg_test_common
     container_name: wal-g_pg_wale_compatibility_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/wale_compatibility_test.sh
 
   pg_wale_tablespace_compatibility_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_wale_tablespace_compatibility_test
-      context: .
-    image: wal-g/wale_tablespace_compatibility_test
+    <<: *pg_test_common
     container_name: wal-g_pg_wale_tablespace_compatibility_test
+    command: /tmp/tests/wale_tablespace_compatibility_test.sh
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
 
   pg_tablespace_support_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_tablespace_support_test
-      context: .
-    image: wal-g/tablespace_support_test
+    <<: *pg_test_common
     container_name: wal-g_pg_tablespace_support_test
+    command: /tmp/tests/tablespace_support_test.sh
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
+
+  pg_transfer_backup_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_transfer_backup_test
+    command: /tmp/tests/transfer_backup_test.sh
 
   pg_catchup_test:
-    build:
-      dockerfile: docker/pg_tests/Dockerfile_catchup_test
-      context: .
-    image: wal-g/catchup_test
+    <<: *pg_test_common
     container_name: wal-g_pg_catchup_test
-    depends_on:
-      - s3
-    links:
-      - s3
+    command: /tmp/tests/catchup_test.sh
+
+  pg_wal_restore_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_wal_restore_test
+    command: /tmp/tests/wal_restore_test.sh
+
+  pg_daemon_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_daemon_test
+    command: /tmp/tests/daemon_test.sh
+
+  pg_daemon_backup_and_restore_test:
+    <<: *pg_test_common
+    command: /tmp/tests/daemon_backup_and_restore_test.sh
+
+  pg_daemon_client_test:
+    <<: *pg_test_common
+    command: /tmp/tests/daemon_client_test.sh
+
+  pg_pgbackrest:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_pgbackrest
+      context: .
+    image: wal-g/docker_pgbackrest
+
+  pg_pgbackrest_backup_fetch_test:
+    image: wal-g/docker_pgbackrest
+    user: postgres
+    container_name: wal-g_pgbackrest_backup_fetch_test
+    command: /tmp/tests/pgbackrest_backup_fetch_test.sh
+    <<: *s3_common_depends
+
+  orioledb:
+    build:
+      dockerfile: docker/orioledb/Dockerfile
+      context: .
+    image: wal-g/orioledb
+
+  orioledb_compatibility_test:
+    image: wal-g/orioledb
+    user: postgres
+    container_name: wal-g_orioledb_compatibility_test
+    command: /tmp/tests/compatibility_test.sh
+    <<: *s3_common_depends
+
+  orioledb_simple_test:
+    image: wal-g/orioledb
+    user: postgres
+    container_name: wal-g_orioledb_simple_test
+    command: /tmp/tests/simple_test.sh
+    <<: *s3_common_depends
+
+  orioledb_compressed_test:
+    image: wal-g/orioledb
+    user: postgres
+    container_name: wal-g_orioledb_compressed_test
+    command: /tmp/tests/compressed_test.sh
+    <<: *s3_common_depends
 
   mysql:
     build:
@@ -364,20 +619,65 @@ services:
     image: wal-g/mysql
     container_name: wal-g_mysql
 
-  mysql_tests:
+  mysql8:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile
+      dockerfile: docker/mysql/Dockerfile_v8
+      context: .
+    image: wal-g/mysql8
+    container_name: wal-g_mysql8
+
+  mysql_base_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_base
       context: .
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql_tests
-    container_name: wal-g_mysql_tests
+    container_name: wal-g_mysql_base_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends
+
+  mysql_delete_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_delete
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_delete_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends
+
+  mysql_copy_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_copy
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_copy_tests
     env_file:
       - docker/common/common_walg.env
     depends_on:
       - s3
+      - s3-another
     links:
       - s3
+      - s3-another
+
+  mysql8_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_v8
+      context: .
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql8_tests
+    container_name: wal-g_mysql8_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends
 
   mariadb:
     build:
@@ -396,10 +696,7 @@ services:
     container_name: wal-g_mariadb_tests
     env_file:
       - docker/common/common_walg.env
-    depends_on:
-      - s3
-    links:
-      - s3
+    <<: *s3_common_depends
 
   fdb:
     image: foundationdb/foundationdb
@@ -433,7 +730,70 @@ services:
     container_name: wal-g_redis_tests
     env_file:
       - docker/common/common_walg.env
+    <<: *s3_common_depends
+
+  etcd:
+    build:
+      dockerfile: docker/etcd/Dockerfile
+      context: .
+    image: wal-g/etcd
+    container_name: wal-g_etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+
+  etcd_tests:
+    build:
+      dockerfile: docker/etcd_tests/Dockerfile
+      context: .
+    image: wal-g/etcd_tests
+    container_name: wal-g_etcd_tests
     depends_on:
+      - etcd
+
+  gp:
+    build:
+      dockerfile: docker/gp/Dockerfile
+      context: .
+    image: wal-g/gp
+    container_name: wal-g_gp
+
+  gp_tests:
+    build:
+      dockerfile: docker/gp_tests/Dockerfile
+      context: .
+    image: wal-g/gp_tests
+    container_name: wal-g_gp_tests
+    depends_on:
+      - gp
       - s3
     links:
       - s3
+
+  cloudberry:
+    build:
+      dockerfile: docker/cloudberry/Dockerfile
+      context: .
+    image: wal-g/cloudberry
+    container_name: wal-g_cloudberry
+
+  cloudberry_tests:
+    build:
+      dockerfile: docker/cloudberry_tests/Dockerfile
+      context: .
+    image: wal-g/cloudberry_tests
+    container_name: wal-g_cloudberry_tests
+    depends_on:
+      - cloudberry
+      - s3
+    links:
+      - s3
+
+  st_tests:
+    build:
+      dockerfile: docker/st_tests/Dockerfile
+      context: .
+    image: wal-g/st_tests
+    container_name: wal-g_st_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends

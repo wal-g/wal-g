@@ -7,27 +7,30 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-type InvalidRecordBlockIdError struct {
+type InvalidRecordBlockIDError struct {
 	error
 }
 
-func NewInvalidRecordBlockIdError(blockId uint8) InvalidRecordBlockIdError {
-	return InvalidRecordBlockIdError{errors.Errorf("invalid record blockId: %v", blockId)}
+func NewInvalidRecordBlockIDError(blockID uint8) InvalidRecordBlockIDError {
+	return InvalidRecordBlockIDError{errors.Errorf("invalid record blockId: %v", blockID)}
 }
 
-func (err InvalidRecordBlockIdError) Error() string {
+func (err InvalidRecordBlockIDError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-type OutOfOrderBlockIdError struct {
+type OutOfOrderBlockIDError struct {
 	error
 }
 
-func NewOutOfOrderBlockIdError(actualBlockId int, expectedBlockId int) OutOfOrderBlockIdError {
-	return OutOfOrderBlockIdError{errors.Errorf("out of order block id: %v, expected: %v", actualBlockId, expectedBlockId)}
+func NewOutOfOrderBlockIDError(actualBlockID int, expectedBlockID int) OutOfOrderBlockIDError {
+	return OutOfOrderBlockIDError{
+		errors.Errorf("out of order block id: %v, expected: %v",
+			actualBlockID,
+			expectedBlockID)}
 }
 
-func (err OutOfOrderBlockIdError) Error() string {
+func (err OutOfOrderBlockIDError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -36,7 +39,10 @@ type InconsistentBlockDataStateError struct {
 }
 
 func NewInconsistentBlockDataStateError(hasData bool, dataLength uint16) InconsistentBlockDataStateError {
-	return InconsistentBlockDataStateError{errors.Errorf("block state is inconsistent: hasData is: %v, while dataLength is: %v", hasData, dataLength)}
+	return InconsistentBlockDataStateError{
+		errors.Errorf("block state is inconsistent: hasData is: %v, while dataLength is: %v",
+			hasData,
+			dataLength)}
 }
 
 func (err InconsistentBlockDataStateError) Error() string {
@@ -60,5 +66,7 @@ type ContinuationNotFoundError struct {
 }
 
 func NewContinuationNotFoundError() ContinuationNotFoundError {
-	return ContinuationNotFoundError{errors.New("expected to find continuation of current xlog record, but found new records instead")}
+	return ContinuationNotFoundError{
+		errors.New(
+			"expected to find continuation of current xlog record, but found new records instead")}
 }

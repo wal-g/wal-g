@@ -3,6 +3,7 @@ package utility
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -13,7 +14,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -30,22 +30,63 @@ func LoggedClose(c io.Closer, errmsg string) {
 	}
 }
 
+type ContextCloser interface {
+	Close(ctx context.Context) error
+}
+
+func LoggedCloseContext(c ContextCloser, errmsg string) {
+	err := c.Close(context.TODO())
+	if errmsg == "" {
+		errmsg = "Problem with closing object"
+	}
+	if err != nil {
+		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+	}
+}
+
+func LoggedSync(file *os.File, errmsg string, fsync bool) {
+	if fsync {
+		err := file.Sync()
+		if errmsg == "" {
+			errmsg = "Problem with file sync"
+		}
+		if err != nil {
+			tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+		}
+	}
+}
+
 const (
 	VersionStr       = "005"
 	BaseBackupPath   = "basebackups_" + VersionStr + "/"
 	CatchupPath      = "catchup_" + VersionStr + "/"
 	WalPath          = "wal_" + VersionStr + "/"
+	SegmentsPath     = "segments_" + VersionStr
 	BackupNamePrefix = "base_"
-	BackupTimeFormat = "20060102T150405Z"
+	BackupTimeFormat = "20060102T150405Z" // timestamps in that format should be lexicographically sorted
 
 	// utility.SentinelSuffix is a suffix of backup finish sentinel file
 	SentinelSuffix         = "_backup_stop_sentinel.json"
 	CompressedBlockMaxSize = 20 << 20
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
+	StreamMetadataFileName = "stream_metadata.json"
 	PathSeparator          = string(os.PathSeparator)
 	Mebibyte               = 1024 * 1024
 )
+
+// MaxTime not really the maximal value, but high enough.
+var MaxTime time.Time
+
+func init() {
+	var err error
+	MaxTime, err = time.Parse(BackupTimeFormat, "99991231T235959Z")
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse MaxTime: %v", err))
+	}
+}
+
+var MinTime = time.Unix(0, 0)
 
 // Empty is used for channel signaling.
 type Empty struct{}
@@ -92,7 +133,8 @@ func IsInDirectory(path, directoryPath string) bool {
 	if err != nil {
 		return false
 	}
-	return relativePath == "." || NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
+	return relativePath == "." ||
+		NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
 }
 
 func PathsEqual(path1, path2 string) bool {
@@ -104,10 +146,23 @@ func ResolveSymlink(path string) string {
 	resolve, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		// TODO: Consider descriptive panic here and other checks
-		// Directory may be absent et c.
+		// Directory may be absent etc.
 		return path
 	}
 	return resolve
+}
+
+// AbsResolveSymlink first tries to turn 'path' to an absolute path, then calls ResolveSymlink.
+// If 'path' can't be turned to an absolute path, keep the relative path.
+func AbsResolveSymlink(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		// keep a trace of the errors, but keep going with 'path'
+		tracelog.DebugLogger.Printf("could not convert path to absolute path: %s", err)
+		abs = path
+	}
+
+	return ResolveSymlink(abs)
 }
 
 func GetFileExtension(filePath string) string {
@@ -132,9 +187,9 @@ type BytesPool struct {
 }
 
 // NewBytesPool creates new BytesPool.
-func NewBytesPool(max int) *BytesPool {
+func NewBytesPool(size int) *BytesPool {
 	return &BytesPool{
-		pool: make(chan []byte, max),
+		pool: make(chan []byte, size),
 	}
 }
 
@@ -161,29 +216,28 @@ func (p *BytesPool) Put(b []byte) {
 	}
 }
 
-//FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
+// FastCopy copies data from src to dst in blocks of CopiedBlockMaxSize bytes
 func FastCopy(dst io.Writer, src io.Reader) (int64, error) {
-	n := int64(0)
 	buf := copyBytesPool.Get()
 	defer copyBytesPool.Put(buf)
 
-	for {
-		m, readingErr := src.Read(buf)
-		if readingErr != nil && readingErr != io.EOF {
-			return n, readingErr
-		}
-		m, writingErr := dst.Write(buf[:m])
-		n += int64(m)
-		if writingErr != nil || readingErr == io.EOF {
-			return n, writingErr
-		}
-	}
+	return io.CopyBuffer(dst, src, buf)
 }
 
-func StripBackupName(path string) string {
+func StripRightmostBackupName(path string) string {
+	path = strings.Trim(path, "/")
 	all := strings.SplitAfter(path, "/")
-	name := strings.Split(all[len(all)-1], "_backup")[0]
-	return name
+	return stripBackupSuffix(all[len(all)-1])
+}
+
+func StripLeftmostBackupName(path string) string {
+	path = strings.Trim(path, "/")
+	all := strings.Split(path, "/")
+	return stripBackupSuffix(all[0])
+}
+
+func stripBackupSuffix(pathValue string) string {
+	return strings.Split(pathValue, "_backup")[0]
 }
 
 func StripPrefixName(path string) string {
@@ -193,13 +247,12 @@ func StripPrefixName(path string) string {
 	return name
 }
 
-// TODO : unit tests
 var patternLSN = "[0-9A-F]{24}"
-var regexpLSN = regexp.MustCompile(patternLSN)
+var RegexpLSN = regexp.MustCompile(patternLSN)
 
 // Strips the backup WAL file name.
 func StripWalFileName(path string) string {
-	foundLsn := regexpLSN.FindAllString(path, 2)
+	foundLsn := RegexpLSN.FindAllString(path, 2)
 	if len(foundLsn) > 0 {
 		return foundLsn[0]
 	}
@@ -313,39 +366,6 @@ func (sh *SignalHandler) Close() error {
 	return nil
 }
 
-// WaitFirstError returns first error from given channels or nil
-func WaitFirstError(errs ...<-chan error) error {
-	errc := MergeErrors(errs...)
-	for err := range errc {
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// MergeErrors merges multiple channels of errors.
-func MergeErrors(cs ...<-chan error) <-chan error {
-	var wg sync.WaitGroup
-	out := make(chan error, len(cs))
-	output := func(c <-chan error) {
-		for n := range c {
-			out <- n
-		}
-		wg.Done()
-	}
-	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
-	}
-
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
-}
-
 func StartCommandWithStdoutStderr(cmd *exec.Cmd) (io.ReadCloser, *bytes.Buffer, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -370,4 +390,40 @@ func StartCommandWithStdoutPipe(cmd *exec.Cmd) (io.ReadCloser, error) {
 		return nil, err
 	}
 	return stdout, err
+}
+
+func ParseUntilTS(untilTS string) (time.Time, error) {
+	if untilTS != "" {
+		dt, err := time.Parse(time.RFC3339, untilTS)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return dt, nil
+	}
+	// far future
+	return MaxTime, nil
+}
+
+// MarshalEnumToString is used to write the string enum representation
+// instead of int enum value to JSON
+func MarshalEnumToString(enum fmt.Stringer) ([]byte, error) {
+	buffer := bytes.NewBufferString(enum.String())
+	return buffer.Bytes(), nil
+}
+
+func ScanToMap(rows *sql.Rows, dst map[string]interface{}) error {
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	args := make([]interface{}, len(columns))
+	var garbage interface{}
+	for i, field := range columns {
+		if v, ok := dst[field]; ok {
+			args[i] = v
+		} else {
+			args[i] = &garbage
+		}
+	}
+	return rows.Scan(args...)
 }

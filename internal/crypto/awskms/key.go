@@ -2,12 +2,11 @@ package awskms
 
 import (
 	"crypto/rand"
+	"sync"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/kms"
-
-	"sync"
 )
 
 // SymmetricKey is AWS KMS implementation of crypto.SymmetricKey interface
@@ -46,7 +45,12 @@ func (symmetricKey *SymmetricKey) Encrypt() error {
 		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
 	}
 
-	svc := kms.New(session.New(), kmsConfig)
+	kmsSession, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+
+	svc := kms.New(kmsSession, kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.EncryptInput{
@@ -74,7 +78,12 @@ func (symmetricKey *SymmetricKey) Decrypt() error {
 		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
 	}
 
-	svc := kms.New(session.New(), kmsConfig)
+	kmsSession, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+
+	svc := kms.New(kmsSession, kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.DecryptInput{
@@ -146,5 +155,8 @@ func (symmetricKey *SymmetricKey) GetKeyLen() int {
 
 // NewSymmetricKey creates new symmetric AWS KMS key object
 func NewSymmetricKey(kmsKeyID string, keyLen int, encryptedKeyLen int, kmsRegion string) *SymmetricKey {
-	return &SymmetricKey{SymmetricKeyLen: keyLen, EncryptedSymmetricKeyLen: encryptedKeyLen, KeyID: kmsKeyID, Region: kmsRegion}
+	return &SymmetricKey{SymmetricKeyLen: keyLen,
+		EncryptedSymmetricKeyLen: encryptedKeyLen,
+		KeyID:                    kmsKeyID,
+		Region:                   kmsRegion}
 }

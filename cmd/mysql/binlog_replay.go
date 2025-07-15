@@ -6,28 +6,41 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const replaySinceFlagShortDescr = "backup name starting from which you want to fetch binlogs"
 const replayUntilFlagShortDescr = "time in RFC3339 for PITR"
+const replayUntilBinlogLastModifiedFlagShortDescr = "time in RFC3339 that is used to prevent wal-g from replaying" +
+	" binlogs that was created/modified after this time"
 
 var replayBackupName string
-var replayUntilDt string
+var replayUntilTS string
+var replayUntilBinlogLastModifiedTS string
 
 var binlogReplayCmd = &cobra.Command{
 	Use:   "binlog-replay",
-	Short: "fetches binlogs from storage and replays them to mysql",
+	Short: "Fetch binlogs from storage and replays them to MySQL",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogReplay(folder, replayBackupName, replayUntilDt)
+		mysql.HandleBinlogReplay(storage.RootFolder(), replayBackupName, replayUntilTS, replayUntilBinlogLastModifiedTS)
+	},
+	PreRun: func(cmd *cobra.Command, args []string) {
+		conf.RequiredSettings[conf.MysqlBinlogReplayCmd] = true
+		err := internal.AssertRequiredSettingsSet()
+		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
 func init() {
 	binlogReplayCmd.PersistentFlags().StringVar(&replayBackupName, "since", "LATEST", replaySinceFlagShortDescr)
-	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilDt, "until", time.Now().Format(time.RFC3339), replayUntilFlagShortDescr)
-	Cmd.AddCommand(binlogReplayCmd)
+	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilTS, "until",
+		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339), replayUntilFlagShortDescr)
+	binlogReplayCmd.PersistentFlags().StringVar(&replayUntilBinlogLastModifiedTS, "until-binlog-last-modified-time",
+		"", replayUntilBinlogLastModifiedFlagShortDescr)
+	cmd.AddCommand(binlogReplayCmd)
 }

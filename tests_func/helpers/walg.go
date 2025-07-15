@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Sentinel struct {
@@ -28,6 +29,24 @@ type NodeMeta struct {
 type BackupMeta struct {
 	Before NodeMeta `json:"Before,omitempty"`
 	After  NodeMeta `json:"After,omitempty"`
+
+	BackupLastTS primitive.Timestamp `json:"BackupLastTS,omitempty"` // for binary backup
+}
+
+func (backupMeta BackupMeta) GetBackupLastTS() OpTimestamp {
+	emptyTS := OpTimestamp{}
+	backupLastTS := ToOpTimestamp(backupMeta.BackupLastTS)
+	if backupLastTS != emptyTS {
+		return backupLastTS
+	}
+	if backupMeta.Before.LastMajTS != emptyTS {
+		return backupMeta.Before.LastMajTS
+	}
+	return emptyTS
+}
+
+func ToOpTimestamp(ts primitive.Timestamp) OpTimestamp {
+	return OpTimestamp{TS: ts.T, Inc: ts.I}
 }
 
 type OpTimestamp struct {
@@ -73,7 +92,7 @@ func TimestampFromStr(s string) (OpTimestamp, error) {
 }
 
 func BackupNamesFromListing(output string) []string {
-	re := regexp.MustCompile("stream_[0-9]{8}T[0-9]{6}Z")
+	re := regexp.MustCompile(`(stream|binary|aof)_\d{8}T\d{6}Z`)
 	return re.FindAllString(output, -1)
 }
 
@@ -82,18 +101,18 @@ func BackupNameFromCreate(output string) string {
 }
 
 type WalgUtil struct {
-	ctx      context.Context
-	host     string
-	cliPath  string
-	confPath string
-	mongoMaj string
+	ctx            context.Context
+	host           string
+	cliPath        string
+	confPath       string
+	dbMajorVersion string
 }
 
-func NewWalgUtil(ctx context.Context, host, cliPath, confPath, mongoMaj string) *WalgUtil {
-	return &WalgUtil{ctx, host, cliPath, confPath, mongoMaj}
+func NewWalgUtil(ctx context.Context, host, cliPath, confPath, dbMajorVersion string) *WalgUtil {
+	return &WalgUtil{ctx, host, cliPath, confPath, dbMajorVersion}
 }
 
-func (w *WalgUtil) runCmd(run []string) (ExecResult, error) {
+func (w *WalgUtil) runCmd(run ...string) (ExecResult, error) {
 	command := []string{w.cliPath, "--config", w.confPath}
 	command = append(command, run...)
 
@@ -102,29 +121,83 @@ func (w *WalgUtil) runCmd(run []string) (ExecResult, error) {
 }
 
 func (w *WalgUtil) PushBackup() (string, error) {
-	PgDataSettingString, ok := internal.GetSetting(internal.PgDataSetting)
-	if ok == false {
+	PgDataSettingString, ok := conf.GetSetting(conf.PgDataSetting)
+	if !ok {
 		tracelog.InfoLogger.Print("\nPGDATA is not set in the conf.\n")
 	}
 	if w.cliPath != PgDataSettingString {
 		tracelog.WarningLogger.Printf("cliPath '%s' differ from conf PGDATA '%s'\n", w.cliPath, PgDataSettingString)
 	}
-	exec, err := w.runCmd([]string{"backup-push"})
+	exec, err := w.runCmd("backup-push")
 	if err != nil {
 		return "", err
 	}
 	return BackupNameFromCreate(exec.Combined()), nil
 }
 
-func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
-	backups, err := w.Backups()
+func (w *WalgUtil) PushBinaryBackup() error {
+	_, err := w.runCmd("binary-backup-push")
 	if err != nil {
 		return err
 	}
-	if backupNum >= len(backups) {
-		return fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), backupNum)
+	return nil
+}
+
+func (w *WalgUtil) GetBackupByNumber(backupNumber int) (string, error) {
+	backups, err := w.Backups()
+	if err != nil {
+		return "", err
 	}
-	_, err = w.runCmd([]string{"backup-fetch", backups[backupNum]})
+	if backupNumber >= len(backups) {
+		return "", fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), backupNumber)
+	}
+	return backups[backupNumber], nil
+}
+
+func (w *WalgUtil) FetchBackupByNum(backupNum int) error {
+	backup, err := w.GetBackupByNumber(backupNum)
+	if err != nil {
+		return err
+	}
+	_, err = w.runCmd("backup-fetch", backup)
+	return err
+}
+
+func (w *WalgUtil) FetchAofBackupByNum(backupNum int, version string) error {
+	backup, err := w.GetBackupByNumber(backupNum)
+	if err != nil {
+		return err
+	}
+	_, err = w.runCmd("aof-backup-fetch", backup, version)
+	if err != nil {
+		return err
+	}
+
+	cmd := []string{"chown", "-R", "redis:redis", "/data"}
+	_, err = RunCommandStrict(w.ctx, w.host, cmd)
+	return err
+}
+
+func (w *WalgUtil) FetchBinaryBackup(backup, mongodConfigPath, mongodbVersion, rsName, rsMembers string) error {
+	cli := []string{"binary-backup-fetch", backup, mongodConfigPath, mongodbVersion}
+	if rsName != "" && rsMembers != "" {
+		cli = append(cli, "--mongo-rs-name", rsName, "--mongo-rs-members", rsMembers)
+	}
+	_, err := w.runCmd(cli...)
+	return err
+}
+
+func (w *WalgUtil) PartialRestore(backup, mongodConfigPath, mongodbVersion, whitelist, blacklist string) error {
+	cli := []string{
+		"partial-restore", backup, mongodConfigPath,
+		mongodbVersion, whitelist,
+	}
+
+	if blacklist != "" {
+		cli = append(cli, "--blacklist", blacklist)
+	}
+
+	_, err := w.runCmd(cli...)
 	return err
 }
 
@@ -137,7 +210,7 @@ func (w *WalgUtil) BackupMeta(backupNum int) (Sentinel, error) {
 		return Sentinel{}, fmt.Errorf("only %d backups exists, backup #%d is not found", len(backups), backupNum)
 	}
 
-	exec, err := w.runCmd([]string{"backup-show", backups[backupNum]})
+	exec, err := w.runCmd("backup-show", backups[backupNum])
 	if err != nil {
 		return Sentinel{}, fmt.Errorf("backup show failed: %v", err)
 	}
@@ -149,7 +222,7 @@ func (w *WalgUtil) BackupMeta(backupNum int) (Sentinel, error) {
 }
 
 func (w *WalgUtil) Backups() ([]string, error) {
-	exec, err := w.runCmd([]string{"backup-list"})
+	exec, err := w.runCmd("backup-list")
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +230,16 @@ func (w *WalgUtil) Backups() ([]string, error) {
 }
 
 func (w *WalgUtil) PurgeRetain(keepNumber int) error {
-	_, err := w.runCmd([]string{"delete", "--retain-count", strconv.Itoa(keepNumber), "--confirm"})
+	_, err := w.runCmd("delete",
+		"--retain-count", strconv.Itoa(keepNumber),
+		"--retain-after", time.Now().Format("2006-01-02T15:04:05Z"),
+		"--purge-oplog",
+		"--confirm")
+	return err
+}
+
+func (w *WalgUtil) DeleteBackup(backupName string) error {
+	_, err := w.runCmd("backup-delete", backupName, "--confirm")
 	return err
 }
 
@@ -177,6 +259,11 @@ func (w *WalgUtil) OplogPush() error {
 }
 
 func (w *WalgUtil) OplogReplay(from, until OpTimestamp) error {
-	_, err := w.runCmd([]string{"oplog-replay", from.String(), until.String()})
+	_, err := w.runCmd("oplog-replay", from.String(), until.String())
+	return err
+}
+
+func (w *WalgUtil) OplogPurge() error {
+	_, err := w.runCmd("oplog-purge", "--confirm")
 	return err
 }

@@ -2,7 +2,8 @@ package openpgp
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func noPassphrase() (string, bool) {
 }
 
 func MockArmedCrypterFromEnv() crypto.Crypter {
-	pgpTestPrivateKeyBytes, err := ioutil.ReadFile(PrivateKeyEnvFilePath)
+	pgpTestPrivateKeyBytes, err := os.ReadFile(PrivateKeyEnvFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +56,7 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	decrypt, err := crypter.Decrypt(buf)
 	assert.NoErrorf(t, err, "Decryption error: %v", err)
 
-	decryptedBytes, err := ioutil.ReadAll(decrypt)
+	decryptedBytes, err := io.ReadAll(decrypt)
 	assert.NoErrorf(t, err, "Decryption read error: %v", err)
 
 	assert.Equal(t, someSecret, string(decryptedBytes), "Decrypted text not equals open text")

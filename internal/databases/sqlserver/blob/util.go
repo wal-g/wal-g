@@ -3,12 +3,13 @@ package blob
 import (
 	"bytes"
 	"errors"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/wal-g/tracelog"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 var ErrNoLease = errors.New("no lease")
@@ -16,9 +17,8 @@ var ErrNotFound = errors.New("object not found")
 var ErrBadRequest = errors.New("invalid request")
 
 type Lease struct {
-	folder storage.Folder
-	ID     string
-	End    time.Time
+	ID  string
+	End time.Time
 }
 
 type DebugResponseWriter struct {
@@ -36,7 +36,10 @@ func (drw *DebugResponseWriter) Write(b []byte) (int, error) {
 func (drw *DebugResponseWriter) WriteHeader(s int) {
 	drw.back.WriteHeader(s)
 	b := bytes.NewBuffer([]byte{})
-	drw.Header().Write(b)
+	err := drw.Header().Write(b)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("WriteHeader failed: %v", err)
+	}
 	tracelog.DebugLogger.Printf("HTTP %d\n%s\n\n", s, b)
 }
 
@@ -51,7 +54,7 @@ func NewSkipReader(r io.Reader, offset uint64) io.Reader {
 
 func (r *SkipReader) Read(s []byte) (int, error) {
 	if r.offset > 0 {
-		done, err := io.CopyN(ioutil.Discard, r.reader, int64(r.offset))
+		done, err := io.CopyN(io.Discard, r.reader, int64(r.offset))
 		if err != nil {
 			return 0, err
 		}
@@ -61,4 +64,11 @@ func (r *SkipReader) Read(s []byte) (int, error) {
 		r.offset = 0
 	}
 	return r.reader.Read(s)
+}
+
+const SQLServerCompressionMethod = "sqlserver"
+
+func UseBuiltinCompression() bool {
+	method, _ := conf.GetSetting(conf.CompressionMethodSetting)
+	return strings.EqualFold(method, SQLServerCompressionMethod)
 }

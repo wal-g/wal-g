@@ -2,12 +2,13 @@ package sqlserver
 
 import (
 	"context"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
-	"github.com/wal-g/wal-g/utility"
 	"os"
 	"syscall"
+
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func RunProxy(folder storage.Folder) {
@@ -16,6 +17,9 @@ func RunProxy(folder storage.Folder) {
 	defer func() { _ = signalHandler.Close() }()
 	bs, err := blob.NewServer(folder)
 	tracelog.ErrorLogger.FatalfOnError("proxy create error: %v", err)
+	lock, err := bs.AcquireLock()
+	tracelog.ErrorLogger.FatalOnError(err)
+	defer func() { tracelog.ErrorLogger.PrintOnError(lock.Close()) }()
 	err = bs.Run(ctx)
 	tracelog.ErrorLogger.FatalfOnError("proxy run error: %v", err)
 }

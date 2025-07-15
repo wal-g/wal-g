@@ -2,19 +2,17 @@ package mongo
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"syscall"
 
+	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 )
 
 var (
@@ -61,8 +59,7 @@ var oplogFetchCmd = &cobra.Command{
 }
 
 func init() {
-	Cmd.AddCommand(oplogFetchCmd)
+	cmd.AddCommand(oplogFetchCmd)
 	oplogFetchCmd.PersistentFlags().StringVarP(
-		&format, "format", "f", "json", fmt.Sprintf("Valid values: json, bson, bson-raw"))
-
+		&format, "format", "f", "json", "Valid values: json, bson, bson-raw")
 }

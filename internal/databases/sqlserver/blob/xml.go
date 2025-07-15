@@ -2,14 +2,13 @@ package blob
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/xml"
 	"fmt"
 	"io"
-	//"io/ioutil"
+
+	"golang.org/x/net/html/charset"
+
 	"strings"
-	"unicode/utf16"
-	"unicode/utf8"
 )
 
 const (
@@ -46,9 +45,8 @@ func (b *XBlockIn) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 		case xml.EndElement:
 			if t2.Name.Local == name {
 				return nil
-			} else {
-				return fmt.Errorf("unexpected closing block tag: %v", t2.Name.Local)
 			}
+			return fmt.Errorf("unexpected closing block tag: %v", t2.Name.Local)
 		case xml.ProcInst:
 		case xml.Comment:
 		case xml.Directive:
@@ -92,9 +90,8 @@ func (bl *XBlockListIn) UnmarshalXML(d *xml.Decoder, start xml.StartElement) err
 		case xml.EndElement:
 			if t2.Name.Local == BlockListTag {
 				return nil
-			} else {
-				return fmt.Errorf("unexpected closing blocklist tag: %v", t2.Name.Local)
 			}
+			return fmt.Errorf("unexpected closing blocklist tag: %v", t2.Name.Local)
 		case xml.CharData:
 		case xml.ProcInst:
 		case xml.Comment:
@@ -123,9 +120,11 @@ func (bl *XBlockListIn) MarshalXML(e *xml.Encoder, start xml.StartElement) error
 
 func ParseBlocklistXML(data []byte) (*XBlockListIn, error) {
 	bl := &XBlockListIn{}
-	data = utf16utf8(data, binary.LittleEndian)
 	d := xml.NewDecoder(bytes.NewBuffer(data))
 	d.CharsetReader = func(s string, r io.Reader) (io.Reader, error) {
+		if s == "utf-16" {
+			return charset.NewReader(r, "charset=utf-16")
+		}
 		return r, nil
 	}
 	err := d.Decode(bl)
@@ -133,18 +132,6 @@ func ParseBlocklistXML(data []byte) (*XBlockListIn, error) {
 		return nil, err
 	}
 	return bl, nil
-}
-
-// 21century, we can't convert charset in golang. nice
-func utf16utf8(b []byte, o binary.ByteOrder) []byte {
-	utf := make([]uint16, (len(b)+(2-1))/2)
-	for i := 0; i+(2-1) < len(b); i += 2 {
-		utf[i/2] = o.Uint16(b[i:])
-	}
-	if len(b)/2 < len(utf) {
-		utf[len(utf)-1] = utf8.RuneError
-	}
-	return []byte(string(utf16.Decode(utf)))
 }
 
 type XBlockListOut struct {

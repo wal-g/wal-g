@@ -3,22 +3,18 @@ package zstd
 import (
 	"io"
 
-	"github.com/DataDog/zstd"
-	"github.com/pkg/errors"
+	"github.com/klauspost/compress/zstd"
 	"github.com/wal-g/wal-g/internal/compression/computils"
-	"github.com/wal-g/wal-g/utility"
 )
 
 type Decompressor struct{}
 
-func (decompressor Decompressor) Decompress(dst io.Writer, src io.Reader) error {
-	zstdReader := zstd.NewReader(computils.NewUntilEofReader(src))
-	_, err := utility.FastCopy(dst, zstdReader)
+func (decompressor Decompressor) Decompress(src io.Reader) (io.ReadCloser, error) {
+	zstdReader, err := zstd.NewReader(computils.NewUntilEOFReader(src))
 	if err != nil {
-		return errors.Wrap(err, "DecompressZstd: zstd write failed")
+		return nil, err
 	}
-	err = zstdReader.Close()
-	return errors.Wrap(err, "DecompressZstd: zstd reader close failed")
+	return zstdReader.IOReadCloser(), nil
 }
 
 func (decompressor Decompressor) FileExtension() string {

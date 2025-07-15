@@ -1,55 +1,126 @@
 package blob
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/wal-g/storages/storage"
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/wal-g/wal-g/utility"
+
+	"github.com/wal-g/wal-g/internal/compression"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/crypto"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"golang.org/x/xerrors"
+
+	"github.com/gofrs/flock"
+	"github.com/google/uuid"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const ProxyStartTimeout = 10 * time.Second
 
+const ReqIDHeader = "X-Ms-Request-Id"
+
+const DefaultConcurrency = 8
+
+const BlockReadCacheSize = 16
+
+const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
+
+const InternalPingURL = "/__walg_g_ping__"
+
 type Server struct {
-	sync.Mutex
-	folder   storage.Folder
-	certFile string
-	keyFile  string
-	endpoint string
-	server   http.Server
-	indexes  map[string]*Index
-	leases   map[string]*Lease
+	folder       storage.Folder
+	certFile     string
+	keyFile      string
+	endpoint     string
+	server       http.Server
+	indexes      map[string]*Index
+	indexesMutex sync.Mutex
+	leases       map[string]Lease
+	leasesMutex  sync.Mutex
+	downloadSem  chan struct{}
+	uploadSem    chan struct{}
+	compression  string
+	compressor   compression.Compressor
+	decompressor compression.Decompressor
+	encryption   string
+	crypter      crypto.Crypter
+	readCache    *lru.Cache
 }
 
 func NewServer(folder storage.Folder) (*Server, error) {
 	var err error
 	bs := new(Server)
 	bs.folder = folder
-	bs.certFile, err = internal.GetRequiredSetting(internal.SQLServerBlobCertFile)
+	bs.certFile, err = conf.GetRequiredSetting(conf.SQLServerBlobCertFile)
 	if err != nil {
 		return nil, err
 	}
-	bs.keyFile, err = internal.GetRequiredSetting(internal.SQLServerBlobKeyFile)
+	bs.keyFile, err = conf.GetRequiredSetting(conf.SQLServerBlobKeyFile)
 	if err != nil {
 		return nil, err
 	}
-	hostname, err := internal.GetRequiredSetting(internal.SQLServerBlobHostname)
+	hostname, err := conf.GetRequiredSetting(conf.SQLServerBlobHostname)
 	if err != nil {
 		return nil, err
 	}
+	downloadConcurrency, err := conf.GetMaxDownloadConcurrency()
+	if err != nil {
+		downloadConcurrency = DefaultConcurrency
+	}
+	bs.downloadSem = make(chan struct{}, downloadConcurrency)
+	uploadConcurrency, err := conf.GetMaxUploadConcurrency()
+	if err != nil {
+		uploadConcurrency = DefaultConcurrency
+	}
+	bs.uploadSem = make(chan struct{}, uploadConcurrency)
 	bs.endpoint = fmt.Sprintf("%s:%d", hostname, 443)
 	bs.server = http.Server{Addr: bs.endpoint, Handler: bs}
 	bs.indexes = make(map[string]*Index)
-	bs.leases = make(map[string]*Lease)
+	bs.leases = make(map[string]Lease)
+	compressor, err := internal.ConfigureCompressor()
+	if err != nil {
+		if _, ok := err.(internal.UnknownCompressionMethodError); !ok || !UseBuiltinCompression() {
+			return nil, err
+		}
+	}
+	if compressor != nil {
+		bs.compression = compressor.FileExtension()
+		bs.compressor = compressor
+		bs.decompressor = compression.FindDecompressor(bs.compression)
+	}
+	bs.crypter = internal.ConfigureCrypter()
+	if bs.crypter != nil {
+		bs.encryption = bs.crypter.Name()
+	}
+	c, err := lru.NewWithEvict(BlockReadCacheSize, func(k, _ interface{}) {
+		tracelog.DebugLogger.Printf("EVICT_CACHE: %s", k)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lru cache: %v", err)
+	}
+	bs.readCache = c
+	go func() {
+		for {
+			// to release memory after restore
+			time.Sleep(time.Minute)
+			bs.readCache.RemoveOldest()
+		}
+	}()
 	return bs, nil
 }
 
@@ -83,7 +154,7 @@ func (bs *Server) RunBackground(ctx context.Context, cancel context.CancelFunc) 
 func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
 	sctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	url := fmt.Sprintf("https://%s/", bs.endpoint)
+	url := fmt.Sprintf("https://%s%s", bs.endpoint, InternalPingURL)
 	c := http.Client{Timeout: 100 * time.Millisecond}
 	t := time.NewTicker(200 * time.Millisecond)
 	for {
@@ -91,7 +162,7 @@ func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
 		case <-t.C:
 			resp, _ := c.Head(url)
 			if resp != nil {
-				return nil
+				return resp.Body.Close()
 			}
 		case <-sctx.Done():
 			return fmt.Errorf("proxy not ready in %s", timeout)
@@ -107,11 +178,23 @@ func (bs *Server) Shutdown() error {
 	if err != nil {
 		tracelog.ErrorLogger.Printf("proxy shutdown error: %v", err)
 	}
+	bs.indexesMutex.Lock()
+	defer bs.indexesMutex.Unlock()
+	for _, idx := range bs.indexes {
+		err2 := idx.Save()
+		if err2 != nil {
+			tracelog.ErrorLogger.Printf("proxy shutdown index save error: %v", err2)
+			err = err2
+		}
+	}
 	return err
 }
 
 func (bs *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if _, ok := internal.GetSetting(internal.SQLServerBlobKeyFile); ok {
+	if _, ok := conf.GetSetting(conf.SQLServerBlobKeyFile); ok {
+		if req.Header.Get(ReqIDHeader) == "" {
+			req.Header.Set(ReqIDHeader, uuid.New().String())
+		}
 		b, _ := httputil.DumpRequest(req, false)
 		tracelog.DebugLogger.Println(string(b))
 		bs.ServeHTTP2(&DebugResponseWriter{w}, req)
@@ -121,12 +204,23 @@ func (bs *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (bs *Server) ServeHTTP2(w http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if err := recover(); err != nil {
+			debug.PrintStack()
+			tracelog.ErrorLogger.Printf("proxy server goroutine panic: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}()
+	if req.URL.Path == InternalPingURL {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	// default headers
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Length", "0")
 	w.Header().Set("X-Ms-Version", "2014-02-14")
 	w.Header().Set("X-Ms-Blob-Type", "BlockBlob")
-	w.Header().Set("X-Ms-Request-Id", uuid.New().String())
+	w.Header().Set(ReqIDHeader, req.Header.Get(ReqIDHeader))
 	w.Header().Set("Accept-Ranges", "bytes")
 	if err := req.ParseForm(); err != nil {
 		tracelog.WarningLogger.Printf("blob proxy: failed to parse form: %v", err)
@@ -169,9 +263,9 @@ func (bs *Server) HandleLease(w http.ResponseWriter, req *http.Request) {
 }
 
 func (bs *Server) HandleAcquireLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Proposed-Lease-Id")
-	if leaseId == "" {
-		leaseId = uuid.New().String()
+	leaseID := req.Header.Get("X-Ms-Proposed-Lease-Id")
+	if leaseID == "" {
+		leaseID = uuid.New().String()
 	}
 	leaseDurationStr := req.Header.Get("X-Ms-Lease-Duration")
 	if leaseDurationStr == "" {
@@ -183,16 +277,18 @@ func (bs *Server) HandleAcquireLease(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
 	if !ok || lease.End.Before(time.Now()) {
-		lease = &Lease{
-			ID:  leaseId,
+		lease = Lease{
+			ID:  leaseID,
 			End: time.Now().Add(time.Duration(leaseDuration * int(time.Second))),
 		}
 		bs.leases[folder.GetPath()] = lease
 	}
-	if lease.ID == leaseId {
-		w.Header().Set("X-Ms-Lease-Id", leaseId)
+	bs.leasesMutex.Unlock()
+	if lease.ID == leaseID {
+		w.Header().Set("X-Ms-Lease-Id", leaseID)
 		w.WriteHeader(http.StatusCreated)
 	} else {
 		w.WriteHeader(http.StatusPreconditionFailed)
@@ -200,8 +296,8 @@ func (bs *Server) HandleAcquireLease(w http.ResponseWriter, req *http.Request) {
 }
 
 func (bs *Server) HandleRenewLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Lease-Id")
-	if leaseId == "" {
+	leaseID := req.Header.Get("X-Ms-Lease-Id")
+	if leaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -215,55 +311,67 @@ func (bs *Server) HandleRenewLease(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
-	if !ok || lease.ID != leaseId {
+	if !ok || lease.ID != leaseID {
+		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
 	}
 	lease.End = time.Now().Add(time.Duration(leaseDuration * int(time.Second)))
+	bs.leases[folder.GetPath()] = lease
+	bs.leasesMutex.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
 func (bs *Server) HandleChangeLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Lease-Id")
-	if leaseId == "" {
+	leaseID := req.Header.Get("X-Ms-Lease-Id")
+	if leaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	newLeaseId := req.Header.Get("X-Ms-Proposed-Lease-Id")
-	if newLeaseId == "" {
+	newLeaseID := req.Header.Get("X-Ms-Proposed-Lease-Id")
+	if newLeaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
-	if !ok || lease.ID != leaseId {
+	if !ok || lease.ID != leaseID {
+		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
 	}
-
-	lease.ID = newLeaseId
+	lease.ID = newLeaseID
+	bs.leases[folder.GetPath()] = lease
+	bs.leasesMutex.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
 func (bs *Server) HandleReleaseLease(w http.ResponseWriter, req *http.Request) {
-	leaseId := req.Header.Get("X-Ms-Lease-Id")
-	if leaseId == "" {
+	leaseID := req.Header.Get("X-Ms-Lease-Id")
+	if leaseID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
-	if !ok || lease.ID != leaseId {
+	if !ok || lease.ID != leaseID {
+		bs.leasesMutex.Unlock()
 		w.WriteHeader(http.StatusPreconditionFailed)
 		return
 	}
 	delete(bs.leases, folder.GetPath())
+	bs.leasesMutex.Unlock()
 	w.WriteHeader(http.StatusOK)
 }
 
-func (bs *Server) checkLease(w http.ResponseWriter, req *http.Request, folder storage.Folder) error {
+func (bs *Server) checkLease(req *http.Request, folder storage.Folder) error {
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
+	bs.leasesMutex.Unlock()
 	if ok && lease.End.After(time.Now()) {
 		if lease.ID != req.Header.Get("X-Ms-Lease-Id") {
 			return ErrNoLease
@@ -273,7 +381,9 @@ func (bs *Server) checkLease(w http.ResponseWriter, req *http.Request, folder st
 }
 
 func (bs *Server) setLeaseHeaders(w http.ResponseWriter, req *http.Request, folder storage.Folder) {
+	bs.leasesMutex.Lock()
 	lease, ok := bs.leases[folder.GetPath()]
+	bs.leasesMutex.Unlock()
 	if !ok {
 		w.Header().Set("X-Ms-Lease-State", "Available")
 		return
@@ -311,30 +421,30 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
-	blockId := strings.TrimSpace(req.Form.Get("blockid"))
+	if err := bs.validateBlobCompressionEncryption(idx); err != nil {
+		bs.returnError(w, req, err)
+	}
+	blockID := strings.TrimSpace(req.Form.Get("blockid"))
 	blockSizeStr := req.Header.Get("Content-Length")
 	blockSize, err := strconv.ParseUint(blockSizeStr, 10, 64)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	filename := idx.PutBlock(blockId, blockSize)
-	err = folder.PutObject(filename, req.Body)
+	filename := idx.PutBlock(blockID, blockSize)
+	bs.uploadSem <- struct{}{}
+	err = folder.PutObject(filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter))
+	<-bs.uploadSem
 	req.Body.Close()
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
-	// TODO: delayed write ?
-	err = idx.Save()
-	if err != nil {
-		bs.returnError(w, req, err)
-		return
-	}
+	idx.SaveDelayed()
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -357,11 +467,11 @@ func (bs *Server) HandleBlockListPut(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
-	data, err := ioutil.ReadAll(req.Body)
+	data, err := io.ReadAll(req.Body)
 	req.Body.Close()
 	if err != nil {
 		bs.returnError(w, req, err)
@@ -395,7 +505,8 @@ func (bs *Server) HandleBlockListGet(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	blocklisttype := strings.Title(strings.ToLower(req.Form.Get("blocklisttype")))
+	caser := cases.Title(language.English)
+	blocklisttype := caser.String(strings.ToLower(req.Form.Get("blocklisttype")))
 	xblocklist := idx.GetBlockList(blocklisttype)
 	data, err := SerializeBlocklistXML(xblocklist)
 	if err != nil {
@@ -405,7 +516,8 @@ func (bs *Server) HandleBlockListGet(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	_, err = w.Write(data)
+	tracelog.ErrorLogger.PrintOnError(err)
 }
 
 // Index operations
@@ -443,9 +555,16 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
+	}
+	if idx.Compression != "" || idx.Encryption != "" {
+		err = bs.validateBlobCompressionEncryption(idx)
+		if err != nil {
+			bs.returnError(w, req, err)
+			return
+		}
 	}
 
 	rangeMin := uint64(0)
@@ -473,14 +592,16 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 
 	sections := idx.GetSections(rangeMin, rangeMax)
 	for _, s := range sections {
-		r, err := folder.ReadObject(s.Path)
+		bs.downloadSem <- struct{}{}
+		r, err := bs.getCachedReader(idx, s)
+		defer utility.LoggedClose(r, "failed to close section reader")
+		<-bs.downloadSem
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to read object from storage: %v", err)
 			break
 		}
 		r2 := io.LimitReader(NewSkipReader(r, s.Offset), int64(s.Limit))
 		_, err = io.Copy(w, r2)
-		r.Close()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("proxy: failed to copy data from storage: %v", err)
 			break
@@ -488,52 +609,85 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (bs *Server) blobPut(r io.Reader, idx *Index) ([]string, error) {
+	const blockSize = 4 * 1024 * 1024
+	buf := make([]byte, blockSize)
+	xblocklist := &XBlockListIn{Blocks: []XBlockIn{}}
+	for i, last := 0, false; !last; i++ {
+		n, err := io.ReadFull(r, buf)
+		if err != nil {
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				last = true
+			} else {
+				return nil, err
+			}
+		}
+		if n == 0 {
+			continue
+		}
+		id := fmt.Sprintf("data_%05d", i)
+		name := idx.PutBlock(id, uint64(n))
+		encryptedReader := internal.CompressAndEncrypt(bytes.NewReader(buf[:n]), bs.compressor, bs.crypter)
+		err = idx.folder.PutObject(name, encryptedReader)
+		if err != nil {
+			return nil, err
+		}
+		xblocklist.Blocks = append(xblocklist.Blocks, XBlockIn{ID: id, Mode: BlockLatest})
+	}
+	return idx.PutBlockList(xblocklist)
+}
+
 func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
 	idx, err := bs.loadBlobIndex(folder)
 	if err == ErrNotFound {
 		idx = NewIndex(folder)
+		idx.Compression = bs.compression
+		idx.Encryption = bs.encryption
 	} else if err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if idx.Compression != "" || idx.Encryption != "" {
+		err = bs.validateBlobCompressionEncryption(idx)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("proxy: misconfiguration: %v", err)
+			bs.returnError(w, req, err)
+			return
+		}
+	}
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
 	blobSizeStr := req.Header.Get("Content-Length")
-	blobSize, err := strconv.ParseUint(blobSizeStr, 10, 64)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	garbage := idx.Clear()
-	if blobSize > 0 {
-		name := idx.PutBlock("data", blobSize)
-		err := folder.PutObject(name, req.Body)
-		req.Body.Close()
-		if err != nil {
-			bs.returnError(w, req, err)
-			return
-		}
-		_, err = idx.PutBlockList(&XBlockListIn{Blocks: []XBlockIn{{ID: "data", Mode: BlockLatest}}})
+	var garbage []string
+	if blobSizeStr == "0" {
+		garbage = idx.Clear()
+	} else {
+		defer req.Body.Close()
+		garbage, err = bs.blobPut(req.Body, idx)
 		if err != nil {
 			bs.returnError(w, req, err)
 			return
 		}
 	}
+	bs.indexesMutex.Lock()
 	err = idx.Save()
 	if err != nil {
+		bs.indexesMutex.Unlock()
 		bs.returnError(w, req, err)
 		return
 	}
+	bs.indexes[folder.GetPath()] = idx
+	bs.indexesMutex.Unlock()
 	bs.deleteGarbage(folder, garbage)
 	w.WriteHeader(http.StatusCreated)
 }
 
 func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
-	if err := bs.checkLease(w, req, folder); err != nil {
+	if err := bs.checkLease(req, folder); err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
@@ -543,8 +697,8 @@ func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 	for _, p := range parts[:len(parts)-1] {
 		upperFolder = upperFolder.GetSubFolder(p)
 	}
-	bs.Lock()
-	defer bs.Unlock()
+	bs.indexesMutex.Lock()
+	defer bs.indexesMutex.Unlock()
 	err := upperFolder.DeleteObjects([]string{blob})
 	if err != nil {
 		bs.returnError(w, req, err)
@@ -556,15 +710,15 @@ func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 
 // utils
 func (bs *Server) returnError(w http.ResponseWriter, req *http.Request, err error) {
-	switch {
-	case err == ErrNoLease:
+	switch err {
+	case ErrNoLease:
 		w.WriteHeader(http.StatusPreconditionFailed)
-	case err == ErrNotFound:
+	case ErrNotFound:
 		w.WriteHeader(http.StatusNotFound)
-	case err == ErrBadRequest:
+	case ErrBadRequest:
 		w.WriteHeader(http.StatusBadRequest)
 	default:
-		tracelog.ErrorLogger.Printf("proxy: failed to load blob index: %s %v", req.URL.Path, err)
+		tracelog.ErrorLogger.Printf("proxy: req: %s %s: error: %v", req.Method, req.URL.Path, err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
@@ -578,8 +732,8 @@ func (bs *Server) getBlobFolder(path string) storage.Folder {
 }
 
 func (bs *Server) loadBlobIndex(folder storage.Folder) (*Index, error) {
-	bs.Lock()
-	defer bs.Unlock()
+	bs.indexesMutex.Lock()
+	defer bs.indexesMutex.Unlock()
 	path := folder.GetPath()
 	if idx, ok := bs.indexes[path]; ok {
 		return idx, nil
@@ -625,4 +779,76 @@ func (bs *Server) parseBytesRange(req *http.Request) (uint64, uint64, error) {
 		return 0, 0, err
 	}
 	return rangeMin, rangeMax, nil
+}
+
+func (bs *Server) AcquireLock() (io.Closer, error) {
+	path, err := conf.GetRequiredSetting(conf.SQLServerBlobLockFile)
+	if err != nil {
+		return nil, err
+	}
+	lock := flock.New(path)
+	locked, err := lock.TryLock()
+	if err != nil || !locked {
+		return nil, xerrors.Errorf("failed to lock %s, another instance running ?", path)
+	}
+	return lock, nil
+}
+
+func (bs *Server) validateBlobCompressionEncryption(idx *Index) error {
+	if idx.Encryption != bs.encryption {
+		return fmt.Errorf("blob encryption (%s) does not match configured (%s)", idx.Encryption, bs.encryption)
+	}
+	if idx.Compression != bs.compression {
+		return fmt.Errorf("blob compression (%s) does not match configured (%s)", idx.Compression, bs.compression)
+	}
+	return nil
+}
+
+func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) {
+	folder := idx.folder
+	key := folder.GetPath() + s.Path
+	if s.BlockSize > MaxCacheBlockSize {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		r, err := folder.ReadObject(s.Path)
+		if err != nil {
+			return nil, err
+		}
+		return bs.decompressDecryptIfNeeded(idx, r)
+	}
+	var buf []byte
+	if b, ok := bs.readCache.Get(key); ok {
+		tracelog.DebugLogger.Printf("READ_CACHE: %s %d", key, s.BlockSize)
+		buf = b.([]byte)
+	} else {
+		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		r, err := folder.ReadObject(s.Path)
+		if err != nil {
+			return nil, err
+		}
+		dr, err := bs.decompressDecryptIfNeeded(idx, r)
+		if err != nil {
+			utility.LoggedClose(r, "failed to close block reader")
+			return nil, err
+		}
+		defer utility.LoggedClose(dr, "failed to close decompress reader")
+		buf = make([]byte, s.BlockSize)
+		_, err = io.ReadFull(dr, buf)
+		if err != nil {
+			return nil, err
+		}
+		tracelog.DebugLogger.Printf("ADD_CACHE: %s %d", key, s.BlockSize)
+		bs.readCache.Add(key, buf)
+	}
+	return io.NopCloser(bytes.NewReader(buf)), nil
+}
+
+func (bs *Server) decompressDecryptIfNeeded(idx *Index, r io.ReadCloser) (io.ReadCloser, error) {
+	if idx.Compression != "" || idx.Encryption != "" {
+		dr, err := internal.DecompressDecryptBytes(r, bs.decompressor)
+		if err != nil {
+			return nil, fmt.Errorf("proxy: failed to decompress / decrypt bytes: %v", err)
+		}
+		r = &utility.CascadeReadCloser{ReadCloser: dr, Underlying: r}
+	}
+	return r, nil
 }

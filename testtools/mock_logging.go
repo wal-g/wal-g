@@ -10,25 +10,25 @@ type callingPrintFuncStats struct {
 	PrintMsg          string
 }
 
-type infoLoggerMock struct {
+type InfoLoggerMock struct {
 	Stats *callingPrintFuncStats
 }
 
-func (loggerMock infoLoggerMock) Println(v ...interface{}) {
+func (loggerMock InfoLoggerMock) Println(v ...interface{}) {
 	loggerMock.Stats.PrintLnCallsCount++
 	loggerMock.Stats.PrintMsg = v[0].(string)
 }
 
-type errorLoggerMock struct {
+type ErrorLoggerMock struct {
 	Stats *callingFatalOnErrorFuncStats
 }
 
-func (loggerMock errorLoggerMock) FatalOnError(err error) {
+func (loggerMock ErrorLoggerMock) FatalOnError(err error) {
 	loggerMock.Stats.FatalOnErrorCallsCount++
 	loggerMock.Stats.Err = err
 }
 
-func MockLoggers() (infoLoggerMock, errorLoggerMock) {
+func MockLoggers() (InfoLoggerMock, ErrorLoggerMock) {
 	infoStats := callingPrintFuncStats{
 		PrintLnCallsCount: 0,
 		PrintMsg:          "",
@@ -38,6 +38,6 @@ func MockLoggers() (infoLoggerMock, errorLoggerMock) {
 		Err:                    nil,
 	}
 
-	return infoLoggerMock{Stats: &infoStats},
-		errorLoggerMock{Stats: &errorStats}
+	return InfoLoggerMock{Stats: &infoStats},
+		ErrorLoggerMock{Stats: &errorStats}
 }

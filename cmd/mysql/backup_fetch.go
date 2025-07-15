@@ -2,33 +2,64 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
 )
 
-const backupFetchShortDescription = "Fetches desired backup from storage"
+const (
+	backupFetchShortDescription = "Fetch desired backup from storage"
+	targetUserDataDescription   = "Fetch storage backup which has the specified user data"
+	useXbtoolExtractDescription = "Use internal xbtool to extract data from xbstream"
+	inplaceDescription          = "(DANGEROUS) Apply diff-s inplace (reduce required disk space)"
+)
 
-// backupFetchCmd represents the streamFetch command
-var backupFetchCmd = &cobra.Command{
-	Use:   "backup-fetch backup-name",
-	Short: backupFetchShortDescription,
-	Args:  cobra.ExactArgs(1),
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.NameStreamRestoreCmd] = true
-		err := internal.AssertRequiredSettingsSet()
-		tracelog.ErrorLogger.FatalOnError(err)
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
-		tracelog.ErrorLogger.FatalOnError(err)
-		restoreCmd, err := internal.GetCommandSetting(internal.NameStreamRestoreCmd)
-		tracelog.ErrorLogger.FatalOnError(err)
-		prepareCmd, _ := internal.GetCommandSetting(internal.MysqlBackupPrepareCmd)
-		mysql.HandleBackupFetch(folder, args[0], restoreCmd, prepareCmd)
-	},
+var (
+	// backupFetchCmd represents the streamFetch command
+	backupFetchCmd = &cobra.Command{
+		Use:   "backup-fetch backup-name",
+		Short: backupFetchShortDescription,
+		Args:  cobra.RangeArgs(0, 1),
+		Run: func(cmd *cobra.Command, args []string) {
+			internal.ConfigureLimiters()
+			storage, err := internal.ConfigureStorage()
+			tracelog.ErrorLogger.FatalOnError(err)
+			restoreCmd, err := internal.GetCommandSetting(conf.NameStreamRestoreCmd)
+			if !useXbtoolExtract {
+				tracelog.ErrorLogger.FatalOnError(err)
+			}
+			prepareCmd, _ := internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
+
+			targetBackupSelector, err := createTargetBackupSelector(args, fetchTargetUserData)
+			tracelog.ErrorLogger.FatalOnError(err)
+
+			mysql.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd, useXbtoolExtract, inplace)
+		},
+	}
+	fetchTargetUserData string
+	useXbtoolExtract    bool
+	inplace             bool
+)
+
+func createTargetBackupSelector(args []string, fetchTargetUserData string) (internal.BackupSelector, error) {
+	if fetchTargetUserData == "" {
+		fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
+	}
+	fetchTargetBackupName := ""
+	if len(args) >= 1 {
+		fetchTargetBackupName = args[0]
+	}
+	return internal.NewTargetBackupSelector(fetchTargetUserData, fetchTargetBackupName, mysql.NewGenericMetaFetcher())
 }
 
 func init() {
-	Cmd.AddCommand(backupFetchCmd)
+	cmd.AddCommand(backupFetchCmd)
+	backupFetchCmd.Flags().StringVar(&fetchTargetUserData, "target-user-data", "", targetUserDataDescription)
+	backupFetchCmd.Flags().BoolVar(&useXbtoolExtract, "use-xbtool-extract", false, useXbtoolExtractDescription)
+	backupFetchCmd.Flags().BoolVar(&inplace, "inplace", false, inplaceDescription)
+	_ = backupFetchCmd.Flags().MarkHidden("use-xbtool-extract")
+	_ = backupFetchCmd.Flags().MarkHidden("inplace")
 }

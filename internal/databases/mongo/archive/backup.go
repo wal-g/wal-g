@@ -3,138 +3,98 @@ package archive
 import (
 	"context"
 	"fmt"
-	"io"
-	"text/tabwriter"
-	"time"
+	"os"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
-// BackupInfoMarshalFunc defines sentinel unmarshal func
-type BackupInfoMarshalFunc func(b Backup) ([]byte, error)
-
-type BackupListing interface {
-	Backups(backups []Backup, output io.Writer) error
-	Names(backups []internal.BackupTime, output io.Writer) error
+type MongoMetaConstructor struct {
+	ctx       context.Context
+	client    client.MongoDriver
+	folder    storage.Folder
+	meta      models.BackupMeta
+	permanent bool
 }
 
-type TabbedBackupListing struct {
-	minwidth int
-	tabwidth int
-	padding  int
-	padchar  byte
-	flags    uint
-}
-
-func NewDefaultTabbedBackupListing() *TabbedBackupListing {
-	return NewTabbedBackupListing(0, 0, 1, ' ', 0)
-}
-
-func NewTabbedBackupListing(minwidth, tabwidth, padding int, padchar byte, flags uint) *TabbedBackupListing {
-	return &TabbedBackupListing{minwidth, tabwidth, padding, padchar, flags}
-}
-
-func (bl *TabbedBackupListing) Backups(backups []Backup, output io.Writer) error {
-	writer := tabwriter.NewWriter(output, bl.minwidth, bl.tabwidth, bl.padding, bl.padchar, bl.flags)
-
-	_, err := fmt.Fprintln(writer, "name\tfinish_local_time\tts_before\tts_after")
-	if err != nil {
-		return err
+func (m *MongoMetaConstructor) MetaInfo() interface{} {
+	meta := m.Meta()
+	backupSentinel := &models.Backup{
+		BackupName:      meta.BackupName,
+		BackupType:      common.LogicalBackupType,
+		StartLocalTime:  meta.StartTime,
+		FinishLocalTime: meta.FinishTime,
+		UserData:        meta.User,
+		MongoMeta:       meta.Mongo,
+		CompressedSize:  meta.CompressedSize,
+		Permanent:       meta.Permanent,
 	}
-	for i := len(backups) - 1; i >= 0; i-- {
-		b := backups[i]
-		_, err := fmt.Fprintf(writer,
-			"%v\t%v\t%v\t%v\n", b.BackupName, b.FinishLocalTime.Format(time.RFC3339), b.MongoMeta.Before.LastMajTS, b.MongoMeta.After.LastMajTS)
-		if err != nil {
-			return err
-		}
-	}
-
-	return writer.Flush()
+	return backupSentinel
 }
 
-func (bl *TabbedBackupListing) Names(backups []internal.BackupTime, output io.Writer) error {
-	writer := tabwriter.NewWriter(output, bl.minwidth, bl.tabwidth, bl.padding, bl.padchar, bl.flags)
-
-	// wal_segment_backup_start for backward compatibility
-	if _, err := fmt.Fprintln(writer, "name\tlast_modified\twal_segment_backup_start"); err != nil {
-		return err
-	}
-	for i := len(backups) - 1; i >= 0; i-- {
-		b := backups[i]
-		_, err := fmt.Fprintf(writer, "%v\t%v\t%v\n", b.BackupName, b.Time.Format(time.RFC3339), b.WalFileName)
-		if err != nil {
-			return err
-		}
-	}
-
-	return writer.Flush()
+func NewBackupMongoMetaConstructor(ctx context.Context,
+	mc client.MongoDriver,
+	folder storage.Folder,
+	permanent bool) internal.MetaConstructor {
+	return &MongoMetaConstructor{ctx: ctx, client: mc, folder: folder, permanent: permanent}
 }
 
-// Backup represents backup sentinel data
-type Backup struct {
-	BackupName      string      `json:"BackupName,omitempty"`
-	StartLocalTime  time.Time   `json:"StartLocalTime,omitempty"`
-	FinishLocalTime time.Time   `json:"FinishLocalTime,omitempty"`
-	UserData        interface{} `json:"UserData,omitempty"`
-	MongoMeta       MongoMeta   `json:"MongoMeta,omitempty"`
-}
-
-// NodeMeta represents MongoDB node metadata
-type NodeMeta struct {
-	LastTS    models.Timestamp `json:"LastTS,omitempty"`
-	LastMajTS models.Timestamp `json:"LastMajTS,omitempty"`
-}
-
-// MongoMeta includes NodeMeta Before and after backup
-type MongoMeta struct {
-	Before NodeMeta `json:"Before,omitempty"`
-	After  NodeMeta `json:"After,omitempty"`
-}
-
-// MongoMetaProvider defines interface to collect backup meta
-type MongoMetaProvider interface {
-	Init() error
-	Finalize() error
-	Meta() MongoMeta
-}
-
-type MongoMetaDBProvider struct {
-	ctx    context.Context
-	client client.MongoDriver
-	meta   MongoMeta
-}
-
-func NewBackupMetaMongoProvider(ctx context.Context, mc client.MongoDriver) *MongoMetaDBProvider {
-	return &MongoMetaDBProvider{ctx: ctx, client: mc}
-}
-
-func (m *MongoMetaDBProvider) Init() error {
+func (m *MongoMetaConstructor) Init() error {
 	lastTS, lastMajTS, err := m.client.LastWriteTS(m.ctx)
 	if err != nil {
-		return fmt.Errorf("can not initialize backup meta")
+		return fmt.Errorf("can not initialize backup mongo")
 	}
-	m.meta.Before = NodeMeta{
-		LastTS:    lastTS,
-		LastMajTS: lastMajTS,
+
+	userData, err := internal.GetSentinelUserData()
+	if err != nil {
+		return errors.Wrap(err, "failed to unmarshal the provided UserData")
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return errors.Wrap(err, "failed to get hostname")
+	}
+
+	m.meta = models.BackupMeta{
+		Hostname:  hostname,
+		StartTime: utility.TimeNowCrossPlatformLocal(),
+		Permanent: m.permanent,
+		User:      userData,
+		Mongo: models.MongoMeta{
+			Before: models.NodeMeta{
+				LastTS:    lastTS,
+				LastMajTS: lastMajTS,
+			},
+		},
 	}
 	return nil
 }
 
-func (m *MongoMetaDBProvider) Finalize() error {
+func (m *MongoMetaConstructor) Finalize(backupName string) error {
+	dataSize, err := internal.FolderSize(m.folder, backupName)
+	if err != nil {
+		return fmt.Errorf("can not get backup size: %+v", err)
+	}
+
 	lastTS, lastMajTS, err := m.client.LastWriteTS(m.ctx)
 	if err != nil {
-		return fmt.Errorf("can not finalize backup meta")
+		return fmt.Errorf("can not finalize backup mongo")
 	}
-	m.meta.After = NodeMeta{
+	m.meta.Mongo.After = models.NodeMeta{
 		LastTS:    lastTS,
 		LastMajTS: lastMajTS,
 	}
+	m.meta.BackupName = backupName
+	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
+	m.meta.CompressedSize = dataSize
 	return nil
 }
 
-func (m *MongoMetaDBProvider) Meta() MongoMeta {
+func (m *MongoMetaConstructor) Meta() models.BackupMeta {
 	return m.meta
 }

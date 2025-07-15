@@ -5,39 +5,42 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/utility"
 )
 
-const BackupFetchShortDescription = "Fetches desired backup from storage"
+const backupFetchShortDescription = "Fetches desired backup from storage"
 
 // backupFetchCmd represents the streamFetch command
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch backup-name",
-	Short: BackupFetchShortDescription,
+	Short: backupFetchShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.ConfigureLimiters()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		restoreCmd, err := internal.GetCommandSettingContext(ctx, internal.NameStreamRestoreCmd)
+		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
-		err = mongo.HandleBackupFetch(ctx, folder, args[0], restoreCmd)
+		backupSelector, err := internal.NewBackupNameSelector(args[0], true)
 		tracelog.ErrorLogger.FatalOnError(err)
+
+		internal.HandleBackupFetch(storage.RootFolder(), backupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 	},
 }
 
 func init() {
-	Cmd.AddCommand(backupFetchCmd)
+	cmd.AddCommand(backupFetchCmd)
 }

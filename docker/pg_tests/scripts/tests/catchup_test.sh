@@ -1,9 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 set -e -x
 
 PGDATA="/var/lib/postgresql/10/main"
 PGDATA_ALPHA="${PGDATA}_alpha"
 PGDATA_BETA="${PGDATA}_beta"
+PGDATA_BETA_1="${PGDATA}_beta_1"
 ALPHA_DUMP="/tmp/alpha_dump"
 ALPHA_PORT=5432
 BETA_DUMP="/tmp/beta_dump"
@@ -36,6 +37,9 @@ popd
 
 # init beta cluster (replica of alpha)
 /usr/lib/postgresql/10/bin/pg_basebackup --wal-method=stream -D ${PGDATA_BETA} -U repl -h 127.0.0.1 -p ${ALPHA_PORT}
+
+cp -r ${PGDATA_BETA} ${PGDATA_BETA_1}
+
 pushd ${PGDATA_BETA}
 echo "port = ${BETA_PORT}" >> postgresql.conf
 echo "hot_standby = on" >> postgresql.conf
@@ -53,47 +57,71 @@ pgbench -i -s 15 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
 LSN=`psql -c "SELECT pg_current_wal_lsn() - '0/0'::pg_lsn;" | grep -E '[0-9]+' | head -1`
 
-#                                               db       table            conn_port    row_count
-/tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} 1500000 # 15 * 100000, 15 is value of -s in pgbench
-# script above waits only one table, so just in case sleep
-sleep 5
-
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} --mode smart -w stop
-sleep 5
 
 # change database postgres and dump database
-pgbench -i -s 10 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+pgbench -T 10 -P 1 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+# create some new files
+pgbench -i -s 5 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 /usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${ALPHA_PORT} -f ${ALPHA_DUMP} postgres
 
 wal-g --config=${TMP_CONFIG} catchup-push ${PGDATA_ALPHA} --from-lsn ${LSN} 2>/tmp/stderr 1>/tmp/stdout
 cat /tmp/stderr /tmp/stdout
 
-BACKUP_NAME=`grep -oE 'base_.*' /tmp/stderr`
-
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w stop
-sleep 5
+BACKUP_NAME=`grep -oE 'base_[0-9A-Z]*' /tmp/stderr | sort -u`
 
 wal-g --config=${TMP_CONFIG} catchup-fetch ${PGDATA_BETA} $BACKUP_NAME
 
-# rename recovery.conf to don't care about wals and remove backup_label
 pushd ${PGDATA_BETA}
-mv recovery.conf{,.bak}
-rm backup_label
-/usr/lib/postgresql/10/bin/pg_resetwal -f .
+echo "port = ${BETA_PORT}" >> postgresql.conf
+echo "hot_standby = on" >> postgresql.conf
+cat > recovery.conf << EOF
+standby_mode = 'on'
+primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
+restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
+trigger_file = '/tmp/postgresql.trigger.${BETA_PORT}'
+EOF
 popd
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w start
-sleep 5
 
 /usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
 
-# return recovery.conf and start master to be sure replication works
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
-pushd ${PGDATA_BETA}
-mv recovery.conf{.bak,}
-popd
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w restart
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w stop
 
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 
-echo "Catchup test success"
+# test catchup-send and catchup-receive
+rm -rf ${PGDATA_BETA}
+
+mv ${PGDATA_BETA_1} ${PGDATA_BETA}
+
+wal-g catchup-receive ${PGDATA_BETA} 1337 &
+
+# wait for wal-g to start
+while netstat -lnt | awk '$4 ~ /:1337$/ {exit 1}'; do sleep 10; done
+
+wal-g --config=${TMP_CONFIG} catchup-send ${PGDATA_ALPHA} localhost:1337
+
+
+pushd ${PGDATA_BETA}
+echo "port = ${BETA_PORT}" >> postgresql.conf
+echo "hot_standby = on" >> postgresql.conf
+cat > recovery.conf << EOF
+standby_mode = 'on'
+primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
+restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
+trigger_file = '/tmp/postgresql.trigger.${BETA_PORT}'
+EOF
+popd
+
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w start
+
+/usr/lib/postgresql/10/bin/pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
+
+/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w stop
+
+diff ${ALPHA_DUMP} ${BETA_DUMP}
+
+/tmp/scripts/drop_pg.sh
+rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA}

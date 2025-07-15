@@ -1,26 +1,24 @@
 package functests
 
 import (
-	"flag"
 	"os"
 	"testing"
 
-	"github.com/DATA-DOG/godog"
-	"github.com/DATA-DOG/godog/colors"
+	"github.com/cucumber/godog"
+	"github.com/cucumber/godog/colors"
+	"github.com/spf13/pflag"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/tests_func/config"
+	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
 type TestOpts struct {
-	test  bool
-	clean bool
-	stop  bool
-	debug bool
+	test          bool
+	clean         bool
+	stop          bool
+	debug         bool
+	featurePrefix string
+	database      string
 }
-
-const (
-	testOptsPrefix = "tf."
-)
 
 var (
 	godogOpts = godog.Options{
@@ -31,64 +29,92 @@ var (
 	}
 
 	testOpts = TestOpts{}
+
+	databases = map[string]bool{
+		"mongodb": true,
+		"redis":   true,
+	}
 )
 
 func init() {
-	flag.BoolVar(&testOpts.test, testOptsPrefix+"test", true, "run tests")
-	flag.BoolVar(&testOpts.stop, testOptsPrefix+"stop", true, "shutdown test environment")
-	flag.BoolVar(&testOpts.clean, testOptsPrefix+"clean", true, "delete test environment")
-	flag.BoolVar(&testOpts.debug, testOptsPrefix+"debug", false, "enable debug logging")
-	godog.BindFlags("godog.", flag.CommandLine, &godogOpts)
+	pflag.BoolVar(&testOpts.test, "tf.test", true, "run tests")
+	pflag.BoolVar(&testOpts.stop, "tf.stop", true, "shutdown test environment")
+	pflag.BoolVar(&testOpts.clean, "tf.clean", true, "delete test environment")
+	pflag.BoolVar(&testOpts.debug, "tf.debug", false, "enable debug logging")
+	pflag.StringVar(&testOpts.featurePrefix, "tf.featurePrefix", "", "features prefix")
+	pflag.StringVar(&testOpts.database, "tf.database", "", "database name [mongodb|redis]")
+
+	godog.BindCommandLineFlags("godog.", &godogOpts)
 }
 
 func TestMain(m *testing.M) {
-	flag.Parse()
+	pflag.Parse()
 
-	status := 0
-	if testOpts.debug {
-		err := tracelog.UpdateLogLevel(tracelog.DevelLogLevel)
-		tracelog.ErrorLogger.FatalOnError(err)
+	if _, ok := databases[testOpts.database]; !ok {
+		tracelog.ErrorLogger.Fatalf("Database '%s' is not valid, please provide test database -tf.database=dbname\n",
+			testOpts.database)
 	}
 
-	envFilePath := config.Env["ENV_FILE"]
+	status, err := RunTestFeatures()
 
-	tctx, err := NewTestContext()
 	tracelog.ErrorLogger.FatalOnError(err)
+	os.Exit(status)
+}
 
-	if testOpts.test {
-		godogOpts.Paths = tctx.Features
-
-		tracelog.InfoLogger.Printf("Starting testing environment: mongodb %s with features: %v",
-			tctx.Version.Full, godogOpts.Paths)
-
-		status = godog.RunWithOptions("godogs", func(s *godog.Suite) {
-			tctx.setupSuites(s)
-		}, godogOpts)
-
-		if st := m.Run(); st > status {
-			status = st
+func RunTestFeatures() (status int, err error) {
+	if testOpts.debug {
+		err := tracelog.Setup(os.Stderr, tracelog.DevelLogLevel)
+		if err != nil {
+			return -1, err
 		}
 	}
 
-	if !EnvExists(envFilePath) {
-		tracelog.ErrorLogger.Fatalln("Environment file is not found: ", envFilePath)
+	tctx, err := CreateTestContext(testOpts.database)
+	if err != nil {
+		return -1, err
 	}
 
-	env, err := ReadEnv(envFilePath)
-	tracelog.ErrorLogger.FatalOnError(err)
+	if testOpts.test {
+		godogOpts.Paths, err = utils.FindFeaturePaths(testOpts.database, testOpts.featurePrefix)
+		if err != nil {
+			return -1, err
+		}
 
-	tctx.Env = env
-	tctx.Infra = InfraFromTestContext(tctx)
+		tracelog.InfoLogger.Printf("Starting testing environment: %s %s with features: %v",
+			testOpts.database, tctx.Version.Full, godogOpts.Paths)
+
+		suite := godog.TestSuite{
+			Name: "godogs",
+			TestSuiteInitializer: func(ctx *godog.TestSuiteContext) {
+				ctx.BeforeSuite(func() {
+					err := tctx.LoadEnv()
+					tracelog.ErrorLogger.FatalOnError(err)
+				})
+			},
+			ScenarioInitializer: func(ctx *godog.ScenarioContext) {
+				SetupCommonSteps(ctx, tctx)
+				SetupMongodbSteps(ctx, tctx)
+				SetupMongodbBinaryBackupSteps(ctx, tctx)
+				SetupRedisSteps(ctx, tctx)
+			},
+			Options: &godogOpts,
+		}
+		status = suite.Run()
+	}
 
 	if testOpts.stop {
 		err = tctx.StopEnv()
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return -1, err
+		}
 	}
 
 	if testOpts.clean {
 		err = tctx.CleanEnv()
-		tracelog.ErrorLogger.FatalOnError(err)
+		if err != nil {
+			return -1, err
+		}
 	}
 
-	os.Exit(status)
+	return status, nil
 }

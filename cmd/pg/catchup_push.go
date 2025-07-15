@@ -1,10 +1,9 @@
 package pg
 
 import (
-	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (
@@ -18,9 +17,9 @@ var (
 		Short: catchupPushShortDescription,
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			uploader, err := internal.ConfigureWalUploader()
-			tracelog.ErrorLogger.FatalOnError(err)
-			internal.HandleCatchupPush(uploader, args[0], fromLSN)
+			internal.ConfigureLimiters()
+
+			postgres.HandleCatchupPush(cmd.Context(), args[0], postgres.LSN(fromLSN))
 		},
 	}
 	fromLSN uint64

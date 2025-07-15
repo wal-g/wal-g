@@ -1,0 +1,20 @@
+{
+  "commands": {
+    "succeeded": {
+      "createIndexes": 1,
+      "dropIndexes": 1
+    },
+    "failed": {},
+    "docs": {
+      "createIndexes": 0,
+      "dropIndexes": 0
+    },
+    "errors": {}
+  },
+  "transactions": {
+    "succeeded": {},
+    "failed": {},
+    "docs": {},
+    "errors": {}
+  }
+}

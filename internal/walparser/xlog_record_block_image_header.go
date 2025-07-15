@@ -17,9 +17,14 @@ type InconsistentBlockImageHoleStateError struct {
 	error
 }
 
-func NewInconsistentBlockImageHoleStateError(holeOffset uint16, holeLength uint16, imageLength uint16, hasHole bool) InconsistentBlockImageHoleStateError {
+func NewInconsistentBlockImageHoleStateError(holeOffset uint16,
+	holeLength uint16,
+	imageLength uint16,
+	hasHole bool) InconsistentBlockImageHoleStateError {
 	return InconsistentBlockImageHoleStateError{errors.Errorf(
-		"block image hole state is inconsistent: holeOffset is: %v, holeLength is: %v, imageLength is: %v, while hasHole is: %v",
+		"block image hole state is inconsistent: "+
+			"holeOffset is: %v, holeLength is: %v, "+
+			"imageLength is: %v, while hasHole is: %v",
 		holeOffset, holeLength, imageLength, hasHole)}
 }
 
@@ -31,8 +36,14 @@ type InconsistentBlockImageLengthError struct {
 	error
 }
 
-func NewInconsistentBlockImageLengthError(hasHole bool, isCompressed bool, length uint16) InconsistentBlockImageLengthError {
-	return InconsistentBlockImageLengthError{errors.Errorf("block image has invalid state: hasHole: %v, isCompressed: %v, imageLength: %v", hasHole, isCompressed, length)}
+func NewInconsistentBlockImageLengthError(hasHole bool,
+	isCompressed bool,
+	length uint16) InconsistentBlockImageLengthError {
+	return InconsistentBlockImageLengthError{
+		errors.Errorf("block image has invalid state: "+
+			"hasHole: %v, isCompressed: %v, imageLength: %v",
+			hasHole, isCompressed, length),
+	}
 }
 
 func (err InconsistentBlockImageLengthError) Error() string {
@@ -59,7 +70,8 @@ func (imageHeader *XLogRecordBlockImageHeader) ApplyImage() bool {
 }
 
 func (imageHeader *XLogRecordBlockImageHeader) checkHoleStateConsistency() error {
-	if (imageHeader.HasHole() && (imageHeader.HoleOffset == 0 || imageHeader.HoleLength == 0 || imageHeader.ImageLength == BlockSize)) ||
+	if (imageHeader.HasHole() &&
+		(imageHeader.HoleOffset == 0 || imageHeader.HoleLength == 0 || imageHeader.ImageLength == BlockSize)) ||
 		(!imageHeader.HasHole() && (imageHeader.HoleOffset != 0 || imageHeader.HoleLength != 0)) {
 		return NewInconsistentBlockImageHoleStateError(imageHeader.HoleOffset, imageHeader.HoleLength,
 			imageHeader.ImageLength, imageHeader.HasHole())
@@ -70,7 +82,9 @@ func (imageHeader *XLogRecordBlockImageHeader) checkHoleStateConsistency() error
 func (imageHeader *XLogRecordBlockImageHeader) checkLengthConsistency() error {
 	if (imageHeader.IsCompressed() && imageHeader.ImageLength == BlockSize) ||
 		(!imageHeader.HasHole() && !imageHeader.IsCompressed() && imageHeader.ImageLength != BlockSize) {
-		return NewInconsistentBlockImageLengthError(imageHeader.HasHole(), imageHeader.IsCompressed(), imageHeader.ImageLength)
+		return NewInconsistentBlockImageLengthError(imageHeader.HasHole(),
+			imageHeader.IsCompressed(),
+			imageHeader.ImageLength)
 	}
 	return nil
 }

@@ -2,33 +2,33 @@ package mongo
 
 import (
 	"context"
-	"sync"
 
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
-	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 // HandleOplogPush starts oplog archiving process: fetch, validate, upload to storage.
 func HandleOplogPush(ctx context.Context, fetcher stages.Fetcher, applier stages.Applier) error {
-	ctx, cancel := context.WithCancel(ctx)
-	wg := &sync.WaitGroup{}
-	defer func() {
-		cancel()
-		wg.Wait()
-	}()
-
+	errgrp, ctx := errgroup.WithContext(ctx)
 	var errs []<-chan error
-	oplogc, errc, err := fetcher.Fetch(ctx, wg)
+
+	oplogc, errc, err := fetcher.Fetch(ctx)
 	if err != nil {
 		return err
 	}
 	errs = append(errs, errc)
 
-	errc, err = applier.Apply(ctx, oplogc, wg)
+	errc, err = applier.Apply(ctx, oplogc)
 	if err != nil {
 		return err
 	}
 	errs = append(errs, errc)
 
-	return utility.WaitFirstError(errs...)
+	for _, errc := range errs {
+		errgrp.Go(func() error {
+			return <-errc
+		})
+	}
+
+	return errgrp.Wait()
 }

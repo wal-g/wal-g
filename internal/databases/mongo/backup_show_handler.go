@@ -1,26 +1,23 @@
 package mongo
 
 import (
-	"fmt"
+	"encoding/json"
 	"io"
 
-	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-// HandleBackupPush prints sentinel contents.
-func HandleBackupShow(downloader archive.Downloader, backup string, marshaller archive.BackupInfoMarshalFunc, output io.Writer) error {
-	sentinel, err := downloader.BackupMeta(backup)
+// HandleBackupShow prints sentinel contents.
+func HandleBackupShow(backupFolder storage.Folder, backupName string, output io.Writer, pretty bool) (err error) {
+	sentinel, err := common.DownloadSentinel(backupFolder, backupName)
 	if err != nil {
 		return err
 	}
 
-	report, err := marshaller(sentinel)
-	if err != nil {
-		return fmt.Errorf("can not marshal sentinel: %w", err)
+	encoder := json.NewEncoder(output)
+	if pretty {
+		encoder.SetIndent("", "    ")
 	}
-
-	if _, err := fmt.Fprintf(output, "%s\n", report); err != nil {
-		return err
-	}
-	return nil
+	return encoder.Encode(sentinel)
 }

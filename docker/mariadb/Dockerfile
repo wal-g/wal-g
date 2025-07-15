@@ -1,13 +1,11 @@
-FROM wal-g/ubuntu:latest
+FROM wal-g/ubuntu:20.04
 
 # mb not another path
 ENV MYSQLDATA /var/lib/mysql
 
-# fixme: the package of MariaDB 10.4 doesn't work in this environement because it's not being added to the services.
 RUN apt-get update && \
-    apt-get install --yes --no-install-recommends --no-install-suggests software-properties-common dirmngr gnupg2 curl && \
-    curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | /bin/bash -s -- --mariadb-server-version="mariadb-10.3" && \
-    apt-get update && \
+    apt-get install --yes --no-install-recommends --no-install-suggests software-properties-common dirmngr gnupg2 curl apt-transport-https && \
+    curl -sSL https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | /bin/bash -s -- --mariadb-server-version="mariadb-10.11" --skip-maxscale && \
     DEBIAN_FRONTEND=noninteractive apt-get install --yes \
     mariadb-server \
     mariadb-client \

@@ -3,16 +3,14 @@ package stages
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/tracelog"
 )
 
 var (
@@ -21,7 +19,7 @@ var (
 
 // Applier defines interface to apply given oplog records.
 type Applier interface {
-	Apply(context.Context, chan *models.Oplog, *sync.WaitGroup) (chan error, error)
+	Apply(context.Context, chan *models.Oplog) (chan error, error)
 }
 
 // DBApplier implements Applier interface for mongodb.
@@ -35,13 +33,11 @@ func NewGenericApplier(applier oplog.Applier) *GenericApplier {
 }
 
 // Apply runs working cycle that applies oplog records.
-func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog, wg *sync.WaitGroup) (chan error, error) {
+func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog) (chan error, error) {
 	errc := make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		defer func() { _ = dba.applier.Close(ctx) }()
 		defer close(errc)
+		defer func() { _ = dba.applier.Close(ctx) }()
 
 		for opr := range ch {
 			// we still pass oplog records in generic appliers by value
@@ -66,25 +62,31 @@ type StorageApplier struct {
 
 // NewStorageApplier builds StorageApplier.
 // TODO: switch to functional options
-func NewStorageApplier(uploader archive.Uploader, buf Buffer, archiveAfterSize int, archiveTimeout time.Duration, statsUpdater stats.OplogUploadStatsUpdater) *StorageApplier {
+func NewStorageApplier(uploader archive.Uploader,
+	buf Buffer,
+	archiveAfterSize int,
+	archiveTimeout time.Duration,
+	statsUpdater stats.OplogUploadStatsUpdater) *StorageApplier {
 	return &StorageApplier{uploader, buf, archiveAfterSize, archiveTimeout, statsUpdater}
 }
 
 // Apply runs working cycle that sends oplog records to storage.
-func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, wg *sync.WaitGroup) (chan error, error) {
+func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) (chan error, error) {
 	archiveTimer := time.NewTimer(sa.timeout)
 	var lastKnownTS, batchStartTS models.Timestamp
 	restartBatch := true
 	batchDocs := 0
 	batchSize := 0
 	errc := make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		defer close(errc)
 		defer archiveTimer.Stop()
 		for oplogc != nil {
 			select {
+			case <-ctx.Done():
+				errc <- fmt.Errorf("stop applying oplog: %w", ctx.Err())
+				return
+
 			case op, ok := <-oplogc:
 				if !ok {
 					oplogc = nil
@@ -126,7 +128,7 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog, 
 			// or switch to PushStreamToDestination (async api):
 			// we don't know archive name beforehand, so upload stream and rename key (it leads to failures and require gc)
 			// but consumes less memory
-			if err := sa.uploader.UploadOplogArchive(bufReader, batchStartTS, lastKnownTS); err != nil {
+			if err := sa.uploader.UploadOplogArchive(ctx, bufReader, batchStartTS, lastKnownTS); err != nil {
 				errc <- fmt.Errorf("can not upload oplog archive: %w", err)
 				return
 			}

@@ -3,7 +3,6 @@ package helpers
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -12,19 +11,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/tests_func/utils"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
 var Docker *client.Client
 
-const envDockerMachineName = "DOCKER_MACHINE_NAME"
+const (
+	envDockerMachineName = "DOCKER_MACHINE_NAME"
+	shell                = "bash"
+)
 
 type ExecResult struct {
 	ExitCode     int
@@ -54,12 +55,6 @@ type RunOptions struct {
 
 type RunOption func(*RunOptions)
 
-func User(user string) RunOption {
-	return func(args *RunOptions) {
-		args.user = user
-	}
-}
-
 func TimeInContainer(ctx context.Context, container string) (time.Time, error) {
 	exc, err := RunCommandStrict(ctx, container, []string{"date", "+%s"})
 	if err != nil {
@@ -73,26 +68,21 @@ func TimeInContainer(ctx context.Context, container string) (time.Time, error) {
 }
 
 func RunCommandStrict(ctx context.Context, container string, command []string) (ExecResult, error) {
-	cmdLine := strings.Join(command, " ")
-
 	exc, err := RunCommand(ctx, container, command)
 	if err != nil {
 		return exc, err
 	}
 	if exc.ExitCode != 0 {
+		cmdLine := strings.Join(command, " ")
 		tracelog.ErrorLogger.Printf("'%s' failed with %d\nstdout:\n%s\nstderr:\n%s\n",
 			cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
-		return exc, fmt.Errorf("%s exit code: %d", cmdLine, exc.ExitCode)
+		return exc, fmt.Errorf("%s exit code: %d, err: %s", cmdLine, exc.ExitCode, exc.Stderr())
 	}
 	return exc, nil
-
 }
 
-func RunCommand(ctx context.Context, container string, cmd []string, setters ...RunOption) (ExecResult, error) {
+func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult, error) {
 	args := &RunOptions{}
-	for _, setter := range setters {
-		setter(args)
-	}
 
 	execConfig := types.ExecConfig{
 		AttachStdout: true,
@@ -143,13 +133,25 @@ func RunCommand(ctx context.Context, container string, cmd []string, setters ...
 	return exc, nil
 }
 
+func RunAsyncCommand(ctx context.Context, container, cmd string) error {
+	execCfg := types.ExecConfig{
+		Detach: true,
+		Cmd:    []string{shell, "-c", cmd},
+	}
+	execResp, err := Docker.ContainerExecCreate(ctx, container, execCfg)
+	if err != nil {
+		return err
+	}
+	return Docker.ContainerExecStart(ctx, execResp.ID, types.ExecStartCheck{})
+}
+
 func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
 	for _, container := range containers {
 		if utils.StringInSlice(name, container.Names) {
 			return &container, nil
 		}
 	}
-	return nil, errors.New(fmt.Sprintf("cannot find container with name %s", name))
+	return nil, fmt.Errorf("cannot find container with name %s", name)
 }
 
 func DockerContainer(ctx context.Context, prefix string) (*types.Container, error) {
@@ -210,6 +212,7 @@ func CreateNet(ctx context.Context, netName string) error {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
 	if len(networkList) != 0 {
+		tracelog.DebugLogger.Printf("Found networks: %+v", networkList)
 		return nil
 	}
 	ipam := &network.IPAM{
@@ -228,19 +231,7 @@ func CreateNet(ctx context.Context, netName string) error {
 	if err != nil {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
-	return nil
-}
-
-func RemoveNet(ctx context.Context, netName string) error {
-	nets, err := ListNets(ctx, netName)
-	if err != nil {
-		return fmt.Errorf("error im removing network %s: %v", netName, err)
-	}
-	for _, net := range nets {
-		if err := Docker.NetworkRemove(ctx, net.ID); err != nil {
-			panic(err)
-		}
-	}
+	tracelog.DebugLogger.Printf("Network %v has been created", netName)
 	return nil
 }
 
@@ -256,9 +247,12 @@ func BuildImage(ctx context.Context, tag string, path string) error {
 	cmd := exec.CommandContext(ctx, "docker", "build", "-t", tag, path)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	tracelog.DebugLogger.Printf("Building image %v with tag %v by command %v", path, tag, cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("error in building base: %v", err)
 	}
+	tracelog.DebugLogger.Printf("Image %v with tag %v was build successfully", path, tag)
 	return nil
 }
 
@@ -275,7 +269,8 @@ type Infra struct {
 	baseImage BaseImage
 }
 
-func NewInfra(ctx context.Context, config string, env map[string]string, net string, base BaseImage) *Infra {
+func NewInfra(ctx context.Context,
+	config string, env map[string]string, net string, base BaseImage) *Infra {
 	return &Infra{
 		ctx:       ctx,
 		config:    config,
@@ -294,7 +289,8 @@ func (inf *Infra) Setup() error {
 		return fmt.Errorf("can not build base image: %v", err)
 	}
 
-	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "build"}); err != nil {
+	actions := []string{"--verbose", "build"}
+	if err := inf.callCompose(actions); err != nil {
 		return fmt.Errorf("can not build images: %v", err)
 	}
 
@@ -302,14 +298,16 @@ func (inf *Infra) Setup() error {
 }
 
 func (inf *Infra) RecreateContainers() error {
-	if err := inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "down", "--volumes", "--timeout", "0"}); err != nil {
+	actions := []string{"--verbose", "down", "--volumes", "--timeout", "0"}
+	if err := inf.callCompose(actions); err != nil {
 		return err
 	}
-	return inf.callCompose([]string{"--verbose", "--log-level", "WARNING", "up", "--detach"})
+	return inf.callCompose([]string{"--verbose", "up", "--detach"})
 }
 
 func (inf *Infra) Shutdown() error {
-	if err := inf.callCompose([]string{"down", "--rmi", "local", "--remove-orphans", "--timeout", "0"}); err != nil {
+	actions := []string{"down", "--rmi", "local", "--remove-orphans", "--timeout", "0"}
+	if err := inf.callCompose(actions); err != nil {
 		return fmt.Errorf("can not shutdown containers: %v", err)
 	}
 
@@ -320,14 +318,19 @@ func (inf *Infra) Shutdown() error {
 }
 
 func (inf *Infra) callCompose(actions []string) error {
-	baseArgs := []string{"--file", inf.config, "-p", "test"}
+	baseArgs := []string{"compose", "--file", inf.config, "-p", "test"}
 	baseArgs = append(baseArgs, actions...)
-	cmd := exec.CommandContext(inf.ctx, "docker-compose", baseArgs...)
-	for _, line := range utils.EnvToList(inf.env) {
-		cmd.Env = append(cmd.Env, line)
+	fullPath, err := exec.LookPath("docker")
+	if err != nil {
+		return err
 	}
+	tracelog.DebugLogger.Printf("Running command %s: with args %v", fullPath, baseArgs)
+	cmd := exec.CommandContext(inf.ctx, fullPath, baseArgs...)
+	cmd.Env = append(cmd.Env, utils.EnvToList(inf.env)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	tracelog.DebugLogger.Printf("Running command: %+v", cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("can not start command: %v", err)
@@ -336,6 +339,8 @@ func (inf *Infra) callCompose(actions []string) error {
 	if err := cmd.Wait(); err != nil {
 		return fmt.Errorf("error when calling compose: %v", err)
 	}
+
+	tracelog.DebugLogger.Printf("Command '%v' has been completed successfully!", cmd)
 
 	return nil
 }

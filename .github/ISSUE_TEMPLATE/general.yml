@@ -1,0 +1,36 @@
+name: 🗣️ General Discussion
+description: Open a general issue or share feedback
+title: "[DISCUSSION] <topic>"
+labels: [discussion]
+body:
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: How urgent is this?
+      options:
+        - Not urgent
+        - Nice to have
+        - Important
+    validations:
+      required: true
+
+  - type: textarea
+    id: topic
+    attributes:
+      label: What would you like to discuss?
+      description: Describe your idea, feedback, or question
+      placeholder: |
+        Share anything related to WAL-G...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add logs, screenshots, or related info
+      placeholder: |
+        Any additional info here...
+    validations:
+      required: false

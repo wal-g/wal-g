@@ -4,22 +4,30 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/wal-g/storages/storage"
-	"io/ioutil"
+	"io"
 	"sort"
 	"sync"
+	"time"
+
+	"github.com/wal-g/tracelog"
+
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const IndexFileName = "__blob_index.json"
 
+const BgSaveInterval = 30 * time.Second
+
 type Index struct {
 	sync.Mutex
-	folder    storage.Folder
-	Size      uint64            `json:"size"`
-	Blocks    []*Block          `json:"blocks"`
-	icache    map[string]*Block // cache by id's
-	ocache    []*Block          // cache by offset, ordered, only committed
-	srequests chan chan error
+	folder      storage.Folder
+	Size        uint64            `json:"size"`
+	Blocks      []*Block          `json:"blocks"`
+	Compression string            `json:"compression"`
+	Encryption  string            `json:"encryption"`
+	icache      map[string]*Block // cache by id's
+	ocache      []*Block          // cache by offset, ordered, only committed
+	needSave    bool
 }
 
 type Block struct {
@@ -32,16 +40,16 @@ type Block struct {
 }
 
 type Section struct {
-	Path   string
-	Offset uint64
-	Limit  uint64
+	Path      string
+	Offset    uint64
+	Limit     uint64
+	BlockSize uint64
 }
 
 func NewIndex(f storage.Folder) *Index {
 	idx := &Index{
-		folder:    f,
-		icache:    make(map[string]*Block),
-		srequests: make(chan chan error, 100),
+		folder: f,
+		icache: make(map[string]*Block),
 	}
 	go idx.saver()
 	return idx
@@ -56,7 +64,7 @@ func (idx *Index) Load() error {
 		return err
 	}
 	defer reader.Close()
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return err
 	}
@@ -85,34 +93,32 @@ func (idx *Index) buildCache() {
 }
 
 func (idx *Index) saver() {
-	for {
-		requests := make([]chan error, 0, 10)
-		// get next save request
-		req := <-idx.srequests
-		requests = append(requests, req)
-		// and other pending
-		select {
-		case req := <-idx.srequests:
-			requests = append(requests, req)
-		default:
-			break
-		}
+	for range time.NewTicker(BgSaveInterval).C {
 		idx.Lock()
-		data, err := json.Marshal(idx)
+		needSave := idx.needSave
+		idx.needSave = false
 		idx.Unlock()
-		if err == nil {
-			err = idx.folder.PutObject(IndexFileName, bytes.NewBuffer(data))
-		}
-		for _, req := range requests {
-			req <- err
+		if needSave {
+			err := idx.Save()
+			tracelog.ErrorLogger.PrintOnError(err)
 		}
 	}
 }
 
 func (idx *Index) Save() error {
-	req := make(chan error, 1)
-	idx.srequests <- req
-	return <-req
+	idx.Lock()
+	data, err := json.Marshal(idx)
+	idx.Unlock()
+	if err == nil {
+		err = idx.folder.PutObject(IndexFileName, bytes.NewBuffer(data))
+	}
+	return err
+}
+
+func (idx *Index) SaveDelayed() {
+	idx.Lock()
+	idx.needSave = true
+	idx.Unlock()
 }
 
 func (idx *Index) PutBlock(id string, size uint64) string {
@@ -130,6 +136,7 @@ func (idx *Index) PutBlock(id string, size uint64) string {
 	return fmt.Sprintf("%s.%d", block.ID, block.UploadedRev)
 }
 
+// nolint: funlen,gocyclo
 func (idx *Index) PutBlockList(xblocklist *XBlockListIn) ([]string, error) {
 	idx.Lock()
 	defer idx.Unlock()
@@ -197,6 +204,7 @@ func (idx *Index) PutBlockList(xblocklist *XBlockListIn) ([]string, error) {
 			}
 		}
 	}
+
 	return garbage, nil
 }
 
@@ -222,7 +230,7 @@ func (idx *Index) GetBlockList(ltype string) *XBlockListOut {
 			}
 		}
 		sort.Slice(bl.UncommittedBlocks.Blocks, func(i, j int) bool {
-			return bl.UncommittedBlocks.Blocks[i].Name < bl.UncommittedBlocks.Blocks[i].Name
+			return bl.UncommittedBlocks.Blocks[i].Name < bl.UncommittedBlocks.Blocks[j].Name
 		})
 	}
 	return &bl
@@ -279,11 +287,20 @@ func (idx *Index) GetSections(rangeMin, rangeMax uint64) []Section {
 		if rangeMax < (block.Offset + block.CommittedSize - 1) {
 			limit = rangeMax - block.Offset + 1
 		}
+		limit -= offset
 		sections = append(sections, Section{
-			Path:   fmt.Sprintf("%s.%d", block.ID, block.CommittedRev),
-			Offset: offset,
-			Limit:  limit,
+			Path:      fmt.Sprintf("%s.%d", block.ID, block.CommittedRev),
+			Offset:    offset,
+			Limit:     limit,
+			BlockSize: block.CommittedSize,
 		})
 	}
 	return sections
+}
+
+// nolint: unused
+func (idx *Index) debugBlocks() {
+	for i, b := range idx.ocache {
+		tracelog.DebugLogger.Printf("BLK %05d %s\t %020d %08d", i, b.ID, b.Offset, b.CommittedSize)
+	}
 }

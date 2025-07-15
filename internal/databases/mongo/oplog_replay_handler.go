@@ -2,34 +2,20 @@ package mongo
 
 import (
 	"context"
-	"sync"
 
+	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
-	"github.com/wal-g/wal-g/utility"
 )
 
-// HandleOplogReplay starts oplog replay process: download from storage and apply to mongodb
-func HandleOplogReplay(ctx context.Context, since, until models.Timestamp, fetcher stages.BetweenFetcher, applier stages.Applier) error {
-	ctx, cancel := context.WithCancel(ctx)
-	wg := &sync.WaitGroup{}
-	defer func() {
-		cancel()
-		wg.Wait()
-	}()
+func HandleOplogReplay(ctx context.Context,
+	since,
+	until models.Timestamp,
+	fetcher stages.BetweenFetcher,
+	applier stages.Applier) error {
+	return binary.HandleOplogReplay(ctx, since, until, fetcher, applier)
+}
 
-	var errs []<-chan error
-	oplogc, errc, err := fetcher.FetchBetween(ctx, since, until, wg)
-	if err != nil {
-		return err
-	}
-	errs = append(errs, errc)
-
-	errc, err = applier.Apply(ctx, oplogc, wg)
-	if err != nil {
-		return err
-	}
-	errs = append(errs, errc)
-
-	return utility.WaitFirstError(errs...)
+func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs binary.ReplyOplogConfig) error {
+	return binary.RunOplogReplay(ctx, mongodbURL, replayArgs)
 }

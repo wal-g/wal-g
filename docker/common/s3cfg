@@ -1,0 +1,8 @@
+[default]
+access_key = AKIAIOSFODNN7EXAMPLE
+secret_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+bucket_location = http://s3:9000
+host_base = s3:9000
+host_bucket = s3:9000
+use_https = False
+signature_v2 = True

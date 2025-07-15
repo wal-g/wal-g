@@ -1,0 +1,6 @@
+"WALG_SSH_PREFIX": "ssh://wal-g_ssh/backups",
+"SSH_USERNAME": "root",
+"SSH_PORT": "6942",
+"SSH_PRIVATE_KEY_PATH": "/tmp/SSH_KEY",
+"WALG_DELTA_MAX_STEPS": "6",
+"WALG_PGP_KEY_PATH": "/tmp/PGP_KEY"

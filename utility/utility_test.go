@@ -2,7 +2,8 @@ package utility_test
 
 import (
 	"bytes"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"sort"
@@ -91,7 +92,7 @@ func TestCreateFileWith(t *testing.T) {
 	content := "content"
 	err := ioextensions.CreateFileWith(CreateFileWithPath, strings.NewReader(content))
 	assert.NoError(t, err)
-	actualContent, err := ioutil.ReadFile(CreateFileWithPath)
+	actualContent, err := os.ReadFile(CreateFileWithPath)
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(content), actualContent)
 	os.Remove(CreateFileWithPath)
@@ -106,7 +107,7 @@ func TestCreateFileWith_ExistenceError(t *testing.T) {
 	os.Remove(CreateFileWithPath)
 }
 
-func TestStripBackupName(t *testing.T) {
+func TestStripRightmostBackupName(t *testing.T) {
 	var testCases = []struct {
 		input    string
 		expected string
@@ -120,7 +121,7 @@ func TestStripBackupName(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		actual := utility.StripBackupName(testCase.input)
+		actual := utility.StripRightmostBackupName(testCase.input)
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
@@ -141,6 +142,29 @@ func TestStripPrefixName(t *testing.T) {
 
 	for _, testCase := range testCases {
 		actual := utility.StripPrefixName(testCase.input)
+		assert.Equal(t, testCase.expected, actual)
+	}
+}
+
+func TestStripLeftmostBackupName(t *testing.T) {
+	var testCases = []struct {
+		input    string
+		expected string
+	}{
+		{"stream_20210329T125616Z/metadata.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/metadata.json", "stream_20210329T125616Z"},
+		{"stream_20210329T125616Z_backup_stop_sentinel.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z_backup_stop_sentinel.json", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/random_folder/random_subfolder/random_file", "stream_20210329T125616Z"},
+		{"/stream_20210329T125616Z/random_folder/random_subfolder/random_file", "stream_20210329T125616Z"},
+		{"base_0000000100000000000000C4/tar_partitions/part_001.tar.lz4", "base_0000000100000000000000C4"},
+		{"base_0000000100000000000000C4_backup_stop_sentinel.json", "base_0000000100000000000000C4"},
+		{"base_0000000100000000000000C9_D_0000000100000000000000C4", "base_0000000100000000000000C9_D_0000000100000000000000C4"},
+		{"/stream_20210329T125616Z/random_folder/random_backup/random_file", "stream_20210329T125616Z"},
+	}
+
+	for _, testCase := range testCases {
+		actual := utility.StripLeftmostBackupName(testCase.input)
 		assert.Equal(t, testCase.expected, actual)
 	}
 }
@@ -392,6 +416,52 @@ func TestStripWalFileName_ValidLsn(t *testing.T) {
 	assert.Equal(t, path, result)
 }
 
+func TestLsnRegex(t *testing.T) {
+	lsns := []string{RandomLsn(), RandomLsn()}
+	tests := []struct {
+		name        string
+		lsn         string
+		expected    []string
+		expectedLen int
+	}{
+		{
+			name:     "LsnRegex_ReturnLsnFromString",
+			lsn:      lsns[0],
+			expected: []string{lsns[0]},
+		},
+		{
+			name:     "LsnRegex_ReturnLsnFromStringWithAnotherText",
+			lsn:      fmt.Sprintf("some text %s or 43567", lsns[0]),
+			expected: []string{lsns[0]},
+		},
+		{
+			name:     "LsnRegex_ReturnEmptyArrayWhenLsnIsIncorrect",
+			lsn:      GetRandomizedHexString(23),
+			expected: nil,
+		},
+		{
+			name:     "LsnRegex_ReturnLsnWhenItIsAllF",
+			lsn:      strings.Repeat("F", 24),
+			expected: []string{strings.Repeat("F", 24)},
+		},
+		{
+			name:     "LsnRegex_ReturnAllLsnWhenHasSeparator",
+			lsn:      strings.Join(lsns[:], "-"),
+			expected: lsns,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			result := utility.RegexpLSN.FindAllString(tt.lsn, -1)
+
+			assert.Equalf(t, len(tt.expected), len(result), "Expected different array length")
+			assert.Equalf(t, tt.expected, result, "Expected different result")
+		})
+	}
+}
+
 func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 	var paths = [3]string{RandomLsn(), RandomLsn(), RandomLsn()}
 	var path = strings.Join(paths[:], "-")
@@ -402,10 +472,13 @@ func TestStripWalFileName_ReturnFirstLsn(t *testing.T) {
 }
 
 func RandomLsn() string {
-	var letter = []rune("ABCDEF0123456789")
 	const LSNLength = 24
+	return GetRandomizedHexString(LSNLength)
+}
 
-	b := make([]rune, LSNLength)
+func GetRandomizedHexString(length int) string {
+	var letter = []rune("ABCDEF0123456789")
+	b := make([]rune, length)
 	for i := range b {
 		b[i] = letter[rand.Intn(len(letter))]
 	}
@@ -420,7 +493,7 @@ func TestLoggedCloseWithoutError(t *testing.T) {
 
 	utility.LoggedClose(&testtools.NopCloser{}, "")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from pipe: %v", err)
 	}
@@ -441,7 +514,7 @@ func TestLoggedCloseWithErrorAndDefaultMessage(t *testing.T) {
 
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from buffer: %v", err)
 	}
@@ -462,7 +535,7 @@ func TestLoggedCloseWithErrorAndCustomMessage(t *testing.T) {
 
 	utility.LoggedClose(&testtools.ErrorWriteCloser{}, "custom error message")
 
-	loggedData, err := ioutil.ReadAll(&buf)
+	loggedData, err := io.ReadAll(&buf)
 	if err != nil {
 		t.Logf("failed read from buffer: %v", err)
 	}

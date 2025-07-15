@@ -1,10 +1,10 @@
 package walparser
 
 const (
-	XlrMaxBlockId       = 32
-	XlrBlockIdDataShort = 255
-	XlrBlockIdDataLong  = 254
-	XlrBlockIdOrigin    = 253
+	XlrMaxBlockID       = 32
+	XlrBlockIDDataShort = 255
+	XlrBlockIDDataLong  = 254
+	XlrBlockIDOrigin    = 253
 
 	BkpBlockForkMask uint8 = 0x0F
 	BkpBlockFlagMask uint8 = 0xF0
@@ -15,15 +15,15 @@ const (
 )
 
 type XLogRecordBlockHeader struct {
-	BlockId       uint8
+	BlockID       uint8
 	ForkFlags     uint8
 	DataLength    uint16
 	ImageHeader   XLogRecordBlockImageHeader
 	BlockLocation BlockLocation
 }
 
-func NewXLogRecordBlockHeader(blockId uint8) *XLogRecordBlockHeader {
-	return &XLogRecordBlockHeader{BlockId: blockId}
+func NewXLogRecordBlockHeader(blockID uint8) *XLogRecordBlockHeader {
+	return &XLogRecordBlockHeader{BlockID: blockID}
 }
 
 func (blockHeader *XLogRecordBlockHeader) ForkNum() uint8 {

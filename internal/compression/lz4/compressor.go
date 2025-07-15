@@ -3,7 +3,9 @@ package lz4
 import (
 	"io"
 
-	"github.com/pierrec/lz4"
+	"github.com/wal-g/wal-g/internal/ioextensions"
+
+	"github.com/pierrec/lz4/v4"
 )
 
 const (
@@ -13,7 +15,7 @@ const (
 
 type Compressor struct{}
 
-func (compressor Compressor) NewWriter(writer io.Writer) io.WriteCloser {
+func (compressor Compressor) NewWriter(writer io.Writer) ioextensions.WriteFlushCloser {
 	return lz4.NewWriter(writer)
 }
 

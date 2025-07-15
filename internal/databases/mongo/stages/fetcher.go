@@ -5,14 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 
-	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -44,12 +43,12 @@ func (sgh *StorageGapHandler) HandleGap(from, until models.Timestamp, gapErr err
 // Fetcher defines interface to fetch oplog records.
 // TODO: FIX INTERFACE METHOD NAME AND SIGNATURE
 type Fetcher interface {
-	Fetch(context.Context, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
+	Fetch(context.Context) (chan *models.Oplog, chan error, error)
 }
 
 // BetweenFetcher defines interface to fetch oplog records between given timestamps.
 type BetweenFetcher interface {
-	FetchBetween(context.Context, models.Timestamp, models.Timestamp, *sync.WaitGroup) (chan *models.Oplog, chan error, error)
+	FetchBetween(context.Context, models.Timestamp, models.Timestamp) (chan *models.Oplog, chan error, error)
 }
 
 // CursorMajFetcher implements Fetcher interface for mongodb
@@ -60,20 +59,19 @@ type CursorMajFetcher struct {
 }
 
 // NewCursorMajFetcher builds CursorMajFetcher with given args.
-func NewCursorMajFetcher(m client.MongoDriver, cur client.OplogCursor, lwUpdateInterval time.Duration) *CursorMajFetcher {
+func NewCursorMajFetcher(m client.MongoDriver,
+	cur client.OplogCursor,
+	lwUpdateInterval time.Duration) *CursorMajFetcher {
 	return &CursorMajFetcher{m, cur, lwUpdateInterval}
 }
 
 // Fetch returns channel of oplog records, channel is filled in background.
-// TODO: handle disconnects && stepdown
 // TODO: use sessions
 // TODO: use context.WithTimeout
-func (dbf *CursorMajFetcher) Fetch(ctx context.Context, wg *sync.WaitGroup) (oplogc chan *models.Oplog, errc chan error, err error) {
+func (dbf *CursorMajFetcher) Fetch(ctx context.Context) (oplogc chan *models.Oplog, errc chan error, err error) {
 	oplogc = make(chan *models.Oplog)
 	errc = make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		defer close(errc)
 		defer close(oplogc)
 
@@ -152,18 +150,18 @@ func NewStorageFetcher(downloader archive.Downloader, path archive.Sequence) *St
 }
 
 // FetchBetween returns channel of oplog records, channel is filled in background.
-func (sf *StorageFetcher) FetchBetween(ctx context.Context, from, until models.Timestamp, wg *sync.WaitGroup) (oplogc chan *models.Oplog, errc chan error, err error) {
+func (sf *StorageFetcher) FetchBetween(ctx context.Context,
+	from,
+	until models.Timestamp) (oplogc chan *models.Oplog, errc chan error, err error) {
 	if models.LessTS(until, from) {
 		return nil, nil, fmt.Errorf("fromTS '%s' must be less than untilTS '%s'", from, until)
 	}
 
 	data := make(chan *models.Oplog)
 	errc = make(chan error)
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		defer close(data)
 		defer close(errc)
+		defer close(data)
 
 		buf := NewCloserBuffer() // TODO: switch to streaming interface
 		path := sf.path
@@ -180,7 +178,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context, from, until models.T
 
 			for {
 				// TODO: benchmark & compare with bson_stream
-				raw, err := bson.NewFromIOReader(buf)
+				raw, err := bson.ReadDocument(buf)
 				if err != nil {
 					if err == io.EOF {
 						break
@@ -195,7 +193,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context, from, until models.T
 				}
 
 				if !firstFound {
-					if op.TS != from { // from ts is not reached, continue
+					if models.LessTS(op.TS, from) {
 						continue
 					}
 					firstFound = true
@@ -216,10 +214,6 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context, from, until models.T
 				}
 			}
 			buf.Reset()
-			if !firstFound { // TODO: do we need this check, add skip flag
-				errc <- fmt.Errorf("'from' timestamp '%s' was not found in first archive: %s", from, arch.Filename())
-				return
-			}
 		}
 		errc <- fmt.Errorf("restore sequence was fetched, but restore point '%s' is not reached",
 			until)

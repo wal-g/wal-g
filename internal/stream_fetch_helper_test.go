@@ -1,14 +1,17 @@
 package internal
 
 import (
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 const (
-	endTSEnvVar = "someTSEnvVar"
+	endTSEnvVar                 = "someTSEnvVar"
+	operationLogsDstEnvVariable = "someOperationLogsDstEnv"
 )
 
 func TestParseTs_shouldParseRFC3339(t *testing.T) {
@@ -18,6 +21,7 @@ func TestParseTs_shouldParseRFC3339(t *testing.T) {
 	viper.Set(endTSEnvVar, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, &currentTime, parsedTime)
+	resetToDefaults()
 }
 
 func TestParseTs_shouldFailOnWrongFormat(t *testing.T) {
@@ -27,6 +31,7 @@ func TestParseTs_shouldFailOnWrongFormat(t *testing.T) {
 	viper.Set(endTSEnvVar, nil)
 	assert.Error(t, err)
 	assert.Nil(t, parsedTime)
+	resetToDefaults()
 }
 
 func TestParseTs_shouldFailOnBadTimeString(t *testing.T) {
@@ -35,10 +40,35 @@ func TestParseTs_shouldFailOnBadTimeString(t *testing.T) {
 	viper.Set(endTSEnvVar, nil)
 	assert.Error(t, err)
 	assert.Nil(t, parsedTime)
+	resetToDefaults()
 }
 
 func TestParseTs_shouldReturnNilOnNoTime(t *testing.T) {
 	parsedTime, err := ParseTS(endTSEnvVar)
 	assert.NoError(t, err)
 	assert.Nil(t, parsedTime)
+	resetToDefaults()
+}
+
+func TestGetLogsDstSettings_simpleCase(t *testing.T) {
+	directoryMock := "some_kek_dir"
+	viper.Set(operationLogsDstEnvVariable, directoryMock)
+	parsedDirectory, err := GetLogsDstSettings(operationLogsDstEnvVariable)
+	assert.NoError(t, err)
+	assert.Equal(t, directoryMock, parsedDirectory)
+	resetToDefaults()
+}
+
+func TestGetLogsDstSettings_shouldReturnNilOnNoDirectory(t *testing.T) {
+	parsedDirectory, err := GetLogsDstSettings(operationLogsDstEnvVariable)
+	assert.Error(t, err)
+	assert.Equal(t, "", parsedDirectory)
+	resetToDefaults()
+}
+
+func resetToDefaults() {
+	viper.Reset()
+	ConfigureSettings(conf.PG)
+	conf.InitConfig()
+	conf.Configure()
 }

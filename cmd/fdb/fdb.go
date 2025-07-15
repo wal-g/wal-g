@@ -2,42 +2,47 @@ package fdb
 
 import (
 	"fmt"
-	"github.com/wal-g/tracelog"
 	"os"
 	"strings"
 
+	"github.com/wal-g/wal-g/cmd/common"
+	conf "github.com/wal-g/wal-g/internal/config"
+
 	"github.com/spf13/cobra"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
-var DBShortDescription = "FoundationDB backup tool"
+var dbShortDescription = "FoundationDB backup tool"
 
 // These variables are here only to show current version. They are set in makefile during build process
-var WalgVersion = "devel"
-var GitRevision = "devel"
-var BuildDate = "devel"
+var walgVersion = "devel"
+var gitRevision = "devel"
+var buildDate = "devel"
 
-var Cmd = &cobra.Command{
+var cmd = &cobra.Command{
 	Use:     "wal-g",
-	Short:   DBShortDescription, // TODO : improve description
-	Version: strings.Join([]string{WalgVersion, GitRevision, BuildDate, "FoundationDB"}, "\t"),
+	Short:   dbShortDescription, // TODO : improve description
+	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "FoundationDB"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main().
 func Execute() {
-	if err := Cmd.Execute(); err != nil {
+	if err := cmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func init() {
-	cobra.OnInitialize(internal.InitConfig, internal.Configure)
+func GetCmd() *cobra.Command {
+	return cmd
+}
 
-	Cmd.PersistentFlags().StringVar(&internal.CfgFile, "config", "", "config file (default is $HOME/.wal-g.yaml)")
-	Cmd.InitDefaultVersionFlag()
-	internal.AddConfigFlags(Cmd)
+func init() {
+	common.Init(cmd, conf.FDB)
 }

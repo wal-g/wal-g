@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 )
@@ -72,7 +72,7 @@ func SplitEnvLine(line string) (string, string) {
 }
 
 func CopyDirectory(src, dest string, filter string) error {
-	entries, err := ioutil.ReadDir(src)
+	entries, err := os.ReadDir(src)
 	if err != nil {
 		return err
 	}
@@ -116,9 +116,10 @@ func CopyDirectory(src, dest string, filter string) error {
 			return err
 		}
 
-		isSymlink := entry.Mode()&os.ModeSymlink != 0
+		info, _ := entry.Info()
+		isSymlink := info.Mode()&os.ModeSymlink != 0
 		if !isSymlink {
-			if err := os.Chmod(destPath, entry.Mode()); err != nil {
+			if err := os.Chmod(destPath, info.Mode()); err != nil {
 				return err
 			}
 		}
@@ -173,10 +174,16 @@ func CopySymLink(source, dest string) error {
 	return os.Symlink(link, dest)
 }
 
-func GetMapValues(m map[string]string) []string {
-	values := make([]string, 0, len(m))
-	for _, v := range m {
-		values = append(values, v)
+func IsArraysEqual(arr1, arr2 []string) bool {
+	sort.Strings(arr1)
+	sort.Strings(arr2)
+	if len(arr1) != len(arr2) {
+		return false
 	}
-	return values
+	for i := range arr1 {
+		if arr1[i] != arr2[i] {
+			return false
+		}
+	}
+	return true
 }

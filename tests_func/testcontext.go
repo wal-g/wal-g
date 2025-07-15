@@ -4,22 +4,22 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/tests_func/config"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 	"github.com/wal-g/wal-g/tests_func/utils"
-
-	"github.com/DATA-DOG/godog"
-	"github.com/DATA-DOG/godog/gherkin"
-	"github.com/wal-g/tracelog"
 )
 
-var (
-	featureFiles = map[string]string{
-		"backup": "features/check_mongodb_backup.feature",
-		"pitr":   "features/check_mongodb_pitr.feature",
-	}
+const (
+	stagingDir = "staging"
+	envFile    = "env.file"
+
+	MAX_RETRIES_COUNT = 10
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {
@@ -61,7 +61,11 @@ func InfraFromTestContext(tctx *TestContext) *helpers.Infra {
 		tctx.Env["COMPOSE_FILE"],
 		tctx.Env,
 		tctx.Env["NETWORK_NAME"],
-		helpers.BaseImage{Path: tctx.Env["BACKUP_BASE_PATH"], Tag: tctx.Env["BACKUP_BASE_TAG"]})
+		helpers.BaseImage{
+			Path: tctx.Env["BACKUP_BASE_PATH"],
+			Tag:  tctx.Env["BACKUP_BASE_TAG"],
+		},
+	)
 }
 
 type AuxData struct {
@@ -70,42 +74,73 @@ type AuxData struct {
 	CreatedBackupNames []string
 	NometaBackupNames  []string
 	OplogPushEnabled   bool
-	PreviousBackupTime time.Time
 }
 
-type MongoVersion struct {
+type DBVersion struct {
 	Major string
 	Full  string
 }
 
 type TestContext struct {
-	Infra    *helpers.Infra
-	Env      map[string]string
-	Context  context.Context
-	AuxData  AuxData
-	Version  MongoVersion
-	Features []string
+	EnvFilePath        string
+	Infra              *helpers.Infra
+	Env                map[string]string
+	Context            context.Context
+	AuxData            AuxData
+	Version            DBVersion
+	PreviousBackupTime time.Time
 }
 
-func NewTestContext() (*TestContext, error) {
+func CreateTestContext(database string) (tctx *TestContext, err error) {
 	environ := utils.ParseEnvLines(os.Environ())
 
-	features := utils.GetMapValues(featureFiles)
-	requestedFeature := environ["MONGO_FEATURE"]
-	if requestedFeature != "" {
-		feature, ok := featureFiles[requestedFeature]
-		if !ok {
-			return nil, fmt.Errorf("requested feature is not found: %s", requestedFeature)
+	envFilePath := path.Join(stagingDir, envFile)
+
+	Env["ENV_FILE"] = envFilePath // set ENV_FILE for docker-compose
+	Env["DOCKER_FILE"] = "Dockerfile." + database
+	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
+	Env["WALG_S3_PREFIX"] = strings.ReplaceAll(Env["WALG_S3_PREFIX"], "DBNAME", database)
+	tracelog.DebugLogger.Printf("Database name %s\nEnv: %s\n", database, Env)
+
+	var env map[string]string
+
+	if !EnvExists(envFilePath) {
+		env, err = SetupNewEnv(Env, environ, envFilePath, stagingDir)
+		if err != nil {
+			return nil, err
 		}
-		features = []string{feature}
+
+		err = SetupStaging(env["IMAGES_DIR"], stagingDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return &TestContext{
-		Context: context.Background(),
-		Version: MongoVersion{
+	var version DBVersion
+	if database == "mongodb" {
+		version = DBVersion{
 			Major: environ["MONGO_MAJOR"],
-			Full:  environ["MONGO_VERSION"]},
-		Features: features}, nil
+			Full:  environ["MONGO_VERSION"],
+		}
+	} else if database == "redis" {
+		full := environ["REDIS_VERSION"]
+		parts := strings.Split(full, ".")
+		major := strings.Join(parts[:2], ".")
+		version = DBVersion{
+			Major: major,
+			Full:  full,
+		}
+	} else {
+		return nil, fmt.Errorf("database %s is not expected here", database)
+	}
+
+	tctx = &TestContext{
+		EnvFilePath: envFilePath,
+		Context:     context.Background(),
+		Version:     version,
+		Env:         env,
+	}
+	return tctx, tctx.LoadEnv()
 }
 
 func (tctx *TestContext) StopEnv() error {
@@ -113,78 +148,47 @@ func (tctx *TestContext) StopEnv() error {
 }
 
 func (tctx *TestContext) CleanEnv() error {
-	// TODO: Enable net cleanup
-	//if err := helpers.RemoveNet(TestContext); err != nil {
-	//	log.Fatalln(err)
-	//}
-
-	return os.RemoveAll(config.Env["STAGING_DIR"])
+	return os.RemoveAll(path.Dir(tctx.EnvFilePath))
 }
 
-func (tctx *TestContext) setupSuites(s *godog.Suite) {
-	s.BeforeFeature(func(feature *gherkin.Feature) {
-		tctx.AuxData.CreatedBackupNames = []string{}
-		tctx.AuxData.NometaBackupNames = []string{}
-		tctx.AuxData.OplogPushEnabled = false
-		tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
-		tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
-		tctx.AuxData.PreviousBackupTime = time.Unix(0, 0)
-		if err := tctx.Infra.RecreateContainers(); err != nil {
-			tracelog.ErrorLogger.Fatalln(err)
+func (tctx *TestContext) LoadEnv() (err error) {
+	if tctx.Env == nil {
+		tctx.Env, err = ReadEnv(tctx.EnvFilePath)
+		if err != nil {
+			return err
 		}
-	})
+	}
 
-	s.BeforeSuite(func() {
-		stagingPath := config.Env["STAGING_DIR"]
-		envFilePath := config.Env["ENV_FILE"]
-		newEnv := !EnvExists(envFilePath)
-		if newEnv {
-			err := SetupEnv(envFilePath, stagingPath)
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
+	// mix os.environ to our database params
+	tctx.Env = utils.MergeEnvs(tctx.Env, utils.ParseEnvLines(os.Environ()))
+	tctx.Infra = InfraFromTestContext(tctx)
+	return tctx.Infra.Setup()
+}
 
-		env, err := ReadEnv(envFilePath)
-		tracelog.ErrorLogger.FatalOnError(err)
-		tctx.Env = utils.MergeEnvs(utils.ParseEnvLines(os.Environ()), env)
-		tctx.Infra = InfraFromTestContext(tctx)
+func GetRedisCtlFromTestContext(tctx *TestContext, hostName string) (*helpers.RedisCtl, error) {
+	return GetRedisCtlFromTestContextTyped(tctx, hostName, "")
+}
 
-		if newEnv {
-			err := SetupStaging(tctx.Env["IMAGES_DIR"], tctx.Env["STAGING_DIR"])
-			tracelog.ErrorLogger.FatalOnError(err)
-		}
-
-		err = tctx.Infra.Setup()
-		tracelog.ErrorLogger.FatalOnError(err)
-
-	})
-
-	s.Step(`^a configured s3 on ([^\s]*)$`, tctx.configureS3)
-	s.Step(`^at least one oplog archive exists in storage$`, tctx.oplogArchiveIsNotEmpty)
-
-	s.Step(`^a working mongodb on ([^\s]*)$`, tctx.testMongoConnect)
-	s.Step(`^mongodb replset initialized on ([^\s]*)$`, tctx.initiateReplSet)
-	s.Step(`^mongodb role is primary on ([^\s]*)$`, tctx.isPrimary)
-	s.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.enableAuth)
-	s.Step(`^([^\s]*) has no data$`, tctx.purgeDataDir)
-
-	s.Step(`we save last oplog timestamp on ([^\s]*) to "([^"]*)"`, tctx.saveOplogTimestamp)
-	s.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
-	s.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
-	s.Step(`^we got same mongodb data at ([^\s]*) ([^\s]*)$`, tctx.testEqualMongodbDataAtHosts)
-	s.Step(`^we have same data in "([^"]*)" and "([^"]*)"$`, tctx.sameDataCheck)
-	s.Step(`^we save ([^\s]*) data "([^"]*)"$`, tctx.saveSnapshot)
-
-	s.Step(`^we create ([^\s]*) backup$`, tctx.createBackup)
-	s.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
-	s.Step(`^we put empty backup via ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
-	s.Step(`^we delete backups retain (\d+) via ([^\s]*)$`, tctx.purgeBackupRetain)
-	s.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
-	s.Step(`^we restore #(\d+) backup to ([^\s]*)$`, tctx.restoreBackupToMongodb)
-	s.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
-	//s.Step(`^we delete backups retain (\d+) after #(\d+) backup via ([^\s]*)$`, tctx.purgeBackupsAfterID)
-	//s.Step(`^we delete backups retain (\d+) after "([^"]*)" timestamp via ([^\s]*)$`, tctx.purgeBackupsAfterTime)
-	s.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
-	s.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
-
-	s.Step(`we sleep ([^\s]*)$`, tctx.sleep)
+func GetRedisCtlFromTestContextTyped(tctx *TestContext, hostName, configType string) (*helpers.RedisCtl, error) {
+	host := tctx.ContainerFQDN(hostName)
+	port, err := strconv.Atoi(tctx.Env["REDIS_EXPOSE_PORT"])
+	if err != nil {
+		return nil, err
+	}
+	confPath := tctx.Env["WALG_CONF_PATH"]
+	if configType != "" {
+		ext := filepath.Ext(confPath)
+		confPath = strings.Join([]string{strings.TrimSuffix(confPath, ext), configType, ext}, "")
+	}
+	return helpers.NewRedisCtl(
+		tctx.Context,
+		helpers.RedisCtlArgs{
+			BinPath:  tctx.Env["WALG_CLIENT_PATH"],
+			ConfPath: confPath,
+			Host:     host,
+			Port:     port,
+			Username: tctx.Env["REDIS_USERNAME"],
+			Password: tctx.Env["REDIS_PASSWORD"],
+		},
+	)
 }

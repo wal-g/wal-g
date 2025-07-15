@@ -1,0 +1,59 @@
+# vim:set ft=dockerfile:
+FROM walg-func-test-base as build
+
+ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
+ENV USE_BROTLI=1
+
+RUN mkdir -p ${WALG_REPO}
+COPY staging/wal-g ${WALG_REPO}/
+
+WORKDIR ${WALG_REPO}
+
+RUN make link_external_deps && \
+    make BUILD_ARGS=-race redis_build && \
+    cp main/redis/wal-g /usr/bin/wal-g
+
+###
+
+FROM ubuntu:focal
+
+COPY --from=build /usr/bin/wal-g /usr/bin/wal-g
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+ENV TMP_DIR=/var/tmp/wal-g
+ENV WALG_CONF_DIR=/etc/wal-g/
+
+ARG REDIS_VERSION
+
+ENV USER=redis
+ENV GROUP=redis
+ENV USERGROUP=$USER:$GROUP
+ENV HOME=/home/$USER
+
+RUN groupadd -r -g 999 $USER && useradd -r -g $GROUP -u 999 $USER && \
+    apt-get update -q && \
+    apt-get install --yes --no-install-recommends --no-install-suggests \
+    supervisor ca-certificates wget build-essential && \
+    rm -rf /var/lib/apt/lists/* /var/cache/debconf && \
+    apt-get clean && \
+    wget https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz && \
+    tar xzf "${REDIS_VERSION}.tar.gz" && \
+    cd "redis-${REDIS_VERSION}" && \
+    make install
+
+COPY staging/wal-g/redis_cli.sh /usr/bin/redis_cli.sh
+COPY images/base/config/supervisor /etc/supervisor
+COPY images/redis/config /config
+
+RUN mkdir -p /data && chown $USERGROUP /data && \
+    mkdir -p /var/log/wal-g/ ${TMP_DIR} && \
+    ln --force -s /config/supervisor/conf.d/redis.conf /etc/supervisor/conf.d/redis.conf && \
+    mkdir -p ${WALG_REPO} ${WALG_CONF_DIR} && \
+    mkdir -p $HOME/.gnupg && touch $HOME/.gnupg/gpg.conf && \
+    chmod -R 700 $HOME/.gnupg && chown $USERGROUP -R $HOME/.gnupg && \
+    ln --force -s /config/wal-g.json ${WALG_CONF_DIR}/wal-g.json && \
+    ln --force -s /config/wal-g-low-disk-usage.json ${WALG_CONF_DIR}/wal-g-low-disk-usage.json && \
+    ln --force -s /config/gpg-key.armor ${WALG_CONF_DIR}/gpg-key.armor
+
+CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]

@@ -3,9 +3,8 @@ package testtools
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 
-	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/fsutil"
 )
 
 type MockDataFolder map[string]*bytes.Buffer
@@ -39,15 +38,19 @@ func (folder *MockDataFolder) IsEmpty() bool {
 }
 
 func (folder *MockDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, error) {
-	if _, ok := (*folder)[filename]; ok {
-		return ioutil.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
-	} else {
-		return nil, internal.NewNoSuchFileError(filename)
+	_, ok := (*folder)[filename]
+	if ok {
+		return io.NopCloser(bytes.NewReader((*folder)[filename].Bytes())), nil
 	}
+	return nil, fsutil.NewNoSuchFileError(filename)
 }
 
 func (folder *MockDataFolder) OpenWriteOnlyFile(filename string) (io.WriteCloser, error) {
 	file := bytes.NewBuffer(nil)
 	(*folder)[filename] = file
 	return &ReadWriteNopCloser{file}, nil
+}
+
+func (folder *MockDataFolder) RenameFile(oldFilename string, newFilename string) error {
+	return nil
 }

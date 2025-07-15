@@ -6,14 +6,42 @@ import (
 	"io"
 	"strings"
 
+	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/txn"
+	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-
-	"github.com/mongodb/mongo-tools-common/db"
-	"github.com/mongodb/mongo-tools-common/txn"
-	"github.com/wal-g/tracelog"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
+
+type TypeAssertionError struct {
+	etype string
+	key   string
+	value interface{}
+}
+
+func NewTypeAssertionError(etype, key string, value interface{}) *TypeAssertionError {
+	return &TypeAssertionError{etype, key, value}
+}
+
+func (e *TypeAssertionError) Error() string {
+	return fmt.Sprintf("assertion to %s failed, field %s: %+v", e.etype, e.key, e.value)
+}
+
+type OpHandleError struct {
+	op  interface{}
+	err error
+}
+
+func NewOpHandleError(op interface{}, err error) *OpHandleError {
+	return &OpHandleError{op, err}
+}
+
+func (e *OpHandleError) Error() string {
+	return fmt.Sprintf("failed to apply with error: %+v\nop:\n%+v", e.err, e.op)
+}
 
 var (
 	jsonBegin     = []byte("[\n")
@@ -45,14 +73,15 @@ func NewWriteApplier(format string, wc io.WriteCloser) (Applier, error) {
 
 // DBApplier implements Applier interface for mongodb.
 type DBApplier struct {
-	db           client.MongoDriver
-	txnBuffer    *txn.Buffer
-	preserveUUID bool
+	db                    client.MongoDriver
+	txnBuffer             *txn.Buffer
+	preserveUUID          bool
+	applyIgnoreErrorCodes map[string][]int32
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(m client.MongoDriver, preserveUUID bool) *DBApplier {
-	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID}
+func NewDBApplier(m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32) *DBApplier {
+	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes}
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -61,7 +90,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
-	if err := ap.shouldSkip(op); err != nil {
+	if err := ap.shouldSkip(&op); err != nil {
 		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
 		return nil
 	}
@@ -72,13 +101,13 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	}
 
 	if meta.IsTxn() {
-		err = ap.handleTxnOp(ctx, meta, op)
+		err = ap.handleTxnOp(ctx, meta, &op)
 	} else {
-		err = ap.handleNonTxnOp(ctx, op)
+		err = ap.handleNonTxnOp(ctx, &op)
 	}
 
 	if err != nil {
-		return fmt.Errorf("can not handle op: %w", err)
+		return err
 	}
 
 	return nil
@@ -94,46 +123,243 @@ func (ap *DBApplier) Close(ctx context.Context) error {
 	return nil
 }
 
-func (ap *DBApplier) shouldSkip(op db.Oplog) error {
-	if op.Operation == "n" {
+func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
+	if oplog.Namespace == "n" {
 		return fmt.Errorf("noop op")
 	}
 
-	// sharded clusters are not supported yet
-	if strings.HasPrefix(op.Namespace, "config.") {
-		return fmt.Errorf("config database op")
+	if oplog.Operation == "c" && len(oplog.Object) > 0 {
+		if oplog.Object[0].Key == "startIndexBuild" ||
+			oplog.Object[0].Key == "abortIndexBuild" {
+			/* See
+			https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L183
+			for startIndexBuild
+			and
+			https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L202
+			for abortIndexBuild details
+			*/
+			return fmt.Errorf("%s operation is not supported in applyOps mode", oplog.Object[0].Key)
+		}
 	}
 
-	// temporary skip view creation due to mongodb bug
-	if strings.HasSuffix(op.Namespace, "system.views") {
-		return fmt.Errorf("view op")
+	if !isOpAllowedInconfigDB(oplog) {
+		return fmt.Errorf("config database op")
 	}
 
 	return nil
 }
 
-// handleNonTxnOp tries to apply given oplog record.
-func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op db.Oplog) error {
-	if !ap.preserveUUID {
-		var err error
-		op, err = filterUUIDs(op)
-		if err != nil {
-			return fmt.Errorf("error filtering UUIDs from oplog: %v", err)
+// shouldIgnore checks if error should be ignored
+func (ap *DBApplier) shouldIgnore(op string, err error) bool {
+	ce, ok := err.(mongo.CommandError)
+	if !ok {
+		return false
+	}
+
+	ignoreErrorCodes, ok := ap.applyIgnoreErrorCodes[op]
+	if !ok {
+		return false
+	}
+
+	for i := range ignoreErrorCodes {
+		if ce.Code == ignoreErrorCodes[i] {
+			return true
+		}
+	}
+	return false
+}
+
+var ConfigCollectionsToKeep = []string{
+	"chunks",
+	"collections",
+	"databases",
+	"settings",
+	"shards",
+	"tags",
+	"version",
+}
+
+var selectedNSSupportedCommands = map[string]struct{}{
+	"create":           {},
+	"drop":             {},
+	"createIndexes":    {},
+	"deleteIndex":      {},
+	"deleteIndexes":    {},
+	"dropIndex":        {},
+	"dropIndexes":      {},
+	"collMod":          {},
+	"commitIndexBuild": {},
+}
+
+func Index[S ~[]E, E comparable](s S, v E) int {
+	for i := range s {
+		if v == s[i] {
+			return i
+		}
+	}
+	return -1
+}
+
+func Contains[S ~[]E, E comparable](s S, v E) bool {
+	return Index(s, v) >= 0
+}
+
+func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
+	coll, ok := strings.CutPrefix(oplog.Namespace, "config.")
+	if !ok {
+		return true // OK: not a "config" database. allow any ops
+	}
+
+	if Contains(ConfigCollectionsToKeep, coll) {
+		return true // OK: create/update/delete a doc
+	}
+
+	if coll != "$cmd" || len(oplog.Object) == 0 {
+		return false // other collections are not allowed
+	}
+
+	if len(oplog.Object) > 0 {
+		op := oplog.Object[0].Key
+		if op == "applyOps" {
+			return true // internal ops of applyOps are checked one by one later
+		}
+		if _, ok := selectedNSSupportedCommands[op]; ok {
+			s, _ := oplog.Object[0].Value.(string)
+			return Contains(ConfigCollectionsToKeep, s)
 		}
 	}
 
-	return ap.db.ApplyOp(ctx, op)
+	return false
+}
+
+// handleNonTxnOp tries to apply given oplog record.
+//
+//nolint:gocyclo
+func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
+	if !ap.preserveUUID {
+		var err error
+		_, err = filterUUIDs(op)
+		if err != nil {
+			return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
+		}
+	}
+
+	// TODO: wait for index building
+	// TODO: if we wait for index building, we can stop ignoring a BackgroundOperation... error in DropIndexes
+	if op.Operation == "c" && len(op.Object) > 0 && op.Object[0].Key == "commitIndexBuild" {
+		collName, indexes, err := indexSpecFromCommitIndexBuilds(op)
+		if err != nil {
+			return NewOpHandleError(op, err)
+		}
+		dbName, _ := util.SplitNamespace(op.Namespace)
+		return ap.db.CreateIndexes(ctx, dbName, collName, indexes)
+	}
+	if op.Operation == "c" && len(op.Object) > 0 && op.Object[0].Key == "createIndexes" {
+		collName, indexes, err := indexSpecsFromCreateIndexes(op)
+		if err != nil {
+			return NewOpHandleError(*op, err)
+		}
+		dbName, _ := util.SplitNamespace(op.Namespace)
+		return ap.db.CreateIndexes(ctx, dbName, collName,
+			[]client.IndexDocument{indexes})
+	}
+	if op.Operation == "c" && len(op.Object) > 0 && op.Object[0].Key == "dropIndexes" {
+		dbName, _ := util.SplitNamespace(op.Namespace)
+		return ap.db.DropIndexes(ctx, dbName, op.Object)
+	}
+
+	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
+	if err := ap.db.ApplyOp(ctx, op); err != nil {
+		// we ignore some errors (for example 'duplicate key error')
+		// TODO: check after TOOLS-2041
+		if !ap.shouldIgnore(op.Operation, err) {
+			return NewOpHandleError(*op, err)
+		}
+		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)
+	}
+	return nil
+}
+
+func indexSpecsFromCreateIndexes(op *db.Oplog) (string, client.IndexDocument, error) {
+	index := client.IndexDocument{Options: bson.M{}}
+	var collName string
+	var elem bson.E
+	var ok bool
+	for i := range op.Object {
+		elem = op.Object[i]
+		switch elem.Key {
+		case "createIndexes":
+			if collName, ok = elem.Value.(string); !ok {
+				return "", client.IndexDocument{}, NewTypeAssertionError("string", "createIndexes", elem.Value)
+			}
+		case "key":
+			if index.Key, ok = elem.Value.(bson.D); !ok {
+				return "", client.IndexDocument{}, NewTypeAssertionError("bson.D", "key", elem.Value)
+			}
+		default:
+			index.Options[elem.Key] = elem.Value
+		}
+	}
+
+	return collName, index, nil
+}
+
+func indexSpecFromCommitIndexBuilds(op *db.Oplog) (string, []client.IndexDocument, error) {
+	var collName string
+	var ok bool
+	var elemE bson.E
+	for i := range op.Object {
+		elemE = op.Object[i]
+		if elemE.Key == "commitIndexBuild" {
+			if collName, ok = elemE.Value.(string); !ok {
+				return "", nil, NewTypeAssertionError("string", "commitIndexBuild", elemE.Value)
+			}
+		}
+	}
+
+	for i := range op.Object {
+		elemE = op.Object[i]
+		if elemE.Key == "indexes" {
+			indexes, ok := elemE.Value.(bson.A)
+			if !ok {
+				return "", nil, NewTypeAssertionError("bson.A", "indexes", elemE.Value)
+			}
+
+			indexSpecs := make([]client.IndexDocument, len(indexes))
+			for i := range indexes {
+				indexSpecs[i].Options = bson.M{}
+				elements, ok := indexes[i].(bson.D)
+				if !ok {
+					return "", nil, NewTypeAssertionError("bson.D", fmt.Sprintf("indexes[%d]", i), elemE.Value)
+				}
+
+				for j := range elements {
+					elemE = elements[j]
+					if elemE.Key == "key" {
+						if indexSpecs[i].Key, ok = elemE.Value.(bson.D); !ok {
+							return "", nil, NewTypeAssertionError("bson.D", "key", elemE.Value)
+						}
+					} else {
+						indexSpecs[i].Options[elemE.Key] = elemE.Value
+					}
+				}
+			}
+			return collName, indexSpecs, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("can not find indexes key in op.Object: %+v", op)
 }
 
 // handleTxnOp handles oplog record with transaction attributes.
 // TODO: unit test
-func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op db.Oplog) error {
+func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op *db.Oplog) error {
 	if meta.IsAbort() {
 		if err := ap.txnBuffer.PurgeTxn(meta); err != nil {
 			return fmt.Errorf("can not clean txn buffer after rollback cmd: %w", err)
 		}
 	}
-	if err := ap.txnBuffer.AddOp(meta, op); err != nil {
+	if err := ap.txnBuffer.AddOp(meta, *op); err != nil {
 		return fmt.Errorf("can not append command to txn buffer: %w", err)
 	}
 
@@ -160,7 +386,7 @@ func (ap *DBApplier) applyTxn(ctx context.Context, meta txn.Meta) error {
 			if !ok {
 				return nil
 			}
-			if err := ap.handleNonTxnOp(ctx, op); err != nil {
+			if err := ap.handleNonTxnOp(ctx, &op); err != nil {
 				return err
 			}
 		case err, ok := <-errc:

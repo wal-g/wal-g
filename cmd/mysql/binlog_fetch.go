@@ -6,28 +6,32 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const fetchSinceFlagShortDescr = "backup name starting from which you want to fetch binlogs"
 const fetchUntilFlagShortDescr = "time in RFC3339 for PITR"
+const fetchUntilBinlogLastModifiedFlagShortDescr = "time in RFC3339 that is used to prevent wal-g from replaying" +
+	" binlogs that was created/modified after this time"
 
 var fetchBackupName string
-var fetchUntilDt string
+var fetchUntilTS string
+var fetchUntilBinlogLastModifiedTS string
 
 // binlogPushCmd represents the cron command
 var binlogFetchCmd = &cobra.Command{
 	Use:   "binlog-fetch",
-	Short: "fetches binlog from storage and save to the disk",
+	Short: "Fetch binlog from storage and save it to the disk",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, err := internal.ConfigureFolder()
+		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogFetch(folder, fetchBackupName, fetchUntilDt)
+		mysql.HandleBinlogFetch(storage.RootFolder(), fetchBackupName, fetchUntilTS, fetchUntilBinlogLastModifiedTS)
 	},
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		internal.RequiredSettings[internal.MysqlBinlogReplayCmd] = true
-		internal.RequiredSettings[internal.MysqlBinlogDstSetting] = true
+	PreRun: func(cmd *cobra.Command, args []string) {
+		conf.RequiredSettings[conf.MysqlBinlogDstSetting] = true
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -35,6 +39,13 @@ var binlogFetchCmd = &cobra.Command{
 
 func init() {
 	binlogFetchCmd.PersistentFlags().StringVar(&fetchBackupName, "since", "LATEST", fetchSinceFlagShortDescr)
-	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilDt, "until", time.Now().Format(time.RFC3339), fetchUntilFlagShortDescr)
-	Cmd.AddCommand(binlogFetchCmd)
+	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilTS,
+		"until",
+		utility.TimeNowCrossPlatformUTC().Format(time.RFC3339),
+		fetchUntilFlagShortDescr)
+	binlogFetchCmd.PersistentFlags().StringVar(&fetchUntilBinlogLastModifiedTS,
+		"until-binlog-last-modified-time",
+		"",
+		fetchUntilBinlogLastModifiedFlagShortDescr)
+	cmd.AddCommand(binlogFetchCmd)
 }

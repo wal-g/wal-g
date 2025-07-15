@@ -85,13 +85,11 @@ func (reader *Reader) Read(p []byte) (n int, err error) {
 	return
 }
 
-func (reader *Reader) readNextChunk() (err error) {
+func (reader *Reader) readNextChunk() error {
 	n, err := io.ReadFull(reader.Reader, reader.in)
 
-	reader.in = reader.in[:n]
-
 	if err != nil && err != io.ErrUnexpectedEOF {
-		return
+		return err
 	}
 
 	var outLen C.ulonglong
@@ -100,8 +98,8 @@ func (reader *Reader) readNextChunk() (err error) {
 	returnCode := C.crypto_secretstream_xchacha20poly1305_pull(
 		&reader.state,
 		(*C.uchar)(&reader.out[0]),
-		(*C.ulonglong)(&outLen),
-		(*C.uchar)(&tag),
+		&outLen,
+		&tag,
 		(*C.uchar)(&reader.in[0]),
 		(C.ulonglong)(n),
 		(*C.uchar)(C.NULL),
@@ -123,5 +121,5 @@ func (reader *Reader) readNextChunk() (err error) {
 	reader.outIdx = 0
 	reader.outLen = int(outLen)
 
-	return
+	return err
 }
