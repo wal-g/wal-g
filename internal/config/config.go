@@ -228,6 +228,10 @@ const (
 
 	GoogleApplicationCredentials = "GOOGLE_APPLICATION_CREDENTIALS"
 
+	AlicloudAccessKeyID     = "OSS_ACCESS_KEY_ID"
+	AlicloudAccessKeySecret = "OSS_ACCESS_KEY_SECRET"
+	AlicloudSecurityToken   = "OSS_SESSION_TOKEN"
+
 	SwiftOsAuthURL    = "OS_AUTH_URL"
 	SwiftOsUsername   = "OS_USERNAME"
 	SwiftOsPassword   = "OS_PASSWORD"
@@ -457,6 +461,12 @@ var (
 		// GS
 		"WALG_GS_PREFIX":             true,
 		GoogleApplicationCredentials: true,
+
+		// Alicloud
+		"WALG_OSS_PREFIX":       true,
+		AlicloudAccessKeyID:     true,
+		AlicloudAccessKeySecret: true,
+		AlicloudSecurityToken:   true,
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
