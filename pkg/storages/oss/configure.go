@@ -14,28 +14,33 @@ const (
 	accessKeyIDSetting     = "OSS_ACCESS_KEY_ID"
 	accessKeySecretSetting = "OSS_ACCESS_KEY_SECRET"
 	securityTokenSetting   = "OSS_SESSION_TOKEN"
+	endpointSetting        = "OSS_ENDPOINT"
 	regionSetting          = "OSS_REGION"
 	roleARNSetting         = "OSS_ROLE_ARN"
 	roleSessionNameSetting = "OSS_ROLE_SESSION_NAME"
 	skipValidationSetting  = "OSS_SKIP_VALIDATION"
 	maxRetriesSetting      = "OSS_MAX_RETRIES"
+	connectTimeoutSetting  = "OSS_CONNECT_TIMEOUT"
 )
 
 var SettingList = []string{
 	accessKeyIDSetting,
 	accessKeySecretSetting,
 	securityTokenSetting,
+	endpointSetting,
 	regionSetting,
 	roleARNSetting,
 	roleSessionNameSetting,
 	skipValidationSetting,
 	maxRetriesSetting,
+	connectTimeoutSetting,
 }
 
 const (
-	defaultSkipValidation = false
-	defaultMaxRetries     = 5
-	defaultLogLevel       = "info"
+	defaultSkipValidation        = false
+	defaultMaxRetries            = 5
+	defaultLogLevel              = "info"
+	defaultConnectTimeoutSeconds = 5
 )
 
 func ConfigureStorage(
@@ -58,17 +63,24 @@ func ConfigureStorage(
 		return nil, err
 	}
 
+	connectTimeout, err := setting.Int64Optional(settings, connectTimeoutSetting, defaultConnectTimeoutSeconds)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &Config{
 		AccessKeyID:     strings.TrimSpace(settings[accessKeyIDSetting]),
 		AccessKeySecret: strings.TrimSpace(settings[accessKeySecretSetting]),
 		SecurityToken:   strings.TrimSpace(settings[securityTokenSetting]),
 		RoleARN:         strings.TrimSpace(settings[roleARNSetting]),
 		RoleSessionName: strings.TrimSpace(settings[roleSessionNameSetting]),
+		Endpoint:        strings.TrimSpace(settings[endpointSetting]),
 		Bucket:          bucket,
 		RootPath:        rootPath,
 		SkipValidation:  skipValidation,
 		MaxRetries:      maxRetries,
 		Region:          settings[regionSetting],
+		ConnectTimeout:  connectTimeout,
 	}
 
 	st, err := NewStorage(config, rootWraps...)
