@@ -218,25 +218,25 @@ func (f *Folder) Validate() error {
 	return nil
 }
 
-func (folder *Folder) isVersioningEnabled() bool {
-	switch folder.config.EnableVersioning {
+func (f *Folder) isVersioningEnabled() bool {
+	switch f.config.EnableVersioning {
 	case VersioningEnabled:
 		return true
 	case VersioningDisabled:
 		return false
 	case VersioningDefault:
-		result, err := folder.ossAPI.GetBucketVersioning(context.Background(), &oss.GetBucketVersioningRequest{
-			Bucket: oss.Ptr(folder.bucket),
+		result, err := f.ossAPI.GetBucketVersioning(context.Background(), &oss.GetBucketVersioningRequest{
+			Bucket: oss.Ptr(f.bucket),
 		})
 		if err != nil {
 			return false
 		}
 
 		if result.VersionStatus != nil && *result.VersionStatus == "Enabled" {
-			folder.config.EnableVersioning = VersioningEnabled
+			f.config.EnableVersioning = VersioningEnabled
 			return true
 		}
-		folder.config.EnableVersioning = VersioningDisabled
+		f.config.EnableVersioning = VersioningDisabled
 	}
 	return false
 }

@@ -14,7 +14,7 @@ type Storage struct {
 }
 
 type Config struct {
-	AccessKeyId      string
+	AccessKeyID      string
 	AccessKeySecret  string
 	SecurityToken    string
 	Region           string

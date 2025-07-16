@@ -6,11 +6,11 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/azure"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/gcs"
+	"github.com/wal-g/wal-g/pkg/storages/oss"
 	"github.com/wal-g/wal-g/pkg/storages/s3"
 	"github.com/wal-g/wal-g/pkg/storages/sh"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/swift"
-	"github.com/wal-g/wal-g/pkg/storages/oss"
 )
 
 type StorageAdapter struct {
