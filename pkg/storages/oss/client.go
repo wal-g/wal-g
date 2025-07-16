@@ -18,19 +18,19 @@ func newCred(config *Config) (*cred, error) {
 	var credentialsProvider providers.CredentialsProvider
 	var err error
 
-	if config.AccessKeyId == "" || config.AccessKeySecret == "" {
+	if config.AccessKeyID == "" || config.AccessKeySecret == "" {
 		return nil, fmt.Errorf("access key ID and secret are required")
 	}
 
 	if config.SecurityToken != "" {
 		credentialsProvider, err = providers.NewStaticSTSCredentialsProviderBuilder().
-			WithAccessKeyId(config.AccessKeyId).
+			WithAccessKeyId(config.AccessKeyID).
 			WithAccessKeySecret(config.AccessKeySecret).
 			WithSecurityToken(config.SecurityToken).
 			Build()
 	} else {
 		credentialsProvider, err = providers.NewStaticAKCredentialsProviderBuilder().
-			WithAccessKeyId(config.AccessKeyId).
+			WithAccessKeyId(config.AccessKeyID).
 			WithAccessKeySecret(config.AccessKeySecret).
 			Build()
 	}

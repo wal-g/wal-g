@@ -59,7 +59,7 @@ func ConfigureStorage(
 	}
 
 	config := &Config{
-		AccessKeyId:     strings.TrimSpace(settings[accessKeyIDSetting]),
+		AccessKeyID:     strings.TrimSpace(settings[accessKeyIDSetting]),
 		AccessKeySecret: strings.TrimSpace(settings[accessKeySecretSetting]),
 		SecurityToken:   strings.TrimSpace(settings[securityTokenSetting]),
 		RoleARN:         strings.TrimSpace(settings[roleARNSetting]),
