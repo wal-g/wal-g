@@ -180,6 +180,10 @@ Set the RAM role ARN for the OSS bucket. This role must have permissions to acce
 
 Whether to skip OSS client validation during initialization. Default is set to `false`, which means it will validate the client by making list request to OSS.
 
+* `OSS_ENDPOINT`
+
+Set the endpoint for the OSS bucket. For instance, if you want to connect to internal OSS endpoint, you may specify `https://oss-ap-southeast-5-internal.aliyuncs.com`.
+
 Swift
 -----------
 To store backups in Swift object storage, WAL-G requires that this variable be set:

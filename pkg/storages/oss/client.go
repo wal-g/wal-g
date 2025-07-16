@@ -3,6 +3,7 @@ package oss
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 	osscred "github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss/credentials"
@@ -90,7 +91,12 @@ func configureClient(config *Config) (*oss.Client, error) {
 		WithRetryMaxAttempts(config.MaxRetries).
 		WithRetryer(retry.NewStandard(func(ro *retry.RetryOptions) {
 			ro.MaxAttempts = config.MaxRetries
-		}))
+		})).
+		WithConnectTimeout(time.Duration(config.ConnectTimeout) * time.Second)
+
+	if config.Endpoint != "" {
+		ossConfig = ossConfig.WithEndpoint(config.Endpoint)
+	}
 
 	return oss.NewClient(ossConfig), nil
 }

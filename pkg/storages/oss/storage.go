@@ -19,12 +19,14 @@ type Config struct {
 	SecurityToken    string
 	Region           string
 	Bucket           string
+	Endpoint         string
 	RootPath         string
 	RoleARN          string
 	RoleSessionName  string
 	SkipValidation   bool
 	MaxRetries       int
 	EnableVersioning string
+	ConnectTimeout   int64
 }
 
 func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
