@@ -137,12 +137,12 @@ func (localStorage *LocalStorage) CleanUpExcessFilesOnPartiallyBackup(filter map
 		if err != nil {
 			return err
 		}
-		if _, ok := filter[fmt.Sprintf("/%s", rel)]; !ok && !info.IsDir() {
+		if _, ok := filter["/"+rel]; !ok && !info.IsDir() {
 			abs, err := filepath.Abs(path)
 			if err != nil {
 				return errors.Wrapf(err, "get abs path to '%s'", path)
 			}
-			err = os.RemoveAll(abs)
+			err = os.Remove(abs)
 			if err != nil {
 				return errors.Wrapf(err, "unable to remove '%s'", abs)
 			}

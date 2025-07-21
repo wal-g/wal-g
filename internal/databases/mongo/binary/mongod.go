@@ -22,6 +22,7 @@ import (
 )
 
 const adminDB = "admin"
+const localDB = "local"
 const LatestBackupString = "LATEST_BACKUP"
 
 const cursorCreateRetries = 10
@@ -159,7 +160,7 @@ func (mongodService *MongodService) GetBackupCursorExtended(backupCursorMeta *Ba
 
 func (mongodService *MongodService) FixReplset(rsConfig RsConfig) error {
 	ctx := mongodService.Context
-	localDatabase := mongodService.MongoClient.Database("local")
+	localDatabase := mongodService.MongoClient.Database(localDB)
 
 	if err := replaceData(ctx, localDatabase.Collection("replset.election"), true, nil); err != nil {
 		return errors.Wrap(err, "unable to fix data in local.replset.election")
@@ -522,6 +523,9 @@ type RestoreArgs struct {
 	SkipBackupDownload bool
 	SkipChecks         bool
 	SkipMongoReconfig  bool
+
+	Whitelist []string
+	Blacklist []string
 }
 
 type RsConfig struct {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"strings"
 )
 
@@ -23,6 +24,8 @@ type BackupRoutesInfo struct {
 	Databases map[string]DBInfo `json:"databases"`
 	Service   map[string]string `json:"service"`
 }
+
+type PathMapFilter map[string]map[string]struct{}
 
 func getFromTarFilesSetAndDeleteKey(key string, tarFilesSet map[string]map[string]struct{}) (string, bool) {
 	for tarFile, tarFileSet := range tarFilesSet {
@@ -78,90 +81,92 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 	return nil
 }
 
-func PartialWhitelistPathsMap(paths []string) map[string][]string {
-	res := make(map[string][]string)
-
-	for _, path := range paths {
-		if !strings.Contains(path, ".") {
-			res[path] = []string{}
-		} else {
-			splitted := strings.SplitN(path, ".", 2)
-			db, col := splitted[0], splitted[1]
-
-			if _, ok := res[db]; !ok {
-				res[db] = []string{}
-			}
-			res[db] = append(res[db], col)
-		}
+func dbAndColFromURI(uri string) (string, string) {
+	if !strings.Contains(uri, ".") {
+		return uri, ""
 	}
 
-	res["admin"] = []string{}
-	res["local"] = []string{}
-
-	return res
+	splitted := strings.SplitN(uri, ".", 2)
+	return splitted[0], splitted[1]
 }
 
-func PartialBlacklistPathMap(paths []string) map[string]map[string]struct{} {
-	res := make(map[string]map[string]struct{})
+func getFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, map[string]map[string]struct{}) {
+	whitelistFilter := make(map[string]map[string]struct{})
+	blacklistFilter := make(map[string]map[string]struct{})
 
-	for _, path := range paths {
-		if !strings.Contains(path, ".") {
-			res[path] = map[string]struct{}{}
-		} else {
-			splitted := strings.SplitN(path, ".", 2)
-			db, col := splitted[0], splitted[1]
+	for _, uri := range whitelist {
+		db, col := dbAndColFromURI(uri)
 
-			if _, ok := res[db]; !ok {
-				res[db] = map[string]struct{}{}
-			}
-			res[db][col] = struct{}{}
+		whitelistFilter[db] = map[string]struct{}{}
+		if col != "" {
+			whitelistFilter[db][col] = struct{}{}
 		}
 	}
 
-	return res
+	whitelistFilter["admin"] = map[string]struct{}{}
+	whitelistFilter["local"] = map[string]struct{}{}
+	whitelistFilter["config"] = map[string]struct{}{}
+	whitelistFilter["mdb_internal"] = map[string]struct{}{}
+
+	for _, uri := range blacklist {
+		db, col := dbAndColFromURI(uri)
+		delete(whitelistFilter[db], col)
+
+		if _, ok := blacklistFilter[db]; !ok {
+			blacklistFilter[db] = map[string]struct{}{}
+		}
+
+		if col != "" {
+			blacklistFilter[db][col] = struct{}{}
+		} else {
+			delete(whitelistFilter, db)
+		}
+	}
+	tracelog.InfoLogger.Printf("whitelist: %v", whitelist)
+	tracelog.InfoLogger.Printf("blacklist: %v", blacklist)
+	return whitelistFilter, blacklistFilter
+}
+
+func shouldDownload(db, col string, whitelist, blacklist map[string]map[string]struct{}, wlSpecified bool) bool {
+	nsIn := func(filter map[string]map[string]struct{}, db, col string) bool {
+		cols, dbOk := filter[db]
+		if dbOk && len(cols) == 0 {
+			return true
+		}
+		_, ok := filter[db][col]
+		return ok
+	}
+
+	if wlSpecified {
+		if nsIn(whitelist, db, col) {
+			return !nsIn(blacklist, db, col)
+		}
+		return false
+	}
+
+	return !nsIn(blacklist, db, col)
 }
 
 func GetTarFilesFilter(
 	routes *BackupRoutesInfo,
-	whitelist map[string][]string,
-	blacklist map[string]map[string]struct{},
-) (map[string]struct{}, map[string]struct{}, error) {
+	whitelist []string,
+	blacklist []string,
+) (map[string]struct{}, map[string]struct{}) {
 	tarFilter := make(map[string]struct{})
 	pathFilter := make(map[string]struct{})
 
-	for db, cols := range whitelist {
-		if _, ok := routes.Databases[db]; !ok {
-			return nil, nil, errors.Errorf("No db %s in backup", db)
-		}
-		blacklistMap, blDBOk := blacklist[db]
-		if blDBOk && len(blacklistMap) == 0 {
-			continue
-		}
+	whitelistSpecified := len(whitelist) > 0
+	whitelistFilter, blacklistFilter := getFilters(whitelist, blacklist)
 
-		colsToIterate := cols
-		if len(cols) == 0 {
-			colsToIterate = make([]string, 0, len(routes.Databases[db]))
-			for k := range routes.Databases[db] {
-				colsToIterate = append(colsToIterate, k)
-			}
-		}
-
-		for _, col := range colsToIterate {
-			if blDBOk {
-				if _, ok := blacklistMap[col]; ok {
-					continue
+	for db, dbInfo := range routes.Databases {
+		for col, colInfo := range dbInfo {
+			if shouldDownload(db, col, whitelistFilter, blacklistFilter, whitelistSpecified) {
+				tarFilter[colInfo.TarPath] = struct{}{}
+				pathFilter[colInfo.DBPath] = struct{}{}
+				for _, indexPaths := range colInfo.IndexInfo {
+					tarFilter[indexPaths.TarPath] = struct{}{}
+					pathFilter[indexPaths.DBPath] = struct{}{}
 				}
-			}
-			colInfo, ok := routes.Databases[db][col]
-			if !ok {
-				return nil, nil, errors.Errorf("No collection %s in db %s in backup", col, db)
-			}
-
-			tarFilter[colInfo.TarPath] = struct{}{}
-			pathFilter[colInfo.DBPath] = struct{}{}
-			for _, indPaths := range colInfo.IndexInfo {
-				tarFilter[indPaths.TarPath] = struct{}{}
-				pathFilter[indPaths.DBPath] = struct{}{}
 			}
 		}
 	}
@@ -171,5 +176,7 @@ func GetTarFilesFilter(
 		pathFilter[dbFile] = struct{}{}
 	}
 
-	return pathFilter, tarFilter, nil
+	tracelog.InfoLogger.Printf("pathFilter: %v", pathFilter)
+	tracelog.InfoLogger.Printf("tarFilter: %v", tarFilter)
+	return pathFilter, tarFilter
 }
