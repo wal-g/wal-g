@@ -2,8 +2,6 @@ package functests
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/cucumber/godog"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
@@ -14,12 +12,14 @@ func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext
 	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
 	ctx.Step(`^we restore initialized binary mongo-backup #(\d+) to ([^\s]+)`,
 		tctx.restoreMongoBinaryBackupAsInitialized)
-	ctx.Step(`^we restore partial mongo-backup #(\d+) to ([^\s]+) ns "([^"]*)"$`,
-		tctx.partiallyRestoreMongoDBBinaryBackup)
-	ctx.Step(`^we restore partial mongo-backup #(\d+) to ([^\s]+) ns "([^"]*)" with blacklist "([^"]*)"$`,
-		tctx.partiallyRestoreMongoDBBinaryBackupWithBlacklist)
-	ctx.Step(`^we restore partial mongo-backup #(\d+) to ([^\s]+) ns "([^"]*)" with error "([^"]*)"$`,
-		tctx.partiallyRestoreMongoDBBinaryBackupWithError)
+	ctx.Step(`^we restore mongo-backup #(\d+) to ([^\s]+) with whitelist "([^"]*)"$`,
+		tctx.restoreMongoBinaryBackupWithWhitelist)
+	ctx.Step(`^we restore mongo-backup #(\d+) to ([^\s]+) with blacklist "([^"]*)"$`,
+		tctx.restoreMongoBinaryBackupWithBlacklist)
+	ctx.Step(`^we restore mongo-backup #(\d+) to ([^\s]+) with whitelist "([^"]*)" and blacklist "([^"]*)"$`,
+		tctx.restoreMongoBinaryBackupWithWhitelistAndBlacklist)
+	ctx.Step(`^we restore non-initialized mongo-backup #(\d+) to ([^\s]+) with whitelist "([^"]*)"$`,
+		tctx.restoreMongoBinaryBackupWithWhitelistAsNonInitialized)
 }
 
 func (tctx *TestContext) createMongoBinaryBackup(container string) error {
@@ -41,88 +41,36 @@ func (tctx *TestContext) createMongoBinaryBackup(container string) error {
 }
 
 func (tctx *TestContext) restoreMongoBinaryBackupAsNonInitialized(backupNumber int, container string) error {
-	return tctx.restoreMongoBinaryBackup(backupNumber, container, false)
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, false, "", "")
 }
 
 func (tctx *TestContext) restoreMongoBinaryBackupAsInitialized(backupNumber int, container string) error {
-	return tctx.restoreMongoBinaryBackup(backupNumber, container, true)
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, true, "", "")
 }
 
-func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackup(backupNumber int, container, paths string) error {
-	return tctx.partiallyRestoreMongoDBBinaryBackupImpl(backupNumber, container, paths, "", "")
+func (tctx *TestContext) restoreMongoBinaryBackupWithWhitelist(backupNumber int, container, whitelist string) error {
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, true, whitelist, "")
 }
 
-func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackupWithBlacklist(
-	backupNumber int,
-	container, paths, blacklist string,
+func (tctx *TestContext) restoreMongoBinaryBackupWithBlacklist(backupNumber int, container, blacklist string) error {
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, true, "", blacklist)
+}
+
+func (tctx *TestContext) restoreMongoBinaryBackupWithWhitelistAndBlacklist(
+	backupNumber int, container, whitelist, blacklist string,
 ) error {
-	return tctx.partiallyRestoreMongoDBBinaryBackupImpl(backupNumber, container, paths, blacklist, "")
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, true, whitelist, blacklist)
 }
 
-func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackupWithError(
-	backupNumber int,
-	container, paths, errMsg string,
+func (tctx *TestContext) restoreMongoBinaryBackupWithWhitelistAsNonInitialized(
+	backupNumber int, container, whitelist string,
 ) error {
-	return tctx.partiallyRestoreMongoDBBinaryBackupImpl(backupNumber, container, paths, "", errMsg)
+	return tctx.restoreMongoBinaryBackup(backupNumber, container, false, whitelist, "")
 }
 
-func (tctx *TestContext) partiallyRestoreMongoDBBinaryBackupImpl(backupNumber int,
-	container, paths, blacklist, errMsg string,
+func (tctx *TestContext) restoreMongoBinaryBackup(
+	backupNumber int, container string, initialized bool, whitelist, blacklist string,
 ) error {
-	walg := WalgUtilFromTestContext(tctx, container)
-
-	backup, err := walg.GetBackupByNumber(backupNumber)
-	if err != nil {
-		return err
-	}
-
-	mc, err := MongoCtlFromTestContext(tctx, container)
-	if err != nil {
-		return err
-	}
-
-	mongodbVersion, err := mc.GetVersion()
-	if err != nil {
-		return err
-	}
-
-	configPath, err := mc.GetConfigPath()
-	if err != nil {
-		return err
-	}
-
-	err = mc.StopMongod()
-	if err != nil {
-		return err
-	}
-
-	err = walg.PartialRestore(backup, configPath, mongodbVersion, paths, blacklist)
-	if err != nil {
-		if errMsg != "" {
-			if !assert.ErrorContains(TestingfWrap(tracelog.ErrorLogger.Printf), err, errMsg) {
-				return fmt.Errorf("error expected to contain \"%s\" but was \"%s\"", errMsg, err)
-			}
-		} else {
-			return err
-		}
-	}
-
-	if err = mc.DeleteMongodReplSetSetting(); err != nil {
-		return err
-	}
-
-	if err = mc.ChownDBPath(); err != nil {
-		return err
-	}
-
-	if err = mc.StartMongod(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container string, initialized bool) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 
 	backup, err := walg.GetBackupByNumber(backupNumber)
@@ -156,7 +104,7 @@ func (tctx *TestContext) restoreMongoBinaryBackup(backupNumber int, container st
 		rsName = container
 		rsMembers = fmt.Sprintf("%s:%d", container, mc.GetMongodPort())
 	}
-	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsName, rsMembers)
+	err = walg.FetchBinaryBackup(backup, configPath, mongodbVersion, rsName, rsMembers, whitelist, blacklist)
 	if err != nil {
 		return err
 	}

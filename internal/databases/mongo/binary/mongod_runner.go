@@ -18,50 +18,35 @@ type MongodProcess struct {
 	replsetID         string
 	isMongoCfg        bool
 	restore           bool
+	repair            bool
 	port              int
 	cancel            context.CancelFunc
 	cmd               *exec.Cmd
 }
 
-func StartMongoWithRestore(minimalConfigPath string) (*MongodProcess, error) {
-	mongodProcess := &MongodProcess{
+func Mongod(minimalConfigPath string) *MongodProcess {
+	return &MongodProcess{
 		minimalConfigPath: minimalConfigPath,
-		restore:           true,
 	}
-
-	err := mongodProcess.start()
-	if err != nil {
-		return nil, err
-	}
-	return mongodProcess, nil
 }
 
-func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, "", false,
-		"disableLogicalSessionCacheRefresh=true", "skipShardingConfigurationChecks=true")
+func (mongodProcess *MongodProcess) WithRestore() *MongodProcess {
+	mongodProcess.restore = true
+	return mongodProcess
 }
 
-func StartMongodWithRecoverFromOplogAsStandalone(minimalConfigPath string) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, "", false,
-		"recoverFromOplogAsStandalone=true", "takeUnstableCheckpointOnShutdown=true")
+func (mongodProcess *MongodProcess) WithRepair() *MongodProcess {
+	mongodProcess.repair = true
+	return mongodProcess
 }
 
-func StartMongodWithReplyOplogAsStandalone(minimalConfigPath string, replsetID string, isMongoCfg bool) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, replsetID, isMongoCfg,
-		"disableLogicalSessionCacheRefresh=true", "takeUnstableCheckpointOnShutdown=true")
+func (mongodProcess *MongodProcess) WithParams(params ...string) *MongodProcess {
+	mongodProcess.parameters = params
+	return mongodProcess
 }
 
-func StartMongo(minimalConfigPath string, replsetID string, isMongoCfg bool, parameters ...string) (*MongodProcess, error) {
-	mongodProcess := &MongodProcess{
-		minimalConfigPath: minimalConfigPath,
-		parameters:        parameters,
-	}
-
-	err := mongodProcess.start()
-	if err != nil {
-		return nil, err
-	}
-	return mongodProcess, nil
+func (mongodProcess *MongodProcess) Start() (*MongodProcess, error) {
+	return mongodProcess, mongodProcess.start()
 }
 
 func (mongodProcess *MongodProcess) GetHostWithPort() string {
@@ -106,6 +91,9 @@ func (mongodProcess *MongodProcess) start() (err error) {
 	}
 	if mongodProcess.restore {
 		cliArgs = append(cliArgs, "--restore")
+	}
+	if mongodProcess.repair {
+		cliArgs = append(cliArgs, "--repair")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

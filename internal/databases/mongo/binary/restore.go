@@ -13,6 +13,13 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
+var (
+	DisableLogicalSessionCacheRefresh = "disableLogicalSessionCacheRefresh=true"
+	SkipShardingConfigurationChecks   = "skipShardingConfigurationChecks=true"
+	RecoverFromOplogAsStandalone      = "recoverFromOplogAsStandalone=true"
+	TakeUnstableCheckpointOnShutdown  = "takeUnstableCheckpointOnShutdown=true"
+)
+
 type RestoreService struct {
 	Context      context.Context
 	LocalStorage *LocalStorage
@@ -42,6 +49,12 @@ func (restoreService *RestoreService) DoRestore(
 	if err != nil {
 		return err
 	}
+	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
+	if err != nil {
+		return err
+	}
+
+	pathFilter, tarFilter := restoreService.getFilters(metadata, args.Whitelist, args.Blacklist)
 
 	if !args.SkipChecks {
 		//todo maybe delete all checks?
@@ -53,24 +66,30 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		if err = restoreService.downloadBackup(args.BackupName, nil); err != nil {
+		if err = restoreService.downloadBackup(args.BackupName, tarFilter); err != nil {
 			return err
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped download mongodb backup files")
 	}
 
+	partial := len(args.Whitelist)+len(args.Blacklist) > 0
+	if partial {
+		if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
+			return err
+		}
+	}
+
 	if !args.SkipMongoReconfig {
 		if err = restoreService.reconfigMongo(
 			rsConfig, shConfig, replyOplogConfig,
-			mongoCfgConfig, sentinel,
+			mongoCfgConfig, sentinel, partial,
 		); err != nil {
 			return err
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
 	}
-
 	return nil
 }
 
@@ -95,25 +114,27 @@ func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion stri
 
 func (restoreService *RestoreService) getFilters(
 	metadata *models.BackupRoutesInfo, whitelist, blacklist []string,
-) (map[string]struct{}, map[string]struct{}, error) {
-	whitelistPathMap := models.PartialWhitelistPathsMap(whitelist)
-	blackListPathMap := models.PartialBlacklistPathMap(blacklist)
-	return models.GetTarFilesFilter(metadata, whitelistPathMap, blackListPathMap)
+) (map[string]struct{}, map[string]struct{}) {
+	if len(whitelist)+len(blacklist) == 0 {
+		return nil, nil
+	}
+
+	return models.GetTarFilesFilter(metadata, whitelist, blacklist)
 }
 
 func (restoreService *RestoreService) reconfigMongo(
 	rsConfig RsConfig, shConfig ShConfig, replyOplogConfig ReplyOplogConfig,
-	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup,
+	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, partial bool,
 ) error {
-	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig); err != nil {
+	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig, partial); err != nil {
 		return err
 	}
-	if err := restoreService.recoverFromOplogAsStandalone(sentinel); err != nil {
+	if err := restoreService.recoverFromOplogAsStandalone(sentinel, partial); err != nil {
 		return err
 	}
 
 	if replyOplogConfig.HasPitr {
-		if err := restoreService.oplogReply(rsConfig, replyOplogConfig); err != nil {
+		if err := restoreService.oplogReply(replyOplogConfig, partial); err != nil {
 			return err
 		}
 	}
@@ -125,9 +146,17 @@ func (restoreService *RestoreService) downloadFromTarArchives(backupName string,
 	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath, filter)
 }
 
-func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig) error {
-	mongodProcess, err := StartMongodWithDisableLogicalSessionCacheRefresh(restoreService.minimalConfigPath)
-	if err != nil {
+func (restoreService *RestoreService) fixSystemData(
+	rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig, partial bool,
+) error {
+	mongodProcess := Mongod(restoreService.minimalConfigPath).
+		WithParams(DisableLogicalSessionCacheRefresh, SkipShardingConfigurationChecks)
+
+	if partial {
+		mongodProcess.WithRestore()
+	}
+
+	if _, err := mongodProcess.Start(); err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
 	defer mongodProcess.Close()
@@ -166,9 +195,15 @@ func (restoreService *RestoreService) fixSystemData(rsConfig RsConfig, shConfig 
 	return mongodProcess.Wait()
 }
 
-func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *models.Backup) error {
-	mongodProcess, err := StartMongodWithRecoverFromOplogAsStandalone(restoreService.minimalConfigPath)
-	if err != nil {
+func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *models.Backup, partial bool) error {
+	mongodProcess := Mongod(restoreService.minimalConfigPath).
+		WithParams(RecoverFromOplogAsStandalone, TakeUnstableCheckpointOnShutdown)
+
+	if partial {
+		mongodProcess.WithRestore()
+	}
+
+	if _, err := mongodProcess.Start(); err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
 
@@ -196,9 +231,15 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	return mongodProcess.Wait()
 }
 
-func (restoreService *RestoreService) oplogReply(rsConfig RsConfig, replayOplogConfig ReplyOplogConfig) error {
-	mongodProcess, err := StartMongodWithReplyOplogAsStandalone(restoreService.minimalConfigPath, rsConfig.RsName, false)
-	if err != nil {
+func (restoreService *RestoreService) oplogReply(replayOplogConfig ReplyOplogConfig, partial bool) error {
+	mongodProcess := Mongod(restoreService.minimalConfigPath).
+		WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
+
+	if partial {
+		mongodProcess.WithRestore()
+	}
+
+	if _, err := mongodProcess.Start(); err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
 
@@ -225,80 +266,4 @@ func (restoreService *RestoreService) oplogReply(rsConfig RsConfig, replayOplogC
 	}
 
 	return mongodProcess.Wait()
-}
-
-func (restoreService *RestoreService) startMongoWithRestore(sentinel *models.Backup) error {
-	mongodProcess, err := StartMongoWithRestore(restoreService.minimalConfigPath)
-	if err != nil {
-		return errors.Wrap(err, "unable to start mongod in restore mode")
-	}
-	defer mongodProcess.Close()
-
-	restoreTimeout, err := conf.GetDurationSettingDefault(conf.PartialRestoreTimeout, ComputeMongoStartTimeout(sentinel.UncompressedSize))
-	if err != nil {
-		return err
-	}
-	mongodService, err := CreateMongodService(
-		restoreService.Context,
-		"wal-g restore",
-		mongodProcess.GetURI(),
-		restoreTimeout,
-	)
-	if err != nil {
-		return err
-	}
-
-	if err = mongodService.Shutdown(); err != nil {
-		return err
-	}
-
-	return mongodProcess.Wait()
-}
-
-func (restoreService *RestoreService) PartialRestore(whitelist, blacklist []string, args RestoreArgs) error {
-	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), args.BackupName)
-	if err != nil {
-		return err
-	}
-
-	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
-	if err != nil {
-		return err
-	}
-
-	blacklist = append(blacklist, "local.oplog.rs")
-	pathFilter, tarFilter, err := restoreService.getFilters(metadata, whitelist, blacklist)
-	if err != nil {
-		return err
-	}
-
-	if !args.SkipChecks {
-		if err = restoreService.doChecks(sentinel.MongoMeta.Version, args.RestoreVersion); err != nil {
-			return err
-		}
-	} else {
-		tracelog.InfoLogger.Println("Skipped partial restore mongodb checks")
-	}
-
-	if !args.SkipBackupDownload {
-		if err = restoreService.downloadBackup(args.BackupName, tarFilter); err != nil {
-			return err
-		}
-	} else {
-		tracelog.InfoLogger.Println("Skipped download partial mongodb backup files")
-	}
-
-	if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
-		return err
-	}
-
-	if !args.SkipMongoReconfig {
-		if err = restoreService.startMongoWithRestore(sentinel); err != nil {
-			return err
-		}
-		tracelog.InfoLogger.Println("Started mongo with --restore")
-	} else {
-		tracelog.InfoLogger.Println("Skipped mongodb reconfig")
-	}
-	return nil
 }
