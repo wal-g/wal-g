@@ -467,6 +467,12 @@ var (
 		AlicloudAccessKeyID:     true,
 		AlicloudAccessKeySecret: true,
 		AlicloudSecurityToken:   true,
+		"OSS_ENDPOINT":          true,
+		"OSS_REGION":            true,
+		"OSS_ROLE_ARN":          true,
+		"OSS_ROLE_SESSION_NAME": true,
+		"OSS_MAX_RETRIES":       true,
+		"OSS_CONNECT_TIMEOUT":   true,
 
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
