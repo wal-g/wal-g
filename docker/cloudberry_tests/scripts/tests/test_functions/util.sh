@@ -30,7 +30,7 @@ insert_a_lot_of_data() {
 }
 
 bootstrap_gp_cluster() {
-  source /usr/local/gpdb_src/greenplum_path.sh
+  source /usr/local/gpdb_src/cloudberry-env.sh
   cd /usr/local/gpdb_src
   # FIXME: mirrors & standby?
   export WITH_STANDBY="false"
@@ -41,7 +41,7 @@ bootstrap_gp_cluster() {
 }
 
 cleanup() {
-  source /usr/local/gpdb_src/greenplum_path.sh
+  source /usr/local/gpdb_src/cloudberry-env.sh
   cd /usr/local/gpdb_src
   make destroy-demo-cluster
   pkill -9 postgres || true
