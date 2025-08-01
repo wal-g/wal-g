@@ -216,6 +216,12 @@ Usage:
 wal-g restore-point-list [--pretty] [--json]
 ```
 
+### Continuous recovery
+
+Continuous recovery - is Disaster Recovery with 2 clusters. One cluster handles production workload. Second cluster is hot-standby. `wal-g follow-primary` command will apply WAL to all segments of the cluster guaranteeing that cluster state is consistent to some restore point. Users may stop original cluster and promote second cluster when needed (e.g. in case of disaster). All changes applied after last restore point will be lost.
+
+Main difference between PiTR and `wal-g follow-primary` - continuous recovery will not promote cluster (as PiTR does) as a result - database will not start new timeline. And this will allow to apply new restore points.
+
 #### Check AO/AOCS tables 
 WAL-G has special command to validate AO/AOCS tables length:
 ```bash
