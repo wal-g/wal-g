@@ -2,22 +2,22 @@
     "segments": {
         "-1": {
             "hostname": "localhost",
-            "port": 7000,
+            "port": 6000,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1"
         },
         "0": {
             "hostname": "localhost",
-            "port": 7002,
+            "port": 6002,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast1/demoDataDir0"
         },
         "1": {
             "hostname": "localhost",
-            "port": 7003,
+            "port": 6003,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast2/demoDataDir1"
         },
         "2": {
             "hostname": "localhost",
-            "port": 7004,
+            "port": 6004,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast3/demoDataDir2"
         }
     }

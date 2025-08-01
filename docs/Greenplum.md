@@ -222,6 +222,8 @@ Continuous recovery - is Disaster Recovery with 2 clusters. One cluster handles 
 
 Main difference between PiTR and `wal-g follow-primary` - continuous recovery will not promote cluster (as PiTR does) as a result - database will not start new timeline. And this will allow to apply new restore points.
 
+Note: works only with Cloudberry Databases and Greenplum 6.25+.
+
 #### Check AO/AOCS tables 
 WAL-G has special command to validate AO/AOCS tables length:
 ```bash

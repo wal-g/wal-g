@@ -30,7 +30,9 @@ func (m RecoveryConfigMaker) Make(contentID int, pgVersion int) string {
 		"recovery_target_timeline = latest",
 	)
 
-	if pgVersion >= 120000 {
+	// `recovery_target_action` is available since PostgreSQL 9.5,
+	// However, it was backported to Greenplum 6.25+ and now supported by all opensource GPDBs
+	if pgVersion >= 90500 {
 		if m.shutdownOnRecoveryTarget {
 			lines = append(lines, "recovery_target_action = 'shutdown'")
 		} else {

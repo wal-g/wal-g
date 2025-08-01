@@ -63,6 +63,10 @@ stop_cluster() {
   /usr/local/gpdb_src/bin/gpstop -a -M fast
 }
 
+prepare_cluster() {
+  echo "prepare_cluster: done"
+}
+
 start_cluster() {
   /usr/local/gpdb_src/bin/gpstart -a || die_with_gp_logs
 }

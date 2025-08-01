@@ -1,1 +1,2 @@
-"WALE_S3_PREFIX": "s3://createrestorepointbucket"
+"WALE_S3_PREFIX": "s3://createrestorepointbucket",
+"WALG_LOG_LEVEL": "DEVEL"
