@@ -229,7 +229,8 @@ etcd_clean:
 
 # refactor
 etcd_integration_test: load_docker_common
-	docker compose build etcd etcd_tests
+	docker compose build etcd
+	docker compose build etcd_tests
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
@@ -245,7 +246,8 @@ gp_install: gp_build
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	docker compose build gp gp_tests
+	docker compose build gp
+	docker compose build gp_tests
 	docker compose up --exit-code-from gp_tests gp_tests
 
 cloudberry_build: gp_build
@@ -257,7 +259,8 @@ cloudberry_install: gp_install
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
-	docker compose build cloudberry cloudberry_tests
+	docker compose build cloudberry
+	docker compose build cloudberry_tests
 	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 
 st_test: deps pg_build unlink_brotli st_integration_test
