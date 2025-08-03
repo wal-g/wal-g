@@ -153,6 +153,7 @@ services:
       &&  mkdir -p /export/mysqlconfonly
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
+      &&  mkdir -p /export/gp-follow-primary-bucket
       &&  mkdir -p /export/gpfullbucket
       &&  mkdir -p /export/gpafterfailedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
@@ -163,6 +164,7 @@ services:
       &&  mkdir -p /export/gpaostoragetestbucket
       &&  mkdir -p /export/gpdeltabackuptestbucket
       &&  mkdir -p /export/gppartialtablebucket
+      &&  mkdir -p /export/cloudberry-follow-primary-bucket
       &&  mkdir -p /export/cloudberry-full-bucket
       &&  mkdir -p /export/cloudberry-after-failed-bucket
       &&  mkdir -p /export/cloudberry-delete-without-confirm
