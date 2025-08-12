@@ -140,16 +140,17 @@ func isPageCorrupted(path string, blockNo uint32, page []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	valid := pageHeader.isValid()
-	if !valid {
-		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
-		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
-		return false, nil
-	}
 
 	// We only calculate the checksum for properly-initialized pages
 	isNew := pageHeader.isNew()
 	if isNew {
+		return false, nil
+	}
+
+	valid := pageHeader.isValid()
+	if !valid {
+		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
+		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
 		return false, nil
 	}
 
