@@ -38,7 +38,7 @@ jobs:
 
       - name: Install deps
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: sudo apt-get install liblzo2-dev
+        run: sudo apt clean && sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
