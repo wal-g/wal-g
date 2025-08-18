@@ -40,7 +40,7 @@ const (
 	SignatureMagicNumber byte = 0x55
 	invalidLsn           LSN  = 0
 	validFlags                = 7
-	layoutVersion             = 4
+	layoutVersion             = 5 // We know WAL-G is compatibe with any page version that has LSN, including 64-bit xid patch version
 	headerSize                = 24
 
 	DefaultTablespace    = "base"
