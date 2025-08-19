@@ -28,17 +28,23 @@ type Folder struct {
 	config *Config
 
 	uploader *oss.Uploader
+	copier   *oss.Copier
 }
 
 func NewFolder(ossAPI *oss.Client, bucket string, path string, config *Config) *Folder {
-	uploader := oss.NewUploader(ossAPI, func(uo *oss.UploaderOptions) {})
-
+	uploader := oss.NewUploader(ossAPI, func(uo *oss.UploaderOptions) {
+		uo.PartSize = config.UploadPartSize
+	})
+	copier := oss.NewCopier(ossAPI, func(co *oss.CopierOptions) {
+		co.PartSize = config.CopyPartSize
+	})
 	return &Folder{
 		ossAPI:   ossAPI,
-		uploader: uploader,
 		bucket:   bucket,
 		path:     path,
 		config:   config,
+		uploader: uploader,
+		copier:   copier,
 	}
 }
 
@@ -201,8 +207,7 @@ func (f *Folder) CopyObject(srcPath string, dstPath string) error {
 	src := path.Join(f.GetPath(), srcPath)
 	dst := path.Join(f.GetPath(), dstPath)
 
-	uploader := oss.NewCopier(f.ossAPI)
-	_, err := uploader.Copy(context.Background(), &oss.CopyObjectRequest{
+	_, err := f.copier.Copy(context.Background(), &oss.CopyObjectRequest{
 		Bucket:       oss.Ptr(f.bucket),
 		Key:          oss.Ptr(dst),
 		SourceBucket: oss.Ptr(f.bucket),

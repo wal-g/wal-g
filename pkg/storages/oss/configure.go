@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/storage/setting"
 )
@@ -21,6 +22,8 @@ const (
 	skipValidationSetting  = "OSS_SKIP_VALIDATION"
 	maxRetriesSetting      = "OSS_MAX_RETRIES"
 	connectTimeoutSetting  = "OSS_CONNECT_TIMEOUT"
+	uploadPartSizeSetting  = "OSS_UPLOAD_PART_SIZE"
+	copyPartSizeSetting    = "OSS_COPY_PART_SIZE"
 )
 
 var SettingList = []string{
@@ -34,6 +37,8 @@ var SettingList = []string{
 	skipValidationSetting,
 	maxRetriesSetting,
 	connectTimeoutSetting,
+	uploadPartSizeSetting,
+	copyPartSizeSetting,
 }
 
 const (
@@ -68,6 +73,16 @@ func ConfigureStorage(
 		return nil, err
 	}
 
+	uploadPartSize, err := setting.Int64Optional(settings, uploadPartSizeSetting, oss.DefaultUploadPartSize)
+	if err != nil {
+		return nil, err
+	}
+
+	copyPartSize, err := setting.Int64Optional(settings, copyPartSizeSetting, oss.DefaultCopyPartSize)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &Config{
 		AccessKeyID:     strings.TrimSpace(settings[accessKeyIDSetting]),
 		AccessKeySecret: strings.TrimSpace(settings[accessKeySecretSetting]),
@@ -81,6 +96,8 @@ func ConfigureStorage(
 		MaxRetries:      maxRetries,
 		Region:          settings[regionSetting],
 		ConnectTimeout:  connectTimeout,
+		UploadPartSize:  uploadPartSize,
+		CopyPartSize:    copyPartSize,
 	}
 
 	st, err := NewStorage(config, rootWraps...)
