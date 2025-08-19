@@ -26,14 +26,19 @@ type Folder struct {
 	bucket string
 	path   string
 	config *Config
+
+	uploader *oss.Uploader
 }
 
 func NewFolder(ossAPI *oss.Client, bucket string, path string, config *Config) *Folder {
+	uploader := oss.NewUploader(ossAPI, func(uo *oss.UploaderOptions) {})
+
 	return &Folder{
-		ossAPI: ossAPI,
-		bucket: bucket,
-		path:   path,
-		config: config,
+		ossAPI:   ossAPI,
+		uploader: uploader,
+		bucket:   bucket,
+		path:     path,
+		config:   config,
 	}
 }
 
@@ -153,11 +158,11 @@ func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 
 func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	objectPath := f.GetPath() + objectRelativePath
-	result, err := f.ossAPI.GetObject(context.Background(), &oss.GetObjectRequest{
+	req := &oss.GetObjectRequest{
 		Bucket: oss.Ptr(f.bucket),
 		Key:    oss.Ptr(objectPath),
-	})
-
+	}
+	result, err := f.ossAPI.GetObject(context.Background(), req)
 	if err != nil {
 		var serviceError *oss.ServiceError
 		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
@@ -175,11 +180,11 @@ func (f *Folder) PutObject(name string, content io.Reader) error {
 
 func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	objectPath := f.GetPath() + name
-	_, err := f.ossAPI.PutObject(ctx, &oss.PutObjectRequest{
+
+	_, err := f.uploader.UploadFrom(context.Background(), &oss.PutObjectRequest{
 		Bucket: oss.Ptr(f.bucket),
 		Key:    oss.Ptr(objectPath),
-		Body:   content,
-	})
+	}, content)
 	if err != nil {
 		return fmt.Errorf("failed to put oss object %q: %w", objectPath, err)
 	}
@@ -195,7 +200,9 @@ func (f *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	src := path.Join(f.GetPath(), srcPath)
 	dst := path.Join(f.GetPath(), dstPath)
-	_, err := f.ossAPI.CopyObject(context.Background(), &oss.CopyObjectRequest{
+
+	uploader := oss.NewCopier(f.ossAPI)
+	_, err := uploader.Copy(context.Background(), &oss.CopyObjectRequest{
 		Bucket:       oss.Ptr(f.bucket),
 		Key:          oss.Ptr(dst),
 		SourceBucket: oss.Ptr(f.bucket),
