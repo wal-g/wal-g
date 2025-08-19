@@ -186,11 +186,11 @@ Set the endpoint for the OSS bucket. For instance, if you want to connect to int
 
 * `OSS_UPLOAD_PART_SIZE`
 
-Size of the part to upload when uploading large files to OSS. Alicloud OSS default is 6,291,456 bytes (6 MB).
+Size of the part to upload when uploading large files to OSS. Alicloud OSS default is 6,291,456 bytes (6 MiB).
 
 * `OSS_COPY_PART_SIZE`
 
-Size of the part to copy when copying large files within OSS. Default OSS is 67,108,864 bytes (64 MB).
+Size of the part to copy when copying large files within OSS. Default OSS is 67,108,864 bytes (64 MiB).
 
 Swift
 -----------
