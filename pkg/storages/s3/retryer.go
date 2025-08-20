@@ -25,7 +25,12 @@ func (r ConnResetRetryer) ShouldRetry(req *request.Request) bool {
 	if req.Error != nil && strings.Contains(req.Error.Error(), "SignatureDoesNotMatch") {
 		// It looks like we have some rare issues with request. Sign one more time
 		auth := r.getAuthHeader(req)
+
+		stash := req.Error
+		req.Error = nil // hide req.Error - so, req.Sign() will not fail
 		err := req.Sign()
+		req.Error = stash
+
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Cannot re-sign request: %v", err)
 			return false
