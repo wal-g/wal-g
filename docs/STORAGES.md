@@ -184,6 +184,14 @@ Whether to skip OSS client validation during initialization. Default is set to `
 
 Set the endpoint for the OSS bucket. For instance, if you want to connect to internal OSS endpoint, you may specify `https://oss-ap-southeast-5-internal.aliyuncs.com`.
 
+* `OSS_UPLOAD_PART_SIZE`
+
+Size of the part to upload when uploading large files to OSS. Alicloud OSS default is 6,291,456 bytes (6 MiB).
+
+* `OSS_COPY_PART_SIZE`
+
+Size of the part to copy when copying large files within OSS. Default OSS is 67,108,864 bytes (64 MiB).
+
 Swift
 -----------
 To store backups in Swift object storage, WAL-G requires that this variable be set:

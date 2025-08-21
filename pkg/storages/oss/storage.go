@@ -27,6 +27,8 @@ type Config struct {
 	MaxRetries       int
 	EnableVersioning string
 	ConnectTimeout   int64
+	UploadPartSize   int64
+	CopyPartSize     int64
 }
 
 func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
