@@ -1,8 +1,8 @@
 # WAL-G for MySQL
 
-**Interface of MySQL and MariaDB now is unstable**
-
 You can use wal-g as a tool for encrypting, compressing MySQL backups and push/fetch them to/from storage without saving it on your filesystem.
+
+**MariaDB support is deprecated**
 
 Configuration
 -------------
@@ -310,6 +310,8 @@ Restore procedure is straightforward:
 
 ### MariaDB - using with `mariabackup`
 
+**MariaDB support is deprecated**
+
 It's recommended to use wal-g with `mariabackup` tool in case of MariaDB for creating lock-less backups.
 Here's typical wal-g configuration for that case:
 ```bash
@@ -340,5 +342,7 @@ mysqlbinlog --stop-datetime="some point in time" --start-position [position abov
 ```
 
 ### MariaDB - using with `mysqldump`
+
+**MariaDB support is deprecated**
 
 The procedure is same as in case of [MySQL. You can follow the instructions from the previous section.](#mysql---using-with-mysqldump)
