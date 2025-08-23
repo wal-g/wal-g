@@ -174,7 +174,7 @@ func SetupSignalListener() {
 	go func() {
 		for {
 			<-sigCh
-			if err := ConfigureLogging(); err != nil {
+			if err := conf.ConfigureLogging(); err != nil {
 				tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
 			}
 		}
