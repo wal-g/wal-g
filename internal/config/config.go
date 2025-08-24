@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/signal"
 	"os/user"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -807,19 +805,6 @@ func Configure() {
 
 		tracelog.DebugLogger.Print(buff.String())
 	}
-}
-
-func SetupSignalListener() {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGUSR1)
-	go func() {
-		for {
-			<-sigCh
-			if err := ConfigureLogging(); err != nil {
-				tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
-			}
-		}
-	}()
 }
 
 // ConfigureAndRunDefaultWebServer configures and runs web server

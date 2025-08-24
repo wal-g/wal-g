@@ -8,8 +8,10 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -166,6 +168,19 @@ func NewMessageReader(c net.Conn) *SocketMessageReader {
 	return &SocketMessageReader{c}
 }
 
+func SetupSignalListener() {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGUSR1)
+	go func() {
+		for {
+			<-sigCh
+			if err := conf.ConfigureLogging(); err != nil {
+				tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
+			}
+		}
+	}()
+}
+
 // Next method reads messages sequentially from the Reader
 func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messageBody []byte, err error) {
 	messageParameters := make([]byte, 3)
@@ -205,7 +220,7 @@ func HandleDaemon(options DaemonOptions) {
 	defer sdNotifyTicker.Stop()
 	go SendSdNotify(sdNotifyTicker.C)
 
-	conf.SetupSignalListener()
+	SetupSignalListener()
 
 	multiSt, err := internal.ConfigureMultiStorage(true)
 	defer utility.LoggedClose(multiSt, "close multi-storage")
