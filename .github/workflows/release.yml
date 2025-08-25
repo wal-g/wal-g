@@ -43,7 +43,7 @@ jobs:
           apt-get install -y liblzo2-dev brotli libsodium-dev curl git cmake build-essential tzdata
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
@@ -101,7 +101,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Build on arch
         uses: uraimo/run-on-arch-action@v3
