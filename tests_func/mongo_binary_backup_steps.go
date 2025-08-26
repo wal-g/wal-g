@@ -20,6 +20,8 @@ func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext
 		tctx.restoreMongoBinaryBackupWithWhitelistAndBlacklist)
 	ctx.Step(`^we restore non-initialized mongo-backup #(\d+) to ([^\s]+) with whitelist "([^"]*)"$`,
 		tctx.restoreMongoBinaryBackupWithWhitelistAsNonInitialized)
+	ctx.Step(`^journal info count is #(\d+)$`,
+		tctx.checkJournals)
 }
 
 func (tctx *TestContext) createMongoBinaryBackup(container string) error {
@@ -125,5 +127,22 @@ func (tctx *TestContext) restoreMongoBinaryBackup(
 		tracelog.DebugLogger.Println("Skip initiateReplSet")
 	}
 
+	return nil
+}
+
+func (tctx *TestContext) checkJournals(count int) error {
+	s3client, err := S3StorageFromTestContext(tctx, tctx.S3Host()).Client()
+	if err != nil {
+		return err
+	}
+
+	contents, err := s3client.List("mongodb-backup/test_uuid/test_mongodb/basebackups_005/journal_")
+	if err != nil {
+		return err
+	}
+
+	if len(contents) != count {
+		return fmt.Errorf("expected %d journals, got %v", count, contents)
+	}
 	return nil
 }

@@ -12,6 +12,7 @@ Feature: MongoDB binary backups with PITR
     Given mongodb01 has test mongodb data test1
     When we create binary mongo-backup on mongodb01
     Then we got 1 backup entries of mongodb01
+    And journal info count is #1
 
     # First load
     Given mongodb01 has been loaded with "load1"
@@ -21,6 +22,7 @@ Feature: MongoDB binary backups with PITR
     # Second backup was done successfully
     When we create binary mongo-backup on mongodb01
     Then we got 2 backup entries of mongodb01
+    And journal info count is #2
 
     # Second load
     Given mongodb01 has been loaded with "load2"

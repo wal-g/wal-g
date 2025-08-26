@@ -15,10 +15,14 @@ import (
 const (
 	binaryBackupPushCommandName = "binary-backup-push"
 
-	SkipMetadataFlag = "skip-metadata"
+	SkipMetadataFlag  = "skip-metadata"
+	CountJournalsFlag = "count-journals"
 )
 
-var skipMetadata = false
+var (
+	countJournals = false
+	skipMetadata  = false
+)
 
 var binaryBackupPushCmd = &cobra.Command{
 	Use:   binaryBackupPushCommandName,
@@ -31,7 +35,13 @@ var binaryBackupPushCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		err := mongo.HandleBinaryBackupPush(ctx, permanent, skipMetadata, "wal-g-mongo "+binaryBackupPushCommandName)
+		pushArgs := mongo.HandleBinaryBackupPushArgs{
+			Permanent:     permanent,
+			SkipMetadata:  skipMetadata,
+			AppName:       "wal-g-mongo " + binaryBackupPushCommandName,
+			CountJournals: countJournals,
+		}
+		err := mongo.HandleBinaryBackupPush(ctx, pushArgs)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -39,5 +49,7 @@ var binaryBackupPushCmd = &cobra.Command{
 func init() {
 	binaryBackupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
 	binaryBackupPushCmd.Flags().BoolVar(&skipMetadata, SkipMetadataFlag, false, "Skip metadata collecting for partial restore")
+	binaryBackupPushCmd.Flags().BoolVar(&countJournals, CountJournalsFlag, false,
+		"Count and store in S3 oplog sizes required to get replay data from a backup to the next one")
 	cmd.AddCommand(binaryBackupPushCmd)
 }

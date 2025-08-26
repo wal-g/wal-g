@@ -136,7 +136,7 @@ func (w *WalgUtil) PushBackup() (string, error) {
 }
 
 func (w *WalgUtil) PushBinaryBackup() error {
-	_, err := w.runCmd("binary-backup-push")
+	_, err := w.runCmd("binary-backup-push", "--count-journals")
 	if err != nil {
 		return err
 	}
