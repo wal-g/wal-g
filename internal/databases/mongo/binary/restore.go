@@ -49,12 +49,17 @@ func (restoreService *RestoreService) DoRestore(
 	if err != nil {
 		return err
 	}
-	metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
-	if err != nil {
-		return err
-	}
 
-	pathFilter, tarFilter := restoreService.getFilters(metadata, args.Whitelist, args.Blacklist)
+	var pathFilter, tarFilter map[string]struct{}
+	partial := len(args.Whitelist)+len(args.Blacklist) > 0
+
+	if partial {
+		metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
+		if err != nil {
+			return err
+		}
+		pathFilter, tarFilter = models.GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
+	}
 
 	if !args.SkipChecks {
 		//todo maybe delete all checks?
@@ -73,7 +78,6 @@ func (restoreService *RestoreService) DoRestore(
 		tracelog.InfoLogger.Println("Skipped download mongodb backup files")
 	}
 
-	partial := len(args.Whitelist)+len(args.Blacklist) > 0
 	if partial {
 		if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
 			return err
@@ -110,16 +114,6 @@ func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion stri
 	}
 
 	return restoreService.LocalStorage.EnsureMongodFsLockFileIsEmpty()
-}
-
-func (restoreService *RestoreService) getFilters(
-	metadata *models.BackupRoutesInfo, whitelist, blacklist []string,
-) (map[string]struct{}, map[string]struct{}) {
-	if len(whitelist)+len(blacklist) == 0 {
-		return nil, nil
-	}
-
-	return models.GetTarFilesFilter(metadata, whitelist, blacklist)
 }
 
 func (restoreService *RestoreService) reconfigMongo(
