@@ -75,6 +75,50 @@ func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeou
 	}, nil
 }
 
+func CreateBackgroundMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
+	var repeatOptions backoff.BackOff
+	repeatOptions = backoff.NewExponentialBackOff()
+	repeatOptions = backoff.WithMaxRetries(repeatOptions, mongoConnectRetries)
+	repeatOptions = backoff.WithContext(repeatOptions, ctx)
+
+	var mongoClient *mongo.Client
+	var err error
+	err = backoff.RetryNotify(
+		func() error {
+			mongoClient, err = mongo.Connect(ctx,
+				options.Client().ApplyURI(mongodbURI).
+					SetMaxPoolSize(1).
+					SetMinPoolSize(1).
+					SetServerSelectionTimeout(time.Minute*10).
+					SetConnectTimeout(time.Minute*10).
+					SetSocketTimeout(time.Minute*10).
+					SetAppName(appName).
+					SetDirect(true).
+					SetRetryReads(false))
+			if err != nil {
+				return errors.Wrap(err, "unable to connect to mongod")
+			}
+			err = mongoClient.Ping(ctx, nil)
+			if err != nil {
+				return errors.Wrap(err, "ping to mongod is failed")
+			}
+			return nil
+		},
+		repeatOptions,
+		func(err error, duration time.Duration) {
+			tracelog.InfoLogger.Printf("Unable to connect due '%+v', next retry: %v", err, duration)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MongodService{
+		Context:     ctx,
+		MongoClient: mongoClient,
+	}, nil
+}
+
 func (mongodService *MongodService) MongodVersion() (string, error) {
 	versionHolder := struct {
 		Version string `bson:"version"`
@@ -317,82 +361,16 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 	return nil
 }
 
-func (mongodService *MongodService) ListDatabases() ([]string, error) {
-	dbs, err := mongodService.MongoClient.ListDatabaseNames(mongodService.Context, bson.D{})
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to list mongod databases")
-	}
-	return dbs, nil
+func convertToFile(ident string) string {
+	return fmt.Sprintf("/%s.wt", ident)
 }
 
-func (mongodService *MongodService) ListCollections(dbName string) ([]string, error) {
-	var res []string
-
-	listCollectionsOpts := options.ListCollections().SetNameOnly(false)
-	cursor, err := mongodService.MongoClient.Database(dbName).ListCollections(mongodService.Context, bson.D{}, listCollectionsOpts)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("unable to list collections in %v db", dbName))
-	}
-	defer cursor.Close(mongodService.Context)
-
-	for cursor.Next(mongodService.Context) {
-		var result bson.M
-		if err := cursor.Decode(&result); err != nil {
-			return nil, err
-		}
-
-		collType, ok := result["type"].(string)
-		if !ok || collType != "view" {
-			if name, ok := result["name"].(string); ok {
-				res = append(res, name)
-			}
-		}
-	}
-
-	return res, nil
-}
-
-func getFileFromURI(uri string) (string, error) {
-	elems := strings.SplitN(uri, ":", 3)
-	if len(elems) < 3 {
-		return "", errors.Errorf("wrong URI: %s", uri)
-	}
-	return fmt.Sprintf("/%s.wt", elems[2]), nil
-}
-
-func (mongodService *MongodService) GetCollectionURI(dbName, collectionName string) (string, map[string]string, error) {
-	stats := struct {
-		WiredTiger struct {
-			URI string `bson:"uri"`
-		} `bson:"wiredTiger"`
-		IndexDetails map[string]bson.M `bson:"indexDetails"`
-	}{}
-	err := mongodService.MongoClient.Database(dbName).RunCommand(
-		mongodService.Context,
-		bson.D{{Key: "collStats", Value: collectionName}},
-	).Decode(&stats)
-	if err != nil {
-		return "", nil, errors.Wrapf(err, "unable to get collstats for %v.%v", dbName, collectionName)
-	}
-
-	indexInfo := make(map[string]string, len(stats.IndexDetails))
-	for index, indexStats := range stats.IndexDetails {
-		indexURI, ok := indexStats["uri"].(string)
-		if ok {
-			file, err := getFileFromURI(indexURI)
-			if err != nil {
-				return "", nil, err
-			}
-			indexInfo[index] = file
-		}
-	}
-
-	collFile, err := getFileFromURI(stats.WiredTiger.URI)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return collFile, indexInfo, nil
+type CatalogRecord struct {
+	Type       string            `bson:"type"`
+	Database   string            `bson:"db"`
+	Collection string            `bson:"name"`
+	Ident      string            `bson:"ident"`
+	IndexIdent map[string]string `bson:"idxIdent"`
 }
 
 func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
@@ -400,39 +378,37 @@ func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesI
 		Databases: make(map[string]models.DBInfo),
 		Service:   make(map[string]string),
 	}
-	dbs, err := mongodService.ListDatabases()
+
+	pipeline := mongo.Pipeline{{{Key: "$listCatalog", Value: bson.M{}}}}
+	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
 	if err != nil {
-		return nil, err // mab specify error with error.Wrap
+		return nil, err
 	}
 
-	for _, db := range dbs {
-		dbInfo := make(models.DBInfo)
-
-		collections, err := mongodService.ListCollections(db)
-		if err != nil {
+	for cursor.TryNext(mongodService.Context) {
+		var record CatalogRecord
+		if err = cursor.Decode(&record); err != nil {
 			return nil, err
 		}
-
-		for _, coll := range collections {
-			collectionURI, indexesURI, err := mongodService.GetCollectionURI(db, coll)
-			if err != nil {
-				return nil, err
-			}
-
-			indexInfo := make(models.IndexInfo)
-			for index, uri := range indexesURI {
-				indexInfo[index] = models.Paths{DBPath: uri}
-			}
-
-			dbInfo[coll] = models.CollectionInfo{
-				Paths: models.Paths{
-					DBPath: collectionURI,
-				},
-				IndexInfo: indexInfo,
-			}
+		if record.Type != "collection" {
+			continue
 		}
 
-		routes.Databases[db] = dbInfo
+		indexInfo := make(models.IndexInfo)
+		for index, uri := range record.IndexIdent {
+			indexInfo[index] = models.Paths{DBPath: convertToFile(uri)}
+		}
+
+		colInfo := models.CollectionInfo{
+			Paths:     models.Paths{DBPath: convertToFile(record.Ident)},
+			IndexInfo: indexInfo,
+		}
+
+		if _, ok := routes.Databases[record.Database]; !ok {
+			routes.Databases[record.Database] = make(models.DBInfo)
+		}
+
+		routes.Databases[record.Database][record.Collection] = colInfo
 	}
 
 	return &routes, nil

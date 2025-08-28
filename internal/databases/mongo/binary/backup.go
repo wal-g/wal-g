@@ -150,28 +150,15 @@ type DoBackupArgs struct {
 	SkipMetadata  bool
 }
 
-func (backupService *BackupService) initializeBackup(args DoBackupArgs) error {
+func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent)
 	if err != nil {
 		return err
 	}
 
-	var backupRoutes *models.BackupRoutesInfo
-	if !args.SkipMetadata {
-		backupRoutes, err = CreateBackupRoutesInfo(backupService.MongodService)
-		if err != nil {
-			return err
-		}
-		backupService.BackupRoutesInfo = *backupRoutes
-	}
-	return nil
-}
-
-func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
-	err := backupService.initializeBackup(args)
-	if err != nil {
-		return err
-	}
+	tarsChan := make(chan internal.TarFileSets)
+	errsChan := make(chan error)
+	go backupService.BackgroundMetadata(tarsChan, errsChan, args.SkipMetadata)
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
@@ -226,8 +213,9 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	}
 
 	if !args.SkipMetadata {
-		if err = backupService.AddMetadata(tarFileSets); err != nil {
-			tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
+		tarsChan <- tarFileSets
+		err = <-errsChan
+		if err != nil {
 			return err
 		}
 	}
@@ -289,11 +277,42 @@ func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUpload
 	return nil
 }
 
-func (backupService *BackupService) AddMetadata(tarFilesSet internal.TarFileSets) error {
-	backupRoutes := &backupService.BackupRoutesInfo
-	if err := models.EnrichWithTarPaths(backupRoutes, tarFilesSet.Get()); err != nil {
-		return err
+func (backupService *BackupService) BackgroundMetadata(
+	tarsChan <-chan internal.TarFileSets,
+	errChan chan<- error,
+	skip bool,
+) {
+	if skip {
+		errChan <- nil
+		return
 	}
 
-	return internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
+	bgCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	bgMongoService, err := CreateBackgroundMongodService(bgCtx, "test", mongodbURI)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	backupRoutes, err := CreateBackupRoutesInfo(bgMongoService)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	tarsFileSet := <-tarsChan
+	if err = models.EnrichWithTarPaths(backupRoutes, tarsFileSet.Get()); err != nil {
+		errChan <- err
+		return
+	}
+
+	errChan <- internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
 }
