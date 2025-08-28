@@ -146,7 +146,6 @@ const (
 	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
-	PartialRestoreTimeout               = "PARTIAL_RESTORE_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
