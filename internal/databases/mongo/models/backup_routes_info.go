@@ -27,10 +27,9 @@ type BackupRoutesInfo struct {
 
 type PathMapFilter map[string]map[string]struct{}
 
-func getFromTarFilesSetAndDeleteKey(key string, tarFilesSet map[string]map[string]struct{}) (string, bool) {
+func getFromTarFilesSet(key string, tarFilesSet map[string]map[string]struct{}) (string, bool) {
 	for tarFile, tarFileSet := range tarFilesSet {
 		if _, ok := tarFileSet[key]; ok {
-			delete(tarFileSet, key)
 			return tarFile, ok
 		}
 	}
@@ -58,14 +57,14 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 
 	for dbName, dbInfo := range backupRoutesInfo.Databases {
 		for colName, colInfo := range dbInfo {
-			colTarPath, ok := getFromTarFilesSetAndDeleteKey(colInfo.DBPath, tarFilesSet)
+			colTarPath, ok := getFromTarFilesSet(colInfo.DBPath, tarFilesSet)
 			if !ok {
 				return errors.Errorf("file %s not found in tar directory", colInfo.DBPath)
 			}
 			colInfo.TarPath = colTarPath
 
 			for indexName, indexInfo := range colInfo.IndexInfo {
-				indTarPath, ok := getFromTarFilesSetAndDeleteKey(indexInfo.DBPath, tarFilesSet)
+				indTarPath, ok := getFromTarFilesSet(indexInfo.DBPath, tarFilesSet)
 				if !ok {
 					return errors.Errorf("file %s not found in tar directory", indexInfo.DBPath)
 				}
