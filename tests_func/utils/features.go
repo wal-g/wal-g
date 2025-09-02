@@ -15,7 +15,7 @@ const (
 func FindFeaturePaths(database, featurePrefix string) ([]string, error) {
 	environ := ParseEnvLines(os.Environ())
 	requestedFeatureName := environ["FEATURE"]
-	pitrSupported := environ["MONGO_MAJOR"] >= "4.2"
+	pitrSupported := environ["MONGO_VERSION"] >= "4.2"
 	binarySupported := strings.HasSuffix(environ["MONGO_PACKAGE"], "-enterprise")
 
 	databaseFeaturesPath := path.Join(featuresDir, database)
