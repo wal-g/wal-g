@@ -10,7 +10,7 @@ import (
 func purgeJournalInfo(backupName string, dryRun bool) {
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't configure storage: %s", err.Error())
+		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
 		return
 	}
 
@@ -21,7 +21,7 @@ func purgeJournalInfo(backupName string, dryRun bool) {
 	)
 	// Backup could be created without journal
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
+		tracelog.WarningLogger.Printf("Can't find the journal info: %+v", err)
 		return
 	}
 

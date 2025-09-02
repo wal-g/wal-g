@@ -43,16 +43,16 @@ type CalculateSizesArgs struct {
 	CountJournals bool
 }
 
-func (backupService *BackupService) createInitialJournals() internal.JournalInfo {
+func (backupService *BackupService) createInitialJournals(journalFiles internal.JournalFiles) internal.JournalInfo {
 	backupFolder, err := common.GetBackupFolder()
 	if err != nil {
-		tracelog.ErrorLogger.Printf("can not get backup folder: %s", err.Error())
+		tracelog.ErrorLogger.Printf("can not get backup folder: %+v", err)
 		return internal.JournalInfo{}
 	}
 	backupTimes, err := internal.GetBackups(backupFolder)
 	if err != nil {
 		// no backups is a valid case, no journals should be created then
-		tracelog.WarningLogger.Printf("can not get backups: %s", err.Error())
+		tracelog.WarningLogger.Printf("can not get backups: %+v", err)
 		return internal.JournalInfo{}
 	}
 
@@ -64,6 +64,7 @@ func (backupService *BackupService) createInitialJournals() internal.JournalInfo
 			backupName:            backupTime.BackupName,
 			mostRecentJournalInfo: mostRecentJournalInfo,
 			timeStop:              backupTime.Time,
+			journalFiles:          journalFiles,
 		})
 	}
 	return mostRecentJournalInfo
@@ -73,6 +74,7 @@ type addJournalInfoArgs struct {
 	backupName            string
 	mostRecentJournalInfo internal.JournalInfo
 	timeStop              time.Time
+	journalFiles          internal.JournalFiles
 }
 
 func (backupService *BackupService) addJournalInfo(args addJournalInfoArgs) internal.JournalInfo {
@@ -82,7 +84,7 @@ func (backupService *BackupService) addJournalInfo(args addJournalInfoArgs) inte
 
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't configure storage: %s", err.Error())
+		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
 		return internal.JournalInfo{}
 	}
 
@@ -95,13 +97,13 @@ func (backupService *BackupService) addJournalInfo(args addJournalInfoArgs) inte
 
 	err = journalInfo.Upload(rootFolder)
 	if err != nil {
-		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
+		tracelog.WarningLogger.Printf("can not upload the journal info: %+v", err)
 		return internal.JournalInfo{}
 	}
 
-	err = journalInfo.UpdateIntervalSize(rootFolder)
+	err = journalInfo.UpdateIntervalSize(rootFolder, args.journalFiles)
 	if err != nil {
-		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
+		tracelog.WarningLogger.Printf("can not calculate journal size: %+v", err)
 		return internal.JournalInfo{}
 	}
 
@@ -117,18 +119,19 @@ func (backupService *BackupService) calculateSizes(args CalculateSizesArgs) {
 
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't configure storage: %s", err.Error())
+		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
 		return
 	}
 
+	var journalFiles internal.JournalFiles
 	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(
 		storage.RootFolder(),
 		models.OplogArchBasePath,
 	)
-	if err != nil {
+	if errors.Is(err, internal.JournalsNotFound) {
 		// there can be no backups on S3 or we do it first time
-		tracelog.WarningLogger.Printf("can not find the last journal info: %s", err.Error())
-		mostRecentJournalInfo = backupService.createInitialJournals()
+		tracelog.WarningLogger.Printf("can not find the last journal info: %+v", err)
+		mostRecentJournalInfo = backupService.createInitialJournals(journalFiles)
 	}
 
 	timeStop := utility.TimeNowCrossPlatformLocal()
@@ -136,6 +139,7 @@ func (backupService *BackupService) calculateSizes(args CalculateSizesArgs) {
 		backupName:            args.BackupName,
 		mostRecentJournalInfo: mostRecentJournalInfo,
 		timeStop:              timeStop,
+		journalFiles:          journalFiles,
 	})
 }
 
@@ -228,11 +232,7 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 		}
 	}
 
-	err = backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
-	if err != nil {
-		return err
-	}
-	return nil
+	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
 }
 
 func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool) error {
