@@ -637,11 +637,12 @@ func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto F
 		return nil
 	}
 
-	dtoBody, err := json.Marshal(filesMetaDto)
+	reader, writer := io.Pipe()
+	err := json2.MarshalWrite(writer, filesMetaDto)
 	if err != nil {
 		return err
 	}
-	return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
+	return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), reader)
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {
