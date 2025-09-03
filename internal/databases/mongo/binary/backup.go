@@ -43,7 +43,7 @@ type CalculateSizesArgs struct {
 	CountJournals bool
 }
 
-func (backupService *BackupService) createInitialJournals(journalFiles internal.JournalFiles) internal.JournalInfo {
+func (backupService *BackupService) createInitialJournals(journalFiles *internal.JournalFiles) internal.JournalInfo {
 	backupFolder, err := common.GetBackupFolder()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("can not get backup folder: %+v", err)
@@ -74,7 +74,7 @@ type addJournalInfoArgs struct {
 	backupName            string
 	mostRecentJournalInfo internal.JournalInfo
 	timeStop              time.Time
-	journalFiles          internal.JournalFiles
+	journalFiles          *internal.JournalFiles
 }
 
 func (backupService *BackupService) addJournalInfo(args addJournalInfoArgs) internal.JournalInfo {
@@ -123,7 +123,7 @@ func (backupService *BackupService) calculateSizes(args CalculateSizesArgs) {
 		return
 	}
 
-	var journalFiles internal.JournalFiles
+	journalFiles := &internal.JournalFiles{}
 	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(
 		storage.RootFolder(),
 		models.OplogArchBasePath,

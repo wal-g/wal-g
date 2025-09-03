@@ -186,7 +186,7 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 		return err
 	}
 
-	err = newerJi.UpdateIntervalSize(folder, JournalFiles{})
+	err = newerJi.UpdateIntervalSize(folder, &JournalFiles{})
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ type JournalFiles struct {
 
 // UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
 // using journal files on JournalDirectoryName and save it for the previous JournalInfo
-func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder, journalFilesObj JournalFiles) error {
+func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder, journalFilesObj *JournalFiles) error {
 	var err error
 	if !journalFilesObj.initialized {
 		// doing this 1 time for reusing it in next runs during single calculation
