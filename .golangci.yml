@@ -58,7 +58,6 @@ linters:
         - name: error-naming
         - name: exported
         - name: increment-decrement
-        - name: var-naming
         - name: var-declaration
         - name: package-comments
         - name: range
