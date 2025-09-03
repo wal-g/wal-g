@@ -27,8 +27,6 @@ FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
 WALG_VERSION ?= `git tag -l --points-at HEAD | tail -1`
 GIT_REVISION ?= `git rev-parse --short HEAD`
 
-GOEXPERIMENT:=jsonv2
-
 BUILD_TAGS:=
 
 ifdef USE_BROTLI
