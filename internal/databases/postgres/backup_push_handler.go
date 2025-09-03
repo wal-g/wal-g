@@ -631,7 +631,7 @@ func (bh *BackupHandler) uploadExtendedMetadata(ctx context.Context, meta Extend
 	return bh.Arguments.Uploader.Upload(ctx, metaFile, bytes.NewReader(dtoBody))
 }
 
-func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto FilesMetadataDto) (err error) {
+func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto FilesMetadataDto) error {
 	if bh.Arguments.withoutFilesMetadata {
 		tracelog.InfoLogger.Printf("Files metadata tracking is disabled, will not upload the %s", FilesMetadataName)
 		return nil
