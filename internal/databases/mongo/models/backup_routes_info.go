@@ -27,9 +27,16 @@ type BackupRoutesInfo struct {
 
 type PathMapFilter map[string]map[string]struct{}
 
-func getFromTarFilesSet(key string, tarFilesSet map[string]map[string]struct{}) (string, bool) {
+func getFromTarFilesSet(
+	key string,
+	tarFilesSet map[string]map[string]struct{},
+	alreadyFound map[string]string,
+) (string, bool) {
 	for tarFile, tarFileSet := range tarFilesSet {
 		if _, ok := tarFileSet[key]; ok {
+			alreadyFound[key] = tarFile
+			return tarFile, ok
+		} else if tarFile, ok = alreadyFound[key]; ok {
 			return tarFile, ok
 		}
 	}
@@ -48,6 +55,7 @@ func GetSpecialFilesFromTarFilesSet(tarFilesSet map[string]map[string]struct{}) 
 
 func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string][]string) error {
 	tarFilesSet := map[string]map[string]struct{}{}
+	alreadyFound := map[string]string{}
 	for tarPath, files := range tarPaths {
 		tarFilesSet[tarPath] = make(map[string]struct{}, len(files))
 		for _, file := range files {
@@ -57,14 +65,14 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 
 	for dbName, dbInfo := range backupRoutesInfo.Databases {
 		for colName, colInfo := range dbInfo {
-			colTarPath, ok := getFromTarFilesSet(colInfo.DBPath, tarFilesSet)
+			colTarPath, ok := getFromTarFilesSet(colInfo.DBPath, tarFilesSet, alreadyFound)
 			if !ok {
 				return errors.Errorf("file %s not found in tar directory", colInfo.DBPath)
 			}
 			colInfo.TarPath = colTarPath
 
 			for indexName, indexInfo := range colInfo.IndexInfo {
-				indTarPath, ok := getFromTarFilesSet(indexInfo.DBPath, tarFilesSet)
+				indTarPath, ok := getFromTarFilesSet(indexInfo.DBPath, tarFilesSet, alreadyFound)
 				if !ok {
 					return errors.Errorf("file %s not found in tar directory", indexInfo.DBPath)
 				}
