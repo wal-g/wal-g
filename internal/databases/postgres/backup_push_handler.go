@@ -642,11 +642,20 @@ func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto F
 
 	errorGroup, _ := errgroup.WithContext(ctx)
 	errorGroup.Go(func() error {
-		defer utility.LoggedClose(writer, "uploadFilesMetadata")
-		return json2.MarshalWrite(writer, filesMetaDto)
+		err := json2.MarshalWrite(writer, filesMetaDto)
+		if err != nil {
+			_ = writer.CloseWithError(err)
+			return err
+		}
+		return writer.Close()
 	})
 	errorGroup.Go(func() error {
-		return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), reader)
+		err := bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), reader)
+		if err != nil {
+			_ = reader.CloseWithError(err)
+			return err
+		}
+		return reader.Close()
 	})
 	return errorGroup.Wait()
 }
