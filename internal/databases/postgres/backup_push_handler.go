@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -638,11 +639,15 @@ func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto F
 	}
 
 	reader, writer := io.Pipe()
-	err := json2.MarshalWrite(writer, filesMetaDto)
-	if err != nil {
-		return err
-	}
-	return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), reader)
+
+	errorGroup, _ := errgroup.WithContext(ctx)
+	errorGroup.Go(func() error {
+		return json2.MarshalWrite(writer, filesMetaDto)
+	})
+	errorGroup.Go(func() error {
+		return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), reader)
+	})
+	return errorGroup.Wait()
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {
