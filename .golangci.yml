@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.24"
+  go: "1.25"
   modules-download-mode: readonly
 linters:
   default: none
@@ -58,7 +58,6 @@ linters:
         - name: error-naming
         - name: exported
         - name: increment-decrement
-        - name: var-naming
         - name: var-declaration
         - name: package-comments
         - name: range

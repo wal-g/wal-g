@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	json2 "encoding/json/v2"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -629,17 +632,32 @@ func (bh *BackupHandler) uploadExtendedMetadata(ctx context.Context, meta Extend
 	return bh.Arguments.Uploader.Upload(ctx, metaFile, bytes.NewReader(dtoBody))
 }
 
-func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto FilesMetadataDto) (err error) {
+func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto FilesMetadataDto) error {
 	if bh.Arguments.withoutFilesMetadata {
 		tracelog.InfoLogger.Printf("Files metadata tracking is disabled, will not upload the %s", FilesMetadataName)
 		return nil
 	}
 
-	dtoBody, err := json.Marshal(filesMetaDto)
-	if err != nil {
-		return err
-	}
-	return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
+	reader, writer := io.Pipe()
+
+	errorGroup, _ := errgroup.WithContext(ctx)
+	errorGroup.Go(func() error {
+		err := json2.MarshalWrite(writer, filesMetaDto)
+		if err != nil {
+			_ = writer.CloseWithError(err)
+			return err
+		}
+		return writer.Close()
+	})
+	errorGroup.Go(func() error {
+		err := bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), reader)
+		if err != nil {
+			_ = reader.CloseWithError(err)
+			return err
+		}
+		return reader.Close()
+	})
+	return errorGroup.Wait()
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {

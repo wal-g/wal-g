@@ -1,8 +1,8 @@
 module github.com/wal-g/wal-g
 
-go 1.24
+go 1.25
 
-toolchain go1.24.5
+toolchain go1.25.0
 
 require (
 	cloud.google.com/go/storage v1.10.0
