@@ -150,9 +150,9 @@ func configureSession(sess *session.Session, config *Config) error {
 		awsConfig = awsConfig.WithLogLevel(func(s string) aws.LogLevelType {
 			switch s {
 			case "DEVEL":
-				return aws.LogDebug
+				return aws.LogDebug | aws.LogDebugWithRequestRetries
 			default:
-				return aws.LogOff
+				return aws.LogDebugWithRequestErrors
 			}
 		}(config.LogLevel))
 	}
