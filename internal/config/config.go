@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -940,7 +941,7 @@ func ToFlagName(s string) string {
 // Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
 func bindConfigToEnv(globalViper *viper.Viper) {
 	for k, v := range globalViper.AllSettings() {
-		val := fmt.Sprint(v)
+		val := cast.ToString(v)
 		k = strings.ToUpper(k)
 
 		// avoid filling environment with empty values :
