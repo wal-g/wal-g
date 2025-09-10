@@ -17,8 +17,11 @@ type ConnResetRetryer struct {
 }
 
 func (r ConnResetRetryer) ShouldRetry(req *request.Request) bool {
-	if req.Error != nil && strings.Contains(req.Error.Error(), "connection reset by peer") {
-		return true
+	if req.Error != nil {
+		if strings.Contains(req.Error.Error(), "connection reset by peer") ||
+			strings.Contains(req.Error.Error(), "connection refused") {
+			return true
+		}
 	}
 
 	return r.Retryer.ShouldRetry(req)
