@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -31,13 +32,15 @@ type AOLengthCheckSegmentHandler struct {
 	port       string
 	segnum     string
 	rootFolder storage.Folder
+	dbDir      string
 }
 
-func NewAOLengthCheckSegmentHandler(port, segnum string, rootFolder storage.Folder) (*AOLengthCheckSegmentHandler, error) {
+func NewAOLengthCheckSegmentHandler(port, segnum string, rootFolder storage.Folder, dbDir string) (*AOLengthCheckSegmentHandler, error) {
 	return &AOLengthCheckSegmentHandler{
 		port:       port,
 		segnum:     segnum,
-		rootFolder: rootFolder}, nil
+		rootFolder: rootFolder,
+		dbDir:      dbDir}, nil
 }
 
 func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
@@ -59,7 +62,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 		}
 		tracelog.DebugLogger.Printf("AO/AOCS relations in db: %d", len(AOTablesSize))
 
-		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), db.Oid))
+		entries, err := os.ReadDir(checker.getGPTablesDirName(db.Oid))
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("unable to list tables` file directory %v", err)
 		}
@@ -118,7 +121,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 	errors := make([]string, 0)
 
 	for _, db := range DBNames {
-		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), db.Oid))
+		entries, err := os.ReadDir(checker.getGPTablesDirName(db.Oid))
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("unable to list tables` file directory %v", err)
 		}
@@ -309,4 +312,11 @@ func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData() (map[string]i
 	tracelog.DebugLogger.Printf("successfully loaded file data from backup")
 
 	return fileData, nil
+}
+
+func (checker *AOLengthCheckSegmentHandler) getGPTablesDirName(oid uint32) string {
+	return filepath.Join(
+		checker.dbDir,
+		fmt.Sprintf("primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), oid),
+	)
 }
