@@ -245,7 +245,7 @@ wal-g recovery-action promote --restore-config=${RESTORE_CONFIG}
 
 *  `GPHOME`
 
-To configure path to greenplum installation directory. Usually it is '/usr/local/greenplum-db' or '/opt/greenplum-db-6'
+To configure path to greenplum installation directory. Usually it is '/usr/local/greenplum-db-6' or '/opt/greenplum-db-6'
 
 
 #### Check AO/AOCS tables 
