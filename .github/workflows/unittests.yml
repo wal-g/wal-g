@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"
+  GOEXPERIMENT: jsonv2
   USE_BROTLI: 1
 
 jobs:
