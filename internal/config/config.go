@@ -189,6 +189,7 @@ const (
 	GPAoDeduplicationAgeLimit    = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
 	GPRelativeRecoveryConfPath   = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
 	GPRelativePostgresqlConfPath = "WALG_GP_RELATIVE_POSTGRESQL_CONF_PATH"
+	GPHome                       = "GPHOME"
 
 	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
 	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
@@ -628,6 +629,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
+		GPHome:                               true,
 	}
 
 	RequiredSettings       = make(map[string]bool)

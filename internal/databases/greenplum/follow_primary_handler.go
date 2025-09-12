@@ -2,14 +2,16 @@ package greenplum
 
 import (
 	"fmt"
+	"path"
+	"sort"
+	"strings"
+
 	"github.com/spf13/viper"
+
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"path"
-	"sort"
-	"strings"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
@@ -156,8 +158,12 @@ func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 
 func (fh *FollowPrimaryHandler) buildSegmentStartCommand(contentID int) string {
 	segment := fh.cluster.ByContent[contentID][0]
+	pgCtlPath := "pg_ctl"
+	if viper.IsSet(conf.GPHome) {
+		pgCtlPath = path.Join(viper.GetString(conf.GPHome), "bin", "pg_ctl")
+	}
 	cmd := []string{
-		"pg_ctl",
+		pgCtlPath,
 		fmt.Sprintf("-t %d", fh.timeoutInSeconds),
 		fmt.Sprintf("-D %s", segment.DataDir),
 		"start",
