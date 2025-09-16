@@ -19,15 +19,16 @@ type WalgExporter struct {
 	scrapeInterval time.Duration
 
 	// Metrics
-	walTimestamp    *prometheus.GaugeVec
-	lsnLag          *prometheus.GaugeVec
-	pitrWindow      prometheus.Gauge
-	errors          *prometheus.CounterVec
-	walIntegrity    *prometheus.GaugeVec
-	backupCount     *prometheus.GaugeVec
-	backupTimestamp *prometheus.GaugeVec
-	scrapeDuration  prometheus.Gauge
-	scrapeErrors    prometheus.Counter
+	walTimestamp          *prometheus.GaugeVec
+	lsnLag                *prometheus.GaugeVec
+	pitrWindow            prometheus.Gauge
+	errors                *prometheus.CounterVec
+	walIntegrity          *prometheus.GaugeVec
+	backupCount           *prometheus.GaugeVec
+	backupStartTimestamp  *prometheus.GaugeVec
+	backupFinishTimestamp *prometheus.GaugeVec
+	scrapeDuration        prometheus.Gauge
+	scrapeErrors          prometheus.Counter
 
 	// Storage aliveness metrics
 	storageAlive   prometheus.Gauge
@@ -173,10 +174,18 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration) (*WalgExport
 			[]string{"backup_type"},
 		),
 
-		backupTimestamp: prometheus.NewGaugeVec(
+		backupStartTimestamp: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "walg_backup_timestamp",
-				Help: "Timestamp of backup",
+				Name: "walg_backup_start_timestamp",
+				Help: "Start timestamp of backup",
+			},
+			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
+		),
+
+		backupFinishTimestamp: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "walg_backup_finish_timestamp",
+				Help: "Finish timestamp of backup",
 			},
 			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
 		),
@@ -219,7 +228,8 @@ func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
 	e.errors.Describe(ch)
 	e.walIntegrity.Describe(ch)
 	e.backupCount.Describe(ch)
-	e.backupTimestamp.Describe(ch)
+	e.backupStartTimestamp.Describe(ch)
+	e.backupFinishTimestamp.Describe(ch)
 	e.scrapeDuration.Describe(ch)
 	e.scrapeErrors.Describe(ch)
 	e.storageAlive.Describe(ch)
@@ -234,7 +244,8 @@ func (e *WalgExporter) Collect(ch chan<- prometheus.Metric) {
 	e.errors.Collect(ch)
 	e.walIntegrity.Collect(ch)
 	e.backupCount.Collect(ch)
-	e.backupTimestamp.Collect(ch)
+	e.backupStartTimestamp.Collect(ch)
+	e.backupFinishTimestamp.Collect(ch)
 	e.scrapeDuration.Collect(ch)
 	e.scrapeErrors.Collect(ch)
 	e.storageAlive.Collect(ch)
@@ -339,7 +350,8 @@ func (e *WalgExporter) getWalInfo() ([]TimelineInfo, error) {
 func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 	// Reset metrics
 	e.backupCount.Reset()
-	e.backupTimestamp.Reset()
+	e.backupStartTimestamp.Reset()
+	e.backupFinishTimestamp.Reset()
 
 	fullCount, deltaCount := 0, 0
 
@@ -371,8 +383,9 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			baseBackupName, // Base backup name for delta backups, empty for full backups
 		}
 
-		// Set timestamp for this specific backup
-		e.backupTimestamp.WithLabelValues(labels...).Set(float64(backup.Time.Unix()))
+		// Set start and finish timestamps for this specific backup
+		e.backupStartTimestamp.WithLabelValues(labels...).Set(float64(backup.StartTime.Unix()))
+		e.backupFinishTimestamp.WithLabelValues(labels...).Set(float64(backup.FinishTime.Unix()))
 	}
 
 	// Set backup counts by type
