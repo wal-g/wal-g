@@ -56,6 +56,7 @@ type BackupInfo struct {
 	UncompressedSize int64       `json:"uncompressed_size"`
 	CompressedSize   int64       `json:"compressed_size"`
 	UserData         interface{} `json:"user_data,omitempty"`
+	IsFull           bool        `json:"is_full"` // Indicates if this is a full backup
 }
 
 // Helper function to convert uint64 LSN to string format (X/Y)
@@ -65,9 +66,9 @@ func formatLSN(lsn uint64) string {
 
 // Helper method to get backup type
 func (b *BackupInfo) GetBackupType() string {
-	// In real wal-g, determine backup type based on backup name or other fields
-	// For now, assume base backups start with "base_" and others are delta
-	if len(b.BackupName) >= 5 && b.BackupName[:5] == "base_" {
+	// Use the is_full field from WAL-G JSON output to determine backup type
+	// This properly reflects WAL-G's internal backup type determination logic
+	if b.IsFull {
 		return "full"
 	}
 	return "delta"
@@ -75,7 +76,8 @@ func (b *BackupInfo) GetBackupType() string {
 
 // Helper method to check if backup is full
 func (b *BackupInfo) IsFullBackup() bool {
-	return b.GetBackupType() == "full"
+	// Directly use the is_full field from WAL-G instead of name-based heuristics
+	return b.IsFull
 }
 
 // TimelineInfo represents timeline information from wal-show --detailed-json
