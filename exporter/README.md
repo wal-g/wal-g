@@ -1,28 +1,40 @@
 # WAL-G Prometheus Exporter
 
-A Prometheus exporter for WAL-G backup and WAL metrics for PostgreSQL databases.
+A comprehensive Prometheus exporter for WAL-G backup and WAL monitoring for PostgreSQL databases.
 
 ## Features
 
-- **Backup completion timestamps**: Track completion timestamps of backup-push operations (full and delta backups)
-- **WAL completion timestamps**: Monitor completion timestamps of wal-push operations
-- **LSN delta lag**: Calculate LSN lag in bytes between current and archived WAL
-- **PITR window**: Monitor point-in-time recovery window size
-- **Error monitoring**: Track WAL-G operation errors
-- **WAL integrity**: Monitor WAL segment integrity status per timeline
+- **Accurate backup type detection**: Uses WAL-G's actual naming conventions to distinguish full vs incremental backups
+- **Separate start/finish timestamps**: Track both when backups started and when they completed
+- **Base backup tracking**: For incremental backups, shows which full backup they're based on
+- **WAL monitoring**: Track WAL segment timestamps and integrity per timeline
+- **LSN lag calculation**: Monitor LSN lag in bytes between current and archived WAL
+- **PITR window**: Calculate point-in-time recovery window size
+- **Storage health**: Monitor storage connectivity and latency
+- **Error tracking**: Comprehensive WAL-G operation error monitoring
 
 ## Metrics
 
 The exporter provides the following metrics:
 
 ### Backup Metrics
-- `walg_backup_timestamp{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent}` - Unix timestamp of backup **completion** (when backup finished successfully)
+- `walg_backup_start_timestamp{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Unix timestamp when backup started
+- `walg_backup_finish_timestamp{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Unix timestamp when backup completed successfully
 - `walg_backup_count{backup_type}` - Number of successful backups (full/delta)
 
+**Label Details:**
+- `backup_name`: Full backup name (e.g., `base_000000010000000000000025` or `base_000000010000000500000007_D_000000010000000000000025`)
+- `backup_type`: `full` or `delta` (determined by presence of `_D_` in backup name)
+- `base_backup`: For delta backups, shows the base backup name they're built on (empty for full backups)
+
 ### WAL Metrics
-- `walg_wal_timestamp{timeline}` - Unix timestamp of WAL segment **completion** (when wal-push finished successfully)
+- `walg_wal_timestamp{timeline}` - Unix timestamp of WAL segment completion
 - `walg_lsn_lag_bytes{timeline}` - LSN delta lag in bytes
 - `walg_wal_integrity_status{timeline}` - WAL integrity status (1 = OK, 0 = ERROR)
+
+### Storage Metrics
+- `walg_storage_alive` - Storage connectivity status (1 = alive, 0 = dead)
+- `walg_storage_latency_seconds` - Storage operation latency
 
 ### PITR Metrics
 - `walg_pitr_window_seconds` - Point-in-time recovery window size in seconds
@@ -33,6 +45,16 @@ The exporter provides the following metrics:
 ### Exporter Metrics
 - `walg_scrape_duration_seconds` - Duration of the last scrape
 - `walg_scrape_errors_total` - Total number of scrape errors
+
+## Backup Type Detection
+
+The exporter correctly identifies backup types using WAL-G's actual naming conventions:
+
+- **Full backups**: Names like `base_000000010000000000000025` (no `_D_` suffix)
+- **Incremental/Delta backups**: Names like `base_000000010000000500000007_D_000000010000000000000025` (contains `_D_`)
+  - The part after `_D_` indicates the base backup: `000000010000000000000025` → `base_000000010000000000000025`
+
+This fixes the common issue where all backups were incorrectly marked as "full" based on the `base_` prefix.
 
 ## Installation
 
@@ -63,7 +85,6 @@ docker run -p 9351:9351 walg-exporter
 - `--web.telemetry-path` - Path for metrics endpoint (default: `/metrics`)
 - `--walg.path` - Path to wal-g binary (default: `wal-g`)
 - `--scrape.interval` - Scrape interval (default: `60s`)
-- `--log.level` - Log level (default: `info`)
 
 ### Example
 
@@ -91,6 +112,7 @@ The exporter requires WAL-G to be properly configured and accessible. Ensure tha
 The exporter executes the following WAL-G commands:
 - `wal-g backup-list --detail --json` - Get backup information
 - `wal-g wal-show --detailed-json` - Get WAL segment information
+- `wal-g st ls` - Check storage connectivity
 
 ## Prometheus Configuration
 
@@ -112,10 +134,19 @@ Example Grafana queries:
 ### Backup Age (in hours)
 ```promql
 # Time since last backup completed
-(time() - walg_backup_timestamp) / 3600
+(time() - walg_backup_finish_timestamp) / 3600
 
 # Show only full backups completion time
-(time() - walg_backup_timestamp{backup_type="full"}) / 3600
+(time() - walg_backup_finish_timestamp{backup_type="full"}) / 3600
+
+# Show incremental backups and their base backups
+walg_backup_finish_timestamp{backup_type="delta"} * on(base_backup) group_left walg_backup_finish_timestamp{backup_type="full"}
+```
+
+### Backup Duration
+```promql
+# How long backups took to complete
+walg_backup_finish_timestamp - walg_backup_start_timestamp
 ```
 
 ### WAL Age (in minutes)
@@ -134,31 +165,36 @@ walg_pitr_window_seconds / 3600
 rate(walg_errors_total[5m])
 ```
 
-### Backup Timeline
+### Storage Health
 ```promql
-# Show backup completion timestamps as time series
-walg_backup_timestamp * 1000  # Convert to milliseconds for Grafana
+# Storage connectivity
+walg_storage_alive
+
+# Storage latency
+walg_storage_latency_seconds
 ```
 
 ## Timestamp Semantics
 
-**Important**: All timestamp metrics represent **completion times**, not start times.
+The exporter provides both start and finish timestamps for comprehensive backup monitoring:
 
 ### Backup Timestamps
-- `walg_backup_timestamp` = Time when the backup operation **finished successfully**
-- This corresponds to when WAL-G writes the `_backup_stop_sentinel.json` file
-- Failed or interrupted backups do not generate timestamps
-- Represents the moment when the backup became available for recovery
+- `walg_backup_start_timestamp` = When the backup operation **started**
+- `walg_backup_finish_timestamp` = When the backup operation **finished successfully**
+  - This corresponds to when WAL-G writes the `_backup_stop_sentinel.json` file
+  - Failed or interrupted backups do not generate finish timestamps
+  - Represents the moment when the backup became available for recovery
 
 ### WAL Timestamps  
-- `walg_wal_timestamp` = Time when the WAL segment **finished uploading**
-- This is when the WAL segment became available in storage
-- Represents the completion of the wal-push operation
+- `walg_wal_timestamp` = When the WAL segment **finished uploading**
+  - This is when the WAL segment became available in storage
+  - Represents the completion of the wal-push operation
 
-### Why Completion Times?
-- **Recovery Point Objective (RPO)**: You care when data was successfully backed up
+### Why Both Start and Finish Times?
+- **Backup Duration**: Calculate how long backups take with `finish - start`
+- **Recovery Point Objective (RPO)**: Use finish time to know when data was successfully backed up
 - **Alerting**: Know how long since you had a complete, usable backup
-- **PITR calculations**: Recovery depends on when backups/WAL completed, not when they started
+- **Performance Monitoring**: Track backup performance trends
 
 ## Development
 
@@ -168,90 +204,71 @@ walg_backup_timestamp * 1000  # Convert to milliseconds for Grafana
 go test -v ./...
 ```
 
-### Running Benchmarks
-
-```bash
-go test -bench=. -benchmem ./...
-```
-
 ### Mock Testing
 
 The exporter includes comprehensive tests with mock WAL-G commands:
 
 ```bash
-# Create a mock wal-g script
-cat > mock-wal-g << 'EOF'
-#!/bin/bash
-case "$1" in
-  "backup-list")
-    echo '[{"backup_name":"test","time":"2024-01-01T12:00:00Z","is_full":true}]'
-    ;;
-  "wal-show")
-    echo '{"integrity":{"status":"OK","details":[{"timeline_id":1,"status":"FOUND"}]}}'
-    ;;
-esac
-EOF
-chmod +x mock-wal-g
-
-# Test with mock
-./walg-exporter --walg.path=./mock-wal-g
+# Test with included mock script
+./walg-exporter --walg.path=./mock-wal-g --scrape.interval=10s
 ```
+
+The mock script generates realistic test data including:
+- Full backups: `base_TIMESTAMP`
+- Incremental backups: `base_TIMESTAMP_D_BASEBACKUP`
+- Proper start/finish timestamps
+- Realistic LSN values
 
 ## Architecture
 
 The exporter consists of several components:
 
 - **main.go**: HTTP server and command-line interface
-- **exporter.go**: Core Prometheus collector implementation
-- **wal_lag.go**: LSN parsing and WAL lag calculation
-- **pitr.go**: PITR window calculation logic
+- **exporter.go**: Core Prometheus collector implementation with accurate backup type detection
+- **mock-wal-g**: Mock WAL-G script for testing
 
-### LSN Parsing
-
-The exporter includes a full LSN parser that handles PostgreSQL LSN format:
+### Backup Type Detection Logic
 
 ```go
-lsn, err := ParseLSN("0/1A2B3C4D")
-fmt.Println(lsn.String()) // "0/1A2B3C4D"
-fmt.Println(lsn.Bytes())  // 439041101
-```
+// IsFullBackup checks if backup is full based on WAL-G naming convention
+func (b *BackupInfo) IsFullBackup() bool {
+    // Incremental/delta backups have "_D_" in their name
+    return !strings.Contains(b.BackupName, "_D_")
+}
 
-### Lag Calculation
-
-WAL and LSN lag calculations:
-
-```go
-// Time-based lag
-walLag := calculateWalLag(lastWalTime)
-
-// LSN-based lag in bytes
-lsnLag := calculateLSNLag(currentLSN, lastArchivedLSN)
+// GetBaseBackupName extracts base backup for delta backups
+func (b *BackupInfo) GetBaseBackupName() string {
+    if b.IsFullBackup() {
+        return "" // Full backups don't have a base backup
+    }
+    
+    // Extract identifier after "_D_" and prepend "base_"
+    deltaIndex := strings.Index(b.BackupName, "_D_")
+    baseIdentifier := b.BackupName[deltaIndex+3:]
+    return "base_" + baseIdentifier
+}
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **WAL-G command not found**
+1. **Incorrect backup types**
+   - ✅ **Fixed**: The exporter now correctly identifies backup types using `_D_` suffix detection
+   - Old issue: All backups were marked as "full" due to `base_` prefix
+
+2. **WAL-G command not found**
    - Ensure WAL-G is in PATH or specify with `--walg.path`
    - Check that WAL-G is executable
 
-2. **Permission denied**
+3. **Permission denied**
    - Ensure the exporter has permission to execute WAL-G
    - Check WAL-G configuration file permissions
 
-3. **No metrics**
+4. **No metrics**
    - Verify WAL-G commands work manually
    - Check exporter logs for errors
    - Ensure WAL-G is properly configured
-
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-./walg-exporter --log.level=debug
-```
 
 ### Health Check
 
@@ -260,6 +277,22 @@ The exporter provides a health endpoint:
 ```bash
 curl http://localhost:9351/
 ```
+
+## Sample Output
+
+### Backup Metrics
+```
+walg_backup_start_timestamp{backup_name="base_000000010000000000000025",backup_type="full",base_backup="",wal_file="000000010000000000000025",...} 1758055800
+walg_backup_finish_timestamp{backup_name="base_000000010000000000000025",backup_type="full",base_backup="",wal_file="000000010000000000000025",...} 1758055900
+
+walg_backup_start_timestamp{backup_name="base_000000010000000500000007_D_000000010000000000000025",backup_type="delta",base_backup="base_000000010000000000000025",...} 1758059400
+walg_backup_finish_timestamp{backup_name="base_000000010000000500000007_D_000000010000000000000025",backup_type="delta",base_backup="base_000000010000000000000025",...} 1758059450
+```
+
+This shows:
+- A full backup that took 100 seconds (1758055900 - 1758055800)
+- An incremental backup based on the full backup that took 50 seconds
+- Clear relationship between incremental and its base backup
 
 ## Contributing
 
@@ -272,10 +305,3 @@ curl http://localhost:9351/
 ## License
 
 This project is licensed under the same license as WAL-G.
-
-## Support
-
-For issues and questions:
-- Check the [WAL-G documentation](https://github.com/wal-g/wal-g)
-- File an issue in the WAL-G repository
-- Join the WAL-G community discussions 
