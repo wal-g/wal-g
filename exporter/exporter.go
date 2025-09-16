@@ -18,8 +18,7 @@ type WalgExporter struct {
 	scrapeInterval time.Duration
 
 	// Metrics
-	backupLag       *prometheus.GaugeVec
-	walLag          *prometheus.GaugeVec
+	walTimestamp    *prometheus.GaugeVec
 	lsnLag          *prometheus.GaugeVec
 	pitrWindow      prometheus.Gauge
 	errors          *prometheus.CounterVec
@@ -99,18 +98,10 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration) (*WalgExport
 		walgPath:       walgPath,
 		scrapeInterval: scrapeInterval,
 
-		backupLag: prometheus.NewGaugeVec(
+		walTimestamp: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "walg_backup_lag_seconds",
-				Help: "Time since backup-push in seconds",
-			},
-			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent"},
-		),
-
-		walLag: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_wal_lag_seconds",
-				Help: "Time since last wal-push in seconds",
+				Name: "walg_wal_timestamp",
+				Help: "Timestamp of last wal-push operation",
 			},
 			[]string{"timeline"},
 		),
@@ -194,8 +185,7 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration) (*WalgExport
 
 // Describe implements the Prometheus Collector interface
 func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
-	e.backupLag.Describe(ch)
-	e.walLag.Describe(ch)
+	e.walTimestamp.Describe(ch)
 	e.lsnLag.Describe(ch)
 	e.pitrWindow.Describe(ch)
 	e.errors.Describe(ch)
@@ -210,8 +200,7 @@ func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements the Prometheus Collector interface
 func (e *WalgExporter) Collect(ch chan<- prometheus.Metric) {
-	e.backupLag.Collect(ch)
-	e.walLag.Collect(ch)
+	e.walTimestamp.Collect(ch)
 	e.lsnLag.Collect(ch)
 	e.pitrWindow.Collect(ch)
 	e.errors.Collect(ch)
@@ -320,12 +309,9 @@ func (e *WalgExporter) getWalInfo() ([]TimelineInfo, error) {
 
 // updateBackupMetrics updates backup-related metrics with detailed labels
 func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
-	now := time.Now()
-
 	// Reset metrics
 	e.backupCount.Reset()
 	e.backupTimestamp.Reset()
-	e.backupLag.Reset()
 
 	fullCount, deltaCount := 0, 0
 
@@ -355,9 +341,6 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 
 		// Set timestamp for this specific backup
 		e.backupTimestamp.WithLabelValues(labels...).Set(float64(backup.Time.Unix()))
-
-		// Set lag for this specific backup
-		e.backupLag.WithLabelValues(labels...).Set(now.Sub(backup.Time).Seconds())
 	}
 
 	// Set backup counts by type
@@ -369,6 +352,7 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 func (e *WalgExporter) updateWalMetrics(timelineInfos []TimelineInfo) {
 	// Reset metrics
 	e.walIntegrity.Reset()
+	e.walTimestamp.Reset()
 
 	// Set WAL integrity status for each timeline
 	for _, timeline := range timelineInfos {
@@ -382,9 +366,10 @@ func (e *WalgExporter) updateWalMetrics(timelineInfos []TimelineInfo) {
 		e.walIntegrity.WithLabelValues(timelineStr).Set(status)
 	}
 
-	// TODO: Implement WAL lag and LSN lag calculations
+	// TODO: Implement WAL timestamp and LSN lag calculations
 	// This requires more complex logic to determine the current WAL position
-	// and calculate the lag from the latest WAL segments
+	// and get timestamps from the latest WAL segments
+	// When implemented, use: e.walTimestamp.WithLabelValues(timelineStr).Set(float64(walTime.Unix()))
 }
 
 // updatePitrWindow calculates and updates the PITR window size

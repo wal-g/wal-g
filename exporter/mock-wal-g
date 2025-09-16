@@ -18,10 +18,10 @@ case "$1" in
       fi
       
       echo "[
-        {\"backup_name\":\"base_$(date +%s)\",\"time\":\"$full_time\",\"wal_file_name\":\"000000010000000000000010\",\"start_lsn\":\"0/10000000\",\"finish_lsn\":\"0/12000000\",\"permanent\":false,\"user_data\":\"\",\"is_full\":true},
-        {\"backup_name\":\"delta_$(date +%s)_D_001\",\"time\":\"$delta1_time\",\"wal_file_name\":\"000000010000000000000015\",\"start_lsn\":\"0/12000000\",\"finish_lsn\":\"0/14000000\",\"permanent\":false,\"user_data\":\"\",\"is_full\":false},
-        {\"backup_name\":\"delta_$(date +%s)_D_002\",\"time\":\"$delta2_time\",\"wal_file_name\":\"000000010000000000000018\",\"start_lsn\":\"0/14000000\",\"finish_lsn\":\"0/16000000\",\"permanent\":false,\"user_data\":\"\",\"is_full\":false},
-        {\"backup_name\":\"base_daily_backup\",\"time\":\"$old_full_time\",\"wal_file_name\":\"000000010000000000000005\",\"start_lsn\":\"0/5000000\",\"finish_lsn\":\"0/8000000\",\"permanent\":true,\"user_data\":\"daily-backup\",\"is_full\":true}
+        {\"backup_name\":\"base_$(date +%s)\",\"time\":\"$full_time\",\"wal_file_name\":\"000000010000000000000010\",\"start_lsn\":268435456,\"finish_lsn\":301989888,\"permanent\":false,\"user_data\":\"\",\"is_full\":true},
+        {\"backup_name\":\"delta_$(date +%s)_D_001\",\"time\":\"$delta1_time\",\"wal_file_name\":\"000000010000000000000015\",\"start_lsn\":301989888,\"finish_lsn\":335544320,\"permanent\":false,\"user_data\":\"\",\"is_full\":false},
+        {\"backup_name\":\"delta_$(date +%s)_D_002\",\"time\":\"$delta2_time\",\"wal_file_name\":\"000000010000000000000018\",\"start_lsn\":335544320,\"finish_lsn\":369098752,\"permanent\":false,\"user_data\":\"\",\"is_full\":false},
+        {\"backup_name\":\"base_daily_backup\",\"time\":\"$old_full_time\",\"wal_file_name\":\"000000010000000000000005\",\"start_lsn\":83886080,\"finish_lsn\":134217728,\"permanent\":true,\"user_data\":\"daily-backup\",\"is_full\":true}
       ]"
     fi
     ;;

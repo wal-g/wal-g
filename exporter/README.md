@@ -4,8 +4,8 @@ A Prometheus exporter for WAL-G backup and WAL metrics for PostgreSQL databases.
 
 ## Features
 
-- **Backup lag monitoring**: Track time since last backup-push (full and delta backups)
-- **WAL lag monitoring**: Monitor time since last wal-push operation
+- **Backup completion timestamps**: Track completion timestamps of backup-push operations (full and delta backups)
+- **WAL completion timestamps**: Monitor completion timestamps of wal-push operations
 - **LSN delta lag**: Calculate LSN lag in bytes between current and archived WAL
 - **PITR window**: Monitor point-in-time recovery window size
 - **Error monitoring**: Track WAL-G operation errors
@@ -16,12 +16,11 @@ A Prometheus exporter for WAL-G backup and WAL metrics for PostgreSQL databases.
 The exporter provides the following metrics:
 
 ### Backup Metrics
-- `walg_backup_lag_seconds{backup_type}` - Time since last backup-push in seconds
-- `walg_backup_count{backup_type}` - Number of backups (full/delta)
-- `walg_backup_timestamp{backup_type}` - Timestamp of last backup
+- `walg_backup_timestamp{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent}` - Unix timestamp of backup **completion** (when backup finished successfully)
+- `walg_backup_count{backup_type}` - Number of successful backups (full/delta)
 
 ### WAL Metrics
-- `walg_wal_lag_seconds{timeline}` - Time since last wal-push in seconds
+- `walg_wal_timestamp{timeline}` - Unix timestamp of WAL segment **completion** (when wal-push finished successfully)
 - `walg_lsn_lag_bytes{timeline}` - LSN delta lag in bytes
 - `walg_wal_integrity_status{timeline}` - WAL integrity status (1 = OK, 0 = ERROR)
 
@@ -110,14 +109,19 @@ scrape_configs:
 
 Example Grafana queries:
 
-### Backup Lag
+### Backup Age (in hours)
 ```promql
-walg_backup_lag_seconds{backup_type="full"}
+# Time since last backup completed
+(time() - walg_backup_timestamp) / 3600
+
+# Show only full backups completion time
+(time() - walg_backup_timestamp{backup_type="full"}) / 3600
 ```
 
-### WAL Lag
+### WAL Age (in minutes)
 ```promql
-walg_wal_lag_seconds
+# Time since last WAL segment completed
+(time() - walg_wal_timestamp) / 60
 ```
 
 ### PITR Window (in hours)
@@ -129,6 +133,32 @@ walg_pitr_window_seconds / 3600
 ```promql
 rate(walg_errors_total[5m])
 ```
+
+### Backup Timeline
+```promql
+# Show backup completion timestamps as time series
+walg_backup_timestamp * 1000  # Convert to milliseconds for Grafana
+```
+
+## Timestamp Semantics
+
+**Important**: All timestamp metrics represent **completion times**, not start times.
+
+### Backup Timestamps
+- `walg_backup_timestamp` = Time when the backup operation **finished successfully**
+- This corresponds to when WAL-G writes the `_backup_stop_sentinel.json` file
+- Failed or interrupted backups do not generate timestamps
+- Represents the moment when the backup became available for recovery
+
+### WAL Timestamps  
+- `walg_wal_timestamp` = Time when the WAL segment **finished uploading**
+- This is when the WAL segment became available in storage
+- Represents the completion of the wal-push operation
+
+### Why Completion Times?
+- **Recovery Point Objective (RPO)**: You care when data was successfully backed up
+- **Alerting**: Know how long since you had a complete, usable backup
+- **PITR calculations**: Recovery depends on when backups/WAL completed, not when they started
 
 ## Development
 
