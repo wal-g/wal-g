@@ -7,6 +7,7 @@ import (
 	"log"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -56,7 +57,7 @@ type BackupInfo struct {
 	UncompressedSize int64       `json:"uncompressed_size"`
 	CompressedSize   int64       `json:"compressed_size"`
 	UserData         interface{} `json:"user_data,omitempty"`
-	IsFull           bool        `json:"is_full"` // Indicates if this is a full backup
+	// Note: Real WAL-G doesn't include is_full field, we determine it from backup name
 }
 
 // Helper function to convert uint64 LSN to string format (X/Y)
@@ -66,9 +67,11 @@ func formatLSN(lsn uint64) string {
 
 // Helper method to get backup type
 func (b *BackupInfo) GetBackupType() string {
-	// Use the is_full field from WAL-G JSON output to determine backup type
-	// This properly reflects WAL-G's internal backup type determination logic
-	if b.IsFull {
+	// WAL-G doesn't include is_full in JSON output, so we determine backup type
+	// from the backup name using the actual WAL-G naming convention:
+	// - Incremental backups have "_D_" in their name (added during delta backup creation)
+	// - Full backups don't have "_D_" in their name
+	if b.IsFullBackup() {
 		return "full"
 	}
 	return "delta"
@@ -76,8 +79,31 @@ func (b *BackupInfo) GetBackupType() string {
 
 // Helper method to check if backup is full
 func (b *BackupInfo) IsFullBackup() bool {
-	// Directly use the is_full field from WAL-G instead of name-based heuristics
-	return b.IsFull
+	// In WAL-G, incremental/delta backups get "_D_" suffix added to their name
+	// (see backup_push_handler.go line 285: bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + "_D_" + ...)
+	// So if backup name contains "_D_", it's incremental; otherwise it's full
+	return !strings.Contains(b.BackupName, "_D_")
+}
+
+// GetBaseBackupName extracts the base backup name for delta backups
+// For delta backups with format "base_XXXXX_D_YYYYY", this returns "base_YYYYY"
+// For full backups, this returns empty string
+func (b *BackupInfo) GetBaseBackupName() string {
+	if b.IsFullBackup() {
+		return "" // Full backups don't have a base backup
+	}
+
+	// Find the "_D_" pattern in the backup name
+	deltaIndex := strings.Index(b.BackupName, "_D_")
+	if deltaIndex == -1 {
+		return "" // Shouldn't happen if IsFullBackup() returned false
+	}
+
+	// Extract the part after "_D_" which contains the base backup identifier
+	baseIdentifier := b.BackupName[deltaIndex+3:] // +3 to skip "_D_"
+
+	// The base backup name follows the pattern "base_" + identifier
+	return "base_" + baseIdentifier
 }
 
 // TimelineInfo represents timeline information from wal-show --detailed-json
@@ -152,7 +178,7 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration) (*WalgExport
 				Name: "walg_backup_timestamp",
 				Help: "Timestamp of backup",
 			},
-			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent"},
+			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
 		),
 
 		scrapeDuration: prometheus.NewGauge(
@@ -331,6 +357,9 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			permanent = "true"
 		}
 
+		// Get base backup name for delta backups (empty for full backups)
+		baseBackupName := backup.GetBaseBackupName()
+
 		// Labels for detailed backup information
 		labels := []string{
 			backup.BackupName,
@@ -339,6 +368,7 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			formatLSN(backup.StartLSN),  // Convert uint64 LSN to string format
 			formatLSN(backup.FinishLSN), // Convert uint64 LSN to string format
 			permanent,
+			baseBackupName, // Base backup name for delta backups, empty for full backups
 		}
 
 		// Set timestamp for this specific backup
