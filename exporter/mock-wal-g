@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 case "$1" in
   "backup-list")
     if [[ "$2" == "--detail" && "$3" == "--json" ]]; then

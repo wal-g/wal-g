@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Simple wrapper script to pass --config to wal-g commands
 # Usage: ./wrapper.sh [wal-g-command] [args...]
