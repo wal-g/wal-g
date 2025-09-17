@@ -20,6 +20,7 @@ var (
 	metricsPath    = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	walgPath       = flag.String("walg.path", "wal-g", "Path to the wal-g binary.")
 	scrapeInterval = flag.Duration("scrape.interval", 60*time.Second, "Interval between scrapes.")
+	walgConfigPath = flag.String("walg.config-path", "", "Path to the wal-g config file.")
 )
 
 func main() {
@@ -30,13 +31,13 @@ func main() {
 	log.Printf("Metrics path: %s", *metricsPath)
 	log.Printf("WAL-G path: %s", *walgPath)
 	log.Printf("Scrape interval: %v", *scrapeInterval)
-
+	log.Printf("WAL-G config path: %s", *walgConfigPath)
 	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Create and register the exporter
-	exporter, err := NewWalgExporter(*walgPath, *scrapeInterval)
+	exporter, err := NewWalgExporter(*walgPath, *scrapeInterval, *walgConfigPath)
 	if err != nil {
 		log.Fatalf("Failed to create exporter: %v", err)
 	}

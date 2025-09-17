@@ -16,6 +16,7 @@ import (
 // WalgExporter implements the Prometheus Collector interface
 type WalgExporter struct {
 	walgPath       string
+	walgConfigPath string
 	scrapeInterval time.Duration
 
 	// Metrics
@@ -122,11 +123,11 @@ type TimelineInfo struct {
 }
 
 // NewWalgExporter creates a new WAL-G exporter
-func NewWalgExporter(walgPath string, scrapeInterval time.Duration) (*WalgExporter, error) {
+func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPath string) (*WalgExporter, error) {
 	return &WalgExporter{
 		walgPath:       walgPath,
 		scrapeInterval: scrapeInterval,
-
+		walgConfigPath: walgConfigPath,
 		walTimestamp: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_wal_timestamp",
@@ -316,7 +317,7 @@ func (e *WalgExporter) scrapeMetrics() {
 
 // getBackupInfo executes wal-g backup-list --detail --json
 func (e *WalgExporter) getBackupInfo() ([]BackupInfo, error) {
-	cmd := exec.Command(e.walgPath, "backup-list", "--detail", "--json")
+	cmd := exec.Command(e.walgPath, "backup-list", "--detail", "--json", "--config", e.walgConfigPath)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute backup-list: %w", err)
@@ -332,7 +333,14 @@ func (e *WalgExporter) getBackupInfo() ([]BackupInfo, error) {
 
 // getWalInfo executes wal-g wal-show --detailed-json
 func (e *WalgExporter) getWalInfo() ([]TimelineInfo, error) {
-	cmd := exec.Command(e.walgPath, "wal-show", "--detailed-json")
+	var cmd *exec.Cmd
+
+	if e.walgConfigPath != "" {
+		cmd = exec.Command(e.walgPath, "wal-show", "--detailed-json", "--config", e.walgConfigPath)
+	} else {
+		cmd = exec.Command(e.walgPath, "wal-show", "--detailed-json")
+	}
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute wal-show: %w", err)
@@ -447,7 +455,12 @@ func (e *WalgExporter) checkStorageAliveness() {
 	defer cancel()
 
 	// Try a simple WAL-G command to test storage connectivity
-	cmd := exec.CommandContext(ctx, e.walgPath, "st", "ls")
+	var cmd *exec.Cmd
+	if e.walgConfigPath != "" {
+		cmd = exec.CommandContext(ctx, e.walgPath, "st", "ls", "--config", e.walgConfigPath)
+	} else {
+		cmd = exec.CommandContext(ctx, e.walgPath, "st", "ls")
+	}
 
 	err := cmd.Run()
 	latency := time.Since(start).Seconds()
