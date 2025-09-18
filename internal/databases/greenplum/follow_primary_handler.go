@@ -135,8 +135,7 @@ func (fh *FollowPrimaryHandler) applyXLogInCluster() {
 func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 	recoveryTarget := fh.stopAtRestorePoint
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker(
-		"wal-g", conf.CfgFile, recoveryTarget, true)
+	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
@@ -144,7 +143,7 @@ func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 			segment := fh.cluster.ByContent[contentID][0]
 			pathToRestore := path.Join(segment.DataDir, viper.GetString(conf.GPRelativeRecoveryConfPath))
 			// For this feature, we expect Cloudberry / Greenplum 6.25+ (in this version some patches from 9.5 were backported)
-			fileContents := restoreCfgMaker.Make(contentID, 90500)
+			fileContents := restoreCfgMaker.Make(contentID, 90500, RecoveryTargetActionShutdown)
 			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToRestore, fileContents)
 			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
 			return cmd

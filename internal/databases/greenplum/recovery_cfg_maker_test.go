@@ -15,24 +15,25 @@ const (
 )
 
 func TestGenerateRecoveryConf(t *testing.T) {
-	recCfgMaker := greenplum.NewRecoveryConfigMaker(walgPath, cfgPath, recoveryTargetName, false)
+	recCfgMaker := greenplum.NewRecoveryConfigMaker(walgPath, cfgPath, recoveryTargetName)
 	contentID := -1
 
 	expectedCfg := `restore_command = '/usr/bin/wal-g seg wal-fetch "%f" "%p" --content-id=-1 --config /etc/wal-g/wal-g.yaml'
 recovery_target_name = 'some_backup'
-recovery_target_timeline = latest`
-	actualCfg := recCfgMaker.Make(contentID, 90400)
+recovery_target_timeline = latest
+recovery_target_action = 'promote'`
+	actualCfg := recCfgMaker.Make(contentID, 90400, greenplum.RecoveryTargetActionPromote)
 	assert.Equal(t, expectedCfg, actualCfg, "Actual recovery.conf does not match the expected one")
 }
 
 func TestGenerateRecoveryConfWithShutdown(t *testing.T) {
-	recCfgMaker := greenplum.NewRecoveryConfigMaker(walgPath, cfgPath, recoveryTargetName, true)
+	recCfgMaker := greenplum.NewRecoveryConfigMaker(walgPath, cfgPath, recoveryTargetName)
 	contentID := -1
 
 	expectedCfg := `restore_command = '/usr/bin/wal-g seg wal-fetch "%f" "%p" --content-id=-1 --config /etc/wal-g/wal-g.yaml'
 recovery_target_name = 'some_backup'
 recovery_target_timeline = latest
 recovery_target_action = 'shutdown'`
-	actualCfg := recCfgMaker.Make(contentID, 120000)
+	actualCfg := recCfgMaker.Make(contentID, 120000, greenplum.RecoveryTargetActionShutdown)
 	assert.Equal(t, expectedCfg, actualCfg, "Actual recovery.conf does not match the expected one")
 }
