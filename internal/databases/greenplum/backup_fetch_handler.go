@@ -75,15 +75,14 @@ func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIDs []int, mode BackupFetchMode,
-	restorePoint string, partialRestoreArgs []string,
+	restorePoint string, partialRestoreArgs []string, withMirrors bool,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
 	initGpLog(logsDir)
 
 	for _, segMeta := range sentinel.Segments {
-		// currently, WAL-G does not restore the mirrors
-		if segMeta.Role == Primary {
+		if segMeta.Role == Primary || withMirrors {
 			// update the segment config from the metadata with the
 			// Hostname, Port and DataDir specified in the restore config
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
@@ -93,7 +92,8 @@ func NewFetchHandler(
 			segmentConfigs = append(segmentConfigs, segmentCfg)
 		} else {
 			tracelog.WarningLogger.Printf(
-				"Skipping non-primary segment: DatabaseID %d, Hostname %s, DataDir: %s\n", segMeta.DatabaseID, segMeta.Hostname, segMeta.DataDir)
+				"Skipping non-primary segment: DatabaseID %d, Hostname %s, DataDir: %s - no --with-mirrors flag passed\n",
+				segMeta.DatabaseID, segMeta.Hostname, segMeta.DataDir)
 		}
 	}
 
@@ -214,7 +214,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
+	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 
@@ -242,7 +242,11 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 			segment := fh.cluster.ByContent[contentID][0]
 			absPathToRestore := path.Join(segment.DataDir, pathToRecoveryConf)
 			absPathToPostgresqlConf := path.Join(segment.DataDir, pathToPostgresqlConf)
-			fileContents := restoreCfgMaker.Make(contentID, pgVersion)
+			recoveryTargetAction := RecoveryTargetActionPromote
+			if segment.Role == "m" {
+				recoveryTargetAction = RecoveryTargetActionShutdown
+			}
+			fileContents := restoreCfgMaker.Make(contentID, pgVersion, recoveryTargetAction)
 			var cmds []string
 			cmds = append(cmds,
 				fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToRestore),
@@ -303,8 +307,15 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	return cmdLine
 }
 
-func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
-	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
+func NewGreenplumBackupFetcher(
+	restoreCfgPath string,
+	inPlaceRestore bool,
+	logsDir string,
+	fetchContentIDs []int,
+	mode BackupFetchMode,
+	restorePoint string,
+	partialRestoreArgs []string,
+	withMirrors bool,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
@@ -318,7 +329,7 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs)
+		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs, withMirrors)
 		err = handler.Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
