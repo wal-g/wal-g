@@ -66,7 +66,7 @@ func HandleBinaryFetchPush(
 
 	var replyOplogConfig binary.ReplyOplogConfig
 	if pitrSince != "" && pitrUntil != "" {
-		replyOplogConfig, err = binary.NewReplyOplogConfig(pitrSince, pitrUntil)
+		replyOplogConfig, err = binary.NewReplyOplogConfig(pitrSince, pitrUntil, whitelist, blacklist)
 		if err != nil {
 			return err
 		}

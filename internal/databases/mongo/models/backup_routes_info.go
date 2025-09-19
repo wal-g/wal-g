@@ -91,7 +91,7 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 	return nil
 }
 
-func dbAndColFromURI(uri string) (string, string) {
+func DbAndColFromURI(uri string) (string, string) {
 	if !strings.Contains(uri, ".") {
 		return uri, ""
 	}
@@ -100,12 +100,12 @@ func dbAndColFromURI(uri string) (string, string) {
 	return splitted[0], splitted[1]
 }
 
-func getFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, map[string]map[string]struct{}) {
+func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, map[string]map[string]struct{}) {
 	whitelistFilter := make(map[string]map[string]struct{})
 	blacklistFilter := make(map[string]map[string]struct{})
 
 	for _, uri := range whitelist {
-		db, col := dbAndColFromURI(uri)
+		db, col := DbAndColFromURI(uri)
 
 		whitelistFilter[db] = map[string]struct{}{}
 		if col != "" {
@@ -119,7 +119,7 @@ func getFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	whitelistFilter["mdb_internal"] = map[string]struct{}{}
 
 	for _, uri := range blacklist {
-		db, col := dbAndColFromURI(uri)
+		db, col := DbAndColFromURI(uri)
 		delete(whitelistFilter[db], col)
 
 		if _, ok := blacklistFilter[db]; !ok {
@@ -137,7 +137,7 @@ func getFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	return whitelistFilter, blacklistFilter
 }
 
-func shouldDownload(db, col string, whitelist, blacklist map[string]map[string]struct{}, wlSpecified bool) bool {
+func ShouldDownload(db, col string, whitelist, blacklist map[string]map[string]struct{}, wlSpecified bool) bool {
 	nsIn := func(filter map[string]map[string]struct{}, db, col string) bool {
 		cols, dbOk := filter[db]
 		if dbOk && len(cols) == 0 {
@@ -166,11 +166,11 @@ func GetTarFilesFilter(
 	pathFilter := make(map[string]struct{})
 
 	whitelistSpecified := len(whitelist) > 0
-	whitelistFilter, blacklistFilter := getFilters(whitelist, blacklist)
+	whitelistFilter, blacklistFilter := GetFilters(whitelist, blacklist)
 
 	for db, dbInfo := range routes.Databases {
 		for col, colInfo := range dbInfo {
-			if shouldDownload(db, col, whitelistFilter, blacklistFilter, whitelistSpecified) {
+			if ShouldDownload(db, col, whitelistFilter, blacklistFilter, whitelistSpecified) {
 				tarFilter[colInfo.TarPath] = struct{}{}
 				pathFilter[colInfo.DBPath] = struct{}{}
 				for _, indexPaths := range colInfo.IndexInfo {

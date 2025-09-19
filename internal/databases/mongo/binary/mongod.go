@@ -520,6 +520,9 @@ type ReplyOplogConfig struct {
 	OplogApplicationMode *string
 
 	HasPitr bool
+
+	Whitelist map[string]map[string]struct{}
+	Blacklist map[string]map[string]struct{}
 }
 
 type ShConfig struct {
@@ -552,7 +555,7 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 	}
 }
 
-func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (ReplyOplogConfig, error) {
+func NewReplyOplogConfig(sincePitrStr, untilPitrStr string, whitelist, blacklist []string) (ReplyOplogConfig, error) {
 	var roConfig ReplyOplogConfig
 	var err error
 	roConfig.HasPitr = true
@@ -588,6 +591,11 @@ func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (ReplyOplogCo
 		conf.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
 		roConfig.OplogApplicationMode = &oplogApplicationMode
 	}
+
+	whitelistFilter, blacklistFilter := models.GetFilters(whitelist, blacklist)
+	roConfig.Whitelist = whitelistFilter
+	roConfig.Blacklist = blacklistFilter
+
 	return roConfig, err
 }
 
