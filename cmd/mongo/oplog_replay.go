@@ -13,6 +13,15 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+const (
+	PartialFlag        = "partial"
+	PartialDescription = "Partial option. If this option is enabled, NamespaceNotFound errors will be ignored"
+)
+
+var (
+	partial bool
+)
+
 // oplogReplayCmd represents oplog replay procedure
 var oplogReplayCmd = &cobra.Command{
 	Use:   "oplog-replay <since ts.inc> <until ts.inc>",
@@ -26,7 +35,7 @@ var oplogReplayCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args)
+		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, partial)
 		if err != nil {
 			return
 		}
@@ -35,8 +44,8 @@ var oplogReplayCmd = &cobra.Command{
 	},
 }
 
-func buildOplogReplayRunArgs(cmdargs []string) (binary.ReplyOplogConfig, string, error) {
-	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1])
+func buildOplogReplayRunArgs(cmdargs []string, partial bool) (binary.ReplyOplogConfig, string, error) {
+	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1], partial)
 	if err != nil {
 		return args, "", err
 	}
@@ -50,5 +59,6 @@ func buildOplogReplayRunArgs(cmdargs []string) (binary.ReplyOplogConfig, string,
 }
 
 func init() {
+	oplogReplayCmd.Flags().BoolVar(&partial, PartialFlag, false, PartialDescription)
 	cmd.AddCommand(oplogReplayCmd)
 }
