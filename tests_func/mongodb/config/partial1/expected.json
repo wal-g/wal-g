@@ -1,0 +1,26 @@
+{
+  "commands": {
+    "succeeded": {
+      "delete": 2,
+      "insert": 4,
+      "update": 2,
+      "create": 2,
+      "createIndexes": 2
+    },
+    "docs": {
+      "delete": 2,
+      "insert": 6,
+      "update": 2,
+      "create": 0,
+      "createIndexes": 0
+    },
+    "failed": {},
+    "errors": {}
+  },
+  "transactions": {
+    "succeeded": {},
+    "docs": {},
+    "failed": {},
+    "errors": {}
+  }
+}

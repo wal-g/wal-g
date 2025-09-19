@@ -55,6 +55,7 @@ func SetupMongodbLogicalSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
 	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
+	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*) partial$`, tctx.replayOplogPartial)
 }
 
 func (tctx *TestContext) createMongoBackup(container string) error {
@@ -183,6 +184,8 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 	if err != nil {
 		return err
 	}
+
+	time.Sleep(1 * time.Minute)
 
 	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		tsMaj, err := mc.LastMajTS()
@@ -342,6 +345,10 @@ func (tctx *TestContext) restoreBackupToMongodb(backupNum int, container string)
 }
 
 func (tctx *TestContext) replayOplog(backupId int, timestampId string, container string) error {
+	return tctx.replayOplogImpl(backupId, timestampId, container, false)
+}
+
+func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container string, partial bool) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 
 	backupMeta, err := walg.BackupMeta(backupId)
@@ -370,8 +377,13 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 		return err
 	}
 
-	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
-	return walg.OplogReplay(from, until)
+	withPartial := ""
+	if partial {
+		withPartial = "with partial"
+	}
+
+	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v %v", from, until, withPartial)
+	return walg.OplogReplay(from, until, partial)
 }
 
 func (tctx *TestContext) addPartiallyData(host string) error {
@@ -465,8 +477,8 @@ func (tctx *TestContext) onlyOneColOnHost(host, db, col string) error {
 		return fmt.Errorf("host %s snapshot is empty: %+v", host, snap)
 	}
 
-	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), len(snap), 1) {
-		return fmt.Errorf("only one snapshot on host %s expected but was %d", host, len(snap))
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), 1, len(snap)) {
+		return fmt.Errorf("only one snapshot on host %s expected but was %d: %v", host, len(snap), snap)
 	}
 
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap[0].NS, ns) {
@@ -474,4 +486,8 @@ func (tctx *TestContext) onlyOneColOnHost(host, db, col string) error {
 	}
 
 	return nil
+}
+
+func (tctx *TestContext) replayOplogPartial(backupId int, timestampId, container string) error {
+	return tctx.replayOplogImpl(backupId, timestampId, container, true)
 }

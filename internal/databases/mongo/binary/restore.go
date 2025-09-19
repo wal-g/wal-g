@@ -2,6 +2,7 @@ package binary
 
 import (
 	"context"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"time"
 
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -50,15 +51,14 @@ func (restoreService *RestoreService) DoRestore(
 		return err
 	}
 
-	var pathFilter, tarFilter map[string]struct{}
-	partial := len(args.Whitelist)+len(args.Blacklist) > 0
+	var onHostFilesFilter, tarFilesFilter map[string]struct{}
 
-	if partial {
+	if args.IsPartial() {
 		metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
 		if err != nil {
 			return err
 		}
-		pathFilter, tarFilter = models.GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
+		onHostFilesFilter, tarFilesFilter = partial.GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
 	}
 
 	if !args.SkipChecks {
@@ -71,15 +71,15 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		if err = restoreService.downloadBackup(args.BackupName, tarFilter); err != nil {
+		if err = restoreService.downloadBackup(args.BackupName, tarFilesFilter); err != nil {
 			return err
 		}
 	} else {
 		tracelog.InfoLogger.Println("Skipped download mongodb backup files")
 	}
 
-	if partial {
-		if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(pathFilter); err != nil {
+	if args.IsPartial() {
+		if err = restoreService.LocalStorage.CleanUpExcessFilesOnPartiallyBackup(onHostFilesFilter); err != nil {
 			return err
 		}
 	}
@@ -87,7 +87,7 @@ func (restoreService *RestoreService) DoRestore(
 	if !args.SkipMongoReconfig {
 		if err = restoreService.reconfigMongo(
 			rsConfig, shConfig, replyOplogConfig,
-			mongoCfgConfig, sentinel, partial,
+			mongoCfgConfig, sentinel, args.IsPartial(),
 		); err != nil {
 			return err
 		}

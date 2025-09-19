@@ -16,6 +16,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+const NamespaceNotFoundError int32 = 26
+
 type TypeAssertionError struct {
 	etype string
 	key   string
@@ -76,12 +78,21 @@ type DBApplier struct {
 	db                    client.MongoDriver
 	txnBuffer             *txn.Buffer
 	preserveUUID          bool
+	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32) *DBApplier {
-	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes}
+func NewDBApplier(
+	m client.MongoDriver, preserveUUID, partial bool, ignoreErrCodes map[string][]int32) *DBApplier {
+	return &DBApplier{
+		db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, partial: partial,
+		applyIgnoreErrorCodes: ignoreErrCodes,
+	}
+}
+
+func (ap *DBApplier) IsPartial() bool {
+	return ap.partial
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -156,13 +167,17 @@ func (ap *DBApplier) shouldIgnore(op string, err error) bool {
 		return false
 	}
 
+	if ce.Code == NamespaceNotFoundError && ap.IsPartial() {
+		return true
+	}
+
 	ignoreErrorCodes, ok := ap.applyIgnoreErrorCodes[op]
 	if !ok {
 		return false
 	}
 
 	for i := range ignoreErrorCodes {
-		if ce.Code == ignoreErrorCodes[i] {
+		if ce.Code == (ignoreErrorCodes[i]) {
 			return true
 		}
 	}
@@ -270,6 +285,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 
 	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
 	if err := ap.db.ApplyOp(ctx, op); err != nil {
+		tracelog.DebugLogger.Printf("error handling op: %v; op: %v", err, *op)
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
 		if !ap.shouldIgnore(op.Operation, err) {

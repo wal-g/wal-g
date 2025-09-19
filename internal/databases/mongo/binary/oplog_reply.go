@@ -32,7 +32,7 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		return err
 	}
 
-	dbApplier := oplog.NewDBApplier(mongoClient, false, replayArgs.IgnoreErrCodes)
+	dbApplier := oplog.NewDBApplier(mongoClient, false, replayArgs.Partial, replayArgs.IgnoreErrCodes)
 	oplogApplier := stages.NewGenericApplier(dbApplier)
 
 	// set up storage downloader client

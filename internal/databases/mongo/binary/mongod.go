@@ -374,10 +374,7 @@ type CatalogRecord struct {
 }
 
 func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
-	routes := models.BackupRoutesInfo{
-		Databases: make(map[string]models.DBInfo),
-		Service:   make(map[string]string),
-	}
+	routes := models.NewBackupRoutesInfo()
 
 	pipeline := mongo.Pipeline{{{Key: "$listCatalog", Value: bson.M{}}}}
 	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
@@ -520,6 +517,10 @@ type ReplyOplogConfig struct {
 	OplogApplicationMode *string
 
 	HasPitr bool
+	Partial bool
+
+	Whitelist map[string]map[string]struct{}
+	Blacklist map[string]map[string]struct{}
 }
 
 type ShConfig struct {
@@ -552,7 +553,7 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 	}
 }
 
-func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (ReplyOplogConfig, error) {
+func NewReplyOplogConfig(sincePitrStr, untilPitrStr string, partial bool) (ReplyOplogConfig, error) {
 	var roConfig ReplyOplogConfig
 	var err error
 	roConfig.HasPitr = true
@@ -588,6 +589,9 @@ func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (ReplyOplogCo
 		conf.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
 		roConfig.OplogApplicationMode = &oplogApplicationMode
 	}
+
+	roConfig.Partial = partial
+
 	return roConfig, err
 }
 
@@ -654,4 +658,8 @@ func (shConfig ShConfig) Validate() error {
 		return fmt.Errorf("got shard name %s, but mongocfg connection string is %s", shConfig.ShardName, shConfig.MongoCfgConnectionString)
 	}
 	return nil
+}
+
+func (args RestoreArgs) IsPartial() bool {
+	return len(args.Whitelist)+len(args.Blacklist) > 0
 }
