@@ -32,11 +32,10 @@ func (m RecoveryConfigMaker) Make(contentID int, pgVersion int, action RecoveryT
 		fmt.Sprintf("restore_command = '%s seg wal-fetch \"%%f\" \"%%p\" --content-id=%d --config %s'", m.walgBinaryPath, contentID, m.cfgPath),
 		fmt.Sprintf("recovery_target_name = '%s'", m.recoveryTargetName),
 		"recovery_target_timeline = latest",
+		// `recovery_target_action` is available since PostgreSQL 9.5,
+		// However, it was backported to Greenplum 6.25+ and now supported by all opensource GPDBs
+		fmt.Sprintf("recovery_target_action = '%s'", action)
 	)
-
-	// `recovery_target_action` is available since PostgreSQL 9.5,
-	// However, it was backported to Greenplum 6.25+ and now supported by all opensource GPDBs
-	lines = append(lines, fmt.Sprintf("recovery_target_action = '%s'", action))
 
 	return strings.Join(lines, "\n")
 }
