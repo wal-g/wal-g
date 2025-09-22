@@ -3,6 +3,7 @@ package oplog
 import (
 	"context"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"io"
 	"strings"
 
@@ -77,11 +78,19 @@ type DBApplier struct {
 	txnBuffer             *txn.Buffer
 	preserveUUID          bool
 	applyIgnoreErrorCodes map[string][]int32
+	whitelist             map[string]map[string]struct{}
+	blacklist             map[string]map[string]struct{}
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32) *DBApplier {
-	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes}
+func NewDBApplier(
+	m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32,
+	whitelist, blacklist map[string]map[string]struct{},
+) *DBApplier {
+	return &DBApplier{
+		db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes,
+		whitelist: whitelist, blacklist: blacklist,
+	}
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -144,6 +153,11 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 
 	if !isOpAllowedInconfigDB(oplog) {
 		return fmt.Errorf("config database op")
+	}
+
+	database, col := partial.DbAndColFromURI(oplog.Namespace)
+	if !partial.ShouldDownload(database, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
+		return fmt.Errorf("operations in %s is not supposed to be applied due to whitelist/blacklist", oplog.Namespace)
 	}
 
 	return nil
