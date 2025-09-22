@@ -3,6 +3,7 @@ package oplog
 import (
 	"context"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"io"
 	"strings"
 
@@ -154,8 +155,8 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 		return fmt.Errorf("config database op")
 	}
 
-	database, col := models.DbAndColFromURI(oplog.Namespace)
-	if !models.ShouldDownload(database, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
+	database, col := partial.DbAndColFromURI(oplog.Namespace)
+	if !partial.ShouldDownload(database, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
 		return fmt.Errorf("operations in %s is not supposed to be applied due to whitelist/blacklist", oplog.Namespace)
 	}
 

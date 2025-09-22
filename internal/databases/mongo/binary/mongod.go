@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"strings"
 	"time"
 
@@ -374,10 +375,7 @@ type CatalogRecord struct {
 }
 
 func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
-	routes := models.BackupRoutesInfo{
-		Databases: make(map[string]models.DBInfo),
-		Service:   make(map[string]string),
-	}
+	routes := models.NewBackupRoutesInfo()
 
 	pipeline := mongo.Pipeline{{{Key: "$listCatalog", Value: bson.M{}}}}
 	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
@@ -592,7 +590,7 @@ func NewReplyOplogConfig(sincePitrStr, untilPitrStr string, whitelist, blacklist
 		roConfig.OplogApplicationMode = &oplogApplicationMode
 	}
 
-	whitelistFilter, blacklistFilter := models.GetFilters(whitelist, blacklist)
+	whitelistFilter, blacklistFilter := partial.GetFilters(whitelist, blacklist)
 	roConfig.Whitelist = whitelistFilter
 	roConfig.Blacklist = blacklistFilter
 

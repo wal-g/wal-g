@@ -2,6 +2,7 @@ package binary
 
 import (
 	"context"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"os"
 	"strings"
 	"time"
@@ -296,7 +297,7 @@ func (backupService *BackupService) BackgroundMetadata(
 		return
 	}
 
-	bgMongoService, err := CreateBackgroundMongodService(bgCtx, "test", mongodbURI)
+	bgMongoService, err := CreateBackgroundMongodService(bgCtx, "bg-metadata", mongodbURI)
 	if err != nil {
 		errChan <- err
 		return
@@ -309,7 +310,7 @@ func (backupService *BackupService) BackgroundMetadata(
 	}
 
 	tarsFileSet := <-tarsChan
-	if err = models.EnrichWithTarPaths(backupRoutes, tarsFileSet.Get()); err != nil {
+	if err = partial.EnrichWithTarPaths(backupRoutes, tarsFileSet.Get()); err != nil {
 		errChan <- err
 		return
 	}
