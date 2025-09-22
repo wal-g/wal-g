@@ -99,7 +99,7 @@ outer:
 		}
 		tracelog.WarningLogger.Printf("WAL file was not found for segment %v (WAL name: %v)", seg, walName)
 	}
-	
+
 	if foundCnt < len(metadata.LsnBySegment) {
 		tracelog.ErrorLogger.Fatalln("WAL file was not uploaded for all segments and master")
 	}
