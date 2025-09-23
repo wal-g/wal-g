@@ -90,7 +90,7 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tinylib/msgp v1.1.0 // indirect
-	github.com/ulikunitz/xz v0.5.11 // indirect
+	github.com/ulikunitz/xz v0.5.14 // indirect
 	github.com/wal-g/json v0.3.1 // indirect
 	github.com/wal-g/tracelog v0.1.1 // indirect
 	github.com/willf/bitset v1.1.10 // indirect
