@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 // WalgExporter implements the Prometheus Collector interface
@@ -62,11 +64,6 @@ type BackupInfo struct {
 	// Note: Real WAL-G doesn't include is_full field, we determine it from backup name
 }
 
-// Helper function to convert uint64 LSN to string format (X/Y)
-func formatLSN(lsn uint64) string {
-	return fmt.Sprintf("%X/%X", uint32(lsn>>32), uint32(lsn))
-}
-
 // Helper method to get backup type
 func (b *BackupInfo) GetBackupType() string {
 	// WAL-G doesn't include is_full in JSON output, so we determine backup type
@@ -108,6 +105,16 @@ func (b *BackupInfo) GetBaseBackupName() string {
 	return "base_" + baseIdentifier
 }
 
+// GetStartLSN converts the uint64 StartLSN to postgres.LSN type
+func (b *BackupInfo) GetStartLSN() postgres.LSN {
+	return postgres.LSN(b.StartLSN)
+}
+
+// GetFinishLSN converts the uint64 FinishLSN to postgres.LSN type
+func (b *BackupInfo) GetFinishLSN() postgres.LSN {
+	return postgres.LSN(b.FinishLSN)
+}
+
 // TimelineInfo represents timeline information from wal-show --detailed-json
 // This matches the actual structure returned by wal-g wal-show --detailed-json
 type TimelineInfo struct {
@@ -120,6 +127,11 @@ type TimelineInfo struct {
 	MissingSegments  []string `json:"missing_segments"`
 	SegmentRangeSize uint64   `json:"segment_range_size"`
 	Status           string   `json:"status"`
+}
+
+// GetSwitchPointLSN converts the uint64 SwitchPointLsn to postgres.LSN type
+func (t *TimelineInfo) GetSwitchPointLSN() postgres.LSN {
+	return postgres.LSN(t.SwitchPointLsn)
 }
 
 // NewWalgExporter creates a new WAL-G exporter
@@ -385,8 +397,8 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			backup.BackupName,
 			backupType,
 			backup.WalFileName,
-			formatLSN(backup.StartLSN),  // Convert uint64 LSN to string format
-			formatLSN(backup.FinishLSN), // Convert uint64 LSN to string format
+			backup.GetStartLSN().String(),  // Convert uint64 LSN to string format
+			backup.GetFinishLSN().String(), // Convert uint64 LSN to string format
 			permanent,
 			baseBackupName, // Base backup name for delta backups, empty for full backups
 		}
