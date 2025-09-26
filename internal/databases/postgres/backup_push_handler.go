@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	json2 "encoding/json/v2"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,7 +15,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -638,26 +635,7 @@ func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto F
 		return nil
 	}
 
-	reader, writer := io.Pipe()
-
-	errorGroup, _ := errgroup.WithContext(ctx)
-	errorGroup.Go(func() error {
-		err := json2.MarshalWrite(writer, filesMetaDto)
-		if err != nil {
-			_ = writer.CloseWithError(err)
-			return err
-		}
-		return writer.Close()
-	})
-	errorGroup.Go(func() error {
-		err := bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), reader)
-		if err != nil {
-			_ = reader.CloseWithError(err)
-			return err
-		}
-		return reader.Close()
-	})
-	return errorGroup.Wait()
+	return bh.Arguments.Uploader.UploadJSON(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), filesMetaDto)
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {
