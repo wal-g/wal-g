@@ -2,7 +2,10 @@ package internal
 
 import (
 	"context"
+	json2 "encoding/json/v2"
 	"fmt"
+	"golang.org/x/sync/errgroup"
+
 	"io"
 	"path/filepath"
 	"sync"
@@ -11,6 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal/statistics"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -20,11 +24,17 @@ import (
 var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")
 
 type Uploader interface {
+	// Upload uploads stream AS IS
 	Upload(ctx context.Context, path string, content io.Reader) error
+	UploadJSON(ctx context.Context, path string, data any) error
+	// UploadFile compresses a file and uploads it
 	UploadFile(ctx context.Context, file ioextensions.NamedReader) error
 	UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error
+	// PushStream compresses a stream and push it
 	PushStream(ctx context.Context, stream io.Reader) (string, error)
+	// PushStreamToDestination compresses a stream and push it to specifyed destination
 	PushStreamToDestination(ctx context.Context, stream io.Reader, dstPath string) error
+	// Compression returns configured compressor
 	Compression() compression.Compressor
 	DisableSizeTracking()
 	UploadedDataSize() (int64, error)
@@ -197,6 +207,30 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 		return err
 	}
 	return nil
+}
+
+// UploadJSON uploads raw JSON to storage without allocating memory for whole JSON.
+func (uploader *RegularUploader) UploadJSON(ctx context.Context, path string, data any) error {
+	reader, writer := io.Pipe()
+
+	errorGroup, _ := errgroup.WithContext(ctx)
+	errorGroup.Go(func() error {
+		err := json2.MarshalWrite(writer, data)
+		if err != nil {
+			_ = writer.CloseWithError(err)
+			return err
+		}
+		return writer.Close()
+	})
+	errorGroup.Go(func() error {
+		err := uploader.Upload(ctx, path, reader)
+		if err != nil {
+			_ = reader.CloseWithError(err)
+			return err
+		}
+		return reader.Close()
+	})
+	return errorGroup.Wait()
 }
 
 // UploadMultiple uploads multiple objects from the start of the slice,
