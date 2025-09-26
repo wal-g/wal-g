@@ -6,137 +6,95 @@ package mock_internal
 
 import (
 	context "context"
-	"encoding/json"
-	io "io"
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	internal "github.com/wal-g/wal-g/internal"
 	compression "github.com/wal-g/wal-g/internal/compression"
 	ioextensions "github.com/wal-g/wal-g/internal/ioextensions"
 	storage "github.com/wal-g/wal-g/pkg/storages/storage"
+	io "io"
+	reflect "reflect"
 )
 
-// MockUploader is a mock of Uploader interface.
+// MockUploader is a mock of Uploader interface
 type MockUploader struct {
-	internal.DefaultJSONUploader
-
 	ctrl     *gomock.Controller
 	recorder *MockUploaderMockRecorder
 }
 
-var _ internal.Uploader = &MockUploader{}
-
-// MockUploaderMockRecorder is the mock recorder for MockUploader.
+// MockUploaderMockRecorder is the mock recorder for MockUploader
 type MockUploaderMockRecorder struct {
 	mock *MockUploader
 }
 
-// NewMockUploader creates a new mock instance.
+// NewMockUploader creates a new mock instance
 func NewMockUploader(ctrl *gomock.Controller) *MockUploader {
 	mock := &MockUploader{ctrl: ctrl}
 	mock.recorder = &MockUploaderMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
+// EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockUploader) EXPECT() *MockUploaderMockRecorder {
 	return m.recorder
 }
 
-// ChangeDirectory mocks base method.
-func (m *MockUploader) ChangeDirectory(relativePath string) {
+// Upload mocks base method
+func (m *MockUploader) Upload(ctx context.Context, path string, content io.Reader) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "ChangeDirectory", relativePath)
-}
-
-// ChangeDirectory indicates an expected call of ChangeDirectory.
-func (mr *MockUploaderMockRecorder) ChangeDirectory(relativePath interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangeDirectory", reflect.TypeOf((*MockUploader)(nil).ChangeDirectory), relativePath)
-}
-
-// Clone mocks base method.
-func (m *MockUploader) Clone() internal.Uploader {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Clone")
-	ret0, _ := ret[0].(internal.Uploader)
+	ret := m.ctrl.Call(m, "Upload", ctx, path, content)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Clone indicates an expected call of Clone.
-func (mr *MockUploaderMockRecorder) Clone() *gomock.Call {
+// Upload indicates an expected call of Upload
+func (mr *MockUploaderMockRecorder) Upload(ctx, path, content interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clone", reflect.TypeOf((*MockUploader)(nil).Clone))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockUploader)(nil).Upload), ctx, path, content)
 }
 
-// Compression mocks base method.
-func (m *MockUploader) Compression() compression.Compressor {
+// UploadJSON mocks base method
+func (m *MockUploader) UploadJSON(ctx context.Context, path string, data any) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Compression")
-	ret0, _ := ret[0].(compression.Compressor)
+	ret := m.ctrl.Call(m, "UploadJSON", ctx, path, data)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Compression indicates an expected call of Compression.
-func (mr *MockUploaderMockRecorder) Compression() *gomock.Call {
+// UploadJSON indicates an expected call of UploadJSON
+func (mr *MockUploaderMockRecorder) UploadJSON(ctx, path, data interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Compression", reflect.TypeOf((*MockUploader)(nil).Compression))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadJSON", reflect.TypeOf((*MockUploader)(nil).UploadJSON), ctx, path, data)
 }
 
-// DisableSizeTracking mocks base method.
-func (m *MockUploader) DisableSizeTracking() {
+// UploadFile mocks base method
+func (m *MockUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "DisableSizeTracking")
-}
-
-// DisableSizeTracking indicates an expected call of DisableSizeTracking.
-func (mr *MockUploaderMockRecorder) DisableSizeTracking() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableSizeTracking", reflect.TypeOf((*MockUploader)(nil).DisableSizeTracking))
-}
-
-// Failed mocks base method.
-func (m *MockUploader) Failed() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Failed")
-	ret0, _ := ret[0].(bool)
+	ret := m.ctrl.Call(m, "UploadFile", ctx, file)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Failed indicates an expected call of Failed.
-func (mr *MockUploaderMockRecorder) Failed() *gomock.Call {
+// UploadFile indicates an expected call of UploadFile
+func (mr *MockUploaderMockRecorder) UploadFile(ctx, file interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Failed", reflect.TypeOf((*MockUploader)(nil).Failed))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadFile", reflect.TypeOf((*MockUploader)(nil).UploadFile), ctx, file)
 }
 
-// Finish mocks base method.
-func (m *MockUploader) Finish() {
+// UploadExactFile mocks base method
+func (m *MockUploader) UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Finish")
-}
-
-// Finish indicates an expected call of Finish.
-func (mr *MockUploaderMockRecorder) Finish() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finish", reflect.TypeOf((*MockUploader)(nil).Finish))
-}
-
-// Folder mocks base method.
-func (m *MockUploader) Folder() storage.Folder {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Folder")
-	ret0, _ := ret[0].(storage.Folder)
+	ret := m.ctrl.Call(m, "UploadExactFile", ctx, file)
+	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Folder indicates an expected call of Folder.
-func (mr *MockUploaderMockRecorder) Folder() *gomock.Call {
+// UploadExactFile indicates an expected call of UploadExactFile
+func (mr *MockUploaderMockRecorder) UploadExactFile(ctx, file interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Folder", reflect.TypeOf((*MockUploader)(nil).Folder))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadExactFile", reflect.TypeOf((*MockUploader)(nil).UploadExactFile), ctx, file)
 }
 
-// PushStream mocks base method.
+// PushStream mocks base method
 func (m *MockUploader) PushStream(ctx context.Context, stream io.Reader) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PushStream", ctx, stream)
@@ -145,13 +103,13 @@ func (m *MockUploader) PushStream(ctx context.Context, stream io.Reader) (string
 	return ret0, ret1
 }
 
-// PushStream indicates an expected call of PushStream.
+// PushStream indicates an expected call of PushStream
 func (mr *MockUploaderMockRecorder) PushStream(ctx, stream interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PushStream", reflect.TypeOf((*MockUploader)(nil).PushStream), ctx, stream)
 }
 
-// PushStreamToDestination mocks base method.
+// PushStreamToDestination mocks base method
 func (m *MockUploader) PushStreamToDestination(ctx context.Context, stream io.Reader, dstPath string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PushStreamToDestination", ctx, stream, dstPath)
@@ -159,70 +117,39 @@ func (m *MockUploader) PushStreamToDestination(ctx context.Context, stream io.Re
 	return ret0
 }
 
-// PushStreamToDestination indicates an expected call of PushStreamToDestination.
+// PushStreamToDestination indicates an expected call of PushStreamToDestination
 func (mr *MockUploaderMockRecorder) PushStreamToDestination(ctx, stream, dstPath interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PushStreamToDestination", reflect.TypeOf((*MockUploader)(nil).PushStreamToDestination), ctx, stream, dstPath)
 }
 
-// RawDataSize mocks base method.
-func (m *MockUploader) RawDataSize() (int64, error) {
+// Compression mocks base method
+func (m *MockUploader) Compression() compression.Compressor {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RawDataSize")
-	ret0, _ := ret[0].(int64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RawDataSize indicates an expected call of RawDataSize.
-func (mr *MockUploaderMockRecorder) RawDataSize() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RawDataSize", reflect.TypeOf((*MockUploader)(nil).RawDataSize))
-}
-
-// Upload mocks base method.
-func (m *MockUploader) Upload(ctx context.Context, path string, content io.Reader) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Upload", ctx, path, content)
-	ret0, _ := ret[0].(error)
+	ret := m.ctrl.Call(m, "Compression")
+	ret0, _ := ret[0].(compression.Compressor)
 	return ret0
 }
 
-// Upload indicates an expected call of Upload.
-func (mr *MockUploaderMockRecorder) Upload(ctx, path, content interface{}) *gomock.Call {
+// Compression indicates an expected call of Compression
+func (mr *MockUploaderMockRecorder) Compression() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockUploader)(nil).Upload), ctx, path, content)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Compression", reflect.TypeOf((*MockUploader)(nil).Compression))
 }
 
-// UploadExactFile mocks base method.
-func (m *MockUploader) UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error {
+// DisableSizeTracking mocks base method
+func (m *MockUploader) DisableSizeTracking() {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UploadExactFile", ctx, file)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "DisableSizeTracking")
 }
 
-// UploadExactFile indicates an expected call of UploadExactFile.
-func (mr *MockUploaderMockRecorder) UploadExactFile(ctx, file interface{}) *gomock.Call {
+// DisableSizeTracking indicates an expected call of DisableSizeTracking
+func (mr *MockUploaderMockRecorder) DisableSizeTracking() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadExactFile", reflect.TypeOf((*MockUploader)(nil).UploadExactFile), ctx, file)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DisableSizeTracking", reflect.TypeOf((*MockUploader)(nil).DisableSizeTracking))
 }
 
-// UploadFile mocks base method.
-func (m *MockUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UploadFile", ctx, file)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UploadFile indicates an expected call of UploadFile.
-func (mr *MockUploaderMockRecorder) UploadFile(ctx, file interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadFile", reflect.TypeOf((*MockUploader)(nil).UploadFile), ctx, file)
-}
-
-// UploadedDataSize mocks base method.
+// UploadedDataSize mocks base method
 func (m *MockUploader) UploadedDataSize() (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UploadedDataSize")
@@ -231,8 +158,89 @@ func (m *MockUploader) UploadedDataSize() (int64, error) {
 	return ret0, ret1
 }
 
-// UploadedDataSize indicates an expected call of UploadedDataSize.
+// UploadedDataSize indicates an expected call of UploadedDataSize
 func (mr *MockUploaderMockRecorder) UploadedDataSize() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadedDataSize", reflect.TypeOf((*MockUploader)(nil).UploadedDataSize))
+}
+
+// RawDataSize mocks base method
+func (m *MockUploader) RawDataSize() (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RawDataSize")
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RawDataSize indicates an expected call of RawDataSize
+func (mr *MockUploaderMockRecorder) RawDataSize() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RawDataSize", reflect.TypeOf((*MockUploader)(nil).RawDataSize))
+}
+
+// ChangeDirectory mocks base method
+func (m *MockUploader) ChangeDirectory(relativePath string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ChangeDirectory", relativePath)
+}
+
+// ChangeDirectory indicates an expected call of ChangeDirectory
+func (mr *MockUploaderMockRecorder) ChangeDirectory(relativePath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangeDirectory", reflect.TypeOf((*MockUploader)(nil).ChangeDirectory), relativePath)
+}
+
+// Folder mocks base method
+func (m *MockUploader) Folder() storage.Folder {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Folder")
+	ret0, _ := ret[0].(storage.Folder)
+	return ret0
+}
+
+// Folder indicates an expected call of Folder
+func (mr *MockUploaderMockRecorder) Folder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Folder", reflect.TypeOf((*MockUploader)(nil).Folder))
+}
+
+// Clone mocks base method
+func (m *MockUploader) Clone() internal.Uploader {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Clone")
+	ret0, _ := ret[0].(internal.Uploader)
+	return ret0
+}
+
+// Clone indicates an expected call of Clone
+func (mr *MockUploaderMockRecorder) Clone() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clone", reflect.TypeOf((*MockUploader)(nil).Clone))
+}
+
+// Failed mocks base method
+func (m *MockUploader) Failed() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Failed")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// Failed indicates an expected call of Failed
+func (mr *MockUploaderMockRecorder) Failed() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Failed", reflect.TypeOf((*MockUploader)(nil).Failed))
+}
+
+// Finish mocks base method
+func (m *MockUploader) Finish() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Finish")
+}
+
+// Finish indicates an expected call of Finish
+func (mr *MockUploaderMockRecorder) Finish() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finish", reflect.TypeOf((*MockUploader)(nil).Finish))
 }
