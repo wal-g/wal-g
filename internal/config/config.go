@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -146,7 +147,6 @@ const (
 	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
-	PartialRestoreTimeout               = "PARTIAL_RESTORE_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -189,6 +189,7 @@ const (
 	GPAoDeduplicationAgeLimit    = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
 	GPRelativeRecoveryConfPath   = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
 	GPRelativePostgresqlConfPath = "WALG_GP_RELATIVE_POSTGRESQL_CONF_PATH"
+	GPHome                       = "GPHOME"
 
 	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
 	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
@@ -628,6 +629,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
+		GPHome:                               true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -940,7 +942,7 @@ func ToFlagName(s string) string {
 // Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
 func bindConfigToEnv(globalViper *viper.Viper) {
 	for k, v := range globalViper.AllSettings() {
-		val := fmt.Sprint(v)
+		val := cast.ToString(v)
 		k = strings.ToUpper(k)
 
 		// avoid filling environment with empty values :

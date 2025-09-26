@@ -124,6 +124,7 @@ func GetBinlogPreviousGTIDsRemote(folder storage.Folder, filename string, flavor
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer utility.LoggedClose(tmp, "failed to close temp file")
+	defer os.Remove(tmp.Name())
 	_, err = io.CopyN(tmp, fh, BinlogReadHeaderSize)
 	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("failed to read binlog beginning")

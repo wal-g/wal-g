@@ -27,21 +27,30 @@ type BackupRoutesInfo struct {
 
 type PathMapFilter map[string]map[string]struct{}
 
-func getFromTarFilesSetAndDeleteKey(key string, tarFilesSet map[string]map[string]struct{}) (string, bool) {
+func getFromTarFilesSet(
+	key string,
+	tarFilesSet map[string]map[string]struct{},
+	visited map[string]struct{},
+) (string, bool) {
 	for tarFile, tarFileSet := range tarFilesSet {
 		if _, ok := tarFileSet[key]; ok {
-			delete(tarFileSet, key)
+			visited[tarFile] = struct{}{}
 			return tarFile, ok
 		}
 	}
 	return "", false
 }
 
-func GetSpecialFilesFromTarFilesSet(tarFilesSet map[string]map[string]struct{}) map[string]string {
+func GetSpecialFilesFromTarFilesSet(
+	tarFilesSet map[string]map[string]struct{},
+	visited map[string]struct{},
+) map[string]string {
 	res := make(map[string]string)
 	for tarFile, tarFileSet := range tarFilesSet {
-		for dbFile := range tarFileSet {
-			res[dbFile] = tarFile
+		if _, ok := visited[tarFile]; !ok {
+			for dbFile := range tarFileSet {
+				res[dbFile] = tarFile
+			}
 		}
 	}
 	return res
@@ -55,17 +64,18 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 			tarFilesSet[tarPath][file] = struct{}{}
 		}
 	}
+	visited := make(map[string]struct{})
 
 	for dbName, dbInfo := range backupRoutesInfo.Databases {
 		for colName, colInfo := range dbInfo {
-			colTarPath, ok := getFromTarFilesSetAndDeleteKey(colInfo.DBPath, tarFilesSet)
+			colTarPath, ok := getFromTarFilesSet(colInfo.DBPath, tarFilesSet, visited)
 			if !ok {
 				return errors.Errorf("file %s not found in tar directory", colInfo.DBPath)
 			}
 			colInfo.TarPath = colTarPath
 
 			for indexName, indexInfo := range colInfo.IndexInfo {
-				indTarPath, ok := getFromTarFilesSetAndDeleteKey(indexInfo.DBPath, tarFilesSet)
+				indTarPath, ok := getFromTarFilesSet(indexInfo.DBPath, tarFilesSet, visited)
 				if !ok {
 					return errors.Errorf("file %s not found in tar directory", indexInfo.DBPath)
 				}
@@ -77,7 +87,7 @@ func EnrichWithTarPaths(backupRoutesInfo *BackupRoutesInfo, tarPaths map[string]
 		}
 	}
 
-	backupRoutesInfo.Service = GetSpecialFilesFromTarFilesSet(tarFilesSet)
+	backupRoutesInfo.Service = GetSpecialFilesFromTarFilesSet(tarFilesSet, visited)
 	return nil
 }
 
