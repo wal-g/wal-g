@@ -4,7 +4,6 @@ import (
 	"context"
 	json2 "encoding/json/v2"
 	"fmt"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 
 	"io"
@@ -47,40 +46,9 @@ type Uploader interface {
 	Finish()
 }
 
-// DefaultJSONUploader implements UploadJSON() on top of Upload().
-type DefaultJSONUploader struct{}
-
-func (uploader *DefaultJSONUploader) Upload(context.Context, string, io.Reader) error {
-	return errors.Errorf("DefaultJSONUploader.Upload() is not implemented")
-}
-
-func (uploader *DefaultJSONUploader) UploadJSON(ctx context.Context, path string, data any) error {
-	reader, writer := io.Pipe()
-
-	errorGroup, _ := errgroup.WithContext(ctx)
-	errorGroup.Go(func() error {
-		err := json2.MarshalWrite(writer, data)
-		if err != nil {
-			_ = writer.CloseWithError(err)
-			return err
-		}
-		return writer.Close()
-	})
-	errorGroup.Go(func() error {
-		err := uploader.Upload(ctx, path, reader)
-		if err != nil {
-			_ = reader.CloseWithError(err)
-			return err
-		}
-		return reader.Close()
-	})
-	return errorGroup.Wait()
-}
-
 // RegularUploader contains fields associated with uploading tarballs.
 // Multiple tarballs can share one Uploader.
 type RegularUploader struct {
-	DefaultJSONUploader
 	UploadingFolder storage.Folder
 	Compressor      compression.Compressor
 	waitGroup       *sync.WaitGroup
@@ -239,6 +207,30 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 		return err
 	}
 	return nil
+}
+
+// UploadJSON uploads raw JSON to storage without allocating memory for whole JSON.
+func (uploader *RegularUploader) UploadJSON(ctx context.Context, path string, data any) error {
+	reader, writer := io.Pipe()
+
+	errorGroup, _ := errgroup.WithContext(ctx)
+	errorGroup.Go(func() error {
+		err := json2.MarshalWrite(writer, data)
+		if err != nil {
+			_ = writer.CloseWithError(err)
+			return err
+		}
+		return writer.Close()
+	})
+	errorGroup.Go(func() error {
+		err := uploader.Upload(ctx, path, reader)
+		if err != nil {
+			_ = reader.CloseWithError(err)
+			return err
+		}
+		return reader.Close()
+	})
+	return errorGroup.Wait()
 }
 
 // UploadMultiple uploads multiple objects from the start of the slice,
