@@ -6,6 +6,7 @@ package mock_internal
 
 import (
 	context "context"
+	"encoding/json"
 	io "io"
 	reflect "reflect"
 
@@ -18,9 +19,13 @@ import (
 
 // MockUploader is a mock of Uploader interface.
 type MockUploader struct {
+	internal.DefaultJSONUploader
+
 	ctrl     *gomock.Controller
 	recorder *MockUploaderMockRecorder
 }
+
+var _ internal.Uploader = &MockUploader{}
 
 // MockUploaderMockRecorder is the mock recorder for MockUploader.
 type MockUploaderMockRecorder struct {
