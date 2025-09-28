@@ -74,6 +74,8 @@ func FatalIfWalLogMissing(restorePoint string, folder storage.Folder) {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
 
+	var foundCnt int
+outer:
 	for seg, lsn := range metadata.LsnBySegment {
 		LSN, err := postgres.ParseLSN(lsn)
 		if err != nil {
@@ -88,17 +90,18 @@ func FatalIfWalLogMissing(restorePoint string, folder storage.Folder) {
 		}
 
 		// WAL file example: "000000010000000000000003.lz4" -> base name is "000000010000000000000003"
-		found := false
+		walName := walSegmentNo.GetFilename(metadata.TimeLine)
 		for _, obj := range folderObjects {
-			if strings.HasPrefix(obj.GetName(), walSegmentNo.GetFilename(metadata.TimeLine)) {
-				found = true
-				break
+			if strings.HasPrefix(obj.GetName(), walName) {
+				foundCnt++
+				continue outer
 			}
 		}
+		tracelog.WarningLogger.Printf("WAL file was not found for segment %v (WAL name: %v)", seg, walName)
+	}
 
-		if !found {
-			tracelog.ErrorLogger.Fatalln("WAL file was not uploaded for all segments and master")
-		}
+	if foundCnt < len(metadata.LsnBySegment) {
+		tracelog.ErrorLogger.Fatalln("WAL file was not uploaded for all segments and master")
 	}
 }
 
