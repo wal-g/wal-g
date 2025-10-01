@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -476,7 +477,7 @@ func (tctx *TestContext) onlyOneColOnHost(host, db, col string) error {
 	}
 
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), len(snap), 1) {
-		return fmt.Errorf("only one snapshot on host %s expected but was %d", host, len(snap))
+		return fmt.Errorf("only one snapshot on host %s expected but was %d: %s", host, len(snap), strings.join(snap, ", "))
 	}
 
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap[0].NS, ns) {
