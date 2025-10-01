@@ -1,4 +1,4 @@
 [
   {"op":"c", "db":"load1_db", "id": 1, "dc":{"insert":"coll", "documents": [{"after_oplog": "val1", "after_oplog2": 1}]}},
-  {"op":"c", "db":"load1_db", "id": 2, "dc":{"insert":"coll2", "documents": [{"after_oplog": "val2"}, {"after_oplog2": "val3", "after_oplog3":  2}]}},
+  {"op":"c", "db":"load1_db", "id": 2, "dc":{"insert":"coll2", "documents": [{"after_oplog": "val2"}, {"after_oplog2": "val3", "after_oplog3":  2}]}}
 ]
