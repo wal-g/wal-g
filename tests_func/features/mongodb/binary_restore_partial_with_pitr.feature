@@ -25,6 +25,6 @@ Feature: MongoDB binary backupsrestores partially with PITR
     And mongodb initialized on mongodb02
 
     When we restore binary mongo-backup #0 to mongodb02 with whitelist "load1_db.coll"
-    And we restore from #0 backup to "after first load" timestamp to mongodb02 with whitelist "load1_db.coll"
+    And we restore from #0 backup to "after second load" timestamp to mongodb02 with whitelist "load1_db.coll"
     And we save mongodb02 data "restore to after second load from first backup"
     Then we have same data in "after second load" and "restore to after second load from first backup"
