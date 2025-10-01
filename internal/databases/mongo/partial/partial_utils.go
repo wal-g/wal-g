@@ -78,6 +78,10 @@ func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	whitelistFilter := make(SetMap)
 	blacklistFilter := make(SetMap)
 
+	if len(whitelist)+len(blacklist) == 0 {
+		return whitelistFilter, blacklistFilter
+	}
+
 	for _, uri := range whitelist {
 		db, col := DBAndColFromURI(uri)
 
