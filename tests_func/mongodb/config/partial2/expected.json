@@ -1,14 +1,10 @@
 {
   "commands": {
     "succeeded": {
-      "delete": 0,
-      "insert": 2,
-      "update": 0
+      "insert": 2
     },
     "docs": {
-      "delete": 0,
-      "insert": 2,
-      "update": 0
+      "insert": 3
     },
     "failed": {},
     "errors": {}
