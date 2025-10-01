@@ -8,7 +8,7 @@ Feature: MongoDB binary backupsrestores partially with PITR
     And oplog archiving is enabled on mongodb01
     And at least one oplog archive exists in storage
 
-  Scenario: Binary backups,  and partial restores with pitr was done successfully
+  Scenario: Binary backups, and partial restores with pitr was done successfully
     Given mongodb01 has test mongodb data test1
     And mongodb01 has been loaded with "partial1"
     When we create binary mongo-backup on mongodb01
@@ -25,6 +25,8 @@ Feature: MongoDB binary backupsrestores partially with PITR
     And mongodb initialized on mongodb02
 
     When we restore binary mongo-backup #0 to mongodb02 with whitelist "load1_db.coll"
+    And a working mongodb on mongodb02
+    Then mongodb02 has only db "load1_db" and col "coll"
     And we restore from #0 backup to "after second load" timestamp to mongodb02 with whitelist "load1_db.coll"
     Then mongodb02 has only db "load1_db" and col "coll"
     And mongodb01 and mongodb02 has same data in db "load1_db" and col "coll"
