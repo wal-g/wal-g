@@ -155,7 +155,7 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 		return fmt.Errorf("config database op")
 	}
 
-	database, col := partial.DbAndColFromURI(oplog.Namespace)
+	database, col := partial.DBAndColFromURI(oplog.Namespace)
 	tracelog.InfoLogger.Printf("%v %v %v %v %v", database, col, ap.whitelist, ap.blacklist, len(ap.whitelist)+len(ap.blacklist) > 0)
 	if !partial.ShouldDownload(database, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
 		return fmt.Errorf("operations in %s is not supposed to be applied due to whitelist/blacklist", oplog.Namespace)

@@ -377,7 +377,7 @@ func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container, w
 
 	withWhitelist := ""
 	if whitelist != "" {
-		withWhitelist = fmt.Sprintf(" with whitelist", whitelist)
+		withWhitelist = fmt.Sprintf("with whitelist \"%s\"", whitelist)
 	}
 
 	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v %v", from, until, withWhitelist)

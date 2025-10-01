@@ -65,7 +65,7 @@ func EnrichWithTarPaths(backupRoutesInfo *models.BackupRoutesInfo, tarPaths map[
 	return nil
 }
 
-func DbAndColFromURI(uri string) (string, string) {
+func DBAndColFromURI(uri string) (string, string) {
 	if !strings.Contains(uri, ".") {
 		return uri, ""
 	}
@@ -79,7 +79,7 @@ func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	blacklistFilter := make(SetMap)
 
 	for _, uri := range whitelist {
-		db, col := DbAndColFromURI(uri)
+		db, col := DBAndColFromURI(uri)
 
 		whitelistFilter[db] = map[string]struct{}{}
 		if col != "" {
@@ -93,7 +93,7 @@ func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	whitelistFilter["mdb_internal"] = map[string]struct{}{}
 
 	for _, uri := range blacklist {
-		db, col := DbAndColFromURI(uri)
+		db, col := DBAndColFromURI(uri)
 		delete(whitelistFilter[db], col)
 
 		if _, ok := blacklistFilter[db]; !ok {
