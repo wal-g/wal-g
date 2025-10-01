@@ -477,7 +477,7 @@ func (tctx *TestContext) onlyOneColOnHost(host, db, col string) error {
 	}
 
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), len(snap), 1) {
-		return fmt.Errorf("only one snapshot on host %s expected but was %d: %s", host, len(snap), strings.Join(snap, ", "))
+		return fmt.Errorf("only one snapshot on host %s expected but was %d: %v", host, len(snap), snap)
 	}
 
 	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap[0].NS, ns) {
