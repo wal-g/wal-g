@@ -19,8 +19,6 @@ type BackupRoutesInfo struct {
 	Service   map[string]string `json:"service"`
 }
 
-type PathMapFilter map[string]map[string]struct{}
-
 func NewBackupRoutesInfo() BackupRoutesInfo {
 	return BackupRoutesInfo{
 		Databases: make(map[string]DBInfo),

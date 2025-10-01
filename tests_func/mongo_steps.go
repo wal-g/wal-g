@@ -55,6 +55,7 @@ func SetupMongodbLogicalSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
 	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
+	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*) with whitelist "([^"]*)"$`, tctx.replayOplogWithWhitelist)
 }
 
 func (tctx *TestContext) createMongoBackup(container string) error {
@@ -342,6 +343,10 @@ func (tctx *TestContext) restoreBackupToMongodb(backupNum int, container string)
 }
 
 func (tctx *TestContext) replayOplog(backupId int, timestampId string, container string) error {
+	return tctx.replayOplogImpl(backupId, timestampId, container, "")
+}
+
+func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container, whitelist string) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 
 	backupMeta, err := walg.BackupMeta(backupId)
@@ -370,8 +375,13 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 		return err
 	}
 
-	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
-	return walg.OplogReplay(from, until)
+	withWhitelist := ""
+	if whitelist != "" {
+		withWhitelist = fmt.Sprintf("with whitelist %s", whitelist)
+	}
+
+	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until, withWhitelist)
+	return walg.OplogReplay(from, until, whitelist)
 }
 
 func (tctx *TestContext) addPartiallyData(host string) error {
@@ -474,4 +484,8 @@ func (tctx *TestContext) onlyOneColOnHost(host, db, col string) error {
 	}
 
 	return nil
+}
+
+func (tctx *TestContext) replayOplogWithWhitelist(backupId int, timestampId, container, whitelist string) error {
+	return tctx.replayOplogImpl(backupId, timestampId, container, whitelist)
 }

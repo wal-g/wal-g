@@ -2,6 +2,7 @@ package partial
 
 import (
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"strings"
 )
@@ -119,8 +120,11 @@ func ShouldDownload(db, col string, whitelist, blacklist SetMap, wlSpecified boo
 		return ok
 	}
 
+	tracelog.InfoLogger.Printf("%v %v", db, col)
+
 	if wlSpecified {
 		if nsIn(whitelist, db, col) {
+			tracelog.InfoLogger.Printf("%v %v true", db, col)
 			return !nsIn(blacklist, db, col)
 		}
 		return false

@@ -1,0 +1,22 @@
+{
+  "commands": {
+    "succeeded": {
+      "delete": 2,
+      "insert": 4,
+      "update": 2
+    },
+    "docs": {
+      "delete": 2,
+      "insert": 6,
+      "update": 2
+    },
+    "failed": {},
+    "errors": {}
+  },
+  "transactions": {
+    "succeeded": {},
+    "docs": {},
+    "failed": {},
+    "errors": {}
+  }
+}
