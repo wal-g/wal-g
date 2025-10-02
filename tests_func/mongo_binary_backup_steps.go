@@ -119,12 +119,20 @@ func (tctx *TestContext) restoreMongoBinaryBackup(
 		return err
 	}
 
+	if err := mc.GetLogs(); err != nil {
+		return err
+	}
+
 	if !initialized {
 		if err := tctx.initiateReplSet(container); err != nil {
 			return err
 		}
 	} else {
 		tracelog.DebugLogger.Println("Skip initiateReplSet")
+	}
+
+	if err := mc.GetLogs(); err != nil {
+		return err
 	}
 
 	return nil
