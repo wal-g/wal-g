@@ -185,6 +185,8 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 		return err
 	}
 
+	time.Sleep(1 * time.Minute)
+
 	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		tsMaj, err := mc.LastMajTS()
 		if err != nil {
