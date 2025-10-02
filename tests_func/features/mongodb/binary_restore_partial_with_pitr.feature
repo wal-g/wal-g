@@ -1,5 +1,5 @@
 #noinspection CucumberUndefinedStep
-Feature: MongoDB binary backupsrestores partially with PITR
+Feature: MongoDB binary backups restores partially with PITR
 
   Background: Wait for working infrastructure
     Given prepared infrastructure
@@ -9,7 +9,7 @@ Feature: MongoDB binary backupsrestores partially with PITR
     And at least one oplog archive exists in storage
 
   Scenario: Binary backups, and partial restores with pitr was done successfully
-    Given mongodb01 has test mongodb data test1
+    And mongodb01 has partial test mongodb data
     And mongodb01 has been loaded with "partial1"
     When we create binary mongo-backup on mongodb01
     Then we got 1 backup entries of mongodb01
