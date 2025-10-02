@@ -155,7 +155,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			if err != nil {
 				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
 			}
-			os.Exit(0)
+			return
 		}
 		handleEventError(err, s)
 		if err != nil {
@@ -282,22 +282,52 @@ func HandleBinlogServer(since string, until string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
-	c, err := l.Accept()
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Printf("connection accepted")
-
-	user, err := conf.GetRequiredSetting(conf.MysqlBinlogServerUser)
-	tracelog.ErrorLogger.FatalOnError(err)
-	password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
-	tracelog.ErrorLogger.FatalOnError(err)
-	conn, err := server.NewConn(c, user, password, Handler{})
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Printf("connection created")
-
 	for {
-		if err := conn.HandleCommand(); err != nil {
-			tracelog.WarningLogger.Printf("Error handling command: %v", err)
-			break
+		c, err := l.Accept()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Error accepting connection: %v", err)
+			continue
+		}
+		tracelog.InfoLogger.Printf("Connection accepted from %s", c.RemoteAddr())
+
+		user, err := conf.GetRequiredSetting(conf.MysqlBinlogServerUser)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to get user: %v", err)
+			err := c.Close()
+			if err != nil {
+				return
+			}
+			continue
+		}
+		password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to get password: %v", err)
+			err := c.Close()
+			if err != nil {
+				return
+			}
+			continue
+		}
+		conn, err := server.NewConn(c, user, password, Handler{})
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to create connection: %v", err)
+			err := c.Close()
+			if err != nil {
+				return
+			}
+			continue
+		}
+		tracelog.InfoLogger.Printf("MySQL connection created for %s", c.RemoteAddr())
+
+		for {
+			if err := conn.HandleCommand(); err != nil {
+				tracelog.WarningLogger.Printf("Error handling command from %s: %v", c.RemoteAddr(), err)
+				break
+			}
+		}
+		err = c.Close()
+		if err != nil {
+			return
 		}
 	}
 }
