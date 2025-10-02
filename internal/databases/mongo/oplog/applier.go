@@ -171,6 +171,11 @@ func (ap *DBApplier) shouldIgnore(op string, err error) bool {
 		return false
 	}
 
+	if ce.Code == 26 && (len(ap.whitelist)+len(ap.blacklist)) > 0 {
+		tracelog.DebugLogger.Printf("error: %v", ce)
+		return true
+	}
+
 	ignoreErrorCodes, ok := ap.applyIgnoreErrorCodes[op]
 	if !ok {
 		return false
