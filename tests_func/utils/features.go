@@ -35,6 +35,9 @@ func FindFeaturePaths(database, featurePrefix string) ([]string, error) {
 		if !binarySupported && strings.HasPrefix(fileName, "partial_") {
 			return false
 		}
+		if binarySupported && strings.HasPrefix(fileName, "logical_") {
+			return false
+		}
 		if !strings.HasSuffix(fileName, featureExt) {
 			return false
 		}
