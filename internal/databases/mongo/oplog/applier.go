@@ -165,6 +165,7 @@ func (ap *DBApplier) shouldIgnore(op, ns string, err error) bool {
 		return false
 	}
 
+	tracelog.DebugLogger.Printf("ce %v op %v ns %s", ce, op, ns)
 	if ce.Code == 26 && (len(ap.whitelist)+len(ap.blacklist)) > 0 {
 		db, col := util.SplitNamespace(ns)
 		if !partial.ShouldDownload(db, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
