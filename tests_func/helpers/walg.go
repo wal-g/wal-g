@@ -252,8 +252,14 @@ func (w *WalgUtil) OplogPush() error {
 	return nil
 }
 
-func (w *WalgUtil) OplogReplay(from, until OpTimestamp) error {
-	_, err := w.runCmd("oplog-replay", from.String(), until.String())
+func (w *WalgUtil) OplogReplay(from, until OpTimestamp, whitelist string) error {
+	args := []string{"oplog-replay", from.String(), until.String()}
+
+	if whitelist != "" {
+		args = append(args, "--whitelist", whitelist)
+	}
+	
+	_, err := w.runCmd(args...)
 	return err
 }
 

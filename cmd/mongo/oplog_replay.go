@@ -13,6 +13,11 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
+var (
+	oplogWhitelist []string
+	oplogBlacklist []string
+)
+
 // oplogReplayCmd represents oplog replay procedure
 var oplogReplayCmd = &cobra.Command{
 	Use:   "oplog-replay <since ts.inc> <until ts.inc>",
@@ -26,7 +31,7 @@ var oplogReplayCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args)
+		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, oplogWhitelist, oplogBlacklist)
 		if err != nil {
 			return
 		}
@@ -35,8 +40,8 @@ var oplogReplayCmd = &cobra.Command{
 	},
 }
 
-func buildOplogReplayRunArgs(cmdargs []string) (binary.ReplyOplogConfig, string, error) {
-	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1])
+func buildOplogReplayRunArgs(cmdargs, whitelist, blacklist []string) (binary.ReplyOplogConfig, string, error) {
+	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1], whitelist, blacklist)
 	if err != nil {
 		return args, "", err
 	}
@@ -50,5 +55,7 @@ func buildOplogReplayRunArgs(cmdargs []string) (binary.ReplyOplogConfig, string,
 }
 
 func init() {
+	oplogReplayCmd.Flags().StringSliceVar(&oplogWhitelist, WhitelistFlag, []string{}, WhitelistDescription)
+	oplogReplayCmd.Flags().StringSliceVar(&oplogBlacklist, BlacklistFlag, []string{}, BlacklistDescription)
 	cmd.AddCommand(oplogReplayCmd)
 }

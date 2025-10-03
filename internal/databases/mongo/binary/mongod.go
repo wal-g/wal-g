@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"strings"
 	"time"
 
@@ -374,10 +375,7 @@ type CatalogRecord struct {
 }
 
 func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
-	routes := models.BackupRoutesInfo{
-		Databases: make(map[string]models.DBInfo),
-		Service:   make(map[string]string),
-	}
+	routes := models.NewBackupRoutesInfo()
 
 	pipeline := mongo.Pipeline{{{Key: "$listCatalog", Value: bson.M{}}}}
 	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
@@ -520,6 +518,9 @@ type ReplyOplogConfig struct {
 	OplogApplicationMode *string
 
 	HasPitr bool
+
+	Whitelist map[string]map[string]struct{}
+	Blacklist map[string]map[string]struct{}
 }
 
 type ShConfig struct {
@@ -552,7 +553,7 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 	}
 }
 
-func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (ReplyOplogConfig, error) {
+func NewReplyOplogConfig(sincePitrStr, untilPitrStr string, whitelist, blacklist []string) (ReplyOplogConfig, error) {
 	var roConfig ReplyOplogConfig
 	var err error
 	roConfig.HasPitr = true
@@ -588,6 +589,11 @@ func NewReplyOplogConfig(sincePitrStr string, untilPitrStr string) (ReplyOplogCo
 		conf.OplogReplayOplogApplicationMode); hasOplogApplicationMode {
 		roConfig.OplogApplicationMode = &oplogApplicationMode
 	}
+
+	whitelistFilter, blacklistFilter := partial.GetFilters(whitelist, blacklist)
+	roConfig.Whitelist = whitelistFilter
+	roConfig.Blacklist = blacklistFilter
+
 	return roConfig, err
 }
 

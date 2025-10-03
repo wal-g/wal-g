@@ -3,6 +3,7 @@ package oplog
 import (
 	"context"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"io"
 	"strings"
 
@@ -77,11 +78,19 @@ type DBApplier struct {
 	txnBuffer             *txn.Buffer
 	preserveUUID          bool
 	applyIgnoreErrorCodes map[string][]int32
+	whitelist             map[string]map[string]struct{}
+	blacklist             map[string]map[string]struct{}
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32) *DBApplier {
-	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes}
+func NewDBApplier(
+	m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32,
+	whitelist, blacklist map[string]map[string]struct{},
+) *DBApplier {
+	return &DBApplier{
+		db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes,
+		whitelist: whitelist, blacklist: blacklist,
+	}
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -150,10 +159,19 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 }
 
 // shouldIgnore checks if error should be ignored
-func (ap *DBApplier) shouldIgnore(op string, err error) bool {
+func (ap *DBApplier) shouldIgnore(op, ns string, err error) bool {
 	ce, ok := err.(mongo.CommandError)
 	if !ok {
 		return false
+	}
+
+	tracelog.DebugLogger.Printf("ce name %s ce message %s ce code %v op %v ns %s", ce.Name, ce.Message, ce.Code, op, ns)
+	if ce.Code == 26 && (len(ap.whitelist)+len(ap.blacklist)) > 0 {
+		db, col := util.SplitNamespace(ns)
+		if !partial.ShouldDownload(db, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
+			tracelog.DebugLogger.Printf("skip %s error on namespace %s due to partial oplog-reply", ce.Message, ns)
+			return true
+		}
 	}
 
 	ignoreErrorCodes, ok := ap.applyIgnoreErrorCodes[op]
@@ -270,9 +288,10 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 
 	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
 	if err := ap.db.ApplyOp(ctx, op); err != nil {
+		tracelog.DebugLogger.Printf("error handling op: %v; op: %v", err, *op)
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
-		if !ap.shouldIgnore(op.Operation, err) {
+		if !ap.shouldIgnore(op.Operation, op.Namespace, err) {
 			return NewOpHandleError(*op, err)
 		}
 		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)

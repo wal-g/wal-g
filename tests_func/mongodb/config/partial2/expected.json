@@ -1,0 +1,18 @@
+{
+  "commands": {
+    "succeeded": {
+      "insert": 2
+    },
+    "docs": {
+      "insert": 3
+    },
+    "failed": {},
+    "errors": {}
+  },
+  "transactions": {
+    "succeeded": {},
+    "docs": {},
+    "failed": {},
+    "errors": {}
+  }
+}
