@@ -20,7 +20,6 @@ services:
             dockerfile: ${DOCKER_FILE}
             context: .
             args:
-                - MONGO_MAJOR=${MONGO_MAJOR}
                 - MONGO_VERSION=${MONGO_VERSION}
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
                 - MONGO_REPO=${MONGO_REPO}
@@ -44,7 +43,6 @@ services:
             dockerfile: ${DOCKER_FILE}
             context: .
             args:
-                - MONGO_MAJOR=${MONGO_MAJOR}
                 - MONGO_VERSION=${MONGO_VERSION}
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
                 - MONGO_REPO=${MONGO_REPO}

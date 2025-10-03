@@ -1,0 +1,64 @@
+#!/bin/bash
+set -euo pipefail
+case "$1" in
+  "backup-list")
+    if [[ "$2" == "--detail" && "$3" == "--json" ]]; then
+      # Generate realistic timestamps (recent backups) - compatible with both GNU and BSD date
+      if date -d '2 hours ago' '+%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
+        # GNU date (Linux)
+        full_time=$(date -u -d '2 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
+        delta1_time=$(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ') 
+        delta2_time=$(date -u -d '30 minutes ago' '+%Y-%m-%dT%H:%M:%SZ')
+        old_full_time=$(date -u -d '1 day ago' '+%Y-%m-%dT%H:%M:%SZ')
+      else
+        # BSD date (macOS)
+        full_time=$(date -u -v-2H '+%Y-%m-%dT%H:%M:%SZ')
+        delta1_time=$(date -u -v-1H '+%Y-%m-%dT%H:%M:%SZ')
+        delta2_time=$(date -u -v-30M '+%Y-%m-%dT%H:%M:%SZ')
+        old_full_time=$(date -u -v-1d '+%Y-%m-%dT%H:%M:%SZ')
+      fi
+      
+      echo "[
+        {\"backup_name\":\"base_$(date +%s)\",\"time\":\"$full_time\",\"start_time\":\"$full_time\",\"finish_time\":\"$full_time\",\"wal_file_name\":\"000000010000000000000010\",\"start_lsn\":268435456,\"finish_lsn\":301989888,\"is_permanent\":false,\"user_data\":\"\"},
+        {\"backup_name\":\"base_$(date +%s)_D_000000010000000000000010\",\"time\":\"$delta1_time\",\"start_time\":\"$delta1_time\",\"finish_time\":\"$delta1_time\",\"wal_file_name\":\"000000010000000000000015\",\"start_lsn\":301989888,\"finish_lsn\":335544320,\"is_permanent\":false,\"user_data\":\"\"},
+        {\"backup_name\":\"base_$(date +%s)_D_000000010000000000000015\",\"time\":\"$delta2_time\",\"start_time\":\"$delta2_time\",\"finish_time\":\"$delta2_time\",\"wal_file_name\":\"000000010000000000000018\",\"start_lsn\":335544320,\"finish_lsn\":369098752,\"is_permanent\":false,\"user_data\":\"\"},
+        {\"backup_name\":\"base_daily_backup\",\"time\":\"$old_full_time\",\"start_time\":\"$old_full_time\",\"finish_time\":\"$old_full_time\",\"wal_file_name\":\"000000010000000000000005\",\"start_lsn\":83886080,\"finish_lsn\":134217728,\"is_permanent\":true,\"user_data\":\"daily-backup\"}
+      ]"
+    fi
+    ;;
+  "wal-show")
+    if [[ "$2" == "--detailed-json" ]]; then
+      echo '[
+        {
+          "id": 1,
+          "parent_id": 0,
+          "switch_point_lsn": 0,
+          "start_segment": "000000010000000000000001",
+          "end_segment": "000000010000000000000020",
+          "segments_count": 20,
+          "missing_segments": [],
+          "segment_range_size": 20,
+          "status": "OK"
+        },
+        {
+          "id": 2,
+          "parent_id": 1,
+          "switch_point_lsn": 536870912,
+          "start_segment": "000000020000000000000001",
+          "end_segment": "000000020000000000000003",
+          "segments_count": 3,
+          "missing_segments": [],
+          "segment_range_size": 3,
+          "status": "OK"
+        }
+      ]'
+    fi
+    ;;
+  "st")
+    if [[ "$2" == "ls" ]]; then
+      # Mock storage listing - simulate successful storage connectivity
+      echo "Storage connection successful - S3 bucket accessible"
+      exit 0
+    fi
+    ;;
+esac
