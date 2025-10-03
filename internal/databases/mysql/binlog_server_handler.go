@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -287,14 +288,35 @@ func HandleBinlogServer(since string, until string) {
 	password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	var activeConnections int64
+	var lastConnTS int64
+	idleTimeout := 60 * time.Second
+
+	atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
+
+	// Goroutine for idle server shutdown
+	go func() {
+		for {
+			time.Sleep(5 * time.Second)
+			idleFor := time.Since(time.Unix(0, atomic.LoadInt64(&lastConnTS)))
+			if atomic.LoadInt64(&activeConnections) == 0 && idleFor > idleTimeout {
+				tracelog.InfoLogger.Printf("Idle timeout (%v) reached with no active connections, shutting down binlog-server", idleTimeout)
+				os.Exit(0)
+			}
+		}
+	}()
+
 	for {
 		c, err := l.Accept()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Listen error: %v", err)
 			continue
 		}
+		atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
+		atomic.AddInt64(&activeConnections, 1)
 		go func(c net.Conn) {
 			defer c.Close()
+			defer atomic.AddInt64(&activeConnections, -1)
 			tracelog.InfoLogger.Printf("connection accepted from %s", c.RemoteAddr())
 			conn, err := server.NewConn(c, user, password, Handler{})
 			if err != nil {
