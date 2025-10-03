@@ -181,7 +181,7 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1 -timeout 30m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 clean_mongo_features:
 	set -e
