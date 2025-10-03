@@ -282,52 +282,32 @@ func HandleBinlogServer(since string, until string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
+	user, err := conf.GetRequiredSetting(conf.MysqlBinlogServerUser)
+	tracelog.ErrorLogger.FatalOnError(err)
+	password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			tracelog.ErrorLogger.Printf("Error accepting connection: %v", err)
+			tracelog.ErrorLogger.Printf("Listen error: %v", err)
 			continue
 		}
-		tracelog.InfoLogger.Printf("Connection accepted from %s", c.RemoteAddr())
-
-		user, err := conf.GetRequiredSetting(conf.MysqlBinlogServerUser)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("Failed to get user: %v", err)
-			err := c.Close()
+		go func(c net.Conn) {
+			defer c.Close()
+			tracelog.InfoLogger.Printf("connection accepted from %s", c.RemoteAddr())
+			conn, err := server.NewConn(c, user, password, Handler{})
 			if err != nil {
+				tracelog.ErrorLogger.Printf("conn failed: %v", err)
 				return
 			}
-			continue
-		}
-		password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("Failed to get password: %v", err)
-			err := c.Close()
-			if err != nil {
-				return
+			for {
+				if err := conn.HandleCommand(); err != nil {
+					tracelog.WarningLogger.Printf("Error handling command: %v", err)
+					break
+				}
 			}
-			continue
-		}
-		conn, err := server.NewConn(c, user, password, Handler{})
-		if err != nil {
-			tracelog.ErrorLogger.Printf("Failed to create connection: %v", err)
-			err := c.Close()
-			if err != nil {
-				return
-			}
-			continue
-		}
-		tracelog.InfoLogger.Printf("MySQL connection created for %s", c.RemoteAddr())
-
-		for {
-			if err := conn.HandleCommand(); err != nil {
-				tracelog.WarningLogger.Printf("Error handling command from %s: %v", c.RemoteAddr(), err)
-				break
-			}
-		}
-		err = c.Close()
-		if err != nil {
-			return
-		}
+			tracelog.InfoLogger.Printf("connection closed from %s", c.RemoteAddr())
+		}(c)
 	}
 }
