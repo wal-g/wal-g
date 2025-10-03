@@ -1,10 +1,9 @@
 package partial
 
 import (
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"strings"
 )
 
 type SetMap map[string]map[string]struct{}
@@ -65,15 +64,6 @@ func EnrichWithTarPaths(backupRoutesInfo *models.BackupRoutesInfo, tarPaths map[
 	return nil
 }
 
-func DBAndColFromURI(uri string) (string, string) {
-	if !strings.Contains(uri, ".") {
-		return uri, ""
-	}
-
-	splitted := strings.SplitN(uri, ".", 2)
-	return splitted[0], splitted[1]
-}
-
 func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, map[string]map[string]struct{}) {
 	whitelistFilter := make(SetMap)
 	blacklistFilter := make(SetMap)
@@ -83,7 +73,7 @@ func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	}
 
 	for _, uri := range whitelist {
-		db, col := DBAndColFromURI(uri)
+		db, col := util.SplitNamespace(uri)
 
 		whitelistFilter[db] = map[string]struct{}{}
 		if col != "" {
@@ -97,7 +87,7 @@ func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	whitelistFilter["mdb_internal"] = map[string]struct{}{}
 
 	for _, uri := range blacklist {
-		db, col := DBAndColFromURI(uri)
+		db, col := util.SplitNamespace(uri)
 		delete(whitelistFilter[db], col)
 
 		if _, ok := blacklistFilter[db]; !ok {
@@ -124,11 +114,8 @@ func ShouldDownload(db, col string, whitelist, blacklist SetMap, wlSpecified boo
 		return ok
 	}
 
-	tracelog.InfoLogger.Printf("%v %v", db, col)
-
 	if wlSpecified {
 		if nsIn(whitelist, db, col) {
-			tracelog.InfoLogger.Printf("%v %v true", db, col)
 			return !nsIn(blacklist, db, col)
 		}
 		return false

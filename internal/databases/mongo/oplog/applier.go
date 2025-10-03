@@ -155,25 +155,22 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 		return fmt.Errorf("config database op")
 	}
 
-	database, col := partial.DBAndColFromURI(oplog.Namespace)
-	tracelog.InfoLogger.Printf("%v %v %v %v %v", database, col, ap.whitelist, ap.blacklist, len(ap.whitelist)+len(ap.blacklist) > 0)
-	if !partial.ShouldDownload(database, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
-		return fmt.Errorf("operations in %s is not supposed to be applied due to whitelist/blacklist", oplog.Namespace)
-	}
-
 	return nil
 }
 
 // shouldIgnore checks if error should be ignored
-func (ap *DBApplier) shouldIgnore(op string, err error) bool {
+func (ap *DBApplier) shouldIgnore(op, ns string, err error) bool {
 	ce, ok := err.(mongo.CommandError)
 	if !ok {
 		return false
 	}
 
 	if ce.Code == 26 && (len(ap.whitelist)+len(ap.blacklist)) > 0 {
-		tracelog.DebugLogger.Printf("error: %v", ce)
-		return true
+		db, col := util.SplitNamespace(ns)
+		if !partial.ShouldDownload(db, col, ap.whitelist, ap.blacklist, len(ap.whitelist) > 0) {
+			tracelog.DebugLogger.Printf("skip %s error on namespace %s due to partial oplog-reply", ce.Message, ns)
+			return true
+		}
 	}
 
 	ignoreErrorCodes, ok := ap.applyIgnoreErrorCodes[op]
@@ -292,7 +289,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 	if err := ap.db.ApplyOp(ctx, op); err != nil {
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
-		if !ap.shouldIgnore(op.Operation, err) {
+		if !ap.shouldIgnore(op.Operation, op.Namespace, err) {
 			return NewOpHandleError(*op, err)
 		}
 		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)
