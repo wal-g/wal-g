@@ -52,7 +52,7 @@ jobs:
         id: go
 
       - name: Get dependencies
-        run: go get -v -t -d ./...
+        run: go get -v -t ./...
 
       - name: Mark repo and submodule as safe
         run: |
