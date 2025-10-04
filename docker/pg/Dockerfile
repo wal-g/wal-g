@@ -8,7 +8,6 @@ RUN apt-get update && \
     postgresql-contrib \
     gnupg \
     gpg-agent \
-    pinentry-qt \
     time \
     bc \
     jq \
