@@ -54,7 +54,7 @@ jobs:
       - name: Get dependencies
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
-          go get -v -t -d ./...
+          go get -v -t ./...
 
       # build images
       - name: Build images
