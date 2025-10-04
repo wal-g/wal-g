@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e -x
 
-rm -rf /var/lib/postgresql/10/main
+rm -rf ${PGDATA}
 
 CONFIG_FILE="/tmp/configs/wal_perftest_throttling_config.json"
 
