@@ -1,7 +1,6 @@
 #!/bin/sh
 set -e -x
 
-export PGDATA=/var/lib/postgresql/10/main
 export WALG_SOCKET="/tmp/wal-daemon.sock"
 export FORCE_NEW_WAL="1"
 export SKIP_TEST_WAL_OVERWRITES="1"

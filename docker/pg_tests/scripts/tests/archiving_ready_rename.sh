@@ -3,7 +3,7 @@ set -e -x
 CONFIG_FILE="/tmp/configs/archiving_ready_rename.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-export PGDATA="/var/lib/postgresql/10/main"
+
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
