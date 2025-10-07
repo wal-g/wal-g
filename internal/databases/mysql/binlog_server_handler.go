@@ -30,6 +30,7 @@ var (
 	startTS      time.Time
 	untilTS      time.Time
 	lastSentGTID string
+	lastConnTS   int64
 )
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
@@ -117,6 +118,7 @@ func waitReplicationIsDone() error {
 
 		if gtidSet.Contain(lastSentGTIDSet) {
 			tracelog.InfoLogger.Println("Replication is done")
+			atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
 			return nil
 		}
 		time.Sleep(1 * time.Second)
@@ -289,7 +291,6 @@ func HandleBinlogServer(since string, until string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	var activeConnections int64
-	var lastConnTS int64
 	idleTimeout := 300 * time.Second
 
 	atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
