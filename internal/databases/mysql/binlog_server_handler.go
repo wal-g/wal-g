@@ -290,7 +290,7 @@ func HandleBinlogServer(since string, until string) {
 
 	var activeConnections int64
 	var lastConnTS int64
-	idleTimeout := 45 * time.Second
+	idleTimeout := 300 * time.Second
 
 	atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
 
