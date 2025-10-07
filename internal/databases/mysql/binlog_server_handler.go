@@ -158,7 +158,9 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			if err != nil {
 				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
 			}
-			return
+			for {
+				time.Sleep(1 * time.Hour)
+			}
 		}
 		handleEventError(err, s)
 		if err != nil {
