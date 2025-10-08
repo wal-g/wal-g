@@ -10,7 +10,7 @@ RUN apt-get update -q && \
     cmake build-essential wget ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-RUN wget -O - "https://go.dev/dl/go1.25.0.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
+RUN wget -O - "https://go.dev/dl/go1.25.2.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
 	export PATH="/usr/local/go/bin:$PATH" && \
 	go version
 
