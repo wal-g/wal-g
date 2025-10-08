@@ -1,8 +1,8 @@
 module github.com/wal-g/wal-g
 
-go 1.24
+go 1.25
 
-toolchain go1.24.5
+toolchain go1.25.2
 
 require (
 	cloud.google.com/go/storage v1.10.0
@@ -53,9 +53,6 @@ require (
 
 require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230426101702-58e86b294756
-	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
-	github.com/alibabacloud-go/sts-20150401/v2 v2.0.4
-	github.com/alibabacloud-go/tea v1.3.9
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.3
 	github.com/aliyun/credentials-go v1.4.5
 	github.com/cactus/go-statsd-client/v5 v5.0.0
@@ -75,21 +72,12 @@ require (
 )
 
 require (
-	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.5 // indirect
 	github.com/alibabacloud-go/debug v1.0.1 // indirect
-	github.com/alibabacloud-go/endpoint-util v1.1.0 // indirect
-	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
-	github.com/alibabacloud-go/tea-utils/v2 v2.0.7 // indirect
-	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
-	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
-	github.com/tjfoc/gmsm v1.4.1 // indirect
 )
 
 require (
@@ -153,7 +141,7 @@ require (
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/siddontang/go-log v0.0.0-20180807004314-8d05993dda07 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
-	github.com/spf13/cast v1.3.0 // indirect
+	github.com/spf13/cast v1.3.0
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tinylib/msgp v1.1.0 // indirect

@@ -3,7 +3,8 @@ name: Cross build
 on: [ push, pull_request, workflow_dispatch]
 
 env:
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.25"
+  GOEXPERIMENT: jsonv2
   GOOS: windows
 
 jobs:
