@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e -x
 
-/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+initdb ${PGDATA}
 
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '\
@@ -21,7 +21,7 @@ WALE_FILE_PREFIX=file://localhost/tmp \
 /usr/bin/timeout 600 wal-e wal-push %p'" >> ${PGDATA}/postgresql.conf
 echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
@@ -109,7 +109,7 @@ cp /tmp/conf_files/postgresql.conf ${PGDATA}
 cp /tmp/conf_files/pg_hba.conf ${PGDATA}
 cp /tmp/conf_files/pg_ident.conf ${PGDATA}
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 pg_dumpall -f /tmp/dump2
 

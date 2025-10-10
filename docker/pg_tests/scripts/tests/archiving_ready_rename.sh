@@ -11,24 +11,24 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 
 wal-g delete everything FORCE --confirm --config=${TMP_CONFIG}
 
-/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+initdb ${PGDATA}
 
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 echo "archive_command = 'exit 1'" > ${PGDATA}/postgresql.auto.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 
 pgbench -i -s 20 postgres
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w stop
+pg_ctl -D ${PGDATA} -w stop
 
 echo "logging_collector = on" >> ${PGDATA}/postgresql.conf
 echo "log_filename = 'postgresql.log'" >> ${PGDATA}/postgresql.conf
 echo "log_min_messages = debug" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p --pg-ready-rename=true'" > ${PGDATA}/postgresql.auto.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 sleep 10

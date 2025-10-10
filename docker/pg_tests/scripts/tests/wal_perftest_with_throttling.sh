@@ -18,8 +18,8 @@ WAL_FETCH_LOGS="/tmp/logs/pg_wal_perftest_fetch"
 echo "" > ${WAL_PUSH_LOGS}
 echo "" > ${WAL_FETCH_LOGS}
 
-/usr/lib/postgresql/10/bin/initdb "${PGDATA}"
-/usr/lib/postgresql/10/bin/pg_ctl -D "${PGDATA}" -w start
+initdb "${PGDATA}"
+pg_ctl -D "${PGDATA}" -w start
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
