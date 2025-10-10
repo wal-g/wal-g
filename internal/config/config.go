@@ -195,6 +195,7 @@ const (
 	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
+	GoDebug    = "GODEBUG"
 
 	HTTPListen       = "HTTP_LISTEN"
 	HTTPExposePprof  = "HTTP_EXPOSE_PPROF"
@@ -491,6 +492,7 @@ var (
 
 		// GOLANG
 		GoMaxProcs: true,
+		GoDebug:    true,
 
 		// Web server
 		HTTPListen:       true,
