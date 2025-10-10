@@ -3,7 +3,7 @@ set -e -x
 CONFIG_FILE="/tmp/configs/archiving_ready_rename.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-export PGDATA="/var/lib/postgresql/10/main"
+
 cat ${CONFIG_FILE} > ${TMP_CONFIG}
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
@@ -13,9 +13,9 @@ wal-g delete everything FORCE --confirm --config=${TMP_CONFIG}
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
-echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = 'exit 1'" > /var/lib/postgresql/10/main/postgresql.auto.conf
+echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
+echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
+echo "archive_command = 'exit 1'" > ${PGDATA}/postgresql.auto.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
@@ -23,19 +23,19 @@ pgbench -i -s 20 postgres
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w stop
 
-echo "logging_collector = on" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "log_filename = 'postgresql.log'" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "log_min_messages = debug" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p --pg-ready-rename=true'" > /var/lib/postgresql/10/main/postgresql.auto.conf
+echo "logging_collector = on" >> ${PGDATA}/postgresql.conf
+echo "log_filename = 'postgresql.log'" >> ${PGDATA}/postgresql.conf
+echo "log_min_messages = debug" >> ${PGDATA}/postgresql.conf
+echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONFIG} wal-push %p --pg-ready-rename=true'" > ${PGDATA}/postgresql.auto.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 sleep 10
 
-grep -i 'archived write-ahead log file' /var/lib/postgresql/10/main/log/postgresql.log
+grep -i 'archived write-ahead log file' ${PGDATA}/log/postgresql.log
 
-count=$(grep -c 'archived write-ahead log file' /var/lib/postgresql/10/main/log/postgresql.log)
+count=$(grep -c 'archived write-ahead log file' ${PGDATA}/log/postgresql.log)
 
 if [ "${count}" = '0' ]; then
     exit 1

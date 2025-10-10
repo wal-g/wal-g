@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e -x
 
-PGDATA="/var/lib/postgresql/10/main"
 PGDATA_ALPHA="${PGDATA}_alpha"
 PGDATA_BETA="${PGDATA}_beta"
 PGDATA_BETA_1="${PGDATA}_beta_1"

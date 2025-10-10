@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e -x
 
-export PGDATA=/var/lib/postgresql/10/main
-
 CONFIG_FILE="/tmp/configs/daemon_test_config.json"
 
 COMMON_CONFIG="/tmp/configs/common_config.json"

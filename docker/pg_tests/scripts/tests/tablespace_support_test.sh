@@ -3,7 +3,7 @@ set -e -x
 
 /usr/lib/postgresql/10/bin/initdb ${PGDATA}
 
-echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '\
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
@@ -19,8 +19,8 @@ PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALG_FILE_PREFIX=file://localhost/tmp \
 WALG_LOG_DESTINATION=stderr \
-/usr/bin/timeout 600 wal-g wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
+/usr/bin/timeout 600 wal-g wal-push %p'" >> ${PGDATA}/postgresql.conf
+echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
 
