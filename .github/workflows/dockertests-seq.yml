@@ -9,8 +9,8 @@ on:
     - cron: '0 0 * * *'
 
 jobs:
-  sequiential:
-    if: ${{ github.repository_owner == 'wal-g' }}
+  sequential:
+    if: ${{ github.repository_owner == 'wal-g' || github.event_name == 'workflow_dispatch' }}
     uses: ./.github/workflows/dockertests.yml
     with:
       command-json-array: >
