@@ -7,8 +7,6 @@ test_receive_wal()
 
   pg_ctl -D ${PGDATA} -w start
 
-  /tmp/scripts/wait_while_pg_not_ready.sh
-
   wal-g --config=${TMP_CONFIG} wal-receive &
 
   pgbench -i -s 5 postgres
