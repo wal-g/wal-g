@@ -10,14 +10,14 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
  
 
-/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+initdb ${PGDATA}
 
 archive_command="/usr/bin/timeout 600 pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups archive-push %p"
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '${archive_command}'" >> ${PGDATA}/postgresql.conf
 echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 mkdir -m 770 /tmp/pgbackrest-backups
@@ -33,7 +33,7 @@ pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backu
 wait $pgbench_pid
 pg_dumpall -f /tmp/dump1
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w stop
+pg_ctl -D ${PGDATA} -w stop
 
 s3cmd mb s3://pgbackrest-backups || echo "Bucket pgbackrest-backups already exists"
 s3cmd sync /tmp/pgbackrest-backups/backup s3://pgbackrest-backups
@@ -52,7 +52,7 @@ diff /tmp/pg_data_expected.tar /tmp/pg_data_actual.tar
 echo "Pgbackrest and wal-g backups are the same!"
 
 echo "restore_command = 'wal-g --config=${TMP_CONFIG} pgbackrest wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 pg_dumpall -f /tmp/dump2
 
