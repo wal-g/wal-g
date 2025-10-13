@@ -25,8 +25,6 @@ echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
 pg_ctl -D "${PGDATA}" -w start
 
-/tmp/scripts/wait_while_pg_not_ready.sh
-
 wal-g --config=${TMP_CONFIG} st rm / --target=all || true
 
 sleep 1

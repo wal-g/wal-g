@@ -10,8 +10,6 @@ test_copy_composer()
 
   pg_ctl -D ${PGDATA} -w start
 
-  /tmp/scripts/wait_while_pg_not_ready.sh
-
   wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
   pgbench -i -s 100

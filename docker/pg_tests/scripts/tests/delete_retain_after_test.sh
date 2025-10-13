@@ -15,7 +15,6 @@ echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONF
 echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
 pg_ctl -D ${PGDATA} -w start
-/tmp/scripts/wait_while_pg_not_ready.sh
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 for i in 1 2 3 4
