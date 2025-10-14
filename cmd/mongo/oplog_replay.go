@@ -14,12 +14,18 @@ import (
 )
 
 const (
-	PartialFlag        = "partial"
-	PartialDescription = "Partial option. If this option is enabled, NamespaceNotFound errors will be ignored"
+	PartialFlag                             = "partial"
+	PartialDescription                      = "Partial option. If this option is enabled, NamespaceNotFound errors will be ignored"
+	WithCatchUpReconfigFlag                 = "with-catch-up-reconfig"
+	WithCatchUpReconfigDescription          = "Reconfig MongoDB oplog service collections for mongod replica oplog catch up"
+	MinimalOplogReplayConfigPathFlag        = "minimal-mongod-config-path"
+	MinimalOplogReplayConfigPathDescription = "Path to mongod config with minimal working configuration"
 )
 
 var (
-	partial bool
+	partial                     bool
+	withCatchUpReconfig         bool
+	minimalOplogReplyConfigPath string
 )
 
 // oplogReplayCmd represents oplog replay procedure
@@ -35,7 +41,8 @@ var oplogReplayCmd = &cobra.Command{
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
 
-		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, partial)
+		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, partial, withCatchUpReconfig,
+			minimalOplogReplyConfigPath)
 		if err != nil {
 			return
 		}
@@ -44,8 +51,11 @@ var oplogReplayCmd = &cobra.Command{
 	},
 }
 
-func buildOplogReplayRunArgs(cmdargs []string, partial bool) (binary.ReplyOplogConfig, string, error) {
-	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1], partial)
+func buildOplogReplayRunArgs(
+	cmdargs []string, partial,
+	withCatchUpReconfig bool, minimalConfigPath string,
+) (binary.ReplyOplogConfig, string, error) {
+	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1], partial, withCatchUpReconfig, minimalConfigPath)
 	if err != nil {
 		return args, "", err
 	}
@@ -60,5 +70,8 @@ func buildOplogReplayRunArgs(cmdargs []string, partial bool) (binary.ReplyOplogC
 
 func init() {
 	oplogReplayCmd.Flags().BoolVar(&partial, PartialFlag, false, PartialDescription)
+	oplogReplayCmd.Flags().BoolVar(&withCatchUpReconfig, WithCatchUpReconfigFlag, false, WithCatchUpReconfigDescription)
+	oplogReplayCmd.Flags().StringVar(&minimalOplogReplyConfigPath, MinimalOplogReplayConfigPathFlag,
+		"", MinimalOplogReplayConfigPathDescription)
 	cmd.AddCommand(oplogReplayCmd)
 }
