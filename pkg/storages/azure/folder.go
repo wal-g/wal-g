@@ -11,20 +11,23 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/pkg/errors"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 )
 
 // TODO: Unit tests
 type Folder struct {
 	path                string
-	containerClient     azblob.ContainerClient
-	uploadStreamOptions azblob.UploadStreamOptions
+	containerClient     *container.Client
+	uploadStreamOptions blockblob.UploadStreamOptions
 	timeout             time.Duration
 }
 
 func NewFolder(
 	path string,
-	containerClient azblob.ContainerClient,
+	containerClient *container.Client,
 	uploadStreamOptions azblob.UploadStreamOptions,
 	timeout time.Duration,
 ) *Folder {
@@ -45,13 +48,9 @@ func (folder *Folder) GetPath() string {
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	ctx := context.Background()
-	blobClient, err := folder.containerClient.NewBlockBlobClient(path)
-	if err != nil {
-		return false, fmt.Errorf("init Azure Blob client to check object %q for existence: %w", path, err)
-	}
-	_, err = blobClient.GetProperties(ctx, nil)
-	var stgErr *azblob.StorageError
-	if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
+	blobClient := folder.containerClient.NewBlockBlobClient(path)
+	_, err := blobClient.GetProperties(ctx, nil)
+	if err != nil && bloberror.HasCode(err, bloberror.BlobNotFound) {
 		return false, nil
 	}
 	if err != nil {
@@ -60,10 +59,16 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	return true, nil
 }
 
-func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
-	blobPager := folder.containerClient.ListBlobsHierarchy("/", &azblob.ContainerListBlobsHierarchyOptions{Prefix: &folder.path})
-	for blobPager.NextPage(context.Background()) {
-		blobs := blobPager.PageResponse()
+func (folder *Folder) ListFolder() ([]storage.Object, []storage.Folder, error) {
+	var objects []storage.Object
+	var subFolders []storage.Folder
+
+	blobPager := folder.containerClient.NewListBlobsHierarchyPager("/", &container.ListBlobsHierarchyOptions{Prefix: &folder.path})
+	for blobPager.More() {
+		blobs, err := blobPager.NextPage(context.Background())
+		if err != nil {
+			return nil, nil, fmt.Errorf("iterate through folder %q: %w", folder.path, err)
+		}
 		//add blobs to the list of storage objects
 		for _, blob := range blobs.Segment.BlobItems {
 			objName := strings.TrimPrefix(*blob.Name, folder.path)
@@ -86,11 +91,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			))
 		}
 	}
-	err = blobPager.Err()
-	if err != nil {
-		return nil, nil, fmt.Errorf("iterate through folder %q: %w", folder.path, err)
-	}
-	return objects, subFolders, err
+	return objects, subFolders, nil
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
@@ -103,22 +104,16 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 
 func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
-	blobClient, err := folder.containerClient.NewBlockBlobClient(path)
-	if err != nil {
-		return nil, fmt.Errorf("init Azure Blob client to read object %q: %w", path, err)
-	}
+	blobClient := folder.containerClient.NewBlockBlobClient(path)
 
-	get, err := blobClient.Download(context.Background(), nil)
+	get, err := blobClient.DownloadStream(context.Background(), nil)
 	if err != nil {
-		var storageError *azblob.StorageError
-		errors.As(err, &storageError)
-		if storageError.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
+		if bloberror.HasCode(err, bloberror.BlobNotFound) {
 			return nil, storage.NewObjectNotFoundError(path)
 		}
 		return nil, fmt.Errorf("download blob %q: %w", path, err)
 	}
-	reader := get.Body(nil)
-	return reader, nil
+	return get.Body, nil
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
@@ -129,13 +124,9 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
-	blobClient, err := folder.containerClient.NewBlockBlobClient(path)
-	if err != nil {
-		return fmt.Errorf("init Azure Blob client to upload object %q: %w", path, err)
-	}
+	blobClient := folder.containerClient.NewBlockBlobClient(path)
 
-	_, err = blobClient.UploadStream(ctx, content, folder.uploadStreamOptions)
-	if err != nil {
+	if _, err := blobClient.UploadStream(ctx, content, &folder.uploadStreamOptions); err != nil {
 		return fmt.Errorf("upload blob %q: %w", path, err)
 	}
 
@@ -152,17 +143,10 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		}
 		return err
 	}
-	var srcClient, dstClient *azblob.BlockBlobClient
-	srcClient, err = folder.containerClient.NewBlockBlobClient(srcPath)
-	if err != nil {
-		return fmt.Errorf("init Azure Blob client for copy source %q: %w", srcPath, err)
-	}
-	dstClient, err = folder.containerClient.NewBlockBlobClient(dstPath)
-	if err != nil {
-		return fmt.Errorf("init Azure Blob client for copy destination %q: %w", dstPath, err)
-	}
-	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(),
-		&azblob.BlobStartCopyOptions{Tier: azblob.AccessTierHot.ToPtr()})
+	srcClient := folder.containerClient.NewBlockBlobClient(srcPath)
+	dstClient := folder.containerClient.NewBlockBlobClient(dstPath)
+	hot := blob.AccessTierHot
+	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &blob.StartCopyFromURLOptions{Tier: &hot})
 	return err
 }
 
@@ -170,15 +154,11 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		//Delete blob using blobClient obtained from full path to blob
 		path := storage.JoinPath(folder.path, objectRelativePath)
-		blobClient, err := folder.containerClient.NewBlockBlobClient(path)
-		if err != nil {
-			return fmt.Errorf("init Azure Blob client to delete object %q: %w", path, err)
-		}
+		blobClient := folder.containerClient.NewBlockBlobClient(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
-		_, err = blobClient.Delete(context.Background(),
-			&azblob.BlobDeleteOptions{DeleteSnapshots: azblob.DeleteSnapshotsOptionTypeInclude.ToPtr()})
-		var stgErr *azblob.StorageError
-		if err != nil && errors.As(err, &stgErr) && stgErr.ErrorCode == azblob.StorageErrorCodeBlobNotFound {
+		deleteOption := blob.DeleteSnapshotsOptionTypeInclude
+		_, err := blobClient.Delete(context.Background(), &blob.DeleteOptions{DeleteSnapshots: &deleteOption})
+		if err != nil && bloberror.HasCode(err, bloberror.BlobNotFound) {
 			continue
 		}
 		if err != nil {
