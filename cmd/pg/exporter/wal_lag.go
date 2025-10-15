@@ -1,11 +1,7 @@
 package main
 
-import (
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-)
-
 // CalculateLSNLag calculates the lag between two LSNs in bytes
-func CalculateLSNLag(currentLSN, lastArchivedLSN postgres.LSN) uint64 {
+func CalculateLSNLag(currentLSN, lastArchivedLSN LSN) uint64 {
 	if currentLSN <= lastArchivedLSN {
 		return 0 // No lag or archived is ahead
 	}
