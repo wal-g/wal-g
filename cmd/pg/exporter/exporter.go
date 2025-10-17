@@ -22,16 +22,18 @@ type WalgExporter struct {
 	scrapeInterval time.Duration
 
 	// Metrics
-	walTimestamp          *prometheus.GaugeVec
-	lsnLag                *prometheus.GaugeVec
-	pitrWindow            prometheus.Gauge
-	errors                *prometheus.CounterVec
-	walIntegrity          *prometheus.GaugeVec
-	backupCount           *prometheus.GaugeVec
-	backupStartTimestamp  *prometheus.GaugeVec
-	backupFinishTimestamp *prometheus.GaugeVec
-	scrapeDuration        prometheus.Gauge
-	scrapeErrors          prometheus.Counter
+	walTimestamp           *prometheus.GaugeVec
+	lsnLag                 *prometheus.GaugeVec
+	pitrWindow             prometheus.Gauge
+	errors                 *prometheus.CounterVec
+	walIntegrity           *prometheus.GaugeVec
+	backupCount            *prometheus.GaugeVec
+	backupStartTimestamp   *prometheus.GaugeVec
+	backupFinishTimestamp  *prometheus.GaugeVec
+	backupUncompressedSize *prometheus.GaugeVec
+	backupCompressedSize   *prometheus.GaugeVec
+	scrapeDuration         prometheus.Gauge
+	scrapeErrors           prometheus.Counter
 
 	// Storage aliveness metrics
 	storageAlive   prometheus.Gauge
@@ -203,6 +205,22 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
 		),
 
+		backupUncompressedSize: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "walg_backup_uncompressed_size_bytes",
+				Help: "Uncompressed size of the backup in bytes.",
+			},
+			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
+		),
+
+		backupCompressedSize: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "walg_backup_compressed_size_bytes",
+				Help: "Compressed size of the backup in bytes.",
+			},
+			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
+		),
+
 		scrapeDuration: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "walg_scrape_duration_seconds",
@@ -243,6 +261,8 @@ func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
 	e.backupCount.Describe(ch)
 	e.backupStartTimestamp.Describe(ch)
 	e.backupFinishTimestamp.Describe(ch)
+	e.backupUncompressedSize.Describe(ch)
+	e.backupCompressedSize.Describe(ch)
 	e.scrapeDuration.Describe(ch)
 	e.scrapeErrors.Describe(ch)
 	e.storageAlive.Describe(ch)
@@ -259,6 +279,8 @@ func (e *WalgExporter) Collect(ch chan<- prometheus.Metric) {
 	e.backupCount.Collect(ch)
 	e.backupStartTimestamp.Collect(ch)
 	e.backupFinishTimestamp.Collect(ch)
+	e.backupUncompressedSize.Collect(ch)
+	e.backupCompressedSize.Collect(ch)
 	e.scrapeDuration.Collect(ch)
 	e.scrapeErrors.Collect(ch)
 	e.storageAlive.Collect(ch)
@@ -372,6 +394,8 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 	e.backupCount.Reset()
 	e.backupStartTimestamp.Reset()
 	e.backupFinishTimestamp.Reset()
+	e.backupUncompressedSize.Reset()
+	e.backupCompressedSize.Reset()
 
 	fullCount, deltaCount := 0, 0
 
@@ -406,6 +430,10 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 		// Set start and finish timestamps for this specific backup
 		e.backupStartTimestamp.WithLabelValues(labels...).Set(float64(backup.StartTime.Unix()))
 		e.backupFinishTimestamp.WithLabelValues(labels...).Set(float64(backup.FinishTime.Unix()))
+
+		// Set the size metrics for the specific backup
+		e.backupUncompressedSize.WithLabelValues(labels...).Set(float64(backup.UncompressedSize))
+		e.backupCompressedSize.WithLabelValues(labels...).Set(float64(backup.CompressedSize))
 	}
 
 	// Set backup counts by type

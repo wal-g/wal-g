@@ -20,6 +20,8 @@ The exporter provides the following metrics:
 ### Backup Metrics
 - `walg_backup_start_timestamp{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Unix timestamp when backup started
 - `walg_backup_finish_timestamp{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Unix timestamp when backup completed successfully
+- `walg_backup_compressed_size_bytes{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Compressed size of the backup in bytes
+- `walg_backup_uncompressed_size_bytes{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Uncompressed size of the backup in bytes
 - `walg_backup_count{backup_type}` - Number of successful backups (full/delta)
 
 **Label Details:**
@@ -185,7 +187,7 @@ The exporter provides both start and finish timestamps for comprehensive backup 
   - Failed or interrupted backups do not generate finish timestamps
   - Represents the moment when the backup became available for recovery
 
-### WAL Timestamps  
+### WAL Timestamps
 - `walg_wal_timestamp` = When the WAL segment **finished uploading**
   - This is when the WAL segment became available in storage
   - Represents the completion of the wal-push operation
@@ -241,7 +243,7 @@ func (b *BackupInfo) GetBaseBackupName() string {
     if b.IsFullBackup() {
         return "" // Full backups don't have a base backup
     }
-    
+
     // Extract identifier after "_D_" and prepend "base_"
     deltaIndex := strings.Index(b.BackupName, "_D_")
     baseIdentifier := b.BackupName[deltaIndex+3:]
