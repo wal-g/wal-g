@@ -233,6 +233,7 @@ func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStream
 		if err != nil {
 			return nil, err
 		}
+
 	} else {
 		syncMutex.Unlock()
 		tracelog.InfoLogger.Println("Sync already started")
