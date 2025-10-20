@@ -10,7 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -30,7 +30,8 @@ var (
 	startTS      time.Time
 	untilTS      time.Time
 	lastSentGTID string
-	lastConnTS   int64
+	syncStarted  bool
+	syncMutex    sync.Mutex
 )
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
@@ -118,7 +119,6 @@ func waitReplicationIsDone() error {
 
 		if gtidSet.Contain(lastSentGTIDSet) {
 			tracelog.InfoLogger.Println("Replication is done")
-			atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
 			return nil
 		}
 		time.Sleep(1 * time.Second)
@@ -158,9 +158,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			if err != nil {
 				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
 			}
-			for {
-				time.Sleep(1 * time.Hour)
-			}
+			os.Exit(0)
 		}
 		handleEventError(err, s)
 		if err != nil {
@@ -207,24 +205,50 @@ func (h Handler) HandleRegisterSlave(data []byte) error {
 func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	s := replication.NewBinlogStreamer()
 
-	st, err := internal.ConfigureStorage()
-	if err != nil {
-		return nil, err
+	syncMutex.Lock()
+	if !syncStarted {
+		syncStarted = true
+		syncMutex.Unlock()
+
+		st, err := internal.ConfigureStorage()
+		if err != nil {
+			return nil, err
+		}
+
+		startTime, err := GetBinlogTS(st.RootFolder(), pos.Name)
+		if err != nil {
+			return nil, err
+		}
+		err = syncBinlogFiles(pos, startTime, s)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		syncMutex.Unlock()
+		tracelog.InfoLogger.Println("Sync already started, returning existing streamer")
 	}
 
-	startTime, err := GetBinlogTS(st.RootFolder(), pos.Name)
-	if err != nil {
-		return nil, err
-	}
-	err = syncBinlogFiles(pos, startTime, s)
-	return s, err
+	return s, nil
 }
 
 func (h Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
 	s := replication.NewBinlogStreamer()
 
-	err := syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, s)
-	return s, err
+	syncMutex.Lock()
+	if !syncStarted {
+		syncStarted = true
+		syncMutex.Unlock()
+
+		err := syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, s)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		syncMutex.Unlock()
+		tracelog.InfoLogger.Println("Sync already started, returning existing streamer")
+	}
+
+	return s, nil
 }
 
 func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
@@ -287,52 +311,33 @@ func HandleBinlogServer(since string, until string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
-	user, err := conf.GetRequiredSetting(conf.MysqlBinlogServerUser)
-	tracelog.ErrorLogger.FatalOnError(err)
-	password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	var activeConnections int64
-	idleTimeout := 300 * time.Second
-
-	atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
-
-	// Goroutine for idle server shutdown
-	go func() {
-		for {
-			time.Sleep(5 * time.Second)
-			idleFor := time.Since(time.Unix(0, atomic.LoadInt64(&lastConnTS)))
-			if atomic.LoadInt64(&activeConnections) == 0 && idleFor > idleTimeout {
-				tracelog.InfoLogger.Printf("Idle timeout (%v) reached with no active connections, shutting down binlog-server", idleTimeout)
-				os.Exit(0)
-			}
-		}
-	}()
-
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			tracelog.ErrorLogger.Printf("Listen error: %v", err)
+			tracelog.ErrorLogger.Printf("Error accepting connection: %v", err)
 			continue
 		}
-		atomic.StoreInt64(&lastConnTS, time.Now().UnixNano())
-		atomic.AddInt64(&activeConnections, 1)
-		go func(c net.Conn) {
-			defer c.Close()
-			defer atomic.AddInt64(&activeConnections, -1)
-			tracelog.InfoLogger.Printf("connection accepted from %s", c.RemoteAddr())
-			conn, err := server.NewConn(c, user, password, Handler{})
-			if err != nil {
-				tracelog.ErrorLogger.Printf("conn failed: %v", err)
-				return
+		tracelog.InfoLogger.Printf("connection accepted from %s", c.RemoteAddr())
+
+		user, err := conf.GetRequiredSetting(conf.MysqlBinlogServerUser)
+		tracelog.ErrorLogger.FatalOnError(err)
+		password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
+		tracelog.ErrorLogger.FatalOnError(err)
+
+		conn, err := server.NewConn(c, user, password, Handler{})
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Error creating connection: %v", err)
+			c.Close()
+			continue
+		}
+		tracelog.InfoLogger.Printf("connection created")
+
+		for {
+			if err := conn.HandleCommand(); err != nil {
+				tracelog.WarningLogger.Printf("Connection closed: %v", err)
+				break
 			}
-			for {
-				if err := conn.HandleCommand(); err != nil {
-					tracelog.WarningLogger.Printf("Error handling command: %v", err)
-					break
-				}
-			}
-			tracelog.InfoLogger.Printf("connection closed from %s", c.RemoteAddr())
-		}(c)
+		}
+		tracelog.InfoLogger.Printf("Client disconnected, waiting for new connection")
 	}
 }
