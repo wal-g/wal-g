@@ -27,11 +27,13 @@ import (
 )
 
 var (
-	startTS      time.Time
-	untilTS      time.Time
-	lastSentGTID string
-	syncStarted  bool
-	syncMutex    sync.Mutex
+	startTS        time.Time
+	untilTS        time.Time
+	lastSentGTID   string
+	syncStarted    bool
+	syncMutex      sync.Mutex
+	globalStreamer *replication.BinlogStreamer
+	streamerMutex  sync.Mutex
 )
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
@@ -203,7 +205,15 @@ func (h Handler) HandleRegisterSlave(data []byte) error {
 }
 
 func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
-	s := replication.NewBinlogStreamer()
+	streamerMutex.Lock()
+	defer streamerMutex.Unlock()
+
+	if globalStreamer != nil {
+		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
+		return globalStreamer, nil
+	}
+
+	globalStreamer = replication.NewBinlogStreamer()
 
 	syncMutex.Lock()
 	if !syncStarted {
@@ -219,36 +229,44 @@ func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStream
 		if err != nil {
 			return nil, err
 		}
-		err = syncBinlogFiles(pos, startTime, s)
+		err = syncBinlogFiles(pos, startTime, globalStreamer)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		syncMutex.Unlock()
-		tracelog.InfoLogger.Println("Sync already started, returning existing streamer")
+		tracelog.InfoLogger.Println("Sync already started")
 	}
 
-	return s, nil
+	return globalStreamer, nil
 }
 
 func (h Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
-	s := replication.NewBinlogStreamer()
+	streamerMutex.Lock()
+	defer streamerMutex.Unlock()
+
+	if globalStreamer != nil {
+		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
+		return globalStreamer, nil
+	}
+
+	globalStreamer = replication.NewBinlogStreamer()
 
 	syncMutex.Lock()
 	if !syncStarted {
 		syncStarted = true
 		syncMutex.Unlock()
 
-		err := syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, s)
+		err := syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, globalStreamer)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		syncMutex.Unlock()
-		tracelog.InfoLogger.Println("Sync already started, returning existing streamer")
+		tracelog.InfoLogger.Println("Sync already started")
 	}
 
-	return s, nil
+	return globalStreamer, nil
 }
 
 func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
