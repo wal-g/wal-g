@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 // WalgExporter implements the Prometheus Collector interface
@@ -106,13 +104,13 @@ func (b *BackupInfo) GetBaseBackupName() string {
 }
 
 // GetStartLSN converts the uint64 StartLSN to postgres.LSN type
-func (b *BackupInfo) GetStartLSN() postgres.LSN {
-	return postgres.LSN(b.StartLSN)
+func (b *BackupInfo) GetStartLSN() LSN {
+	return LSN(b.StartLSN)
 }
 
 // GetFinishLSN converts the uint64 FinishLSN to postgres.LSN type
-func (b *BackupInfo) GetFinishLSN() postgres.LSN {
-	return postgres.LSN(b.FinishLSN)
+func (b *BackupInfo) GetFinishLSN() LSN {
+	return LSN(b.FinishLSN)
 }
 
 // TimelineInfo represents timeline information from wal-show --detailed-json
@@ -130,8 +128,8 @@ type TimelineInfo struct {
 }
 
 // GetSwitchPointLSN converts the uint64 SwitchPointLsn to postgres.LSN type
-func (t *TimelineInfo) GetSwitchPointLSN() postgres.LSN {
-	return postgres.LSN(t.SwitchPointLsn)
+func (t *TimelineInfo) GetSwitchPointLSN() LSN {
+	return LSN(t.SwitchPointLsn)
 }
 
 // NewWalgExporter creates a new WAL-G exporter
