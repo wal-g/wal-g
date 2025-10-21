@@ -2,6 +2,7 @@
 set -e -x
 
 . /usr/local/export_common.sh
+
 s3cmd mb s3://mysql_pitr_binlogserver_reconnection_bucket || true
 export WALE_S3_PREFIX=s3://mysql_pitr_binlogserver_bucket
 export WALG_MYSQL_BINLOG_SERVER_HOST="localhost"
@@ -55,7 +56,7 @@ mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql -e "CHANGE MASTER TO MASTER_HOST=\"127.0.0.1\", MASTER_PORT=9306, MASTER_USER=\"walg\", MASTER_PASSWORD=\"walgpwd\", MASTER_AUTO_POSITION=1"
 mysql -e "START SLAVE"
 
-sleep 2
+sleep 5
 
 SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
 if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
@@ -65,25 +66,37 @@ else
     exit 1
 fi
 
-sleep 3
+echo "Simulating real connection loss (TCP kill via ss)..."
+MYSQL_PORT=9306
 
-echo "Testing reconnection by stopping slave IO thread..."
-mysql -e "STOP SLAVE IO_THREAD"
+for try in 1 2 3 4 5; do
+    REPL_CONN_PIDS=$(ss -tnp 2>/dev/null \
+        | awk -v port=":$MYSQL_PORT" '
+           $4 ~ port && /ESTAB/ && /users:/ {
+               match($0,"pid=[0-9]+");
+               if (RSTART>0) {
+                   pid=substr($0,RSTART+4,RLENGTH-4);
+                   print pid
+               }
+           }' | sort -u)
+    if [ -n "$REPL_CONN_PIDS" ]; then break; fi
+    sleep 1
+done
 
-sleep 2
-
-SLAVE_IO_STOPPED=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: No" | wc -l)
-if [ "$SLAVE_IO_STOPPED" -ne 1 ]; then
-    echo "ERROR: Failed to stop slave IO thread"
+if [ -z "$REPL_CONN_PIDS" ]; then
+    echo "ERROR: Could not determine replica connection PID (using ss)"
+    ss -tnp
     exit 1
 fi
 
-echo "Slave IO thread stopped, waiting before restart..."
-sleep 3
+echo "Killing replica TCP connection PID(s) $REPL_CONN_PIDS"
+for pid in $REPL_CONN_PIDS; do
+    if ps -p $pid >/dev/null 2>&1; then
+        kill -9 $pid
+    fi
+done
 
-mysql -e "START SLAVE IO_THREAD"
-
-sleep 3
+sleep 7
 
 SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
 if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
@@ -110,11 +123,11 @@ if [ "$AFTER_COUNT" -ne 0 ]; then
     exit 1
 fi
 
-CONN_COUNT=$(grep -c "connection accepted from" $BINLOG_SERVER_LOG || true)
+CONN_COUNT=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" || true)
 if [ "$CONN_COUNT" -lt 2 ]; then
-    echo "ERROR: Reconnections not detected (connection count: $CONN_COUNT)"
-    cat $BINLOG_SERVER_LOG
+    echo "ERROR: Reconnections not detected, connection count: $CONN_COUNT"
+    cat "$BINLOG_SERVER_LOG"
     exit 1
 fi
 
-echo "Test passed! Detected $CONN_COUNT connections to binlog server"
+echo "Test passed!"
