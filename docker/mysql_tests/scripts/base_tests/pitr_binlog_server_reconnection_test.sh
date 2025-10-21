@@ -43,7 +43,9 @@ chown -R mysql:mysql $MYSQLDATA
 service mysql start || (cat /var/log/mysql/error.log && false)
 mysql_set_gtid_purged
 
-WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" &
+BINLOG_SERVER_LOG=/tmp/binlog_server_reconnect.log
+
+WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee $BINLOG_SERVER_LOG &
 walg_pid=$!
 
 sleep 3
@@ -58,30 +60,33 @@ sleep 2
 SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
 if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
     echo "Replication started successfully"
+else
+    echo "ERROR: Replication IO thread did not start"
+    exit 1
+fi
 
-    for attempt in $(seq 1 3); do
-        sleep 1
+sleep 2
 
-        if ! kill -0 $walg_pid 2>/dev/null; then
-            echo "Binlog server finished, stopping reconnection test"
-            break
-        fi
+which lsof >/dev/null || { echo "ERROR: lsof required"; exit 1; }
+MYSQL_PORT=9306
 
-        echo "Reconnection attempt $attempt"
-        mysql -e "STOP SLAVE IO_THREAD"
-        sleep 1
-        mysql -e "START SLAVE IO_THREAD"
-        sleep 1
+REPL_CONN_PID=$(lsof -iTCP:${MYSQL_PORT} -sTCP:ESTABLISHED | awk 'NR>1 {print $2}' | head -n1)
+if [ -z "$REPL_CONN_PID" ]; then
+    echo "ERROR: Could not determine replica connection PID"
+    exit 1
+fi
+echo "Killing replica connection PID $REPL_CONN_PID to simulate network cut"
+kill -9 $REPL_CONN_PID
 
-        SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-        if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-            echo "Reconnection $attempt successful"
-        else
-            echo "ERROR: Reconnection $attempt failed"
-            mysql -e "SHOW SLAVE STATUS\G"
-            exit 1
-        fi
-    done
+sleep 7
+
+SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
+if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
+    echo "Replication restored successfully after reconnect"
+else
+    echo "ERROR: Replication IO thread did not restore after reconnect"
+    mysql -e "SHOW SLAVE STATUS\G"
+    exit 1
 fi
 
 wait $walg_pid || true
@@ -97,6 +102,13 @@ fi
 AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
 if [ "$AFTER_COUNT" -ne 0 ]; then
     echo "ERROR: Record after DT1 should not be replicated"
+    exit 1
+fi
+
+CONN_COUNT=$(grep -c "connection accepted from" $BINLOG_SERVER_LOG || true)
+if [ "$CONN_COUNT" -lt 2 ]; then
+    echo "ERROR: Reconnections not detected (connection count: $CONN_COUNT)"
+    cat $BINLOG_SERVER_LOG
     exit 1
 fi
 
