@@ -14,6 +14,7 @@ export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest@tcp(127.0.0.1:3306)/sbtes
 mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
 
+# first full backup
 wal-g backup-push
 
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
@@ -21,14 +22,15 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr02', NOW())"
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr03', NOW())"
 sleep 1
 DT1=$(date3339)
 sleep 1
-mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr03', NOW())"
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr04', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
-mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr04', NOW())"
 
+# pitr restore across full backup
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
@@ -39,9 +41,7 @@ WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" &
 walg_pid=$!
 
 sleep 3
-
 mysql -e "STOP SLAVE"
-mysql -e "RESET SLAVE"
 mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql -e "CHANGE MASTER TO MASTER_HOST=\"127.0.0.1\", MASTER_PORT=9306, MASTER_USER=\"walg\", MASTER_PASSWORD=\"walgpwd\", MASTER_AUTO_POSITION=1"
 mysql -e "START SLAVE"
@@ -51,7 +51,7 @@ sleep 2
 CONN_PID=$(lsof -t -i :9306)
 if [ -n "$CONN_PID" ]; then
     kill -9 $CONN_PID
-    tracelog.InfoLogger.Printf "Killed connection PID: $CONN_PID"
+    echo "Killed connection PID: $CONN_PID"
 fi
 
 sleep 1
@@ -63,5 +63,5 @@ wait $walg_pid
 mysqldump sbtest > /tmp/dump_after_pitr
 grep -w 'testpitr01' /tmp/dump_after_pitr
 grep -w 'testpitr02' /tmp/dump_after_pitr
-! grep -w 'testpitr03' /tmp/dump_after_pitr
+grep -w 'testpitr03' /tmp/dump_after_pitr
 ! grep -w 'testpitr04' /tmp/dump_after_pitr
