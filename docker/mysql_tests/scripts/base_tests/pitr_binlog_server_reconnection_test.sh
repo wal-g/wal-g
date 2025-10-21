@@ -17,22 +17,23 @@ service mysql start
 wal-g backup-push
 
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
-for i in $(seq 1 20); do
-    mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch1_$i', NOW())"
-done
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-for i in $(seq 1 20); do
-    mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch2_$i', NOW())"
+for i in $(seq 1 100); do
+    mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
+    if [ $((i % 20)) -eq 0 ]; then
+        mysql -e "FLUSH LOGS"
+        wal-g binlog-push
+    fi
 done
+
 sleep 1
 DT1=$(date3339)
 sleep 1
 
-for i in $(seq 1 20); do
-    mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch3_$i', NOW())"
-done
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
@@ -54,50 +55,48 @@ mysql -e "START SLAVE"
 
 sleep 2
 
-SLAVE_STATUS=$(mysql -e "SHOW SLAVE STATUS\G")
-echo "=== Slave status before stop ==="
-echo "$SLAVE_STATUS" | grep -E "Slave_IO_Running|Slave_SQL_Running|Retrieved_Gtid_Set|Executed_Gtid_Set"
+SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
+if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
+    echo "Replication started successfully"
 
-if kill -0 $walg_pid 2>/dev/null; then
-    echo "Binlog server is running, testing reconnection..."
-
-    mysql -e "STOP SLAVE IO_THREAD"
-    sleep 2
-
-    echo "=== Slave status after stop ==="
-    mysql -e "SHOW SLAVE STATUS\G" | grep -E "Slave_IO_Running|Slave_SQL_Running"
-
-    mysql -e "START SLAVE IO_THREAD"
-
-    for i in $(seq 1 10); do
+    for attempt in $(seq 1 3); do
         sleep 1
-        SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-        if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-            echo "Reconnection successful after $i seconds!"
+
+        if ! kill -0 $walg_pid 2>/dev/null; then
+            echo "Binlog server finished, stopping reconnection test"
             break
         fi
-    done
 
-    if [ "$SLAVE_IO_RUNNING" -ne 1 ]; then
-        echo "ERROR: Reconnection failed after 10 attempts"
-        mysql -e "SHOW SLAVE STATUS\G"
-        exit 1
-    fi
-else
-    echo "WARNING: Binlog server already finished, skipping reconnection test"
+        echo "Reconnection attempt $attempt"
+        mysql -e "STOP SLAVE IO_THREAD"
+        sleep 1
+        mysql -e "START SLAVE IO_THREAD"
+        sleep 1
+
+        SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
+        if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
+            echo "Reconnection $attempt successful"
+        else
+            echo "ERROR: Reconnection $attempt failed"
+            mysql -e "SHOW SLAVE STATUS\G"
+            exit 1
+        fi
+    done
 fi
 
 wait $walg_pid || true
 
-ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id LIKE 'testpitr_batch1_%' OR id LIKE 'testpitr_batch2_%'")
-if [ "$ROW_COUNT" -ne 40 ]; then
-    echo "ERROR: Expected 40 rows, got $ROW_COUNT"
+ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
+EXPECTED_COUNT=101  # 1 + 100
+
+if [ "$ROW_COUNT" -ne "$EXPECTED_COUNT" ]; then
+    echo "ERROR: Expected $EXPECTED_COUNT rows, got $ROW_COUNT"
     exit 1
 fi
 
-BATCH3_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id LIKE 'testpitr_batch3_%'")
-if [ "$BATCH3_COUNT" -ne 0 ]; then
-    echo "ERROR: batch3 should not be replicated"
+AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
+if [ "$AFTER_COUNT" -ne 0 ]; then
+    echo "ERROR: Record after DT1 should not be replicated"
     exit 1
 fi
 
