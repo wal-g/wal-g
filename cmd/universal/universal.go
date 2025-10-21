@@ -49,6 +49,11 @@ func init() {
 	pgCmd.Use = "pg"
 	universalCmd.AddCommand(pgCmd)
 
+	valkeyCmd := redis.GetCmd()
+	valkeyCmd.Use = "valkey"
+	universalCmd.AddCommand(valkeyCmd)
+
+	// DEPRECATED, Only for backward compatibility
 	redisCmd := redis.GetCmd()
 	redisCmd.Use = "redis"
 	universalCmd.AddCommand(redisCmd)

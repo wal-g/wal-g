@@ -138,7 +138,7 @@ func marshalUserData(userData interface{}) string {
 	return string(rawUserData)
 }
 
-func SplitRedisBackups(backups []Backup, purgeBackups, retainBackups map[string]bool) (purge, retain []Backup) {
+func SplitValkeyBackups(backups []Backup, purgeBackups, retainBackups map[string]bool) (purge, retain []Backup) {
 	for i := range backups {
 		backup := backups[i]
 		if purgeBackups[backup.Name()] {
@@ -152,7 +152,7 @@ func SplitRedisBackups(backups []Backup, purgeBackups, retainBackups map[string]
 	return purge, retain
 }
 
-func RedisModelToTimedBackup(backups []Backup) []internal.TimedBackup {
+func ValkeyModelToTimedBackup(backups []Backup) []internal.TimedBackup {
 	if backups == nil {
 		return nil
 	}
@@ -178,7 +178,7 @@ type BackupMeta struct {
 	MaxDBNumber    int64
 }
 
-type RedisMetaConstructor struct {
+type ValkeyMetaConstructor struct {
 	ctx              context.Context
 	folder           storage.Folder
 	meta             BackupMeta
@@ -189,7 +189,7 @@ type RedisMetaConstructor struct {
 }
 
 // Init - required for internal.MetaConstructor
-func (m *RedisMetaConstructor) Init() error {
+func (m *ValkeyMetaConstructor) Init() error {
 	userData, err := internal.GetSentinelUserData()
 	if err != nil {
 		return err
@@ -213,7 +213,7 @@ func (m *RedisMetaConstructor) Init() error {
 	return nil
 }
 
-func (m *RedisMetaConstructor) MetaInfo() interface{} {
+func (m *ValkeyMetaConstructor) MetaInfo() interface{} {
 	meta := m.meta
 	return &Backup{
 		Permanent:       meta.Permanent,
@@ -228,14 +228,14 @@ func (m *RedisMetaConstructor) MetaInfo() interface{} {
 	}
 }
 
-func (m *RedisMetaConstructor) Finalize(backupName string) error {
+func (m *ValkeyMetaConstructor) Finalize(backupName string) error {
 	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
 	return nil
 }
 
-func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, permanent bool, backupType string,
+func NewBackupValkeyMetaConstructor(ctx context.Context, folder storage.Folder, permanent bool, backupType string,
 	versionParser *VersionParser, memoryDataGetter client.ServerDataGetter) internal.MetaConstructor {
-	return &RedisMetaConstructor{
+	return &ValkeyMetaConstructor{
 		ctx: ctx, folder: folder,
 		permanent:        permanent,
 		backupType:       backupType,

@@ -12,23 +12,23 @@ import (
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
-func SetupRedisSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
-	ctx.Step(`^redis stopped on ([^\s]*)$`, tctx.redisStoppedOn)
-	ctx.Step(`^a working redis on ([^\s]*)$`, tctx.isWorkingRedis)
-	ctx.Step(`^([^\s]*) has test redis data test(\d+)$`, tctx.redisHasTestRedisDataTest)
-	ctx.Step(`^we create ([^\s]*) ([^\s]*)-redis-backup with ([^\s]*)$`, tctx.createRedisBackup)
-	ctx.Step(`^we delete redis backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteRedisBackupsRetainViaRedis)
-	ctx.Step(`^we restart redis-server at ([^\s]*)$`, tctx.weRestartRedisServerAt)
-	ctx.Step(`^we stop redis-server at ([^\s]*)$`, tctx.weStopRedisServerAt)
-	ctx.Step(`^we start redis-server at ([^\s]*)$`, tctx.weStartRedisServerAt)
-	ctx.Step(`^we got same redis data at ([^\s]*) ([^\s]*)$`, tctx.testEqualRedisDataAtHosts)
+func SetupValkeySteps(ctx *godog.ScenarioContext, tctx *TestContext) {
+	ctx.Step(`^valkey stopped on ([^\s]*)$`, tctx.valkeyStoppedOn)
+	ctx.Step(`^a working valkey on ([^\s]*)$`, tctx.isWorkingValkey)
+	ctx.Step(`^([^\s]*) has test valkey data test(\d+)$`, tctx.valkeyHasTestValkeyDataTest)
+	ctx.Step(`^we create ([^\s]*) ([^\s]*)-valkey-backup with ([^\s]*)$`, tctx.createValkeyBackup)
+	ctx.Step(`^we delete valkey backups retain (\d+) via ([^\s]*)$`, tctx.weDeleteValkeyBackupsRetainViaValkey)
+	ctx.Step(`^we restart valkey-server at ([^\s]*)$`, tctx.weRestartValkeyServerAt)
+	ctx.Step(`^we stop valkey-server at ([^\s]*)$`, tctx.weStopValkeyServerAt)
+	ctx.Step(`^we start valkey-server at ([^\s]*)$`, tctx.weStartValkeyServerAt)
+	ctx.Step(`^we got same valkey data at ([^\s]*) ([^\s]*)$`, tctx.testEqualValkeyDataAtHosts)
 	ctx.Step(`^([^\s]*) manifest is not empty$`, tctx.manifestIsNotEmpty)
 	ctx.Step(`^([^\s]*) has heavy write$`, tctx.hasHeavyWrite)
 	ctx.Step(`^we stop heavy write on ([^\s]*)$`, tctx.weStopHeavyWriteOn)
-	ctx.Step(`^we restore #(\d+) aof ([^\s]*) version backup to ([^\s]*)$`, tctx.weRestoreAofBackupToRedis)
+	ctx.Step(`^we restore #(\d+) aof ([^\s]*) version backup to ([^\s]*)$`, tctx.weRestoreAofBackupToValkey)
 }
 
-func (tctx *TestContext) weRestoreAofBackupToRedis(backupNum int, matchVersion string, container string) error {
+func (tctx *TestContext) weRestoreAofBackupToValkey(backupNum int, matchVersion string, container string) error {
 	var version string
 	if matchVersion == "same" {
 		version = tctx.Version.Full
@@ -49,13 +49,13 @@ func (tctx *TestContext) weRestoreAofBackupToRedis(backupNum int, matchVersion s
 }
 
 func (tctx *TestContext) hasHeavyWrite(hostName string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	rc, err := GetValkeyCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
 	}
 	host := rc.Host()
 
-	cmd := "redis-benchmark -a password -t set -n 100000000 -d 1000 -r 100000"
+	cmd := "valkey-benchmark -a password -t set -n 100000000 -d 1000 -r 100000"
 	err = helpers.RunAsyncCommand(tctx.Context, host, cmd)
 	if err != nil {
 		return fmt.Errorf("heavy write cmd err: %+v", err)
@@ -65,13 +65,13 @@ func (tctx *TestContext) hasHeavyWrite(hostName string) error {
 }
 
 func (tctx *TestContext) weStopHeavyWriteOn(hostName string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	rc, err := GetValkeyCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
 	}
 	host := rc.Host()
 
-	cmd := []string{"pkill", "redis-benchmark"}
+	cmd := []string{"pkill", "valkey-benchmark"}
 	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
 	if err != nil {
 		return fmt.Errorf("heavy write stop err: %+v", err)
@@ -81,7 +81,7 @@ func (tctx *TestContext) weStopHeavyWriteOn(hostName string) error {
 }
 
 func (tctx *TestContext) manifestIsNotEmpty(hostName string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+	rc, err := GetValkeyCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
 	}
@@ -101,8 +101,8 @@ func (tctx *TestContext) manifestIsNotEmpty(hostName string) error {
 	})
 }
 
-func (tctx *TestContext) redisStoppedOn(hostName string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+func (tctx *TestContext) valkeyStoppedOn(hostName string) error {
+	rc, err := GetValkeyCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
 	}
@@ -114,18 +114,18 @@ func (tctx *TestContext) redisStoppedOn(hostName string) error {
 		return nil
 	}
 
-	return fmt.Errorf("unexpected result of checking running redis: %+v, %d: %s: %s", err, res.ExitCode, res.Stdout(), res.Stderr())
+	return fmt.Errorf("unexpected result of checking running valkey: %+v, %d: %s: %s", err, res.ExitCode, res.Stdout(), res.Stderr())
 }
 
-func (tctx *TestContext) isWorkingRedis(hostName string) error {
-	redisCtl, err := GetRedisCtlFromTestContext(tctx, hostName)
+func (tctx *TestContext) isWorkingValkey(hostName string) error {
+	valkeyCtl, err := GetValkeyCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
 	}
 
 	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
-		tracelog.DebugLogger.Printf("Redis client connect to host '%s'", redisCtl.Addr())
-		status := redisCtl.Ping(tctx.Context)
+		tracelog.DebugLogger.Printf("Valkey client connect to host '%s'", valkeyCtl.Addr())
+		status := valkeyCtl.Ping(tctx.Context)
 		err = status.Err()
 		if err != nil {
 			return fmt.Errorf("Client on ping returned err: %v\n", err)
@@ -133,13 +133,13 @@ func (tctx *TestContext) isWorkingRedis(hostName string) error {
 		if status.Val() != "PONG" {
 			return fmt.Errorf("Client on ping does not returned PONG: %v\n", err)
 		}
-		tracelog.DebugLogger.Printf("Redis: Got PONG on PING from %s", hostName)
+		tracelog.DebugLogger.Printf("Valkey: Got PONG on PING from %s", hostName)
 		return nil
 	})
 }
 
-func (tctx *TestContext) redisHasTestRedisDataTest(host string, testId int) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, host)
+func (tctx *TestContext) valkeyHasTestValkeyDataTest(host string, testId int) error {
+	rc, err := GetValkeyCtlFromTestContext(tctx, host)
 	if err != nil {
 		return err
 	}
@@ -152,7 +152,7 @@ func (tctx *TestContext) redisHasTestRedisDataTest(host string, testId int) erro
 	return nil
 }
 
-func (tctx *TestContext) createRedisBackup(host, backupType, resultType string) error {
+func (tctx *TestContext) createValkeyBackup(host, backupType, resultType string) error {
 	allowedValues := []string{"success", "error", "threshold"}
 	if !slices.Contains(allowedValues, resultType) {
 		return fmt.Errorf("undefined resultType: use one of %+v", allowedValues)
@@ -162,7 +162,7 @@ func (tctx *TestContext) createRedisBackup(host, backupType, resultType string) 
 	if resultType == "threshold" {
 		configType = "-low-disk-usage"
 	}
-	rc, err := GetRedisCtlFromTestContextTyped(tctx, host, configType)
+	rc, err := GetValkeyCtlFromTestContextTyped(tctx, host, configType)
 	if err != nil {
 		return nil
 	}
@@ -180,7 +180,7 @@ func (tctx *TestContext) createRedisBackup(host, backupType, resultType string) 
 		}
 	}
 
-	tracelog.DebugLogger.Printf("Push redis %s backup\n", backupType)
+	tracelog.DebugLogger.Printf("Push valkey %s backup\n", backupType)
 	backupId, err := rc.PushBackup(backupType)
 	if err != nil && resultType == "success" {
 		return err
@@ -194,8 +194,8 @@ func (tctx *TestContext) createRedisBackup(host, backupType, resultType string) 
 	return nil
 }
 
-func (tctx *TestContext) weDeleteRedisBackupsRetainViaRedis(backupsRetain int, host string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, host)
+func (tctx *TestContext) weDeleteValkeyBackupsRetainViaValkey(backupsRetain int, host string) error {
+	rc, err := GetValkeyCtlFromTestContext(tctx, host)
 	if err != nil {
 		return err
 	}
@@ -203,8 +203,8 @@ func (tctx *TestContext) weDeleteRedisBackupsRetainViaRedis(backupsRetain int, h
 	return rc.PurgeRetain(backupsRetain)
 }
 
-func (tctx *TestContext) weRestartRedisServerAt(host string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, host)
+func (tctx *TestContext) weRestartValkeyServerAt(host string) error {
+	rc, err := GetValkeyCtlFromTestContext(tctx, host)
 	if err != nil {
 		return err
 	}
@@ -212,45 +212,45 @@ func (tctx *TestContext) weRestartRedisServerAt(host string) error {
 	return nil
 }
 
-func (tctx *TestContext) weStopRedisServerAt(hostName string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+func (tctx *TestContext) weStopValkeyServerAt(hostName string) error {
+	rc, err := GetValkeyCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
 	}
 	host := rc.Host()
 
-	cmd := []string{"supervisorctl", "stop", "redis"}
+	cmd := []string{"supervisorctl", "stop", "valkey"}
 	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
 	if err != nil {
-		return fmt.Errorf("stop redis failed: %+v", err)
+		return fmt.Errorf("stop valkey failed: %+v", err)
 	}
 
 	return nil
 }
 
-func (tctx *TestContext) weStartRedisServerAt(hostName string) error {
-	rc, err := GetRedisCtlFromTestContext(tctx, hostName)
+func (tctx *TestContext) weStartValkeyServerAt(hostName string) error {
+	rc, err := GetValkeyCtlFromTestContext(tctx, hostName)
 	if err != nil {
 		return err
 	}
 	host := rc.Host()
 
-	cmd := []string{"supervisorctl", "start", "redis"}
+	cmd := []string{"supervisorctl", "start", "valkey"}
 	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
 	if err != nil {
-		return fmt.Errorf("start redis failed: %+v", err)
+		return fmt.Errorf("start valkey failed: %+v", err)
 	}
 
 	return nil
 }
 
-func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
-	rc1, err := GetRedisCtlFromTestContext(tctx, host1)
+func (tctx *TestContext) testEqualValkeyDataAtHosts(host1, host2 string) error {
+	rc1, err := GetValkeyCtlFromTestContext(tctx, host1)
 	if err != nil {
 		return err
 	}
 
-	rc2, err := GetRedisCtlFromTestContext(tctx, host2)
+	rc2, err := GetValkeyCtlFromTestContext(tctx, host2)
 	if err != nil {
 		return err
 	}
@@ -282,7 +282,7 @@ func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
 	}
 
 	if !utils.IsArraysEqual(keys1.Val(), keys2.Val()) {
-		return fmt.Errorf("keys from redis1/redis2 aren't equal")
+		return fmt.Errorf("keys from valkey1/valkey2 aren't equal")
 	}
 	values1 := rc1.MGet(tctx.Context, keys1.Val()...)
 	values2 := rc1.MGet(tctx.Context, keys2.Val()...)
@@ -297,7 +297,7 @@ func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
 		vals2[i] = val.(string)
 	}
 	if !utils.IsArraysEqual(vals1, vals2) {
-		return fmt.Errorf("values from redis1/redis2 aren't equal")
+		return fmt.Errorf("values from valkey1/valkey2 aren't equal")
 	}
 	return nil
 }

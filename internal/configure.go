@@ -453,8 +453,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificDefaultSettings = conf.PGDefaultSettings
 		case conf.MONGO:
 			dbSpecificDefaultSettings = conf.MongoDefaultSettings
-		case conf.REDIS:
-			dbSpecificDefaultSettings = conf.RedisDefaultSettings
+		case conf.VALKEY:
+			dbSpecificDefaultSettings = conf.ValkeyDefaultSettings
 		case conf.MYSQL:
 			dbSpecificDefaultSettings = conf.MysqlDefaultSettings
 		case conf.SQLSERVER:
@@ -485,8 +485,8 @@ func ConfigureSettings(currentType string) {
 			dbSpecificSettings = conf.MysqlAllowedSettings
 		case conf.SQLSERVER:
 			dbSpecificSettings = conf.SQLServerAllowedSettings
-		case conf.REDIS:
-			dbSpecificSettings = conf.RedisAllowedSettings
+		case conf.VALKEY:
+			dbSpecificSettings = conf.ValkeyAllowedSettings
 		}
 
 		for k, v := range dbSpecificSettings {

@@ -100,11 +100,12 @@ func DynConf(env map[string]string, osEnviron map[string]string) (map[string]str
 	}
 
 	if imageType, ok := osEnviron["IMAGE_TYPE"]; ok {
-		if imageType == "aof" {
-			res["REDIS_CONF_FILE"] = "redis-aof.conf"
-		} else if imageType == "rdb" {
-			res["REDIS_CONF_FILE"] = "redis-rdb.conf"
-		} else {
+		switch imageType {
+		case "aof":
+			res["VALKEY_CONF_FILE"] = "valkey-aof.conf"
+		case "rdb":
+			res["VALKEY_CONF_FILE"] = "valkey-rdb.conf"
+		default:
 			return nil, fmt.Errorf("unknown IMAGE_TYPE env value")
 		}
 	}

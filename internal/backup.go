@@ -173,7 +173,7 @@ type ErrWaiter interface {
 
 // MetaConstructor - interface that helps with building meta-info about backup and generate MetaInfo
 // see MongoMetaConstructor
-// see RedisMetaConstructor
+// see ValkeyMetaConstructor
 type MetaConstructor interface {
 	Init() error
 	Finalize(backupName string) error

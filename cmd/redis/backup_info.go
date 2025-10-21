@@ -16,7 +16,7 @@ var tag string
 
 var backupInfoCmd = &cobra.Command{
 	Use:   "backup-info",
-	Short: "Prints redis backup info",
+	Short: "Prints valkey backup info",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()

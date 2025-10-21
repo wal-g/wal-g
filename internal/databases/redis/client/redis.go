@@ -23,27 +23,27 @@ func GetSettingWithLocalDefault(key string, defaultValue string) string {
 	return defaultValue
 }
 
-// getRedisConnection
-func getRedisConnection(strict bool) *redis.Client {
-	redisAddr := GetSettingWithLocalDefault("WALG_REDIS_HOST", "localhost")
-	redisPort := GetSettingWithLocalDefault("WALG_REDIS_PORT", "6379")
-	redisUsername := GetSettingWithLocalDefault(conf.RedisUsername, "default") // no user set
-	redisPassword := GetSettingWithLocalDefault(conf.RedisPassword, "")        // no password set
-	redisDBStr, ok := conf.GetSetting("WALG_REDIS_DB")
-	redisDB := 0 // use default DB
+// getValkeyConnection
+func getValkeyConnection(strict bool) *redis.Client {
+	valkeyAddr := GetSettingWithLocalDefault(conf.RedisHost, "localhost")
+	valkeyPort := GetSettingWithLocalDefault(conf.RedisPort, "6379")
+	valkeyUsername := GetSettingWithLocalDefault(conf.RedisUsername, "default") // no user set
+	valkeyPassword := GetSettingWithLocalDefault(conf.RedisPassword, "")        // no password set
+	valkeyDBStr, ok := conf.GetSetting(conf.RedisDBIndex)
+	valkeyDB := 0 // use default DB
 	if ok {
-		redisDBValue, err := strconv.Atoi(redisDBStr)
-		// DISCUSS: could redisDB changed on success without additional variable redisDBValue?
+		valkeyDBValue, err := strconv.Atoi(valkeyDBStr)
+		// DISCUSS: could valkeyDB changed on success without additional variable valkeyDBValue?
 		if strict {
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
-		redisDB = redisDBValue
+		valkeyDB = valkeyDBValue
 	}
 	return redis.NewClient(&redis.Options{
-		Addr:     redisAddr + ":" + redisPort,
-		Username: redisUsername,
-		Password: redisPassword,
-		DB:       redisDB,
+		Addr:     valkeyAddr + ":" + valkeyPort,
+		Username: valkeyUsername,
+		Password: valkeyPassword,
+		DB:       valkeyDB,
 	})
 }
 
@@ -59,7 +59,7 @@ type ServerDataGetter struct {
 
 func NewServerDataGetter() ServerDataGetter {
 	return ServerDataGetter{
-		conn: getRedisConnection(dontPanic),
+		conn: getValkeyConnection(dontPanic),
 	}
 }
 

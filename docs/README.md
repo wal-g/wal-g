@@ -6,7 +6,7 @@
 
 [This documentation is also available at wal-g.readthedocs.io](https://wal-g.readthedocs.io)
 
-WAL-G is an archival restoration tool for PostgreSQL, MySQL/MariaDB, and MS SQL Server (beta for MongoDB and Redis).
+WAL-G is an archival restoration tool for PostgreSQL, MySQL/MariaDB, MongoDB, Valkey and MS SQL Server.
 
 WAL-G is the successor of WAL-E with a number of key differences. WAL-G uses LZ4, LZMA, ZSTD, or Brotli compression, multiple processors, and non-exclusive base backups for Postgres. More information on the original design and implementation of WAL-G can be found on the Citus Data blog post ["Introducing WAL-G by Citus: Faster Disaster Recovery for Postgres"](https://www.citusdata.com/blog/2017/08/18/introducing-wal-g-faster-restores-for-postgres/).
 
@@ -261,14 +261,14 @@ Databases
 ### SQLServer
 [Information about installing, configuration and usage](SQLServer.md)
 
-### Mongo [Beta]
+### MongoDB
 [Information about installing, configuration and usage](MongoDB.md)
 
 ### FoundationDB [Work in progress]
 [Information about installing, configuration and usage](FoundationDB.md)
 
-### Redis [Beta]
-[Information about installing, configuration and usage](Redis.md)
+### Valkey
+[Information about installing, configuration and usage](Valkey.md)
 
 ### Greenplum [Production ready]
 [Information about installing, configuration and usage](Greenplum.md)

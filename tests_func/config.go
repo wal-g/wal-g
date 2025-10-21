@@ -34,8 +34,8 @@ var Env = map[string]string{
 	"MONGO_ADMIN_DB_NAME":  "admin",
 	"MONGO_EXPOSE_MONGOD":  "27018",
 
-	// Redis specific
-	"REDIS_EXPOSE_PORT": "6379",
-	"REDIS_PASSWORD":    "password",
-	"REDIS_USERNAME":    "default",
+	// Valkey specific
+	"VALKEY_EXPOSE_PORT": "6379",
+	"VALKEY_PASSWORD":    "password",
+	"VALKEY_USERNAME":    "default",
 }

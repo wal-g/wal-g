@@ -13,7 +13,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 )
 
-var ShortDescription = "Redis backup tool"
+var ShortDescription = "Valkey backup tool"
 
 // These variables are here only to show current version. They are set in makefile during build process
 var walgVersion = "devel"
@@ -21,9 +21,9 @@ var gitRevision = "devel"
 var buildDate = "devel"
 
 var cmd = &cobra.Command{
-	Use:     "redis",
+	Use:     "valkey",
 	Short:   ShortDescription, // TODO : improve description
-	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "Redis"}, "\t"),
+	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "Valkey"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -44,5 +44,5 @@ func GetCmd() *cobra.Command {
 }
 
 func init() {
-	common.Init(cmd, conf.REDIS)
+	common.Init(cmd, conf.VALKEY)
 }

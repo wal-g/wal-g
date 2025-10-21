@@ -13,8 +13,8 @@ type StorageUploader struct {
 	internal.Uploader
 }
 
-// NewRedisStorageUploader builds redis uploader, that also push metadata
-func NewRedisStorageUploader(upl internal.Uploader) *StorageUploader {
+// NewValkeyStorageUploader builds valkey uploader, that also push metadata
+func NewValkeyStorageUploader(upl internal.Uploader) *StorageUploader {
 	return &StorageUploader{upl}
 }
 

@@ -17,7 +17,7 @@ const (
 	SkipBackupDownloadFlag        = "skip-backup-download"
 	SkipBackupDownloadDescription = "Skip backup download"
 	SkipChecksFlag                = "skip-checks"
-	SkipChecksDescription         = "Skip checking redis version on compatibility with backup"
+	SkipChecksDescription         = "Skip checking valkey version on compatibility with backup"
 )
 
 var (
@@ -26,8 +26,8 @@ var (
 )
 
 var aofBackupFetchCmd = &cobra.Command{
-	Use:   aofBackupFetchCommandName + " <backup name> <redis version>",
-	Short: "Fetches a redis AOF backup from storage and restores it in redis storage",
+	Use:   aofBackupFetchCommandName + " <backup name> <valkey version>",
+	Short: "Fetches a valkey AOF backup from storage and restores it in valkey storage",
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
@@ -43,9 +43,9 @@ var aofBackupFetchCmd = &cobra.Command{
 		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
 		backupName := args[0]
-		redisVersion := args[1]
+		valkeyVersion := args[1]
 
-		err = redis.HandleAofFetchPush(ctx, sourceStorageFolder, uploader, backupName, redisVersion, skipBackupDownloadFlag, skipCheckFlag)
+		err = redis.HandleAofFetchPush(ctx, sourceStorageFolder, uploader, backupName, valkeyVersion, skipBackupDownloadFlag, skipCheckFlag)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

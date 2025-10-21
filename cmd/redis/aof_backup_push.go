@@ -29,7 +29,7 @@ const (
 
 var aofBackupPushCmd = &cobra.Command{
 	Use:   aofBackupPushCommandName,
-	Short: "Creates redis aof backup and pushes it to storage without local disk",
+	Short: "Creates valkey aof backup and pushes it to storage without local disk",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
@@ -48,7 +48,7 @@ var aofBackupPushCmd = &cobra.Command{
 		processName, _ := conf.GetSetting(conf.RedisServerProcessName)
 		versionParser := archive.NewVersionParser(processName)
 
-		metaConstructor := archive.NewBackupRedisMetaConstructor(
+		metaConstructor := archive.NewBackupValkeyMetaConstructor(
 			ctx,
 			uploader.Folder(),
 			permanent,

@@ -51,11 +51,11 @@ func EnsureRestoreCompatibility(backupVersion, restoreVersion string) (bool, err
 	return b.LessThanOrEqual(r), nil
 }
 
-func EnsureRedisStopped() error {
+func EnsureValkeyStopped() error {
 	outErr, err := exec.Command("bash", "-c", "ps aux | grep [r]edis-server").CombinedOutput()
 	if _, ok := err.(*exec.ExitError); ok && err.Error() == "exit status 1" && len(outErr) == 0 {
 		return nil
 	}
 
-	return fmt.Errorf("unexpected result of checking running redis: %T: %v: %s", err, err, outErr)
+	return fmt.Errorf("unexpected result of checking running valkey: %T: %v: %s", err, err, outErr)
 }

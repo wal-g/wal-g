@@ -91,7 +91,7 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 		return nil, nil, err
 	}
 
-	timedBackup := archive.RedisModelToTimedBackup(backups)
+	timedBackup := archive.ValkeyModelToTimedBackup(backups)
 
 	internal.SortTimedBackup(timedBackup)
 	purgeBackups, retainBackups, err := internal.SplitPurgingBackups(timedBackup, opts.retainCount, opts.retainAfter)
@@ -99,7 +99,7 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 		return nil, nil, err
 	}
 
-	purge, retain = archive.SplitRedisBackups(backups, purgeBackups, retainBackups)
+	purge, retain = archive.SplitValkeyBackups(backups, purgeBackups, retainBackups)
 
 	purgeFiles := BackupNamesFromBackups(purge)
 

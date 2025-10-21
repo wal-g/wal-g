@@ -26,7 +26,7 @@ const (
 	PG        = "PG"
 	SQLSERVER = "SQLSERVER"
 	MYSQL     = "MYSQL"
-	REDIS     = "REDIS"
+	VALKEY    = "VALKEY"
 	FDB       = "FDB"
 	MONGO     = "MONGO"
 	GP        = "GP"
@@ -168,6 +168,9 @@ const (
 
 	RedisUsername            = "WALG_REDIS_USERNAME"
 	RedisPassword            = "WALG_REDIS_PASSWORD"
+	RedisHost                = "WALG_REDIS_HOST"
+	RedisPort                = "WALG_REDIS_PORT"
+	RedisDBIndex             = "WALG_REDIS_DB"
 	RedisDataPath            = "WALG_REDIS_DATA_PATH"
 	RedisAppendonlyFolder    = "WALG_REDIS_APPENDONLY_PATH"
 	RedisAppendonlyManifest  = "WALG_REDIS_APPENDONLY_MANIFEST"
@@ -295,16 +298,16 @@ var (
 		StreamSplitterBlockSize:        "1048576",
 	}
 
-	RedisDefaultSettings = map[string]string{
-		RedisDataPath:            "/var/lib/redis",
+	ValkeyDefaultSettings = map[string]string{
+		RedisDataPath:            "/var/lib/valkey",
 		RedisAppendonlyFolder:    "appendonlydir",
 		RedisAppendonlyManifest:  "appendonly.aof.manifest",
-		RedisAppendonlyTmpFolder: "/var/lib/redis/wal-g/",
+		RedisAppendonlyTmpFolder: "/var/lib/valkey/wal-g/",
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
-		RedisServerProcessName:   "redis-server",
+		RedisServerProcessName:   "valkey-server",
 		RedisFQDNToIDMap:         "{}",
-		RedisClusterConfPath:     "/etc/redis/cluster.conf",
+		RedisClusterConfPath:     "/etc/valkey/cluster.conf",
 	}
 
 	MysqlDefaultSettings = map[string]string{
@@ -592,8 +595,8 @@ var (
 		MysqlDataDir:                   true,
 	}
 
-	RedisAllowedSettings = map[string]bool{
-		// Redis
+	ValkeyAllowedSettings = map[string]bool{
+		// Valkey
 		RedisUsername:            true,
 		RedisPassword:            true,
 		RedisDataPath:            true,

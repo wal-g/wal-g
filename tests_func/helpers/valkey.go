@@ -11,7 +11,7 @@ import (
 	"github.com/wal-g/tracelog"
 )
 
-type RedisCtl struct {
+type ValkeyCtl struct {
 	*redis.Client
 	ctx      context.Context
 	binPath  string
@@ -20,7 +20,7 @@ type RedisCtl struct {
 	port     int
 }
 
-type RedisCtlArgs struct {
+type ValkeyCtlArgs struct {
 	BinPath  string
 	ConfPath string
 
@@ -31,7 +31,7 @@ type RedisCtlArgs struct {
 	Password string
 }
 
-func NewRedisCtl(ctx context.Context, args RedisCtlArgs) (*RedisCtl, error) {
+func NewValkeyCtl(ctx context.Context, args ValkeyCtlArgs) (*ValkeyCtl, error) {
 	expHost, expPort, err := ExposedHostPort(ctx, args.Host, args.Port)
 	if err != nil {
 		return nil, fmt.Errorf("expose host failed: %v", err)
@@ -42,7 +42,7 @@ func NewRedisCtl(ctx context.Context, args RedisCtlArgs) (*RedisCtl, error) {
 		Password: args.Password,
 		Username: args.Username,
 	})
-	return &RedisCtl{
+	return &ValkeyCtl{
 		client,
 		ctx,
 		args.BinPath,
@@ -52,11 +52,11 @@ func NewRedisCtl(ctx context.Context, args RedisCtlArgs) (*RedisCtl, error) {
 	}, nil
 }
 
-func (rc *RedisCtl) Addr() string {
+func (rc *ValkeyCtl) Addr() string {
 	return rc.Options().Addr
 }
 
-func (rc *RedisCtl) Host() string {
+func (rc *ValkeyCtl) Host() string {
 	return rc.host
 }
 
@@ -64,7 +64,7 @@ type Strings struct {
 	arraylist []string
 }
 
-func (rc *RedisCtl) WriteTestData(mark string, docsCount int) error {
+func (rc *ValkeyCtl) WriteTestData(mark string, docsCount int) error {
 	var rows []interface{}
 	for k := 1; k <= docsCount; k++ {
 		var data interface{}
@@ -81,12 +81,12 @@ func (rc *RedisCtl) WriteTestData(mark string, docsCount int) error {
 	status := rc.MSet(rc.ctx, rows...)
 	tracelog.DebugLogger.Printf("WriteTestData result: %v", status)
 	if status.Err() != nil {
-		return fmt.Errorf("failed to write test data to redis: %w", status.Err())
+		return fmt.Errorf("failed to write test data to valkey: %w", status.Err())
 	}
 	return nil
 }
 
-func (rc *RedisCtl) PushBackup(backupType string) (string, error) {
+func (rc *ValkeyCtl) PushBackup(backupType string) (string, error) {
 	cmd := fmt.Sprintf("%s-backup-push", backupType)
 	exec, err := rc.runCmd([]string{cmd})
 	if err != nil {
@@ -98,7 +98,7 @@ func (rc *RedisCtl) PushBackup(backupType string) (string, error) {
 	return "", nil
 }
 
-func (rc *RedisCtl) runCmd(run []string) (ExecResult, error) {
+func (rc *ValkeyCtl) runCmd(run []string) (ExecResult, error) {
 	command := []string{rc.binPath, "--config", rc.confPath}
 	command = append(command, run...)
 
@@ -106,7 +106,7 @@ func (rc *RedisCtl) runCmd(run []string) (ExecResult, error) {
 	return exc, err
 }
 
-func (rc *RedisCtl) PurgeRetain(keepNumber int) error {
+func (rc *ValkeyCtl) PurgeRetain(keepNumber int) error {
 	_, err := rc.runCmd([]string{
 		"delete",
 		"--retain-count", strconv.Itoa(keepNumber),

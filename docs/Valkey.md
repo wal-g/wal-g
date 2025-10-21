@@ -1,33 +1,33 @@
-# WAL-G for Redis
+# WAL-G for Valkey
 
-**Interface of Redis features is currently unstable**
+**Interface of Valkey features is currently unstable**
 
-You can use wal-g as a tool for making encrypted, compressed Redis backups and push/fetch them to/from storage without saving it on your filesystem.
+You can use wal-g as a tool for making encrypted, compressed Valkey backups and push/fetch them to/from storage without saving it on your filesystem.
 
 Configuration
 -------------
 
 * `WALG_STREAM_CREATE_COMMAND`
 
-Command to create Redis backup, should return backup as single stream to STDOUT. Required for backup procedure.
+Command to create Valkey backup, should return backup as single stream to STDOUT. Required for backup procedure.
 
 * `WALG_STREAM_RESTORE_COMMAND`
 
-Command to unpack Redis backup, should take backup (created by `WALG_STREAM_CREATE_COMMAND`)
+Command to unpack Valkey backup, should take backup (created by `WALG_STREAM_CREATE_COMMAND`)
 to STDIN. Required for restore procedure.
 
 * `WALG_REDIS_USERNAME`
 
-Username for 'redis-cli' command. Required for interacting with server if you have password.
+Username for 'valkey-cli' command. Required for interacting with server if you have password.
 
 * `WALG_REDIS_PASSWORD`
 
-Password for 'redis-cli' command. Required for backup archiving procedure if you have password.
+Password for 'valkey-cli' command. Required for backup archiving procedure if you have password.
 
 Usage
 -----
 
-WAL-G redis extension currently supports these commands:
+WAL-G valkey extension currently supports these commands:
 
 ### ``backup-push``
 
@@ -95,11 +95,6 @@ Typical configurations
 
 Here's typical wal-g configuration for that case:
 ```bash
-WALG_STREAM_CREATE_COMMAND:  'redis_cli --rdb /dev/stdout'
-WALG_STREAM_RESTORE_COMMAND: 'cat > /var/lib/redis/dump.rdb'
+WALG_STREAM_CREATE_COMMAND:  'valkey-cli --rdb /dev/stdout'
+WALG_STREAM_RESTORE_COMMAND: 'cat > /var/lib/valkey/dump.rdb'
 ```
-
-### Why we made redis_cli.sh
-redis-cli fails with error when redis version >= 6.2, so we made this workaround
-
-If you use redis >= 6.2, use [redis_cli.sh](https://github.com/wal-g/wal-g/blob/master/redis_cli.sh) and replace redis-cli in WALG_STREAM_CREATE_COMMAND

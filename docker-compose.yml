@@ -147,7 +147,7 @@ services:
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
       &&  mkdir -p /export/mongodeleteretainbucket
-      &&  mkdir -p /export/redisbucket
+      &&  mkdir -p /export/valkeybucket
       &&  mkdir -p /export/mysqlcopybackupfrom
       &&  mkdir -p /export/mysqlcopybackupto
       &&  mkdir -p /export/mysqlconfonly
@@ -717,19 +717,19 @@ services:
     depends_on:
       - fdb
 
-  redis:
+  valkey:
     build:
-      dockerfile: docker/redis/Dockerfile
+      dockerfile: docker/valkey/Dockerfile
       context: .
-    image: wal-g/redis
-    container_name: wal-g_redis
+    image: wal-g/valkey
+    container_name: wal-g_valkey
 
-  redis_tests:
+  valkey_tests:
     build:
-      dockerfile: docker/redis_tests/Dockerfile
+      dockerfile: docker/valkey_tests/Dockerfile
       context: .
-    image: wal-g/redis_tests
-    container_name: wal-g_redis_tests
+    image: wal-g/valkey_tests
+    container_name: wal-g_valkey_tests
     env_file:
       - docker/common/common_walg.env
     <<: *s3_common_depends
