@@ -2,7 +2,7 @@
 set -e -x
 
 . /usr/local/export_common.sh
-
+s3cmd mb s3://mysql_pitr_binlogserver_reconnection_bucket || true
 export WALE_S3_PREFIX=s3://mysql_pitr_binlogserver_bucket
 export WALG_MYSQL_BINLOG_SERVER_HOST="localhost"
 export WALG_MYSQL_BINLOG_SERVER_PORT=9306
@@ -87,7 +87,7 @@ fi
 wait $walg_pid || true
 
 ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-EXPECTED_COUNT=101  # 1 + 100
+EXPECTED_COUNT=101
 
 if [ "$ROW_COUNT" -ne "$EXPECTED_COUNT" ]; then
     echo "ERROR: Expected $EXPECTED_COUNT rows, got $ROW_COUNT"
