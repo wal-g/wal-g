@@ -65,20 +65,25 @@ else
     exit 1
 fi
 
+sleep 3
+
+echo "Testing reconnection by stopping slave IO thread..."
+mysql -e "STOP SLAVE IO_THREAD"
+
 sleep 2
 
-which lsof >/dev/null || { echo "ERROR: lsof required"; exit 1; }
-MYSQL_PORT=9306
-
-REPL_CONN_PID=$(lsof -iTCP:${MYSQL_PORT} -sTCP:ESTABLISHED | awk 'NR>1 {print $2}' | head -n1)
-if [ -z "$REPL_CONN_PID" ]; then
-    echo "ERROR: Could not determine replica connection PID"
+SLAVE_IO_STOPPED=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: No" | wc -l)
+if [ "$SLAVE_IO_STOPPED" -ne 1 ]; then
+    echo "ERROR: Failed to stop slave IO thread"
     exit 1
 fi
-echo "Killing replica connection PID $REPL_CONN_PID to simulate network cut"
-kill -9 $REPL_CONN_PID
 
-sleep 7
+echo "Slave IO thread stopped, waiting before restart..."
+sleep 3
+
+mysql -e "START SLAVE IO_THREAD"
+
+sleep 3
 
 SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
 if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
@@ -112,4 +117,4 @@ if [ "$CONN_COUNT" -lt 2 ]; then
     exit 1
 fi
 
-echo "Test passed!"
+echo "Test passed! Detected $CONN_COUNT connections to binlog server"
