@@ -55,7 +55,7 @@ func (tctx *TestContext) hasHeavyWrite(hostName string) error {
 	}
 	host := rc.Host()
 
-	cmd := "valkey-benchmark -a password -t set -n 100000000 -d 1000 -r 100000"
+	cmd := "valkey-benchmark -l -a password -t set -n 100000000 -d 1000 -r 100000"
 	err = helpers.RunAsyncCommand(tctx.Context, host, cmd)
 	if err != nil {
 		return fmt.Errorf("heavy write cmd err: %+v", err)
