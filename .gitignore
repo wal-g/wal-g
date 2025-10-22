@@ -45,3 +45,8 @@ venv/
 
 #Ctags tags file
 tags
+
+# Vim temporary files
+.*.swp
+.*.swo
+*~
