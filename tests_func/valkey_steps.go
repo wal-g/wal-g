@@ -3,7 +3,6 @@ package functests
 import (
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -72,14 +71,12 @@ func (tctx *TestContext) weStopHeavyWriteOn(hostName string) error {
 	}
 	host := rc.Host()
 
-	cmd1 := []string{"ps", "wawux"}
-	cmdLine := strings.Join(cmd1, " ")
-	exc, _ := helpers.RunCommandStrict(tctx.Context, host, cmd1)
-	tracelog.ErrorLogger.Printf("'%s' result is %d\nstdout:\n%s\nstderr:\n%s\n",
-		cmdLine, exc.ExitCode, exc.Stdout(), exc.Stderr())
-	cmd := []string{"pkill", "valkey-benchmark"}
+	cmd := []string{"pkill", "-9", "valkey-benchmark"}
 	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
 	if err != nil {
+		cmd = []string{"ps", "wawux"}
+		exc, _ := helpers.RunCommandStrict(tctx.Context, host, cmd)
+		tracelog.ErrorLogger.Printf("Active process list is:\n%s\n", exc.Stdout())
 		return fmt.Errorf("heavy write stop err: %+v", err)
 	}
 
