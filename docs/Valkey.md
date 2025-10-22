@@ -95,6 +95,6 @@ Typical configurations
 
 Here's typical wal-g configuration for that case:
 ```bash
-WALG_STREAM_CREATE_COMMAND:  'valkey-cli --rdb /dev/stdout'
+WALG_STREAM_CREATE_COMMAND:  'valkey-cli --rdb -'
 WALG_STREAM_RESTORE_COMMAND: 'cat > /var/lib/valkey/dump.rdb'
 ```

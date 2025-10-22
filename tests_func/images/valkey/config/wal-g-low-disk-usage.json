@@ -5,7 +5,7 @@
   "AWS_ENDPOINT": "http://minio:9000",
   "AWS_S3_FORCE_PATH_STYLE": "true",
 
-  "WALG_STREAM_CREATE_COMMAND": "/usr/local/bin/valkey-cli --rdb /dev/stdout --user acl-test",
+  "WALG_STREAM_CREATE_COMMAND": "/usr/local/bin/valkey-cli --rdb - --user acl-test",
   "WALG_STREAM_RESTORE_COMMAND": "cat > /data/dump.rdb",
 
   "WALG_SENTINEL_USER_DATA":    "{\"key\": \"value\"}",

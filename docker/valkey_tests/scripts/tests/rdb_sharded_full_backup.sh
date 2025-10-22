@@ -2,7 +2,7 @@
 set -e -x
 . /tmp/lib.sh
 
-export WALG_STREAM_CREATE_COMMAND="valkey-cli --rdb /dev/stdout"
+export WALG_STREAM_CREATE_COMMAND="valkey-cli --rdb -"
 export WALG_STREAM_RESTORE_COMMAND="cat > /var/lib/valkey/dump.rdb"
 
 sleep $VALKEY_TIMEOUT

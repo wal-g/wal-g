@@ -2,7 +2,7 @@
 set -e -x
 . /tmp/lib.sh
 
-export WALG_STREAM_CREATE_COMMAND="valkey-cli -a {password} --user default --rdb /dev/stdout"
+export WALG_STREAM_CREATE_COMMAND="valkey-cli -a {password} --user default --rdb -"
 
 sleep $VALKEY_TIMEOUT
 valkey-server --save "900 0" --appendonly "no" --dir "/var/lib/valkey" &
