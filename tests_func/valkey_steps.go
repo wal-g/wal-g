@@ -71,7 +71,7 @@ func (tctx *TestContext) weStopHeavyWriteOn(hostName string) error {
 	}
 	host := rc.Host()
 
-	cmd := []string{"pkill", "-fil", "-9", "valkey-benchmark"}
+	cmd := []string{"pkill", "-fie", "-9", "valkey-benchmark"}
 	_, err = helpers.RunCommandStrict(tctx.Context, host, cmd)
 	if err != nil {
 		cmd = []string{"ps", "wawux"}
