@@ -72,17 +72,15 @@ CURRENT_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
 echo "Current row count during replication: $CURRENT_COUNT"
 
 echo "Simulating network connection loss during replication..."
-iptables -A INPUT -p tcp --dport 9306 -j DROP
-iptables -A OUTPUT -p tcp --sport 9306 -j DROP
-
+MYSQL_CONN_PID=$(ps aux | grep "mysql.*START SLAVE" | grep -v grep | awk '{print $2}' | head -1)
+if [ -n "$MYSQL_CONN_PID" ]; then
+    echo "Killing MySQL connection process: $MYSQL_CONN_PID"
+    kill -9 $MYSQL_CONN_PID
+fi
 sleep 5
 
 SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
 echo "Slave IO State after network block: $SLAVE_IO_STATE"
-
-echo "Restoring network connection..."
-iptables -D INPUT -p tcp --dport 9306 -j DROP
-iptables -D OUTPUT -p tcp --sport 9306 -j DROP
 
 sleep 15
 
