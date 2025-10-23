@@ -155,10 +155,11 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 
 	for {
 		logFile, err := logFilesProvider.GetObject()
-		// for test
 		if errors.Is(err, storage.ErrNoMoreObjects) {
-			tracelog.InfoLogger.Println("No more binlog objects available, waiting for new uploads...")
-			time.Sleep(5 * time.Second)
+			err := waitReplicationIsDone()
+			if err != nil {
+				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
+			}
 			continue
 		}
 		handleEventError(err, s)
@@ -223,14 +224,17 @@ func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStream
 		if err != nil {
 			return nil, err
 		}
+
 		startTime, err := GetBinlogTS(st.RootFolder(), pos.Name)
 		if err != nil {
 			return nil, err
 		}
+
 		err = syncBinlogFiles(pos, startTime, globalStreamer)
 		if err != nil {
 			return nil, err
 		}
+
 	} else {
 		syncMutex.Unlock()
 		tracelog.InfoLogger.Println("Sync already started")
