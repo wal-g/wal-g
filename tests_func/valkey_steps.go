@@ -94,6 +94,8 @@ func (tctx *TestContext) manifestIsNotEmpty(hostName string) error {
 		cmd := []string{"stat", "--printf=\"%s\"", "/data/appendonlydir/appendonly.aof.manifest"}
 		res, err := helpers.RunCommandStrict(tctx.Context, host, cmd)
 		if err != nil {
+			lsRes, _ := helpers.RunCommandStrict(tctx.Context, host, []string{"ls", "-lR", "/data"})
+			tracelog.ErrorLogger.Printf("ls -lR /data: %s", lsRes.Stdout())
 			return fmt.Errorf("manifest is missing")
 		}
 		if res.Stdout() == "0" {
