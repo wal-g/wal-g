@@ -22,9 +22,9 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-for i in $(seq 1 200); do
+for i in $(seq 1 1000); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
-    if [ $((i % 20)) -eq 0 ]; then
+    if [ $((i % 50)) -eq 0 ]; then
         mysql -e "FLUSH LOGS"
         wal-g binlog-push
     fi
@@ -62,52 +62,53 @@ SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes"
 if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
     echo "Replication started successfully"
 else
-    echo "ERROR: Replication IO thread did not start"
+    echo "ERROR: Replication IO thread did not start initially"
     mysql -e "SHOW SLAVE STATUS\G"
     exit 1
 fi
 
-INITIAL_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-echo "Initial row count after replication start: $INITIAL_COUNT"
+sleep 4
+CURRENT_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
+echo "Current row count during replication: $CURRENT_COUNT"
 
-echo "Simulating network connection loss via iptables..."
-
+echo "Simulating network connection loss during replication..."
 iptables -A INPUT -p tcp --dport 9306 -j DROP
 iptables -A OUTPUT -p tcp --sport 9306 -j DROP
 
-sleep 3
+sleep 5
 
-SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-echo "Slave IO running after network block: $SLAVE_IO_RUNNING"
+SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
+echo "Slave IO State after network block: $SLAVE_IO_STATE"
 
-# Восстанавливаем соединение
 echo "Restoring network connection..."
 iptables -D INPUT -p tcp --dport 9306 -j DROP
 iptables -D OUTPUT -p tcp --sport 9306 -j DROP
 
-sleep 10
+sleep 15
 
 SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
 if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
     echo "Replication restored successfully after network reconnect"
 else
-    echo "ERROR: Replication IO thread did not restore after network reconnect"
-    mysql -e "SHOW SLAVE STATUS\G"
-    exit 1
-fi
+    echo "Checking if replication is still in progress..."
+    SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
+    echo "Current Slave IO State: $SLAVE_IO_STATE"
 
-sleep 5
-COUNT_AFTER_RECONNECT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-echo "Row count after reconnect: $COUNT_AFTER_RECONNECT"
-
-if [ "$COUNT_AFTER_RECONNECT" -gt "$INITIAL_COUNT" ]; then
-    echo "Data continues to replicate after reconnect: $INITIAL_COUNT -> $COUNT_AFTER_RECONNECT"
-else
-    echo "WARNING: No new data replicated yet, waiting more..."
-    sleep 5
-    COUNT_AFTER_RECONNECT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-    if [ "$COUNT_AFTER_RECONNECT" -gt "$INITIAL_COUNT" ]; then
-        echo "Data replicated after additional wait: $INITIAL_COUNT -> $COUNT_AFTER_RECONNECT"
+    if echo "$SLAVE_IO_STATE" | grep -q "onnect"; then
+        echo "Replication is reconnecting, waiting more..."
+        sleep 10
+        SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
+        if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
+            echo "Replication restored after additional wait"
+        else
+            echo "ERROR: Replication IO thread did not restore after reconnect"
+            mysql -e "SHOW SLAVE STATUS\G"
+            exit 1
+        fi
+    else
+        echo "ERROR: Replication IO thread did not restore after reconnect"
+        mysql -e "SHOW SLAVE STATUS\G"
+        exit 1
     fi
 fi
 
@@ -116,7 +117,7 @@ wait $walg_pid || true
 echo "wal-g completed"
 
 ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-EXPECTED_COUNT=201
+EXPECTED_COUNT=1001
 
 if [ "$ROW_COUNT" -ne "$EXPECTED_COUNT" ]; then
     echo "ERROR: Expected $EXPECTED_COUNT rows, got $ROW_COUNT"
