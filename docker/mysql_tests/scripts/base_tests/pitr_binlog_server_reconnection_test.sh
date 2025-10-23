@@ -22,7 +22,7 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-for i in $(seq 1 100); do
+for i in $(seq 1 200); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 20)) -eq 0 ]; then
         mysql -e "FLUSH LOGS"
@@ -66,6 +66,9 @@ else
     exit 1
 fi
 
+INITIAL_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
+echo "Initial row count after replication start: $INITIAL_COUNT"
+
 echo "Simulating real connection loss (TCP kill via ss)..."
 MYSQL_PORT=9306
 
@@ -89,7 +92,6 @@ if [ -z "$REPL_CONN_PIDS" ]; then
     exit 1
 fi
 
-echo "Killing replica TCP connection PID(s) $REPL_CONN_PIDS"
 for pid in $REPL_CONN_PIDS; do
     if ps -p $pid >/dev/null 2>&1; then
         kill -9 $pid
@@ -107,10 +109,21 @@ else
     exit 1
 fi
 
+sleep 5
+COUNT_AFTER_RECONNECT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
+echo "Row count after reconnect: $COUNT_AFTER_RECONNECT"
+
+if [ "$COUNT_AFTER_RECONNECT" -gt "$INITIAL_COUNT" ]; then
+    echo "Data continues to replicate after reconnect: $INITIAL_COUNT -> $COUNT_AFTER_RECONNECT"
+else
+    echo "ERROR: No new data replicated after reconnect"
+    exit 1
+fi
+
 wait $walg_pid || true
 
 ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-EXPECTED_COUNT=101
+EXPECTED_COUNT=201
 
 if [ "$ROW_COUNT" -ne "$EXPECTED_COUNT" ]; then
     echo "ERROR: Expected $EXPECTED_COUNT rows, got $ROW_COUNT"
