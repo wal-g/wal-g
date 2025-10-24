@@ -11,14 +11,14 @@ export WALG_MYSQL_BINLOG_SERVER_PASSWORD="walgpwd"
 export WALG_MYSQL_BINLOG_SERVER_ID=99
 export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest@tcp(127.0.0.1:3306)/sbtest"
 
-# Инициализация MySQL
+WALG_LOG_FILE="/tmp/walg_binlog_server.log"
+
 mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
 
-# Полный бэкап
 wal-g backup-push
 
-# Вставка данных и бинлоги
+# Вставка данных
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
@@ -27,7 +27,7 @@ wal-g binlog-push
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr02', NOW())"
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr03', NOW())"
 sleep 1
-DT1=$(date3339)
+DT1=$(date3339)  # Точка PITR — после 02, 03
 sleep 1
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr04', NOW())"
 mysql -e "FLUSH LOGS"
@@ -40,52 +40,55 @@ chown -R mysql:mysql $MYSQLDATA
 service mysql start || (cat /var/log/mysql/error.log && false)
 mysql_set_gtid_purged
 
-# Время до DT1 — значит, testpitr04 не должно быть
-# Но testpitr01, 02, 03 — должны быть
-
-# Запускаем binlog-server в фоне
-WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" &
+FUTURE_DT=$(date --rfc-3339=ns | sed 's/ /T/' | sed 's/\.[0-9]*+/+00:00/')
+WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$FUTURE_DT" > "$WALG_LOG_FILE" 2>&1 &
 WALG_PID=$!
 
-# Ждём, пока сервер начнёт слушать
 sleep 5
 
-# --- Первое подключение реплики ---
+netstat -tuln | grep 9306 || (echo "❌ binlog-server is not listening on 9306" && exit 1)
+
 mysql -e "STOP SLAVE"
 mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql -e "CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=9306, MASTER_USER='walg', MASTER_PASSWORD='walgpwd', MASTER_AUTO_POSITION=1"
 mysql -e "START SLAVE"
 
-# Ждём несколько секунд — пусть реплика начнёт процесс
 sleep 10
 
-# Проверим, что реплика работает (необязательно, но полезно)
-mysql -e "SHOW SLAVE STATUS FOR CHANNEL 'master'\G" || true
+grep "connection accepted" "$WALG_LOG_FILE" | grep -q "127.0.0.1" \
+  && echo "✅ First connection accepted" \
+  || (echo "❌ No first connection in logs" && cat "$WALG_LOG_FILE" && exit 1)
 
-# --- Имитируем переподключение: STOP + START ---
 mysql -e "STOP SLAVE"
 sleep 3
 mysql -e "START SLAVE"
 
-# Ждём, пока реплика снова подключится и дональёт данные
-sleep 15
+sleep 10
 
-# Проверим, что репликация работает
-mysql -e "SHOW SLAVE STATUS FOR CHANNEL 'master'\G"
+if grep "connection accepted" "$WALG_LOG_FILE" | grep -c "127.0.0.1" | grep -q "2"; then
+  echo "✅ Second connection accepted (reconnection)"
+else
+  echo "❌ Expected two connections, got:"
+  grep "connection accepted" "$WALG_LOG_FILE"
+  cat "$WALG_LOG_FILE"
+  exit 1
+fi
 
-# --- Ожидаем завершения binlog-server (он сам завершится, когда достигнет --until) ---
-wait $WALG_PID || echo "wal-g binlog-server exited with error"
+grep "Returning existing streamer for reconnection" "$WALG_LOG_FILE" \
+  && echo "✅ Reused existing streamer on reconnection" \
+  || (echo "❌ Expected reconnection reuse" && cat "$WALG_LOG_FILE" && exit 1)
 
-# Делаем дамп и проверяем данные
+kill $WALG_PID || true
+wait $WALG_PID || echo "wal-g binlog-server exited"
+
 mysqldump sbtest > /tmp/dump_after_pitr
 
 grep -w 'testpitr01' /tmp/dump_after_pitr
 grep -w 'testpitr02' /tmp/dump_after_pitr
 grep -w 'testpitr03' /tmp/dump_after_pitr
+# testpitr04 не должно быть, если мы хотим PITR
 ! grep -w 'testpitr04' /tmp/dump_after_pitr
 
-# Проверим, что в логах был хотя бы один reconnection
-# (можно добавить, если логи доступны)
-# grep -i "Returning existing streamer for reconnection" /path/to/walg.log
+mysql -e "SHOW SLAVE STATUS FOR CHANNEL 'master'\G" || true
 
-echo "✅ Test passed: binlog-server handled reconnection successfully."
+echo "✅ Test passed: binlog-server handled reconnection correctly and resumed replication."

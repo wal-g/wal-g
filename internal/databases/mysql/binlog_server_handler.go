@@ -207,6 +207,7 @@ func (h Handler) HandleRegisterSlave(data []byte) error {
 func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	streamerMutex.Lock()
 	defer streamerMutex.Unlock()
+	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
 
 	if globalStreamer != nil {
 		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
