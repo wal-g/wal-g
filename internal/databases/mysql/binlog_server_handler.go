@@ -134,6 +134,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	p := replication.NewBinlogParser()
 	p.SetRawMode(true)
 	p.SetFlavor(mysql.MySQLFlavor)
+	// check checksum on our side - we should exit with error here rather than stuck waiting for MySQL apply all binlogs till `lastSentGTID`.
 	p.SetVerifyChecksum(true)
 
 	f := func(e *replication.BinlogEvent) error {
@@ -152,31 +153,14 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	}
 	dstDir, _ := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
 
-	replicationCompleted := false
-
 	for {
 		logFile, err := logFilesProvider.GetObject()
 		if errors.Is(err, storage.ErrNoMoreObjects) {
-			if !replicationCompleted {
-				err := waitReplicationIsDone()
-				if err != nil {
-					tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
-				} else {
-					replicationCompleted = true
-					tracelog.InfoLogger.Println("Replication completed successfully")
-				}
+			err := waitReplicationIsDone()
+			if err != nil {
+				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
 			}
-
-			if os.Getenv("WALG_BINLOG_SERVER_KEEP_ALIVE") == "true" && replicationCompleted {
-				tracelog.InfoLogger.Println("Keeping server alive for reconnection testing")
-				time.Sleep(30 * time.Second)
-			}
-
-			if replicationCompleted {
-				return
-			}
-
-			continue
+			os.Exit(0)
 		}
 		handleEventError(err, s)
 		if err != nil {
@@ -252,6 +236,7 @@ func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStream
 		syncMutex.Unlock()
 		tracelog.InfoLogger.Println("Sync already started")
 	}
+
 	return globalStreamer, nil
 }
 
