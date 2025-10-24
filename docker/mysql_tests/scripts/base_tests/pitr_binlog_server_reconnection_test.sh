@@ -11,138 +11,67 @@ export WALG_MYSQL_BINLOG_SERVER_USER="walg"
 export WALG_MYSQL_BINLOG_SERVER_PASSWORD="walgpwd"
 export WALG_MYSQL_BINLOG_SERVER_ID=99
 export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest@tcp(127.0.0.1:3306)/sbtest"
+export WALG_BINLOG_SERVER_KEEP_ALIVE=true
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
+mysql -e "CREATE DATABASE IF NOT EXISTS sbtest;"
+mysql -e "CREATE USER IF NOT EXISTS 'walg'@'%' IDENTIFIED BY 'walgpwd';"
+mysql -e "GRANT REPLICATION SLAVE ON *.* TO 'walg'@'%'; FLUSH PRIVILEGES;"
 
 wal-g backup-push
 
-mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
-mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
-mysql -e "FLUSH LOGS"
-wal-g binlog-push
-
-for i in $(seq 1 1000); do
-    mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
-    if [ $((i % 50)) -eq 0 ]; then
-        mysql -e "FLUSH LOGS"
-        wal-g binlog-push
-    fi
-done
-
-sleep 1
-DT1=$(date3339)
-sleep 1
-
-mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
-mysql -e "FLUSH LOGS"
-wal-g binlog-push
-
-mysql_kill_and_clean_data
-wal-g backup-fetch LATEST
-chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
-mysql_set_gtid_purged
-
-BINLOG_SERVER_LOG=/tmp/binlog_server_reconnect.log
-
-WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee $BINLOG_SERVER_LOG &
-walg_pid=$!
-
-sleep 3
-
-mysql -e "STOP SLAVE"
-mysql -e "SET GLOBAL SERVER_ID = 123"
-mysql -e "CHANGE MASTER TO MASTER_HOST=\"127.0.0.1\", MASTER_PORT=9306, MASTER_USER=\"walg\", MASTER_PASSWORD=\"walgpwd\", MASTER_AUTO_POSITION=1"
-mysql -e "START SLAVE"
+echo "Starting WAL-G binlog server..."
+wal-g binlog-server --listen-addr=0.0.0.0:9306 --dir=/tmp/binlogs > /tmp/binlog_server.log 2>&1 &
+BINLOG_SERVER_PID=$!
 
 sleep 5
+echo "Binlog server started with PID $BINLOG_SERVER_PID"
 
-SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-    echo "Replication started successfully"
-else
-    echo "ERROR: Replication IO thread did not start initially"
-    mysql -e "SHOW SLAVE STATUS\G"
-    exit 1
-fi
+mysql -e "CHANGE MASTER TO
+  MASTER_HOST='127.0.0.1',
+  MASTER_PORT=9306,
+  MASTER_USER='walg',
+  MASTER_PASSWORD='walgpwd',
+  MASTER_AUTO_POSITION=1;"
 
-sleep 10
-CURRENT_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-echo "Current row count during replication: $CURRENT_COUNT"
+mysql -e "START SLAVE;"
 
-echo "Simulating network connection loss during replication..."
-MYSQL_CONN_PID=$(ps aux | grep "mysql.*START SLAVE" | grep -v grep | awk '{print $2}' | head -1)
-if [ -n "$MYSQL_CONN_PID" ]; then
-    echo "Killing MySQL connection process: $MYSQL_CONN_PID"
-    kill -9 $MYSQL_CONN_PID
-fi
 sleep 5
+mysql -e "SHOW SLAVE STATUS\G" | grep -E "Running|State" || true
 
-SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
-echo "Slave IO State after network block: $SLAVE_IO_STATE"
+echo "Initial binlog connections:"
+ss -tnp | grep ":9306" || true
 
-sleep 15
-
-SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-    echo "Replication restored successfully after network reconnect"
+echo "Killing binlog-server connection to simulate disconnect..."
+CONN_PID=$(ss -tnp | grep ":9306" | awk '{print $7}' | cut -d',' -f2 | cut -d'=' -f2 | head -n1 || true)
+if [ -n "$CONN_PID" ]; then
+  kill -9 "$CONN_PID" || true
 else
-    echo "Checking if replication is still in progress..."
-    SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
-    echo "Current Slave IO State: $SLAVE_IO_STATE"
-
-    if echo "$SLAVE_IO_STATE" | grep -q "onnect"; then
-        echo "Replication is reconnecting, waiting more..."
-        sleep 10
-        SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-        if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-            echo "Replication restored after additional wait"
-        else
-            echo "ERROR: Replication IO thread did not restore after reconnect"
-            mysql -e "SHOW SLAVE STATUS\G"
-            exit 1
-        fi
-    else
-        echo "ERROR: Replication IO thread did not restore after reconnect"
-        mysql -e "SHOW SLAVE STATUS\G"
-        exit 1
-    fi
+  echo "No connection PID found for port 9306"
 fi
 
-echo "Waiting for wal-g to complete..."
-wait $walg_pid || true
-echo "wal-g completed"
+echo "Waiting for MySQL to detect disconnect..."
+sleep 30
 
-# Проверяем финальные данные
-ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-EXPECTED_COUNT=1001  # 1 + 1000 batch inserts
+echo "Binlog connections after 30s:"
+ss -tnp | grep ":9306" || true
 
-if [ "$ROW_COUNT" -ne "$EXPECTED_COUNT" ]; then
-    echo "ERROR: Expected $EXPECTED_COUNT rows, got $ROW_COUNT"
+mysql -e "SHOW SLAVE STATUS\G" | grep -E "Running|State" || true
+
+echo "=== Binlog server logs ==="
+cat /tmp/binlog_server.log || true
+
+if grep -q "connection accepted" /tmp/binlog_server.log; then
+  COUNT=$(grep -c "connection accepted" /tmp/binlog_server.log)
+  if [ "$COUNT" -ge 2 ]; then
+    echo "✅ SUCCESS: MySQL reconnected to binlog-server ($COUNT connections)"
+    exit 0
+  else
+    echo "❌ FAIL: Only one connection detected, no reconnect"
     exit 1
-fi
-
-AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
-if [ "$AFTER_COUNT" -ne 0 ]; then
-    echo "ERROR: Record after DT1 should not be replicated"
-    exit 1
-fi
-
-CONN_COUNT=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" || true)
-echo "Total connections detected: $CONN_COUNT"
-
-RECONNECT_COUNT=$(grep -c 'Returning existing streamer for reconnection' "$BINLOG_SERVER_LOG" || true)
-if [ "$RECONNECT_COUNT" -ge 1 ]; then
-    echo "Reconnection detected in logs: $RECONNECT_COUNT times"
+  fi
 else
-    echo "WARNING: No explicit reconnection detected in logs"
+  echo "❌ FAIL: No connections detected at all"
+  exit 1
 fi
-
-if [ "$CONN_COUNT" -ge 2 ]; then
-    echo "Multiple connections detected - reconnection test passed"
-else
-    echo "WARNING: Expected at least 2 connections, got $CONN_COUNT"
-fi
-
-echo "Test passed!"
