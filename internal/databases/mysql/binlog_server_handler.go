@@ -156,11 +156,11 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	for {
 		logFile, err := logFilesProvider.GetObject()
 		if errors.Is(err, storage.ErrNoMoreObjects) {
-			// Все бинлоги отданы, но мы не выходим — ждём, пока не наступит --until
-			tracelog.InfoLogger.Println("All binlogs synced. Waiting until --until time to exit...")
-			// Просто продолжаем — HandleCommand() будет ждать новых подключений
-			// Сервер завершится только когда время --until наступит (или вручную)
-			break // выходим из for {}, но не завершаем процесс
+			err := waitReplicationIsDone()
+			if err != nil {
+				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
+			}
+			os.Exit(0)
 		}
 		handleEventError(err, s)
 		if err != nil {
