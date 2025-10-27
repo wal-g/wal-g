@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func initDTOConfig(t *testing.T) {
@@ -80,7 +81,7 @@ func TestGenericMetaFetcher_Fetch_NoSentinel_ReturnsError(t *testing.T) {
 
 	mf := NewGenericMetaFetcher()
 	_, err := mf.Fetch("nonexistent_backup", folder)
-	require.Error(t, err)
+	require.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 }
 
 func TestGenericMetaFetcher_Fetch_NonIncremental(t *testing.T) {
