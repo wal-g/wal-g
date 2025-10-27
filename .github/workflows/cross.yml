@@ -27,6 +27,6 @@ jobs:
           go get -v -t ./...
           make deps
 
-      - name: Build wal-g for SQL Server
+      - name: Build wal-g for SQL Server and PostgreSQL
         run: |
-          make sqlserver_build
+          make sqlserver_build pg_build

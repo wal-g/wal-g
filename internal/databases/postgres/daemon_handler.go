@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"path"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
@@ -170,7 +169,7 @@ func NewMessageReader(c net.Conn) *SocketMessageReader {
 
 func SetupSignalListener() {
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGUSR1)
+	signal.Notify(sigCh, SIGUSR1)
 	go func() {
 		for {
 			<-sigCh
