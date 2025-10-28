@@ -162,6 +162,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			err := waitReplicationIsDone()
 			if err != nil {
 				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
+				os.Exit(1)
 			}
 			os.Exit(0)
 		}
@@ -339,7 +340,7 @@ func HandleBinlogServer(since string, until string) {
 		conn, err := server.NewConn(c, user, password, globalHandler)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Error creating connection: %v", err)
-			c.Close()
+			utility.LoggedClose(c, "Failed to close connection after error")
 			continue
 		}
 		tracelog.InfoLogger.Printf("connection created")
