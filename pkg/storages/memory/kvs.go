@@ -2,6 +2,7 @@ package memory
 
 import (
 	"bytes"
+	"slices"
 	"sync"
 	"time"
 )
@@ -29,11 +30,13 @@ func TimeStampData(data bytes.Buffer, timeNow func() time.Time) TimeStampedData 
 // TODO: Get rid of the KVS and move this logic to the Folder.
 type KVS struct {
 	underlying *sync.Map
-	timeNow    func() time.Time
+	// keep track of insertion/update order to resolve races where two files are created in the same instant
+	order   *[]string
+	timeNow func() time.Time
 }
 
 func NewKVS(opts ...func(*KVS)) *KVS {
-	s := &KVS{underlying: &sync.Map{}, timeNow: time.Now}
+	s := &KVS{underlying: &sync.Map{}, timeNow: time.Now, order: &[]string{}}
 	for _, o := range opts {
 		o(s)
 	}
@@ -55,15 +58,28 @@ func (storage *KVS) Load(key string) (value TimeStampedData, exists bool) {
 }
 
 func (storage *KVS) Store(key string, value bytes.Buffer) {
+	popOrderedKey(key, storage)
+	*storage.order = append(*storage.order, key)
 	storage.underlying.Store(key, TimeStampData(value, storage.timeNow))
 }
 
+func popOrderedKey(key string, storage *KVS) {
+	// always pop the current key from order
+	idx := slices.IndexFunc(*storage.order, func(c string) bool { return c == key })
+	if idx != -1 {
+		*storage.order = append((*storage.order)[:idx], (*storage.order)[idx+1:]...)
+	}
+}
+
 func (storage *KVS) Delete(key string) {
+	popOrderedKey(key, storage)
 	storage.underlying.Delete(key)
 }
 
 func (storage *KVS) Range(callback func(key string, value TimeStampedData) bool) {
-	storage.underlying.Range(func(iKey, iValue interface{}) bool {
-		return callback(iKey.(string), iValue.(TimeStampedData))
-	})
+	// keep ordering consistent with last updated/insertion per https://go.dev/blog/maps#iteration-order
+	for _, v := range *storage.order {
+		data, _ := storage.Load(v)
+		callback(v, data)
+	}
 }
