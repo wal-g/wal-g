@@ -253,6 +253,7 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 	h.syncOnce.Do(func() {
 		syncErr = syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, h.globalStreamer)
 	})
+
 	if syncErr != nil {
 		return nil, syncErr
 	}
