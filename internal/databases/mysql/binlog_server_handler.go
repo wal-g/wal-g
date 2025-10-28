@@ -321,6 +321,8 @@ func HandleBinlogServer(since string, until string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
+	globalHandler := &Handler{}
+
 	for {
 		c, err := l.Accept()
 		if err != nil {
@@ -334,7 +336,7 @@ func HandleBinlogServer(since string, until string) {
 		password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		conn, err := server.NewConn(c, user, password, Handler{})
+		conn, err := server.NewConn(c, user, password, globalHandler)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Error creating connection: %v", err)
 			c.Close()
