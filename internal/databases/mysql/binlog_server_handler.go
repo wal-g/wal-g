@@ -27,14 +27,17 @@ import (
 )
 
 var (
-	startTS        time.Time
-	untilTS        time.Time
-	lastSentGTID   string
-	syncStarted    bool
-	syncMutex      sync.Mutex
+	startTS      time.Time
+	untilTS      time.Time
+	lastSentGTID string
+)
+
+type Handler struct {
+	server.EmptyReplicationHandler
 	globalStreamer *replication.BinlogStreamer
 	streamerMutex  sync.Mutex
-)
+	syncOnce       sync.Once
+}
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
 	if err == nil {
@@ -196,80 +199,69 @@ func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.Binlo
 	return nil
 }
 
-type Handler struct {
-	server.EmptyReplicationHandler
-}
-
-func (h Handler) HandleRegisterSlave(data []byte) error {
+func (h *Handler) HandleRegisterSlave(data []byte) error {
 	return nil
 }
 
-func (h Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
-	streamerMutex.Lock()
-	defer streamerMutex.Unlock()
+func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
+	h.streamerMutex.Lock()
+	defer h.streamerMutex.Unlock()
+
 	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
 
-	if globalStreamer != nil {
+	if h.globalStreamer != nil {
 		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
-		return globalStreamer, nil
+		return h.globalStreamer, nil
 	}
 
-	globalStreamer = replication.NewBinlogStreamer()
+	h.globalStreamer = replication.NewBinlogStreamer()
 
-	syncMutex.Lock()
-	if !syncStarted {
-		syncStarted = true
-		syncMutex.Unlock()
-
+	var syncErr error
+	h.syncOnce.Do(func() {
 		st, err := internal.ConfigureStorage()
 		if err != nil {
-			return nil, err
+			syncErr = err
+			return
 		}
 		startTime, err := GetBinlogTS(st.RootFolder(), pos.Name)
 		if err != nil {
-			return nil, err
+			syncErr = err
+			return
 		}
-		err = syncBinlogFiles(pos, startTime, globalStreamer)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		syncMutex.Unlock()
-		tracelog.InfoLogger.Println("Sync already started")
+		syncErr = syncBinlogFiles(pos, startTime, h.globalStreamer)
+	})
+
+	if syncErr != nil {
+		return nil, syncErr
 	}
 
-	return globalStreamer, nil
+	return h.globalStreamer, nil
 }
 
-func (h Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
-	streamerMutex.Lock()
-	defer streamerMutex.Unlock()
+func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
+	h.streamerMutex.Lock()
+	defer h.streamerMutex.Unlock()
 
-	if globalStreamer != nil {
+	if h.globalStreamer != nil {
 		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
-		return globalStreamer, nil
+		return h.globalStreamer, nil
 	}
 
-	globalStreamer = replication.NewBinlogStreamer()
+	h.globalStreamer = replication.NewBinlogStreamer()
 
-	syncMutex.Lock()
-	if !syncStarted {
-		syncStarted = true
-		syncMutex.Unlock()
+	var syncErr error
+	h.syncOnce.Do(func() {
+		syncErr = syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, h.globalStreamer)
+	})
 
-		err := syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, globalStreamer)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		syncMutex.Unlock()
-		tracelog.InfoLogger.Println("Sync already started")
+	if syncErr != nil {
+		return nil, syncErr
 	}
 
-	return globalStreamer, nil
+	return h.globalStreamer, nil
 }
 
-func (h Handler) HandleQuery(query string) (*mysql.Result, error) {
+func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	switch strings.ToLower(query) {
 	case "select @master_binlog_checksum":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"master_binlog_checksum"}, [][]interface{}{{"CRC32"}})
