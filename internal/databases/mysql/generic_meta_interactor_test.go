@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -128,4 +129,74 @@ func TestGenericMetaFetcher_Fetch_NonIncremental(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, ok)
 	require.Zero(t, inc)
+}
+
+func TestGenericMetaSetter_SetUserData_Success(t *testing.T) {
+	initDTOConfig(t)
+
+	kvs := memory.NewKVS()
+	st := memory.NewStorage("memory://generic-meta-setter-test", kvs)
+	folder := st.RootFolder()
+
+	backupName := "base_000000010000000000000010"
+	backup, err := internal.NewBackup(folder, backupName)
+	require.NoError(t, err)
+
+	start := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	stop := time.Date(2020, 1, 1, 1, 0, 0, 0, time.UTC)
+
+	sentinel := StreamSentinelDto{
+		UncompressedSize: 123456,
+		CompressedSize:   654321,
+		Hostname:         "test-host",
+		StartLocalTime:   start,
+		StopLocalTime:    stop,
+		IsPermanent:      false,
+		UserData:         "initial",
+		IsIncremental:    false,
+	}
+
+	require.NoError(t, backup.UploadSentinel(sentinel))
+
+	ms := NewGenericMetaSetter()
+
+	newUserData := map[string]string{"key": "value"}
+	require.NoError(t, ms.SetUserData(backupName, folder, newUserData))
+
+	var updated StreamSentinelDto
+	require.NoError(t, backup.FetchSentinel(&updated))
+	require.Equal(t, map[string]interface{}{"key": "value"}, updated.UserData)
+	require.Equal(t, sentinel.Hostname, updated.Hostname)
+	require.Equal(t, sentinel.UncompressedSize, updated.UncompressedSize)
+	require.Equal(t, sentinel.CompressedSize, updated.CompressedSize)
+	require.Equal(t, sentinel.StartLocalTime, updated.StartLocalTime)
+	require.Equal(t, sentinel.StopLocalTime, updated.StopLocalTime)
+}
+
+func TestGenericMetaSetter_SetUserData_BackupNotFound(t *testing.T) {
+	initDTOConfig(t)
+
+	kvs := memory.NewKVS()
+	st := memory.NewStorage("memory://generic-meta-setter-test", kvs)
+	folder := st.RootFolder()
+
+	ms := NewGenericMetaSetter()
+
+	err := ms.SetUserData("nonexistent_backup", folder, "data")
+	require.ErrorAs(t, err, &storage.ObjectNotFoundError{})
+}
+
+func TestGenericMetaSetter_SetUserData_InvalidSentinel(t *testing.T) {
+	initDTOConfig(t)
+
+	kvs := memory.NewKVS()
+	st := memory.NewStorage("memory://generic-meta-setter-test", kvs)
+	folder := st.RootFolder()
+
+	backupName := "base_000000010000000000000011"
+	require.NoError(t, folder.PutObject(backupName+"_backup_stop_sentinel.json", bytes.NewReader([]byte("invalid json"))))
+
+	ms := NewGenericMetaSetter()
+	err := ms.SetUserData(backupName, folder, "newdata")
+	require.Error(t, err)
 }
