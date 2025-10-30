@@ -43,9 +43,9 @@ var backupFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		tracelog.InfoLogger.Print(restoreCmd.String())
 
-		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
-		if ok && redisPassword != "" { // special hack for redis-cli
-			restoreCmd.Env = append(restoreCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
+		valkeyPassword, ok := conf.GetSetting(conf.RedisPassword)
+		if ok && valkeyPassword != "" { // special hack for valkey-cli
+			restoreCmd.Env = append(restoreCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", valkeyPassword))
 		}
 
 		restoreCmd.Stdout = os.Stdout

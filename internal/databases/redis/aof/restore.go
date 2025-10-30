@@ -52,12 +52,12 @@ func (r *RestoreService) DoRestore(args RestoreArgs) error {
 			return fmt.Errorf("backup of version %s could not be restored to version %s", sentinel.Version, args.RestoreVersion)
 		}
 
-		err = archive.EnsureRedisStopped()
+		err = archive.EnsureValkeyStopped()
 		if err != nil {
 			return err
 		}
 	} else {
-		tracelog.InfoLogger.Println("Skipped restore redis checks")
+		tracelog.InfoLogger.Println("Skipped restore valkey checks")
 	}
 
 	if !args.SkipBackupDownload {
@@ -72,7 +72,7 @@ func (r *RestoreService) DoRestore(args RestoreArgs) error {
 			return err
 		}
 	} else {
-		tracelog.InfoLogger.Println("Skipped download redis backup files")
+		tracelog.InfoLogger.Println("Skipped download valkey backup files")
 	}
 
 	return nil

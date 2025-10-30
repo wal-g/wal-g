@@ -8,7 +8,7 @@ nav:
     - Mongo DB: MongoDB.md
     - MySQL: MySQL.md
     - PostgreSQL: PostgreSQL.md
-    - Redis: Redis.md
+    - Valkey: Valkey.md
     - SQLServer: SQLServer.md
     - Windows: Windows.md
     - Contributors: CONTRIBUTORS.md

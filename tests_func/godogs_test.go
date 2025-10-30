@@ -32,7 +32,7 @@ var (
 
 	databases = map[string]bool{
 		"mongodb": true,
-		"redis":   true,
+		"valkey":  true,
 	}
 )
 
@@ -42,7 +42,7 @@ func init() {
 	pflag.BoolVar(&testOpts.clean, "tf.clean", true, "delete test environment")
 	pflag.BoolVar(&testOpts.debug, "tf.debug", false, "enable debug logging")
 	pflag.StringVar(&testOpts.featurePrefix, "tf.featurePrefix", "", "features prefix")
-	pflag.StringVar(&testOpts.database, "tf.database", "", "database name [mongodb|redis]")
+	pflag.StringVar(&testOpts.database, "tf.database", "", "database name [mongodb|valkey]")
 
 	godog.BindCommandLineFlags("godog.", &godogOpts)
 }
@@ -95,7 +95,7 @@ func RunTestFeatures() (status int, err error) {
 				SetupCommonSteps(ctx, tctx)
 				SetupMongodbSteps(ctx, tctx)
 				SetupMongodbBinaryBackupSteps(ctx, tctx)
-				SetupRedisSteps(ctx, tctx)
+				SetupValkeySteps(ctx, tctx)
 			},
 			Options: &godogOpts,
 		}

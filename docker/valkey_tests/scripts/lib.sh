@@ -1,13 +1,13 @@
-export REDIS_TIMEOUT=5
+export VALKEY_TIMEOUT=5
 export FETCH_TIMEOUT=10
 export WALG_FILE_PREFIX='/tmp/wal-g-test-data'
-export WALE_S3_PREFIX=s3://redisbucket
+export WALE_S3_PREFIX=s3://valkeybucket
 export WALG_COMPRESSION_METHOD=lz4
 
 test_cleanup() {
-    redis-cli flushall
-    redis-cli shutdown
-    rm -rf /var/lib/redis/*
+    valkey-cli flushall
+    valkey-cli shutdown
+    rm -rf /var/lib/valkey/*
     rm -rf $WALG_FILE_PREFIX
     rm -rf /tmp/nodes.conf
 }
@@ -17,7 +17,7 @@ ensure() {
     if [ $# -eq 2 ]; then
         _actual_output=$2
     else
-        _actual_output=$(redis-cli get key)
+        _actual_output=$(valkey-cli get key)
     fi
 
     if [ "$_actual_output" != "$_expected_output" ]; then

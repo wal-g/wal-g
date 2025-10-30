@@ -19,13 +19,13 @@ type Addrs struct {
 
 func TestGetSlotsMap(t *testing.T) {
 	tests := []struct {
-		name                 string
-		ipAddrs              map[string]Addrs // ip -> hostnames
-		redisFQDNToIDMap     string
-		redisClusterConfPath string
-		confContent          string
-		expected             map[string][][]string
-		expectedErr          error
+		name                  string
+		ipAddrs               map[string]Addrs // ip -> hostnames
+		valkeyFQDNToIDMap     string
+		valkeyClusterConfPath string
+		confContent           string
+		expected              map[string][][]string
+		expectedErr           error
 	}{
 		{
 			name: "[success] simple parsing",
@@ -33,8 +33,8 @@ func TestGetSlotsMap(t *testing.T) {
 				"ip1": {[]string{"hostname1"}, true},
 				"ip2": {[]string{"hostname2"}, true},
 			},
-			redisFQDNToIDMap:     `{"hostname1": "id1", "hostname2": "id2"}`,
-			redisClusterConfPath: "test_cluster.conf",
+			valkeyFQDNToIDMap:     `{"hostname1": "id1", "hostname2": "id2"}`,
+			valkeyClusterConfPath: "test_cluster.conf",
 			confContent: `
 56cac18e538888e2fb81b09b8491e819d2bda1e1 ip1:6379@16379 master,nofailover - 0 1747228909000 44 connected 2731-5460 10923-13653
 d36dacb40728f82b6453a611941cded23915d24a ip2:6379@16379 master,nofailover - 0 1747228909000 44 connected 5461-10922
@@ -50,8 +50,8 @@ d36dacb40728f82b6453a611941cded23915d24a ip2:6379@16379 master,nofailover - 0 17
 				"ip1": {[]string{"hostname1"}, true},
 				"ip2": {[]string{"hostname2"}, false},
 			},
-			redisFQDNToIDMap:     `{"hostname1": "id1", "hostname2": "id2"}`,
-			redisClusterConfPath: "test_cluster.conf",
+			valkeyFQDNToIDMap:     `{"hostname1": "id1", "hostname2": "id2"}`,
+			valkeyClusterConfPath: "test_cluster.conf",
 			confContent: `
 56cac18e538888e2fb81b09b8491e819d2bda1e1 ip1:6379@16379 master,nofailover - 0 1747228909000 44 connected 2731-5460 10923-13653
 d36dacb40728f82b6453a611941cded23915d24a ip2:6379@16379 master,nofailover - 0 1747228909000 44 connected 5461-10922 [10923->3d68e5b49b010564b64c8a4ac26536a8d6a756f8]
@@ -64,8 +64,8 @@ d36dacb40728f82b6453a611941cded23915d24a ip2:6379@16379 master,nofailover - 0 17
 				// "ip1": {[]string{"hostname1"}, true},
 				"ip2": {[]string{"hostname2"}, true},
 			},
-			redisFQDNToIDMap:     `{"hostname1": "id1", "hostname2": "id2"}`,
-			redisClusterConfPath: "test_cluster.conf",
+			valkeyFQDNToIDMap:     `{"hostname1": "id1", "hostname2": "id2"}`,
+			valkeyClusterConfPath: "test_cluster.conf",
 			confContent: `
 17b6be48fa511f0adad8c887dc01dd7067e7bfe5 ip1:6379@16379,hostname1,tls-port=0,shard-id=078c4272db66981a314129680c33a980ebd2e037 master,fail,nofailover - 1750694758775 1750694758775 419 connected
 d36dacb40728f82b6453a611941cded23915d24a ip2:6379@16379,,tls-port=0,shard-id=3e0c8579c9f33534b4ccaafe168eb9a1d97c116e master,fail,nofailover - 1750771752642 1750771748000 53 connected
@@ -92,12 +92,12 @@ d36dacb40728f82b6453a611941cded23915d24a ip2:6379@16379,,tls-port=0,shard-id=3e0
 			}
 
 			// Mock viper configuration
-			viper.Set(conf.RedisFQDNToIDMap, tt.redisFQDNToIDMap)
-			viper.Set(conf.RedisClusterConfPath, tt.redisClusterConfPath)
+			viper.Set(conf.RedisFQDNToIDMap, tt.valkeyFQDNToIDMap)
+			viper.Set(conf.RedisClusterConfPath, tt.valkeyClusterConfPath)
 
 			// Create a test file with cluster info
-			require.NoError(t, os.WriteFile(tt.redisClusterConfPath, []byte(tt.confContent), 0644))
-			defer os.Remove(tt.redisClusterConfPath)
+			require.NoError(t, os.WriteFile(tt.valkeyClusterConfPath, []byte(tt.confContent), 0644))
+			defer os.Remove(tt.valkeyClusterConfPath)
 
 			slotsMap, err := GetSlotsMap(mockNet)
 			if tt.expectedErr == nil {

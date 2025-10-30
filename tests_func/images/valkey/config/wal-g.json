@@ -1,11 +1,11 @@
 {
-  "WALG_S3_PREFIX": "s3://dbaas/redis-backup/test_uuid/test_redis",
+  "WALG_S3_PREFIX": "s3://dbaas/valkey-backup/test_uuid/test_valkey",
   "AWS_ACCESS_KEY_ID": "S3_ACCESS_KEY",
   "AWS_SECRET_ACCESS_KEY": "S3_SECRET_KEY",
   "AWS_ENDPOINT": "http://minio:9000",
   "AWS_S3_FORCE_PATH_STYLE": "true",
 
-  "WALG_STREAM_CREATE_COMMAND": "/usr/bin/redis_cli.sh --rdb /dev/stdout --user acl-test",
+  "WALG_STREAM_CREATE_COMMAND": "/usr/local/bin/valkey-cli --rdb - --user acl-test",
   "WALG_STREAM_RESTORE_COMMAND": "cat > /data/dump.rdb",
 
   "WALG_SENTINEL_USER_DATA":    "{\"key\": \"value\"}",
@@ -19,7 +19,5 @@
 
   "WALG_REDIS_USERNAME": "acl-test",
   "WALG_REDIS_PASSWORD": "1234",
-  "WALG_REDIS_DATA_PATH": "/data",
-
-  "WALG_REDIS_DATA_THRESHOLD": 1
+  "WALG_REDIS_DATA_PATH": "/data"
 }

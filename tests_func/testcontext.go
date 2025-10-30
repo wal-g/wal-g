@@ -120,8 +120,8 @@ func CreateTestContext(database string) (tctx *TestContext, err error) {
 	var version DBVersion
 	if database == "mongodb" {
 		full = environ["MONGO_VERSION"]
-	} else if database == "redis" {
-		full = environ["REDIS_VERSION"]
+	} else if database == "valkey" {
+		full = environ["VALKEY_VERSION"]
 	} else {
 		return nil, fmt.Errorf("database %s is not expected here", database)
 	}
@@ -165,13 +165,13 @@ func (tctx *TestContext) LoadEnv() (err error) {
 	return tctx.Infra.Setup()
 }
 
-func GetRedisCtlFromTestContext(tctx *TestContext, hostName string) (*helpers.RedisCtl, error) {
-	return GetRedisCtlFromTestContextTyped(tctx, hostName, "")
+func GetValkeyCtlFromTestContext(tctx *TestContext, hostName string) (*helpers.ValkeyCtl, error) {
+	return GetValkeyCtlFromTestContextTyped(tctx, hostName, "")
 }
 
-func GetRedisCtlFromTestContextTyped(tctx *TestContext, hostName, configType string) (*helpers.RedisCtl, error) {
+func GetValkeyCtlFromTestContextTyped(tctx *TestContext, hostName, configType string) (*helpers.ValkeyCtl, error) {
 	host := tctx.ContainerFQDN(hostName)
-	port, err := strconv.Atoi(tctx.Env["REDIS_EXPOSE_PORT"])
+	port, err := strconv.Atoi(tctx.Env["VALKEY_EXPOSE_PORT"])
 	if err != nil {
 		return nil, err
 	}
@@ -180,15 +180,15 @@ func GetRedisCtlFromTestContextTyped(tctx *TestContext, hostName, configType str
 		ext := filepath.Ext(confPath)
 		confPath = strings.Join([]string{strings.TrimSuffix(confPath, ext), configType, ext}, "")
 	}
-	return helpers.NewRedisCtl(
+	return helpers.NewValkeyCtl(
 		tctx.Context,
-		helpers.RedisCtlArgs{
+		helpers.ValkeyCtlArgs{
 			BinPath:  tctx.Env["WALG_CLIENT_PATH"],
 			ConfPath: confPath,
 			Host:     host,
 			Port:     port,
-			Username: tctx.Env["REDIS_USERNAME"],
-			Password: tctx.Env["REDIS_PASSWORD"],
+			Username: tctx.Env["VALKEY_USERNAME"],
+			Password: tctx.Env["VALKEY_PASSWORD"],
 		},
 	)
 }

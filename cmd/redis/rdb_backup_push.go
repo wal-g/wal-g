@@ -48,14 +48,14 @@ var backupPushCmd = &cobra.Command{
 		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd, cmdArgs...)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
-		if ok && redisPassword != "" { // special hack for redis-cli
-			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
+		valkeyPassword, ok := conf.GetSetting(conf.RedisPassword)
+		if ok && valkeyPassword != "" { // special hack for valkey-cli
+			backupCmd.Env = append(backupCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", valkeyPassword))
 		}
 
 		memoryDataGetter := client.NewServerDataGetter()
 
-		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
+		metaConstructor := archive.NewBackupValkeyMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
 
 		backupCmd.Stderr = os.Stderr
 
@@ -66,7 +66,7 @@ var backupPushCmd = &cobra.Command{
 			MetaConstructor: metaConstructor,
 		}
 		err = redis.HandleRDBBackupPush(pushArgs)
-		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
+		tracelog.ErrorLogger.FatalfOnError("Valkey backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		conf.RequiredSettings[conf.NameStreamCreateCmd] = true

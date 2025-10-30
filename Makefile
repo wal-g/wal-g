@@ -1,7 +1,7 @@
 MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 MAIN_SQLSERVER_PATH := main/sqlserver
-MAIN_REDIS_PATH := main/redis
+MAIN_VALKEY_PATH := main/redis
 MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
@@ -19,7 +19,7 @@ MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
 GOLANGCI_LINT_VERSION ?= "v2.0"
-REDIS_VERSION ?= "6.2.4"
+VALKEY_VERSION ?= "9.0.0"
 IMAGE_TYPE ?= "rdb"
 TOOLS_MOD_DIR := ./internal/tools
 MOCKS_DESTINATION := ./testtools/mocks
@@ -49,7 +49,7 @@ endif
 
 .PHONY: unittest fmt lint clean install_tools
 
-test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
+test: deps unittest pg_build mysql_build valkey_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test valkey_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
@@ -197,30 +197,37 @@ fdb_integration_test: load_docker_common
 	docker compose build fdb_tests
 	docker compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
 
-redis_test: deps redis_build unlink_brotli redis_integration_test
+valkey_test: deps valkey_build unlink_brotli valkey_integration_test
 
-redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
+valkey_build: $(CMD_FILES) $(PKG_FILES)
+	(cd $(MAIN_VALKEY_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
 
-redis_integration_test: load_docker_common
-	docker compose build redis && docker compose build redis_tests
-	docker compose up --exit-code-from redis_tests redis_tests
+valkey_integration_test: load_docker_common
+	docker compose build valkey && docker compose build valkey_tests
+	docker compose up --exit-code-from valkey_tests valkey_tests
 
-redis_clean:
-	(cd $(MAIN_REDIS_PATH) && go clean)
+valkey_clean:
+	(cd $(MAIN_VALKEY_PATH) && go clean)
 	./cleanup.sh
 
-redis_install: redis_build
-	mv $(MAIN_REDIS_PATH)/wal-g $(GOBIN)/wal-g
+valkey_install: valkey_build
+	mv $(MAIN_VALKEY_PATH)/wal-g $(GOBIN)/wal-g
 
-redis_features:
+valkey_features:
 	set -e
 	make go_deps
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) IMAGE_TYPE=$(IMAGE_TYPE) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
+	cd tests_func/ && VALKEY_VERSION=$(VALKEY_VERSION) IMAGE_TYPE=$(IMAGE_TYPE) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=valkey
 
-clean_redis_features:
+clean_valkey_features:
 	set -e
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
+	cd tests_func/ && VALKEY_VERSION=$(VALKEY_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=valkey
+
+# For backward compatibility
+redis_build: valkey_build
+
+redis_clean: valkey_clean
+
+redis_install: valkey_install
 
 etcd_test: deps etcd_build unlink_brotli etcd_integration_test
 

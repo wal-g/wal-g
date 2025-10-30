@@ -19,11 +19,10 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
     cd main/redis && \
     go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
-FROM wal-g/redis:latest
+FROM wal-g/valkey:latest
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/redis/wal-g /usr/bin
 
-COPY docker/redis_tests/scripts/ /tmp
-COPY redis_cli.sh /usr/bin/redis_cli.sh
+COPY docker/valkey_tests/scripts/ /tmp
 
 CMD /tmp/run_integration_tests.sh
