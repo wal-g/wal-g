@@ -145,7 +145,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if err != nil {
 		return fmt.Errorf("unable to copy: %w", err)
 	}
-	return nil
+	return file.Close()
 }
 
 func OpenFileWithDir(filePath string) (*os.File, error) {
