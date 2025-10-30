@@ -27,6 +27,7 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 		all, err := io.ReadAll(readCloser)
 		assert.NoError(t, err)
 		assert.Equal(t, token, all)
+		assert.NoError(t, readCloser.Close())
 	}
 
 	err = sub1.PutObject("file1", strings.NewReader("data1"))
