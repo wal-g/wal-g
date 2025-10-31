@@ -56,7 +56,7 @@ mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql -e "CHANGE MASTER TO MASTER_HOST=\"127.0.0.1\", MASTER_PORT=9306, MASTER_USER=\"walg\", MASTER_PASSWORD=\"walgpwd\", MASTER_AUTO_POSITION=1"
 mysql -e "START SLAVE"
 
-sleep 5
+sleep 4
 
 SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
 if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
@@ -67,20 +67,35 @@ else
     exit 1
 fi
 
-sleep 10
+sleep 4
 CURRENT_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
 echo "Current row count during replication: $CURRENT_COUNT"
 
 echo "Simulating network connection loss during replication..."
-MYSQL_CONN_PID=$(ps aux | grep "mysql.*START SLAVE" | grep -v grep | awk '{print $2}' | head -1)
-if [ -n "$MYSQL_CONN_PID" ]; then
-    echo "Killing MySQL connection process: $MYSQL_CONN_PID"
-    kill -9 $MYSQL_CONN_PID
-fi
+
+BINLOG_SERVER_PORT=9306
+
+echo "Killing TCP connections to binlog server using ss..."
+ss -K dport = $BINLOG_SERVER_PORT 2>/dev/null || true
+
+#echo "Killing TCP connections using conntrack..."
+#conntrack -D -p tcp --dport $BINLOG_SERVER_PORT 2>/dev/null || true
+
+#MYSQL_TO_BINLOG_CONN=$(netstat -tnp 2>/dev/null | grep ":$BINLOG_SERVER_PORT" | grep ESTABLISHED | head -1)
+#if [ -n "$MYSQL_TO_BINLOG_CONN" ]; then
+#    echo "Found specific connection: $MYSQL_TO_BINLOG_CONN"
+#    LOCAL_PORT=$(echo "$MYSQL_TO_BINLOG_CONN" | awk '{print $4}' | cut -d':' -f2)
+#    if [ -n "$LOCAL_PORT" ]; then
+#        echo "Killing specific connection on local port $LOCAL_PORT"
+#        ss -K sport = $LOCAL_PORT dport = $BINLOG_SERVER_PORT 2>/dev/null || true
+#    fi
+#fi
+
+echo "TCP connections killed, waiting for reconnection..."
 sleep 5
 
 SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
-echo "Slave IO State after network block: $SLAVE_IO_STATE"
+echo "Slave IO State after connection kill: $SLAVE_IO_STATE"
 
 sleep 15
 
