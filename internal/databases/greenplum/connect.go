@@ -34,7 +34,7 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 			tracelog.ErrorLogger.Println("Failed to connect using provided PGHOST and PGPORT, trying localhost:5432")
 			config.Host = "localhost"
 			config.Port = 5432
-			
+
 			// Try with GP utility mode first
 			config.RuntimeParams["gp_role"] = "utility"
 			conn, err = pgx.ConnectConfig(context.TODO(), config)
