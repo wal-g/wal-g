@@ -4,8 +4,7 @@ set -e -x
 . /usr/local/export_common.sh
 
 s3cmd mb s3://mysql_pitr_binlogserver_reconnection_bucket || true
-export WALE_S3_PREFIX=s3://mysql_pitr_binlogserver_bucket
-export WALG_MYSQL_BINLOG_SERVER_HOST="localhost"
+export WALE_S3_PREFIX=s3://mysql_pitr_binlogserver_reconnection_bucket
 export WALG_MYSQL_BINLOG_SERVER_PORT=9306
 export WALG_MYSQL_BINLOG_SERVER_USER="walg"
 export WALG_MYSQL_BINLOG_SERVER_PASSWORD="walgpwd"
