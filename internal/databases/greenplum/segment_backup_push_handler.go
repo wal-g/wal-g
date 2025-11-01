@@ -19,10 +19,7 @@ func NewSegBackupHandler(arguments postgres.BackupArguments) (*postgres.BackupHa
 	}
 
 	// Continue with original segment-specific setup
-	err = configureSegmentBackupHandler(bh)
-	if err != nil {
-		return nil, err
-	}
+	configureSegmentBackupHandler(bh)
 
 	return bh, nil
 }
@@ -39,7 +36,7 @@ func GetSegmentServerInfo(keepRunner bool) (pgInfo postgres.BackupPgInfo, runner
 	return postgres.GetPgServerInfoWithConnection(tmpConn, keepRunner)
 }
 
-func configureSegmentBackupHandler(bh *postgres.BackupHandler) error {
+func configureSegmentBackupHandler(bh *postgres.BackupHandler) {
 
 	composerInitFunc := func(handler *postgres.BackupHandler) error {
 		queryRunner := ToGpQueryRunner(handler.Workers.QueryRunner)
@@ -62,6 +59,4 @@ func configureSegmentBackupHandler(bh *postgres.BackupHandler) error {
 		tracelog.DebugLogger.Printf("Query runner version is %d, disabling concurrent backups", bh.PgInfo.PgVersion)
 		bh.Arguments.EnablePreventConcurrentBackups()
 	}
-
-	return nil
 }
