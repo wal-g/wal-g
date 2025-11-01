@@ -118,15 +118,16 @@ func (b *BackupInfo) GetFinishLSN() LSN {
 // TimelineInfo represents timeline information from wal-show --detailed-json
 // This matches the actual structure returned by wal-g wal-show --detailed-json
 type TimelineInfo struct {
-	ID               uint32   `json:"id"`
-	ParentID         uint32   `json:"parent_id"`
-	SwitchPointLsn   uint64   `json:"switch_point_lsn"` // LSN is serialized as uint64 in JSON
-	StartSegment     string   `json:"start_segment"`
-	EndSegment       string   `json:"end_segment"`
-	SegmentsCount    int      `json:"segments_count"`
-	MissingSegments  []string `json:"missing_segments"`
-	SegmentRangeSize uint64   `json:"segment_range_size"`
-	Status           string   `json:"status"`
+	ID               uint32       `json:"id"`
+	ParentID         uint32       `json:"parent_id"`
+	SwitchPointLsn   uint64       `json:"switch_point_lsn"` // LSN is serialized as uint64 in JSON
+	StartSegment     string       `json:"start_segment"`
+	EndSegment       string       `json:"end_segment"`
+	SegmentsCount    int          `json:"segments_count"`
+	MissingSegments  []string     `json:"missing_segments"`
+	SegmentRangeSize uint64       `json:"segment_range_size"`
+	Status           string       `json:"status"`
+	BackupInfo       []BackupInfo `json:"backups"`
 }
 
 // GetSwitchPointLSN converts the uint64 SwitchPointLsn to postgres.LSN type
@@ -314,16 +315,7 @@ func (e *WalgExporter) scrapeMetrics() {
 
 	log.Printf("Scraping WAL-G metrics...")
 
-	// Get backup information
-	backups, err := e.getBackupInfo()
-	if err != nil {
-		log.Printf("Error getting backup info: %v", err)
-		e.scrapeErrors.Inc()
-		e.errors.WithLabelValues("backup-list", "command_failed").Inc()
-		return
-	}
-
-	// Get WAL information
+	// Get WAL information and backup information
 	timelineInfos, err := e.getWalInfo()
 	if err != nil {
 		log.Printf("Error getting WAL info: %v", err)
@@ -335,6 +327,11 @@ func (e *WalgExporter) scrapeMetrics() {
 	// Check storage aliveness
 	e.checkStorageAliveness()
 
+	var backups []BackupInfo
+	for _, timeline := range timelineInfos {
+		backups = append(backups, timeline.BackupInfo...)
+	}
+
 	// Update backup metrics
 	e.updateBackupMetrics(backups)
 
@@ -345,22 +342,6 @@ func (e *WalgExporter) scrapeMetrics() {
 	e.updatePitrWindow(backups, timelineInfos)
 
 	log.Printf("Metrics scrape completed in %v", time.Since(start))
-}
-
-// getBackupInfo executes wal-g backup-list --detail --json
-func (e *WalgExporter) getBackupInfo() ([]BackupInfo, error) {
-	cmd := exec.Command(e.walgPath, "backup-list", "--detail", "--json", "--config", e.walgConfigPath)
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute backup-list: %w", err)
-	}
-
-	var backups []BackupInfo
-	if err := json.Unmarshal(output, &backups); err != nil {
-		return nil, fmt.Errorf("failed to parse backup-list output: %w", err)
-	}
-
-	return backups, nil
 }
 
 // getWalInfo executes wal-g wal-show --detailed-json
@@ -495,9 +476,9 @@ func (e *WalgExporter) checkStorageAliveness() {
 	// Try a simple WAL-G command to test storage connectivity
 	var cmd *exec.Cmd
 	if e.walgConfigPath != "" {
-		cmd = exec.CommandContext(ctx, e.walgPath, "st", "ls", "--config", e.walgConfigPath)
+		cmd = exec.CommandContext(ctx, e.walgPath, "st", "check", "read", "--config", e.walgConfigPath)
 	} else {
-		cmd = exec.CommandContext(ctx, e.walgPath, "st", "ls")
+		cmd = exec.CommandContext(ctx, e.walgPath, "st", "check", "read")
 	}
 
 	err := cmd.Run()
