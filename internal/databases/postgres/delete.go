@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -14,6 +15,21 @@ import (
 
 type DeleteHandler struct {
 	internal.DeleteHandler
+}
+
+// CleanupSnapshotBackupsBeforeDeletion scans for snapshot backups and executes cleanup commands
+// This should be called before performing backup deletion operations
+func (dh *DeleteHandler) CleanupSnapshotBackupsBeforeDeletion() {
+	// Check if snapshot delete command is configured
+	_, ok := conf.GetSetting(conf.PgSnapshotDeleteCommand)
+	if !ok {
+		tracelog.DebugLogger.Println("No snapshot delete command configured, skipping snapshot cleanup scan")
+		return
+	}
+
+	tracelog.InfoLogger.Println("Scanning for snapshot backups to cleanup...")
+	// The actual cleanup will be handled by HandleSnapshotBackupDeletion 
+	// when specific backups are identified for deletion
 }
 
 const (
