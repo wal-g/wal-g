@@ -324,6 +324,8 @@ func HandleBinlogServer(since string, until string) {
 
 	globalHandler := &Handler{}
 
+	// This loop continues accepting connections until the process exits.
+	// It will be terminated by os.Exit() call in sendEventsFromBinlogFiles.
 	for {
 		c, err := l.Accept()
 		if err != nil {

@@ -3,8 +3,8 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-s3cmd mb s3://mysql_pitr_binlogserver_reconnection_bucket || true
-export WALE_S3_PREFIX=s3://mysql_pitr_binlogserver_reconnection_bucket
+s3cmd mb s3://mysql-pitr-binlogserver-reconnection-bucket || true
+export WALE_S3_PREFIX=s3://mysql-pitr-binlogserver-reconnection-bucket
 export WALG_MYSQL_BINLOG_SERVER_PORT=9306
 export WALG_MYSQL_BINLOG_SERVER_USER="walg"
 export WALG_MYSQL_BINLOG_SERVER_PASSWORD="walgpwd"
@@ -48,7 +48,8 @@ BINLOG_SERVER_LOG=/tmp/binlog_server_reconnect.log
 WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee $BINLOG_SERVER_LOG &
 walg_pid=$!
 
-sleep 3
+echo "Started wal-g binlog-server with PID: $walg_pid"
+sleep 5
 
 mysql -e "STOP SLAVE"
 mysql -e "SET GLOBAL SERVER_ID = 123"
@@ -76,19 +77,6 @@ BINLOG_SERVER_PORT=9306
 
 echo "Killing TCP connections to binlog server using ss..."
 ss -K dport = $BINLOG_SERVER_PORT 2>/dev/null || true
-
-#echo "Killing TCP connections using conntrack..."
-#conntrack -D -p tcp --dport $BINLOG_SERVER_PORT 2>/dev/null || true
-
-#MYSQL_TO_BINLOG_CONN=$(netstat -tnp 2>/dev/null | grep ":$BINLOG_SERVER_PORT" | grep ESTABLISHED | head -1)
-#if [ -n "$MYSQL_TO_BINLOG_CONN" ]; then
-#    echo "Found specific connection: $MYSQL_TO_BINLOG_CONN"
-#    LOCAL_PORT=$(echo "$MYSQL_TO_BINLOG_CONN" | awk '{print $4}' | cut -d':' -f2)
-#    if [ -n "$LOCAL_PORT" ]; then
-#        echo "Killing specific connection on local port $LOCAL_PORT"
-#        ss -K sport = $LOCAL_PORT dport = $BINLOG_SERVER_PORT 2>/dev/null || true
-#    fi
-#fi
 
 echo "TCP connections killed, waiting for reconnection..."
 sleep 5
@@ -124,12 +112,71 @@ else
     fi
 fi
 
-echo "Waiting for wal-g to complete..."
-wait $walg_pid || true
-echo "wal-g completed"
+# Ждем пока реплика догонит все данные
+echo "Waiting for replication to complete..."
+MAX_WAIT=60
+WAIT_COUNT=0
+while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+    ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
+    echo "Current row count: $ROW_COUNT / 1001"
+
+    if [ "$ROW_COUNT" -eq 1001 ]; then
+        echo "Replication completed successfully"
+        break
+    fi
+
+    SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_SQL_Running: Yes" | wc -l)
+    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
+
+    if [ "$SLAVE_SQL_RUNNING" -eq 0 ] || [ "$SLAVE_IO_RUNNING" -eq 0 ]; then
+        echo "ERROR: Slave stopped unexpectedly"
+        mysql -e "SHOW SLAVE STATUS\G"
+        exit 1
+    fi
+
+    sleep 1
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+done
+
+if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
+    echo "ERROR: Timeout waiting for replication to complete"
+    mysql -e "SHOW SLAVE STATUS\G"
+    exit 1
+fi
+
+# Теперь можем останавливать wal-g
+echo "Stopping wal-g binlog-server (PID: $walg_pid)..."
+if kill -0 $walg_pid 2>/dev/null; then
+    echo "Sending SIGTERM to wal-g..."
+    kill -TERM $walg_pid 2>/dev/null || true
+
+    # Ждем до 30 секунд пока процесс завершится
+    TIMEOUT=30
+    ELAPSED=0
+    while [ $ELAPSED -lt $TIMEOUT ]; do
+        if ! kill -0 $walg_pid 2>/dev/null; then
+            echo "wal-g stopped successfully after ${ELAPSED}s"
+            break
+        fi
+        sleep 1
+        ELAPSED=$((ELAPSED + 1))
+    done
+
+    # Если все еще работает, убиваем силой
+    if kill -0 $walg_pid 2>/dev/null; then
+        echo "wal-g did not stop gracefully, sending SIGKILL..."
+        kill -9 $walg_pid 2>/dev/null || true
+        sleep 1
+    fi
+else
+    echo "wal-g process already exited"
+fi
+
+# Проверяем код выхода (если процесс еще можно дождаться)
+wait $walg_pid 2>/dev/null && echo "wal-g exit code: $?" || echo "wal-g already terminated"
 
 ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-EXPECTED_COUNT=1001  # 1 + 1000 batch inserts
+EXPECTED_COUNT=1001
 
 if [ "$ROW_COUNT" -ne "$EXPECTED_COUNT" ]; then
     echo "ERROR: Expected $EXPECTED_COUNT rows, got $ROW_COUNT"
