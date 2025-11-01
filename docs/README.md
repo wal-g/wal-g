@@ -255,6 +255,8 @@ Databases
 ### PostgreSQL
 [Information about installing, configuration and usage](PostgreSQL.md)
 
+[Snapshot Backups for PostgreSQL](PostgreSQL_Snapshot.md)
+
 ### MySQL/MariaDB
 [Information about installing, configuration and usage](MySQL.md)
 

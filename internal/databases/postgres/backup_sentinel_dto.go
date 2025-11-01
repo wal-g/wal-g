@@ -35,6 +35,10 @@ type BackupSentinelDto struct {
 	FilesMetadataDisabled bool    `json:"FilesMetadataDisabled,omitempty"`
 	BackupStartChkpNum    *uint32 `json:"ChkpNum"`
 	IncrementFromChkpNum  *uint32 `json:"DeltaChkpNum,omitempty"`
+
+	// Snapshot backup fields - exact content from pg_stop_backup()
+	BackupLabel   *string `json:"BackupLabel,omitempty"`
+	TablespaceMap *string `json:"TablespaceMap,omitempty"`
 }
 
 func NewBackupSentinelDto(bh *BackupHandler, tbsSpec *TablespaceSpec) BackupSentinelDto {

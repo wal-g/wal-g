@@ -96,6 +96,8 @@ const (
 	PgWalSize                            = "WALG_PG_WAL_SIZE"
 	PgWalPageSize                        = "WALG_PG_WAL_PAGE_SIZE"
 	PgBlockSize                          = "WALG_PG_BLOCK_SIZE"
+	PgSnapshotCommand                    = "WALG_SNAPSHOT_COMMAND"
+	PgSnapshotDeleteCommand              = "WALG_SNAPSHOT_DELETE_COMMAND"
 	TotalBgUploadedLimit                 = "TOTAL_BG_UPLOADED_LIMIT"
 	NameStreamCreateCmd                  = "WALG_STREAM_CREATE_COMMAND"
 	NameStreamRestoreCmd                 = "WALG_STREAM_RESTORE_COMMAND"
@@ -517,6 +519,8 @@ var (
 		PgWalSize:                            true,
 		PgWalPageSize:                        true,
 		PgBlockSize:                          true,
+		PgSnapshotCommand:                    true,
+		PgSnapshotDeleteCommand:              true,
 		PrefetchDir:                          true,
 		PgReadyRename:                        true,
 		PgBackRestStanza:                     true,
