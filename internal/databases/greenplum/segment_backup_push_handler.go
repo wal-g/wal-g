@@ -37,7 +37,6 @@ func GetSegmentServerInfo(keepRunner bool) (pgInfo postgres.BackupPgInfo, runner
 }
 
 func configureSegmentBackupHandler(bh *postgres.BackupHandler) {
-
 	composerInitFunc := func(handler *postgres.BackupHandler) error {
 		queryRunner := ToGpQueryRunner(handler.Workers.QueryRunner)
 		relStorageMap, err := NewAoRelFileStorageMap(queryRunner)
