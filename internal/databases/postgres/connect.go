@@ -27,23 +27,5 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		}
 	}
 
-	conn, err := pgx.ConnectConfig(context.TODO(), config)
-	if err != nil {
-		// Try with GP utility mode as a fallback (for GP/CB segment connections)
-		conn, err = tryConnectToGpSegment(config)
-	}
-
-	return conn, err
-}
-
-// nolint:gocritic
-func tryConnectToGpSegment(config *pgx.ConnConfig) (*pgx.Conn, error) {
-	config.RuntimeParams["gp_role"] = "utility"
-	conn, err := pgx.ConnectConfig(context.TODO(), config)
-
-	if err != nil {
-		config.RuntimeParams["gp_session_role"] = "utility"
-		conn, err = pgx.ConnectConfig(context.TODO(), config)
-	}
-	return conn, err
+	return pgx.ConnectConfig(context.TODO(), config)
 }

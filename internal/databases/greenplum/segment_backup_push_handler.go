@@ -7,7 +7,8 @@ import (
 )
 
 func NewSegBackupHandler(arguments postgres.BackupArguments) (*postgres.BackupHandler, error) {
-	bh, err := postgres.NewBackupHandler(arguments)
+	// Segments need GP utility mode to connect
+	bh, err := postgres.NewBackupHandler(arguments, GpConnectOption())
 	if err != nil {
 		return nil, err
 	}

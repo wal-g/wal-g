@@ -9,11 +9,29 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
-// Connect establishes connection to Greenplum master with additional fallback logic
-// (tries localhost:5432 as last resort)
+// GpConnectOption returns a connection config option that sets GP utility mode
+// This is required for connecting to GP/Cloudberry segments
+func GpConnectOption() func(*pgx.ConnConfig) error {
+	return func(config *pgx.ConnConfig) error {
+		if config.RuntimeParams == nil {
+			config.RuntimeParams = make(map[string]string)
+		}
+		// Try gp_role first (newer versions)
+		config.RuntimeParams["gp_role"] = "utility"
+		// Also set gp_session_role as fallback (older versions)
+		config.RuntimeParams["gp_session_role"] = "utility"
+		return nil
+	}
+}
+
+// Connect establishes connection to Greenplum master with GP-specific options
+// and additional fallback logic (tries localhost:5432 as last resort)
 func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, error) {
-	// Try normal connection (postgres.Connect already handles GP segment fallback)
-	conn, err := postgres.Connect(configOptions...)
+	// Combine user options with GP utility mode option
+	allOptions := append([]func(*pgx.ConnConfig) error{GpConnectOption()}, configOptions...)
+
+	// Try normal connection with GP options
+	conn, err := postgres.Connect(allOptions...)
 	if err != nil {
 		// Additional fallback for GP master: try localhost:5432
 		config, configErr := pgx.ParseConfig("")
@@ -21,8 +39,8 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 			return nil, errors.Wrap(configErr, "Connect: unable to read environment variables")
 		}
 
-		// apply passed custom config options, if any
-		for _, option := range configOptions {
+		// apply all options including GP utility mode
+		for _, option := range allOptions {
 			optErr := option(config)
 			if optErr != nil {
 				return nil, optErr
@@ -34,14 +52,7 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 			tracelog.ErrorLogger.Println("Failed to connect using provided PGHOST and PGPORT, trying localhost:5432")
 			config.Host = "localhost"
 			config.Port = 5432
-
-			// Try with GP utility mode first
-			config.RuntimeParams["gp_role"] = "utility"
 			conn, err = pgx.ConnectConfig(context.TODO(), config)
-			if err != nil {
-				config.RuntimeParams["gp_session_role"] = "utility"
-				conn, err = pgx.ConnectConfig(context.TODO(), config)
-			}
 		}
 
 		if err != nil {

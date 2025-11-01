@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/wal-g/wal-g/internal"
@@ -511,12 +512,12 @@ func (bh *BackupHandler) collectDatabaseNamesMetadata() (DatabasesByNames, error
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
-func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) {
+func NewBackupHandler(arguments BackupArguments, configOptions ...func(config *pgx.ConnConfig) error) (bh *BackupHandler, err error) {
 	// RemoteBackup is triggered by not passing PGDATA to wal-g,
 	// and version cannot be read easily using replication connection.
 	// Retrieve both with this helper function which uses a temp connection to postgres.
 
-	pgInfo, _, err := GetPgServerInfo(false)
+	pgInfo, _, err := GetPgServerInfo(false, configOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -570,10 +571,10 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	return baseBackup
 }
 
-func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunner, err error) {
+func GetPgServerInfo(keepRunner bool, configOptions ...func(config *pgx.ConnConfig) error) (pgInfo BackupPgInfo, runner *PgQueryRunner, err error) {
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tracelog.DebugLogger.Println("Initializing tmp connection to read Postgres info")
-	tmpConn, err := Connect()
+	tmpConn, err := Connect(configOptions...)
 	if err != nil {
 		return pgInfo, nil, err
 	}
