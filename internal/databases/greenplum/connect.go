@@ -9,29 +9,49 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
-// GpConnectOption returns a connection config option that sets GP utility mode
-// This is required for connecting to GP/Cloudberry segments
-func GpConnectOption() func(*pgx.ConnConfig) error {
-	return func(config *pgx.ConnConfig) error {
+// ConnectSegment establishes a connection to a GP/Cloudberry segment
+// It tries multiple connection strategies:
+// 1. Normal Postgres connection
+// 2. GP utility mode with gp_role
+// 3. GP utility mode with gp_session_role (older versions)
+func ConnectSegment(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, error) {
+	// Try normal Postgres connection first
+	conn, err := postgres.Connect(configOptions...)
+	if err == nil {
+		return conn, nil
+	}
+
+	// Try with gp_role=utility (newer GP/CB versions)
+	gpRoleOption := func(config *pgx.ConnConfig) error {
 		if config.RuntimeParams == nil {
 			config.RuntimeParams = make(map[string]string)
 		}
-		// Try gp_role first (newer versions)
 		config.RuntimeParams["gp_role"] = "utility"
-		// Also set gp_session_role as fallback (older versions)
+		return nil
+	}
+	allOptions := append([]func(*pgx.ConnConfig) error{gpRoleOption}, configOptions...)
+	conn, err = postgres.Connect(allOptions...)
+	if err == nil {
+		return conn, nil
+	}
+
+	// Try with gp_session_role=utility (older GP versions)
+	gpSessionRoleOption := func(config *pgx.ConnConfig) error {
+		if config.RuntimeParams == nil {
+			config.RuntimeParams = make(map[string]string)
+		}
 		config.RuntimeParams["gp_session_role"] = "utility"
 		return nil
 	}
+	allOptions = append([]func(*pgx.ConnConfig) error{gpSessionRoleOption}, configOptions...)
+	return postgres.Connect(allOptions...)
 }
 
 // Connect establishes connection to Greenplum master with GP-specific options
 // and additional fallback logic (tries localhost:5432 as last resort)
 func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, error) {
-	// Combine user options with GP utility mode option
-	allOptions := append([]func(*pgx.ConnConfig) error{GpConnectOption()}, configOptions...)
-
-	// Try normal connection with GP options
-	conn, err := postgres.Connect(allOptions...)
+	// Try ConnectSegment which handles GP utility mode properly
+	conn, err := ConnectSegment(configOptions...)
 	if err != nil {
 		// Additional fallback for GP master: try localhost:5432
 		config, configErr := pgx.ParseConfig("")
@@ -39,8 +59,8 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 			return nil, errors.Wrap(configErr, "Connect: unable to read environment variables")
 		}
 
-		// apply all options including GP utility mode
-		for _, option := range allOptions {
+		// apply custom options
+		for _, option := range configOptions {
 			optErr := option(config)
 			if optErr != nil {
 				return nil, optErr
@@ -52,7 +72,16 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 			tracelog.ErrorLogger.Println("Failed to connect using provided PGHOST and PGPORT, trying localhost:5432")
 			config.Host = "localhost"
 			config.Port = 5432
+
+			// Try with gp_role for localhost
+			config.RuntimeParams = make(map[string]string)
+			config.RuntimeParams["gp_role"] = "utility"
 			conn, err = pgx.ConnectConfig(context.TODO(), config)
+			if err != nil {
+				// Try with gp_session_role
+				config.RuntimeParams["gp_session_role"] = "utility"
+				conn, err = pgx.ConnectConfig(context.TODO(), config)
+			}
 		}
 
 		if err != nil {
