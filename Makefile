@@ -18,6 +18,7 @@ MYSQL8_TEST := "mysql8_tests"
 MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
+MONGO_TEST_TYPE ?= "all"
 GOLANGCI_LINT_VERSION ?= "v2.0"
 REDIS_VERSION ?= "6.2.4"
 IMAGE_TYPE ?= "rdb"
@@ -180,7 +181,19 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) MONGO_TEST_TYPE=$(MONGO_TEST_TYPE) go test -v -count=1 -timeout 45m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
+
+mongo_binary_features:
+	MONGO_TEST_TYPE="binary" $(MAKE) mongo_features
+
+mongo_logical_features:
+	MONGO_TEST_TYPE="logical" $(MAKE) mongo_features
+
+mongo_partial_features:
+	MONGO_TEST_TYPE="partial" $(MAKE) mongo_features
+
+mongo_catch_up_features:
+	MONGO_TEST_TYPE="catch_up" $(MAKE) mongo_features
 
 clean_mongo_features:
 	set -e
