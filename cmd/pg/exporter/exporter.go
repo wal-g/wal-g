@@ -181,7 +181,7 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 
 		backupCount: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "walg_backup_count",
+				Name: "walg_backups",
 				Help: "Number of backups by type",
 			},
 			[]string{"backup_type"},
