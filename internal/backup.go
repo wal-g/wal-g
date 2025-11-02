@@ -114,7 +114,11 @@ func FetchDto(folder storage.Folder, dto interface{}, path string) error {
 	if err != nil {
 		return err
 	}
-	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
+	err = unmarshaller.Unmarshal(reader, dto)
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to fetch dto from %s", path))
+	}
+	return reader.Close()
 }
 
 // UploadDto serializes given object to JSON and puts it to path

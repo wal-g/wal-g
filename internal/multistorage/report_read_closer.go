@@ -44,7 +44,7 @@ func (r *reportReadCloser) Read(p []byte) (n int, err error) {
 
 func (r *reportReadCloser) Close() error {
 	r.reportResult(true)
-	return nil
+	return r.ReadCloser.Close()
 }
 
 func (r *reportReadCloser) reportResult(success bool) {
