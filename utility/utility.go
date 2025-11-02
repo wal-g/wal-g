@@ -126,6 +126,7 @@ func NormalizePath(path string) string {
 
 func IsInDirectory(path, directoryPath string) bool {
 	relativePath, err := filepath.Rel(directoryPath, path)
+	relativePath = filepath.ToSlash(relativePath)
 	if err != nil {
 		return false
 	}

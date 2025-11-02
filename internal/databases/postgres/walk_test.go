@@ -143,7 +143,7 @@ func generateData(t *testing.T) string {
 	// Create `backup_label` and `tablespace_map` files.
 	createLabelFiles(t, dir)
 
-	return dir
+	return filepath.ToSlash(dir)
 }
 
 // Extract files to temp directory 'extracted'.
