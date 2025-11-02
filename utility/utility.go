@@ -71,8 +71,6 @@ const (
 	CopiedBlockMaxSize     = CompressedBlockMaxSize
 	MetadataFileName       = "metadata.json"
 	StreamMetadataFileName = "stream_metadata.json"
-	PathSeparator          = string(os.PathSeparator)
-	Mebibyte               = 1024 * 1024
 )
 
 // MaxTime not really the maximal value, but high enough.
@@ -85,8 +83,6 @@ func init() {
 		panic(fmt.Sprintf("failed to parse MaxTime: %v", err))
 	}
 }
-
-var MinTime = time.Unix(0, 0)
 
 // Empty is used for channel signaling.
 type Empty struct{}
@@ -121,11 +117,11 @@ func AllZero(s []byte) bool {
 }
 
 func SanitizePath(path string) string {
-	return strings.TrimLeft(path, PathSeparator)
+	return strings.TrimLeft(path, "/")
 }
 
 func NormalizePath(path string) string {
-	return strings.TrimRight(path, PathSeparator)
+	return strings.TrimRight(path, "/")
 }
 
 func IsInDirectory(path, directoryPath string) bool {
@@ -134,7 +130,7 @@ func IsInDirectory(path, directoryPath string) bool {
 		return false
 	}
 	return relativePath == "." ||
-		NormalizePath(NormalizePath(directoryPath)+PathSeparator+relativePath) == NormalizePath(path)
+		NormalizePath(NormalizePath(directoryPath)+"/"+relativePath) == NormalizePath(path)
 }
 
 func PathsEqual(path1, path2 string) bool {
