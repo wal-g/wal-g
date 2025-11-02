@@ -127,8 +127,8 @@ func (sbh *SnapshotBackupHandler) startBackup() error {
 
 	// Call pg_start_backup
 	tracelog.InfoLogger.Println("Calling pg_start_backup() for snapshot backup")
-	backupName := utility.CeilTimeUpToMicroseconds(time.Now()).String()
-
+	backupLabel := "snapshot-backup-" + time.Now().Format("20060102-150405")
+	
 	startBackupQuery, err := sbh.QueryRunner.BuildStartBackup()
 	if err != nil {
 		return errors.Wrap(err, "Building start backup query failed")
@@ -137,7 +137,7 @@ func (sbh *SnapshotBackupHandler) startBackup() error {
 	var walFileName string
 	var lsnString string
 	var inRecovery bool
-	err = sbh.QueryRunner.Connection.QueryRow(context.TODO(), startBackupQuery, backupName).Scan(
+	err = sbh.QueryRunner.Connection.QueryRow(context.TODO(), startBackupQuery, backupLabel).Scan(
 		&walFileName, &lsnString, &inRecovery)
 	if err != nil {
 		return errors.Wrap(err, "pg_start_backup() failed")
@@ -153,8 +153,6 @@ func (sbh *SnapshotBackupHandler) startBackup() error {
 		return errors.Wrap(err, "failed to parse start LSN")
 	}
 
-	sbh.CurBackupInfo.Name = backupName
-
 	// Store WAL file name for snapshot command
 	if walFileName != "" {
 		sbh.startWalFileName = walFileName
@@ -162,9 +160,13 @@ func (sbh *SnapshotBackupHandler) startBackup() error {
 		// On standby or when not available, calculate from LSN
 		sbh.startWalFileName = NewWalSegmentNo(sbh.CurBackupInfo.startLSN - 1).GetFilename(sbh.PgInfo.Timeline)
 	}
-
-	tracelog.InfoLogger.Printf("Snapshot backup started: %s, LSN: %s, WAL: %s",
-		backupName, lsnString, sbh.startWalFileName)
+	
+	// Create backup name in snapshot_WALFILENAME format
+	// This ensures filesystem-friendly names and clearly identifies snapshot backups
+	sbh.CurBackupInfo.Name = "snapshot_" + sbh.startWalFileName
+	
+	tracelog.InfoLogger.Printf("Snapshot backup started: %s, LSN: %s, WAL: %s", 
+		sbh.CurBackupInfo.Name, lsnString, sbh.startWalFileName)
 
 	return nil
 }

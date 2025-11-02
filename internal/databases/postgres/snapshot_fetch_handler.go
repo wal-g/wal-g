@@ -40,13 +40,14 @@ func (sfh *SnapshotFetchHandler) HandleSnapshotFetch(ctx context.Context) error 
 		return errors.Wrapf(err, "failed to load backup %s", sfh.BackupName)
 	}
 
-	sentinel := backup.SentinelDto
-	if sentinel == nil {
-		return errors.Errorf("backup %s has no sentinel", sfh.BackupName)
+	// Load the sentinel from storage
+	sentinel, err := backup.GetSentinel()
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch sentinel for backup %s", sfh.BackupName)
 	}
 
 	// Verify this is a snapshot backup
-	if !IsSnapshotBackup(sfh.BackupName, *sentinel) {
+	if !IsSnapshotBackup(sfh.BackupName, sentinel) {
 		return errors.Errorf("backup %s is not a snapshot backup", sfh.BackupName)
 	}
 

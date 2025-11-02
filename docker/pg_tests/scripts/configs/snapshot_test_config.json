@@ -1,9 +1,8 @@
-{
-    "WALG_COMPRESSION_METHOD": "lz4",
     "WALG_DELTA_MAX_STEPS": "0",
-    "PGPORT": "5432",
-    "PGHOST": "/var/run/postgresql"
-}
+    "PGPORT": "5433",
+    "PGHOST": "/tmp",
+    "WALG_FILE_PREFIX": "/tmp/walg_storage",
+    "WALG_COMPRESSION_METHOD": "lz4"
 
 
 

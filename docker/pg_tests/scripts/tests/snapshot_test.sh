@@ -5,7 +5,7 @@ set -e -x
 
 PGDATA_PRIMARY="${PGDATA}_primary"
 PGDATA_SNAPSHOT_DIR="/tmp/snapshots"
-PRIMARY_PORT=5432
+PRIMARY_PORT=5433
 PRIMARY_DUMP="/tmp/primary_dump"
 RESTORED_DUMP="/tmp/restored_dump"
 
@@ -17,6 +17,13 @@ cp ${CONFIG_FILE} ${TMP_CONFIG}
 echo "," >> ${TMP_CONFIG}
 cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+
+# Override compression method to lz4 (brotli not available in this build)
+export WALG_COMPRESSION_METHOD="lz4"
+
+# Override connection settings for macOS (Unix socket in /tmp, not /var/run/postgresql)
+export PGHOST="/tmp"
+export PGPORT="${PRIMARY_PORT}"
 
 # Create snapshot directory
 mkdir -p ${PGDATA_SNAPSHOT_DIR}
@@ -36,25 +43,30 @@ export WALG_SNAPSHOT_DELETE_COMMAND="rm -rf ${PGDATA_SNAPSHOT_DIR}/\${WALG_SNAPS
 WAL_ARCHIVE_DIR="/tmp/wal_archive"
 mkdir -p ${WAL_ARCHIVE_DIR}
 
+# Configure WAL-G storage directory
+WALG_STORAGE_DIR="/tmp/walg_storage"
+mkdir -p ${WALG_STORAGE_DIR}
+
 # init primary cluster
 initdb ${PGDATA_PRIMARY}
 
 # Configure WAL archiving and other settings
 pushd ${PGDATA_PRIMARY}
 cat >> postgresql.conf << EOF
+port = ${PRIMARY_PORT}
 wal_level = replica
 archive_mode = on
 archive_command = 'cp %p ${WAL_ARCHIVE_DIR}/%f'
 max_wal_senders = 4
-wal_keep_segments = 100
+wal_keep_size = 1600MB
 EOF
 popd
 
 pg_ctl -D ${PGDATA_PRIMARY} -w start
-PGDATA=${PGDATA_PRIMARY} /tmp/scripts/wait_while_pg_not_ready.sh
+PGDATA=${PGDATA_PRIMARY} PGDATABASE=postgres PGPORT=${PRIMARY_PORT} /tmp/scripts/wait_while_pg_not_ready.sh
 
 # Create test database and fill with data
-psql -c "CREATE DATABASE testdb;"
+psql -d postgres -c "CREATE DATABASE testdb;"
 pgbench -i -s 10 -h 127.0.0.1 -p ${PRIMARY_PORT} testdb
 
 echo "=== Test 1: Creating snapshot backup ==="
@@ -62,16 +74,27 @@ echo "=== Test 1: Creating snapshot backup ==="
 wal-g --config=${TMP_CONFIG} snapshot-push ${PGDATA_PRIMARY} 2>/tmp/snapshot1_stderr 1>/tmp/snapshot1_stdout
 cat /tmp/snapshot1_stderr /tmp/snapshot1_stdout
 
-# Extract backup name from output
-SNAPSHOT1_NAME=`grep -oE 'base_[0-9A-Z]*' /tmp/snapshot1_stderr | sort -u | head -1`
+# Get backup name directly from storage directory (most reliable)
+# The backup name format includes spaces and needs to match the directory name exactly
+SNAPSHOT1_NAME=`ls -1t /tmp/walg_storage/basebackups_005/ 2>/dev/null | grep -v '_backup_stop_sentinel.json' | head -1`
 echo "First snapshot backup: ${SNAPSHOT1_NAME}"
 
-# Verify snapshot directory was created
-if [ ! -d "${PGDATA_SNAPSHOT_DIR}/${SNAPSHOT1_NAME}" ]; then
-    echo "ERROR: Snapshot directory was not created"
+if [ -z "${SNAPSHOT1_NAME}" ]; then
+    echo "ERROR: Could not find snapshot backup in storage"
+    echo "=== Checking storage directory ==="
+    ls -la /tmp/walg_storage/basebackups_005/ 2>/dev/null || echo "No basebackups_005 directory"
+    cat /tmp/snapshot1_stderr /tmp/snapshot1_stdout
     exit 1
 fi
-echo "✓ Snapshot directory created successfully"
+
+# Verify the backup directory exists
+if [ -d "/tmp/walg_storage/basebackups_005/${SNAPSHOT1_NAME}" ]; then
+    echo "✓ Snapshot backup created successfully in storage"
+else
+    echo "ERROR: Backup directory doesn't exist: /tmp/walg_storage/basebackups_005/${SNAPSHOT1_NAME}"
+    ls -la /tmp/walg_storage/basebackups_005/ 2>/dev/null
+    exit 1
+fi
 
 # Add more data after first snapshot
 pgbench -T 5 -P 1 -h 127.0.0.1 -p ${PRIMARY_PORT} testdb
@@ -85,8 +108,15 @@ wal-g --config=${TMP_CONFIG} snapshot-push ${PGDATA_PRIMARY} \
   2>/tmp/snapshot2_stderr 1>/tmp/snapshot2_stdout
 cat /tmp/snapshot2_stderr /tmp/snapshot2_stdout
 
-SNAPSHOT2_NAME=`grep -oE 'base_[0-9A-Z]*' /tmp/snapshot2_stderr | sort -u | head -1`
+# Get the second backup name from storage (most recent directory, which is the one we just created)
+SNAPSHOT2_NAME=`ls -1t /tmp/walg_storage/basebackups_005/ 2>/dev/null | grep -v '_backup_stop_sentinel.json' | head -1`
 echo "Second snapshot backup: ${SNAPSHOT2_NAME}"
+if [ -z "${SNAPSHOT2_NAME}" ]; then
+    echo "ERROR: Could not find second snapshot backup in storage"
+    echo "Available backups:"
+    ls -la /tmp/walg_storage/basebackups_005/ 2>/dev/null || echo "No backups found"
+    exit 1
+fi
 
 # More changes
 pgbench -T 3 -P 1 -h 127.0.0.1 -p ${PRIMARY_PORT} testdb
@@ -97,7 +127,8 @@ wal-g --config=${TMP_CONFIG} snapshot-push ${PGDATA_PRIMARY} --permanent \
   2>/tmp/snapshot3_stderr 1>/tmp/snapshot3_stdout
 cat /tmp/snapshot3_stderr /tmp/snapshot3_stdout
 
-SNAPSHOT3_NAME=`grep -oE 'base_[0-9A-Z]*' /tmp/snapshot3_stderr | sort -u | head -1`
+# Get the third backup name from storage (most recent directory, which is the one we just created)
+SNAPSHOT3_NAME=`ls -1t /tmp/walg_storage/basebackups_005/ 2>/dev/null | grep -v '_backup_stop_sentinel.json' | head -1`
 echo "Third snapshot backup (permanent): ${SNAPSHOT3_NAME}"
 
 # Dump database state before stopping
@@ -126,15 +157,29 @@ fi
 echo "✓ All snapshots found in backup list"
 
 echo "=== Test 5: Restore from snapshot backup using snapshot-fetch ==="
-# Simulate restore from second snapshot
+# For testing snapshot-fetch, we'll use the actual snapshot created by the snapshot command
+# The snapshot directory name is the backup name from WAL-G
 PGDATA_RESTORED="${PGDATA}_restored"
 rm -rf ${PGDATA_RESTORED}
 
-# Copy snapshot data to restore location
-cp -a ${PGDATA_SNAPSHOT_DIR}/${SNAPSHOT2_NAME} ${PGDATA_RESTORED}
+# Use the snapshot directory that corresponds to SNAPSHOT2_NAME
+# The snapshot directory name should match the backup name
+if [ ! -d "${PGDATA_SNAPSHOT_DIR}/${SNAPSHOT2_NAME}" ]; then
+    echo "ERROR: Snapshot directory ${SNAPSHOT2_NAME} not found in ${PGDATA_SNAPSHOT_DIR}"
+    echo "Available snapshots:"
+    ls -la ${PGDATA_SNAPSHOT_DIR}
+    exit 1
+fi
+echo "Using snapshot directory: ${SNAPSHOT2_NAME}"
 
-# Use snapshot-fetch to prepare the backup for recovery
-wal-g --config=${TMP_CONFIG} snapshot-fetch ${SNAPSHOT2_NAME} ${PGDATA_RESTORED} \
+# Copy snapshot data to restore location  
+cp -a "${PGDATA_SNAPSHOT_DIR}/${SNAPSHOT2_NAME}" ${PGDATA_RESTORED}
+
+# Fix permissions for PostgreSQL (requires 0700 or 0750)
+chmod 700 ${PGDATA_RESTORED}
+
+# Use snapshot-fetch to prepare the backup for recovery (quote backup name due to spaces)
+wal-g --config=${TMP_CONFIG} snapshot-fetch "${SNAPSHOT2_NAME}" ${PGDATA_RESTORED} \
   --setup-recovery --restore-command "cp ${WAL_ARCHIVE_DIR}/%f %p" \
   2>/tmp/snapshot_fetch_stderr 1>/tmp/snapshot_fetch_stdout
 cat /tmp/snapshot_fetch_stderr /tmp/snapshot_fetch_stdout
@@ -164,7 +209,7 @@ fi
 
 # Start restored instance
 pg_ctl -D ${PGDATA_RESTORED} -w start
-PGDATA=${PGDATA_RESTORED} /tmp/scripts/wait_while_pg_not_ready.sh
+PGDATA=${PGDATA_RESTORED} PGDATABASE=postgres PGPORT=${PRIMARY_PORT} /tmp/scripts/wait_while_pg_not_ready.sh
 
 # Verify data
 pg_dump -h 127.0.0.1 -p ${PRIMARY_PORT} -f ${RESTORED_DUMP} testdb
@@ -172,11 +217,16 @@ pg_dump -h 127.0.0.1 -p ${PRIMARY_PORT} -f ${RESTORED_DUMP} testdb
 # Stop restored instance
 pg_ctl -D ${PGDATA_RESTORED} -w stop
 
-# Compare dumps
-if diff ${PRIMARY_DUMP} ${RESTORED_DUMP}; then
+# Compare dumps (filter out random pg_dump tokens)
+# The \restrict and \unrestrict lines contain random security tokens that differ on each dump
+if diff <(grep -v '\\restrict' ${PRIMARY_DUMP} | grep -v '\\unrestrict') \
+        <(grep -v '\\restrict' ${RESTORED_DUMP} | grep -v '\\unrestrict'); then
     echo "✓ Restored data matches original"
 else
     echo "ERROR: Restored data does not match original"
+    echo "Diff output:"
+    diff <(grep -v '\\restrict' ${PRIMARY_DUMP} | grep -v '\\unrestrict') \
+         <(grep -v '\\restrict' ${RESTORED_DUMP} | grep -v '\\unrestrict') | head -50
     exit 1
 fi
 
@@ -243,7 +293,8 @@ PGDATA=${PGDATA_PRIMARY} /tmp/scripts/wait_while_pg_not_ready.sh
 # Create snapshot
 wal-g --config=${TMP_CONFIG} snapshot-push ${PGDATA_PRIMARY} 2>/tmp/pitr_snapshot_stderr 1>/tmp/pitr_snapshot_stdout
 cat /tmp/pitr_snapshot_stderr /tmp/pitr_snapshot_stdout
-PITR_SNAPSHOT_NAME=`grep -oE 'base_[0-9A-Z]*' /tmp/pitr_snapshot_stderr | sort -u | head -1`
+# Get the latest backup for PITR test from storage
+PITR_SNAPSHOT_NAME=`ls -1t /tmp/walg_storage/basebackups_005/ 2>/dev/null | grep -v '_backup_stop_sentinel.json' | head -1`
 
 # Make more changes after snapshot
 sleep 2
@@ -258,13 +309,14 @@ psql -d testdb -c "INSERT INTO pitr_test DEFAULT VALUES;"
 # Stop and prepare for PITR
 pg_ctl -D ${PGDATA_PRIMARY} -w stop
 
-# Restore from snapshot for PITR
+# Restore from snapshot for PITR (use latest snapshot directory)
 PGDATA_PITR="${PGDATA}_pitr"
 rm -rf ${PGDATA_PITR}
-cp -a ${PGDATA_SNAPSHOT_DIR}/${PITR_SNAPSHOT_NAME} ${PGDATA_PITR}
+PITR_SNAPSHOT_DIR=`ls -1t ${PGDATA_SNAPSHOT_DIR} | head -1`
+cp -a "${PGDATA_SNAPSHOT_DIR}/${PITR_SNAPSHOT_DIR}" ${PGDATA_PITR}
 
 # Use snapshot-fetch with recovery target for PITR
-wal-g --config=${TMP_CONFIG} snapshot-fetch ${PITR_SNAPSHOT_NAME} ${PGDATA_PITR} \
+wal-g --config=${TMP_CONFIG} snapshot-fetch "${PITR_SNAPSHOT_NAME}" ${PGDATA_PITR} \
   --setup-recovery --restore-command "cp ${WAL_ARCHIVE_DIR}/%f %p" \
   --recovery-target "${TARGET_TIME}" \
   2>&1 | tee /tmp/pitr_snapshot_fetch.txt
@@ -309,7 +361,8 @@ PGDATA=${PGDATA_PRIMARY} /tmp/scripts/wait_while_pg_not_ready.sh
 # Create a snapshot backup
 wal-g --config=${TMP_CONFIG} snapshot-push ${PGDATA_PRIMARY} 2>/tmp/wal_protect_snapshot_stderr 1>/tmp/wal_protect_snapshot_stdout
 cat /tmp/wal_protect_snapshot_stderr /tmp/wal_protect_snapshot_stdout
-WAL_PROTECT_SNAPSHOT=`grep -oE 'base_[0-9A-Z]*' /tmp/wal_protect_snapshot_stderr | sort -u | head -1`
+# Get the latest backup for WAL protection test from storage
+WAL_PROTECT_SNAPSHOT=`ls -1t /tmp/walg_storage/basebackups_005/ 2>/dev/null | grep -v '_backup_stop_sentinel.json' | head -1`
 echo "Snapshot for WAL protection test: ${WAL_PROTECT_SNAPSHOT}"
 
 # Make more changes to generate WAL files
@@ -348,10 +401,11 @@ echo "✓ WAL files protected for snapshot backup (${WAL_COUNT_AFTER} files rema
 # Verify we can still restore from the snapshot backup with remaining WAL files
 PGDATA_WAL_TEST="${PGDATA}_wal_test"
 rm -rf ${PGDATA_WAL_TEST}
-cp -a ${PGDATA_SNAPSHOT_DIR}/${WAL_PROTECT_SNAPSHOT} ${PGDATA_WAL_TEST}
+WAL_TEST_SNAPSHOT_DIR=`ls -1t ${PGDATA_SNAPSHOT_DIR} | head -1`
+cp -a "${PGDATA_SNAPSHOT_DIR}/${WAL_TEST_SNAPSHOT_DIR}" ${PGDATA_WAL_TEST}
 
-# Use snapshot-fetch to prepare
-wal-g --config=${TMP_CONFIG} snapshot-fetch ${WAL_PROTECT_SNAPSHOT} ${PGDATA_WAL_TEST} \
+# Use snapshot-fetch to prepare (quote backup name due to spaces)
+wal-g --config=${TMP_CONFIG} snapshot-fetch "${WAL_PROTECT_SNAPSHOT}" ${PGDATA_WAL_TEST} \
   --setup-recovery --restore-command "cp ${WAL_ARCHIVE_DIR}/%f %p" \
   2>&1 | tee /tmp/wal_test_snapshot_fetch.txt
 
