@@ -4,6 +4,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -22,7 +23,7 @@ func home(filePath string) string {
 	if filePath == "~" {
 		return _home
 	}
-	if filePath[0:1] == "~" {
+	if strings.HasPrefix(filePath, "~") {
 		return path.Join(_home, filePath[1:])
 	}
 	return filePath
