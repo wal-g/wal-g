@@ -87,6 +87,8 @@ func (storage *KVS) Range(callback func(key string, value TimeStampedData) bool)
 	defer storage.orderMu.Unlock()
 	for _, v := range *storage.order {
 		data, _ := storage.Load(v)
-		callback(v, data)
+		if !callback(v, data) {
+			break
+		}
 	}
 }
