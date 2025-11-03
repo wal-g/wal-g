@@ -146,6 +146,8 @@ func ResolveSymlink(path string) string {
 		// Directory may be absent etc.
 		return path
 	}
+	// to slash for windows converting
+	resolve = filepath.ToSlash(resolve)
 	return resolve
 }
 
