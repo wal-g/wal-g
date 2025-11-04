@@ -86,18 +86,18 @@ if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
     exit 1
 fi
 
-# Разрыв соединения через 2 секунды
-sleep 2
+# Разрыв соединения через 1 секунду
+sleep 1
 echo "Simulating network connection loss..."
 BINLOG_SERVER_PORT=9306
 ss -K dport = $BINLOG_SERVER_PORT 2>/dev/null || true
 echo "TCP connections killed, waiting for reconnection..."
-sleep 5
+sleep 3
 
 # Проверка переподключения
 echo "Checking reconnection status..."
 WAIT_COUNT=0
-MAX_WAIT=30
+MAX_WAIT=15
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_Running:/ {print $2}')
     [ "$SLAVE_IO_RUNNING" = "Yes" ] && break
