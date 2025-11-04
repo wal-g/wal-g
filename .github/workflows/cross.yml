@@ -10,7 +10,7 @@ env:
 jobs:
   build:
     name: cross build smoke test
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
 
       - name: Check out code into the Go module directory
@@ -26,6 +26,10 @@ jobs:
         run: |
           go get -v -t ./...
           make deps
+
+      - name: Run unittests
+        run: |
+          make unittest
 
       - name: Build wal-g for SQL Server and PostgreSQL
         run: |
