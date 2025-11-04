@@ -29,8 +29,7 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-# Генерация данных
-for i in $(seq 1 4000); do
+for i in $(seq 1 8000); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
         sleep 0.1
@@ -86,36 +85,63 @@ if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
     exit 1
 fi
 
-# Разрыв соединения через 1 секунду
-sleep 0.3
-echo "Simulating network connection loss..."
-BINLOG_SERVER_PORT=9306
-ss -K dport = $BINLOG_SERVER_PORT 2>/dev/null || true
-echo "TCP connections killed, waiting for reconnection..."
+echo "Waiting for data transfer to begin..."
 sleep 3
 
-# Проверка переподключения
-echo "Checking reconnection status..."
 WAIT_COUNT=0
-MAX_WAIT=15
+MAX_WAIT=20
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_Running:/ {print $2}')
-    [ "$SLAVE_IO_RUNNING" = "Yes" ] && break
+    ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
+    echo "Current row count before disconnect: $ROW_COUNT"
+
+    # Разрываем соединение когда получили часть данных, но не все
+    if [ "$ROW_COUNT" -gt 500 ] && [ "$ROW_COUNT" -lt 4000 ]; then
+        echo "Partial data received ($ROW_COUNT rows), simulating connection loss..."
+        break
+    fi
+
     sleep 1
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
-if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
-    echo "ERROR: Reconnection failed"
+echo "Simulating network connection loss..."
+BINLOG_SERVER_PORT=9306
+ss -K dport = $BINLOG_SERVER_PORT 2>/dev/null || true
+echo "TCP connections killed, waiting for reconnection..."
+sleep 2
+
+echo "Checking reconnection status..."
+WAIT_COUNT=0
+MAX_WAIT=30
+RECONNECTED=false
+while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_Running:/ {print $2}')
+    SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_State:/ {print $2}' | head -1)
+
+    echo "Attempt $((WAIT_COUNT + 1))/$MAX_WAIT: IO_Running=$SLAVE_IO_RUNNING, IO_State=$SLAVE_IO_STATE"
+
+    if [ "$SLAVE_IO_RUNNING" = "Yes" ]; then
+        echo "Reconnection successful!"
+        RECONNECTED=true
+        break
+    fi
+
+    sleep 1
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+done
+
+if [ "$RECONNECTED" = "false" ]; then
+    echo "ERROR: Reconnection failed after $MAX_WAIT attempts"
     mysql -e "SHOW SLAVE STATUS\G"
+    echo "Binlog server log:"
+    cat $BINLOG_SERVER_LOG
     exit 1
 fi
 
-# Ожидание завершения репликации
 echo "Waiting for replication to complete..."
-MAX_WAIT=60
+MAX_WAIT=120
 WAIT_COUNT=0
-EXPECTED_ROWS=4001  # 1 начальная + 4000 сгенерированных
+EXPECTED_ROWS=8001  # 1 начальная + 8000 сгенерированных
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
     echo "Current row count: $ROW_COUNT / $EXPECTED_ROWS"
@@ -128,7 +154,7 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_SQL_Running:/ {print $2}')
     SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_Running:/ {print $2}')
 
-    if [ "$SLAVE_SQL_Running" != "Yes" ] || [ "$SLAVE_IO_Running" != "Yes" ]; then
+    if [ "$SLAVE_SQL_RUNNING" != "Yes" ] || [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
         echo "ERROR: Slave stopped unexpectedly"
         mysql -e "SHOW SLAVE STATUS\G"
         exit 1
@@ -144,34 +170,33 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     exit 1
 fi
 
-# Остановка сервера
 echo "Stopping wal-g binlog-server (PID: $walg_pid)..."
 if kill -0 $walg_pid 2>/dev/null; then
     kill -TERM $walg_pid
     wait $walg_pid 2>/dev/null || true
 fi
 
-# Проверка данных
 AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
 if [ "$AFTER_COUNT" -ne 0 ]; then
     echo "ERROR: Record after DT1 should not be replicated"
     exit 1
 fi
 
-# Проверка переподключения в логах
+echo "Analyzing binlog server logs..."
 CONN_COUNT=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" || true)
 RECONNECT_COUNT=$(grep -c 'Returning existing streamer for reconnection' "$BINLOG_SERVER_LOG" || true)
 
-if [ "$RECONNECT_COUNT" -ge 1 ]; then
-    echo "Reconnection detected in logs: $RECONNECT_COUNT times"
-else
-    echo "WARNING: No explicit reconnection detected in logs"
-fi
+echo "Connection count: $CONN_COUNT"
+echo "Reconnection count: $RECONNECT_COUNT"
 
-if [ "$CONN_COUNT" -ge 2 ]; then
-    echo "Multiple connections detected - reconnection test passed"
+if [ "$RECONNECT_COUNT" -ge 1 ]; then
+    echo "SUCCESS: Reconnection detected in logs: $RECONNECT_COUNT times"
+elif [ "$CONN_COUNT" -ge 2 ]; then
+    echo "SUCCESS: Multiple connections detected - reconnection test passed"
 else
-    echo "WARNING: Expected at least 2 connections, got $CONN_COUNT"
+    echo "WARNING: Expected reconnection evidence, got connections: $CONN_COUNT, reconnects: $RECONNECT_COUNT"
+    echo "Full binlog server log:"
+    cat $BINLOG_SERVER_LOG
 fi
 
 echo "Test passed!"
