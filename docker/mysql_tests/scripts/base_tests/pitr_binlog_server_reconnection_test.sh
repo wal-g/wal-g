@@ -3,6 +3,13 @@ set -e -x
 
 . /usr/local/export_common.sh
 
+# Проверка и установка awk при необходимости
+if ! command -v awk >/dev/null 2>&1; then
+    echo "awk not found, installing..."
+    apt-get update
+    apt-get install -y gawk
+fi
+
 s3cmd mb s3://mysql-pitr-binlogserver-reconnection-bucket || true
 export WALE_S3_PREFIX=s3://mysql-pitr-binlogserver-reconnection-bucket
 export WALG_MYSQL_BINLOG_SERVER_HOST="localhost"
@@ -22,9 +29,11 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-for i in $(seq 1 1000); do
+# Генерация данных
+for i in $(seq 1 3000); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
+        sleep 0.1
         mysql -e "FLUSH LOGS"
         wal-g binlog-push
     fi
@@ -57,79 +66,69 @@ mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql -e "CHANGE MASTER TO MASTER_HOST=\"127.0.0.1\", MASTER_PORT=9306, MASTER_USER=\"walg\", MASTER_PASSWORD=\"walgpwd\", MASTER_AUTO_POSITION=1"
 mysql -e "START SLAVE"
 
-sleep 4
+# Ожидание запуска репликации
+echo "Waiting for replication to start..."
+WAIT_COUNT=0
+MAX_WAIT=30
+while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_Running:/ {print $2}')
+    if [ "$SLAVE_IO_RUNNING" = "Yes" ]; then
+        echo "Replication IO thread started successfully"
+        break
+    fi
+    sleep 1
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+done
 
-SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-    echo "Replication started successfully"
-else
-    echo "ERROR: Replication IO thread did not start initially"
+if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
+    echo "ERROR: Replication IO thread failed to start"
     mysql -e "SHOW SLAVE STATUS\G"
     exit 1
 fi
 
-sleep 4
-CURRENT_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-echo "Current row count during replication: $CURRENT_COUNT"
-
-echo "Simulating network connection loss during replication..."
-
+# Разрыв соединения через 2 секунды
+sleep 2
+echo "Simulating network connection loss..."
 BINLOG_SERVER_PORT=9306
-
-echo "Killing TCP connections to binlog server using ss..."
 ss -K dport = $BINLOG_SERVER_PORT 2>/dev/null || true
-
 echo "TCP connections killed, waiting for reconnection..."
 sleep 5
 
-SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
-echo "Slave IO State after connection kill: $SLAVE_IO_STATE"
+# Проверка переподключения
+echo "Checking reconnection status..."
+WAIT_COUNT=0
+MAX_WAIT=30
+while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_Running:/ {print $2}')
+    [ "$SLAVE_IO_RUNNING" = "Yes" ] && break
+    sleep 1
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+done
 
-sleep 15
-
-SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-    echo "Replication restored successfully after network reconnect"
-else
-    echo "Checking if replication is still in progress..."
-    SLAVE_IO_STATE=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_State:" | head -1)
-    echo "Current Slave IO State: $SLAVE_IO_STATE"
-
-    if echo "$SLAVE_IO_STATE" | grep -q "onnect"; then
-        echo "Replication is reconnecting, waiting more..."
-        sleep 10
-        SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
-        if [ "$SLAVE_IO_RUNNING" -eq 1 ]; then
-            echo "Replication restored after additional wait"
-        else
-            echo "ERROR: Replication IO thread did not restore after reconnect"
-            mysql -e "SHOW SLAVE STATUS\G"
-            exit 1
-        fi
-    else
-        echo "ERROR: Replication IO thread did not restore after reconnect"
-        mysql -e "SHOW SLAVE STATUS\G"
-        exit 1
-    fi
+if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
+    echo "ERROR: Reconnection failed"
+    mysql -e "SHOW SLAVE STATUS\G"
+    exit 1
 fi
 
-# Ждем пока реплика догонит все данные
+# Ожидание завершения репликации
 echo "Waiting for replication to complete..."
 MAX_WAIT=60
 WAIT_COUNT=0
+EXPECTED_ROWS=3001  # 1 начальная + 3000 сгенерированных
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-    echo "Current row count: $ROW_COUNT / 1001"
+    echo "Current row count: $ROW_COUNT / $EXPECTED_ROWS"
 
-    if [ "$ROW_COUNT" -eq 1001 ]; then
+    if [ "$ROW_COUNT" -eq "$EXPECTED_ROWS" ]; then
         echo "Replication completed successfully"
         break
     fi
 
-    SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_SQL_Running: Yes" | wc -l)
-    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running: Yes" | wc -l)
+    SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_SQL_Running:/ {print $2}')
+    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | awk '/Slave_IO_Running:/ {print $2}')
 
-    if [ "$SLAVE_SQL_RUNNING" -eq 0 ] || [ "$SLAVE_IO_RUNNING" -eq 0 ]; then
+    if [ "$SLAVE_SQL_Running" != "Yes" ] || [ "$SLAVE_IO_Running" != "Yes" ]; then
         echo "ERROR: Slave stopped unexpectedly"
         mysql -e "SHOW SLAVE STATUS\G"
         exit 1
@@ -145,55 +144,24 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     exit 1
 fi
 
-# Теперь можем останавливать wal-g
+# Остановка сервера
 echo "Stopping wal-g binlog-server (PID: $walg_pid)..."
 if kill -0 $walg_pid 2>/dev/null; then
-    echo "Sending SIGTERM to wal-g..."
-    kill -TERM $walg_pid 2>/dev/null || true
-
-    # Ждем до 30 секунд пока процесс завершится
-    TIMEOUT=30
-    ELAPSED=0
-    while [ $ELAPSED -lt $TIMEOUT ]; do
-        if ! kill -0 $walg_pid 2>/dev/null; then
-            echo "wal-g stopped successfully after ${ELAPSED}s"
-            break
-        fi
-        sleep 1
-        ELAPSED=$((ELAPSED + 1))
-    done
-
-    # Если все еще работает, убиваем силой
-    if kill -0 $walg_pid 2>/dev/null; then
-        echo "wal-g did not stop gracefully, sending SIGKILL..."
-        kill -9 $walg_pid 2>/dev/null || true
-        sleep 1
-    fi
-else
-    echo "wal-g process already exited"
+    kill -TERM $walg_pid
+    wait $walg_pid 2>/dev/null || true
 fi
 
-# Проверяем код выхода (если процесс еще можно дождаться)
-wait $walg_pid 2>/dev/null && echo "wal-g exit code: $?" || echo "wal-g already terminated"
-
-ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
-EXPECTED_COUNT=1001
-
-if [ "$ROW_COUNT" -ne "$EXPECTED_COUNT" ]; then
-    echo "ERROR: Expected $EXPECTED_COUNT rows, got $ROW_COUNT"
-    exit 1
-fi
-
+# Проверка данных
 AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
 if [ "$AFTER_COUNT" -ne 0 ]; then
     echo "ERROR: Record after DT1 should not be replicated"
     exit 1
 fi
 
+# Проверка переподключения в логах
 CONN_COUNT=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" || true)
-echo "Total connections detected: $CONN_COUNT"
-
 RECONNECT_COUNT=$(grep -c 'Returning existing streamer for reconnection' "$BINLOG_SERVER_LOG" || true)
+
 if [ "$RECONNECT_COUNT" -ge 1 ]; then
     echo "Reconnection detected in logs: $RECONNECT_COUNT times"
 else
