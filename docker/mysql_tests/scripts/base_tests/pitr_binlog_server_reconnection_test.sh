@@ -139,7 +139,7 @@ if [ "$RECONNECTED" = "false" ]; then
 fi
 
 echo "Waiting for replication to complete..."
-MAX_WAIT=120
+MAX_WAIT=100
 WAIT_COUNT=0
 EXPECTED_ROWS=5001  # 1 начальная + 5000 сгенерированных
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
