@@ -30,7 +30,7 @@ mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
 # Генерация данных
-for i in $(seq 1 3000); do
+for i in $(seq 1 4000); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
         sleep 0.1
@@ -87,7 +87,7 @@ if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
 fi
 
 # Разрыв соединения через 1 секунду
-sleep 1
+sleep 0.3
 echo "Simulating network connection loss..."
 BINLOG_SERVER_PORT=9306
 ss -K dport = $BINLOG_SERVER_PORT 2>/dev/null || true
@@ -115,7 +115,7 @@ fi
 echo "Waiting for replication to complete..."
 MAX_WAIT=60
 WAIT_COUNT=0
-EXPECTED_ROWS=3001  # 1 начальная + 3000 сгенерированных
+EXPECTED_ROWS=4001  # 1 начальная + 4000 сгенерированных
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
     echo "Current row count: $ROW_COUNT / $EXPECTED_ROWS"
