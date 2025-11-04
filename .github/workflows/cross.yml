@@ -23,9 +23,11 @@ jobs:
         id: go
 
       - name: Build dependencies
+        shell: bash
         run: |
           go get -v -t ./...
           make deps
+          ./link_libsodium.sh
 
       - name: Run unittests
         run: |
