@@ -36,7 +36,6 @@ import (
 const (
 	pgDefaultDatabasePageSize = 8192
 	DefaultDataBurstRateLimit = 8 * pgDefaultDatabasePageSize
-	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )
 
@@ -158,7 +157,7 @@ func ConfigureStorageForSpecificConfig(
 
 func getWalFolderPath() string {
 	if !viper.IsSet(conf.PgDataSetting) {
-		return DefaultDataFolderPath
+		return filepath.ToSlash(os.TempDir())
 	}
 	return getRelativeWalFolderPath(viper.GetString(conf.PgDataSetting))
 }
@@ -170,11 +169,11 @@ func getRelativeWalFolderPath(pgdata string) string {
 			return dataFolderPath
 		}
 	}
-	return DefaultDataFolderPath
+	return filepath.ToSlash(os.TempDir())
 }
 
 func GetDataFolderPath() string {
-	return filepath.Join(getWalFolderPath(), "walg_data")
+	return filepath.ToSlash(filepath.Join(getWalFolderPath(), "walg_data"))
 }
 
 // GetPgSlotName reads the slot name from the environment

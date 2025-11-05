@@ -53,7 +53,7 @@ func TestGetDataFolderPath_Default(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	assert.Equal(t, filepath.Join(os.TempDir(), "walg_data"), actual)
 	resetToDefaults()
 }
 
@@ -65,7 +65,7 @@ func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	assert.Equal(t, filepath.ToSlash(filepath.Join(os.TempDir(), "walg_data")), actual)
 	resetToDefaults()
 }
 
