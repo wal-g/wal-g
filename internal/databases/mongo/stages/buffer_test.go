@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
 )
 
 func buildFileBuffer(path string) *FileBuffer {
@@ -19,7 +19,6 @@ func buildFileBuffer(path string) *FileBuffer {
 }
 
 func TestBuffers_ReadWriteLen(t *testing.T) {
-	tmp := filepath.ToSlash(os.TempDir())
 	tests := []struct {
 		name string
 		b    Buffer
@@ -30,7 +29,7 @@ func TestBuffers_ReadWriteLen(t *testing.T) {
 		},
 		{
 			name: "file_buffer",
-			b:    buildFileBuffer(tmp),
+			b:    buildFileBuffer(internal.GetDefaultDataFolderPath()),
 		},
 	}
 
@@ -99,7 +98,7 @@ func TestFileBuffer_NewClose(t *testing.T) {
 	}{
 		{
 			name:        "tmp_dir",
-			path:        filepath.ToSlash(os.TempDir()) + "/",
+			path:        internal.GetDefaultDataFolderPath() + "/",
 			expectedErr: false,
 		},
 		{

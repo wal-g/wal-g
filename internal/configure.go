@@ -39,6 +39,11 @@ const (
 	WaleFileHost              = "file://localhost"
 )
 
+// GetDefaultDataFolderPath is typically "/tmp"
+func GetDefaultDataFolderPath() string {
+	return filepath.ToSlash(os.TempDir())
+}
+
 var DeprecatedExternalGpgMessage = fmt.Sprintf(
 	`You are using deprecated functionality that uses an external gpg library.
 It will be removed in next major version.
@@ -157,7 +162,7 @@ func ConfigureStorageForSpecificConfig(
 
 func getWalFolderPath() string {
 	if !viper.IsSet(conf.PgDataSetting) {
-		return filepath.ToSlash(os.TempDir())
+		return GetDefaultDataFolderPath()
 	}
 	return getRelativeWalFolderPath(viper.GetString(conf.PgDataSetting))
 }
@@ -169,7 +174,7 @@ func getRelativeWalFolderPath(pgdata string) string {
 			return dataFolderPath
 		}
 	}
-	return filepath.ToSlash(os.TempDir())
+	return GetDefaultDataFolderPath()
 }
 
 func GetDataFolderPath() string {

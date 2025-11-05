@@ -3,6 +3,7 @@ package internal_test
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -60,7 +61,7 @@ func TestGetDataFolderPath_Default(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.ToSlash(filepath.Join(os.TempDir(), "walg_data")), actual)
+	assert.Equal(t, path.Join(internal.GetDefaultDataFolderPath(), "walg_data"), actual)
 	os.Setenv(config.PgDataSetting, pgEnv)
 	resetToDefaults()
 }
@@ -73,7 +74,7 @@ func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.ToSlash(filepath.Join(os.TempDir(), "walg_data")), actual)
+	assert.Equal(t, path.Join(internal.GetDefaultDataFolderPath(), "walg_data"), actual)
 	resetToDefaults()
 }
 
