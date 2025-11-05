@@ -28,7 +28,7 @@ jobs:
           go get -v -t ./...
           make deps
           curl "https://github.com/jedisct1/libsodium/releases/download/${{ env.LIBSODIUM_VERSION }}-RELEASE/libsodium-${{ env.LIBSODIUM_VERSION }}-mingw.tar.gz" -o "libsodium-${{ env.LIBSODIUM_VERSION }}-mingw.tar.gz"
-          tar xfz libsodium-${{ env.LIBSODIUM_VERSION }}-mingw.tar.gz
+          tar -xf .\libsodium-${{ env.LIBSODIUM_VERSION }}-mingw.tar.gz
           mv libsodium-win64/include ./
           mv libsodium-win64/lib ./
           rm -r .\libsodium-*
