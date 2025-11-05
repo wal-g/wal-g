@@ -120,23 +120,38 @@ All standard WAL-G settings still apply:
 ### Creating a Snapshot Backup
 
 ```bash
+# Automatically detects data directory from PostgreSQL connection
+wal-g snapshot-push
+
+# Or specify data directory explicitly
 wal-g snapshot-push /var/lib/postgresql/data
 ```
+
+**Notes:**
+- The data directory is **optional** - WAL-G will automatically query PostgreSQL for it if not provided
+- Can be run on **standby servers** (read replicas) without issues
+- The actual database data is **not uploaded** to WAL-G storage (only small metadata files are uploaded)
+- Although snapshot backups don't compress data, you still need to set `WALG_COMPRESSION_METHOD` to a valid value (e.g., `lz4`, `lzma`, `zstd`) for WAL-G's uploader initialization
 
 **Flags:**
 - `--permanent` or `-p`: Mark the backup as permanent (won't be deleted by retention policies)
 - `--add-user-data <json>`: Add custom metadata to the backup
 - `--target-storage <name>`: Specify which storage to use (for multi-storage configurations)
 
-**Example:**
+**Examples:**
 ```bash
-# Simple snapshot backup
-wal-g snapshot-push /var/lib/postgresql/data
+# Simple snapshot backup (auto-detects data directory)
+wal-g snapshot-push
 
 # Permanent snapshot backup with metadata
-wal-g snapshot-push /var/lib/postgresql/data \
-  --permanent \
+wal-g snapshot-push --permanent \
   --add-user-data '{"description":"pre-upgrade-backup","ticket":"JIRA-123"}'
+
+# On a standby server
+wal-g snapshot-push
+
+# With explicit data directory
+wal-g snapshot-push /var/lib/postgresql/data
 ```
 
 ### Listing Backups
@@ -154,17 +169,19 @@ Snapshot backups are identified by:
 
 ### Deleting Snapshot Backups
 
-Snapshot backups are deleted like regular backups:
+> **⚠️ Note**: Snapshot backup deletion is currently not fully implemented. The `delete` command will fail when trying to delete snapshot backups. This is a known limitation that will be addressed in a future release.
+
+Snapshot backups will be deleted like regular backups (once fully implemented):
 
 ```bash
 # Delete backups older than the specified backup
-wal-g delete before base_000000010000000000000004
+wal-g delete before snapshot_000000010000000000000004
 
 # Retain only the last 5 backups
 wal-g delete retain 5
 
 # Delete a specific backup
-wal-g delete target base_000000010000000000000004
+wal-g delete target snapshot_000000010000000000000004
 ```
 
 If `WALG_SNAPSHOT_DELETE_COMMAND` is configured, WAL-G will automatically execute it to clean up the snapshot.
@@ -179,14 +196,32 @@ If `WALG_SNAPSHOT_DELETE_COMMAND` is configured, WAL-G will automatically execut
 
 ### Preparing Snapshot for Recovery with `snapshot-fetch`
 
-After restoring the snapshot data, you **must** run `snapshot-fetch` to create the `backup_label` file that PostgreSQL needs for recovery:
+After restoring the snapshot data, you **must** run `snapshot-fetch` to create the `backup_label` file that PostgreSQL needs for recovery.
+
+#### Simple Usage (Manual Recovery Configuration)
 
 ```bash
 # 1. Restore snapshot data to target directory
 # (Example with AWS EBS - restore snapshot to volume and mount it)
 
-# 2. Prepare the backup for recovery
-wal-g snapshot-fetch base_000000010000000000000004 /var/lib/postgresql/data \
+# 2. Place backup_label and tablespace_map files
+wal-g snapshot-fetch snapshot_000000010000000000000004 /var/lib/postgresql/data
+
+# 3. Manually configure recovery (PostgreSQL 12+)
+touch /var/lib/postgresql/data/recovery.signal
+echo "restore_command = 'wal-g wal-fetch %f %p'" >> /var/lib/postgresql/data/postgresql.auto.conf
+
+# 4. Start PostgreSQL
+pg_ctl start -D /var/lib/postgresql/data
+```
+
+#### Advanced Usage (Automatic Recovery Configuration)
+
+```bash
+# 1. Restore snapshot data to target directory
+
+# 2. Prepare the backup for recovery with automatic configuration
+wal-g snapshot-fetch snapshot_000000010000000000000004 /var/lib/postgresql/data \
   --setup-recovery \
   --restore-command "wal-g wal-fetch %f %p"
 
@@ -199,12 +234,12 @@ pg_ctl start -D /var/lib/postgresql/data
 - Writes the exact `backup_label` content that PostgreSQL provided during `pg_stop_backup()`
   - **Important**: The files are NOT reconstructed - we use the exact content from PostgreSQL to ensure compatibility across all versions
 - Writes `tablespace_map` if tablespaces were used (also exact content from PostgreSQL)
-- With `--setup-recovery`: Automatically configures recovery settings (creates `recovery.signal` or `recovery.conf`)
+- With `--setup-recovery` flag: Automatically configures recovery settings (creates `recovery.signal` or `recovery.conf` depending on PostgreSQL version)
 
 **Command Options:**
-- `--setup-recovery`: Configure recovery settings automatically
-- `--restore-command <cmd>`: Custom restore_command (default: `'wal-g wal-fetch %f %p'`)
-- `--recovery-target <time>`: Point-in-time recovery target
+- `--setup-recovery`: Configure recovery settings automatically (creates `recovery.signal` and updates `postgresql.auto.conf`)
+- `--restore-command <cmd>`: Custom restore_command (default: `'wal-g wal-fetch %f %p'`) - requires `--setup-recovery`
+- `--recovery-target <time>`: Point-in-time recovery target - requires `--setup-recovery`
 
 ### Full Recovery
 

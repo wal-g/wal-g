@@ -22,26 +22,28 @@ const (
 var (
 	// snapshotPushCmd represents the snapshot-push command
 	snapshotPushCmd = &cobra.Command{
-		Use:   "snapshot-push db_directory",
+		Use:   "snapshot-push [db_directory]",
 		Short: snapshotPushShortDescription,
 		Long: `Creates a snapshot backup using filesystem or cloud disk snapshots.
 
 This command:
-1. Calls pg_start_backup() to ensure database consistency
-2. Executes a user-defined snapshot command (WALG_SNAPSHOT_COMMAND)
-3. Calls pg_stop_backup()
-4. Uploads backup metadata to storage
+1. Connects to PostgreSQL and gets the data directory (if not provided as argument)
+2. Calls pg_start_backup() to ensure database consistency
+3. Executes a user-defined snapshot command (WALG_SNAPSHOT_COMMAND)
+4. Calls pg_stop_backup()
+5. Uploads backup metadata to storage
 
 The snapshot command receives the following environment variables:
   - WALG_SNAPSHOT_NAME: The backup name
   - WALG_PG_DATA: The PostgreSQL data directory path
   - WALG_SNAPSHOT_START_LSN: The backup start LSN
+  - WALG_SNAPSHOT_START_WAL_FILE: The WAL file name at backup start
 
 Example snapshot command for AWS EBS:
   aws ec2 create-snapshot --volume-id vol-xxxxx --description "$WALG_SNAPSHOT_NAME"
 
 WAL archiving must be properly configured for point-in-time recovery.`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
@@ -60,7 +62,22 @@ WAL archiving must be properly configured for point-in-time recovery.`,
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			dataDirectory := args[0]
+			// Get data directory - from argument if provided, otherwise from PostgreSQL
+			var dataDirectory string
+			if len(args) > 0 {
+				dataDirectory = args[0]
+			} else {
+				// Get data directory from PostgreSQL connection
+				conn, err := postgres.Connect()
+				if err != nil {
+					tracelog.ErrorLogger.FatalOnError(err)
+				}
+				defer conn.Close(cmd.Context())
+				
+				err = conn.QueryRow(cmd.Context(), "SHOW data_directory").Scan(&dataDirectory)
+				tracelog.ErrorLogger.FatalfOnError("Failed to get data directory from PostgreSQL: %v", err)
+				tracelog.InfoLogger.Printf("Using data directory from PostgreSQL: %s", dataDirectory)
+			}
 
 			// Get snapshot command from config
 			snapshotCommand, err := postgres.GetSnapshotCommand()

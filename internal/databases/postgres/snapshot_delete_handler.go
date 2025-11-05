@@ -59,25 +59,34 @@ func HandleSnapshotBackupDeletion(backupNames []string, folder storage.Folder) {
 		return
 	}
 
+	tracelog.InfoLogger.Printf("Checking %d backup(s) for snapshot deletion", len(backupNames))
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
 	
 	for _, backupName := range backupNames {
-		// Try to fetch the backup metadata to check if it's a snapshot backup
-		backup, err := NewBackupInStorage(baseBackupFolder, backupName, "")
+		tracelog.InfoLogger.Printf("Checking if %s is a snapshot backup", backupName)
+		
+		// Create backup object
+		backup, err := NewBackup(baseBackupFolder, backupName)
 		if err != nil {
-			tracelog.WarningLogger.Printf("Could not load backup %s metadata, skipping snapshot cleanup: %v", 
+			tracelog.WarningLogger.Printf("Could not create backup object for %s, skipping snapshot cleanup: %v", 
+				backupName, err)
+			continue
+		}
+		
+		// Try to fetch the sentinel
+		var sentinel BackupSentinelDto
+		err = backup.FetchSentinel(&sentinel)
+		if err != nil {
+			tracelog.WarningLogger.Printf("Backup %s failed to get sentinel, skipping snapshot cleanup: %v", 
 				backupName, err)
 			continue
 		}
 
-		sentinel := backup.SentinelDto
-		if sentinel == nil {
-			tracelog.WarningLogger.Printf("Backup %s has no sentinel, skipping snapshot cleanup", backupName)
-			continue
-		}
-
 		// Check if this is a snapshot backup
-		if IsSnapshotBackup(backupName, *sentinel) {
+		tracelog.InfoLogger.Printf("Backup %s: FilesMetadataDisabled=%v, CompressedSize=%d, UncompressedSize=%d",
+			backupName, sentinel.FilesMetadataDisabled, sentinel.CompressedSize, sentinel.UncompressedSize)
+			
+		if IsSnapshotBackup(backupName, sentinel) {
 			tracelog.InfoLogger.Printf("Detected snapshot backup %s, executing delete command", backupName)
 			err := ExecuteSnapshotDeleteCommand(backupName)
 			if err != nil {
@@ -85,6 +94,8 @@ func HandleSnapshotBackupDeletion(backupNames []string, folder storage.Folder) {
 				tracelog.WarningLogger.Printf("Failed to execute snapshot delete command for %s: %v", 
 					backupName, err)
 			}
+		} else {
+			tracelog.InfoLogger.Printf("Backup %s is not a snapshot backup, skipping", backupName)
 		}
 	}
 }

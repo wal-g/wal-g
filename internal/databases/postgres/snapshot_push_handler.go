@@ -32,6 +32,7 @@ type SnapshotBackupHandler struct {
 	QueryRunner      *PgQueryRunner
 	PgInfo           BackupPgInfo
 	startWalFileName string
+	isStandby        bool
 	// Exact content from pg_stop_backup() - don't reconstruct, use what Postgres gives us
 	backupLabel   string
 	tablespaceMap string
@@ -143,8 +144,11 @@ func (sbh *SnapshotBackupHandler) startBackup() error {
 		return errors.Wrap(err, "pg_start_backup() failed")
 	}
 
+	// Note: pg_backup_start() can be called on standby servers
+	// On standby, walFileName will be empty and we'll use the LSN instead
+	sbh.isStandby = inRecovery
 	if inRecovery {
-		return errors.New("Cannot perform snapshot backup on a standby server")
+		tracelog.InfoLogger.Println("Snapshot backup is being performed on a standby server")
 	}
 
 	// Parse start LSN
