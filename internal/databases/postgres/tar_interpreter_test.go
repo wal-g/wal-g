@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -16,6 +17,7 @@ func testInterpret(t *testing.T,
 	dbDataDirectory, name string, typeflag byte,
 	create, delete func(string) error, assertFiles func(os.FileInfo, os.FileInfo)) {
 
+	dbDataDirectory = filepath.ToSlash(dbDataDirectory)
 	tarInterpreter := &postgres.FileTarInterpreter{
 		DBDataDirectory: dbDataDirectory,
 	}

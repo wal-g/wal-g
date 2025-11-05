@@ -99,7 +99,7 @@ func TestFileBuffer_NewClose(t *testing.T) {
 	}{
 		{
 			name:        "tmp_dir",
-			path:        "/tmp/",
+			path:        filepath.ToSlash(os.TempDir()) + "/",
 			expectedErr: false,
 		},
 		{
