@@ -82,6 +82,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileOld(fileReader io.Rea
 func (tarInterpreter *FileTarInterpreter) Interpret(fileReader io.Reader, fileInfo *tar.Header) error {
 	tracelog.DebugLogger.Println("Interpreting: ", fileInfo.Name)
 	targetPath := path.Join(tarInterpreter.DBDataDirectory, fileInfo.Name)
+	targetPath = filepath.ToSlash(targetPath)
 	fsync := !viper.GetBool(conf.TarDisableFsyncSetting)
 	// nolint : staticcheck
 	switch fileInfo.Typeflag {
