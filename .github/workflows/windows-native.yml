@@ -1,16 +1,16 @@
-name: Cross build
+name: windows native build
 
 on: [ push, pull_request, workflow_dispatch]
 
 env:
   GO_VERSION: "1.25"
   GOEXPERIMENT: jsonv2
-  GOOS: windows
   LIBSODIUM_VERSION: "1.0.20"
+  USE_LIBSODIUM: 1
 
 jobs:
   build:
-    name: cross build smoke test
+    name: windows build smoke test
     runs-on: windows-latest
     steps:
 
