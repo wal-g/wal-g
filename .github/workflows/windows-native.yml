@@ -40,9 +40,13 @@ jobs:
           echo "TMP=$env:RUNNER_TEMP" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Run unittests
+        env:
+          USE_LIBSODIUM: 1
         run: |
           make unittest
 
       - name: Build wal-g for SQL Server and PostgreSQL
+        env:
+          USE_LIBSODIUM: 1
         run: |
           make sqlserver_build pg_build
