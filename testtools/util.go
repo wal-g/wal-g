@@ -385,8 +385,7 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 		0x00, 0x00, 0x15, 0x40, 0x00, 0x00, 0xe4, 0x18, 0x00, 0x00,
 		0xff, 0x04,
 	}
-	data = utility.ConcatByteSlices(utility.ConcatByteSlices(utility.ConcatByteSlices(data, imageData), blockData),
-		mainData)
+	data = utility.ConcatByteSlices(data, imageData, blockData, mainData)
 	recordHeader := walparser.XLogRecordHeader{
 		TotalRecordLength: uint32(walparser.XLogRecordHeaderSize + len(data)),
 		XactID:            0x00000243,
