@@ -37,7 +37,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.10.0
-	github.com/ulikunitz/xz v0.5.11
+	github.com/ulikunitz/xz v0.5.15
 	github.com/wal-g/json v0.3.1
 	github.com/wal-g/tracelog v0.1.1
 	github.com/yandex-cloud/go-genproto v0.0.0-20230918115514-93a99045c9de
