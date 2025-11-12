@@ -407,6 +407,34 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 	return *record, recordData
 }
 
+func serializeXLogPageHeader(pageHeader walparser.XLogPageHeader) []byte {
+	data := make([]byte, 24)
+	offset := 0
+	binary.LittleEndian.PutUint16(data[offset:], pageHeader.Magic)
+	offset += 2
+	binary.LittleEndian.PutUint16(data[offset:], pageHeader.Info)
+	offset += 2
+	binary.LittleEndian.PutUint32(data[offset:], uint32(pageHeader.TimeLineID))
+	offset += 4
+	binary.LittleEndian.PutUint64(data[offset:], uint64(pageHeader.PageAddress))
+	offset += 8
+	binary.LittleEndian.PutUint32(data[offset:], pageHeader.RemainingDataLen)
+	return data
+}
+
+func CreateWalPageWithRecord(recordData []byte) []byte {
+	header := walparser.XLogPageHeader{
+		Magic: 	0xD119,
+		TimeLineID: 1,
+	}
+	data := serializeXLogPageHeader(header)
+	data = append(data, recordData...)
+	if len(data) < int(walparser.WalPageSize) {
+		data = append(data, make([]byte, int(walparser.WalPageSize) - len(data))...)
+	}
+	return data
+}
+
 type ReadWriteNopCloser struct {
 	io.ReadWriter
 }
