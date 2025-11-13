@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -114,6 +115,12 @@ func FetchDto(folder storage.Folder, dto interface{}, path string) error {
 	if err != nil {
 		return err
 	}
+	defer func(reader io.ReadCloser) {
+		err := reader.Close()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("failed to close reader for %s: %v", path, err)
+		}
+	}(reader)
 	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
 }
 
