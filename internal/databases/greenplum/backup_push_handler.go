@@ -375,13 +375,13 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 			gplog.GetLogFilePath())
 	}
 
-	for _, command := range remoteOutput.Commands {
+	for i := range remoteOutput.Commands {
 		backupState := SegCmdState{}
-		err := json.Unmarshal([]byte(command.Stdout), &backupState)
+		err := json.Unmarshal([]byte(remoteOutput.Commands[i].Stdout), &backupState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal state JSON file: %v", err)
 		}
-		segmentStates[command.Content] = backupState
+		segmentStates[remoteOutput.Commands[i].Content] = backupState
 	}
 
 	return segmentStates, nil
@@ -705,12 +705,14 @@ func (bh *BackupHandler) terminateWalgProcesses() error {
 		return fmt.Sprintf("Unable to terminate backup-push process on segment %d", contentID)
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
-		if command.Stderr == "" {
+	for i := range remoteOutput.Commands {
+		if remoteOutput.Commands[i].Stderr == "" {
 			continue
 		}
 
-		tracelog.WarningLogger.Printf("Unable to terminate backup-push process (segment %d):\n%s\n", command.Content, command.Stderr)
+		tracelog.WarningLogger.Printf(
+			"Unable to terminate backup-push process (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 	}
 
 	return nil

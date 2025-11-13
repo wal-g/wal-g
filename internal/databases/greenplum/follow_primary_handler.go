@@ -124,8 +124,10 @@ func (fh *FollowPrimaryHandler) applyXLogInCluster() {
 		return "Unable to run wal-g"
 	})
 
-	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+	for i := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf(
+			"WAL-G output (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 	}
 }
 
