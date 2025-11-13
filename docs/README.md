@@ -314,6 +314,8 @@ export USE_BROTLI=1
 export USE_LIBSODIUM=1
 export USE_LZO=1
 
+# until it become stable https://go.dev/blog/jsonv2-exp
+export GOEXPERIMENT=jsonv2
 make deps
 make pg_build
 main/pg/wal-g --version
