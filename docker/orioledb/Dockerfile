@@ -42,14 +42,14 @@ WORKDIR /usr/src/postgresql/contrib/orioledb
 RUN set -eux; \
 	git init; \
 	git remote add origin https://github.com/orioledb/orioledb.git; \
-	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +466738fe9d9a0f225ee5e5c776182ad426ae2008:refs/remotes/origin/main; \
+	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +beta13:refs/remotes/origin/main; \
 	git checkout --progress --force -B main refs/remotes/origin/main;
 
 WORKDIR /
 RUN set -eux; \
 	\
 	# don't forget to change PGTAG below
-	PGTAG=$(grep "^16: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
+	PGTAG=$(grep "^17: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
 	\
 	curl -o postgresql.tar.gz \
 			--header "Accept: application/vnd.github.v3.raw" \
@@ -96,7 +96,7 @@ ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
 RUN set -eux; \
 	\
 	# don't forget to change PGTAG above
-	PGTAG=$(grep "^16: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
+	PGTAG=$(grep "^17: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
 	ORIOLEDB_VERSION=$(grep "^#define ORIOLEDB_VERSION" /usr/src/postgresql/contrib/orioledb/include/orioledb.h | cut -d'"' -f2) ; \
 	ORIOLEDB_BUILDTIME=$(date -Iseconds) ; \
 	\
