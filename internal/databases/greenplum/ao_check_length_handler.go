@@ -67,7 +67,9 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 
 	for i := range remoteOutput.Commands {
 		if remoteOutput.Commands[i].Error != nil {
-			tracelog.ErrorLogger.Printf("error (segment %d):\n%v\n%s\n", remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Error, remoteOutput.Commands[i].Stderr)
+			tracelog.ErrorLogger.Printf(
+				"error (segment %d):\n%v\n%s\n",
+				remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Error, remoteOutput.Commands[i].Stderr)
 		}
 	}
 

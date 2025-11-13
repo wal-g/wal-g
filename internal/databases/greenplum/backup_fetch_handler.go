@@ -157,7 +157,9 @@ func (fh *FetchHandler) Unpack() {
 	})
 
 	for i := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("[Unpack] WAL-G output (segment %d):\n%s\n", remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
+		tracelog.DebugLogger.Printf(
+			"[Unpack] WAL-G output (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 	}
 }
 
@@ -264,7 +266,9 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	})
 
 	for i := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("Create recovery.conf output (segment %d):\n%s\n", remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
+		tracelog.DebugLogger.Printf(
+			"Create recovery.conf output (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 	}
 	return nil
 }

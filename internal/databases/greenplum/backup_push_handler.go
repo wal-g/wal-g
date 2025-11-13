@@ -192,9 +192,11 @@ func (bh *BackupHandler) HandleBackupPush() {
 		return "Unable to run wal-g"
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
-		if command.Stderr != "" {
-			tracelog.ErrorLogger.Printf("stderr (segment %d):\n%s\n", command.Content, command.Stderr)
+	for i := range remoteOutput.Commands {
+		if remoteOutput.Commands[i].Stderr != "" {
+			tracelog.ErrorLogger.Printf(
+				"stderr (segment %d):\n%s\n",
+				remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 		}
 	}
 
@@ -327,14 +329,14 @@ func extractBackupPids(output *cluster.RemoteOutput) (map[int]int, error) {
 	backupPids := make(map[int]int)
 	var resErr error
 
-	for _, command := range output.Commands {
-		pid, err := strconv.Atoi(strings.TrimSpace(command.Stdout))
+	for i := range output.Commands {
+		pid, err := strconv.Atoi(strings.TrimSpace(output.Commands[i].Stdout))
 		if err != nil {
 			resErr = fmt.Errorf("%w; failed to parse the backup PID: %v", resErr, err)
 			continue
 		}
 
-		backupPids[command.Content] = pid
+		backupPids[output.Commands[i].Content] = pid
 	}
 
 	tracelog.InfoLogger.Printf("WAL-G segment PIDs: %v", backupPids)
@@ -355,13 +357,17 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 		return fmt.Sprintf("Unable to poll backup-push state on segment %d", contentID)
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
+	for i := range remoteOutput.Commands {
 		logger := tracelog.DebugLogger
-		if command.Stderr != "" {
+		if remoteOutput.Commands[i].Stderr != "" {
 			logger = tracelog.WarningLogger
 		}
-		logger.Printf("Poll segment backup-push state STDERR (segment %d):\n%s\n", command.Content, command.Stderr)
-		logger.Printf("Poll segment backup-push state STDOUT (segment %d):\n%s\n", command.Content, command.Stdout)
+		logger.Printf(
+			"Poll segment backup-push state STDERR (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
+		logger.Printf(
+			"Poll segment backup-push state STDOUT (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stdout)
 	}
 
 	if remoteOutput.NumErrors > 0 {
