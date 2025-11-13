@@ -91,6 +91,7 @@ services:
       &&  mkdir -p /export/copyallbucket
       &&  mkdir -p /export/copybackupbucket
       &&  mkdir -p /export/compressionreversebucket
+      &&  mkdir -p /export/backupmergebucket
       &&  mkdir -p /export/delete-retain-full-bucket
       &&  mkdir -p /export/delete-retain-full-multist-bucket
       &&  mkdir -p /export/delete-retain-full-multist-fo-bucket
@@ -174,6 +175,7 @@ services:
       &&  mkdir -p /export/cloudberry-delete-before-time-bucket
       &&  mkdir -p /export/cloudberry-aostorage-test-bucket
       &&  mkdir -p /export/cloudberry-delta-backup-test-bucket
+      &&  mkdir -p /export/cloudberry-backup-merge-test-bucket
       &&  mkdir -p /export/cloudberry-partial-table-bucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
