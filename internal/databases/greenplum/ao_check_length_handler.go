@@ -65,9 +65,11 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 			return checker.buildCheckAOLengthCmd(contentID, segmentsBackups, globalCluster)
 		})
 
-	for _, command := range remoteOutput.Commands {
-		if command.Error != nil {
-			tracelog.ErrorLogger.Printf("error (segment %d):\n%v\n%s\n", command.Content, command.Error, command.Stderr)
+	for i := range remoteOutput.Commands {
+		if remoteOutput.Commands[i].Error != nil {
+			tracelog.ErrorLogger.Printf(
+				"error (segment %d):\n%v\n%s\n",
+				remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Error, remoteOutput.Commands[i].Stderr)
 		}
 	}
 
