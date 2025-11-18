@@ -16,6 +16,7 @@ func FindFeaturePaths(database, featurePrefix string) ([]string, error) {
 	environ := ParseEnvLines(os.Environ())
 	requestedFeatureName := environ["FEATURE"]
 	binarySupported := strings.HasSuffix(environ["MONGO_PACKAGE"], "-enterprise")
+	mongoTestTypePrefix := environ["MONGO_TEST_TYPE"]
 
 	databaseFeaturesPath := path.Join(featuresDir, database)
 	foundFeatures, err := scanDirs(databaseFeaturesPath, func(fileName string) bool {
@@ -32,6 +33,9 @@ func FindFeaturePaths(database, featurePrefix string) ([]string, error) {
 			return false
 		}
 		if binarySupported && strings.HasPrefix(fileName, "logical_") {
+			return false
+		}
+		if mongoTestTypePrefix != "all" && !strings.HasPrefix(fileName, mongoTestTypePrefix) {
 			return false
 		}
 		if !strings.HasSuffix(fileName, featureExt) {

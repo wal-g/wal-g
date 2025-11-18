@@ -3,9 +3,6 @@ package oplog
 import (
 	"context"
 	"fmt"
-	"io"
-	"strings"
-
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/txn"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -13,7 +10,10 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"io"
+	"strings"
 )
 
 const NamespaceNotFoundError int32 = 26
@@ -80,14 +80,29 @@ type DBApplier struct {
 	preserveUUID          bool
 	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
+	lastTS                primitive.Timestamp
+	reconfig              bool
+	initMongo             bool
+}
+
+type DBApplierArgs struct {
+	PreserveUUID   bool
+	Partial        bool
+	Reconfig       bool
+	InitMongo      bool
+	IgnoreErrCodes map[string][]int32
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(
-	m client.MongoDriver, preserveUUID, partial bool, ignoreErrCodes map[string][]int32) *DBApplier {
+func NewDBApplier(m client.MongoDriver, args DBApplierArgs) *DBApplier {
 	return &DBApplier{
-		db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, partial: partial,
-		applyIgnoreErrorCodes: ignoreErrCodes,
+		db:                    m,
+		txnBuffer:             txn.NewBuffer(),
+		preserveUUID:          args.PreserveUUID,
+		partial:               args.Partial,
+		reconfig:              args.Reconfig,
+		applyIgnoreErrorCodes: args.IgnoreErrCodes,
+		initMongo:             args.InitMongo,
 	}
 }
 
@@ -120,17 +135,26 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	if err != nil {
 		return err
 	}
+	ap.lastTS = op.Timestamp
 
 	return nil
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {
-	if err := ap.db.Close(ctx); err != nil {
+	if ap.reconfig {
+		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastTS); err != nil {
+			return err
+		}
+	}
+
+	if err := ap.db.Close(ctx, ap.initMongo); err != nil {
 		return err
 	}
+
 	if err := ap.txnBuffer.Stop(); err != nil {
 		return err
 	}
+
 	return nil
 }
 

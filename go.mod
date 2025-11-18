@@ -37,7 +37,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.10.0
-	github.com/ulikunitz/xz v0.5.11
+	github.com/ulikunitz/xz v0.5.15
 	github.com/wal-g/json v0.3.1
 	github.com/wal-g/tracelog v0.1.1
 	github.com/yandex-cloud/go-genproto v0.0.0-20230918115514-93a99045c9de
@@ -101,7 +101,7 @@ require (
 	github.com/go-openapi/errors v0.19.3 // indirect
 	github.com/go-openapi/strfmt v0.19.4 // indirect
 	github.com/gofrs/uuid v4.0.0+incompatible // indirect
-	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-sql/civil v0.0.0-20190719163853-cb61b32ac6fe // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -159,7 +159,7 @@ require (
 	golang.org/x/tools v0.23.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20211021150943-2b146023228c // indirect
-	google.golang.org/grpc v1.64.0 // indirect
+	google.golang.org/grpc v1.64.1 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

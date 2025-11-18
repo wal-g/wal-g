@@ -24,6 +24,7 @@ import (
 const adminDB = "admin"
 const localDB = "local"
 const LatestBackupString = "LATEST_BACKUP"
+const LatestOnReplica = "LATEST_ON_REPLICA"
 
 const cursorCreateRetries = 10
 const mongoConnectRetries = 3
@@ -516,8 +517,10 @@ type ReplyOplogConfig struct {
 	OplogAlwaysUpsert    *bool
 	OplogApplicationMode *string
 
-	HasPitr bool
-	Partial bool
+	HasPitr             bool
+	Partial             bool
+	WithCatchUpReconfig bool
+	MinimalConfigPath   string
 
 	Whitelist map[string]map[string]struct{}
 	Blacklist map[string]map[string]struct{}
@@ -553,7 +556,9 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 	}
 }
 
-func NewReplyOplogConfig(sincePitrStr, untilPitrStr string, partial bool) (ReplyOplogConfig, error) {
+func NewReplyOplogConfig(
+	sincePitrStr, untilPitrStr string, partial, withCatchUpReconfig bool, minimalConfigPath string,
+) (ReplyOplogConfig, error) {
 	var roConfig ReplyOplogConfig
 	var err error
 	roConfig.HasPitr = true
@@ -591,6 +596,8 @@ func NewReplyOplogConfig(sincePitrStr, untilPitrStr string, partial bool) (Reply
 	}
 
 	roConfig.Partial = partial
+	roConfig.WithCatchUpReconfig = withCatchUpReconfig
+	roConfig.MinimalConfigPath = minimalConfigPath
 
 	return roConfig, err
 }
@@ -609,6 +616,8 @@ func processTimestamp(arg string, downloader *archive.StorageDownloader) (models
 			return models.Timestamp{}, err
 		}
 		return models.TimestampFromBson(backupMeta.MongoMeta.BackupLastTS), nil
+	case LatestOnReplica:
+		return models.Timestamp{}, nil
 	default:
 		return models.TimestampFromStr(arg)
 	}

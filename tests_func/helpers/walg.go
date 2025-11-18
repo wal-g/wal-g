@@ -252,11 +252,19 @@ func (w *WalgUtil) OplogPush() error {
 	return nil
 }
 
-func (w *WalgUtil) OplogReplay(from, until OpTimestamp, partial bool) error {
-	args := []string{"oplog-replay", from.String(), until.String()}
+func (w *WalgUtil) OplogReplay(from, until string, partial, reconfig bool, config string) error {
+	args := []string{"oplog-replay", from, until}
+
+	if reconfig {
+		args = append(args, "--with-catch-up-reconfig")
+	}
 
 	if partial {
 		args = append(args, "--partial")
+	}
+
+	if config != "" {
+		args = append(args, "--minimal-mongod-config-path", config)
 	}
 
 	_, err := w.runCmd(args...)

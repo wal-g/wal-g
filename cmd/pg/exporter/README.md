@@ -22,7 +22,7 @@ The exporter provides the following metrics:
 - `walg_backup_finish_timestamp{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Unix timestamp when backup completed successfully
 - `walg_backup_compressed_size_bytes{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Compressed size of the backup in bytes
 - `walg_backup_uncompressed_size_bytes{backup_name, backup_type, wal_file, start_lsn, finish_lsn, permanent, base_backup}` - Uncompressed size of the backup in bytes
-- `walg_backup_count{backup_type}` - Number of successful backups (full/delta)
+- `walg_backups{backup_type}` - Number of successful backups (full/delta)
 
 **Label Details:**
 - `backup_name`: Full backup name (e.g., `base_000000010000000000000025` or `base_000000010000000500000007_D_000000010000000000000025`)
