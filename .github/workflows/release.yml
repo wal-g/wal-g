@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ { distro: ubuntu20.04, label: ubuntu-20.04 }, { distro: ubuntu22.04, label: ubuntu-22.04 } ]
+        os: [ { distro: ubuntu20.04, label: ubuntu-20.04 }, { distro: ubuntu22.04, label: ubuntu-22.04 }, { distro: ubuntu24.04, label: ubuntu-24.04 } ]
         db: [ pg, mysql, sqlserver, redis, mongo, fdb, gp ]
         include:
           - arch: aarch64
