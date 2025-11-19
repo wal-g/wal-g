@@ -227,7 +227,6 @@ check_port_listening() {
     local port=$1
     local host=${2:-127.0.0.1}
 
-    # Метод 1: netstat
     if command -v netstat >/dev/null 2>&1; then
         if netstat -ln 2>/dev/null | grep -E ":${port}[[:space:]]" >/dev/null; then
             echo "Port $port detected by netstat"
@@ -235,7 +234,6 @@ check_port_listening() {
         fi
     fi
 
-    # Метод 2: ss
     if command -v ss >/dev/null 2>&1; then
         if ss -ln 2>/dev/null | grep -E ":${port}[[:space:]]" >/dev/null; then
             echo "Port $port detected by ss"
@@ -243,7 +241,6 @@ check_port_listening() {
         fi
     fi
 
-    # Метод 3: прямое подключение
     if timeout 2 bash -c "echo >/dev/tcp/${host}/${port}" 2>/dev/null; then
         echo "Port $port is accepting connections"
         return 0
@@ -276,9 +273,6 @@ safe_kill_process() {
     fi
 }
 
-recover_replication() {
-    echo ""
-}
 
 echo "Starting wal-g binlog-server..."
 WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee $BINLOG_SERVER_LOG &
@@ -412,11 +406,6 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_SQL_Running:" | awk '{print $2}')
     mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Retrieved_Gtid_Set|Executed_Gtid_Set)"
     echo "Row count: $ROW_COUNT / $EXPECTED_ROWS, IO: $SLAVE_IO_RUNNING, SQL: $SLAVE_SQL_RUNNING (wait: $WAIT_COUNT/$MAX_WAIT)"
-    if [ "$ROW_COUNT" -ge 490 ]; then
-            echo "=== Current table content (showing all rows) ==="
-            mysql -e "SELECT id FROM sbtest.pitr ORDER BY id"
-            echo "=== End of table ==="
-    fi
 
     if [ "$ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
         echo "Replication completed successfully"
@@ -431,7 +420,6 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
-# Остановка процессов
 safe_kill_process "$proxy_pid" "proxy"
 safe_kill_process "$walg_pid" "wal-g binlog-server"
 
@@ -444,24 +432,20 @@ if [ "$AFTER_COUNT" -ne 0 ]; then
     exit 1
 fi
 
-# Анализ результатов
 echo "=== Test Results ==="
 echo "Final row count: $FINAL_ROW_COUNT"
 echo "Recovery attempts used: $RECOVERY_ATTEMPTS"
 
-# Подсчитываем переподключения из логов
 PROXY_RECONNECTS=$(grep -c "Simulating network disconnect" "$PROXY_LOG" 2>/dev/null || echo "0")
 BINLOG_CONNECTIONS=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" 2>/dev/null || echo "0")
 
 echo "Proxy reconnects: $PROXY_RECONNECTS (expected: 2)"
 echo "Binlog server connections: $BINLOG_CONNECTIONS"
 
-# Проверяем, что было ровно 2 переподключения
 if [ "$PROXY_RECONNECTS" -ne 2 ]; then
     echo "WARNING: Expected exactly 2 reconnects, got $PROXY_RECONNECTS"
 fi
 
-# Проверка успешности теста
 if [ "$FINAL_ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
     echo "SUCCESS: Limited reconnection test passed!"
     echo "- Data replicated successfully: $FINAL_ROW_COUNT rows"

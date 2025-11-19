@@ -191,8 +191,6 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
 		handleEventError(err, s)
 
-		err = os.Remove(binlogPath)
-		handleEventError(err, s)
 		pos.Pos = 4
 	}
 }
