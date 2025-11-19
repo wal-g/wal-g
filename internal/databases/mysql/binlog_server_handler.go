@@ -37,7 +37,7 @@ type Handler struct {
 	globalStreamer *replication.BinlogStreamer
 	streamerMutex  sync.Mutex
 	syncOnce       sync.Once
-	gtidSet        *mysql.MysqlGTIDSet // Новое поле для GTID-set от клиента
+	gtidSet        *mysql.MysqlGTIDSet
 }
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
@@ -122,7 +122,7 @@ func waitReplicationIsDone() error {
 		}
 
 		tracelog.DebugLogger.Printf("Expected GTID set: %v; MySQL GTID set: %v", lastSentGTIDSet.String(), gtidSet.String())
-		tracelog.InfoLogger.Println("NOT DONE NOT DONE NOT DONE NOT DONE NOT DONE NOT DONE NOT DONE NOT DONE")
+
 		if gtidSet.Contain(lastSentGTIDSet) {
 			tracelog.InfoLogger.Println("Replication is done")
 			return nil
@@ -141,7 +141,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	// check checksum on our side - we should exit with error here rather than stuck waiting for MySQL apply all binlogs till `lastSentGTID`.
 	p.SetVerifyChecksum(true)
 
-	var skipTx bool // Флаг для skip транзакции
+	var skipTx bool
 
 	f := func(e *replication.BinlogEvent) error {
 		if int64(e.Header.Timestamp) > untilTS.Unix() {
@@ -157,20 +157,15 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			if err != nil {
 				return err
 			}
-
-			skipTx = gtidSet != nil && gtidSet.Contain(thisGtidSet) // Skip если уже executed
-
+			skipTx = gtidSet != nil && gtidSet.Contain(thisGtidSet)
 			lastSentGTID = thisGtidStr
-
 			if skipTx {
-				return nil // Skip GTID_EVENT
+				return nil
 			}
 		}
-
 		if skipTx {
-			return nil // Skip события в skipped tx
+			return nil
 		}
-
 		err := s.AddEventToStreamer(e)
 		return err
 	}
@@ -196,7 +191,8 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
 		handleEventError(err, s)
 
-		// УДАЛЕНО: os.Remove(binlogPath) -- не удаляем файлы, чтобы reuse при reconnect
+		err = os.Remove(binlogPath)
+		handleEventError(err, s)
 		pos.Pos = 4
 	}
 }
@@ -248,7 +244,7 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 			syncErr = err
 			return
 		}
-		syncErr = syncBinlogFiles(pos, startTime, h.globalStreamer, h.gtidSet) // Передаём gtidSet
+		syncErr = syncBinlogFiles(pos, startTime, h.globalStreamer, h.gtidSet)
 	})
 
 	if syncErr != nil {
@@ -267,7 +263,7 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 		return h.globalStreamer, nil
 	}
 
-	h.gtidSet = gtidSet // Сохраняем GTID-set
+	h.gtidSet = gtidSet
 
 	h.globalStreamer = replication.NewBinlogStreamer()
 
@@ -358,7 +354,7 @@ func HandleBinlogServer(since string, until string) {
 		password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		handler := &Handler{} // Новый handler per conn!
+		handler := &Handler{}
 
 		conn, err := server.NewConn(c, user, password, handler)
 		if err != nil {

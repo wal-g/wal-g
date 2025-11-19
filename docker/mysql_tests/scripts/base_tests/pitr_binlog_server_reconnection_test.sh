@@ -3,13 +3,6 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-# Проверка и установка python3
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "python3 not found, installing..."
-    apt-get update
-    apt-get install -y python3
-fi
-
 s3cmd s3://mysql_pitr_binlogserver_reconnection_bucket || true
 export WALE_S3_PREFIX=s3://mysql_pitr_binlogserver_reconnection_bucket
 export WALG_MYSQL_BINLOG_SERVER_HOST="127.0.0.1"
@@ -20,7 +13,6 @@ export WALG_MYSQL_BINLOG_SERVER_ID=99
 export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest@tcp(127.0.0.1:3306)/sbtest"
 export WALG_COMPRESSION_METHOD=zstd
 
-# Порты для прокси
 PROXY_PORT=9307
 BINLOG_SERVER_PORT=9306
 
@@ -34,7 +26,6 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-# Генерируем данные для теста
 for i in $(seq 1 500); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
@@ -61,7 +52,6 @@ mysql_set_gtid_purged
 BINLOG_SERVER_LOG=/tmp/binlog_server_reconnect.log
 PROXY_LOG=/tmp/proxy.log
 
-# Создаем прокси с ограничением на ДВА переподключения
 cat > /tmp/binlog_proxy.py << 'EOF'
 #!/usr/bin/env python3
 import socket
@@ -79,14 +69,13 @@ class TwoDisconnectBinlogProxy:
         self.client_socket = None
         self.server_socket = None
         self.disconnect_count = 0
-        self.planned_disconnects = planned_disconnects  # Планируемое количество разрывов
+        self.planned_disconnects = planned_disconnects
         self.bytes_transferred = 0
         self.connection_start_time = None
         self.total_bytes_transferred = 0
-        self.disconnects_completed = False  # Флаг завершения плановых разрывов
+        self.disconnects_completed = False
 
     def connect_to_server(self):
-        """Подключается к binlog серверу"""
         try:
             if self.server_socket:
                 self.server_socket.close()
@@ -101,27 +90,21 @@ class TwoDisconnectBinlogProxy:
             return False
 
     def should_disconnect(self):
-        """Определяет, нужно ли разорвать соединение"""
-        # Если уже сделали все плановые разрывы - больше не разрываем
         if self.disconnects_completed:
             return False
 
         if not self.connection_start_time:
             return False
 
-        # Разрываем соединение после передачи 32KB данных
-        # Но только если еще не достигли лимита плановых разрывов
         if self.bytes_transferred > 32768 and self.disconnect_count < self.planned_disconnects:
             return True
 
         return False
 
     def handle_client_connection(self, client_socket):
-        """Обрабатывает подключение клиента с ограниченными переподключениями"""
         self.client_socket = client_socket
         print(f"[Proxy] Client connected from {client_socket.getpeername()}")
 
-        # Первоначальное подключение к серверу
         if not self.connect_to_server():
             print("[Proxy] Initial connection to server failed")
             return
@@ -131,17 +114,15 @@ class TwoDisconnectBinlogProxy:
 
         try:
             while self.running:
-                # Проверяем, нужно ли переподключиться (только если не завершили плановые разрывы)
                 if self.should_disconnect():
                     print(f"[Proxy] Planned disconnect #{self.disconnect_count + 1}/{self.planned_disconnects} after {self.bytes_transferred} bytes")
                     print(f"[Proxy] Total bytes transferred so far: {self.total_bytes_transferred}")
 
                     self.server_socket.close()
-                    time.sleep(2)  # Имитируем задержку сети
+                    time.sleep(2)
 
                     self.disconnect_count += 1
 
-                    # Проверяем, завершили ли мы все плановые разрывы
                     if self.disconnect_count >= self.planned_disconnects:
                         self.disconnects_completed = True
                         print(f"[Proxy] Completed all {self.planned_disconnects} planned disconnects. Now working in stable mode.")
@@ -154,7 +135,6 @@ class TwoDisconnectBinlogProxy:
                     self.bytes_transferred = 0
 
                 try:
-                    # Используем select для мониторинга сокетов
                     ready_sockets, _, error_sockets = select.select(
                         [self.client_socket, self.server_socket], [],
                         [self.client_socket, self.server_socket], 1.0
@@ -167,7 +147,6 @@ class TwoDisconnectBinlogProxy:
                     if not ready_sockets:
                         continue
 
-                    # Передача данных от клиента к серверу
                     if self.client_socket in ready_sockets:
                         try:
                             data = self.client_socket.recv(8192)
@@ -178,14 +157,12 @@ class TwoDisconnectBinlogProxy:
                             self.bytes_transferred += len(data)
                             self.total_bytes_transferred += len(data)
 
-                            # Показываем статус режима работы
                             mode = "STABLE" if self.disconnects_completed else f"DISCONNECT_MODE({self.disconnect_count}/{self.planned_disconnects})"
                             print(f"[Proxy] [{mode}] Client->Server: {len(data)} bytes (session: {self.bytes_transferred}, total: {self.total_bytes_transferred})")
                         except Exception as e:
                             print(f"[Proxy] Error forwarding client->server: {e}")
                             break
 
-                    # Передача данных от сервера к клиенту
                     if self.server_socket in ready_sockets:
                         try:
                             data = self.server_socket.recv(8192)
@@ -196,7 +173,6 @@ class TwoDisconnectBinlogProxy:
                             self.bytes_transferred += len(data)
                             self.total_bytes_transferred += len(data)
 
-                            # Показываем статус режима работы
                             mode = "STABLE" if self.disconnects_completed else f"DISCONNECT_MODE({self.disconnect_count}/{self.planned_disconnects})"
                             print(f"[Proxy] [{mode}] Server->Client: {len(data)} bytes (session: {self.bytes_transferred}, total: {self.total_bytes_transferred})")
                         except Exception as e:
@@ -220,7 +196,6 @@ class TwoDisconnectBinlogProxy:
                 self.server_socket.close()
 
     def start(self):
-        """Запускает прокси сервер"""
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind(('127.0.0.1', self.listen_port))
@@ -248,7 +223,6 @@ EOF
 
 chmod +x /tmp/binlog_proxy.py
 
-# Функция для проверки, что порт слушается
 check_port_listening() {
     local port=$1
     local host=${2:-127.0.0.1}
@@ -278,7 +252,6 @@ check_port_listening() {
     return 1
 }
 
-# Функция для безопасной остановки процесса
 safe_kill_process() {
     local pid=$1
     local name=$2
@@ -303,131 +276,15 @@ safe_kill_process() {
     fi
 }
 
-# Улучшенная функция для восстановления репликации с анализом ошибок
-# Улучшенная функция для восстановления репликации с анализом ошибок
 recover_replication() {
-    echo "=== ANALYZING REPLICATION ERROR ==="
-
-    # Получаем детальную информацию об ошибке
-    SLAVE_STATUS=$(mysql -e "SHOW SLAVE STATUS\G" 2>/dev/null)
-    LAST_SQL_ERROR=$(echo "$SLAVE_STATUS" | grep "Last_SQL_Error:" | cut -d: -f2- | xargs)
-    LAST_SQL_ERRNO=$(echo "$SLAVE_STATUS" | grep "Last_SQL_Errno:" | awk '{print $2}')
-
-    # Получаем GTID информацию
-    RETRIEVED_GTID=$(echo "$SLAVE_STATUS" | grep "Retrieved_Gtid_Set:" | cut -d: -f2- | xargs)
-    EXECUTED_GTID=$(echo "$SLAVE_STATUS" | grep "Executed_Gtid_Set:" | cut -d: -f2- | xargs)
-
-    echo "SQL Error Code: $LAST_SQL_ERRNO"
-    echo "SQL Error Message: $LAST_SQL_ERROR"
-    echo "Retrieved GTID: $RETRIEVED_GTID"
-    echo "Executed GTID: $EXECUTED_GTID"
-
-    # Логируем ошибку для анализа
-    echo "$(date): Error $LAST_SQL_ERRNO: $LAST_SQL_ERROR" >> /tmp/replication_errors.log
-
-    # Проверяем, является ли это безопасной ошибкой дублирования
-    SAFE_TO_SKIP=false
-
-    case "$LAST_SQL_ERRNO" in
-        "1062")  # Duplicate entry for key
-            echo "SAFE: Duplicate entry error (1062) - transaction already applied"
-            SAFE_TO_SKIP=true
-            ;;
-        "1778")  # GTID transaction error - НОВЫЙ КОД!
-            echo "ANALYZING: GTID transaction error (1778) - checking details..."
-            # Получаем детали из performance_schema
-            WORKER_ERROR=$(mysql -N -e "SELECT LAST_ERROR_MESSAGE FROM performance_schema.replication_applier_status_by_worker WHERE LAST_ERROR_NUMBER != 0 LIMIT 1" 2>/dev/null || echo "")
-
-            echo "Worker Error Message: $WORKER_ERROR"
-
-            if echo "$WORKER_ERROR" | grep -qi "GTID_NEXT.*UUID:NUMBER"; then
-                echo "SAFE: GTID transaction conflict - transaction already processed"
-                SAFE_TO_SKIP=true
-            elif echo "$WORKER_ERROR" | grep -qi "implicit commit.*transaction"; then
-                echo "SAFE: GTID implicit commit error - duplicate transaction"
-                SAFE_TO_SKIP=true
-            else
-                echo "UNSAFE: Unknown GTID error: $WORKER_ERROR"
-            fi
-            ;;
-        "1837")  # Coordinator stopped
-            echo "ANALYZING: Coordinator error (1837) - checking worker details..."
-            # Получаем детали из performance_schema
-            WORKER_ERROR=$(mysql -N -e "SELECT LAST_ERROR_MESSAGE FROM performance_schema.replication_applier_status_by_worker WHERE LAST_ERROR_NUMBER != 0 LIMIT 1" 2>/dev/null || echo "")
-            WORKER_ERRNO=$(mysql -N -e "SELECT LAST_ERROR_NUMBER FROM performance_schema.replication_applier_status_by_worker WHERE LAST_ERROR_NUMBER != 0 LIMIT 1" 2>/dev/null || echo "")
-
-            echo "Worker Error Code: $WORKER_ERRNO"
-            echo "Worker Error Message: $WORKER_ERROR"
-
-            if [ "$WORKER_ERRNO" = "1062" ]; then
-                echo "SAFE: Worker failed with duplicate entry (1062) - transaction already applied"
-                SAFE_TO_SKIP=true
-            elif [ "$WORKER_ERRNO" = "1778" ]; then
-                echo "SAFE: Worker failed with GTID error (1778) - duplicate transaction"
-                SAFE_TO_SKIP=true
-            elif echo "$WORKER_ERROR" | grep -qi "duplicate\|already.*exist\|GTID_NEXT"; then
-                echo "SAFE: Worker failed due to duplicate data or GTID conflict"
-                SAFE_TO_SKIP=true
-            else
-                echo "UNSAFE: Worker failed with unknown error: $WORKER_ERROR"
-            fi
-            ;;
-        "0")     # Coordinator error - нужно анализировать текст
-            if echo "$LAST_SQL_ERROR" | grep -qi "already executed"; then
-                echo "SAFE: GTID already executed - transaction was applied before"
-                SAFE_TO_SKIP=true
-            elif echo "$LAST_SQL_ERROR" | grep -qi "duplicate"; then
-                echo "SAFE: Duplicate transaction detected"
-                SAFE_TO_SKIP=true
-            else
-                echo "UNSAFE: Unknown coordinator error"
-            fi
-            ;;
-        *)
-            echo "UNSAFE: Unknown error code $LAST_SQL_ERRNO - manual investigation required"
-            ;;
-    esac
-
-    if [ "$SAFE_TO_SKIP" = "true" ]; then
-        echo "PROCEEDING: Skipping duplicate/conflicting transaction..."
-
-        # Останавливаем репликацию
-        mysql -e "STOP SLAVE" 2>/dev/null || true
-
-        # Пропускаем одну ошибочную транзакцию
-        mysql -e "SET GLOBAL SQL_SLAVE_SKIP_COUNTER = 1" 2>/dev/null || true
-
-        # Перезапускаем репликацию
-        mysql -e "START SLAVE" 2>/dev/null || true
-
-        sleep 3
-
-        # Проверяем статус
-        SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_SQL_Running:" | awk '{print $2}')
-        if [ "$SLAVE_SQL_RUNNING" = "Yes" ]; then
-            echo "SUCCESS: Replication recovered after skipping conflicting transaction"
-            return 0
-        else
-            echo "FAILED: Replication still not running after skip"
-            return 1
-        fi
-    else
-        echo "ERROR: Cannot safely skip this error - stopping test"
-        echo "=== Full slave status ==="
-        mysql -e "SHOW SLAVE STATUS\G"
-        echo "=== Worker error details ==="
-        mysql -e "SELECT * FROM performance_schema.replication_applier_status_by_worker WHERE LAST_ERROR_NUMBER != 0" 2>/dev/null || echo "No worker error details available"
-        return 1
-    fi
+    echo ""
 }
 
-# Запуск wal-g binlog-server
 echo "Starting wal-g binlog-server..."
-WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" > $BINLOG_SERVER_LOG 2>&1 &
+WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee $BINLOG_SERVER_LOG &
 walg_pid=$!
 echo "Started wal-g binlog-server with PID: $walg_pid"
 
-# Ждем запуска binlog-server
 echo "Waiting for binlog-server to start..."
 WAIT_COUNT=0
 MAX_WAIT=30
@@ -464,13 +321,10 @@ fi
 
 sleep 2
 
-# Запуск прокси с ограничением на 2 переподключения
 echo "Starting proxy with max 2 reconnections..."
-python3 /tmp/binlog_proxy.py > $PROXY_LOG 2>&1 &
-proxy_pid=$!
+python3 /tmp/binlog_proxy.py 2>&1 | tee $PROXY_LOG &proxy_pid=$!
 echo "Started proxy with PID: $proxy_pid"
 
-# Ждем запуска прокси
 echo "Waiting for proxy to start..."
 WAIT_COUNT=0
 while [ $WAIT_COUNT -lt 15 ]; do
@@ -498,7 +352,6 @@ if [ $WAIT_COUNT -eq 15 ]; then
     exit 1
 fi
 
-# Настройка MySQL slave для подключения через прокси
 echo "Configuring MySQL replication..."
 mysql -e "STOP SLAVE"
 mysql -e "RESET SLAVE ALL"
@@ -507,7 +360,6 @@ mysql -e "SET GLOBAL SLAVE_NET_TIMEOUT = 10"
 mysql -e "CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$PROXY_PORT, MASTER_USER='walg', MASTER_PASSWORD='walgpwd', MASTER_AUTO_POSITION=1, MASTER_CONNECT_RETRY=5, MASTER_RETRY_COUNT=86400"
 mysql -e "START SLAVE"
 
-# Ожидание запуска репликации
 echo "Waiting for replication to start..."
 WAIT_COUNT=0
 MAX_WAIT=60
@@ -546,15 +398,13 @@ if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
     exit 1
 fi
 
-# Ожидание завершения репликации с точным анализом ошибок
 echo "Waiting for replication to complete..."
 MAX_WAIT=180
 WAIT_COUNT=0
 EXPECTED_ROWS=501
 LAST_ROW_COUNT=0
-STUCK_COUNT=0
 RECOVERY_ATTEMPTS=0
-MAX_RECOVERY_ATTEMPTS=3  # Ограничиваем количество попыток восстановления
+MAX_RECOVERY_ATTEMPTS=3
 
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
@@ -573,39 +423,9 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
         break
     fi
 
-    # Проверяем, не застряла ли репликация
-    if [ "$ROW_COUNT" -eq "$LAST_ROW_COUNT" ]; then
-        STUCK_COUNT=$((STUCK_COUNT + 1))
-        if [ $STUCK_COUNT -ge 15 ]; then
-            echo "WARNING: Replication appears stuck for 30 seconds"
-            mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Master_Log_File|Read_Master_Log_Pos|Exec_Master_Log_Pos|Last_.*Error)"
-            STUCK_COUNT=0
-        fi
-    else
-        STUCK_COUNT=0
-    fi
     LAST_ROW_COUNT=$ROW_COUNT
 
-    # Обработка ошибок SQL потока с точным анализом
-    if [ "$SLAVE_SQL_RUNNING" != "Yes" ]; then
-        echo "WARNING: Slave SQL thread stopped (attempt $((RECOVERY_ATTEMPTS + 1))/$MAX_RECOVERY_ATTEMPTS)"
 
-        if [ $RECOVERY_ATTEMPTS -lt $MAX_RECOVERY_ATTEMPTS ]; then
-            if recover_replication; then
-                echo "Recovery successful, continuing replication"
-                RECOVERY_ATTEMPTS=$((RECOVERY_ATTEMPTS + 1))
-                STUCK_COUNT=0
-                sleep 5
-                continue
-            else
-                echo "ERROR: Recovery failed - unsafe to continue"
-                exit 1
-            fi
-        else
-            echo "ERROR: Maximum recovery attempts reached"
-            exit 1
-        fi
-    fi
 
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 1))
