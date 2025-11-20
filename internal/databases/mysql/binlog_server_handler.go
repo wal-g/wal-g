@@ -30,6 +30,7 @@ var (
 	startTS      time.Time
 	untilTS      time.Time
 	lastSentGTID string
+	gtidMutex    sync.RWMutex
 )
 
 type Handler struct {
@@ -116,7 +117,11 @@ func waitReplicationIsDone() error {
 			return err
 		}
 
-		lastSentGTIDSet, err := mysql.ParseGTIDSet("mysql", lastSentGTID)
+		gtidMutex.RLock()
+		currentLastSentGTID := lastSentGTID
+		gtidMutex.RUnlock()
+
+		lastSentGTIDSet, err := mysql.ParseGTIDSet("mysql", currentLastSentGTID)
 		if err != nil {
 			return err
 		}
@@ -158,7 +163,11 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 				return err
 			}
 			skipTx = gtidSet != nil && gtidSet.Contain(thisGtidSet)
+
+			gtidMutex.Lock()
 			lastSentGTID = thisGtidStr
+			gtidMutex.Unlock()
+
 			if skipTx {
 				return nil
 			}

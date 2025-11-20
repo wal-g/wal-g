@@ -43,6 +43,20 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
+
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
+
+
+
+
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
