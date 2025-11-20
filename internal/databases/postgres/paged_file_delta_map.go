@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -111,7 +110,7 @@ func GetRelFileIDFrom(filePath string) (int, error) {
 
 func GetRelFileNodeFrom(filePath string) (*walparser.RelFileNode, error) {
 	folderPath, name := path.Split(filePath)
-	folderPathParts := strings.Split(strings.TrimSuffix(folderPath, "/"), string(os.PathSeparator))
+	folderPathParts := strings.Split(strings.TrimSuffix(folderPath, "/"), "/")
 	match := pagedFilenameRegexp.FindStringSubmatch(name)
 	if match == nil {
 		return nil, errors.New("GetRelFileNodeFrom: can't parse path: " + filePath)

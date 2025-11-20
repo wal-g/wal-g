@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -14,8 +15,9 @@ import (
 
 func testInterpret(t *testing.T,
 	dbDataDirectory, name string, typeflag byte,
-	create, delete func(string) error) (os.FileInfo, os.FileInfo) {
+	create, delete func(string) error, assertFiles func(os.FileInfo, os.FileInfo)) {
 
+	dbDataDirectory = filepath.ToSlash(dbDataDirectory)
 	tarInterpreter := &postgres.FileTarInterpreter{
 		DBDataDirectory: dbDataDirectory,
 	}
@@ -50,7 +52,7 @@ func testInterpret(t *testing.T,
 
 	assert.NoError(t, err)
 
-	return srcFileInfo, dstFileInfo
+	assertFiles(srcFileInfo, dstFileInfo)
 }
 
 func createDir(path string) error {
@@ -58,13 +60,16 @@ func createDir(path string) error {
 }
 
 func createFile(path string) error {
-	_, err := os.Create(path)
-
-	return err
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	// close the handle so windows can delete
+	return f.Close()
 }
 
 func TestInterpretTypeReg(t *testing.T) {
-	_, dstFileInfo := testInterpret(t,
+	testInterpret(t,
 		os.TempDir(),
 
 		"test_file",
@@ -72,14 +77,16 @@ func TestInterpretTypeReg(t *testing.T) {
 
 		createFile,
 		os.Remove,
+		func(_, dstFileInfo os.FileInfo) {
+			assert.False(t, dstFileInfo.IsDir())
+			assert.False(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
+		},
 	)
 
-	assert.False(t, dstFileInfo.IsDir())
-	assert.False(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
 }
 
 func TestInterpretTypeRegA(t *testing.T) {
-	_, dstFileInfo := testInterpret(t,
+	testInterpret(t,
 		os.TempDir(),
 
 		"test_file",
@@ -87,14 +94,15 @@ func TestInterpretTypeRegA(t *testing.T) {
 
 		createFile,
 		os.Remove,
+		func(_, dstFileInfo os.FileInfo) {
+			assert.False(t, dstFileInfo.IsDir())
+			assert.False(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
+		},
 	)
-
-	assert.False(t, dstFileInfo.IsDir())
-	assert.False(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
 }
 
 func TestInterpretTypeDir(t *testing.T) {
-	_, dstFileInfo := testInterpret(t,
+	testInterpret(t,
 		os.TempDir(),
 
 		"test_dir",
@@ -102,15 +110,17 @@ func TestInterpretTypeDir(t *testing.T) {
 
 		createDir,
 		os.RemoveAll,
+		func(_, dstFileInfo os.FileInfo) {
+			assert.True(t, dstFileInfo.IsDir())
+		},
 	)
 
-	assert.True(t, dstFileInfo.IsDir())
 }
 
 func TestInterpretTypeDirNested(t *testing.T) {
 	dbDataDirectory := path.Join(os.TempDir(), "nested")
 
-	_, dstFileInfo := testInterpret(t,
+	testInterpret(t,
 		dbDataDirectory,
 
 		"test_dir",
@@ -118,17 +128,19 @@ func TestInterpretTypeDirNested(t *testing.T) {
 
 		createDir,
 		os.RemoveAll,
+		func(_, dstFileInfo os.FileInfo) {
+			assert.True(t, dstFileInfo.IsDir())
+		},
 	)
 
 	defer func() {
 		assert.NoError(t, os.RemoveAll(dbDataDirectory))
 	}()
 
-	assert.True(t, dstFileInfo.IsDir())
 }
 
 func TestInterpretTypeLink(t *testing.T) {
-	srcFileInfo, dstFileInfo := testInterpret(t,
+	testInterpret(t,
 		os.TempDir(),
 
 		"test_file",
@@ -136,13 +148,16 @@ func TestInterpretTypeLink(t *testing.T) {
 
 		createFile,
 		os.Remove,
+		func(srcFileInfo, dstFileInfo os.FileInfo) {
+			// SameFile on windows has i/o vs unix so it must be called in the test
+			assert.True(t, os.SameFile(srcFileInfo, dstFileInfo))
+		},
 	)
 
-	assert.True(t, os.SameFile(srcFileInfo, dstFileInfo))
 }
 
 func TestInterpretTypeSymlink(t *testing.T) {
-	_, dstFileInfo := testInterpret(t,
+	testInterpret(t,
 		os.TempDir(),
 
 		"test_file",
@@ -150,9 +165,11 @@ func TestInterpretTypeSymlink(t *testing.T) {
 
 		createFile,
 		os.Remove,
+		func(_, dstFileInfo os.FileInfo) {
+			// Mode on Windows has i/o vs unix so it must be called within the test
+			assert.True(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
+		},
 	)
-
-	assert.True(t, dstFileInfo.Mode()&os.ModeSymlink != 0)
 }
 
 func TestPrepareDirsForLocalDirectory(t *testing.T) {

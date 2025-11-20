@@ -3,15 +3,15 @@ package innodb
 import (
 	"errors"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/utility"
 )
 
 var ErrSpaceIDNotFound = errors.New("SpaceID not found")
@@ -31,6 +31,7 @@ type spaceIDCollectorImpl struct {
 var _ SpaceIDCollector = &spaceIDCollectorImpl{}
 
 func NewSpaceIDCollector(dataDir string) (SpaceIDCollector, error) {
+	dataDir = filepath.ToSlash(dataDir)
 	result := &spaceIDCollectorImpl{dataDir: dataDir}
 	result.collected = make(map[SpaceID]string)
 
@@ -59,8 +60,9 @@ func NewSpaceIDCollector(dataDir string) (SpaceIDCollector, error) {
 }
 
 func (c *spaceIDCollectorImpl) collect(filePath string) (SpaceID, error) {
+	filePath = filepath.ToSlash(filePath)
 	// read first FPS page (always first page in the file)
-	file, err := os.OpenFile(filePath, os.O_RDONLY|syscall.O_NOFOLLOW, 0) // FIXME: test performance with O_SYNC
+	file, err := fsutil.OpenFileSecure(filePath, os.O_RDONLY, 0) // FIXME: test performance with O_SYNC
 	if err != nil {
 		tracelog.DebugLogger.Printf("error opening file %v: %v", filePath, err)
 		return SpaceIDUnknown, ErrSpaceIDNotFound
