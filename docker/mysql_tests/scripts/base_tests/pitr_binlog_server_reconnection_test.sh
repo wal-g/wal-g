@@ -43,20 +43,6 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-
-mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
-mysql -e "FLUSH LOGS"
-wal-g binlog-push
-mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
-mysql -e "FLUSH LOGS"
-wal-g binlog-push
-mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
-mysql -e "FLUSH LOGS"
-wal-g binlog-push
-
-
-
-
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
@@ -248,13 +234,6 @@ check_port_listening() {
         fi
     fi
 
-    if command -v ss >/dev/null 2>&1; then
-        if ss -ln 2>/dev/null | grep -E ":${port}[[:space:]]" >/dev/null; then
-            echo "Port $port detected by ss"
-            return 0
-        fi
-    fi
-
     if timeout 2 bash -c "echo >/dev/tcp/${host}/${port}" 2>/dev/null; then
         echo "Port $port is accepting connections"
         return 0
@@ -330,7 +309,7 @@ fi
 sleep 2
 
 echo "Starting proxy with max 2 reconnections..."
-python3 /tmp/binlog_proxy.py 2>&1 | tee $PROXY_LOG &proxy_pid=$!
+python3 /tmp/binlog_proxy.py > $PROXY_LOG 2>&1 & proxy_pid=$!
 echo "Started proxy with PID: $proxy_pid"
 
 echo "Waiting for proxy to start..."
@@ -375,45 +354,19 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     SLAVE_STATUS=$(mysql -e "SHOW SLAVE STATUS\G" 2>/dev/null || echo "")
     SLAVE_IO_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_IO_Running:" | awk '{print $2}')
     SLAVE_SQL_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_SQL_Running:" | awk '{print $2}')
-    LAST_IO_ERROR=$(echo "$SLAVE_STATUS" | grep "Last_IO_Error:" | cut -d: -f2- | xargs)
-
-    echo "Wait $WAIT_COUNT/$MAX_WAIT: IO=$SLAVE_IO_RUNNING, SQL=$SLAVE_SQL_RUNNING"
-
-    if [ -n "$LAST_IO_ERROR" ] && [ "$LAST_IO_ERROR" != "" ]; then
-        echo "IO Error: $LAST_IO_ERROR"
-    fi
-
     if [ "$SLAVE_IO_RUNNING" = "Yes" ]; then
         echo "Replication IO thread started successfully"
         break
     fi
-
-    if [ "$SLAVE_IO_RUNNING" != "Connecting" ] && [ "$SLAVE_IO_RUNNING" != "" ]; then
-        echo "ERROR: Unexpected slave IO state: $SLAVE_IO_RUNNING"
-        echo "=== Full slave status ==="
-        mysql -e "SHOW SLAVE STATUS\G"
-        exit 1
-    fi
-
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
-if [ "$SLAVE_IO_RUNNING" != "Yes" ]; then
-    echo "ERROR: Replication IO thread failed to start"
-    echo "=== Final slave status ==="
-    mysql -e "SHOW SLAVE STATUS\G"
-    exit 1
-fi
 
 echo "Waiting for replication to complete..."
 MAX_WAIT=180
 WAIT_COUNT=0
 EXPECTED_ROWS=501
-LAST_ROW_COUNT=0
-RECOVERY_ATTEMPTS=0
-MAX_RECOVERY_ATTEMPTS=3
-
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
     SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running:" | awk '{print $2}')
@@ -426,10 +379,6 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
         break
     fi
 
-    LAST_ROW_COUNT=$ROW_COUNT
-
-
-
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
@@ -437,7 +386,6 @@ done
 safe_kill_process "$proxy_pid" "proxy"
 safe_kill_process "$walg_pid" "wal-g binlog-server"
 
-# Проверка данных
 FINAL_ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
 AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
 
@@ -446,41 +394,20 @@ if [ "$AFTER_COUNT" -ne 0 ]; then
     exit 1
 fi
 
-echo "=== Test Results ==="
-echo "Final row count: $FINAL_ROW_COUNT"
-echo "Recovery attempts used: $RECOVERY_ATTEMPTS"
-
 PROXY_RECONNECTS=$(grep -c "Simulating network disconnect" "$PROXY_LOG" 2>/dev/null || echo "0")
 BINLOG_CONNECTIONS=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" 2>/dev/null || echo "0")
 
 echo "Proxy reconnects: $PROXY_RECONNECTS (expected: 2)"
 echo "Binlog server connections: $BINLOG_CONNECTIONS"
 
-if [ "$PROXY_RECONNECTS" -ne 2 ]; then
-    echo "WARNING: Expected exactly 2 reconnects, got $PROXY_RECONNECTS"
-fi
 
 if [ "$FINAL_ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
-    echo "SUCCESS: Limited reconnection test passed!"
     echo "- Data replicated successfully: $FINAL_ROW_COUNT rows"
     echo "- Network disconnects: $PROXY_RECONNECTS (limited to 2)"
-    echo "- Recovery attempts: $RECOVERY_ATTEMPTS (only for duplicate transactions)"
-elif [ "$FINAL_ROW_COUNT" -gt 350 ] && [ "$PROXY_RECONNECTS" -eq 2 ]; then
-    echo "PARTIAL SUCCESS: Reconnection functionality verified"
-    echo "- Partial data replicated: $FINAL_ROW_COUNT rows"
-    echo "- Network disconnects: $PROXY_RECONNECTS (as expected)"
-    echo "- Recovery attempts: $RECOVERY_ATTEMPTS"
 else
     echo "ERROR: Test failed"
     echo "- Expected $EXPECTED_ROWS rows, got $FINAL_ROW_COUNT"
     echo "- Proxy reconnects: $PROXY_RECONNECTS (expected: 2)"
-    echo "- Recovery attempts: $RECOVERY_ATTEMPTS"
-    echo "=== Proxy log ==="
-    cat $PROXY_LOG
-    echo "=== Binlog server log (last 50 lines) ==="
-    tail -50 $BINLOG_SERVER_LOG
-    echo "=== Replication errors log ==="
-    cat /tmp/replication_errors.log 2>/dev/null || echo "No replication errors logged"
     exit 1
 fi
 
