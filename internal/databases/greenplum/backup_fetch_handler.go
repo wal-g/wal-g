@@ -122,8 +122,8 @@ func prepareContentIDsToFetch(fetchContentIDs []int, segmentConfigs []cluster.Se
 			contentIDsToFetch[id] = true
 		}
 	} else {
-		for _, cfg := range segmentConfigs {
-			contentIDsToFetch[cfg.ContentID] = true
+		for i := range segmentConfigs {
+			contentIDsToFetch[segmentConfigs[i].ContentID] = true
 		}
 	}
 
@@ -156,8 +156,10 @@ func (fh *FetchHandler) Unpack() {
 		return "Unable to run wal-g"
 	})
 
-	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("[Unpack] WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+	for i := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf(
+			"[Unpack] WAL-G output (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 	}
 }
 
@@ -199,8 +201,8 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 		return fmt.Sprintf("Unable to update pg_hba on segment %d", contentID)
 	})
 
-	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("Update pg_hba output (segment %d):\n%s\n", command.Content, command.Stderr)
+	for i := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf("Update pg_hba output (segment %d):\n%s\n", remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 	}
 	return nil
 }
@@ -263,8 +265,10 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		return fmt.Sprintf("Unable to create recovery.conf on segment %d", contentID)
 	})
 
-	for _, command := range remoteOutput.Commands {
-		tracelog.DebugLogger.Printf("Create recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
+	for i := range remoteOutput.Commands {
+		tracelog.DebugLogger.Printf(
+			"Create recovery.conf output (segment %d):\n%s\n",
+			remoteOutput.Commands[i].Content, remoteOutput.Commands[i].Stderr)
 	}
 	return nil
 }
