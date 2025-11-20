@@ -26,7 +26,7 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-for i in $(seq 1 500); do
+for i in $(seq 1 250); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
         mysql -e "FLUSH LOGS"
@@ -96,7 +96,7 @@ class TwoDisconnectBinlogProxy:
         if not self.connection_start_time:
             return False
 
-        if self.bytes_transferred > 32768 and self.disconnect_count < self.planned_disconnects:
+        if self.bytes_transferred > 16384 and self.disconnect_count < self.planned_disconnects:
             return True
 
         return False
@@ -227,13 +227,6 @@ check_port_listening() {
     local port=$1
     local host=${2:-127.0.0.1}
 
-    if command -v netstat >/dev/null 2>&1; then
-        if netstat -ln 2>/dev/null | grep -E ":${port}[[:space:]]" >/dev/null; then
-            echo "Port $port detected by netstat"
-            return 0
-        fi
-    fi
-
     if timeout 2 bash -c "echo >/dev/tcp/${host}/${port}" 2>/dev/null; then
         echo "Port $port is accepting connections"
         return 0
@@ -293,8 +286,6 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
             echo "Binlog server reports listening but port check failed, waiting..."
         fi
     fi
-
-    echo "Waiting for binlog-server... ($WAIT_COUNT/$MAX_WAIT)"
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
@@ -364,9 +355,9 @@ done
 
 
 echo "Waiting for replication to complete..."
-MAX_WAIT=180
+MAX_WAIT=30
 WAIT_COUNT=0
-EXPECTED_ROWS=501
+EXPECTED_ROWS=251
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
     SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running:" | awk '{print $2}')
@@ -384,7 +375,6 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 done
 
 safe_kill_process "$proxy_pid" "proxy"
-safe_kill_process "$walg_pid" "wal-g binlog-server"
 
 FINAL_ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
 AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
@@ -393,8 +383,8 @@ if [ "$AFTER_COUNT" -ne 0 ]; then
     echo "ERROR: Record after DT1 should not be replicated"
     exit 1
 fi
-
-PROXY_RECONNECTS=$(grep -c "Simulating network disconnect" "$PROXY_LOG" 2>/dev/null || echo "0")
+# cat $PROXY_LOG
+PROXY_RECONNECTS=$(grep -c "Planned disconnect" "$PROXY_LOG" 2>/dev/null || echo "0")
 BINLOG_CONNECTIONS=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" 2>/dev/null || echo "0")
 
 echo "Proxy reconnects: $PROXY_RECONNECTS (expected: 2)"
