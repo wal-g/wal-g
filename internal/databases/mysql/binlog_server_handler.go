@@ -154,11 +154,14 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	p.SetVerifyChecksum(true)
 
 	var skipTx bool
+	var currentTxGTID string
+	var txSent bool
 
 	f := func(e *replication.BinlogEvent) error {
 		if int64(e.Header.Timestamp) > untilTS.Unix() {
 			return nil
 		}
+
 		if e.Header.EventType == replication.GTID_EVENT {
 			gtidEvent := &replication.GTIDEvent{}
 			err = gtidEvent.Decode(e.RawData[replication.EventHeaderSize:])
@@ -175,16 +178,28 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 				return nil
 			}
 
-			gtidMutex.Lock()
-			lastSentGTID = thisGtidStr
-			gtidMutex.Unlock()
+			currentTxGTID = thisGtidStr
+			txSent = false
 		}
+
 		if skipTx {
 			return nil
 		}
+
 		err := s.AddEventToStreamer(e)
+		if err == nil {
+			txSent = true
+
+			if e.Header.EventType == replication.XID_EVENT && txSent && currentTxGTID != "" {
+				gtidMutex.Lock()
+				lastSentGTID = currentTxGTID
+				gtidMutex.Unlock()
+			}
+		}
+
 		return err
 	}
+
 	dstDir, _ := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
 
 	for {
