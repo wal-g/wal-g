@@ -362,8 +362,33 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
     SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running:" | awk '{print $2}')
     SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_SQL_Running:" | awk '{print $2}')
+
+    LAST_IO_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_IO_Error:" | cut -d: -f2-)
+    LAST_SQL_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_SQL_Error:" | cut -d: -f2-)
+
     mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Retrieved_Gtid_Set|Executed_Gtid_Set)"
     echo "Row count: $ROW_COUNT / $EXPECTED_ROWS, IO: $SLAVE_IO_RUNNING, SQL: $SLAVE_SQL_RUNNING (wait: $WAIT_COUNT/$MAX_WAIT)"
+
+    if [ -n "$LAST_IO_ERROR" ] && [ "$LAST_IO_ERROR" != " " ]; then
+        echo "Last IO Error: $LAST_IO_ERROR"
+    fi
+    if [ -n "$LAST_SQL_ERROR" ] && [ "$LAST_SQL_ERROR" != " " ]; then
+        echo "Last SQL Error: $LAST_SQL_ERROR"
+    fi
+
+    if ! kill -0 $walg_pid 2>/dev/null; then
+        echo "WARNING: wal-g binlog-server process died!"
+        echo "=== Last lines of binlog server log ==="
+        tail -20 $BINLOG_SERVER_LOG
+        break
+    fi
+
+    if ! kill -0 $proxy_pid 2>/dev/null; then
+        echo "WARNING: Proxy process died!"
+        echo "=== Last lines of proxy log ==="
+        tail -20 $PROXY_LOG
+        break
+    fi
 
     if [ "$ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
         echo "Replication completed successfully"
