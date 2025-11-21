@@ -164,13 +164,13 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			}
 			skipTx = gtidSet != nil && gtidSet.Contain(thisGtidSet)
 
-			gtidMutex.Lock()
-			lastSentGTID = thisGtidStr
-			gtidMutex.Unlock()
-
 			if skipTx {
 				return nil
 			}
+
+			gtidMutex.Lock()
+			lastSentGTID = thisGtidStr
+			gtidMutex.Unlock()
 		}
 		if skipTx {
 			return nil
