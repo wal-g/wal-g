@@ -267,7 +267,7 @@ echo "Started wal-g binlog-server with PID: $walg_pid"
 
 echo "Waiting for binlog-server to start..."
 WAIT_COUNT=0
-MAX_WAIT=30
+MAX_WAIT=10
 
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     if ! kill -0 $walg_pid 2>/dev/null; then
