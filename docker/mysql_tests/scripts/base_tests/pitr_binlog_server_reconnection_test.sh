@@ -30,14 +30,14 @@ for i in $(seq 1 250); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
         mysql -e "FLUSH LOGS"
-        sleep 0.2
+        sleep 0.5
         wal-g binlog-push
     fi
 done
 
 sleep 3
 DT1=$(date3339)
-sleep 1
+sleep 3
 
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
 mysql -e "FLUSH LOGS"
@@ -46,6 +46,7 @@ wal-g binlog-push
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
+sleep 2
 service mysql start || (cat /var/log/mysql/error.log && false)
 mysql_set_gtid_purged
 
@@ -297,7 +298,7 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     exit 1
 fi
 
-sleep 2
+sleep 5
 
 echo "Starting proxy with max 2 reconnections..."
 python3 /tmp/binlog_proxy.py > $PROXY_LOG 2>&1 & proxy_pid=$!

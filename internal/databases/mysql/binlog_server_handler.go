@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -137,6 +138,12 @@ func waitReplicationIsDone() error {
 }
 
 func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mysql.Position, s *replication.BinlogStreamer, gtidSet *mysql.MysqlGTIDSet) {
+	defer func() {
+		if r := recover(); r != nil {
+			tracelog.ErrorLogger.Printf("Panic in sendEventsFromBinlogFiles: %v", r)
+			tracelog.ErrorLogger.Printf("Stack trace: %s", debug.Stack())
+		}
+	}()
 	err := addRotateEvent(s, pos)
 	handleEventError(err, s)
 
@@ -183,6 +190,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	for {
 		logFile, err := logFilesProvider.GetObject()
 		if errors.Is(err, storage.ErrNoMoreObjects) {
+			tracelog.InfoLogger.Println("No more binlog files to process, starting wait for replication")
 			err := waitReplicationIsDone()
 			if err != nil {
 				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
@@ -190,14 +198,20 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			}
 			os.Exit(0)
 		}
-		handleEventError(err, s)
 		if err != nil {
+			tracelog.ErrorLogger.Printf("Error getting binlog file: %v", err)
+			handleEventError(err, s)
 			break
 		}
+
 		binlogName := utility.TrimFileExtension(logFile.GetName())
-		tracelog.InfoLogger.Printf("Synced binlog file %s", binlogName)
+		tracelog.InfoLogger.Printf("Processing binlog file %s", binlogName)
 		binlogPath := path.Join(dstDir, binlogName)
+
 		err = p.ParseFile(binlogPath, int64(pos.Pos), f)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Error parsing binlog file %s: %v", binlogName, err)
+		}
 		handleEventError(err, s)
 
 		pos.Pos = 4
