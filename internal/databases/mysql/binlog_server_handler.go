@@ -155,7 +155,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 
 	var skipTx bool
 	var currentTxGTID string
-	var txSent bool
+	var inTransaction bool
 
 	f := func(e *replication.BinlogEvent) error {
 		if int64(e.Header.Timestamp) > untilTS.Unix() {
@@ -179,7 +179,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			}
 
 			currentTxGTID = thisGtidStr
-			txSent = false
+			inTransaction = true
 		}
 
 		if skipTx {
@@ -187,17 +187,32 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		}
 
 		err := s.AddEventToStreamer(e)
-		if err == nil {
-			txSent = true
+		if err != nil {
+			return err
+		}
 
-			if e.Header.EventType == replication.XID_EVENT && txSent && currentTxGTID != "" {
+		if inTransaction && currentTxGTID != "" {
+			switch e.Header.EventType {
+			case replication.XID_EVENT:
 				gtidMutex.Lock()
 				lastSentGTID = currentTxGTID
 				gtidMutex.Unlock()
+				inTransaction = false
+				currentTxGTID = ""
+			case replication.QUERY_EVENT:
+				queryEvent := &replication.QueryEvent{}
+				err := queryEvent.Decode(e.RawData[replication.EventHeaderSize:])
+				if err == nil && strings.ToUpper(strings.TrimSpace(string(queryEvent.Query))) == "COMMIT" {
+					gtidMutex.Lock()
+					lastSentGTID = currentTxGTID
+					gtidMutex.Unlock()
+					inTransaction = false
+					currentTxGTID = ""
+				}
 			}
 		}
 
-		return err
+		return nil
 	}
 
 	dstDir, _ := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
