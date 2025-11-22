@@ -209,9 +209,17 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 // files to each segment instance (including master) so they can recover correctly
 // during the database startup
 func (fh *FetchHandler) createRecoveryConfigs() error {
-	recoveryTarget := fh.backup.Name
+	// Determine recovery_target_name for recovery.conf:
+	// 1) use user-provided --restore-point if present
+	// 2) else use backup's sentinel RestorePoint (created at backup time)
+	// 3) else fallback to the current backup name (merged backup name)
+	var recoveryTarget string
 	if fh.restorePoint != "" {
 		recoveryTarget = fh.restorePoint
+	} else if fh.sentinel.RestorePoint != nil && *fh.sentinel.RestorePoint != "" {
+		recoveryTarget = *fh.sentinel.RestorePoint
+	} else {
+		recoveryTarget = fh.backup.Name
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
 	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
