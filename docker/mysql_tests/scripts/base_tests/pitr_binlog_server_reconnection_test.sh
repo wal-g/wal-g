@@ -30,18 +30,14 @@ for i in $(seq 1 250); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
         mysql -e "FLUSH LOGS"
-        sleep 0.2
+        sleep 1
         wal-g binlog-push
     fi
 done
 
-# Ensure all binlogs are pushed before taking timestamp
-mysql -e "FLUSH LOGS"
-wal-g binlog-push
-sleep 2
-
+sleep 3
 DT1=$(date3339)
-sleep 1
+sleep 3
 
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
 mysql -e "FLUSH LOGS"
@@ -50,6 +46,7 @@ wal-g binlog-push
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
+sleep 2
 service mysql start || (cat /var/log/mysql/error.log && false)
 mysql_set_gtid_purged
 
@@ -227,6 +224,18 @@ EOF
 
 chmod +x /tmp/binlog_proxy.py
 
+check_port_listening() {
+    local port=$1
+    local host=${2:-127.0.0.1}
+
+    if timeout 2 bash -c "echo >/dev/tcp/${host}/${port}" 2>/dev/null; then
+        echo "Port $port is accepting connections"
+        return 0
+    fi
+
+    return 1
+}
+
 safe_kill_process() {
     local pid=$1
     local name=$2
@@ -251,6 +260,7 @@ safe_kill_process() {
     fi
 }
 
+
 echo "Starting wal-g binlog-server..."
 WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee $BINLOG_SERVER_LOG &
 walg_pid=$!
@@ -258,7 +268,7 @@ echo "Started wal-g binlog-server with PID: $walg_pid"
 
 echo "Waiting for binlog-server to start..."
 WAIT_COUNT=0
-MAX_WAIT=30
+MAX_WAIT=10
 
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     if ! kill -0 $walg_pid 2>/dev/null; then
@@ -268,20 +278,15 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
         exit 1
     fi
 
-    # Check if binlog server is listening AND has synced at least one file
     if grep -q "Listening on.*wait connection" $BINLOG_SERVER_LOG 2>/dev/null; then
         echo "Binlog server reports it's listening"
-
-        # Wait for at least one binlog file to be synced
-        if grep -q "Synced binlog file" $BINLOG_SERVER_LOG 2>/dev/null; then
-            echo "Binlog server has synced files and is ready"
-            sleep 2  # Give it a moment to stabilize
+        if check_port_listening $BINLOG_SERVER_PORT; then
+            echo "Binlog server is ready and accepting connections"
             break
         else
-            echo "Waiting for binlog server to sync files..."
+            echo "Binlog server reports listening but port check failed, waiting..."
         fi
     fi
-
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
@@ -292,6 +297,8 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     cat $BINLOG_SERVER_LOG
     exit 1
 fi
+
+sleep 5
 
 echo "Starting proxy with max 2 reconnections..."
 python3 /tmp/binlog_proxy.py > $PROXY_LOG 2>&1 & proxy_pid=$!
@@ -307,10 +314,8 @@ while [ $WAIT_COUNT -lt 15 ]; do
         exit 1
     fi
 
-    # Check if proxy is actually listening
-    if grep -q "Listening on port" $PROXY_LOG 2>/dev/null; then
-        echo "Proxy is ready and listening"
-        sleep 1
+    if check_port_listening $PROXY_PORT; then
+        echo "Proxy is ready and accepting connections"
         break
     fi
 
@@ -349,6 +354,7 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
+
 echo "Waiting for replication to complete..."
 MAX_WAIT=30
 WAIT_COUNT=0
@@ -357,8 +363,33 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
     SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running:" | awk '{print $2}')
     SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_SQL_Running:" | awk '{print $2}')
+
+    LAST_IO_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_IO_Error:" | cut -d: -f2-)
+    LAST_SQL_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_SQL_Error:" | cut -d: -f2-)
+
     mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Retrieved_Gtid_Set|Executed_Gtid_Set)"
     echo "Row count: $ROW_COUNT / $EXPECTED_ROWS, IO: $SLAVE_IO_RUNNING, SQL: $SLAVE_SQL_RUNNING (wait: $WAIT_COUNT/$MAX_WAIT)"
+
+    if [ -n "$LAST_IO_ERROR" ] && [ "$LAST_IO_ERROR" != " " ]; then
+        echo "Last IO Error: $LAST_IO_ERROR"
+    fi
+    if [ -n "$LAST_SQL_ERROR" ] && [ "$LAST_SQL_ERROR" != " " ]; then
+        echo "Last SQL Error: $LAST_SQL_ERROR"
+    fi
+
+    if ! kill -0 $walg_pid 2>/dev/null; then
+        echo "WARNING: wal-g binlog-server process died!"
+        echo "=== Last lines of binlog server log ==="
+        tail -20 $BINLOG_SERVER_LOG
+        break
+    fi
+
+    if ! kill -0 $proxy_pid 2>/dev/null; then
+        echo "WARNING: Proxy process died!"
+        echo "=== Last lines of proxy log ==="
+        tail -20 $PROXY_LOG
+        break
+    fi
 
     if [ "$ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
         echo "Replication completed successfully"
@@ -378,12 +409,13 @@ if [ "$AFTER_COUNT" -ne 0 ]; then
     echo "ERROR: Record after DT1 should not be replicated"
     exit 1
 fi
-
+# cat $PROXY_LOG
 PROXY_RECONNECTS=$(grep -c "Planned disconnect" "$PROXY_LOG" 2>/dev/null || echo "0")
 BINLOG_CONNECTIONS=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" 2>/dev/null || echo "0")
 
 echo "Proxy reconnects: $PROXY_RECONNECTS (expected: 2)"
 echo "Binlog server connections: $BINLOG_CONNECTIONS"
+
 
 if [ "$FINAL_ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
     echo "- Data replicated successfully: $FINAL_ROW_COUNT rows"
