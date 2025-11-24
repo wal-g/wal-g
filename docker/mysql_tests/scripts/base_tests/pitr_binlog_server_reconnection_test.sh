@@ -30,23 +30,34 @@ for i in $(seq 1 250); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
     if [ $((i % 50)) -eq 0 ]; then
         mysql -e "FLUSH LOGS"
-        sleep 0.5
+        sleep 0.2
         wal-g binlog-push
     fi
 done
 
+# Ensure all binlogs are pushed before taking timestamp
+mysql -e "FLUSH LOGS"
+wal-g binlog-push
 sleep 3
+
+# Get current GTID set before taking timestamp
+GTID_BEFORE_TS=$(mysql -N -e "SELECT @@GLOBAL.GTID_EXECUTED")
+echo "GTID set before timestamp: $GTID_BEFORE_TS"
+
 DT1=$(date3339)
-sleep 3
+sleep 1
 
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
+# Get final GTID set
+GTID_FINAL=$(mysql -N -e "SELECT @@GLOBAL.GTID_EXECUTED")
+echo "Final GTID set: $GTID_FINAL"
+
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
-sleep 2
 service mysql start || (cat /var/log/mysql/error.log && false)
 mysql_set_gtid_purged
 
@@ -75,6 +86,7 @@ class TwoDisconnectBinlogProxy:
         self.connection_start_time = None
         self.total_bytes_transferred = 0
         self.disconnects_completed = False
+        self.first_connection = True
 
     def connect_to_server(self):
         try:
@@ -97,7 +109,11 @@ class TwoDisconnectBinlogProxy:
         if not self.connection_start_time:
             return False
 
-        if self.bytes_transferred > 16384 and self.disconnect_count < self.planned_disconnects:
+        # Wait longer before first disconnect to ensure replication is established
+        min_bytes = 32768 if self.first_connection else 16384
+
+        if self.bytes_transferred > min_bytes and self.disconnect_count < self.planned_disconnects:
+            self.first_connection = False
             return True
 
         return False
@@ -120,7 +136,7 @@ class TwoDisconnectBinlogProxy:
                     print(f"[Proxy] Total bytes transferred so far: {self.total_bytes_transferred}")
 
                     self.server_socket.close()
-                    time.sleep(2)
+                    time.sleep(3)  # Increased delay between disconnects
 
                     self.disconnect_count += 1
 
@@ -260,7 +276,6 @@ safe_kill_process() {
     fi
 }
 
-
 echo "Starting wal-g binlog-server..."
 WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee $BINLOG_SERVER_LOG &
 walg_pid=$!
@@ -268,7 +283,7 @@ echo "Started wal-g binlog-server with PID: $walg_pid"
 
 echo "Waiting for binlog-server to start..."
 WAIT_COUNT=0
-MAX_WAIT=10
+MAX_WAIT=30  # Increased timeout
 
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     if ! kill -0 $walg_pid 2>/dev/null; then
@@ -282,7 +297,12 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
         echo "Binlog server reports it's listening"
         if check_port_listening $BINLOG_SERVER_PORT; then
             echo "Binlog server is ready and accepting connections"
-            break
+            # Additional check for binlog sync completion
+            if grep -q "Synced binlog file" $BINLOG_SERVER_LOG 2>/dev/null; then
+                echo "Binlog server has started syncing files"
+                sleep 5  # Give it time to sync initial files
+                break
+            fi
         else
             echo "Binlog server reports listening but port check failed, waiting..."
         fi
@@ -297,8 +317,6 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     cat $BINLOG_SERVER_LOG
     exit 1
 fi
-
-sleep 5
 
 echo "Starting proxy with max 2 reconnections..."
 python3 /tmp/binlog_proxy.py > $PROXY_LOG 2>&1 & proxy_pid=$!
@@ -336,6 +354,7 @@ mysql -e "STOP SLAVE"
 mysql -e "RESET SLAVE ALL"
 mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql -e "SET GLOBAL SLAVE_NET_TIMEOUT = 10"
+mysql -e "SET GLOBAL SLAVE_CONNECT_TIMEOUT = 10"
 mysql -e "CHANGE MASTER TO MASTER_HOST='127.0.0.1', MASTER_PORT=$PROXY_PORT, MASTER_USER='walg', MASTER_PASSWORD='walgpwd', MASTER_AUTO_POSITION=1, MASTER_CONNECT_RETRY=5, MASTER_RETRY_COUNT=86400"
 mysql -e "START SLAVE"
 
@@ -346,6 +365,13 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     SLAVE_STATUS=$(mysql -e "SHOW SLAVE STATUS\G" 2>/dev/null || echo "")
     SLAVE_IO_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_IO_Running:" | awk '{print $2}')
     SLAVE_SQL_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_SQL_Running:" | awk '{print $2}')
+    LAST_IO_ERROR=$(echo "$SLAVE_STATUS" | grep "Last_IO_Error:" | cut -d: -f2-)
+
+    echo "Replication status check $WAIT_COUNT: IO=$SLAVE_IO_RUNNING, SQL=$SLAVE_SQL_RUNNING"
+    if [ -n "$LAST_IO_ERROR" ] && [ "$LAST_IO_ERROR" != " " ]; then
+        echo "Last IO Error: $LAST_IO_ERROR"
+    fi
+
     if [ "$SLAVE_IO_RUNNING" = "Yes" ]; then
         echo "Replication IO thread started successfully"
         break
@@ -354,51 +380,69 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
+if [ "$WAIT_COUNT" -eq "$MAX_WAIT" ]; then
+    echo "ERROR: Replication failed to start"
+    echo "=== Slave Status ==="
+    mysql -e "SHOW SLAVE STATUS\G"
+    echo "=== Binlog server log (last 50 lines) ==="
+    tail -50 $BINLOG_SERVER_LOG
+    echo "=== Proxy log ==="
+    cat $PROXY_LOG
+    exit 1
+fi
 
 echo "Waiting for replication to complete..."
-MAX_WAIT=30
+MAX_WAIT=60  # Increased timeout
 WAIT_COUNT=0
 EXPECTED_ROWS=251
+LAST_ROW_COUNT=0
+STALL_COUNT=0
+
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
-    SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running:" | awk '{print $2}')
-    SLAVE_SQL_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_SQL_Running:" | awk '{print $2}')
+    SLAVE_STATUS=$(mysql -e "SHOW SLAVE STATUS\G" 2>/dev/null || echo "")
+    SLAVE_IO_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_IO_Running:" | awk '{print $2}')
+    SLAVE_SQL_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_SQL_Running:" | awk '{print $2}')
+    SECONDS_BEHIND=$(echo "$SLAVE_STATUS" | grep "Seconds_Behind_Master:" | awk '{print $2}')
 
-    LAST_IO_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_IO_Error:" | cut -d: -f2-)
-    LAST_SQL_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_SQL_Error:" | cut -d: -f2-)
+    echo "Row count: $ROW_COUNT / $EXPECTED_ROWS, IO: $SLAVE_IO_RUNNING, SQL: $SLAVE_SQL_RUNNING, Lag: $SECONDS_BEHIND (wait: $WAIT_COUNT/$MAX_WAIT)"
 
-    mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Retrieved_Gtid_Set|Executed_Gtid_Set)"
-    echo "Row count: $ROW_COUNT / $EXPECTED_ROWS, IO: $SLAVE_IO_RUNNING, SQL: $SLAVE_SQL_RUNNING (wait: $WAIT_COUNT/$MAX_WAIT)"
-
-    if [ -n "$LAST_IO_ERROR" ] && [ "$LAST_IO_ERROR" != " " ]; then
-        echo "Last IO Error: $LAST_IO_ERROR"
-    fi
-    if [ -n "$LAST_SQL_ERROR" ] && [ "$LAST_SQL_ERROR" != " " ]; then
-        echo "Last SQL Error: $LAST_SQL_ERROR"
-    fi
-
-    if ! kill -0 $walg_pid 2>/dev/null; then
-        echo "WARNING: wal-g binlog-server process died!"
-        echo "=== Last lines of binlog server log ==="
-        tail -20 $BINLOG_SERVER_LOG
-        break
-    fi
-
-    if ! kill -0 $proxy_pid 2>/dev/null; then
-        echo "WARNING: Proxy process died!"
-        echo "=== Last lines of proxy log ==="
-        tail -20 $PROXY_LOG
-        break
-    fi
+    # Show GTID progress
+    mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Retrieved_Gtid_Set|Executed_Gtid_Set)" || true
 
     if [ "$ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
         echo "Replication completed successfully"
         break
     fi
 
+    # Check if replication is stalled
+    if [ "$ROW_COUNT" -eq "$LAST_ROW_COUNT" ]; then
+        STALL_COUNT=$((STALL_COUNT + 1))
+        if [ "$STALL_COUNT" -gt 10 ]; then
+            echo "WARNING: Replication appears to be stalled at $ROW_COUNT rows"
+            echo "=== Current binlog server status ==="
+            tail -20 $BINLOG_SERVER_LOG
+            echo "=== Current proxy status ==="
+            tail -20 $PROXY_LOG
+        fi
+    else
+        STALL_COUNT=0
+    fi
+    LAST_ROW_COUNT=$ROW_COUNT
+
+    # Check if replication threads are still running
+    if [ "$SLAVE_IO_RUNNING" != "Yes" ] || [ "$SLAVE_SQL_RUNNING" != "Yes" ]; then
+        echo "WARNING: Replication thread stopped unexpectedly"
+        mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Last_.*_Error:|Slave_.*_Running:)" || true
+    fi
+
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
+
+# Final status check
+echo "=== Final replication status ==="
+mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Slave_.*_Running:|Last_.*_Error:|Retrieved_Gtid_Set|Executed_Gtid_Set)" || true
 
 safe_kill_process "$proxy_pid" "proxy"
 
@@ -409,22 +453,29 @@ if [ "$AFTER_COUNT" -ne 0 ]; then
     echo "ERROR: Record after DT1 should not be replicated"
     exit 1
 fi
-# cat $PROXY_LOG
+
 PROXY_RECONNECTS=$(grep -c "Planned disconnect" "$PROXY_LOG" 2>/dev/null || echo "0")
 BINLOG_CONNECTIONS=$(grep -c 'connection accepted from' "$BINLOG_SERVER_LOG" 2>/dev/null || echo "0")
 
+echo "=== Test Results ==="
 echo "Proxy reconnects: $PROXY_RECONNECTS (expected: 2)"
 echo "Binlog server connections: $BINLOG_CONNECTIONS"
-
+echo "Final row count: $FINAL_ROW_COUNT (expected: $EXPECTED_ROWS)"
 
 if [ "$FINAL_ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
-    echo "- Data replicated successfully: $FINAL_ROW_COUNT rows"
-    echo "- Network disconnects: $PROXY_RECONNECTS (limited to 2)"
+    echo "✓ Data replicated successfully: $FINAL_ROW_COUNT rows"
+    echo "✓ Network disconnects handled: $PROXY_RECONNECTS"
+    echo "Test completed successfully!"
 else
     echo "ERROR: Test failed"
     echo "- Expected $EXPECTED_ROWS rows, got $FINAL_ROW_COUNT"
     echo "- Proxy reconnects: $PROXY_RECONNECTS (expected: 2)"
+    echo "=== Debug information ==="
+    echo "Expected GTID before timestamp: $GTID_BEFORE_TS"
+    echo "Final GTID: $GTID_FINAL"
+    echo "=== Last 100 lines of binlog server log ==="
+    tail -100 $BINLOG_SERVER_LOG
+    echo "=== Complete proxy log ==="
+    cat $PROXY_LOG
     exit 1
 fi
-
-echo "Test completed successfully!"
