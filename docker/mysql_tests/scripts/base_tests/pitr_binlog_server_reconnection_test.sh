@@ -26,9 +26,9 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
-for i in $(seq 1 250); do
+for i in $(seq 1 300); do
     mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_batch_$i', NOW())"
-    if [ $((i % 50)) -eq 0 ]; then
+    if [ $((i % 25)) -eq 0 ]; then
         mysql -e "FLUSH LOGS"
         sleep 1
         wal-g binlog-push
@@ -358,7 +358,7 @@ done
 echo "Waiting for replication to complete..."
 MAX_WAIT=30
 WAIT_COUNT=0
-EXPECTED_ROWS=251
+EXPECTED_ROWS=301
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr" 2>/dev/null || echo "0")
     SLAVE_IO_RUNNING=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Slave_IO_Running:" | awk '{print $2}')
