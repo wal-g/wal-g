@@ -3,6 +3,7 @@ package partial
 import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -75,7 +76,10 @@ func GetFilters(whitelist, blacklist []string) (map[string]map[string]struct{}, 
 	for _, uri := range whitelist {
 		db, col := util.SplitNamespace(uri)
 
-		whitelistFilter[db] = map[string]struct{}{}
+		if _, ok := whitelistFilter[db]; !ok {
+			whitelistFilter[db] = map[string]struct{}{}
+		}
+
 		if col != "" {
 			whitelistFilter[db][col] = struct{}{}
 		}
@@ -134,6 +138,8 @@ func GetTarFilesFilter(
 
 	whitelistSpecified := len(whitelist) > 0
 	whitelistFilter, blacklistFilter := GetFilters(whitelist, blacklist)
+	tracelog.DebugLogger.Printf("Whitelist namespaces filter: %v", whitelistFilter)
+	tracelog.DebugLogger.Printf("Blacklist namespaces filter: %v", blacklistFilter)
 
 	for db, dbInfo := range routes.Databases {
 		for col, colInfo := range dbInfo {
