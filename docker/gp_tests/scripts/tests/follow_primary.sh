@@ -3,10 +3,7 @@ set -e -x
 CONFIG_FILE="/tmp/configs/follow_primary_test_config.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/pg_scripts/wrap_config_file.sh ${TMP_CONFIG}
+jq -s '.[0] * .[1]' ${COMMON_CONFIG} ${CONFIG_FILE} > ${TMP_CONFIG}
 source /tmp/tests/test_functions/util.sh
 
 bootstrap_gp_cluster
