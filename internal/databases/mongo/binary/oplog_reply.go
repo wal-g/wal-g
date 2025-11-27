@@ -2,7 +2,6 @@ package binary
 
 import (
 	"context"
-
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -23,16 +22,40 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 			client.OplogApplicationMode(client.OplogAppMode(*replayArgs.OplogApplicationMode)))
 	}
 
+	initMongo := replayArgs.MinimalConfigPath != ""
+	if initMongo {
+		mongodProcess, err := Mongod(replayArgs.MinimalConfigPath).Start()
+		if err != nil {
+			return err
+		}
+		defer mongodProcess.Close()
+		mongodbURL = mongodProcess.GetURI()
+	}
+
 	mongoClient, err := client.NewMongoClient(ctx, mongodbURL, mongoClientArgs...)
 	if err != nil {
 		return err
+	}
+
+	var emptyTS models.Timestamp
+	if replayArgs.Since == emptyTS {
+		replayArgs.Since, err = mongoClient.LastOplogTS(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err = mongoClient.EnsureIsMaster(ctx); err != nil {
 		return err
 	}
 
-	dbApplier := oplog.NewDBApplier(mongoClient, false, replayArgs.IgnoreErrCodes)
+	dbApplier := oplog.NewDBApplier(mongoClient, oplog.DBApplierArgs{
+		PreserveUUID:   false,
+		Partial:        replayArgs.Partial,
+		InitMongo:      initMongo,
+		Reconfig:       replayArgs.WithCatchUpReconfig,
+		IgnoreErrCodes: replayArgs.IgnoreErrCodes,
+	})
 	oplogApplier := stages.NewGenericApplier(dbApplier)
 
 	// set up storage downloader client

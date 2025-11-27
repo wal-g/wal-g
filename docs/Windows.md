@@ -10,10 +10,11 @@ Since Go version 1.5 cross-compiling of pure Go executables has become very easy
 
 * export GOOS=windows
 * export GOARCH=amd64
+* export GOEXPERIMENT=jsonv2
 
 * make install
 * make deps
-* make sqlserver_build
+* make sqlserver_build pg_build
 
 * mv main/sqlserver/wal-g{,.exe}
 

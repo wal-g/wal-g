@@ -223,6 +223,13 @@ Runs mysql server implementation which can be used to fetch binlogs from storage
 ```bash
 wal-g binlog-server
 ```
+### ``binlog-list``
+
+Lists binlogs in storage with filtering and formatting options.
+
+```bash
+wal-g binlog-list
+```
 
 ### ``backup-mark``
 

@@ -1,11 +1,6 @@
 name: Docker tests
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
-  workflow_dispatch:
+on: [ push, pull_request, workflow_dispatch ]
 
 jobs:
   parallel:
@@ -63,12 +58,16 @@ jobs:
         "make TEST=\"pg_daemon_client_test\" pg_integration_test",
         "make TEST=\"prefetch_test\" pg_integration_test",
         "make mongo_test",
-        "make MONGO_VERSION=\"8.0.3\" MONGO_MAJOR=\"8.0\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_features",
-        "make MONGO_VERSION=\"8.0.3\" MONGO_MAJOR=\"8.0\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_features",
-        "make MONGO_VERSION=\"7.0.15\" MONGO_MAJOR=\"7.0\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_features",
-        "make MONGO_VERSION=\"7.0.15\" MONGO_MAJOR=\"7.0\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_features",
-        "make MONGO_VERSION=\"6.0.19\" MONGO_MAJOR=\"6.0\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_features",
-        "make MONGO_VERSION=\"6.0.19\" MONGO_MAJOR=\"6.0\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_logical_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_partial_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_logical_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_partial_features",
         "make redis_test",
         "make FEATURE=\"aof_backup\" IMAGE_TYPE=\"aof\" REDIS_VERSION=\"7.0.15\" redis_features",
         "make FEATURE=\"aof_backup\" IMAGE_TYPE=\"aof\" REDIS_VERSION=\"7.2.4\" redis_features",

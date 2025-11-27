@@ -15,16 +15,18 @@ COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
 MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
-MONGO_MAJOR ?= "8.0"
 MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
+MONGO_TEST_TYPE ?= "all"
 GOLANGCI_LINT_VERSION ?= "v2.0"
 REDIS_VERSION ?= "6.2.4"
 IMAGE_TYPE ?= "rdb"
 TOOLS_MOD_DIR := ./internal/tools
 MOCKS_DESTINATION := ./testtools/mocks
 FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
+WALG_VERSION ?= `git tag -l --points-at HEAD | tail -1`
+GIT_REVISION ?= `git rev-parse --short HEAD`
 
 BUILD_TAGS:=
 
@@ -40,6 +42,12 @@ ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
+BUILD_GCFLAGS := 
+
+ifdef ENABLE_DEBUG
+	BUILD_GCFLAGS:=$(BUILD_GCFLAGS) all=-N -l
+endif
+
 .PHONY: unittest fmt lint clean install_tools
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
@@ -47,7 +55,7 @@ test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudb
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/pg.walgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
 
 install_and_build_pg: deps pg_build
 
@@ -79,7 +87,7 @@ pg_integration_test: clean_compose
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
 	fi
-	@if echo "$(TEST)" | grep -Fqe "pg_ssh_"; then\
+	@if echo "$(TEST)" | grep -Fq -e "pg_ssh_" -e "pg_storage_ssh_"; then\
 		docker compose build ssh;\
 	fi
 
@@ -124,10 +132,10 @@ mysql_base: deps mysql_build unlink_brotli
 mysql_test: deps mysql_build unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
 
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
@@ -165,7 +173,7 @@ mariadb_integration_test: unlink_brotli load_docker_common
 mongo_test: deps mongo_build unlink_brotli
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build $(BUILD_ARGS) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_MONGO_PATH) && go build $(BUILD_ARGS) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
 
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
@@ -173,14 +181,26 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) MONGO_TEST_TYPE=$(MONGO_TEST_TYPE) go test -v -count=1 -timeout 45m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
+
+mongo_binary_features:
+	MONGO_TEST_TYPE="binary" $(MAKE) mongo_features
+
+mongo_logical_features:
+	MONGO_TEST_TYPE="logical" $(MAKE) mongo_features
+
+mongo_partial_features:
+	MONGO_TEST_TYPE="partial" $(MAKE) mongo_features
+
+mongo_catch_up_features:
+	MONGO_TEST_TYPE="catch_up" $(MAKE) mongo_features
 
 clean_mongo_features:
 	set -e
-	cd tests_func/ && MONGO_MAJOR=$(MONGO_MAJOR) MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w")
+	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w")
 
 fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
@@ -193,7 +213,7 @@ fdb_integration_test: load_docker_common
 redis_test: deps redis_build unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/redis.walgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
 
 redis_integration_test: load_docker_common
 	docker compose build redis && docker compose build redis_tests
@@ -218,7 +238,7 @@ clean_redis_features:
 etcd_test: deps etcd_build unlink_brotli etcd_integration_test
 
 etcd_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_ETCD_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_ETCD_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=$(WALG_VERSION)")
 
 etcd_install: etcd_build
 	mv $(MAIN_ETCD_PATH)/wal-g $(GOBIN)/wal-g
@@ -229,11 +249,12 @@ etcd_clean:
 
 # refactor
 etcd_integration_test: load_docker_common
-	docker compose build etcd etcd_tests
+	docker compose build etcd
+	docker compose build etcd_tests
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=`git rev-parse --short HEAD` -X github.com/wal-g/wal-g/cmd/gp.walgVersion=`git tag -l --points-at HEAD`")
+	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
 
 gp_clean:
 	(cd $(MAIN_GP_PATH) && go clean)
@@ -245,7 +266,8 @@ gp_install: gp_build
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	docker compose build gp gp_tests
+	docker compose build gp
+	docker compose build gp_tests
 	docker compose up --exit-code-from gp_tests gp_tests
 
 cloudberry_build: gp_build
@@ -257,7 +279,8 @@ cloudberry_install: gp_install
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
-	docker compose build cloudberry cloudberry_tests
+	docker compose build cloudberry
+	docker compose build cloudberry_tests
 	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 
 st_test: deps pg_build unlink_brotli st_integration_test
@@ -335,7 +358,7 @@ unlink_libsodium:
 
 build_client:
 	cd cmd/daemonclient && \
-	go build -o ../../bin/walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=`git rev-parse --short HEAD` -X main.version=`git tag -l --points-at HEAD`"
+	go build -o ../../bin/walg-daemon-client -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=$(GIT_REVISION) -X main.version=$(WALG_VERSION)"
 
 .PHONY: mocks
 # put the files with interfaces you'd like to mock in prerequisites

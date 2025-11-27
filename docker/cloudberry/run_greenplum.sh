@@ -4,7 +4,7 @@ set +ex
 
 sudo /etc/init.d/ssh start
 
-source /usr/local/gpdb_src/greenplum_path.sh
+source /usr/local/gpdb_src/greenplum_path.sh || source /usr/local/gpdb_src/cloudberry-env.sh
 
 cd /usr/local/gpdb_src
 

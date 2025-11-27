@@ -3,6 +3,7 @@ FROM walg-func-test-base as build
 
 ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
 ENV USE_BROTLI 1
+ENV GOEXPERIMENT=jsonv2
 
 RUN mkdir -p ${WALG_REPO}
 COPY staging/wal-g ${WALG_REPO}/
@@ -24,11 +25,12 @@ ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
 ARG MONGO_PACKAGE=mongodb-org
 ARG MONGO_REPO=repo.mongodb.org
 ENV MONGO_PACKAGE=${MONGO_PACKAGE} MONGO_REPO=${MONGO_REPO}
-ARG MONGO_MAJOR=
 ARG MONGO_VERSION=
 
 ENV TMP_DIR /var/tmp/wal-g
 ENV WALG_CONF_DIR /etc/wal-g/
+
+ENV MONGO_MAJOR=${MONGO_VERSION%.*}
 
 RUN apt-get update -q && \
     apt-get install --yes --no-install-recommends --no-install-suggests \

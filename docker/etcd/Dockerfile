@@ -1,4 +1,4 @@
-FROM bitnami/etcd:3.5.21
+FROM bitnamilegacy/etcd:3.5.21
 # in 3.6 which is latest "etcdctl snapshot restore" -> "etcdutl snapshot restore" 
 
 # FROM wal-g/ubuntu:latest

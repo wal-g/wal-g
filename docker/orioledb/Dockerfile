@@ -1,5 +1,5 @@
 FROM wal-g/golang:latest as build
-
+ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 RUN apt-get update && \

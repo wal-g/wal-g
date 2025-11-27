@@ -29,7 +29,8 @@ func (header *PageHeader) isValid() bool {
 		header.pdUpper > header.pdSpecial ||
 		int64(header.pdSpecial) > DatabasePageSize ||
 		(header.lsn() == invalidLsn) ||
-		int64(header.pdPageSizeVersion) != DatabasePageSize+layoutVersion)
+		int64(header.pdPageSizeVersion&0xFF00) != DatabasePageSize ||
+		int64(header.pdPageSizeVersion&0xFF) > layoutVersion)
 }
 
 func (header *PageHeader) isNew() bool {

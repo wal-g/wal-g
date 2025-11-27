@@ -1,21 +1,17 @@
 #!/bin/sh
 set -e -x
-CONFIG_FILE="/tmp/configs/partial_restore_test_config.json"
-COMMON_CONFIG="/tmp/configs/common_config.json"
-TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+
+. /tmp/tests/test_functions/prepare_config.sh
+prepare_config "/tmp/configs/partial_restore_test_config.json"
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
-/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+initdb ${PGDATA}
 
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = 'wal-g --config=${TMP_CONFIG} wal-push %p && echo \"WAL pushing: %p\"'" >> ${PGDATA}/postgresql.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 psql -c "CREATE DATABASE first" postgres
@@ -41,7 +37,7 @@ sleep 10
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST --restore-only=first/tbl1,second
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 if [ "$(psql -t -c "SELECT COUNT(*) FROM tbl1;" -d first -A)" = 20000 ]; then

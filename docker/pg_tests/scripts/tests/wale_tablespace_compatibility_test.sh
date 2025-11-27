@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e -x
 
-/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+initdb ${PGDATA}
 
-echo "archive_mode = on" >> /var/lib/postgresql/10/main/postgresql.conf
+echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '\
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
@@ -18,12 +18,10 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-/usr/bin/timeout 600 wal-e wal-push %p'" >> /var/lib/postgresql/10/main/postgresql.conf
-echo "archive_timeout = 600" >> /var/lib/postgresql/10/main/postgresql.conf
+/usr/bin/timeout 600 wal-e wal-push %p'" >> ${PGDATA}/postgresql.conf
+echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
-
-/tmp/scripts/wait_while_pg_not_ready.sh
+pg_ctl -D ${PGDATA} -w start
 
 mkdir /tmp/spaces
 mkdir /tmp/spaces/space
@@ -105,7 +103,7 @@ WALE_FILE_PREFIX=file://localhost/tmp \
 
 cp -t ${PGDATA} /tmp/conf_files/postgresql.conf /tmp/conf_files/pg_hba.conf /tmp/conf_files/pg_ident.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 pg_dumpall -f /tmp/dump2
 

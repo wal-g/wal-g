@@ -1,5 +1,5 @@
 FROM wal-g/golang:latest as build
-
+ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 COPY go.mod go.mod
@@ -11,6 +11,7 @@ COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
 
+# we test wal-g logic, not our deps. So, no brotli in these tests.
 RUN cd main/gp && \
     go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 

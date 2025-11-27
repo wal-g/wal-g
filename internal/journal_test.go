@@ -103,7 +103,7 @@ func CreateThreeJournals(
 	)
 
 	assert.NoError(t, ji2.Upload(folder))
-	assert.NoError(t, ji2.UpdateIntervalSize(folder))
+	assert.NoError(t, ji2.UpdateIntervalSize(folder, &internal.JournalFiles{}))
 	assert.NoError(t, ji1.Read(folder))
 
 	ji3 := internal.NewEmptyJournalInfo(
@@ -120,7 +120,7 @@ func CreateThreeJournals(
 	)
 
 	assert.NoError(t, ji3.Upload(folder))
-	assert.NoError(t, ji3.UpdateIntervalSize(folder))
+	assert.NoError(t, ji3.UpdateIntervalSize(folder, &internal.JournalFiles{}))
 	assert.NoError(t, ji2.Read(folder))
 	assert.NoError(t, ji1.Read(folder))
 
@@ -186,13 +186,13 @@ func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
 
 	// There are random method calls
 	for i := 0; i < 10; i++ {
-		assert.NoError(t, ji1.UpdateIntervalSize(folder))
+		assert.NoError(t, ji1.UpdateIntervalSize(folder, &internal.JournalFiles{}))
 		assert.NoError(t, ji1.Upload(folder))
 		assert.NoError(t, ji3.Read(folder))
 		assert.NoError(t, ji2.Upload(folder))
-		assert.NoError(t, ji2.UpdateIntervalSize(folder))
+		assert.NoError(t, ji2.UpdateIntervalSize(folder, &internal.JournalFiles{}))
 		assert.NoError(t, ji3.Upload(folder))
-		assert.NoError(t, ji3.UpdateIntervalSize(folder))
+		assert.NoError(t, ji3.UpdateIntervalSize(folder, &internal.JournalFiles{}))
 		assert.NoError(t, ji2.Read(folder))
 		assert.NoError(t, ji1.Read(folder))
 	}

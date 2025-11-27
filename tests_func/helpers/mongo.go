@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -189,30 +190,53 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 			restore = "&restore=true"
 		}
 	}
+
 	uri := fmt.Sprintf("mongodb://%s%s:%d/%s"+
 		"?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000%s",
 		auth, mc.expHost, mc.expPort, dbase, restore)
-	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(mc.ctx, options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, fmt.Errorf("can not create mongo client: %v", err)
-	}
-	err = client.Connect(mc.ctx)
-	if err != nil {
-		return nil, fmt.Errorf("can not connect via mongo client: %v", err)
 	}
 	return client, nil
 }
 
-func (mc *MongoCtl) AddDataToCollection(dbName, colName, prefix string) error {
+func (mc *MongoCtl) AddDataToCollection(dbName, colName, prefix string, strLen, inserts int) error {
 	conn, err := mc.AdminConnect()
 	if err != nil {
 		return err
 	}
-	if _, err = conn.Database(dbName).Collection(colName).InsertOne(
-		mc.ctx, generateRecord(1, 1, prefix),
-	); err != nil {
+
+	docs := make([]interface{}, inserts)
+
+	for i := 0; i < inserts; i++ {
+		docs[i] = generateRecord(1, strLen, prefix)
+	}
+
+	_, err = conn.Database(dbName).Collection(colName).InsertMany(mc.ctx, docs)
+	time.Sleep(3 * time.Second)
+
+	return err
+}
+
+func (mc *MongoCtl) OplogTimeDiff() (float64, error) {
+	res, err := mc.runMongoShellEval("db.getReplicationInfo().timeDiff", AutoDetectAuth, false, AdminDB)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(strings.Trim(res.Stdout(), "\n \t"), 64)
+}
+
+func (mc *MongoCtl) DeleteCollection(db, collection string) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
 		return err
 	}
+	err = conn.Database(db).Collection(collection).Drop(mc.ctx)
+	if err != nil {
+		return err
+	}
+	time.Sleep(3 * time.Second)
 	return nil
 }
 
@@ -368,7 +392,6 @@ func (mc *MongoCtl) runIsMaster() (IsMaster, error) {
 	}
 	im := IsMaster{}
 	err = conn.Database(AdminDB).RunCommand(mc.ctx, bson.D{{Key: "isMaster", Value: 1}}).Decode(&im)
-
 	return im, err
 }
 
@@ -396,6 +419,7 @@ func (mc *MongoCtl) LastTS() (OpTimestamp, error) {
 	if err != nil {
 		return OpTimestamp{}, err
 	}
+
 	var op db.Oplog
 	opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
 	err = conn.Database(LocalDB).Collection(OplogColl).
@@ -448,6 +472,21 @@ func (mc *MongoCtl) InitReplSet() error {
 	_, err = mc.runMongoShellEval("rs.initiate()", AutoDetectAuth, false, "")
 	time.Sleep(3 * time.Second) // TODO: wait until rs initiated
 
+	return err
+}
+
+func (mc *MongoCtl) AddToReplicaset(host string) error {
+	im, err := mc.runIsMaster()
+	if err != nil {
+		return err
+	}
+	if !im.IsMaster {
+		return fmt.Errorf("host %v is master", host)
+	}
+	_, err = mc.runMongoShellEval(fmt.Sprintf("rs.add({host: '%s:%d', priority: 0, votes: 0, hidden: true})", host, MongodPort), AutoDetectAuth, false, "")
+	if err != nil {
+		return err
+	}
 	return err
 }
 
@@ -558,26 +597,8 @@ func (mc *MongoCtl) StartMongod() error {
 	return err
 }
 
-func (mc *MongoCtl) DeleteMongodReplSetSetting() error {
-	_, err := mc.runCmd("bash", "-c",
-		"sed -i \"s/ --replSet.*//\" /config/supervisor/conf.d/mongodb.conf",
-	)
-	if err != nil {
-		return err
-	}
-	_, err = mc.runCmd("supervisorctl", "reread")
-	if err != nil {
-		return err
-	}
-	_, err = mc.runCmd("supervisorctl", "update")
-	if err != nil {
-		return err
-	}
-	return mc.StopMongod()
-}
-
 func (mc *MongoCtl) GetLogs() error {
-	t, err := mc.runCmd("cat", "/var/log/mongodb/mongod.log")
+	t, err := mc.runCmd("tail", "-n2000", "/var/log/mongodb/mongod.log")
 	tracelog.InfoLogger.Println(t)
 	return err
 }
@@ -598,4 +619,26 @@ func (mc *MongoCtl) PurgeDatadir() error {
 func (mc *MongoCtl) ChownDBPath() error {
 	_, err := mc.runCmd("bash", "-c", "chown -R mongodb.mongodb /var/lib/mongodb/*")
 	return err
+}
+
+func (mc *MongoCtl) ChangeReplSet(rs string) error {
+	_, err := mc.runCmd("bash", "-c",
+		fmt.Sprintf("sed -i 's/--replSet [^ ]*/--replSet %s/' /etc/supervisor/conf.d/mongodb.conf", rs),
+	)
+	if err != nil {
+		return err
+	}
+	_, err = mc.runCmd("supervisorctl", "reread")
+	if err != nil {
+		return err
+	}
+	_, err = mc.runCmd("supervisorctl", "update")
+	if err != nil {
+		return err
+	}
+	err = mc.StopMongod()
+	if err != nil {
+		return err
+	}
+	return mc.StartMongod()
 }

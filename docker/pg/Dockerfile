@@ -1,6 +1,7 @@
 FROM wal-g/ubuntu:18.04
 
 ENV PGDATA /var/lib/postgresql/10/main
+ENV PATH /usr/lib/postgresql/10/bin:$PATH
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
@@ -8,7 +9,6 @@ RUN apt-get update && \
     postgresql-contrib \
     gnupg \
     gpg-agent \
-    pinentry-qt \
     time \
     bc \
     jq \

@@ -604,7 +604,7 @@ func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunne
 	pgInfo.systemIdentifier = queryRunner.SystemIdentifier
 	tracelog.DebugLogger.Printf("Postgres SystemIdentifier: %d", queryRunner.Version)
 
-	pgInfo.Timeline, err = queryRunner.readTimeline()
+	pgInfo.Timeline, err = queryRunner.ReadTimeline()
 	if err != nil {
 		return pgInfo, nil, err
 	}
@@ -629,17 +629,13 @@ func (bh *BackupHandler) uploadExtendedMetadata(ctx context.Context, meta Extend
 	return bh.Arguments.Uploader.Upload(ctx, metaFile, bytes.NewReader(dtoBody))
 }
 
-func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto FilesMetadataDto) (err error) {
+func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto FilesMetadataDto) error {
 	if bh.Arguments.withoutFilesMetadata {
 		tracelog.InfoLogger.Printf("Files metadata tracking is disabled, will not upload the %s", FilesMetadataName)
 		return nil
 	}
 
-	dtoBody, err := json.Marshal(filesMetaDto)
-	if err != nil {
-		return err
-	}
-	return bh.Arguments.Uploader.Upload(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), bytes.NewReader(dtoBody))
+	return bh.Arguments.Uploader.UploadJSON(ctx, getFilesMetadataPath(bh.CurBackupInfo.Name), filesMetaDto)
 }
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {
