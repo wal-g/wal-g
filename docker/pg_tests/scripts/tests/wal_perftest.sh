@@ -1,15 +1,8 @@
 #!/bin/sh
 set -e -x
 
-CONFIG_FILE="/tmp/configs/wal_perftest_config.json"
-
-COMMON_CONFIG="/tmp/configs/common_config.json"
-TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+. /tmp/tests/test_functions/prepare_config.sh
+prepare_config "/tmp/configs/wal_perftest_config.json"
 
 WAL_PUSH_LOGS="/tmp/logs/pg_wal_perftest_push"
 WAL_FETCH_LOGS="/tmp/logs/pg_wal_perftest_fetch"

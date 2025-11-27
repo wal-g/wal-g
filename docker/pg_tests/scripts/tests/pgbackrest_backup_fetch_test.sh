@@ -1,14 +1,10 @@
 #!/bin/bash
 set -e -x
-CONFIG_FILE="/tmp/configs/pgbackrest_backup_fetch_config.json"
-COMMON_CONFIG="/tmp/configs/common_config.json"
-TMP_CONFIG="/tmp/configs/tmp_config.json"
+
 PGBACKREST_CONFIG="/tmp/configs/pgbackrest_backup_fetch_config.ini"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
- 
+
+. /tmp/tests/test_functions/prepare_config.sh
+prepare_config "/tmp/configs/pgbackrest_backup_fetch_config.json"
 
 initdb ${PGDATA}
 
