@@ -51,7 +51,7 @@ func (fh *ActionHandler) UpdateAction(action string) {
 		return fmt.Sprintf("Unable to create recovery.conf on segment %d", contentID)
 	})
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		tracelog.DebugLogger.Printf("Update recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 }
