@@ -18,7 +18,11 @@ type CompressAndEncryptError struct {
 }
 
 func newCompressingPipeWriterError(reason string, cause error) CompressAndEncryptError {
-	return CompressAndEncryptError{errors.Wrap(cause, reason)}
+	err := errors.Wrap(cause, reason)
+	if err == nil {
+		err = errors.New(reason)
+	}
+	return CompressAndEncryptError{err}
 }
 
 func (err CompressAndEncryptError) Error() string {
