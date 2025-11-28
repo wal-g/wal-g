@@ -37,7 +37,6 @@ type Handler struct {
 	server.EmptyReplicationHandler
 	globalStreamer    *replication.BinlogStreamer
 	streamerMutex     sync.Mutex
-	syncOnce          sync.Once
 	gtidSet           *mysql.MysqlGTIDSet
 	historicalStarted bool
 	historicalMu      sync.Mutex
@@ -228,7 +227,7 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 	return nil
 }
 
-func (h *Handler) startHistoricalStreamingOnce(pos mysql.Position) {
+func (h *Handler) startHistoricalStreaming(pos mysql.Position) {
 	h.historicalMu.Lock()
 	if h.historicalStarted {
 		h.historicalMu.Unlock()
@@ -238,58 +237,40 @@ func (h *Handler) startHistoricalStreamingOnce(pos mysql.Position) {
 	h.historicalMu.Unlock()
 
 	go func() {
-		tracelog.InfoLogger.Println("Starting historical binlog streaming from downloaded files...")
+		tracelog.InfoLogger.Println("=== STARTING HISTORICAL BINLOG STREAMING ===")
 
 		logFilesProvider := storage.NewLowMemoryObjectProvider()
+
 		st, err := internal.ConfigureStorage()
 		if err != nil {
-			tracelog.ErrorLogger.Printf("Failed to configure storage for historical streaming: %v", err)
-			return
+			tracelog.ErrorLogger.Fatal("Failed to configure storage", err)
 		}
 		dstDir, _ := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
-
 		go provideLogs(st.RootFolder(), dstDir, startTS, untilTS, logFilesProvider)
 
+		time.Sleep(2 * time.Second)
+
+		err = addRotateEvent(h.globalStreamer, pos)
+		handleEventError(err, h.globalStreamer)
+
 		sendEventsFromBinlogFiles(logFilesProvider, pos, h.globalStreamer, h.gtidSet)
+		tracelog.InfoLogger.Println("=== HISTORICAL STREAMING FINISHED ===")
 	}()
 }
 
 func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	h.streamerMutex.Lock()
 	if h.globalStreamer != nil {
-		tracelog.InfoLogger.Println("Reusing existing streamer (BinlogDump)")
 		h.streamerMutex.Unlock()
 		return h.globalStreamer, nil
 	}
 
 	h.globalStreamer = replication.NewBinlogStreamer()
-	current := h.globalStreamer
+	streamer := h.globalStreamer
 	h.streamerMutex.Unlock()
 
-	var syncErr error
-	h.syncOnce.Do(func() {
-		st, err := internal.ConfigureStorage()
-		if err != nil {
-			syncErr = err
-			return
-		}
-		startTime, err := GetBinlogTS(st.RootFolder(), pos.Name)
-		if err != nil {
-			syncErr = err
-			return
-		}
-		syncErr = syncBinlogFiles(pos, startTime, current, h.gtidSet)
-	})
-	if syncErr != nil {
-		h.streamerMutex.Lock()
-		h.globalStreamer = nil
-		h.streamerMutex.Unlock()
-		return nil, syncErr
-	}
-
-	h.startHistoricalStreamingOnce(pos)
-
-	return current, nil
+	h.startHistoricalStreaming(pos)
+	return streamer, nil
 }
 
 func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
@@ -297,34 +278,16 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 
 	h.streamerMutex.Lock()
 	if h.globalStreamer != nil {
-		tracelog.InfoLogger.Println("Reusing existing streamer (BinlogDumpGTID)")
 		h.streamerMutex.Unlock()
 		return h.globalStreamer, nil
 	}
 
 	h.globalStreamer = replication.NewBinlogStreamer()
-	current := h.globalStreamer
+	streamer := h.globalStreamer
 	h.streamerMutex.Unlock()
 
-	var syncErr error
-	h.syncOnce.Do(func() {
-		syncErr = syncBinlogFiles(
-			mysql.Position{Name: "host-binlog-file", Pos: 4},
-			startTS,
-			current,
-			h.gtidSet,
-		)
-	})
-	if syncErr != nil {
-		h.streamerMutex.Lock()
-		h.globalStreamer = nil
-		h.streamerMutex.Unlock()
-		return nil, syncErr
-	}
-
-	h.startHistoricalStreamingOnce(mysql.Position{Name: "host-binlog-file", Pos: 4})
-
-	return current, nil
+	h.startHistoricalStreaming(mysql.Position{Name: "mysql-bin.000001", Pos: 4})
+	return streamer, nil
 }
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
