@@ -227,3 +227,86 @@ func TestBackupNameSelector_emptyFolder(t *testing.T) {
 	assert.NoError(t, err)
 	checkEmptyFolderBehaviour(t, backupSelector)
 }
+
+// Tests for LatestBackupSelectorWithMetaFetcher - Issue #694 fix
+// These tests verify that LATEST backup selection uses creation time from metadata
+// instead of storage modification time.
+
+func TestLatestBackupSelectorWithMetaFetcher_selectsByCreationTime(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	// Create two backups where the "older" one (by creation time) has a newer modification time
+	// This simulates the scenario where a backup is re-uploaded to storage
+
+	// Backup 1: Created earlier (older), but will have later modification time
+	olderBackup := internal.GenericMetadata{
+		BackupName: "stream_20231118T100000Z",
+		StartTime:  time.Date(2023, 11, 18, 10, 0, 0, 0, time.UTC),
+	}
+
+	// Backup 2: Created later (newer), but will have earlier modification time
+	newerBackup := internal.GenericMetadata{
+		BackupName: "stream_20231118T120000Z",
+		StartTime:  time.Date(2023, 11, 18, 12, 0, 0, 0, time.UTC),
+	}
+
+	// Put backup 2 first (earlier modification time)
+	b2 := path.Join(utility.BaseBackupPath, newerBackup.BackupName+utility.SentinelSuffix)
+	meta2 := convertMetadata(newerBackup)
+	bytesMeta2, _ := json.Marshal(&meta2)
+	_ = folder.PutObject(b2, strings.NewReader(string(bytesMeta2)))
+
+	// Then put backup 1 (later modification time)
+	b1 := path.Join(utility.BaseBackupPath, olderBackup.BackupName+utility.SentinelSuffix)
+	meta1 := convertMetadata(olderBackup)
+	bytesMeta1, _ := json.Marshal(&meta1)
+	_ = folder.PutObject(b1, strings.NewReader(string(bytesMeta1)))
+
+	// Without metaFetcher, it would select olderBackup (has later modification time)
+	// With metaFetcher, it should select newerBackup (has later creation time)
+	backupSelector := internal.NewLatestBackupSelectorWithMetaFetcher(greenplum.NewGenericMetaFetcher())
+	latestBackup, err := backupSelector.Select(folder)
+
+	assert.NoError(t, err)
+	assert.Equal(t, newerBackup.BackupName, latestBackup.Name)
+}
+
+func TestLatestBackupSelectorWithMetaFetcher_fallsBackToModificationTime(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	// Create backups without valid metadata (empty sentinel files)
+	b1 := path.Join(utility.BaseBackupPath, "backup_1"+utility.SentinelSuffix)
+	b2 := path.Join(utility.BaseBackupPath, "backup_2"+utility.SentinelSuffix)
+
+	// Put backup_1 first (earlier modification time)
+	_ = folder.PutObject(b1, &bytes.Buffer{})
+	// Then backup_2 (later modification time)
+	_ = folder.PutObject(b2, &bytes.Buffer{})
+
+	// Even with metaFetcher, should fall back to modification time when metadata is unavailable
+	backupSelector := internal.NewLatestBackupSelectorWithMetaFetcher(greenplum.NewGenericMetaFetcher())
+	latestBackup, err := backupSelector.Select(folder)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "backup_2", latestBackup.Name)
+}
+
+func TestLatestBackupSelectorWithMetaFetcher_emptyFolder(t *testing.T) {
+	backupSelector := internal.NewLatestBackupSelectorWithMetaFetcher(greenplum.NewGenericMetaFetcher())
+	checkEmptyFolderBehaviour(t, backupSelector)
+}
+
+func TestLatestBackupSelectorWithMetaFetcher_nilMetaFetcher(t *testing.T) {
+	// When metaFetcher is nil, should behave like NewLatestBackupSelector()
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	b1 := path.Join(utility.BaseBackupPath, "backup_1"+utility.SentinelSuffix)
+	b2 := path.Join(utility.BaseBackupPath, "backup_2"+utility.SentinelSuffix)
+	_ = folder.PutObject(b1, &bytes.Buffer{})
+	_ = folder.PutObject(b2, &bytes.Buffer{})
+
+	backupSelector := internal.NewLatestBackupSelectorWithMetaFetcher(nil)
+	latestBackup, err := backupSelector.Select(folder)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "backup_2", latestBackup.Name)
+}
