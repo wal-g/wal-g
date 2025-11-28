@@ -35,10 +35,12 @@ var (
 
 type Handler struct {
 	server.EmptyReplicationHandler
-	globalStreamer *replication.BinlogStreamer
-	streamerMutex  sync.Mutex
-	syncOnce       sync.Once
-	gtidSet        *mysql.MysqlGTIDSet
+	globalStreamer         *replication.BinlogStreamer
+	streamerMutex          sync.Mutex
+	syncOnce               sync.Once
+	gtidSet                *mysql.MysqlGTIDSet
+	streamingFinished      bool
+	streamingFinishedMutex sync.RWMutex
 }
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
@@ -232,8 +234,14 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 
 	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
 
-	if h.globalStreamer != nil {
-		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
+	h.streamingFinishedMutex.RLock()
+	finished := h.streamingFinished
+	h.streamingFinishedMutex.RUnlock()
+	if h.globalStreamer != nil && finished {
+		tracelog.InfoLogger.Println("Previous streaming finished, creating new streamer for reconnection")
+		h.globalStreamer = replication.NewBinlogStreamer()
+	} else if h.globalStreamer != nil {
+		tracelog.InfoLogger.Println("Returning existing active streamer")
 		return h.globalStreamer, nil
 	}
 
@@ -252,6 +260,9 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 			return
 		}
 		syncErr = syncBinlogFiles(pos, startTime, h.globalStreamer, h.gtidSet)
+		h.streamingFinishedMutex.Lock()
+		h.streamingFinished = true
+		h.streamingFinishedMutex.Unlock()
 	})
 
 	if syncErr != nil {
@@ -265,18 +276,27 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 	h.streamerMutex.Lock()
 	defer h.streamerMutex.Unlock()
 
-	if h.globalStreamer != nil {
-		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
+	h.streamingFinishedMutex.RLock()
+	finished := h.streamingFinished
+	h.streamingFinishedMutex.RUnlock()
+
+	if h.globalStreamer != nil && finished {
+		tracelog.InfoLogger.Println("Previous GTID streaming finished, creating new streamer for reconnection")
+		h.globalStreamer = replication.NewBinlogStreamer()
+	} else if h.globalStreamer != nil {
+		tracelog.InfoLogger.Println("Returning existing active GTID streamer")
 		return h.globalStreamer, nil
 	}
 
 	h.gtidSet = gtidSet
-
 	h.globalStreamer = replication.NewBinlogStreamer()
 
 	var syncErr error
 	h.syncOnce.Do(func() {
-		syncErr = syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, h.globalStreamer, h.gtidSet) // Передаём gtidSet
+		syncErr = syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, h.globalStreamer, h.gtidSet)
+		h.streamingFinishedMutex.Lock()
+		h.streamingFinished = true
+		h.streamingFinishedMutex.Unlock()
 	})
 
 	if syncErr != nil {
