@@ -35,12 +35,13 @@ var (
 
 type Handler struct {
 	server.EmptyReplicationHandler
-	globalStreamer         *replication.BinlogStreamer
-	streamerMutex          sync.Mutex
-	syncOnce               sync.Once
-	gtidSet                *mysql.MysqlGTIDSet
-	streamingFinished      bool
-	streamingFinishedMutex sync.RWMutex
+	globalStreamer *replication.BinlogStreamer
+	streamerMutex  sync.Mutex
+	syncOnce       sync.Once
+	gtidSet        *mysql.MysqlGTIDSet
+
+	historicalSent bool
+	historicalMu   sync.Mutex
 }
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
@@ -228,24 +229,36 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 	return nil
 }
 
+func (h *Handler) sendHistoricalEventsOnce(streamer *replication.BinlogStreamer) {
+	h.historicalMu.Lock()
+	if h.historicalSent {
+		h.historicalMu.Unlock()
+		return
+	}
+	h.historicalSent = true
+	h.historicalMu.Unlock()
+
+	go func() {
+		tracelog.InfoLogger.Println("Sending historical binlog events from downloaded files...")
+		if err := sendEventsFromBinlogFiles(streamer, h.gtidSet); err != nil {
+			tracelog.ErrorLogger.Printf("Failed to send historical events: %v", err)
+		} else {
+			tracelog.InfoLogger.Println("All historical binlog events sent successfully")
+		}
+	}()
+}
+
 func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	h.streamerMutex.Lock()
-	defer h.streamerMutex.Unlock()
-
-	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
-
-	h.streamingFinishedMutex.RLock()
-	finished := h.streamingFinished
-	h.streamingFinishedMutex.RUnlock()
-	if h.globalStreamer != nil && finished {
-		tracelog.InfoLogger.Println("Previous streaming finished, creating new streamer for reconnection")
-		h.globalStreamer = replication.NewBinlogStreamer()
-	} else if h.globalStreamer != nil {
-		tracelog.InfoLogger.Println("Returning existing active streamer")
+	if h.globalStreamer != nil {
+		tracelog.InfoLogger.Println("Reusing existing streamer (BinlogDump)")
+		h.streamerMutex.Unlock()
 		return h.globalStreamer, nil
 	}
 
 	h.globalStreamer = replication.NewBinlogStreamer()
+	current := h.globalStreamer
+	h.streamerMutex.Unlock()
 
 	var syncErr error
 	h.syncOnce.Do(func() {
@@ -259,51 +272,52 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 			syncErr = err
 			return
 		}
-		syncErr = syncBinlogFiles(pos, startTime, h.globalStreamer, h.gtidSet)
-		h.streamingFinishedMutex.Lock()
-		h.streamingFinished = true
-		h.streamingFinishedMutex.Unlock()
+		syncErr = syncBinlogFiles(pos, startTime, current, h.gtidSet)
 	})
-
 	if syncErr != nil {
+		h.streamerMutex.Lock()
+		h.globalStreamer = nil
+		h.streamerMutex.Unlock()
 		return nil, syncErr
 	}
 
-	return h.globalStreamer, nil
+	h.sendHistoricalEventsOnce(current)
+	return current, nil
 }
 
 func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
+	h.gtidSet = gtidSet
+
 	h.streamerMutex.Lock()
-	defer h.streamerMutex.Unlock()
-
-	h.streamingFinishedMutex.RLock()
-	finished := h.streamingFinished
-	h.streamingFinishedMutex.RUnlock()
-
-	if h.globalStreamer != nil && finished {
-		tracelog.InfoLogger.Println("Previous GTID streaming finished, creating new streamer for reconnection")
-		h.globalStreamer = replication.NewBinlogStreamer()
-	} else if h.globalStreamer != nil {
-		tracelog.InfoLogger.Println("Returning existing active GTID streamer")
+	if h.globalStreamer != nil {
+		tracelog.InfoLogger.Println("Reusing existing streamer (BinlogDumpGTID)")
+		h.streamerMutex.Unlock()
 		return h.globalStreamer, nil
 	}
 
-	h.gtidSet = gtidSet
 	h.globalStreamer = replication.NewBinlogStreamer()
+	current := h.globalStreamer
+	h.streamerMutex.Unlock()
 
 	var syncErr error
 	h.syncOnce.Do(func() {
-		syncErr = syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, h.globalStreamer, h.gtidSet)
-		h.streamingFinishedMutex.Lock()
-		h.streamingFinished = true
-		h.streamingFinishedMutex.Unlock()
-	})
 
+		syncErr = syncBinlogFiles(
+			mysql.Position{Name: "host-binlog-file", Pos: 4},
+			startTS,
+			current,
+			h.gtidSet,
+		)
+	})
 	if syncErr != nil {
+		h.streamerMutex.Lock()
+		h.globalStreamer = nil
+		h.streamerMutex.Unlock()
 		return nil, syncErr
 	}
 
-	return h.globalStreamer, nil
+	h.sendHistoricalEventsOnce(current)
+	return current, nil
 }
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
