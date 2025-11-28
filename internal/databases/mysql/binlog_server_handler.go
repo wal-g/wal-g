@@ -35,13 +35,12 @@ var (
 
 type Handler struct {
 	server.EmptyReplicationHandler
-	globalStreamer *replication.BinlogStreamer
-	streamerMutex  sync.Mutex
-	syncOnce       sync.Once
-	gtidSet        *mysql.MysqlGTIDSet
-
-	historicalSent bool
-	historicalMu   sync.Mutex
+	globalStreamer    *replication.BinlogStreamer
+	streamerMutex     sync.Mutex
+	syncOnce          sync.Once
+	gtidSet           *mysql.MysqlGTIDSet
+	historicalStarted bool
+	historicalMu      sync.Mutex
 }
 
 func handleEventError(err error, s *replication.BinlogStreamer) {
@@ -229,22 +228,29 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 	return nil
 }
 
-func (h *Handler) sendHistoricalEventsOnce(streamer *replication.BinlogStreamer) {
+func (h *Handler) startHistoricalStreamingOnce(pos mysql.Position) {
 	h.historicalMu.Lock()
-	if h.historicalSent {
+	if h.historicalStarted {
 		h.historicalMu.Unlock()
 		return
 	}
-	h.historicalSent = true
+	h.historicalStarted = true
 	h.historicalMu.Unlock()
 
 	go func() {
-		tracelog.InfoLogger.Println("Sending historical binlog events from downloaded files...")
-		if err := sendEventsFromBinlogFiles(streamer, h.gtidSet); err != nil {
-			tracelog.ErrorLogger.Printf("Failed to send historical events: %v", err)
-		} else {
-			tracelog.InfoLogger.Println("All historical binlog events sent successfully")
+		tracelog.InfoLogger.Println("Starting historical binlog streaming from downloaded files...")
+
+		logFilesProvider := storage.NewLowMemoryObjectProvider()
+		st, err := internal.ConfigureStorage()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("Failed to configure storage for historical streaming: %v", err)
+			return
 		}
+		dstDir, _ := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
+
+		go provideLogs(st.RootFolder(), dstDir, startTS, untilTS, logFilesProvider)
+
+		sendEventsFromBinlogFiles(logFilesProvider, pos, h.globalStreamer, h.gtidSet)
 	}()
 }
 
@@ -281,7 +287,8 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 		return nil, syncErr
 	}
 
-	h.sendHistoricalEventsOnce(current)
+	h.startHistoricalStreamingOnce(pos)
+
 	return current, nil
 }
 
@@ -301,7 +308,6 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 
 	var syncErr error
 	h.syncOnce.Do(func() {
-
 		syncErr = syncBinlogFiles(
 			mysql.Position{Name: "host-binlog-file", Pos: 4},
 			startTS,
@@ -316,7 +322,8 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 		return nil, syncErr
 	}
 
-	h.sendHistoricalEventsOnce(current)
+	h.startHistoricalStreamingOnce(mysql.Position{Name: "host-binlog-file", Pos: 4})
+
 	return current, nil
 }
 
