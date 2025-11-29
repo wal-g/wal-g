@@ -46,6 +46,7 @@ const (
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
+	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
 )
 
 var SettingList = []string{
@@ -82,6 +83,7 @@ var SettingList = []string{
 	retentionPeriodSetting,
 	retentionModeSetting,
 	disable100ContinueSetting,
+	enableVersioningSetting,
 }
 
 const (
@@ -213,6 +215,7 @@ func ConfigureStorage(
 		MinThrottlingRetryDelay: time.Duration(minThrottlingRetryDelay) * time.Millisecond,
 		MaxThrottlingRetryDelay: time.Duration(maxThrottlingRetryDelay) * time.Millisecond,
 		Disable100Continue:      disable100Continue,
+		EnableVersioning:        settings[enableVersioningSetting],
 	}
 
 	st, err := NewStorage(config, rootWraps...)
