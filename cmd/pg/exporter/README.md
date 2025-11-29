@@ -112,9 +112,9 @@ The exporter requires WAL-G to be properly configured and accessible. Ensure tha
 ### WAL-G Commands Used
 
 The exporter executes the following WAL-G commands:
-- `wal-g backup-list --detail --json` - Get backup information
-- `wal-g wal-show --detailed-json` - Get WAL segment information
-- `wal-g st ls` - Check storage connectivity
+
+- `wal-g wal-show --detailed-json` - Get WAL segment information and backup information
+- `wal-g st check read` - Check storage connectivity
 
 ## Prometheus Configuration
 
