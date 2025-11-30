@@ -1,2 +1,4 @@
-"WALE_S3_PREFIX": "s3://gp-follow-primary-bucket",
-"WALG_LOG_LEVEL": "DEVEL"
+{
+  "WALE_S3_PREFIX": "s3://gp-follow-primary-bucket",
+  "WALG_LOG_LEVEL": "DEVEL"
+}
