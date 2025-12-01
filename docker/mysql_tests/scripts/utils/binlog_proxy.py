@@ -5,7 +5,7 @@ import sys
 import select
 
 class DisconnectBinlogProxy:
-    def __init__(self, listen_port, target_host, target_port, planned_disconnects=5):
+    def __init__(self, listen_port, target_host, target_port, planned_disconnects=3):
         self.listen_port = listen_port
         self.target_host = target_host
         self.target_port = target_port
@@ -40,7 +40,7 @@ class DisconnectBinlogProxy:
         if not self.connection_start_time:
             return False
 
-        if self.bytes_transferred > 350 and self.disconnect_count < self.planned_disconnects:
+        if self.bytes_transferred > 256 and self.disconnect_count < self.planned_disconnects:
             return True
 
         return False
