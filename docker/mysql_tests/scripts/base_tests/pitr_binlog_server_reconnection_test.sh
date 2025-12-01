@@ -17,7 +17,7 @@ PROXY_PORT=9307
 BINLOG_SERVER_PORT=9306
 
 SCRIPT_DIR="$(dirname "$0")"
-PROXY_SCRIPT="$SCRIPT_DIR/binlog_proxy.py"
+PROXY_SCRIPT="$SCRIPT_DIR/../utils/binlog_proxy.py"
 
 mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
