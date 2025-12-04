@@ -153,7 +153,7 @@ func (fh *FetchHandler) Unpack() {
 	commandList := gpcluster.GenerateSSHCommandForSegments(fh.cluster, func(segment cluster.SegConfig) string {
 		return fh.buildFetchCommand(segment)
 	})
-	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER|cluster.INCLUDE_MIRRORS, commandList)
+	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS, commandList)
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return "Unable to run wal-g"
@@ -195,7 +195,7 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 		tracelog.DebugLogger.Printf("Command to run on segment %d: %s", segment.ContentID, cmd)
 		return cmd
 	})
-	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER|cluster.INCLUDE_MIRRORS, commandList)
+	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS, commandList)
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to update pg_hba", func(contentID int) string {
 		return fmt.Sprintf("Unable to update pg_hba on segment %d", contentID)
@@ -264,7 +264,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
 		return cmd
 	})
-	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER|cluster.INCLUDE_MIRRORS, commandList)
+	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS, commandList)
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to create recovery.conf", func(contentID int) string {
 		return fmt.Sprintf("Unable to create recovery.conf on segment %d", contentID)
