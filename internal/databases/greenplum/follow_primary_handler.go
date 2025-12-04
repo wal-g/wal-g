@@ -115,7 +115,7 @@ func (fh *FollowPrimaryHandler) applyXLogInCluster() {
 	tracelog.InfoLogger.Println("Running recovery on segments and master...")
 	// Run WAL-G to restore the each segment as a single Postgres instance
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR,
 		func(contentID int) string {
 			return fh.buildSegmentStartCommand(contentID)
 		})
@@ -138,7 +138,7 @@ func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating recovery.conf on segments and master",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR,
 		func(contentID int) string {
 			segment := fh.cluster.ByContent[contentID][0]
 			pathToRestore := path.Join(segment.DataDir, viper.GetString(conf.GPRelativeRecoveryConfPath))

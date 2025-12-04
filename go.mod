@@ -18,14 +18,13 @@ require (
 	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/docker/docker v1.13.1
 	github.com/go-mysql-org/go-mysql v1.7.0
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.7.1
 	github.com/gofrs/flock v0.8.0
 	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.6.0
-	github.com/greenplum-db/gp-common-go-libs v1.0.4
+	github.com/greenplum-db/gp-common-go-libs v1.0.22
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jackc/pglogrepl v0.0.0-20250325003938-6dfcde87cfc7
-	github.com/jackc/pgx v3.6.0+incompatible // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/minio/sio v0.2.0
@@ -120,7 +119,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/jessevdk/go-flags v1.5.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/jmoiron/sqlx v1.3.3 // indirect
+	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/jstemmer/go-junit-report v0.9.1 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -128,7 +127,6 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/mschoch/smat v0.0.0-20160514031455-90eadee771ae // indirect
-	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
@@ -137,7 +135,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/shopspring/decimal v0.0.0-20200227202807-02e2044944cc // indirect
+	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/siddontang/go-log v0.0.0-20180807004314-8d05993dda07 // indirect
 	github.com/spf13/afero v1.2.2 // indirect

@@ -38,7 +38,7 @@ func NewActionHandler(logsDir string, restoreCfgPath string) *ActionHandler {
 func (fh *ActionHandler) UpdateAction(action string) {
 	tracelog.InfoLogger.Printf("Updating recovery.conf recovery_target_action %s on segments and master...", action)
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating recovery.conf on segments and master",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR,
 		func(contentID int) string {
 			segment := fh.cluster.ByContent[contentID][0]
 			pathToRestore := path.Join(segment.DataDir, viper.GetString(conf.GPRelativeRecoveryConfPath))
