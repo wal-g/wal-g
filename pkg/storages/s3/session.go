@@ -35,6 +35,10 @@ func createSession(config *Config) (*session.Session, error) {
 		sessOpts.CustomCABundle = file
 	}
 
+	if http.DefaultClient.Transport != nil {
+		http.DefaultClient.Transport = nil
+	}
+
 	sess, err := session.NewSessionWithOptions(sessOpts)
 	if err != nil {
 		return nil, fmt.Errorf("init new session: %w", err)
