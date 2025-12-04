@@ -132,6 +132,23 @@ Cluster restore configuration declares destination host, directory, and port for
                         "port": 6001,
                         "data_dir": "/gpdata/primary/gpseg1"
                 }
+        },
+        "mirrors": {
+                "-1": {
+                          "hostname": "gp6mirror",
+                          "port": 5432,
+                          "data_dir": "/gpdata/master/gpseg-1"
+                },
+                "0": {
+                          "hostname": "gp6segment1",
+                          "port": 7000,
+                          "data_dir": "/gpdata/primary/gpseg0"
+                },
+                "1": {
+                          "hostname": "gp6segment1",
+                          "port": 7001,
+                          "data_dir": "/gpdata/primary/gpseg1"
+                }
         }
 }
 ```

@@ -132,6 +132,6 @@ func init() {
 	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 
 	backupFetchCmd.Flags().StringVar(&fetchModeStr, "mode", "default", fetchModeDescription)
-	backupFetchCmd.Flags().BoolVar(&withMirrors, "with-mirrors", false, inPlaceFlagDescription)
+	backupFetchCmd.Flags().BoolVar(&withMirrors, "with-mirrors", false, withMirrorsFlagDescription)
 	cmd.AddCommand(backupFetchCmd)
 }
