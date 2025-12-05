@@ -47,11 +47,11 @@ type SegmentRestoreConfig struct {
 	DatabaseID int    `json:"db_id"`
 }
 
-func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
+func (cfg SegmentRestoreConfig) ToSegConfig(contentID int, role SegmentRole) cluster.SegConfig {
 	return cluster.SegConfig{
 		DbID:      cfg.DatabaseID,
 		ContentID: contentID,
-		Role:      string(Primary),
+		Role:      string(role),
 		Port:      cfg.Port,
 		Hostname:  cfg.Hostname,
 		DataDir:   cfg.DataDir,

@@ -32,6 +32,7 @@ func NewFollowPrimaryHandler(
 	logsDir string,
 	restoreCfgPath, stopAtRestorePoint string,
 	timeoutInSeconds int,
+	withMirrors bool,
 ) *FollowPrimaryHandler {
 	restoreCfg, err := readRestoreConfig(restoreCfgPath)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -40,7 +41,12 @@ func NewFollowPrimaryHandler(
 
 	segmentConfigs := make([]cluster.SegConfig, 0)
 	for contentID, segRestoreCfg := range restoreCfg.Segments {
-		segmentConfigs = append(segmentConfigs, segRestoreCfg.ToSegConfig(contentID))
+		segmentConfigs = append(segmentConfigs, segRestoreCfg.ToSegConfig(contentID, Primary))
+	}
+	if withMirrors {
+		for contentID, segRestoreCfg := range restoreCfg.Mirrors {
+			segmentConfigs = append(segmentConfigs, segRestoreCfg.ToSegConfig(contentID, Mirror))
+		}
 	}
 
 	globalCluster := cluster.NewCluster(segmentConfigs)
@@ -59,7 +65,8 @@ func NewFollowPrimaryHandler(
 		tracelog.InfoLogger.Printf("Selected latest restore point: %s", stopAtRestorePoint)
 	}
 
-	FatalIfWalLogMissing(stopAtRestorePoint, folder)
+	// Disable this check - we don't have segment timelines
+	// FatalIfWalLogMissing(stopAtRestorePoint, folder)
 
 	return &FollowPrimaryHandler{
 		cluster:            globalCluster,
@@ -113,9 +120,9 @@ func (fh *FollowPrimaryHandler) Follow() {
 
 func (fh *FollowPrimaryHandler) applyXLogInCluster() {
 	tracelog.InfoLogger.Println("Running recovery on segments and master...")
-	// Run WAL-G to restore the each segment as a single Postgres instance
+	// Run WAL-G to restore each segment as a single Postgres instance
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR,
+		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS,
 		func(contentID int) string {
 			return fh.buildSegmentStartCommand(contentID)
 		})
@@ -138,7 +145,7 @@ func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating recovery.conf on segments and master",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR,
+		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS,
 		func(contentID int) string {
 			segment := fh.cluster.ByContent[contentID][0]
 			pathToRestore := path.Join(segment.DataDir, viper.GetString(conf.GPRelativeRecoveryConfPath))

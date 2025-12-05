@@ -20,5 +20,27 @@
             "port": 7004,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast3/demoDataDir2"
         }
+    },
+    "mirrors": {
+        "-1": {
+            "hostname": "localhost",
+            "port": 7001,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/standby/gpseg-1"
+        },
+        "0": {
+            "hostname": "localhost",
+            "port": 8002,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror1/demoDataDir0"
+        },
+        "1": {
+            "hostname": "localhost",
+            "port": 8003,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror2/demoDataDir1"
+        },
+        "2": {
+            "hostname": "localhost",
+            "port": 8004,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror3/demoDataDir2"
+        }
     }
 }
