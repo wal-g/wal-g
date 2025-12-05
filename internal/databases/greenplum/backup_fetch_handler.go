@@ -41,15 +41,17 @@ func NewBackupFetchMode(mode string) (BackupFetchMode, error) {
 }
 
 type SegmentRestoreConfig struct {
-	Hostname string `json:"hostname"`
-	Port     int    `json:"port"`
-	DataDir  string `json:"data_dir"`
+	Hostname   string `json:"hostname"`
+	Port       int    `json:"port"`
+	DataDir    string `json:"data_dir"`
+	DatabaseID int    `json:"db_id"`
 }
 
-func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
+func (cfg SegmentRestoreConfig) ToSegConfig(contentID int, role SegmentRole) cluster.SegConfig {
 	return cluster.SegConfig{
+		DbID:      cfg.DatabaseID,
 		ContentID: contentID,
-		Role:      string(Primary),
+		Role:      string(role),
 		Port:      cfg.Port,
 		Hostname:  cfg.Hostname,
 		DataDir:   cfg.DataDir,
@@ -58,7 +60,9 @@ func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
 
 // ClusterRestoreConfig is used to describe the restored cluster
 type ClusterRestoreConfig struct {
+	// contentID -> config
 	Segments map[int]SegmentRestoreConfig `json:"segments"`
+	Mirrors  map[int]SegmentRestoreConfig `json:"mirrors"`
 }
 
 type FetchHandler struct {
@@ -84,18 +88,31 @@ func NewFetchHandler(
 	segmentConfigs := make([]cluster.SegConfig, 0)
 	initGpLog(logsDir)
 
+	if withMirrors && len(fetchContentIDs) != 0 {
+		tracelog.ErrorLogger.Fatal("--with-mirrors can only be used with primary segments")
+	}
+
 	for _, segMeta := range sentinel.Segments {
-		if segMeta.Role == Primary || withMirrors {
+		if segMeta.Role == Primary {
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
 			// update the segment config from the metadata with the
 			// Hostname, Port and DataDir specified in the restore config
 			segmentCfg, err := segCfgMaker.Make(segMeta)
 			tracelog.ErrorLogger.FatalOnError(err)
 			segmentConfigs = append(segmentConfigs, segmentCfg)
+
+			// Generate mirrors from restore-config.
+			// Note: sentinel doesn't contain information about mirrors.
+			if withMirrors {
+				mirrorMeta := segMeta
+				mirrorMeta.Role = Mirror
+				mirrorCfg, err := segCfgMaker.Make(mirrorMeta)
+				tracelog.ErrorLogger.FatalOnError(err)
+				segmentConfigs = append(segmentConfigs, mirrorCfg)
+			}
 		} else {
 			tracelog.WarningLogger.Printf(
-				"Skipping mirror segment: DatabaseID %d, Hostname %s, DataDir: %s - no --with-mirrors flag passed\n",
-				segMeta.DatabaseID, segMeta.Hostname, segMeta.DataDir)
+				"Skipping non-primary segment: DatabaseID %d, Hostname %s, DataDir: %s\n", segMeta.DatabaseID, segMeta.Hostname, segMeta.DataDir)
 		}
 	}
 

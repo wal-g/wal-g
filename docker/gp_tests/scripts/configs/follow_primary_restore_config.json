@@ -3,22 +3,52 @@
         "-1": {
             "hostname": "localhost",
             "port": 6000,
-            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1"
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1",
+            "db_id": 1
         },
         "0": {
             "hostname": "localhost",
             "port": 6002,
-            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast1/demoDataDir0"
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast1/demoDataDir0",
+            "db_id": 2
         },
         "1": {
             "hostname": "localhost",
             "port": 6003,
-            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast2/demoDataDir1"
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast2/demoDataDir1",
+            "db_id": 3
         },
         "2": {
             "hostname": "localhost",
             "port": 6004,
-            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast3/demoDataDir2"
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast3/demoDataDir2",
+            "db_id": 4
+        }
+    },
+    "mirrors": {
+        "-1": {
+            "hostname": "localhost",
+            "port": 6001,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/standby/gpseg-1",
+            "db_id": 5
+        },
+        "0": {
+            "hostname": "localhost",
+            "port": 7002,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror1/demoDataDir0",
+            "db_id": 6
+        },
+        "1": {
+            "hostname": "localhost",
+            "port": 7003,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror2/demoDataDir1",
+            "db_id": 7
+        },
+        "2": {
+            "hostname": "localhost",
+            "port": 7004,
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror3/demoDataDir2",
+            "db_id": 8
         }
     }
 }

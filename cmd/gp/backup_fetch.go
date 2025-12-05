@@ -77,6 +77,9 @@ var backupFetchCmd = &cobra.Command{
 		if len(*fetchContentIDs) > 0 {
 			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIDs)
 		}
+		if len(*fetchContentIDs) > 0 && withMirrors {
+			tracelog.ErrorLogger.Fatalf("can't use both --with-mirrors and --content-ids")
+		}
 
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
 		tracelog.ErrorLogger.FatalOnError(err)
