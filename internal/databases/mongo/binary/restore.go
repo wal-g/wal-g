@@ -123,6 +123,7 @@ func (restoreService *RestoreService) reconfigMongo(
 	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig, partial); err != nil {
 		return err
 	}
+
 	if err := restoreService.recoverFromOplogAsStandalone(sentinel, partial); err != nil {
 		return err
 	}
@@ -178,6 +179,10 @@ func (restoreService *RestoreService) fixSystemData(
 	}
 
 	if err = mongodService.CleanCacheAndSessions(shConfig); err != nil {
+		return err
+	}
+
+	if err = mongodService.ClearMinvalid(); err != nil {
 		return err
 	}
 

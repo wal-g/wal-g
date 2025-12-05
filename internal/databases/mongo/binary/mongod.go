@@ -262,6 +262,19 @@ func (mongodService *MongodService) FixShardIdentity(shConfig ShConfig) error {
 	return nil
 }
 
+func (mongodService *MongodService) ClearMinvalid() error {
+	minvalidCol := mongodService.MongoClient.Database(localDB).Collection("replset.minvalid")
+	_, err := minvalidCol.DeleteMany(mongodService.Context, bson.M{})
+	if err != nil {
+		return err
+	}
+	_, err = minvalidCol.InsertOne(mongodService.Context, bson.M{
+		"ts": primitive.Timestamp{T: 0, I: 1},
+		"t":  -1,
+	})
+	return err
+}
+
 func (mongodService *MongodService) FixMongoCfg(mongocfgConfig MongoCfgConfig) error {
 	if mongocfgConfig.Empty() {
 		return nil
