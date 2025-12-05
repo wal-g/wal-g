@@ -43,8 +43,8 @@ require (
 	github.com/yandex-cloud/go-genproto v0.0.0-20230918115514-93a99045c9de
 	github.com/yandex-cloud/go-sdk v0.0.0-20230918120620-9e95f0816d79
 	go.mongodb.org/mongo-driver v1.17.1
-	golang.org/x/crypto v0.37.0
-	golang.org/x/sync v0.13.0
+	golang.org/x/crypto v0.45.0
+	golang.org/x/sync v0.18.0
 	golang.org/x/time v0.4.0
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/api v0.30.0
@@ -65,9 +65,9 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/redis/go-redis/v9 v9.7.3
-	golang.org/x/mod v0.19.0
-	golang.org/x/net v0.39.0
-	golang.org/x/sys v0.32.0
+	golang.org/x/mod v0.29.0
+	golang.org/x/net v0.47.0
+	golang.org/x/sys v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -78,6 +78,7 @@ require (
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8 // indirect
 )
 
 require (
@@ -154,9 +155,9 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/term v0.31.0 // indirect
-	golang.org/x/text v0.24.0
-	golang.org/x/tools v0.23.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0
+	golang.org/x/tools v0.38.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20211021150943-2b146023228c // indirect
 	google.golang.org/grpc v1.64.1 // indirect
