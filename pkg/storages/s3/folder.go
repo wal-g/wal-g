@@ -6,6 +6,7 @@ import (
 	"io"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -166,15 +167,44 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return objects, subFolders, nil
 }
 
+// versionInfo holds information about an S3 object version collected during listing.
+type versionInfo struct {
+	relativePath string
+	lastModified time.Time
+	size         int64
+	versionID    string
+	isLatest     bool
+}
+
 func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage.Object, []storage.Folder, error) {
-	objects := []storage.Object{}
 	subFolders := []storage.Folder{}
+
+	// Collect all versions and delete markers across all pages first,
+	// because a delete marker and its corresponding version might be on different pages.
+	allVersions := []versionInfo{}
+
+	// Track keys where the LATEST version is a delete marker.
+	// These objects are effectively deleted and should not appear in the listing.
+	deletedKeys := make(map[string]bool)
+
 	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
-		for _, prefix := range out.CommonPrefixes {
-			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+		for _, p := range out.CommonPrefixes {
+			subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
 			subFolders = append(subFolders, subFolder)
 		}
 
+		// Collect delete markers - if LATEST, mark the key as deleted
+		for _, marker := range out.DeleteMarkers {
+			if *marker.Key == folder.path {
+				continue
+			}
+			if *marker.IsLatest {
+				objectRelativePath := strings.TrimPrefix(*marker.Key, folder.path)
+				deletedKeys[objectRelativePath] = true
+			}
+		}
+
+		// Collect all versions for later filtering
 		for _, object := range out.Versions {
 			// Some storages return root tar_partitions folder as a Key.
 			if *object.Key == folder.path {
@@ -182,30 +212,17 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 			}
 
 			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			if *object.IsLatest {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-					*object.Size, fmt.Sprintf("%s LATEST", *object.VersionId)))
-			} else {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-					*object.Size, *object.VersionId))
-			}
-		}
-		for _, object := range out.DeleteMarkers {
-			// Some storages return root tar_partitions folder as a Key.
-			if *object.Key == folder.path {
-				continue
-			}
-
-			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			if *object.IsLatest {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-					0, fmt.Sprintf("%s LATEST", *object.VersionId)))
-			} else {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified, 0, *object.VersionId))
-			}
+			allVersions = append(allVersions, versionInfo{
+				relativePath: objectRelativePath,
+				lastModified: *object.LastModified,
+				size:         *object.Size,
+				versionID:    *object.VersionId,
+				isLatest:     *object.IsLatest,
+			})
 		}
 		return true
 	}
+
 	input := &s3.ListObjectVersionsInput{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
@@ -218,6 +235,24 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	if err != nil && !isAwsNotExist(err) {
 		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 	}
+
+	// Filter out versions of objects that have been deleted (LATEST is a delete marker)
+	objects := make([]storage.Object, 0, len(allVersions))
+	for _, v := range allVersions {
+		// Skip objects where the LATEST version is a delete marker
+		if deletedKeys[v.relativePath] {
+			continue
+		}
+
+		if v.isLatest {
+			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified,
+				v.size, fmt.Sprintf("%s LATEST", v.versionID)))
+		} else {
+			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified,
+				v.size, v.versionID))
+		}
+	}
+
 	return objects, subFolders, nil
 }
 
