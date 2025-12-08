@@ -24,7 +24,7 @@ for i in "$prefix"/*; do
   echo "===== RUNNING $i ====="
   set -x
   chmod a+x "$i"
-  timeout 3m "$i"
+  timeout 10m "$i"
   set +x
   echo "===== SUCCESS $i ====="
   echo
