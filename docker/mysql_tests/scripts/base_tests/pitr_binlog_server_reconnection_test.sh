@@ -15,6 +15,7 @@ export WALG_COMPRESSION_METHOD=zstd
 
 PROXY_PORT=9307
 BINLOG_SERVER_PORT=9306
+PLANNED_DISCONNECTS=7
 
 SCRIPT_DIR="$(dirname "$0")"
 PROXY_SCRIPT="$SCRIPT_DIR/../utils/binlog_proxy.py"
@@ -22,9 +23,9 @@ PROXY_SCRIPT="$SCRIPT_DIR/../utils/binlog_proxy.py"
 mysqld --initialize --init-file=/etc/mysql/init.sql
 service mysql start
 
+mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
 wal-g backup-push
 
-mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
@@ -131,36 +132,20 @@ fi
 
 sleep 5
 
-echo "Starting proxy with max 2 reconnections..."
-python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT 2 > $PROXY_LOG 2>&1 & proxy_pid=$!
+echo "Starting proxy with reconnections..."
+python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT $PLANNED_DISCONNECTS > $PROXY_LOG 2>&1 & proxy_pid=$!
 echo "Started proxy with PID: $proxy_pid"
 
 echo "Waiting for proxy to start..."
-WAIT_COUNT=0
-while [ $WAIT_COUNT -lt 15 ]; do
-    if ! kill -0 $proxy_pid 2>/dev/null; then
-        echo "ERROR: Proxy process died"
-        echo "=== Proxy log ==="
-        cat $PROXY_LOG
-        exit 1
-    fi
-
-    if check_port_listening $PROXY_PORT; then
-        echo "Proxy is ready and accepting connections"
-        break
-    fi
-
-    echo "Waiting for proxy... ($WAIT_COUNT/15)"
-    sleep 1
-    WAIT_COUNT=$((WAIT_COUNT + 1))
-done
-
-if [ $WAIT_COUNT -eq 15 ]; then
-    echo "ERROR: Proxy failed to start within 15 seconds"
-    echo "=== Proxy log ==="
+echo "Waiting for proxy to start..."
+sleep 15
+if ! kill -0 $proxy_pid 2>/dev/null; then
+    echo "ERROR: Proxy process died"
     cat $PROXY_LOG
     exit 1
 fi
+echo "Proxy should be ready"
+
 
 echo "Configuring MySQL replication..."
 mysql -e "STOP SLAVE"
@@ -172,11 +157,19 @@ mysql -e "START SLAVE"
 
 echo "Waiting for replication to start..."
 WAIT_COUNT=0
-MAX_WAIT=60
+MAX_WAIT=15
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     SLAVE_STATUS=$(mysql -e "SHOW SLAVE STATUS\G" 2>/dev/null || echo "")
     SLAVE_IO_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_IO_Running:" | awk '{print $2}')
     SLAVE_SQL_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_SQL_Running:" | awk '{print $2}')
+    LAST_IO_ERROR=$(echo "$SLAVE_STATUS" | grep "Last_IO_Error:" | cut -d: -f2-)
+
+#    if [ "$SLAVE_IO_RUNNING" = "No" ] && [ -n "$LAST_IO_ERROR" ]; then
+#        echo "Restarting slave due to IO error..."
+#        mysql -e "STOP SLAVE; START SLAVE;"
+#        sleep 2
+#    fi
+
     if [ "$SLAVE_IO_RUNNING" = "Yes" ]; then
         echo "Replication IO thread started successfully"
         break
@@ -186,7 +179,7 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 done
 
 echo "Waiting for replication to complete..."
-MAX_WAIT=30
+MAX_WAIT=10
 WAIT_COUNT=0
 EXPECTED_ROWS=301
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
@@ -197,9 +190,14 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     LAST_IO_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_IO_Error:" | cut -d: -f2-)
     LAST_SQL_ERROR=$(mysql -e "SHOW SLAVE STATUS\G" | grep "Last_SQL_Error:" | cut -d: -f2-)
 
+    if [ "$SLAVE_IO_RUNNING" = "No" ] && [ -n "$LAST_IO_ERROR" ]; then
+        echo "Restarting slave due to IO error..."
+        mysql -e "STOP SLAVE; START SLAVE;"
+        sleep 2
+    fi
+
     mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Retrieved_Gtid_Set|Executed_Gtid_Set)"
     echo "Row count: $ROW_COUNT / $EXPECTED_ROWS, IO: $SLAVE_IO_RUNNING, SQL: $SLAVE_SQL_RUNNING (wait: $WAIT_COUNT/$MAX_WAIT)"
-
     if [ -n "$LAST_IO_ERROR" ] && [ "$LAST_IO_ERROR" != " " ]; then
         echo "Last IO Error: $LAST_IO_ERROR"
     fi
@@ -209,6 +207,8 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 
     if ! kill -0 $walg_pid 2>/dev/null; then
         echo "WARNING: wal-g binlog-server process died!"
+        cat $BINLOG_SERVER_LOG
+        cat $PROXY_LOG
         echo "=== Last lines of binlog server log ==="
         tail -20 $BINLOG_SERVER_LOG
         break
@@ -230,6 +230,9 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
 
+cat $BINLOG_SERVER_LOG
+cat $PROXY_LOG
+
 safe_kill_process "$proxy_pid" "proxy"
 
 FINAL_ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
@@ -240,11 +243,11 @@ if [ "$AFTER_COUNT" -ne 0 ]; then
     exit 1
 fi
 
-PROXY_RECONNECTS=$(grep -c "Planned disconnect" "$PROXY_LOG" 2>/dev/null || echo "0")
+PROXY_RECONNECTS=$(grep -c "Disconnect #" "$PROXY_LOG" 2>/dev/null || echo "0")
 
 if [ "$FINAL_ROW_COUNT" -ge "$EXPECTED_ROWS" ]; then
     echo "- Data replicated successfully: $FINAL_ROW_COUNT rows"
-    echo "- Network disconnects: $PROXY_RECONNECTS (limited to 2)"
+    echo "- Network disconnects: $PROXY_RECONNECTS (planned: $PLANNED_DISCONNECTS)"
 else
     echo "ERROR: Test failed"
     echo "- Expected $EXPECTED_ROWS rows, got $FINAL_ROW_COUNT"

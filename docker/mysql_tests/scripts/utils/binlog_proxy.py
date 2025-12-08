@@ -5,7 +5,7 @@ import sys
 import select
 
 class DisconnectBinlogProxy:
-    def __init__(self, listen_port, target_host, target_port, planned_disconnects=3):
+    def __init__(self, listen_port, target_host, target_port, planned_disconnects=10):
         self.listen_port = listen_port
         self.target_host = target_host
         self.target_port = target_port
@@ -19,18 +19,25 @@ class DisconnectBinlogProxy:
         self.total_bytes_transferred = 0
         self.disconnects_completed = False
 
+    def log(self, msg):
+        print(f"[Proxy] {msg}", flush=True)
+
     def connect_to_server(self):
         try:
             if self.server_socket:
-                self.server_socket.close()
+                try:
+                    self.server_socket.close()
+                except:
+                    pass
 
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.settimeout(10)
             self.server_socket.connect((self.target_host, self.target_port))
-            print(f"[Proxy] Connected to binlog server (disconnect #{self.disconnect_count})")
+            self.server_socket.setblocking(False)
+            self.log(f"Connected to binlog server (disconnect #{self.disconnect_count})")
             return True
         except Exception as e:
-            print(f"[Proxy] Failed to connect to binlog server: {e}")
+            self.log(f"Failed to connect to binlog server: {e}")
             return False
 
     def should_disconnect(self):
@@ -40,129 +47,147 @@ class DisconnectBinlogProxy:
         if not self.connection_start_time:
             return False
 
-        if self.bytes_transferred > 256 and self.disconnect_count < self.planned_disconnects:
+        if self.bytes_transferred > 8192 and self.disconnect_count < self.planned_disconnects:
             return True
 
         return False
 
     def handle_client_connection(self, client_socket):
         self.client_socket = client_socket
-        print(f"[Proxy] Client connected from {client_socket.getpeername()}")
+        peer = None
+        try:
+            peer = client_socket.getpeername()
+        except:
+            pass
+        self.log(f"Client connected from {peer}")
 
         if not self.connect_to_server():
-            print("[Proxy] Initial connection to server failed")
+            self.log("Initial connection to server failed")
+            client_socket.close()
             return
 
+        self.client_socket.setblocking(False)
         self.connection_start_time = time.time()
         self.bytes_transferred = 0
 
         try:
             while self.running:
                 if self.should_disconnect():
-                    print(f"[Proxy] Planned disconnect #{self.disconnect_count + 1}/{self.planned_disconnects} after {self.bytes_transferred} bytes")
-                    print(f"[Proxy] Total bytes transferred so far: {self.total_bytes_transferred}")
-
-                    self.server_socket.close()
-                    time.sleep(2)
+                    self.log(f"Planned disconnect #{self.disconnect_count + 1}/{self.planned_disconnects} after {self.bytes_transferred} bytes")
+                    self.log(f"Total bytes transferred so far: {self.total_bytes_transferred}")
 
                     self.disconnect_count += 1
 
                     if self.disconnect_count >= self.planned_disconnects:
                         self.disconnects_completed = True
-                        print(f"[Proxy] Completed all {self.planned_disconnects} planned disconnects. Now working in stable mode.")
+                        self.log(f"Completed all {self.planned_disconnects} planned disconnects.")
 
-                    if not self.connect_to_server():
-                        print("[Proxy] Reconnection failed, closing client connection")
-                        break
+                    try:
+                        self.server_socket.close()
+                    except:
+                        pass
+                    try:
+                        self.client_socket.close()
+                    except:
+                        pass
 
-                    self.connection_start_time = time.time()
-                    self.bytes_transferred = 0
+                    self.log("Both connections closed, waiting for new client connection")
+                    return
 
                 try:
-                    ready_sockets, _, error_sockets = select.select(
+                    readable, _, exceptional = select.select(
                         [self.client_socket, self.server_socket], [],
                         [self.client_socket, self.server_socket], 1.0
                     )
 
-                    if error_sockets:
-                        print("[Proxy] Socket error detected")
+                    if exceptional:
+                        self.log("Socket error detected")
                         break
 
-                    if not ready_sockets:
+                    if not readable:
                         continue
 
-                    if self.client_socket in ready_sockets:
+                    if self.client_socket in readable:
                         try:
                             data = self.client_socket.recv(8192)
                             if not data:
-                                print("[Proxy] Client disconnected")
+                                self.log("Client disconnected (EOF)")
                                 break
                             self.server_socket.send(data)
                             self.bytes_transferred += len(data)
                             self.total_bytes_transferred += len(data)
 
                             mode = "STABLE" if self.disconnects_completed else f"DISCONNECT_MODE({self.disconnect_count}/{self.planned_disconnects})"
-                            print(f"[Proxy] [{mode}] Client->Server: {len(data)} bytes (session: {self.bytes_transferred}, total: {self.total_bytes_transferred})")
+                            self.log(f"[{mode}] Client->Server: {len(data)} bytes (session: {self.bytes_transferred}, total: {self.total_bytes_transferred})")
+                        except BlockingIOError:
+                            pass
                         except Exception as e:
-                            print(f"[Proxy] Error forwarding client->server: {e}")
+                            self.log(f"Error forwarding client->server: {e}")
                             break
 
-                    if self.server_socket in ready_sockets:
+                    if self.server_socket in readable:
                         try:
                             data = self.server_socket.recv(8192)
                             if not data:
-                                print("[Proxy] Server disconnected")
+                                self.log("Server disconnected (EOF)")
                                 break
                             self.client_socket.send(data)
                             self.bytes_transferred += len(data)
                             self.total_bytes_transferred += len(data)
 
                             mode = "STABLE" if self.disconnects_completed else f"DISCONNECT_MODE({self.disconnect_count}/{self.planned_disconnects})"
-                            print(f"[Proxy] [{mode}] Server->Client: {len(data)} bytes (session: {self.bytes_transferred}, total: {self.total_bytes_transferred})")
+                            self.log(f"[{mode}] Server->Client: {len(data)} bytes (session: {self.bytes_transferred}, total: {self.total_bytes_transferred})")
+                        except BlockingIOError:
+                            pass
                         except Exception as e:
-                            print(f"[Proxy] Error forwarding server->client: {e}")
+                            self.log(f"Error forwarding server->client: {e}")
                             break
 
                 except Exception as e:
-                    print(f"[Proxy] Select error: {e}")
+                    self.log(f"Select error: {e}")
                     break
 
         except Exception as e:
-            print(f"[Proxy] Connection handling error: {e}")
+            self.log(f"Connection handling error: {e}")
         finally:
             final_mode = "STABLE" if self.disconnects_completed else "INCOMPLETE"
-            print(f"[Proxy] Connection closed in {final_mode} mode")
-            print(f"[Proxy] Total disconnects: {self.disconnect_count}/{self.planned_disconnects}")
-            print(f"[Proxy] Total bytes transferred: {self.total_bytes_transferred}")
-            if self.client_socket:
+            self.log(f"Connection closed in {final_mode} mode")
+            self.log(f"Total disconnects: {self.disconnect_count}/{self.planned_disconnects}")
+            self.log(f"Total bytes transferred: {self.total_bytes_transferred}")
+            try:
                 self.client_socket.close()
-            if self.server_socket:
+            except:
+                pass
+            try:
                 self.server_socket.close()
+            except:
+                pass
 
     def start(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind(('127.0.0.1', self.listen_port))
-        server_socket.listen(1)
+        server_socket.listen(5)
 
-        print(f"[Proxy] Listening on port {self.listen_port}")
-        print(f"[Proxy] Will make {self.planned_disconnects} planned disconnects, then work stably")
+        self.log(f"Listening on port {self.listen_port}")
+        self.log(f"Will make {self.planned_disconnects} planned disconnects, then work stably")
 
         try:
             while self.running:
                 try:
+                    self.log("Waiting for client connection...")
                     client_socket, addr = server_socket.accept()
                     self.handle_client_connection(client_socket)
                 except Exception as e:
                     if self.running:
-                        print(f"[Proxy] Accept error: {e}")
+                        self.log(f"Accept error: {e}")
         finally:
             server_socket.close()
-            print("[Proxy] Server socket closed")
+            self.log("Server socket closed")
 
 if __name__ == "__main__":
     if len(sys.argv) != 5:
-        print("Usage: binlog_proxy.py <listen_port> <target_host> <target_port> <planned_disconnects>")
+        print("Usage: binlog_proxy.py <listen_port> <target_host> <target_port> <planned_disconnects>", flush=True)
         sys.exit(1)
 
     listen_port = int(sys.argv[1])
