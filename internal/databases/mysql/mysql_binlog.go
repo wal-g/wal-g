@@ -91,15 +91,15 @@ func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, erro
 			if err != nil {
 				return err
 			}
-			var _result = new(mysql.MariadbGTIDSet)
-			_result.Sets = make(map[uint32]*mysql.MariadbGTID) // there is no good constructor for MariadbGTIDSet
+			resultSet := &mysql.MariadbGTIDSet{
+				Sets: make(map[uint32]map[uint32]*mysql.MariadbGTID),
+			}
 			for _, gtid := range listEvent.GTIDs {
-				err = _result.AddSet(&gtid)
-				if err != nil {
+				if err := resultSet.AddSet(&gtid); err != nil {
 					return err
 				}
 			}
-			result = _result
+			result = resultSet
 			return fmt.Errorf("shallow file read finished")
 		}
 		return nil
