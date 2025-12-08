@@ -54,3 +54,5 @@ grep -w 'testpitr01' /tmp/dump_after_pitr
 grep -w 'testpitr02' /tmp/dump_after_pitr
 grep -w 'testpitr03' /tmp/dump_after_pitr
 ! grep -w 'testpitr04' /tmp/dump_after_pitr
+
+sleep 11
