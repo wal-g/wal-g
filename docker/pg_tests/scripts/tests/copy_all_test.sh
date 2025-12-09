@@ -4,18 +4,12 @@ CONFIG_FILE="/tmp/configs/copy_all_test_config.json"
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+jq -s '.[0] * .[1]' ${COMMON_CONFIG} ${CONFIG_FILE} > ${TMP_CONFIG}
 
 mkdir /tmp/copy_all_test_storage
 TO_CONFIG_FILE="/tmp/configs/copy_all_to_test_config.json"
 TO_TMP_CONFIG="/tmp/configs/to_tmp_config.json"
-cat ${TO_CONFIG_FILE} > ${TO_TMP_CONFIG}
-echo "," >> ${TO_TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TO_TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TO_TMP_CONFIG}
+jq -s '.[0] * .[1]' ${COMMON_CONFIG} ${TO_CONFIG_FILE} > ${TO_TMP_CONFIG}
 
 initdb "${PGDATA}"
 
