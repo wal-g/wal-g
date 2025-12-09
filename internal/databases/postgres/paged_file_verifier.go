@@ -132,16 +132,17 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 	if err != nil {
 		return false, err
 	}
-	valid := pageHeader.isValid()
-	if !valid {
-		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
-		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
-		return false, nil
-	}
 
 	// We only calculate the checksum for properly-initialized pages
 	isNew := pageHeader.isNew()
 	if isNew {
+		return false, nil
+	}
+
+	valid := pageHeader.isValid()
+	if !valid {
+		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
+		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
 		return false, nil
 	}
 
@@ -237,7 +238,6 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 // verifySinglePage reads and verifies single paged file block
 func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, error) {
 	page := PgDatabasePage{}
-	tracelog.WarningLogger.Printf("PgDatabasePage %d DatabasePageSize %d\n", MaxDatabasePageSize, DatabasePageSize)
 	_, err := io.ReadFull(pageBlocks, page[:DatabasePageSize])
 	if err != nil {
 		return false, err

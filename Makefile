@@ -54,7 +54,7 @@ test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudb
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build -v -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
 
 install_and_build_pg: deps pg_build
 
