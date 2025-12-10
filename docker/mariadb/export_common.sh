@@ -12,7 +12,7 @@ export WALG_COMPRESSION_METHOD=zstd
 # test tools
 mariadb_kill_and_clean_data() {
     # MariaDB service is weired - it returns error on service stop. Repeat it until success
-    while ! service mariadb stop
+    while ! service mysql stop
     do
       echo "Stopping MariaDB... Try again"
       sleep 1
@@ -25,6 +25,8 @@ mariadb_kill_and_clean_data() {
 
 mariadb_installdb() {
     mysql_install_db > /dev/null && chown -R mysql:mysql $MYSQLDATA
+    echo "MariaDB version"
+    mariadb --version
 }
 
 sysbench() {
