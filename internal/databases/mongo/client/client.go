@@ -82,11 +82,13 @@ type MongoDriver interface {
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
 	ApplyOp(ctx context.Context, op *db.Oplog) error
 	Close(ctx context.Context, shutdown bool) error
-	ChangeOplogLastTimestamp(ctx context.Context, ts primitive.Timestamp) error
+	ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error
 	LastOplogTS(ctx context.Context) (lastTS models.Timestamp, err error)
 }
 
 // OplogCursor defines methods to work with mongodb cursor.
+//
+//go:generate mockery --name OplogCursor
 type OplogCursor interface {
 	Close(ctx context.Context) error
 	Data() []byte
@@ -474,23 +476,23 @@ func WaitForBecomePrimary(ctx context.Context, mc *MongoClient, checkTimeout tim
 // 2) Change timestamp value of "replset.minvalid" collection's document
 //
 // 3) Change timestamp of "replset.oplogTruncateAfterPoint" collection's document
-func (mc *MongoClient) ChangeOplogLastTimestamp(ctx context.Context, ts primitive.Timestamp) error {
-	if err := mc.addNoopToOplog(ctx, ts); err != nil {
+func (mc *MongoClient) ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error {
+	if err := mc.addNoopToOplog(ctx, opTime); err != nil {
 		return err
 	}
 
-	if err := mc.changeMinValueTimestamp(ctx, ts); err != nil {
+	if err := mc.changeMinValueTimestamp(ctx, opTime); err != nil {
 		return err
 	}
 
-	if err := mc.changeOplogTruncateAfterPointTimestamp(ctx, ts); err != nil {
+	if err := mc.changeOplogTruncateAfterPointTimestamp(ctx); err != nil {
 		return err
 	}
 
 	return mc.fsync(ctx)
 }
 
-func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, ts primitive.Timestamp) error {
+func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, opTime models.OpTime) error {
 	minValidCol := mc.c.Database(oplogDatabaseName).Collection("replset.minvalid")
 	var minValue = struct {
 		ID primitive.ObjectID  `bson:"_id,omitempty"`
@@ -503,7 +505,8 @@ func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, ts primitive
 	}
 	result, err := minValidCol.UpdateOne(ctx, bson.M{"_id": minValue.ID}, bson.M{
 		"$set": bson.M{
-			"ts": ts,
+			"ts": opTime.TS,
+			"t":  opTime.Term,
 		},
 	})
 
@@ -515,7 +518,7 @@ func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, ts primitive
 	return err
 }
 
-func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Context, ts primitive.Timestamp) error {
+func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Context) error {
 	otapCol := mc.c.Database(oplogDatabaseName).Collection("replset.oplogTruncateAfterPoint")
 	var otap = struct {
 		ID string              `bson:"_id,omitempty"`
@@ -527,7 +530,7 @@ func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Contex
 	}
 	result, err := otapCol.UpdateOne(ctx, bson.M{"_id": otap.ID}, bson.M{
 		"$set": bson.M{
-			"oplogTruncateAfterPoint": ts,
+			"oplogTruncateAfterPoint": primitive.Timestamp{},
 		},
 	})
 
@@ -539,7 +542,7 @@ func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Contex
 	return err
 }
 
-func (mc *MongoClient) addNoopToOplog(ctx context.Context, ts primitive.Timestamp) error {
+func (mc *MongoClient) addNoopToOplog(ctx context.Context, opTime models.OpTime) error {
 	oplogCollection, err := mc.getOplogCollection(ctx)
 	if err != nil {
 		return err
@@ -552,15 +555,9 @@ func (mc *MongoClient) addNoopToOplog(ctx context.Context, ts primitive.Timestam
 		return fmt.Errorf("failed to get last oplog entry: %w", err)
 	}
 
-	var tValue int64 = 1
-	term, ok := lastEntry["t"].(int64)
-	if ok {
-		tValue = term
-	}
-
 	noopEntry := bson.D{
-		{Key: "ts", Value: ts},
-		{Key: "t", Value: tValue},
+		{Key: "ts", Value: opTime.TS},
+		{Key: "t", Value: opTime.Term},
 		{Key: "v", Value: 2},
 		{Key: "op", Value: "n"},
 		{Key: "ns", Value: ""},
