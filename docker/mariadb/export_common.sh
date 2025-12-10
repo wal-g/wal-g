@@ -6,6 +6,7 @@ export WALG_STREAM_CREATE_COMMAND="mariabackup --backup --stream=xbstream --user
 export WALG_STREAM_RESTORE_COMMAND="mbstream -x -C ${MYSQLDATA}"
 export WALG_MYSQL_BACKUP_PREPARE_COMMAND="mariabackup --prepare --target-dir=${MYSQLDATA}"
 export WALG_MYSQL_CHECK_GTIDS=False
+export WALG_COMPRESSION_METHOD=zstd
 
 
 # test tools
