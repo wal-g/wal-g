@@ -10,7 +10,7 @@ export WALG_MYSQL_BACKUP_PREPARE_COMMAND=
 
 
 mariadb_installdb
-service mariadb start
+service mysql start
 
 sysbench --table-size=10 prepare
 sysbench --time=5 run
@@ -25,7 +25,7 @@ wal-g backup-push
 mariadb_kill_and_clean_data
 
 mariadb_installdb
-service mariadb start
+service mysql start
 
 wal-g backup-fetch LATEST
 

@@ -7,7 +7,7 @@ export WALE_S3_PREFIX=s3://mariadb_binlog_push_fetch
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 
 mariadb_installdb
-service mariadb start
+service mysql start
 
 # drop all before-dump binlogs, so SHOW BINARY LOGS will show all binlogs we need to fetch
 current_binlog=$(mysql -e "SHOW BINARY LOGS" | tail -n 1 | awk '{print $1}')
