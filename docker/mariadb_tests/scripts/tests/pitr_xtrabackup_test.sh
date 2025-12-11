@@ -46,7 +46,7 @@ wal-g backup-fetch LATEST
 cat /var/lib/mysql/xtrabackup_binlog_info
 
 chown -R mysql:mysql $MYSQLDATA
-service mariadb start || (cat /var/log/mysql/error.log && false)
+service mysql start || (cat /var/log/mysql/error.log && false)
 # For backups made from replicas we should update GTIDs. Test our reset logic here.
 # https://mariadb.com/kb/en/gtid/#setting-up-a-new-replica-from-a-backup
 mysql_set_gtid_from_backup
