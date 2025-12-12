@@ -236,3 +236,66 @@ func TestListFolder_VersioningEnabled_HandlesOldDeleteMarkers(t *testing.T) {
 	assert.Equal(t, "object1.txt", objects[0].GetName())
 }
 
+func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.T) {
+	now := time.Now()
+
+	// Create mock data:
+	// - object1.txt: has a version (LATEST) - should be included
+	// - object2.txt: has a delete marker (LATEST) - normally excluded, but with ShowAllVersions should be included
+	mockClient := &mockS3ClientVersioning{
+		versions: []*s3.ObjectVersion{
+			{
+				Key:          aws.String("object1.txt"),
+				VersionId:    aws.String("v1"),
+				IsLatest:     aws.Bool(true),
+				LastModified: aws.Time(now),
+				Size:         aws.Int64(100),
+			},
+			{
+				Key:          aws.String("object2.txt"),
+				VersionId:    aws.String("v2-old"),
+				IsLatest:     aws.Bool(false), // Old version before deletion
+				LastModified: aws.Time(now.Add(-time.Hour)),
+				Size:         aws.Int64(200),
+			},
+		},
+		deleteMarkers: []*s3.DeleteMarkerEntry{
+			{
+				Key:          aws.String("object2.txt"),
+				VersionId:    aws.String("dm2"),
+				IsLatest:     aws.Bool(true), // Object is deleted
+				LastModified: aws.Time(now),
+			},
+		},
+	}
+
+	config := &walgs3.Config{
+		Bucket:           "test-bucket",
+		EnableVersioning: "enabled",
+	}
+	folder := walgs3.NewFolder(mockClient, nil, "", config)
+
+	// Enable show all versions
+	folder.SetShowAllVersions(true)
+
+	objects, _, err := folder.ListFolder()
+
+	require.NoError(t, err)
+
+	// Should have 3 entries:
+	// - object1.txt (version)
+	// - object2.txt (old version)
+	// - object2.txt (delete marker)
+	assert.Len(t, objects, 3, "Should include all versions and delete markers")
+
+	// Check that delete marker is included with DELETE info
+	foundDeleteMarker := false
+	for _, obj := range objects {
+		info := obj.GetAdditionalInfo()
+		if obj.GetName() == "object2.txt" && (info == "dm2 LATEST DELETE" || info == "dm2 DELETE") {
+			foundDeleteMarker = true
+			break
+		}
+	}
+	assert.True(t, foundDeleteMarker, "Delete marker should be included with DELETE label")
+}

@@ -28,11 +28,12 @@ const (
 
 // TODO: Unit tests
 type Folder struct {
-	s3API    s3iface.S3API
-	uploader *Uploader
-	bucket   *string
-	path     string
-	config   *Config
+	s3API           s3iface.S3API
+	uploader        *Uploader
+	bucket          *string
+	path            string
+	config          *Config
+	showAllVersions bool // When true, include deleted objects in listing (for st ls --all-versions)
 }
 
 func NewFolder(
@@ -120,11 +121,19 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 		storage.JoinPath(folder.path, subFolderRelativePath)+"/",
 		folder.config,
 	)
+	// Propagate the showAllVersions setting to subfolders
+	subFolder.showAllVersions = folder.showAllVersions
 	return subFolder
 }
 
 func (folder *Folder) GetPath() string {
 	return folder.path
+}
+
+// SetShowAllVersions controls whether ListFolder includes deleted objects
+// (objects where the latest version is a delete marker) when versioning is enabled.
+func (folder *Folder) SetShowAllVersions(show bool) {
+	folder.showAllVersions = show
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
@@ -182,6 +191,7 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	// Collect all versions and delete markers across all pages first,
 	// because a delete marker and its corresponding version might be on different pages.
 	allVersions := []versionInfo{}
+	deleteMarkers := []versionInfo{}
 
 	// Track keys where the LATEST version is a delete marker.
 	// These objects are effectively deleted and should not appear in the listing.
@@ -198,10 +208,18 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 			if *marker.Key == folder.path {
 				continue
 			}
+			objectRelativePath := strings.TrimPrefix(*marker.Key, folder.path)
 			if *marker.IsLatest {
-				objectRelativePath := strings.TrimPrefix(*marker.Key, folder.path)
 				deletedKeys[objectRelativePath] = true
 			}
+			// Also collect delete marker info for --all-versions mode
+			deleteMarkers = append(deleteMarkers, versionInfo{
+				relativePath: objectRelativePath,
+				lastModified: *marker.LastModified,
+				size:         0,
+				versionID:    *marker.VersionId,
+				isLatest:     *marker.IsLatest,
+			})
 		}
 
 		// Collect all versions for later filtering
@@ -237,10 +255,11 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	}
 
 	// Filter out versions of objects that have been deleted (LATEST is a delete marker)
+	// unless showAllVersions is enabled
 	objects := make([]storage.Object, 0, len(allVersions))
 	for _, v := range allVersions {
-		// Skip objects where the LATEST version is a delete marker
-		if deletedKeys[v.relativePath] {
+		// Skip objects where the LATEST version is a delete marker (unless showing all versions)
+		if deletedKeys[v.relativePath] && !folder.showAllVersions {
 			continue
 		}
 
@@ -250,6 +269,20 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 		} else {
 			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified,
 				v.size, v.versionID))
+		}
+	}
+
+	// If showing all versions, also include delete markers themselves
+	if folder.showAllVersions {
+		for _, marker := range deleteMarkers {
+			var info string
+			if marker.isLatest {
+				info = fmt.Sprintf("%s LATEST DELETE", marker.versionID)
+			} else {
+				info = fmt.Sprintf("%s DELETE", marker.versionID)
+			}
+			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(
+				marker.relativePath, marker.lastModified, 0, info))
 		}
 	}
 
