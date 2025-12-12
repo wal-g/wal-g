@@ -131,8 +131,8 @@ fi
 
 sleep 5
 
-echo "Starting proxy with max 2 reconnections..."
-python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT 2 > $PROXY_LOG 2>&1 & proxy_pid=$!
+echo "Starting proxy with reconnections..."
+python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT 7 > $PROXY_LOG 2>&1 & proxy_pid=$!
 echo "Started proxy with PID: $proxy_pid"
 
 echo "Waiting for proxy to start..."
@@ -172,7 +172,7 @@ mysql -e "START SLAVE"
 
 echo "Waiting for replication to start..."
 WAIT_COUNT=0
-MAX_WAIT=60
+MAX_WAIT=15
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     SLAVE_STATUS=$(mysql -e "SHOW SLAVE STATUS\G" 2>/dev/null || echo "")
     SLAVE_IO_RUNNING=$(echo "$SLAVE_STATUS" | grep "Slave_IO_Running:" | awk '{print $2}')
@@ -186,7 +186,7 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 done
 
 echo "Waiting for replication to complete..."
-MAX_WAIT=30
+MAX_WAIT=10
 WAIT_COUNT=0
 EXPECTED_ROWS=301
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
@@ -199,7 +199,6 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 
     mysql -e "SHOW SLAVE STATUS\G" | grep -E "(Retrieved_Gtid_Set|Executed_Gtid_Set)"
     echo "Row count: $ROW_COUNT / $EXPECTED_ROWS, IO: $SLAVE_IO_RUNNING, SQL: $SLAVE_SQL_RUNNING (wait: $WAIT_COUNT/$MAX_WAIT)"
-
     if [ -n "$LAST_IO_ERROR" ] && [ "$LAST_IO_ERROR" != " " ]; then
         echo "Last IO Error: $LAST_IO_ERROR"
     fi
@@ -209,6 +208,8 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 
     if ! kill -0 $walg_pid 2>/dev/null; then
         echo "WARNING: wal-g binlog-server process died!"
+        cat $BINLOG_SERVER_LOG
+        cat $PROXY_LOG
         echo "=== Last lines of binlog server log ==="
         tail -20 $BINLOG_SERVER_LOG
         break
@@ -229,6 +230,9 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     sleep 2
     WAIT_COUNT=$((WAIT_COUNT + 1))
 done
+
+cat $BINLOG_SERVER_LOG
+cat $PROXY_LOG
 
 safe_kill_process "$proxy_pid" "proxy"
 
