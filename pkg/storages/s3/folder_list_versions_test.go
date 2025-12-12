@@ -16,8 +16,9 @@ import (
 // for testing versioning-related functionality.
 type mockS3ClientVersioning struct {
 	s3iface.S3API
-	versions      []*s3.ObjectVersion
-	deleteMarkers []*s3.DeleteMarkerEntry
+	versions       []*s3.ObjectVersion
+	deleteMarkers  []*s3.DeleteMarkerEntry
+	commonPrefixes []*s3.CommonPrefix
 }
 
 func (m *mockS3ClientVersioning) ListObjectVersionsPages(
@@ -25,8 +26,9 @@ func (m *mockS3ClientVersioning) ListObjectVersionsPages(
 	fn func(*s3.ListObjectVersionsOutput, bool) bool,
 ) error {
 	output := &s3.ListObjectVersionsOutput{
-		Versions:      m.versions,
-		DeleteMarkers: m.deleteMarkers,
+		CommonPrefixes: m.commonPrefixes,
+		Versions:       m.versions,
+		DeleteMarkers:  m.deleteMarkers,
 	}
 	fn(output, true)
 	return nil
@@ -298,4 +300,68 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.
 		}
 	}
 	assert.True(t, foundDeleteMarker, "Delete marker should be included with DELETE label")
+}
+
+func TestListFolder_VersioningEnabled_ShowAllVersionsPropagatesToSubfoldersFromListing(t *testing.T) {
+	now := time.Now()
+
+	// Root listing returns a subfolder via CommonPrefixes. We validate that the returned
+	// subfolder inherits showAllVersions=true, so listing that subfolder includes delete markers.
+	//
+	// S3 list versions returns:
+	// - CommonPrefixes: "dir/"
+	// - Versions: "dir/object2.txt" (old version)
+	// - DeleteMarkers: "dir/object2.txt" (LATEST delete marker)
+	mockClient := &mockS3ClientVersioning{
+		commonPrefixes: []*s3.CommonPrefix{
+			{Prefix: aws.String("dir/")},
+		},
+		versions: []*s3.ObjectVersion{
+			{
+				Key:          aws.String("dir/object2.txt"),
+				VersionId:    aws.String("v2-old"),
+				IsLatest:     aws.Bool(false),
+				LastModified: aws.Time(now.Add(-time.Hour)),
+				Size:         aws.Int64(200),
+			},
+		},
+		deleteMarkers: []*s3.DeleteMarkerEntry{
+			{
+				Key:          aws.String("dir/object2.txt"),
+				VersionId:    aws.String("dm2"),
+				IsLatest:     aws.Bool(true),
+				LastModified: aws.Time(now),
+			},
+		},
+	}
+
+	config := &walgs3.Config{
+		Bucket:           "test-bucket",
+		EnableVersioning: "enabled",
+	}
+	root := walgs3.NewFolder(mockClient, nil, "", config)
+	root.SetShowAllVersions(true)
+
+	_, subFolders, err := root.ListFolder()
+	require.NoError(t, err)
+	require.Len(t, subFolders, 1)
+
+	// This is the critical part: the subfolder was created by ListFolder() from CommonPrefixes,
+	// not via GetSubFolder(). It must still have showAllVersions enabled.
+	sub := subFolders[0]
+	objects, _, err := sub.ListFolder()
+	require.NoError(t, err)
+
+	// Expect:
+	// - object2.txt (old version)
+	// - object2.txt (delete marker)
+	require.Len(t, objects, 2)
+
+	foundDelete := false
+	for _, obj := range objects {
+		if obj.GetName() == "object2.txt" && (obj.GetAdditionalInfo() == "dm2 LATEST DELETE" || obj.GetAdditionalInfo() == "dm2 DELETE") {
+			foundDelete = true
+		}
+	}
+	assert.True(t, foundDelete, "Delete marker in subfolder should be included when --all-versions is enabled")
 }

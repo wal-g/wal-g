@@ -149,6 +149,8 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
 			for _, prefix := range commonPrefixes {
 				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+				// Propagate the showAllVersions setting to subfolders created during listing
+				subFolder.showAllVersions = folder.showAllVersions
 				subFolders = append(subFolders, subFolder)
 			}
 			for _, object := range contents {
@@ -200,6 +202,8 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
 		for _, p := range out.CommonPrefixes {
 			subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
+			// Propagate the showAllVersions setting to subfolders created during listing
+			subFolder.showAllVersions = folder.showAllVersions
 			subFolders = append(subFolders, subFolder)
 		}
 
