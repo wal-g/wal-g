@@ -29,26 +29,26 @@
         "-1": {
             "hostname": "localhost",
             "port": 6001,
-            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/standby/gpseg-1",
-            "db_id": 5
+            "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/standby",
+            "db_id": 8
         },
         "0": {
             "hostname": "localhost",
-            "port": 7002,
+            "port": 6005,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror1/demoDataDir0",
-            "db_id": 6
+            "db_id": 5
         },
         "1": {
             "hostname": "localhost",
-            "port": 7003,
+            "port": 6006,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror2/demoDataDir1",
-            "db_id": 7
+            "db_id": 6
         },
         "2": {
             "hostname": "localhost",
-            "port": 7004,
+            "port": 6007,
             "data_dir": "/usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror3/demoDataDir2",
-            "db_id": 8
+            "db_id": 7
         }
     }
 }

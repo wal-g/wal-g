@@ -7,6 +7,7 @@ import (
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/gpcluster"
 
 	conf "github.com/wal-g/wal-g/internal/config"
 )
@@ -44,20 +45,23 @@ func NewActionHandler(logsDir string, restoreCfgPath string, withMirrors bool) *
 }
 
 func (fh *ActionHandler) UpdateAction(action string) {
-	if action == string(RecoveryTargetActionPromote) && fh.withMirrors {
-		tracelog.ErrorLogger.Fatalf("cannot promote mirrors")
-	}
+	tracelog.InfoLogger.Print("Updating recovery.conf on segments and master", action)
+	commandList := gpcluster.GenerateSSHCommandForSegments(fh.cluster, func(segment cluster.SegConfig) string {
+		if segment.Role == string(Mirror) && !fh.withMirrors {
+			return ""
+		}
+		action := action
+		if segment.Role == string(Mirror) && action == string(RecoveryTargetActionPromote) {
+			action = string(RecoveryTargetActionPause)
+		}
 
-	tracelog.InfoLogger.Printf("Updating recovery.conf recovery_target_action %s on segments and master...", action)
-	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating recovery.conf on segments and master",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS,
-		func(contentID int) string {
-			segment := fh.cluster.ByContent[contentID][0]
-			pathToRestore := path.Join(segment.DataDir, viper.GetString(conf.GPRelativeRecoveryConfPath))
-			cmd := fmt.Sprintf(actionCmd, pathToRestore, action, pathToRestore)
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
-			return cmd
-		})
+		pathToRestore := path.Join(segment.DataDir, viper.GetString(conf.GPRelativeRecoveryConfPath))
+		cmd := fmt.Sprintf(actionCmd, pathToRestore, action, pathToRestore)
+		tracelog.DebugLogger.Printf("Command to run on segment %d: %s", segment.ContentID, cmd)
+		return cmd
+
+	})
+	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS, commandList)
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to update recovery_target_action", func(contentID int) string {
 		return fmt.Sprintf("Unable to create recovery.conf on segment %d", contentID)

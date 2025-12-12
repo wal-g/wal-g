@@ -1,11 +1,22 @@
 #!/bin/bash
 set -e
 
+declare -a MASTERS_DIRS=(
+  '-1 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1'
+  '0 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast1/demoDataDir0'
+  '1 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast2/demoDataDir1'
+  '2 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast3/demoDataDir2'
+)
+
 declare -a SEGMENTS_DIRS=(
   '-1 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1'
   '0 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast1/demoDataDir0'
   '1 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast2/demoDataDir1'
   '2 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast3/demoDataDir2'
+  '5 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/standby'
+  '6 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror1/demoDataDir0'
+  '7 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror2/demoDataDir1'
+  '8 /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror3/demoDataDir2'
 )
 
 insert_data() {
@@ -54,7 +65,7 @@ die_with_gp_logs() {
     for elem in "${SEGMENTS_DIRS[@]}"; do
       read -a arr <<< "$elem"
       echo "*** ${arr[1]} ***"
-      more "${arr[1]}"/log/* | cat || true
+      more "${arr[1]}"/pg_log/* | cat || true
     done
     exit 1
 }
@@ -72,7 +83,7 @@ start_cluster() {
 }
 
 setup_wal_archiving() {
-  for elem in "${SEGMENTS_DIRS[@]}"; do
+  for elem in "${MASTERS_DIRS[@]}"; do
     read -a arr <<< "$elem"
       echo "
   wal_level = archive

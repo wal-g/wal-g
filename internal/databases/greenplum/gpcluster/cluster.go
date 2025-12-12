@@ -10,7 +10,7 @@ func GenerateSSHCommandForSegments(cl *cluster.Cluster, generator func(segment c
 	var commands []cluster.ShellCommand
 	localHost := cl.GetHostForContent(-1)
 
-	for _, segment := range cl.Segments {
+	for _, segment := range cl.Segments { //nolint:gocritic // rangeValCopy
 		cmd := generator(segment)
 		if cmd == "" {
 			continue

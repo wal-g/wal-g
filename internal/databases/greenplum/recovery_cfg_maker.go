@@ -10,6 +10,7 @@ type RecoveryTargetAction string
 var (
 	RecoveryTargetActionShutdown RecoveryTargetAction = "shutdown"
 	RecoveryTargetActionPromote  RecoveryTargetAction = "promote"
+	RecoveryTargetActionPause    RecoveryTargetAction = "pause"
 )
 
 func NewRecoveryConfigMaker(walgBinaryPath, cfgPath, recoveryTargetName string) RecoveryConfigMaker {
