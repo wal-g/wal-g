@@ -26,9 +26,9 @@ type BackupSentinelDto struct {
 	BackupFinishLSN  *LSN    `json:"FinishLSN"`
 	SystemIdentifier *uint64 `json:"SystemIdentifier,omitempty"`
 
-	UncompressedSize int64           `json:"UncompressedSize"`
-	CompressedSize   int64           `json:"CompressedSize"`
-	DataCatalogSize  int64           `json:"DataCatalogSize,omitempty"`
+	UncompressedSize int64 `json:"UncompressedSize"`
+	CompressedSize   int64 `json:"CompressedSize"`
+	DataCatalogSize  int64 `json:"DataCatalogSize,omitempty"`
 	// TablespaceSpec holds tablespace locations. UnmarshalJSON handles both "Spec" and "spec" (WAL-E).
 	TablespaceSpec *TablespaceSpec `json:"Spec,omitempty"`
 
