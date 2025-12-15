@@ -29,7 +29,8 @@ type BackupSentinelDto struct {
 	UncompressedSize int64           `json:"UncompressedSize"`
 	CompressedSize   int64           `json:"CompressedSize"`
 	DataCatalogSize  int64           `json:"DataCatalogSize,omitempty"`
-	TablespaceSpec   *TablespaceSpec `json:"Spec,omitempty"` // uppercase for backward compatibility; UnmarshalJSON also handles lowercase "spec" (WAL-E format)
+	// TablespaceSpec holds tablespace locations. UnmarshalJSON handles both "Spec" and "spec" (WAL-E).
+	TablespaceSpec *TablespaceSpec `json:"Spec,omitempty"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 
