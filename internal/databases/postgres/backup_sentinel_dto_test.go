@@ -46,9 +46,9 @@ func TestBackupSentinelDto_IsIncremental(t *testing.T) {
 }
 
 func TestBackupSentinelDto_UnmarshalJSON_LowercaseSpec(t *testing.T) {
-	// Test that lowercase "spec" (WAL-E format and new WAL-G format) is correctly parsed
+	// Test that lowercase "spec" (WAL-E format) is correctly parsed
 	jsonData := `{
-		"LSN": "0/5000000",
+		"LSN": 83886080,
 		"PgVersion": 160000,
 		"spec": {
 			"base_prefix": "/pgdata/test",
@@ -69,9 +69,9 @@ func TestBackupSentinelDto_UnmarshalJSON_LowercaseSpec(t *testing.T) {
 }
 
 func TestBackupSentinelDto_UnmarshalJSON_UppercaseSpec(t *testing.T) {
-	// Test that uppercase "Spec" (legacy WAL-G format) is correctly parsed
+	// Test that uppercase "Spec" (WAL-G format) is correctly parsed
 	jsonData := `{
-		"LSN": "0/5000000",
+		"LSN": 83886080,
 		"PgVersion": 160000,
 		"Spec": {
 			"base_prefix": "/pgdata/legacy",
@@ -94,7 +94,7 @@ func TestBackupSentinelDto_UnmarshalJSON_UppercaseSpec(t *testing.T) {
 func TestBackupSentinelDto_UnmarshalJSON_NoSpec(t *testing.T) {
 	// Test that missing spec field results in nil TablespaceSpec (not an error)
 	jsonData := `{
-		"LSN": "0/5000000",
+		"LSN": 83886080,
 		"PgVersion": 160000
 	}`
 
