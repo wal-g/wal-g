@@ -69,7 +69,7 @@ func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDire
 		return err
 	}
 	tablespaceSpec = chooseTablespaceSpecification(sentinelDto.TablespaceSpec, tablespaceSpec)
-	sentinelDto.TablespaceSpec = tablespaceSpec
+	*sentinelDto.TablespaceSpec = *tablespaceSpec
 
 	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %s \n", *(sentinelDto.IncrementFrom),
