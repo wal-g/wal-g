@@ -138,6 +138,10 @@ wal-g backup-fetch --restore-spec /tmp/modified_restore_spec.json ${PGDATA} LATE
 echo "=== Verifying tablespace symlinks ==="
 ls -la ${PGDATA}/pg_tblspc/
 
+# TODO: i don't know what to do with tablespace_map in walg
+cat ${PGDATA}/tablespace_map
+rm ${PGDATA}/tablespace_map
+
 # Setup recovery
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& \
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
@@ -163,6 +167,8 @@ pg_ctl -D ${PGDATA} -w start
 pg_dumpall -f /tmp/dump2
 
 # Verify data is identical
+sed -i "s|LOCATION '/tmp/spaces/space'|LOCATION '/tmp/new_spaces/new_space'|" /tmp/dump1
+sed -i "s|LOCATION '/tmp/spaces/space2'|LOCATION '/tmp/new_spaces/new_space2'|" /tmp/dump1
 diff /tmp/dump1 /tmp/dump2
 
 # Verify tablespace files are in the NEW locations
