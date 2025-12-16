@@ -19,6 +19,7 @@ func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedund
 
 		var spec *TablespaceSpec
 		if restoreSpecPath != "" {
+			delete(filesToUnwrap, TablespaceMapFilename)
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
 			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)

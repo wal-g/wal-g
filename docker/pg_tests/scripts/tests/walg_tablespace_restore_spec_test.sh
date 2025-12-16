@@ -138,9 +138,13 @@ wal-g backup-fetch --restore-spec /tmp/modified_restore_spec.json ${PGDATA} LATE
 echo "=== Verifying tablespace symlinks ==="
 ls -la ${PGDATA}/pg_tblspc/
 
-# TODO: i don't know what to do with tablespace_map in walg
-cat ${PGDATA}/tablespace_map
-rm ${PGDATA}/tablespace_map
+# Verify tablespace_map is not existing
+if [ ! -f ${PGDATA}/tablespace_map ]; then
+    echo "tablespace_map does not exist"
+else
+    echo "FAIL: tablespace_map exists with --restore-spec"
+    exit 1
+fi
 
 # Setup recovery
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& \
