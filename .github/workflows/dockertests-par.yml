@@ -76,6 +76,7 @@ jobs:
         "make FEATURE=\"rdb_backup\" IMAGE_TYPE=\"rdb\" REDIS_VERSION=\"7.2.4\" redis_features",
         "make TEST=\"pg_wale_tablespace_compatibility_test\" pg_integration_test",
         "make TEST=\"pg_tablespace_support_test\" pg_integration_test",
+        "make TEST=\"pg_walg_tablespace_restore_spec_test\" pg_integration_test",
         "make TEST=\"pg_wal_perftest\" pg_integration_test",
         "make TEST=\"pg_wal_perftest_with_throttling\" pg_integration_test",
         "make TEST=\"pg_backup_perftest\" pg_integration_test",

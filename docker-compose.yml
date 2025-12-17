@@ -547,6 +547,14 @@ services:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
 
+  pg_walg_tablespace_restore_spec_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_walg_tablespace_restore_spec_test
+    command: /tmp/tests/walg_tablespace_restore_spec_test.sh
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+
   pg_transfer_backup_test:
     <<: *pg_test_common
     container_name: wal-g_pg_transfer_backup_test

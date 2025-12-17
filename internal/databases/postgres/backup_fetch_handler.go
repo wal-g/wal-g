@@ -69,7 +69,11 @@ func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDire
 		return err
 	}
 	tablespaceSpec = chooseTablespaceSpecification(sentinelDto.TablespaceSpec, tablespaceSpec)
-	sentinelDto.TablespaceSpec = tablespaceSpec
+	if sentinelDto.TablespaceSpec == nil {
+		sentinelDto.TablespaceSpec = tablespaceSpec
+	} else {
+		*sentinelDto.TablespaceSpec = *tablespaceSpec
+	}
 
 	if sentinelDto.IsIncremental() {
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %s \n", *(sentinelDto.IncrementFrom),
@@ -107,6 +111,7 @@ func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractPro
 
 		var spec *TablespaceSpec
 		if restoreSpecPath != "" {
+			delete(filesToUnwrap, TablespaceMapFilename)
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
 			errMessage := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
