@@ -37,7 +37,11 @@ func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog) (ch
 	errc := make(chan error)
 	go func() {
 		defer close(errc)
-		defer func() { _ = dba.applier.Close(ctx) }()
+		defer func() {
+			if err := dba.applier.Close(ctx); err != nil {
+				errc <- fmt.Errorf("can not close applier: %w", err)
+			}
+		}()
 
 		for opr := range ch {
 			// we still pass oplog records in generic appliers by value
