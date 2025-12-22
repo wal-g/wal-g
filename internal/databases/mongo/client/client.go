@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/mongodb/mongo-tools/common/db"
@@ -505,16 +504,17 @@ func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, opTime model
 	}
 	result, err := minValidCol.UpdateOne(ctx, bson.M{"_id": minValue.ID}, bson.M{
 		"$set": bson.M{
-			"ts": opTime.TS,
+			"ts": models.BsonTimestampFromOplogTS(opTime.TS),
 			"t":  opTime.Term,
 		},
 	})
 
 	if result.ModifiedCount == 0 && result.MatchedCount > 0 {
-		return fmt.Errorf("minvalue note alreadhy has this value")
+		return err
 	} else if result.ModifiedCount == 0 {
 		return fmt.Errorf("need to debug I guess")
 	}
+
 	return err
 }
 
@@ -535,7 +535,7 @@ func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Contex
 	})
 
 	if result.ModifiedCount == 0 && result.MatchedCount > 0 {
-		return fmt.Errorf("minvalue note alreadhy has this value")
+		return err
 	} else if result.ModifiedCount == 0 {
 		return fmt.Errorf("need to debug I guess")
 	}
@@ -554,9 +554,8 @@ func (mc *MongoClient) addNoopToOplog(ctx context.Context, opTime models.OpTime)
 	if err != nil {
 		return fmt.Errorf("failed to get last oplog entry: %w", err)
 	}
-
 	noopEntry := bson.D{
-		{Key: "ts", Value: opTime.TS},
+		{Key: "ts", Value: models.BsonTimestampFromOplogTS(opTime.TS)},
 		{Key: "t", Value: opTime.Term},
 		{Key: "v", Value: 2},
 		{Key: "op", Value: "n"},
@@ -568,6 +567,7 @@ func (mc *MongoClient) addNoopToOplog(ctx context.Context, opTime models.OpTime)
 	}
 
 	_, err = oplogCollection.InsertOne(ctx, noopEntry)
+
 	return err
 }
 
@@ -583,8 +583,8 @@ func (mc *MongoClient) fsync(ctx context.Context) error {
 func (mc *MongoClient) Shutdown(ctx context.Context) error {
 	res := mc.c.Database("admin").RunCommand(ctx, bson.D{{Key: "shutdown", Value: 1}})
 
-	if res.Err() != nil && !strings.Contains(res.Err().Error(), "connection EOF closed") {
-		return res.Err()
+	if err := res.Err(); err != nil && !mongo.IsNetworkError(res.Err()) {
+		return err
 	}
 	return nil
 }
