@@ -1,2 +1,4 @@
-"WALG_DELTA_MAX_STEPS": "6",
-"WALG_FILE_PREFIX": "/tmp/storage"
+{
+  "WALG_DELTA_MAX_STEPS": "6",
+  "WALG_FILE_PREFIX": "/tmp/storage"
+}
