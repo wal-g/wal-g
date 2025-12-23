@@ -250,6 +250,72 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 	}, nil
 }
 
+// checkWalIntegrity runs wal-verify integrity check and updates the integrity metric
+func (e *WalgExporter) checkWalIntegrity() error {
+	var cmd *exec.Cmd
+	if e.walgConfigPath != "" {
+		cmd = exec.Command(e.walgPath, "wal-verify", "--config", e.walgConfigPath, "integrity")
+	} else {
+		cmd = exec.Command(e.walgPath, "wal-verify", "integrity")
+	}
+
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+
+	// Reset the metric
+	e.walIntegrity.Reset()
+
+	// Check overall status
+	isOK := strings.Contains(outputStr, "integrity check status: OK")
+
+	lines := strings.Split(outputStr, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// Skip non-data lines
+		if line == "" || !strings.HasPrefix(line, "|") || 
+		   strings.Contains(line, "TLI") || strings.HasPrefix(line, "+") {
+			continue
+		}
+
+		// Parse table row
+		fields := strings.Split(line, "|")
+		if len(fields) < 6 {
+			continue
+		}
+
+		timelineStr := strings.TrimSpace(fields[1])
+		statusStr := strings.TrimSpace(fields[5])
+
+		// Validate timeline is numeric
+		if _, parseErr := strconv.Atoi(timelineStr); parseErr != nil {
+			continue
+		}
+
+		// Set metric: 1 if FOUND and overall OK, 0 otherwise
+		var metricValue float64
+		if statusStr == "FOUND" && isOK {
+			metricValue = 1
+		} else {
+			metricValue = 0
+		}
+
+		e.walIntegrity.WithLabelValues(timelineStr).Set(metricValue)
+		log.Printf("Timeline %s: WAL integrity status = %v", timelineStr, metricValue)
+	}
+
+	if err != nil {
+		log.Printf("wal-verify integrity command failed: %v", err)
+		return fmt.Errorf("wal-verify failed: %w", err)
+	}
+
+	if !isOK {
+		return fmt.Errorf("integrity check returned non-OK status")
+	}
+
+	return nil
+}
+
 // Describe implements the Prometheus Collector interface
 func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
 	e.walTimestamp.Describe(ch)
@@ -305,7 +371,6 @@ func (e *WalgExporter) Start(ctx context.Context) {
 	}
 }
 
-// scrapeMetrics collects all metrics from WAL-G
 func (e *WalgExporter) scrapeMetrics() {
 	start := time.Now()
 	defer func() {
@@ -326,6 +391,12 @@ func (e *WalgExporter) scrapeMetrics() {
 
 	// Check storage aliveness
 	e.checkStorageAliveness()
+
+	// Run WAL integrity verification
+	if err := e.checkWalIntegrity(); err != nil {
+		log.Printf("Error checking WAL integrity: %v", err)
+		e.errors.WithLabelValues("wal-verify", "integrity_check_failed").Inc()
+	}
 
 	var backups []BackupInfo
 	for _, timeline := range timelineInfos {
@@ -423,20 +494,8 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 // updateWalMetrics updates WAL-related metrics
 func (e *WalgExporter) updateWalMetrics(timelineInfos []TimelineInfo) {
 	// Reset metrics
-	e.walIntegrity.Reset()
+	// NOTE: walIntegrity is NOT reset here - it's managed by checkWalIntegrity()
 	e.walTimestamp.Reset()
-
-	// Set WAL integrity status for each timeline
-	for _, timeline := range timelineInfos {
-		timelineStr := strconv.Itoa(int(timeline.ID))
-		var status float64
-		if timeline.Status == "OK" {
-			status = 1
-		} else {
-			status = 0
-		}
-		e.walIntegrity.WithLabelValues(timelineStr).Set(status)
-	}
 
 	// TODO: Implement WAL timestamp and LSN lag calculations
 	// This requires more complex logic to determine the current WAL position
