@@ -187,6 +187,93 @@ type versionInfo struct {
 	isLatest     bool
 }
 
+// addListedSubfolders converts S3 CommonPrefixes to Folder handles.
+// These handles are used by callers (e.g. `st ls` non-recursive output, or recursive listing via subfolders).
+func (folder *Folder) addListedSubfolders(subFolders *[]storage.Folder, commonPrefixes []*s3.CommonPrefix) {
+	for _, p := range commonPrefixes {
+		subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
+		// Propagate the showAllVersions setting to subfolders created during listing
+		subFolder.showAllVersions = folder.showAllVersions
+		*subFolders = append(*subFolders, subFolder)
+	}
+}
+
+// collectDeleteMarkers gathers delete marker entries and records which keys are "deleted"
+// (i.e. their LATEST is a delete marker). `deletedKeys` drives filtering in buildObjectsFromVersions.
+func (folder *Folder) collectDeleteMarkers(
+	deleteMarkers *[]versionInfo,
+	deletedKeys map[string]bool,
+	markers []*s3.DeleteMarkerEntry,
+) {
+	for _, marker := range markers {
+		if *marker.Key == folder.path {
+			continue
+		}
+		objectRelativePath := strings.TrimPrefix(*marker.Key, folder.path)
+		if *marker.IsLatest {
+			deletedKeys[objectRelativePath] = true
+		}
+		// Also collect delete marker info for --all-versions mode
+		*deleteMarkers = append(*deleteMarkers, versionInfo{
+			relativePath: objectRelativePath,
+			lastModified: *marker.LastModified,
+			size:         0,
+			versionID:    *marker.VersionId,
+			isLatest:     *marker.IsLatest,
+		})
+	}
+}
+
+// collectVersions gathers object versions from S3. Filtering happens later to correctly handle pagination
+// (delete markers and corresponding versions can appear on different pages).
+func (folder *Folder) collectVersions(allVersions *[]versionInfo, versions []*s3.ObjectVersion) {
+	for _, object := range versions {
+		// Some storages return root tar_partitions folder as a Key.
+		if *object.Key == folder.path {
+			continue
+		}
+		objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+		*allVersions = append(*allVersions, versionInfo{
+			relativePath: objectRelativePath,
+			lastModified: *object.LastModified,
+			size:         *object.Size,
+			versionID:    *object.VersionId,
+			isLatest:     *object.IsLatest,
+		})
+	}
+}
+
+// buildObjectsFromVersions turns collected versions into storage objects for output and higher-level logic.
+// By default it filters out keys whose LATEST is a delete marker; `showAllVersions` disables that filter.
+func (folder *Folder) buildObjectsFromVersions(allVersions []versionInfo, deletedKeys map[string]bool) []storage.Object {
+	objects := make([]storage.Object, 0, len(allVersions))
+	for _, v := range allVersions {
+		// Skip objects where the LATEST version is a delete marker (unless showing all versions)
+		if deletedKeys[v.relativePath] && !folder.showAllVersions {
+			continue
+		}
+		if v.isLatest {
+			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(
+				v.relativePath,
+				v.lastModified,
+				v.size,
+				fmt.Sprintf("%s LATEST", v.versionID),
+			))
+			continue
+		}
+		objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified, v.size, v.versionID))
+	}
+	return objects
+}
+
+// deleteMarkerAdditionalInfo formats marker version metadata for `st ls --all-versions` output.
+func deleteMarkerAdditionalInfo(marker versionInfo) string {
+	if marker.isLatest {
+		return fmt.Sprintf("%s LATEST DELETE", marker.versionID)
+	}
+	return fmt.Sprintf("%s DELETE", marker.versionID)
+}
+
 func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage.Object, []storage.Folder, error) {
 	subFolders := []storage.Folder{}
 
@@ -199,49 +286,11 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	// These objects are effectively deleted and should not appear in the listing.
 	deletedKeys := make(map[string]bool)
 
+	// Keep the page callback small and side-effect-only: collect state; build output after paging completes.
 	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
-		for _, p := range out.CommonPrefixes {
-			subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
-			// Propagate the showAllVersions setting to subfolders created during listing
-			subFolder.showAllVersions = folder.showAllVersions
-			subFolders = append(subFolders, subFolder)
-		}
-
-		// Collect delete markers - if LATEST, mark the key as deleted
-		for _, marker := range out.DeleteMarkers {
-			if *marker.Key == folder.path {
-				continue
-			}
-			objectRelativePath := strings.TrimPrefix(*marker.Key, folder.path)
-			if *marker.IsLatest {
-				deletedKeys[objectRelativePath] = true
-			}
-			// Also collect delete marker info for --all-versions mode
-			deleteMarkers = append(deleteMarkers, versionInfo{
-				relativePath: objectRelativePath,
-				lastModified: *marker.LastModified,
-				size:         0,
-				versionID:    *marker.VersionId,
-				isLatest:     *marker.IsLatest,
-			})
-		}
-
-		// Collect all versions for later filtering
-		for _, object := range out.Versions {
-			// Some storages return root tar_partitions folder as a Key.
-			if *object.Key == folder.path {
-				continue
-			}
-
-			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			allVersions = append(allVersions, versionInfo{
-				relativePath: objectRelativePath,
-				lastModified: *object.LastModified,
-				size:         *object.Size,
-				versionID:    *object.VersionId,
-				isLatest:     *object.IsLatest,
-			})
-		}
+		folder.addListedSubfolders(&subFolders, out.CommonPrefixes)
+		folder.collectDeleteMarkers(&deleteMarkers, deletedKeys, out.DeleteMarkers)
+		folder.collectVersions(&allVersions, out.Versions)
 		return true
 	}
 
@@ -258,35 +307,14 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 	}
 
-	// Filter out versions of objects that have been deleted (LATEST is a delete marker)
-	// unless showAllVersions is enabled
-	objects := make([]storage.Object, 0, len(allVersions))
-	for _, v := range allVersions {
-		// Skip objects where the LATEST version is a delete marker (unless showing all versions)
-		if deletedKeys[v.relativePath] && !folder.showAllVersions {
-			continue
-		}
-
-		if v.isLatest {
-			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified,
-				v.size, fmt.Sprintf("%s LATEST", v.versionID)))
-		} else {
-			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified,
-				v.size, v.versionID))
-		}
-	}
+	// Convert collected versions to storage objects, applying delete-marker filtering unless requested otherwise.
+	objects := folder.buildObjectsFromVersions(allVersions, deletedKeys)
 
 	// If showing all versions, also include delete markers themselves
 	if folder.showAllVersions {
 		for _, marker := range deleteMarkers {
-			var info string
-			if marker.isLatest {
-				info = fmt.Sprintf("%s LATEST DELETE", marker.versionID)
-			} else {
-				info = fmt.Sprintf("%s DELETE", marker.versionID)
-			}
 			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(
-				marker.relativePath, marker.lastModified, 0, info))
+				marker.relativePath, marker.lastModified, 0, deleteMarkerAdditionalInfo(marker)))
 		}
 	}
 
