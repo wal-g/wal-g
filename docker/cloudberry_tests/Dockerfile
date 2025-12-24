@@ -13,7 +13,11 @@ COPY Makefile Makefile
 
 # we test wal-g logic, not our deps. So, no brotli in these tests.
 RUN cd main/gp && \
-    go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    if [ "$(uname -m)" = "aarch64" ]; then \
+        go build -mod vendor -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"; \
+    else \
+        go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"; \
+    fi
 
 FROM wal-g/cloudberry:latest
 
