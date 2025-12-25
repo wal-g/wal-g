@@ -1,11 +1,13 @@
 package mysql
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/pkg/errors"
 	"os"
 	"path"
 	"sort"
@@ -314,8 +316,15 @@ outer:
 	return nil
 }
 
-func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time, p *storage.ObjectProvider) {
-	defer p.Close()
+func provideLogsWithContext(ctx context.Context, folder storage.Folder, dstDir string, startTS, endTS time.Time, p *storage.ObjectProvider) {
+
+	select {
+	case <-ctx.Done():
+		tracelog.InfoLogger.Println("provideLogs: context canceled at start")
+		return
+	default:
+	}
+
 	_, err := os.Stat(dstDir)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(dstDir, 0777)
@@ -333,13 +342,27 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 	}
 
 	for _, logFile := range logsToFetch {
-		// download log files
+		select {
+		case <-ctx.Done():
+			tracelog.InfoLogger.Println("provideLogs: context canceled in loop")
+			return
+		default:
+		}
+
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
 		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
+
 		if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
+			select {
+			case <-ctx.Done():
+				tracelog.InfoLogger.Println("provideLogs: context canceled during download")
+				return
+			default:
+			}
+
 			if os.IsExist(err) {
-				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
+				tracelog.WarningLogger.Printf("file %s exists, skipping", binlogName)
 			} else {
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 				p.HandleError(err)
@@ -347,17 +370,38 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 			}
 		}
 
-		// add file to provider
-		err = p.AddObject(logFile)
-		p.HandleError(err)
-		if err != nil {
+		select {
+		case <-ctx.Done():
+			tracelog.InfoLogger.Println("provideLogs: context canceled before adding to provider")
+			os.Remove(binlogPath)
+			return
+		default:
+		}
+
+		if err = addObjectWithContext(ctx, p, logFile); err != nil {
+			if errors.Is(err, context.Canceled) {
+				tracelog.InfoLogger.Println("provideLogs: context canceled while adding object")
+			} else {
+				tracelog.ErrorLogger.Printf("provideLogs: error adding object: %v", err)
+			}
 			return
 		}
 
-		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
-		p.HandleError(err)
-		if err != nil {
+		select {
+		case <-ctx.Done():
 			return
+		default:
+		}
+
+		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				p.HandleError(err)
+				return
+			}
 		}
 		if timestamp.After(endTS) {
 			return
