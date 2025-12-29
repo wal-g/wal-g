@@ -450,7 +450,6 @@ func (e *WalgExporter) updateWalMetrics(timelineInfos []TimelineInfo) {
 }
 
 // getBackupsDirect executes wal-g backup-list --detail --json
-// This provides real-time backup data, unlike wal-show which uses cached timeline data
 func (e *WalgExporter) getBackupsDirect() ([]BackupInfo, error) {
 	var cmd *exec.Cmd
 
