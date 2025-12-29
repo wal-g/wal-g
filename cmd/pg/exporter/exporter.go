@@ -315,24 +315,29 @@ func (e *WalgExporter) scrapeMetrics() {
 
 	log.Printf("Scraping WAL-G metrics...")
 
-	// Get WAL information and backup information
+	// Get fresh backup list directly 
+	backups, err := e.getBackupsDirect()
+	if err != nil {
+		log.Printf("Error getting backups: %v", err)
+		e.scrapeErrors.Inc()
+		e.errors.WithLabelValues("backup-list", "command_failed").Inc()
+		return
+	}
+
+	// Get WAL timeline info (for WAL metrics, not for backup data)
 	timelineInfos, err := e.getWalInfo()
 	if err != nil {
 		log.Printf("Error getting WAL info: %v", err)
 		e.scrapeErrors.Inc()
 		e.errors.WithLabelValues("wal-show", "command_failed").Inc()
-		return
+		// Don't return - we still have backup data from backup-list
+		timelineInfos = []TimelineInfo{}
 	}
 
 	// Check storage aliveness
 	e.checkStorageAliveness()
 
-	var backups []BackupInfo
-	for _, timeline := range timelineInfos {
-		backups = append(backups, timeline.BackupInfo...)
-	}
-
-	// Update backup metrics
+	// Update backup metrics with FRESH data from backup-list
 	e.updateBackupMetrics(backups)
 
 	// Update WAL metrics
@@ -442,6 +447,30 @@ func (e *WalgExporter) updateWalMetrics(timelineInfos []TimelineInfo) {
 	// This requires more complex logic to determine the current WAL position
 	// and get timestamps from the latest WAL segments
 	// When implemented, use: e.walTimestamp.WithLabelValues(timelineStr).Set(float64(walTime.Unix()))
+}
+
+// getBackupsDirect executes wal-g backup-list --detail --json
+// This provides real-time backup data, unlike wal-show which uses cached timeline data
+func (e *WalgExporter) getBackupsDirect() ([]BackupInfo, error) {
+	var cmd *exec.Cmd
+
+	if e.walgConfigPath != "" {
+		cmd = exec.Command(e.walgPath, "backup-list", "--detail", "--json", "--config", e.walgConfigPath)
+	} else {
+		cmd = exec.Command(e.walgPath, "backup-list", "--detail", "--json")
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute backup-list: %w", err)
+	}
+
+	var backups []BackupInfo
+	if err := json.Unmarshal(output, &backups); err != nil {
+		return nil, fmt.Errorf("failed to parse backup-list output: %w", err)
+	}
+
+	return backups, nil
 }
 
 // updatePitrWindow calculates and updates the PITR window size
