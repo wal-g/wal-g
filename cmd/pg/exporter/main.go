@@ -16,11 +16,13 @@ import (
 )
 
 var (
-	listenAddr     = flag.String("web.listen-address", ":9351", "Address to listen on for web interface and telemetry.")
-	metricsPath    = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-	walgPath       = flag.String("walg.path", "wal-g", "Path to the wal-g binary.")
-	scrapeInterval = flag.Duration("scrape.interval", 60*time.Second, "Interval between scrapes.")
-	walgConfigPath = flag.String("walg.config-path", "", "Path to the wal-g config file.")
+	listenAddr            = flag.String("web.listen-address", ":9351", "Address to listen on for web interface and telemetry.")
+	metricsPath           = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	walgPath              = flag.String("walg.path", "wal-g", "Path to the wal-g binary.")
+	backupScrapeInterval  = flag.Duration("backup-list.scrape-interval", 60*time.Second, "Interval between backup-list scrapes.")
+	verifyScrapeInterval  = flag.Duration("wal-verify.scrape-interval", 5*time.Minute, "Interval between wal-verify scrapes.")
+	storageScrapeInterval = flag.Duration("storage-check.scrape-interval", 30*time.Second, "Interval between storage scrapes.")
+	walgConfigPath        = flag.String("walg.config-path", "", "Path to the wal-g config file.")
 )
 
 func main() {
@@ -30,14 +32,28 @@ func main() {
 	log.Printf("Listen address: %s", *listenAddr)
 	log.Printf("Metrics path: %s", *metricsPath)
 	log.Printf("WAL-G path: %s", *walgPath)
-	log.Printf("Scrape interval: %v", *scrapeInterval)
 	log.Printf("WAL-G config path: %s", *walgConfigPath)
+	log.Printf("WAL-G backup-list scrape interval: %v", *backupScrapeInterval)
+	log.Printf("WAL-G wal-verify scrape interval: %v", *verifyScrapeInterval)
+	log.Printf("WAL-G storage check scrape interval: %v", *storageScrapeInterval)
 	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	unsupportedEnvs := []string{
+		"WALG_LOG_LEVEL",
+		"S3_LOG_LEVEL",
+	}
+
+	for _, env := range unsupportedEnvs {
+		if val := os.Getenv(env); val != "" {
+			log.Printf("Clearing unsupported environment variable %s=%s", env, val)
+			os.Unsetenv(env)
+		}
+	}
+
 	// Create and register the exporter
-	exporter, err := NewWalgExporter(*walgPath, *scrapeInterval, *walgConfigPath)
+	exporter, err := NewWalgExporter(*walgPath, *backupScrapeInterval, *verifyScrapeInterval, *storageScrapeInterval, *walgConfigPath)
 	if err != nil {
 		log.Fatalf("Failed to create exporter: %v", err)
 	}
