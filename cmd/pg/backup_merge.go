@@ -8,13 +8,12 @@ import (
 )
 
 var targetIncrementalBackupName string
-var cleanupAfterMerge bool
+var cleanup bool
 
 const (
 	backupMergeShortDescription            = "Create a single backup from delta backups and put it in storage"
 	targetIncrementalBackupNameDescription = "Name of the target delta backup relative to which the base backup should be generated"
-	cleanupAfterMergeDescription           = "Automatically delete the old backup chain (FIND_FULL) and outdated WAL archives " +
-		"(ARCHIVES) after merge (default: true)"
+	cleanupAfterMergeDescription           = "Delete the old backup chain (FIND_FULL) and outdated WAL archives (ARCHIVES) after merge"
 )
 
 var backupMergeCmd = &cobra.Command{
@@ -29,7 +28,7 @@ var backupMergeCmd = &cobra.Command{
 
 		composer := chooseTarBallComposer()
 
-		mergeHandler, err := postgres.NewBackupMergeHandler(targetBackupName, folder, composer, cleanupAfterMerge)
+		mergeHandler, err := postgres.NewBackupMergeHandler(targetBackupName, folder, composer, cleanup)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		mergeHandler.HandleBackupMerge()
@@ -40,7 +39,7 @@ var backupMergeCmd = &cobra.Command{
 func init() {
 	backupMergeCmd.Flags().StringVar(&targetIncrementalBackupName, "target-backup-name", "",
 		targetIncrementalBackupNameDescription)
-	backupMergeCmd.Flags().BoolVar(&cleanupAfterMerge, "cleanup-after-merge", true, cleanupAfterMergeDescription)
+	backupMergeCmd.Flags().BoolVar(&cleanup, "cleanup", false, cleanupAfterMergeDescription)
 
 	Cmd.AddCommand(backupMergeCmd)
 }

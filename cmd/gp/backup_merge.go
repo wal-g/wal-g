@@ -15,7 +15,7 @@ const (
 )
 
 var (
-	noCleanup bool
+	cleanup bool
 
 	backupMergeCmd = &cobra.Command{
 		Use:   "backup-merge target_backup_name",
@@ -38,7 +38,7 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			segmentFwdArgs := []greenplum.SegmentFwdArg{}
-			doCleanup := !noCleanup // default to cleanup; user can disable with --no-cleanup
+			doCleanup := cleanup
 			arguments := greenplum.NewBackupMergeArguments(uploader, targetBackupName, segmentFwdArgs, logsDir,
 				segPollInterval, segPollRetries, doCleanup)
 			mergeHandler, err := greenplum.NewBackupMergeHandler(&arguments)
@@ -50,6 +50,6 @@ var (
 )
 
 func init() {
-	backupMergeCmd.Flags().BoolVar(&noCleanup, "no-cleanup", false, "Do not delete old incremental chain or garbage after merge")
+	backupMergeCmd.Flags().BoolVar(&cleanup, "cleanup", false, "Delete old incremental chain and garbage after merge")
 	cmd.AddCommand(backupMergeCmd)
 }

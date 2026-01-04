@@ -117,6 +117,9 @@ func TestBuildFetchCommand(t *testing.T) {
 				backupIDByContentID: map[int]string{
 					1: "testing",
 				},
+				backupNameByContentID: map[int]string{
+					1: "base_000000010000000000000008",
+				},
 				backup:             internal.Backup{},
 				contentIDsToFetch:  map[int]bool{1: true},
 				fetchMode:          "",
@@ -128,8 +131,8 @@ func TestBuildFetchCommand(t *testing.T) {
 				"wal-g " +
 				"seg-backup-fetch " +
 				"/etc/test/ " +
+				"base_000000010000000000000008 " +
 				"--content-id=2 " +
-				"--target-user-data=\"{\\\"id\\\":\\\"testing\\\"}\" " +
 				"--config=testConfig >> " + formatSegmentLogPath(1) + " 2>&1",
 		},
 		{

@@ -345,7 +345,8 @@ func removeDirectory(path string) {
 }
 
 func createTempDirForBackupMerge() string {
-	tempDir, err := os.MkdirTemp("", "backup-merge")
+	tmpDirRoot := viper.GetString(conf.BackupMergeTmpDirSetting)
+	tempDir, err := os.MkdirTemp(tmpDirRoot, "backup-merge")
 	tracelog.ErrorLogger.FatalOnError(err)
 	return tempDir
 }

@@ -19,12 +19,8 @@ RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
         vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
     sed -i 's|\(#cgo LDFLAGS:\) .*|\1 -Wl,-Bstatic -llzo2 -Wl,-Bdynamic|' \
         vendor/github.com/cyberdelia/lzo/lzo.go
-RUN --mount=type=cache,target=/gocache cd main/pg && GOCACHE=/gocache && \
-    if [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then \
-        go build -mod vendor -o wal-g -tags "brotli lzo" -gcflags "all=-N -l" -ldflags "-X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"; \
-    else \
-        go build -mod vendor -o wal-g -tags "brotli lzo" -gcflags "all=-N -l" -ldflags "-X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"; \
-    fi
+RUN --mount=type=cache,target=/gocache cd main/pg && GOCACHE=/gocache \
+    go build -mod vendor -o wal-g -tags "brotli lzo" -gcflags "all=-N -l" -ldflags "-X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 RUN --mount=type=cache,target=/gocache cd cmd/daemonclient && GOCACHE=/gocache \
     go build -mod vendor -o walg-daemon-client -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 

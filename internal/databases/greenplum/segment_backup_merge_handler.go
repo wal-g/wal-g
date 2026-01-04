@@ -204,7 +204,7 @@ func (bm *SegBackupMergeHandler) uploadLabelFiles(uploader internal.Uploader) (s
 	if err != nil {
 		return "", err
 	}
-	defer archiveWithLabel.Close()
+	defer utility.LoggedClose(archiveWithLabel, "Failed to close archive with label")
 
 	targetPath := filepath.Join(bm.resultBackupName, internal.TarPartitionFolderName, targetArchiveFileName)
 	err = uploader.Upload(context.Background(), targetPath, archiveWithLabel)
@@ -324,7 +324,8 @@ func removeDirectory(path string) {
 }
 
 func createTempDirForBackupMerge() string {
-	tempDir, err := os.MkdirTemp("", "backup-merge")
+	tmpDirRoot := viper.GetString(conf.BackupMergeTmpDirSetting)
+	tempDir, err := os.MkdirTemp(tmpDirRoot, "backup-merge")
 	tracelog.ErrorLogger.FatalOnError(err)
 	return tempDir
 }

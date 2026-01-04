@@ -51,7 +51,7 @@ pg_dumpall -f /tmp/dump_before_merge
 /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -m smart -w stop
 
 echo "Testing backup-merge command..."
-wal-g --config=${TMP_CONFIG} backup-merge ${SECOND_DELTA_BACKUP_NAME}
+wal-g --config=${TMP_CONFIG} backup-merge ${SECOND_DELTA_BACKUP_NAME} --cleanup
 
 MERGED_BACKUP_NAME=$(echo "${SECOND_DELTA_BACKUP_NAME}" | sed 's/_D_[^_]*//g')
 echo "Expected merged backup name: ${MERGED_BACKUP_NAME}"
