@@ -2,6 +2,8 @@ package s3
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"path"
@@ -60,6 +62,15 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		Key:    aws.String(objectPath),
 	}
 
+	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
+		stopSentinelObjectInput.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+		stopSentinelObjectInput.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+
+		hash := md5.Sum([]byte(folder.uploader.SSECustomerKey))
+		customerKeyMD5 := base64.StdEncoding.EncodeToString(hash[:])
+		stopSentinelObjectInput.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
+	}
+
 	_, err := folder.s3API.HeadObject(stopSentinelObjectInput)
 	if err != nil {
 		if isAwsNotExist(err) {
@@ -88,6 +99,20 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	source := path.Join(*folder.bucket, folder.path, srcPath)
 	dst := path.Join(folder.path, dstPath)
 	input := &s3.CopyObjectInput{CopySource: &source, Bucket: folder.bucket, Key: &dst}
+
+	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
+		hash := md5.Sum([]byte(folder.uploader.SSECustomerKey))
+		md5Hash := base64.StdEncoding.EncodeToString(hash[:])
+
+		input.CopySourceSSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+		input.CopySourceSSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+		input.CopySourceSSECustomerKeyMD5 = aws.String(md5Hash)
+
+		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+		input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+		input.SSECustomerKeyMD5 = aws.String(md5Hash)
+	}
+
 	_, err := folder.s3API.CopyObject(input)
 	return err
 }
@@ -97,6 +122,15 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	input := &s3.GetObjectInput{
 		Bucket: folder.bucket,
 		Key:    aws.String(objectPath),
+	}
+
+	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
+		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+		input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+
+		hash := md5.Sum([]byte(folder.uploader.SSECustomerKey))
+		customerKeyMD5 := base64.StdEncoding.EncodeToString(hash[:])
+		input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
 	object, err := folder.s3API.GetObject(input)
