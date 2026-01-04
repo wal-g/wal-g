@@ -132,7 +132,8 @@ func (bmh *BackupMergeHandler) HandleBackupMerge() error {
 		return fmt.Sprintf("Unable to start merge on segment %d", contentID)
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
+	for i := range remoteOutput.Commands {
+		command := &remoteOutput.Commands[i]
 		if command.Stderr != "" {
 			tracelog.ErrorLogger.Printf("stderr (segment %d):\n%s\n", command.Content, command.Stderr)
 		}
@@ -240,7 +241,8 @@ func (bmh *BackupMergeHandler) pollSegmentMergeStates() (map[int]SegCmdState, er
 		return fmt.Sprintf("Unable to poll backup-merge state on segment %d", contentID)
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
+	for i := range remoteOutput.Commands {
+		command := &remoteOutput.Commands[i]
 		logger := tracelog.DebugLogger
 		if command.Stderr != "" {
 			logger = tracelog.WarningLogger
@@ -254,7 +256,8 @@ func (bmh *BackupMergeHandler) pollSegmentMergeStates() (map[int]SegCmdState, er
 			gplog.GetLogFilePath())
 	}
 
-	for _, command := range remoteOutput.Commands {
+	for i := range remoteOutput.Commands {
+		command := &remoteOutput.Commands[i]
 		mergeState := SegCmdState{}
 		err := json.Unmarshal([]byte(command.Stdout), &mergeState)
 		if err != nil {
