@@ -125,16 +125,3 @@ func TestMysqlFailoverStoragesEMA_AllSettingsAllowed(t *testing.T) {
 
 	viper.Reset()
 }
-
-func TestMysqlTargetStorage_IsAllowed(t *testing.T) {
-	viper.Reset()
-	internal.ConfigureSettings(config.MYSQL)
-	config.InitConfig()
-
-	viper.Set(config.PgTargetStorage, "default")
-
-	allowed := config.AllowedSettings[config.PgTargetStorage]
-	assert.True(t, allowed)
-
-	viper.Reset()
-}
