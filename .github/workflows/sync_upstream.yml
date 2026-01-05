@@ -1,0 +1,75 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  sync:
+    name: Sync with upstream repository
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/wal-g/wal-g.git || true
+          git remote -v
+      
+      - name: Fetch upstream
+        run: git fetch upstream
+      
+      - name: Check for updates
+        id: check
+        run: |
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          BEHIND=$(git rev-list --count HEAD..upstream/master || echo "0")
+          echo "behind=${BEHIND}" >> $GITHUB_OUTPUT
+          echo "Current branch is ${BEHIND} commits behind upstream"
+      
+      - name: Merge upstream changes
+        if: steps.check.outputs.behind != '0'
+        run: |
+          git merge upstream/master --no-edit || {
+            echo "Merge conflict detected. Creating an issue..."
+            exit 1
+          }
+      
+      - name: Push changes
+        if: steps.check.outputs.behind != '0'
+        run: |
+          git push origin HEAD
+      
+      - name: Create Issue on Conflict
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Upstream Sync Failed - Manual Intervention Required',
+              body: `The automated upstream sync encountered a merge conflict.
+              
+              Please manually sync the fork by running:
+              \`\`\`bash
+              cd internal-docs && ./sync_upstream.sh
+              \`\`\`
+              
+              Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+            })
+
