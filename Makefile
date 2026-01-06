@@ -106,7 +106,7 @@ pg_integration_test: clean_compose
 
 orioledb_integration_test: install_and_build_pg clean_compose load_docker_common
 	docker compose build orioledb
-	docker compose up --exit-code-from $(TEST) $(TEST)
+	for f in docker/orioledb/scripts/tests/*; do T=$$(basename "$${f}" .$${f##*.}); docker compose up --exit-code-from orioledb_$${T} orioledb_$${T}; done
 	make clean_compose
 
 .PHONY: clean_compose
