@@ -88,8 +88,6 @@ RUN set -eux; \
 		uuid-dev \
 		wget
 
-RUN apt search zstd
-
 WORKDIR /usr/src/postgresql
 ENV PATH="$PATH:/usr/local/bin"
 ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
