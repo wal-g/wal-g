@@ -104,16 +104,24 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	dst := path.Join(folder.path, dstPath)
 	input := &s3.CopyObjectInput{CopySource: &source, Bucket: folder.bucket, Key: &dst}
 
-	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
-		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+	if folder.uploader.serverSideEncryption != "" {
+		if folder.uploader.SSECustomerKey != "" {
+			customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
 
-		input.CopySourceSSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
-		input.CopySourceSSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
-		input.CopySourceSSECustomerKeyMD5 = aws.String(customerKeyMD5)
+			input.CopySourceSSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+			input.CopySourceSSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+			input.CopySourceSSECustomerKeyMD5 = aws.String(customerKeyMD5)
 
-		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
-		input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
-		input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
+			input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+			input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+			input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
+		} else {
+			input.ServerSideEncryption = aws.String(folder.uploader.serverSideEncryption)
+		}
+
+		if folder.uploader.SSEKMSKeyID != "" {
+			input.SSEKMSKeyId = aws.String(folder.uploader.SSEKMSKeyID)
+		}
 	}
 
 	_, err := folder.s3API.CopyObject(input)

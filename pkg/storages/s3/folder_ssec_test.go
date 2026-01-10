@@ -223,3 +223,57 @@ func TestReadObject_WithSSEC_CorrectObjectPath(t *testing.T) {
 	assert.Equal(t, "base/path/subfolder/file.txt", *mockClient.LastGetObjectInput.Key)
 	assert.Equal(t, "test-bucket", *mockClient.LastGetObjectInput.Bucket)
 }
+
+func TestCopyObject_WithSSEKMS_AddsCorrectHeadersForKMS(t *testing.T) {
+	mockClient := &MockS3ClientSSEC{}
+	sseAlgorithm := "aws:kms"
+	sseKMSKeyID := "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+
+	uploader := walgs3.NewUploader(nil, sseAlgorithm, "", sseKMSKeyID, "STANDARD", "GOVERNANCE", 0)
+	config := &walgs3.Config{Bucket: "test-bucket"}
+	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
+
+	err := folder.CopyObject("source-file.txt", "dest-file.txt")
+
+	require.NoError(t, err)
+	require.NotNil(t, mockClient.LastCopyObjectInput)
+
+	assert.NotNil(t, mockClient.LastCopyObjectInput.ServerSideEncryption)
+	assert.Equal(t, sseAlgorithm, *mockClient.LastCopyObjectInput.ServerSideEncryption)
+
+	assert.NotNil(t, mockClient.LastCopyObjectInput.SSEKMSKeyId)
+	assert.Equal(t, sseKMSKeyID, *mockClient.LastCopyObjectInput.SSEKMSKeyId)
+
+	assert.Nil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerAlgorithm)
+	assert.Nil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerKey)
+	assert.Nil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerKeyMD5)
+	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerAlgorithm)
+	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerKey)
+	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerKeyMD5)
+}
+
+func TestCopyObject_WithSSES3_AddsCorrectHeadersForS3(t *testing.T) {
+	mockClient := &MockS3ClientSSEC{}
+	sseAlgorithm := "AES256"
+
+	uploader := walgs3.NewUploader(nil, sseAlgorithm, "", "", "STANDARD", "GOVERNANCE", 0)
+	config := &walgs3.Config{Bucket: "test-bucket"}
+	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
+
+	err := folder.CopyObject("source-file.txt", "dest-file.txt")
+
+	require.NoError(t, err)
+	require.NotNil(t, mockClient.LastCopyObjectInput)
+
+	assert.NotNil(t, mockClient.LastCopyObjectInput.ServerSideEncryption)
+	assert.Equal(t, sseAlgorithm, *mockClient.LastCopyObjectInput.ServerSideEncryption)
+
+	assert.Nil(t, mockClient.LastCopyObjectInput.SSEKMSKeyId)
+
+	assert.Nil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerAlgorithm)
+	assert.Nil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerKey)
+	assert.Nil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerKeyMD5)
+	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerAlgorithm)
+	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerKey)
+	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerKeyMD5)
+}
