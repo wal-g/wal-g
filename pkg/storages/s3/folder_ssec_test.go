@@ -1,8 +1,6 @@
 ﻿package s3_test
 
 import (
-	"crypto/md5"
-	"encoding/base64"
 	"io"
 	"strings"
 	"testing"
@@ -43,16 +41,11 @@ func createSSECUploader(sseAlgorithm, sseKey string) *walgs3.Uploader {
 	return walgs3.NewUploader(nil, sseAlgorithm, sseKey, "", "STANDARD", "GOVERNANCE", 0)
 }
 
-func calculateExpectedMD5(key string) string {
-	hash := md5.Sum([]byte(key))
-	return base64.StdEncoding.EncodeToString(hash[:])
-}
-
 func TestReadObject_WithSSEC_AddsCorrectHeaders(t *testing.T) {
 	mockClient := &MockS3ClientSSEC{}
 	sseKey := "MySecretKey32BytesLongForSSE!123"
 	sseAlgorithm := "AES256"
-	expectedMD5 := calculateExpectedMD5(sseKey)
+	expectedMD5 := walgs3.GetSSECustomerKeyMD5(sseKey)
 
 	uploader := createSSECUploader(sseAlgorithm, sseKey)
 	config := &walgs3.Config{Bucket: "test-bucket"}
@@ -95,7 +88,7 @@ func TestExists_WithSSEC_AddsCorrectHeaders(t *testing.T) {
 	mockClient := &MockS3ClientSSEC{}
 	sseKey := "MySecretKey32BytesLongForSSE!123"
 	sseAlgorithm := "AES256"
-	expectedMD5 := calculateExpectedMD5(sseKey)
+	expectedMD5 := walgs3.GetSSECustomerKeyMD5(sseKey)
 
 	uploader := createSSECUploader(sseAlgorithm, sseKey)
 	config := &walgs3.Config{Bucket: "test-bucket"}
@@ -136,7 +129,7 @@ func TestCopyObject_WithSSEC_AddsCorrectHeadersForSourceAndDestination(t *testin
 	mockClient := &MockS3ClientSSEC{}
 	sseKey := "MySecretKey32BytesLongForSSE!123"
 	sseAlgorithm := "AES256"
-	expectedMD5 := calculateExpectedMD5(sseKey)
+	expectedMD5 := walgs3.GetSSECustomerKeyMD5(sseKey)
 
 	uploader := createSSECUploader(sseAlgorithm, sseKey)
 	config := &walgs3.Config{Bucket: "test-bucket"}

@@ -2,8 +2,6 @@ package s3
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"time"
@@ -85,8 +83,7 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 		if uploader.SSECustomerKey != "" {
 			uploadInput.SSECustomerAlgorithm = aws.String(uploader.serverSideEncryption)
 			uploadInput.SSECustomerKey = aws.String(uploader.SSECustomerKey)
-			hash := md5.Sum([]byte(uploader.SSECustomerKey))
-			customerKeyMD5 := base64.StdEncoding.EncodeToString(hash[:])
+			customerKeyMD5 := GetSSECustomerKeyMD5(uploader.SSECustomerKey)
 			uploadInput.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 		} else {
 			uploadInput.ServerSideEncryption = aws.String(uploader.serverSideEncryption)

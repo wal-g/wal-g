@@ -55,7 +55,7 @@ func NewFolder(
 	}
 }
 
-func getSSECustomerKeyMD5(sseCustomerKey string) string {
+func GetSSECustomerKeyMD5(sseCustomerKey string) string {
 	hash := md5.Sum([]byte(sseCustomerKey))
 	return base64.StdEncoding.EncodeToString(hash[:])
 }
@@ -71,7 +71,7 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 		stopSentinelObjectInput.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
 		stopSentinelObjectInput.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
 
-		customerKeyMD5 := getSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
 		stopSentinelObjectInput.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
@@ -105,7 +105,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	input := &s3.CopyObjectInput{CopySource: &source, Bucket: folder.bucket, Key: &dst}
 
 	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
-		customerKeyMD5 := getSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
 
 		input.CopySourceSSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
 		input.CopySourceSSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
@@ -131,7 +131,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
 		input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
 
-		customerKeyMD5 := getSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
 		input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
