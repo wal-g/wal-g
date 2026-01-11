@@ -40,7 +40,7 @@ services:
     container_name: wal-g_ubuntu_20_04
 
   swift:
-    image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"
+    image: openstackswift/saio:py3
     container_name: wal-g_swift
     hostname: swift
     ports:
