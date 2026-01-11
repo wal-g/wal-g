@@ -56,7 +56,7 @@ require (
 	github.com/aliyun/credentials-go v1.4.5
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v0.0.0-20220110100810-f4153a09f87c
-	github.com/klauspost/compress v1.17.8
+	github.com/klauspost/compress v1.18.2
 	github.com/mongodb/mongo-tools v0.0.0-20240724183527-6d4f001be3fc
 	github.com/ncw/directio v1.0.5
 	github.com/ncw/swift/v2 v2.0.2
