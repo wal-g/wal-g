@@ -363,12 +363,14 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	parts := partitionStrings(objectRelativePaths, 1000)
 	needsVersioning := folder.isVersioningEnabled()
+	objects := folder.partitionToObjects(objectRelativePaths, needsVersioning)
+
+	parts := partitionObjects(objects, 1000)
 
 	for _, part := range parts {
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
-			Objects: folder.partitionToObjects(part, needsVersioning),
+			Objects: part,
 		}}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {

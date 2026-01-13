@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -136,6 +137,30 @@ func TestPartitionStrings(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
 			actual := partitionStrings(tc.strings, tc.blockSize)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestPartitionObjects(t *testing.T) {
+	testCases := []struct {
+		strings   []*s3.ObjectIdentifier
+		blockSize int
+		expected  [][]*s3.ObjectIdentifier
+	}{
+		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 2, [][]*s3.ObjectIdentifier{{{}, {}}, {{}, {}}, {{}}}},
+		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}, {}}, 3, [][]*s3.ObjectIdentifier{{{}, {}, {}}, {{}, {}, {}}}},
+		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 1000, [][]*s3.ObjectIdentifier{{{}, {}, {}, {}, {}}}},
+		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 1, [][]*s3.ObjectIdentifier{{{}}, {{}}, {{}}, {{}}, {{}}}},
+		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 0, [][]*s3.ObjectIdentifier{{{}, {}, {}, {}, {}}}},
+		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, -1, [][]*s3.ObjectIdentifier{{{}, {}, {}, {}, {}}}},
+		{[]*s3.ObjectIdentifier{{}, {}}, 5, [][]*s3.ObjectIdentifier{{{}, {}}}},
+		{[]*s3.ObjectIdentifier{{}}, 1, [][]*s3.ObjectIdentifier{{{}}}},
+		{[]*s3.ObjectIdentifier{}, 1, [][]*s3.ObjectIdentifier{}},
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			actual := partitionObjects(tc.strings, tc.blockSize)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
