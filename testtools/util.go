@@ -408,11 +408,9 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 }
 
 func serializeXLogPageHeader(pageHeader walparser.XLogPageHeader) []byte {
-	data := make([]byte, 20)
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.LittleEndian, pageHeader)
-	copy(data, buf.Bytes())
-	return data
+	return buf.Bytes()
 }
 
 func CreateWalPagesWithRecords(records ...[]byte) []byte {
