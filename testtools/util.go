@@ -408,31 +408,57 @@ func GetXLogRecordData() (walparser.XLogRecord, []byte) {
 }
 
 func serializeXLogPageHeader(pageHeader walparser.XLogPageHeader) []byte {
-	data := make([]byte, 24)
-	offset := 0
-	binary.LittleEndian.PutUint16(data[offset:], pageHeader.Magic)
-	offset += 2
-	binary.LittleEndian.PutUint16(data[offset:], pageHeader.Info)
-	offset += 2
-	binary.LittleEndian.PutUint32(data[offset:], uint32(pageHeader.TimeLineID))
-	offset += 4
-	binary.LittleEndian.PutUint64(data[offset:], uint64(pageHeader.PageAddress))
-	offset += 8
-	binary.LittleEndian.PutUint32(data[offset:], pageHeader.RemainingDataLen)
+	data := make([]byte, 20)
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, pageHeader)
+	copy(data, buf.Bytes())
 	return data
 }
 
-func CreateWalPageWithRecord(recordData []byte) []byte {
-	header := walparser.XLogPageHeader{
-		Magic: 	0xD119,
+func CreateWalPagesWithRecords(records ...[]byte) []byte {
+	const WalPageHeaderSize = 20
+
+	defaultHeader := walparser.XLogPageHeader{
+		Magic:      0xD119,
 		TimeLineID: 1,
 	}
-	data := serializeXLogPageHeader(header)
-	data = append(data, recordData...)
-	if len(data) < int(walparser.WalPageSize) {
-		data = append(data, make([]byte, int(walparser.WalPageSize) - len(data))...)
+	pages := make([][]byte, 0)
+	offset := WalPageHeaderSize
+
+	newPage := func(remainingDataLen int) {
+		header := defaultHeader
+		header.RemainingDataLen = uint32(remainingDataLen)
+		page := make([]byte, walparser.WalPageSize)
+		copy(page[:WalPageHeaderSize], serializeXLogPageHeader(header))
+		pages = append(pages, page)
+		offset = WalPageHeaderSize
 	}
-	return data
+	newPage(0)
+
+	for _, record := range records {
+		padding := walparser.XLogRecordAlignment - (offset % walparser.XLogRecordAlignment)
+		if offset+padding >= int(walparser.WalPageSize) {
+			newPage(0)
+			padding = walparser.XLogRecordAlignment - (offset % walparser.XLogRecordAlignment)
+		}
+		offset += padding
+
+		bytesWritten := 0
+		for bytesWritten < len(record) {
+			spaceRemaining := int(walparser.WalPageSize) - offset
+			bytesRemaining := len(record) - bytesWritten
+			if spaceRemaining >= bytesRemaining {
+				copy(pages[len(pages)-1][offset:], record[bytesWritten:])
+				offset += bytesRemaining
+				bytesWritten += bytesRemaining
+			} else {
+				copy(pages[len(pages)-1][offset:], record[bytesWritten:bytesWritten+spaceRemaining])
+				bytesWritten += spaceRemaining
+				newPage(len(record) - bytesWritten)
+			}
+		}
+	}
+	return utility.ConcatByteSlices(pages...)
 }
 
 type ReadWriteNopCloser struct {

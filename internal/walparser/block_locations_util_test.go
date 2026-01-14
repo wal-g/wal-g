@@ -19,9 +19,20 @@ func TestExtractBlockLocations(t *testing.T) {
 
 func TestExtractLocationsFromWalFile(t *testing.T) {
 	record, recordData := testtools.GetXLogRecordData()
-	page := testtools.CreateWalPageWithRecord(recordData)
-	walFile := io.NopCloser(bytes.NewReader(page))
+	fileData := testtools.CreateWalPagesWithRecords(recordData)
+	walFile := io.NopCloser(bytes.NewReader(fileData))
 	expectedLocations := []walparser.BlockLocation{record.Blocks[0].Header.BlockLocation}
+	actualLocations, err := walparser.ExtractLocationsFromWalFile(walparser.NewWalParser(), walFile)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedLocations, actualLocations)
+}
+
+func TestExtractLocationsFromWalFile_MultipleRecords(t *testing.T) {
+	record, recordData := testtools.GetXLogRecordData()
+	fileData := testtools.CreateWalPagesWithRecords(recordData, recordData)
+	walFile := io.NopCloser(bytes.NewReader(fileData))
+	expectedLocations := []walparser.BlockLocation{
+		record.Blocks[0].Header.BlockLocation, record.Blocks[0].Header.BlockLocation}
 	actualLocations, err := walparser.ExtractLocationsFromWalFile(walparser.NewWalParser(), walFile)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLocations, actualLocations)
