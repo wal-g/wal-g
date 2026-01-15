@@ -129,3 +129,18 @@ func partitionStrings(strings []string, blockSize int) [][]string {
 	}
 	return partition
 }
+
+func partitionObjects(objects []*s3.ObjectIdentifier, blockSize int) [][]*s3.ObjectIdentifier {
+	if blockSize <= 0 {
+		return [][]*s3.ObjectIdentifier{objects}
+	}
+	partition := make([][]*s3.ObjectIdentifier, 0)
+	for i := 0; i < len(objects); i += blockSize {
+		if i+blockSize > len(objects) {
+			partition = append(partition, objects[i:])
+		} else {
+			partition = append(partition, objects[i:i+blockSize])
+		}
+	}
+	return partition
+}
