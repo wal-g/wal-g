@@ -50,3 +50,6 @@ tags
 internal-docs/
 .sync_upstream.log
 .dev-notes
+
+# BinLogic CDC - Future standalone project research
+binlogic-cdc/
