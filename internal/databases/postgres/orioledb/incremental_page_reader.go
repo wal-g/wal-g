@@ -224,20 +224,7 @@ func (pageReader *incrementalPageReader) WriteDiffMapToHeader(headerWriter io.Wr
 }
 
 type pageHeader struct {
-	state             uint32
-	usageCount        uint32
-	pageChangeCount   uint32
-	checkpointNum     uint32
-	undoLocation      uint64
-	csn               uint64
-	rightLink         uint64
-	flagsField1Field2 uint32
-	maxKeyLen         uint16
-	prevInsertOffset  uint16
-	chunksCount       uint16
-	itemsCount        uint16
-	hikeysEnd         uint16
-	dataSize          uint16
+	checkpointNum uint32
 }
 
 func (header *pageHeader) isValid() bool {
@@ -249,21 +236,7 @@ func (header *pageHeader) isValid() bool {
 func parsePageHeader(reader io.Reader) (*pageHeader, error) {
 	pageHeader := pageHeader{}
 	fields := []parsingutil.FieldToParse{
-		{Field: &pageHeader.state, Name: "state"},
-		{Field: &pageHeader.usageCount, Name: "usageCount"},
-		{Field: &pageHeader.pageChangeCount, Name: "pageChangeCount"},
-
 		{Field: &pageHeader.checkpointNum, Name: "checkpointNum"},
-		{Field: &pageHeader.undoLocation, Name: "undoLocation"},
-		{Field: &pageHeader.csn, Name: "csn"},
-		{Field: &pageHeader.rightLink, Name: "rightLink"},
-		{Field: &pageHeader.flagsField1Field2, Name: "flagsField1Field2"},
-		{Field: &pageHeader.maxKeyLen, Name: "maxKeyLen"},
-		{Field: &pageHeader.prevInsertOffset, Name: "prevInsertOffset"},
-		{Field: &pageHeader.chunksCount, Name: "chunksCount"},
-		{Field: &pageHeader.itemsCount, Name: "itemsCount"},
-		{Field: &pageHeader.hikeysEnd, Name: "hikeysEnd"},
-		{Field: &pageHeader.dataSize, Name: "dataSize"},
 	}
 	err := parsingutil.ParseMultipleFieldsFromReader(fields, reader)
 	if err != nil {

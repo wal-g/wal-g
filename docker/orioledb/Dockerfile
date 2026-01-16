@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go
 
 FROM wal-g/ubuntu:20.04
 
-ENV PGDATA /var/lib/postgresql/16/main
+ENV PGDATA /var/lib/postgresql/17/main
 
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends --no-install-suggests \
@@ -42,14 +42,14 @@ WORKDIR /usr/src/postgresql/contrib/orioledb
 RUN set -eux; \
 	git init; \
 	git remote add origin https://github.com/orioledb/orioledb.git; \
-	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +466738fe9d9a0f225ee5e5c776182ad426ae2008:refs/remotes/origin/main; \
+	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +beta13:refs/remotes/origin/main; \
 	git checkout --progress --force -B main refs/remotes/origin/main;
 
 WORKDIR /
 RUN set -eux; \
 	\
 	# don't forget to change PGTAG below
-	PGTAG=$(grep "^16: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
+	PGTAG=$(grep "^17: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
 	\
 	curl -o postgresql.tar.gz \
 			--header "Accept: application/vnd.github.v3.raw" \
@@ -94,7 +94,7 @@ ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
 RUN set -eux; \
 	\
 	# don't forget to change PGTAG above
-	PGTAG=$(grep "^16: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
+	PGTAG=$(grep "^17: " /usr/src/postgresql/contrib/orioledb/.pgtags | cut -d' ' -f2-) ; \
 	ORIOLEDB_VERSION=$(grep "^#define ORIOLEDB_VERSION" /usr/src/postgresql/contrib/orioledb/include/orioledb.h | cut -d'"' -f2) ; \
 	ORIOLEDB_BUILDTIME=$(date -Iseconds) ; \
 	\
@@ -118,13 +118,21 @@ RUN set -eux; \
 		--with-zstd \
 		--with-extra-version=" ${ORIOLEDB_VERSION} PGTAG=${PGTAG} ubuntu:focal+clang build:${ORIOLEDB_BUILDTIME}" \
 	|| cat config.log ); \
-	echo "ORIOLEDB_PATCHSET_VERSION = `echo $PGTAG | cut -d'_' -f2`" >> src/Makefile.global; \
+	if printf "%s\n" "$PGTAG" | grep -Fqe "patches${PG_MAJOR}_"; then \
+		echo "ORIOLEDB_PATCHSET_VERSION = `echo $PGTAG | cut -d'_' -f2`" >> src/Makefile.global; \
+	else \
+		echo "ORIOLEDB_PATCHSET_VERSION = $PGTAG" >> src/Makefile.global; \
+	fi ; \
+	# install postgresql
 	make -j "$(nproc)"; \
 	make -C contrib -j "$(nproc)"; \
-	make -C contrib/orioledb -j "$(nproc)"; \
 	make install; \
 	make -C contrib install; \
-	make -C contrib/orioledb install; \
+	# install orioledb extension
+	cd /usr/src/postgresql/contrib/orioledb; \
+	make USE_PGXS=1 IS_DEV=1 -j "$(nproc)"; \
+	make USE_PGXS=1 IS_DEV=1 install; \
+
 	postgres --version
 
 COPY docker/common/s3cfg /var/lib/postgresql/.s3cfg
