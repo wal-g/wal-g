@@ -62,12 +62,16 @@ type ClusterRestoreConfig struct {
 type FetchHandler struct {
 	cluster             *cluster.Cluster
 	backupIDByContentID map[int]string
-	backup              internal.Backup
-	contentIDsToFetch   map[int]bool
-	fetchMode           BackupFetchMode
-	restorePoint        string
-	partialRestoreArgs  []string
-	sentinel            BackupSentinelDto
+	// backupNameByContentID is used to select the exact segment backup to fetch by name (segments[].backup_name from the
+	// coordinator sentinel). This avoids ambiguity when multiple backups share the same segment user_data (e.g. after
+	// backup-merge without cleanup, both old delta and new merged segment backups can match the same --target-user-data).
+	backupNameByContentID map[int]string
+	backup                internal.Backup
+	contentIDsToFetch     map[int]bool
+	fetchMode             BackupFetchMode
+	restorePoint          string
+	partialRestoreArgs    []string
+	sentinel              BackupSentinelDto
 }
 
 // nolint:gocritic
@@ -78,6 +82,7 @@ func NewFetchHandler(
 	restorePoint string, partialRestoreArgs []string,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
+	backupNameByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
 	initGpLog(logsDir)
 
@@ -87,6 +92,7 @@ func NewFetchHandler(
 			// update the segment config from the metadata with the
 			// Hostname, Port and DataDir specified in the restore config
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
+			backupNameByContentID[segMeta.ContentID] = segMeta.BackupName
 			segmentCfg, err := segCfgMaker.Make(segMeta)
 			tracelog.ErrorLogger.FatalOnError(err)
 
@@ -101,14 +107,15 @@ func NewFetchHandler(
 	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
 
 	return &FetchHandler{
-		cluster:             globalCluster,
-		backupIDByContentID: backupIDByContentID,
-		backup:              backup,
-		contentIDsToFetch:   prepareContentIDsToFetch(fetchContentIDs, segmentConfigs),
-		fetchMode:           mode,
-		restorePoint:        restorePoint,
-		partialRestoreArgs:  partialRestoreArgs,
-		sentinel:            sentinel,
+		cluster:               globalCluster,
+		backupIDByContentID:   backupIDByContentID,
+		backupNameByContentID: backupNameByContentID,
+		backup:                backup,
+		contentIDsToFetch:     prepareContentIDsToFetch(fetchContentIDs, segmentConfigs),
+		fetchMode:             mode,
+		restorePoint:          restorePoint,
+		partialRestoreArgs:    partialRestoreArgs,
+		sentinel:              sentinel,
 	}
 }
 
@@ -209,9 +216,17 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 // files to each segment instance (including master) so they can recover correctly
 // during the database startup
 func (fh *FetchHandler) createRecoveryConfigs() error {
-	recoveryTarget := fh.backup.Name
+	// Determine recovery_target_name for recovery.conf:
+	// 1) use user-provided --restore-point if present
+	// 2) else use backup's sentinel RestorePoint (created at backup time)
+	// 3) else fallback to the current backup name (merged backup name)
+	var recoveryTarget string
 	if fh.restorePoint != "" {
 		recoveryTarget = fh.restorePoint
+	} else if fh.sentinel.RestorePoint != nil && *fh.sentinel.RestorePoint != "" {
+		recoveryTarget = *fh.sentinel.RestorePoint
+	} else {
+		recoveryTarget = fh.backup.Name
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
 	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
@@ -277,21 +292,29 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	}
 
 	segment := fh.cluster.ByContent[contentID][0]
-	backupID, ok := fh.backupIDByContentID[contentID]
-	if !ok {
-		// this should never happen
-		tracelog.ErrorLogger.Fatalf("Failed to load backup id by content id %d", contentID)
-	}
-
-	segUserData := NewSegmentUserDataFromID(backupID)
 	cmd := []string{
 		fmt.Sprintf("PGPORT=%d", segment.Port),
 		"wal-g seg-backup-fetch",
 		fmt.Sprint(segment.DataDir),
-		fmt.Sprintf("--content-id=%d", segment.ContentID),
-		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
-		fmt.Sprintf("--config=%s", conf.CfgFile),
 	}
+
+	backupName, hasBackupName := fh.backupNameByContentID[contentID]
+	hasBackupName = hasBackupName && backupName != ""
+	if hasBackupName {
+		cmd = append(cmd, backupName)
+	}
+	cmd = append(cmd, fmt.Sprintf("--content-id=%d", segment.ContentID))
+
+	if !hasBackupName {
+		backupID, ok := fh.backupIDByContentID[contentID]
+		if !ok || backupID == "" {
+			tracelog.ErrorLogger.Fatalf("Failed to load backup name or id by content id %d", contentID)
+		}
+		segUserData := NewSegmentUserDataFromID(backupID)
+		cmd = append(cmd, fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()))
+	}
+
+	cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
 	if fh.partialRestoreArgs != nil {
 		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))
 	}
