@@ -151,8 +151,11 @@ func testCompressAndEncryptErrorPropagation(compressor compression.Compressor, t
 }
 
 func TestCompressAndEncryptErrorPropagation(t *testing.T) {
-	for _, compressor := range compression.Compressors {
-		go testCompressAndEncryptErrorPropagation(compressor, t)
+	for name, compressor := range compression.Compressors {
+		t.Run(name, func(t *testing.T){
+			t.Parallel()
+			testCompressAndEncryptErrorPropagation(compressor, t)
+		})
 	}
 }
 
