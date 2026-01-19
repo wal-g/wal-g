@@ -1,0 +1,306 @@
+---
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║  Kubernetes StatefulSet: MariaDB + WAL-G                                    ║
+# ║  Production-ready with init container restore pattern                       ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+
+---
+# S3 Credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+  namespace: database
+type: Opaque
+stringData:
+  access-key-id: "YOUR_AWS_ACCESS_KEY_ID"
+  secret-access-key: "YOUR_AWS_SECRET_ACCESS_KEY"
+
+---
+# MySQL Root Password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-credentials
+  namespace: database
+type: Opaque
+stringData:
+  root-password: "YOUR_MYSQL_ROOT_PASSWORD"
+
+---
+# WAL-G ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: walg-config
+  namespace: database
+data:
+  WALG_S3_PREFIX: "s3://your-bucket/mariadb-backups"
+  AWS_REGION: "us-east-1"
+  WALG_COMPRESSION_METHOD: "lz4"
+  WALG_UPLOAD_CONCURRENCY: "4"
+  WALG_DOWNLOAD_CONCURRENCY: "4"
+
+---
+# PersistentVolumeClaim for MariaDB
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mariadb-pvc
+  namespace: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd  # Adjust to your storage class
+
+---
+# StatefulSet with WAL-G restore capability
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  namespace: database
+spec:
+  serviceName: mariadb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+    spec:
+      # Init container: Restore from backup if needed
+      initContainers:
+      - name: walg-restore
+        image: mariadb-walg:latest
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -e
+          
+          DATADIR="/var/lib/mysql"
+          
+          # Check if restore is needed
+          if [ ! -d "$DATADIR/mysql" ]; then
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "📦 Empty datadir - restoring from backup"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            
+            # Restore backup
+            /usr/local/bin/wal-g backup-fetch LATEST "$DATADIR"
+            
+            # Fix permissions (critical for K8s)
+            echo "🔒 Setting permissions..."
+            chown -R 999:999 "$DATADIR"
+            chmod 750 "$DATADIR"
+            
+            echo "✅ Restore completed"
+          else
+            echo "ℹ️  Datadir already exists - skipping restore"
+          fi
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: s3-credentials
+              key: access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: s3-credentials
+              key: secret-access-key
+        envFrom:
+        - configMapRef:
+            name: walg-config
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        securityContext:
+          runAsUser: 0  # Must run as root for chown
+          capabilities:
+            add: ["CHOWN", "FOWNER"]
+      
+      # Main container: MariaDB
+      containers:
+      - name: mariadb
+        image: mariadb:11.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-credentials
+              key: root-password
+        - name: MYSQL_DATABASE
+          value: "myapp"
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        args:
+        - --log-bin=mysql-bin
+        - --binlog-format=ROW
+        - --server-id=1
+        - --gtid-strict-mode=ON
+        livenessProbe:
+          exec:
+            command:
+            - mysqladmin
+            - ping
+            - -h
+            - localhost
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - mysqladmin
+            - ping
+            - -h
+            - localhost
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        securityContext:
+          runAsUser: 999  # mysql user
+          runAsGroup: 999
+          fsGroup: 999
+          runAsNonRoot: true
+      
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: mariadb-pvc
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb
+  namespace: database
+spec:
+  selector:
+    app: mariadb
+  ports:
+  - port: 3306
+    targetPort: 3306
+    name: mysql
+  clusterIP: None  # Headless service for StatefulSet
+
+---
+# Backup CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mariadb-backup
+  namespace: database
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: mariadb-walg:latest
+            command: ["/bin/bash", "-c"]
+            args:
+            - |
+              set -e
+              echo "Starting backup..."
+              /usr/local/bin/wal-g backup-push
+              echo "Backup completed successfully"
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: secret-access-key
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-credentials
+                  key: root-password
+            - name: MYSQL_HOST
+              value: "mariadb.database.svc.cluster.local"
+            - name: WALG_MYSQL_DATASOURCE_NAME
+              value: "root:$(MYSQL_ROOT_PASSWORD)@tcp(mariadb:3306)/"
+            envFrom:
+            - configMapRef:
+                name: walg-config
+
+---
+# Binlog Push CronJob
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mariadb-binlog-push
+  namespace: database
+spec:
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: binlog-push
+            image: mariadb-walg:latest
+            command: ["/bin/bash", "-c"]
+            args:
+            - |
+              set -e
+              echo "Pushing binlogs..."
+              /usr/local/bin/wal-g binlog-push
+              echo "Binlogs pushed successfully"
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: secret-access-key
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-credentials
+                  key: root-password
+            - name: WALG_MYSQL_DATASOURCE_NAME
+              value: "root:$(MYSQL_ROOT_PASSWORD)@tcp(mariadb:3306)/"
+            envFrom:
+            - configMapRef:
+                name: walg-config
