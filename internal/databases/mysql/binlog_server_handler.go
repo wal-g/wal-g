@@ -111,30 +111,15 @@ func waitReplicationIsDone(flavor string) error {
 	defer db.Close()
 	
 	for {
-		// Get executed GTID set from replica
-		var gtidSet mysql.GTIDSet
-		var lastSentGTIDSet mysql.GTIDSet
+		// Get executed GTID set from replica (works for both MySQL and MariaDB)
+		gtidSet, err := getMySQLGTIDExecuted(db, flavor)
+		if err != nil {
+			return err
+		}
 		
-		if flavor == mysql.MariaDBFlavor {
-			// For MariaDB, read @@gtid_current_pos
-			gtidSet, err = getMySQLGTIDExecuted(db, flavor)
-			if err != nil {
-				return err
-			}
-			lastSentGTIDSet, err = mysql.ParseGTIDSet(flavor, lastSentGTID)
-			if err != nil {
-				return err
-			}
-		} else {
-			// For MySQL, read @@gtid_executed
-			gtidSet, err = getMySQLGTIDExecuted(db, flavor)
-			if err != nil {
-				return err
-			}
-			lastSentGTIDSet, err = mysql.ParseGTIDSet(flavor, lastSentGTID)
-			if err != nil {
-				return err
-			}
+		lastSentGTIDSet, err := mysql.ParseGTIDSet(flavor, lastSentGTID)
+		if err != nil {
+			return err
 		}
 
 		tracelog.DebugLogger.Printf("Expected GTID set: %v; %s GTID set: %v", 
@@ -167,7 +152,11 @@ func extractMariaDBGTIDFromEvent(e *replication.BinlogEvent) string {
 	sequence := binary.LittleEndian.Uint64(data[0:8])
 	domain := binary.LittleEndian.Uint32(data[8:12])
 	
-	// Server ID is in the event header
+	// Server ID is in the event header; ensure the raw data is long enough
+	if len(e.RawData) < 9 {
+		tracelog.WarningLogger.Printf("Binlog event header too short for server ID: %d bytes", len(e.RawData))
+		return ""
+	}
 	serverID := binary.LittleEndian.Uint32(e.RawData[5:9])
 	
 	// Format: domain-server-sequence
