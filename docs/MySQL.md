@@ -403,4 +403,4 @@ walg_mysql_backup_compressed_size_bytes / walg_mysql_backup_uncompressed_size_by
 (time() - walg_mysql_backup_finish_timestamp) / 3600 > 25
 ```
 
-For complete documentation, see [cmd/mysql/exporter/README.md](../cmd/mysql/exporter/README.md)
+For complete documentation, see [cmd/mysql/exporter/README.md](/cmd/mysql/exporter/README.md)

@@ -74,8 +74,14 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 
 		switch flavor {
 		case mysql.MySQLFlavor:
-			gtid, _ := mysql.ParseMysqlGTIDSet(binlogSentinelDto.GTIDArchived)
-			gtidArchived, _ := gtid.(*mysql.MysqlGTIDSet)
+			gtid, err := mysql.ParseMysqlGTIDSet(binlogSentinelDto.GTIDArchived)
+			if err != nil {
+				tracelog.ErrorLogger.Fatalf("Failed to parse MySQL GTID set '%s': %v", binlogSentinelDto.GTIDArchived, err)
+			}
+			gtidArchived, ok := gtid.(*mysql.MysqlGTIDSet)
+			if !ok {
+				tracelog.ErrorLogger.Fatalf("Failed to convert GTID to MysqlGTIDSet type")
+			}
 			filter = &gtidFilter{
 				BinlogsFolder: binlogsFolder,
 				Flavor:        flavor,
@@ -85,8 +91,15 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 		case mysql.MariaDBFlavor:
 			var mariadbGTID *mysql.MariadbGTIDSet
 			if binlogSentinelDto.GTIDArchived != "" {
-				gtid, _ := mysql.ParseMariadbGTIDSet(binlogSentinelDto.GTIDArchived)
-				mariadbGTID = gtid.(*mysql.MariadbGTIDSet)
+				gtid, err := mysql.ParseMariadbGTIDSet(binlogSentinelDto.GTIDArchived)
+				if err != nil {
+					tracelog.ErrorLogger.Fatalf("Failed to parse MariaDB GTID set '%s': %v", binlogSentinelDto.GTIDArchived, err)
+				}
+				var ok bool
+				mariadbGTID, ok = gtid.(*mysql.MariadbGTIDSet)
+				if !ok {
+					tracelog.ErrorLogger.Fatalf("Failed to convert GTID to MariadbGTIDSet type")
+				}
 			}
 			filter = &mariadbGtidFilter{
 				BinlogsFolder: binlogsFolder,

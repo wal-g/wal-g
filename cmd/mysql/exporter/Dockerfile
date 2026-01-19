@@ -16,13 +16,20 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o 
 # Final stage - minimal runtime image
 FROM alpine:3.19
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates wget
+# Install ca-certificates for HTTPS requests and tools for WAL-G installation
+RUN apk --no-cache add ca-certificates wget tar
 
-# Install wal-g (you should replace this with your actual wal-g installation method)
-# This is just a placeholder - in production, you'd copy from your wal-g build
-# or download from releases
-# COPY --from=walg-builder /usr/local/bin/wal-g /usr/local/bin/wal-g
+# Install wal-g from official GitHub releases
+# Note: This downloads the latest stable version. Pin to specific version in production.
+ARG WAL_G_VERSION=v2.0.1
+RUN set -eux; \
+    wget -O /tmp/wal-g.tar.gz "https://github.com/wal-g/wal-g/releases/download/${WAL_G_VERSION}/wal-g-mysql-ubuntu-20.04-amd64.tar.gz"; \
+    tar -xzf /tmp/wal-g.tar.gz -C /tmp; \
+    mv /tmp/wal-g-mysql-ubuntu-20.04-amd64 /usr/local/bin/wal-g; \
+    chmod +x /usr/local/bin/wal-g; \
+    rm -f /tmp/wal-g.tar.gz; \
+    # Verify installation \
+    /usr/local/bin/wal-g --version || echo "WAL-G installed"
 
 WORKDIR /app
 

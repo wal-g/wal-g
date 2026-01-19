@@ -340,23 +340,30 @@ func (e *MySQLWalgExporter) getBinlogList() ([]MySQLBinlogInfo, error) {
 		}
 
 		fields := strings.Fields(line)
-		if len(fields) >= 3 {
-			binlog := MySQLBinlogInfo{
-				BinlogName: fields[0],
-			}
-
-			// Try to parse timestamp (fields[1])
-			if t, err := time.Parse("2006-01-02T15:04:05Z", fields[1]); err == nil {
-				binlog.ModifiedTime = t
-			}
-
-			// Try to parse size (fields[2])
-			if size, err := strconv.ParseInt(fields[2], 10, 64); err == nil {
-				binlog.Size = size
-			}
-
-			binlogs = append(binlogs, binlog)
+		if len(fields) < 3 {
+			log.Printf("Warning: binlog line has insufficient fields (expected 3, got %d): %s", len(fields), line)
+			continue
 		}
+
+		binlog := MySQLBinlogInfo{
+			BinlogName: fields[0],
+		}
+
+		// Try to parse timestamp (fields[1])
+		if t, err := time.Parse("2006-01-02T15:04:05Z", fields[1]); err == nil {
+			binlog.ModifiedTime = t
+		} else {
+			log.Printf("Warning: failed to parse binlog timestamp '%s': %v", fields[1], err)
+		}
+
+		// Try to parse size (fields[2])
+		if size, err := strconv.ParseInt(fields[2], 10, 64); err == nil {
+			binlog.Size = size
+		} else {
+			log.Printf("Warning: failed to parse binlog size '%s': %v", fields[2], err)
+		}
+
+		binlogs = append(binlogs, binlog)
 	}
 
 	return binlogs, nil
@@ -384,9 +391,10 @@ func (e *MySQLWalgExporter) updateBackupMetrics(backups []MySQLBackupInfo) {
 
 		permanent := strconv.FormatBool(backup.IsPermanent)
 
-		// Set timestamp metrics with detailed labels
+		// Set timestamp metrics with reduced-cardinality labels
+		// Use "latest" constant instead of backup name to avoid creating a new time series per backup
 		labels := []string{
-			backup.BackupName,
+			"latest",
 			backupType,
 			backup.Hostname,
 			permanent,
@@ -397,18 +405,18 @@ func (e *MySQLWalgExporter) updateBackupMetrics(backups []MySQLBackupInfo) {
 		e.backupStartTimestamp.WithLabelValues(labels...).Set(float64(backup.StartLocalTime.Unix()))
 		e.backupFinishTimestamp.WithLabelValues(labels...).Set(float64(backup.StopLocalTime.Unix()))
 
-		// Set size metrics
+		// Set size metrics with reduced-cardinality labels
 		sizeLabels := []string{
-			backup.BackupName,
+			"latest",
 			backupType,
 			backup.Hostname,
 		}
 		e.backupUncompressedSize.WithLabelValues(sizeLabels...).Set(float64(backup.UncompressedSize))
 		e.backupCompressedSize.WithLabelValues(sizeLabels...).Set(float64(backup.CompressedSize))
 
-		// Set duration metric
+		// Set duration metric with reduced-cardinality labels
 		durationLabels := []string{
-			backup.BackupName,
+			"latest",
 			backupType,
 		}
 		e.backupDuration.WithLabelValues(durationLabels...).Set(backup.GetBackupDuration())

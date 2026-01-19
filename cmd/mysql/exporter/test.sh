@@ -32,9 +32,26 @@ echo "✅ Exporter started (PID: $EXPORTER_PID)"
 # Trap to kill exporter on exit
 trap "echo ''; echo '🛑 Stopping exporter...'; kill $EXPORTER_PID 2>/dev/null; exit" INT TERM EXIT
 
-# Wait for exporter to start
+# Wait for exporter to be ready with retry logic
 echo "⏳ Waiting for exporter to be ready..."
-sleep 3
+MAX_RETRIES=10
+SLEEP_INTERVAL=1
+ready=0
+
+for attempt in $(seq 1 $MAX_RETRIES); do
+    if curl -fs "http://localhost:$EXPORTER_PORT/health" >/dev/null 2>&1; then
+        echo "✅ Exporter is healthy and ready (after $attempt attempt(s))"
+        ready=1
+        break
+    fi
+    echo "   Still waiting for exporter... (attempt $attempt/$MAX_RETRIES)"
+    sleep "$SLEEP_INTERVAL"
+done
+
+if [ "$ready" -ne 1 ]; then
+    echo "❌ Exporter did not become healthy after $MAX_RETRIES attempts. Exiting."
+    exit 1
+fi
 
 # Test health endpoint
 echo ""
