@@ -1,0 +1,35 @@
+{
+  "integrity": {
+    "status": "FAILURE",
+    "details": [
+      {
+        "timeline_id": 67,
+        "start_segment": "000000430000030600000060",
+        "end_segment": "000000430000030600000060",
+        "segments_count": 1,
+        "status": "MISSING_LOST"
+      },
+      {
+        "timeline_id": 67,
+        "start_segment": "000000430000030600000061",
+        "end_segment": "0000004300000388000000C2",
+        "segments_count": 33379,
+        "status": "FOUND"
+      },
+      {
+        "timeline_id": 68,
+        "start_segment": "0000004400000388000000C3",
+        "end_segment": "0000004400000388000000E9",
+        "segments_count": 39,
+        "status": "FOUND"
+      }
+    ]
+  },
+  "timeline": {
+    "status": "OK",
+    "details": {
+      "current_timeline_id": 68,
+      "highest_storage_timeline_id": 68
+    }
+  }
+}

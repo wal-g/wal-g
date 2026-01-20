@@ -1,6 +1,12 @@
-# WAL-G for Greenplum
+# WAL-G for Greenplum and Cloudberry
 
-You can use WAL-G as a tool for making encrypted, compressed physical Greenplum backups and push/fetch them to/from the remote storage without saving it on your filesystem.
+You can use WAL-G as a tool for making encrypted, compressed physical Greenplum/Cloudberry backups and push/fetch them to/from the remote storage without saving it on your filesystem.
+
+### Supported versions
+
+WAL-G works with Greenplum 6.19+ and Cloudberry 2.0+.
+
+**Limitations:** Cloudberry PAX-storage haven't been tested yet.
 
 Configuration
 -------------
@@ -55,6 +61,7 @@ In Greenplum 6 it works as extension that should be enabled:
 ```sql
 create extension if not exists gp_pitr;
 ```
+In Cloudberry it works without additional configuration.
 
 Usage
 -----

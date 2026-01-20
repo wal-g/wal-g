@@ -298,10 +298,15 @@ func TryFetchTimeRFC3999(name string) (string, bool) {
 	return "", false
 }
 
-func ConcatByteSlices(a []byte, b []byte) []byte {
-	result := make([]byte, len(a)+len(b))
-	copy(result, a)
-	copy(result[len(a):], b)
+func ConcatByteSlices(slices ...[]byte) []byte {
+	totalLen := 0
+	for _, slice := range slices {
+		totalLen += len(slice)
+	}
+	result := make([]byte, 0, totalLen)
+	for _, slice := range slices {
+		result = append(result, slice...)
+	}
 	return result
 }
 

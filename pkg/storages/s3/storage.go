@@ -43,6 +43,7 @@ type Config struct {
 	MaxThrottlingRetryDelay  time.Duration
 	Disable100Continue       bool
 	EnableVersioning         string
+	DeleteBatchSize          int
 }
 
 type Secrets struct {

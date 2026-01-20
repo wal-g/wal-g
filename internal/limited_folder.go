@@ -43,3 +43,9 @@ func (lf *LimitedFolder) PutObjectWithContext(ctx context.Context, name string, 
 	limitedReader := limiters.NewReader(ctx, content, lf.limiter)
 	return lf.Folder.PutObjectWithContext(ctx, name, limitedReader)
 }
+
+// SetShowAllVersions delegates the "show all versions" toggle to the underlying folder (if supported).
+// This is used by storage tools (e.g. `wal-g st ls --all-versions`) and must work even when the folder is wrapped.
+func (lf *LimitedFolder) SetShowAllVersions(show bool) {
+	storage.SetShowAllVersions(lf.Folder, show)
+}

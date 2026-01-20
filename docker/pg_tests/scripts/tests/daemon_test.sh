@@ -1,15 +1,8 @@
 #!/bin/bash
 set -e -x
 
-CONFIG_FILE="/tmp/configs/daemon_test_config.json"
-
-COMMON_CONFIG="/tmp/configs/common_config.json"
-TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+. /tmp/tests/test_functions/prepare_config.sh
+prepare_config "/tmp/configs/daemon_test_config.json"
 
 initdb ${PGDATA}
 pg_ctl -D ${PGDATA} -w start

@@ -28,7 +28,7 @@ jobs:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
@@ -43,7 +43,7 @@ jobs:
 
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -81,7 +81,7 @@ jobs:
         run: sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6
@@ -96,7 +96,7 @@ jobs:
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}

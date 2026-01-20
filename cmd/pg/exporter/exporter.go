@@ -17,28 +17,34 @@ import (
 type WalgExporter struct {
 	walgPath       string
 	walgConfigPath string
-	scrapeInterval time.Duration
+
+	// Scrape intervals
+	backupScrapeInterval  time.Duration
+	verifyScrapeInterval  time.Duration
+	storageScrapeInterval time.Duration
 
 	// Metrics
-	walTimestamp           *prometheus.GaugeVec
-	lsnLag                 *prometheus.GaugeVec
-	pitrWindow             prometheus.Gauge
-	errors                 *prometheus.CounterVec
-	walIntegrity           *prometheus.GaugeVec
+	pitrWindow   prometheus.Gauge
+	errors       *prometheus.CounterVec
+	scrapeErrors prometheus.Counter
+
+	// Metrics of backups
 	backupCount            *prometheus.GaugeVec
+	backupInfo             *prometheus.GaugeVec
 	backupStartTimestamp   *prometheus.GaugeVec
 	backupFinishTimestamp  *prometheus.GaugeVec
 	backupUncompressedSize *prometheus.GaugeVec
 	backupCompressedSize   *prometheus.GaugeVec
-	scrapeDuration         prometheus.Gauge
-	scrapeErrors           prometheus.Counter
+	backupScrapeDuration   prometheus.Gauge
+
+	// Metrics of wal-verify
+	walVerifyCheck       *prometheus.GaugeVec
+	walIntegrity         *prometheus.GaugeVec
+	verifyScrapeDuration prometheus.Gauge
 
 	// Storage aliveness metrics
 	storageAlive   prometheus.Gauge
 	storageLatency prometheus.Gauge
-
-	// Internal state
-	lastScrape time.Time
 }
 
 // BackupInfo represents backup information from backup-list --detail --json
@@ -64,6 +70,39 @@ type BackupInfo struct {
 	// Note: Real WAL-G doesn't include is_full field, we determine it from backup name
 }
 
+// WalVerifyResponse represents information from wal-verify integrity timeline --json
+type WalVerifyResponse struct {
+	Integrity IntegrityData `json:"integrity"`
+	Timeline  TimelineData  `json:"timeline"`
+}
+
+// IntegrityData represents the inner integrity object
+type IntegrityData struct {
+	Status  string            `json:"status"`
+	Details []IntegrityDetail `json:"details"`
+}
+
+// IntegrityDetail represents the individual items in the integrity details array
+type IntegrityDetail struct {
+	TimelineID    int    `json:"timeline_id"`
+	StartSegment  string `json:"start_segment"`
+	EndSegment    string `json:"end_segment"`
+	SegmentsCount int    `json:"segments_count"`
+	Status        string `json:"status"`
+}
+
+// TimelineData represents the inner timeline object
+type TimelineData struct {
+	Status  string         `json:"status"`
+	Details TimelineDetail `json:"details"`
+}
+
+// TimelineDetail represents the timeline details object
+type TimelineDetail struct {
+	CurrentTimelineID        int `json:"current_timeline_id"`
+	HighestStorageTimelineID int `json:"highest_storage_timeline_id"`
+}
+
 // Helper method to get backup type
 func (b *BackupInfo) GetBackupType() string {
 	// WAL-G doesn't include is_full in JSON output, so we determine backup type
@@ -84,25 +123,27 @@ func (b *BackupInfo) IsFullBackup() bool {
 	return !strings.Contains(b.BackupName, "_D_")
 }
 
-// GetBaseBackupName extracts the base backup name for delta backups
-// For delta backups with format "base_XXXXX_D_YYYYY", this returns "base_YYYYY"
-// For full backups, this returns empty string
-func (b *BackupInfo) GetBaseBackupName() string {
+// GetDeltaOriginName extracts the parent backup name for delta backups
+func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
 	if b.IsFullBackup() {
 		return "" // Full backups don't have a base backup
 	}
 
 	// Find the "_D_" pattern in the backup name
 	deltaIndex := strings.Index(b.BackupName, "_D_")
-	if deltaIndex == -1 {
-		return "" // Shouldn't happen if IsFullBackup() returned false
+	if deltaIndex == -1 || len(b.BackupName) <= deltaIndex+3 {
+		return ""
 	}
 
 	// Extract the part after "_D_" which contains the base backup identifier
-	baseIdentifier := b.BackupName[deltaIndex+3:] // +3 to skip "_D_"
+	expectedParent := "base_" + b.BackupName[deltaIndex+3:] // +3 to skip "_D_"
+	for _, candidate := range backups {
+		if b.BackupName != candidate.BackupName && strings.HasPrefix(candidate.BackupName, expectedParent) {
+			return candidate.BackupName
+		}
+	}
 
-	// The base backup name follows the pattern "base_" + identifier
-	return "base_" + baseIdentifier
+	return ""
 }
 
 // GetStartLSN converts the uint64 StartLSN to postgres.LSN type
@@ -115,46 +156,14 @@ func (b *BackupInfo) GetFinishLSN() LSN {
 	return LSN(b.FinishLSN)
 }
 
-// TimelineInfo represents timeline information from wal-show --detailed-json
-// This matches the actual structure returned by wal-g wal-show --detailed-json
-type TimelineInfo struct {
-	ID               uint32   `json:"id"`
-	ParentID         uint32   `json:"parent_id"`
-	SwitchPointLsn   uint64   `json:"switch_point_lsn"` // LSN is serialized as uint64 in JSON
-	StartSegment     string   `json:"start_segment"`
-	EndSegment       string   `json:"end_segment"`
-	SegmentsCount    int      `json:"segments_count"`
-	MissingSegments  []string `json:"missing_segments"`
-	SegmentRangeSize uint64   `json:"segment_range_size"`
-	Status           string   `json:"status"`
-}
-
-// GetSwitchPointLSN converts the uint64 SwitchPointLsn to postgres.LSN type
-func (t *TimelineInfo) GetSwitchPointLSN() LSN {
-	return LSN(t.SwitchPointLsn)
-}
-
 // NewWalgExporter creates a new WAL-G exporter
-func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPath string) (*WalgExporter, error) {
+func NewWalgExporter(walgPath string, backupScrapeInterval time.Duration, verifyScrapeInterval time.Duration, storageScrapeInterval time.Duration, walgConfigPath string) (*WalgExporter, error) {
 	return &WalgExporter{
-		walgPath:       walgPath,
-		scrapeInterval: scrapeInterval,
-		walgConfigPath: walgConfigPath,
-		walTimestamp: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_wal_timestamp",
-				Help: "Timestamp of last wal-push operation",
-			},
-			[]string{"timeline"},
-		),
-
-		lsnLag: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_lsn_lag_bytes",
-				Help: "LSN delta lag in bytes",
-			},
-			[]string{"timeline"},
-		),
+		walgPath:              walgPath,
+		backupScrapeInterval:  backupScrapeInterval,
+		verifyScrapeInterval:  verifyScrapeInterval,
+		storageScrapeInterval: storageScrapeInterval,
+		walgConfigPath:        walgConfigPath,
 
 		pitrWindow: prometheus.NewGauge(
 			prometheus.GaugeOpts{
@@ -171,12 +180,20 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 			[]string{"operation", "error_type"},
 		),
 
+		walVerifyCheck: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "walg_wal_verify_status",
+				Help: "WAL verify status (1 = OK, 0 = FAILURE, 2 = WARNING, -1 = UNKNOWN)",
+			},
+			[]string{"operation"},
+		),
+
 		walIntegrity: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_wal_integrity_status",
-				Help: "WAL integrity status (1 = OK, 0 = ERROR)",
+				Help: "WAL integrity status (1 = FOUND, 0 = MISSING)",
 			},
-			[]string{"timeline"},
+			[]string{"timeline_id", "timeline_hex"},
 		),
 
 		backupCount: prometheus.NewGaugeVec(
@@ -187,20 +204,28 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 			[]string{"backup_type"},
 		),
 
+		backupInfo: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "walg_backup_info",
+				Help: "Information about stored backups. Value is always 1.",
+			},
+			[]string{"backup_name", "backup_type", "wal_file", "pg_version", "start_lsn", "finish_lsn", "is_permanent", "delta_origin"},
+		),
+
 		backupStartTimestamp: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_backup_start_timestamp",
-				Help: "Start timestamp of backup",
+				Help: "Start time of the backup (Unix timestamp).",
 			},
-			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
+			[]string{"backup_name"},
 		),
 
 		backupFinishTimestamp: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_backup_finish_timestamp",
-				Help: "Finish timestamp of backup",
+				Help: "Finish time of the backup (Unix timestamp).",
 			},
-			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
+			[]string{"backup_name"},
 		),
 
 		backupUncompressedSize: prometheus.NewGaugeVec(
@@ -208,7 +233,7 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 				Name: "walg_backup_uncompressed_size_bytes",
 				Help: "Uncompressed size of the backup in bytes.",
 			},
-			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
+			[]string{"backup_name"},
 		),
 
 		backupCompressedSize: prometheus.NewGaugeVec(
@@ -216,13 +241,20 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 				Name: "walg_backup_compressed_size_bytes",
 				Help: "Compressed size of the backup in bytes.",
 			},
-			[]string{"backup_name", "backup_type", "wal_file", "start_lsn", "finish_lsn", "permanent", "base_backup"},
+			[]string{"backup_name"},
 		),
 
-		scrapeDuration: prometheus.NewGauge(
+		backupScrapeDuration: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "walg_scrape_duration_seconds",
-				Help: "Duration of the last scrape",
+				Name: "walg_backup_list_duration_seconds",
+				Help: "Time taken to execute 'backup-list' during the last collector run.",
+			},
+		),
+
+		verifyScrapeDuration: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "walg_wal_verify_duration_seconds",
+				Help: "Time taken to execute 'wal-verify' during the last collector run.",
 			},
 		),
 
@@ -235,8 +267,8 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 
 		storageAlive: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "walg_storage_alive",
-				Help: "Storage connectivity status (1 = alive, 0 = dead)",
+				Name: "walg_storage_up",
+				Help: "Storage connectivity status (1 = up, 0 = down)",
 			},
 		),
 
@@ -251,17 +283,18 @@ func NewWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPa
 
 // Describe implements the Prometheus Collector interface
 func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
-	e.walTimestamp.Describe(ch)
-	e.lsnLag.Describe(ch)
 	e.pitrWindow.Describe(ch)
 	e.errors.Describe(ch)
+	e.walVerifyCheck.Describe(ch)
 	e.walIntegrity.Describe(ch)
 	e.backupCount.Describe(ch)
+	e.backupInfo.Describe(ch)
 	e.backupStartTimestamp.Describe(ch)
 	e.backupFinishTimestamp.Describe(ch)
 	e.backupUncompressedSize.Describe(ch)
 	e.backupCompressedSize.Describe(ch)
-	e.scrapeDuration.Describe(ch)
+	e.backupScrapeDuration.Describe(ch)
+	e.verifyScrapeDuration.Describe(ch)
 	e.scrapeErrors.Describe(ch)
 	e.storageAlive.Describe(ch)
 	e.storageLatency.Describe(ch)
@@ -269,17 +302,18 @@ func (e *WalgExporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements the Prometheus Collector interface
 func (e *WalgExporter) Collect(ch chan<- prometheus.Metric) {
-	e.walTimestamp.Collect(ch)
-	e.lsnLag.Collect(ch)
 	e.pitrWindow.Collect(ch)
 	e.errors.Collect(ch)
+	e.walVerifyCheck.Collect(ch)
 	e.walIntegrity.Collect(ch)
 	e.backupCount.Collect(ch)
+	e.backupInfo.Collect(ch)
 	e.backupStartTimestamp.Collect(ch)
 	e.backupFinishTimestamp.Collect(ch)
 	e.backupUncompressedSize.Collect(ch)
 	e.backupCompressedSize.Collect(ch)
-	e.scrapeDuration.Collect(ch)
+	e.backupScrapeDuration.Collect(ch)
+	e.verifyScrapeDuration.Collect(ch)
 	e.scrapeErrors.Collect(ch)
 	e.storageAlive.Collect(ch)
 	e.storageLatency.Collect(ch)
@@ -287,32 +321,40 @@ func (e *WalgExporter) Collect(ch chan<- prometheus.Metric) {
 
 // Start begins the metrics collection loop
 func (e *WalgExporter) Start(ctx context.Context) {
-	ticker := time.NewTicker(e.scrapeInterval)
-	defer ticker.Stop()
+	tickerStorage := time.NewTicker(e.storageScrapeInterval)
+	defer tickerStorage.Stop()
+	tickerBackup := time.NewTicker(e.backupScrapeInterval)
+	defer tickerBackup.Stop()
+	tickerWalVerify := time.NewTicker(e.verifyScrapeInterval)
+	defer tickerWalVerify.Stop()
 
 	// Initial scrape
-	e.scrapeMetrics()
+	e.checkStorageAliveness()
+	e.scrapeBackupMetrics()
+	e.scrapeWalMetrics()
 
+	log.Printf("Initial WAL-G metrics scrape completed; starting periodic collection")
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("Exporter context cancelled, stopping metrics collection")
 			return
-		case <-ticker.C:
-			e.scrapeMetrics()
+		case <-tickerStorage.C:
+			e.checkStorageAliveness()
+		case <-tickerBackup.C:
+			e.scrapeBackupMetrics()
+		case <-tickerWalVerify.C:
+			e.scrapeWalMetrics()
 		}
 	}
 }
 
-// scrapeMetrics collects all metrics from WAL-G
-func (e *WalgExporter) scrapeMetrics() {
+// scrapeBackupMetrics collects backup metrics from WAL-G
+func (e *WalgExporter) scrapeBackupMetrics() {
 	start := time.Now()
 	defer func() {
-		e.scrapeDuration.Set(time.Since(start).Seconds())
-		e.lastScrape = time.Now()
+		e.backupScrapeDuration.Set(time.Since(start).Seconds())
 	}()
-
-	log.Printf("Scraping WAL-G metrics...")
 
 	// Get backup information
 	backups, err := e.getBackupInfo()
@@ -323,33 +365,44 @@ func (e *WalgExporter) scrapeMetrics() {
 		return
 	}
 
-	// Get WAL information
-	timelineInfos, err := e.getWalInfo()
-	if err != nil {
-		log.Printf("Error getting WAL info: %v", err)
-		e.scrapeErrors.Inc()
-		e.errors.WithLabelValues("wal-show", "command_failed").Inc()
-		return
-	}
-
-	// Check storage aliveness
-	e.checkStorageAliveness()
-
 	// Update backup metrics
 	e.updateBackupMetrics(backups)
 
-	// Update WAL metrics
-	e.updateWalMetrics(timelineInfos)
-
 	// Calculate PITR window
-	e.updatePitrWindow(backups, timelineInfos)
+	e.updatePitrWindow(backups)
 
-	log.Printf("Metrics scrape completed in %v", time.Since(start))
+	log.Printf("Metrics for backups scrape completed in %v", time.Since(start))
+}
+
+// scrapeWalMetrics collects wal metrics from WAL-G
+func (e *WalgExporter) scrapeWalMetrics() {
+	start := time.Now()
+	defer func() {
+		e.verifyScrapeDuration.Set(time.Since(start).Seconds())
+	}()
+
+	// Get WAL verify information
+	verifyData, err := e.getWalVerify()
+	if err != nil {
+		log.Printf("Error getting WAL verify info: %v", err)
+		e.scrapeErrors.Inc()
+		e.errors.WithLabelValues("wal-verify", "command_failed").Inc()
+		return
+	}
+
+	// Update WAL verify metrics
+	e.updateWalMetrics(verifyData)
+
+	log.Printf("Metrics for WALs verify scrape completed in %v", time.Since(start))
 }
 
 // getBackupInfo executes wal-g backup-list --detail --json
 func (e *WalgExporter) getBackupInfo() ([]BackupInfo, error) {
-	cmd := exec.Command(e.walgPath, "backup-list", "--detail", "--json", "--config", e.walgConfigPath)
+	args := []string{"backup-list", "--detail", "--json"}
+	if e.walgConfigPath != "" {
+		args = append(args, "--config", e.walgConfigPath)
+	}
+	cmd := exec.Command(e.walgPath, args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute backup-list: %w", err)
@@ -363,33 +416,31 @@ func (e *WalgExporter) getBackupInfo() ([]BackupInfo, error) {
 	return backups, nil
 }
 
-// getWalInfo executes wal-g wal-show --detailed-json
-func (e *WalgExporter) getWalInfo() ([]TimelineInfo, error) {
-	var cmd *exec.Cmd
-
+// getWalVerify executes wal-g wal-verify integrity timeline --json
+func (e *WalgExporter) getWalVerify() (*WalVerifyResponse, error) {
+	args := []string{"wal-verify", "integrity", "timeline", "--json"}
 	if e.walgConfigPath != "" {
-		cmd = exec.Command(e.walgPath, "wal-show", "--detailed-json", "--config", e.walgConfigPath)
-	} else {
-		cmd = exec.Command(e.walgPath, "wal-show", "--detailed-json")
+		args = append(args, "--config", e.walgConfigPath)
 	}
-
+	cmd := exec.Command(e.walgPath, args...)
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute wal-show: %w", err)
+		return nil, fmt.Errorf("failed to execute wal-verify: %w", err)
 	}
 
-	var timelineInfos []TimelineInfo
-	if err := json.Unmarshal(output, &timelineInfos); err != nil {
-		return nil, fmt.Errorf("failed to parse wal-show output: %w", err)
+	var walVerifyResponse WalVerifyResponse
+	if err := json.Unmarshal(output, &walVerifyResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse wal-verify output: %w", err)
 	}
 
-	return timelineInfos, nil
+	return &walVerifyResponse, nil
 }
 
 // updateBackupMetrics updates backup-related metrics with detailed labels
 func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 	// Reset metrics
 	e.backupCount.Reset()
+	e.backupInfo.Reset()
 	e.backupStartTimestamp.Reset()
 	e.backupFinishTimestamp.Reset()
 	e.backupUncompressedSize.Reset()
@@ -406,32 +457,31 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			deltaCount++
 		}
 
-		permanent := "false"
-		if backup.IsPermanent {
-			permanent = "true"
-		}
+		isPermanent := strconv.FormatBool(backup.IsPermanent)
 
-		// Get base backup name for delta backups (empty for full backups)
-		baseBackupName := backup.GetBaseBackupName()
+		// Get parent backup name for delta backups (empty for full backups)
+		deltaOriginBackupName := backup.GetDeltaOriginName(backups)
 
 		// Labels for detailed backup information
 		labels := []string{
-			backup.BackupName,
-			backupType,
-			backup.WalFileName,
-			backup.GetStartLSN().String(),  // Convert uint64 LSN to string format
-			backup.GetFinishLSN().String(), // Convert uint64 LSN to string format
-			permanent,
-			baseBackupName, // Base backup name for delta backups, empty for full backups
+			backup.BackupName,              // backup_name
+			backupType,                     // backup_type
+			backup.WalFileName,             // wal_file
+			strconv.Itoa(backup.PgVersion), // pg_version
+			backup.GetStartLSN().String(),  // start_lsn
+			backup.GetFinishLSN().String(), // finish_lsn
+			isPermanent,                    // is_permanent
+			deltaOriginBackupName,          // delta_origin
 		}
+		e.backupInfo.WithLabelValues(labels...).Set(1)
 
 		// Set start and finish timestamps for this specific backup
-		e.backupStartTimestamp.WithLabelValues(labels...).Set(float64(backup.StartTime.Unix()))
-		e.backupFinishTimestamp.WithLabelValues(labels...).Set(float64(backup.FinishTime.Unix()))
+		e.backupStartTimestamp.WithLabelValues(backup.BackupName).Set(float64(backup.StartTime.Unix()))
+		e.backupFinishTimestamp.WithLabelValues(backup.BackupName).Set(float64(backup.FinishTime.Unix()))
 
 		// Set the size metrics for the specific backup
-		e.backupUncompressedSize.WithLabelValues(labels...).Set(float64(backup.UncompressedSize))
-		e.backupCompressedSize.WithLabelValues(labels...).Set(float64(backup.CompressedSize))
+		e.backupUncompressedSize.WithLabelValues(backup.BackupName).Set(float64(backup.UncompressedSize))
+		e.backupCompressedSize.WithLabelValues(backup.BackupName).Set(float64(backup.CompressedSize))
 	}
 
 	// Set backup counts by type
@@ -439,49 +489,91 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 	e.backupCount.WithLabelValues("delta").Set(float64(deltaCount))
 }
 
-// updateWalMetrics updates WAL-related metrics
-func (e *WalgExporter) updateWalMetrics(timelineInfos []TimelineInfo) {
-	// Reset metrics
-	e.walIntegrity.Reset()
-	e.walTimestamp.Reset()
+func mapStatus(status string) float64 {
+	switch status {
+	case "OK":
+		return 1.0
+	case "WARNING":
+		return 2.0
+	case "FAILURE":
+		return 0.0
+	default:
+		return -1.0 // "UNKNOWN" state
+	}
+}
 
-	// Set WAL integrity status for each timeline
-	for _, timeline := range timelineInfos {
-		timelineStr := strconv.Itoa(int(timeline.ID))
-		var status float64
-		if timeline.Status == "OK" {
-			status = 1
-		} else {
-			status = 0
+// updateWalMetrics updates WAL-related metrics
+func (e *WalgExporter) updateWalMetrics(verifyData *WalVerifyResponse) {
+	// Reset metrics
+	e.walVerifyCheck.Reset()
+	e.walIntegrity.Reset()
+
+	e.walVerifyCheck.WithLabelValues("integrity").Set(mapStatus(verifyData.Integrity.Status))
+	e.walVerifyCheck.WithLabelValues("timeline").Set(mapStatus(verifyData.Timeline.Status))
+
+	timelineStatusMap := make(map[int]bool)
+	for _, data := range verifyData.Integrity.Details {
+		id := data.TimelineID
+		// If a single segment is not "FOUND", the entire timeline is marked failed (false)
+		if data.Status != "FOUND" {
+			timelineStatusMap[id] = false
+			continue
 		}
-		e.walIntegrity.WithLabelValues(timelineStr).Set(status)
+		// Initialize the timeline as true if we haven't seen it yet
+		if _, exists := timelineStatusMap[id]; !exists {
+			timelineStatusMap[id] = true
+		}
 	}
 
-	// TODO: Implement WAL timestamp and LSN lag calculations
-	// This requires more complex logic to determine the current WAL position
-	// and get timestamps from the latest WAL segments
-	// When implemented, use: e.walTimestamp.WithLabelValues(timelineStr).Set(float64(walTime.Unix()))
+	for id, isTimelineOK := range timelineStatusMap {
+		timelineStr := strconv.Itoa(id)
+		// Also show the timeline in hex format
+		timelineHex := fmt.Sprintf("%08x", id)
+
+		statusTimeline := 0.0
+		if isTimelineOK {
+			statusTimeline = 1.0
+		}
+
+		e.walIntegrity.WithLabelValues(timelineStr, timelineHex).Set(statusTimeline)
+	}
 }
 
 // updatePitrWindow calculates and updates the PITR window size
-func (e *WalgExporter) updatePitrWindow(backups []BackupInfo, timelineInfos []TimelineInfo) {
+func (e *WalgExporter) updatePitrWindow(backups []BackupInfo) {
 	if len(backups) == 0 {
 		e.pitrWindow.Set(0)
 		return
 	}
 
-	// Find the oldest backup
-	var oldestBackup time.Time
-	for _, backup := range backups {
-		if oldestBackup.IsZero() || backup.Time.Before(oldestBackup) {
-			oldestBackup = backup.Time
+	// Find earliest non-permanent backup (matches wal-verify behavior)
+	var earliestEligibleBackup *BackupInfo
+
+	for i := range backups {
+		// Skip permanent backups
+		if backups[i].IsPermanent {
+			continue
+		}
+
+		// Update if this is the first eligible backup or older than the current find
+		if earliestEligibleBackup == nil || backups[i].Time.Before(earliestEligibleBackup.Time) {
+			earliestEligibleBackup = &backups[i]
 		}
 	}
 
-	// PITR window is from the oldest backup to now
-	// In a real implementation, this should be to the latest WAL segment
-	pitrWindow := time.Since(oldestBackup).Seconds()
-	e.pitrWindow.Set(pitrWindow)
+	// If no backups or no eligible backups found, set window to 0
+	if earliestEligibleBackup == nil {
+		e.pitrWindow.Set(0)
+		return
+	}
+
+	// Calculate window, ensuring we don't report negative time
+	window := time.Since(earliestEligibleBackup.Time).Seconds()
+	if window < 0 {
+		window = 0
+	}
+
+	e.pitrWindow.Set(window)
 }
 
 // checkStorageAliveness checks if the storage backend is accessible
@@ -493,12 +585,11 @@ func (e *WalgExporter) checkStorageAliveness() {
 	defer cancel()
 
 	// Try a simple WAL-G command to test storage connectivity
-	var cmd *exec.Cmd
+	args := []string{"st", "check", "read"}
 	if e.walgConfigPath != "" {
-		cmd = exec.CommandContext(ctx, e.walgPath, "st", "ls", "--config", e.walgConfigPath)
-	} else {
-		cmd = exec.CommandContext(ctx, e.walgPath, "st", "ls")
+		args = append(args, "--config", e.walgConfigPath)
 	}
+	cmd := exec.CommandContext(ctx, e.walgPath, args...)
 
 	err := cmd.Run()
 	latency := time.Since(start).Seconds()
@@ -513,4 +604,5 @@ func (e *WalgExporter) checkStorageAliveness() {
 	} else {
 		e.storageAlive.Set(1)
 	}
+	log.Printf("Storage check completed in %v", time.Since(start))
 }

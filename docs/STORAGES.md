@@ -95,6 +95,14 @@ COMPLIANCE mode prohibits deletion for everyone before retention period is over.
 
 By default wal-g validates s3 credentials before work. If you want to disable validation, set this setting to true.
 
+* `S3_ENABLE_VERSIONING`
+
+By default, WAL-G checks whether versioning is enabled on the bucket. When the user already knows the bucket’s versioning state, this setting allows them to specify `enabled` or `disabled`, avoiding an unnecessary round trip to the server.
+
+* `S3_DELETE_BATCH_SIZE`
+
+Sets batch size for object deletion. By default is set to 1000.
+
 GCS
 -----------
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:

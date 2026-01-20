@@ -69,8 +69,8 @@ To configure where WAL-G stores backups, please consult the [Storages](STORAGES.
 ### Compression
 * `WALG_COMPRESSION_METHOD`
 
-To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `zstd`, `brotli`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
-LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli and zstd are a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
+To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `zstd`, `brotli`, `none`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
+LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli and zstd are a good trade-off between speed and compression ratio, which is about 3 times better than LZ4. None compression method disables compression.
 
 ### Encryption
 
@@ -270,7 +270,7 @@ Databases
 ### Redis [Beta]
 [Information about installing, configuration and usage](Redis.md)
 
-### Greenplum [Production ready]
+### Greenplum / Cloudberry [Production ready]
 [Information about installing, configuration and usage](Greenplum.md)
 
 ### ETCD [Work in progress]

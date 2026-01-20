@@ -71,7 +71,6 @@ var binaryBackupFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
-		tracelog.InfoLogger.Println("t1")
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
@@ -79,7 +78,6 @@ var binaryBackupFetchCmd = &cobra.Command{
 		backupName := args[0]
 		mongodConfigPath := args[1]
 		mongodVersion := args[2]
-		tracelog.InfoLogger.Println(skipMongoReconfigFlag)
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
 			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
 			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil, whitelist, blacklist)

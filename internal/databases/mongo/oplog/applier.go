@@ -10,7 +10,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"io"
 	"strings"
@@ -80,7 +79,7 @@ type DBApplier struct {
 	preserveUUID          bool
 	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
-	lastTS                primitive.Timestamp
+	lastOpTime            models.OpTime
 	reconfig              bool
 	initMongo             bool
 }
@@ -135,14 +134,18 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	if err != nil {
 		return err
 	}
-	ap.lastTS = op.Timestamp
+	var term int64
+	if op.Term != nil {
+		term = *op.Term
+	}
+	ap.lastOpTime = models.OpTime{TS: models.TimestampFromBson(op.Timestamp), Term: term}
 
 	return nil
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {
 	if ap.reconfig {
-		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastTS); err != nil {
+		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastOpTime); err != nil {
 			return err
 		}
 	}

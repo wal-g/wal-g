@@ -40,7 +40,7 @@ services:
     container_name: wal-g_ubuntu_20_04
 
   swift:
-    image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"
+    image: openstackswift/saio:py3
     container_name: wal-g_swift
     hostname: swift
     ports:
@@ -130,6 +130,7 @@ services:
       &&  mkdir -p /export/mysqlmarkincrementalbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysql_pitr_binlogserver_bucket
+      &&  mkdir -p /export/mysql_pitr_binlogserver_reconnection_bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay
@@ -542,6 +543,14 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_tablespace_support_test
     command: /tmp/tests/tablespace_support_test.sh
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+
+  pg_walg_tablespace_restore_spec_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_walg_tablespace_restore_spec_test
+    command: /tmp/tests/walg_tablespace_restore_spec_test.sh
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
