@@ -101,6 +101,7 @@ const (
 	NameStreamRestoreCmd                 = "WALG_STREAM_RESTORE_COMMAND"
 	MaxDelayedSegmentsCount              = "WALG_INTEGRITY_MAX_DELAYED_WALS"
 	PrefetchDir                          = "WALG_PREFETCH_DIR"
+	BackupMergeTmpDirSetting             = "WALG_BACKUP_MERGE_TMP_DIR"
 	PgReadyRename                        = "PG_READY_RENAME"
 	SerializerTypeSetting                = "WALG_SERIALIZER_TYPE"
 	StreamSplitterPartitions             = "WALG_STREAM_SPLITTER_PARTITIONS"
@@ -518,6 +519,7 @@ var (
 		PgWalPageSize:                        true,
 		PgBlockSize:                          true,
 		PrefetchDir:                          true,
+		BackupMergeTmpDirSetting:             true,
 		PgReadyRename:                        true,
 		PgBackRestStanza:                     true,
 		PgAliveCheckInterval:                 true,

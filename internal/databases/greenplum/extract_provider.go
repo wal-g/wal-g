@@ -3,6 +3,7 @@ package greenplum
 import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type ExtractProviderImpl struct {
@@ -31,7 +32,11 @@ func (t ExtractProviderImpl) getTarInterpreter(dbDataDir string, backup SegBacku
 	filesToUnwrap map[string]bool, createNewIncrementalFiles bool) (*IncrementalTarInterpreter, error) {
 	_, err := backup.LoadAoFilesMetadata()
 	if err != nil {
-		return nil, err
+		if _, ok := err.(storage.ObjectNotFoundError); ok {
+			backup.AoFilesMetadataDto = NewAOFilesMetadataDTO()
+		} else {
+			return nil, err
+		}
 	}
 
 	_, _, err = backup.GetSentinelAndFilesMetadata()

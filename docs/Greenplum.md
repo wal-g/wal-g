@@ -100,6 +100,22 @@ wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/pa
 
 To prevent WAL-G from falling back to a full scan delta backup when it fails to download delta files.
 
+### ``backup-merge``
+
+`backup-merge` creates a new full backup from an incremental (delta) backup chain. This can speed up restore by reducing the number of delta steps.
+
+```bash
+wal-g backup-merge target_delta_backup_name --config=/path/to/config.yaml
+```
+
+* `--cleanup` (optional)
+
+Delete the old backup chain and outdated WAL archives after merge.
+
+* `WALG_BACKUP_MERGE_TMP_DIR` (optional)
+
+Directory where WAL-G creates a temporary working directory for merge. Defaults to the system temp directory (usually `/tmp`).
+
 ### ``backup-fetch``
 
 When fetching base backups, the user should pass in the cluster restore configuration and the name of the backup.
