@@ -110,7 +110,7 @@ func (bundle *Bundle) FinishComposing() (TarFileSets, error) {
 
 func (bundle *Bundle) GetFileRelPath(fileAbsPath string) string {
 	if strings.HasPrefix(fileAbsPath, bundle.Directory) {
-		return utility.PathSeparator + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
+		return "/" + utility.GetSubdirectoryRelativePath(fileAbsPath, bundle.Directory)
 	}
 	return fileAbsPath
 }

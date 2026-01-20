@@ -114,6 +114,7 @@ func FetchDto(folder storage.Folder, dto interface{}, path string) error {
 	if err != nil {
 		return err
 	}
+	defer utility.LoggedClose(reader, fmt.Sprintf("failed to close reader for %s", path))
 	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
 }
 

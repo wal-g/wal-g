@@ -1,6 +1,10 @@
 package postgres_test
 
 import (
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -10,41 +14,56 @@ import (
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
+func home(filePath string) string {
+	if filePath == "" {
+		return filePath
+	}
+	_home, _ := os.UserHomeDir()
+	_home = filepath.ToSlash(_home)
+	if filePath == "~" {
+		return _home
+	}
+	if strings.HasPrefix(filePath, "~") {
+		return path.Join(_home, filePath[1:])
+	}
+	return filePath
+}
+
 func TestGetRelFileIdFrom_ZeroId(t *testing.T) {
-	relFileId, err := postgres.GetRelFileIDFrom("~/DemoDb/base/16384/2668")
+	relFileId, err := postgres.GetRelFileIDFrom(home("~/DemoDb/base/16384/2668"))
 	assert.NoError(t, err)
 	assert.Equal(t, 0, relFileId)
 }
 
 func TestGetRelFileIdFrom_NonZeroId(t *testing.T) {
-	relFileId, err := postgres.GetRelFileIDFrom("~/DemoDb/base/16384/2668.3")
+	relFileId, err := postgres.GetRelFileIDFrom(home("~/DemoDb/base/16384/2668.3"))
 	assert.NoError(t, err)
 	assert.Equal(t, 3, relFileId)
 }
 
 func TestGetRelFileNodeFrom_DefaultTableSpace(t *testing.T) {
-	relFileNode, err := postgres.GetRelFileNodeFrom("~/DemoDb/base/123/100500")
+	relFileNode, err := postgres.GetRelFileNodeFrom(home("~/DemoDb/base/123/100500"))
 	assert.NoError(t, err)
 	assert.Equal(t, walparser.RelFileNode{SpcNode: postgres.DefaultSpcNode, DBNode: 123, RelNode: 100500}, *relFileNode)
 }
 
 func TestGetRelFileNodeFrom_IncorrectDefaultTableSpace_v1(t *testing.T) {
-	_, err := postgres.GetRelFileNodeFrom("~/DemoDb/base.old/123/100500")
+	_, err := postgres.GetRelFileNodeFrom(home("~/DemoDb/base.old/123/100500"))
 	assert.Error(t, err)
 }
 
 func TestGetRelFileNodeFrom_IncorrectDefaultTableSpace_v2(t *testing.T) {
-	_, err := postgres.GetRelFileNodeFrom("~/DemoDb/base/some_garbage/123/100500")
+	_, err := postgres.GetRelFileNodeFrom(home("~/DemoDb/base/some_garbage/123/100500"))
 	assert.Error(t, err)
 }
 
 func TestGetRelFileNodeFrom_IncorrectDefaultTableSpace_v3(t *testing.T) {
-	_, err := postgres.GetRelFileNodeFrom("~/DemoDb/garbage/123/100500")
+	_, err := postgres.GetRelFileNodeFrom(home("~/DemoDb/garbage/123/100500"))
 	assert.Error(t, err)
 }
 
 func TestGetRelFileNodeFrom_NonDefaultTableSpace(t *testing.T) {
-	relFileNode, err := postgres.GetRelFileNodeFrom("~/DemoDb/pg_tblspc/16709/PG_9.3_201306121/16499/19401")
+	relFileNode, err := postgres.GetRelFileNodeFrom(home("~/DemoDb/pg_tblspc/16709/PG_9.3_201306121/16499/19401"))
 	assert.NoError(t, err)
 	assert.Equal(t, walparser.RelFileNode{SpcNode: 16709, DBNode: 16499, RelNode: 19401}, *relFileNode)
 }
@@ -92,7 +111,7 @@ func TestGetDeltaBitmapFor(t *testing.T) {
 	}
 	deltaMap.AddLocationsToDelta(otherLocations)
 
-	bitmap, err := deltaMap.GetDeltaBitmapFor("~/DemoDb/base/1/2.1")
+	bitmap, err := deltaMap.GetDeltaBitmapFor(home("~/DemoDb/base/1/2.1"))
 	assert.NoError(t, err)
 	assert.Equal(t, []uint32{23, 134}, bitmap.ToArray())
 }

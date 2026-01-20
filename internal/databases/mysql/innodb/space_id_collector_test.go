@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -33,7 +34,7 @@ func generateData(t *testing.T) string {
 		"orders",
 	}
 	for _, file := range files {
-		generateRandomFile(t, filepath.Join(dir, file))
+		generateRandomFile(t, path.Join(dir, file))
 	}
 
 	// Generate innodb files with something like FSP-header:
@@ -43,15 +44,15 @@ func generateData(t *testing.T) string {
 		"orders.ibd",
 	}
 	for idx, file := range ibdFiles {
-		generateInnodbFile(t, filepath.Join(dir, file), SpaceID(idx+1))
+		generateInnodbFile(t, path.Join(dir, file), SpaceID(idx+1))
 	}
 
 	// add nested dir & nested file:
-	err = os.MkdirAll(filepath.Join(dir, "nested"), 0777)
+	err = os.MkdirAll(path.Join(dir, "nested"), 0777)
 	if err != nil {
 		t.Log(err)
 	}
-	generateInnodbFile(t, filepath.Join(dir, "nested", "database.ibd"), SpaceID(999))
+	generateInnodbFile(t, path.Join(dir, "nested", "database.ibd"), SpaceID(999))
 
 	return dir
 }
