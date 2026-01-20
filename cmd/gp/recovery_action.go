@@ -2,6 +2,7 @@ package gp
 
 import (
 	"github.com/spf13/viper"
+
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 
@@ -19,7 +20,7 @@ var (
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			logsDir := viper.GetString(conf.GPLogsDirectory)
-			follower := greenplum.NewActionHandler(logsDir, restoreConfigPath)
+			follower := greenplum.NewActionHandler(logsDir, restoreConfigPath, withMirrors)
 			follower.UpdateAction(args[0])
 		},
 	}
@@ -28,5 +29,6 @@ var (
 func init() {
 	actionCmd.Flags().StringVar(&restoreConfigPath, "restore-config", "", restoreConfigPathDescription)
 	_ = actionCmd.MarkFlagRequired("restore-config")
+	actionCmd.Flags().BoolVar(&withMirrors, "with-mirrors", false, withMirrorsFlagDescription)
 	cmd.AddCommand(actionCmd)
 }
