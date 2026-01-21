@@ -231,7 +231,7 @@ See `test-e2e.sh` for comprehensive end-to-end testing.
 
 - Check container logs: `docker logs -f mariadb`
 - Verify restore: Look for "Backup restored successfully"
-- Verify PITR: Look for "PITR completado"
+- Verify PITR: Look for "PITR completed"
 
 ## Troubleshooting
 

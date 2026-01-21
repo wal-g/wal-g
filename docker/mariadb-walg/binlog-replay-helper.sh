@@ -43,4 +43,4 @@ fi
 # Execute
 eval "$MYSQLBINLOG_CMD | $MYSQL_CMD"
 
-echo "✅ Binlog replayed successfully"
+echo "Binlog replayed successfully"
