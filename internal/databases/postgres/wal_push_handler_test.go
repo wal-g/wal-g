@@ -2,7 +2,7 @@ package postgres_test
 
 import (
 	"context"
-	"path/filepath"
+	"path"
 	"testing"
 
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -23,7 +23,7 @@ func init() {
 
 func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUploader, *asm.FakeASM, string, string) {
 	dir, _ := setupArchiveStatus(t, "")
-	dirName := filepath.Join(dir, "pg_wal")
+	dirName := path.Join(dir, "pg_wal")
 	defer testtools.Cleanup(t, dir)
 	addTestDataFile(t, dirName, fileFormat)
 	viper.Set(conf.PgDataSetting, dir)
@@ -31,7 +31,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUplo
 	uploader := testtools.NewMockWalDirUploader(false, false)
 	fakeASM := asm.NewFakeASM()
 	uploader.ArchiveStatusManager = fakeASM
-	postgres.HandleWALPush(context.Background(), uploader, filepath.Join(dirName, testFileName))
+	postgres.HandleWALPush(context.Background(), uploader, path.Join(dirName, testFileName))
 	return *uploader, fakeASM, dir, testFileName
 }
 

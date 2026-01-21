@@ -184,6 +184,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 // ExcludedFilenames. Excluded directories will be created but their
 // contents will not be included in the tar bundle.
 func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err error) error {
+	path = filepath.ToSlash(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			tracelog.WarningLogger.Println(path, " deleted during filepath walk")

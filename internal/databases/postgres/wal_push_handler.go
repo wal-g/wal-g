@@ -93,7 +93,10 @@ func uploadWALFile(ctx context.Context, uploader *WalUploader, walFilePath strin
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
 	err = uploader.UploadWalFile(ctx, walFile)
-	return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
+	if err != nil {
+		return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
+	}
+	return walFile.Close()
 }
 
 // TODO : unit tests
