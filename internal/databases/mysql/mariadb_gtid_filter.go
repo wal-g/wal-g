@@ -43,9 +43,9 @@ func (f *mariadbGtidFilter) isValid() bool {
 // 3. Return true if the current binlog contains new transactions
 //
 // Why do we check the NEXT binlog?
-// - Each binlog file starts with a MARIADB_GTID_LIST_EVENT that contains all GTIDs
-//   executed BEFORE this binlog started
-// - So the "next" binlog's GTID list represents the end state of the "current" binlog
+//   - Each binlog file starts with a MARIADB_GTID_LIST_EVENT that contains all GTIDs
+//     executed BEFORE this binlog started
+//   - So the "next" binlog's GTID list represents the end state of the "current" binlog
 //
 // MariaDB GTID format: domain-server-sequence
 // Example: "0-1-1011" means:
@@ -138,9 +138,9 @@ func (f *mariadbGtidFilter) getArchivedGTIDString() string {
 // It returns a new set containing GTIDs in 'minuend' that are not in 'subtrahend'.
 //
 // For MariaDB GTIDs, we work per domain:
-// - If a domain exists in minuend but not in subtrahend, include it entirely
-// - If a domain exists in both, we can't simply subtract (MariaDB doesn't track intervals)
-//   So we check if the sequence numbers are different
+//   - If a domain exists in minuend but not in subtrahend, include it entirely
+//   - If a domain exists in both, we can't simply subtract (MariaDB doesn't track intervals)
+//     So we check if the sequence numbers are different
 //
 // Note: This is a simplified subtraction for the binlog-push use case.
 // A more sophisticated implementation would track actual transaction intervals.
@@ -161,7 +161,7 @@ func subtractMariadbGTIDSets(minuend, subtrahend *mysql.MariadbGTIDSet) *mysql.M
 	// For each domain in minuend
 	for domainID, gtid := range minuend.Sets {
 		subGtid, existsInSub := subtrahend.Sets[domainID]
-		
+
 		if !existsInSub {
 			// Domain only exists in minuend, include it
 			result.Sets[domainID] = gtid.Clone()
@@ -175,4 +175,3 @@ func subtractMariadbGTIDSets(minuend, subtrahend *mysql.MariadbGTIDSet) *mysql.M
 
 	return result
 }
-
