@@ -48,8 +48,25 @@ tags
 
 # Internal documentation and fork management (not to be pushed to fork)
 internal-docs/
+
+# Release packages
+release/
 .sync_upstream.log
 .dev-notes
 
 # BinLogic CDC - Future standalone project research
 binlogic-cdc/
+
+# Testing and development files
+.env.test
+test-*.sh
+run-*.sh
+docker-compose.test.yml
+docker-compose.e2e-*.yml
+docker-compose.restore-*.yml
+docker-restore-auto.sh
+test-mysql-walg
+*.code-workspace
+main/mysql/wal-g-linux
+main/pg/wal-g-linux
+main/*/wal-g-*
