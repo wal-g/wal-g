@@ -109,20 +109,20 @@ func waitReplicationIsDone(flavor string) error {
 		return err
 	}
 	defer db.Close()
-	
+
 	for {
 		// Get executed GTID set from replica (works for both MySQL and MariaDB)
 		gtidSet, err := getMySQLGTIDExecuted(db, flavor)
 		if err != nil {
 			return err
 		}
-		
+
 		lastSentGTIDSet, err := mysql.ParseGTIDSet(flavor, lastSentGTID)
 		if err != nil {
 			return err
 		}
 
-		tracelog.DebugLogger.Printf("Expected GTID set: %v; %s GTID set: %v", 
+		tracelog.DebugLogger.Printf("Expected GTID set: %v; %s GTID set: %v",
 			lastSentGTIDSet.String(), flavor, gtidSet.String())
 
 		if gtidSet.Contain(lastSentGTIDSet) {
@@ -138,32 +138,32 @@ func waitReplicationIsDone(flavor string) error {
 func extractMariaDBGTIDFromEvent(e *replication.BinlogEvent) string {
 	// Skip event header (19 bytes)
 	data := e.RawData[replication.EventHeaderSize:]
-	
+
 	// MariaDB GTID event structure:
 	// - Sequence number: 8 bytes (uint64)
 	// - Domain ID: 4 bytes (uint32)
 	// - Flags: 1 byte
-	
+
 	if len(data) < 13 {
 		tracelog.WarningLogger.Printf("MariaDB GTID event too short: %d bytes", len(data))
 		return ""
 	}
-	
+
 	sequence := binary.LittleEndian.Uint64(data[0:8])
 	domain := binary.LittleEndian.Uint32(data[8:12])
-	
+
 	// Server ID is in the event header; ensure the raw data is long enough
 	if len(e.RawData) < 9 {
 		tracelog.WarningLogger.Printf("Binlog event header too short for server ID: %d bytes", len(e.RawData))
 		return ""
 	}
 	serverID := binary.LittleEndian.Uint32(e.RawData[5:9])
-	
+
 	// Format: domain-server-sequence
 	gtid := strconv.FormatUint(uint64(domain), 10) + "-" +
 		strconv.FormatUint(uint64(serverID), 10) + "-" +
 		strconv.FormatUint(sequence, 10)
-	
+
 	return gtid
 }
 
@@ -187,7 +187,7 @@ func detectBinlogFlavor() string {
 			}
 		}
 	}
-	
+
 	// Default to MySQL flavor for backward compatibility
 	tracelog.InfoLogger.Println("No flavor detected, defaulting to MySQL")
 	return mysql.MySQLFlavor
@@ -213,7 +213,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 			gtidEvent := &replication.GTIDEvent{}
 			err = gtidEvent.Decode(e.RawData[replication.EventHeaderSize:])
 			tracelog.ErrorLogger.FatalOnError(err)
-			
+
 			// Check flavor to determine how to extract GTID
 			if flavor == mysql.MariaDBFlavor {
 				// MariaDB GTID format: domain-server-sequence
@@ -329,7 +329,7 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet mysql.GTIDSet) (*replication.Binl
 		flavor = mysql.MySQLFlavor
 	}
 
-	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: requested GTID set: %s (detected flavor: %s)", 
+	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: requested GTID set: %s (detected flavor: %s)",
 		gtidSet.String(), flavor)
 
 	if h.globalStreamer != nil {
