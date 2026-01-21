@@ -308,9 +308,12 @@ var (
 	}
 
 	MysqlDefaultSettings = map[string]string{
-		StreamSplitterBlockSize:     "1048576",
-		MysqlBackupDownloadMaxRetry: "1",
-		MysqlIncrementalBackupDst:   "/tmp",
+		StreamSplitterBlockSize:      "1048576",
+		MysqlBackupDownloadMaxRetry:  "1",
+		MysqlIncrementalBackupDst:    "/tmp",
+		FailoverStoragesCheckTimeout: "30s",
+		FailoverStorageCacheLifetime: "15m",
+		FailoverStoragesCheckSize:    "1mb",
 	}
 
 	SQLServerDefaultSettings = map[string]string{
@@ -571,25 +574,37 @@ var (
 
 	MysqlAllowedSettings = map[string]bool{
 		// MySQL
-		MysqlDatasourceNameSetting:     true,
-		MysqlSslCaSetting:              true,
-		MysqlBinlogReplayCmd:           true,
-		MysqlBinlogDstSetting:          true,
-		MysqlBackupPrepareCmd:          true,
-		MysqlTakeBinlogsFromMaster:     true,
-		MysqlCheckGTIDs:                true,
-		StreamSplitterPartitions:       true,
-		StreamSplitterBlockSize:        true,
-		StreamSplitterMaxFileSize:      true,
-		MysqlBinlogServerHost:          true,
-		MysqlBinlogServerPort:          true,
-		MysqlBinlogServerUser:          true,
-		MysqlBinlogServerPassword:      true,
-		MysqlBinlogServerID:            true,
-		MysqlBinlogServerReplicaSource: true,
-		MysqlBackupDownloadMaxRetry:    true,
-		MysqlIncrementalBackupDst:      true,
-		MysqlDataDir:                   true,
+		MysqlDatasourceNameSetting:           true,
+		MysqlSslCaSetting:                    true,
+		MysqlBinlogReplayCmd:                 true,
+		MysqlBinlogDstSetting:                true,
+		MysqlBackupPrepareCmd:                true,
+		MysqlTakeBinlogsFromMaster:           true,
+		MysqlCheckGTIDs:                      true,
+		StreamSplitterPartitions:             true,
+		StreamSplitterBlockSize:              true,
+		StreamSplitterMaxFileSize:            true,
+		MysqlBinlogServerHost:                true,
+		MysqlBinlogServerPort:                true,
+		MysqlBinlogServerUser:                true,
+		MysqlBinlogServerPassword:            true,
+		MysqlBinlogServerID:                  true,
+		MysqlBinlogServerReplicaSource:       true,
+		MysqlBackupDownloadMaxRetry:          true,
+		MysqlIncrementalBackupDst:            true,
+		MysqlDataDir:                         true,
+		FailoverStorages:                     true,
+		FailoverStoragesCheck:                true,
+		FailoverStoragesCheckTimeout:         true,
+		FailoverStorageCacheLifetime:         true,
+		FailoverStorageCacheEMAAliveLimit:    true,
+		FailoverStorageCacheEMADeadLimit:     true,
+		FailoverStorageCacheEMAAlphaAliveMax: true,
+		FailoverStorageCacheEMAAlphaAliveMin: true,
+		FailoverStorageCacheEMAAlphaDeadMax:  true,
+		FailoverStorageCacheEMAAlphaDeadMin:  true,
+		FailoverStoragesCheckSize:            true,
+		PgTargetStorage:                      true,
 	}
 
 	RedisAllowedSettings = map[string]bool{
