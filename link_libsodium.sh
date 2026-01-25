@@ -4,7 +4,8 @@ set -e
 
 readonly CWD=$PWD
 readonly OS=$(uname)
-readonly LIBSODIUM_VERSION=${LIBSODIUM_VERSION:-1.0.20}
+readonly ARCH=$(uname -m)
+readonly LIBSODIUM_VERSION=${LIBSODIUM_VERSION:-1.0.21}
 
 test -d tmp/libsodium || mkdir -p tmp/libsodium
 
@@ -13,13 +14,18 @@ cd tmp/libsodium
 curl --retry 5 --retry-delay 0 -sL https://github.com/jedisct1/libsodium/releases/download/$LIBSODIUM_VERSION-RELEASE/libsodium-$LIBSODIUM_VERSION.tar.gz -o libsodium-$LIBSODIUM_VERSION.tar.gz
 tar xfz libsodium-$LIBSODIUM_VERSION.tar.gz --strip-components=1
 
-CONFIGURE_ARGS="--prefix ${PWD}"
+CONFIGURE_ARGS="--prefix ${PWD} --disable-debug --disable-dependency-tracking --enable-static --disable-shared"
 if [[ "${OS}" == "SunOS" ]]; then
   # On Illumos / Solaris libssp causes linking issues when building wal-g.
   CONFIGURE_ARGS="${CONFIGURE_ARGS} --disable-ssp"
-fi      
+fi   
 
-./configure ${CONFIGURE_ARGS}
+LOCAL_CFLAGS="-O2"
+if [[ "${OS}" == "Linux" ]] && [[ "${ARCH}" == *arm* || "${ARCH}" == "aarch64" ]]; then
+  LOCAL_CFLAGS="${LOCAL_CFLAGS} -flax-vector-conversions"
+fi
+
+CFLAGS="${LOCAL_CFLAGS}" ./configure ${CONFIGURE_ARGS}
 make && make check && make install
 
 # Remove shared libraries for using static
