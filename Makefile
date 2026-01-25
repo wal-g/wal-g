@@ -1,3 +1,5 @@
+export GOEXPERIMENT=jsonv2
+
 MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 MAIN_SQLSERVER_PATH := main/sqlserver
