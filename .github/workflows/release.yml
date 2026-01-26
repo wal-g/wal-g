@@ -7,7 +7,6 @@ on:
 
 env:
   GO_VERSION: "1.25"
-  GOEXPERIMENT: jsonv2
   USE_BROTLI: 1
   USE_LIBSODIUM: 1
   USE_LZO: 1
