@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -70,7 +71,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 
 // removeEmptyParentDirs removes empty parent directories up to the root path
 func (folder *Folder) removeEmptyParentDirs(filePath string) {
-	dir := path.Dir(filePath)
+	dir := filepath.Dir(filePath)
 	rootPath := folder.rootPath
 
 	// Walk up the directory tree, removing empty directories
@@ -94,7 +95,7 @@ func (folder *Folder) removeEmptyParentDirs(filePath string) {
 		}
 
 		// Move to parent directory
-		dir = path.Dir(dir)
+		dir = filepath.Dir(dir)
 	}
 }
 
