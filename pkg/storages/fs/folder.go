@@ -54,15 +54,48 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, fileName := range objectRelativePaths {
-		err := os.RemoveAll(folder.GetFilePath(fileName))
+		filePath := folder.GetFilePath(fileName)
+		err := os.RemoveAll(filePath)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
 			return fmt.Errorf("unable to delete file %q: %w", fileName, err)
 		}
+		// Clean up empty parent directories after deleting the file
+		folder.removeEmptyParentDirs(filePath)
 	}
 	return nil
+}
+
+// removeEmptyParentDirs removes empty parent directories up to the root path
+func (folder *Folder) removeEmptyParentDirs(filePath string) {
+	dir := path.Dir(filePath)
+	rootPath := folder.rootPath
+
+	// Walk up the directory tree, removing empty directories
+	for dir != rootPath && strings.HasPrefix(dir, rootPath) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			// If we can't read the directory, stop trying to clean up
+			break
+		}
+
+		// If directory is not empty, stop
+		if len(entries) > 0 {
+			break
+		}
+
+		// Try to remove the empty directory
+		err = os.Remove(dir)
+		if err != nil {
+			// If we can't remove it (permissions, etc.), stop trying
+			break
+		}
+
+		// Move to parent directory
+		dir = path.Dir(dir)
+	}
 }
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
