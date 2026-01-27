@@ -601,26 +601,8 @@ services:
       dockerfile: docker/orioledb/Dockerfile
       context: .
     image: wal-g/orioledb
-
-  orioledb_compatibility_test:
-    image: wal-g/orioledb
     user: postgres
-    container_name: wal-g_orioledb_compatibility_test
-    command: /tmp/tests/compatibility_test.sh
-    <<: *s3_common_depends
-
-  orioledb_simple_test:
-    image: wal-g/orioledb
-    user: postgres
-    container_name: wal-g_orioledb_simple_test
-    command: /tmp/tests/simple_test.sh
-    <<: *s3_common_depends
-
-  orioledb_compressed_test:
-    image: wal-g/orioledb
-    user: postgres
-    container_name: wal-g_orioledb_compressed_test
-    command: /tmp/tests/compressed_test.sh
+    command: /tmp/run_integration_tests.sh
     <<: *s3_common_depends
 
   mysql:
