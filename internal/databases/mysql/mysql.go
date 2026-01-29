@@ -1,13 +1,16 @@
 package mysql
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -314,55 +317,165 @@ outer:
 	return nil
 }
 
-func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time, p *storage.ObjectProvider) {
-	defer p.Close()
+func provideLogs(ctx context.Context, folder storage.Folder, dstDir string, startTS, endTS time.Time,
+	p *storage.ObjectProvider, sessionID int) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			tracelog.ErrorLogger.Printf("[Session %d] Panic in provideLogs: %v\nStack: %s",
+				sessionID, r, debug.Stack())
+			// Пытаемся отправить ошибку в provider
+			p.HandleError(fmt.Errorf("panic in provideLogs: %v", r))
+		}
+		p.Close()
+		tracelog.InfoLogger.Printf("[Session %d] provideLogs: Provider closed", sessionID)
+		tracelog.InfoLogger.Printf("[Session %d] provideLogs: Goroutine finished", sessionID)
+	}()
+
+	if p == nil {
+		tracelog.ErrorLogger.Printf("[Session %d] provideLogs: Provider is nil", sessionID)
+		return
+	}
+
+	select {
+	case <-ctx.Done():
+		tracelog.InfoLogger.Printf("[Session %d] provideLogs: Context cancelled before starting", sessionID)
+		return
+	default:
+	}
+
+	tracelog.InfoLogger.Printf("[Session %d] provideLogs: Starting. startTS=%v, endTS=%v, dstDir=%s",
+		sessionID, startTS, endTS, dstDir)
+
 	_, err := os.Stat(dstDir)
 	if os.IsNotExist(err) {
-		err = os.MkdirAll(dstDir, 0777)
-		p.HandleError(err)
+		tracelog.DebugLogger.Printf("[Session %d] provideLogs: Creating destination directory %s", sessionID, dstDir)
+		err = os.MkdirAll(dstDir, 0755)
 		if err != nil {
+			tracelog.ErrorLogger.Printf("[Session %d] provideLogs: Failed to create directory %s: %v",
+				sessionID, dstDir, err)
+			p.HandleError(err)
 			return
 		}
 	}
 
 	logFolder := folder.GetSubFolder(BinlogPath)
-	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, utility.MaxTime)
-	p.HandleError(err)
+	tracelog.DebugLogger.Printf("[Session %d] provideLogs: Fetching logs from folder %s", sessionID, BinlogPath)
+
+	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, endTS)
 	if err != nil {
+		tracelog.ErrorLogger.Printf("[Session %d] provideLogs: Failed to get logs covering interval: %v",
+			sessionID, err)
+		p.HandleError(err)
 		return
 	}
 
+	if len(logsToFetch) == 0 {
+		tracelog.InfoLogger.Printf("[Session %d] provideLogs: No logs to fetch in specified time range", sessionID)
+		return
+	}
+
+	tracelog.InfoLogger.Printf("[Session %d] provideLogs: Found %d binlog files to process",
+		sessionID, len(logsToFetch))
+
+	processedCount := 0
 	for _, logFile := range logsToFetch {
-		// download log files
+		select {
+		case <-ctx.Done():
+			tracelog.InfoLogger.Printf("[Session %d] provideLogs: Context cancelled after processing %d/%d files",
+				sessionID, processedCount, len(logsToFetch))
+			return
+		default:
+		}
+
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
-		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
+
+		tracelog.InfoLogger.Printf("[Session %d] provideLogs: [%d/%d] Downloading %s into %s",
+			sessionID, processedCount+1, len(logsToFetch), logFile.GetName(), binlogPath)
+
+		if _, err := os.Stat(binlogPath); err == nil {
+			tracelog.DebugLogger.Printf("[Session %d] NOOOOOTT provideLogs: Removing existing file %s", sessionID, binlogPath)
+			//_ = os.Remove(binlogPath)
+		}
+
 		if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+				tracelog.InfoLogger.Printf("[Session %d] provideLogs: Context cancelled during download of %s",
+					sessionID, binlogName)
+				return
+			}
+
 			if os.IsExist(err) {
-				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
+				tracelog.WarningLogger.Printf("[Session %d] provideLogs: File %s already exists, skipping",
+					sessionID, binlogName)
 			} else {
-				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
+				select {
+				case <-ctx.Done():
+					tracelog.InfoLogger.Printf("[Session %d] provideLogs: Context cancelled after download error", sessionID)
+					return
+				default:
+				}
+
+				tracelog.ErrorLogger.Printf("[Session %d] provideLogs: Failed to download %s: %v",
+					sessionID, logFile.GetName(), err)
 				p.HandleError(err)
 				return
 			}
+		} else {
+			if info, err := os.Stat(binlogPath); err == nil {
+				tracelog.DebugLogger.Printf("[Session %d] provideLogs: Downloaded %s (size: %d bytes)",
+					sessionID, binlogName, info.Size())
+			}
 		}
 
-		// add file to provider
-		err = p.AddObject(logFile)
-		p.HandleError(err)
+		tracelog.DebugLogger.Printf("[Session %d] provideLogs: Adding %s to provider", sessionID, binlogName)
+		err = p.AddObject(ctx, logFile)
 		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {
+				tracelog.InfoLogger.Printf("[Session %d] NOOOT provideLogs: Context cancelled while adding %s to provider",
+					sessionID, binlogName)
+				// os.Remove(binlogPath)
+				return
+			}
+			if errors.Is(err, storage.ErrProviderClosed) {
+				tracelog.InfoLogger.Printf("[Session %d] NOOOOT provideLogs: Provider closed while adding %s",
+					sessionID, binlogName)
+				// os.Remove(binlogPath)
+				return
+			}
+			tracelog.ErrorLogger.Printf("[Session %d] provideLogs: Failed to add %s to provider: %v",
+				sessionID, binlogName, err)
+			p.HandleError(err)
 			return
 		}
 
-		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
-		p.HandleError(err)
+		processedCount++
+		tracelog.InfoLogger.Printf("[Session %d] provideLogs: Successfully added %s to provider (%d/%d)",
+			sessionID, binlogName, processedCount, len(logsToFetch))
+
+		// timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
 		if err != nil {
+			if errors.Is(ctx.Err(), context.Canceled) {
+				tracelog.InfoLogger.Printf("[Session %d] provideLogs: Context cancelled while getting binlog timestamp",
+					sessionID)
+				return
+			}
+			tracelog.ErrorLogger.Printf("[Session %d] provideLogs: Failed to get timestamp for %s: %v",
+				sessionID, binlogPath, err)
+			p.HandleError(err)
 			return
 		}
-		if timestamp.After(endTS) {
-			return
-		}
+
+		//if timestamp.After(endTS) {
+		//	tracelog.InfoLogger.Printf("[Session %d] provideLogs: Reached endTS (%v), stopping. Last binlog timestamp: %v",
+		//		sessionID, endTS, timestamp)
+		//	break
+		//}
 	}
+
+	tracelog.InfoLogger.Printf("[Session %d] provideLogs: Finished processing all %d binlog files",
+		sessionID, processedCount)
 }
 
 func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time, error) {
