@@ -6,8 +6,6 @@ RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
     liblzo2-dev
 
-RUN ls
-
 COPY go.mod go.mod
 COPY vendor/ vendor/
 COPY internal/ internal/

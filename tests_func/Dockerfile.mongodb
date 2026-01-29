@@ -3,7 +3,6 @@ FROM walg-func-test-base as build
 
 ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
 ENV USE_BROTLI 1
-ENV GOEXPERIMENT=jsonv2
 
 RUN mkdir -p ${WALG_REPO}
 COPY staging/wal-g ${WALG_REPO}/

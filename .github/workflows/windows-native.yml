@@ -4,7 +4,6 @@ on: [ push, pull_request, workflow_dispatch]
 
 env:
   GO_VERSION: "1.25"
-  GOEXPERIMENT: jsonv2
   LIBSODIUM_VERSION: "1.0.20"
 
 defaults:
@@ -18,7 +17,7 @@ jobs:
     steps:
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6

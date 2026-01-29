@@ -1,3 +1,5 @@
+export GOEXPERIMENT=jsonv2
+
 MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 MAIN_SQLSERVER_PATH := main/sqlserver
@@ -106,7 +108,7 @@ pg_integration_test: clean_compose
 
 orioledb_integration_test: install_and_build_pg clean_compose load_docker_common
 	docker compose build orioledb
-	docker compose up --exit-code-from $(TEST) $(TEST)
+	docker compose up --exit-code-from orioledb orioledb
 	make clean_compose
 
 .PHONY: clean_compose
