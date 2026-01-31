@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -53,16 +55,97 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
+	// Track parent directories of successfully deleted objects for cleanup
+	dirsToCheck := make(map[string]bool)
+
 	for _, fileName := range objectRelativePaths {
-		err := os.RemoveAll(folder.GetFilePath(fileName))
+		filePath := folder.GetFilePath(fileName)
+		err := os.RemoveAll(filePath)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
 			return fmt.Errorf("unable to delete file %q: %w", fileName, err)
 		}
+		// Collect parent directory for later cleanup
+		dir := filepath.Dir(filePath)
+		dirsToCheck[dir] = true
 	}
+
+	// Clean up empty directories after all deletions
+	folder.removeEmptyDirs(dirsToCheck)
 	return nil
+}
+
+// removeEmptyDirs removes empty parent directories up to the storage root
+func (folder *Folder) removeEmptyDirs(dirsToCheck map[string]bool) {
+	// Calculate the effective storage root (rootPath + subPath)
+	storageRoot := filepath.Clean(folder.GetFilePath(""))
+
+	// Convert map to slice and sort by depth (deepest first)
+	dirs := make([]string, 0, len(dirsToCheck))
+	for dir := range dirsToCheck {
+		dirs = append(dirs, filepath.Clean(dir))
+	}
+	// Sort by depth descending (deepest paths first)
+	sort.Slice(dirs, func(i, j int) bool {
+		depthI := strings.Count(dirs[i], string(filepath.Separator))
+		depthJ := strings.Count(dirs[j], string(filepath.Separator))
+		return depthI > depthJ
+	})
+
+	// Process each directory, walking up to parent as needed
+	processed := make(map[string]bool)
+	for _, dir := range dirs {
+		folder.removeEmptyParentDirs(dir, storageRoot, processed)
+	}
+}
+
+// removeEmptyParentDirs walks up from dir, removing empty directories until storageRoot
+func (folder *Folder) removeEmptyParentDirs(dir, storageRoot string, processed map[string]bool) {
+	for {
+		// Canonicalize the directory path
+		dir = filepath.Clean(dir)
+
+		// Stop if we've already processed this directory
+		if processed[dir] {
+			break
+		}
+		processed[dir] = true
+
+		// Stop if we've reached or gone above the storage root
+		if dir == storageRoot {
+			break
+		}
+		// Verify dir is within storage root using filepath.Rel
+		rel, err := filepath.Rel(storageRoot, dir)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			// dir is outside storageRoot
+			break
+		}
+
+		// Check if directory is empty
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			// If we can't read the directory, stop trying to clean up
+			break
+		}
+
+		// If directory is not empty, stop
+		if len(entries) > 0 {
+			break
+		}
+
+		// Try to remove the empty directory
+		err = os.Remove(dir)
+		if err != nil {
+			// If we can't remove it (permissions, etc.), stop trying
+			break
+		}
+
+		// Move to parent directory
+		dir = filepath.Dir(dir)
+	}
 }
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
