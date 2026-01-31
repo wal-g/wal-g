@@ -11,9 +11,7 @@ import (
 )
 
 func TestFSFolder(t *testing.T) {
-	tmpDir := setupTmpDir(t)
-
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	st, err := ConfigureStorage(tmpDir, nil)
 	assert.NoError(t, err)
@@ -22,8 +20,7 @@ func TestFSFolder(t *testing.T) {
 }
 
 func TestDeleteObjectsRemovesEmptyDirs(t *testing.T) {
-	tmpDir := setupTmpDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	folder := NewFolder(tmpDir, "")
 
@@ -57,8 +54,7 @@ func TestDeleteObjectsRemovesEmptyDirs(t *testing.T) {
 }
 
 func TestDeleteObjectsPreservesNonEmptyDirs(t *testing.T) {
-	tmpDir := setupTmpDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	folder := NewFolder(tmpDir, "")
 
@@ -87,8 +83,7 @@ func TestDeleteObjectsPreservesNonEmptyDirs(t *testing.T) {
 }
 
 func TestDeleteObjectsMultipleFiles(t *testing.T) {
-	tmpDir := setupTmpDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	folder := NewFolder(tmpDir, "")
 
@@ -125,8 +120,7 @@ func TestDeleteObjectsMultipleFiles(t *testing.T) {
 }
 
 func TestDeleteObjectsNonExistentFile(t *testing.T) {
-	tmpDir := setupTmpDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	folder := NewFolder(tmpDir, "")
 
@@ -135,19 +129,39 @@ func TestDeleteObjectsNonExistentFile(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func setupTmpDir(t *testing.T) string {
-	cwd, err := filepath.Abs("./")
-	if err != nil {
-		t.Log(err)
-	}
-	// Create temp directory.
-	tmpDir, err := os.MkdirTemp(cwd, "data")
-	if err != nil {
-		t.Log(err)
-	}
-	err = os.Chmod(tmpDir, 0755)
-	if err != nil {
-		t.Log(err)
-	}
-	return tmpDir
+func TestDeleteObjectsWithSubPath(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a folder with a subPath to ensure cleanup stops at the correct root
+	folder := NewFolder(tmpDir, "storage/data")
+
+	// Create nested directory structure with a file
+	testPath := "backups/base_123/file.txt"
+	err := folder.PutObject(testPath, strings.NewReader("test content"))
+	assert.NoError(t, err)
+
+	// Verify the directory structure exists
+	fullPath := filepath.Join(tmpDir, "storage/data/backups/base_123")
+	_, err = os.Stat(fullPath)
+	assert.NoError(t, err, "directory should exist before deletion")
+
+	// Delete the file
+	err = folder.DeleteObjects([]string{testPath})
+	assert.NoError(t, err)
+
+	// Verify empty directories are removed up to the storage root
+	_, err = os.Stat(fullPath)
+	assert.True(t, os.IsNotExist(err), "empty base_123 directory should be removed")
+
+	_, err = os.Stat(filepath.Join(tmpDir, "storage/data/backups"))
+	assert.True(t, os.IsNotExist(err), "empty backups directory should be removed")
+
+	// Verify storage root (storage/data) still exists
+	storageRoot := filepath.Join(tmpDir, "storage/data")
+	_, err = os.Stat(storageRoot)
+	assert.NoError(t, err, "storage root should still exist")
+
+	// Verify we didn't prune above the storage root
+	_, err = os.Stat(filepath.Join(tmpDir, "storage"))
+	assert.NoError(t, err, "parent directory above storage root should still exist")
 }
