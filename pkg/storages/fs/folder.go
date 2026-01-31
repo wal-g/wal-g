@@ -87,9 +87,11 @@ func (folder *Folder) removeEmptyDirs(dirsToCheck map[string]bool) {
 	for dir := range dirsToCheck {
 		dirs = append(dirs, filepath.Clean(dir))
 	}
-	// Sort by length descending (deepest paths first)
+	// Sort by depth descending (deepest paths first)
 	sort.Slice(dirs, func(i, j int) bool {
-		return len(dirs[i]) > len(dirs[j])
+		depthI := strings.Count(dirs[i], string(filepath.Separator))
+		depthJ := strings.Count(dirs[j], string(filepath.Separator))
+		return depthI > depthJ
 	})
 
 	// Process each directory, walking up to parent as needed
@@ -118,7 +120,7 @@ func (folder *Folder) removeEmptyParentDirs(dir, storageRoot string, processed m
 		// Verify dir is within storage root using filepath.Rel
 		rel, err := filepath.Rel(storageRoot, dir)
 		if err != nil || strings.HasPrefix(rel, "..") {
-			// dir is outside or equal to storageRoot
+			// dir is outside storageRoot
 			break
 		}
 
