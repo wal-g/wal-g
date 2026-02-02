@@ -44,6 +44,16 @@ type SegmentRestoreConfig struct {
 	DataDir  string `json:"data_dir"`
 }
 
+func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
+	return cluster.SegConfig{
+		ContentID: contentID,
+		Role:      string(Primary),
+		Port:      cfg.Port,
+		Hostname:  cfg.Hostname,
+		DataDir:   cfg.DataDir,
+	}
+}
+
 // ClusterRestoreConfig is used to describe the restored cluster
 type ClusterRestoreConfig struct {
 	Segments map[int]SegmentRestoreConfig `json:"segments"`
@@ -112,7 +122,7 @@ func prepareContentIDsToFetch(fetchContentIDs []int, segmentConfigs []cluster.Se
 			contentIDsToFetch[id] = true
 		}
 	} else {
-		for _, cfg := range segmentConfigs {
+		for _, cfg := range segmentConfigs { //nolint:gocritic // rangeValCopy
 			contentIDsToFetch[cfg.ContentID] = true
 		}
 	}
@@ -146,7 +156,7 @@ func (fh *FetchHandler) Unpack() {
 		return "Unable to run wal-g"
 	})
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		tracelog.DebugLogger.Printf("[Unpack] WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 }
@@ -189,7 +199,7 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 		return fmt.Sprintf("Unable to update pg_hba on segment %d", contentID)
 	})
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		tracelog.DebugLogger.Printf("Update pg_hba output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 	return nil
@@ -204,7 +214,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
+	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 
@@ -253,7 +263,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		return fmt.Sprintf("Unable to create recovery.conf on segment %d", contentID)
 	})
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		tracelog.DebugLogger.Printf("Create recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
 	}
 	return nil

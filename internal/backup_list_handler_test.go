@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,5 +136,26 @@ func TestHandleDefaultBackupList(t *testing.T) {
 
 		assert.Empty(t, string(captured))
 		assert.Contains(t, infoOutput.String(), "No backups found")
+	})
+
+	t.Run("handle valid json with no backups", func(t *testing.T) {
+		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
+
+		infoOutput := new(bytes.Buffer)
+		rescueInfoOutput := tracelog.InfoLogger.Writer()
+		tracelog.InfoLogger.SetOutput(infoOutput)
+		defer func() { tracelog.InfoLogger.SetOutput(rescueInfoOutput) }()
+
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+		defer func() { os.Stdout = rescueStdout }()
+
+		HandleDefaultBackupList(folder, true, true)
+
+		_ = w.Close()
+		captured, _ := io.ReadAll(r)
+
+		assert.Equal(t, strings.TrimSpace(string(captured)), "[]")
 	})
 }

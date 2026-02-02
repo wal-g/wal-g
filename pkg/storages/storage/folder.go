@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -189,7 +188,7 @@ func filterObjectsWithGlobPattern(objects []Object, pattern string) ([]Object, e
 	result := make([]Object, 0)
 	for _, object := range objects {
 		objectName := object.GetName()
-		matched, err := filepath.Match(pattern, objectName)
+		matched, err := path.Match(pattern, objectName)
 		if err != nil {
 			return nil, err
 		}
@@ -203,8 +202,8 @@ func filterObjectsWithGlobPattern(objects []Object, pattern string) ([]Object, e
 func filterFoldersWithGlobPattern(folders []Folder, pattern string) ([]Folder, error) {
 	result := make([]Folder, 0)
 	for _, folder := range folders {
-		folderName := filepath.Base(folder.GetPath())
-		matched, err := filepath.Match(pattern, folderName)
+		folderName := path.Base(folder.GetPath())
+		matched, err := path.Match(pattern, folderName)
 		if err != nil {
 			return nil, err
 		}
@@ -213,4 +212,18 @@ func filterFoldersWithGlobPattern(folders []Folder, pattern string) ([]Folder, e
 		}
 	}
 	return result, nil
+}
+
+// AllVersionsFolder is an optional interface that folders can implement
+// to support showing all versions including deleted objects.
+type AllVersionsFolder interface {
+	SetShowAllVersions(show bool)
+}
+
+// SetShowAllVersions sets whether to show all versions including deleted objects.
+// If the folder doesn't support this feature, it's a no-op.
+func SetShowAllVersions(folder Folder, show bool) {
+	if avf, ok := folder.(AllVersionsFolder); ok {
+		avf.SetShowAllVersions(show)
+	}
 }

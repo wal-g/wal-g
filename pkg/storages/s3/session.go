@@ -19,8 +19,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/utility"
 	"gopkg.in/yaml.v3"
+
+	"github.com/wal-g/wal-g/utility"
 )
 
 func createSession(config *Config) (*session.Session, error) {
@@ -55,7 +56,7 @@ func createSession(config *Config) (*session.Session, error) {
 			sess.Config.WithCredentials(cred)
 			sess.Handlers.Send.PushFront(func(r *request.Request) {
 				token := r.HTTPRequest.Header.Get("X-Amz-Security-Token")
-				r.HTTPRequest.Header.Add("X-YaCloud-SubjectToken", token)
+				r.HTTPRequest.Header.Set("X-YaCloud-SubjectToken", token)
 			})
 		}
 	}
@@ -67,7 +68,6 @@ func createSession(config *Config) (*session.Session, error) {
 				tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
 				host := strings.TrimPrefix(*sess.Config.Endpoint, "https://")
 				request.HTTPRequest.Host = host
-				request.HTTPRequest.Header.Add("Host", host)
 				request.HTTPRequest.URL.Host = *endpoint
 				request.HTTPRequest.URL.Scheme = "http"
 			} else {

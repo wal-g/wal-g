@@ -2,7 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
-	"path/filepath"
+	"path"
 	"sort"
 	"testing"
 
@@ -39,7 +39,7 @@ func requireIsTablespaceSymlink(t *testing.T, spec TablespaceSpec, path string) 
 
 func formatLocations(tablespaceLocations []TablespaceLocation) {
 	for index, loc := range tablespaceLocations {
-		tablespaceLocations[index].Symlink = filepath.Join(TablespaceFolder, loc.Symlink)
+		tablespaceLocations[index].Symlink = path.Join(TablespaceFolder, loc.Symlink)
 		tablespaceLocations[index].Location = utility.NormalizePath(loc.Location)
 	}
 }

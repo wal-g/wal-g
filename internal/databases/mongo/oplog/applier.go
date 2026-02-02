@@ -3,9 +3,6 @@ package oplog
 import (
 	"context"
 	"fmt"
-	"io"
-	"strings"
-
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/txn"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -14,7 +11,11 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"io"
+	"strings"
 )
+
+const NamespaceNotFoundError int32 = 26
 
 type TypeAssertionError struct {
 	etype string
@@ -76,12 +77,36 @@ type DBApplier struct {
 	db                    client.MongoDriver
 	txnBuffer             *txn.Buffer
 	preserveUUID          bool
+	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
+	lastOpTime            models.OpTime
+	reconfig              bool
+	initMongo             bool
+}
+
+type DBApplierArgs struct {
+	PreserveUUID   bool
+	Partial        bool
+	Reconfig       bool
+	InitMongo      bool
+	IgnoreErrCodes map[string][]int32
 }
 
 // NewDBApplier builds DBApplier with given args.
-func NewDBApplier(m client.MongoDriver, preserveUUID bool, ignoreErrCodes map[string][]int32) *DBApplier {
-	return &DBApplier{db: m, txnBuffer: txn.NewBuffer(), preserveUUID: preserveUUID, applyIgnoreErrorCodes: ignoreErrCodes}
+func NewDBApplier(m client.MongoDriver, args DBApplierArgs) *DBApplier {
+	return &DBApplier{
+		db:                    m,
+		txnBuffer:             txn.NewBuffer(),
+		preserveUUID:          args.PreserveUUID,
+		partial:               args.Partial,
+		reconfig:              args.Reconfig,
+		applyIgnoreErrorCodes: args.IgnoreErrCodes,
+		initMongo:             args.InitMongo,
+	}
+}
+
+func (ap *DBApplier) IsPartial() bool {
+	return ap.partial
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -109,17 +134,30 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	if err != nil {
 		return err
 	}
+	var term int64
+	if op.Term != nil {
+		term = *op.Term
+	}
+	ap.lastOpTime = models.OpTime{TS: models.TimestampFromBson(op.Timestamp), Term: term}
 
 	return nil
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {
-	if err := ap.db.Close(ctx); err != nil {
+	if ap.reconfig {
+		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastOpTime); err != nil {
+			return err
+		}
+	}
+
+	if err := ap.db.Close(ctx, ap.initMongo); err != nil {
 		return err
 	}
+
 	if err := ap.txnBuffer.Stop(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -156,13 +194,17 @@ func (ap *DBApplier) shouldIgnore(op string, err error) bool {
 		return false
 	}
 
+	if ce.Code == NamespaceNotFoundError && ap.IsPartial() {
+		return true
+	}
+
 	ignoreErrorCodes, ok := ap.applyIgnoreErrorCodes[op]
 	if !ok {
 		return false
 	}
 
 	for i := range ignoreErrorCodes {
-		if ce.Code == ignoreErrorCodes[i] {
+		if ce.Code == (ignoreErrorCodes[i]) {
 			return true
 		}
 	}
@@ -270,6 +312,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 
 	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
 	if err := ap.db.ApplyOp(ctx, op); err != nil {
+		tracelog.DebugLogger.Printf("error handling op: %v; op: %v", err, *op)
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
 		if !ap.shouldIgnore(op.Operation, err) {

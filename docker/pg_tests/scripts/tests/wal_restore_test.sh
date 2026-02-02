@@ -3,7 +3,6 @@ echo '\e[0;31m This test require some memory available to docker! \e[0m'
 echo 'It runs smooth on Colima with \e[0;31m 2 CPU / 8 GB Mem \e[0m and fails on 4 GB Mem.'
 set -e -x
 
-PGDATA="/var/lib/postgresql/10/main"
 PGDATA_ALPHA="${PGDATA}_alpha"
 PGDATA_BETA="${PGDATA}_beta"
 ALPHA_PORT=5432
@@ -41,16 +40,11 @@ check_archiving_status() {
 }
 
 # init config
-CONFIG_FILE="/tmp/configs/wal_restore_test_config.json"
-COMMON_CONFIG="/tmp/configs/common_config.json"
-TMP_CONFIG="/tmp/configs/tmp_config.json"
-cp ${CONFIG_FILE} ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+. /tmp/tests/test_functions/prepare_config.sh
+prepare_config "/tmp/configs/wal_restore_test_config.json"
 
 # init alpha cluster
-/usr/lib/postgresql/10/bin/initdb ${PGDATA_ALPHA}
+initdb ${PGDATA_ALPHA}
 
 # preparation for replication
 cd ${PGDATA_ALPHA}
@@ -68,7 +62,7 @@ echo "host  replication  repl              127.0.0.1/32  md5" >> pg_hba.conf
   echo "archive_timeout = 600"
 } >> postgresql.conf
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
+pg_ctl -D ${PGDATA_ALPHA} -w start
 PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
 
 timeout 30 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
@@ -76,7 +70,7 @@ timeout 30 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 psql -c "CREATE ROLE repl WITH REPLICATION PASSWORD 'password' LOGIN;"
 
 # init beta cluster (replica of alpha)
-/usr/lib/postgresql/10/bin/pg_basebackup --wal-method=stream -D ${PGDATA_BETA} -U repl -h 127.0.0.1 -p ${ALPHA_PORT}
+pg_basebackup --wal-method=stream -D ${PGDATA_BETA} -U repl -h 127.0.0.1 -p ${ALPHA_PORT}
 
 # preparation for replication
 cd ${PGDATA_BETA}
@@ -99,7 +93,7 @@ restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
 trigger_file = '/tmp/postgresql.trigger.${BETA_PORT}'
 EOF
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w start
+pg_ctl -D ${PGDATA_BETA} -w start
 
 # fill database postgres
 pgbench -i -s 4 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
@@ -118,9 +112,9 @@ fi
 #                                               db       table            conn_port    row_count
 /tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} 400000 # 4 * 100000, 4 is value of -s in pgbench
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -m fast -w stop
+pg_ctl -D ${PGDATA_ALPHA} -m fast -w stop
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -w promote
+pg_ctl -D ${PGDATA_BETA} -w promote
 
 pgbench -i -s 4 -h 127.0.0.1 -p ${BETA_PORT} postgres
 
@@ -143,9 +137,9 @@ if ! check_archiving_status ${BETA_PORT} 8 10; then
     exit 1
 fi
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_BETA} -m fast -W stop
+pg_ctl -D ${PGDATA_BETA} -m fast -W stop
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -w start
+pg_ctl -D ${PGDATA_ALPHA} -w start
 PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
 
 
@@ -157,14 +151,14 @@ if ! check_archiving_status ${ALPHA_PORT} 8 10; then
     exit 1
 fi
 
-/usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA_ALPHA} -m fast -W stop
+pg_ctl -D ${PGDATA_ALPHA} -m fast -W stop
 
 # for more info to log
 ls "${PGDATA_BETA}/pg_wal"
 
 timeout 30 wal-g --config=${TMP_CONFIG} wal-restore ${PGDATA_ALPHA} ${PGDATA_BETA}
 
-/usr/lib/postgresql/10/bin/pg_rewind -D ${PGDATA_ALPHA} --source-pgdata=${PGDATA_BETA}
+pg_rewind -D ${PGDATA_ALPHA} --source-pgdata=${PGDATA_BETA}
 
 /tmp/scripts/drop_pg.sh
 rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA}

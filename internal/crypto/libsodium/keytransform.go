@@ -1,5 +1,10 @@
 package libsodium
 
+// #cgo CFLAGS: -I../../../tmp/libsodium/include
+// #cgo LDFLAGS: -L../../../tmp/libsodium/lib -lsodium
+// #include <sodium.h>
+import "C"
+
 import (
 	"encoding/base64"
 	"encoding/hex"

@@ -3,6 +3,7 @@ package internal_test
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 
@@ -49,11 +50,19 @@ func TestGetSentinelUserData(t *testing.T) {
 }
 
 func TestGetDataFolderPath_Default(t *testing.T) {
+	pgEnv := os.Getenv(config.PgDataSetting)
+	os.Unsetenv(config.PgDataSetting)
+	// ensure the PgData environment variable is not set bc if it is set, viper returns it. viper.Set(..., nil) does not
+	// "override" the environment variable. Likely a bug in viper: https://github.com/spf13/viper/blob/528f7416c4b56a4948673984b190bf8713f0c3c4/viper.go#L1212-L1216
+	// some environments actually have PGDATA set _with_ proper structure (C:\PostgreSQL\17\data\pg_wal) and tests
+	// fail because of that
+	resetToDefaults()
 	viper.Set(config.PgDataSetting, nil)
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	assert.Equal(t, path.Join(internal.GetDefaultDataFolderPath(), "walg_data"), actual)
+	os.Setenv(config.PgDataSetting, pgEnv)
 	resetToDefaults()
 }
 
@@ -65,7 +74,7 @@ func TestGetDataFolderPath_FolderNotExist(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.Join(internal.DefaultDataFolderPath, "walg_data"), actual)
+	assert.Equal(t, path.Join(internal.GetDefaultDataFolderPath(), "walg_data"), actual)
 	resetToDefaults()
 }
 
@@ -77,7 +86,7 @@ func TestGetDataFolderPath_Wal(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
+	assert.Equal(t, filepath.ToSlash(filepath.Join(parentDir, "pg_wal", "walg_data")), actual)
 	resetToDefaults()
 }
 
@@ -89,7 +98,7 @@ func TestGetDataFolderPath_Xlog(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.Join(parentDir, "pg_xlog", "walg_data"), actual)
+	assert.Equal(t, filepath.ToSlash(filepath.Join(parentDir, "pg_xlog", "walg_data")), actual)
 	resetToDefaults()
 }
 
@@ -105,7 +114,7 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 
 	actual := internal.GetDataFolderPath()
 
-	assert.Equal(t, filepath.Join(parentDir, "pg_wal", "walg_data"), actual)
+	assert.Equal(t, filepath.ToSlash(filepath.Join(parentDir, "pg_wal", "walg_data")), actual)
 	resetToDefaults()
 }
 

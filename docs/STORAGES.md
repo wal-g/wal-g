@@ -1,6 +1,6 @@
 # WAL-G storage configuration
 
-WAL-G can store backups in S3, Google Cloud Storage, Azure, Swift, remote host (via SSH) or local file system. 
+WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, remote host (via SSH) or local file system. 
 
 S3
 -----------
@@ -95,6 +95,14 @@ COMPLIANCE mode prohibits deletion for everyone before retention period is over.
 
 By default wal-g validates s3 credentials before work. If you want to disable validation, set this setting to true.
 
+* `S3_ENABLE_VERSIONING`
+
+By default, WAL-G checks whether versioning is enabled on the bucket. When the user already knows the bucket’s versioning state, this setting allows them to specify `enabled` or `disabled`, avoiding an unnecessary round trip to the server.
+
+* `S3_DELETE_BATCH_SIZE`
+
+Sets batch size for object deletion. By default is set to 1000.
+
 GCS
 -----------
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:
@@ -155,6 +163,42 @@ Overrides the default `upload buffer size` of 8388608 bytes (8 MB). Note that th
   (e.g. `5`)
 
 Overrides the default `maximum number of upload buffers`. By default, at most 4 buffers are used concurrently.
+
+Alicloud OSS
+-----------
+
+To connect to Alicloud OSS, WAL-G requires that this variable be set:
+
+* `WALG_OSS_PREFIX`
+  (e.g. `oss://bucket/path/to/folder`)
+
+You can set `OSS_ACCESS_KEY_ID` and `OSS_ACCESS_KEY_SECRET` (optionally with `OSS_SESSION_TOKEN`) to access the OSS.
+
+* `OSS_REGION`
+
+Set the region for the OSS bucket.
+
+**Optional variables**
+
+* `OSS_ROLE_ARN`
+
+Set the RAM role ARN for the OSS bucket. This role must have permissions to access the bucket. RAM user should be allowed to assume this role. Set `OSS_ROLE_SESSION_NAME` to specify the session name for the role assumption.
+
+* `OSS_SKIP_VALIDATION`
+
+Whether to skip OSS client validation during initialization. Default is set to `false`, which means it will validate the client by making list request to OSS.
+
+* `OSS_ENDPOINT`
+
+Set the endpoint for the OSS bucket. For instance, if you want to connect to internal OSS endpoint, you may specify `https://oss-ap-southeast-5-internal.aliyuncs.com`.
+
+* `OSS_UPLOAD_PART_SIZE`
+
+Size of the part to upload when uploading large files to OSS. Alicloud OSS default is 6,291,456 bytes (6 MiB).
+
+* `OSS_COPY_PART_SIZE`
+
+Size of the part to copy when copying large files within OSS. Default OSS is 67,108,864 bytes (64 MiB).
 
 Swift
 -----------

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -96,34 +96,34 @@ func (spec *TablespaceSpec) addTablespace(symlinkName string, actualLocation str
 	spec.tablespaceNames = append(spec.tablespaceNames, symlinkName)
 	spec.tablespaceLocationMap[symlinkName] = TablespaceLocation{
 		Location: actualLocation,
-		Symlink:  filepath.Join(TablespaceFolder, symlinkName),
+		Symlink:  path.Join(TablespaceFolder, symlinkName),
 	}
 }
 
-func (spec *TablespaceSpec) makeTablespaceSymlinkPath(path string) (string, error) {
+func (spec *TablespaceSpec) makeTablespaceSymlinkPath(tblPath string) (string, error) {
 	basePrefix, ok := spec.BasePrefix()
 	if !ok {
 		return "", ErrorBasePrefixMissing
 	}
-	if utility.IsInDirectory(path, basePrefix) {
-		return path, nil
+	if utility.IsInDirectory(tblPath, basePrefix) {
+		return tblPath, nil
 	}
-	location, ok := spec.findTablespaceLocation(path)
+	location, ok := spec.findTablespaceLocation(tblPath)
 	if !ok {
-		return path, fmt.Errorf("tablespace at path %s wasn't found", path)
+		return tblPath, fmt.Errorf("tablespace at path %s wasn't found", tblPath)
 	}
-	path = filepath.Join(basePrefix, location.Symlink, utility.GetSubdirectoryRelativePath(path, location.Location))
-	return path, nil
+	tblPath = path.Join(basePrefix, location.Symlink, utility.GetSubdirectoryRelativePath(tblPath, location.Location))
+	return tblPath, nil
 }
 
-func (spec *TablespaceSpec) isTablespaceSymlink(path string) (bool, error) {
+func (spec *TablespaceSpec) isTablespaceSymlink(tblPath string) (bool, error) {
 	basePrefix, ok := spec.BasePrefix()
 	if !ok {
 		return false, ErrorBasePrefixMissing
 	}
 
 	for _, location := range spec.tablespaceLocations() {
-		if utility.PathsEqual(path, filepath.Join(basePrefix, location.Symlink)) {
+		if utility.PathsEqual(tblPath, path.Join(basePrefix, location.Symlink)) {
 			return true, nil
 		}
 	}
@@ -182,7 +182,7 @@ func (spec *TablespaceSpec) EnsureSymlinkExist(location TablespaceLocation) erro
 	if !ok {
 		return ErrorBasePrefixMissing
 	}
-	linkpath := filepath.Join(basePrefix, location.Symlink)
+	linkpath := path.Join(basePrefix, location.Symlink)
 	linktarget, err := os.Readlink(linkpath)
 	if err != nil {
 		// create symlink if not exist

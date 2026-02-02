@@ -2,10 +2,13 @@ package s3
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -27,11 +30,12 @@ const (
 
 // TODO: Unit tests
 type Folder struct {
-	s3API    s3iface.S3API
-	uploader *Uploader
-	bucket   *string
-	path     string
-	config   *Config
+	s3API           s3iface.S3API
+	uploader        *Uploader
+	bucket          *string
+	path            string
+	config          *Config
+	showAllVersions bool // When true, include deleted objects in listing (for st ls --all-versions)
 }
 
 func NewFolder(
@@ -51,11 +55,24 @@ func NewFolder(
 	}
 }
 
+func GetSSECustomerKeyMD5(sseCustomerKey string) string {
+	hash := md5.Sum([]byte(sseCustomerKey))
+	return base64.StdEncoding.EncodeToString(hash[:])
+}
+
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	objectPath := folder.path + objectRelativePath
 	stopSentinelObjectInput := &s3.HeadObjectInput{
 		Bucket: folder.bucket,
 		Key:    aws.String(objectPath),
+	}
+
+	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
+		stopSentinelObjectInput.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+		stopSentinelObjectInput.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+
+		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+		stopSentinelObjectInput.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
 	_, err := folder.s3API.HeadObject(stopSentinelObjectInput)
@@ -86,6 +103,27 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	source := path.Join(*folder.bucket, folder.path, srcPath)
 	dst := path.Join(folder.path, dstPath)
 	input := &s3.CopyObjectInput{CopySource: &source, Bucket: folder.bucket, Key: &dst}
+
+	if folder.uploader.serverSideEncryption != "" {
+		if folder.uploader.SSECustomerKey != "" {
+			customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+
+			input.CopySourceSSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+			input.CopySourceSSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+			input.CopySourceSSECustomerKeyMD5 = aws.String(customerKeyMD5)
+
+			input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+			input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+			input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
+		} else {
+			input.ServerSideEncryption = aws.String(folder.uploader.serverSideEncryption)
+		}
+
+		if folder.uploader.SSEKMSKeyID != "" {
+			input.SSEKMSKeyId = aws.String(folder.uploader.SSEKMSKeyID)
+		}
+	}
+
 	_, err := folder.s3API.CopyObject(input)
 	return err
 }
@@ -95,6 +133,14 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	input := &s3.GetObjectInput{
 		Bucket: folder.bucket,
 		Key:    aws.String(objectPath),
+	}
+
+	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
+		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+		input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+
+		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+		input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
 	object, err := folder.s3API.GetObject(input)
@@ -119,11 +165,19 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 		storage.JoinPath(folder.path, subFolderRelativePath)+"/",
 		folder.config,
 	)
+	// Propagate the showAllVersions setting to subfolders
+	subFolder.showAllVersions = folder.showAllVersions
 	return subFolder
 }
 
 func (folder *Folder) GetPath() string {
 	return folder.path
+}
+
+// SetShowAllVersions controls whether ListFolder includes deleted objects
+// (objects where the latest version is a delete marker) when versioning is enabled.
+func (folder *Folder) SetShowAllVersions(show bool) {
+	folder.showAllVersions = show
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
@@ -139,6 +193,8 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
 			for _, prefix := range commonPrefixes {
 				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+				// Propagate the showAllVersions setting to subfolders created during listing
+				subFolder.showAllVersions = folder.showAllVersions
 				subFolders = append(subFolders, subFolder)
 			}
 			for _, object := range contents {
@@ -166,46 +222,122 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return objects, subFolders, nil
 }
 
+// versionInfo holds information about an S3 object version collected during listing.
+type versionInfo struct {
+	relativePath string
+	lastModified time.Time
+	size         int64
+	versionID    string
+	isLatest     bool
+}
+
+// addListedSubfolders converts S3 CommonPrefixes to Folder handles.
+// These handles are used by callers (e.g. `st ls` non-recursive output, or recursive listing via subfolders).
+func (folder *Folder) addListedSubfolders(subFolders *[]storage.Folder, commonPrefixes []*s3.CommonPrefix) {
+	for _, p := range commonPrefixes {
+		subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
+		// Propagate the showAllVersions setting to subfolders created during listing
+		subFolder.showAllVersions = folder.showAllVersions
+		*subFolders = append(*subFolders, subFolder)
+	}
+}
+
+// collectDeleteMarkers gathers delete marker entries and records which keys are "deleted"
+// (i.e. their LATEST is a delete marker). `deletedKeys` drives filtering in buildObjectsFromVersions.
+func (folder *Folder) collectDeleteMarkers(
+	deleteMarkers *[]versionInfo,
+	deletedKeys map[string]bool,
+	markers []*s3.DeleteMarkerEntry,
+) {
+	for _, marker := range markers {
+		if *marker.Key == folder.path {
+			continue
+		}
+		objectRelativePath := strings.TrimPrefix(*marker.Key, folder.path)
+		if *marker.IsLatest {
+			deletedKeys[objectRelativePath] = true
+		}
+		// Also collect delete marker info for --all-versions mode
+		*deleteMarkers = append(*deleteMarkers, versionInfo{
+			relativePath: objectRelativePath,
+			lastModified: *marker.LastModified,
+			size:         0,
+			versionID:    *marker.VersionId,
+			isLatest:     *marker.IsLatest,
+		})
+	}
+}
+
+// collectVersions gathers object versions from S3. Filtering happens later to correctly handle pagination
+// (delete markers and corresponding versions can appear on different pages).
+func (folder *Folder) collectVersions(allVersions *[]versionInfo, versions []*s3.ObjectVersion) {
+	for _, object := range versions {
+		// Some storages return root tar_partitions folder as a Key.
+		if *object.Key == folder.path {
+			continue
+		}
+		objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+		*allVersions = append(*allVersions, versionInfo{
+			relativePath: objectRelativePath,
+			lastModified: *object.LastModified,
+			size:         *object.Size,
+			versionID:    *object.VersionId,
+			isLatest:     *object.IsLatest,
+		})
+	}
+}
+
+// buildObjectsFromVersions turns collected versions into storage objects for output and higher-level logic.
+// By default it filters out keys whose LATEST is a delete marker; `showAllVersions` disables that filter.
+func (folder *Folder) buildObjectsFromVersions(allVersions []versionInfo, deletedKeys map[string]bool) []storage.Object {
+	objects := make([]storage.Object, 0, len(allVersions))
+	for _, v := range allVersions {
+		// Skip objects where the LATEST version is a delete marker (unless showing all versions)
+		if deletedKeys[v.relativePath] && !folder.showAllVersions {
+			continue
+		}
+		if v.isLatest {
+			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(
+				v.relativePath,
+				v.lastModified,
+				v.size,
+				fmt.Sprintf("%s LATEST", v.versionID),
+			))
+			continue
+		}
+		objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified, v.size, v.versionID))
+	}
+	return objects
+}
+
+// deleteMarkerAdditionalInfo formats marker version metadata for `st ls --all-versions` output.
+func deleteMarkerAdditionalInfo(marker versionInfo) string {
+	if marker.isLatest {
+		return fmt.Sprintf("%s LATEST DELETE", marker.versionID)
+	}
+	return fmt.Sprintf("%s DELETE", marker.versionID)
+}
+
 func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage.Object, []storage.Folder, error) {
-	objects := []storage.Object{}
 	subFolders := []storage.Folder{}
+
+	// Collect all versions and delete markers across all pages first,
+	// because a delete marker and its corresponding version might be on different pages.
+	allVersions := []versionInfo{}
+	deleteMarkers := []versionInfo{}
+
+	// Track keys where the LATEST version is a delete marker.
+	// These objects are effectively deleted and should not appear in the listing.
+	deletedKeys := make(map[string]bool)
+
+	// Keep the page callback small and side-effect-only: collect state; build output after paging completes.
 	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
-		for _, prefix := range out.CommonPrefixes {
-			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
-			subFolders = append(subFolders, subFolder)
-		}
-
-		for _, object := range out.Versions {
-			// Some storages return root tar_partitions folder as a Key.
-			if *object.Key == folder.path {
-				continue
-			}
-
-			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			if *object.IsLatest {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-					*object.Size, fmt.Sprintf("%s LATEST", *object.VersionId)))
-			} else {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-					*object.Size, *object.VersionId))
-			}
-		}
-		for _, object := range out.DeleteMarkers {
-			// Some storages return root tar_partitions folder as a Key.
-			if *object.Key == folder.path {
-				continue
-			}
-
-			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			if *object.IsLatest {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified,
-					0, fmt.Sprintf("%s LATEST", *object.VersionId)))
-			} else {
-				objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(objectRelativePath, *object.LastModified, 0, *object.VersionId))
-			}
-		}
+		folder.addListedSubfolders(&subFolders, out.CommonPrefixes)
+		folder.collectDeleteMarkers(&deleteMarkers, deletedKeys, out.DeleteMarkers)
+		folder.collectVersions(&allVersions, out.Versions)
 		return true
 	}
+
 	input := &s3.ListObjectVersionsInput{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
@@ -218,6 +350,18 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	if err != nil && !isAwsNotExist(err) {
 		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 	}
+
+	// Convert collected versions to storage objects, applying delete-marker filtering unless requested otherwise.
+	objects := folder.buildObjectsFromVersions(allVersions, deletedKeys)
+
+	// If showing all versions, also include delete markers themselves
+	if folder.showAllVersions {
+		for _, marker := range deleteMarkers {
+			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(
+				marker.relativePath, marker.lastModified, 0, deleteMarkerAdditionalInfo(marker)))
+		}
+	}
+
 	return objects, subFolders, nil
 }
 
@@ -263,15 +407,25 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 }
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	parts := partitionStrings(objectRelativePaths, 1000)
 	needsVersioning := folder.isVersioningEnabled()
+	tracelog.DebugLogger.Printf("len of names %d", len(objectRelativePaths))
+	objects := folder.partitionToObjects(objectRelativePaths, needsVersioning)
+	tracelog.DebugLogger.Printf("len of objects %d", len(objects))
+
+	parts := partitionObjects(objects, folder.config.DeleteBatchSize)
+
+	tracelog.DebugLogger.Printf("len of parts list %d", len(parts))
 
 	for _, part := range parts {
+		tracelog.DebugLogger.Printf("len of part  %d", len(part))
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
-			Objects: folder.partitionToObjects(part, needsVersioning),
+			Objects: part,
 		}}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
+			for _, obj := range part {
+				tracelog.DebugLogger.Printf("object %s version %s", *obj.Key, *obj.VersionId)
+			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
 		}
 	}

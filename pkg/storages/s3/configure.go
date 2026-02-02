@@ -46,6 +46,8 @@ const (
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
+	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
+	deleteBatchSizeSetting         = "S3_DELETE_BATCH_SIZE"
 )
 
 var SettingList = []string{
@@ -82,6 +84,8 @@ var SettingList = []string{
 	retentionPeriodSetting,
 	retentionModeSetting,
 	disable100ContinueSetting,
+	enableVersioningSetting,
+	deleteBatchSizeSetting,
 }
 
 const (
@@ -99,6 +103,7 @@ const (
 	defaultRangeMaxRetries         = 10
 	defaultDisabledRetentionPeriod = -1
 	defaultDisable100Continue      = false
+	defaultDeleteBatchSize         = 1000
 )
 
 // TODO: Unit tests
@@ -175,6 +180,11 @@ func ConfigureStorage(
 		return nil, err
 	}
 
+	deleteBatchSize, err := setting.IntOptional(settings, deleteBatchSizeSetting, defaultDeleteBatchSize)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &Config{
 		Secrets: &Secrets{
 			SecretKey: strings.TrimSpace(setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting)),
@@ -213,6 +223,8 @@ func ConfigureStorage(
 		MinThrottlingRetryDelay: time.Duration(minThrottlingRetryDelay) * time.Millisecond,
 		MaxThrottlingRetryDelay: time.Duration(maxThrottlingRetryDelay) * time.Millisecond,
 		Disable100Continue:      disable100Continue,
+		EnableVersioning:        settings[enableVersioningSetting],
+		DeleteBatchSize:         deleteBatchSize,
 	}
 
 	st, err := NewStorage(config, rootWraps...)

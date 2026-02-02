@@ -80,10 +80,14 @@ type MongoDriver interface {
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
 	ApplyOp(ctx context.Context, op *db.Oplog) error
-	Close(ctx context.Context) error
+	Close(ctx context.Context, shutdown bool) error
+	ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error
+	LastOplogTS(ctx context.Context) (lastTS models.Timestamp, err error)
 }
 
 // OplogCursor defines methods to work with mongodb cursor.
+//
+//go:generate mockery --name OplogCursor
 type OplogCursor interface {
 	Close(ctx context.Context) error
 	Data() []byte
@@ -153,7 +157,7 @@ type Options struct {
 
 type Option func(*Options)
 
-// OplogAlwaysUpsert sets applyOps argument oplogApplicationMode
+// OplogApplicationMode sets applyOps argument oplogApplicationMode
 func OplogApplicationMode(mode OplogAppMode) Option {
 	return func(args *Options) {
 		args.OplogApplicationMode = &mode
@@ -278,7 +282,6 @@ func (mc *MongoClient) IsMaster(ctx context.Context) (models.IsMaster, error) {
 }
 
 // LastWriteTS fetches timestamps with last write
-// TODO: support non-replset setups
 func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error) {
 	im, err := mc.IsMaster(ctx)
 	if err != nil {
@@ -287,9 +290,37 @@ func (mc *MongoClient) LastWriteTS(ctx context.Context) (lastTS, lastMajTS model
 	return im.LastWrite.OpTime.TS, im.LastWrite.MajorityOpTime.TS, nil
 }
 
+// LastOplogTS returns timestamp of last oplog entry
+func (mc *MongoClient) LastOplogTS(ctx context.Context) (lastTS models.Timestamp, err error) {
+	var op db.Oplog
+	oplogCol, err := mc.getOplogCollection(ctx)
+	if err != nil {
+		return models.Timestamp{}, err
+	}
+	opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
+	if err = oplogCol.FindOne(ctx, bson.D{}, opts).Decode(&op); err != nil {
+		return models.Timestamp{}, err
+	}
+	return models.TimestampFromBson(op.Timestamp), nil
+}
+
 // Close disconnects from mongodb
-func (mc *MongoClient) Close(ctx context.Context) error {
-	return mc.c.Disconnect(ctx)
+//
+// If shutdown specified, gracefully shutdowns MongoDB before close
+func (mc *MongoClient) Close(ctx context.Context, shutdown bool) error {
+	if shutdown {
+		err := mc.Shutdown(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	err := mc.c.Disconnect(ctx)
+	if err != nil && shutdown {
+		tracelog.ErrorLogger.Printf("Disconnect after shutdown ended with error: %v", err)
+		return nil
+	}
+	return err
 }
 
 // TailOplogFrom gives OplogCursor to tail oplog from
@@ -374,7 +405,7 @@ type BsonCursor struct {
 	err    error
 }
 
-// NewMongoOplogCursor builds MongoOplogCursor.
+// NewBsonCursor builds BsonCursor.
 func NewBsonCursor(r io.Reader) *BsonCursor {
 	return &BsonCursor{r: r}
 }
@@ -435,4 +466,125 @@ func WaitForBecomePrimary(ctx context.Context, mc *MongoClient, checkTimeout tim
 			return ctx.Err()
 		}
 	}
+}
+
+// ChangeOplogLastTimestamp do some actions to change system lastOpTimeFetchedTimestamp
+//
+// 1) Manually inserts noop operation with "ts" timestamp
+//
+// 2) Change timestamp value of "replset.minvalid" collection's document
+//
+// 3) Change timestamp of "replset.oplogTruncateAfterPoint" collection's document
+func (mc *MongoClient) ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error {
+	if err := mc.addNoopToOplog(ctx, opTime); err != nil {
+		return err
+	}
+
+	if err := mc.changeMinValueTimestamp(ctx, opTime); err != nil {
+		return err
+	}
+
+	if err := mc.changeOplogTruncateAfterPointTimestamp(ctx); err != nil {
+		return err
+	}
+
+	return mc.fsync(ctx)
+}
+
+func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, opTime models.OpTime) error {
+	minValidCol := mc.c.Database(oplogDatabaseName).Collection("replset.minvalid")
+	var minValue = struct {
+		ID primitive.ObjectID  `bson:"_id,omitempty"`
+		TS primitive.Timestamp `bson:"ts"`
+		T  int64               `bson:"t"`
+	}{}
+
+	if err := minValidCol.FindOne(ctx, bson.M{}).Decode(&minValue); err != nil {
+		return err
+	}
+	result, err := minValidCol.UpdateOne(ctx, bson.M{"_id": minValue.ID}, bson.M{
+		"$set": bson.M{
+			"ts": models.BsonTimestampFromOplogTS(opTime.TS),
+			"t":  opTime.Term,
+		},
+	})
+
+	if result.ModifiedCount == 0 && result.MatchedCount > 0 {
+		return err
+	} else if result.ModifiedCount == 0 {
+		return fmt.Errorf("need to debug I guess")
+	}
+
+	return err
+}
+
+func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Context) error {
+	otapCol := mc.c.Database(oplogDatabaseName).Collection("replset.oplogTruncateAfterPoint")
+	var otap = struct {
+		ID string              `bson:"_id,omitempty"`
+		TS primitive.Timestamp `bson:"oplogTruncateAfterPoint"`
+	}{}
+
+	if err := otapCol.FindOne(ctx, bson.M{}).Decode(&otap); err != nil {
+		return err
+	}
+	result, err := otapCol.UpdateOne(ctx, bson.M{"_id": otap.ID}, bson.M{
+		"$set": bson.M{
+			"oplogTruncateAfterPoint": primitive.Timestamp{},
+		},
+	})
+
+	if result.ModifiedCount == 0 && result.MatchedCount > 0 {
+		return err
+	} else if result.ModifiedCount == 0 {
+		return fmt.Errorf("need to debug I guess")
+	}
+	return err
+}
+
+func (mc *MongoClient) addNoopToOplog(ctx context.Context, opTime models.OpTime) error {
+	oplogCollection, err := mc.getOplogCollection(ctx)
+	if err != nil {
+		return err
+	}
+
+	opts := options.FindOne().SetSort(bson.D{{Key: "$natural", Value: -1}})
+	var lastEntry bson.M
+	err = oplogCollection.FindOne(ctx, bson.D{}, opts).Decode(&lastEntry)
+	if err != nil {
+		return fmt.Errorf("failed to get last oplog entry: %w", err)
+	}
+	noopEntry := bson.D{
+		{Key: "ts", Value: models.BsonTimestampFromOplogTS(opTime.TS)},
+		{Key: "t", Value: opTime.Term},
+		{Key: "v", Value: 2},
+		{Key: "op", Value: "n"},
+		{Key: "ns", Value: ""},
+		{Key: "wall", Value: primitive.NewDateTimeFromTime(time.Now())},
+		{Key: "o", Value: bson.D{
+			{Key: "msg", Value: "manually inserted oplog position"},
+		}},
+	}
+
+	_, err = oplogCollection.InsertOne(ctx, noopEntry)
+
+	return err
+}
+
+func (mc *MongoClient) fsync(ctx context.Context) error {
+	res := mc.c.Database("admin").RunCommand(ctx, bson.D{
+		{Key: "fsync", Value: 1},
+		{Key: "lock", Value: false},
+	})
+
+	return res.Err()
+}
+
+func (mc *MongoClient) Shutdown(ctx context.Context) error {
+	res := mc.c.Database("admin").RunCommand(ctx, bson.D{{Key: "shutdown", Value: 1}})
+
+	if err := res.Err(); err != nil && !mongo.IsNetworkError(res.Err()) {
+		return err
+	}
+	return nil
 }

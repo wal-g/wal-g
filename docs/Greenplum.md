@@ -1,6 +1,12 @@
-# WAL-G for Greenplum
+# WAL-G for Greenplum and Cloudberry
 
-You can use WAL-G as a tool for making encrypted, compressed physical Greenplum backups and push/fetch them to/from the remote storage without saving it on your filesystem.
+You can use WAL-G as a tool for making encrypted, compressed physical Greenplum/Cloudberry backups and push/fetch them to/from the remote storage without saving it on your filesystem.
+
+### Supported versions
+
+WAL-G works with Greenplum 6.19+ and Cloudberry 2.0+.
+
+**Limitations:** Cloudberry PAX-storage haven't been tested yet.
 
 Configuration
 -------------
@@ -55,6 +61,7 @@ In Greenplum 6 it works as extension that should be enabled:
 ```sql
 create extension if not exists gp_pitr;
 ```
+In Cloudberry it works without additional configuration.
 
 Usage
 -----
@@ -215,6 +222,38 @@ Usage:
 ```bash
 wal-g restore-point-list [--pretty] [--json]
 ```
+
+### Continuous recovery (ALPHA version)
+
+NOTE: this feature is in ALPHA stage and is not recommended for production use.
+Note: works only with Cloudberry Databases and Greenplum 6.25+.
+
+Continuous recovery - is Disaster Recovery with 2 clusters. One cluster handles production workload. Second cluster is hot-standby. `wal-g follow-primary` command will apply WAL to all segments of the cluster guaranteeing that cluster state is consistent to some restore point. Users may stop original cluster and promote second cluster when needed (e.g. in case of disaster). All changes applied after last restore point will be lost.
+
+Main difference between PiTR and `wal-g follow-primary` - continuous recovery will not promote cluster (as PiTR does) as a result - database will not start new timeline. And this will allow to apply new restore points.
+
+`wal-g recovery-action` - is a command to control the `recovery_target_action` on all segments. Possible values are `promote`, `shutdown`, `pause` (check documentation for corresponding PostgreSQL version).
+
+Usage:
+```bash
+# restore database from backup
+wal-g backup-fetch LATEST --restore-config=${RESTORE_CONFIG}
+
+# disallow automatic promotion:
+wal-g recovery-action shutdown --restore-config=${RESTORE_CONFIG}
+
+# start continuous recovery (repeat following commands in loop):
+wal-g follow-primary RESTORE_POINT_NAME --restore-config=${RESTORE_CONFIG}
+wait_postgres_shutdown
+
+# promote cluster:
+wal-g recovery-action promote --restore-config=${RESTORE_CONFIG}
+```
+
+*  `GPHOME`
+
+To configure path to greenplum installation directory. Usually it is '/usr/local/greenplum-db-6' or '/opt/greenplum-db-6'
+
 
 #### Check AO/AOCS tables 
 WAL-G has special command to validate AO/AOCS tables length:

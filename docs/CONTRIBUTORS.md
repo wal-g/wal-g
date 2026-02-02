@@ -22,3 +22,4 @@
 - Will Glynn <will@willglynn.com>
 - Andrey Dudin <dudin.andrey@gmail.com>
 - Daniil Zakhlystov <main@usernamedt.me>
+- Joseph Lawson <joe@joekiller.com>

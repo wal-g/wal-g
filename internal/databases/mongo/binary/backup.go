@@ -2,8 +2,12 @@ package binary
 
 import (
 	"context"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"os"
+	"strings"
+	"time"
+
+	"github.com/wal-g/tracelog"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
@@ -35,20 +39,127 @@ func CreateBackupService(ctx context.Context, mongodService *MongodService, uplo
 	}, nil
 }
 
-func (backupService *BackupService) DoBackup(backupName string, permanent, skipMetadata bool) error {
-	err := backupService.InitializeMongodBackupMeta(backupName, permanent)
+type CalculateSizesArgs struct {
+	BackupName    string
+	CountJournals bool
+}
+
+func (backupService *BackupService) createInitialJournals(journalFiles *internal.JournalFiles) internal.JournalInfo {
+	backupFolder, err := common.GetBackupFolder()
+	if err != nil {
+		tracelog.ErrorLogger.Printf("can not get backup folder: %+v", err)
+		return internal.JournalInfo{}
+	}
+	backupTimes, err := internal.GetBackups(backupFolder)
+	if err != nil {
+		// no backups is a valid case, no journals should be created then
+		tracelog.WarningLogger.Printf("can not get backups: %+v", err)
+		return internal.JournalInfo{}
+	}
+
+	tracelog.WarningLogger.Printf("trying to create initial journals")
+	internal.SortBackupTimeSlices(backupTimes)
+	mostRecentJournalInfo := internal.JournalInfo{}
+	for _, backupTime := range backupTimes {
+		mostRecentJournalInfo = backupService.addJournalInfo(addJournalInfoArgs{
+			backupName:            backupTime.BackupName,
+			mostRecentJournalInfo: mostRecentJournalInfo,
+			timeStop:              backupTime.Time,
+			journalFiles:          journalFiles,
+		})
+	}
+	return mostRecentJournalInfo
+}
+
+type addJournalInfoArgs struct {
+	backupName            string
+	mostRecentJournalInfo internal.JournalInfo
+	timeStop              time.Time
+	journalFiles          *internal.JournalFiles
+}
+
+func (backupService *BackupService) addJournalInfo(args addJournalInfoArgs) internal.JournalInfo {
+	if !strings.HasPrefix(args.backupName, common.BinaryBackupType) {
+		return args.mostRecentJournalInfo
+	}
+
+	storage, err := internal.ConfigureStorage()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
+		return internal.JournalInfo{}
+	}
+
+	rootFolder := storage.RootFolder()
+	journalInfo := internal.NewEmptyJournalInfo(
+		args.backupName,
+		args.mostRecentJournalInfo.CurrentBackupEnd, args.timeStop,
+		models.OplogArchBasePath,
+	)
+
+	err = journalInfo.Upload(rootFolder)
+	if err != nil {
+		tracelog.WarningLogger.Printf("can not upload the journal info: %+v", err)
+		return internal.JournalInfo{}
+	}
+
+	err = journalInfo.UpdateIntervalSize(rootFolder, args.journalFiles)
+	if err != nil {
+		tracelog.WarningLogger.Printf("can not calculate journal size: %+v", err)
+		return internal.JournalInfo{}
+	}
+
+	tracelog.InfoLogger.Printf("uploaded journal info for %s", args.backupName)
+	return journalInfo
+}
+
+func (backupService *BackupService) calculateSizes(args CalculateSizesArgs) {
+	if !args.CountJournals {
+		tracelog.InfoLogger.Printf("oplog counting mode is disabled: option is disabled")
+		return
+	}
+
+	storage, err := internal.ConfigureStorage()
+	if err != nil {
+		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
+		return
+	}
+
+	journalFiles := &internal.JournalFiles{}
+	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(
+		storage.RootFolder(),
+		models.OplogArchBasePath,
+	)
+	if errors.Is(err, internal.JournalsNotFound) {
+		// there can be no backups on S3 or we do it first time
+		tracelog.WarningLogger.Printf("can not find the last journal info: %+v", err)
+		mostRecentJournalInfo = backupService.createInitialJournals(journalFiles)
+	}
+
+	timeStop := utility.TimeNowCrossPlatformLocal()
+	backupService.addJournalInfo(addJournalInfoArgs{
+		backupName:            args.BackupName,
+		mostRecentJournalInfo: mostRecentJournalInfo,
+		timeStop:              timeStop,
+		journalFiles:          journalFiles,
+	})
+}
+
+type DoBackupArgs struct {
+	BackupName    string
+	CountJournals bool
+	Permanent     bool
+	SkipMetadata  bool
+}
+
+func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
+	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent)
 	if err != nil {
 		return err
 	}
 
-	var backupRoutes *models.BackupRoutesInfo
-	if !skipMetadata {
-		backupRoutes, err = CreateBackupRoutesInfo(backupService.MongodService)
-		if err != nil {
-			return err
-		}
-		backupService.BackupRoutesInfo = *backupRoutes
-	}
+	tarsChan := make(chan internal.TarFileSets)
+	errsChan := make(chan error)
+	go backupService.BackgroundMetadata(tarsChan, errsChan, args.SkipMetadata)
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
@@ -67,7 +178,7 @@ func (backupService *BackupService) DoBackup(backupName string, permanent, skipM
 	concurrentUploader, err := internal.CreateConcurrentUploader(
 		internal.CreateConcurrentUploaderArgs{
 			Uploader:             backupService.Uploader,
-			BackupName:           backupName,
+			BackupName:           args.BackupName,
 			Directory:            mongodDBPath,
 			TarBallComposerMaker: NewDirDatabaseTarBallComposerMaker(),
 		})
@@ -102,14 +213,15 @@ func (backupService *BackupService) DoBackup(backupName string, permanent, skipM
 		return err
 	}
 
-	if !skipMetadata {
-		if err = backupService.AddMetadata(tarFileSets); err != nil {
-			tracelog.InfoLogger.Printf("error while uploading metadata, %v", err)
+	if !args.SkipMetadata {
+		tarsChan <- tarFileSets
+		err = <-errsChan
+		if err != nil {
 			return err
 		}
 	}
 
-	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta)
+	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
 }
 
 func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool) error {
@@ -139,7 +251,8 @@ func (backupService *BackupService) InitializeMongodBackupMeta(backupName string
 	return nil
 }
 
-func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta) error {
+func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUploader, backupCursorMeta *BackupCursorMeta,
+	countJournals bool) error {
 	sentinel := &backupService.Sentinel
 	sentinel.FinishLocalTime = utility.TimeNowCrossPlatformLocal()
 	sentinel.UncompressedSize = uploader.UncompressedSize
@@ -152,14 +265,55 @@ func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUpload
 	sentinel.MongoMeta.After.LastMajTS = backupLastTS
 	sentinel.MongoMeta.After.LastTS = backupLastTS
 
-	return internal.UploadSentinel(backupService.Uploader, sentinel, sentinel.BackupName)
-}
-
-func (backupService *BackupService) AddMetadata(tarFilesSet internal.TarFileSets) error {
-	backupRoutes := &backupService.BackupRoutesInfo
-	if err := models.EnrichWithTarPaths(backupRoutes, tarFilesSet.Get()); err != nil {
+	err := internal.UploadSentinel(backupService.Uploader, sentinel, sentinel.BackupName)
+	if err != nil {
 		return err
 	}
 
-	return internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
+	calculateArgs := CalculateSizesArgs{
+		BackupName:    sentinel.BackupName,
+		CountJournals: countJournals,
+	}
+	backupService.calculateSizes(calculateArgs)
+	return nil
+}
+
+func (backupService *BackupService) BackgroundMetadata(
+	tarsChan <-chan internal.TarFileSets,
+	errChan chan<- error,
+	skip bool,
+) {
+	if skip {
+		errChan <- nil
+		return
+	}
+
+	bgCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	bgMongoService, err := CreateBackgroundMongodService(bgCtx, "bg-metadata", mongodbURI)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	backupRoutes, err := CreateBackupRoutesInfo(bgMongoService)
+	if err != nil {
+		errChan <- err
+		return
+	}
+
+	tarsFileSet := <-tarsChan
+	if err = partial.EnrichWithTarPaths(backupRoutes, tarsFileSet.Get()); err != nil {
+		errChan <- err
+		return
+	}
+
+	errChan <- internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
 }

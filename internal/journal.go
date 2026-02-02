@@ -30,6 +30,8 @@ const (
 	newer direction = 1
 )
 
+var JournalsNotFound = xerrors.New("there are no journals on the S3")
+
 // JournalInfo is a projection of the S3 journal info object.
 // When a JournalInfo instance was changed, it should be synced with S3 using the upload/read method.
 type JournalInfo struct {
@@ -184,7 +186,7 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 		return err
 	}
 
-	err = newerJi.UpdateIntervalSize(folder)
+	err = newerJi.UpdateIntervalSize(folder, &JournalFiles{})
 	if err != nil {
 		return err
 	}
@@ -208,7 +210,7 @@ func GetMostRecentJournalInfo(
 	objs = filterJournalsInfoFiles(objs)
 	objs = sortJournalsInfo(objs)
 	if len(objs) == 0 {
-		return JournalInfo{}, xerrors.New("there are no journals on the S3")
+		return JournalInfo{}, JournalsNotFound
 	}
 
 	theMostRecentJournalObject := objs[len(objs)-1]
@@ -225,13 +227,26 @@ func GetMostRecentJournalInfo(
 	return backupInfo, nil
 }
 
+type JournalFiles struct {
+	files       []storage.Object
+	initialized bool
+}
+
 // UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
 // using journal files on JournalDirectoryName and save it for the previous JournalInfo
-func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder) error {
-	journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder()
-	if err != nil {
-		return err
+func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder, journalFilesObj *JournalFiles) error {
+	var err error
+	if !journalFilesObj.initialized {
+		// doing this 1 time for reusing it in next runs during single calculation
+		journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder()
+		if err != nil {
+			return err
+		}
+		journalFilesObj.files = journalFiles
+		journalFilesObj.initialized = true
 	}
+
+	journalFiles := journalFilesObj.files
 	if len(journalFiles) == 0 {
 		return nil
 	}

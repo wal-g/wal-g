@@ -63,6 +63,10 @@ stop_cluster() {
   /usr/local/gpdb_src/bin/gpstop -a -M fast
 }
 
+prepare_cluster() {
+  echo "prepare_cluster: done"
+}
+
 start_cluster() {
   /usr/local/gpdb_src/bin/gpstart -a || die_with_gp_logs
 }
@@ -102,4 +106,14 @@ run_backup_logged() {
       cat /var/log/wal-g-log-seg*
       exit 1
   fi
+}
+
+wait_postgres_shutdown() {
+  while true; do
+    if ! ps -ef | grep -v grep | grep -q postgres; then
+      break
+    else
+      sleep 1
+    fi
+  done
 }

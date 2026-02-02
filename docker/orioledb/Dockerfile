@@ -1,5 +1,5 @@
 FROM wal-g/golang:latest as build
-
+ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 RUN apt-get update && \
@@ -87,8 +87,6 @@ RUN set -eux; \
 		pkg-config \
 		uuid-dev \
 		wget
-
-RUN apt search zstd
 
 WORKDIR /usr/src/postgresql
 ENV PATH="$PATH:/usr/local/bin"

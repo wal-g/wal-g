@@ -10,14 +10,19 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBinaryBackupPush(ctx context.Context, permanent, skipMetadata bool, appName string) error {
-	backupName := binary.GenerateNewBackupName()
+type HandleBinaryBackupPushArgs struct {
+	AppName       string
+	CountJournals bool
+	Permanent     bool
+	SkipMetadata  bool
+}
 
+func HandleBinaryBackupPush(ctx context.Context, args HandleBinaryBackupPushArgs) error {
 	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
 		return err
 	}
-	mongodService, err := binary.CreateMongodService(ctx, appName, mongodbURI, 10*time.Minute)
+	mongodService, err := binary.CreateMongodService(ctx, args.AppName, mongodbURI, 10*time.Minute)
 	if err != nil {
 		return err
 	}
@@ -33,5 +38,11 @@ func HandleBinaryBackupPush(ctx context.Context, permanent, skipMetadata bool, a
 		return err
 	}
 
-	return backupService.DoBackup(backupName, permanent, skipMetadata)
+	doBackupArgs := binary.DoBackupArgs{
+		BackupName:    binary.GenerateNewBackupName(),
+		CountJournals: args.CountJournals,
+		Permanent:     args.Permanent,
+		SkipMetadata:  args.SkipMetadata,
+	}
+	return backupService.DoBackup(doBackupArgs)
 }

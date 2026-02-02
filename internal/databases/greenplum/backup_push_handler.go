@@ -192,7 +192,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 		return "Unable to run wal-g"
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		if command.Stderr != "" {
 			tracelog.ErrorLogger.Printf("stderr (segment %d):\n%s\n", command.Content, command.Stderr)
 		}
@@ -212,7 +212,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 		bh.abortBackup()
 	}
 
-	restoreLSNs, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
+	restoreLSNs, _, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
@@ -327,7 +327,7 @@ func extractBackupPids(output *cluster.RemoteOutput) (map[int]int, error) {
 	backupPids := make(map[int]int)
 	var resErr error
 
-	for _, command := range output.Commands {
+	for _, command := range output.Commands { //nolint:gocritic // rangeValCopy
 		pid, err := strconv.Atoi(strings.TrimSpace(command.Stdout))
 		if err != nil {
 			resErr = fmt.Errorf("%w; failed to parse the backup PID: %v", resErr, err)
@@ -355,7 +355,7 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 		return fmt.Sprintf("Unable to poll backup-push state on segment %d", contentID)
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		logger := tracelog.DebugLogger
 		if command.Stderr != "" {
 			logger = tracelog.WarningLogger
@@ -369,7 +369,7 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 			gplog.GetLogFilePath())
 	}
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		backupState := SegCmdState{}
 		err := json.Unmarshal([]byte(command.Stdout), &backupState)
 		if err != nil {
@@ -699,7 +699,7 @@ func (bh *BackupHandler) terminateWalgProcesses() error {
 		return fmt.Sprintf("Unable to terminate backup-push process on segment %d", contentID)
 	}, true)
 
-	for _, command := range remoteOutput.Commands {
+	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
 		if command.Stderr == "" {
 			continue
 		}

@@ -10,6 +10,8 @@ Prints listing of the objects in the provided storage folder.
 
 ``wal-g st ls some_folder/some_subfolder`` get listing with all objects in the provided storage path.
 
+``wal-g st ls --all-versions`` show all object versions including deleted objects (S3 with versioning enabled). Delete markers are labeled with `DELETE` in the output. This is useful for debugging or inspecting the full version history of objects.
+
 ### ``get``
 Download the specified storage object. By default, the command will try to apply the decompression and decryption (if configured).
 

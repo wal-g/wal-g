@@ -40,7 +40,7 @@ services:
     container_name: wal-g_ubuntu_20_04
 
   swift:
-    image: openstackswift/saio:change_890691_py3 # "version": "2.32.0.dev213"
+    image: openstackswift/saio:py3
     container_name: wal-g_swift
     hostname: swift
     ports:
@@ -130,6 +130,7 @@ services:
       &&  mkdir -p /export/mysqlmarkincrementalbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysql_pitr_binlogserver_bucket
+      &&  mkdir -p /export/mysql_pitr_binlogserver_reconnection_bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay
@@ -153,6 +154,7 @@ services:
       &&  mkdir -p /export/mysqlconfonly
       &&  mkdir -p /export/mysqldeletebinlogs
       &&  mkdir -p /export/archivereadyrename
+      &&  mkdir -p /export/gp-follow-primary-bucket
       &&  mkdir -p /export/gpfullbucket
       &&  mkdir -p /export/gpafterfailedbucket
       &&  mkdir -p /export/gpdeletewithoutconfirm
@@ -163,6 +165,7 @@ services:
       &&  mkdir -p /export/gpaostoragetestbucket
       &&  mkdir -p /export/gpdeltabackuptestbucket
       &&  mkdir -p /export/gppartialtablebucket
+      &&  mkdir -p /export/cloudberry-follow-primary-bucket
       &&  mkdir -p /export/cloudberry-full-bucket
       &&  mkdir -p /export/cloudberry-after-failed-bucket
       &&  mkdir -p /export/cloudberry-delete-without-confirm
@@ -544,6 +547,14 @@ services:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
 
+  pg_walg_tablespace_restore_spec_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_walg_tablespace_restore_spec_test
+    command: /tmp/tests/walg_tablespace_restore_spec_test.sh
+    env_file:
+      - docker/common/common_walg.env
+      - docker/pg_tests/walg.env
+
   pg_transfer_backup_test:
     <<: *pg_test_common
     container_name: wal-g_pg_transfer_backup_test
@@ -590,26 +601,8 @@ services:
       dockerfile: docker/orioledb/Dockerfile
       context: .
     image: wal-g/orioledb
-
-  orioledb_compatibility_test:
-    image: wal-g/orioledb
     user: postgres
-    container_name: wal-g_orioledb_compatibility_test
-    command: /tmp/tests/compatibility_test.sh
-    <<: *s3_common_depends
-
-  orioledb_simple_test:
-    image: wal-g/orioledb
-    user: postgres
-    container_name: wal-g_orioledb_simple_test
-    command: /tmp/tests/simple_test.sh
-    <<: *s3_common_depends
-
-  orioledb_compressed_test:
-    image: wal-g/orioledb
-    user: postgres
-    container_name: wal-g_orioledb_compressed_test
-    command: /tmp/tests/compressed_test.sh
+    command: /tmp/run_integration_tests.sh
     <<: *s3_common_depends
 
   mysql:

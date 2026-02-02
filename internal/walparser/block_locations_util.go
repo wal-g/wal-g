@@ -18,7 +18,6 @@ func ExtractBlockLocations(records []XLogRecord) []BlockLocation {
 	return locations
 }
 
-// TODO : unit tests
 func ExtractLocationsFromWalFile(parser *WalParser, walFile io.ReadCloser) ([]BlockLocation, error) {
 	pageReader := NewWalPageReader(walFile)
 	locations := make([]BlockLocation, 0)

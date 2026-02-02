@@ -4,16 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/signal"
 	"os/user"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -148,7 +147,6 @@ const (
 	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
-	PartialRestoreTimeout               = "PARTIAL_RESTORE_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
 	MysqlSslCaSetting              = "WALG_MYSQL_SSL_CA"
@@ -191,11 +189,13 @@ const (
 	GPAoDeduplicationAgeLimit    = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
 	GPRelativeRecoveryConfPath   = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
 	GPRelativePostgresqlConfPath = "WALG_GP_RELATIVE_POSTGRESQL_CONF_PATH"
+	GPHome                       = "GPHOME"
 
 	ETCDMemberDataDirectory = "WALG_ETCD_DATA_DIR"
 	ETCDWalDirectory        = "WALG_ETCD_WAL_DIR"
 
 	GoMaxProcs = "GOMAXPROCS"
+	GoDebug    = "GODEBUG"
 
 	HTTPListen       = "HTTP_LISTEN"
 	HTTPExposePprof  = "HTTP_EXPOSE_PPROF"
@@ -227,6 +227,10 @@ const (
 	AzureEnvironmentName  = "AZURE_ENVIRONMENT_NAME"
 
 	GoogleApplicationCredentials = "GOOGLE_APPLICATION_CREDENTIALS"
+
+	AlicloudAccessKeyID     = "OSS_ACCESS_KEY_ID"
+	AlicloudAccessKeySecret = "OSS_ACCESS_KEY_SECRET"
+	AlicloudSecurityToken   = "OSS_SESSION_TOKEN"
 
 	SwiftOsAuthURL    = "OS_AUTH_URL"
 	SwiftOsUsername   = "OS_USERNAME"
@@ -458,6 +462,20 @@ var (
 		"WALG_GS_PREFIX":             true,
 		GoogleApplicationCredentials: true,
 
+		// Alicloud
+		"WALG_OSS_PREFIX":       true,
+		AlicloudAccessKeyID:     true,
+		AlicloudAccessKeySecret: true,
+		AlicloudSecurityToken:   true,
+		"OSS_ENDPOINT":          true,
+		"OSS_REGION":            true,
+		"OSS_ROLE_ARN":          true,
+		"OSS_ROLE_SESSION_NAME": true,
+		"OSS_MAX_RETRIES":       true,
+		"OSS_CONNECT_TIMEOUT":   true,
+		"OSS_UPLOAD_PART_SIZE":  true,
+		"OSS_COPY_PART_SIZE":    true,
+
 		// Yandex Cloud
 		YcSaKeyFileSetting: true,
 		YcKmsKeyIDSetting:  true,
@@ -474,6 +492,7 @@ var (
 
 		// GOLANG
 		GoMaxProcs: true,
+		GoDebug:    true,
 
 		// Web server
 		HTTPListen:       true,
@@ -504,6 +523,7 @@ var (
 		PgAliveCheckInterval:                 true,
 		PgStopBackupTimeout:                  true,
 		FailoverStorages:                     true,
+		FailoverStoragesCheck:                true,
 		FailoverStoragesCheckTimeout:         true,
 		FailoverStorageCacheLifetime:         true,
 		FailoverStorageCacheEMAAliveLimit:    true,
@@ -611,6 +631,7 @@ var (
 		FailoverStoragesCheckSize:            true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
+		GPHome:                               true,
 	}
 
 	RequiredSettings       = make(map[string]bool)
@@ -630,6 +651,9 @@ var (
 		AzureStorageAccessKey:        true,
 		AzureStorageSasToken:         true,
 		GoogleApplicationCredentials: true,
+		AlicloudAccessKeyID:          true,
+		AlicloudAccessKeySecret:      true,
+		AlicloudSecurityToken:        true,
 		LibsodiumKeySetting:          true,
 		PgPasswordSetting:            true,
 		PgpKeyPassphraseSetting:      true,
@@ -787,19 +811,6 @@ func Configure() {
 	}
 }
 
-func SetupSignalListener() {
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGUSR1)
-	go func() {
-		for {
-			<-sigCh
-			if err := ConfigureLogging(); err != nil {
-				tracelog.ErrorLogger.Printf("error configuring logging: %s\n", err.Error())
-			}
-		}
-	}()
-}
-
 // ConfigureAndRunDefaultWebServer configures and runs web server
 func ConfigureAndRunDefaultWebServer() error {
 	var ws webserver.WebServer
@@ -933,7 +944,7 @@ func ToFlagName(s string) string {
 // Applicable for Swift/Postgres/etc libs that waiting config paramenters only from ENV.
 func bindConfigToEnv(globalViper *viper.Viper) {
 	for k, v := range globalViper.AllSettings() {
-		val := fmt.Sprint(v)
+		val := cast.ToString(v)
 		k = strings.ToUpper(k)
 
 		// avoid filling environment with empty values :
