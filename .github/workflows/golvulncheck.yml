@@ -1,0 +1,34 @@
+name: Run govulncheck
+on:
+  push:
+  pull_request:
+
+env:
+  GO_VERSION: "1.25"
+  USE_BROTLI: 1
+  USE_LIBSODIUM: 1
+  USE_LZO: 1
+  GOEXPERIMENT: jsonv2
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install deps
+        run: sudo apt-get install liblzo2-dev brotli libsodium-dev
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        id: go
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+      - id: govulncheck
+        uses: golang/govulncheck-action@v1
