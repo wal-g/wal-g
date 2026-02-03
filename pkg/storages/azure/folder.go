@@ -175,3 +175,8 @@ func (folder *Folder) Validate() error {
 
 // NOT IMPLEMENTED
 func (folder *Folder) SetVersioningEnabled(using bool) {}
+
+// NOT IMPLEMENTED
+func (folder *Folder) GetVersioningEnabled() bool {
+	return false
+}

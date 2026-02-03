@@ -476,21 +476,21 @@ func DeleteObjectsWhere(
 	if err != nil {
 		return err
 	}
-	filteredRelativePaths := make([]string, 0)
+	filteredRelativePathsObjects := make([]storage.Object, 0)
 	tracelog.InfoLogger.Println("Objects in folder:")
 	for _, object := range relativePathObjects {
 		if objFilter(object) {
 			tracelog.InfoLogger.Printf("\twill be deleted: %s, from storage: %s\n", object.GetName(), multistorage.GetStorage(object))
-			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
+			filteredRelativePathsObjects = append(filteredRelativePathsObjects, object)
 		} else {
 			tracelog.DebugLogger.Printf("\tskipped: %s, in storage: %s\n", object.GetName(), multistorage.GetStorage(object))
 		}
 	}
-	if len(filteredRelativePaths) == 0 {
+	if len(filteredRelativePathsObjects) == 0 {
 		return nil
 	}
 	if confirm {
-		return folder.DeleteObjects(filteredRelativePaths)
+		return folder.DeleteObjects(filteredRelativePathsObjects)
 	}
 	tracelog.InfoLogger.Println("Dry run, nothing were deleted")
 	return nil

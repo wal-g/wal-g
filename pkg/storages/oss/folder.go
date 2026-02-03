@@ -260,3 +260,7 @@ func (f *Folder) SetVersioningEnabled(enable bool) {
 		f.config.EnableVersioning = VersioningDisabled
 	}
 }
+
+func (f *Folder) GetVersioningEnabled() bool {
+	return f.isVersioningEnabled()
+}

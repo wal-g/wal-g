@@ -249,18 +249,24 @@ func SplitPurgingBackups(backups []TimedBackup,
 
 // DeleteGarbage purges given garbage keys
 func DeleteGarbage(folder storage.Folder, garbage []string) error {
-	var keys []string
+	var objects []storage.Object
 	for _, prefix := range garbage {
 		garbageObjects, err := storage.ListFolderRecursively(folder.GetSubFolder(prefix))
 		if err != nil {
 			return err
 		}
 		for _, obj := range garbageObjects {
-			keys = append(keys, path.Join(prefix, obj.GetName()))
+			objects = append(objects, storage.NewLocalObjectWithVersion(
+				path.Join(prefix, obj.GetName()),
+				obj.GetLastModified(),
+				obj.GetSize(),
+				obj.GetVersionId(),
+				obj.GetIsVersionLatest()),
+			)
 		}
 	}
-	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", keys)
-	return folder.DeleteObjects(keys)
+	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", objects)
+	return folder.DeleteObjects(objects)
 }
 
 // DeleteBackups purges given backups files

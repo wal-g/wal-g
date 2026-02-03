@@ -296,16 +296,11 @@ func (folder *Folder) buildObjectsFromVersions(allVersions []versionInfo, delete
 		if deletedKeys[v.relativePath] && !folder.showAllVersions {
 			continue
 		}
+		isLatest := ""
 		if v.isLatest {
-			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(
-				v.relativePath,
-				v.lastModified,
-				v.size,
-				fmt.Sprintf("%s LATEST", v.versionID),
-			))
-			continue
+			isLatest = "LATEST"
 		}
-		objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(v.relativePath, v.lastModified, v.size, v.versionID))
+		objects = append(objects, storage.NewLocalObjectWithVersion(v.relativePath, v.lastModified, v.size, v.versionID, isLatest))
 	}
 	return objects
 }
@@ -357,7 +352,7 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	// If showing all versions, also include delete markers themselves
 	if folder.showAllVersions {
 		for _, marker := range deleteMarkers {
-			objects = append(objects, storage.NewLocalObjectWithAdditionalInfo(
+			objects = append(objects, storage.NewLocalObjectWithVersion(
 				marker.relativePath, marker.lastModified, 0, deleteMarkerAdditionalInfo(marker)))
 		}
 	}
@@ -406,25 +401,23 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 	return err
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	needsVersioning := folder.isVersioningEnabled()
-	tracelog.DebugLogger.Printf("len of names %d", len(objectRelativePaths))
-	objects := folder.partitionToObjects(objectRelativePaths, needsVersioning)
-	tracelog.DebugLogger.Printf("len of objects %d", len(objects))
-
+func (folder *Folder) DeleteObjects(objects []storage.Object) error {
 	parts := partitionObjects(objects, folder.config.DeleteBatchSize)
-
-	tracelog.DebugLogger.Printf("len of parts list %d", len(parts))
 
 	for _, part := range parts {
 		tracelog.DebugLogger.Printf("len of part  %d", len(part))
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
-			Objects: part,
+			Objects: []*s3.ObjectIdentifier{},
 		}}
+		for _, obj := range part {
+			name := obj.GetName()
+			version := obj.GetVersionId()
+			input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: &name, VersionId: &version})
+		}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
 			for _, obj := range part {
-				tracelog.DebugLogger.Printf("object %s version %s", *obj.Key, *obj.VersionId)
+				tracelog.DebugLogger.Printf("object %s version %s", obj.GetName(), obj.GetVersionId())
 			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
 		}
@@ -502,20 +495,14 @@ func (folder *Folder) SetVersioningEnabled(enable bool) {
 	}
 }
 
+func (folder *Folder) GetVersioningEnabled() bool {
+	return folder.isVersioningEnabled()
+}
+
 func (folder *Folder) partitionToObjects(keys []string, versioningEnabled bool) []*s3.ObjectIdentifier {
 	objects := make([]*s3.ObjectIdentifier, 0, len(keys))
 	for _, key := range keys {
-		if versioningEnabled {
-			versions, err := folder.getObjectVersions(key)
-			if err != nil {
-				tracelog.ErrorLogger.Printf("failed to list versions: %v", err)
-				//TODO to error or not to error
-			}
-			objects = append(objects, versions...)
-		} else {
-			objects = append(objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + key)})
-		}
-		//objects[id] = &s3.ObjectIdentifier{Key: aws.String(folder.path + key)}
+		objects = append(objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + key)})
 	}
 	return objects
 }
