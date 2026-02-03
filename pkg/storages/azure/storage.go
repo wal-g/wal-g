@@ -73,8 +73,8 @@ func buildClientOptions(config *Config) *container.ClientOptions {
 		},
 	}
 	if config.BlobStoreAPIVersion != "" {
-		opts.ClientOptions.PerCallPolicies = append(
-			opts.ClientOptions.PerCallPolicies,
+		opts.PerCallPolicies = append(
+			opts.PerCallPolicies,
 			&apiVersionPolicy{apiVersion: config.BlobStoreAPIVersion},
 		)
 	}
