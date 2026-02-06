@@ -19,11 +19,26 @@ const (
 )
 
 // TODO : unit tests
-// PushStream compresses a stream and push it
+// PushStream compresses a stream and uploads it to storage.
+// This method uploads both the compressed stream data and metadata file.
+// The metadata file is required for backup-fetch to properly restore the backup.
 func (uploader *RegularUploader) PushStream(ctx context.Context, stream io.Reader) (string, error) {
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 	dstPath := GetStreamName(backupName, uploader.Compressor.FileExtension())
 	err := uploader.PushStreamToDestination(ctx, stream, dstPath)
+	if err != nil {
+		return backupName, err
+	}
+
+	// Upload stream metadata to enable proper backup restoration.
+	// This metadata indicates the backup type and compression used.
+	meta := BackupStreamMetadata{
+		Type:        SingleStreamStreamBackup,
+		Compression: uploader.Compressor.FileExtension(),
+	}
+	uploaderClone := uploader.Clone()
+	uploaderClone.DisableSizeTracking() // exclude metadata from backup size calculation
+	err = UploadBackupStreamMetadata(uploaderClone, meta, backupName)
 
 	return backupName, err
 }
@@ -75,7 +90,8 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 		return backupName, err
 	}
 
-	// Upload StreamMetadata
+	// Upload stream metadata to enable proper backup restoration.
+	// This metadata indicates the backup type, partitioning scheme, and compression used.
 	meta := BackupStreamMetadata{
 		Type:        SplitMergeStreamBackup,
 		Partitions:  uint(uploader.partitions),
@@ -83,8 +99,8 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 		Compression: uploader.Compression().FileExtension(),
 	}
 	uploaderClone := uploader.Clone()
-	uploaderClone.DisableSizeTracking() // don't count metadata.json in backup size
-	err := UploadBackupStreamMetadata(uploader, meta, backupName)
+	uploaderClone.DisableSizeTracking() // exclude metadata from backup size calculation
+	err := UploadBackupStreamMetadata(uploaderClone, meta, backupName)
 
 	return backupName, err
 }

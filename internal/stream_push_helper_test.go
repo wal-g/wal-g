@@ -322,3 +322,110 @@ func TestSplitPush_Synchronous_With_Error_2(t *testing.T) {
 func TestSplitPush_MaxFileSize_Equal_BlockSize(t *testing.T) {
 	checkSplitPush(t, 3, 7919, 7919, 0, 1000*1000)
 }
+
+// TestRegularUploader_UploadsStreamMetadata verifies that RegularUploader
+// properly uploads stream_metadata.json when pushing a stream backup.
+// This metadata file is required for backup-fetch operations to work correctly.
+func TestRegularUploader_UploadsStreamMetadata(t *testing.T) {
+	storageFolder, clear, err := GetFolder(0)
+	assert.NoError(t, err)
+	defer clear()
+
+	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	uploader := NewRegularUploader(compressor, storageFolder)
+
+	sample := getByteSampleArray(1000)
+	backupName, err := uploader.PushStream(context.Background(), bytes.NewReader(sample))
+	assert.NoError(t, err)
+
+	// Verify stream_metadata.json was created
+	metadataPath := StreamMetadataNameFromBackup(backupName)
+	exists, err := storageFolder.Exists(metadataPath)
+	assert.NoError(t, err)
+	assert.True(t, exists, "stream_metadata.json should exist after backup push")
+
+	// Verify metadata content is valid
+	var metadata BackupStreamMetadata
+	err = FetchDto(storageFolder, &metadata, metadataPath)
+	assert.NoError(t, err)
+	assert.Equal(t, SingleStreamStreamBackup, metadata.Type)
+	assert.Equal(t, compressor.FileExtension(), metadata.Compression)
+}
+
+// TestSplitStreamUploader_UploadsStreamMetadata verifies that SplitStreamUploader
+// properly uploads stream_metadata.json with correct partitioning information.
+func TestSplitStreamUploader_UploadsStreamMetadata(t *testing.T) {
+	storageFolder, clear, err := GetFolder(0)
+	assert.NoError(t, err)
+	defer clear()
+
+	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	partitions := 3
+	blockSize := 1000
+	uploader := NewSplitStreamUploader(
+		NewRegularUploader(compressor, storageFolder),
+		partitions,
+		blockSize,
+		0,
+	)
+
+	sample := getByteSampleArray(5000)
+	backupName, err := uploader.PushStream(context.Background(), bytes.NewReader(sample))
+	assert.NoError(t, err)
+
+	// Verify stream_metadata.json was created
+	metadataPath := StreamMetadataNameFromBackup(backupName)
+	exists, err := storageFolder.Exists(metadataPath)
+	assert.NoError(t, err)
+	assert.True(t, exists, "stream_metadata.json should exist after split backup push")
+
+	// Verify metadata content has correct partitioning info
+	var metadata BackupStreamMetadata
+	err = FetchDto(storageFolder, &metadata, metadataPath)
+	assert.NoError(t, err)
+	assert.Equal(t, SplitMergeStreamBackup, metadata.Type)
+	assert.Equal(t, uint(partitions), metadata.Partitions)
+	assert.Equal(t, uint(blockSize), metadata.BlockSize)
+	assert.Equal(t, compressor.FileExtension(), metadata.Compression)
+}
+
+// TestBackupFetch_WithoutMetadata verifies backward compatibility.
+// When stream_metadata.json is missing, backup-fetch should fall back
+// to regular decompression without errors.
+func TestBackupFetch_WithoutMetadata(t *testing.T) {
+	storageFolder, clear, err := GetFolder(0)
+	assert.NoError(t, err)
+	defer clear()
+
+	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	uploader := NewRegularUploader(compressor, storageFolder)
+
+	sample := getByteSampleArray(1000)
+	backupName, err := uploader.PushStream(context.Background(), bytes.NewReader(sample))
+	assert.NoError(t, err)
+
+	// Manually delete stream_metadata.json to simulate old backup
+	metadataPath := StreamMetadataNameFromBackup(backupName)
+	err = storageFolder.DeleteObjects([]string{metadataPath})
+	assert.NoError(t, err)
+
+	// Verify backup can still be fetched
+	backup := Backup{
+		Name:   backupName,
+		Folder: storageFolder,
+	}
+	fetcher, err := GetBackupStreamFetcher(backup)
+	assert.NoError(t, err)
+	assert.NotNil(t, fetcher, "fetcher should use fallback when metadata is missing")
+
+	writer := newTestWriter()
+	err = fetcher(backup, writer)
+	assert.NoError(t, err)
+	<-writer.CloseNotify
+
+	// Verify restored data matches original
+	result := writer.Result
+	assert.Equal(t, len(sample), len(result))
+	assert.Equal(t, sample, result)
+}
+
