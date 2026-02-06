@@ -12,8 +12,9 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
+	networktypes "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/wal-g/tracelog"
@@ -84,7 +85,7 @@ func RunCommandStrict(ctx context.Context, container string, command []string) (
 func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult, error) {
 	args := &RunOptions{}
 
-	execConfig := types.ExecConfig{
+	execConfig := containertypes.ExecOptions{
 		AttachStdout: true,
 		AttachStderr: true,
 		User:         args.user,
@@ -96,7 +97,7 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 		return ExecResult{}, err
 	}
 
-	attach, err := Docker.ContainerExecAttach(ctx, containerExec.ID, types.ExecConfig{})
+	attach, err := Docker.ContainerExecAttach(ctx, containerExec.ID, containertypes.ExecAttachOptions{})
 	if err != nil {
 		return ExecResult{}, err
 	}
@@ -134,7 +135,7 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 }
 
 func RunAsyncCommand(ctx context.Context, container, cmd string) error {
-	execCfg := types.ExecConfig{
+	execCfg := containertypes.ExecOptions{
 		Detach: true,
 		Cmd:    []string{shell, "-c", cmd},
 	}
@@ -142,7 +143,7 @@ func RunAsyncCommand(ctx context.Context, container, cmd string) error {
 	if err != nil {
 		return err
 	}
-	return Docker.ContainerExecStart(ctx, execResp.ID, types.ExecStartCheck{})
+	return Docker.ContainerExecStart(ctx, execResp.ID, containertypes.ExecStartOptions{})
 }
 
 func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
@@ -155,7 +156,7 @@ func ContainerWithPrefix(containers []types.Container, name string) (*types.Cont
 }
 
 func DockerContainer(ctx context.Context, prefix string) (*types.Container, error) {
-	containers, err := Docker.ContainerList(ctx, types.ContainerListOptions{})
+	containers, err := Docker.ContainerList(ctx, containertypes.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error in getting docker container: %v", err)
 	}
@@ -189,19 +190,19 @@ func ExposedPort(container types.Container, port int) (string, int, error) {
 	return "", 0, fmt.Errorf("error in getting exposed port")
 }
 
-func ListNets(ctx context.Context, name string) ([]types.NetworkResource, error) {
+func ListNets(ctx context.Context, name string) ([]networktypes.Summary, error) {
 	networkFilters := filters.NewArgs()
-	networkResources, err := Docker.NetworkList(ctx, types.NetworkListOptions{
+	networkResources, err := Docker.NetworkList(ctx, networktypes.ListOptions{
 		Filters: networkFilters,
 	})
-	var result []types.NetworkResource
+	var result []networktypes.Summary
 	for _, value := range networkResources {
 		if value.Name == name {
 			result = append(result, value)
 		}
 	}
 	if err != nil {
-		return []types.NetworkResource{}, fmt.Errorf("error in getting network list with name: %v", err)
+		return []networktypes.Summary{}, fmt.Errorf("error in getting network list with name: %v", err)
 	}
 	return result, nil
 }
@@ -215,15 +216,15 @@ func CreateNet(ctx context.Context, netName string) error {
 		tracelog.DebugLogger.Printf("Found networks: %+v", networkList)
 		return nil
 	}
-	ipam := &network.IPAM{
-		Config: []network.IPAMConfig{{Subnet: fmt.Sprintf("10.0.%d.0/24", rand.Intn(255))}},
+	ipam := &networktypes.IPAM{
+		Config: []networktypes.IPAMConfig{{Subnet: fmt.Sprintf("10.0.%d.0/24", rand.Intn(255))}},
 	}
 	netOpts := map[string]string{
 		"com.docker.network.bridge.enable_ip_masquerade": "true",
 		"com.docker.network.bridge.enable_icc":           "true",
 		"com.docker.network.bridge.netName":              netName,
 	}
-	config := types.NetworkCreate{
+	config := networktypes.CreateOptions{
 		IPAM:    ipam,
 		Options: netOpts,
 	}
@@ -347,6 +348,6 @@ func (inf *Infra) callCompose(actions []string) error {
 
 func init() {
 	var err error
-	Docker, err = client.NewEnvClient()
+	Docker, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	tracelog.ErrorLogger.FatalOnError(err)
 }
