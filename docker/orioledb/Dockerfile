@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go
 
 FROM wal-g/ubuntu:20.04
 
-ENV PGDATA /var/lib/postgresql/16/main
+ENV PGDATA=/var/lib/postgresql/16/main
 
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends --no-install-suggests \
@@ -156,4 +156,4 @@ COPY docker/orioledb/scripts/ /tmp
 
 RUN mkdir -p /tmp/logs/ && chmod 777 /tmp/configs/ && chmod 777 /tmp/logs/
 RUN mkdir -p /var/run/postgresql && chmod 777 /var/run/postgresql
-ENV PGHOST /var/run/postgresql
+ENV PGHOST=/var/run/postgresql
