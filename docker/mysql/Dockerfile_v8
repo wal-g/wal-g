@@ -1,7 +1,7 @@
 FROM wal-g/ubuntu:20.04
 
 # install mysql
-ENV MYSQLDATA /var/lib/mysql
+ENV MYSQLDATA=/var/lib/mysql
 
 RUN apt-get update && \
     apt-get install --yes \
