@@ -1,6 +1,7 @@
 package stages
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
@@ -138,6 +139,23 @@ func (cb *CloserBuffer) Close() error {
 	return nil
 }
 
+func NewCloserPipeWriter(pw *io.PipeWriter) *CloserPipeWriter {
+	return &CloserPipeWriter{pw}
+}
+
+// CloserPipeWriter defines PipeWriter which wraps io.PipeWriter and has dummy implementation of Closer interface.
+type CloserPipeWriter struct {
+	*io.PipeWriter
+}
+
+func (w *CloserPipeWriter) Close() error {
+	return nil
+}
+
+func (w *CloserPipeWriter) RealClose() error {
+	return w.PipeWriter.Close()
+}
+
 // StorageFetcher implements BetweenFetcher interface for storage.
 type StorageFetcher struct {
 	downloader archive.Downloader
@@ -158,65 +176,79 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 	}
 
 	data := make(chan *models.Oplog)
-	errc = make(chan error)
+	errc = make(chan error, 2)
+
+	pr, pw := io.Pipe() // streaming data via io.Pipe
+	cpw := NewCloserPipeWriter(pw)
+	const bufferSize = 4 * 1024 * 1024
+	bufferedReader := bufio.NewReaderSize(pr, bufferSize)
+
 	go func() {
-		defer close(errc)
-		defer close(data)
+		defer cpw.RealClose()
 
-		buf := NewCloserBuffer() // TODO: switch to streaming interface
 		path := sf.path
-		firstFound := false
-
 		for _, arch := range path {
 			tracelog.DebugLogger.Printf("Fetching archive %s", arch.Filename())
 
-			err := sf.downloader.DownloadOplogArchive(arch, buf)
-			if err != nil {
-				errc <- fmt.Errorf("failed to download archive %s: %w", arch.Filename(), err)
+			if err := sf.downloader.DownloadOplogArchive(arch, cpw); err != nil {
+				cpw.CloseWithError(fmt.Errorf("failed to download archive %s: %w", arch.Filename(), err))
 				return
 			}
 
-			for {
-				// TODO: benchmark & compare with bson_stream
-				raw, err := bson.ReadDocument(buf)
-				if err != nil {
-					if err == io.EOF {
-						break
-					}
-					errc <- fmt.Errorf("error during read bson: %w", err)
-				}
-
-				op, err := models.OplogFromRaw(raw)
-				if err != nil {
-					errc <- fmt.Errorf("oplog record decoding failed: %w", err)
-					return
-				}
-
-				if !firstFound {
-					if models.LessTS(op.TS, from) {
-						continue
-					}
-					firstFound = true
-				}
-
-				// TODO: do we need also check every op "op.TS > from"
-				if models.LessTS(until, op.TS) || op.TS == until {
-					tracelog.InfoLogger.Println("Oplog archives fetching is completed")
-					return
-				}
-
-				// tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
-				select {
-				case data <- op:
-				case <-ctx.Done():
-					tracelog.InfoLogger.Println("Oplog archives fetching is canceled")
-					return
-				}
+			select {
+			case <-ctx.Done():
+				cpw.CloseWithError(ctx.Err())
+				return
+			default:
 			}
-			buf.Reset()
 		}
-		errc <- fmt.Errorf("restore sequence was fetched, but restore point '%s' is not reached",
-			until)
+	}()
+
+	go func() {
+		defer close(errc)
+		defer close(data)
+		defer pr.Close()
+
+		firstFound := false
+		for {
+			// TODO: benchmark & compare with bson_stream
+			raw, err := bson.ReadDocument(bufferedReader)
+			if err != nil {
+				if err == io.EOF {
+					errc <- fmt.Errorf("restore sequence was fetched, but restore point '%s' is not reached", until)
+					return
+				}
+				errc <- fmt.Errorf("error during read bson: %w", err)
+				return
+			}
+
+			op, err := models.OplogFromRaw(raw)
+			if err != nil {
+				errc <- fmt.Errorf("oplog record decoding failed: %w", err)
+				return
+			}
+
+			if !firstFound {
+				if models.LessTS(op.TS, from) {
+					continue
+				}
+				firstFound = true
+			}
+
+			// TODO: do we need also check every op "op.TS > from"
+			if models.LessTS(until, op.TS) || op.TS == until {
+				tracelog.InfoLogger.Println("Oplog archives fetching is completed")
+				return
+			}
+
+			// tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
+			select {
+			case data <- op:
+			case <-ctx.Done():
+				tracelog.InfoLogger.Println("Oplog archives fetching is canceled")
+				return
+			}
+		}
 	}()
 
 	return data, errc, nil
