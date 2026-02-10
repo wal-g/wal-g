@@ -10,7 +10,7 @@ pg_ctl -D ${PGDATA} -w start
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 pgbench -i -s 50 postgres
-du -hs ${PGDATA}
+du -hs ${PGDATA} 2>/dev/null || true
 sleep 1
 WAL=$(ls -l ${PGDATA}/pg_wal | head -n2 | tail -n1 | egrep -o "[0-9A-F]{24}")
 
