@@ -349,3 +349,58 @@ mysqlbinlog --stop-datetime="some point in time" --start-position [position abov
 ### MariaDB - using with `mysqldump`
 
 The procedure is same as in case of [MySQL. You can follow the instructions from the previous section.](#mysql---using-with-mysqldump)
+
+## Monitoring with Prometheus Exporter
+
+WAL-G provides a production-ready Prometheus exporter for MySQL/MariaDB backup monitoring. The exporter provides comprehensive metrics for backups, binlogs, and storage health.
+
+### Features
+
+- **Backup metrics**: Track backup timestamps, sizes, duration, and types (full/incremental)
+- **Binlog monitoring**: Monitor binlog count, latest timestamp, and total size
+- **Storage health**: Monitor storage connectivity and latency
+- **Error tracking**: Track WAL-G operation errors
+- **Zero dependencies**: Single binary with graceful shutdown support
+
+### Installation
+
+```bash
+cd cmd/mysql/exporter
+go build -o walg-mysql-exporter .
+```
+
+### Usage
+
+```bash
+./walg-mysql-exporter \
+  --web.listen-address=:9352 \
+  --scrape.interval=60s \
+  --walg.path=/usr/local/bin/wal-g
+```
+
+### Key Metrics
+
+- `walg_mysql_backup_finish_timestamp` - When backups completed
+- `walg_mysql_backup_duration_seconds` - How long backups took
+- `walg_mysql_backup_compressed_size_bytes` - Backup sizes
+- `walg_mysql_binlog_count` - Number of binlogs in storage
+- `walg_mysql_storage_alive` - Storage connectivity status (1=up, 0=down)
+
+### Example Prometheus Queries
+
+**Time since last backup (hours)**:
+```promql
+(time() - walg_mysql_backup_finish_timestamp) / 3600
+```
+
+**Backup compression ratio**:
+```promql
+walg_mysql_backup_compressed_size_bytes / walg_mysql_backup_uncompressed_size_bytes
+```
+
+**Alert if no backup in 25 hours**:
+```promql
+(time() - walg_mysql_backup_finish_timestamp) / 3600 > 25
+```
+
+For complete documentation, see [cmd/mysql/exporter/README.md](/cmd/mysql/exporter/README.md)
