@@ -15,11 +15,11 @@ pg_ctl -D "${PGDATA}" -w start
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 pgbench -i -s 50 postgres
-du -hs ${PGDATA}
+du -hs ${PGDATA} 2>/dev/null || true
 sleep 1
 WAL=$(ls -l ${PGDATA}/pg_wal | head -n2 | tail -n1 | egrep -o "[0-9A-F]{24}")
 
-du -hs "${PGDATA}"
+du -hs "${PGDATA}" 2>/dev/null || true
 /usr/bin/time -v -a --output ${WAL_PUSH_LOGS} wal-g --config=${TMP_CONFIG} wal-push "${PGDATA}"/pg_wal/"${WAL}"
 sleep 1
 /tmp/scripts/drop_pg.sh
