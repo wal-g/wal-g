@@ -1,7 +1,7 @@
 FROM wal-g/ubuntu:20.04
 
 # mb not another path
-ENV MYSQLDATA /var/lib/mysql
+ENV MYSQLDATA=/var/lib/mysql
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests software-properties-common dirmngr gnupg2 curl apt-transport-https && \

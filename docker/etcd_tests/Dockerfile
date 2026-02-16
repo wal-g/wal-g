@@ -13,7 +13,7 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
-ENV USE_BROTLI 1
+ENV USE_BROTLI=1
 
 RUN wget https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-x86_64.tar.gz && \
     tar xf cmake-3.31.0-linux-x86_64.tar.gz -C /usr --strip-components=1

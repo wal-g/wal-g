@@ -125,6 +125,7 @@ func (sd *StorageDownloader) DownloadOplogArchive(arch models.Archive, writeClos
 
 // ListOplogArchives fetches all oplog archives existed in storage.
 func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
+	tracelog.DebugLogger.Printf("Listing %s", sd.oplogsFolder.GetPath())
 	objects, _, err := sd.oplogsFolder.ListFolder()
 	if err != nil {
 		return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
@@ -139,6 +140,8 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 		}
 		archives = append(archives, arch)
 	}
+
+	tracelog.DebugLogger.Printf("%s listed", sd.oplogsFolder.GetPath())
 	return archives, nil
 }
 

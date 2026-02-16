@@ -2,7 +2,7 @@
 FROM walg-func-test-base as build
 
 ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
-ENV USE_BROTLI 1
+ENV USE_BROTLI=1
 
 RUN mkdir -p ${WALG_REPO}
 COPY staging/wal-g ${WALG_REPO}/
@@ -26,8 +26,8 @@ ARG MONGO_REPO=repo.mongodb.org
 ENV MONGO_PACKAGE=${MONGO_PACKAGE} MONGO_REPO=${MONGO_REPO}
 ARG MONGO_VERSION=
 
-ENV TMP_DIR /var/tmp/wal-g
-ENV WALG_CONF_DIR /etc/wal-g/
+ENV TMP_DIR=/var/tmp/wal-g
+ENV WALG_CONF_DIR=/etc/wal-g/
 
 ENV MONGO_MAJOR=${MONGO_VERSION%.*}
 

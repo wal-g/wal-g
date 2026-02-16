@@ -2,6 +2,7 @@ package azure
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -20,14 +21,15 @@ type Storage struct {
 }
 
 type Config struct {
-	Secrets        *Secrets `json:"-"`
-	RootPath       string
-	Container      string
-	AuthType       authType
-	AccountName    string
-	EndpointSuffix string
-	TryTimeout     time.Duration
-	Uploader       *UploaderConfig
+	Secrets             *Secrets `json:"-"`
+	RootPath            string
+	Container           string
+	AuthType            authType
+	AccountName         string
+	EndpointSuffix      string
+	TryTimeout          time.Duration
+	Uploader            *UploaderConfig
+	BlobStoreAPIVersion string
 }
 
 type Secrets struct {
@@ -47,6 +49,37 @@ const (
 	authTypeAccessKey    authType = "AzureAccessKeyAuth"
 	authTypeSASToken     authType = "AzureSASTokenAuth"
 )
+
+// apiVersionPolicy overrides the x-ms-version header sent to Azure Storage.
+// This allows compatibility with Azure environments that don't support the
+// latest API version used by the SDK.
+type apiVersionPolicy struct {
+	apiVersion string
+}
+
+func (p *apiVersionPolicy) Do(req *policy.Request) (*http.Response, error) {
+	if p.apiVersion != "" {
+		req.Raw().Header["x-ms-version"] = []string{p.apiVersion}
+	}
+	return req.Next()
+}
+
+// buildClientOptions creates container.ClientOptions with the configured
+// retry timeout and optional API version override.
+func buildClientOptions(config *Config) *container.ClientOptions {
+	opts := &container.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+		},
+	}
+	if config.BlobStoreAPIVersion != "" {
+		opts.PerCallPolicies = append(
+			opts.PerCallPolicies,
+			&apiVersionPolicy{apiVersion: config.BlobStoreAPIVersion},
+		)
+	}
+	return opts
+}
 
 // TODO: Unit tests
 func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
@@ -97,11 +130,7 @@ func containerClientWithSASToken(config *Config) (*container.Client, error) {
 		return nil, fmt.Errorf("parse service URL with SAS token: %w", err)
 	}
 
-	containerClient, err := container.NewClientWithNoCredential(containerURLString, &container.ClientOptions{
-		ClientOptions: policy.ClientOptions{
-			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
-		},
-	})
+	containerClient, err := container.NewClientWithNoCredential(containerURLString, buildClientOptions(config))
 	return containerClient, err
 }
 
@@ -120,11 +149,7 @@ func containerClientWithAccessKey(config *Config) (*container.Client, error) {
 		return nil, fmt.Errorf("parse service URL: %w", err)
 	}
 
-	containerClient, err := container.NewClientWithSharedKeyCredential(containerURLString, credential, &container.ClientOptions{
-		ClientOptions: policy.ClientOptions{
-			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
-		},
-	})
+	containerClient, err := container.NewClientWithSharedKeyCredential(containerURLString, credential, buildClientOptions(config))
 	return containerClient, err
 }
 
@@ -145,11 +170,7 @@ func containerClientWithDefaultAuth(config *Config) (*container.Client, error) {
 		return nil, fmt.Errorf("parse service URL: %w", err)
 	}
 
-	containerClient, err := container.NewClient(containerURLString, defaultCredential, &container.ClientOptions{
-		ClientOptions: policy.ClientOptions{
-			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
-		},
-	})
+	containerClient, err := container.NewClient(containerURLString, defaultCredential, buildClientOptions(config))
 	return containerClient, err
 }
 
