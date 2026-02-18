@@ -105,7 +105,19 @@ Examples:
 
 * `WALG_STOP_BACKUP_TIMEOUT`
 
-Timeout for the pg_stop_backup() call. By default, there is no timeout.
+**Deprecated: use WALG_PG_TIMEOUT instead.**
+Previously used as a timeout for the pg_stop_backup() call. Now replaced by a unified WALG_PG_TIMEOUT setting. Will be removed in a future release. 
+By default, there is no timeout.
+
+Examples:
+- `0` - disable the timeout (default value)
+- `10s` - 10 seconds timeout
+- `10m` - 10 minutes timeout
+
+* `WALG_PG_TIMEOUT`
+
+Timeout for both establishing a connection to PostgreSQL and executing SQL queries.
+By default, there is no timeout.
 
 Examples:
 - `0` - disable the timeout (default value)

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
@@ -28,8 +29,23 @@ func Connect(configOptions ...func(config *pgx.ConnConfig) error) (*pgx.Conn, er
 		}
 	}
 
-	conn, err := pgx.ConnectConfig(context.TODO(), config)
+	timeout, err := getPgTimeoutSetting()
 	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := ContextWithPgTimeout(context.Background(), timeout)
+	defer cancel()
+
+	conn, err := pgx.ConnectConfig(ctx, config)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Failed to connect normally: %v", err)
+
+		// TODO(greenplum-split):
+		// This fallback calls Greenplum-specific tryConnectToGpSegment()
+		// even in a plain PostgreSQL build. As a result, the PG server
+		// replies with FATAL: unrecognized configuration parameter "gp_role".
+		// We need to separate GP logic from PG.
 		conn, err = tryConnectToGpSegment(config)
 
 		if err != nil && config.Host != "localhost" {
@@ -58,4 +74,13 @@ func tryConnectToGpSegment(config *pgx.ConnConfig) (*pgx.Conn, error) {
 		conn, err = pgx.ConnectConfig(context.TODO(), config)
 	}
 	return conn, err
+}
+
+// ContextWithPgTimeout creates a new context with timeout if timeout > 0,
+// otherwise returns the original context and a no-op cancel function.
+func ContextWithPgTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout > 0 {
+		return context.WithTimeout(ctx, timeout)
+	}
+	return ctx, func() {}
 }
