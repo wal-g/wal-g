@@ -49,7 +49,7 @@ func getDeltaRange(firstUsedLsn, firstNotUsedLsn LSN) (DeltaNo, DeltaNo) {
 
 func getWalSegmentRange(firstNotUsedDeltaNo DeltaNo, firstNotUsedLsn LSN) (WalSegmentNo, WalSegmentNo) {
 	firstUsedWalSegmentNo := firstNotUsedDeltaNo.firstWalSegmentNo()
-	lastUsedLsn := firstNotUsedLsn - 1
+	lastUsedLsn := firstNotUsedLsn - SizeOfXLogLongPHD - 1
 	lastUsedWalSegmentNo := NewWalSegmentNo(lastUsedLsn)
 	return firstUsedWalSegmentNo, lastUsedWalSegmentNo.Next()
 }
