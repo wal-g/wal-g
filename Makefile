@@ -142,7 +142,7 @@ sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 load_docker_common:
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
 		echo "Rebuild";\
-		docker compose build $(DOCKER_COMMON);\
+		DOCKER_DEFAULT_PLATFORM=linux/$(shell uname -m) docker compose build $(DOCKER_COMMON);\
 	else\
 		docker load -i ${CACHE_FILE_UBUNTU_18_04};\
 		docker load -i ${CACHE_FILE_UBUNTU_20_04};\
@@ -256,7 +256,12 @@ etcd_integration_test: load_docker_common
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_GP_PATH) && \
+	if [ "$$(uname -m)" = "aarch64" ] || [ "$$(uname -m)" = "arm64" ]; then \
+		go build -mod vendor -tags "$(BUILD_TAGS)" $(BUILD_ARGS) -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)"; \
+	else \
+		go build -mod vendor -tags "$(BUILD_TAGS)" $(BUILD_ARGS) -race -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)"; \
+	fi)
 
 gp_clean:
 	(cd $(MAIN_GP_PATH) && go clean)
@@ -281,8 +286,8 @@ cloudberry_install: gp_install
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
-	docker compose build cloudberry
-	docker compose build cloudberry_tests
+	DOCKER_DEFAULT_PLATFORM=linux/$(shell uname -m) docker compose build cloudberry
+	DOCKER_DEFAULT_PLATFORM=linux/$(shell uname -m) docker compose build cloudberry_tests
 	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 
 st_test: deps pg_build unlink_brotli st_integration_test
