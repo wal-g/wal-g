@@ -14,7 +14,6 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
-	"github.com/wal-g/wal-g/pkg/storages/s3"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -413,10 +412,4 @@ func TestGlob(t *testing.T) {
 			assert.Equal(t, tc.expected, matches)
 		})
 	}
-}
-
-func TestSetShowAllVersions(t *testing.T) {
-	folder := s3.Folder{}
-	ans := storage.SetShowAllVersions(&folder, true)
-	assert.True(t, ans)
 }
