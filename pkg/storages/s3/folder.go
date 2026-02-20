@@ -164,8 +164,6 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 		storage.JoinPath(folder.path, subFolderRelativePath)+"/",
 		folder.config,
 	)
-	// Propagate the showAllVersions setting to subfolders
-	//subFolder.showAllVersions = folder.showAllVersions
 	return subFolder
 }
 
@@ -321,7 +319,7 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	// These objects are effectively deleted and should not appear in the listing.
 	deletedKeys := make(map[string]bool)
 
-	//Keep the page callback small and side-effect-only: collect state; build output after paging completes.
+	// Keep the page callback small and side-effect-only: collect state; build output after paging completes.
 	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
 		folder.addListedSubfolders(&subFolders, out.CommonPrefixes)
 		folder.collectDeleteMarkers(&deleteMarkers, deletedKeys, out.DeleteMarkers)

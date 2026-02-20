@@ -18,8 +18,8 @@ func NewLocalObject(name string, lastModified time.Time, size int64) *LocalObjec
 	return &LocalObject{name: name, lastModified: lastModified, size: size}
 }
 
-func NewLocalObjectWithVersion(name string, lastModified time.Time, size int64, version string, latest string) *LocalObject {
-	return &LocalObject{name: name, lastModified: lastModified, size: size, versionId: version, additionalInfo: latest}
+func NewLocalObjectWithVersion(name string, lastModified time.Time, size int64, version string, additionalInfo string) *LocalObject {
+	return &LocalObject{name: name, lastModified: lastModified, size: size, versionId: version, additionalInfo: additionalInfo}
 }
 
 func (object LocalObject) GetName() string {
