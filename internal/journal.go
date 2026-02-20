@@ -152,9 +152,10 @@ func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (Jour
 // updates the PriorBackupEnd of a newer JournalInfo with the PriorBackupEnd of the current one,
 // updates the older one journal size.
 func (ji *JournalInfo) Delete(folder storage.Folder) error {
+	storage.NewLocalObject(ji.JournalName, time.Time{}, 0)
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
-		DeleteObjects([]string{ji.JournalName})
+		DeleteObjects([]storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
 	if err != nil {
 		return err
 	}

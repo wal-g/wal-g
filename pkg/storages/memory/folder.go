@@ -57,9 +57,9 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	for _, objectName := range objectRelativePaths {
-		folder.KVS.Delete(storage.JoinPath(folder.path, objectName))
+func (folder *Folder) DeleteObjects(objectsWithRelativePath []storage.Object) error {
+	for _, object := range objectsWithRelativePath {
+		folder.KVS.Delete(storage.JoinPath(folder.path, object.GetName()))
 	}
 	return nil
 }

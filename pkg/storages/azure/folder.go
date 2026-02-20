@@ -150,10 +150,11 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return err
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	for _, objectRelativePath := range objectRelativePaths {
+func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+	for _, object := range objectsWithRelativePaths {
+
 		//Delete blob using blobClient obtained from full path to blob
-		path := storage.JoinPath(folder.path, objectRelativePath)
+		path := storage.JoinPath(folder.path, object.GetName())
 		blobClient := folder.containerClient.NewBlockBlobClient(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		deleteOption := blob.DeleteSnapshotsOptionTypeInclude

@@ -261,7 +261,7 @@ func DeleteGarbage(folder storage.Folder, garbage []string) error {
 				obj.GetLastModified(),
 				obj.GetSize(),
 				obj.GetVersionId(),
-				obj.GetIsVersionLatest()),
+				obj.GetAdditionalInfo()),
 			)
 		}
 	}
@@ -272,17 +272,17 @@ func DeleteGarbage(folder storage.Folder, garbage []string) error {
 // DeleteBackups purges given backups files
 // TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
 func DeleteBackups(folder storage.Folder, backups []string) error {
-	keys := make([]string, 0, len(backups)*2)
+	keys := make([]storage.Object, 0, len(backups)*2)
 	for i := range backups {
 		backupName := backups[i]
-		keys = append(keys, SentinelNameFromBackup(backupName))
+		keys = append(keys, storage.NewLocalObject(SentinelNameFromBackup(backupName), time.Time{}, 0))
 
 		dataObjects, err := storage.ListFolderRecursively(folder.GetSubFolder(backupName))
 		if err != nil {
 			return err
 		}
 		for _, obj := range dataObjects {
-			keys = append(keys, path.Join(backupName, obj.GetName()))
+			keys = append(keys, storage.NewLocalObject(path.Join(backupName, obj.GetName()), time.Time{}, 0))
 		}
 	}
 

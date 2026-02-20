@@ -30,12 +30,11 @@ const (
 
 // TODO: Unit tests
 type Folder struct {
-	s3API           s3iface.S3API
-	uploader        *Uploader
-	bucket          *string
-	path            string
-	config          *Config
-	showAllVersions bool // When true, include deleted objects in listing (for st ls --all-versions)
+	s3API    s3iface.S3API
+	uploader *Uploader
+	bucket   *string
+	path     string
+	config   *Config
 }
 
 func NewFolder(
@@ -166,7 +165,7 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 		folder.config,
 	)
 	// Propagate the showAllVersions setting to subfolders
-	subFolder.showAllVersions = folder.showAllVersions
+	//subFolder.showAllVersions = folder.showAllVersions
 	return subFolder
 }
 
@@ -177,7 +176,8 @@ func (folder *Folder) GetPath() string {
 // SetShowAllVersions controls whether ListFolder includes deleted objects
 // (objects where the latest version is a delete marker) when versioning is enabled.
 func (folder *Folder) SetShowAllVersions(show bool) {
-	folder.showAllVersions = show
+	tracelog.DebugLogger.Printf("setting all versions %t for folder %s", show, folder.path)
+	folder.config.showAllVersions = show
 }
 
 func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
@@ -193,8 +193,6 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
 			for _, prefix := range commonPrefixes {
 				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
-				// Propagate the showAllVersions setting to subfolders created during listing
-				subFolder.showAllVersions = folder.showAllVersions
 				subFolders = append(subFolders, subFolder)
 			}
 			for _, object := range contents {
@@ -236,8 +234,6 @@ type versionInfo struct {
 func (folder *Folder) addListedSubfolders(subFolders *[]storage.Folder, commonPrefixes []*s3.CommonPrefix) {
 	for _, p := range commonPrefixes {
 		subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
-		// Propagate the showAllVersions setting to subfolders created during listing
-		subFolder.showAllVersions = folder.showAllVersions
 		*subFolders = append(*subFolders, subFolder)
 	}
 }
@@ -293,7 +289,7 @@ func (folder *Folder) buildObjectsFromVersions(allVersions []versionInfo, delete
 	objects := make([]storage.Object, 0, len(allVersions))
 	for _, v := range allVersions {
 		// Skip objects where the LATEST version is a delete marker (unless showing all versions)
-		if deletedKeys[v.relativePath] && !folder.showAllVersions {
+		if deletedKeys[v.relativePath] && !folder.config.showAllVersions {
 			continue
 		}
 		isLatest := ""
@@ -308,9 +304,9 @@ func (folder *Folder) buildObjectsFromVersions(allVersions []versionInfo, delete
 // deleteMarkerAdditionalInfo formats marker version metadata for `st ls --all-versions` output.
 func deleteMarkerAdditionalInfo(marker versionInfo) string {
 	if marker.isLatest {
-		return fmt.Sprintf("%s LATEST DELETE", marker.versionID)
+		return "LATEST DELETE"
 	}
-	return fmt.Sprintf("%s DELETE", marker.versionID)
+	return "DELETE"
 }
 
 func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage.Object, []storage.Folder, error) {
@@ -325,7 +321,7 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	// These objects are effectively deleted and should not appear in the listing.
 	deletedKeys := make(map[string]bool)
 
-	// Keep the page callback small and side-effect-only: collect state; build output after paging completes.
+	//Keep the page callback small and side-effect-only: collect state; build output after paging completes.
 	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
 		folder.addListedSubfolders(&subFolders, out.CommonPrefixes)
 		folder.collectDeleteMarkers(&deleteMarkers, deletedKeys, out.DeleteMarkers)
@@ -350,13 +346,19 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	objects := folder.buildObjectsFromVersions(allVersions, deletedKeys)
 
 	// If showing all versions, also include delete markers themselves
-	if folder.showAllVersions {
+	if folder.config.showAllVersions {
+		tracelog.DebugLogger.Println("adding delete markers")
 		for _, marker := range deleteMarkers {
 			objects = append(objects, storage.NewLocalObjectWithVersion(
-				marker.relativePath, marker.lastModified, 0, deleteMarkerAdditionalInfo(marker)))
+				marker.relativePath,
+				marker.lastModified,
+				0,
+				marker.versionID,
+				deleteMarkerAdditionalInfo(marker),
+			),
+			)
 		}
 	}
-
 	return objects, subFolders, nil
 }
 
@@ -410,9 +412,9 @@ func (folder *Folder) DeleteObjects(objects []storage.Object) error {
 			Objects: []*s3.ObjectIdentifier{},
 		}}
 		for _, obj := range part {
-			name := obj.GetName()
-			version := obj.GetVersionId()
-			input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: &name, VersionId: &version})
+			input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + obj.GetName()),
+				VersionId: aws.String(obj.GetVersionId()),
+			})
 		}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
@@ -423,28 +425,6 @@ func (folder *Folder) DeleteObjects(objects []storage.Object) error {
 		}
 	}
 	return nil
-}
-
-func (folder *Folder) getObjectVersions(key string) ([]*s3.ObjectIdentifier, error) {
-	inp := &s3.ListObjectVersionsInput{
-		Bucket: folder.bucket,
-		Prefix: aws.String(folder.path + key),
-	}
-
-	out, err := folder.s3API.ListObjectVersions(inp)
-	if err != nil {
-		return nil, err
-	}
-	list := make([]*s3.ObjectIdentifier, 0)
-	for _, version := range out.Versions {
-		list = append(list, &s3.ObjectIdentifier{Key: version.Key, VersionId: version.VersionId})
-	}
-
-	for _, deleteMarker := range out.DeleteMarkers {
-		list = append(list, &s3.ObjectIdentifier{Key: deleteMarker.Key, VersionId: deleteMarker.VersionId})
-	}
-
-	return list, nil
 }
 
 func (folder *Folder) isVersioningEnabled() bool {
@@ -497,14 +477,6 @@ func (folder *Folder) SetVersioningEnabled(enable bool) {
 
 func (folder *Folder) GetVersioningEnabled() bool {
 	return folder.isVersioningEnabled()
-}
-
-func (folder *Folder) partitionToObjects(keys []string, versioningEnabled bool) []*s3.ObjectIdentifier {
-	objects := make([]*s3.ObjectIdentifier, 0, len(keys))
-	for _, key := range keys {
-		objects = append(objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + key)})
-	}
-	return objects
 }
 
 func isAwsNotExist(err error) bool {

@@ -6,6 +6,8 @@ import (
 	"io"
 	"path"
 	"strings"
+
+	"github.com/wal-g/tracelog"
 )
 
 //go:generate mockery --name Folder
@@ -226,8 +228,14 @@ type AllVersionsFolder interface {
 
 // SetShowAllVersions sets whether to show all versions including deleted objects.
 // If the folder doesn't support this feature, it's a no-op.
-func SetShowAllVersions(folder Folder, show bool) {
-	if avf, ok := folder.(AllVersionsFolder); ok {
+func SetShowAllVersions(folder Folder, show bool) bool {
+	tracelog.WarningLogger.Print("setting all versions")
+	avf, ok := folder.(AllVersionsFolder)
+	tracelog.WarningLogger.Printf("defenetely setting all versions %t", ok)
+	if ok {
+		tracelog.WarningLogger.Print("defenetely setting all versions")
 		avf.SetShowAllVersions(show)
+		return true
 	}
+	return false
 }

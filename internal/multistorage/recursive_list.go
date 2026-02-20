@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -23,10 +24,17 @@ func ListFolderRecursivelyWithFilter(
 ) (relativePathObjects []storage.Object, err error) {
 	queue := make([]storage.Folder, 0)
 	queue = append(queue, folder)
+	i := 0
 	for len(queue) > 0 {
+		i++
+		tracelog.DebugLogger.Printf("recursion step %d", i)
 		subFolder := queue[0]
 		queue = queue[1:]
 		objects, subFolders, err := subFolder.ListFolder()
+		for _, obj := range objects {
+			tracelog.DebugLogger.Printf("in recursion object %s version %s", obj.GetName(), obj.GetVersionId())
+		}
+
 		folderPrefix := strings.TrimPrefix(subFolder.GetPath(), folder.GetPath())
 		relativePathObjects = append(relativePathObjects, prependPaths(objects, folderPrefix)...)
 		if err != nil {
@@ -71,10 +79,11 @@ func prependPaths(objects []storage.Object, folderPrefix string) []storage.Objec
 	relativePathObjects := make([]storage.Object, len(objects))
 	for i, object := range objects {
 		relativePathObjects[i] = multiObject{
-			Object: storage.NewLocalObject(
-				path.Join(folderPrefix, object.GetName()),
+			Object: storage.NewLocalObjectWithVersion(path.Join(folderPrefix, object.GetName()),
 				object.GetLastModified(),
 				object.GetSize(),
+				object.GetVersionId(),
+				object.GetAdditionalInfo(),
 			),
 			storageName: GetStorage(object),
 		}

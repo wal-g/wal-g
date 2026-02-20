@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/wal-g/internal/splitmerge"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -55,7 +57,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 						return err
 					}
 					if read == 0 {
-						err = uploader.Folder().DeleteObjects([]string{dstPath})
+						err = uploader.Folder().DeleteObjects([]storage.Object{storage.NewLocalObject(dstPath, time.Time{}, 0)})
 						return err
 					}
 					idx++

@@ -7,11 +7,11 @@ import (
 var _ Object = LocalObject{}
 
 type LocalObject struct {
-	name            string
-	lastModified    time.Time
-	size            int64
-	versionId       string
-	isVersionLatest string
+	name           string
+	lastModified   time.Time
+	size           int64
+	versionId      string
+	additionalInfo string
 }
 
 func NewLocalObject(name string, lastModified time.Time, size int64) *LocalObject {
@@ -19,7 +19,7 @@ func NewLocalObject(name string, lastModified time.Time, size int64) *LocalObjec
 }
 
 func NewLocalObjectWithVersion(name string, lastModified time.Time, size int64, version string, latest string) *LocalObject {
-	return &LocalObject{name: name, lastModified: lastModified, size: size, versionId: version, isVersionLatest: latest}
+	return &LocalObject{name: name, lastModified: lastModified, size: size, versionId: version, additionalInfo: latest}
 }
 
 func (object LocalObject) GetName() string {
@@ -38,6 +38,6 @@ func (object LocalObject) GetVersionId() string {
 	return object.versionId
 }
 
-func (object LocalObject) GetIsVersionLatest() string {
-	return object.isVersionLatest
+func (object LocalObject) GetAdditionalInfo() string {
+	return object.additionalInfo
 }

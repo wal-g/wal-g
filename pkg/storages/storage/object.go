@@ -11,5 +11,5 @@ type Object interface {
 	GetLastModified() time.Time
 	GetSize() int64
 	GetVersionId() string
-	GetIsVersionLatest() string
+	GetAdditionalInfo() string
 }

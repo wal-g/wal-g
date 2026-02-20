@@ -59,7 +59,7 @@ func (ld *ListDirectory) GetVersionId() string {
 	return ""
 }
 
-func (ld *ListDirectory) GetIsVersionLatest() string {
+func (ld *ListDirectory) GetAdditionalInfo() string {
 	return ""
 }
 
@@ -105,7 +105,7 @@ func WriteObjectsList(objects []ListElement, output io.Writer) error {
 		return err
 	}
 	for _, o := range objects {
-		_, err = fmt.Fprintf(writer, "%s\t%d\t%s\t%s\t%s\t%s\n", o.Type(), o.GetSize(), o.GetLastModified(), o.GetName(), o.GetVersionId(), o.GetIsVersionLatest())
+		_, err = fmt.Fprintf(writer, "%s\t%d\t%s\t%s\t%s\t%s\n", o.Type(), o.GetSize(), o.GetLastModified(), o.GetName(), o.GetVersionId(), o.GetAdditionalInfo())
 		if err != nil {
 			return err
 		}

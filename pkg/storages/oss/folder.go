@@ -97,15 +97,15 @@ func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Fo
 	return objects, subFolders, nil
 }
 
-func (f *Folder) DeleteObjects(objectRelativePaths []string) error {
+func (f *Folder) DeleteObjects(objectRelativePaths []storage.Object) error {
 	if f.isVersioningEnabled() {
 		return fmt.Errorf("versioning is not supported for oss")
 	}
 
-	for _, part := range partitionObjectKeys(objectRelativePaths, 1000) {
+	for _, part := range partitionObjects(objectRelativePaths, 1000) {
 		var objectsToDelete []oss.DeleteObject
 		for _, key := range part {
-			fullPath := f.GetPath() + key
+			fullPath := f.GetPath() + key.GetName()
 			tracelog.DebugLogger.Println("Deleting OSS object:", fullPath)
 			objectsToDelete = append(objectsToDelete, oss.DeleteObject{Key: oss.Ptr(fullPath)})
 		}
@@ -122,14 +122,14 @@ func (f *Folder) DeleteObjects(objectRelativePaths []string) error {
 	return nil
 }
 
-func partitionObjectKeys(keys []string, size int) [][]string {
+func partitionObjects(keys []storage.Object, size int) [][]storage.Object {
 	if len(keys) == 0 {
 		return nil
 	}
 	if size <= 0 {
 		size = 1
 	}
-	var parts [][]string
+	var parts [][]storage.Object
 	for i := 0; i < len(keys); i += size {
 		end := i + size
 		if end > len(keys) {

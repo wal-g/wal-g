@@ -69,14 +69,14 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return objects, subFolders, err
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
+func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
 	client, err := folder.sftpLazy.Client()
 	if err != nil {
 		return err
 	}
 
-	for _, relativePath := range objectRelativePaths {
-		objPath := client.Join(folder.path, relativePath)
+	for _, object := range objectsWithRelativePaths {
+		objPath := client.Join(folder.path, object.GetName())
 
 		stat, err := client.Stat(objPath)
 		if errors.Is(err, os.ErrNotExist) {
