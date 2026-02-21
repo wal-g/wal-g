@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -51,7 +53,7 @@ func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 
 	for fileName, fileDescription := range filesMetaDto.Files {
 		if fileDescription.IsSkipped {
-			tracelog.DebugLogger.Printf("Skipped file %v\n", fileName)
+			slog.Debug(fmt.Sprintf("Skipped file %v\n", fileName))
 		}
 	}
 
@@ -106,6 +108,6 @@ func (backup *Backup) unwrapNew(
 		}
 	}
 
-	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
+	slog.Info("\nBackup extraction complete.\n")
 	return tarInterpreter.GetUnwrapResult(), nil
 }

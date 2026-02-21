@@ -6,12 +6,12 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	client "github.com/wal-g/wal-g/internal/databases/redis/client"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -39,7 +39,7 @@ var aofBackupPushCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		uploader, err := internal.ConfigureUploader()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
@@ -64,7 +64,7 @@ var aofBackupPushCmd = &cobra.Command{
 		}
 
 		err = redis.HandleAOFBackupPush(ctx, pushArgs)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

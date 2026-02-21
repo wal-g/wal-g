@@ -1,9 +1,10 @@
 package pgbackrest
 
 import (
+	"fmt"
+	"log/slog"
 	"sort"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -46,10 +47,10 @@ func (selector NamedBackupSelector) Select(folder storage.Folder) (internal.Back
 
 func NewBackupSelector(backupName string, stanza string) internal.BackupSelector {
 	if backupName == internal.LatestString {
-		tracelog.InfoLogger.Printf("Selecting the latest backup...\n")
+		slog.Info(fmt.Sprintf("Selecting the latest backup...\n"))
 		return LatestBackupSelector{Stanza: stanza}
 	}
 
-	tracelog.InfoLogger.Printf("Selecting the backup with name %s...\n", backupName)
+	slog.Info(fmt.Sprintf("Selecting the backup with name %s...\n", backupName))
 	return NamedBackupSelector{BackupName: backupName, Stanza: stanza}
 }

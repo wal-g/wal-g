@@ -3,7 +3,9 @@ package gcs
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"math/rand"
 	"time"
@@ -58,14 +60,14 @@ func (u *Uploader) UploadChunk(ctx context.Context, chunk chunk) error {
 
 func (u *Uploader) getUploadFunc(chunk chunk) func(context.Context) error {
 	return func(ctx context.Context) (err error) {
-		tracelog.DebugLogger.Printf("Upload %s, chunk %d\n", chunk.name, chunk.index)
+		slog.Debug(fmt.Sprintf("Upload %s, chunk %d\n", chunk.name, chunk.index))
 
 		writer := u.objHandle.NewWriter(ctx)
 		reader := bytes.NewReader(chunk.data[:chunk.size])
 
 		defer func() {
 			if closeErr := writer.Close(); closeErr != nil {
-				tracelog.WarningLogger.Printf("Unable to close object writer %s, part %d, err: %v", chunk.name, chunk.index, closeErr)
+				slog.Warn(fmt.Sprintf("Unable to close object writer %s, part %d, err: %v", chunk.name, chunk.index, closeErr))
 
 				if err == nil {
 					err = closeErr
@@ -83,7 +85,7 @@ func (u *Uploader) getUploadFunc(chunk chunk) func(context.Context) error {
 			return nil
 		}
 
-		tracelog.WarningLogger.Printf("Unable to copy an object chunk %s, part %d, err: %v", chunk.name, chunk.index, err)
+		slog.Warn(fmt.Sprintf("Unable to copy an object chunk %s, part %d, err: %v", chunk.name, chunk.index, err))
 
 		return err
 	}
@@ -110,7 +112,7 @@ func (u *Uploader) getComposeFunc(tmpChunks []*storage.ObjectHandle) func(contex
 func (u *Uploader) CleanUpChunks(ctx context.Context, tmpChunks []*storage.ObjectHandle) {
 	for _, tmpChunk := range tmpChunks {
 		if err := u.retry(ctx, u.getCleanUpChunksFunc(tmpChunk)); err != nil {
-			tracelog.WarningLogger.Printf("Unable to delete a temporary chunk %v. Err: %v", tmpChunk.BucketName(), err)
+			slog.Warn(fmt.Sprintf("Unable to delete a temporary chunk %v. Err: %v", tmpChunk.BucketName(), err))
 		}
 	}
 }
@@ -120,7 +122,7 @@ func (u *Uploader) getCleanUpChunksFunc(tmpChunk *storage.ObjectHandle) func(con
 		err := tmpChunk.Delete(ctx)
 
 		if err == storage.ErrObjectNotExist {
-			tracelog.WarningLogger.Printf("Temporary chunk %v doesn't exist", tmpChunk.BucketName())
+			slog.Warn(fmt.Sprintf("Temporary chunk %v doesn't exist", tmpChunk.BucketName()))
 			return nil
 		}
 

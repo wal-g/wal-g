@@ -3,6 +3,7 @@ package greenplum
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strconv"
 
@@ -64,7 +65,7 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName s
 	for rows.Next() {
 		var row string
 		if err := rows.Scan(&row); err != nil {
-			tracelog.WarningLogger.Printf("CreateGreenplumRestorePoint:  %v\n", err.Error())
+			slog.Warn(fmt.Sprintf("CreateGreenplumRestorePoint:  %v\n", err.Error()))
 		}
 		match := restorePointPattern.FindStringSubmatch(row)
 		if match == nil {
@@ -131,7 +132,7 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(version Version) (seg
 		var hostname string
 		var dataDir string
 		if err := rows.Scan(&dbID, &contentID, &role, &port, &hostname, &dataDir); err != nil {
-			tracelog.WarningLogger.Printf("GetGreenplumSegmentsInfo:  %v\n", err.Error())
+			slog.Warn(fmt.Sprintf("GetGreenplumSegmentsInfo:  %v\n", err.Error()))
 		}
 		segment := cluster.SegConfig{
 			DbID:      dbID,
@@ -209,7 +210,7 @@ func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bo
 		var contentID int
 		var isInBackup bool
 		if err := rows.Scan(&isInBackup, &contentID); err != nil {
-			tracelog.WarningLogger.Printf("QueryRunner IsInBackup:  %v\n", err.Error())
+			slog.Warn(fmt.Sprintf("QueryRunner IsInBackup:  %v\n", err.Error()))
 		}
 		results[contentID] = isInBackup
 	}
@@ -257,7 +258,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatab
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
-	tracelog.InfoLogger.Printf("Querying pg_class for %s", dbInfo.Name)
+	slog.Info(fmt.Sprintf("Querying pg_class for %s", dbInfo.Name))
 	getStatQuery, err := queryRunner.buildAORelPgClassQuery()
 	conn := queryRunner.Connection
 	if err != nil {
@@ -327,7 +328,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatab
 
 		err = loadStorageMetadata(relStorageMap, dbInfo, queryFunc, aoSegTableFqn, relPgClassInfo)
 		if err != nil {
-			tracelog.WarningLogger.Printf("failed to fetch the AOCS storage metadata: %v\n", err)
+			slog.Warn(fmt.Sprintf("failed to fetch the AOCS storage metadata: %v\n", err))
 		}
 	}
 
@@ -348,7 +349,7 @@ func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDa
 		var eof int64
 
 		if err := rows.Scan(&segNo, &modCount, &eof); err != nil {
-			tracelog.WarningLogger.Printf("failed to parse query result: %v\n", err.Error())
+			slog.Warn(fmt.Sprintf("failed to parse query result: %v\n", err.Error()))
 		}
 
 		cInfo := relPgClassInfo[aoSegTableFqn]

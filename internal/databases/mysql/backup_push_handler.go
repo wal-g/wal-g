@@ -2,6 +2,8 @@ package mysql
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"runtime"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -30,24 +33,24 @@ func HandleBackupPush(
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = ""
-		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname")
+		slog.Warn(fmt.Sprintf("Failed to obtain the OS hostname"))
 	}
 
 	db, err := getMySQLConnection()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 
 	version, err := getMySQLVersion(db)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	flavor, err := getMySQLFlavor(db)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	serverUUID, err := getServerUUID(db, flavor)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	gtidStart, err := getMySQLGTIDExecuted(db, flavor)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	binlogStart, err := getLastUploadedBinlogBeforeGTID(folder, gtidStart, flavor)
 	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog: %v", err)
@@ -116,19 +119,19 @@ func HandleBackupPush(
 		IncrementFullName: prevBackupInfo.fullBackupName,
 		IncrementCount:    &incrementCount,
 	}
-	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
+	slog.Info(fmt.Sprintf("Backup sentinel: %s", sentinel.String()))
 
 	err = internal.UploadSentinel(uploader, &sentinel, backupName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if !countJournals {
-		tracelog.InfoLogger.Printf("binlog counting mode is disabled: option is disabled")
+		slog.Info(fmt.Sprintf("binlog counting mode is disabled: option is disabled"))
 		return
 	}
 
 	// permanent backups can live longer than binlogs; they should not take part in binlog counting
 	if isPermanent {
-		tracelog.InfoLogger.Printf("binlog counting mode is disabled: the backup is permanent")
+		slog.Info(fmt.Sprintf("binlog counting mode is disabled: the backup is permanent"))
 		return
 	}
 
@@ -138,7 +141,7 @@ func HandleBackupPush(
 	)
 	if err != nil {
 		// there can be no backups on S3
-		tracelog.WarningLogger.Printf("can not find the last journal info: %s", err.Error())
+		slog.Warn(fmt.Sprintf("can not find the last journal info: %s", err.Error()))
 	}
 
 	journalInfo := internal.NewEmptyJournalInfo(
@@ -149,17 +152,17 @@ func HandleBackupPush(
 
 	err = journalInfo.Upload(folder)
 	if err != nil {
-		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
+		slog.Warn(fmt.Sprintf("can not upload the journal info: %s", err.Error()))
 		return
 	}
 
 	err = journalInfo.UpdateIntervalSize(folder, &internal.JournalFiles{})
 	if err != nil {
-		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
+		slog.Warn(fmt.Sprintf("can not calculate journal size: %s", err.Error()))
 		return
 	}
 
-	tracelog.InfoLogger.Printf("uploaded journal info for %s", backupName)
+	slog.Info(fmt.Sprintf("uploaded journal info for %s", backupName))
 }
 
 func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backupName string, err error) {
@@ -191,7 +194,7 @@ func handleXtrabackupBackup(
 	tracelog.ErrorLogger.FatalfOnError("failed to prepare tmp directory for diff-backup: %v", err)
 
 	enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, prevBackupInfo)
-	tracelog.InfoLogger.Printf("Command to execute: %v", strings.Join(backupCmd.Args, " "))
+	slog.Info(fmt.Sprintf("Command to execute: %v", strings.Join(backupCmd.Args, " ")))
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
@@ -206,7 +209,7 @@ func handleXtrabackupBackup(
 
 	backupInfo, err := readXtrabackupInfo(xtrabackupExtraDirectory)
 	if err != nil {
-		tracelog.WarningLogger.Printf("failed to read and parse `xtrabackup_checkpoints`: %v", err)
+		slog.Warn(fmt.Sprintf("failed to read and parse `xtrabackup_checkpoints`: %v", err))
 	}
 	backupExtInfo = XtrabackupExtInfo{
 		XtrabackupInfo: backupInfo,

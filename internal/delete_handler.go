@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"sort"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -115,51 +117,51 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
 	modifier, beforeStr := ExtractDeleteModifierFromArgs(args)
 
 	target, err := h.FindTargetBefore(beforeStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
-		tracelog.InfoLogger.Printf("No backup found for deletion")
+		slog.Info(fmt.Sprintf("No backup found for deletion"))
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target, confirmed)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
 	modifier, retentionStr := ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetain(retentionCount, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
-		tracelog.InfoLogger.Printf("No backup found for deletion")
+		slog.Info(fmt.Sprintf("No backup found for deletion"))
 		os.Exit(0)
 	}
 	err = h.DeleteBeforeTarget(target, confirmed)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 	modifier, retentionSir, afterStr := ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetainAfter(retentionCount, afterStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
-		tracelog.InfoLogger.Printf("No backup found for deletion")
+		slog.Info(fmt.Sprintf("No backup found for deletion"))
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target, confirmed)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
 	target, err := h.FindTargetBySelector(targetSelector)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
 		// since we want to delete the target backup, we should fail if
@@ -169,7 +171,7 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(target, confirmed, findFull, folderFilter)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups []string, confirmed bool) {
@@ -183,7 +185,7 @@ func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups [
 		if !forceModifier {
 			tracelog.ErrorLogger.Fatalf("Found permanent backups=%v\n", permanentBackups)
 		}
-		tracelog.InfoLogger.Printf("Found permanent backups=%v\n", permanentBackups)
+		slog.Info(fmt.Sprintf("Found permanent backups=%v\n", permanentBackups))
 	}
 	h.DeleteEverything(confirmed)
 }
@@ -355,7 +357,7 @@ func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
 	folderFilter := func(path string) bool { return true }
 	err := DeleteObjectsWhere(h.Folder, confirmed, filter, folderFilter)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
@@ -392,7 +394,7 @@ func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bo
 		// delete all dependant backups
 		backupsToDelete = h.findDependantBackups(target)
 	}
-	tracelog.DebugLogger.Printf("backupsToDelete: %v", backupsToDelete)
+	slog.Debug(fmt.Sprintf("backupsToDelete: %v", backupsToDelete))
 
 	backupNamesToDelete := make(map[string]bool)
 	for _, bTarget := range backupsToDelete {
@@ -480,10 +482,10 @@ func DeleteObjectsWhere(
 	tracelog.InfoLogger.Println("Objects in folder:")
 	for _, object := range relativePathObjects {
 		if objFilter(object) {
-			tracelog.InfoLogger.Printf("\twill be deleted: %s, from storage: %s\n", object.GetName(), multistorage.GetStorage(object))
+			slog.Info(fmt.Sprintf("\twill be deleted: %s, from storage: %s\n", object.GetName(), multistorage.GetStorage(object)))
 			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
 		} else {
-			tracelog.DebugLogger.Printf("\tskipped: %s, in storage: %s\n", object.GetName(), multistorage.GetStorage(object))
+			slog.Debug(fmt.Sprintf("\tskipped: %s, in storage: %s\n", object.GetName(), multistorage.GetStorage(object)))
 		}
 	}
 	if len(filteredRelativePaths) == 0 {
@@ -503,7 +505,7 @@ func findTarget(objects []BackupObject,
 		return compare(objects[i], objects[j])
 	})
 	for _, object := range objects {
-		tracelog.DebugLogger.Printf("processing %s\n", object.GetName())
+		slog.Debug(fmt.Sprintf("processing %s\n", object.GetName()))
 		if isTarget(object) {
 			return object, nil
 		}

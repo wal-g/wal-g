@@ -3,10 +3,10 @@ package mysql
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -28,17 +28,17 @@ var (
 			conf.RequiredSettings[conf.NameStreamCreateCmd] = true
 			conf.RequiredSettings[conf.MysqlDatasourceNameSetting] = true
 			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
 			uploader, err := internal.ConfigureSplitUploader()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			folder := uploader.Folder()
 			uploader.ChangeDirectory(utility.BaseBackupPath)
 			backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			if userData == "" {
 				userData = viper.GetString(conf.SentinelUserDataSetting)

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -135,7 +136,7 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 
 	// skip the files metadata fetch if backup was taken without it
 	if sentinel.FilesMetadataDisabled {
-		tracelog.InfoLogger.Printf("Files metadata tracking was disabled, skipping the download of %s", FilesMetadataName)
+		slog.Info(fmt.Sprintf("Files metadata tracking was disabled, skipping the download of %s", FilesMetadataName))
 		backup.FilesMetadataDto = &filesMetadata
 		return sentinel, filesMetadata, nil
 	}
@@ -211,7 +212,7 @@ func checkDBDirectoryForUnwrap(dbDataDirectory string, sentinelDto BackupSentine
 
 		for fileName, fileDescription := range filesMeta.Files {
 			if fileDescription.IsSkipped {
-				tracelog.DebugLogger.Printf("Skipped file %v\n", fileName)
+				slog.Debug(fmt.Sprintf("Skipped file %v\n", fileName))
 			}
 		}
 	}
@@ -292,7 +293,7 @@ func (backup *Backup) unwrapOld(
 		}
 	}
 
-	tracelog.InfoLogger.Print("\nBackup extraction complete.\n")
+	slog.Info("\nBackup extraction complete.\n")
 	return nil
 }
 
@@ -337,14 +338,14 @@ func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap m
 		}
 	}
 
-	tracelog.DebugLogger.Printf("Skipping archive '%s'\n", tarName)
+	slog.Debug(fmt.Sprintf("Skipping archive '%s'\n", tarName))
 	return false
 }
 
 func GetLastWalFilename(backup Backup) (string, error) {
 	meta, err := backup.FetchMeta()
 	if err != nil {
-		tracelog.InfoLogger.Print("No meta found.")
+		slog.Info("No meta found.")
 		return "", err
 	}
 	timelineID, err := ParseTimelineFromBackupName(backup.Name)
@@ -359,7 +360,7 @@ func GetLastWalFilename(backup Backup) (string, error) {
 func GetFirstWalFilename(backup Backup) (string, error) {
 	meta, err := backup.FetchMeta()
 	if err != nil {
-		tracelog.InfoLogger.Print("No meta found.")
+		slog.Info("No meta found.")
 		return "", err
 	}
 	timelineID, err := ParseTimelineFromBackupName(backup.Name)

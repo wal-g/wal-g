@@ -2,6 +2,7 @@ package exec
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -24,7 +25,7 @@ func OnAllStorages(fn func(folder storage.Folder) error) error {
 
 	atLeastOneOK := false
 	for _, st := range toRun {
-		tracelog.InfoLogger.Printf("storage %s", st.Name)
+		slog.Info(fmt.Sprintf("storage %s", st.Name))
 		err := fn(st.RootFolder())
 		tracelog.ErrorLogger.PrintOnError(err)
 		if err == nil {

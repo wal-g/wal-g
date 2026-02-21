@@ -2,23 +2,26 @@ package xbstream
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"sync"
 
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 // xbstream BackupSink will unpack archive to disk.
 // Note: files may be compressed(quicklz,lz4,zstd) / encrypted("NONE", "AES128", "AES192","AES256")
 func BackupSink(stream *Reader, output string, decompress bool) {
 	err := os.MkdirAll(output, 0777) // FIXME: permission & UMASK
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	spaceIDCollector, err := innodb.NewSpaceIDCollector(output)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	factory := fileSinkFactory{
 		dataDir:          output,
@@ -52,7 +55,7 @@ func BackupSink(stream *Reader, output string, decompress bool) {
 	}
 
 	for path := range sinks {
-		tracelog.WarningLogger.Printf("File %v wasn't clossed properly. Probably xbstream is broken", path)
+		slog.Warn(fmt.Sprintf("File %v wasn't clossed properly. Probably xbstream is broken", path))
 	}
 }
 

@@ -3,12 +3,12 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/wal-g/tracelog"
 )
 
 type RedisCtl struct {
@@ -79,7 +79,7 @@ func (rc *RedisCtl) WriteTestData(mark string, docsCount int) error {
 		rows = append(rows, fmt.Sprintf("%s_key_num%d", mark, k), data)
 	}
 	status := rc.MSet(rc.ctx, rows...)
-	tracelog.DebugLogger.Printf("WriteTestData result: %v", status)
+	slog.Debug(fmt.Sprintf("WriteTestData result: %v", status))
 	if status.Err() != nil {
 		return fmt.Errorf("failed to write test data to redis: %w", status.Err())
 	}

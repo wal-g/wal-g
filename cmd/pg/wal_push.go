@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const WalPushShortDescription = "Uploads a WAL file to storage"
@@ -19,10 +20,10 @@ var walPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 		walUploader, err := postgres.PrepareMultiStorageWalUploader(storage.RootFolder(), targetStorage)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = postgres.HandleWALPush(cmd.Context(), walUploader, args[0])
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

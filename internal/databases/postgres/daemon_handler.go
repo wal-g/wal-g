@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -18,6 +19,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/daemon"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -36,7 +38,7 @@ func newSocketWriteFailedError(socketError error) SocketWriteFailedError {
 }
 
 func (err SocketWriteFailedError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type DaemonOptions struct {
@@ -68,13 +70,13 @@ type ArchiveMessageHandler struct {
 func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
 	walFileName := string(messageBody)
 
-	tracelog.DebugLogger.Printf("wal file name: %s\n", walFileName)
+	slog.Debug(fmt.Sprintf("wal file name: %s\n", walFileName))
 
 	fullPath, err := getFullPath(path.Join("pg_wal", walFileName))
 	if err != nil {
 		return err
 	}
-	tracelog.DebugLogger.Printf("starting wal-push: %s\n", fullPath)
+	slog.Debug(fmt.Sprintf("starting wal-push: %s\n", fullPath))
 	pushTimeout, err := conf.GetDurationSetting(conf.PgDaemonWALUploadTimeout)
 	if err != nil {
 		return err
@@ -111,11 +113,11 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	if err != nil {
 		return err
 	}
-	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
+	slog.Debug(fmt.Sprintf("starting wal-fetch: %v -> %v\n", args[0], fullPath))
 
 	err = HandleWALFetch(h.reader, walFileName, fullPath, DaemonPrefetcher{})
 	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
-		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
+		slog.Warn(fmt.Sprintf("ArchiveNonExistenceError: %v\n", err.Error()))
 		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
 		if err != nil {
 			return newSocketWriteFailedError(err)
@@ -129,7 +131,7 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	if err != nil {
 		return newSocketWriteFailedError(err)
 	}
-	tracelog.DebugLogger.Printf("successfully fetched: %v -> %v\n", args[0], fullPath)
+	slog.Debug(fmt.Sprintf("successfully fetched: %v -> %v\n", args[0], fullPath))
 	return nil
 }
 
@@ -253,11 +255,11 @@ func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.St
 			return
 		}
 		if messageType == daemon.WalPushType {
-			tracelog.DebugLogger.Printf("successfully archived: %s\n", string(messageBody))
+			slog.Debug(fmt.Sprintf("successfully archived: %s\n", string(messageBody)))
 			return
 		}
 		if messageType == daemon.WalFetchType {
-			tracelog.DebugLogger.Printf("successfully fetched: %s\n", string(messageBody))
+			slog.Debug(fmt.Sprintf("successfully fetched: %s\n", string(messageBody)))
 			return
 		}
 	}
@@ -325,7 +327,7 @@ func getFullPath(relativePath string) (string, error) {
 		return "", fmt.Errorf("PGDATA is not set in the conf")
 	}
 	if strings.Contains(relativePath, PgDataSettingString) {
-		tracelog.InfoLogger.Printf("path %s already contain pgdata", relativePath)
+		slog.Info(fmt.Sprintf("path %s already contain pgdata", relativePath))
 		return relativePath, nil
 	}
 	return path.Join(PgDataSettingString, relativePath), nil

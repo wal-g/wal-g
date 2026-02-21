@@ -2,9 +2,8 @@ package cache
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
-
-	"github.com/wal-g/tracelog"
 )
 
 type Cache interface {
@@ -100,7 +99,7 @@ func (c *cache) Read(storageNames ...string) (relevant, outdated AliveMap, err e
 	if c.shFileUsed {
 		fileStatuses, err = c.shFile.read()
 		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to read storage status cache file %q: %v", c.shFile.Path, err)
+			slog.Warn(fmt.Sprintf("Failed to read storage status cache file %q: %v", c.shFile.Path, err))
 		}
 	}
 	memAndFileMerged := mergeByRelevance(c.shMem.Statuses, fileStatuses)
@@ -198,11 +197,11 @@ func (c *cache) Flush() {
 func (c *cache) flushFileFromMem() {
 	fileStatuses, err := c.shFile.read()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to read storage status cache file to merge it with memory %q: %v", c.shFile.Path, err)
+		slog.Warn(fmt.Sprintf("Failed to read storage status cache file to merge it with memory %q: %v", c.shFile.Path, err))
 	}
 	memAndFileMerged := mergeByRelevance(c.shMem.Statuses, fileStatuses)
 	err = c.shFile.write(memAndFileMerged)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to flush storage status cache file: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to flush storage status cache file: %v", err))
 	}
 }

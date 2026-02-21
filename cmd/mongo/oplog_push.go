@@ -2,6 +2,8 @@ package mongo
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 	"syscall"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/webserver"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -28,7 +31,7 @@ var oplogPushCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
-		defer func() { tracelog.ErrorLogger.FatalOnError(err) }()
+		defer func() { logging.FatalOnError(err) }()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
@@ -54,7 +57,7 @@ func init() {
 
 func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplogPushStatsArgs) error {
 	// set up storage client
-	tracelog.DebugLogger.Printf("starting oplog archiving with arguments: %+v", pushArgs)
+	slog.Debug(fmt.Sprintf("starting oplog archiving with arguments: %+v", pushArgs))
 	uplProvider, err := internal.ConfigureUploader()
 	if err != nil {
 		return err
@@ -68,7 +71,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 		return err
 	}
 
-	tracelog.DebugLogger.Printf("starting archiving stats with arguments: %+v", statsArgs)
+	slog.Debug(fmt.Sprintf("starting archiving stats with arguments: %+v", statsArgs))
 	uploadStatsUpdater, err := configureUploadStatsUpdater(ctx, models.Timestamp{}, mongoClient, statsArgs)
 	if err != nil {
 		return err
@@ -78,7 +81,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 		if !pushArgs.primaryWait {
 			return err
 		}
-		tracelog.InfoLogger.Printf("Archiving is waiting for mongodb to become a primary")
+		slog.Info(fmt.Sprintf("Archiving is waiting for mongodb to become a primary"))
 		if err = client.WaitForBecomePrimary(ctx, mongoClient, pushArgs.primaryWaitTimeout); err != nil {
 			return err
 		}
@@ -93,14 +96,14 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("Archiving storage last known timestamp is %s", since)
+	slog.Info(fmt.Sprintf("Archiving storage last known timestamp is %s", since))
 
 	// fetch cursor started from since TS or from newest TS (if since is not exists)
 	oplogCursor, since, err := discovery.BuildCursorFromTS(ctx, since, uploader, mongoClient)
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("Archiving is starting from timestamp %s", since)
+	slog.Info(fmt.Sprintf("Archiving is starting from timestamp %s", since))
 
 	/* File buffer is useful for debugging:
 	fileBatchBuffer, err := stages.NewFileBuffer("/run/wal-g-oplog-push")

@@ -3,6 +3,7 @@ package greenplum
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -105,7 +106,7 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 		"&>>", formatSegmentLogPath(contentID),
 	}
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.InfoLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
+	slog.Info(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmdLine))
 	return cmdLine
 }
 

@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -54,20 +55,20 @@ var (
 			logsDir := viper.GetString(conf.GPLogsDirectory)
 
 			segPollInterval, err := conf.GetDurationSetting(conf.GPSegmentsPollInterval)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			segPollRetries := viper.GetInt(conf.GPSegmentsPollRetries)
 
 			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			arguments := greenplum.NewBackupArguments(uploader, permanent, fullBackup, userData, prepareSegmentFwdArgs(), logsDir,
 				segPollInterval, segPollRetries, deltaBaseSelector)
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			backupHandler.HandleBackupPush()
 		},
 	}

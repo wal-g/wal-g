@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -53,7 +54,7 @@ func listMissingFiles(source, target storage.Folder, prefix string, overwrite bo
 	if err != nil {
 		return nil, fmt.Errorf("list files in the source storage: %w", err)
 	}
-	tracelog.InfoLogger.Printf("Total files in the source storage: %d", len(sourceFiles))
+	slog.Info(fmt.Sprintf("Total files in the source storage: %d", len(sourceFiles)))
 
 	missingFiles := make(map[string]storage.Object, len(sourceFiles))
 	for _, sourceFile := range sourceFiles {
@@ -70,7 +71,7 @@ func listMissingFiles(source, target storage.Folder, prefix string, overwrite bo
 			delete(missingFiles, targetFile.GetName())
 		}
 	}
-	tracelog.InfoLogger.Printf("Files missing in the target storage: %d", len(missingFiles))
+	slog.Info(fmt.Sprintf("Files missing in the target storage: %d", len(missingFiles)))
 	return missingFiles, nil
 }
 
@@ -98,6 +99,6 @@ func limitFiles(files map[string]storage.Object, size int) []FilesGroup {
 		fileGroups = append(fileGroups, singleFileGroup)
 		count++
 	}
-	tracelog.InfoLogger.Printf("Files will be transferred: %d", len(fileGroups))
+	slog.Info(fmt.Sprintf("Files will be transferred: %d", len(fileGroups)))
 	return fileGroups
 }

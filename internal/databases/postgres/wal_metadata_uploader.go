@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -131,7 +133,7 @@ func (u *WalMetadataUploader) uploadBulkMetadataFile(ctx context.Context, walFil
 	//Deleting the temporary metadata files created
 	for _, walMetadataFile := range walMetadataFiles {
 		if err = os.Remove(walMetadataFile); err != nil {
-			tracelog.InfoLogger.Printf("Unable to remove walmetadata file %s", walMetadataFile)
+			slog.Info(fmt.Sprintf("Unable to remove walmetadata file %s", walMetadataFile))
 		}
 	}
 	return errors.Wrapf(err, "Unable to upload bulk wal metadata %s", walFileName)

@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 func RepairSparse(file *os.File) error {
@@ -22,7 +23,7 @@ func RepairSparse(file *os.File) error {
 	}
 
 	pageReader, err := NewPageReader(file)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	pageNumber := 1 // Never compress/decompress the first page (FSP_HDR)
 	for {
 		page, err := pageReader.ReadRaw(PageNumber(pageNumber))
@@ -30,7 +31,7 @@ func RepairSparse(file *os.File) error {
 			return nil
 		}
 		pageNumber++
-		tracelog.ErrorLogger.FatalOnError(err) // FIXME: in future we can ignore such errors
+		logging.FatalOnError(err) // FIXME: in future we can ignore such errors
 
 		if page.Header.PageType == PageTypeCompressed {
 			// do punch hole, if possible

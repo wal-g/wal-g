@@ -3,7 +3,9 @@ package blob
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -40,7 +42,7 @@ func (drw *DebugResponseWriter) WriteHeader(s int) {
 	if err != nil {
 		tracelog.ErrorLogger.Printf("WriteHeader failed: %v", err)
 	}
-	tracelog.DebugLogger.Printf("HTTP %d\n%s\n\n", s, b)
+	slog.Debug(fmt.Sprintf("HTTP %d\n%s\n\n", s, b))
 }
 
 type SkipReader struct {

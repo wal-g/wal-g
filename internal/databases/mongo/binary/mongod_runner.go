@@ -3,6 +3,7 @@ package binary
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"os/exec"
 	"strconv"
@@ -58,12 +59,12 @@ func (mongodProcess *MongodProcess) GetURI() string {
 }
 
 func (mongodProcess *MongodProcess) Wait() error {
-	tracelog.InfoLogger.Printf("Waiting for the mongod %v to be stopped", mongodProcess.GetURI())
+	slog.Info(fmt.Sprintf("Waiting for the mongod %v to be stopped", mongodProcess.GetURI()))
 	err := mongodProcess.cmd.Wait()
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Mongod %v stopped with error %v", mongodProcess.GetURI(), err)
 	} else {
-		tracelog.InfoLogger.Printf("Mongod %v stopped successfully!", mongodProcess.GetURI())
+		slog.Info(fmt.Sprintf("Mongod %v stopped successfully!", mongodProcess.GetURI()))
 	}
 	return err
 }
@@ -99,7 +100,7 @@ func (mongodProcess *MongodProcess) start() (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	mongodProcess.cmd = exec.CommandContext(ctx, "mongod", cliArgs...)
 
-	tracelog.InfoLogger.Printf("Starting mongod by command: %v", mongodProcess.cmd)
+	slog.Info(fmt.Sprintf("Starting mongod by command: %v", mongodProcess.cmd))
 	err = mongodProcess.cmd.Start()
 	if err != nil {
 		cancel()

@@ -3,6 +3,7 @@ package greenplum
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -57,7 +58,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("unable to get metadata EOF %v", err)
 		}
-		tracelog.DebugLogger.Printf("AO/AOCS relations in db: %d", len(AOTablesSize))
+		slog.Debug(fmt.Sprintf("AO/AOCS relations in db: %d", len(AOTablesSize)))
 
 		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), db.Oid))
 		if err != nil {
@@ -79,7 +80,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 				if !ok {
 					continue
 				}
-				tracelog.DebugLogger.Printf("found file for table: %s with size: %d", metaInfo.TableName, fileInfo.Size())
+				slog.Debug(fmt.Sprintf("found file for table: %s with size: %d", metaInfo.TableName, fileInfo.Size()))
 				metaInfo.Size -= fileInfo.Size()
 				AOTablesSize[fileName] = metaInfo
 			}
@@ -113,7 +114,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
 	}
-	tracelog.DebugLogger.Printf("AO/AOCS backupped files count: %d", len(backupFilesMetadata))
+	slog.Debug(fmt.Sprintf("AO/AOCS backupped files count: %d", len(backupFilesMetadata)))
 
 	errors := make([]string, 0)
 
@@ -137,7 +138,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 			if !ok {
 				continue
 			}
-			tracelog.DebugLogger.Printf("found file : %s with size: %d", fileName, fileInfo.Size())
+			slog.Debug(fmt.Sprintf("found file : %s with size: %d", fileName, fileInfo.Size()))
 			if backupFile.EOF > fileInfo.Size() {
 				errors = append(errors, fmt.Sprintf("table file %s is shorter than backup for %d", fileName, backupFile.EOF-fileInfo.Size()))
 			}
@@ -205,7 +206,7 @@ func (checker *AOLengthCheckSegmentHandler) getTablesSizes(conn *pgx.Conn, dbOID
 			return nil, fmt.Errorf("unable to get table metadata %v", err)
 		}
 		AOTablesSize[fmt.Sprintf("/base/%d/%d", dbOID, table.FileName)] = table
-		tracelog.DebugLogger.Printf("table: %s size: %d", table.TableName, table.Size)
+		slog.Debug(fmt.Sprintf("table: %s size: %d", table.TableName, table.Size))
 	}
 	return AOTablesSize, nil
 }
@@ -233,7 +234,7 @@ func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo() ([]dbInfo, error)
 		if err = rows.Scan(&db.DBName, &db.Oid); err != nil {
 			return nil, err
 		}
-		tracelog.DebugLogger.Printf("existing database: %s oid: %d", db.DBName, db.Oid)
+		slog.Debug(fmt.Sprintf("existing database: %s oid: %d", db.DBName, db.Oid))
 		names = append(names, db)
 	}
 
@@ -276,7 +277,7 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 		return nil, err
 	}
 
-	tracelog.DebugLogger.Printf("backup %s", backup.Name)
+	slog.Debug(fmt.Sprintf("backup %s", backup.Name))
 	files := NewAOFilesMetadataDTO()
 
 	err = internal.FetchDto(backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
@@ -285,7 +286,7 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 		return nil, err
 	}
 
-	tracelog.DebugLogger.Printf("successfully loaded file metadata from backup")
+	slog.Debug(fmt.Sprintf("successfully loaded file metadata from backup"))
 
 	return files.Files, nil
 }
@@ -306,7 +307,7 @@ func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData() (map[string]i
 		fileData[file.GetName()] = file.GetSize()
 	}
 
-	tracelog.DebugLogger.Printf("successfully loaded file data from backup")
+	slog.Debug(fmt.Sprintf("successfully loaded file data from backup"))
 
 	return fileData, nil
 }

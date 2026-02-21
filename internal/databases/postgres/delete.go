@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -250,13 +252,13 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error 
 func ExtractDeleteGarbagePredicate(args []string) func(storage.Object) bool {
 	switch {
 	case len(args) == 1 && args[0] == DeleteGarbageArchivesModifier:
-		tracelog.InfoLogger.Printf("Archive-only mode selected. Will remove only outdated WAL files.")
+		slog.Info(fmt.Sprintf("Archive-only mode selected. Will remove only outdated WAL files."))
 		return storagePrefixFilter(utility.WalPath)
 	case len(args) == 1 && args[0] == DeleteGarbageBackupsModifier:
-		tracelog.InfoLogger.Printf("Backups-only mode selected. Will remove only leftover backup files.")
+		slog.Info(fmt.Sprintf("Backups-only mode selected. Will remove only leftover backup files."))
 		return storagePrefixFilter(utility.BaseBackupPath)
 	default:
-		tracelog.InfoLogger.Printf("Running in default mode. Will remove outdated WAL files and leftover backup files.")
+		slog.Info(fmt.Sprintf("Running in default mode. Will remove outdated WAL files and leftover backup files."))
 		return func(storage.Object) bool { return true }
 	}
 }

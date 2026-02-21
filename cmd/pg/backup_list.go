@@ -1,10 +1,13 @@
 package pg
 
 import (
+	"fmt"
+	"log/slog"
+
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
@@ -25,7 +28,7 @@ var (
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
 			storage, err := internal.ConfigureMultiStorage(false)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.UniteAllStorages)
 			if targetStorage == "" {
@@ -33,8 +36,8 @@ var (
 			} else {
 				rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 			}
-			tracelog.ErrorLogger.FatalOnError(err)
-			tracelog.InfoLogger.Printf("List backups from storages: %v", multistorage.UsedStorages(rootFolder))
+			logging.FatalOnError(err)
+			slog.Info(fmt.Sprintf("List backups from storages: %v", multistorage.UsedStorages(rootFolder)))
 
 			backupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
 			if detail {

@@ -1,9 +1,10 @@
 package internal
 
 import (
+	"fmt"
 	"io"
+	"log/slog"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -34,7 +35,7 @@ func PrepareMultiStorageFolderReader(folder storage.Folder, targetStorage string
 	} else {
 		folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
 	}
-	tracelog.DebugLogger.Printf("Files will be read from storages: %v", multistorage.UsedStorages(folder))
+	slog.Debug(fmt.Sprintf("Files will be read from storages: %v", multistorage.UsedStorages(folder)))
 	if err != nil {
 		return nil, err
 	}

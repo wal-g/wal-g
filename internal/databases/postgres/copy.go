@@ -1,12 +1,15 @@
 package postgres
 
 import (
+	"fmt"
+	"log/slog"
 	"path"
 	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -19,14 +22,14 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, w
 		return
 	}
 	infos, err := getCopyingInfos(backupName, from.RootFolder(), to.RootFolder(), withAllHistory)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = copy.Infos(infos)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tracelog.InfoLogger.Println("Success copy.")
 }
 
 func BackupCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
-	tracelog.InfoLogger.Print("Collecting backup files...")
+	slog.Info("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 
 	var objects, err = storage.ListFolderRecursively(from)
@@ -50,10 +53,10 @@ func getCopyingInfos(backupName string,
 	to storage.Folder,
 	withAllHistory bool) ([]copy.InfoProvider, error) {
 	if backupName == "" {
-		tracelog.InfoLogger.Printf("Copy all backups and history.")
+		slog.Info(fmt.Sprintf("Copy all backups and history."))
 		return WildcardInfo(from, to)
 	}
-	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
+	slog.Info(fmt.Sprintf("Handle backupname '%s'.", backupName))
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
 	if err != nil {
 		return nil, err
@@ -73,7 +76,7 @@ func getCopyingInfos(backupName string,
 }
 
 func HistoryCopyingInfo(backup Backup, from storage.Folder, to storage.Folder, withAllHistory bool) ([]copy.InfoProvider, error) {
-	tracelog.DebugLogger.Print("Collecting history files... ")
+	slog.Debug("Collecting history files... ")
 
 	var fromWalFolder = from.GetSubFolder(utility.WalPath)
 
@@ -87,7 +90,7 @@ func HistoryCopyingInfo(backup Backup, from storage.Folder, to storage.Folder, w
 		return make([]copy.InfoProvider, 0), err
 	}
 
-	tracelog.DebugLogger.Print("getLastWalFilename not failed!")
+	slog.Debug("getLastWalFilename not failed!")
 
 	objects, err := storage.ListFolderRecursively(fromWalFolder)
 	if err != nil {

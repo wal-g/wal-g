@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/wal-g/internal"
@@ -30,7 +31,7 @@ var cmd = &cobra.Command{
 			tracelog.WarningLogger.PrintError(err)
 		}
 		err = conf.ConfigureAndRunDefaultWebServer()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

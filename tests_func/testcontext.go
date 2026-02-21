@@ -3,6 +3,7 @@ package functests
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
@@ -100,7 +100,7 @@ func CreateTestContext(database string) (tctx *TestContext, err error) {
 	Env["DOCKER_FILE"] = "Dockerfile." + database
 	Env["COMPOSE_FILE"] = database + Env["COMPOSE_FILE_SUFFIX"]
 	Env["WALG_S3_PREFIX"] = strings.ReplaceAll(Env["WALG_S3_PREFIX"], "DBNAME", database)
-	tracelog.DebugLogger.Printf("Database name %s\nEnv: %s\n", database, Env)
+	slog.Debug(fmt.Sprintf("Database name %s\nEnv: %s\n", database, Env))
 
 	var env map[string]string
 

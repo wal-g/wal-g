@@ -2,9 +2,9 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -21,7 +21,7 @@ func init() {
 
 func configurePgbackrestSettings() (folder storage.Folder, stanza string) {
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	stanza, _ = conf.GetSetting(conf.PgBackRestStanza)
 	return st.RootFolder(), stanza
 }

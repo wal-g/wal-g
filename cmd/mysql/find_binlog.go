@@ -2,10 +2,10 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -20,11 +20,11 @@ var (
 		PreRun: func(cmd *cobra.Command, args []string) {
 			conf.RequiredSettings[conf.MysqlDatasourceNameSetting] = true
 			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			storage, err := internal.ConfigureStorage()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			mysql.HandleBinlogFind(storage.RootFolder(), findGtid)
 		},
 	}

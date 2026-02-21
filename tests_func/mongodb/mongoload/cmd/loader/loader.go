@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/internal"
 )
@@ -22,22 +22,22 @@ var Cmd = &cobra.Command{
 		ctx := context.Background()
 
 		client, err := internal.NewMongoClient(ctx, "mongodb://localhost:27018") // TODO: get from environ
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		var input io.Reader
 		input = os.Stdin
 		if ammoFile != "" {
 			file, err := os.Open(ammoFile)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			input = file
 			defer func() { _ = file.Close() }()
 		}
 
 		stat, err := mongoload.HandleLoad(ctx, input, client, 1)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = internal.PrintStat(stat, os.Stdout)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

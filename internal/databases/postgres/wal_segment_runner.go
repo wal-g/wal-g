@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -19,7 +19,7 @@ func newWalSegmentNotFoundError(segmentFileName string) WalSegmentNotFoundError 
 }
 
 func (err WalSegmentNotFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type ReachedStopSegmentError struct {
@@ -31,7 +31,7 @@ func newReachedStopSegmentError() ReachedStopSegmentError {
 }
 
 func (err ReachedStopSegmentError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type WalSegmentDescription struct {

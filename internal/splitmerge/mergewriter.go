@@ -1,7 +1,9 @@
 package splitmerge
 
 import (
+	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/wal-g/wal-g/utility"
 
@@ -38,7 +40,7 @@ func MergeWriter(sink io.WriteCloser, parts int, blockSize int) []io.WriteCloser
 			for i, ch := range channels {
 				block, ok := <-ch
 				if !ok {
-					tracelog.DebugLogger.Printf("MergeWriter. #%d closed", i)
+					slog.Debug(fmt.Sprintf("MergeWriter. #%d closed", i))
 					closed++
 					continue
 				}
@@ -46,7 +48,7 @@ func MergeWriter(sink io.WriteCloser, parts int, blockSize int) []io.WriteCloser
 				wbytes, err := sink.Write(block)
 				writeResults[i] <- writeResult{n: wbytes, err: err}
 				if wbytes != rbytes {
-					tracelog.DebugLogger.Printf("%d / %d bytes written due to %v", wbytes, rbytes, err)
+					slog.Debug(fmt.Sprintf("%d / %d bytes written due to %v", wbytes, rbytes, err))
 				}
 				if err != nil {
 					tracelog.ErrorLogger.Printf("MergeWriter error: %v", err)
@@ -61,7 +63,7 @@ func MergeWriter(sink io.WriteCloser, parts int, blockSize int) []io.WriteCloser
 			}
 
 			if closed == len(channels) {
-				tracelog.DebugLogger.Printf("MergeWriter: finished")
+				slog.Debug(fmt.Sprintf("MergeWriter: finished"))
 				err := sink.Close()
 				if err != nil {
 					tracelog.ErrorLogger.Printf("MergeWriter error on sink close: %v", err)

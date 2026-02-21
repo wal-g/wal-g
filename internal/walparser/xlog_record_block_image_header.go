@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -29,7 +29,7 @@ func NewInconsistentBlockImageHoleStateError(holeOffset uint16,
 }
 
 func (err InconsistentBlockImageHoleStateError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type InconsistentBlockImageLengthError struct {
@@ -47,7 +47,7 @@ func NewInconsistentBlockImageLengthError(hasHole bool,
 }
 
 func (err InconsistentBlockImageLengthError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type XLogRecordBlockImageHeader struct {

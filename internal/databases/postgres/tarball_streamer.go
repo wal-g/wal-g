@@ -3,7 +3,9 @@ package postgres
 import (
 	"archive/tar"
 	"bytes"
+	"fmt"
 	"io"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -105,7 +107,7 @@ func (streamer *TarballStreamer) NextInputFile() (err error) {
 		return errTarInputHeaderAlreadySet
 	}
 
-	tracelog.DebugLogger.Printf("Next file")
+	slog.Debug(fmt.Sprintf("Next file"))
 	streamer.curHeader, err = streamer.inputTar.Next()
 	if err != nil {
 		return err
@@ -122,14 +124,14 @@ func (streamer *TarballStreamer) addFile() (err error) {
 	if streamer.tarFileReadIndex+streamer.curHeader.Size > streamer.maxTarSize {
 		if streamer.tarFileReadIndex > 0 {
 			// Seems like output file is going to exceed maxTarSize. Next file.
-			tracelog.DebugLogger.Printf("Exceeding maxTarSize")
+			slog.Debug(fmt.Sprintf("Exceeding maxTarSize"))
 			return errTarStreamerOutputEOF
 		}
 		tracelog.WarningLogger.Printf("This file %s is larger than max tar size. "+
 			"It will have its own tar file, which will be larger than the selected max tar size.", streamer.curHeader.Name)
 	}
 
-	tracelog.DebugLogger.Printf("Adding file %s", streamer.curHeader.Name)
+	slog.Debug(fmt.Sprintf("Adding file %s", streamer.curHeader.Name))
 	err = streamer.outputTar.WriteHeader(streamer.curHeader)
 	if err != nil {
 		return err
@@ -233,7 +235,7 @@ func (streamer *TarballStreamer) Read(p []byte) (n int, err error) {
 	// Handle next file header if needed, read file data if needed, and write to output tar writer
 	err = streamer.pipeFileData()
 	if err == errTarStreamerOutputEOF {
-		tracelog.InfoLogger.Printf("maxTarSize exceeded. Closing this tar.")
+		slog.Info(fmt.Sprintf("maxTarSize exceeded. Closing this tar."))
 		closeErr := streamer.outputTar.Close()
 		if closeErr != nil {
 			return 0, closeErr

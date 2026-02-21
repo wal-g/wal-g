@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"sync/atomic"
 
 	"github.com/pkg/errors"
@@ -61,7 +62,7 @@ func (tarBall *StorageTarBall) CloseTar() error {
 	if err != nil {
 		return errors.Wrap(err, "CloseTar: failed to close underlying writer")
 	}
-	tracelog.InfoLogger.Printf("Finished writing part %d.\n", tarBall.partNumber)
+	slog.Info(fmt.Sprintf("Finished writing part %d.\n", tarBall.partNumber))
 	return nil
 }
 
@@ -85,7 +86,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 
 	path := GetBackupTarPath(tarBall.backupName, name)
 
-	tracelog.InfoLogger.Printf("Starting part %d ...\n", tarBall.partNumber)
+	slog.Info(fmt.Sprintf("Starting part %d ...\n", tarBall.partNumber))
 
 	go func() {
 		err := uploader.Upload(context.Background(), path, pipeReader)

@@ -2,13 +2,14 @@ package pg
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
@@ -45,10 +46,10 @@ var backupFetchCmd = &cobra.Command{
 			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		storage, err := internal.ConfigureMultiStorage(false)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.UniteAllStorages)
 		if targetStorage == "" {
@@ -56,8 +57,8 @@ var backupFetchCmd = &cobra.Command{
 		} else {
 			rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 		}
-		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.InfoLogger.Printf("Backup to fetch will be searched in storages: %v", multistorage.UsedStorages(rootFolder))
+		logging.FatalOnError(err)
+		slog.Info(fmt.Sprintf("Backup to fetch will be searched in storages: %v", multistorage.UsedStorages(rootFolder)))
 
 		if partialRestoreArgs != nil {
 			skipRedundantTars = true

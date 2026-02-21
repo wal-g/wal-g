@@ -2,8 +2,8 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres/pgbackrest"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var pgbackrestWalFetchCmd = &cobra.Command{
@@ -13,7 +13,7 @@ var pgbackrestWalFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		folder, stanza := configurePgbackrestSettings()
 		err := pgbackrest.HandleWalFetch(folder, stanza, args[0], args[1])
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

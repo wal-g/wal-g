@@ -2,7 +2,9 @@ package copy
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 
 	"github.com/wal-g/tracelog"
@@ -86,7 +88,7 @@ func (ch *InfoProvider) copyObject() error {
 	}
 	defer objReadCloser.Close()
 
-	tracelog.DebugLogger.Printf("fetched object %s reader\n", ch.SrcObj.GetName())
+	slog.Debug(fmt.Sprintf("fetched object %s reader\n", ch.SrcObj.GetName()))
 
 	uploader, err := internal.ConfigureUploaderToFolder(ch.To)
 	if err != nil {
@@ -132,7 +134,7 @@ func BuildCopyingInfos(
 				targetName:        renameFunc(object),
 				SourceTransformer: sourceTransformer,
 			})
-			tracelog.DebugLogger.Printf("add copy info %s-%s \n", object.GetName(), renameFunc(object))
+			slog.Debug(fmt.Sprintf("add copy info %s-%s \n", object.GetName(), renameFunc(object)))
 		}
 	}
 	return

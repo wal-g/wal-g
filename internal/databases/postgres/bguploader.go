@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -142,7 +143,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 	for {
 		files, err := os.ReadDir(filepath.Join(b.dir, archiveStatusDir))
 		if err != nil {
-			tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
+			slog.Error("Error of parallel upload: ", err)
 			return
 		}
 
@@ -213,7 +214,7 @@ func (b *BgUploader) upload(ctx context.Context, walStatusFilename string) bool 
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
 	err := uploadWALFile(ctx, b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite)
 	if err != nil {
-		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
+		slog.Error("Error of background uploader: ", err)
 		return false
 	}
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 )
@@ -30,7 +32,7 @@ func newNoFilesToExtractError() NoFilesToExtractError {
 }
 
 func (err NoFilesToExtractError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // UnsupportedFileTypeError is used to signal file types
@@ -44,7 +46,7 @@ func newUnsupportedFileTypeError(path string, fileFormat string) UnsupportedFile
 }
 
 func (err UnsupportedFileTypeError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // TarInterpreter behaves differently
@@ -170,7 +172,7 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 		if len(failed) > 0 {
 			tracelog.WarningLogger.Printf("%d files failed to download: %s. Going to sleep and retry downloading them.\n",
 				len(failed), readerMakersToFilePaths(failed))
-			tracelog.WarningLogger.Printf("retries left: %d", retries)
+			slog.Warn(fmt.Sprintf("retries left: %d", retries))
 			sleeper.Sleep()
 		}
 	}
@@ -192,7 +194,6 @@ func extractFile(tarInterpreter TarInterpreter, extractingReader io.Reader, file
 	case RegularFileType:
 		return extractNonTar(tarInterpreter, extractingReader, fileClosure.LocalPath(), fileClosure.FileType(), fileClosure.Mode())
 	default:
-		tracelog.InfoLogger.Print()
 		return errors.New("Unknown fileType " + string(fileClosure.FileType()))
 	}
 }
@@ -228,7 +229,7 @@ func tryExtractFiles(files []ReaderMaker,
 					defer extractingReader.Close()
 					err = extractFile(tarInterpreter, extractingReader, fileClosure)
 					err = errors.Wrapf(err, "Extraction error in %s", filePath)
-					tracelog.InfoLogger.Printf("Finished extraction of %s", filePath)
+					slog.Info(fmt.Sprintf("Finished extraction of %s", filePath))
 				}
 			}
 

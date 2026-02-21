@@ -3,6 +3,7 @@ package storagetools
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func HandleCheckWrite(folder storage.Folder) error {
 	}
 	err := folder.PutObject(filename, bytes.NewBufferString("test"))
 	if folder.DeleteObjects([]string{filename}) != nil {
-		tracelog.WarningLogger.Printf("failed to clean temp files, %s left in storage", filename)
+		slog.Warn(fmt.Sprintf("failed to clean temp files, %s left in storage", filename))
 	}
 	if err != nil {
 		return fmt.Errorf("failed to write to the storage: %v", err)

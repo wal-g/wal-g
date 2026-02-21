@@ -3,6 +3,7 @@ package binary
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -56,11 +57,11 @@ func (backupCursor *BackupCursor) StartKeepAlive() {
 		for {
 			select {
 			case <-backupContext.Done():
-				tracelog.InfoLogger.Printf("stop process with ping the backup cursor")
+				slog.Info(fmt.Sprintf("stop process with ping the backup cursor"))
 				return
 			case <-ticker.C:
 				hasNext := backupCursor.TryNext(backupContext)
-				tracelog.InfoLogger.Printf("ping the backup cursor (has next = %v", hasNext)
+				slog.Info(fmt.Sprintf("ping the backup cursor (has next = %v", hasNext))
 			}
 		}
 	}()
@@ -137,7 +138,7 @@ func (backupCursor *BackupCursor) loadMetadata() error {
 	if err != nil {
 		return errors.Wrap(err, "unable to decode metadata")
 	}
-	tracelog.DebugLogger.Printf("backup cursor metadata: %v", metadataHolder)
+	slog.Debug(fmt.Sprintf("backup cursor metadata: %v", metadataHolder))
 
 	if metadataHolder.Metadata.DBPath == "" {
 		return fmt.Errorf("invalid state: empty metadata")

@@ -2,9 +2,8 @@ package postgres
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
-
-	"github.com/wal-g/tracelog"
 )
 
 func NewPgWatcher(queryRunner *PgQueryRunner, aliveCheckInterval time.Duration) *PgAliveWatcher {
@@ -25,7 +24,7 @@ type PgAliveWatcher struct {
 func watchPgStatus(queryRunner *PgQueryRunner, ticker *time.Ticker) error {
 	for {
 		<-ticker.C
-		tracelog.DebugLogger.Printf("Checking if Postgres is still alive...")
+		slog.Debug(fmt.Sprintf("Checking if Postgres is still alive..."))
 
 		err := queryRunner.Ping()
 		if err != nil {

@@ -3,6 +3,7 @@ package mysql
 import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -66,7 +67,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 
 	var prevBackupSentinelDto = StreamSentinelDto{}
 	err = previousBackup.FetchSentinel(&prevBackupSentinelDto)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
 		incrementCount = *prevBackupSentinelDto.IncrementCount + 1
@@ -113,24 +114,24 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	}
 
 	if prevBackupSentinelDto.Hostname == "" || prevBackupSentinelDto.Hostname != hostname {
-		tracelog.InfoLogger.Printf("Previous backup was made from another host (%s vs %s). "+
+		slog.Info(fmt.Sprintf("Previous backup was made from another host (%s vs %s)). "+
 			"Fallback to full backup.", prevBackupSentinelDto.Hostname, hostname)
 		return PrevBackupInfo{}, 0, nil
 	}
 
 	if prevBackupSentinelDto.ServerUUID == "" || prevBackupSentinelDto.ServerUUID != serverUUID {
-		tracelog.InfoLogger.Printf("Server UUID has changed since last backup (%s vs %s). "+
+		slog.Info(fmt.Sprintf("Server UUID has changed since last backup (%s vs %s)). "+
 			"Fallback to full backup.", prevBackupSentinelDto.ServerUUID, serverUUID)
 		return PrevBackupInfo{}, 0, nil
 	}
 
 	if prevBackupSentinelDto.ServerVersion == "" || prevBackupSentinelDto.ServerVersion != serverVersion {
-		tracelog.InfoLogger.Printf("Server version has changed since last backup (%s vs %s). "+
+		slog.Info(fmt.Sprintf("Server version has changed since last backup (%s vs %s)). "+
 			"Fallback to full backup.", prevBackupSentinelDto.ServerVersion, serverVersion)
 		return PrevBackupInfo{}, 0, nil
 	}
 
-	tracelog.InfoLogger.Printf("Delta backup from %s with LSN %v.\n", previousBackup.Name, prevBackupSentinelDto.LSN)
+	slog.Info(fmt.Sprintf("Delta backup from %s with LSN %v.\n", previousBackup.Name, prevBackupSentinelDto.LSN))
 	prevBackupInfo = PrevBackupInfo{
 		prevBackupName,
 		prevFullBackupName,

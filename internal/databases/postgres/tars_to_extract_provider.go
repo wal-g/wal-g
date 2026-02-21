@@ -1,9 +1,9 @@
 package postgres
 
 import (
+	"fmt"
+	"log/slog"
 	"regexp"
-
-	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
 )
@@ -27,7 +27,7 @@ func (t FilesToExtractProviderImpl) Get(backup Backup, filesToUnwrap map[string]
 	if err != nil {
 		return nil, nil, err
 	}
-	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
+	slog.Debug(fmt.Sprintf("Tars to extract: '%+v'\n", tarNames))
 	concurrentTarsToExtract = make([]internal.ReaderMaker, 0, len(tarNames))
 	sequentialTarsToExtract = make([]internal.ReaderMaker, 0, 2)
 

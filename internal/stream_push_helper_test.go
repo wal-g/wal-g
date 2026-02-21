@@ -3,6 +3,8 @@ package internal_test
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -53,7 +55,7 @@ func (t *TestWriter) Write(p []byte) (n int, err error) {
 	t.mtx.Lock()
 	defer t.mtx.Unlock()
 	t.Result = append(t.Result, p...)
-	tracelog.DebugLogger.Printf("Add %d length and result lenth is %d\n", len(p), len(t.Result))
+	slog.Debug(fmt.Sprintf("Add %d length and result lenth is %d\n", len(p), len(t.Result)))
 	return len(p), nil
 }
 

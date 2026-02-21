@@ -5,19 +5,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto/yckms"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
@@ -61,7 +63,7 @@ func newUnconfiguredStorageError(storagePrefixVariants []string) UnconfiguredSto
 }
 
 func (err UnconfiguredStorageError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type UnknownCompressionMethodError struct {
@@ -75,7 +77,7 @@ func newUnknownCompressionMethodError(method string) UnknownCompressionMethodErr
 }
 
 func (err UnknownCompressionMethodError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type UnmarshallingError struct {
@@ -87,7 +89,7 @@ func newUnmarshallingError(subject string, err error) UnmarshallingError {
 }
 
 func (err UnmarshallingError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // TODO : unit tests
@@ -339,7 +341,7 @@ func configurePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	}
 
 	if keyRingID, ok := conf.GetWaleCompatibleSetting(conf.GpgKeyIDSetting); ok {
-		tracelog.WarningLogger.Print(DeprecatedExternalGpgMessage)
+		slog.Warn(DeprecatedExternalGpgMessage)
 		return openpgp.CrypterFromKeyRingID(keyRingID, loadPassphrase), nil
 	}
 	return nil, errors.New("there is no any supported gpg crypter configuration")
@@ -412,11 +414,11 @@ func UnmarshalSentinelUserData(userDataStr string) (interface{}, error) {
 func GetCommandSettingContext(ctx context.Context, variableName string, args ...string) (*exec.Cmd, error) {
 	dataStr, ok := conf.GetSetting(variableName)
 	if !ok {
-		tracelog.InfoLogger.Printf("command %s not configured", variableName)
+		slog.Info(fmt.Sprintf("command %s not configured", variableName))
 		return nil, errors.New("command not configured")
 	}
 	if len(dataStr) == 0 {
-		tracelog.ErrorLogger.Print(variableName + " expected.")
+		slog.Error(variableName + " expected.")
 		return nil, errors.New(variableName + " not configured")
 	}
 	shell := os.Getenv("SHELL")

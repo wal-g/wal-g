@@ -2,9 +2,9 @@ package etcd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/etcd"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const fetchSinceFlagShortDescr = "backup name starting from which you want to fetch wals"
@@ -17,7 +17,7 @@ var WalFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		folderReader := internal.NewFolderReader(storage.RootFolder())
 		etcd.HandleWalFetch(storage.RootFolder(), fetchBackupName, args[0], folderReader)
 	},

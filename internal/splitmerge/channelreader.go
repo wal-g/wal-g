@@ -30,7 +30,7 @@ func (cr *channelReader) Read(dst []byte) (n int, err error) {
 			cr.offset = 0
 		}
 		if !cr.ok {
-			//tracelog.InfoLogger.Printf("ChannelReader read finished [EOF]")
+			//slog.Info(fmt.Sprintf("ChannelReader read finished [EOF]"))
 			return dstOffset, io.EOF
 		}
 

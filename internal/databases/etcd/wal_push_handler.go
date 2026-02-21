@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os/user"
 	"path"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/wal-g/wal-g/utility"
 )
@@ -51,7 +53,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 
 		//write ensurance that reading leader member of cluster
 		if lastSeq < cachedSeq {
-			tracelog.WarningLogger.Printf("wal was reset (%s => %s), clearing cache",
+			slog.Warn(fmt.Sprintf("wal was reset (%s => %s)), clearing cache",
 				cache.LastArchivedWal, walFiles[0])
 			cache = LogsCache{}
 		} else {
@@ -66,11 +68,11 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	for i := fromWal; i < len(walFiles)-1; i++ {
 		wal := walFiles[i]
 
-		tracelog.DebugLogger.Printf("Testing... %v\n", wal)
+		slog.Debug(fmt.Sprintf("Testing... %v\n", wal))
 
 		// Upload wals:
 		err = archiveWal(uploader, walDir, wal)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		cache.LastArchivedWal = wal
 		putCache(cache)
@@ -82,7 +84,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 }
 
 func archiveWal(uploader internal.Uploader, dataDir string, wal string) error {
-	tracelog.InfoLogger.Printf("Archiving %v\n", wal)
+	slog.Info(fmt.Sprintf("Archiving %v\n", wal))
 
 	filename := path.Join(dataDir, wal)
 	walFile, err := os.Open(filename)

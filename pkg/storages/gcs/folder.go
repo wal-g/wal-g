@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"path"
 	"strconv"
 	"strings"
@@ -100,7 +101,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		objPath := folder.joinPath(folder.path, objectRelativePath)
 		object := folder.BuildObjectHandle(objPath)
-		tracelog.DebugLogger.Printf("Delete %v\n", objPath)
+		slog.Debug(fmt.Sprintf("Delete %v\n", objPath))
 		ctx, ctxCancel := folder.createTimeoutContext(context.Background())
 		err := object.Delete(ctx)
 		if err != nil && err != gcs.ErrObjectNotExist {
@@ -154,7 +155,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 }
 
 func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
+	slog.Debug(fmt.Sprintf("Put %v into %v\n", name, folder.path))
 	objectPath := folder.joinPath(folder.path, name)
 	object := folder.BuildObjectHandle(objectPath)
 
@@ -204,7 +205,7 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 			compositeChunkName := folder.joinPath(name+"_chunks", "composite"+strconv.Itoa(chunkNum))
 			compositeChunk := folder.BuildObjectHandle(folder.joinPath(folder.path, compositeChunkName))
 
-			tracelog.DebugLogger.Printf("Compose temporary chunks into an intermediate chunk %v\n", compositeChunkName)
+			slog.Debug(fmt.Sprintf("Compose temporary chunks into an intermediate chunk %v\n", compositeChunkName))
 
 			if err := composeChunks(ctx, NewUploader(compositeChunk, folder.config.Uploader), tmpChunks); err != nil {
 				return fmt.Errorf("compose GCS temporary chunks into an intermediate chunk: %w", err)
@@ -214,13 +215,13 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 		}
 	}
 
-	tracelog.DebugLogger.Printf("Compose file %v from chunks\n", object.ObjectName())
+	slog.Debug(fmt.Sprintf("Compose file %v from chunks\n", object.ObjectName()))
 
 	if err := composeChunks(ctx, NewUploader(object, folder.config.Uploader), tmpChunks); err != nil {
 		return fmt.Errorf("compose GCS temporary chunks into an object: %w", err)
 	}
 
-	tracelog.DebugLogger.Printf("Put %v done\n", name)
+	slog.Debug(fmt.Sprintf("Put %v done\n", name))
 
 	return nil
 }
@@ -262,7 +263,7 @@ func composeChunks(ctx context.Context, uploader *Uploader, chunks []*gcs.Object
 		return fmt.Errorf("compose object %q: %w", uploader.objHandle.ObjectName(), err)
 	}
 
-	tracelog.DebugLogger.Printf("Remove temporary chunks for %v\n", uploader.objHandle.ObjectName())
+	slog.Debug(fmt.Sprintf("Remove temporary chunks for %v\n", uploader.objHandle.ObjectName()))
 
 	uploader.CleanUpChunks(ctx, chunks)
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 
 	"github.com/wal-g/wal-g/internal"
@@ -306,7 +307,7 @@ func getSpecifiedBackupStartSegmentNo(
 		return 0, fmt.Errorf("Backup with specified name %q is incorrect", backupDetails.BackupName)
 	}
 
-	tracelog.InfoLogger.Printf("Detected correct backup with specified name: %s\n", backupDetails.BackupName)
+	slog.Info(fmt.Sprintf("Detected correct backup with specified name: %s\n", backupDetails.BackupName))
 	return backupLogSegNo, nil
 }
 

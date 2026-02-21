@@ -2,9 +2,10 @@ package postgres
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type NotWalFilenameError struct {
@@ -16,7 +17,7 @@ func newNotWalFilenameError(filename string) NotWalFilenameError {
 }
 
 func (err NotWalFilenameError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type WalPartRecorder struct {
@@ -71,6 +72,6 @@ func (recorder *WalPartRecorder) SaveNextWalHead(head []byte) error {
 }
 
 func (recorder *WalPartRecorder) cancelRecordingWithErr(err error) {
-	tracelog.WarningLogger.Printf("Stopped wal file: '%s' recording because of error: '%v'\n", recorder.walFilename, err)
+	slog.Warn(fmt.Sprintf("Stopped wal file: '%s' recording because of error: '%v'\n", recorder.walFilename, err))
 	recorder.manager.CancelRecording(recorder.walFilename)
 }

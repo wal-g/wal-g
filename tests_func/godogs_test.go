@@ -8,6 +8,7 @@ import (
 	"github.com/cucumber/godog/colors"
 	"github.com/spf13/pflag"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
@@ -57,7 +58,7 @@ func TestMain(m *testing.M) {
 
 	status, err := RunTestFeatures()
 
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	os.Exit(status)
 }
 
@@ -88,7 +89,7 @@ func RunTestFeatures() (status int, err error) {
 			TestSuiteInitializer: func(ctx *godog.TestSuiteContext) {
 				ctx.BeforeSuite(func() {
 					err := tctx.LoadEnv()
-					tracelog.ErrorLogger.FatalOnError(err)
+					logging.FatalOnError(err)
 				})
 			},
 			ScenarioInitializer: func(ctx *godog.ScenarioContext) {

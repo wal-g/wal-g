@@ -7,19 +7,20 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func HandleBackupInfo(folder storage.Folder, backupName string, output io.Writer, tag string) {
 	backupDetails, err := archive.SentinelWithExistenceCheck(folder, backupName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if tag != "" {
 		v, err := getField(folder, &backupDetails, tag)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		_, err = fmt.Fprintln(output, v)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		return
 	}
 

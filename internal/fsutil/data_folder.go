@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type NoSuchFileError struct {
@@ -17,7 +17,7 @@ func NewNoSuchFileError(filename string) NoSuchFileError {
 }
 
 func (err NoSuchFileError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type DataFolder interface {

@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -47,7 +47,7 @@ var CompletionCmd = &cobra.Command{
 			err = cmd.Root().GenZshCompletion(os.Stdout)
 		}
 
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

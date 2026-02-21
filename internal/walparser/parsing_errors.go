@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type InvalidRecordBlockIDError struct {
@@ -16,7 +16,7 @@ func NewInvalidRecordBlockIDError(blockID uint8) InvalidRecordBlockIDError {
 }
 
 func (err InvalidRecordBlockIDError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type OutOfOrderBlockIDError struct {
@@ -31,7 +31,7 @@ func NewOutOfOrderBlockIDError(actualBlockID int, expectedBlockID int) OutOfOrde
 }
 
 func (err OutOfOrderBlockIDError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type InconsistentBlockDataStateError struct {
@@ -46,7 +46,7 @@ func NewInconsistentBlockDataStateError(hasData bool, dataLength uint16) Inconsi
 }
 
 func (err InconsistentBlockDataStateError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type NoPrevRelFileNodeError struct {
@@ -58,7 +58,7 @@ func NewNoPrevRelFileNodeError() NoPrevRelFileNodeError {
 }
 
 func (err NoPrevRelFileNodeError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type ContinuationNotFoundError struct {

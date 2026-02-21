@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/cenkalti/backoff"
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
@@ -63,7 +63,7 @@ func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeou
 		},
 		repeatOptions,
 		func(err error, duration time.Duration) {
-			tracelog.InfoLogger.Printf("Unable to connect due '%+v', next retry: %v", err, duration)
+			slog.Info(fmt.Sprintf("Unable to connect due '%+v', next retry: %v", err, duration))
 		},
 	)
 	if err != nil {
@@ -107,7 +107,7 @@ func CreateBackgroundMongodService(ctx context.Context, appName, mongodbURI stri
 		},
 		repeatOptions,
 		func(err error, duration time.Duration) {
-			tracelog.InfoLogger.Printf("Unable to connect due '%+v', next retry: %v", err, duration)
+			slog.Info(fmt.Sprintf("Unable to connect due '%+v', next retry: %v", err, duration))
 		},
 	)
 	if err != nil {
@@ -179,7 +179,7 @@ func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err
 		}
 		if i < cursorCreateRetries {
 			minutes := time.Duration(i + 1)
-			tracelog.WarningLogger.Printf("%+v. Sleep %d minutes and retry", err, minutes)
+			slog.Warn(fmt.Sprintf("%+v. Sleep %d minutes and retry", err, minutes))
 			time.Sleep(time.Minute * minutes)
 		}
 	}
@@ -238,7 +238,7 @@ func (mongodService *MongodService) FixShardIdentity(shConfig ShConfig) error {
 	} else {
 		val := adminDatabase.Collection("system.version").FindOne(ctx, bson.D{{Key: "_id", Value: "shardIdentity"}})
 		if val.Err() != nil {
-			tracelog.WarningLogger.Printf("Unable to find system.version in admin database. Skipping this step, assuming oplog replay will fix this")
+			slog.Warn(fmt.Sprintf("Unable to find system.version in admin database. Skipping this step, assuming oplog replay will fix this"))
 		} else {
 			var systemShConfig bson.M
 			err := val.Decode(&systemShConfig)
@@ -256,7 +256,7 @@ func (mongodService *MongodService) FixShardIdentity(shConfig ShConfig) error {
 			if err != nil {
 				return errors.Wrap(err, "unable to update shardIdentity in system.version")
 			}
-			tracelog.InfoLogger.Printf("Successfully fixed admin.system.version document with proper shardIdentity")
+			slog.Info(fmt.Sprintf("Successfully fixed admin.system.version document with proper shardIdentity"))
 		}
 	}
 	return nil
@@ -301,7 +301,7 @@ func (mongodService *MongodService) FixMongoCfg(mongocfgConfig MongoCfgConfig) e
 			return errors.Wrap(err, fmt.Sprintf("unable to insert shard info for name '%s'", shardName))
 		}
 	}
-	tracelog.InfoLogger.Printf("Successfully updated config.shards collection")
+	slog.Info(fmt.Sprintf("Successfully updated config.shards collection"))
 
 	return nil
 }
@@ -327,7 +327,7 @@ func (mongodService *MongodService) CleanCacheAndSessions(shConfig ShConfig) err
 		if err == nil || !strings.Contains(err.Error(), "(BackgroundOperationInProgressForNamespace)") {
 			break
 		}
-		tracelog.DebugLogger.Printf("drop config.system.sessions: BackgroundOperationInProgressForNamespace, retrying")
+		slog.Debug(fmt.Sprintf("drop config.system.sessions: BackgroundOperationInProgressForNamespace, retrying"))
 		time.Sleep(time.Second * time.Duration(i+1))
 	}
 	if err != nil {
@@ -356,7 +356,7 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 		if err != nil {
 			return errors.Wrap(err, "unable to delete other documents to system.replset")
 		}
-		tracelog.DebugLogger.Printf("Removed %d documents from system.replset", deleteResult.DeletedCount)
+		slog.Debug(fmt.Sprintf("Removed %d documents from system.replset", deleteResult.DeletedCount))
 	} else {
 		updateResult, err := localDatabase.Collection("system.replset").
 			UpdateMany(ctx,
@@ -369,7 +369,7 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 			return errors.Errorf("MatchedCount = %v during update rs config in system.replset",
 				updateResult.MatchedCount)
 		}
-		tracelog.InfoLogger.Printf("Updated %d documents in system.replset", updateResult.MatchedCount)
+		slog.Info(fmt.Sprintf("Updated %d documents in system.replset", updateResult.MatchedCount))
 	}
 
 	return nil
@@ -440,7 +440,7 @@ func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, i
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to marchal data from %v", collection.Name()))
 		}
-		tracelog.InfoLogger.Printf("[%v] %v", collection.Name(), string(bytes))
+		slog.Info(fmt.Sprintf("[%v] %v", collection.Name(), string(bytes)))
 	}
 
 	if drop {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -121,7 +122,7 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backupDetails := make([]BackupDetail, 0, len(backupTimes))
 	for _, backupTime := range backupTimes {
 		backup, err := internal.NewBackup(folder, backupTime.BackupName)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		var sentinel StreamSentinelDto
 		err = backup.FetchSentinel(&sentinel)

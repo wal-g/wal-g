@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"path"
 
 	"github.com/wal-g/tracelog"
@@ -48,7 +49,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 					read := int64(0)
 					fileReader = utility.NewWithSizeReader(fileReader, &read)
 
-					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
+					slog.Debug(fmt.Sprintf("Get file reader %d of part %d\n", idx, currentPartNumber))
 					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compression().FileExtension(), currentPartNumber, idx)
 					err := uploader.PushStreamToDestination(ctx, fileReader, dstPath)
 					if err != nil {
@@ -71,7 +72,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 
 	// Wait for upload finished:
 	if err := errGroup.Wait(); err != nil {
-		tracelog.WarningLogger.Printf("Failed to upload part of backup: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to upload part of backup: %v", err))
 		return backupName, err
 	}
 

@@ -5,10 +5,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"strings"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -125,7 +125,7 @@ func (sd *StorageDownloader) DownloadOplogArchive(arch models.Archive, writeClos
 
 // ListOplogArchives fetches all oplog archives existed in storage.
 func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
-	tracelog.DebugLogger.Printf("Listing %s", sd.oplogsFolder.GetPath())
+	slog.Debug(fmt.Sprintf("Listing %s", sd.oplogsFolder.GetPath()))
 	objects, _, err := sd.oplogsFolder.ListFolder()
 	if err != nil {
 		return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
@@ -141,7 +141,7 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 		archives = append(archives, arch)
 	}
 
-	tracelog.DebugLogger.Printf("%s listed", sd.oplogsFolder.GetPath())
+	slog.Debug(fmt.Sprintf("%s listed", sd.oplogsFolder.GetPath()))
 	return archives, nil
 }
 
@@ -308,6 +308,6 @@ func (sp *StoragePurger) DeleteOplogArchives(archives []models.Archive) error {
 	for _, arch := range archives {
 		oplogKeys = append(oplogKeys, arch.Filename())
 	}
-	tracelog.DebugLogger.Printf("Oplog keys will be deleted: %+v\n", oplogKeys)
+	slog.Debug(fmt.Sprintf("Oplog keys will be deleted: %+v\n", oplogKeys))
 	return sp.oplogsFolder.DeleteObjects(oplogKeys)
 }

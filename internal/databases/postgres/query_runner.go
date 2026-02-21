@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -25,7 +27,7 @@ func NewNoPostgresVersionError() NoPostgresVersionError {
 }
 
 func (err NoPostgresVersionError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type UnsupportedPostgresVersionError struct {
@@ -37,7 +39,7 @@ func NewUnsupportedPostgresVersionError(version int) UnsupportedPostgresVersionE
 }
 
 func (err UnsupportedPostgresVersionError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // The QueryRunner interface for controlling database during backup
@@ -152,7 +154,7 @@ func NewPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 	}
 	err = r.getSystemIdentifier()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Couldn't get system identifier because of error: '%v'\n", err)
+		slog.Warn(fmt.Sprintf("Couldn't get system identifier because of error: '%v'\n", err))
 	}
 
 	return r, nil
@@ -325,7 +327,7 @@ func (queryRunner *PgQueryRunner) getStatistics(
 		var spcNode uint32
 		if err := rows.Scan(&relFileNodeID, &spcNode, &relationStat.insertedTuplesCount, &relationStat.updatedTuplesCount,
 			&relationStat.deletedTuplesCount); err != nil {
-			tracelog.WarningLogger.Printf("GetStatistics:  %v\n", err.Error())
+			slog.Warn(fmt.Sprintf("GetStatistics:  %v\n", err.Error()))
 		}
 		relFileNode := walparser.RelFileNode{DBNode: dbInfo.Oid,
 			RelNode: walparser.Oid(relFileNodeID), SpcNode: walparser.Oid(spcNode)}
@@ -379,7 +381,7 @@ func (queryRunner *PgQueryRunner) GetDatabaseInfos() ([]PgDatabaseInfo, error) {
 		var dbOid uint32
 		var dbTblSpcOid uint32
 		if err := rows.Scan(&dbOid, &dbInfo.Name, &dbTblSpcOid); err != nil {
-			tracelog.WarningLogger.Printf("GetStatistics:  %v\n", err.Error())
+			slog.Warn(fmt.Sprintf("GetStatistics:  %v\n", err.Error()))
 		}
 		dbInfo.Oid = walparser.Oid(dbOid)
 		dbInfo.TblSpcOid = walparser.Oid(dbTblSpcOid)
@@ -522,7 +524,7 @@ func (queryRunner *PgQueryRunner) executeForDatabase(function func(runner *PgQue
 	}
 	dbConn, err := Connect(databaseOption)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
+		slog.Warn(fmt.Sprintf("Failed to connect to database: %s\n'%v'\n", db.Name, err))
 		return nil
 	}
 	defer utility.LoggedCloseContext(dbConn, "")
@@ -600,7 +602,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 
 	err = queryRunner.processTables(queryRunner.Connection, getTablesQuery,
 		func(relFileNode, oid uint32, tableName, namespaceName, parentTableName string) {
-			tracelog.DebugLogger.Printf("adding %s as %d with filenode %d", tableName, oid, relFileNode)
+			slog.Debug(fmt.Sprintf("adding %s as %d with filenode %d", tableName, oid, relFileNode))
 			parent := fmt.Sprintf("%s.%s", namespaceName, parentTableName)
 			child := fmt.Sprintf("%s.%s", namespaceName, tableName)
 
@@ -657,7 +659,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 	getTablesQuery string, process func(relFileNode, oid uint32, tableName, namespaceName, parentTableName string)) error {
 	rows, err := conn.Query(context.TODO(), getTablesQuery)
 	if err != nil {
-		tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
+		slog.Warn(fmt.Sprintf("GetTables:  %v\n", err.Error()))
 		return errors.Wrap(err, "QueryRunner GetTables: Query failed")
 	}
 	defer rows.Close()
@@ -671,7 +673,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 		var relKind rune
 		var parentTableName pgtype.Text
 		if err := rows.Scan(&relFileNode, &oid, &path, &tableName, &namespaceName, &relKind, &parentTableName); err != nil {
-			tracelog.WarningLogger.Printf("GetTables:  %v\n", err.Error())
+			slog.Warn(fmt.Sprintf("GetTables:  %v\n", err.Error()))
 			continue
 		}
 
@@ -690,7 +692,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 			// This happens for:
 			// partitioned indexes, views, foreign tables
 			if path.String == "" {
-				tracelog.DebugLogger.Printf("Skipping relation '%s.%s' (relkind=%c) due to no physical storage", namespaceName, tableName, relKind)
+				slog.Debug(fmt.Sprintf("Skipping relation '%s.%s' (relkind=%c) due to no physical storage", namespaceName, tableName, relKind))
 				continue
 			}
 
@@ -701,7 +703,7 @@ func (queryRunner *PgQueryRunner) processTables(conn *pgx.Conn,
 			parts := strings.Split(path.String, "/")
 			chis, err := strconv.ParseUint(parts[len(parts)-1], 10, 32)
 			if err != nil {
-				tracelog.DebugLogger.Printf("Failed to get relfilenode for relation %s: %v\n", tableName, err)
+				slog.Debug(fmt.Sprintf("Failed to get relfilenode for relation %s: %v\n", tableName, err))
 				continue
 			}
 			relFileNode = uint32(chis)

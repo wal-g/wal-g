@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common/st"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/statistics"
 )
 
@@ -76,7 +76,7 @@ func Init(cmd *cobra.Command, dbName string) {
 
 		var err error
 		p, err = internal.Profile()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 	cmd.PersistentPostRun = func(cmd *cobra.Command, args []string) {
 		if persistentPostRun != nil {

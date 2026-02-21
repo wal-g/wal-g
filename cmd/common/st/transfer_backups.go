@@ -4,7 +4,7 @@ import (
 	"math"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/storagetools/transfer"
 )
 
@@ -32,10 +32,10 @@ var backupsCmd = &cobra.Command{
 		}
 
 		handler, err := transfer.NewHandler(transferSourceStorage, targetStorage, fileLister, cfg)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = handler.Handle()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

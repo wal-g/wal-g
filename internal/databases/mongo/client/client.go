@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/mongodb/mongo-tools/common/db"
@@ -239,7 +240,7 @@ func (mc *MongoClient) DropIndexes(ctx context.Context, dbName string, rawComman
 			// https://www.mongodb.com/docs/manual/reference/command/dropIndexes/#behavior
 
 			// We just ignore these error and continue a replay
-			tracelog.WarningLogger.Printf("Unable to drop index, skipped. Error is: %+v\n", err)
+			slog.Warn(fmt.Sprintf("Unable to drop index, skipped. Error is: %+v\n", err))
 			return nil
 		}
 
@@ -460,7 +461,7 @@ func WaitForBecomePrimary(ctx context.Context, mc *MongoClient, checkTimeout tim
 			if err == nil {
 				return nil
 			}
-			tracelog.InfoLogger.Printf("Waiting: %v", err)
+			slog.Info(fmt.Sprintf("Waiting: %v", err))
 			utility.ResetTimer(reconnect, checkTimeout)
 		case <-ctx.Done():
 			return ctx.Err()

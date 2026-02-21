@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,7 +34,7 @@ func CreateLocalStorage(mongodDBPath string) *LocalStorage {
 func (localStorage *LocalStorage) EnsureMongodFsLockFileIsEmpty() error {
 	mongoFsLockFilePath := path.Join(localStorage.MongodDBPath, mongoFsLock)
 
-	tracelog.InfoLogger.Printf("Check mongod has been shutdown (file '%v' should be empty)", mongoFsLockFilePath)
+	slog.Info(fmt.Sprintf("Check mongod has been shutdown (file '%v' should be empty)", mongoFsLockFilePath))
 
 	lockFileStat, err := os.Stat(mongoFsLockFilePath)
 	if err != nil {
@@ -52,7 +53,7 @@ func (localStorage *LocalStorage) EnsureMongodFsLockFileIsEmpty() error {
 }
 
 func (localStorage *LocalStorage) CleanupMongodDBPath() error {
-	tracelog.InfoLogger.Printf("Cleanup data in dbPath '%v'", localStorage.MongodDBPath)
+	slog.Info(fmt.Sprintf("Cleanup data in dbPath '%v'", localStorage.MongodDBPath))
 
 	openedDBPath, err := os.Open(localStorage.MongodDBPath)
 	if err != nil {
@@ -65,13 +66,13 @@ func (localStorage *LocalStorage) CleanupMongodDBPath() error {
 		return errors.Wrap(err, "read file names")
 	}
 	if len(names) == 0 {
-		tracelog.WarningLogger.Printf("dbPath '%v' is empty already", localStorage.MongodDBPath)
+		slog.Warn(fmt.Sprintf("dbPath '%v' is empty already", localStorage.MongodDBPath))
 		return nil
 	}
 	for _, name := range names {
 		fullPath := filepath.Join(localStorage.MongodDBPath, name)
 		if localStorage.whitelist != nil && localStorage.whitelist.MatchString(name) {
-			tracelog.InfoLogger.Printf("skip remove %s", fullPath)
+			slog.Info(fmt.Sprintf("skip remove %s", fullPath))
 			continue
 		}
 
@@ -79,7 +80,7 @@ func (localStorage *LocalStorage) CleanupMongodDBPath() error {
 		if err != nil {
 			return errors.Wrapf(err, "unable to remove '%s' in '%s'", name, localStorage.MongodDBPath)
 		}
-		tracelog.InfoLogger.Printf("remove %s", filepath.Join(localStorage.MongodDBPath, name))
+		slog.Info(fmt.Sprintf("remove %s", filepath.Join(localStorage.MongodDBPath, name)))
 	}
 	return nil
 }
@@ -121,7 +122,7 @@ func CreateWhiteList() *regexp.Regexp {
 }
 
 func (localStorage *LocalStorage) CleanUpExcessFilesOnPartiallyBackup(filter map[string]struct{}) error {
-	tracelog.InfoLogger.Printf("Cleanup excess files after partially backup in dbPath '%v'", localStorage.MongodDBPath)
+	slog.Info(fmt.Sprintf("Cleanup excess files after partially backup in dbPath '%v'", localStorage.MongodDBPath))
 
 	openedDBPath, err := os.Open(localStorage.MongodDBPath)
 	if err != nil {
@@ -146,7 +147,7 @@ func (localStorage *LocalStorage) CleanUpExcessFilesOnPartiallyBackup(filter map
 			if err != nil {
 				return errors.Wrapf(err, "unable to remove '%s'", abs)
 			}
-			tracelog.InfoLogger.Printf("remove %s", abs)
+			slog.Info(fmt.Sprintf("remove %s", abs))
 		}
 		return nil
 	})

@@ -2,6 +2,7 @@ package etcd
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 	"path/filepath"
 	"sort"
@@ -40,7 +41,7 @@ func HandleWalFetch(folder storage.Folder, backupName string, dstDir string, bas
 		if lastBackupSentinel.StartLocalTime.Before(walFile.GetLastModified()) {
 			walName := strings.TrimSuffix(walFile.GetName(), filepath.Ext(walFile.GetName()))
 			walPath := path.Join(dstDir, walName)
-			tracelog.InfoLogger.Printf("fetching %s into %s", walName, walPath)
+			slog.Info(fmt.Sprintf("fetching %s into %s", walName, walPath))
 			err = internal.DownloadFileTo(reader, walName, walPath)
 			tracelog.ErrorLogger.FatalfOnError("Failed to download wal file: %v", err)
 		}

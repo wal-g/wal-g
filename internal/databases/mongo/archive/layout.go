@@ -2,6 +2,7 @@ package archive
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/pkg/errors"
@@ -135,10 +136,10 @@ func SplitPurgingOplogArchivesByTS(archives []models.Archive, purgeBeforeTS mode
 	purge := make([]models.Archive, 0)
 	for _, arch := range archives {
 		if models.LessTS(arch.End, purgeBeforeTS) {
-			tracelog.DebugLogger.Printf("Purging oplog archive: %s", arch.Filename())
+			slog.Debug(fmt.Sprintf("Purging oplog archive: %s", arch.Filename()))
 			purge = append(purge, arch)
 		} else {
-			tracelog.DebugLogger.Printf("Keeping oplog archive: %s", arch.Filename())
+			slog.Debug(fmt.Sprintf("Keeping oplog archive: %s", arch.Filename()))
 		}
 	}
 	return purge

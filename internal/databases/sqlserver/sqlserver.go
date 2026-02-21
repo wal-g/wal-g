@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"math/big"
 	"net/url"
@@ -22,6 +23,7 @@ import (
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -309,7 +311,7 @@ func getDatabaseBackupPath(backupName, dbname string) string {
 func getDatabaseBackupURL(backupName, dbname string) string {
 	hostname, err := conf.GetRequiredSetting(conf.SQLServerBlobHostname)
 	if err != nil {
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 	backupName = url.QueryEscape(backupName)
 	dbname = url.QueryEscape(dbname)
@@ -327,7 +329,7 @@ func getLogBackupPath(logBackupName, dbname string) string {
 func getLogBackupURL(logBackupName, dbname string) string {
 	hostname, err := conf.GetRequiredSetting(conf.SQLServerBlobHostname)
 	if err != nil {
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 	logBackupName = url.QueryEscape(logBackupName)
 	dbname = url.QueryEscape(dbname)
@@ -432,8 +434,8 @@ func runParallel(f func(int) error, cnt int, concurrency int) error {
 func getDBConcurrency() int {
 	concurrency, err := conf.GetMaxConcurrency(conf.SQLServerDBConcurrency)
 	if err != nil {
-		tracelog.WarningLogger.Printf("config error: %v", err)
-		tracelog.WarningLogger.Printf("using default db concurrency: %d", blob.DefaultConcurrency)
+		slog.Warn(fmt.Sprintf("config error: %v", err))
+		slog.Warn(fmt.Sprintf("using default db concurrency: %d", blob.DefaultConcurrency))
 		return blob.DefaultConcurrency
 	}
 	return concurrency

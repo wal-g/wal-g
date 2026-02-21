@@ -2,7 +2,9 @@ package utility
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -89,7 +91,7 @@ func IsDirectoryEmpty(directoryPath string, whitelistRegexp *regexp.Regexp) (boo
 		relativePath, _ := filepath.Rel(directoryPath, path)
 		if path != directoryPath && (whitelistRegexp == nil || !whitelistRegexp.MatchString(relativePath)) {
 			isEmpty = false
-			tracelog.InfoLogger.Printf("found file '%s' in directory: '%s'\n", path, directoryPath)
+			slog.Info(fmt.Sprintf("found file '%s' in directory: '%s'\n", path, directoryPath))
 		}
 		return nil
 	}

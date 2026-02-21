@@ -66,12 +66,12 @@ func (u *AoStorageUploader) AddFile(cfi *internal.ComposeFileInfo, aoMeta AoRelF
 func (u *AoStorageUploader) addFile(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
 	remoteFile, ok := u.baseAoFiles[cfi.Header.Name]
 	if !ok {
-		tracelog.DebugLogger.Printf("%s: no base file in storage, will perform a regular upload", cfi.Header.Name)
+		slog.Debug(fmt.Sprintf("%s: no base file in storage, will perform a regular upload", cfi.Header.Name))
 		return u.regularAoUpload(cfi, aoMeta, location)
 	}
 
 	if remoteFile.InitialUploadTS.Before(u.deduplicationMinAge) {
-		tracelog.DebugLogger.Printf("%s: deduplication age limit passed (initial upload time: %s), will perform a regular upload",
+		slog.Debug(fmt.Sprintf("%s: deduplication age limit passed (initial upload time: %s)), will perform a regular upload",
 			cfi.Header.Name, remoteFile.InitialUploadTS)
 		return u.regularAoUpload(cfi, aoMeta, location)
 	}
@@ -140,14 +140,14 @@ func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta A
 	initialUploadTS time.Time, isIncremented bool) error {
 	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, isIncremented, initialUploadTS)
 	u.bundleFiles.AddSkippedFile(cfi.Header, cfi.FileInfo)
-	tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey)
+	slog.Debug(fmt.Sprintf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey))
 	return nil
 }
 
 func (u *AoStorageUploader) regularAoUpload(
 	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
 	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location, u.newAoSegFilesID)
-	tracelog.DebugLogger.Printf("Uploading %s AO relfile to %s", cfi.Path, storageKey)
+	slog.Debug(fmt.Sprintf("Uploading %s AO relfile to %s", cfi.Path, storageKey))
 	fileReadCloser, err := internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
 		return err
@@ -175,7 +175,7 @@ func (u *AoStorageUploader) incrementalAoUpload(
 	baseFileStorageKey string,
 	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, baseFileEOF int64, initialUploadTS time.Time) error {
 	storageKey := makeDeltaAoFileStorageKey(baseFileStorageKey, aoMeta.modCount)
-	tracelog.DebugLogger.Printf("Uploading %s AO relfile delta to %s", cfi.Path, storageKey)
+	slog.Debug(fmt.Sprintf("Uploading %s AO relfile delta to %s", cfi.Path, storageKey))
 
 	file, err := internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {

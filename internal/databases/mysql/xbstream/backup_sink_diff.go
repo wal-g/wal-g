@@ -2,13 +2,16 @@ package xbstream
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"sync"
 
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 // DiffBackupSink doesn't try to replicate sophisticated xtrabackup logic
@@ -18,10 +21,10 @@ import (
 // * let xtrabackup do its job
 func DiffBackupSink(stream *Reader, dataDir string, incrementalDir string) {
 	err := os.MkdirAll(dataDir, 0777) // FIXME: permission & UMASK
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	spaceIDCollector, err := innodb.NewSpaceIDCollector(dataDir)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	factory := fileSinkFactory{
 		dataDir:          dataDir,
@@ -55,7 +58,7 @@ func DiffBackupSink(stream *Reader, dataDir string, incrementalDir string) {
 	}
 
 	for path := range sinks {
-		tracelog.WarningLogger.Printf("File %v wasn't clossed properly. Probably xbstream is broken", path)
+		slog.Warn(fmt.Sprintf("File %v wasn't clossed properly. Probably xbstream is broken", path))
 	}
 }
 

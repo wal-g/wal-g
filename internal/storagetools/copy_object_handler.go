@@ -1,12 +1,14 @@
 package storagetools
 
 import (
+	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -52,7 +54,7 @@ func collectCopyingInfo(
 	toConfigFile string,
 	decryptSource bool,
 	encryptTarget bool) ([]copy.InfoProvider, error) {
-	tracelog.InfoLogger.Printf("Collecting files with prefix %s.", prefix)
+	slog.Info(fmt.Sprintf("Collecting files with prefix %s.", prefix))
 	from, err := internal.StorageFromConfig(fromConfigFile)
 	if err != nil {
 		return nil, err
@@ -103,19 +105,19 @@ func HandleCopyObjects(
 	decryptSource, encryptTarget bool) {
 	infos, err := collectCopyingInfo(prefix, fromConfigFile, toConfigFile, decryptSource,
 		encryptTarget)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	// TODO: truncate this log line, because it may grow really big?
-	tracelog.DebugLogger.Printf("copying files %s\n", strings.Join(func() []string {
+	slog.Debug(fmt.Sprintf("copying files %s\n", strings.Join(func() []string {
 		ret := make([]string, 0)
 		for _, e := range infos {
 			ret = append(ret, e.SrcObj.GetName())
 		}
 
 		return ret
-	}(), ","))
+	}(), ",")))
 
-	tracelog.ErrorLogger.FatalOnError(copy.Infos(infos))
+	logging.FatalOnError(copy.Infos(infos))
 
-	tracelog.InfoLogger.Printf("Successfully copied %d objects", len(infos))
+	slog.Info(fmt.Sprintf("Successfully copied %d objects", len(infos)))
 }

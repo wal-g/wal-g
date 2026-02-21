@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"strings"
@@ -99,7 +100,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 }
 
 func (folder *Folder) PutObject(name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subPath)
+	slog.Debug(fmt.Sprintf("Put %v into %v\n", name, folder.subPath))
 	filePath := folder.GetFilePath(name)
 	file, err := OpenFileWithDir(filePath)
 	if err != nil {

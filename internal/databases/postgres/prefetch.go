@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	pg_errors "github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -69,7 +71,7 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 
 	useWalDelta, deltaDataFolder, err := configureWalDeltaUsage()
 	if err != nil || !useWalDelta {
-		tracelog.DebugLogger.Printf("configure WAL Delta usage: %v", err)
+		slog.Debug(fmt.Sprintf("configure WAL Delta usage: %v", err))
 		return
 	}
 
@@ -93,9 +95,9 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 	}
 	tracelog.InfoLogger.Println("Walking for prefault...")
 	err = filepath.Walk(archiveDirectory, bundle.prefaultWalkedFSObject)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = bundle.FinishQueue()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 // TODO : unit tests
@@ -213,12 +215,12 @@ func prefetchFile(location string, reader internal.StorageFolderReader, walFileN
 		tracelog.ErrorLogger.Printf("WAL-prefetch %s, make dirs: %v", walFileName, err)
 	}
 
-	tracelog.DebugLogger.Printf("File prefetched to %s", oldPath)
+	slog.Debug(fmt.Sprintf("File prefetched to %s", oldPath))
 	err = internal.DownloadFileTo(reader, walFileName, oldPath)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("WAL-prefetch %s, download: %v", walFileName, err)
 	} else {
-		tracelog.DebugLogger.Printf("WAL-prefetch %s, download OK", walFileName)
+		slog.Debug(fmt.Sprintf("WAL-prefetch %s, download OK", walFileName))
 	}
 
 	_, errO = os.Stat(oldPath)

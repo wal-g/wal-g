@@ -1,6 +1,9 @@
 package internal
 
 import (
+	"fmt"
+	"log/slog"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -23,11 +26,11 @@ func NewBackupMarkHandler(metaInteractor GenericMetaInteractor, storageRootFolde
 
 // MarkBackup marks a backup as permanent or impermanent
 func (h *BackupMarkHandler) MarkBackup(backupName string, toPermanent bool) {
-	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
+	slog.Info(fmt.Sprintf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent))
 	backupsToMark, err := h.GetBackupsToMark(backupName, toPermanent)
 
 	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
-	tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", backupsToMark)
+	slog.Info(fmt.Sprintf("Retrieved backups to be marked, marking: %v", backupsToMark))
 	for _, backupName := range backupsToMark {
 		err = h.metaInteractor.SetIsPermanent(backupName, h.baseBackupFolder, toPermanent)
 		tracelog.ErrorLogger.FatalfOnError("Failed to mark backups: %v", err)
@@ -53,7 +56,7 @@ func (h *BackupMarkHandler) GetBackupsToMark(backupName string, toPermanent bool
 		if !meta.IsPermanent {
 			permanentType = "impermanent"
 		}
-		tracelog.WarningLogger.Printf("Backup %s is already marked as %s, ignoring...", backupName, permanentType)
+		slog.Warn(fmt.Sprintf("Backup %s is already marked as %s, ignoring...", backupName, permanentType))
 	}
 
 	if toPermanent {

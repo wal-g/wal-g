@@ -1,11 +1,14 @@
 package internal
 
 import (
+	"fmt"
+	"log/slog"
 	"path/filepath"
 	"sync/atomic"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -47,28 +50,28 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
 	err := bundle.StartQueue(NewStorageTarBallMaker(u.backupName, u.uploader))
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = bundle.SetupComposer(u.tarBallComposerMaker)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(path, bundle.AddToBundle)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Packing ...")
 	tarFileSets, err := bundle.FinishComposing()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Finishing queue ...")
 	err = bundle.FinishQueue()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	uncompressedSize := atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
 	compressedSize, err := u.uploader.UploadedDataSize()
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Printf("Uncompressed size: %d", uncompressedSize)
-	tracelog.DebugLogger.Printf("Compressed size: %d", compressedSize)
+	logging.FatalOnError(err)
+	slog.Debug(fmt.Sprintf("Uncompressed size: %d", uncompressedSize))
+	slog.Debug(fmt.Sprintf("Compressed size: %d", compressedSize))
 
 	// Wait for all uploads to finish.
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")

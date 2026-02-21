@@ -4,8 +4,8 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -19,7 +19,7 @@ var catchupReceiveCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		port, err := strconv.Atoi(args[1])
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		postgres.HandleCatchupReceive(args[0], port)
 	},
 	Annotations: map[string]string{"NoStorage": ""},

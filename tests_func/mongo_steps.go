@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
@@ -177,7 +178,7 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 	if err != nil {
 		return err
 	}
-	tracelog.DebugLogger.Printf("load stat: %+v", currentStat)
+	slog.Debug(fmt.Sprintf("load stat: %+v", currentStat))
 
 	if err := currentStat.GetError(); err != nil {
 		return err
@@ -202,7 +203,7 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 		if helpers.LessTS(tsMaj, tsLast) {
 			return fmt.Errorf("last maj (%v) < last ts (%v)", tsLast, tsMaj)
 		}
-		tracelog.DebugLogger.Printf("last ts (%v) == last maj (%v)\n", tsLast, tsMaj)
+		slog.Debug(fmt.Sprintf("last ts (%v) == last maj (%v)\n", tsLast, tsMaj))
 
 		return nil
 	})
@@ -376,11 +377,11 @@ func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container st
 	}
 	from := backupMeta.MongoMeta.GetBackupLastTS()
 	until := tctx.AuxData.Timestamps[timestampId]
-	tracelog.DebugLogger.Printf("Saved timestamps:\nbackup #%d majTs: %v\n%s: %v\n", backupId, from, timestampId, until)
+	slog.Debug(fmt.Sprintf("Saved timestamps:\nbackup #%d majTs: %v\n%s: %v\n", backupId, from, timestampId, until))
 	until.Inc++
 
 	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
-	tracelog.DebugLogger.Printf("Waiting until ts %v appears in storage", until)
+	slog.Debug(fmt.Sprintf("Waiting until ts %v appears in storage", until))
 
 	err = helpers.Retry(tctx.Context, 30, func() error {
 		exists, err := s3.ArchTsExists(until)
@@ -401,7 +402,7 @@ func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container st
 		withPartial = "with partial"
 	}
 
-	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v %v", from, until, withPartial)
+	slog.Debug(fmt.Sprintf("Starting oplog replay from %v until %v %v", from, until, withPartial))
 	return walg.OplogReplay(from.String(), until.String(), partial, false, "")
 }
 

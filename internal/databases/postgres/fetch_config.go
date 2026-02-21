@@ -1,6 +1,9 @@
 package postgres
 
 import (
+	"fmt"
+	"log/slog"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -40,7 +43,7 @@ func (fc *FetchConfig) SkipRedundantFiles(unwrapResult *UnwrapResult) {
 
 func (fc *FetchConfig) excludeCompletedFile(filePath string) {
 	delete(fc.filesToUnwrap, filePath)
-	tracelog.DebugLogger.Printf("Excluded file %s\n", filePath)
+	slog.Debug(fmt.Sprintf("Excluded file %s\n", filePath))
 }
 
 func (fc *FetchConfig) processCreatedPageFiles(createdPageFiles map[string]int64) {

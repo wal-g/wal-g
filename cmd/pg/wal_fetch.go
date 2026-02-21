@@ -1,6 +1,7 @@
 package pg
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -8,6 +9,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/constants"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const WalFetchShortDescription = "Fetches a WAL file from storage"
@@ -22,14 +24,14 @@ var walFetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 		folderReader, err := internal.PrepareMultiStorageFolderReader(storage.RootFolder(), targetStorage)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = postgres.HandleWALFetch(folderReader, args[0], args[1], postgres.RegularPrefetcher{})
 		if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
-			tracelog.ErrorLogger.Print(err.Error())
+			slog.Error(err.Error())
 			os.Exit(constants.ExIoError)
 		}
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

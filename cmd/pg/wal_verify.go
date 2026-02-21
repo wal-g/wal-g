@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -47,7 +48,7 @@ var (
 		Args:  checkArgs,
 		Run: func(cmd *cobra.Command, checks []string) {
 			storage, err := internal.ConfigureStorage()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			outputType := postgres.WalVerifyTableOutput
 			if useJSONOutput {
 				outputType = postgres.WalVerifyJSONOutput
@@ -71,7 +72,7 @@ func getWalSegmentDescription(cmd *cobra.Command, lsnStr string, timeline uint32
 		return postgres.QueryCurrentWalSegment()
 	}
 	lsn, err := postgres.ParseLSN(lsnStr)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	return postgres.WalSegmentDescription{
 		Timeline: timeline,
 		Number:   postgres.NewWalSegmentNo(lsn - 1),

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"os/exec"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -22,7 +24,7 @@ func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
 }
 
 func (err BackupNonExistenceError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // GetBackupToCommandFetcher returns function that copies all bytes from backup to cmd's stdin
@@ -60,7 +62,7 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch backup: %v", err)
 	}
-	tracelog.DebugLogger.Printf("Running command: %s", cmd.Args)
+	slog.Debug(fmt.Sprintf("Running command: %s", cmd.Args))
 	err = cmd.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start command: %v", err)
@@ -86,7 +88,7 @@ type Fetcher func(rootFolder storage.Folder, backup Backup)
 func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher Fetcher) {
 	backup, err := targetBackupSelector.Select(folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to select backup: %v\n", err)
-	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backup.Name)
+	slog.Debug(fmt.Sprintf("HandleBackupFetch(%s)\n", backup.Name))
 
 	fetcher(folder, backup)
 }

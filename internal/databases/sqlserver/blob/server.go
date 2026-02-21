@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"runtime/debug"
@@ -108,7 +109,7 @@ func NewServer(folder storage.Folder) (*Server, error) {
 		bs.encryption = bs.crypter.Name()
 	}
 	c, err := lru.NewWithEvict(BlockReadCacheSize, func(k, _ interface{}) {
-		tracelog.DebugLogger.Printf("EVICT_CACHE: %s", k)
+		slog.Debug(fmt.Sprintf("EVICT_CACHE: %s", k))
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lru cache: %v", err)
@@ -127,7 +128,7 @@ func NewServer(folder storage.Folder) (*Server, error) {
 func (bs *Server) Run(ctx context.Context) error {
 	errs := make(chan error)
 	go func() {
-		tracelog.InfoLogger.Printf("running proxy at %s", bs.endpoint)
+		slog.Info(fmt.Sprintf("running proxy at %s", bs.endpoint))
 		errs <- bs.server.ListenAndServeTLS(bs.certFile, bs.keyFile)
 	}()
 	select {
@@ -171,7 +172,7 @@ func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
 }
 
 func (bs *Server) Shutdown() error {
-	tracelog.InfoLogger.Printf("stopping proxy")
+	slog.Info(fmt.Sprintf("stopping proxy"))
 	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	err := bs.server.Shutdown(sctx)
@@ -223,7 +224,7 @@ func (bs *Server) ServeHTTP2(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set(ReqIDHeader, req.Header.Get(ReqIDHeader))
 	w.Header().Set("Accept-Ranges", "bytes")
 	if err := req.ParseForm(); err != nil {
-		tracelog.WarningLogger.Printf("blob proxy: failed to parse form: %v", err)
+		slog.Warn(fmt.Sprintf("blob proxy: failed to parse form: %v", err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -485,7 +486,7 @@ func (bs *Server) HandleBlockListPut(w http.ResponseWriter, req *http.Request) {
 	}
 	garbage, err := idx.PutBlockList(xblocklist)
 	if err != nil {
-		tracelog.ErrorLogger.Print(err)
+		slog.Error(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -753,7 +754,7 @@ func (bs *Server) deleteGarbage(folder storage.Folder, garbage []string) {
 	}
 	err := folder.DeleteObjects(garbage)
 	if err != nil {
-		tracelog.WarningLogger.Printf("proxy: failed to delete garbage objects: %v", err)
+		slog.Warn(fmt.Sprintf("proxy: failed to delete garbage objects: %v", err))
 	}
 }
 
@@ -808,7 +809,7 @@ func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) 
 	folder := idx.folder
 	key := folder.GetPath() + s.Path
 	if s.BlockSize > MaxCacheBlockSize {
-		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		slog.Debug(fmt.Sprintf("READ_OBJ: %s %d", key, s.BlockSize))
 		r, err := folder.ReadObject(s.Path)
 		if err != nil {
 			return nil, err
@@ -817,10 +818,10 @@ func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) 
 	}
 	var buf []byte
 	if b, ok := bs.readCache.Get(key); ok {
-		tracelog.DebugLogger.Printf("READ_CACHE: %s %d", key, s.BlockSize)
+		slog.Debug(fmt.Sprintf("READ_CACHE: %s %d", key, s.BlockSize))
 		buf = b.([]byte)
 	} else {
-		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
+		slog.Debug(fmt.Sprintf("READ_OBJ: %s %d", key, s.BlockSize))
 		r, err := folder.ReadObject(s.Path)
 		if err != nil {
 			return nil, err
@@ -836,7 +837,7 @@ func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) 
 		if err != nil {
 			return nil, err
 		}
-		tracelog.DebugLogger.Printf("ADD_CACHE: %s %d", key, s.BlockSize)
+		slog.Debug(fmt.Sprintf("ADD_CACHE: %s %d", key, s.BlockSize))
 		bs.readCache.Add(key, buf)
 	}
 	return io.NopCloser(bytes.NewReader(buf)), nil

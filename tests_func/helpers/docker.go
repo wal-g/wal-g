@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
@@ -104,7 +106,7 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 	defer attach.Close()
 
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.DebugLogger.Printf("Running command on %s: %v", container, cmdLine)
+	slog.Debug(fmt.Sprintf("Running command on %s: %v", container, cmdLine))
 
 	var outBuf, errBuf bytes.Buffer
 	outputDone := make(chan error)
@@ -213,7 +215,7 @@ func CreateNet(ctx context.Context, netName string) error {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
 	if len(networkList) != 0 {
-		tracelog.DebugLogger.Printf("Found networks: %+v", networkList)
+		slog.Debug(fmt.Sprintf("Found networks: %+v", networkList))
 		return nil
 	}
 	ipam := &networktypes.IPAM{
@@ -232,7 +234,7 @@ func CreateNet(ctx context.Context, netName string) error {
 	if err != nil {
 		return fmt.Errorf("error in creating network: %v", err)
 	}
-	tracelog.DebugLogger.Printf("Network %v has been created", netName)
+	slog.Debug(fmt.Sprintf("Network %v has been created", netName))
 	return nil
 }
 
@@ -249,11 +251,11 @@ func BuildImage(ctx context.Context, tag string, path string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	tracelog.DebugLogger.Printf("Building image %v with tag %v by command %v", path, tag, cmd)
+	slog.Debug(fmt.Sprintf("Building image %v with tag %v by command %v", path, tag, cmd))
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("error in building base: %v", err)
 	}
-	tracelog.DebugLogger.Printf("Image %v with tag %v was build successfully", path, tag)
+	slog.Debug(fmt.Sprintf("Image %v with tag %v was build successfully", path, tag))
 	return nil
 }
 
@@ -325,13 +327,13 @@ func (inf *Infra) callCompose(actions []string) error {
 	if err != nil {
 		return err
 	}
-	tracelog.DebugLogger.Printf("Running command %s: with args %v", fullPath, baseArgs)
+	slog.Debug(fmt.Sprintf("Running command %s: with args %v", fullPath, baseArgs))
 	cmd := exec.CommandContext(inf.ctx, fullPath, baseArgs...)
 	cmd.Env = append(cmd.Env, utils.EnvToList(inf.env)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	tracelog.DebugLogger.Printf("Running command: %+v", cmd)
+	slog.Debug(fmt.Sprintf("Running command: %+v", cmd))
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("can not start command: %v", err)
@@ -341,7 +343,7 @@ func (inf *Infra) callCompose(actions []string) error {
 		return fmt.Errorf("error when calling compose: %v", err)
 	}
 
-	tracelog.DebugLogger.Printf("Command '%v' has been completed successfully!", cmd)
+	slog.Debug(fmt.Sprintf("Command '%v' has been completed successfully!", cmd))
 
 	return nil
 }
@@ -349,5 +351,5 @@ func (inf *Infra) callCompose(actions []string) error {
 func init() {
 	var err error
 	Docker, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }

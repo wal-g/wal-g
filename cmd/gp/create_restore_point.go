@@ -2,9 +2,9 @@ package gp
 
 import (
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 )
 
 const (
@@ -21,7 +21,7 @@ var (
 			name := args[0]
 
 			restorePointCreator, err := greenplum.NewRestorePointCreator(name)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			restorePointCreator.Create()
 		},

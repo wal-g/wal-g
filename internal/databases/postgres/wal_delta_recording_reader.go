@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
@@ -23,7 +24,7 @@ func newCantDiscardWalDataError() CantDiscardWalDataError {
 }
 
 func (err CantDiscardWalDataError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // In case of recording error WalDeltaRecordingReader stops recording, but continues reading data correctly
@@ -56,7 +57,7 @@ func NewWalDeltaRecordingReader(walFileReader io.Reader,
 func (reader *WalDeltaRecordingReader) Close() error {
 	err := reader.partRecorder.SaveNextWalHead(reader.WalParser.GetCurrentRecordData())
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to save next wal file prefix after end of recording because of: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to save next wal file prefix after end of recording because of: %v", err))
 	}
 	return err
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -33,5 +34,5 @@ func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
 	sentinel := streamSentinelDto{StartLocalTime: timeStart}
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }

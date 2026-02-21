@@ -3,6 +3,7 @@ package aof
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -66,7 +67,7 @@ func (r *RestoreService) DoRestore(args RestoreArgs) error {
 			return err
 		}
 
-		tracelog.InfoLogger.Printf("Download backup files to %s\n", r.TargetDiskFolder.Path)
+		slog.Info(fmt.Sprintf("Download backup files to %s\n", r.TargetDiskFolder.Path))
 		err = r.downloadFromTarArchives(sentinel.Name())
 		if err != nil {
 			return err

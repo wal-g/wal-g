@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 )
 
@@ -84,7 +84,7 @@ func PushMetrics() {
 
 	err := pushMetrics(address, extraTags)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Pushing metrics failed: %v", err)
+		slog.Warn(fmt.Sprintf("Pushing metrics failed: %v", err))
 	}
 }
 
@@ -106,7 +106,7 @@ func pushMetrics(address string, extraTags map[string]string) error {
 	}
 	defer client.Close()
 
-	tracelog.DebugLogger.Printf("Sending metrics to statsd")
+	slog.Debug(fmt.Sprintf("Sending metrics to statsd"))
 
 	mfs, err := prometheus.DefaultGatherer.Gather()
 	if err != nil {
@@ -147,7 +147,7 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extr
 			if metric.Gauge == nil {
 				return fmt.Errorf("expected gauge in metric %s %s", name, metric)
 			}
-			tracelog.DebugLogger.Printf("writing metric: %s", metric.String())
+			slog.Debug(fmt.Sprintf("writing metric: %s", metric.String()))
 			err := client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
 			if err != nil {
 				return err

@@ -1,7 +1,9 @@
 package mongo
 
 import (
-	"github.com/wal-g/tracelog"
+	"fmt"
+	"log/slog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -10,7 +12,7 @@ import (
 func purgeJournalInfo(backupName string, dryRun bool) {
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
+		slog.Warn(fmt.Sprintf("Can't configure storage: %+v", err))
 		return
 	}
 
@@ -21,20 +23,20 @@ func purgeJournalInfo(backupName string, dryRun bool) {
 	)
 	// Backup could be created without journal
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't find the journal info: %+v", err)
+		slog.Warn(fmt.Sprintf("Can't find the journal info: %+v", err))
 		return
 	}
 
 	if dryRun {
-		tracelog.InfoLogger.Printf("About to delete journal info: %+v", journalInfo)
+		slog.Info(fmt.Sprintf("About to delete journal info: %+v", journalInfo))
 		return
 	}
 
 	err = journalInfo.Delete(storage.RootFolder())
 	if err != nil {
-		tracelog.ErrorLogger.Print(err)
+		slog.Error(err.Error())
 	} else {
-		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+		slog.Info(fmt.Sprintf("Deleted journal info: %+v", journalInfo))
 	}
 }
 
@@ -46,14 +48,14 @@ func HandleBackupDelete(backupName string, downloader archive.Downloader, purger
 	}
 
 	if dryRun {
-		tracelog.InfoLogger.Printf("Skipping backup deletion due to dry-run: %+v", backup)
+		slog.Info(fmt.Sprintf("Skipping backup deletion due to dry-run: %+v", backup))
 		return nil
 	}
 
 	if err := purger.DeleteBackups([]*models.Backup{backup}); err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("Backup was deleted: %+v", backup)
+	slog.Info(fmt.Sprintf("Backup was deleted: %+v", backup))
 	purgeJournalInfo(backupName, dryRun)
 	return nil
 }

@@ -3,6 +3,7 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/wal-g/tracelog"
 )
@@ -44,8 +46,8 @@ func (r *SegCmdRunner) Run() {
 	}
 
 	segCmdStatesPath := FormatSegmentStateFolderPath(r.contentID)
-	tracelog.ErrorLogger.FatalOnError(os.RemoveAll(segCmdStatesPath))
-	tracelog.ErrorLogger.FatalOnError(os.MkdirAll(segCmdStatesPath, os.ModePerm))
+	logging.FatalOnError(os.RemoveAll(segCmdStatesPath))
+	logging.FatalOnError(os.MkdirAll(segCmdStatesPath, os.ModePerm))
 
 	cmd := exec.Command(os.Args[0], args...)
 	cmd.Env = os.Environ()
@@ -53,7 +55,7 @@ func (r *SegCmdRunner) Run() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	tracelog.InfoLogger.Printf("starting the command: %v", cmd)
+	slog.Info(fmt.Sprintf("starting the command: %v", cmd))
 
 	err := cmd.Start()
 	tracelog.ErrorLogger.FatalfOnError("command start failed: %v", err)
@@ -64,7 +66,7 @@ func (r *SegCmdRunner) Run() {
 	}()
 
 	err = r.waitCmd(cmd, done)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (r *SegCmdRunner) waitCmd(cmd *exec.Cmd, doneCh chan error) error {
@@ -76,7 +78,7 @@ func (r *SegCmdRunner) waitCmd(cmd *exec.Cmd, doneCh chan error) error {
 		status, err := checkCmdStatus(ticker, doneCh, sigCh)
 		saveErr := writeCmdState(SegCmdState{Status: status, TS: time.Now()}, r.contentID, r.cmdName)
 		if saveErr != nil {
-			tracelog.WarningLogger.Printf("Failed to update the command status file: %v", saveErr)
+			slog.Warn(fmt.Sprintf("Failed to update the command status file: %v", saveErr))
 			if status != RunningCmdStatus {
 				// must exit to avoid endless loop
 				return nil
@@ -103,7 +105,7 @@ func (r *SegCmdRunner) waitCmd(cmd *exec.Cmd, doneCh chan error) error {
 func checkCmdStatus(ticker *time.Ticker, doneCh chan error, sigCh chan os.Signal) (SegCmdStatus, error) {
 	select {
 	case <-ticker.C:
-		tracelog.DebugLogger.Printf("Tick")
+		slog.Debug(fmt.Sprintf("Tick"))
 		return RunningCmdStatus, nil
 
 	case err := <-doneCh:

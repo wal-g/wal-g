@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/spf13/cobra"
@@ -51,12 +52,12 @@ func runPurge(cmd *cobra.Command, args []string) {
 	}
 
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	backupFolder := st.RootFolder().GetSubFolder(utility.BaseBackupPath)
 
 	err = redis.HandlePurge(backupFolder, opts...)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func init() {

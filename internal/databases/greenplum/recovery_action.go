@@ -2,11 +2,13 @@ package greenplum
 
 import (
 	"fmt"
+	"log/slog"
+	"path"
+
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"path"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type ActionHandler struct {
@@ -18,7 +20,7 @@ const actionCmd = "sed -i '/^recovery_target_action = /d' %s && echo 'recovery_t
 // nolint:gocritic
 func NewActionHandler(logsDir string, restoreCfgPath string) *ActionHandler {
 	restoreCfg, err := readRestoreConfig(restoreCfgPath)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	initGpLog(logsDir)
 
@@ -28,7 +30,7 @@ func NewActionHandler(logsDir string, restoreCfgPath string) *ActionHandler {
 	}
 
 	globalCluster := cluster.NewCluster(segmentConfigs)
-	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
+	slog.Debug(fmt.Sprintf("cluster %v\n", globalCluster))
 
 	return &ActionHandler{
 		cluster: globalCluster,
@@ -36,14 +38,14 @@ func NewActionHandler(logsDir string, restoreCfgPath string) *ActionHandler {
 }
 
 func (fh *ActionHandler) UpdateAction(action string) {
-	tracelog.InfoLogger.Printf("Updating recovery.conf recovery_target_action %s on segments and master...", action)
+	slog.Info(fmt.Sprintf("Updating recovery.conf recovery_target_action %s on segments and master...", action))
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
 			segment := fh.cluster.ByContent[contentID][0]
 			pathToRestore := path.Join(segment.DataDir, viper.GetString(conf.GPRelativeRecoveryConfPath))
 			cmd := fmt.Sprintf(actionCmd, pathToRestore, action, pathToRestore)
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			slog.Debug(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmd))
 			return cmd
 		})
 
@@ -52,6 +54,6 @@ func (fh *ActionHandler) UpdateAction(action string) {
 	})
 
 	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
-		tracelog.DebugLogger.Printf("Update recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
+		slog.Debug(fmt.Sprintf("Update recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr))
 	}
 }

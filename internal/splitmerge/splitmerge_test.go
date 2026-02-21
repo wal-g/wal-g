@@ -75,7 +75,7 @@ func TestSplitMerge(t *testing.T) {
 				data := make([]byte, buffSize, buffSize)
 				rbytes := copy(data, allData[offset:])
 				offset += rbytes
-				// tracelog.InfoLogger.Printf("goroutine #%d: %d bytes fetched, err=%v", idx, rbytes, rerr)
+				// slog.Info(fmt.Sprintf("goroutine #%d: %d bytes fetched, err=%v", idx, rbytes, rerr))
 				if rbytes == 0 {
 					return nil
 				}
@@ -83,7 +83,7 @@ func TestSplitMerge(t *testing.T) {
 				if werr != nil {
 					return werr
 				} else {
-					// tracelog.InfoLogger.Printf("goroutine #%d: %d bytes copied", idx, rbytes)
+					// slog.Info(fmt.Sprintf("goroutine #%d: %d bytes copied", idx, rbytes))
 				}
 			}
 		})

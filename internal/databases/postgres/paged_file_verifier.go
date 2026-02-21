@@ -3,7 +3,9 @@ package postgres
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"unsafe"
 
@@ -142,7 +144,7 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 	valid := pageHeader.isValid()
 	if !valid {
 		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
-		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
+		slog.Warn(fmt.Sprintf("Invalid page header encountered: blockNo %d, path %s", blockNo, path))
 		return false, nil
 	}
 
@@ -219,7 +221,7 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 		}
 		if err == io.ErrUnexpectedEOF {
 			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
-			tracelog.WarningLogger.Printf("verifyPageBlocks: %s invalid file size %d\n", path, fileInfo.Size())
+			slog.Warn(fmt.Sprintf("verifyPageBlocks: %s invalid file size %d\n", path, fileInfo.Size()))
 			break
 		}
 		if err != nil {
@@ -228,7 +230,7 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 	}
 	// check if some extra delta blocks left in increment
 	if isEmpty := isTarReaderEmpty(pageBlocks); !isEmpty {
-		tracelog.WarningLogger.Printf("verifyPageBlocks: Unexpected extra bytes: %s\n", path)
+		slog.Warn(fmt.Sprintf("verifyPageBlocks: Unexpected extra bytes: %s\n", path))
 	}
 	tracelog.DebugLogger.Printf("verifyPageBlocks: %s, checked %d blocks, found %d corrupt\n",
 		path, len(blockNumbers), len(corruptBlockNumbers))

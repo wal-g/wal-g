@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"log/slog"
 	"reflect"
 	"strings"
 
@@ -157,11 +158,11 @@ func NewTargetBackupSelector(targetUserData, targetName string, metaFetcher Gene
 		err = errors.New("incorrect arguments. Specify target backup name OR target userdata, not both")
 
 	case targetName == LatestString:
-		tracelog.InfoLogger.Printf("Selecting the latest backup...\n")
+		slog.Info(fmt.Sprintf("Selecting the latest backup...\n"))
 		return NewLatestBackupSelector(), nil
 
 	case targetName != "":
-		tracelog.InfoLogger.Printf("Selecting the backup with name %s...\n", targetName)
+		slog.Info(fmt.Sprintf("Selecting the backup with name %s...\n", targetName))
 		return NewBackupNameSelector(targetName, true)
 
 	case targetUserData != "":

@@ -1,9 +1,9 @@
 package fsutil
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
-
-	"github.com/wal-g/tracelog"
 )
 
 // FileSystemCleaner actually performs it's functions on file system
@@ -29,6 +29,6 @@ func (cleaner FileSystemCleaner) GetFiles(directory string) (files []string, err
 func (cleaner FileSystemCleaner) Remove(file string) {
 	err := os.Remove(file)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Tried to remove file: '%s', but got error: '%v'\n", file, err)
+		slog.Warn(fmt.Sprintf("Tried to remove file: '%s', but got error: '%v'\n", file, err))
 	}
 }

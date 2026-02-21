@@ -8,6 +8,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -16,14 +17,14 @@ func HandleDatabaseList(backupName string) {
 	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 	defer func() { _ = signalHandler.Close() }()
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, storage.RootFolder())
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("can't find backup %s: %v", backupName, err)
 	}
 	sentinel := new(SentinelDto)
 	err = backup.FetchSentinel(sentinel)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	for _, name := range sentinel.Databases {
 		fmt.Println(name)
 	}

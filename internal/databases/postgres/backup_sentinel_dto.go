@@ -2,11 +2,12 @@ package postgres
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/internal"
@@ -91,7 +92,7 @@ func NewExtendedMetadataDto(isPermanent bool, dataDir string, startTime time.Tim
 	sentinelDto BackupSentinelDto) (meta ExtendedMetadataDto) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to fetch the hostname for metadata, leaving empty: %v", err))
 	}
 	meta.DatetimeFormat = MetadataDatetimeFormat
 	meta.StartTime = startTime

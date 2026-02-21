@@ -7,7 +7,9 @@ package postgres
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/wal-g/tracelog"
@@ -42,7 +44,7 @@ func (rw *ReadWriterAtFileImpl) Size() int64 {
 // RestoreMissingPages restores missing pages (zero blocks)
 // of local file with their base backup version
 func RestoreMissingPages(base io.Reader, target ReadWriterAt) error {
-	tracelog.DebugLogger.Printf("Restoring missing pages from base backup: %s\n", target.Name())
+	slog.Debug(fmt.Sprintf("Restoring missing pages from base backup: %s\n", target.Name()))
 
 	targetPageCount := target.Size() / DatabasePageSize
 	for i := int64(0); i < targetPageCount; i++ {
@@ -65,7 +67,7 @@ func RestoreMissingPages(base io.Reader, target ReadWriterAt) error {
 // CreateFileFromIncrement writes the pages from the increment to local file
 // and write empty blocks in place of pages which are not present in the increment
 func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) (int64, error) {
-	tracelog.DebugLogger.Printf("Creating from increment: %s\n", target.Name())
+	slog.Debug(fmt.Sprintf("Creating from increment: %s\n", target.Name()))
 
 	fileSize, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {
@@ -97,14 +99,14 @@ func CreateFileFromIncrement(increment io.Reader, target ReadWriterAt) (int64, e
 	}
 	// check if some extra delta blocks left in increment
 	if isEmpty := isTarReaderEmpty(increment); !isEmpty {
-		tracelog.DebugLogger.Printf("Skipping extra increment blocks, target: %s\n", target.Name())
+		slog.Debug(fmt.Sprintf("Skipping extra increment blocks, target: %s\n", target.Name()))
 	}
 	return missingBlockCount, nil
 }
 
 // WritePagesFromIncrement writes pages from delta backup according to diffMap
 func WritePagesFromIncrement(increment io.Reader, target ReadWriterAt, overwriteExisting bool) (int64, error) {
-	tracelog.DebugLogger.Printf("Writing pages from increment: %s\n", target.Name())
+	slog.Debug(fmt.Sprintf("Writing pages from increment: %s\n", target.Name()))
 
 	_, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {

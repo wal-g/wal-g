@@ -3,16 +3,17 @@ package oplog
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
+	"strings"
+
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/txn"
 	"github.com/mongodb/mongo-tools/common/util"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"io"
-	"strings"
 )
 
 const NamespaceNotFoundError int32 = 26
@@ -116,7 +117,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	}
 
 	if err := ap.shouldSkip(&op); err != nil {
-		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+		slog.Debug(fmt.Sprintf("skipping op %+v due to: %+v", op, err))
 		return nil
 	}
 
@@ -310,15 +311,15 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 		return ap.db.DropIndexes(ctx, dbName, op.Object)
 	}
 
-	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
+	//slog.Debug(fmt.Sprintf("applying op: %+v", *op))
 	if err := ap.db.ApplyOp(ctx, op); err != nil {
-		tracelog.DebugLogger.Printf("error handling op: %v; op: %v", err, *op)
+		slog.Debug(fmt.Sprintf("error handling op: %v; op: %v", err, *op))
 		// we ignore some errors (for example 'duplicate key error')
 		// TODO: check after TOOLS-2041
 		if !ap.shouldIgnore(op.Operation, err) {
 			return NewOpHandleError(*op, err)
 		}
-		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)
+		slog.Warn(fmt.Sprintf("apply error is skipped: %+v\nop:\n%+v", err, *op))
 	}
 	return nil
 }

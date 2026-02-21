@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,7 +18,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 func LoggedClose(c io.Closer, errmsg string) {
@@ -26,7 +27,7 @@ func LoggedClose(c io.Closer, errmsg string) {
 		errmsg = "Problem with closing object"
 	}
 	if err != nil {
-		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+		slog.Error(fmt.Sprintf("%s: %v", errmsg, err))
 	}
 }
 
@@ -40,7 +41,7 @@ func LoggedCloseContext(c ContextCloser, errmsg string) {
 		errmsg = "Problem with closing object"
 	}
 	if err != nil {
-		tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+		slog.Error(fmt.Sprintf("%s: %v", errmsg, err))
 	}
 }
 
@@ -51,7 +52,7 @@ func LoggedSync(file *os.File, errmsg string, fsync bool) {
 			errmsg = "Problem with file sync"
 		}
 		if err != nil {
-			tracelog.ErrorLogger.Printf("%s: %v", errmsg, err)
+			slog.Error(fmt.Sprintf("%s: %v", errmsg, err))
 		}
 	}
 }
@@ -157,7 +158,7 @@ func AbsResolveSymlink(path string) string {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		// keep a trace of the errors, but keep going with 'path'
-		tracelog.DebugLogger.Printf("could not convert path to absolute path: %s", err)
+		slog.Debug(fmt.Sprintf("could not convert path to absolute path: %s", err))
 		abs = path
 	}
 
@@ -267,7 +268,7 @@ func NewForbiddenActionError(message string) ForbiddenActionError {
 }
 
 func (err ForbiddenActionError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // This function is needed for being cross-platform
@@ -354,7 +355,7 @@ func NewSignalHandler(ctx context.Context, cancel func(), signals []os.Signal) *
 	go func() {
 		select {
 		case s := <-sh.ch:
-			tracelog.InfoLogger.Printf("Received %s signal. Shutting down", s.String())
+			slog.Info(fmt.Sprintf("Received %s signal. Shutting down", s.String()))
 			sh.cancel()
 		case <-sh.ctx.Done():
 		}
@@ -364,7 +365,7 @@ func NewSignalHandler(ctx context.Context, cancel func(), signals []os.Signal) *
 
 // Close removes signal mask and call cancel func
 func (sh *SignalHandler) Close() error {
-	tracelog.InfoLogger.Printf("Removing sigmask. Shutting down")
+	slog.Info("Removing sigmask. Shutting down")
 	signal.Stop(sh.ch)
 	sh.cancel()
 	return nil

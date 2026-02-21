@@ -2,6 +2,8 @@ package xbstream
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -69,7 +71,7 @@ func (fsf *fileSinkFactory) NewDataSink(chunkPath string) fileSink {
 	}
 
 	if fsf.inplace && (strings.HasSuffix(chunkPath, ".meta") || strings.HasSuffix(chunkPath, ".delta")) {
-		tracelog.DebugLogger.Printf("Extracting [AUTO]/%v", chunkPath)
+		slog.Debug(fmt.Sprintf("Extracting [AUTO]/%v", chunkPath))
 		return newDiffFileSink(fsf.dataDir, fsf.incrementalDir, decompressor, fsf.spaceIDCollector)
 	}
 
@@ -77,9 +79,9 @@ func (fsf *fileSinkFactory) NewDataSink(chunkPath string) fileSink {
 	destinationDir := fsf.incrementalDir
 	if destinationDir == "" {
 		destinationDir = fsf.dataDir
-		tracelog.DebugLogger.Printf("Extracting [DATA]/%v", chunkPath)
+		slog.Debug(fmt.Sprintf("Extracting [DATA]/%v", chunkPath))
 	} else {
-		tracelog.DebugLogger.Printf("Extracting [INCR]/%v", chunkPath)
+		slog.Debug(fmt.Sprintf("Extracting [INCR]/%v", chunkPath))
 	}
 
 	if decompressor != nil {

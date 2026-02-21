@@ -3,10 +3,9 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
-
-	"github.com/wal-g/tracelog"
 )
 
 // Key identifies a storage and is unique within all WAL-G configurations, in contrast to Name, that is unique only
@@ -83,7 +82,7 @@ func (s storageStatus) applyExplicitCheckResult(alive bool, checkTime time.Time)
 
 func (s storageStatus) applyOperationResult(p *EMAParams, alive bool, weight float64, checkTime time.Time) storageStatus {
 	alpha := s.calcEMAAlpha(p)
-	tracelog.DebugLogger.Printf("Apply storage operation result with EMA alpha = %v", alpha)
+	slog.Debug(fmt.Sprintf("Apply storage operation result with EMA alpha = %v", alpha))
 
 	if alive {
 		return storageStatus{

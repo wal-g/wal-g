@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/wal-g/tracelog"
 	"golang.org/x/xerrors"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -259,7 +259,7 @@ func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder, journalFilesObj
 		isEqualToCurrentBackupEnd := timestamp.Equal(ji.CurrentBackupEnd)
 
 		if isInInterval || isEqualToCurrentBackupEnd {
-			tracelog.DebugLogger.Printf("Taking into account: %s (%s)", journal.GetName(), journal.GetLastModified())
+			slog.Debug(fmt.Sprintf("Taking into account: %s (%s)", journal.GetName(), journal.GetLastModified()))
 			sum += journal.GetSize()
 		}
 	}
@@ -290,7 +290,7 @@ func getJournalTimestamp(journal string) time.Time {
 	timestampStr := journal[fullJournalPrefixLength:]
 	timestamp, err := time.Parse(JournalTimeLayout, timestampStr)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Error during parsing timestamp '%s': %s", journal, err)
+		slog.Warn(fmt.Sprintf("Error during parsing timestamp '%s': %s", journal, err))
 	}
 
 	return timestamp

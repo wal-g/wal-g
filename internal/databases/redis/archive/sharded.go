@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -16,10 +17,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -57,7 +58,7 @@ func NewMigratingSlotsError(slots string) MigratingSlotsError {
 }
 
 func (err MigratingSlotsError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 func getIntervals(line string) ([][]string, error) {
@@ -253,7 +254,7 @@ func FillSlotsForSharded(ctx context.Context, args FillSlotsForShardedArgs) erro
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("packing %s", string(jsonData))
+	slog.Info(fmt.Sprintf("packing %s", string(jsonData)))
 
 	fullPath, err := GetSlotsCompressedFileName(args.BackupName)
 	if err != nil {

@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"syscall"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -20,16 +22,16 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	defer func() { _ = signalHandler.Close() }()
 
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	folder := storage.RootFolder()
 
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
 	err = backup.FetchSentinel(sentinel)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
@@ -38,7 +40,7 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore: %v", err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer lock.Close()
 
 	backupName = backup.Name
@@ -57,7 +59,7 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	}, len(dbnames), getDBConcurrency())
 	tracelog.ErrorLogger.FatalfOnError("overall restore failed: %v", err)
 
-	tracelog.InfoLogger.Printf("restore finished")
+	slog.Info(fmt.Sprintf("restore finished"))
 }
 
 func restoreSingleDatabase(ctx context.Context,
@@ -87,26 +89,26 @@ func restoreSingleDatabase(ctx context.Context,
 		return err
 	}
 	sql += ", " + move
-	tracelog.InfoLogger.Printf("starting restore database [%s] from %s", dbname, urls)
-	tracelog.DebugLogger.Printf("SQL: %s", sql)
+	slog.Info(fmt.Sprintf("starting restore database [%s] from %s", dbname, urls))
+	slog.Debug(fmt.Sprintf("SQL: %s", sql))
 	_, err = db.ExecContext(ctx, sql)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("database [%s] restore failed: %v", dbname, err)
 	} else {
-		tracelog.InfoLogger.Printf("database [%s] restore succefully finished", dbname)
+		slog.Info(fmt.Sprintf("database [%s] restore succefully finished", dbname))
 	}
 	return err
 }
 
 func recoverSingleDatabase(ctx context.Context, db *sql.DB, dbname string) error {
 	sql := fmt.Sprintf("RESTORE DATABASE %s WITH RECOVERY", quoteName(dbname))
-	tracelog.InfoLogger.Printf("recovering database [%s]", dbname)
-	tracelog.DebugLogger.Printf("SQL: %s", sql)
+	slog.Info(fmt.Sprintf("recovering database [%s]", dbname))
+	slog.Debug(fmt.Sprintf("SQL: %s", sql))
 	_, err := db.ExecContext(ctx, sql)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("database [%s] recovery failed: %v", dbname, err)
 	} else {
-		tracelog.InfoLogger.Printf("database [%s] recovery succefully finished", dbname)
+		slog.Info(fmt.Sprintf("database [%s] recovery succefully finished", dbname))
 	}
 	return err
 }
