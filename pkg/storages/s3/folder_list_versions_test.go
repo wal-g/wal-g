@@ -294,7 +294,7 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.
 	foundDeleteMarker := false
 	for _, obj := range objects {
 		info := obj.GetAdditionalInfo()
-		version := obj.GetVersionId()
+		version := obj.GetVersionID()
 		if obj.GetName() == "object2.txt" && version == "dm2" && (info == "LATEST DELETE" || info == "DELETE") {
 			foundDeleteMarker = true
 			break
@@ -360,7 +360,7 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsPropagatesToSubfoldersFromL
 
 	foundDelete := false
 	for _, obj := range objects {
-		if obj.GetName() == "object2.txt" && obj.GetVersionId() == "dm2" && (obj.GetAdditionalInfo() == "LATEST DELETE" || obj.GetAdditionalInfo() == "DELETE") {
+		if obj.GetName() == "object2.txt" && obj.GetVersionID() == "dm2" && (obj.GetAdditionalInfo() == "LATEST DELETE" || obj.GetAdditionalInfo() == "DELETE") {
 			foundDelete = true
 		}
 	}

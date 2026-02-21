@@ -411,13 +411,13 @@ func (folder *Folder) DeleteObjects(objects []storage.Object) error {
 		}}
 		for _, obj := range part {
 			input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + obj.GetName()),
-				VersionId: aws.String(obj.GetVersionId()),
+				VersionId: aws.String(obj.GetVersionID()),
 			})
 		}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
 			for _, obj := range part {
-				tracelog.DebugLogger.Printf("object %s version %s", obj.GetName(), obj.GetVersionId())
+				tracelog.DebugLogger.Printf("object %s version %s", obj.GetName(), obj.GetVersionID())
 			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
 		}

@@ -90,16 +90,16 @@ func (mr *MockObjectMockRecorder) GetSize() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSize", reflect.TypeOf((*MockObject)(nil).GetSize))
 }
 
-// GetVersionId mocks base method.
-func (m *MockObject) GetVersionId() string {
+// GetVersionID mocks base method.
+func (m *MockObject) GetVersionID() string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVersionId")
+	ret := m.ctrl.Call(m, "GetVersionID")
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-// GetVersionId indicates an expected call of GetVersionId.
-func (mr *MockObjectMockRecorder) GetVersionId() *gomock.Call {
+// GetVersionID indicates an expected call of GetVersionID.
+func (mr *MockObjectMockRecorder) GetVersionID() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVersionId", reflect.TypeOf((*MockObject)(nil).GetVersionId))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVersionID", reflect.TypeOf((*MockObject)(nil).GetVersionID))
 }

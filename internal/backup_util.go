@@ -260,7 +260,7 @@ func DeleteGarbage(folder storage.Folder, garbage []string) error {
 				path.Join(prefix, obj.GetName()),
 				obj.GetLastModified(),
 				obj.GetSize(),
-				obj.GetVersionId(),
+				obj.GetVersionID(),
 				obj.GetAdditionalInfo()),
 			)
 		}

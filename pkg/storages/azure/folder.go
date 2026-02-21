@@ -152,7 +152,6 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 
 func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
-
 		//Delete blob using blobClient obtained from full path to blob
 		path := storage.JoinPath(folder.path, object.GetName())
 		blobClient := folder.containerClient.NewBlockBlobClient(path)

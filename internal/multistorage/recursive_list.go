@@ -74,7 +74,7 @@ func prependPaths(objects []storage.Object, folderPrefix string) []storage.Objec
 			Object: storage.NewLocalObjectWithVersion(path.Join(folderPrefix, object.GetName()),
 				object.GetLastModified(),
 				object.GetSize(),
-				object.GetVersionId(),
+				object.GetVersionID(),
 				object.GetAdditionalInfo(),
 			),
 			storageName: GetStorage(object),
