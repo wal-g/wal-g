@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -216,7 +217,7 @@ func (bb *StreamingBaseBackup) streamFromPostgres() (err error) {
 		if pgconn.Timeout(err) {
 			continue
 		}
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		switch msg := message.(type) {
 		case *pgproto3.CopyData:
 			bb.buffer = msg.Data

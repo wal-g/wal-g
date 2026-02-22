@@ -18,6 +18,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/logging"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"golang.org/x/xerrors"
@@ -485,7 +486,7 @@ func (bs *Server) HandleBlockListPut(w http.ResponseWriter, req *http.Request) {
 	}
 	garbage, err := idx.PutBlockList(xblocklist)
 	if err != nil {
-		tracelog.ErrorLogger.Print(err)
+		logging.PrintError(err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -517,7 +518,7 @@ func (bs *Server) HandleBlockListGet(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(data)
-	tracelog.ErrorLogger.PrintOnError(err)
+	logging.PrintOnError(err)
 }
 
 // Index operations

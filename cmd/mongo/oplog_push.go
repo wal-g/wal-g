@@ -17,6 +17,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/webserver"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -28,7 +29,7 @@ var oplogPushCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
-		defer func() { tracelog.ErrorLogger.FatalOnError(err) }()
+		defer func() { logging.FatalOnError(err) }()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
@@ -104,11 +105,11 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 
 	/* File buffer is useful for debugging:
 	fileBatchBuffer, err := stages.NewFileBuffer("/run/wal-g-oplog-push")
-	defer tracelog.ErrorLogger.PrintError(fileBatchBuffer.Close())
+	defer logging.PrintError(fileBatchBuffer.Close())
 	*/
 
 	memoryBatchBuffer := stages.NewMemoryBuffer()
-	defer func() { tracelog.ErrorLogger.PrintOnError(memoryBatchBuffer.Close()) }()
+	defer func() { logging.PrintOnError(memoryBatchBuffer.Close()) }()
 
 	// set up storage archiver
 	oplogApplier := stages.NewStorageApplier(uploader,

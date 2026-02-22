@@ -2,11 +2,13 @@ package greenplum
 
 import (
 	"fmt"
+	"path"
+
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"path"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type ActionHandler struct {
@@ -18,7 +20,7 @@ const actionCmd = "sed -i '/^recovery_target_action = /d' %s && echo 'recovery_t
 // nolint:gocritic
 func NewActionHandler(logsDir string, restoreCfgPath string) *ActionHandler {
 	restoreCfg, err := readRestoreConfig(restoreCfgPath)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	initGpLog(logsDir)
 

@@ -3,6 +3,7 @@ package mysql
 import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -66,7 +67,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 
 	var prevBackupSentinelDto = StreamSentinelDto{}
 	err = previousBackup.FetchSentinel(&prevBackupSentinelDto)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
 		incrementCount = *prevBackupSentinelDto.IncrementCount + 1

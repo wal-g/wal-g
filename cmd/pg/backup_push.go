@@ -1,6 +1,7 @@
 package pg
 
 import (
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
@@ -48,7 +49,7 @@ var (
 			internal.ConfigureLimiters()
 
 			storage, err := internal.ConfigureMultiStorage(true)
-			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
+			logging.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 			rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.TakeFirstStorage)
 			if targetStorage == "" {
@@ -56,11 +57,11 @@ var (
 			} else {
 				rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 			}
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			tracelog.InfoLogger.Printf("Backup will be pushed to storage: %v", multistorage.UsedStorages(rootFolder)[0])
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			var dataDirectory string
 
@@ -86,12 +87,12 @@ var (
 			if withoutFilesMetadata {
 				// files metadata tracking is required for delta backups and copy/rating composers
 				if tarBallComposerType != postgres.RegularComposer {
-					tracelog.ErrorLogger.Fatalf(
+					logging.Fatalf(
 						"%s option cannot be used with non-regular tar ball composer",
 						withoutFilesMetadataFlag)
 				}
 				if deltaFromName != "" || deltaFromUserData != "" {
-					tracelog.ErrorLogger.Fatalf(
+					logging.Fatalf(
 						"%s option cannot be used with %s, %s options",
 						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag)
 				}
@@ -101,10 +102,10 @@ var (
 
 			deltaBaseSelector, err := internal.NewDeltaBaseSelector(
 				deltaFromName, deltaFromUserData, postgres.NewGenericMetaFetcher())
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
-			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
+			logging.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
@@ -113,7 +114,7 @@ var (
 				userData, withoutFilesMetadata)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
 		},
 	}

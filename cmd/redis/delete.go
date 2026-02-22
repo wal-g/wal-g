@@ -6,9 +6,9 @@ import (
 	"syscall"
 
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -32,9 +32,9 @@ var backupDeleteCmd = &cobra.Command{
 		backupName := args[0]
 
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		err = redis.HandleBackupDelete(storage.RootFolder(), backupName, !confirmedBackupDelete)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

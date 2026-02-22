@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 // ResolveStartingTS fetches last-known folder TS or initiates first run from last-known mongoClient TS
@@ -59,7 +60,7 @@ func BuildCursorFromTS(ctx context.Context,
 
 	// since ts is not exists, report gap and continue with newest timestamp
 	gapErr := models.NewError(models.SplitFound, fmt.Sprintf("expected first ts is %v, but %v is given", since, op.TS))
-	tracelog.ErrorLogger.PrintError(gapErr)
+	logging.PrintError(gapErr)
 
 	tracelog.ErrorLogger.Printf("Reinitializing archiving with newest TS")
 	im, err := mongoClient.IsMaster(ctx)

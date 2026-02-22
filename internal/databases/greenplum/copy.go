@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -19,9 +20,9 @@ func HandleCopy(fromConfigFile string, toConfigFile string, backupName string) {
 		return
 	}
 	infos, err := GetCopyingInfos(backupName, from.RootFolder(), to.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = copy.Infos(infos)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tracelog.InfoLogger.Println("Success copy.")
 }
 

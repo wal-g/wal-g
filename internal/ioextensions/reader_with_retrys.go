@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type ReaderWithRetry struct {
@@ -47,7 +48,7 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 				return n, err
 			} else if err != nil {
 				tracelog.ErrorLogger.Printf("error while initializing reader: %v", err)
-				tracelog.ErrorLogger.PrintOnError(r.reader.Close())
+				logging.PrintOnError(r.reader.Close())
 				r.reader = nil
 				r.attempt++
 				continue
@@ -63,7 +64,7 @@ func (r *ReaderWithRetry) Read(p []byte) (int, error) {
 			return n, err
 		} else if err != nil {
 			tracelog.ErrorLogger.Printf("error while read file: %v. Attempt: %d\n", err, r.attempt)
-			tracelog.ErrorLogger.PrintOnError(r.reader.Close())
+			logging.PrintOnError(r.reader.Close())
 			r.reader = nil
 			r.attempt++
 			continue

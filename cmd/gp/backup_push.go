@@ -4,10 +4,10 @@ import (
 	"strconv"
 
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -45,29 +45,29 @@ var (
 				userDataRaw = viper.GetString(conf.SentinelUserDataSetting)
 			}
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
-			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
+			logging.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 			deltaBaseSelector, err := internal.NewDeltaBaseSelector(
 				deltaFromName, deltaFromUserData, greenplum.NewGenericMetaFetcher())
-			tracelog.ErrorLogger.FatalfOnError("Failed to find the base for a delta backup: %s", err)
+			logging.FatalfOnError("Failed to find the base for a delta backup: %s", err)
 
 			logsDir := viper.GetString(conf.GPLogsDirectory)
 
 			segPollInterval, err := conf.GetDurationSetting(conf.GPSegmentsPollInterval)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			segPollRetries := viper.GetInt(conf.GPSegmentsPollRetries)
 
 			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			arguments := greenplum.NewBackupArguments(uploader, permanent, fullBackup, userData, prepareSegmentFwdArgs(), logsDir,
 				segPollInterval, segPollRetries, deltaBaseSelector)
 			backupHandler, err := greenplum.NewBackupHandler(arguments)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			backupHandler.HandleBackupPush()
 		},
 	}

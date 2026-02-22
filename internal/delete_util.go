@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -15,7 +16,7 @@ func FatalOnUnrecoverableMetadataError(backupTime BackupTime, err error) {
 		tracelog.InfoLogger.Printf("Backup %s lacks metadata to check if it's permanent, ignoring...",
 			backupTime.BackupName)
 	} else {
-		tracelog.ErrorLogger.Fatalf("failed to fetch backup meta for backup %s with error %s",
+		logging.Fatalf("failed to fetch backup meta for backup %s with error %s",
 			backupTime.BackupName, err.Error())
 	}
 }

@@ -2,9 +2,9 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const WalPushShortDescription = "Uploads a WAL file to storage"
@@ -16,13 +16,13 @@ var walPushCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		storage, err := internal.ConfigureMultiStorage(true)
-		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
+		logging.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 		walUploader, err := postgres.PrepareMultiStorageWalUploader(storage.RootFolder(), targetStorage)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = postgres.HandleWALPush(cmd.Context(), walUploader, args[0])
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

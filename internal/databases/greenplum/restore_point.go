@@ -3,12 +3,14 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
+
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
@@ -136,10 +138,10 @@ func (rpc *RestorePointCreator) Create() {
 	initGpLog(rpc.logsDir)
 
 	err := rpc.checkExists()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	restoreLSNs, timeLine, err := createRestorePoint(rpc.Conn, rpc.pointName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = rpc.uploadMetadata(restoreLSNs, timeLine)
 	if err != nil {

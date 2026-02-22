@@ -5,6 +5,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -26,7 +27,7 @@ func OnAllStorages(fn func(folder storage.Folder) error) error {
 	for _, st := range toRun {
 		tracelog.InfoLogger.Printf("storage %s", st.Name)
 		err := fn(st.RootFolder())
-		tracelog.ErrorLogger.PrintOnError(err)
+		logging.PrintOnError(err)
 		if err == nil {
 			atLeastOneOK = true
 		}

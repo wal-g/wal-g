@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 // Crypter is AWS KMS Crypter implementation
@@ -23,10 +24,10 @@ func (crypter *Crypter) Name() string {
 func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if len(crypter.SymmetricKey.GetKey()) == 0 {
 		err := crypter.SymmetricKey.Generate()
-		tracelog.ErrorLogger.FatalfOnError("Can't generate symmetric key: %v", err)
+		logging.FatalfOnError("Can't generate symmetric key: %v", err)
 
 		err = crypter.SymmetricKey.Encrypt()
-		tracelog.ErrorLogger.FatalfOnError("Can't encrypt symmetric key: %v", err)
+		logging.FatalfOnError("Can't encrypt symmetric key: %v", err)
 	}
 
 	bufferedWriter := bufio.NewWriter(writer)
@@ -51,13 +52,13 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	encryptedSymmetricKey := make([]byte, crypter.SymmetricKey.GetEncryptedKeyLen())
 	_, err := reader.Read(encryptedSymmetricKey)
-	tracelog.ErrorLogger.FatalfOnError("Can't read encryption key from archive file header: %v", err)
+	logging.FatalfOnError("Can't read encryption key from archive file header: %v", err)
 
 	err = crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
-	tracelog.ErrorLogger.FatalfOnError("Can't set encrypted key: %v", err)
+	logging.FatalfOnError("Can't set encrypted key: %v", err)
 
 	err = crypter.SymmetricKey.Decrypt()
-	tracelog.ErrorLogger.FatalfOnError("Can't decrypt symmetric key: %v", err)
+	logging.FatalfOnError("Can't decrypt symmetric key: %v", err)
 
 	return sio.DecryptReader(reader, sio.Config{Key: crypter.SymmetricKey.GetKey()})
 }

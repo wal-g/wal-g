@@ -3,11 +3,11 @@ package mysql
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -26,15 +26,15 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 			storage, err := internal.ConfigureStorage()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			restoreCmd, err := internal.GetCommandSetting(conf.NameStreamRestoreCmd)
 			if !useXbtoolExtract {
-				tracelog.ErrorLogger.FatalOnError(err)
+				logging.FatalOnError(err)
 			}
 			prepareCmd, _ := internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
 
 			targetBackupSelector, err := createTargetBackupSelector(args, fetchTargetUserData)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			mysql.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd, useXbtoolExtract, inplace)
 		},

@@ -6,12 +6,12 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/oplog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -31,30 +31,30 @@ var oplogFetchCmd = &cobra.Command{
 
 		// resolve archiving settings
 		since, err := models.TimestampFromStr(args[0])
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		until, err := models.TimestampFromStr(args[1])
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		formatApplier, err := oplog.NewWriteApplier(format, os.Stdout)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		oplogApplier := stages.NewGenericApplier(formatApplier)
 
 		// set up storage downloader client
 		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		// discover archive sequence to replay
 		archives, err := downloader.ListOplogArchives()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		path, err := archive.SequenceBetweenTS(archives, since, until)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		// setup storage fetcher
 		oplogFetcher := stages.NewStorageFetcher(downloader, path)
 
 		// run worker cycle
 		err = mongo.HandleOplogReplay(ctx, since, until, oplogFetcher, oplogApplier)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

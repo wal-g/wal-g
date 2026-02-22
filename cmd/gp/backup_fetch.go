@@ -2,12 +2,13 @@ package gp
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -44,7 +45,7 @@ var backupFetchCmd = &cobra.Command{
 		internal.ConfigureLimiters()
 
 		if !inPlaceRestore && restoreConfigPath == "" {
-			tracelog.ErrorLogger.Fatalf(
+			logging.Fatal(
 				"No restore config was specified. Either specify one via the --restore-config flag or add the --in-place flag to restore in-place.")
 		}
 
@@ -53,30 +54,30 @@ var backupFetchCmd = &cobra.Command{
 		}
 
 		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		if restorePoint != "" && restorePointTS != "" {
-			tracelog.ErrorLogger.Fatalf("can't use both --restore-point and --restore-point-ts")
+			logging.Fatal("can't use both --restore-point and --restore-point-ts")
 		}
 
 		if restorePointTS != "" {
 			restorePoints, err := greenplum.FetchAllRestorePoints(rootFolder)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, restorePoints)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 
 		targetBackupSelector, err := createTargetFetchBackupSelector(cmd, args, fetchTargetUserData, restorePoint)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		logsDir := viper.GetString(conf.GPLogsDirectory)
 
 		if len(*fetchContentIDs) > 0 {
-			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIDs)
+			slog.Info(fmt.Sprintf("Will perform fetch operations only on the specified segments: %v", *fetchContentIDs))
 		}
 
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		internal.HandleBackupFetch(rootFolder, targetBackupSelector,
 			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIDs, fetchMode, restorePoint,
@@ -95,8 +96,8 @@ func createTargetFetchBackupSelector(cmd *cobra.Command,
 	// if target restore point is provided without the backup name, then
 	// choose the latest backup up to the specified restore point name
 	if restorePoint != "" && targetUserData == "" && targetName == "" {
-		tracelog.InfoLogger.Printf("Restore point %s is specified without the backup name or target user data, "+
-			"will search for a matching backup", restorePoint)
+		slog.Info(fmt.Sprintf("Restore point %s is specified without the backup name or target user data, "+
+			"will search for a matching backup", restorePoint))
 		return greenplum.NewRestorePointBackupSelector(restorePoint), nil
 	}
 

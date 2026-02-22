@@ -9,6 +9,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -29,10 +30,10 @@ func newFileSinkDecompress(filePath string, dataDir string, decompressor compres
 	// we should combine data from all file chunks in a single io.Reader before passing to Decompressor:
 	writeHere := make(chan []byte)
 	readHere, err := decompressor.Decompress(splitmerge.NewChannelReader(writeHere))
-	tracelog.ErrorLogger.FatalfOnError("Cannot decompress: %v", err)
+	logging.FatalfOnError("Cannot decompress: %v", err)
 
 	file, err := safeFileCreate(dataDir, filePath)
-	tracelog.ErrorLogger.FatalfOnError("Cannot open new file for write: %v", err)
+	logging.FatalfOnError("Cannot open new file for write: %v", err)
 
 	sink := &fileSinkDecompress{
 		dataDir:       dataDir,
@@ -44,7 +45,7 @@ func newFileSinkDecompress(filePath string, dataDir string, decompressor compres
 
 	go func() {
 		_, err := io.Copy(file, readHere)
-		tracelog.ErrorLogger.FatalfOnError("Cannot copy data: %v", err)
+		logging.FatalfOnError("Cannot copy data: %v", err)
 		err = innodb.RepairSparse(file)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Error during repairSparse(): %v", err)
@@ -64,17 +65,17 @@ func (sink *fileSinkDecompress) Process(chunk *Chunk) error {
 	}
 
 	if len(chunk.SparseMap) != 0 {
-		tracelog.ErrorLogger.Fatalf("Found compressed file %v with sparse map", chunk.Path)
+		logging.Fatalf("Found compressed file %v with sparse map", chunk.Path)
 	}
 	if sink.xbOffset != chunk.Offset {
-		tracelog.ErrorLogger.Fatalf("Offset mismatch for file %v: expected=%v, actual=%v", chunk.Path, sink.xbOffset, chunk.Offset)
+		logging.Fatalf("Offset mismatch for file %v: expected=%v, actual=%v", chunk.Path, sink.xbOffset, chunk.Offset)
 	}
 	sink.xbOffset += chunk.PayloadLen
 
 	// synchronously read data & send it to writer
 	buffer := make([]byte, chunk.PayloadLen)
 	_, err := io.ReadFull(chunk, buffer)
-	tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("ReadFull on file %v", chunk.Path), err)
+	logging.FatalfOnError(fmt.Sprintf("ReadFull on file %v", chunk.Path), err)
 	sink.writeHere <- buffer
 	return nil
 }

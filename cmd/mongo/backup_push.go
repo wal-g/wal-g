@@ -6,12 +6,12 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -38,29 +38,29 @@ var backupPushCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		mongodbURL, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbURL)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		uplProvider, err := internal.ConfigureSplitUploader()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		uplProvider.ChangeDirectory(utility.BaseBackupPath)
 
 		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		backupCmd.Stderr = os.Stderr
 		uploader := archive.NewStorageUploader(uplProvider)
 		metaConstructor := archive.NewBackupMongoMetaConstructor(ctx, mongoClient, uplProvider.Folder(), permanent)
 
 		err = mongo.HandleBackupPush(uploader, metaConstructor, backupCmd)
-		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)
+		logging.FatalfOnError("Backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		conf.RequiredSettings[conf.NameStreamCreateCmd] = true
 		err := internal.AssertRequiredSettingsSet()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

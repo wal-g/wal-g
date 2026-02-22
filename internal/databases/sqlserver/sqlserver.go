@@ -22,6 +22,7 @@ import (
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -309,7 +310,7 @@ func getDatabaseBackupPath(backupName, dbname string) string {
 func getDatabaseBackupURL(backupName, dbname string) string {
 	hostname, err := conf.GetRequiredSetting(conf.SQLServerBlobHostname)
 	if err != nil {
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 	backupName = url.QueryEscape(backupName)
 	dbname = url.QueryEscape(dbname)
@@ -327,7 +328,7 @@ func getLogBackupPath(logBackupName, dbname string) string {
 func getLogBackupURL(logBackupName, dbname string) string {
 	hostname, err := conf.GetRequiredSetting(conf.SQLServerBlobHostname)
 	if err != nil {
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 	logBackupName = url.QueryEscape(logBackupName)
 	dbname = url.QueryEscape(dbname)
@@ -546,7 +547,7 @@ type LockWrapper struct {
 
 func (lw LockWrapper) Close() {
 	if lw.c != nil {
-		tracelog.ErrorLogger.PrintOnError(lw.c.Close())
+		logging.PrintOnError(lw.c.Close())
 	}
 }
 
@@ -569,7 +570,7 @@ func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder stor
 
 	err = bs.RunBackground(ctx, cancel)
 	if err != nil {
-		tracelog.ErrorLogger.PrintOnError(lock.Close())
+		logging.PrintOnError(lock.Close())
 		return nil, xerrors.Errorf("proxy run error: %v", err)
 	}
 	return &LockWrapper{lock}, nil

@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/wal-g/wal-g/utility"
 )
@@ -19,9 +19,9 @@ func safeFileCreate(dataDir string, relFilePath string) (*os.File, error) {
 	}
 
 	err := os.MkdirAll(filepath.Dir(filePath), 0777) // FIXME: permissions
-	tracelog.ErrorLogger.FatalfOnError("Cannot create new file: %v", err)
+	logging.FatalfOnError("Cannot create new file: %v", err)
 
 	file, err := fsutil.OpenFileSecure(filePath, os.O_CREATE|os.O_RDWR, 0666) // FIXME: permissions
-	tracelog.ErrorLogger.FatalfOnError("Cannot open new file for write: %v", err)
+	logging.FatalfOnError("Cannot open new file for write: %v", err)
 	return file, nil
 }

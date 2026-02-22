@@ -10,6 +10,7 @@ import (
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 
@@ -34,7 +35,7 @@ func NewFollowPrimaryHandler(
 	timeoutInSeconds int,
 ) *FollowPrimaryHandler {
 	restoreCfg, err := readRestoreConfig(restoreCfgPath)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	initGpLog(logsDir)
 
@@ -51,7 +52,7 @@ func NewFollowPrimaryHandler(
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
-		tracelog.ErrorLogger.FatalfOnError("Get restore points from folder: %v", err)
+		logging.FatalfOnError("Get restore points from folder: %v", err)
 		sort.Slice(restorePoints, func(i, j int) bool {
 			return restorePoints[i].Time.After(restorePoints[j].Time)
 		})
@@ -71,7 +72,7 @@ func NewFollowPrimaryHandler(
 func FatalIfWalLogMissing(restorePoint string, folder storage.Folder) {
 	metadata, err := FetchRestorePointMetadata(folder, restorePoint)
 	if err != nil {
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 
 	var foundCnt int
@@ -79,14 +80,14 @@ outer:
 	for seg, lsn := range metadata.LsnBySegment {
 		LSN, err := postgres.ParseLSN(lsn)
 		if err != nil {
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 		walSegmentNo := postgres.NewWalSegmentNo(LSN)
 
 		subfolder := folder.GetSubFolder(fmt.Sprintf(WalFolder, seg))
 		folderObjects, _, err := subfolder.ListFolder()
 		if err != nil {
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 
 		// WAL file example: "000000010000000000000003.lz4" -> base name is "000000010000000000000003"

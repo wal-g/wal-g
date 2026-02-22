@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -31,14 +32,14 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 	uploader.ChangeDirectory(BinlogPath)
 
 	db, err := getMySQLConnection()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 
 	binlogsFolder, err := getMySQLBinlogsFolder(db)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	binlogs, err := getMySQLBinlogs(db)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	lastBinlog := lastOrDefault(binlogs, "")
 	if untilBinlog == "" || BinlogNum(untilBinlog) > BinlogNum(lastBinlog) {
@@ -63,7 +64,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 	var filter gtidFilter
 	if checkGTIDs {
 		flavor, err := getMySQLFlavor(db)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		switch flavor {
 		case mysql.MySQLFlavor:
@@ -76,7 +77,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 				lastGtidSeen:  nil,
 			}
 		default:
-			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable WALG_MYSQL_CHECK_GTIDS for current database.", flavor)
+			logging.Fatalf("Unsupported flavor type: %s. Disable WALG_MYSQL_CHECK_GTIDS for current database.", flavor)
 		}
 	}
 
@@ -120,7 +121,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 
 		// Upload binlogs:
 		err = archiveBinLog(uploader, binlogsFolder, binlog)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		cache.LastArchivedBinlog = binlog
 		putCache(cache)
@@ -130,7 +131,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 			binlogSentinelDto.GTIDArchived = filter.gtidArchived.String()
 			tracelog.InfoLogger.Printf("Uploading binlog sentinel: %s", binlogSentinelDto)
 			err := UploadBinlogSentinel(rootFolder, &binlogSentinelDto)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 	}
 

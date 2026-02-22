@@ -22,6 +22,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -68,10 +69,10 @@ func handleEventError(err error, s *replication.BinlogStreamer) {
 // https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L53-L108
 func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	serverIDNum, err := strconv.Atoi(serverID)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	// create rotate event
 	rotateBinlogEvent := replication.BinlogEvent{}
@@ -141,7 +142,7 @@ func (h *Handler) waitReplicationIsDoneSafe() {
 
 	db, err := sql.Open("mysql", h.replicaSource)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to connect to replica SQL port: %v", err)
+		logging.Fatalf("Failed to connect to replica SQL port: %v", err)
 	}
 	defer db.Close()
 
@@ -306,9 +307,9 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.server_id":
 		serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{serverID}})
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.gtid_mode":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"GTID_MODE"}, [][]interface{}{{"ON"}})
@@ -333,26 +334,26 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 func HandleBinlogServer(since string, until string) {
 	// get necessary settings
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	startTS, untilTS, _, err = getTimestamps(st.RootFolder(), since, until, "")
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	// validate WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE
 	replicaSource, err := conf.GetRequiredSetting(conf.MysqlBinlogServerReplicaSource)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	_, err = mysqldriver.ParseDSN(replicaSource)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	serverAddress, err := conf.GetRequiredSetting(conf.MysqlBinlogServerHost)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	serverPort, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPort)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	l, err := net.Listen("tcp", serverAddress+":"+serverPort)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
 	srv := server.NewServer("5.7.42", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)

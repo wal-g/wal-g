@@ -2,9 +2,10 @@ package mysql
 
 import (
 	"fmt"
-	"github.com/wal-g/wal-g/cmd/mysql/xb"
 	"os"
 	"strings"
+
+	"github.com/wal-g/wal-g/cmd/mysql/xb"
 
 	"github.com/wal-g/wal-g/cmd/common"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var ShortDescription = "MySQL backup tool"
@@ -33,7 +35,7 @@ var cmd = &cobra.Command{
 			}
 		}
 		err := conf.ConfigureAndRunDefaultWebServer()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

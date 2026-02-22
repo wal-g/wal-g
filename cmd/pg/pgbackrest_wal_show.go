@@ -4,9 +4,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/pgbackrest"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var pgbackrestWalgShowCmd = &cobra.Command{
@@ -22,7 +22,7 @@ var pgbackrestWalgShowCmd = &cobra.Command{
 		}
 		outputWriter := postgres.NewWalShowOutputWriter(outputType, os.Stdout, false)
 		err := pgbackrest.HandleWalShow(folder, stanza, outputWriter)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 
