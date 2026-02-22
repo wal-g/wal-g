@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"errors"
+	"fmt"
+	"log/slog"
 
 	"github.com/wal-g/tracelog"
 
@@ -29,7 +31,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 
 	if withoutFilesMetadata {
 		if composerType != RegularComposer {
-			tracelog.InfoLogger.Printf("No files metadata mode is enabled. Choosing the regular tar ball composer.")
+			slog.Info(fmt.Sprintf("No files metadata mode is enabled. Choosing the regular tar ball composer."))
 		}
 		return NewRegularTarBallComposerMaker(filePackOptions, &internal.NopBundleFiles{}, internal.NewNopTarFileSets()), nil
 	}

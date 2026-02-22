@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 	"strings"
 	"time"
@@ -118,10 +119,10 @@ func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, c
 	}
 
 	for segPath := range aoSegmentsToRetain {
-		tracelog.DebugLogger.Printf("%s is still used, retaining...\n", segPath)
+		slog.Debug(fmt.Sprintf("%s is still used, retaining...\n", segPath))
 	}
 
-	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
+	slog.Info(fmt.Sprintf("Cleaning up the AO segment objects"))
 	aoSegmentsToDelete, err := findAoSegmentsToDelete(target, aoSegmentsToRetain, aoSegFolder)
 	if err != nil {
 		return err

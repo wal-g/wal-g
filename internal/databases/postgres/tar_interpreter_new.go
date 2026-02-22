@@ -2,9 +2,10 @@ package postgres
 
 import (
 	"archive/tar"
+	"fmt"
 	"io"
+	"log/slog"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -16,7 +17,7 @@ func (tarInterpreter *FileTarInterpreter) unwrapRegularFileNew(fileReader io.Rea
 	if tarInterpreter.FilesToUnwrap != nil {
 		if _, ok := tarInterpreter.FilesToUnwrap[header.Name]; !ok {
 			// don't have to unwrap it this time
-			tracelog.DebugLogger.Printf("Don't have to unwrap '%s' this time\n", header.Name)
+			slog.Debug(fmt.Sprintf("Don't have to unwrap '%s' this time\n", header.Name))
 			return nil
 		}
 	}

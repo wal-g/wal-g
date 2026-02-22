@@ -2,7 +2,9 @@ package mysql
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -85,7 +87,7 @@ func prepareTemporaryDirectory(tmpDirRoot string) (string, error) {
 func removeTemporaryDirectory(tmpDir string) error {
 	err := os.RemoveAll(tmpDir)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to remove temporary directory in %s", tmpDir)
+		slog.Warn(fmt.Sprintf("Failed to remove temporary directory in %s", tmpDir))
 		return err
 	}
 	return nil
@@ -141,7 +143,7 @@ func xtrabackupFetch(
 		_, err = internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
 		tracelog.ErrorLogger.FatalfOnError("%v", err)
 
-		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinel.IncrementFrom, *sentinel.IncrementFromLSN)
+		slog.Info(fmt.Sprintf("Delta from %v at LSN %x \n", *sentinel.IncrementFrom, *sentinel.IncrementFromLSN))
 		err = xtrabackupFetch(*sentinel.IncrementFrom, folder, restoreCmd, prepareCmd, useXbtoolExtract, inplace, false)
 		if err != nil {
 			return err
@@ -192,7 +194,7 @@ func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepar
 	stderr := &bytes.Buffer{}
 	restoreCmd.Stderr = stderr
 
-	tracelog.InfoLogger.Printf("Restoring %s with cmd %v", backup.Name, restoreCmd.Args)
+	slog.Info(fmt.Sprintf("Restoring %s with cmd %v", backup.Name, restoreCmd.Args))
 	err = restoreCmd.Start()
 	if err != nil {
 		return err
@@ -211,10 +213,10 @@ func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepar
 	if err != nil {
 		return err
 	}
-	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
+	slog.Info(fmt.Sprintf("Restored %s", backup.Name))
 
 	if prepareCmd != nil {
-		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args)
+		slog.Info(fmt.Sprintf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args))
 		prepareCmd.Stdout = os.Stdout
 		prepareCmd.Stderr = os.Stderr
 		err = prepareCmd.Run()
@@ -222,9 +224,9 @@ func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepar
 			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
 			return err
 		}
-		tracelog.InfoLogger.Printf("Prepared %s", backup.Name)
+		slog.Info(fmt.Sprintf("Prepared %s", backup.Name))
 	} else {
-		tracelog.InfoLogger.Printf("WALG_MYSQL_BACKUP_PREPARE_COMMAND not configured. Skipping prepare phase")
+		slog.Info(fmt.Sprintf("WALG_MYSQL_BACKUP_PREPARE_COMMAND not configured. Skipping prepare phase"))
 	}
 
 	return os.RemoveAll(tempDeltaDir)
@@ -292,10 +294,10 @@ func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, inplac
 		return err
 	}
 	wg.Wait()
-	tracelog.InfoLogger.Printf("Restored %s", backup.Name)
+	slog.Info(fmt.Sprintf("Restored %s", backup.Name))
 
 	if prepareCmd != nil {
-		tracelog.InfoLogger.Printf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args)
+		slog.Info(fmt.Sprintf("Preparing %s with cmd %v", backup.Name, prepareCmd.Args))
 		prepareCmd.Stdout = os.Stdout
 		prepareCmd.Stderr = os.Stderr
 		err = prepareCmd.Run()
@@ -303,9 +305,9 @@ func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, inplac
 			tracelog.ErrorLogger.Printf("Failed to prepare fetched backup: %v", err)
 			return err
 		}
-		tracelog.InfoLogger.Printf("Prepared %s", backup.Name)
+		slog.Info(fmt.Sprintf("Prepared %s", backup.Name))
 	} else {
-		tracelog.InfoLogger.Printf("WALG_MYSQL_BACKUP_PREPARE_COMMAND not configured. Skipping prepare phase")
+		slog.Info(fmt.Sprintf("WALG_MYSQL_BACKUP_PREPARE_COMMAND not configured. Skipping prepare phase"))
 	}
 
 	return os.RemoveAll(tempDeltaDir)

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"sort"
@@ -158,7 +159,7 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 			return utility.TrimFileExtension(logFiles[i].GetName()), nil
 		}
 	}
-	tracelog.WarningLogger.Printf("failed to find uploaded binlog behind %s", gtid)
+	slog.Warn(fmt.Sprintf("failed to find uploaded binlog behind %s", gtid))
 	return "", nil
 }
 
@@ -290,7 +291,7 @@ outer:
 			startTS = logFile.GetLastModified()
 			binlogName := utility.TrimFileExtension(logFile.GetName())
 			binlogPath := path.Join(dstDir, binlogName)
-			tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
+			slog.Info(fmt.Sprintf("downloading %s into %s", binlogName, binlogPath))
 			if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 				return err
@@ -336,10 +337,10 @@ func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time,
 		// download log files
 		binlogName := utility.TrimFileExtension(logFile.GetName())
 		binlogPath := path.Join(dstDir, binlogName)
-		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
+		slog.Info(fmt.Sprintf("downloading %s into %s", binlogName, binlogPath))
 		if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
 			if os.IsExist(err) {
-				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
+				slog.Warn(fmt.Sprintf("file %s exist skipping", binlogName))
 			} else {
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 				p.HandleError(err)
@@ -372,7 +373,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 	if err != nil {
 		return time.Time{}, err
 	}
-	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel.String())
+	slog.Info(fmt.Sprintf("Backup sentinel: %s", streamSentinel.String()))
 
 	// case when backup was uploaded before first binlog
 	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
@@ -381,7 +382,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 	}
 	for _, sentinel := range sentinels {
 		if strings.HasPrefix(sentinel.GetName(), backup.Name) {
-			tracelog.InfoLogger.Printf("Backup sentinel file: %s (%s)", sentinel.GetName(), sentinel.GetLastModified())
+			slog.Info(fmt.Sprintf("Backup sentinel file: %s (%s)", sentinel.GetName(), sentinel.GetLastModified()))
 			if sentinel.GetLastModified().Before(startTS) {
 				startTS = sentinel.GetLastModified()
 			}
@@ -394,7 +395,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 	}
 	for _, binlog := range binlogs {
 		if strings.HasPrefix(binlog.GetName(), streamSentinel.BinLogStart) {
-			tracelog.InfoLogger.Printf("Backup start binlog: %s (%s)", binlog.GetName(), binlog.GetLastModified())
+			slog.Info(fmt.Sprintf("Backup start binlog: %s (%s)", binlog.GetName(), binlog.GetLastModified()))
 			if binlog.GetLastModified().Before(startTS) {
 				startTS = binlog.GetLastModified()
 			}

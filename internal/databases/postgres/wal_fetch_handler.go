@@ -3,11 +3,13 @@ package postgres
 import (
 	"encoding/binary"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -23,19 +25,19 @@ func newInvalidWalFileMagicError() InvalidWalFileMagicError {
 }
 
 func (err InvalidWalFileMagicError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
 func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string, location string, prefetcher WalPrefetcher) error {
-	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s)\n", walFileName, location)
+	slog.Debug(fmt.Sprintf("HandleWALFetch(folder, %s, %s)\n", walFileName, location))
 	reader := baseReader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
 	defer prefetcher.Prefetch(baseReader, walFileName, location)
 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
-	tracelog.DebugLogger.Printf("Going to check prefetch in %s", prefetched)
+	slog.Debug(fmt.Sprintf("Going to check prefetch in %s", prefetched))
 	seenSize := int64(-1)
 
 	sizeStallInterations := 0
@@ -59,7 +61,7 @@ func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string,
 				break
 			}
 
-			tracelog.DebugLogger.Printf("Successful prefetch for file %s", walFileName)
+			slog.Debug(fmt.Sprintf("Successful prefetch for file %s", walFileName))
 			return nil
 		} else if !os.IsNotExist(err) {
 			return err

@@ -5,6 +5,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -15,7 +16,7 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
 
 	backupDetails, err := GetBackupsDetails(folder, backups)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	SortBackupDetails(backupDetails)
 

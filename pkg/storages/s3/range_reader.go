@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"log/slog"
 	"math"
 	"math/rand"
 	"strconv"
@@ -75,7 +76,7 @@ func (reader *RangeReader) getDebugLogLine(format string, v ...interface{}) stri
 }
 
 func (reader *RangeReader) debugLog(format string, v ...interface{}) {
-	tracelog.DebugLogger.Print(reader.getDebugLogLine(format, v...))
+	slog.Debug(reader.getDebugLogLine(format, v...))
 }
 
 func (reader *RangeReader) reconnect() error {
@@ -99,7 +100,7 @@ func (reader *RangeReader) reconnect() error {
 			err = reader.lastBody.Close()
 			if err != nil {
 				msg := reader.getDebugLogLine("We have problems with closing previous connection")
-				tracelog.DebugLogger.Print(msg)
+				slog.Debug(msg)
 				return errors.Wrap(err, msg)
 			}
 		}

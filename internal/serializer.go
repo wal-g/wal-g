@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/viper"
 	streamJSON "github.com/wal-g/json"
-	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type UnknownSerializerTypeError struct {
@@ -21,7 +21,7 @@ func NewUnknownSerializerTypeError(serializerType DtoSerializerType) UnknownSeri
 }
 
 func (err UnknownSerializerTypeError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type DtoSerializerType string

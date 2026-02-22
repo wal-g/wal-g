@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
@@ -12,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -45,7 +47,7 @@ type genericWalReceiveError struct {
 }
 
 func (err genericWalReceiveError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // HandleWALReceive is invoked to receive wal with a replication connection and push
@@ -57,15 +59,15 @@ func HandleWALReceive(ctx context.Context, uploader *WalUploader) {
 	uploader.ChangeDirectory(utility.WalPath)
 
 	slot, walSegmentBytes, err := getCurrentWalInfo()
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.DebugLogger.Printf("WAL segment bytes: %d", walSegmentBytes)
+	logging.FatalOnError(err)
+	slog.Debug(fmt.Sprintf("WAL segment bytes: %d", walSegmentBytes))
 
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer conn.Close(context.Background())
 
 	sysident, err := pglogrepl.IdentifySystem(context.Background(), conn)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if slot.Exists {
 		XLogPos = slot.RestartLSN
@@ -73,50 +75,50 @@ func HandleWALReceive(ctx context.Context, uploader *WalUploader) {
 		tracelog.InfoLogger.Println("Trying to create the replication slot")
 		_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slot.Name, "",
 			pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		XLogPos = sysident.XLogPos
 	}
 
 	// Get timeline for XLogPos from historyfile with helper function
 	timeline, err := getStartTimeline(ctx, conn, uploader, uint32(sysident.Timeline), XLogPos)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
 	startReplication(conn, segment, slot.Name)
 	for {
 		streamResult, err := segment.Stream(conn, StandbyMessageTimeout)
-		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.DebugLogger.Printf("Successfully received wal segment %s: ", segment.Name())
+		logging.FatalOnError(err)
+		slog.Debug(fmt.Sprintf("Successfully received wal segment %s: ", segment.Name()))
 
 		switch streamResult {
 		case ProcessMessageOK:
 			// segment is a regular segemnt. Write, and create a new for this timeline.
 			err = uploader.UploadWalFile(ctx, ioextensions.NewNamedReaderImpl(segment, segment.Name()))
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			err = uploadRemoteWalMetadata(ctx, segment.Name(), uploader.Uploader)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			XLogPos = segment.endLSN
 			segment, err = segment.NextWalSegment()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		case ProcessMessageCopyDone:
 			// segment is a partial. Write, and create a new for the next timeline.
 			err = uploader.UploadWalFile(ctx, ioextensions.NewNamedReaderImpl(segment, segment.Name()))
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			err = uploadRemoteWalMetadata(ctx, segment.Name(), uploader.Uploader)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			timeline++
 			timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, int32(timeline))
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			tlh, err := NewTimeLineHistFile(timeline, timelinehistfile.FileName, timelinehistfile.Content)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			err = uploader.UploadWalFile(ctx, ioextensions.NewNamedReaderImpl(tlh, tlh.Name()))
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			err = uploadRemoteWalMetadata(ctx, tlh.Name(), uploader.Uploader)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
 			startReplication(conn, segment, slot.Name)
 		default:
-			tracelog.ErrorLogger.FatalOnError(errors.Errorf("Unexpected result from WalSegment.Stream() %v", streamResult))
+			logging.FatalOnError(errors.Errorf("Unexpected result from WalSegment.Stream() %v", streamResult))
 		}
 	}
 }
@@ -132,9 +134,9 @@ func getStartTimeline(ctx context.Context,
 	timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, int32(systemTimeline))
 	if err == nil {
 		tlh, err := NewTimeLineHistFile(systemTimeline, timelinehistfile.FileName, timelinehistfile.Content)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		err = uploader.UploadWalFile(ctx, ioextensions.NewNamedReaderImpl(tlh, tlh.Name()))
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		return tlh.LSNToTimeLine(xLogPos)
 	}
 	if pgErr, ok := err.(*pgconn.PgError); ok {
@@ -146,10 +148,10 @@ func getStartTimeline(ctx context.Context,
 }
 
 func startReplication(conn *pgconn.PgConn, segment *WalSegment, slotName string) {
-	tracelog.DebugLogger.Printf("Starting replication from %s: ", segment.StartLSN)
+	slog.Debug(fmt.Sprintf("Starting replication from %s: ", segment.StartLSN))
 	err := pglogrepl.StartReplication(context.Background(), conn, slotName, segment.StartLSN,
 		pglogrepl.StartReplicationOptions{Timeline: int32(segment.TimeLine), Mode: pglogrepl.PhysicalReplication})
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tracelog.DebugLogger.Println("Started replication")
 }
 

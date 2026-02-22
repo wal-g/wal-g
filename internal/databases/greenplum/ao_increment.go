@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -27,7 +28,7 @@ func newUnexpectedTarDataError() UnexpectedTarDataError {
 }
 
 func (err UnexpectedTarDataError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // IncrementFileHeader contains "wi" at the head which stands for "wal-g increment"
@@ -43,7 +44,7 @@ func newUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
 }
 
 func (err UnknownIncrementFileHeaderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type InvalidIncrementFileHeaderError struct {
@@ -55,7 +56,7 @@ func newInvalidIncrementFileHeaderError(header []byte) InvalidIncrementFileHeade
 }
 
 func (err InvalidIncrementFileHeaderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 func ReadIncrementFileHeader(reader io.Reader) error {
@@ -78,7 +79,7 @@ func ReadIncrementFileHeader(reader io.Reader) error {
 }
 
 func ApplyFileIncrement(fileName string, increment io.Reader, fsync bool) error {
-	tracelog.DebugLogger.Printf("Incrementing AO/AOCS segment %s\n", fileName)
+	slog.Debug(fmt.Sprintf("Incrementing AO/AOCS segment %s\n", fileName))
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
 		return err

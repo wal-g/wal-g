@@ -1,12 +1,15 @@
 package mysql
 
 import (
+	"fmt"
+	"log/slog"
 	"path"
 	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -19,9 +22,9 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 		return
 	}
 	infos, err := backupCopyingInfo(backupName, prefix, from.RootFolder(), to.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
-	tracelog.DebugLogger.Printf("copying files %s\n", strings.Join(func() []string {
+	slog.Debug(fmt.Sprintf("copying files %s\n", strings.Join(func()) []string {
 		ret := make([]string, 0)
 		for _, e := range infos {
 			ret = append(ret, e.SrcObj.GetName())
@@ -30,9 +33,9 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 		return ret
 	}(), ","))
 
-	tracelog.ErrorLogger.FatalOnError(copy.Infos(infos))
+	logging.FatalOnError(copy.Infos(infos))
 
-	tracelog.InfoLogger.Printf("Success copyed backup %s.\n", backupName)
+	slog.Info(fmt.Sprintf("Success copyed backup %s.\n", backupName))
 }
 
 // HandleCopyBackup copy  all backups from one storage to another
@@ -43,19 +46,19 @@ func HandleCopyAll(fromConfigFile string, toConfigFile string) {
 		return
 	}
 	infos, err := WildcardInfo(from.RootFolder(), to.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = copy.Infos(infos)
-	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Printf("Success copyed all backups\n")
+	logging.FatalOnError(err)
+	slog.Info(fmt.Sprintf("Success copyed all backups\n"))
 }
 
 func backupCopyingInfo(backupName, prefix string, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
-	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
+	slog.Info(fmt.Sprintf("Handle backupname '%s'.", backupName))
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
 	if err != nil {
 		return nil, err
 	}
-	tracelog.InfoLogger.Print("Collecting backup files...")
+	slog.Info("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 
 	objects, err := storage.ListFolderRecursively(from)

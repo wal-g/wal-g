@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -28,7 +30,7 @@ func newCantOverwriteWalFileError(walFilePath string) CantOverwriteWalFileError 
 }
 
 func (err CantOverwriteWalFileError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // TODO : unit tests
@@ -122,6 +124,6 @@ func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAtte
 	if !bytes.Equal(archived, localBytes) {
 		return true, newCantOverwriteWalFileError(walFilePath)
 	}
-	tracelog.InfoLogger.Printf("WAL file '%s' already archived with equal content, skipping", walFilePath)
+	slog.Info(fmt.Sprintf("WAL file '%s' already archived with equal content, skipping", walFilePath))
 	return true, nil
 }

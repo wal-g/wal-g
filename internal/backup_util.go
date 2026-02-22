@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 	"sort"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -49,7 +51,7 @@ func FilterOutNoBackupFoundError(err error, json bool) error {
 }
 
 func (err NoBackupsFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 func GetBackupByName(backupName, subfolder string, folder storage.Folder) (backup Backup, err error) {
@@ -70,7 +72,7 @@ func GetLatestBackup(folder storage.Folder) (backup Backup, err error) {
 	SortBackupTimeSlices(backupTimes)
 
 	latest := backupTimes[len(backupTimes)-1]
-	tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest.BackupName)
+	slog.Info(fmt.Sprintf("LATEST backup is: '%s'\n", latest.BackupName))
 
 	return NewBackupInStorage(folder, latest.BackupName, latest.StorageName)
 }
@@ -191,7 +193,7 @@ func UnwrapLatestModifier(backupName string, folder storage.Folder) (string, err
 	if err != nil {
 		return "", err
 	}
-	tracelog.InfoLogger.Printf("LATEST backup is: '%s'\n", latest)
+	slog.Info(fmt.Sprintf("LATEST backup is: '%s'\n", latest))
 	return latest.Name, nil
 }
 
@@ -218,13 +220,13 @@ func SplitPurgingBackups(backups []TimedBackup,
 	for i := range backups {
 		backup := backups[i]
 		if backup.IsPermanent() {
-			tracelog.DebugLogger.Printf("Preserving backup due to keep permanent policy: %s", backup.Name())
+			slog.Debug(fmt.Sprintf("Preserving backup due to keep permanent policy: %s", backup.Name()))
 			retain[backup.Name()] = true
 			continue
 		}
 
 		if retainAll {
-			tracelog.DebugLogger.Printf("Preserving backup due to an unspecified policy: %s", backup.Name())
+			slog.Debug(fmt.Sprintf("Preserving backup due to an unspecified policy: %s", backup.Name()))
 			retain[backup.Name()] = true
 			continue
 		}
@@ -238,7 +240,7 @@ func SplitPurgingBackups(backups []TimedBackup,
 		}
 
 		if retainAfter != nil && backup.StartTime().After(*retainAfter) { // TODO: fix condition, use func args
-			tracelog.DebugLogger.Printf("Preserving backup due to retain time policy: %s", backup.Name())
+			slog.Debug(fmt.Sprintf("Preserving backup due to retain time policy: %s", backup.Name()))
 			retain[backup.Name()] = true
 			continue
 		}
@@ -259,7 +261,7 @@ func DeleteGarbage(folder storage.Folder, garbage []string) error {
 			keys = append(keys, path.Join(prefix, obj.GetName()))
 		}
 	}
-	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", keys)
+	slog.Debug(fmt.Sprintf("Garbage keys will be deleted: %+v\n", keys))
 	return folder.DeleteObjects(keys)
 }
 
@@ -280,7 +282,7 @@ func DeleteBackups(folder storage.Folder, backups []string) error {
 		}
 	}
 
-	tracelog.DebugLogger.Printf("Backup keys will be deleted: %+v\n", keys)
+	slog.Debug(fmt.Sprintf("Backup keys will be deleted: %+v\n", keys))
 	if err := folder.DeleteObjects(keys); err != nil {
 		return err
 	}

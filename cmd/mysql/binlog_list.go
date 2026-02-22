@@ -2,9 +2,9 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const binlogListShortDescription = "List available binlogs in storage"
@@ -20,11 +20,11 @@ var binlogListCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	PreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		mysql.HandleBinlogList(storage.RootFolder(), listSince, listUntil, prettyOutput, jsonOutput)
 	},
 }

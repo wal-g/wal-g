@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"path"
 
 	"github.com/wal-g/tracelog"
@@ -84,7 +85,7 @@ func PrepareMultiStorageWalUploader(folder storage.Folder, targetStorage string)
 	if err != nil {
 		return nil, err
 	}
-	tracelog.InfoLogger.Printf("Files will be uploaded to storage: %v", multistorage.UsedStorages(folder)[0])
+	slog.Info(fmt.Sprintf("Files will be uploaded to storage: %v", multistorage.UsedStorages(folder)[0]))
 
 	baseUploader, err := internal.ConfigureUploaderToFolder(folder)
 	if err != nil {

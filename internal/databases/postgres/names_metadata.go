@@ -2,11 +2,12 @@ package postgres
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type DatabasesByNames map[string]DatabaseObjectsInfo
@@ -46,7 +47,7 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 	if err != nil {
 		return map[uint32][]uint32{}, err
 	}
-	tracelog.InfoLogger.Printf("unpaсked keys  %s %s", database, table)
+	slog.Info(fmt.Sprintf("unpaсked keys  %s %s", database, table))
 	toRestore := map[uint32][]uint32{}
 	database = strings.ReplaceAll(database, "*", ".*")
 	table = strings.ReplaceAll(table, "*", ".*")
@@ -56,14 +57,14 @@ func (meta DatabasesByNames) ResolveRegexp(key string) (map[uint32][]uint32, err
 		if databaseRegexp.MatchString(db) {
 			toRestore[dbInfo.Oid] = []uint32{}
 			if table == "" {
-				tracelog.InfoLogger.Printf("restore all for  %s", db)
+				slog.Info(fmt.Sprintf("restore all for  %s", db))
 			}
 			for name, tableInfo := range dbInfo.Tables {
 				if table == "" || tableRegexp.MatchString(name) {
-					tracelog.InfoLogger.Printf("table to restore through key  %d %s", tableInfo.Relfilenode, table)
+					slog.Info(fmt.Sprintf("table to restore through key  %d %s", tableInfo.Relfilenode, table))
 					toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], tableInfo.Relfilenode)
 					for _, tableInfo2 := range tableInfo.SubTables {
-						tracelog.InfoLogger.Printf("subtanble for the table table to restore through key  %d %s", tableInfo2.Relfilenode, table)
+						slog.Info(fmt.Sprintf("subtanble for the table table to restore through key  %d %s", tableInfo2.Relfilenode, table))
 						toRestore[dbInfo.Oid] = append(toRestore[dbInfo.Oid], tableInfo2.Relfilenode)
 					}
 				}
@@ -79,7 +80,7 @@ func (meta DatabasesByNames) GetSystemTables() RestoreDesc {
 		toRestore[dbInfo.Oid] = map[uint32]uint32{}
 		for _, tableInfo := range dbInfo.Tables {
 			if tableInfo.Oid < systemIDLimit {
-				tracelog.DebugLogger.Printf("chose table %d to restore as system one", tableInfo.Oid)
+				slog.Debug(fmt.Sprintf("chose table %d to restore as system one", tableInfo.Oid))
 				toRestore[dbInfo.Oid][tableInfo.Relfilenode] = tableInfo.Oid
 			}
 		}
@@ -134,7 +135,7 @@ func newMetaDatabaseNameError(databaseName string) metaDatabaseNameError {
 	return metaDatabaseNameError{errors.Errorf("Can't find database in meta with name: '%s'", databaseName)}
 }
 func (err metaDatabaseNameError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type metaTableNameError struct {
@@ -146,7 +147,7 @@ func newMetaTableNameError(databaseName, tableName string) metaTableNameError {
 		errors.Errorf("Can't find table in meta for '%s' database and name: '%s'", databaseName, tableName)}
 }
 func (err metaTableNameError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type metaIncorrectKeyError struct {
@@ -159,5 +160,5 @@ func newMetaIncorrectKeyError(key string) metaIncorrectKeyError {
 			"Use 'dat', 'dat/rel' or 'dat/nmsp.rel'", key)}
 }
 func (err metaIncorrectKeyError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }

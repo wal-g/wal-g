@@ -4,6 +4,7 @@ import (
 	"context"
 	json2 "encoding/json/v2"
 	"fmt"
+
 	"golang.org/x/sync/errgroup"
 
 	"io"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/statistics"
 
 	"github.com/wal-g/tracelog"
@@ -203,7 +205,7 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
 		uploader.failed.Load()
-		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
+		tracelog.ErrorLogger.Printf(logging.GetErrorFormatter()+"\n", err)
 		return err
 	}
 	return nil

@@ -2,13 +2,14 @@ package greenplum
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/wal-g/tracelog"
 )
 
 type SegmentRole string
@@ -101,7 +102,7 @@ func NewBackupSentinelDto(currBackupInfo *CurrBackupInfo, prevBackupInfo *PrevBa
 	isPermanent bool) BackupSentinelDto {
 	hostname, err := os.Hostname()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to fetch the hostname for metadata, leaving empty: %v", err))
 	}
 
 	sentinel := BackupSentinelDto{

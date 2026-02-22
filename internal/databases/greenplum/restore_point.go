@@ -3,12 +3,15 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"log/slog"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
+
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
@@ -136,21 +139,21 @@ func (rpc *RestorePointCreator) Create() {
 	initGpLog(rpc.logsDir)
 
 	err := rpc.checkExists()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	restoreLSNs, timeLine, err := createRestorePoint(rpc.Conn, rpc.pointName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = rpc.uploadMetadata(restoreLSNs, timeLine)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for restore point %s", rpc.pointName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	tracelog.InfoLogger.Printf("Restore point %s successfully created", rpc.pointName)
+	slog.Info(fmt.Sprintf("Restore point %s successfully created", rpc.pointName))
 }
 
 func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs map[int]string, timeLine uint32, err error) {
-	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
+	slog.Info(fmt.Sprintf("Creating restore point with name %s", restorePointName))
 	queryRunner, err := NewGpQueryRunner(conn)
 	if err != nil {
 		return nil, 0, err
@@ -210,7 +213,7 @@ func (rpc *RestorePointCreator) checkExists() error {
 func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string, timeLine uint32) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to fetch the hostname for metadata, leaving empty: %v", err))
 	}
 
 	meta := RestorePointMetadata{
@@ -226,7 +229,7 @@ func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string, timeL
 	}
 
 	metaFileName := RestorePointMetadataFileName(rpc.pointName)
-	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
+	slog.Info(fmt.Sprintf("Uploading restore point metadata file %s", metaFileName))
 	tracelog.InfoLogger.Println(meta.String())
 
 	return internal.UploadDto(rpc.Uploader.Folder(), meta, metaFileName)

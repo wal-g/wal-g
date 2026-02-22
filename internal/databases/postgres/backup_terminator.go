@@ -1,10 +1,10 @@
 package postgres
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"path"
-
-	"github.com/wal-g/tracelog"
 )
 
 const backupLabelFileName = "backup_label"
@@ -26,11 +26,11 @@ func NewBackupTerminator(queryRunner *PgQueryRunner, pgVersion int, pgDataDir st
 func (t *BackupTerminator) TerminateBackup() {
 	_, _, _, err := t.queryRunner.StopBackup()
 	if err == nil {
-		tracelog.InfoLogger.Printf("Successfully stopped the running backup")
+		slog.Info(fmt.Sprintf("Successfully stopped the running backup"))
 		return
 	}
 
-	tracelog.WarningLogger.Printf("Failed to stop backup: %v", err)
+	slog.Warn(fmt.Sprintf("Failed to stop backup: %v", err))
 	// failed to stop backup, try to rename the backup_label file (if required)
 	t.renameBackupLabel()
 }
@@ -44,8 +44,8 @@ func (t *BackupTerminator) renameBackupLabel() {
 	backupLabelDstPath := path.Join(t.pgDataDir, backupLabelDstFileName)
 	err := os.Rename(backupLabelPath, backupLabelDstPath)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to rename the backup label file (%s -> %s): %v", backupLabelPath, backupLabelDstPath, err)
+		slog.Warn(fmt.Sprintf("Failed to rename the backup label file (%s -> %s): %v", backupLabelPath, backupLabelDstPath, err))
 		return
 	}
-	tracelog.InfoLogger.Printf("Successfully renamed the backup label file (%s -> %s)", backupLabelPath, backupLabelDstPath)
+	slog.Info(fmt.Sprintf("Successfully renamed the backup label file (%s -> %s)", backupLabelPath, backupLabelDstPath))
 }

@@ -2,10 +2,13 @@ package binary
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
+	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 
 	"github.com/wal-g/tracelog"
 
@@ -53,11 +56,11 @@ func (backupService *BackupService) createInitialJournals(journalFiles *internal
 	backupTimes, err := internal.GetBackups(backupFolder)
 	if err != nil {
 		// no backups is a valid case, no journals should be created then
-		tracelog.WarningLogger.Printf("can not get backups: %+v", err)
+		slog.Warn(fmt.Sprintf("can not get backups: %+v", err))
 		return internal.JournalInfo{}
 	}
 
-	tracelog.WarningLogger.Printf("trying to create initial journals")
+	slog.Warn(fmt.Sprintf("trying to create initial journals"))
 	internal.SortBackupTimeSlices(backupTimes)
 	mostRecentJournalInfo := internal.JournalInfo{}
 	for _, backupTime := range backupTimes {
@@ -85,7 +88,7 @@ func (backupService *BackupService) addJournalInfo(args addJournalInfoArgs) inte
 
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
+		slog.Warn(fmt.Sprintf("Can't configure storage: %+v", err))
 		return internal.JournalInfo{}
 	}
 
@@ -98,29 +101,29 @@ func (backupService *BackupService) addJournalInfo(args addJournalInfoArgs) inte
 
 	err = journalInfo.Upload(rootFolder)
 	if err != nil {
-		tracelog.WarningLogger.Printf("can not upload the journal info: %+v", err)
+		slog.Warn(fmt.Sprintf("can not upload the journal info: %+v", err))
 		return internal.JournalInfo{}
 	}
 
 	err = journalInfo.UpdateIntervalSize(rootFolder, args.journalFiles)
 	if err != nil {
-		tracelog.WarningLogger.Printf("can not calculate journal size: %+v", err)
+		slog.Warn(fmt.Sprintf("can not calculate journal size: %+v", err))
 		return internal.JournalInfo{}
 	}
 
-	tracelog.InfoLogger.Printf("uploaded journal info for %s", args.backupName)
+	slog.Info(fmt.Sprintf("uploaded journal info for %s", args.backupName))
 	return journalInfo
 }
 
 func (backupService *BackupService) calculateSizes(args CalculateSizesArgs) {
 	if !args.CountJournals {
-		tracelog.InfoLogger.Printf("oplog counting mode is disabled: option is disabled")
+		slog.Info(fmt.Sprintf("oplog counting mode is disabled: option is disabled"))
 		return
 	}
 
 	storage, err := internal.ConfigureStorage()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
+		slog.Warn(fmt.Sprintf("Can't configure storage: %+v", err))
 		return
 	}
 
@@ -131,7 +134,7 @@ func (backupService *BackupService) calculateSizes(args CalculateSizesArgs) {
 	)
 	if errors.Is(err, internal.JournalsNotFound) {
 		// there can be no backups on S3 or we do it first time
-		tracelog.WarningLogger.Printf("can not find the last journal info: %+v", err)
+		slog.Warn(fmt.Sprintf("can not find the last journal info: %+v", err))
 		mostRecentJournalInfo = backupService.createInitialJournals(journalFiles)
 	}
 

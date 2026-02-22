@@ -6,9 +6,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -27,15 +27,15 @@ var backupFetchCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr
 
 		backupSelector, err := internal.NewBackupNameSelector(args[0], true)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		internal.HandleBackupFetch(storage.RootFolder(), backupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 	},

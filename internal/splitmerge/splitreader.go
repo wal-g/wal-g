@@ -2,7 +2,9 @@ package splitmerge
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/wal-g/tracelog"
 )
@@ -34,7 +36,7 @@ func SplitReader(ctx context.Context, reader io.Reader, parts int, blockSize int
 				}
 
 				if bytes != blockSize {
-					tracelog.InfoLogger.Printf("SplitReader. #%d send: %d / %d bytes", idx, bytes, blockSize)
+					slog.Info(fmt.Sprintf("SplitReader. #%d send: %d / %d bytes", idx, bytes, blockSize))
 				}
 			}
 			if err == io.ErrUnexpectedEOF || err == io.EOF {

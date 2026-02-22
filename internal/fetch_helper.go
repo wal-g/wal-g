@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/user"
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -25,7 +26,7 @@ func newArchiveNonExistenceError(archiveName string) ArchiveNonExistenceError {
 }
 
 func (err ArchiveNonExistenceError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // DownloadFile downloads, decompresses and decrypts
@@ -36,7 +37,7 @@ func DownloadFile(reader StorageFolderReader, filename, ext string, writeCloser 
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for extension '%s' was not found", ext)
 	}
-	tracelog.DebugLogger.Printf("Found decompressor for %s", decompressor.FileExtension())
+	slog.Debug(fmt.Sprintf("Found decompressor for %s", decompressor.FileExtension()))
 
 	archiveReader, exists, err := TryDownloadFile(reader, filename)
 	if err != nil {
@@ -75,7 +76,7 @@ func DecompressDecryptBytes(archiveReader io.Reader, decompressor compression.De
 		return nil, err
 	}
 	if decompressor == nil {
-		tracelog.DebugLogger.Printf("No decompressor has been selected")
+		slog.Debug(fmt.Sprintf("No decompressor has been selected"))
 		return io.NopCloser(decryptReader), nil
 	}
 	return decompressor.Decompress(decryptReader)
@@ -84,11 +85,11 @@ func DecompressDecryptBytes(archiveReader io.Reader, decompressor compression.De
 func DecryptBytes(archiveReader io.Reader) (io.Reader, error) {
 	crypter := ConfigureCrypter()
 	if crypter == nil {
-		tracelog.DebugLogger.Printf("No crypter has been selected")
+		slog.Debug(fmt.Sprintf("No crypter has been selected"))
 		return archiveReader, nil
 	}
 
-	tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
+	slog.Debug(fmt.Sprintf("Selected crypter: %s", crypter.Name()))
 
 	decryptReader, err := crypter.Decrypt(archiveReader)
 	if err != nil {

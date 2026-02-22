@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
@@ -17,8 +18,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -105,7 +106,7 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 	remaps := TarballStreamerRemaps{}
 	if bb.tbsPointer == len(bb.tablespaces) {
 		tee = append(tee, "global/pg_control")
-		tracelog.InfoLogger.Printf("Adding data directory")
+		slog.Info(fmt.Sprintf("Adding data directory"))
 	} else {
 		curTbs := bb.tablespaces[bb.tbsPointer]
 		tsr, err := NewTarballStreamerRemap("^", fmt.Sprintf("pg_tblspc/%d/", curTbs.OID))
@@ -113,7 +114,7 @@ func (bb *StreamingBaseBackup) nextTbs() (err error) {
 			return err
 		}
 		remaps = append(remaps, *tsr)
-		tracelog.InfoLogger.Printf("Adding tablespace %d (%s)", curTbs.OID, curTbs.Location)
+		slog.Info(fmt.Sprintf("Adding tablespace %d (%s)", curTbs.OID, curTbs.Location))
 	}
 	bb.streamer.Tee = tee
 	bb.streamer.Remaps = remaps
@@ -216,7 +217,7 @@ func (bb *StreamingBaseBackup) streamFromPostgres() (err error) {
 		if pgconn.Timeout(err) {
 			continue
 		}
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		switch msg := message.(type) {
 		case *pgproto3.CopyData:
 			bb.buffer = msg.Data

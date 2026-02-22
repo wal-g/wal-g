@@ -3,14 +3,15 @@ package yckms
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
+	"log/slog"
 
 	"github.com/pkg/errors"
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/kms/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 
@@ -105,7 +106,7 @@ func readEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 		return nil, err
 	}
 	keyID := string(keyIDBytes)
-	tracelog.DebugLogger.Printf("Encrypted key was found: %s\n", keyID)
+	slog.Debug(fmt.Sprintf("Encrypted key was found: %s\n", keyID))
 
 	encryptedKeyLenBytes := make([]byte, sizeofInt32)
 	_, err = io.ReadFull(r, encryptedKeyLenBytes)

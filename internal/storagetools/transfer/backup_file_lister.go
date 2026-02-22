@@ -1,10 +1,11 @@
 package transfer
 
 import (
+	"fmt"
+	"log/slog"
 	"path"
 	"strings"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -70,7 +71,7 @@ func findBackups(files map[string]storage.Object, targetName string) map[string]
 		}
 		backups[backupName] = backup
 	}
-	tracelog.InfoLogger.Printf("Backups missing in the target storage: %d", len(backups))
+	slog.Info(fmt.Sprintf("Backups missing in the target storage: %d", len(backups)))
 	return backups
 }
 
@@ -102,11 +103,11 @@ func groupAndLimitBackupFiles(backups map[string]backupFiles, maxFiles, maxBacku
 	fileGroups := make([]FilesGroup, 0, len(backups))
 	for name, backup := range backups {
 		if backup.sentinel == nil {
-			tracelog.InfoLogger.Printf("Skip incomplete backup without sentinel file: %s", name)
+			slog.Info(fmt.Sprintf("Skip incomplete backup without sentinel file: %s", name))
 			continue
 		}
 		if len(backup.backupData) == 0 {
-			tracelog.WarningLogger.Printf("Backup doesn't have any data: %s", name)
+			slog.Warn(fmt.Sprintf("Backup doesn't have any data: %s", name))
 			continue
 		}
 
@@ -122,8 +123,8 @@ func groupAndLimitBackupFiles(backups map[string]backupFiles, maxFiles, maxBacku
 			break
 		}
 	}
-	tracelog.InfoLogger.Printf("Backups will be transferred: %d", len(fileGroups))
-	tracelog.InfoLogger.Printf("Files will be transferred: %d", filesCount)
+	slog.Info(fmt.Sprintf("Backups will be transferred: %d", len(fileGroups)))
+	slog.Info(fmt.Sprintf("Files will be transferred: %d", filesCount))
 	return fileGroups, filesCount
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/consts"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -35,7 +36,7 @@ var getStreamCmd = &cobra.Command{
 		if len(args) == 2 {
 			dstPath := args[1]
 			file, err := os.Create(dstPath)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			defer utility.LoggedClose(file, "got an error during stream-file close()")
 			outStream = file
 		}
@@ -45,17 +46,17 @@ var getStreamCmd = &cobra.Command{
 		}
 
 		backupSelector, err := internal.NewTargetBackupSelector("", backupName, mysql.NewGenericMetaFetcher())
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = exec.OnStorage(targetStorage, func(folder storage.Folder) error {
 			backup, err := backupSelector.Select(folder)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			fetcher, err := internal.GetBackupStreamFetcher(backup)
 			tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
 
 			return fetcher(backup, outStream)
 		})
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

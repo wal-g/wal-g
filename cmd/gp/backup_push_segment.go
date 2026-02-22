@@ -2,6 +2,7 @@ package gp
 
 import (
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -31,10 +32,10 @@ var (
 			greenplum.SetSegmentStoragePrefix(contentID)
 
 			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			dataDirectory := args[0]
 
@@ -53,7 +54,7 @@ var (
 			}
 			deltaBaseSelector, err := internal.NewDeltaBaseSelector(
 				deltaFromName, deltaFromUserData, postgres.NewGenericMetaFetcher())
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
@@ -70,7 +71,7 @@ var (
 				userData, viper.GetBool(conf.WithoutFilesMetadataSetting))
 
 			backupHandler, err := greenplum.NewSegBackupHandler(arguments)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
 		},
 	}

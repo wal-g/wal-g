@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -51,14 +52,14 @@ func runPurge(cmd *cobra.Command, args []string) {
 
 	// set up storage downloader client
 	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	// set up storage downloader client
 	purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = mongo.HandlePurge(downloader, purger, opts...)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func init() {

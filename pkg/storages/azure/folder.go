@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"time"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -121,7 +121,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 }
 
 func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
+	slog.Debug(fmt.Sprintf("Put %v into %v\n", name, folder.path))
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
 	blobClient := folder.containerClient.NewBlockBlobClient(path)
@@ -130,7 +130,7 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 		return fmt.Errorf("upload blob %q: %w", path, err)
 	}
 
-	tracelog.DebugLogger.Printf("Put %v done\n", name)
+	slog.Debug(fmt.Sprintf("Put %v done\n", name))
 	return nil
 }
 
@@ -155,7 +155,7 @@ func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 		//Delete blob using blobClient obtained from full path to blob
 		path := storage.JoinPath(folder.path, objectRelativePath)
 		blobClient := folder.containerClient.NewBlockBlobClient(path)
-		tracelog.DebugLogger.Printf("Delete %v\n", path)
+		slog.Debug(fmt.Sprintf("Delete %v\n", path))
 		deleteOption := blob.DeleteSnapshotsOptionTypeInclude
 		_, err := blobClient.Delete(context.Background(), &blob.DeleteOptions{DeleteSnapshots: &deleteOption})
 		if err != nil && bloberror.HasCode(err, bloberror.BlobNotFound) {

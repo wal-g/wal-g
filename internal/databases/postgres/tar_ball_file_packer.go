@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/wal-g/wal-g/internal"
@@ -14,6 +15,7 @@ import (
 	pg_errors "github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/errgroup"
 )
@@ -27,7 +29,7 @@ func newSkippedFileError(path string) SkippedFileError {
 }
 
 func (err SkippedFileError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type TarBallFilePackerOptions struct {
@@ -152,7 +154,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 				Closer: fileReadCloser,
 			}
 		case pg_errors.InvalidBlockError: // fallback to full file backup
-			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.Header.Name)
+			slog.Warn(fmt.Sprintf("failed to read file '%s' as incremented\n", cfi.Header.Name))
 			cfi.IsIncremented = false
 			fileReadCloser, err = internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
 			if err != nil {

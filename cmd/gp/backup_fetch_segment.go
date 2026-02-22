@@ -10,6 +10,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
@@ -41,10 +42,10 @@ var segBackupFetchCmd = &cobra.Command{
 		greenplum.SetSegmentStoragePrefix(contentID)
 
 		targetBackupSelector, err := createTargetFetchSegBackupSelector(cmd, args, fetchTargetUserData)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		reverseDeltaUnpack := viper.GetBool(conf.UseReverseUnpackSetting)
 		skipRedundantTars := viper.GetBool(conf.SkipRedundantTarsSetting)

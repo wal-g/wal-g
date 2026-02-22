@@ -3,11 +3,13 @@ package greenplum
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"golang.org/x/sync/errgroup"
@@ -74,47 +76,47 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string) {
 	modifier, beforeStr := internal.ExtractDeleteModifierFromArgs(args)
 
 	target, err := h.FindTargetBefore(beforeStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
-		tracelog.InfoLogger.Printf("No backup found for deletion")
+		slog.Info(fmt.Sprintf("No backup found for deletion"))
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetain(args []string) {
 	modifier, retentionStr := internal.ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetain(retentionCount, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
-		tracelog.InfoLogger.Printf("No backup found for deletion")
+		slog.Info(fmt.Sprintf("No backup found for deletion"))
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetainAfter(args []string) {
 	modifier, retentionSir, afterStr := internal.ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetainAfter(retentionCount, afterStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
-		tracelog.InfoLogger.Printf("No backup found for deletion")
+		slog.Info(fmt.Sprintf("No backup found for deletion"))
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteEverything(args []string) {
@@ -127,7 +129,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete the segments backups: %w", err)
 	}
-	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
+	slog.Info(fmt.Sprintf("Finished deleting the segments backups"))
 
 	objFilter := func(object storage.Object) bool { return true }
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
@@ -136,7 +138,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 
 func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelector) {
 	target, err := h.FindTargetBySelector(targetSelector)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
 		// since we want to delete the target backup, we should fail if
@@ -149,11 +151,11 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelecto
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
 	}
-	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
+	slog.Info(fmt.Sprintf("Finished deleting the segments backups"))
 
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(target, h.args.Confirmed, h.args.FindFull, folderFilter)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {
@@ -168,7 +170,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 
 	deleteConcurrency, err := conf.GetMaxConcurrency(conf.GPDeleteConcurrency)
 	if err != nil {
-		tracelog.WarningLogger.Printf("config error: %v", err)
+		slog.Warn(fmt.Sprintf("config error: %v", err))
 	}
 
 	errorGroup, _ := errgroup.WithContext(context.Background())
@@ -177,7 +179,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 	// clean the segments
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
-		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)", meta.ContentID, meta.BackupID)
+		slog.Info(fmt.Sprintf("Processing segment %d (backupId=%s)", meta.ContentID, meta.BackupID))
 
 		errorGroup.Go(func() error {
 			segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args, delType)
@@ -226,7 +228,7 @@ func (h *DeleteHandler) HandleDeleteGarbage(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete: %w", err)
 	}
-	tracelog.InfoLogger.Printf("Finished processing the segments backups")
+	slog.Info(fmt.Sprintf("Finished processing the segments backups"))
 
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
 	return h.DeleteBeforeTargetWhere(target, h.args.Confirmed, predicate, folderFilter)

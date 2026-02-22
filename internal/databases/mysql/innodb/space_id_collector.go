@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -54,7 +55,7 @@ func NewSpaceIDCollector(dataDir string) (SpaceIDCollector, error) {
 		return nil, err
 	}
 
-	tracelog.DebugLogger.Printf("SpaceIDCollector for dir %v collected %v", dataDir, result.collected)
+	slog.Debug(fmt.Sprintf("SpaceIDCollector for dir %v collected %v", dataDir, result.collected))
 
 	return result, nil
 }
@@ -64,13 +65,13 @@ func (c *spaceIDCollectorImpl) collect(filePath string) (SpaceID, error) {
 	// read first FPS page (always first page in the file)
 	file, err := fsutil.OpenFileSecure(filePath, os.O_RDONLY, 0) // FIXME: test performance with O_SYNC
 	if err != nil {
-		tracelog.DebugLogger.Printf("error opening file %v: %v", filePath, err)
+		slog.Debug(fmt.Sprintf("error opening file %v: %v", filePath, err))
 		return SpaceIDUnknown, ErrSpaceIDNotFound
 	}
 
 	reader, err := NewPageReader(file)
 	if err != nil {
-		tracelog.InfoLogger.Printf("cannot collect spaceID from file %v: %v", filePath, err)
+		slog.Info(fmt.Sprintf("cannot collect spaceID from file %v: %v", filePath, err))
 		return SpaceIDUnknown, ErrSpaceIDNotFound
 	}
 	defer utility.LoggedClose(reader, "")

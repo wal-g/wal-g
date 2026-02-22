@@ -1,6 +1,8 @@
 package mongo
 
 import (
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -79,7 +81,7 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 	}
 
 	if opts.purgeGarbage {
-		tracelog.InfoLogger.Printf("Garbage prefixes in backups folder: %v", garbage)
+		slog.Info(fmt.Sprintf("Garbage prefixes in backups folder: %v", garbage))
 		if !opts.dryRun {
 			if err := purger.DeleteGarbage(garbage); err != nil {
 				return err
@@ -115,14 +117,14 @@ func HandleBackupsPurge(backupTimes []internal.BackupTime,
 	}
 
 	purge, retain = archive.SplitMongoBackups(backups, purgeBackups, retainBackups)
-	tracelog.InfoLogger.Printf("Backups selected to be deleted: %v", archive.BackupNamesFromBackups(purge))
-	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", archive.BackupNamesFromBackups(retain))
+	slog.Info(fmt.Sprintf("Backups selected to be deleted: %v", archive.BackupNamesFromBackups(purge)))
+	slog.Info(fmt.Sprintf("Backups selected to be retained: %v", archive.BackupNamesFromBackups(retain)))
 
 	if !opts.dryRun {
 		if err := purger.DeleteBackups(purge); err != nil {
 			return nil, nil, err
 		}
-		tracelog.InfoLogger.Printf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain))
+		slog.Info(fmt.Sprintf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain)))
 	}
 	return purge, retain, nil
 }

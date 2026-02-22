@@ -5,9 +5,9 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -26,7 +26,7 @@ func newCompressingPipeWriterError(reason string, cause error) CompressAndEncryp
 }
 
 func (err CompressAndEncryptError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // CompressAndEncrypt compresses input to a pipe reader. Output must be used or

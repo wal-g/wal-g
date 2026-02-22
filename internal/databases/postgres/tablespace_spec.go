@@ -3,11 +3,11 @@ package postgres
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -195,7 +195,7 @@ func (spec *TablespaceSpec) EnsureSymlinkExist(location TablespaceLocation) erro
 		if linktarget != location.Location {
 			return errors.Errorf("symlink %v having incorrect target", linkpath)
 		}
-		tracelog.WarningLogger.Printf("Symlink %v already exists", linkpath)
+		slog.Warn(fmt.Sprintf("Symlink %v already exists", linkpath))
 	}
 	return nil
 }

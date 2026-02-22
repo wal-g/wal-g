@@ -8,9 +8,9 @@ import (
 	"strconv"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -31,7 +31,7 @@ func newHistoryFileNotFoundError(historyFileName string) HistoryFileNotFoundErro
 }
 
 func (err HistoryFileNotFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // TimelineHistoryRecord represents entry in .history file

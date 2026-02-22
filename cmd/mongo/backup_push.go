@@ -12,6 +12,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -38,18 +39,18 @@ var backupPushCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		mongodbURL, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		// set up mongodb client and oplog fetcher
 		mongoClient, err := client.NewMongoClient(ctx, mongodbURL)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		uplProvider, err := internal.ConfigureSplitUploader()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		uplProvider.ChangeDirectory(utility.BaseBackupPath)
 
 		backupCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamCreateCmd)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		backupCmd.Stderr = os.Stderr
 		uploader := archive.NewStorageUploader(uplProvider)
 		metaConstructor := archive.NewBackupMongoMetaConstructor(ctx, mongoClient, uplProvider.Folder(), permanent)
@@ -60,7 +61,7 @@ var backupPushCmd = &cobra.Command{
 	PreRun: func(cmd *cobra.Command, args []string) {
 		conf.RequiredSettings[conf.NameStreamCreateCmd] = true
 		err := internal.AssertRequiredSettingsSet()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

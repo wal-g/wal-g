@@ -3,6 +3,7 @@ package s3
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -65,13 +66,13 @@ func createSession(config *Config) (*session.Session, error) {
 		sess.Handlers.Validate.PushBack(func(request *request.Request) {
 			endpoint := requestEndpointFromSource(config.EndpointSource, config.EndpointPort)
 			if endpoint != nil {
-				tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
+				slog.Debug(fmt.Sprintf("using S3 endpoint %s", *endpoint))
 				host := strings.TrimPrefix(*sess.Config.Endpoint, "https://")
 				request.HTTPRequest.Host = host
 				request.HTTPRequest.URL.Host = *endpoint
 				request.HTTPRequest.URL.Scheme = "http"
 			} else {
-				tracelog.DebugLogger.Printf("using S3 endpoint %s", *sess.Config.Endpoint)
+				slog.Debug(fmt.Sprintf("using S3 endpoint %s", *sess.Config.Endpoint))
 			}
 		})
 	}
@@ -113,7 +114,7 @@ func configureSession(sess *session.Session, config *Config) error {
 	if config.RoleARN != "" {
 		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != "" && os.Getenv("AWS_ROLE_ARN") != "" {
 			// Skip explicit role assumption when using IRSA
-			tracelog.InfoLogger.Printf("Running with IRSA, skipping explicit role assumption")
+			slog.Info(fmt.Sprintf("Running with IRSA, skipping explicit role assumption"))
 		} else {
 			stsSession := sts.New(sess)
 			assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
@@ -175,7 +176,7 @@ func configureSession(sess *session.Session, config *Config) error {
 	} else {
 		awsConfig = awsConfig.WithRegion(config.Region)
 	}
-	tracelog.DebugLogger.Printf("disable 100 continue %t", config.Disable100Continue)
+	slog.Debug(fmt.Sprintf("disable 100 continue %t", config.Disable100Continue))
 	awsConfig.S3Disable100Continue = aws.Bool(config.Disable100Continue)
 
 	sess.Config = awsConfig

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -147,7 +149,7 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	}
 
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.InfoLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
+	slog.Info(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmdLine))
 	return cmdLine
 }
 
@@ -213,10 +215,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 
 	restoreLSNs, _, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	bh.currBackupInfo.finishTime = utility.TimeNowCrossPlatformUTC()
 
@@ -229,16 +231,16 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 
 	err = bh.uploadRestorePointMetadata(restoreLSNs)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
-	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
+	slog.Info(fmt.Sprintf("Backup %s successfully created", bh.currBackupInfo.backupName))
 	bh.disconnect()
 }
 
 func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to fetch the hostname for metadata, leaving empty: %v", err))
 	}
 
 	meta := RestorePointMetadata{
@@ -253,7 +255,7 @@ func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) 
 	}
 
 	metaFileName := RestorePointMetadataFileName(meta.Name)
-	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
+	slog.Info(fmt.Sprintf("Uploading restore point metadata file %s", metaFileName))
 	tracelog.InfoLogger.Println(meta.String())
 
 	if err := internal.UploadDto(bh.workers.Uploader.Folder(), meta, metaFileName); err != nil {
@@ -273,7 +275,7 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 				return fmt.Errorf("gave up polling the backup-push states (tried %d times): %v", bh.arguments.segPollRetries, err)
 			}
 			retryCount--
-			tracelog.WarningLogger.Printf("failed to poll segment backup-push states, will try again %d more times", retryCount)
+			slog.Warn(fmt.Sprintf("failed to poll segment backup-push states, will try again %d more times", retryCount))
 			continue
 		}
 		// reset retries after the successful poll
@@ -285,7 +287,7 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 		}
 
 		if runningBackups == 0 {
-			tracelog.InfoLogger.Printf("No running backups left.")
+			slog.Info(fmt.Sprintf("No running backups left."))
 			return nil
 		}
 	}
@@ -295,7 +297,7 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 func (bh *BackupHandler) checkBackupStates(states map[int]SegCmdState) (int, error) {
 	runningBackupsCount := 0
 
-	tracelog.InfoLogger.Printf("backup-push states:")
+	slog.Info(fmt.Sprintf("backup-push states:"))
 	for contentID, state := range states {
 		segments, ok := bh.globalCluster.ByContent[contentID]
 		if !ok || len(segments) != 1 {
@@ -337,7 +339,7 @@ func extractBackupPids(output *cluster.RemoteOutput) (map[int]int, error) {
 		backupPids[command.Content] = pid
 	}
 
-	tracelog.InfoLogger.Printf("WAL-G segment PIDs: %v", backupPids)
+	slog.Info(fmt.Sprintf("WAL-G segment PIDs: %v", backupPids))
 	return backupPids, resErr
 }
 
@@ -347,7 +349,7 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
 		func(contentID int) string {
 			cmd := fmt.Sprintf("cat %s", FormatCmdStatePath(contentID, SegBackupPushCmdName))
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			slog.Debug(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmd))
 			return cmd
 		})
 
@@ -417,14 +419,14 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	}
 
 	if len(isInBackupSegments) > 0 {
-		tracelog.InfoLogger.Printf("backup is already in progress on one or more segments: %v", isInBackupSegments)
+		slog.Info(fmt.Sprintf("backup is already in progress on one or more segments: %v", isInBackupSegments))
 		err = queryRunner.AbortBackup()
 		if err != nil {
 			return fmt.Errorf("closing old backups failed: %v", err)
 		}
 	}
 
-	tracelog.InfoLogger.Printf("Checking backup prerequisites: OK")
+	slog.Info(fmt.Sprintf("Checking backup prerequisites: OK"))
 	return nil
 }
 
@@ -449,7 +451,7 @@ func (bh *BackupHandler) disconnect() {
 	tracelog.InfoLogger.Println("Disconnecting from the Greenplum master.")
 	err := bh.workers.Conn.Close(context.TODO())
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to disconnect: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to disconnect: %v", err))
 	}
 }
 
@@ -515,7 +517,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
-	tracelog.InfoLogger.Printf("Greenplum version: %s", versionStr)
+	slog.Info(fmt.Sprintf("Greenplum version: %s", versionStr))
 	version, err = parseGreenplumVersion(versionStr)
 	if err != nil {
 		return globalCluster, Version{}, nil, err
@@ -644,12 +646,12 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 func (bh *BackupHandler) abortBackup() {
 	err := bh.terminateRunningBackups()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to stop running backups: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to stop running backups: %v", err))
 	}
 
 	err = bh.terminateWalgProcesses()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to shutdown the running WAL-G processes: %v", err)
+		slog.Warn(fmt.Sprintf("Failed to shutdown the running WAL-G processes: %v", err))
 	}
 
 	tracelog.InfoLogger.Fatalf("Encountered one or more errors during the backup-push. See %s for a complete list of errors.",
@@ -680,7 +682,7 @@ func (bh *BackupHandler) terminateWalgProcesses() error {
 	}
 
 	if knownPidsLen < len(bh.globalCluster.ContentIDs) {
-		tracelog.WarningLogger.Printf("Known PIDs count (%d) is less than the total segments number (%d)",
+		slog.Warn(fmt.Sprintf("Known PIDs count (%d) is less than the total segments number (%d))",
 			knownPidsLen, len(bh.globalCluster.ContentIDs))
 	}
 
@@ -704,7 +706,7 @@ func (bh *BackupHandler) terminateWalgProcesses() error {
 			continue
 		}
 
-		tracelog.WarningLogger.Printf("Unable to terminate backup-push process (segment %d):\n%s\n", command.Content, command.Stderr)
+		slog.Warn(fmt.Sprintf("Unable to terminate backup-push process (segment %d):\n%s\n", command.Content, command.Stderr))
 	}
 
 	return nil
@@ -732,9 +734,9 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 	}
 
 	previousGpBackup, err := NewBackup(folder, previousBackup.Name)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	prevBackupSentinelDto, err := previousGpBackup.GetSentinel()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	bh.currBackupInfo.incrementCount = 1
 	if prevBackupSentinelDto.IncrementCount != nil {
@@ -760,14 +762,14 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 		}
 
 		previousGpBackup, err = NewBackup(folder, prevName)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		prevBackupSentinelDto, err = previousGpBackup.GetSentinel()
 		if err != nil {
 			return err
 		}
 	}
 
-	tracelog.InfoLogger.Printf("Delta backup from %v.\n", previousGpBackup.Name)
+	slog.Info(fmt.Sprintf("Delta backup from %v.\n", previousGpBackup.Name))
 	bh.prevBackupInfo.name = previousGpBackup.Name
 	bh.prevBackupInfo.sentinelDto, err = previousGpBackup.GetSentinel()
 	if err != nil {

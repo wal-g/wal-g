@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const WalPrefetchShortDescription = `Used for prefetching process forking
@@ -28,10 +29,10 @@ var WalPrefetchCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 		folderReader, err := internal.PrepareMultiStorageFolderReader(storage.RootFolder(), targetStorage)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = postgres.HandleWALPrefetch(folderReader, args[0], args[1])
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

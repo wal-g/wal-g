@@ -6,7 +6,7 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -29,7 +29,7 @@ func newBytesPerWalSegmentError() BytesPerWalSegmentError {
 }
 
 func (err BytesPerWalSegmentError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type IncorrectLogSegNoError struct {
@@ -41,7 +41,7 @@ func newIncorrectLogSegNoError(name string) IncorrectLogSegNoError {
 }
 
 func (err IncorrectLogSegNoError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type IncorrectBackupNameError struct {
@@ -53,7 +53,7 @@ func newIncorrectBackupNameError(name string) IncorrectBackupNameError {
 }
 
 func (err IncorrectBackupNameError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 const (

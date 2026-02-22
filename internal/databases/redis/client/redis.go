@@ -3,12 +3,13 @@ package redis
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const dontPanic = false
@@ -35,7 +36,7 @@ func getRedisConnection(strict bool) *redis.Client {
 		redisDBValue, err := strconv.Atoi(redisDBStr)
 		// DISCUSS: could redisDB changed on success without additional variable redisDBValue?
 		if strict {
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 		redisDB = redisDBValue
 	}
@@ -70,7 +71,7 @@ func parseInfoLine(line, name string) (i int64) {
 		s := strings.Split(line, ":")[1]
 		i, err = strconv.ParseInt(s, 10, 64)
 		if err != nil {
-			tracelog.InfoLogger.Printf("%s parsing from %s to int64 failed: %v", name, line, err)
+			slog.Info(fmt.Sprintf("%s parsing from %s to int64 failed: %v", name, line, err))
 			return
 		}
 	}
@@ -81,7 +82,7 @@ func (m *ServerDataGetter) fillMemoryData(res *ServerData) {
 	ctx := context.Background()
 	data, err := m.conn.Info(ctx, "memory").Result()
 	if err != nil {
-		tracelog.InfoLogger.Printf("memory info getting failed: %v", err)
+		slog.Info(fmt.Sprintf("memory info getting failed: %v", err))
 		return
 	}
 	data = strings.ReplaceAll(data, "\r", "")
@@ -103,7 +104,7 @@ func parseInfoLineNumberedName(line, name string) (i int64) {
 		number := strings.Split(numberedName, name)[1]
 		i, err = strconv.ParseInt(number, 10, 64)
 		if err != nil {
-			tracelog.InfoLogger.Printf("%s parsing from %s to int64 failed: %v", name, line, err)
+			slog.Info(fmt.Sprintf("%s parsing from %s to int64 failed: %v", name, line, err))
 			return
 		}
 	}
@@ -114,7 +115,7 @@ func (m *ServerDataGetter) fillMaxDBNumData(res *ServerData) {
 	ctx := context.Background()
 	data, err := m.conn.Info(ctx, "keyspace").Result()
 	if err != nil {
-		tracelog.InfoLogger.Printf("keyspace info getting failed: %v", err)
+		slog.Info(fmt.Sprintf("keyspace info getting failed: %v", err))
 		return
 	}
 	data = strings.ReplaceAll(data, "\r", "")

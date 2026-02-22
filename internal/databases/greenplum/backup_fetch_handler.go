@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -88,7 +90,7 @@ func NewFetchHandler(
 			// Hostname, Port and DataDir specified in the restore config
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
 			segmentCfg, err := segCfgMaker.Make(segMeta)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			segmentConfigs = append(segmentConfigs, segmentCfg)
 		} else {
@@ -98,7 +100,7 @@ func NewFetchHandler(
 	}
 
 	globalCluster := cluster.NewCluster(segmentConfigs)
-	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
+	slog.Debug(fmt.Sprintf("cluster %v\n", globalCluster))
 
 	return &FetchHandler{
 		cluster:             globalCluster,
@@ -157,7 +159,7 @@ func (fh *FetchHandler) Unpack() {
 	})
 
 	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
-		tracelog.DebugLogger.Printf("[Unpack] WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+		slog.Debug(fmt.Sprintf("[Unpack] WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr))
 	}
 }
 
@@ -191,7 +193,7 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 			pathToHba := path.Join(segment.DataDir, "pg_hba.conf")
 
 			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToHba, fileContents)
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			slog.Debug(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmd))
 			return cmd
 		})
 
@@ -200,7 +202,7 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 	})
 
 	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
-		tracelog.DebugLogger.Printf("Update pg_hba output (segment %d):\n%s\n", command.Content, command.Stderr)
+		slog.Debug(fmt.Sprintf("Update pg_hba output (segment %d):\n%s\n", command.Content, command.Stderr))
 	}
 	return nil
 }
@@ -213,7 +215,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	if fh.restorePoint != "" {
 		recoveryTarget = fh.restorePoint
 	}
-	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
+	slog.Info(fmt.Sprintf("Recovery target is %s", recoveryTarget))
 	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
@@ -255,7 +257,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 					fmt.Sprintf("echo 'include_if_exists=%s' >> %s", pathToRecoveryConf, absPathToPostgresqlConf))
 			}
 			cmd := strings.Join(cmds, "")
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			slog.Debug(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmd))
 			return cmd
 		})
 
@@ -264,7 +266,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	})
 
 	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
-		tracelog.DebugLogger.Printf("Create recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
+		slog.Debug(fmt.Sprintf("Create recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr))
 	}
 	return nil
 }
@@ -299,7 +301,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	cmd = append(cmd, ">>", formatSegmentLogPath(contentID), "2>&1")
 
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
+	slog.Debug(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmdLine))
 	return cmdLine
 }
 
@@ -307,20 +309,20 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
-		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
+		slog.Info(fmt.Sprintf("Starting backup-fetch for %s", backup.Name))
 		if restorePoint != "" {
-			tracelog.ErrorLogger.FatalOnError(ValidateMatch(folder, backup.Name, restorePoint, backup.GetStorageName()))
+			logging.FatalOnError(ValidateMatch(folder, backup.Name, restorePoint, backup.GetStorageName()))
 		}
 		var sentinel BackupSentinelDto
 		err := backup.FetchSentinel(&sentinel)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs)
 		err = handler.Fetch()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 }
 

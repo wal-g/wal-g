@@ -3,13 +3,14 @@ package postgres
 import (
 	"archive/tar"
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"golang.org/x/sync/errgroup"
@@ -165,7 +166,7 @@ func (c *CopyTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.FileIn
 }
 
 func (c *CopyTarBallComposer) copyTar(tarName string) error {
-	tracelog.InfoLogger.Printf("Copying %s ...\n", tarName)
+	slog.Info(fmt.Sprintf("Copying %s ...\n", tarName))
 	splitTarName := strings.Split(tarName, ".")
 	fileExtension := splitTarName[len(splitTarName)-1]
 	newTarName := "copy_" + strconv.Itoa(c.copyCount) + ".tar." + fileExtension

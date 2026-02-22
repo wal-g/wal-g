@@ -1,6 +1,8 @@
 package diskwatcher
 
 import (
+	"fmt"
+	"log/slog"
 	"path/filepath"
 	"syscall"
 	"unsafe"
@@ -39,7 +41,7 @@ func (w *DiskWatcher) CheckUpperLimit() {
 		return
 	}
 
-	tracelog.InfoLogger.Printf("free:%d; total:%d; thresh:%d", totalNumberOfFreeBytes, totalNumberOfBytes, w.Threshold)
+	slog.Info(fmt.Sprintf("free:%d; total:%d; thresh:%d", totalNumberOfFreeBytes, totalNumberOfBytes, w.Threshold))
 	if totalNumberOfFreeBytes*100/totalNumberOfBytes < (100 - uint64(w.Threshold)) {
 		w.Signaling <- true
 	}

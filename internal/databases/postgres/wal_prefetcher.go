@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -58,7 +60,7 @@ func (p DaemonPrefetcher) Prefetch(reader internal.StorageFolderReader, walFileN
 	}
 
 	go func() {
-		tracelog.DebugLogger.Printf("Invoking daemon WAL-prefetch (%s)", walFileName)
+		slog.Debug(fmt.Sprintf("Invoking daemon WAL-prefetch (%s)", walFileName))
 		err := HandleWALPrefetch(reader, walFileName, location)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("WAL-prefetch (%s): %v", walFileName, err)

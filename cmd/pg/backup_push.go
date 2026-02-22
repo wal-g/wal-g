@@ -1,6 +1,10 @@
 package pg
 
 import (
+	"fmt"
+	"log/slog"
+
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
@@ -56,11 +60,11 @@ var (
 			} else {
 				rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
 			}
-			tracelog.ErrorLogger.FatalOnError(err)
-			tracelog.InfoLogger.Printf("Backup will be pushed to storage: %v", multistorage.UsedStorages(rootFolder)[0])
+			logging.FatalOnError(err)
+			slog.Info(fmt.Sprintf("Backup will be pushed to storage: %v", multistorage.UsedStorages(rootFolder)[0]))
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			var dataDirectory string
 
@@ -95,13 +99,13 @@ var (
 						"%s option cannot be used with %s, %s options",
 						withoutFilesMetadataFlag, deltaFromNameFlag, deltaFromUserDataFlag)
 				}
-				tracelog.InfoLogger.Print("Files metadata tracking is disabled")
+				slog.Info("Files metadata tracking is disabled")
 				fullBackup = true
 			}
 
 			deltaBaseSelector, err := internal.NewDeltaBaseSelector(
 				deltaFromName, deltaFromUserData, postgres.NewGenericMetaFetcher())
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
@@ -113,7 +117,7 @@ var (
 				userData, withoutFilesMetadata)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
 		},
 	}

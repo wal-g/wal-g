@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -33,7 +33,7 @@ var (
 			conf.RequiredSettings[conf.MysqlBinlogServerID] = true
 			conf.RequiredSettings[conf.MysqlBinlogServerReplicaSource] = true
 			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			mysql.HandleBinlogServer(BinlogBackupName, untilTS)

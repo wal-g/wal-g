@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 	"strconv"
 	"strings"
@@ -10,7 +11,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
@@ -30,7 +31,7 @@ func newNoBitmapFoundError() NoBitmapFoundError {
 }
 
 func (err NoBitmapFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type UnknownTableSpaceError struct {
@@ -42,7 +43,7 @@ func newUnknownTableSpaceError() UnknownTableSpaceError {
 }
 
 func (err UnknownTableSpaceError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type PagedFileDeltaMap map[walparser.RelFileNode]*roaring.Bitmap
@@ -149,7 +150,7 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromDeltas(reader internal.Storag
 		if err != nil {
 			return err
 		}
-		tracelog.InfoLogger.Printf("Successfully downloaded delta file %s\n", filename)
+		slog.Info(fmt.Sprintf("Successfully downloaded delta file %s\n", filename))
 		deltaMap.AddLocationsToDelta(deltaFile.Locations)
 	}
 	return nil
@@ -166,7 +167,7 @@ func (deltaMap *PagedFileDeltaMap) getLocationsFromWals(reader internal.StorageF
 		if err != nil {
 			return err
 		}
-		tracelog.InfoLogger.Printf("Successfully downloaded wal file %s\n", filename)
+		slog.Info(fmt.Sprintf("Successfully downloaded wal file %s\n", filename))
 	}
 	return nil
 }

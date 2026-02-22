@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 	"sort"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 
@@ -34,7 +36,7 @@ func NewFollowPrimaryHandler(
 	timeoutInSeconds int,
 ) *FollowPrimaryHandler {
 	restoreCfg, err := readRestoreConfig(restoreCfgPath)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	initGpLog(logsDir)
 
@@ -44,7 +46,7 @@ func NewFollowPrimaryHandler(
 	}
 
 	globalCluster := cluster.NewCluster(segmentConfigs)
-	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
+	slog.Debug(fmt.Sprintf("cluster %v\n", globalCluster))
 
 	if stopAtRestorePoint == LATEST {
 		restorePoints, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
@@ -56,7 +58,7 @@ func NewFollowPrimaryHandler(
 			return restorePoints[i].Time.After(restorePoints[j].Time)
 		})
 		stopAtRestorePoint = restorePoints[0].Name
-		tracelog.InfoLogger.Printf("Selected latest restore point: %s", stopAtRestorePoint)
+		slog.Info(fmt.Sprintf("Selected latest restore point: %s", stopAtRestorePoint))
 	}
 
 	FatalIfWalLogMissing(stopAtRestorePoint, folder)
@@ -71,7 +73,7 @@ func NewFollowPrimaryHandler(
 func FatalIfWalLogMissing(restorePoint string, folder storage.Folder) {
 	metadata, err := FetchRestorePointMetadata(folder, restorePoint)
 	if err != nil {
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 
 	var foundCnt int
@@ -79,14 +81,14 @@ outer:
 	for seg, lsn := range metadata.LsnBySegment {
 		LSN, err := postgres.ParseLSN(lsn)
 		if err != nil {
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 		walSegmentNo := postgres.NewWalSegmentNo(LSN)
 
 		subfolder := folder.GetSubFolder(fmt.Sprintf(WalFolder, seg))
 		folderObjects, _, err := subfolder.ListFolder()
 		if err != nil {
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 
 		// WAL file example: "000000010000000000000003.lz4" -> base name is "000000010000000000000003"
@@ -97,7 +99,7 @@ outer:
 				continue outer
 			}
 		}
-		tracelog.WarningLogger.Printf("WAL file was not found for segment %v (WAL name: %v)", seg, walName)
+		slog.Warn(fmt.Sprintf("WAL file was not found for segment %v (WAL name: %v)", seg, walName))
 	}
 
 	if foundCnt < len(metadata.LsnBySegment) {
@@ -125,7 +127,7 @@ func (fh *FollowPrimaryHandler) applyXLogInCluster() {
 	})
 
 	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
-		tracelog.DebugLogger.Printf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr)
+		slog.Debug(fmt.Sprintf("WAL-G output (segment %d):\n%s\n", command.Content, command.Stderr))
 	}
 }
 
@@ -134,7 +136,7 @@ func (fh *FollowPrimaryHandler) applyXLogInCluster() {
 // up to the expected restore point
 func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 	recoveryTarget := fh.stopAtRestorePoint
-	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
+	slog.Info(fmt.Sprintf("Recovery target is %s", recoveryTarget))
 	restoreCfgMaker := NewRecoveryConfigMaker(
 		"wal-g", conf.CfgFile, recoveryTarget, true)
 
@@ -146,7 +148,7 @@ func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 			// For this feature, we expect Cloudberry / Greenplum 6.25+ (in this version some patches from 9.5 were backported)
 			fileContents := restoreCfgMaker.Make(contentID, 90500)
 			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToRestore, fileContents)
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+			slog.Debug(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmd))
 			return cmd
 		})
 
@@ -155,7 +157,7 @@ func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 	})
 
 	for _, command := range remoteOutput.Commands { //nolint:gocritic // rangeValCopy
-		tracelog.DebugLogger.Printf("Update recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr)
+		slog.Debug(fmt.Sprintf("Update recovery.conf output (segment %d):\n%s\n", command.Content, command.Stderr))
 	}
 }
 
@@ -175,6 +177,6 @@ func (fh *FollowPrimaryHandler) buildSegmentStartCommand(contentID int) string {
 	}
 
 	cmdLine := strings.Join(cmd, " ")
-	tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
+	slog.Debug(fmt.Sprintf("Command to run on segment %d: %s", contentID, cmdLine))
 	return cmdLine
 }

@@ -1,10 +1,11 @@
 package greenplum_test
 
 import (
+	"fmt"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
@@ -26,7 +27,7 @@ func TestGetHistoryCopyingInfo_WhenFolderIsNotEmpty(t *testing.T) {
 	infos, err := greenplum.GetCopyingInfos("backup_20241212T061346Z", from, to)
 	assert.NoError(t, err)
 	for _, foo := range infos {
-		tracelog.InfoLogger.Printf("%s", foo.SrcObj.GetName())
+		slog.Info(fmt.Sprintf("%s", foo.SrcObj.GetName()))
 	}
 	assert.Equal(t, 26, len(infos))
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type ObjectNotFoundError struct {
@@ -16,7 +16,7 @@ func NewObjectNotFoundError(path string) ObjectNotFoundError {
 }
 
 func (err ObjectNotFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type Error struct {
@@ -28,5 +28,5 @@ func NewError(err error, storageName, format string, args ...interface{}) Error 
 }
 
 func (err Error) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }

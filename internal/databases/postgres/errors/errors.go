@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 // InvalidBlockError indicates that file contain invalid page and cannot be archived incrementally
@@ -17,5 +17,5 @@ func NewInvalidBlockError(blockNo uint32) InvalidBlockError {
 }
 
 func (err InvalidBlockError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }

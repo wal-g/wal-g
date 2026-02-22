@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
@@ -123,10 +124,10 @@ func (w *WalgUtil) runCmd(run ...string) (ExecResult, error) {
 func (w *WalgUtil) PushBackup() (string, error) {
 	PgDataSettingString, ok := conf.GetSetting(conf.PgDataSetting)
 	if !ok {
-		tracelog.InfoLogger.Print("\nPGDATA is not set in the conf.\n")
+		slog.Info("\nPGDATA is not set in the conf.\n")
 	}
 	if w.cliPath != PgDataSettingString {
-		tracelog.WarningLogger.Printf("cliPath '%s' differ from conf PGDATA '%s'\n", w.cliPath, PgDataSettingString)
+		slog.Warn(fmt.Sprintf("cliPath '%s' differ from conf PGDATA '%s'\n", w.cliPath, PgDataSettingString))
 	}
 	exec, err := w.runCmd("backup-push")
 	if err != nil {

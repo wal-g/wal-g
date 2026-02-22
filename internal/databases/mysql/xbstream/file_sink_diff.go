@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 )
 
@@ -142,7 +144,7 @@ func (sink *diffFileSink) ProcessMeta(chunk *Chunk) error {
 	sink.file = file
 
 	err = strategy.AsyncRun(sink)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	return nil
 }
@@ -163,7 +165,7 @@ func (sink *diffFileSink) startApplyDiffStrategy() {
 		tracelog.ErrorLogger.FatalfOnError("Cannot handle diff: %v", err)
 		err = innodb.RepairSparse(sink.file)
 		if err != nil {
-			tracelog.WarningLogger.Printf("Error during repairSparse(): %v", err)
+			slog.Warn(fmt.Sprintf("Error during repairSparse(): %v", err))
 		}
 		utility.LoggedClose(sink.file, "sink.Close()")
 		close(sink.fileCloseChan)
@@ -188,7 +190,7 @@ func (sink *diffFileSink) getHandlingStrategy(chunk *Chunk) (diffFileStrategy, e
 		if errors.Is(checkErr, innodb.ErrSpaceIDNotFound) {
 			// we had tried twice and still haven't found Tablespace in datadir. Highly likely that this a new Tablespace.
 			// let xtrabackup to decide what to do with it - send it too incremental dir:
-			tracelog.InfoLogger.Printf("New file for SpaceID %v will be created at %s", sink.meta.SpaceID, newFilePath)
+			slog.Info(fmt.Sprintf("New file for SpaceID %v will be created at %s", sink.meta.SpaceID, newFilePath))
 			return diffFileStrategy{
 				destinationDir:      sink.incrementalDir,
 				destinationFilePath: newFilePath + ".delta",
@@ -197,7 +199,7 @@ func (sink *diffFileSink) getHandlingStrategy(chunk *Chunk) (diffFileStrategy, e
 		}
 		// we have found Tablespace at `newFilePath` path.
 		// send it to dataDir
-		tracelog.DebugLogger.Printf("Our spaceId collector failed to find SpaceID %v, however it is at %v", sink.meta.SpaceID, newFilePath)
+		slog.Debug(fmt.Sprintf("Our spaceId collector failed to find SpaceID %v, however it is at %v", sink.meta.SpaceID, newFilePath))
 		return diffFileStrategy{
 			destinationDir:      sink.dataDir,
 			destinationFilePath: newFilePath,
@@ -207,7 +209,7 @@ func (sink *diffFileSink) getHandlingStrategy(chunk *Chunk) (diffFileStrategy, e
 
 	// We have found Tablespace - use it:
 	if oldFilePath != newFilePath {
-		tracelog.InfoLogger.Printf("File path for SpaceID %v changed from %s to %s", sink.meta.SpaceID, oldFilePath, newFilePath)
+		slog.Info(fmt.Sprintf("File path for SpaceID %v changed from %s to %s", sink.meta.SpaceID, oldFilePath, newFilePath))
 	}
 	return diffFileStrategy{
 		destinationDir:      sink.dataDir,
@@ -269,7 +271,7 @@ func (sink *diffFileSink) applyDiff() error {
 				if err != nil {
 					return err
 				}
-				tracelog.DebugLogger.Printf("[DATA]/%v: %v bytes applied", sink.file.Name(), len(firstPage))
+				slog.Debug(fmt.Sprintf("[DATA]/%v: %v bytes applied", sink.file.Name(), len(firstPage)))
 
 				// write to incremental dir:
 				raw := sink.buildFakeDelta(header, firstPage)
@@ -277,14 +279,14 @@ func (sink *diffFileSink) applyDiff() error {
 				if err != nil {
 					return err
 				}
-				tracelog.DebugLogger.Printf("[INCR]/%v: %v bytes copied", sink.strategy.destinationFilePath+".delta", len(raw))
+				slog.Debug(fmt.Sprintf("[INCR]/%v: %v bytes copied", sink.strategy.destinationFilePath+".delta", len(raw)))
 				miniDeltaWritten = true
 			} else {
 				_, err = io.CopyN(sink.file, sink.readHere, int64(sink.meta.PageSize))
 				if err != nil {
 					return err
 				}
-				tracelog.DebugLogger.Printf("[DATA]/%v: %v bytes applied", sink.file.Name(), sink.meta.PageSize)
+				slog.Debug(fmt.Sprintf("[DATA]/%v: %v bytes applied", sink.file.Name(), sink.meta.PageSize))
 			}
 		}
 
@@ -295,11 +297,11 @@ func (sink *diffFileSink) applyDiff() error {
 			if err != nil {
 				return err
 			}
-			tracelog.DebugLogger.Printf("[INCR]/%v: %v bytes copied", sink.strategy.destinationFilePath+".delta", len(raw))
+			slog.Debug(fmt.Sprintf("[INCR]/%v: %v bytes copied", sink.strategy.destinationFilePath+".delta", len(raw)))
 			miniDeltaWritten = true
 		}
 
-		tracelog.DebugLogger.Printf("[DATA]/%v pages applied to file %v", len(pageNums), sink.file.Name())
+		slog.Debug(fmt.Sprintf("[DATA]/%v pages applied to file %v", len(pageNums), sink.file.Name()))
 		if isLast {
 			return nil
 		}

@@ -4,8 +4,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
-
-	"github.com/wal-g/tracelog"
+	"log/slog"
 )
 
 //go:generate mockery --name Enveloper --with-expecter=true
@@ -26,7 +25,7 @@ func (encryptedKey *EncryptedKey) ID() string {
 		return encryptedKey.id
 	}
 	uid := encryptedKey.KeyUID()
-	tracelog.WarningLogger.Printf("Encrypted key has no ID, UID %s will be used", uid)
+	slog.Warn(fmt.Sprintf("Encrypted key has no ID, UID %s will be used", uid))
 	return uid
 }
 

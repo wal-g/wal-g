@@ -3,6 +3,7 @@ package xbstream
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/wal-g/tracelog"
@@ -47,7 +48,7 @@ func newFileSinkDecompress(filePath string, dataDir string, decompressor compres
 		tracelog.ErrorLogger.FatalfOnError("Cannot copy data: %v", err)
 		err = innodb.RepairSparse(file)
 		if err != nil {
-			tracelog.WarningLogger.Printf("Error during repairSparse(): %v", err)
+			slog.Warn(fmt.Sprintf("Error during repairSparse(): %v", err))
 		}
 		utility.LoggedClose(file, "datasink.Close()")
 		close(sink.fileCloseChan)

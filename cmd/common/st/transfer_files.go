@@ -2,7 +2,7 @@ package st
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/storagetools/transfer"
 )
 
@@ -30,10 +30,10 @@ func transferFiles(prefix string) {
 	}
 
 	handler, err := transfer.NewHandler(transferSourceStorage, targetStorage, separateFileLister, cfg)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = handler.Handle()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func init() {

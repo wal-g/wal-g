@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
-
-	"github.com/wal-g/tracelog"
 )
 
 const pgControlSize = 8192
@@ -29,7 +29,7 @@ func ExtractPgControl(folder string) (*PgControlData, error) {
 	result, err := extractPgControlData(pgControlReadCloser)
 	if err != nil {
 		closeErr := pgControlReadCloser.Close()
-		tracelog.WarningLogger.Printf("Error on closing pg_control file: %v\n", closeErr)
+		slog.Warn(fmt.Sprintf("Error on closing pg_control file: %v\n", closeErr))
 		return nil, err
 	}
 

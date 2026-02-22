@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
@@ -38,7 +40,7 @@ func newTarSizeError(packedFileSize, expectedSize int64) TarSizeError {
 }
 
 func (err TarSizeError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 // ExcludedFilenames is a list of excluded members from the bundled backup.
@@ -170,7 +172,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 	} else {
 		bundle.Timeline, err = queryRunner.ReadTimeline()
 		if err != nil {
-			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
+			slog.Warn(fmt.Sprintf("Couldn't get current timeline because of error: '%v'\n", err))
 		}
 	}
 	return "base_" + name, lsn, nil

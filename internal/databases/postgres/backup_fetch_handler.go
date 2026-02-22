@@ -3,11 +3,13 @@ package postgres
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -21,7 +23,7 @@ func NewNonEmptyDBDataDirectoryError(dbDataDirectory string) NonEmptyDBDataDirec
 }
 
 func (err NonEmptyDBDataDirectoryError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type PgControlNotFoundError struct {
@@ -33,7 +35,7 @@ func newPgControlNotFoundError() PgControlNotFoundError {
 }
 
 func (err PgControlNotFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 func readRestoreSpec(path string, spec *TablespaceSpec) (err error) {
@@ -76,7 +78,7 @@ func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDire
 	}
 
 	if sentinelDto.IsIncremental() {
-		tracelog.InfoLogger.Printf("Delta from %v at LSN %s \n", *(sentinelDto.IncrementFrom),
+		slog.Info(fmt.Sprintf("Delta from %v at LSN %s \n", *(sentinelDto.IncrementFrom)),
 			*(sentinelDto.IncrementFromLSN))
 		baseFilesToUnwrap, err := GetBaseFilesToUnwrap(filesMetaDto.Files, filesToUnwrap)
 		if err != nil {

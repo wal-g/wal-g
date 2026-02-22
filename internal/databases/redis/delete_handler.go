@@ -1,6 +1,8 @@
 package redis
 
 import (
+	"fmt"
+	"log/slog"
 	"sort"
 	"time"
 
@@ -66,7 +68,7 @@ func HandlePurge(backupFolder storage.Folder, setters ...PurgeOption) error {
 	}
 
 	if opts.purgeGarbage {
-		tracelog.InfoLogger.Printf("Garbage prefixes in backups folder: %v", garbage)
+		slog.Info(fmt.Sprintf("Garbage prefixes in backups folder: %v", garbage))
 		if !opts.dryRun {
 			if err := internal.DeleteGarbage(backupFolder, garbage); err != nil {
 				return err
@@ -103,14 +105,14 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 
 	purgeFiles := BackupNamesFromBackups(purge)
 
-	tracelog.InfoLogger.Printf("Backups selected to be deleted: %v", purgeFiles)
-	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", BackupNamesFromBackups(retain))
+	slog.Info(fmt.Sprintf("Backups selected to be deleted: %v", purgeFiles))
+	slog.Info(fmt.Sprintf("Backups selected to be retained: %v", BackupNamesFromBackups(retain)))
 
 	if !opts.dryRun {
 		if err := internal.DeleteBackups(folder, purgeFiles); err != nil {
 			return nil, nil, err
 		}
-		tracelog.InfoLogger.Printf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain))
+		slog.Info(fmt.Sprintf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain)))
 	}
 	return purge, retain, nil
 }

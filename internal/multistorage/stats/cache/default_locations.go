@@ -1,10 +1,10 @@
 package cache
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
-
-	"github.com/wal-g/tracelog"
 )
 
 // DefaultROMem is the default in-memory cache for read-only statuses that is shared within a single WAL-G process.
@@ -32,7 +32,7 @@ func pathInHomeOrTmp(name string) string {
 		return filepath.Join(homeDir, name)
 	}
 	tmpDir := "/tmp"
-	tracelog.DebugLogger.Printf("Failed to get user HOME dir, will use %q instead: %q", tmpDir, err)
+	slog.Debug(fmt.Sprintf("Failed to get user HOME dir, will use %q instead: %q", tmpDir, err))
 
 	return filepath.Join(tmpDir, name)
 }

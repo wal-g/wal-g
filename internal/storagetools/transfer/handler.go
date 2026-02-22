@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -259,7 +260,7 @@ func (h *Handler) transferFilesWorker(
 		}
 
 		atomic.AddInt32(&h.filesLeft, -1)
-		tracelog.InfoLogger.Printf("File is transferred (%d left): %q", atomic.LoadInt32(&h.filesLeft), job.key.filePath)
+		slog.Info(fmt.Sprintf("File is transferred (%d left): %q", atomic.LoadInt32(&h.filesLeft), job.key.filePath))
 	}
 }
 

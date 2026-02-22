@@ -1,7 +1,9 @@
 package cached
 
 import (
+	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -36,13 +38,13 @@ func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) (*envelope.EncryptedKe
 
 func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]byte, error) {
 	KeyUID := encryptedKey.KeyUID()
-	tracelog.DebugLogger.Printf("Decrypt encrypted key %s\n", KeyUID)
+	slog.Debug(fmt.Sprintf("Decrypt encrypted key %s\n", KeyUID))
 
 	enveloper.locker.RLock()
 	item, exists := enveloper.items[KeyUID]
 	enveloper.locker.RUnlock()
 	if exists && item.isFresh() {
-		tracelog.DebugLogger.Printf("Use cached encrypted key %s\n", KeyUID)
+		slog.Debug(fmt.Sprintf("Use cached encrypted key %s\n", KeyUID))
 		return item.Object, nil
 	}
 

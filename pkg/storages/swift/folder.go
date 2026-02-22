@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/ncw/swift/v2"
@@ -106,7 +106,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 }
 
 func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
+	slog.Debug(fmt.Sprintf("Put %v into %v\n", name, folder.path))
 	path := storage.JoinPath(folder.path, name)
 	//put the object in the cloud using full path
 	_, err := folder.connection.ObjectPut(ctx, folder.container.Name, path, content, false, "", "", nil)
@@ -136,7 +136,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	for _, objectRelativePath := range objectRelativePaths {
 		path := storage.JoinPath(folder.path, objectRelativePath)
-		tracelog.DebugLogger.Printf("Delete object %v\n", path)
+		slog.Debug(fmt.Sprintf("Delete object %v\n", path))
 		err := folder.connection.ObjectDelete(context.Background(), folder.container.Name, path)
 		if err == swift.ObjectNotFound {
 			continue

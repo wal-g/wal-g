@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -8,6 +10,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -44,14 +47,14 @@ func (ih *indexHandler) createIndexFile() error {
 
 func HandleBinlogFetch(folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
 	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	handler := newIndexHandler(dstDir)
 
-	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
+	slog.Info(fmt.Sprintf("Fetching binlogs since %s until %s", startTS, endTS))
 	err = fetchLogs(folder, dstDir, startTS, endTS, endBinlogTS, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 

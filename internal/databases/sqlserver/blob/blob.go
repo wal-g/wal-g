@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"sort"
 	"sync"
 	"time"
@@ -301,6 +302,6 @@ func (idx *Index) GetSections(rangeMin, rangeMax uint64) []Section {
 // nolint: unused
 func (idx *Index) debugBlocks() {
 	for i, b := range idx.ocache {
-		tracelog.DebugLogger.Printf("BLK %05d %s\t %020d %08d", i, b.ID, b.Offset, b.CommittedSize)
+		slog.Debug(fmt.Sprintf("BLK %05d %s\t %020d %08d", i, b.ID, b.Offset, b.CommittedSize))
 	}
 }

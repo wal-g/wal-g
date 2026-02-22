@@ -6,9 +6,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -37,7 +37,7 @@ var aofBackupFetchCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		uploader, err := internal.ConfigureUploader()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		sourceStorageFolder := uploader.Folder()
 		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
@@ -46,7 +46,7 @@ var aofBackupFetchCmd = &cobra.Command{
 		redisVersion := args[1]
 
 		err = redis.HandleAofFetchPush(ctx, sourceStorageFolder, uploader, backupName, redisVersion, skipBackupDownloadFlag, skipCheckFlag)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

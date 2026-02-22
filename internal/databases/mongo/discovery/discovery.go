@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
@@ -20,11 +21,11 @@ func ResolveStartingTS(ctx context.Context,
 	}
 	zeroTS := models.Timestamp{}
 	if since != zeroTS {
-		tracelog.InfoLogger.Printf("Newest timestamp at storage folder: %v", since)
+		slog.Info(fmt.Sprintf("Newest timestamp at storage folder: %v", since))
 		return since, nil
 	}
 
-	tracelog.InfoLogger.Printf("Initiating archiving first run")
+	slog.Info(fmt.Sprintf("Initiating archiving first run"))
 	im, err := mongoClient.IsMaster(ctx)
 	if err != nil {
 		return models.Timestamp{}, fmt.Errorf("can not fetch LastWrite.MajorityOpTime: %+v", err)

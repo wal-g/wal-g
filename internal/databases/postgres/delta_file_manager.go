@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/wal-g/wal-g/internal"
@@ -12,6 +13,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -25,7 +27,7 @@ func newDeltaFileWriterNotFoundError(filename string) DeltaFileWriterNotFoundErr
 }
 
 func (err DeltaFileWriterNotFoundError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type DeltaFileManager struct {
@@ -134,14 +136,14 @@ func (manager *DeltaFileManager) FlushPartFiles() (completedPartFiles map[string
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
 				tracelog.WarningLogger.Printf(
-					"Canceled delta file writing because of error: "+tracelog.GetErrorFormatter()+"\n",
+					"Canceled delta file writing because of error: "+logging.GetErrorFormatter()+"\n",
 					err)
 			}
 		} else {
 			err := fsutil.SaveToDataFolder(partFile, partFilename, manager.dataFolder)
 			if err != nil {
 				manager.CanceledDeltaFiles[deltaFilename] = true
-				tracelog.WarningLogger.Printf("Failed to save part file: '%s' because of error: '%v'\n", partFilename, err)
+				slog.Warn(fmt.Sprintf("Failed to save part file: '%s' because of error: '%v'\n", partFilename, err))
 			}
 		}
 		return true
@@ -178,7 +180,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(ctx context.Context, uploader i
 		} else {
 			err := fsutil.SaveToDataFolder(deltaFileWriter.DeltaFile, deltaFilename, manager.dataFolder)
 			if err != nil {
-				tracelog.WarningLogger.Printf("Failed to save delta file: '%s' because of error: '%v'\n", deltaFilename, err)
+				slog.Warn(fmt.Sprintf("Failed to save delta file: '%s' because of error: '%v'\n", deltaFilename, err))
 			}
 		}
 		return true
@@ -188,7 +190,7 @@ func (manager *DeltaFileManager) FlushDeltaFiles(ctx context.Context, uploader i
 func (manager *DeltaFileManager) FlushFiles(ctx context.Context, uploader internal.Uploader) {
 	err := manager.dataFolder.CleanFolder()
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to clean delta folder because of error: '%v'\n", err)
+		slog.Warn(fmt.Sprintf("Failed to clean delta folder because of error: '%v'\n", err))
 	}
 	completedPartFiles := manager.FlushPartFiles()
 	manager.FlushDeltaFiles(ctx, uploader, completedPartFiles)

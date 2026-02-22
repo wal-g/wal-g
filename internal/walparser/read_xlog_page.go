@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
@@ -21,7 +21,7 @@ func NewZeroPageHeaderError() error {
 }
 
 func (err ZeroPageHeaderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type InvalidPageHeaderError struct {
@@ -33,7 +33,7 @@ func NewInvalidPageHeaderError() error {
 }
 
 func (err InvalidPageHeaderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 func tryReadXLogRecordData(alignedReader *AlignedReader) (data []byte, whole bool, err error) {

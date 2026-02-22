@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 	"syscall"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -68,18 +70,18 @@ func HandleBackupImport(externalConfig string, importDatabases map[string]string
 	defer func() { _ = signalHandler.Close() }()
 
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	folder := st.RootFolder()
 
 	externalSt, err := internal.StorageFromConfig(externalConfig)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	externalFolder := externalSt.RootFolder()
 
 	dbnames, databaseFiles, err := prepareBackupImportSpec(externalFolder, importDatabases)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer lock.Close()
 
 	var backupName string
@@ -89,7 +91,7 @@ func HandleBackupImport(externalConfig string, importDatabases map[string]string
 	backupName = backup.Name
 	sentinel = new(SentinelDto)
 	err = backup.FetchSentinel(sentinel)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = runParallel(func(i int) error {
 		return importSingleDatabaseBackup(ctx, backupName, dbnames[i], externalFolder, databaseFiles[dbnames[i]])
@@ -98,27 +100,27 @@ func HandleBackupImport(externalConfig string, importDatabases map[string]string
 
 	sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	uploader := internal.NewRegularUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
-	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
+	slog.Info(fmt.Sprintf("uploading sentinel: %s", sentinel))
 	err = internal.UploadSentinel(uploader, sentinel, backupName)
 	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)
 
-	tracelog.InfoLogger.Printf("import finished")
+	slog.Info(fmt.Sprintf("import finished"))
 }
 
 func importSingleDatabaseBackup(ctx context.Context, backupName string, dbname string,
 	externalFolder storage.Folder, backupFiles []storage.Object) error {
 	baseURL := getDatabaseBackupURL(backupName, dbname)
 	urls := buildBackupUrlsList(baseURL, len(backupFiles))
-	tracelog.InfoLogger.Printf("starting importing backup files for %v from %v", dbname, backupFiles)
+	slog.Info(fmt.Sprintf("starting importing backup files for %v from %v", dbname, backupFiles))
 	for i := 0; i < len(backupFiles); i++ {
 		err := importSingleDatabaseBlob(ctx, externalFolder, backupFiles[i], urls[i])
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to import backup %v: %v", backupFiles[i], err)
 			return err
 		}
-		tracelog.InfoLogger.Printf("backup file %v imported", backupFiles[i])
+		slog.Info(fmt.Sprintf("backup file %v imported", backupFiles[i]))
 	}
-	tracelog.InfoLogger.Printf("all backup files for %v are imported successfully", dbname)
+	slog.Info(fmt.Sprintf("all backup files for %v are imported successfully", dbname))
 	return nil
 }
 

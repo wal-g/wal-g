@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"path"
 	"time"
 
@@ -49,7 +50,7 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 		if !exists {
 			continue
 		}
-		tracelog.DebugLogger.Printf("Found file: %s.%s", backup.Name, decompressor.FileExtension())
+		slog.Debug(fmt.Sprintf("Found file: %s.%s", backup.Name, decompressor.FileExtension()))
 		defer utility.LoggedClose(archiveReader, "")
 
 		decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
@@ -124,7 +125,7 @@ func downloadAndDecompressFile(backup Backup, decompressor compression.Decompres
 		} else if !exists {
 			return nil, io.EOF
 		}
-		tracelog.DebugLogger.Printf("Found file: %s", fileName)
+		slog.Debug(fmt.Sprintf("Found file: %s", fileName))
 		return archiveReader, nil
 	}
 

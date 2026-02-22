@@ -2,9 +2,9 @@ package gp
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
@@ -20,9 +20,9 @@ var checkAOLengthSegmentCmd = &cobra.Command{
 	Short: "Checks ao and aocs tables` EOF on disk is no less than in metadata for current segment",
 	Run: func(cmd *cobra.Command, args []string) {
 		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		handler, err := greenplum.NewAOLengthCheckSegmentHandler(port, segnum, rootFolder)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		if checkBackup {
 			handler.CheckAOBackupLengthSegment(backupName)
 		} else {

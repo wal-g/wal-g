@@ -2,6 +2,7 @@ package functests
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
 
@@ -124,7 +125,7 @@ func (tctx *TestContext) isWorkingRedis(hostName string) error {
 	}
 
 	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
-		tracelog.DebugLogger.Printf("Redis client connect to host '%s'", redisCtl.Addr())
+		slog.Debug(fmt.Sprintf("Redis client connect to host '%s'", redisCtl.Addr()))
 		status := redisCtl.Ping(tctx.Context)
 		err = status.Err()
 		if err != nil {
@@ -133,7 +134,7 @@ func (tctx *TestContext) isWorkingRedis(hostName string) error {
 		if status.Val() != "PONG" {
 			return fmt.Errorf("Client on ping does not returned PONG: %v\n", err)
 		}
-		tracelog.DebugLogger.Printf("Redis: Got PONG on PING from %s", hostName)
+		slog.Debug(fmt.Sprintf("Redis: Got PONG on PING from %s", hostName))
 		return nil
 	})
 }
@@ -180,7 +181,7 @@ func (tctx *TestContext) createRedisBackup(host, backupType, resultType string) 
 		}
 	}
 
-	tracelog.DebugLogger.Printf("Push redis %s backup\n", backupType)
+	slog.Debug(fmt.Sprintf("Push redis %s backup\n", backupType))
 	backupId, err := rc.PushBackup(backupType)
 	if err != nil && resultType == "success" {
 		return err

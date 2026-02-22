@@ -1,9 +1,11 @@
 package internal
 
 import (
+	"fmt"
+	"log/slog"
+
 	"github.com/pkg/errors"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -71,7 +73,7 @@ func (downloader *CommonDirectoryDownloader) getTarsToExtract() (tarsToExtract [
 	if err != nil {
 		return nil, err
 	}
-	tracelog.DebugLogger.Printf("Tars to extract: '%+v'\n", tarNames)
+	slog.Debug(fmt.Sprintf("Tars to extract: '%+v'\n", tarNames))
 	tarsToExtract = make([]ReaderMaker, 0, len(tarNames))
 
 	for _, tarName := range tarNames {

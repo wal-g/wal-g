@@ -14,6 +14,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"regexp"
@@ -21,12 +22,12 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 	"github.com/wal-g/wal-g/utility"
@@ -65,7 +66,7 @@ func newInvalidIncrementFileHeaderError() InvalidIncrementFileHeaderError {
 }
 
 func (err InvalidIncrementFileHeaderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type UnknownIncrementFileHeaderError struct {
@@ -77,7 +78,7 @@ func newUnknownIncrementFileHeaderError() UnknownIncrementFileHeaderError {
 }
 
 func (err UnknownIncrementFileHeaderError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type UnexpectedTarDataError struct {
@@ -89,7 +90,7 @@ func newUnexpectedTarDataError() UnexpectedTarDataError {
 }
 
 func (err UnexpectedTarDataError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 var pagedFilenameRegexp *regexp.Regexp
@@ -198,7 +199,7 @@ func convertBlocksToLocations(filePath string, blocks []uint32) ([]walparser.Blo
 
 // ApplyFileIncrement changes pages according to supplied change map file
 func ApplyFileIncrement(fileName string, increment io.Reader, createNewIncrementalFiles bool, fsync bool) error {
-	tracelog.DebugLogger.Printf("Incrementing %s\n", fileName)
+	slog.Debug(fmt.Sprintf("Incrementing %s\n", fileName))
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
 		return err

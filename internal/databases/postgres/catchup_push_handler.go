@@ -2,10 +2,13 @@ package postgres
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -18,7 +21,7 @@ func extendExcludedFiles() {
 // HandleCatchupPush is invoked to perform a wal-g catchup-push
 func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN) {
 	uploader, err := internal.ConfigureUploader()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 
@@ -37,10 +40,10 @@ func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN)
 		RegularComposer, NewCatchupDeltaBackupConfigurator(fakePreviousBackupSentinelDto),
 		userData, false)
 	if orioledb.IsEnabled(pgDataDirectory) {
-		tracelog.InfoLogger.Printf("Catchup incremental backup is not implemented for orioledb. Full backup will be performed.")
+		slog.Info(fmt.Sprintf("Catchup incremental backup is not implemented for orioledb. Full backup will be performed."))
 	}
 
 	backupConfig, err := NewBackupHandler(backupArguments)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	backupConfig.HandleBackupPush(ctx)
 }

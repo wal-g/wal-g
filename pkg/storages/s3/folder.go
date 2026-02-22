@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"path"
 	"strings"
 	"time"
@@ -408,23 +409,23 @@ func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxK
 
 func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
 	needsVersioning := folder.isVersioningEnabled()
-	tracelog.DebugLogger.Printf("len of names %d", len(objectRelativePaths))
+	slog.Debug(fmt.Sprintf("len of names %d", len(objectRelativePaths)))
 	objects := folder.partitionToObjects(objectRelativePaths, needsVersioning)
-	tracelog.DebugLogger.Printf("len of objects %d", len(objects))
+	slog.Debug(fmt.Sprintf("len of objects %d", len(objects)))
 
 	parts := partitionObjects(objects, folder.config.DeleteBatchSize)
 
-	tracelog.DebugLogger.Printf("len of parts list %d", len(parts))
+	slog.Debug(fmt.Sprintf("len of parts list %d", len(parts)))
 
 	for _, part := range parts {
-		tracelog.DebugLogger.Printf("len of part  %d", len(part))
+		slog.Debug(fmt.Sprintf("len of part  %d", len(part)))
 		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
 			Objects: part,
 		}}
 		_, err := folder.s3API.DeleteObjects(input)
 		if err != nil {
 			for _, obj := range part {
-				tracelog.DebugLogger.Printf("object %s version %s", *obj.Key, *obj.VersionId)
+				slog.Debug(fmt.Sprintf("object %s version %s", *obj.Key, *obj.VersionId))
 			}
 			return errors.Wrapf(err, "failed to delete s3 object: '%s'", part)
 		}

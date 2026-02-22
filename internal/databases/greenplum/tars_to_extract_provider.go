@@ -2,11 +2,10 @@ package greenplum
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-
-	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -30,12 +29,12 @@ func (t FilesToExtractProviderImpl) Get(backup SegBackup, filesToUnwrap map[stri
 			return nil, nil,
 				fmt.Errorf("failed to fetch AO files metadata for backup %s: %w", backup.Name, err)
 		}
-		tracelog.WarningLogger.Printf("AO files metadata was not found. Skipping the AO segments unpacking.")
+		slog.Warn(fmt.Sprintf("AO files metadata was not found. Skipping the AO segments unpacking."))
 	} else {
-		tracelog.InfoLogger.Printf("AO files metadata found. Will perform the AO segments unpacking.")
+		slog.Info(fmt.Sprintf("AO files metadata found. Will perform the AO segments unpacking."))
 		for extractPath, meta := range aoMeta.Files {
 			if filesToUnwrap != nil && !filesToUnwrap[extractPath] {
-				tracelog.InfoLogger.Printf("Don't need to unwrap the %s AO segment file, skipping it...", extractPath)
+				slog.Info(fmt.Sprintf("Don't need to unwrap the %s AO segment file, skipping it...", extractPath))
 				continue
 			}
 			objPath := path.Join(AoStoragePath, meta.StoragePath)

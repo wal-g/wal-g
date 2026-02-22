@@ -2,13 +2,13 @@ package postgres
 
 import (
 	"fmt"
+	"log/slog"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -55,22 +55,22 @@ func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 			filesToDelete = append(filesToDelete, file)
 			_, ok := filesToUnwrap[file]
 			if ok {
-				tracelog.InfoLogger.Printf("will skip  %s", file)
+				slog.Info(fmt.Sprintf("will skip  %s", file))
 			}
 		} else {
-			tracelog.DebugLogger.Printf("will restore  %s because %t %t %t", file, isDB, desc.IsSkipped(dbID, tableFileID), tableFileID != 0)
+			slog.Debug(fmt.Sprintf("will restore  %s because %t %t %t", file, isDB, desc.IsSkipped(dbID, tableFileID), tableFileID != 0))
 		}
 	}
 
 	for _, file := range filesToDelete {
 		_, ok := filesToUnwrap[file]
 		if ok {
-			tracelog.InfoLogger.Printf("deleting %s", file)
+			slog.Info(fmt.Sprintf("deleting %s", file))
 		}
 		delete(filesToUnwrap, file)
 		_, ok = filesToUnwrap[file]
 		if ok {
-			tracelog.InfoLogger.Printf("skipped %s", file)
+			slog.Info(fmt.Sprintf("skipped %s", file))
 		}
 	}
 }
@@ -160,10 +160,10 @@ func (p ExtractProviderDBSpec) Get(
 	createNewIncrementalFiles bool,
 ) (IncrementalTarInterpreter, []internal.ReaderMaker, []internal.ReaderMaker, error) {
 	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	desc, err := p.restoreDescMaker.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
 	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -188,7 +189,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 
 		path := sf.path
 		for _, arch := range path {
-			tracelog.DebugLogger.Printf("Fetching archive %s", arch.Filename())
+			slog.Debug(fmt.Sprintf("Fetching archive %s", arch.Filename()))
 
 			if err := sf.downloader.DownloadOplogArchive(arch, cpw); err != nil {
 				cpw.CloseWithError(fmt.Errorf("failed to download archive %s: %w", arch.Filename(), err))
@@ -241,7 +242,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 				return
 			}
 
-			// tracelog.DebugLogger.Printf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS)
+			// slog.Debug(fmt.Sprintf("Fetcher receieved op %s (%s on %s)", op.TS, op.OP, op.NS))
 			select {
 			case data <- op:
 			case <-ctx.Done():

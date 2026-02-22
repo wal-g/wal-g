@@ -2,6 +2,8 @@ package greenplum
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
@@ -45,7 +47,7 @@ func (storageMap *AoRelFileStorageMap) getAOStorageMetadata(filePath string) (bo
 	blockNo, err := postgres.GetRelFileIDFrom(filePath)
 	if err != nil {
 		// same as above, but this is some unusual / unexpected error, better log it
-		tracelog.WarningLogger.Printf("Failed to parse blockNo for path %s: %v", filePath, err)
+		slog.Warn(fmt.Sprintf("Failed to parse blockNo for path %s: %v", filePath, err))
 		return false, AoRelFileMetadata{}, nil
 	}
 
@@ -78,7 +80,7 @@ func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, er
 
 		dbConn, err := postgres.Connect(databaseOption)
 		if err != nil {
-			tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
+			slog.Warn(fmt.Sprintf("Failed to connect to database: %s\n'%v'\n", db.Name, err))
 			continue
 		}
 
@@ -88,10 +90,10 @@ func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, er
 		}
 		rows, err := queryRunner.FetchAOStorageMetadata(db)
 		if err != nil {
-			tracelog.WarningLogger.Printf("failed to fetch storage types: %s\n'%v'\n", db.Name, err)
+			slog.Warn(fmt.Sprintf("failed to fetch storage types: %s\n'%v'\n", db.Name, err))
 			continue
 		}
-		tracelog.InfoLogger.Printf("Successfully loaded AO/AOCS metadata about %d relations in database %s\n", len(rows), db.Name)
+		slog.Info(fmt.Sprintf("Successfully loaded AO/AOCS metadata about %d relations in database %s\n", len(rows), db.Name))
 		for relFileLoc, metadata := range rows {
 			result[relFileLoc] = metadata
 		}
