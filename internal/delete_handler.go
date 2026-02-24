@@ -472,6 +472,8 @@ func DeleteObjectsWhere(
 	objFilter func(object1 storage.Object) bool,
 	folderFilter func(name string) bool,
 ) error {
+	// if folder has uncurrent versions we need to clean them as well
+	storage.SetShowAllVersions(folder, true)
 	relativePathObjects, err := multistorage.ListFolderRecursivelyWithFilter(folder, folderFilter)
 	if err != nil {
 		return err

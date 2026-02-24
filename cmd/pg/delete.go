@@ -135,8 +135,6 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 
 	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
 
-	// if folder has uncurrent versions we need to clean them as well
-	storage.SetShowAllVersions(folder, true)
 	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, false)
 	tracelog.ErrorLogger.FatalOnError(err)
 
