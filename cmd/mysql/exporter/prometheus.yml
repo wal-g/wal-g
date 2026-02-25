@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 60s
+  evaluation_interval: 60s
+
+scrape_configs:
+  - job_name: 'walg-mysql-exporter'
+    static_configs:
+      - targets: ['walg-mysql-exporter:9352']
+    scrape_interval: 60s
+    scrape_timeout: 30s
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
