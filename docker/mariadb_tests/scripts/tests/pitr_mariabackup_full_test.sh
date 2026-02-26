@@ -10,6 +10,14 @@ export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 mariadb_installdb
 service mysql start
 
+mariadbVersion=$(mysql -s -N -e "SELECT VERSION();")
+
+# Compare version with 10.8
+if [ "$(printf '%s\n' "10.8" "$mariadbVersion" | sort -V | head -n1)" != "10.8" ]; then
+    echo "MariaDB version is lower than 10.8"
+    exit 0
+fi
+
 # Create initial data
 mysql -e "CREATE DATABASE testdb"
 mysql -e "CREATE TABLE testdb.users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(50), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
