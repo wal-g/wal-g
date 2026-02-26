@@ -82,12 +82,11 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 			if !ok {
 				tracelog.ErrorLogger.Fatalf("Failed to convert GTID to MysqlGTIDSet type")
 			}
-			filter = &gtidFilter{
-				BinlogsFolder: binlogsFolder,
-				Flavor:        flavor,
-				gtidArchived:  gtidArchived,
-				lastGtidSeen:  nil,
-			}
+		filter = &gtidFilter{
+			BinlogsFolder: binlogsFolder,
+			Flavor:        flavor,
+			gtidArchived:  gtidArchived,
+		}
 		case mysql.MariaDBFlavor:
 			var mariadbGTID *mysql.MariadbGTIDSet
 			if binlogSentinelDto.GTIDArchived != "" {
@@ -101,12 +100,11 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 					tracelog.ErrorLogger.Fatalf("Failed to convert GTID to MariadbGTIDSet type")
 				}
 			}
-			filter = &mariadbGtidFilter{
-				BinlogsFolder: binlogsFolder,
-				Flavor:        flavor,
-				gtidArchived:  mariadbGTID,
-				lastGtidSeen:  nil,
-			}
+		filter = &mariadbGtidFilter{
+			BinlogsFolder: binlogsFolder,
+			Flavor:        flavor,
+			gtidArchived:  mariadbGTID,
+		}
 			tracelog.InfoLogger.Printf("Using MariaDB GTID filter for binlog push")
 		default:
 			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable WALG_MYSQL_CHECK_GTIDS for current database.", flavor)

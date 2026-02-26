@@ -311,7 +311,6 @@ func TestMariaDBGTIDFilter_ShouldUpload_FirstRun(t *testing.T) {
 		BinlogsFolder: "/var/lib/mysql",
 		Flavor:        mysql.MariaDBFlavor,
 		gtidArchived:  nil, // First run - no archived GTIDs
-		lastGtidSeen:  nil,
 	}
 
 	// On first run with no next binlog, should return false
