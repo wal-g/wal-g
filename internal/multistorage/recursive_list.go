@@ -71,10 +71,11 @@ func prependPaths(objects []storage.Object, folderPrefix string) []storage.Objec
 	relativePathObjects := make([]storage.Object, len(objects))
 	for i, object := range objects {
 		relativePathObjects[i] = multiObject{
-			Object: storage.NewLocalObject(
-				path.Join(folderPrefix, object.GetName()),
+			Object: storage.NewLocalObjectWithVersion(path.Join(folderPrefix, object.GetName()),
 				object.GetLastModified(),
 				object.GetSize(),
+				object.GetVersionID(),
+				object.GetAdditionalInfo(),
 			),
 			storageName: GetStorage(object),
 		}

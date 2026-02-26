@@ -52,14 +52,14 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	for _, fileName := range objectRelativePaths {
-		err := os.RemoveAll(folder.GetFilePath(fileName))
+func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+	for _, object := range objectsWithRelativePaths {
+		err := os.RemoveAll(folder.GetFilePath(object.GetName()))
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("unable to delete file %q: %w", fileName, err)
+			return fmt.Errorf("unable to delete file %q: %w", object.GetName(), err)
 		}
 	}
 	return nil
@@ -187,3 +187,8 @@ func (folder *Folder) Validate() error {
 
 // NOT IMPLEMENTED
 func (folder *Folder) SetVersioningEnabled(enable bool) {}
+
+// NOT IMPLEMENTED
+func (folder *Folder) GetVersioningEnabled() bool {
+	return false
+}

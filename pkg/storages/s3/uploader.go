@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type UploaderConfig struct {
@@ -130,11 +131,11 @@ func partitionStrings(strings []string, blockSize int) [][]string {
 	return partition
 }
 
-func partitionObjects(objects []*s3.ObjectIdentifier, blockSize int) [][]*s3.ObjectIdentifier {
+func partitionObjects(objects []storage.Object, blockSize int) [][]storage.Object {
 	if blockSize <= 0 {
-		return [][]*s3.ObjectIdentifier{objects}
+		return [][]storage.Object{objects}
 	}
-	partition := make([][]*s3.ObjectIdentifier, 0)
+	partition := make([][]storage.Object, 0)
 	for i := 0; i < len(objects); i += blockSize {
 		if i+blockSize > len(objects) {
 			partition = append(partition, objects[i:])
