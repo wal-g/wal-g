@@ -133,39 +133,6 @@ func waitReplicationIsDone(flavor string) error {
 	}
 }
 
-// extractMariaDBGTIDFromEvent extracts the MariaDB GTID from a GTID event.
-// MariaDB GTID format in binlog events: domain-server-sequence
-func extractMariaDBGTIDFromEvent(e *replication.BinlogEvent) string {
-	// Skip event header (19 bytes)
-	data := e.RawData[replication.EventHeaderSize:]
-
-	// MariaDB GTID event structure:
-	// - Sequence number: 8 bytes (uint64)
-	// - Domain ID: 4 bytes (uint32)
-	// - Flags: 1 byte
-
-	if len(data) < 13 {
-		tracelog.WarningLogger.Printf("MariaDB GTID event too short: %d bytes", len(data))
-		return ""
-	}
-
-	sequence := binary.LittleEndian.Uint64(data[0:8])
-	domain := binary.LittleEndian.Uint32(data[8:12])
-
-	// Server ID is in the event header; ensure the raw data is long enough
-	if len(e.RawData) < 9 {
-		tracelog.WarningLogger.Printf("Binlog event header too short for server ID: %d bytes", len(e.RawData))
-		return ""
-	}
-	serverID := binary.LittleEndian.Uint32(e.RawData[5:9])
-
-	// Format: domain-server-sequence
-	gtid := strconv.FormatUint(uint64(domain), 10) + "-" +
-		strconv.FormatUint(uint64(serverID), 10) + "-" +
-		strconv.FormatUint(sequence, 10)
-
-	return gtid
-}
 
 // detectBinlogFlavor detects whether we're working with MySQL or MariaDB binlogs.
 // It tries to detect from the replica source connection, or defaults to MySQL.
@@ -209,22 +176,21 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 		if int64(e.Header.Timestamp) > untilTS.Unix() {
 			return nil
 		}
-		if e.Header.EventType == replication.GTID_EVENT {
+		switch e.Header.EventType {
+		case replication.MARIADB_GTID_EVENT:
+			ev := &replication.MariadbGTIDEvent{}
+			ev.GTID.ServerID = e.Header.ServerID
+			err = ev.Decode(e.RawData[replication.EventHeaderSize:])
+			tracelog.ErrorLogger.FatalOnError(err)
+			lastSentGTID = ev.GTID.String()
+			tracelog.DebugLogger.Printf("MariaDB GTID event: %s", lastSentGTID)
+		case replication.GTID_EVENT:
 			gtidEvent := &replication.GTIDEvent{}
 			err = gtidEvent.Decode(e.RawData[replication.EventHeaderSize:])
 			tracelog.ErrorLogger.FatalOnError(err)
-
-			// Check flavor to determine how to extract GTID
-			if flavor == mysql.MariaDBFlavor {
-				// MariaDB GTID format: domain-server-sequence
-				lastSentGTID = extractMariaDBGTIDFromEvent(e)
-				tracelog.DebugLogger.Printf("MariaDB GTID event: %s", lastSentGTID)
-			} else {
-				// MySQL GTID format: uuid:interval
-				u, _ := uuid.FromBytes(gtidEvent.SID)
-				lastSentGTID = u.String() + ":1-" + strconv.Itoa(int(gtidEvent.GNO))
-				tracelog.DebugLogger.Printf("MySQL GTID event: %s", lastSentGTID)
-			}
+			u, _ := uuid.FromBytes(gtidEvent.SID)
+			lastSentGTID = u.String() + ":1-" + strconv.Itoa(int(gtidEvent.GNO))
+			tracelog.DebugLogger.Printf("MySQL GTID event: %s", lastSentGTID)
 		}
 		err := s.AddEventToStreamer(e)
 		return err
