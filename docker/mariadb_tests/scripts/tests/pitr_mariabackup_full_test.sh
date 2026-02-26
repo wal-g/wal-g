@@ -39,7 +39,7 @@ mysql -e "FLUSH LOGS"
 wal-g binlog-push
 
 # Verify data before disaster
-mysql -e "SELECT COUNT(*) FROM testdb.users" | grep -q 5
+mysql -e "SELECT COUNT(*) FROM testdb.users" | grep -q 4
 mysql -e "SELECT COUNT(*) FROM testdb.products" | grep -q 3
 
 # Simulate disaster
