@@ -61,7 +61,7 @@ service mysql start || (cat /var/log/mysql/error.log && false)
 mysql -e "STOP ALL SLAVES; SET GLOBAL gtid_slave_pos='$gtids';" || true
 mysql -e "SET GLOBAL gtid_slave_pos='$gtids';"
 
-rm -rf ${WALG_MYSQL_BINLOG_DST}
+rm -rf ${WALG_MYSQL_BINLOG_DST}/*
 
 # Apply binlogs until PITR point
 wal-g binlog-replay --since LATEST --until "$DT_PITR"
