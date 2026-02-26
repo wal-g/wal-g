@@ -24,6 +24,13 @@ type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
 }
 
+// binlogGtidFilter is a common interface for MySQL and MariaDB GTID filtering
+type binlogGtidFilter interface {
+	isValid() bool
+	shouldUpload(binlog, nextBinlog string) bool
+	getArchivedGTIDString() string
+}
+
 //gocyclo:ignore
 //nolint:funlen
 func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs bool) {
@@ -60,21 +67,45 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 		}
 	}
 
-	var filter gtidFilter
+	var filter binlogGtidFilter
 	if checkGTIDs {
 		flavor, err := getMySQLFlavor(db)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		switch flavor {
 		case mysql.MySQLFlavor:
-			gtid, _ := mysql.ParseMysqlGTIDSet(binlogSentinelDto.GTIDArchived)
-			gtidArchived, _ := gtid.(*mysql.MysqlGTIDSet)
-			filter = gtidFilter{
-				BinlogsFolder: binlogsFolder,
-				Flavor:        flavor,
-				gtidArchived:  gtidArchived,
-				lastGtidSeen:  nil,
+			gtid, err := mysql.ParseMysqlGTIDSet(binlogSentinelDto.GTIDArchived)
+			if err != nil {
+				tracelog.ErrorLogger.Fatalf("Failed to parse MySQL GTID set '%s': %v", binlogSentinelDto.GTIDArchived, err)
 			}
+			gtidArchived, ok := gtid.(*mysql.MysqlGTIDSet)
+			if !ok {
+				tracelog.ErrorLogger.Fatalf("Failed to convert GTID to MysqlGTIDSet type")
+			}
+		filter = &gtidFilter{
+			BinlogsFolder: binlogsFolder,
+			Flavor:        flavor,
+			gtidArchived:  gtidArchived,
+		}
+		case mysql.MariaDBFlavor:
+			var mariadbGTID *mysql.MariadbGTIDSet
+			if binlogSentinelDto.GTIDArchived != "" {
+				gtid, err := mysql.ParseMariadbGTIDSet(binlogSentinelDto.GTIDArchived)
+				if err != nil {
+					tracelog.ErrorLogger.Fatalf("Failed to parse MariaDB GTID set '%s': %v", binlogSentinelDto.GTIDArchived, err)
+				}
+				var ok bool
+				mariadbGTID, ok = gtid.(*mysql.MariadbGTIDSet)
+				if !ok {
+					tracelog.ErrorLogger.Fatalf("Failed to convert GTID to MariadbGTIDSet type")
+				}
+			}
+		filter = &mariadbGtidFilter{
+			BinlogsFolder: binlogsFolder,
+			Flavor:        flavor,
+			gtidArchived:  mariadbGTID,
+		}
+			tracelog.InfoLogger.Printf("Using MariaDB GTID filter for binlog push")
 		default:
 			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable WALG_MYSQL_CHECK_GTIDS for current database.", flavor)
 		}
@@ -96,7 +127,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 			continue
 		}
 
-		if checkGTIDs && filter.isValid() {
+		if checkGTIDs && filter != nil && filter.isValid() {
 			nextBinlog := ""
 			if i < len(binlogs)-1 {
 				nextBinlog = binlogs[i+1]
@@ -126,8 +157,8 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 		putCache(cache)
 
 		// Write Binlog Sentinel
-		if checkGTIDs && filter.isValid() {
-			binlogSentinelDto.GTIDArchived = filter.gtidArchived.String()
+		if checkGTIDs && filter != nil && filter.isValid() {
+			binlogSentinelDto.GTIDArchived = filter.getArchivedGTIDString()
 			tracelog.InfoLogger.Printf("Uploading binlog sentinel: %s", binlogSentinelDto)
 			err := UploadBinlogSentinel(rootFolder, &binlogSentinelDto)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -310,6 +341,14 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 	tracelog.InfoLogger.Printf("Should upload binlog %s with GTID set: %s (gtid check)\n", binlog, currentBinlogGTIDSet.String())
 	u.lastGtidSeen = nextPreviousGTIDs
 	return true
+}
+
+// getArchivedGTIDString returns the string representation of archived GTIDs for MySQL
+func (u *gtidFilter) getArchivedGTIDString() string {
+	if u.gtidArchived == nil {
+		return ""
+	}
+	return u.gtidArchived.String()
 }
 
 func lastOrDefault(data []string, defaultValue string) string {

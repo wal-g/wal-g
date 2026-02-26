@@ -99,7 +99,7 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	return s.AddEventToStreamer(&rotateBinlogEvent)
 }
 
-func waitReplicationIsDone() error {
+func waitReplicationIsDone(flavor string) error {
 	replicaSource, err := conf.GetRequiredSetting(conf.MysqlBinlogServerReplicaSource)
 	if err != nil {
 		return err
@@ -108,19 +108,22 @@ func waitReplicationIsDone() error {
 	if err != nil {
 		return err
 	}
+	defer db.Close()
+
 	for {
-		// get executed GTID set from replica
-		gtidSet, err := getMySQLGTIDExecuted(db, "mysql")
+		// Get executed GTID set from replica (works for both MySQL and MariaDB)
+		gtidSet, err := getMySQLGTIDExecuted(db, flavor)
 		if err != nil {
 			return err
 		}
 
-		lastSentGTIDSet, err := mysql.ParseGTIDSet("mysql", lastSentGTID)
+		lastSentGTIDSet, err := mysql.ParseGTIDSet(flavor, lastSentGTID)
 		if err != nil {
 			return err
 		}
 
-		tracelog.DebugLogger.Printf("Expected GTID set: %v; MySQL GTID set: %v", lastSentGTIDSet.String(), gtidSet.String())
+		tracelog.DebugLogger.Printf("Expected GTID set: %v; %s GTID set: %v",
+			lastSentGTIDSet.String(), flavor, gtidSet.String())
 
 		if gtidSet.Contain(lastSentGTIDSet) {
 			tracelog.InfoLogger.Println("Replication is done")
@@ -130,26 +133,64 @@ func waitReplicationIsDone() error {
 	}
 }
 
-func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mysql.Position, s *replication.BinlogStreamer) {
+
+// detectBinlogFlavor detects whether we're working with MySQL or MariaDB binlogs.
+// It tries to detect from the replica source connection, or defaults to MySQL.
+func detectBinlogFlavor() string {
+	// Try to connect to replica source and detect flavor
+	replicaSource, ok := conf.GetSetting(conf.MysqlBinlogServerReplicaSource)
+	if ok && replicaSource != "" {
+		db, err := sql.Open("mysql", replicaSource)
+		if err != nil {
+			tracelog.DebugLogger.Printf("Could not connect to replica source: %v", err)
+		} else {
+			defer db.Close()
+			flavor, err := getMySQLFlavor(db)
+			if err != nil {
+				tracelog.DebugLogger.Printf("Could not detect flavor from replica source: %v", err)
+			} else {
+				tracelog.InfoLogger.Printf("Detected binlog flavor from replica source: %s", flavor)
+				return flavor
+			}
+		}
+	}
+
+	// Default to MySQL flavor for backward compatibility
+	tracelog.InfoLogger.Println("No flavor detected, defaulting to MySQL")
+	return mysql.MySQLFlavor
+}
+
+func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mysql.Position, s *replication.BinlogStreamer, flavor string) {
 	err := addRotateEvent(s, pos)
 	handleEventError(err, s)
 
 	p := replication.NewBinlogParser()
 	p.SetRawMode(true)
-	p.SetFlavor(mysql.MySQLFlavor)
+	p.SetFlavor(flavor) // Set flavor based on parameter
 	// check checksum on our side - we should exit with error here rather than stuck waiting for MySQL apply all binlogs till `lastSentGTID`.
 	p.SetVerifyChecksum(true)
+
+	tracelog.InfoLogger.Printf("Binlog parser configured with flavor: %s", flavor)
 
 	f := func(e *replication.BinlogEvent) error {
 		if int64(e.Header.Timestamp) > untilTS.Unix() {
 			return nil
 		}
-		if e.Header.EventType == replication.GTID_EVENT {
+		switch e.Header.EventType {
+		case replication.MARIADB_GTID_EVENT:
+			ev := &replication.MariadbGTIDEvent{}
+			ev.GTID.ServerID = e.Header.ServerID
+			err = ev.Decode(e.RawData[replication.EventHeaderSize:])
+			tracelog.ErrorLogger.FatalOnError(err)
+			lastSentGTID = ev.GTID.String()
+			tracelog.DebugLogger.Printf("MariaDB GTID event: %s", lastSentGTID)
+		case replication.GTID_EVENT:
 			gtidEvent := &replication.GTIDEvent{}
 			err = gtidEvent.Decode(e.RawData[replication.EventHeaderSize:])
 			tracelog.ErrorLogger.FatalOnError(err)
 			u, _ := uuid.FromBytes(gtidEvent.SID)
 			lastSentGTID = u.String() + ":1-" + strconv.Itoa(int(gtidEvent.GNO))
+			tracelog.DebugLogger.Printf("MySQL GTID event: %s", lastSentGTID)
 		}
 		err := s.AddEventToStreamer(e)
 		return err
@@ -159,9 +200,9 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	for {
 		logFile, err := logFilesProvider.GetObject()
 		if errors.Is(err, storage.ErrNoMoreObjects) {
-			err := waitReplicationIsDone()
+			err := waitReplicationIsDone(flavor)
 			if err != nil {
-				tracelog.InfoLogger.Println("Error while waiting MySQL applied binlogs: ", err)
+				tracelog.InfoLogger.Println("Error while waiting for replication to apply binlogs: ", err)
 			}
 			os.Exit(0)
 		}
@@ -181,7 +222,7 @@ func sendEventsFromBinlogFiles(logFilesProvider *storage.ObjectProvider, pos mys
 	}
 }
 
-func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.BinlogStreamer) error {
+func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.BinlogStreamer, flavor string) error {
 	// get necessary settings
 	st, err := internal.ConfigureStorage()
 	if err != nil {
@@ -193,7 +234,7 @@ func syncBinlogFiles(pos mysql.Position, startTS time.Time, s *replication.Binlo
 	}
 	logFilesProvider := storage.NewLowMemoryObjectProvider()
 	// start sync
-	go sendEventsFromBinlogFiles(logFilesProvider, pos, s)
+	go sendEventsFromBinlogFiles(logFilesProvider, pos, s, flavor)
 	go provideLogs(st.RootFolder(), dstDir, startTS, untilTS, logFilesProvider)
 
 	return nil
@@ -228,7 +269,8 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 			syncErr = err
 			return
 		}
-		syncErr = syncBinlogFiles(pos, startTime, h.globalStreamer)
+		flavor := detectBinlogFlavor()
+		syncErr = syncBinlogFiles(pos, startTime, h.globalStreamer, flavor)
 	})
 
 	if syncErr != nil {
@@ -238,9 +280,23 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 	return h.globalStreamer, nil
 }
 
-func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
+func (h *Handler) HandleBinlogDumpGTID(gtidSet mysql.GTIDSet) (*replication.BinlogStreamer, error) {
 	h.streamerMutex.Lock()
 	defer h.streamerMutex.Unlock()
+
+	// Detect flavor from GTID set type
+	var flavor string
+	switch gtidSet.(type) {
+	case *mysql.MariadbGTIDSet:
+		flavor = mysql.MariaDBFlavor
+	case *mysql.MysqlGTIDSet:
+		flavor = mysql.MySQLFlavor
+	default:
+		flavor = mysql.MySQLFlavor
+	}
+
+	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: requested GTID set: %s (detected flavor: %s)",
+		gtidSet.String(), flavor)
 
 	if h.globalStreamer != nil {
 		tracelog.InfoLogger.Println("Returning existing streamer for reconnection")
@@ -251,7 +307,8 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 
 	var syncErr error
 	h.syncOnce.Do(func() {
-		syncErr = syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, h.globalStreamer)
+		tracelog.InfoLogger.Printf("Using flavor for binlog server: %s", flavor)
+		syncErr = syncBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, startTS, h.globalStreamer, flavor)
 	})
 
 	if syncErr != nil {
