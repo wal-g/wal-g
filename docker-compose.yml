@@ -144,6 +144,7 @@ services:
       &&  mkdir -p /export/mariadb_full_mysqldump
       &&  mkdir -p /export/mariadb_full_maria_backup
       &&  mkdir -p /export/mariadb_pitr_xtrabackup
+      &&  mkdir -p /export/mariadb_pitr_mariabackup_full
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
