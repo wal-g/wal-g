@@ -30,13 +30,13 @@ stop_and_delete_cluster_dir
 
 RESTORE_CONFIG="/tmp/configs/follow_primary_restore_config.json"
 
-wal-g backup-fetch LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
-wal-g recovery-action shutdown --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
-wal-g follow-primary rp1 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
+wal-g backup-fetch LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
+wal-g recovery-action shutdown --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
+wal-g follow-primary rp1 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
 wait_postgres_shutdown
-wal-g follow-primary rp2 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
+wal-g follow-primary rp2 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
 wait_postgres_shutdown
-wal-g follow-primary LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
+wal-g follow-primary LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
 wait_postgres_shutdown
 wal-g recovery-action promote --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 prepare_cluster

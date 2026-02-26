@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -22,8 +23,9 @@ const (
 	fetchContentIDsDescription   = "If set, WAL-G will fetch only the specified segments"
 	fetchModeDescription         = "Backup fetch mode. default: do the backup unpacking " +
 		"and prepare the configs [unpack+prepare], unpack: backup unpacking only, prepare: config preparation only."
-	inPlaceFlagDescription = "Perform the backup fetch in-place (without the restore config)"
-	restoreOnlyDescription = `[Experimental] Downloads only databases specified by passed names from default tablespace.
+	inPlaceFlagDescription     = "Perform the backup fetch in-place (without the restore config)"
+	withMirrorsFlagDescription = "Fetch mirrors as well"
+	restoreOnlyDescription     = `[Experimental] Downloads only databases specified by passed names from default tablespace.
 Always downloads system databases.`
 )
 
@@ -35,6 +37,7 @@ var fetchContentIDs *[]int
 var fetchModeStr string
 var inPlaceRestore bool
 var partialRestoreArgs []string
+var withMirrors bool
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch [backup_name | --target-user-data <data> | --restore-point <name>]",
@@ -74,13 +77,25 @@ var backupFetchCmd = &cobra.Command{
 		if len(*fetchContentIDs) > 0 {
 			tracelog.InfoLogger.Printf("Will perform fetch operations only on the specified segments: %v", *fetchContentIDs)
 		}
+		if len(*fetchContentIDs) > 0 && withMirrors {
+			tracelog.ErrorLogger.Fatalf("can't use both --with-mirrors and --content-ids")
+		}
 
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		internal.HandleBackupFetch(rootFolder, targetBackupSelector,
-			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIDs, fetchMode, restorePoint,
-				partialRestoreArgs))
+			greenplum.NewGreenplumBackupFetcher(
+				restoreConfigPath,
+				inPlaceRestore,
+				logsDir,
+				*fetchContentIDs,
+				fetchMode,
+				restorePoint,
+				partialRestoreArgs,
+				withMirrors,
+			),
+		)
 	},
 }
 
@@ -120,5 +135,6 @@ func init() {
 	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 
 	backupFetchCmd.Flags().StringVar(&fetchModeStr, "mode", "default", fetchModeDescription)
+	backupFetchCmd.Flags().BoolVar(&withMirrors, "with-mirrors", false, withMirrorsFlagDescription)
 	cmd.AddCommand(backupFetchCmd)
 }

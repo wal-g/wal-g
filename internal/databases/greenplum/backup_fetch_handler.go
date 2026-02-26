@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
+	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/pkg/errors"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/gpcluster"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -39,15 +41,17 @@ func NewBackupFetchMode(mode string) (BackupFetchMode, error) {
 }
 
 type SegmentRestoreConfig struct {
-	Hostname string `json:"hostname"`
-	Port     int    `json:"port"`
-	DataDir  string `json:"data_dir"`
+	Hostname   string `json:"hostname"`
+	Port       int    `json:"port"`
+	DataDir    string `json:"data_dir"`
+	DatabaseID int    `json:"db_id"`
 }
 
-func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
+func (cfg SegmentRestoreConfig) ToSegConfig(contentID int, role SegmentRole) cluster.SegConfig {
 	return cluster.SegConfig{
+		DbID:      cfg.DatabaseID,
 		ContentID: contentID,
-		Role:      string(Primary),
+		Role:      string(role),
 		Port:      cfg.Port,
 		Hostname:  cfg.Hostname,
 		DataDir:   cfg.DataDir,
@@ -56,18 +60,21 @@ func (cfg SegmentRestoreConfig) ToSegConfig(contentID int) cluster.SegConfig {
 
 // ClusterRestoreConfig is used to describe the restored cluster
 type ClusterRestoreConfig struct {
+	// contentID -> config
 	Segments map[int]SegmentRestoreConfig `json:"segments"`
+	Mirrors  map[int]SegmentRestoreConfig `json:"mirrors"`
 }
 
 type FetchHandler struct {
 	cluster             *cluster.Cluster
 	backupIDByContentID map[int]string
 	backup              internal.Backup
-	contentIDsToFetch   map[int]bool
+	contentIDsToFetch   map[int]bool // FIXME: use dbids? // probably, remove it at all - just use slice of SegConfig
 	fetchMode           BackupFetchMode
 	restorePoint        string
 	partialRestoreArgs  []string
 	sentinel            BackupSentinelDto
+	withMirrors         bool
 }
 
 // nolint:gocritic
@@ -75,22 +82,34 @@ func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIDs []int, mode BackupFetchMode,
-	restorePoint string, partialRestoreArgs []string,
+	restorePoint string, partialRestoreArgs []string, withMirrors bool,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	segmentConfigs := make([]cluster.SegConfig, 0)
 	initGpLog(logsDir)
 
+	if withMirrors && len(fetchContentIDs) != 0 {
+		tracelog.ErrorLogger.Fatal("--with-mirrors can only be used with primary segments")
+	}
+
 	for _, segMeta := range sentinel.Segments {
-		// currently, WAL-G does not restore the mirrors
 		if segMeta.Role == Primary {
+			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
 			// update the segment config from the metadata with the
 			// Hostname, Port and DataDir specified in the restore config
-			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
 			segmentCfg, err := segCfgMaker.Make(segMeta)
 			tracelog.ErrorLogger.FatalOnError(err)
-
 			segmentConfigs = append(segmentConfigs, segmentCfg)
+
+			// Generate mirrors from restore-config.
+			// Note: sentinel doesn't contain information about mirrors.
+			if withMirrors {
+				mirrorMeta := segMeta
+				mirrorMeta.Role = Mirror
+				mirrorCfg, err := segCfgMaker.Make(mirrorMeta)
+				tracelog.ErrorLogger.FatalOnError(err)
+				segmentConfigs = append(segmentConfigs, mirrorCfg)
+			}
 		} else {
 			tracelog.WarningLogger.Printf(
 				"Skipping non-primary segment: DatabaseID %d, Hostname %s, DataDir: %s\n", segMeta.DatabaseID, segMeta.Hostname, segMeta.DataDir)
@@ -109,6 +128,7 @@ func NewFetchHandler(
 		restorePoint:        restorePoint,
 		partialRestoreArgs:  partialRestoreArgs,
 		sentinel:            sentinel,
+		withMirrors:         withMirrors,
 	}
 }
 
@@ -145,12 +165,12 @@ func (fh *FetchHandler) Fetch() error {
 func (fh *FetchHandler) Unpack() {
 	tracelog.InfoLogger.Println("[Unpack] Running wal-g on segments and master...")
 
-	// Run WAL-G to restore the each segment as a single Postgres instance
-	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Running wal-g",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
-		func(contentID int) string {
-			return fh.buildFetchCommand(contentID)
-		})
+	// Run WAL-G to restore each segment as a single Postgres instance
+	gplog.Verbose("Running wal-g")
+	commandList := gpcluster.GenerateSSHCommandForSegments(fh.cluster, func(segment cluster.SegConfig) string {
+		return fh.buildFetchCommand(segment)
+	})
+	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS, commandList)
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to run wal-g", func(contentID int) string {
 		return "Unable to run wal-g"
@@ -180,20 +200,19 @@ func (fh *FetchHandler) createPgHbaOnSegments() error {
 		return err
 	}
 
-	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating pg_hba on segments",
-		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
-		func(contentID int) string {
-			if !fh.contentIDsToFetch[contentID] {
-				return newSkippedSegmentMsg(contentID)
-			}
+	gplog.Verbose("Updating pg_hba on segments")
+	commandList := gpcluster.GenerateSSHCommandForSegments(fh.cluster, func(segment cluster.SegConfig) string {
+		if !fh.contentIDsToFetch[segment.ContentID] {
+			tracelog.InfoLogger.Printf("Update PGHBA: skipping contentID %d: disabled in config", segment.ContentID)
+			return ""
+		}
 
-			segment := fh.cluster.ByContent[contentID][0]
-			pathToHba := path.Join(segment.DataDir, "pg_hba.conf")
-
-			cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToHba, fileContents)
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
-			return cmd
-		})
+		pathToHba := path.Join(segment.DataDir, "pg_hba.conf")
+		cmd := fmt.Sprintf("cat > %s << EOF\n%s\nEOF", pathToHba, fileContents)
+		tracelog.DebugLogger.Printf("Command to run on segment %d: %s", segment.ContentID, cmd)
+		return cmd
+	})
+	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS, commandList)
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to update pg_hba", func(contentID int) string {
 		return fmt.Sprintf("Unable to update pg_hba on segment %d", contentID)
@@ -214,7 +233,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
+	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget)
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 
@@ -232,32 +251,37 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 				"remove 'recovery.conf' & 'recovery.signal' and restart wal-g with `--mode prepare` to finish this recovery")
 	}
 
-	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Creating recovery.conf on segments and master",
-		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
-		func(contentID int) string {
-			if !fh.contentIDsToFetch[contentID] {
-				return newSkippedSegmentMsg(contentID)
-			}
+	gplog.Verbose("Creating recovery.conf on segments and master")
+	commandList := gpcluster.GenerateSSHCommandForSegments(fh.cluster, func(segment cluster.SegConfig) string {
+		contentID := segment.ContentID
+		if !fh.contentIDsToFetch[contentID] {
+			tracelog.InfoLogger.Printf("Update recovery.conf: skipping contentID %d: disabled in config", segment.ContentID)
+			return ""
+		}
 
-			segment := fh.cluster.ByContent[contentID][0]
-			absPathToRestore := path.Join(segment.DataDir, pathToRecoveryConf)
-			absPathToPostgresqlConf := path.Join(segment.DataDir, pathToPostgresqlConf)
-			fileContents := restoreCfgMaker.Make(contentID, pgVersion)
-			var cmds []string
+		absPathToRestore := path.Join(segment.DataDir, pathToRecoveryConf)
+		absPathToPostgresqlConf := path.Join(segment.DataDir, pathToPostgresqlConf)
+		recoveryTargetAction := RecoveryTargetActionPromote
+		if segment.Role == "m" {
+			recoveryTargetAction = RecoveryTargetActionShutdown
+		}
+		fileContents := restoreCfgMaker.Make(contentID, pgVersion, recoveryTargetAction)
+		var cmds []string
+		cmds = append(cmds,
+			fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToRestore),
+			fmt.Sprintf("cat > %s << EOF\n%s\nEOF\n", absPathToRestore, fileContents),
+		)
+		if pgVersion >= 120000 {
 			cmds = append(cmds,
-				fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToRestore),
-				fmt.Sprintf("cat > %s << EOF\n%s\nEOF\n", absPathToRestore, fileContents),
-			)
-			if pgVersion >= 120000 {
-				cmds = append(cmds,
-					fmt.Sprintf("touch %s\n", path.Join(segment.DataDir, "recovery.signal")),
-					fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToPostgresqlConf),
-					fmt.Sprintf("echo 'include_if_exists=%s' >> %s", pathToRecoveryConf, absPathToPostgresqlConf))
-			}
-			cmd := strings.Join(cmds, "")
-			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
-			return cmd
-		})
+				fmt.Sprintf("touch %s\n", path.Join(segment.DataDir, "recovery.signal")),
+				fmt.Sprintf("mkdir -p $(dirname %s)\n", absPathToPostgresqlConf),
+				fmt.Sprintf("echo 'include_if_exists=%s' >> %s", pathToRecoveryConf, absPathToPostgresqlConf))
+		}
+		cmd := strings.Join(cmds, "")
+		tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
+		return cmd
+	})
+	remoteOutput := fh.cluster.ExecuteClusterCommand(cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR|cluster.INCLUDE_MIRRORS, commandList)
 
 	fh.cluster.CheckClusterError(remoteOutput, "Unable to create recovery.conf", func(contentID int) string {
 		return fmt.Sprintf("Unable to create recovery.conf on segment %d", contentID)
@@ -271,12 +295,13 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 
 // buildFetchCommand creates the WAL-G command to restore the segment with
 // the provided contentID
-func (fh *FetchHandler) buildFetchCommand(contentID int) string {
+func (fh *FetchHandler) buildFetchCommand(segment cluster.SegConfig) string {
+	contentID := segment.ContentID
 	if !fh.contentIDsToFetch[contentID] {
-		return newSkippedSegmentMsg(contentID)
+		tracelog.InfoLogger.Printf("Backup fetch: skipping contentID %d: disabled in config", segment.ContentID)
+		return ""
 	}
 
-	segment := fh.cluster.ByContent[contentID][0]
 	backupID, ok := fh.backupIDByContentID[contentID]
 	if !ok {
 		// this should never happen
@@ -303,8 +328,15 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	return cmdLine
 }
 
-func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
-	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
+func NewGreenplumBackupFetcher(
+	restoreCfgPath string,
+	inPlaceRestore bool,
+	logsDir string,
+	fetchContentIDs []int,
+	mode BackupFetchMode,
+	restorePoint string,
+	partialRestoreArgs []string,
+	withMirrors bool,
 ) func(folder storage.Folder, backup internal.Backup) {
 	return func(folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
@@ -318,7 +350,7 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs)
+		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs, withMirrors)
 		err = handler.Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}

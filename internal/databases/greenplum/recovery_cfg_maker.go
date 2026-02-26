@@ -5,40 +5,38 @@ import (
 	"strings"
 )
 
-func NewRecoveryConfigMaker(walgBinaryPath, cfgPath, recoveryTargetName string,
-	shutdownOnRecoveryTarget bool) RecoveryConfigMaker {
+type RecoveryTargetAction string
+
+var (
+	RecoveryTargetActionShutdown RecoveryTargetAction = "shutdown"
+	RecoveryTargetActionPromote  RecoveryTargetAction = "promote"
+	RecoveryTargetActionPause    RecoveryTargetAction = "pause"
+)
+
+func NewRecoveryConfigMaker(walgBinaryPath, cfgPath, recoveryTargetName string) RecoveryConfigMaker {
 	return RecoveryConfigMaker{
-		walgBinaryPath:           walgBinaryPath,
-		cfgPath:                  cfgPath,
-		recoveryTargetName:       recoveryTargetName,
-		shutdownOnRecoveryTarget: shutdownOnRecoveryTarget,
+		walgBinaryPath:     walgBinaryPath,
+		cfgPath:            cfgPath,
+		recoveryTargetName: recoveryTargetName,
 	}
 }
 
 type RecoveryConfigMaker struct {
-	walgBinaryPath           string
-	cfgPath                  string
-	recoveryTargetName       string
-	shutdownOnRecoveryTarget bool
+	walgBinaryPath     string
+	cfgPath            string
+	recoveryTargetName string
 }
 
-func (m RecoveryConfigMaker) Make(contentID int, pgVersion int) string {
+func (m RecoveryConfigMaker) Make(contentID int, pgVersion int, action RecoveryTargetAction) string {
 	var lines []string
 	lines = append(lines,
 		fmt.Sprintf("restore_command = '%s seg wal-fetch \"%%f\" \"%%p\" --content-id=%d --config %s'", m.walgBinaryPath, contentID, m.cfgPath),
 		fmt.Sprintf("recovery_target_name = '%s'", m.recoveryTargetName),
 		"recovery_target_timeline = latest",
+		// `recovery_target_action` is available since PostgreSQL 9.5,
+		// However, it was backported to Greenplum 6.25+ and now supported by all opensource GPDBs
+		fmt.Sprintf("recovery_target_action = '%s'", action),
 	)
-
-	// `recovery_target_action` is available since PostgreSQL 9.5,
-	// However, it was backported to Greenplum 6.25+ and now supported by all opensource GPDBs
-	if pgVersion >= 90500 {
-		if m.shutdownOnRecoveryTarget {
-			lines = append(lines, "recovery_target_action = 'shutdown'")
-		} else {
-			lines = append(lines, "recovery_target_action = 'promote'")
-		}
-	}
 
 	return strings.Join(lines, "\n")
 }
