@@ -11,6 +11,7 @@ env:
   CACHE_FOLDER: ~/docker-images-${{ github.sha }}
   CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tgz
   CACHE_FILE_UBUNTU_20_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-20.04.tgz
+  CACHE_FILE_UBUNTU_24_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-24.04.tgz
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tgz
   CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tgz
   IMAGE: wal-g/docker_prefix

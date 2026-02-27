@@ -8,7 +8,7 @@ export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 export WALG_MYSQL_CHECK_GTIDS=True
 
 mariadb_installdb
-service mysql start
+service mariadb start
 
 sysbench --table-size=10 prepare
 sysbench --time=3 run

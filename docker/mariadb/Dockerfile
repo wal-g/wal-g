@@ -1,4 +1,4 @@
-FROM wal-g/ubuntu:20.04
+FROM wal-g/ubuntu:24.04
 
 # mb not another path
 ENV MYSQLDATA=/var/lib/mysql
