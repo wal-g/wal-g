@@ -34,6 +34,7 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_20_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_24_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
@@ -102,6 +103,7 @@ jobs:
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_20_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_24_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
