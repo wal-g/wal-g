@@ -184,3 +184,5 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
+
+replace github.com/go-mysql-org/go-mysql => github.com/zkramorev/go-mysql v0.0.0-20260226085232-ed6ab333e0b0

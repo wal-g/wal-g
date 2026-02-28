@@ -1,7 +1,11 @@
 package storage
 
 import (
+	"context"
 	"errors"
+	"sync"
+
+	"github.com/wal-g/tracelog"
 )
 
 var (
@@ -10,37 +14,45 @@ var (
 )
 
 type ObjectProvider struct {
-	ch  chan Object
-	ech chan error
-	err error
+	ch     chan Object
+	ech    chan error
+	err    error
+	closed bool
+	mu     sync.Mutex
 }
 
 func NewLowMemoryObjectProvider() *ObjectProvider {
-	s := new(ObjectProvider)
-
-	s.ch = make(chan Object)
-	s.ech = make(chan error, 4)
-
-	return s
+	return &ObjectProvider{
+		ch:  make(chan Object),
+		ech: make(chan error, 1),
+	}
 }
 
-func (p *ObjectProvider) GetObject() (Object, error) {
+func (p *ObjectProvider) GetObject(ctx context.Context) (Object, error) {
 	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	case o, ok := <-p.ch:
 		if !ok {
 			return nil, ErrNoMoreObjects
 		}
 		return o, nil
-	case p.err = <-p.ech:
-		if p.err == nil || p.err == ErrProviderClosed {
-			return p.GetObject()
-		}
-		return nil, p.err
+	case err := <-p.ech:
+		return nil, err
 	}
 }
 
-func (p *ObjectProvider) AddObject(o Object) error {
+func (p *ObjectProvider) AddObject(ctx context.Context, o Object) error {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return ErrProviderClosed
+	}
+	p.mu.Unlock()
+
 	select {
+	case <-ctx.Done():
+		return ctx.Err()
 	case p.ch <- o:
 		return nil
 	case err := <-p.ech:
@@ -48,28 +60,40 @@ func (p *ObjectProvider) AddObject(o Object) error {
 	}
 }
 
-func (p *ObjectProvider) AddError(err error) bool {
-	if p.err != nil {
-		return false
-	}
-	if err == nil {
-		return true
-	}
-	select {
-	case p.ech <- err:
-		return true
-	default:
-		return false
-	}
-}
-
 func (p *ObjectProvider) HandleError(err error) {
 	if err == nil {
 		return
 	}
-	ok := p.AddError(err)
-	for !ok {
-		ok = p.AddError(err)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return
+	}
+	select {
+	case p.ech <- err:
+	default:
+	}
+}
+
+func (p *ObjectProvider) AddError(err error) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.err != nil || p.closed {
+		tracelog.DebugLogger.Printf("ObjectProvider.AddError: Cannot add error (closed=%v, existing_err=%v)", p.closed, p.err)
+		return false
+	}
+	if err == nil {
+		return true
+	}
+
+	tracelog.DebugLogger.Printf("ObjectProvider.AddError: Adding error: %v", err)
+	select {
+	case p.ech <- err:
+		return true
+	default:
+		tracelog.WarningLogger.Printf("ObjectProvider.AddError: Error channel full, dropping error: %v", err)
+		return false
 	}
 }
 
@@ -78,10 +102,11 @@ func (p *ObjectProvider) ObjectsCount() int {
 }
 
 func (p *ObjectProvider) Close() {
-	close(p.ch)
-	select {
-	case p.ech <- ErrProviderClosed:
-	default:
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return
 	}
-	close(p.ech)
+	p.closed = true
+	close(p.ch)
 }
