@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,122 @@ import (
 
 type DeleteHandler struct {
 	internal.DeleteHandler
+}
+
+// HandleDeleteBefore deletes backups before a target, with snapshot cleanup
+func (dh *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
+	modifier, beforeStr := internal.ExtractDeleteModifierFromArgs(args)
+
+	target, err := dh.FindTargetBefore(beforeStr, modifier)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		return
+	}
+
+	// Collect backups to delete for snapshot cleanup
+	backupsToDelete := dh.collectBackupsBeforeTarget(target)
+	handleSnapshotDeletion(backupsToDelete, dh.Folder)
+
+	// Delegate to parent
+	err = dh.DeleteBeforeTarget(target, confirmed)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+// HandleDeleteRetain deletes old backups with retention, with snapshot cleanup
+func (dh *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
+	modifier, retentionStr := internal.ExtractDeleteModifierFromArgs(args)
+	retentionCount, err := strconv.Atoi(retentionStr)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	target, err := dh.FindTargetRetain(retentionCount, modifier)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		return
+	}
+
+	// Collect backups to delete for snapshot cleanup
+	backupsToDelete := dh.collectBackupsBeforeTarget(target)
+	handleSnapshotDeletion(backupsToDelete, dh.Folder)
+
+	// Delegate to parent
+	err = dh.DeleteBeforeTarget(target, confirmed)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+// HandleDeleteTarget deletes a specific backup, with snapshot cleanup
+func (dh *DeleteHandler) HandleDeleteTarget(backupSelector internal.BackupSelector, confirmed bool, findFull bool) {
+	backup, err := backupSelector.Select(dh.Folder)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	target, err := dh.FindTargetByName(backup.Name)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if target == nil {
+		tracelog.InfoLogger.Printf("No backup found for deletion")
+		return
+	}
+
+	// Collect backups to delete for snapshot cleanup
+	backupsToDelete := dh.collectBackupsForTarget(target, findFull)
+	handleSnapshotDeletion(backupsToDelete, dh.Folder)
+
+	// Delegate to parent
+	folderFilter := func(string) bool { return true }
+	err = dh.DeleteTarget(target, confirmed, findFull, folderFilter)
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
+// collectBackupsBeforeTarget collects backup names before a target
+func (dh *DeleteHandler) collectBackupsBeforeTarget(target internal.BackupObject) []string {
+	tracelog.InfoLogger.Printf("collectBackupsBeforeTarget: target is %s", target.GetBackupName())
+	backupNames := make([]string, 0)
+	// Get all backup objects from the folder
+	backupObjects, err := internal.GetBackupSentinelObjects(dh.Folder)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Failed to list backups for snapshot cleanup: %v", err)
+		return backupNames
+	}
+
+	tracelog.InfoLogger.Printf("Found %d backup sentinel objects", len(backupObjects))
+	for _, obj := range backupObjects {
+		backupName := DeduceBackupName(obj)
+		tracelog.InfoLogger.Printf("  Checking object %s -> backup name: %s", obj.GetName(), backupName)
+		if backupName == "" {
+			tracelog.InfoLogger.Printf("    Skipped: backup name is empty")
+			continue
+		}
+		// Check if this backup is before the target
+		// Simple name comparison (both backups and snapshots have sortable names)
+		if backupName < target.GetBackupName() {
+			tracelog.InfoLogger.Printf("    %s < %s, adding to deletion list", backupName, target.GetBackupName())
+			backupNames = append(backupNames, backupName)
+		} else {
+			tracelog.InfoLogger.Printf("    %s >= %s, not before target", backupName, target.GetBackupName())
+		}
+	}
+	tracelog.InfoLogger.Printf("collectBackupsBeforeTarget: collected %d backups", len(backupNames))
+	return backupNames
+}
+
+// collectBackupsForTarget collects backup names for a specific target
+func (dh *DeleteHandler) collectBackupsForTarget(target internal.BackupObject, findFull bool) []string {
+	// For now, just return the target itself
+	// In the future, this could be expanded to handle delta backups
+	return []string{target.GetBackupName()}
+}
+
+// handleSnapshotDeletion handles deletion of snapshot backups
+func handleSnapshotDeletion(backupNames []string, folder storage.Folder) {
+	tracelog.InfoLogger.Printf("handleSnapshotDeletion called with %d backups", len(backupNames))
+	for _, name := range backupNames {
+		tracelog.InfoLogger.Printf("  - %s", name)
+	}
+	if len(backupNames) == 0 {
+		tracelog.InfoLogger.Println("No backups to check for snapshot deletion")
+		return
+	}
+	HandleSnapshotBackupDeletion(backupNames, folder)
 }
 
 const (
