@@ -109,7 +109,8 @@ const (
 	StatsdAddressSetting                 = "WALG_STATSD_ADDRESS"
 	StatsdExtraTagsSetting               = "WALG_STATSD_EXTRA_TAGS"
 	PgAliveCheckInterval                 = "WALG_ALIVE_CHECK_INTERVAL"
-	PgStopBackupTimeout                  = "WALG_STOP_BACKUP_TIMEOUT"
+	PgStopBackupTimeout                  = "WALG_STOP_BACKUP_TIMEOUT" // deprecated, use WALG_PG_TIMEOUT
+	PgTimeout                            = "WALG_PG_TIMEOUT"
 	FailoverStorages                     = "WALG_FAILOVER_STORAGES"
 	FailoverStoragesCheck                = "WALG_FAILOVER_STORAGES_CHECK"
 	FailoverStoragesCheckTimeout         = "WALG_FAILOVER_STORAGES_CHECK_TIMEOUT"
@@ -522,6 +523,7 @@ var (
 		PgBackRestStanza:                     true,
 		PgAliveCheckInterval:                 true,
 		PgStopBackupTimeout:                  true,
+		PgTimeout:                            true,
 		FailoverStorages:                     true,
 		FailoverStoragesCheck:                true,
 		FailoverStoragesCheckTimeout:         true,
