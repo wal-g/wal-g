@@ -45,6 +45,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 	type args struct {
 		ctx      context.Context
 		since    models.Timestamp
+		initial  bool
 		uploader *archivemocks.Uploader
 		mongo    MongoDriverFields
 	}
@@ -62,8 +63,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				newestTS := models.Timestamp{TS: 1579005001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						upl := archivemocks.Uploader{}
 						upl.On("UploadGapArchive",
@@ -92,10 +94,10 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 						secondCur.On("Data").Return(secondCurDoc).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).
 							Return(models.IsMaster{LastWrite: models.IsMasterLastWrite{MajorityOpTime: models.OpTime{TS: newestTS}}}, nil).
-							On("TailOplogFrom", mock.Anything, newestTS).Return(secondCur, nil).Once()
+							On("TailOplogFrom", mock.Anything, newestTS, true).Return(secondCur, nil).Once()
 						return MongoDriverFields{
 							client:    md,
 							firstCur:  firstCur,
@@ -113,8 +115,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
@@ -129,7 +132,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS).Return(cur, nil).Once()
+						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(cur, nil).Once()
 						return MongoDriverFields{
 							client:   md,
 							firstCur: cur,
@@ -145,14 +148,15 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 			args: func() args {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
 					mongo: func() MongoDriverFields {
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS).
+						md.On("TailOplogFrom", mock.Anything, reqTS, true).
 							Return(nil, fmt.Errorf("can not create first cursor")).Once()
 						return MongoDriverFields{
 							client: md,
@@ -168,8 +172,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
@@ -179,7 +184,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Err").Return(fmt.Errorf("next failed")).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once()
+						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once()
 						return MongoDriverFields{
 							client:   md,
 							firstCur: firstCur,
@@ -196,8 +201,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				oldestTS := models.Timestamp{TS: 1579003001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
@@ -212,7 +218,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstCurDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).Return(models.IsMaster{}, fmt.Errorf("isMaster error"))
 
 						return MongoDriverFields{
@@ -254,7 +260,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstCurDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).
 							Return(models.IsMaster{LastWrite: models.IsMasterLastWrite{MajorityOpTime: models.OpTime{TS: newestTS}}}, nil)
 						return MongoDriverFields{
@@ -297,10 +303,10 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstCurDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).
 							Return(models.IsMaster{LastWrite: models.IsMasterLastWrite{MajorityOpTime: models.OpTime{TS: newestTS}}}, nil).
-							On("TailOplogFrom", mock.Anything, newestTS).
+							On("TailOplogFrom", mock.Anything, newestTS, true).
 							Return(nil, fmt.Errorf("can not create second cursor")).Once()
 						return MongoDriverFields{
 							client:   md,
@@ -315,7 +321,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotCur, gotSince, err := BuildCursorFromTS(tc.args.ctx, tc.args.since, tc.args.uploader, tc.args.mongo.client)
+			gotCur, gotSince, err := BuildCursorFromTS(tc.args.ctx, tc.args.since, true, tc.args.uploader, tc.args.mongo.client)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 				tc.args.uploader.AssertExpectations(t)
@@ -431,7 +437,7 @@ func TestResolveStartingTS(t *testing.T) {
 			defer tc.args.downloader.AssertExpectations(t)
 			defer tc.args.mongoClient.AssertExpectations(t)
 
-			ts, err := ResolveStartingTS(tc.args.ctx, tc.args.downloader, tc.args.mongoClient)
+			ts, _, err := ResolveStartingTS(tc.args.ctx, tc.args.downloader, tc.args.mongoClient)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 				return

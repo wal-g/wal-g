@@ -220,9 +220,9 @@ func (_m *MongoDriver) LastWriteTS(ctx context.Context) (models.Timestamp, model
 	return r0, r1, r2
 }
 
-// TailOplogFrom provides a mock function with given fields: ctx, from
-func (_m *MongoDriver) TailOplogFrom(ctx context.Context, from models.Timestamp) (client.OplogCursor, error) {
-	ret := _m.Called(ctx, from)
+// TailOplogFrom provides a mock function with given fields: ctx, from, initial
+func (_m *MongoDriver) TailOplogFrom(ctx context.Context, from models.Timestamp, initial bool) (client.OplogCursor, error) {
+	ret := _m.Called(ctx, from, initial)
 
 	if len(ret) == 0 {
 		panic("no return value specified for TailOplogFrom")
@@ -230,19 +230,19 @@ func (_m *MongoDriver) TailOplogFrom(ctx context.Context, from models.Timestamp)
 
 	var r0 client.OplogCursor
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, models.Timestamp) (client.OplogCursor, error)); ok {
-		return rf(ctx, from)
+	if rf, ok := ret.Get(0).(func(context.Context, models.Timestamp, bool) (client.OplogCursor, error)); ok {
+		return rf(ctx, from, initial)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, models.Timestamp) client.OplogCursor); ok {
-		r0 = rf(ctx, from)
+	if rf, ok := ret.Get(0).(func(context.Context, models.Timestamp, bool) client.OplogCursor); ok {
+		r0 = rf(ctx, from, initial)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(client.OplogCursor)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, models.Timestamp) error); ok {
-		r1 = rf(ctx, from)
+	if rf, ok := ret.Get(1).(func(context.Context, models.Timestamp, bool) error); ok {
+		r1 = rf(ctx, from, initial)
 	} else {
 		r1 = ret.Error(1)
 	}
