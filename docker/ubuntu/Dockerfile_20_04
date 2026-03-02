@@ -11,7 +11,5 @@ RUN apt-get update && \
     apt-get install --yes \
         wget curl \
         git \
-        ca-certificates \
-        htop \
-        nano less && \
+        ca-certificates && \
   rm -rf /var/lib/apt/lists/*
