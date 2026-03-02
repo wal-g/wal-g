@@ -31,4 +31,4 @@ jobs:
         run: |
           go get -v -t -d ./...
       - id: govulncheck
-        uses: golang/govulncheck-action@5accf6f1b739690f60277e881531d59debe04a22
+        uses: golang/govulncheck-action@31f7c5463448f83528bd771c2d978d940080c9fd
