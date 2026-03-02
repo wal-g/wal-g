@@ -89,14 +89,14 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	if err != nil {
 		return err
 	}
-	since, err := discovery.ResolveStartingTS(ctx, downloader, mongoClient)
+	since, initial, err := discovery.ResolveStartingTS(ctx, downloader, mongoClient)
 	if err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Printf("Archiving storage last known timestamp is %s", since)
 
 	// fetch cursor started from since TS or from newest TS (if since is not exists)
-	oplogCursor, since, err := discovery.BuildCursorFromTS(ctx, since, uploader, mongoClient)
+	oplogCursor, since, err := discovery.BuildCursorFromTS(ctx, since, initial, uploader, mongoClient)
 	if err != nil {
 		return err
 	}
