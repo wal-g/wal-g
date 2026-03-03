@@ -8,7 +8,7 @@ export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQ
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 
 mariadb_installdb
-service mysql start
+service mariadb start
 
 # Create initial data
 mysql -e "CREATE DATABASE testdb"
@@ -55,7 +55,7 @@ gtids=$(tail -n 1 /var/lib/mysql/xtrabackup_binlog_info | awk '{print $3}')
 echo "GTIDs from backup: $gtids"
 
 chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
+service mariadb start || (cat /var/log/mysql/error.log && false)
 
 # Reset GTIDs
 mysql -e "STOP ALL SLAVES; SET GLOBAL gtid_slave_pos='$gtids';" || true
