@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache
 RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go test -v -c
 
 
-FROM wal-g/ubuntu:20.04
+FROM wal-g/ubuntu:22.04
 
 ENV PGDATA=/var/lib/postgresql/16/main
 
