@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache
 RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go test -v -c
 
 
-FROM wal-g/ubuntu:20.04
+FROM wal-g/ubuntu:22.04
 
 ENV PGDATA=/var/lib/postgresql/16/main
 
@@ -116,7 +116,7 @@ RUN set -eux; \
 		--with-llvm \
 		--with-lz4 \
 		--with-zstd \
-		--with-extra-version=" ${ORIOLEDB_VERSION} PGTAG=${PGTAG} ubuntu:focal+clang build:${ORIOLEDB_BUILDTIME}" \
+		--with-extra-version=" ${ORIOLEDB_VERSION} PGTAG=${PGTAG} ubuntu:jammy+clang build:${ORIOLEDB_BUILDTIME}" \
 	|| cat config.log ); \
 	echo "ORIOLEDB_PATCHSET_VERSION = `echo $PGTAG | cut -d'_' -f2`" >> src/Makefile.global; \
 	make -j "$(nproc)"; \
