@@ -9,11 +9,11 @@ on:
 
 env:
   CACHE_FOLDER: ~/docker-images-${{ github.sha }}
-  CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tgz
-  CACHE_FILE_UBUNTU_20_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-20.04.tgz
-  CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tgz
-  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tgz
-  CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tgz
+  CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
+  CACHE_FILE_UBUNTU_20_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-20.04.tar
+  CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
+  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
+  CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tar
   IMAGE: wal-g/docker_prefix
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
