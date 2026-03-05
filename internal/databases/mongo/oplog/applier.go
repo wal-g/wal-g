@@ -80,7 +80,7 @@ type DBApplier struct {
 	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
 	lastOpTime            models.OpTime
-	reconfig              bool
+	catchUp               bool
 	initMongo             bool
 }
 
@@ -99,7 +99,7 @@ func NewDBApplier(m client.MongoDriver, args DBApplierArgs) *DBApplier {
 		txnBuffer:             txn.NewBuffer(),
 		preserveUUID:          args.PreserveUUID,
 		partial:               args.Partial,
-		reconfig:              args.Reconfig,
+		catchUp:               args.Reconfig,
 		applyIgnoreErrorCodes: args.IgnoreErrCodes,
 		initMongo:             args.InitMongo,
 	}
@@ -115,9 +115,11 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
-	if err := ap.shouldSkip(&op); err != nil {
-		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
-		return nil
+	if !ap.catchUp {
+		if err := ap.shouldSkip(&op); err != nil {
+			tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+			return nil
+		}
 	}
 
 	meta, err := txn.NewMeta(op)
@@ -144,7 +146,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {
-	if ap.reconfig {
+	if ap.catchUp {
 		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastOpTime); err != nil {
 			return err
 		}
