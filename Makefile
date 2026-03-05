@@ -72,11 +72,11 @@ pg_build_image:
 pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE} | gzip -c > ${CACHE_FILE_DOCKER_PREFIX}
-	docker save wal-g/ubuntu:18.04 | gzip -c > ${CACHE_FILE_UBUNTU_18_04}
-	docker save wal-g/ubuntu:20.04 | gzip -c > ${CACHE_FILE_UBUNTU_20_04}
-	docker save wal-g/ubuntu:22.04 | gzip -c > ${CACHE_FILE_UBUNTU_22_04}
-	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
+	docker save ${IMAGE} > ${CACHE_FILE_DOCKER_PREFIX}
+	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
+	docker save wal-g/ubuntu:20.04 > ${CACHE_FILE_UBUNTU_20_04}
+	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
+	docker save ${IMAGE_GOLANG} > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
@@ -85,7 +85,7 @@ pg_integration_test: clean_compose
 		make install_and_build_pg;\
 		make pg_build_image;\
 	else\
-		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
+		docker load -i ${CACHE_FILE_DOCKER_PREFIX} && rm ${CACHE_FILE_DOCKER_PREFIX};\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
@@ -145,10 +145,10 @@ load_docker_common:
 		echo "Rebuild";\
 		docker compose build $(DOCKER_COMMON);\
 	else\
-		docker load -i ${CACHE_FILE_UBUNTU_18_04};\
-		docker load -i ${CACHE_FILE_UBUNTU_20_04};\
-		docker load -i ${CACHE_FILE_UBUNTU_22_04};\
-		docker load -i ${CACHE_FILE_GOLANG};\
+		docker load -i ${CACHE_FILE_UBUNTU_18_04} && rm ${CACHE_FILE_UBUNTU_18_04};\
+		docker load -i ${CACHE_FILE_UBUNTU_20_04} && rm ${CACHE_FILE_UBUNTU_20_04};\
+		docker load -i ${CACHE_FILE_UBUNTU_22_04} && rm ${CACHE_FILE_UBUNTU_22_04};\
+		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
 	fi
 
 mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
