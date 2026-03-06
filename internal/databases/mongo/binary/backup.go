@@ -3,6 +3,7 @@ package binary
 import (
 	"context"
 	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
+	"golang.org/x/sync/errgroup"
 	"os"
 	"strings"
 	"time"
@@ -161,6 +162,19 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	errsChan := make(chan error)
 	go backupService.BackgroundMetadata(tarsChan, errsChan, args.SkipMetadata)
 
+	g, ctx := errgroup.WithContext(backupService.Context)
+	g.Go(func() error {
+		top100, count, err := backupService.BackgroundTop100(ctx)
+		if err != nil {
+			return err
+		}
+		tracelog.InfoLogger.Printf("==================== TOP100: %v", top100)
+		tracelog.InfoLogger.Printf("==================== NAMESPACES COUNT: %v", count)
+		backupService.Sentinel.Top100Namespaces = top100
+		backupService.Sentinel.NamespacesCount = count
+		return nil
+	})
+
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
 		return err
@@ -219,6 +233,10 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if err = g.Wait(); err != nil {
+		return err
 	}
 
 	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
@@ -316,4 +334,18 @@ func (backupService *BackupService) BackgroundMetadata(
 	}
 
 	errChan <- internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
+}
+
+func (backupService *BackupService) BackgroundTop100(ctx context.Context) ([]string, int64, error) {
+	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	bgMongoService, err := CreateBackgroundMongodService(ctx, "bg-top100", mongodbURI)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return GetTop100Namespaces(bgMongoService)
 }
