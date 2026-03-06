@@ -239,7 +239,9 @@ type StreamSentinelDto struct {
 	BinLogStart string     `json:"BinLogStart,omitempty"`
 	// BinLogEnd field is for debug purpose only.
 	// As we can not guarantee that transactions in BinLogEnd file happened before or after backup
-	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
+	BinLogEnd              string `json:"BinLogEnd,omitempty"`
+	BinLogFileName         string `json:"BinLogFileName,omitempty"`
+	BinLogFilePosition     int64  `json:"BinLogFilePosition,omitempty"`
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
 

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -31,6 +32,9 @@ type XtrabackupInfo struct {
 	ToLSN *LSN
 	// max LSN that were observed at the end of the backup
 	LastLSN *LSN
+	// Binlog file and position at the time of backup (parsed from xtrabackup_info/mariadb_backup_info)
+	BinLogFileName     string
+	BinLogFilePosition int64
 }
 
 type XtrabackupExtInfo struct {
@@ -55,14 +59,45 @@ func NewXtrabackupInfo(content string) XtrabackupInfo {
 			result.ToLSN = ParseLSN(value)
 		case "last_lsn":
 			result.LastLSN = ParseLSN(value)
+		case "binlog_pos":
+			result.BinLogFileName, result.BinLogFilePosition = parseBinlogPos(value)
 		}
 	}
 	return result
 }
 
+// parseBinlogPos extracts binlog filename and position from the binlog_pos field
+// in xtrabackup_info / mariadb_backup_info.
+// Formats:
+//
+//	"filename 'mysql-bin.000002', position '607', GTID of the last change '0-1-7'" (mariabackup)
+//	"filename 'mysql-bin.000003', position '154'" (xtrabackup)
+func parseBinlogPos(value string) (string, int64) {
+	var fileName string
+	var filePos int64
+
+	if idx := strings.Index(value, "filename '"); idx >= 0 {
+		rest := value[idx+len("filename '"):]
+		if end := strings.Index(rest, "'"); end >= 0 {
+			fileName = rest[:end]
+		}
+	}
+
+	if idx := strings.Index(value, "position '"); idx >= 0 {
+		rest := value[idx+len("position '"):]
+		if end := strings.Index(rest, "'"); end >= 0 {
+			if pos, err := strconv.ParseInt(rest[:end], 10, 64); err == nil {
+				filePos = pos
+			}
+		}
+	}
+
+	return fileName, filePos
+}
+
 func isXtrabackup(cmd *exec.Cmd) bool {
 	for _, arg := range cmd.Args {
-		if strings.Contains(arg, "xtrabackup") || strings.Contains(arg, "xbstream") {
+		if strings.Contains(arg, "xtrabackup") || strings.Contains(arg, "xbstream") || strings.Contains(arg, "mariabackup") {
 			return true
 		}
 	}
@@ -91,12 +126,41 @@ func removeTemporaryDirectory(tmpDir string) error {
 	return nil
 }
 
+// readFileWithFallback tries primary path, falling back to alternate.
+// Supports both xtrabackup_* (MySQL/older MariaDB) and mariadb_backup_* (MariaDB 11.8+) naming.
+func readFileWithFallback(dir, primary, fallback string) ([]byte, error) {
+	raw, err := os.ReadFile(filepath.Join(dir, primary))
+	if err == nil {
+		return raw, nil
+	}
+	return os.ReadFile(filepath.Join(dir, fallback))
+}
+
 func readXtrabackupInfo(xtrabackupExtraDirectory string) (XtrabackupInfo, error) {
-	raw, err := os.ReadFile(filepath.Join(xtrabackupExtraDirectory, "xtrabackup_checkpoints"))
+	checkpointsRaw, err := readFileWithFallback(
+		xtrabackupExtraDirectory,
+		"xtrabackup_checkpoints",
+		"mariadb_backup_checkpoints",
+	)
 	if err != nil {
 		return XtrabackupInfo{}, err
 	}
-	return NewXtrabackupInfo(string(raw)), nil
+	result := NewXtrabackupInfo(string(checkpointsRaw))
+
+	infoRaw, err := readFileWithFallback(
+		xtrabackupExtraDirectory,
+		"xtrabackup_info",
+		"mariadb_backup_info",
+	)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Could not read backup info file for binlog position: %v", err)
+		return result, nil
+	}
+	infoResult := NewXtrabackupInfo(string(infoRaw))
+	result.BinLogFileName = infoResult.BinLogFileName
+	result.BinLogFilePosition = infoResult.BinLogFilePosition
+
+	return result, nil
 }
 
 func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, prevBackupInfo *PrevBackupInfo) {

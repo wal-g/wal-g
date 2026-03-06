@@ -11,12 +11,22 @@ export WALG_COMPRESSION_METHOD=zstd
 
 # test tools
 mariadb_kill_and_clean_data() {
-    # MariaDB service is weired - it returns error on service stop. Repeat it until success
-    while ! service mariadb stop
-    do
-      echo "Stopping MariaDB... Try again"
-      sleep 1
+    local max_attempts=10
+    local attempt=0
+    while [ "$attempt" -lt "$max_attempts" ]; do
+        if service mariadb stop; then
+            break
+        fi
+        service mysql stop 2>/dev/null || true
+        attempt=$((attempt + 1))
+        echo "Stopping MariaDB... Attempt $attempt/$max_attempts"
+        sleep 1
     done
+    if [ "$attempt" -eq "$max_attempts" ]; then
+        echo "WARNING: Could not stop MariaDB gracefully, forcing kill"
+        pkill -9 mariadbd 2>/dev/null || pkill -9 mysqld 2>/dev/null || true
+        sleep 2
+    fi
 
     rm -rf "${MYSQLDATA}"/*
     rm -rf "${MYSQLDATA}"/.tmp
@@ -24,9 +34,25 @@ mariadb_kill_and_clean_data() {
 }
 
 mariadb_installdb() {
-    mysql_install_db > /dev/null && chown -R mysql:mysql $MYSQLDATA
-    echo "MariaDB version"
-    mariadb --version
+    mysql_install_db --user=mysql --datadir="${MYSQLDATA}" | grep -v '^$'
+    chown -R mysql:mysql "${MYSQLDATA}"
+    echo "MariaDB version: $(mariadb --version)"
+}
+
+mariadb_get_version() {
+    mariadb --version | grep -oP '(?<=Distrib )[\d\.]+'
+}
+
+mariadb_version_check() {
+    local required_version="$1"
+    local current_version
+    current_version=$(mariadb_get_version)
+
+    if [ "$(printf '%s\n' "$required_version" "$current_version" | sort -V | head -n1)" != "$required_version" ]; then
+        echo "SKIP: MariaDB $current_version < $required_version (required)"
+        return 1
+    fi
+    return 0
 }
 
 sysbench() {
@@ -39,7 +65,26 @@ date3339() {
 }
 
 mysql_set_gtid_from_backup() {
-    gtids=$(tail -n 1 < /var/lib/mysql/xtrabackup_binlog_info | awk '{print $3}')
-    echo "GTIDs from backup $gtids"
-    mysql -e "STOP ALL SLAVES; SET GLOBAL gtid_slave_pos='$gtids';"
+    local gtid_file="${MYSQLDATA}/xtrabackup_binlog_info"
+
+    if [ ! -f "$gtid_file" ]; then
+        gtid_file="${MYSQLDATA}/mariadb_backup_binlog_info"
+    fi
+
+    if [ ! -f "$gtid_file" ]; then
+        echo "ERROR: GTID file not found (tried xtrabackup_binlog_info and mariadb_backup_binlog_info)"
+        return 1
+    fi
+
+    local gtids
+    gtids=$(tail -n 1 < "$gtid_file" | awk '{print $3}')
+
+    if [ -z "$gtids" ]; then
+        echo "ERROR: Could not extract GTIDs from backup"
+        return 1
+    fi
+
+    echo "Setting GTIDs from backup: $gtids"
+    mysql -e "STOP ALL SLAVES; SET GLOBAL gtid_slave_pos='$gtids';" 2>/dev/null || \
+    mysql -e "SET GLOBAL gtid_slave_pos='$gtids';"
 }
