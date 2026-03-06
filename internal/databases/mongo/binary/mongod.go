@@ -1,11 +1,9 @@
 package binary
 
 import (
-	"container/heap"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/util"
 	"strings"
 	"time"
 
@@ -434,32 +432,7 @@ func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesI
 	return &routes, nil
 }
 
-type CollStats struct {
-	NS           string `bson:"ns"`
-	StorageStats struct {
-		TotalSize int64 `bson:"totalSize"`
-	} `bson:"storageStats"`
-}
-
-type NsSizeHeap []CollStats
-
-func (h NsSizeHeap) Len() int { return len(h) }
-func (h NsSizeHeap) Less(i, j int) bool {
-	return h[i].StorageStats.TotalSize < h[j].StorageStats.TotalSize
-}
-func (h NsSizeHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
-func (h *NsSizeHeap) Push(x any) {
-	*h = append(*h, x.(CollStats))
-}
-func (h *NsSizeHeap) Pop() any {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-	return x
-}
-
-func GetTop100Namespaces(mongodService *MongodService) ([]string, int64, error) {
+func GetTop100Namespaces(mongodService *MongodService) ([]string, int, error) {
 	pipeline := mongo.Pipeline{
 		{{Key: "$_internalAllCollectionStats", Value: bson.D{
 			{Key: "stats", Value: bson.D{
@@ -474,41 +447,7 @@ func GetTop100Namespaces(mongodService *MongodService) ([]string, int64, error) 
 	}
 	defer cursor.Close(mongodService.Context)
 
-	var counter int64
-	h := &NsSizeHeap{}
-	heap.Init(h)
-	const topK = 100
-
-	for cursor.TryNext(mongodService.Context) {
-		var doc CollStats
-		if err = cursor.Decode(&doc); err != nil {
-			return nil, 0, err
-		}
-
-		db, _ := util.SplitNamespace(doc.NS)
-		if _, ok := systemDBs[db]; ok {
-			continue
-		}
-		counter++
-
-		if h.Len() < topK {
-			heap.Push(h, doc)
-		} else if doc.StorageStats.TotalSize > (*h)[0].StorageStats.TotalSize {
-			heap.Pop(h)
-			heap.Push(h, doc)
-		}
-	}
-
-	if err = cursor.Err(); err != nil {
-		return nil, 0, err
-	}
-
-	res := make([]string, h.Len())
-	for i := h.Len() - 1; i >= 0; i-- {
-		res[i] = heap.Pop(h).(CollStats).NS
-	}
-
-	return res, counter, nil
+	return SortNamespacesWithHeap(mongodService.Context, cursor)
 }
 
 func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, insertData bson.M) error {

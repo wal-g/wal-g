@@ -345,7 +345,7 @@ func (backupService *BackupService) BackgroundMetadata(
 	errChan <- internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
 }
 
-func (backupService *BackupService) BackgroundTop100(ctx context.Context) ([]string, int64, error) {
+func (backupService *BackupService) BackgroundTop100(ctx context.Context) ([]string, int, error) {
 	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
 		return nil, 0, err
