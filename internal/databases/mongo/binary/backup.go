@@ -152,6 +152,20 @@ type DoBackupArgs struct {
 	SkipMetadata  bool
 }
 
+func uploadExtendBackupCursorFiles(cursor *BackupCursor, uploader *internal.ConcurrentUploader) error {
+	extendedBackupFiles, err := cursor.LoadExtendedBackupCursorFiles()
+	if err != nil {
+		return errors.Wrapf(err, "unable to load data from backup cursor")
+	}
+
+	err = uploader.UploadBackupFiles(extendedBackupFiles)
+	if err != nil {
+		return errors.Wrapf(err, "unable to upload backup files")
+	}
+
+	return nil
+}
+
 func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent)
 	if err != nil {
@@ -213,14 +227,8 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	}
 
 	if extendBackupCursor {
-		extendedBackupFiles, err := backupCursor.LoadExtendedBackupCursorFiles()
-		if err != nil {
-			return errors.Wrapf(err, "unable to load data from backup cursor")
-		}
-
-		err = concurrentUploader.UploadBackupFiles(extendedBackupFiles)
-		if err != nil {
-			return errors.Wrapf(err, "unable to upload backup files")
+		if err = uploadExtendBackupCursorFiles(backupCursor, concurrentUploader); err != nil {
+			return err
 		}
 	}
 
