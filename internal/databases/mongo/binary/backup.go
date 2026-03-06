@@ -163,17 +163,19 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	go backupService.BackgroundMetadata(tarsChan, errsChan, args.SkipMetadata)
 
 	g, ctx := errgroup.WithContext(backupService.Context)
-	g.Go(func() error {
-		top100, count, err := backupService.BackgroundTop100(ctx)
-		if err != nil {
-			return err
-		}
-		tracelog.InfoLogger.Printf("==================== TOP100: %v", top100)
-		tracelog.InfoLogger.Printf("==================== NAMESPACES COUNT: %v", count)
-		backupService.Sentinel.Top100Namespaces = top100
-		backupService.Sentinel.NamespacesCount = count
-		return nil
-	})
+	if !args.SkipMetadata {
+		g.Go(func() error {
+			top100, count, err := backupService.BackgroundTop100(ctx)
+			if err != nil {
+				return err
+			}
+			tracelog.InfoLogger.Printf("==================== TOP100: %v", top100)
+			tracelog.InfoLogger.Printf("==================== NAMESPACES COUNT: %v", count)
+			backupService.Sentinel.Top100Namespaces = top100
+			backupService.Sentinel.NamespacesCount = count
+			return nil
+		})
+	}
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
@@ -233,10 +235,9 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if err = g.Wait(); err != nil {
-		return err
+		if err = g.Wait(); err != nil {
+			return err
+		}
 	}
 
 	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)

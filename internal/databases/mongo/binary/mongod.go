@@ -461,7 +461,7 @@ func (h *NsSizeHeap) Pop() any {
 
 func GetTop100Namespaces(mongodService *MongodService) ([]string, int64, error) {
 	pipeline := mongo.Pipeline{
-		{{"$_internalAllCollectionStats", bson.D{
+		{{Key: "$_internalAllCollectionStats", Value: bson.D{
 			{Key: "stats", Value: bson.D{
 				{Key: "storageStats", Value: bson.D{}},
 			}},
