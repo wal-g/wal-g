@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -17,15 +18,23 @@ import (
 
 const binlogFetchAhead = 2
 
-type replayHandler struct {
-	logCh chan string
-	errCh chan error
-	endTS string
+type backupBinlogInfo struct {
+	fileName     string
+	filePosition int64
 }
 
-func newReplayHandler(endTS time.Time) *replayHandler {
+type replayHandler struct {
+	logCh        chan string
+	errCh        chan error
+	endTS        string
+	backupBinlog backupBinlogInfo
+	appliedFirst bool
+}
+
+func newReplayHandler(endTS time.Time, info backupBinlogInfo) *replayHandler {
 	rh := new(replayHandler)
 	rh.endTS = endTS.Local().Format(TimeMysqlFormat)
+	rh.backupBinlog = info
 	rh.logCh = make(chan string, binlogFetchAhead)
 	rh.errCh = make(chan error, 1)
 	go rh.replayLogs()
@@ -34,11 +43,35 @@ func newReplayHandler(endTS time.Time) *replayHandler {
 
 func (rh *replayHandler) replayLogs() {
 	for binlogPath := range rh.logCh {
-		tracelog.InfoLogger.Printf("replaying %s ...", path.Base(binlogPath))
-		err := rh.replayLog(binlogPath)
+		binlogName := path.Base(binlogPath)
+
+		if !rh.appliedFirst && rh.backupBinlog.fileName != "" {
+			if binlogName < rh.backupBinlog.fileName {
+				tracelog.InfoLogger.Printf("skipping %s (before backup boundary %s)", binlogName, rh.backupBinlog.fileName)
+				os.Remove(binlogPath)
+				continue
+			}
+
+			rh.appliedFirst = true
+
+			if binlogName == rh.backupBinlog.fileName && rh.backupBinlog.filePosition > 0 {
+				tracelog.InfoLogger.Printf("replaying %s from position %d (backup boundary)", binlogName, rh.backupBinlog.filePosition)
+				err := rh.replayLog(binlogPath, rh.backupBinlog.filePosition)
+				os.Remove(binlogPath)
+				if err != nil {
+					tracelog.ErrorLogger.Printf("failed to replay %s: %v", binlogName, err)
+					rh.errCh <- err
+					break
+				}
+				continue
+			}
+		}
+
+		tracelog.InfoLogger.Printf("replaying %s ...", binlogName)
+		err := rh.replayLog(binlogPath, 0)
 		os.Remove(binlogPath)
 		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to replay %s: %v", path.Base(binlogPath), err)
+			tracelog.ErrorLogger.Printf("failed to replay %s: %v", binlogName, err)
 			rh.errCh <- err
 			break
 		}
@@ -46,7 +79,7 @@ func (rh *replayHandler) replayLogs() {
 	close(rh.errCh)
 }
 
-func (rh *replayHandler) replayLog(binlogPath string) error {
+func (rh *replayHandler) replayLog(binlogPath string, startPosition int64) error {
 	cmd, err := internal.GetCommandSetting(conf.MysqlBinlogReplayCmd)
 	if err != nil {
 		return err
@@ -54,7 +87,13 @@ func (rh *replayHandler) replayLog(binlogPath string) error {
 	env := os.Environ()
 	env = append(env,
 		fmt.Sprintf("%s=%s", "WALG_MYSQL_CURRENT_BINLOG", binlogPath),
-		fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_END_TS", rh.endTS))
+		fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_END_TS", rh.endTS),
+	)
+	if startPosition > 0 {
+		env = append(env,
+			fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_START_POSITION", strconv.FormatInt(startPosition, 10)),
+		)
+	}
 	cmd.Env = env
 	return cmd.Run()
 }
@@ -80,7 +119,15 @@ func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string
 	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	handler := newReplayHandler(endTS)
+	info, err := getBackupBinlogInfo(folder, backupName)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Could not determine backup binlog info: %v", err)
+	}
+	if info.fileName != "" {
+		tracelog.InfoLogger.Printf("Backup binlog boundary: file=%s position=%d", info.fileName, info.filePosition)
+	}
+
+	handler := newReplayHandler(endTS, info)
 
 	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
 	err = fetchLogs(folder, dstDir, startTS, endTS, endBinlogTS, handler)
@@ -111,4 +158,20 @@ func getTimestamps(folder storage.Folder, backupName, untilTS, untilBinlogLastMo
 		return time.Time{}, time.Time{}, time.Time{}, err
 	}
 	return startTS, endTS, endBinlogTS, nil
+}
+
+func getBackupBinlogInfo(folder storage.Folder, backupName string) (backupBinlogInfo, error) {
+	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	if err != nil {
+		return backupBinlogInfo{}, errors.Wrap(err, "Unable to get backup")
+	}
+	var sentinel StreamSentinelDto
+	err = backup.FetchSentinel(&sentinel)
+	if err != nil {
+		return backupBinlogInfo{}, errors.Wrap(err, "Unable to fetch sentinel")
+	}
+	return backupBinlogInfo{
+		fileName:     sentinel.BinLogFileName,
+		filePosition: sentinel.BinLogFilePosition,
+	}, nil
 }
