@@ -10,7 +10,6 @@ on:
 env:
   CACHE_FOLDER: ~/docker-images-${{ github.sha }}
   CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
-  CACHE_FILE_UBUNTU_20_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-20.04.tar
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
   CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tar
@@ -33,7 +32,6 @@ jobs:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
-            ${{ env.CACHE_FILE_UBUNTU_20_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
@@ -102,7 +100,6 @@ jobs:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
-            ${{ env.CACHE_FILE_UBUNTU_20_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
