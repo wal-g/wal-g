@@ -55,7 +55,11 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 }
 
 func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+	// Track parent directories of successfully deleted objects for cleanup
+	dirsToCheck := make(map[string]bool)
+	
 	for _, object := range objectsWithRelativePaths {
+		filePath := folder.GetFilePath(object.GetName())
 		err := os.RemoveAll(folder.GetFilePath(object.GetName()))
 		if os.IsNotExist(err) {
 			continue
@@ -67,7 +71,6 @@ func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) e
 		dir := filepath.Dir(filePath)
 		dirsToCheck[dir] = true
 	}
-
 	// Clean up empty directories after all deletions
 	folder.removeEmptyDirs(dirsToCheck)
 	return nil
