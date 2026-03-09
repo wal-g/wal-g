@@ -363,7 +363,7 @@ func (h *Handler) checkForAppearance(prevCheck time.Time, filePath string) (appe
 }
 
 func (h *Handler) deleteFile(job transferJob) error {
-	err := h.source.DeleteObjects([]string{job.key.filePath})
+	err := h.source.DeleteObjects([]storage.Object{storage.NewLocalObject(job.key.filePath, time.Time{}, 0)})
 	if err != nil {
 		return fmt.Errorf("delete file from the source storage: %w", err)
 	}

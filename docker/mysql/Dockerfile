@@ -1,6 +1,6 @@
 FROM wal-g/ubuntu:18.04
 
-ENV MYSQLDATA /var/lib/mysql
+ENV MYSQLDATA=/var/lib/mysql
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \

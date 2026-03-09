@@ -220,13 +220,13 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 
 // TODO: unit tests
 func findAoSegmentsToDelete(target internal.BackupObject,
-	aoSegmentsToRetain map[string]struct{}, aoSegFolder storage.Folder) ([]string, error) {
+	aoSegmentsToRetain map[string]struct{}, aoSegFolder storage.Folder) ([]storage.Object, error) {
 	aoObjects, _, err := aoSegFolder.ListFolder()
 	if err != nil {
 		return nil, err
 	}
 
-	aoSegmentsToDelete := make([]string, 0)
+	aoSegmentsToDelete := make([]storage.Object, 0)
 	for _, obj := range aoObjects {
 		if !strings.HasSuffix(obj.GetName(), AoSegSuffix) && obj.GetLastModified().After(target.GetLastModified()) {
 			tracelog.DebugLogger.Println(
@@ -242,7 +242,7 @@ func findAoSegmentsToDelete(target internal.BackupObject,
 
 		tracelog.InfoLogger.Println("\twill be deleted: " + obj.GetName())
 
-		aoSegmentsToDelete = append(aoSegmentsToDelete, obj.GetName())
+		aoSegmentsToDelete = append(aoSegmentsToDelete, obj)
 	}
 
 	return aoSegmentsToDelete, nil

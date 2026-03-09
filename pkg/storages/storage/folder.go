@@ -20,7 +20,7 @@ type Folder interface {
 	ListFolder() (objects []Object, subFolders []Folder, err error)
 
 	// DeleteObjects deletes objects from the storage if they exist.
-	DeleteObjects(objectRelativePaths []string) error
+	DeleteObjects(objects []Object) error
 
 	// Exists checks if an object exists in the folder.
 	Exists(objectRelativePath string) (bool, error)
@@ -48,6 +48,10 @@ type Folder interface {
 	// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
 	// Default versioning is set according to server setting.
 	SetVersioningEnabled(enable bool)
+
+	// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
+	// Default versioning is set according to server setting.
+	GetVersioningEnabled() bool
 }
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
@@ -220,10 +224,14 @@ type AllVersionsFolder interface {
 	SetShowAllVersions(show bool)
 }
 
+// TODO: unittests
 // SetShowAllVersions sets whether to show all versions including deleted objects.
 // If the folder doesn't support this feature, it's a no-op.
-func SetShowAllVersions(folder Folder, show bool) {
-	if avf, ok := folder.(AllVersionsFolder); ok {
+func SetShowAllVersions(folder Folder, show bool) bool {
+	avf, ok := folder.(AllVersionsFolder)
+	if ok {
 		avf.SetShowAllVersions(show)
+		return true
 	}
+	return false
 }

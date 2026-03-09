@@ -16,11 +16,11 @@ pg_ctl -D "${PGDATA}" -w start
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 # push permanent and impermanent delta backups
-du -hs "${PGDATA}"
+du -hs "${PGDATA}" 2>/dev/null || true
 sleep 1
 pgbench -i -s 10 postgres
 sleep 1
-du -hs "${PGDATA}"
+du -hs "${PGDATA}" 2>/dev/null || true
 
 sleep 1
 /usr/bin/time -v -a --output ${BACKUP_PUSH_LOGS} wal-g --config=${TMP_CONFIG} backup-push "${PGDATA}"

@@ -154,7 +154,7 @@ func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (Jour
 func (ji *JournalInfo) Delete(folder storage.Folder) error {
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
-		DeleteObjects([]string{ji.JournalName})
+		DeleteObjects([]storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
 	if err != nil {
 		return err
 	}

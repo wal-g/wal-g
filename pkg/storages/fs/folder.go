@@ -54,18 +54,14 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	// Track parent directories of successfully deleted objects for cleanup
-	dirsToCheck := make(map[string]bool)
-
-	for _, fileName := range objectRelativePaths {
-		filePath := folder.GetFilePath(fileName)
-		err := os.RemoveAll(filePath)
+func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+	for _, object := range objectsWithRelativePaths {
+		err := os.RemoveAll(folder.GetFilePath(object.GetName()))
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("unable to delete file %q: %w", fileName, err)
+			return fmt.Errorf("unable to delete file %q: %w", object.GetName(), err)
 		}
 		// Collect parent directory for later cleanup
 		dir := filepath.Dir(filePath)
@@ -270,3 +266,8 @@ func (folder *Folder) Validate() error {
 
 // NOT IMPLEMENTED
 func (folder *Folder) SetVersioningEnabled(enable bool) {}
+
+// NOT IMPLEMENTED
+func (folder *Folder) GetVersioningEnabled() bool {
+	return false
+}

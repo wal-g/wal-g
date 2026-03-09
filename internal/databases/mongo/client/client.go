@@ -78,7 +78,7 @@ type MongoDriver interface {
 	EnsureIsMaster(ctx context.Context) error
 	IsMaster(ctx context.Context) (models.IsMaster, error)
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
-	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
+	TailOplogFrom(ctx context.Context, from models.Timestamp, initial bool) (OplogCursor, error)
 	ApplyOp(ctx context.Context, op *db.Oplog) error
 	Close(ctx context.Context, shutdown bool) error
 	ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error
@@ -324,14 +324,19 @@ func (mc *MongoClient) Close(ctx context.Context, shutdown bool) error {
 }
 
 // TailOplogFrom gives OplogCursor to tail oplog from
-func (mc *MongoClient) TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error) {
+func (mc *MongoClient) TailOplogFrom(ctx context.Context, from models.Timestamp, initial bool) (OplogCursor, error) {
 	coll, err := mc.getOplogCollection(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	bsonTS := models.BsonTimestampFromOplogTS(from)
-	filter := bson.M{"ts": bson.M{"$gte": bsonTS}}
+	filterTS := bson.M{"$gt": bsonTS}
+	if initial {
+		filterTS = bson.M{"$gte": bsonTS}
+	}
+
+	filter := bson.M{"ts": filterTS}
 	cur, err := coll.Find(ctx, filter, options.Find().SetCursorType(options.TailableAwait))
 
 	if err == nil && cur.ID() == 0 {

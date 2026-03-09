@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 var (
@@ -144,19 +144,19 @@ func TestPartitionStrings(t *testing.T) {
 
 func TestPartitionObjects(t *testing.T) {
 	testCases := []struct {
-		strings   []*s3.ObjectIdentifier
+		strings   []storage.Object
 		blockSize int
-		expected  [][]*s3.ObjectIdentifier
+		expected  [][]storage.Object
 	}{
-		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 2, [][]*s3.ObjectIdentifier{{{}, {}}, {{}, {}}, {{}}}},
-		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}, {}}, 3, [][]*s3.ObjectIdentifier{{{}, {}, {}}, {{}, {}, {}}}},
-		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 1000, [][]*s3.ObjectIdentifier{{{}, {}, {}, {}, {}}}},
-		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 1, [][]*s3.ObjectIdentifier{{{}}, {{}}, {{}}, {{}}, {{}}}},
-		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, 0, [][]*s3.ObjectIdentifier{{{}, {}, {}, {}, {}}}},
-		{[]*s3.ObjectIdentifier{{}, {}, {}, {}, {}}, -1, [][]*s3.ObjectIdentifier{{{}, {}, {}, {}, {}}}},
-		{[]*s3.ObjectIdentifier{{}, {}}, 5, [][]*s3.ObjectIdentifier{{{}, {}}}},
-		{[]*s3.ObjectIdentifier{{}}, 1, [][]*s3.ObjectIdentifier{{{}}}},
-		{[]*s3.ObjectIdentifier{}, 1, [][]*s3.ObjectIdentifier{}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, 2, [][]storage.Object{{nil, nil}, {nil, nil}, {nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil, nil}, 3, [][]storage.Object{{nil, nil, nil}, {nil, nil, nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, 1000, [][]storage.Object{{nil, nil, nil, nil, nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, 1, [][]storage.Object{{nil}, {nil}, {nil}, {nil}, {nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, 0, [][]storage.Object{{nil, nil, nil, nil, nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, -1, [][]storage.Object{{nil, nil, nil, nil, nil}}},
+		{[]storage.Object{nil, nil}, 5, [][]storage.Object{{nil, nil}}},
+		{[]storage.Object{nil}, 1, [][]storage.Object{{nil}}},
+		{[]storage.Object{}, 1, [][]storage.Object{}},
 	}
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {

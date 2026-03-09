@@ -16,12 +16,7 @@ func HandleRemove(prefix string, folder storage.Folder) error {
 		return fmt.Errorf("object or folder %q does not exist", prefix)
 	}
 
-	paths := make([]string, len(objects))
-	for i, obj := range objects {
-		paths[i] = obj.GetName()
-	}
-
-	err = folder.DeleteObjects(paths)
+	err = folder.DeleteObjects(objects)
 	if err != nil {
 		return fmt.Errorf("delete objects by the prefix: %v", err)
 	}

@@ -699,7 +699,7 @@ func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 	}
 	bs.indexesMutex.Lock()
 	defer bs.indexesMutex.Unlock()
-	err := upperFolder.DeleteObjects([]string{blob})
+	err := upperFolder.DeleteObjects([]storage.Object{storage.NewLocalObject(blob, time.Time{}, 0)})
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -751,7 +751,12 @@ func (bs *Server) deleteGarbage(folder storage.Folder, garbage []string) {
 	if len(garbage) == 0 {
 		return
 	}
-	err := folder.DeleteObjects(garbage)
+
+	objects := make([]storage.Object, 0, len(garbage))
+	for _, item := range garbage {
+		objects = append(objects, storage.NewLocalObject(item, time.Time{}, 0))
+	}
+	err := folder.DeleteObjects(objects)
 	if err != nil {
 		tracelog.WarningLogger.Printf("proxy: failed to delete garbage objects: %v", err)
 	}
