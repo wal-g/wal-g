@@ -36,6 +36,16 @@ jobs:
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
+      - name: Cleanup space on runner
+        run: |
+          swapon --show=NAME --noheadings | while read swap_device; do
+            sudo swapoff $swap_device
+          done
+  
+          if [ -e /swapfile ]; then
+            sudo rm /swapfile
+          fi
+
       - name: Install deps
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: sudo apt clean && sudo apt-get install liblzo2-dev
