@@ -2,12 +2,12 @@ package binary
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
@@ -15,6 +15,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 type BackupService struct {
@@ -151,6 +152,20 @@ type DoBackupArgs struct {
 	SkipMetadata  bool
 }
 
+func uploadExtendBackupCursorFiles(cursor *BackupCursor, uploader *internal.ConcurrentUploader) error {
+	extendedBackupFiles, err := cursor.LoadExtendedBackupCursorFiles()
+	if err != nil {
+		return errors.Wrapf(err, "unable to load data from backup cursor")
+	}
+
+	err = uploader.UploadBackupFiles(extendedBackupFiles)
+	if err != nil {
+		return errors.Wrapf(err, "unable to upload backup files")
+	}
+
+	return nil
+}
+
 func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent)
 	if err != nil {
@@ -160,6 +175,21 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	tarsChan := make(chan internal.TarFileSets)
 	errsChan := make(chan error)
 	go backupService.BackgroundMetadata(tarsChan, errsChan, args.SkipMetadata)
+
+	g, ctx := errgroup.WithContext(backupService.Context)
+	if !args.SkipMetadata {
+		g.Go(func() error {
+			top100, count, err := backupService.BackgroundTop100(ctx)
+			if err != nil {
+				return err
+			}
+			tracelog.InfoLogger.Printf("==================== TOP100: %v", top100)
+			tracelog.InfoLogger.Printf("==================== NAMESPACES COUNT: %v", count)
+			backupService.Sentinel.Top100Namespaces = top100
+			backupService.Sentinel.NamespacesCount = count
+			return nil
+		})
+	}
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
@@ -197,14 +227,8 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	}
 
 	if extendBackupCursor {
-		extendedBackupFiles, err := backupCursor.LoadExtendedBackupCursorFiles()
-		if err != nil {
-			return errors.Wrapf(err, "unable to load data from backup cursor")
-		}
-
-		err = concurrentUploader.UploadBackupFiles(extendedBackupFiles)
-		if err != nil {
-			return errors.Wrapf(err, "unable to upload backup files")
+		if err = uploadExtendBackupCursorFiles(backupCursor, concurrentUploader); err != nil {
+			return err
 		}
 	}
 
@@ -217,6 +241,9 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 		tarsChan <- tarFileSets
 		err = <-errsChan
 		if err != nil {
+			return err
+		}
+		if err = g.Wait(); err != nil {
 			return err
 		}
 	}
@@ -316,4 +343,18 @@ func (backupService *BackupService) BackgroundMetadata(
 	}
 
 	errChan <- internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
+}
+
+func (backupService *BackupService) BackgroundTop100(ctx context.Context) ([]string, int, error) {
+	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	bgMongoService, err := CreateBackgroundMongodService(ctx, "bg-top100", mongodbURI)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return GetTop100Namespaces(bgMongoService)
 }

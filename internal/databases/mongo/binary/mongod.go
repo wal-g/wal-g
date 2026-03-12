@@ -34,6 +34,13 @@ type MongodService struct {
 	MongoClient *mongo.Client
 }
 
+var systemDBs = map[string]struct{}{
+	"admin":        {},
+	"local":        {},
+	"config":       {},
+	"mdb_internal": {},
+}
+
 func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeout time.Duration) (*MongodService, error) {
 	var repeatOptions backoff.BackOff
 	repeatOptions = backoff.NewExponentialBackOff()
@@ -423,6 +430,24 @@ func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesI
 	}
 
 	return &routes, nil
+}
+
+func GetTop100Namespaces(mongodService *MongodService) ([]string, int, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$_internalAllCollectionStats", Value: bson.D{
+			{Key: "stats", Value: bson.D{
+				{Key: "storageStats", Value: bson.D{}},
+			}},
+		}}},
+	}
+
+	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer cursor.Close(mongodService.Context)
+
+	return SortNamespacesWithHeap(mongodService.Context, cursor)
 }
 
 func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, insertData bson.M) error {
