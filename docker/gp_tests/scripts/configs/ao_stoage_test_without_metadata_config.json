@@ -1,4 +1,6 @@
-"WALE_S3_PREFIX": "s3://gpaostoragetestbucket",
-"WALG_LOG_LEVEL": "DEVEL",
-"WALG_DELTA_MAX_STEPS": "0",
-"WALG_WITHOUT_FILES_METADATA": "True"
+{
+  "WALE_S3_PREFIX": "s3://gpaostoragetestbucket",
+  "WALG_LOG_LEVEL": "DEVEL",
+  "WALG_DELTA_MAX_STEPS": "0",
+  "WALG_WITHOUT_FILES_METADATA": "True"
+}

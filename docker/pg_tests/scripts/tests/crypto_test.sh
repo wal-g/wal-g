@@ -6,13 +6,7 @@ gpg_key_id=`gpg --list-keys | tail -n +4 | head -n 1 | cut -d ' ' -f 7`
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-
-
-printf ",\n\"WALE_GPG_KEY_ID\":\"${gpg_key_id}\"" >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+jq -s --arg gpg_key_id "${gpg_key_id}" '.[0] * .[1] * {"WALE_GPG_KEY_ID": $gpg_key_id}' ${COMMON_CONFIG} ${CONFIG_FILE} > ${TMP_CONFIG}
 
 initdb ${PGDATA}
 
