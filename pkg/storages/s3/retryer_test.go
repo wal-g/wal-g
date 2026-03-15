@@ -42,6 +42,7 @@ func TestConnResetRetryerNoError(t *testing.T) {
 	retryer := NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: 15})
 	assert.False(t, retryer.ShouldRetry(&request.Request{}))
 }
+
 func TestConnResetRetryerOperationAborted(t *testing.T) {
 	retryer := NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: 15})
 	resp := &http.Response{StatusCode: 409}
