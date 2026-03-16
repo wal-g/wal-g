@@ -94,10 +94,10 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 						secondCur.On("Data").Return(secondCurDoc).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).
 							Return(models.IsMaster{LastWrite: models.IsMasterLastWrite{MajorityOpTime: models.OpTime{TS: newestTS}}}, nil).
-							On("TailOplogFrom", mock.Anything, newestTS, true).Return(secondCur, nil).Once()
+							On("TailOplogFrom", mock.Anything, newestTS).Return(secondCur, nil).Once()
 						return MongoDriverFields{
 							client:    md,
 							firstCur:  firstCur,
@@ -132,7 +132,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(cur, nil).Once()
+						md.On("TailOplogFrom", mock.Anything, reqTS).Return(cur, nil).Once()
 						return MongoDriverFields{
 							client:   md,
 							firstCur: cur,
@@ -156,7 +156,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 					}(),
 					mongo: func() MongoDriverFields {
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS, true).
+						md.On("TailOplogFrom", mock.Anything, reqTS).
 							Return(nil, fmt.Errorf("can not create first cursor")).Once()
 						return MongoDriverFields{
 							client: md,
@@ -184,7 +184,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Err").Return(fmt.Errorf("next failed")).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once()
+						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once()
 						return MongoDriverFields{
 							client:   md,
 							firstCur: firstCur,
@@ -218,7 +218,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstCurDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).Return(models.IsMaster{}, fmt.Errorf("isMaster error"))
 
 						return MongoDriverFields{
@@ -260,7 +260,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstCurDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).
 							Return(models.IsMaster{LastWrite: models.IsMasterLastWrite{MajorityOpTime: models.OpTime{TS: newestTS}}}, nil)
 						return MongoDriverFields{
@@ -303,10 +303,10 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 							On("Push", firstCurDoc).Return(nil).Once()
 
 						md := &mocks.MongoDriver{}
-						md.On("TailOplogFrom", mock.Anything, reqTS, true).Return(firstCur, nil).Once().
+						md.On("TailOplogFrom", mock.Anything, reqTS).Return(firstCur, nil).Once().
 							On("IsMaster", mock.Anything).
 							Return(models.IsMaster{LastWrite: models.IsMasterLastWrite{MajorityOpTime: models.OpTime{TS: newestTS}}}, nil).
-							On("TailOplogFrom", mock.Anything, newestTS, true).
+							On("TailOplogFrom", mock.Anything, newestTS).
 							Return(nil, fmt.Errorf("can not create second cursor")).Once()
 						return MongoDriverFields{
 							client:   md,

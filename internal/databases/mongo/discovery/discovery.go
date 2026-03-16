@@ -38,7 +38,7 @@ func BuildCursorFromTS(ctx context.Context,
 	initial bool,
 	uploader archive.Uploader,
 	mongoClient client.MongoDriver) (oplogCursor client.OplogCursor, fromTS models.Timestamp, err error) {
-	oplogCursor, err = mongoClient.TailOplogFrom(ctx, since, initial)
+	oplogCursor, err = mongoClient.TailOplogFrom(ctx, since)
 	if err != nil {
 		return nil, models.Timestamp{}, fmt.Errorf("can not build oplog cursor from ts '%s': %+v", since, err)
 	}
@@ -55,6 +55,11 @@ func BuildCursorFromTS(ctx context.Context,
 	}
 
 	if op.TS == since {
+		if !initial {
+			// If we resume oplog-pushing, there will be same oplog entry in last position of last oplog archive
+			// and first position of current archive, so we skip one operation
+			oplogCursor.Next(ctx)
+		}
 		return oplogCursor, since, nil
 	}
 
@@ -72,7 +77,7 @@ func BuildCursorFromTS(ctx context.Context,
 		return nil, models.Timestamp{}, err
 	}
 
-	oplogCursor, err = mongoClient.TailOplogFrom(ctx, newestTS, true)
+	oplogCursor, err = mongoClient.TailOplogFrom(ctx, newestTS)
 	if err != nil {
 		return nil, models.Timestamp{}, fmt.Errorf("can not build oplog cursor from ts '%s': %+v", newestTS, err)
 	}
