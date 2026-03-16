@@ -26,7 +26,7 @@ func (r ConnResetRetryer) ShouldRetry(req *request.Request) bool {
 	}
 
 	if req.HTTPResponse != nil && req.HTTPResponse.StatusCode == 409 {
-		tracelog.WarningLogger.Printf("S3 returned HTTP 409 (OperationAborted), retrying request")
+		tracelog.InfoLogger.Printf("S3 returned HTTP 409 (OperationAborted), retrying request")
 		return true
 	}
 
