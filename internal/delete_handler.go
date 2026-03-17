@@ -489,12 +489,17 @@ func DeleteObjectsWhere(
 		}
 	}
 	if len(filteredRelativePathsObjects) == 0 {
+		tracelog.InfoLogger.Println("No backup sets matched the deletion criteria.")
 		return nil
 	}
 	if confirm {
-		return folder.DeleteObjects(filteredRelativePathsObjects)
+		err := folder.DeleteObjects(filteredRelativePathsObjects)
+		if err == nil {
+			tracelog.InfoLogger.Printf("Succession: %d objects were successfully deleted.", len(filteredRelativePathsObjects))
+		}
+		return err
 	}
-	tracelog.InfoLogger.Println("Dry run, nothing were deleted")
+	tracelog.InfoLogger.Printf("Dry run: %d objects would be deleted. Run with --confirm to execute.", len(filteredRelativePathsObjects))
 	return nil
 }
 
