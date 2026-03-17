@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,14 +28,22 @@ var (
 func main() {
 	flag.Parse()
 
-	log.Printf("Starting WAL-G Prometheus exporter")
-	log.Printf("Listen address: %s", *listenAddr)
-	log.Printf("Metrics path: %s", *metricsPath)
-	log.Printf("WAL-G path: %s", *walgPath)
-	log.Printf("WAL-G config path: %s", *walgConfigPath)
-	log.Printf("WAL-G backup-list scrape interval: %v", *backupScrapeInterval)
-	log.Printf("WAL-G wal-verify scrape interval: %v", *verifyScrapeInterval)
-	log.Printf("WAL-G storage check scrape interval: %v", *storageScrapeInterval)
+	// Initialize structured logger
+	// Using JSONHandler for production-ready structured logs
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	logger.Info("Starting WAL-G Prometheus exporter",
+		"listen_address", *listenAddr,
+		"metrics_path", *metricsPath,
+		"walg_path", *walgPath,
+		"walg_config", *walgConfigPath,
+		"intervals", slog.GroupValue(
+			slog.Duration("backup", *backupScrapeInterval),
+			slog.Duration("verify", *verifyScrapeInterval),
+			slog.Duration("storage", *storageScrapeInterval),
+		),
+	)
+
 	// Create context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -47,7 +55,7 @@ func main() {
 
 	for _, env := range unsupportedEnvs {
 		if val := os.Getenv(env); val != "" {
-			log.Printf("Clearing unsupported environment variable %s=%s", env, val)
+			logger.Warn("Clearing unsupported environment variable", "key", env, "value", val)
 			os.Unsetenv(env)
 		}
 	}
@@ -55,7 +63,8 @@ func main() {
 	// Create and register the exporter
 	exporter, err := NewWalgExporter(*walgPath, *backupScrapeInterval, *verifyScrapeInterval, *storageScrapeInterval, *walgConfigPath)
 	if err != nil {
-		log.Fatalf("Failed to create exporter: %v", err)
+		logger.Error("Failed to create exporter", "error", err)
+		os.Exit(1)
 	}
 
 	prometheus.MustRegister(exporter)
@@ -84,18 +93,19 @@ func main() {
 
 	// Start HTTP server in a goroutine
 	go func() {
-		log.Printf("Starting HTTP server on %s", *listenAddr)
+		logger.Info("Starting HTTP server", "addr", *listenAddr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server failed: %v", err)
+			logger.Error("HTTP server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
 	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
+	sig := <-sigChan
 
-	log.Println("Received shutdown signal, shutting down gracefully...")
+	logger.Info("Received shutdown signal", "signal", sig.String())
 
 	// Cancel context to stop exporter
 	cancel()
@@ -105,8 +115,8 @@ func main() {
 	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		logger.Error("HTTP server shutdown error", "error", err)
 	}
 
-	log.Println("Exporter shutdown complete")
+	logger.Info("Exporter shutdown complete")
 }

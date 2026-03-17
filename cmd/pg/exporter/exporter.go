@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog" // Replaced standard log with structured slog
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 // WalgExporter implements the Prometheus Collector interface
 type WalgExporter struct {
+	logger         *slog.Logger // Added structured logger instance
 	walgPath       string
 	walgConfigPath string
 
@@ -146,19 +148,13 @@ func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
 	return ""
 }
 
-// GetStartLSN converts the uint64 StartLSN to postgres.LSN type
-func (b *BackupInfo) GetStartLSN() LSN {
-	return LSN(b.StartLSN)
-}
-
-// GetFinishLSN converts the uint64 FinishLSN to postgres.LSN type
-func (b *BackupInfo) GetFinishLSN() LSN {
-	return LSN(b.FinishLSN)
-}
-
 // NewWalgExporter creates a new WAL-G exporter
 func NewWalgExporter(walgPath string, backupScrapeInterval time.Duration, verifyScrapeInterval time.Duration, storageScrapeInterval time.Duration, walgConfigPath string) (*WalgExporter, error) {
+	// Initialize slog with a JSON handler (Standard for structured logging)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
 	return &WalgExporter{
+		logger:                logger,
 		walgPath:              walgPath,
 		backupScrapeInterval:  backupScrapeInterval,
 		verifyScrapeInterval:  verifyScrapeInterval,
@@ -333,11 +329,11 @@ func (e *WalgExporter) Start(ctx context.Context) {
 	e.scrapeBackupMetrics()
 	e.scrapeWalMetrics()
 
-	log.Printf("Initial WAL-G metrics scrape completed; starting periodic collection")
+	e.logger.Info("Initial WAL-G metrics scrape completed; starting periodic collection")
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Exporter context cancelled, stopping metrics collection")
+			e.logger.Info("Exporter context cancelled, stopping metrics collection")
 			return
 		case <-tickerStorage.C:
 			e.checkStorageAliveness()
@@ -359,7 +355,7 @@ func (e *WalgExporter) scrapeBackupMetrics() {
 	// Get backup information
 	backups, err := e.getBackupInfo()
 	if err != nil {
-		log.Printf("Error getting backup info: %v", err)
+		e.logger.Error("Error getting backup info", "error", err, "operation", "backup-list")
 		e.scrapeErrors.Inc()
 		e.errors.WithLabelValues("backup-list", "command_failed").Inc()
 		return
@@ -371,7 +367,7 @@ func (e *WalgExporter) scrapeBackupMetrics() {
 	// Calculate PITR window
 	e.updatePitrWindow(backups)
 
-	log.Printf("Metrics for backups scrape completed in %v", time.Since(start))
+	e.logger.Info("Metrics for backups scrape completed", "duration", time.Since(start))
 }
 
 // scrapeWalMetrics collects wal metrics from WAL-G
@@ -384,7 +380,7 @@ func (e *WalgExporter) scrapeWalMetrics() {
 	// Get WAL verify information
 	verifyData, err := e.getWalVerify()
 	if err != nil {
-		log.Printf("Error getting WAL verify info: %v", err)
+		e.logger.Error("Error getting WAL verify info", "error", err, "operation", "wal-verify")
 		e.scrapeErrors.Inc()
 		e.errors.WithLabelValues("wal-verify", "command_failed").Inc()
 		return
@@ -393,7 +389,7 @@ func (e *WalgExporter) scrapeWalMetrics() {
 	// Update WAL verify metrics
 	e.updateWalMetrics(verifyData)
 
-	log.Printf("Metrics for WALs verify scrape completed in %v", time.Since(start))
+	e.logger.Info("Metrics for WALs verify scrape completed", "duration", time.Since(start))
 }
 
 // getBackupInfo executes wal-g backup-list --detail --json
@@ -468,8 +464,8 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			backupType,                     // backup_type
 			backup.WalFileName,             // wal_file
 			strconv.Itoa(backup.PgVersion), // pg_version
-			backup.GetStartLSN().String(),  // start_lsn
-			backup.GetFinishLSN().String(), // finish_lsn
+			strconv.FormatUint(backup.StartLSN, 10),  // Converted to string for metric labels
+			strconv.FormatUint(backup.FinishLSN, 10), // Converted to string for metric labels
 			isPermanent,                    // is_permanent
 			deltaOriginBackupName,          // delta_origin
 		}
@@ -598,11 +594,11 @@ func (e *WalgExporter) checkStorageAliveness() {
 	e.storageLatency.Set(latency)
 
 	if err != nil {
-		log.Printf("Storage aliveness check failed: %v", err)
+		e.logger.Error("Storage aliveness check failed", "error", err, "latency", latency)
 		e.storageAlive.Set(0)
 		e.errors.WithLabelValues("storage-check", "connectivity_failed").Inc()
 	} else {
 		e.storageAlive.Set(1)
+		e.logger.Info("Storage check completed", "duration", time.Since(start))
 	}
-	log.Printf("Storage check completed in %v", time.Since(start))
 }
