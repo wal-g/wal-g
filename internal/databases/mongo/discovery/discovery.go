@@ -35,7 +35,6 @@ func ResolveStartingTS(ctx context.Context,
 // BuildCursorFromTS finds point to resume archiving or _restarts_ procedure from newest oplog document
 func BuildCursorFromTS(ctx context.Context,
 	since models.Timestamp,
-	initial bool,
 	uploader archive.Uploader,
 	mongoClient client.MongoDriver) (oplogCursor client.OplogCursor, fromTS models.Timestamp, err error) {
 	oplogCursor, err = mongoClient.TailOplogFrom(ctx, since)
@@ -55,11 +54,6 @@ func BuildCursorFromTS(ctx context.Context,
 	}
 
 	if op.TS == since {
-		if !initial {
-			// If we resume oplog-pushing, there will be same oplog entry in last position of last oplog archive
-			// and first position of current archive, so we skip one operation
-			oplogCursor.Next(ctx)
-		}
 		return oplogCursor, since, nil
 	}
 
