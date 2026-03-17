@@ -321,7 +321,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotCur, gotSince, err := BuildCursorFromTS(tc.args.ctx, tc.args.since, true, tc.args.uploader, tc.args.mongo.client)
+			gotCur, gotSince, err := BuildCursorFromTS(tc.args.ctx, tc.args.since, tc.args.uploader, tc.args.mongo.client)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 				tc.args.uploader.AssertExpectations(t)
