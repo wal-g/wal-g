@@ -188,7 +188,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			return nil, nil, err
 		}
 	} else {
-		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) {
+		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool {
 			for _, prefix := range commonPrefixes {
 				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
 				subFolders = append(subFolders, subFolder)
@@ -204,15 +204,56 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
 				objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
 			}
+			return true
 		}
 
-		err = folder.listObjectsPages(prefix, delimiter, nil, listFunc)
+		err = folder.listObjectsPages(prefix, delimiter, nil, nil, listFunc)
 
 		// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
 		// which don't yet exist.
 		if err != nil && !isAwsNotExist(err) {
 			return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 		}
+	}
+
+	return objects, subFolders, nil
+}
+
+func (folder *Folder) ListFolderSegment(startAfter *string, endBefore *string) (objects []storage.Object, subFolders []storage.Folder, err error) {
+	prefix := aws.String(folder.path)
+	delimiter := aws.String("/")
+
+	listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool {
+		cont := true
+		for _, prefix := range commonPrefixes {
+			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
+			subFolders = append(subFolders, subFolder)
+		}
+		for _, object := range contents {
+			key := *object.Key
+			if endBefore != nil && key >= *endBefore {
+				cont = false
+				break
+			}
+			// Some storages return root tar_partitions folder as a Key.
+			// We do not want to fail restoration due to this fact.
+			// Keep in mind that skipping files is very dangerous and any decision here must be weighted.
+			if key == folder.path {
+				continue
+			}
+
+			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
+			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
+		}
+		return cont
+	}
+
+	err = folder.listObjectsPages(prefix, delimiter, nil, startAfter, listFunc)
+
+	// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+	// which don't yet exist.
+	if err != nil && !isAwsNotExist(err) {
+		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
 	}
 
 	return objects, subFolders, nil
@@ -360,43 +401,43 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	return objects, subFolders, nil
 }
 
-func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int64,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) (err error) {
+func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int64, startAfter *string,
+	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool) (err error) {
 	if folder.config.UseListObjectsV1 {
-		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, listFunc)
+		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, startAfter, listFunc)
 	} else {
-		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, listFunc)
+		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, startAfter, listFunc)
 	}
 	return
 }
 
-func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string, maxKeys *int64,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
+func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string, maxKeys *int64, startAfter *string,
+	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool) error {
 	s3Objects := &s3.ListObjectsInput{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 		MaxKeys:   maxKeys,
+		Marker:    startAfter,
 	}
 
 	err := folder.s3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
-		listFunc(files.CommonPrefixes, files.Contents)
-		return true
+		return listFunc(files.CommonPrefixes, files.Contents)
 	})
 	return err
 }
 
-func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxKeys *int64,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object)) error {
+func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxKeys *int64, startAfter *string,
+	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool) error {
 	s3Objects := &s3.ListObjectsV2Input{
-		Bucket:    folder.bucket,
-		Prefix:    prefix,
-		Delimiter: delimiter,
-		MaxKeys:   maxKeys,
+		Bucket:     folder.bucket,
+		Prefix:     prefix,
+		Delimiter:  delimiter,
+		MaxKeys:    maxKeys,
+		StartAfter: startAfter,
 	}
 	err := folder.s3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
-		listFunc(files.CommonPrefixes, files.Contents)
-		return true
+		return listFunc(files.CommonPrefixes, files.Contents)
 	})
 	return err
 }
