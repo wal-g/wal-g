@@ -45,3 +45,9 @@ venv/
 
 #Ctags tags file
 tags
+
+
+# AI tools files and directories
+.claude
+AGENTS.md
+.mcp.json

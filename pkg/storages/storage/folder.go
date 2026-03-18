@@ -10,6 +10,7 @@ import (
 
 //go:generate mockery --name Folder
 //go:generate mockgen -destination=../../../test/mocks/mock_folder.go -package mocks -build_flags -mod=readonly github.com/wal-g/wal-g/pkg/storages/storage Folder
+//go:generate mockgen -destination=../../../test/mocks/mock_folder_ext.go -package mocks -build_flags -mod=readonly github.com/wal-g/wal-g/pkg/storages/storage FolderExt
 
 type Folder interface {
 	// GetPath provides a relative path from the root of the storage. It must always end with '/'.
@@ -52,6 +53,11 @@ type Folder interface {
 	// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
 	// Default versioning is set according to server setting.
 	GetVersioningEnabled() bool
+}
+
+type FolderExt interface {
+	Folder
+	ListFolderSegment(startAfter *string, endBefore *string) (objects []Object, subFolders []Folder, err error)
 }
 
 func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
