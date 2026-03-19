@@ -149,12 +149,11 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 		}
 		return nil, errors.Wrapf(err, "failed to read object: '%s' from S3", objectPath)
 	}
-
 	reader := object.Body
 	if folder.config.RangeBatchEnabled {
 		reader = NewRangeReader(object.Body, objectPath, folder.config.RangeMaxRetries, folder)
 	}
-	return reader, nil
+	return NewContentLengthValidator(reader, aws.Int64Value(object.ContentLength), objectPath), nil
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
