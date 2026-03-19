@@ -116,7 +116,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 		pushArgs.archiveAfterSize,
 		pushArgs.archiveTimeout,
 		uploadStatsUpdater,
-		initial)
+		!initial)
 	oplogFetcher := stages.NewCursorMajFetcher(mongoClient, oplogCursor, pushArgs.lwUpdate)
 
 	// run working cycle

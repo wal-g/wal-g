@@ -50,6 +50,7 @@ func (restoreService *RestoreService) DoRestore(
 	if err != nil {
 		return err
 	}
+	tracelog.InfoLogger.Printf("Sentinel %v", sentinel)
 
 	var onHostFilesFilter, tarFilesFilter map[string]struct{}
 

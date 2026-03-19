@@ -19,8 +19,8 @@ type BackupRoutesInfo struct {
 	Service   map[string]string `json:"service"`
 }
 
-func NewBackupRoutesInfo() BackupRoutesInfo {
-	return BackupRoutesInfo{
+func NewBackupRoutesInfo() *BackupRoutesInfo {
+	return &BackupRoutesInfo{
 		Databases: make(map[string]DBInfo),
 		Service:   make(map[string]string),
 	}
