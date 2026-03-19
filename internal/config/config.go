@@ -133,6 +133,7 @@ const (
 	MongoDBLastWriteUpdateInterval      = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	MongoDBExtendBackupCursor           = "MONGODB_EXTEND_BACKUP_CURSOR"
 	MongoDBDeletionProtectionWhitelist  = "MONGODB_DELETION_PROTECTION_WHITELIST"
+	MongoDBExtraInternalDatabases       = "MONGODB_EXTRA_INTERNAL_DATABASES"
 	OplogArchiveAfterSize               = "OPLOG_ARCHIVE_AFTER_SIZE"
 	OplogArchiveTimeoutInterval         = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
 	OplogPITRDiscoveryInterval          = "OPLOG_PITR_DISCOVERY_INTERVAL"
@@ -545,6 +546,7 @@ var (
 		MongoDBLastWriteUpdateInterval:     true,
 		MongoDBExtendBackupCursor:          true,
 		MongoDBDeletionProtectionWhitelist: true,
+		MongoDBExtraInternalDatabases:      true,
 		OplogArchiveTimeoutInterval:        true,
 		OplogArchiveAfterSize:              true,
 		OplogPushStatsEnabled:              true,
@@ -643,27 +645,28 @@ var (
 	Turbo bool
 
 	secretSettings = map[string]bool{
-		"WALE_" + GpgKeyIDSetting:    true,
-		"WALG_" + GpgKeyIDSetting:    true,
-		AwsAccessKeyID:               true,
-		AwsSecretAccessKey:           true,
-		AwsSessionToken:              true,
-		AzureStorageAccessKey:        true,
-		AzureStorageSasToken:         true,
-		GoogleApplicationCredentials: true,
-		AlicloudAccessKeyID:          true,
-		AlicloudAccessKeySecret:      true,
-		AlicloudSecurityToken:        true,
-		LibsodiumKeySetting:          true,
-		PgPasswordSetting:            true,
-		PgpKeyPassphraseSetting:      true,
-		PgpKeySetting:                true,
-		PgpEnvelopeKeySetting:        true,
-		RedisUsername:                true,
-		RedisPassword:                true,
-		SQLServerConnectionString:    true,
-		SSHPassword:                  true,
-		SwiftOsPassword:              true,
+		"WALE_" + GpgKeyIDSetting:     true,
+		"WALG_" + GpgKeyIDSetting:     true,
+		AwsAccessKeyID:                true,
+		AwsSecretAccessKey:            true,
+		AwsSessionToken:               true,
+		AzureStorageAccessKey:         true,
+		AzureStorageSasToken:          true,
+		GoogleApplicationCredentials:  true,
+		AlicloudAccessKeyID:           true,
+		AlicloudAccessKeySecret:       true,
+		AlicloudSecurityToken:         true,
+		LibsodiumKeySetting:           true,
+		PgPasswordSetting:             true,
+		PgpKeyPassphraseSetting:       true,
+		PgpKeySetting:                 true,
+		PgpEnvelopeKeySetting:         true,
+		RedisUsername:                 true,
+		RedisPassword:                 true,
+		SQLServerConnectionString:     true,
+		SSHPassword:                   true,
+		SwiftOsPassword:               true,
+		MongoDBExtraInternalDatabases: true,
 	}
 
 	complexSettings = map[string]bool{
