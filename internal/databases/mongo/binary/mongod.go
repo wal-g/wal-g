@@ -34,13 +34,6 @@ type MongodService struct {
 	MongoClient *mongo.Client
 }
 
-var systemDBs = map[string]struct{}{
-	"admin":        {},
-	"local":        {},
-	"config":       {},
-	"mdb_internal": {},
-}
-
 func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeout time.Duration) (*MongodService, error) {
 	var repeatOptions backoff.BackOff
 	repeatOptions = backoff.NewExponentialBackOff()
@@ -380,74 +373,6 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 	}
 
 	return nil
-}
-
-func convertToFile(ident string) string {
-	return fmt.Sprintf("/%s.wt", ident)
-}
-
-type CatalogRecord struct {
-	Type       string            `bson:"type"`
-	Database   string            `bson:"db"`
-	Collection string            `bson:"name"`
-	Ident      string            `bson:"ident"`
-	IndexIdent map[string]string `bson:"idxIdent"`
-}
-
-func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
-	routes := models.NewBackupRoutesInfo()
-
-	pipeline := mongo.Pipeline{{{Key: "$listCatalog", Value: bson.M{}}}}
-	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
-	if err != nil {
-		return nil, err
-	}
-
-	for cursor.TryNext(mongodService.Context) {
-		var record CatalogRecord
-		if err = cursor.Decode(&record); err != nil {
-			return nil, err
-		}
-		if record.Type != "collection" {
-			continue
-		}
-
-		indexInfo := make(models.IndexInfo)
-		for index, uri := range record.IndexIdent {
-			indexInfo[index] = models.Paths{DBPath: convertToFile(uri)}
-		}
-
-		colInfo := models.CollectionInfo{
-			Paths:     models.Paths{DBPath: convertToFile(record.Ident)},
-			IndexInfo: indexInfo,
-		}
-
-		if _, ok := routes.Databases[record.Database]; !ok {
-			routes.Databases[record.Database] = make(models.DBInfo)
-		}
-
-		routes.Databases[record.Database][record.Collection] = colInfo
-	}
-
-	return &routes, nil
-}
-
-func GetTop100Namespaces(mongodService *MongodService) ([]string, int, error) {
-	pipeline := mongo.Pipeline{
-		{{Key: "$_internalAllCollectionStats", Value: bson.D{
-			{Key: "stats", Value: bson.D{
-				{Key: "storageStats", Value: bson.D{}},
-			}},
-		}}},
-	}
-
-	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer cursor.Close(mongodService.Context)
-
-	return SortNamespacesWithHeap(mongodService.Context, cursor)
 }
 
 func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, insertData bson.M) error {

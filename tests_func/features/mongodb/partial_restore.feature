@@ -6,7 +6,7 @@ Feature: MongoDB partially restore
     And a configured s3 on minio01
     And mongodb initialized on mongodb01
     And mongodb01 has partial test mongodb data
-    And we create binary mongo-backup on mongodb01
+    And we create binary mongo-backup on mongodb01 with metadata
     Then we got 1 backup entries of mongodb01
 
   Scenario: Partial restore works
