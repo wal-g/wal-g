@@ -14,7 +14,7 @@ import (
 
 type StorageMetadataCollector struct {
 	mongodService *MongodService
-	pmc           *partial.PartialMetadataCollector
+	pmc           *PartialMetadataCollector
 	heap          *NsSizeHeap
 	counter       int
 	top100Ns      *[]string
@@ -33,7 +33,7 @@ func NewStorageMetadataCollector(
 
 	return &StorageMetadataCollector{
 		mongodService: mongodService,
-		pmc:           partial.NewPartialMetadataCollector(),
+		pmc:           NewPartialMetadataCollector(),
 		heap:          h,
 		TarsChan:      make(chan internal.TarFileSets),
 		ErrsChan:      make(chan error),
