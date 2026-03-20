@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,12 +12,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
-func TestBuildOplog(t *testing.T) {
-	ts := models.Timestamp{TS: 123, Inc: 7}
-
-	assert.Equal(t, models.OplogArchBasePath+models.ArchiveTypeOplog+"_123.7", buildOplog(ts))
-}
-
 func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 	since := models.Timestamp{TS: 600, Inc: 1}
 	until := models.Timestamp{TS: 630, Inc: 1}
@@ -24,8 +19,8 @@ func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 	lastArch := mustArchive(t, firstArch.End, models.Timestamp{TS: 630, Inc: 1})
 	downloader := archivemocks.NewDownloader(t)
 
-	expectedSince := buildOplog(models.Timestamp{TS: since.TS - 300, Inc: 0})
-	expectedUntil := buildOplog(models.Timestamp{TS: until.TS + 30, Inc: until.Inc})
+	expectedSince := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: since.TS - 300, Inc: 0}.String())
+	expectedUntil := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: until.TS + 30, Inc: until.Inc}.String())
 
 	var actualSince *string
 	var actualUntil *string
