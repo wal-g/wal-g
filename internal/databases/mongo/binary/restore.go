@@ -2,7 +2,6 @@ package binary
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"time"
 
 	conf "github.com/wal-g/wal-g/internal/config"

@@ -1,4 +1,4 @@
-package partial
+package binary
 
 import (
 	"github.com/stretchr/testify/assert"
