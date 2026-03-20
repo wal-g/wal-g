@@ -3,6 +3,7 @@ package binary
 import (
 	"container/heap"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/wal-g/wal-g/internal"
@@ -13,28 +14,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type NsInfo struct {
-	Ns           string `bson:"ns"`
-	StorageStats struct {
-		TotalSize  int64 `bson:"totalSize"`
-		WiredTiger struct {
-			URI string `bson:"uri"`
-		} `bson:"wiredTiger"`
-		IndexDetails map[string]struct {
-			URI string `bson:"uri"`
-		} `bson:"indexDetails"`
-	} `bson:"storageStats"`
-}
-
 type StorageMetadataCollector struct {
 	mongodService *MongodService
-	routes        *models.BackupRoutesInfo
+	pmc           *partial.PartialMetadataCollector
 	heap          *NsSizeHeap
 	counter       int
 	top100Ns      *[]string
 	TarsChan      chan internal.TarFileSets
 	ErrsChan      chan error
 	onComplete    func(routes *models.BackupRoutesInfo) error
+	systemDbs     *map[string]struct{}
 }
 
 func NewStorageMetadataCollector(
@@ -46,11 +35,12 @@ func NewStorageMetadataCollector(
 
 	return &StorageMetadataCollector{
 		mongodService: mongodService,
-		routes:        models.NewBackupRoutesInfo(),
+		pmc:           partial.NewPartialMetadataCollector(),
 		heap:          h,
 		TarsChan:      make(chan internal.TarFileSets),
 		ErrsChan:      make(chan error),
 		onComplete:    onComplete,
+		systemDbs:     common.SystemDBs(),
 	}
 }
 
@@ -71,7 +61,7 @@ func (smc *StorageMetadataCollector) GetStats() {
 	defer cursor.Close(smc.mongodService.Context)
 
 	for cursor.TryNext(smc.mongodService.Context) {
-		var nsInfo NsInfo
+		var nsInfo models.NsInfo
 		if err = cursor.Decode(&nsInfo); err != nil {
 			smc.ErrsChan <- err
 			return
@@ -79,7 +69,7 @@ func (smc *StorageMetadataCollector) GetStats() {
 		tracelog.DebugLogger.Printf("NsInfo: %v", nsInfo)
 
 		smc.handleTop100Info(&nsInfo)
-		smc.handleRoutesInfo(&nsInfo)
+		smc.pmc.HandleNsInfo(&nsInfo)
 	}
 
 	if err := cursor.Err(); err != nil {
@@ -95,40 +85,17 @@ func (smc *StorageMetadataCollector) GetStats() {
 	smc.top100Ns = &top100Ns
 
 	tarsFileSet := <-smc.TarsChan
-	if err := partial.EnrichWithTarPaths(smc.routes, tarsFileSet.Get()); err != nil {
+	if err := smc.pmc.EnrichWithTarPaths(tarsFileSet.Get()); err != nil {
 		smc.ErrsChan <- err
 		return
 	}
 
-	smc.ErrsChan <- smc.onComplete(smc.routes)
+	smc.ErrsChan <- smc.onComplete(smc.pmc.GetRoutes())
 }
 
-func (smc *StorageMetadataCollector) handleRoutesInfo(nsInfo *NsInfo) {
-	db, col := util.SplitNamespace(nsInfo.Ns)
-
-	indexInfo := make(models.IndexInfo)
-	for index, details := range nsInfo.StorageStats.IndexDetails {
-		if len(details.URI) == 0 {
-			continue
-		}
-		indexInfo[index] = models.Paths{DBPath: convertToFile(localPathFromURI(details.URI))}
-	}
-
-	colInfo := models.CollectionInfo{
-		Paths:     models.Paths{DBPath: convertToFile(localPathFromURI(nsInfo.StorageStats.WiredTiger.URI))},
-		IndexInfo: indexInfo,
-	}
-
-	if _, ok := smc.routes.Databases[db]; !ok {
-		smc.routes.Databases[db] = make(models.DBInfo)
-	}
-
-	smc.routes.Databases[db][col] = colInfo
-}
-
-func (smc *StorageMetadataCollector) handleTop100Info(nsInfo *NsInfo) {
+func (smc *StorageMetadataCollector) handleTop100Info(nsInfo *models.NsInfo) {
 	db, _ := util.SplitNamespace(nsInfo.Ns)
-	if _, ok := systemDBs[db]; ok {
+	if _, ok := (*smc.systemDbs)[db]; ok {
 		return
 	}
 	smc.counter++

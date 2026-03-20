@@ -1,6 +1,8 @@
 package partial
 
 import (
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"reflect"
 	"testing"
 )
@@ -261,7 +263,7 @@ func TestGetFilters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotWhitelist, gotBlacklist := GetFilters(tt.whitelist, tt.blacklist)
+			gotWhitelist, gotBlacklist := getFilters(tt.whitelist, tt.blacklist)
 
 			if !reflect.DeepEqual(gotWhitelist, tt.expectedWhitelist) {
 				t.Errorf("Whitelist mismatch\nGot:      %v\nExpected: %v", gotWhitelist, tt.expectedWhitelist)
@@ -270,6 +272,151 @@ func TestGetFilters(t *testing.T) {
 			if !reflect.DeepEqual(gotBlacklist, tt.expectedBlacklist) {
 				t.Errorf("Blacklist mismatch\nGot:      %v\nExpected: %v", gotBlacklist, tt.expectedBlacklist)
 			}
+		})
+	}
+}
+
+func makeNsInfo(ns, collectionURI string, indexURIs map[string]string) *models.NsInfo {
+	nsInfo := &models.NsInfo{}
+	nsInfo.Ns = ns
+	nsInfo.StorageStats.WiredTiger.URI = collectionURI
+	nsInfo.StorageStats.IndexDetails = make(map[string]struct {
+		URI string `bson:"uri"`
+	})
+	for name, uri := range indexURIs {
+		nsInfo.StorageStats.IndexDetails[name] = struct {
+			URI string `bson:"uri"`
+		}{URI: uri}
+	}
+	return nsInfo
+}
+
+func TestHandleNsInfo(t *testing.T) {
+	tests := []struct {
+		name     string
+		nsInfos  []*models.NsInfo
+		expected map[string]models.DBInfo
+	}{
+		{
+			name: "single collection without indexes",
+			nsInfos: []*models.NsInfo{
+				makeNsInfo("testdb.testcol", "statistics:table:collection-1-1234", nil),
+			},
+			expected: map[string]models.DBInfo{
+				"testdb": {
+					"testcol": models.CollectionInfo{
+						Paths:     models.Paths{DBPath: "/collection-1-1234.wt"},
+						IndexInfo: models.IndexInfo{},
+					},
+				},
+			},
+		},
+		{
+			name: "single collection with single index",
+			nsInfos: []*models.NsInfo{
+				makeNsInfo("testdb.testcol", "statistics:table:collection-1-1234", map[string]string{
+					"id_": "statistics:table:index-1-1234",
+				}),
+			},
+			expected: map[string]models.DBInfo{
+				"testdb": {
+					"testcol": models.CollectionInfo{
+						Paths: models.Paths{DBPath: "/collection-1-1234.wt"},
+						IndexInfo: models.IndexInfo{
+							"id_": models.Paths{DBPath: "/index-1-1234.wt"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "single collection with multiple indexes",
+			nsInfos: []*models.NsInfo{
+				makeNsInfo("testdb.testcol", "statistics:table:collection-1-1234", map[string]string{
+					"id_":    "statistics:table:index-1-1234",
+					"name_1": "statistics:table:index-2-1234",
+				}),
+			},
+			expected: map[string]models.DBInfo{
+				"testdb": {
+					"testcol": models.CollectionInfo{
+						Paths: models.Paths{DBPath: "/collection-1-1234.wt"},
+						IndexInfo: models.IndexInfo{
+							"id_":    models.Paths{DBPath: "/index-1-1234.wt"},
+							"name_1": models.Paths{DBPath: "/index-2-1234.wt"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "index with empty URI is skipped",
+			nsInfos: []*models.NsInfo{
+				makeNsInfo("testdb.testcol", "statistics:table:collection-1-1234", map[string]string{
+					"id_":    "",
+					"name_1": "statistics:table:index-2-1234",
+				}),
+			},
+			expected: map[string]models.DBInfo{
+				"testdb": {
+					"testcol": models.CollectionInfo{
+						Paths: models.Paths{DBPath: "/collection-1-1234.wt"},
+						IndexInfo: models.IndexInfo{
+							"name_1": models.Paths{DBPath: "/index-2-1234.wt"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple collections in same db",
+			nsInfos: []*models.NsInfo{
+				makeNsInfo("testdb.col1", "statistics:table:collection-1-1234", nil),
+				makeNsInfo("testdb.col2", "statistics:table:collection-2-1234", nil),
+			},
+			expected: map[string]models.DBInfo{
+				"testdb": {
+					"col1": models.CollectionInfo{
+						Paths:     models.Paths{DBPath: "/collection-1-1234.wt"},
+						IndexInfo: models.IndexInfo{},
+					},
+					"col2": models.CollectionInfo{
+						Paths:     models.Paths{DBPath: "/collection-2-1234.wt"},
+						IndexInfo: models.IndexInfo{},
+					},
+				},
+			},
+		},
+		{
+			name: "collections in different dbs",
+			nsInfos: []*models.NsInfo{
+				makeNsInfo("db1.col1", "statistics:table:collection-1-1234", nil),
+				makeNsInfo("db2.col1", "statistics:table:collection-2-1234", nil),
+			},
+			expected: map[string]models.DBInfo{
+				"db1": {
+					"col1": models.CollectionInfo{
+						Paths:     models.Paths{DBPath: "/collection-1-1234.wt"},
+						IndexInfo: models.IndexInfo{},
+					},
+				},
+				"db2": {
+					"col1": models.CollectionInfo{
+						Paths:     models.Paths{DBPath: "/collection-2-1234.wt"},
+						IndexInfo: models.IndexInfo{},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pmc := NewPartialMetadataCollector()
+			for _, nsInfo := range tt.nsInfos {
+				pmc.HandleNsInfo(nsInfo)
+			}
+			assert.Equal(t, tt.expected, pmc.routes.Databases)
 		})
 	}
 }

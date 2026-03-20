@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"context"
 	"fmt"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestNewStorageMetadataCollector_Initialization(t *testing.T) {
 	collector := NewStorageMetadataCollector(svc, onComplete)
 
 	assert.NotNil(t, collector)
-	assert.NotNil(t, collector.routes)
+	assert.NotNil(t, collector.pmc)
 	assert.NotNil(t, collector.heap)
 	assert.NotNil(t, collector.TarsChan)
 	assert.NotNil(t, collector.ErrsChan)
@@ -26,142 +27,14 @@ func TestNewStorageMetadataCollector_Initialization(t *testing.T) {
 	assert.Nil(t, collector.top100Ns)
 }
 
-func TestHandleRoutesInfo_BasicCollection(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
-	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
-		return nil
-	})
-
-	nsInfo := &NsInfo{Ns: "testdb.testcol"}
-	nsInfo.StorageStats.WiredTiger.URI = "statistics:table:test/collection-140-3211222180999241170"
-	nsInfo.StorageStats.IndexDetails = map[string]struct {
-		URI string `bson:"uri"`
-	}{
-		"_id_": {URI: "statistics:table:test/index-141-3211222180999241170"},
-	}
-
-	collector.handleRoutesInfo(nsInfo)
-
-	dbInfo, ok := collector.routes.Databases["testdb"]
-	assert.True(t, ok, "database 'testdb' should exist in routes")
-
-	colInfo, ok := dbInfo["testcol"]
-	assert.True(t, ok, "collection 'testcol' should exist in routes")
-
-	assert.NotEmpty(t, colInfo.Paths.DBPath)
-	assert.Contains(t, colInfo.IndexInfo, "_id_")
-	assert.NotEmpty(t, colInfo.IndexInfo["_id_"].DBPath)
-}
-
-func TestHandleRoutesInfo_EmptyIndexURI(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
-	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
-		return nil
-	})
-
-	nsInfo := &NsInfo{Ns: "testdb.testcol"}
-	nsInfo.StorageStats.WiredTiger.URI = "statistics:table:test/collection-140-3211222180999241170"
-	nsInfo.StorageStats.IndexDetails = map[string]struct {
-		URI string `bson:"uri"`
-	}{
-		"_id_": {URI: ""},
-	}
-
-	collector.handleRoutesInfo(nsInfo)
-
-	colInfo := collector.routes.Databases["testdb"]["testcol"]
-	assert.NotContains(t, colInfo.IndexInfo, "_id_", "index with empty URI should be skipped")
-}
-
-func TestHandleRoutesInfo_MultipleCollectionsSameDB(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
-	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
-		return nil
-	})
-
-	nsInfo1 := &NsInfo{Ns: "testdb.col1"}
-	nsInfo1.StorageStats.WiredTiger.URI = "statistics:table:test/collection-140-3211222180999241170"
-
-	nsInfo2 := &NsInfo{Ns: "testdb.col2"}
-	nsInfo2.StorageStats.WiredTiger.URI = "statistics:table:test/collection-142-3211222180999241170"
-
-	collector.handleRoutesInfo(nsInfo1)
-	collector.handleRoutesInfo(nsInfo2)
-
-	dbInfo := collector.routes.Databases["testdb"]
-	assert.Contains(t, dbInfo, "col1")
-	assert.Contains(t, dbInfo, "col2")
-}
-
-func TestHandleRoutesInfo_MultipleDatabases(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
-	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
-		return nil
-	})
-
-	nsInfo1 := &NsInfo{Ns: "db1.col1"}
-	nsInfo1.StorageStats.WiredTiger.URI = "statistics:table:db1/collection-140-3211222180999241170"
-
-	nsInfo2 := &NsInfo{Ns: "db2.col1"}
-	nsInfo2.StorageStats.WiredTiger.URI = "statistics:table:db2/collection-142-3211222180999241170"
-
-	collector.handleRoutesInfo(nsInfo1)
-	collector.handleRoutesInfo(nsInfo2)
-
-	assert.Contains(t, collector.routes.Databases, "db1")
-	assert.Contains(t, collector.routes.Databases, "db2")
-}
-
-func TestHandleRoutesInfo_NoIndexDetails(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
-	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
-		return nil
-	})
-
-	nsInfo := &NsInfo{Ns: "testdb.testcol"}
-	nsInfo.StorageStats.WiredTiger.URI = "statistics:table:testdb/collection-142-3211222180999241170"
-	nsInfo.StorageStats.IndexDetails = nil
-
-	collector.handleRoutesInfo(nsInfo)
-
-	colInfo := collector.routes.Databases["testdb"]["testcol"]
-	assert.Empty(t, colInfo.IndexInfo)
-}
-
-func TestHandleRoutesInfo_MultipleIndexes(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
-	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
-		return nil
-	})
-
-	nsInfo := &NsInfo{Ns: "testdb.testcol"}
-	nsInfo.StorageStats.WiredTiger.URI = "statistics:table:testdb/collection-142-3211222180999241170"
-	nsInfo.StorageStats.IndexDetails = map[string]struct {
-		URI string `bson:"uri"`
-	}{
-		"_id_":     {URI: "statistics:table:testdb/index-144-3211222180999241170"},
-		"name_1":   {URI: "statistics:table:testdb/index-146-3211222180999241170"},
-		"empty_ix": {URI: ""},
-	}
-
-	collector.handleRoutesInfo(nsInfo)
-
-	colInfo := collector.routes.Databases["testdb"]["testcol"]
-	assert.Contains(t, colInfo.IndexInfo, "_id_")
-	assert.Contains(t, colInfo.IndexInfo, "name_1")
-	assert.NotContains(t, colInfo.IndexInfo, "empty_ix")
-}
-
-// --- Тесты handleTop100Info ---
-
 func TestHandleTop100Info_SystemDBsSkipped(t *testing.T) {
 	svc := &MongodService{Context: context.Background()}
 	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
 		return nil
 	})
 
-	for db := range systemDBs {
-		nsInfo := &NsInfo{Ns: db + ".somecol"}
+	for db := range *common.SystemDBs() {
+		nsInfo := &models.NsInfo{Ns: db + ".somecol"}
 		nsInfo.StorageStats.TotalSize = 1000
 		collector.handleTop100Info(nsInfo)
 	}
@@ -177,7 +50,7 @@ func TestHandleTop100Info_FillHeapUnderTopK(t *testing.T) {
 	})
 
 	for i := 0; i < topK-1; i++ {
-		nsInfo := &NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
+		nsInfo := &models.NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
 		nsInfo.StorageStats.TotalSize = int64(i * 100)
 		collector.handleTop100Info(nsInfo)
 	}
@@ -193,7 +66,7 @@ func TestHandleTop100Info_FillHeapExactlyTopK(t *testing.T) {
 	})
 
 	for i := 0; i < topK; i++ {
-		nsInfo := &NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
+		nsInfo := &models.NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
 		nsInfo.StorageStats.TotalSize = int64(i * 100)
 		collector.handleTop100Info(nsInfo)
 	}
@@ -209,12 +82,12 @@ func TestHandleTop100Info_ReplaceSmallestWhenFull(t *testing.T) {
 	})
 
 	for i := 0; i < topK; i++ {
-		nsInfo := &NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
+		nsInfo := &models.NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
 		nsInfo.StorageStats.TotalSize = int64(i + 1)
 		collector.handleTop100Info(nsInfo)
 	}
 
-	bigNsInfo := &NsInfo{Ns: "userdb.bigcol"}
+	bigNsInfo := &models.NsInfo{Ns: "userdb.bigcol"}
 	bigNsInfo.StorageStats.TotalSize = 999999
 	collector.handleTop100Info(bigNsInfo)
 
@@ -238,14 +111,14 @@ func TestHandleTop100Info_SmallElementNotReplaced(t *testing.T) {
 	})
 
 	for i := 0; i < topK; i++ {
-		nsInfo := &NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
+		nsInfo := &models.NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
 		nsInfo.StorageStats.TotalSize = int64(1000 * (i + 1))
 		collector.handleTop100Info(nsInfo)
 	}
 
 	minBefore := (*collector.heap)[0].Size
 
-	smallNsInfo := &NsInfo{Ns: "userdb.smallcol"}
+	smallNsInfo := &models.NsInfo{Ns: "userdb.smallcol"}
 	smallNsInfo.StorageStats.TotalSize = 1
 	collector.handleTop100Info(smallNsInfo)
 
@@ -264,15 +137,14 @@ func TestHandleTop100Info_EqualToMinNotReplaced(t *testing.T) {
 	})
 
 	for i := 0; i < topK; i++ {
-		nsInfo := &NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
+		nsInfo := &models.NsInfo{Ns: fmt.Sprintf("userdb.col%d", i)}
 		nsInfo.StorageStats.TotalSize = int64(100 * (i + 1))
 		collector.handleTop100Info(nsInfo)
 	}
 
 	minBefore := (*collector.heap)[0].Size
 
-	// Элемент равный минимуму — не должен заменять
-	equalNsInfo := &NsInfo{Ns: "userdb.equalcol"}
+	equalNsInfo := &models.NsInfo{Ns: "userdb.equalcol"}
 	equalNsInfo.StorageStats.TotalSize = minBefore
 	collector.handleTop100Info(equalNsInfo)
 

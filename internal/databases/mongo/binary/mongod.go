@@ -34,13 +34,6 @@ type MongodService struct {
 	MongoClient *mongo.Client
 }
 
-var systemDBs = map[string]struct{}{
-	"admin":        {},
-	"local":        {},
-	"config":       {},
-	"mdb_internal": {},
-}
-
 func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeout time.Duration) (*MongodService, error) {
 	var repeatOptions backoff.BackOff
 	repeatOptions = backoff.NewExponentialBackOff()
@@ -380,15 +373,6 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 	}
 
 	return nil
-}
-
-func convertToFile(ident string) string {
-	return fmt.Sprintf("/%s.wt", ident)
-}
-
-func localPathFromURI(uri string) string {
-	tracelog.InfoLogger.Printf("URI: %s", uri)
-	return strings.SplitN(uri, ":", 3)[2]
 }
 
 func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, insertData bson.M) error {
