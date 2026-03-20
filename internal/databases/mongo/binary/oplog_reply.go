@@ -2,6 +2,9 @@ package binary
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -63,12 +66,8 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	if err != nil {
 		return err
 	}
-	// discover archive sequence to replay
-	archives, err := downloader.ListOplogArchives()
-	if err != nil {
-		return err
-	}
-	path, err := archive.SequenceBetweenTS(archives, replayArgs.Since, replayArgs.Until)
+
+	path, err := resolveOplogReplaySequence(downloader, replayArgs.Since, replayArgs.Until)
 	if err != nil {
 		return err
 	}
@@ -78,6 +77,36 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 
 	// run worker cycle
 	return HandleOplogReplay(ctx, replayArgs.Since, replayArgs.Until, oplogFetcher, oplogApplier)
+}
+
+func resolveOplogReplaySequence(
+	downloader archive.Downloader,
+	since, until models.Timestamp,
+) (archive.Sequence, error) {
+	// because of oplog archives are write every 30 second intervals, we need to expand segment
+	sinceStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: since.TS - 300, Inc: 0}.String())
+	untilStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: until.TS + 30, Inc: until.Inc}.String())
+
+	archives, err := downloader.ListOplogArchivesSegment(&sinceStr, &untilStr)
+	if err != nil {
+		return nil, err
+	}
+	path, err := archive.SequenceBetweenTS(archives, since, until)
+	// if the start and end found in the archives, return the sequence
+	if err == nil {
+		return path, nil
+	}
+	tracelog.WarningLogger.Printf("!!!!fallback teeerrr", err)
+
+	tracelog.WarningLogger.Printf("!!!!fallback to ListFolderSegment to find the sequence")
+
+
+	// fallback to list all archives
+	archives, err = downloader.ListOplogArchives()
+	if err != nil {
+		return nil, err
+	}
+	return archive.SequenceBetweenTS(archives, since, until)
 }
 
 // HandleOplogReplay starts oplog replay process: download from storage and apply to mongodb

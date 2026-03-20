@@ -4,14 +4,16 @@ import (
 	"context"
 	"io"
 	"testing"
-
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
-	"github.com/wal-g/wal-g/internal/compression/lz4"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/compression"
+	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/test/mocks"
 )
 
@@ -47,4 +49,61 @@ func TestStorageUploader_UploadOplogArchive_ProperInterfaces(t *testing.T) {
 	if err := su.UploadOplogArchive(context.Background(), r, firstTS, lastTS); err != nil {
 		t.Errorf("UploadOplogArchive() error = %v", err)
 	}
+}
+
+func TestStorageDownloaderListOplogArchivesSegmentFallsBackToListFolder(t *testing.T) {
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+
+	arch := mustArchive(t, models.Timestamp{TS: 100, Inc: 1}, models.Timestamp{TS: 130, Inc: 1})
+	folder := mocks.NewMockFolder(mockCtl)
+	folder.EXPECT().GetPath().Return(models.OplogArchBasePath).AnyTimes()
+	folder.EXPECT().ListFolder().Return(
+		[]storage.Object{storage.NewLocalObject(arch.Filename(), time.Time{}, 0)},
+		nil,
+		nil,
+	)
+
+	downloader := &StorageDownloader{oplogsFolder: folder}
+
+	var (
+		got []models.Archive
+		err error
+	)
+	assert.NotPanics(t, func() {
+		got, err = downloader.ListOplogArchivesSegment(nil, nil)
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []models.Archive{arch}, got)
+}
+
+func TestStorageDownloaderLastKnownArchiveTSUsesSegmentResults(t *testing.T) {
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+
+	arch := mustArchive(t, models.Timestamp{TS: 100, Inc: 1}, models.Timestamp{TS: 130, Inc: 1})
+	folder := mocks.NewMockFolderExt(mockCtl)
+	var segmentCalls int
+	folder.EXPECT().ListFolderSegment(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(
+		func(_, _ *string) ([]storage.Object, []storage.Folder, error) {
+			segmentCalls++
+			return []storage.Object{storage.NewLocalObject(arch.Filename(), time.Time{}, 0)}, nil, nil
+		},
+	)
+	folder.EXPECT().GetPath().AnyTimes()
+	folder.EXPECT().ListFolder().Times(0)
+	downloader := &StorageDownloader{oplogsFolder: folder}
+
+	got, err := downloader.LastKnownArchiveTS()
+	require.NoError(t, err)
+	assert.Equal(t, arch.End, got)
+	assert.Equal(t, 1, segmentCalls)
+}
+
+func mustArchive(t *testing.T, start, end models.Timestamp) models.Archive {
+	t.Helper()
+
+	arch, err := models.NewArchive(start, end, "lz4", models.ArchiveTypeOplog)
+	require.NoError(t, err)
+	return arch
 }
