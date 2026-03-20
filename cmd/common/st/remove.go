@@ -46,5 +46,6 @@ var removeCmd = &cobra.Command{
 
 func init() {
 	removeCmd.Flags().BoolVar(&removeAllVersions, "all-versions", false, "Remove all file versions if versioning is enabled in storage")
+	removeCmd.Flags().StringVar(&removeVersionID, "version-id", "", "Remove a specific object version by its version ID")
 	StorageToolsCmd.AddCommand(removeCmd)
 }
