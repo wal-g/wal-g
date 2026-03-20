@@ -11,12 +11,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
-func TestBuildOplog(t *testing.T) {
-	ts := models.Timestamp{TS: 123, Inc: 7}
-
-	assert.Equal(t, models.OplogArchBasePath+models.ArchiveTypeOplog+"_123.7", buildOplog(ts))
-}
-
 func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 	since := models.Timestamp{TS: 600, Inc: 1}
 	until := models.Timestamp{TS: 630, Inc: 1}
@@ -24,8 +18,8 @@ func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 	lastArch := mustArchive(t, firstArch.End, models.Timestamp{TS: 630, Inc: 1})
 	downloader := archivemocks.NewDownloader(t)
 
-	expectedSince := buildOplog(models.Timestamp{TS: since.TS - 300, Inc: 0})
-	expectedUntil := buildOplog(models.Timestamp{TS: until.TS + 30, Inc: until.Inc})
+	expectedSince := models.Timestamp{TS: since.TS - 300, Inc: 0}
+	expectedUntil := models.Timestamp{TS: until.TS + 30, Inc: until.Inc}
 
 	var actualSince *string
 	var actualUntil *string
@@ -33,11 +27,11 @@ func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 		"ListOplogArchivesSegment",
 		testifymock.MatchedBy(func(value *string) bool {
 			actualSince = value
-			return value != nil && *value == expectedSince
+			return value != nil && *value == expectedSince.String()
 		}),
 		testifymock.MatchedBy(func(value *string) bool {
 			actualUntil = value
-			return value != nil && *value == expectedUntil
+			return value != nil && *value == expectedUntil.String()
 		}),
 	).Return([]models.Archive{firstArch}, nil).Once()
 	downloader.On("ListOplogArchives").Return([]models.Archive{firstArch, lastArch}, nil).Once()
@@ -47,8 +41,8 @@ func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 	assert.Equal(t, archivepkg.Sequence{firstArch, lastArch}, got)
 	require.NotNil(t, actualSince)
 	require.NotNil(t, actualUntil)
-	assert.Equal(t, expectedSince, *actualSince)
-	assert.Equal(t, expectedUntil, *actualUntil)
+	assert.Equal(t, expectedSince.String(), *actualSince)
+	assert.Equal(t, expectedUntil.String(), *actualUntil)
 }
 
 func mustArchive(t *testing.T, start, end models.Timestamp) models.Archive {

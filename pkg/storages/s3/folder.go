@@ -219,9 +219,13 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return objects, subFolders, nil
 }
 
-func (folder *Folder) ListFolderSegment(startAfter *string, endBefore *string) (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (folder *Folder) ListFolderSegment(startAfterKey *string, endBeforeKey *string) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	prefix := aws.String(folder.path)
 	delimiter := aws.String("/")
+	startAfterPrefix := new(string)
+	if startAfterKey != nil {
+		startAfterPrefix = aws.String(*prefix+*startAfterKey)
+	}
 
 	listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool {
 		cont := true
@@ -231,7 +235,7 @@ func (folder *Folder) ListFolderSegment(startAfter *string, endBefore *string) (
 		}
 		for _, object := range contents {
 			key := *object.Key
-			if endBefore != nil && key >= *endBefore {
+			if endBeforeKey != nil && key > *endBeforeKey {
 				cont = false
 				break
 			}
@@ -248,7 +252,7 @@ func (folder *Folder) ListFolderSegment(startAfter *string, endBefore *string) (
 		return cont
 	}
 
-	err = folder.listObjectsPages(prefix, delimiter, nil, startAfter, listFunc)
+	err = folder.listObjectsPages(prefix, delimiter, nil, startAfterPrefix, listFunc)
 
 	// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
 	// which don't yet exist.
