@@ -2,6 +2,7 @@ package storagetools
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -40,6 +41,15 @@ func HandleRemoveWithGlobPattern(pattern string, folder storage.Folder) error {
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func HandleRemoveVersion(key string, versionID string, folder storage.Folder) error {
+	obj := storage.NewLocalObjectWithVersion(key, time.Time{}, 0, versionID, "")
+	err := folder.DeleteObjects([]storage.Object{obj})
+	if err != nil {
+		return fmt.Errorf("delete object %q version %q: %w", key, versionID, err)
 	}
 	return nil
 }
