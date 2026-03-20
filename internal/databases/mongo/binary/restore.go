@@ -59,7 +59,6 @@ func (restoreService *RestoreService) DoRestore(
 		if err != nil {
 			return err
 		}
-		onHostFilesFilter, tarFilesFilter = metadata.
 		onHostFilesFilter, tarFilesFilter = partial.GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
 	}
 
