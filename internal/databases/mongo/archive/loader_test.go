@@ -90,6 +90,7 @@ func TestStorageDownloaderLastKnownArchiveTSUsesSegmentResults(t *testing.T) {
 			return []storage.Object{storage.NewLocalObject(arch.Filename(), time.Time{}, 0)}, nil, nil
 		},
 	)
+	folder.EXPECT().GetPath().AnyTimes()
 	folder.EXPECT().ListFolder().Times(0)
 	downloader := &StorageDownloader{oplogsFolder: folder}
 

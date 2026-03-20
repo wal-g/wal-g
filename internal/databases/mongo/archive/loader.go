@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -130,9 +131,13 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 	return sd.ListOplogArchivesSegment(nil, nil)
 }
 
-// ListOplogArchivesStartAfter fetches all oplog archives existed in storage after the given startAfter.
+// ListOplogArchivesSegment fetches all oplog archives existed in storage after the given startAfter.
 func (sd *StorageDownloader) ListOplogArchivesSegment(startAfter *string, endBefore *string) ([]models.Archive, error) {
-	tracelog.DebugLogger.Printf("Listing %s", sd.oplogsFolder.GetPath())
+	tracelog.DebugLogger.Printf("Listing %s with startAfter `%s` and endBefore `%s`",
+		sd.oplogsFolder.GetPath(),
+		aws.StringValue(startAfter),
+		aws.StringValue(endBefore),
+	)
 	var objects []storage.Object
 	var err error
 
@@ -144,7 +149,6 @@ func (sd *StorageDownloader) ListOplogArchivesSegment(startAfter *string, endBef
 		}
 	} else {
 		objects, _, err = folder.ListFolderSegment(startAfter, endBefore)
-
 		if err != nil {
 			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
 		}
@@ -193,22 +197,24 @@ func (sd *StorageDownloader) LastKnownArchiveTS() (models.Timestamp, error) {
 	return maxTS, nil
 }
 
-// try to find the last record by steps 15minutes, 3hours, 1.1day, 10days to improve performance
+// try to find the last record by steps in last 15minutes, 3hours, 1.1day, 10days to improve performance
 func findLastRecordsByStep(folder storage.FolderExt) ([]storage.Object, error) {
-	oplogPrefix := models.OplogArchBasePath + models.ArchiveTypeOplog + "_" + fmt.Sprintf("%d", time.Now().Unix())
-	oplogPrefix = oplogPrefix[:len(oplogPrefix)-3]
+	keyPrefix := fmt.Sprintf("%s_%d", models.ArchiveTypeOplog, time.Now().Unix())
+	keyPrefix = keyPrefix[:len(keyPrefix)-3]
 	// make 4 steps to find the last record 1step~15minutes, 2step~3hour, 3step~1.1day, 4step~10day
 	// next step is 3 month so just fallback to list all archives
 	for i := 0; i < 4; i++ {
-		keys, _, err := folder.ListFolderSegment(&oplogPrefix, nil)
+		tracelog.DebugLogger.Printf("try oplog prefix to find the last record: %s", keyPrefix)
+		keys, _, err := folder.ListFolderSegment(&keyPrefix, nil)
 		if err != nil {
 			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
 		}
 		if len(keys) > 0 {
 			return keys, nil
 		}
-		oplogPrefix = oplogPrefix[:len(oplogPrefix)-1]
+		keyPrefix = keyPrefix[:len(keyPrefix)-1]
 	}
+	tracelog.WarningLogger.Println("fallback to ListFolder to find the last record")
 	keys, _, err := folder.ListFolder()
 	return keys, err
 }

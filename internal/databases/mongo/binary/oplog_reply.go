@@ -2,7 +2,9 @@ package binary
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -82,8 +84,8 @@ func resolveOplogReplaySequence(
 	since, until models.Timestamp,
 ) (archive.Sequence, error) {
 	// because of oplog archives are write every 30 second intervals, we need to expand segment
-	sinceStr := buildOplog(models.Timestamp{TS: since.TS - 300, Inc: 0})
-	untilStr := buildOplog(models.Timestamp{TS: until.TS + 30, Inc: until.Inc})
+	sinceStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: since.TS - 300, Inc: 0}.String())
+	untilStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: until.TS + 30, Inc: until.Inc}.String())
 
 	archives, err := downloader.ListOplogArchivesSegment(&sinceStr, &untilStr)
 	if err != nil {
@@ -96,15 +98,12 @@ func resolveOplogReplaySequence(
 	}
 
 	// fallback to list all archives
+	tracelog.WarningLogger.Println("fallback to ListFolder to find the last record", err)
 	archives, err = downloader.ListOplogArchives()
 	if err != nil {
 		return nil, err
 	}
 	return archive.SequenceBetweenTS(archives, since, until)
-}
-
-func buildOplog(ts models.Timestamp) string {
-	return models.OplogArchBasePath + models.ArchiveTypeOplog + "_" + ts.String()
 }
 
 // HandleOplogReplay starts oplog replay process: download from storage and apply to mongodb
