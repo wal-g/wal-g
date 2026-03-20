@@ -9,6 +9,7 @@ import (
 
 func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*)$`, tctx.createMongoBinaryBackup)
+	ctx.Step(`^we create binary mongo-backup on ([^\s]*) with metadata$`, tctx.createMongoBinaryBackupWithMetadata)
 	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
 	ctx.Step(`^we restore initialized binary mongo-backup #(\d+) to ([^\s]+)`,
 		tctx.restoreMongoBinaryBackupAsInitialized)
@@ -28,7 +29,25 @@ func (tctx *TestContext) createMongoBinaryBackup(container string) error {
 	host := tctx.ContainerFQDN(container)
 
 	walg := WalgUtilFromTestContext(tctx, container)
-	err := walg.PushBinaryBackup()
+	err := walg.PushBinaryBackup(true)
+	if err != nil {
+		return err
+	}
+	tracelog.DebugLogger.Println("Backup created")
+
+	tctx.PreviousBackupTime, err = helpers.TimeInContainer(tctx.Context, host)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (tctx *TestContext) createMongoBinaryBackupWithMetadata(container string) error {
+	host := tctx.ContainerFQDN(container)
+
+	walg := WalgUtilFromTestContext(tctx, container)
+	err := walg.PushBinaryBackup(false)
 	if err != nil {
 		return err
 	}
