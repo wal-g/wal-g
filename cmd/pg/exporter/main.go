@@ -30,7 +30,7 @@ func main() {
 
 	// Initialize structured logger
 	// Using JSONHandler for production-ready structured logs
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	logger.Info("Starting WAL-G Prometheus exporter",
 		"listen_address", *listenAddr,
