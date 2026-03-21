@@ -308,6 +308,9 @@ func (backupService *BackupService) BackgroundMetadata(ctx context.Context, skip
 	}
 
 	return NewStorageMetadataCollector(bgMongoService, func(routes *models.BackupRoutesInfo) error {
-		return internal.UploadMetadata(backupService.Uploader, routes, backupService.Sentinel.BackupName)
+		tracelog.InfoLogger.Printf("ROUTES BEFORE DOWNLOADING: %v", routes)
+		err = internal.UploadMetadata(backupService.Uploader, routes, backupService.Sentinel.BackupName)
+		tracelog.InfoLogger.Printf("DOWNLOADED OR ERR: %v", err)
+		return err
 	}), nil
 }

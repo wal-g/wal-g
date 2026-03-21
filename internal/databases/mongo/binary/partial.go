@@ -13,8 +13,7 @@ import (
 type SetMap map[string]map[string]struct{}
 
 type PartialMetadataCollector struct {
-	routes    *models.BackupRoutesInfo
-	systemDBs *map[string]struct{}
+	routes *models.BackupRoutesInfo
 }
 
 func NewPartialMetadataCollector() *PartialMetadataCollector {
