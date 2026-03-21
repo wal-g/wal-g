@@ -37,7 +37,7 @@ func main() {
 		"metrics_path", *metricsPath,
 		"walg_path", *walgPath,
 		"walg_config", *walgConfigPath,
-		"intervals", slog.GroupValue(
+		slog.Group("intervals",
 			slog.Duration("backup", *backupScrapeInterval),
 			slog.Duration("verify", *verifyScrapeInterval),
 			slog.Duration("storage", *storageScrapeInterval),
