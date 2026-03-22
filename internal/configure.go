@@ -373,7 +373,6 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	return nil, errors.New("there is no any supported envelope gpg crypter configuration")
 }
 
-// TODO : unit tests
 func GetDeltaConfig() (maxDeltas int, fromFull bool) {
 	maxDeltas = viper.GetInt(conf.DeltaMaxStepsSetting)
 	if origin, hasOrigin := conf.GetSetting(conf.DeltaOriginSetting); hasOrigin {
