@@ -337,7 +337,8 @@ func HandleBinlogServer(since string, until string) {
 		password, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPassword)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		conn, err := server.NewConn(c, user, password, globalHandler)
+		srv := server.NewDefaultServer()
+		conn, err := srv.NewConn(c, user, password, globalHandler)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Error creating connection: %v", err)
 			c.Close()
