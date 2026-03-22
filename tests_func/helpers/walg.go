@@ -135,8 +135,12 @@ func (w *WalgUtil) PushBackup() (string, error) {
 	return BackupNameFromCreate(exec.Combined()), nil
 }
 
-func (w *WalgUtil) PushBinaryBackup() error {
-	_, err := w.runCmd("binary-backup-push", "--count-journals")
+func (w *WalgUtil) PushBinaryBackup(skipMetadata bool) error {
+	args := []string{"binary-backup-push", "--count-journals"}
+	if skipMetadata {
+		args = append(args, "--skip-metadata")
+	}
+	_, err := w.runCmd(args...)
 	if err != nil {
 		return err
 	}

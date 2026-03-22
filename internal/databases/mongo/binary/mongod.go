@@ -375,56 +375,6 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 	return nil
 }
 
-func convertToFile(ident string) string {
-	return fmt.Sprintf("/%s.wt", ident)
-}
-
-type CatalogRecord struct {
-	Type       string            `bson:"type"`
-	Database   string            `bson:"db"`
-	Collection string            `bson:"name"`
-	Ident      string            `bson:"ident"`
-	IndexIdent map[string]string `bson:"idxIdent"`
-}
-
-func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
-	routes := models.NewBackupRoutesInfo()
-
-	pipeline := mongo.Pipeline{{{Key: "$listCatalog", Value: bson.M{}}}}
-	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
-	if err != nil {
-		return nil, err
-	}
-
-	for cursor.TryNext(mongodService.Context) {
-		var record CatalogRecord
-		if err = cursor.Decode(&record); err != nil {
-			return nil, err
-		}
-		if record.Type != "collection" {
-			continue
-		}
-
-		indexInfo := make(models.IndexInfo)
-		for index, uri := range record.IndexIdent {
-			indexInfo[index] = models.Paths{DBPath: convertToFile(uri)}
-		}
-
-		colInfo := models.CollectionInfo{
-			Paths:     models.Paths{DBPath: convertToFile(record.Ident)},
-			IndexInfo: indexInfo,
-		}
-
-		if _, ok := routes.Databases[record.Database]; !ok {
-			routes.Databases[record.Database] = make(models.DBInfo)
-		}
-
-		routes.Databases[record.Database][record.Collection] = colInfo
-	}
-
-	return &routes, nil
-}
-
 func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, insertData bson.M) error {
 	findCursor, err := collection.Find(ctx, bson.D{})
 	if err != nil {
