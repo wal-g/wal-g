@@ -181,3 +181,53 @@ func resetToDefaults() {
 	config.InitConfig()
 	config.Configure()
 }
+
+func TestGetDeltaConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		maxDeltas int
+		origin    string
+		wantMax   int
+		wantFull  bool
+	}{
+		{
+			name:      "latest origin",
+			maxDeltas: 3,
+			origin:    "LATEST",
+			wantMax:   3,
+			wantFull:  false,
+		},
+		{
+			name:      "latest full origin",
+			maxDeltas: 5,
+			origin:    "LATEST_FULL",
+			wantMax:   5,
+			wantFull:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			viper.Set(config.DeltaMaxStepsSetting, tt.maxDeltas)
+			viper.Set(config.DeltaOriginSetting, tt.origin)
+
+			gotMax, gotFull := internal.GetDeltaConfig()
+
+			assert.Equal(t, tt.wantMax, gotMax)
+			assert.Equal(t, tt.wantFull, gotFull)
+
+			resetToDefaults()
+		})
+	}
+}
+
+func TestGetDeltaConfig_DefaultOrigin(t *testing.T) {
+	viper.Set(config.DeltaMaxStepsSetting, 7)
+
+	gotMax, gotFull := internal.GetDeltaConfig()
+
+	assert.Equal(t, 7, gotMax)
+	assert.False(t, gotFull)
+
+	resetToDefaults()
+}
