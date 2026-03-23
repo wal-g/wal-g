@@ -3,6 +3,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+  
 env:
   GO_VERSION: "1.25"
   USE_BROTLI: 1
