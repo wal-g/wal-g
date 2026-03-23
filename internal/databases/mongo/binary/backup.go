@@ -147,6 +147,7 @@ type DoBackupArgs struct {
 	CountJournals bool
 	Permanent     bool
 	SkipMetadata  bool
+	UserData      interface{}
 }
 
 func uploadExtendBackupCursorFiles(cursor *BackupCursor, uploader *internal.ConcurrentUploader) error {
@@ -164,7 +165,7 @@ func uploadExtendBackupCursorFiles(cursor *BackupCursor, uploader *internal.Conc
 }
 
 func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
-	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent)
+	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent, args.UserData)
 	if err != nil {
 		return err
 	}
@@ -238,13 +239,8 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
 }
 
-func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool) error {
+func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool, userData interface{}) error {
 	mongodVersion, err := backupService.MongodService.MongodVersion()
-	if err != nil {
-		return err
-	}
-
-	userData, err := internal.GetSentinelUserData()
 	if err != nil {
 		return err
 	}
