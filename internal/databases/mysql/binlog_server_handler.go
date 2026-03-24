@@ -392,6 +392,7 @@ func HandleBinlogServer(since string, until string) {
 	l, err := net.Listen("tcp", serverAddress+":"+serverPort)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
+
 	srv := server.NewServer("5.7.42", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)
 	// This loop continues accepting connections until the process exits.
 	// It will be terminated by os.Exit() call in waitReplicationIsDoneSafe.
@@ -416,36 +417,39 @@ func HandleBinlogServer(since string, until string) {
 			continue
 		}
 
-		go func(c net.Conn) {
-			h := newHandler(replicaSource, st.RootFolder(), dstDir)
+		go handleBinlogConnection(c, srv, replicaSource, st.RootFolder(), dstDir, user, password)
+	}
+}
 
-			defer func() {
-				h.cancel()
-				c.Close()
-				tracelog.InfoLogger.Printf("Client disconnected, waiting for new connection...")
-			}()
-			authHandler := server.NewInMemoryAuthenticationHandler(mysql.AUTH_NATIVE_PASSWORD)
-			if errAuth := authHandler.AddUser(user, password); errAuth != nil {
-				tracelog.ErrorLogger.Printf("Failed to set user auth: %v", errAuth)
-				return
-			}
-			conn, err := srv.NewCustomizedConn(c, authHandler, h)
-			if err != nil {
-				if strings.Contains(err.Error(), "EOF") || strings.Contains(err.Error(), "bad") {
-					tracelog.WarningLogger.Printf("Handshake dropped (network issue/proxy): %v", err)
-				} else {
-					tracelog.ErrorLogger.Printf("Error creating connection: %v", err)
-				}
-				return
-			}
-			defer conn.Close()
+func handleBinlogConnection(c net.Conn, srv *server.Server, replicaSource string, folder storage.Folder, dstDir string, user string, password string) {
+	h := newHandler(replicaSource, folder, dstDir)
+	defer func() {
+		h.cancel()
+		c.Close()
+		tracelog.InfoLogger.Printf("Client disconnected, waiting for new connection...")
+	}()
 
-			for {
-				if err := conn.HandleCommand(); err != nil {
-					tracelog.WarningLogger.Printf("Connection closed: %v", err)
-					return
-				}
-			}
-		}(c)
+	authHandler := server.NewInMemoryAuthenticationHandler(mysql.AUTH_NATIVE_PASSWORD)
+	if errAuth := authHandler.AddUser(user, password); errAuth != nil {
+		tracelog.ErrorLogger.Printf("Failed to set user auth: %v", errAuth)
+		return
+	}
+
+	conn, err := srv.NewCustomizedConn(c, authHandler, h)
+	if err != nil {
+		if strings.Contains(err.Error(), "EOF") || strings.Contains(err.Error(), "bad") {
+			tracelog.WarningLogger.Printf("Handshake dropped (network issue/proxy): %v", err)
+		} else {
+			tracelog.ErrorLogger.Printf("Error creating connection: %v", err)
+		}
+		return
+	}
+	defer conn.Close()
+
+	for {
+		if err := conn.HandleCommand(); err != nil {
+			tracelog.WarningLogger.Printf("Connection closed: %v", err)
+			return
+		}
 	}
 }
