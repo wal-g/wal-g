@@ -421,7 +421,15 @@ func HandleBinlogServer(since string, until string) {
 	}
 }
 
-func handleBinlogConnection(c net.Conn, srv *server.Server, replicaSource string, folder storage.Folder, dstDir string, user string, password string) {
+func handleBinlogConnection(
+	c net.Conn,
+	srv *server.Server,
+	replicaSource string,
+	folder storage.Folder,
+	dstDir string,
+	user string,
+	password string,
+) {
 	h := newHandler(replicaSource, folder, dstDir)
 	defer func() {
 		h.cancel()
