@@ -29,7 +29,7 @@ func main() {
 	flag.Parse()
 
 	// Initialize structured logger
-	// Using JSONHandler for production-ready structured logs
+	// Using TextHandler for production-ready structured logs
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	logger.Info("Starting WAL-G Prometheus exporter",
@@ -61,7 +61,7 @@ func main() {
 	}
 
 	// Create and register the exporter
-	exporter, err := NewWalgExporter(*walgPath, *backupScrapeInterval, *verifyScrapeInterval, *storageScrapeInterval, *walgConfigPath)
+	exporter, err := NewWalgExporter(logger, *walgPath, *backupScrapeInterval, *verifyScrapeInterval, *storageScrapeInterval, *walgConfigPath)
 	if err != nil {
 		logger.Error("Failed to create exporter", "error", err)
 		os.Exit(1)

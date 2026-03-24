@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog" // Replaced standard log with structured slog
-	"os"
+	"log/slog"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -149,10 +148,7 @@ func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
 }
 
 // NewWalgExporter creates a new WAL-G exporter
-func NewWalgExporter(walgPath string, backupScrapeInterval time.Duration, verifyScrapeInterval time.Duration, storageScrapeInterval time.Duration, walgConfigPath string) (*WalgExporter, error) {
-	// Initialize slog with a JSON handler (Standard for structured logging)
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-
+func NewWalgExporter(logger *slog.Logger, walgPath string, backupScrapeInterval time.Duration, verifyScrapeInterval time.Duration, storageScrapeInterval time.Duration, walgConfigPath string) (*WalgExporter, error) {
 	return &WalgExporter{
 		logger:                logger,
 		walgPath:              walgPath,
@@ -464,8 +460,8 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 			backupType,                     // backup_type
 			backup.WalFileName,             // wal_file
 			strconv.Itoa(backup.PgVersion), // pg_version
-			strconv.FormatUint(backup.StartLSN, 10),  // Converted to string for metric labels
-			strconv.FormatUint(backup.FinishLSN, 10), // Converted to string for metric labels
+			LSN(backup.StartLSN).String(),  // start_lsn
+			LSN(backup.FinishLSN).String(), // finish_lsn
 			isPermanent,                    // is_permanent
 			deltaOriginBackupName,          // delta_origin
 		}
@@ -594,11 +590,11 @@ func (e *WalgExporter) checkStorageAliveness() {
 	e.storageLatency.Set(latency)
 
 	if err != nil {
-		e.logger.Error("Storage aliveness check failed", "error", err, "latency", latency)
+		e.logger.Error("Storage aliveness check failed", "error", err, "duration", latency)
 		e.storageAlive.Set(0)
 		e.errors.WithLabelValues("storage-check", "connectivity_failed").Inc()
 	} else {
 		e.storageAlive.Set(1)
-		e.logger.Info("Storage check completed", "duration", time.Since(start))
+		e.logger.Info("Storage check completed", "duration", latency)
 	}
 }
