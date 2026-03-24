@@ -45,3 +45,7 @@ venv/
 
 #Ctags tags file
 tags
+
+# Local-only directories
+forensics/
+demo/
