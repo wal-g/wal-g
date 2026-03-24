@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"syscall"
 )
 
 func ReadLines(r io.Reader) ([]string, error) {
@@ -89,11 +88,6 @@ func CopyDirectory(src, dest string, filter string) error {
 			return err
 		}
 
-		stat, ok := fileInfo.Sys().(*syscall.Stat_t)
-		if !ok {
-			return fmt.Errorf("failed to get raw syscall.Stat_t data for '%s'", sourcePath)
-		}
-
 		switch fileInfo.Mode() & os.ModeType {
 		case os.ModeDir:
 			if err := CreateDir(destPath, 0755); err != nil {
@@ -112,8 +106,9 @@ func CopyDirectory(src, dest string, filter string) error {
 			}
 		}
 
-		if err := os.Lchown(destPath, int(stat.Uid), int(stat.Gid)); err != nil {
-			return err
+		err2 := setOwner(fileInfo, sourcePath, destPath)
+		if err2 != nil {
+			return err2
 		}
 
 		info, _ := entry.Info()

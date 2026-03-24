@@ -10,14 +10,15 @@ import (
 )
 
 const (
-	AccountSetting    = "AZURE_STORAGE_ACCOUNT"
-	AccessKeySetting  = "AZURE_STORAGE_ACCESS_KEY"
-	SASTokenSetting   = "AZURE_STORAGE_SAS_TOKEN"
-	EndpointSuffix    = "AZURE_ENDPOINT_SUFFIX"
-	EnvironmentName   = "AZURE_ENVIRONMENT_NAME"
-	BufferSizeSetting = "AZURE_BUFFER_SIZE"
-	BuffersSetting    = "AZURE_MAX_BUFFERS"
-	TryTimeoutSetting = "AZURE_TRY_TIMEOUT"
+	AccountSetting      = "AZURE_STORAGE_ACCOUNT"
+	AccessKeySetting    = "AZURE_STORAGE_ACCESS_KEY"
+	SASTokenSetting     = "AZURE_STORAGE_SAS_TOKEN"
+	EndpointSuffix      = "AZURE_ENDPOINT_SUFFIX"
+	EnvironmentName     = "AZURE_ENVIRONMENT_NAME"
+	BufferSizeSetting   = "AZURE_BUFFER_SIZE"
+	BuffersSetting      = "AZURE_MAX_BUFFERS"
+	TryTimeoutSetting   = "AZURE_TRY_TIMEOUT"
+	BlobStoreAPIVersion = "AZURE_BLOB_STORE_API_VERSION"
 )
 
 // SettingList provides a list of GCS folder settings.
@@ -30,6 +31,7 @@ var SettingList = []string{
 	BufferSizeSetting,
 	BuffersSetting,
 	TryTimeoutSetting,
+	BlobStoreAPIVersion,
 }
 
 const (
@@ -91,6 +93,8 @@ func ConfigureStorage(
 		buffers = minBuffers
 	}
 
+	blobStoreAPIVersion := settings[BlobStoreAPIVersion]
+
 	config := &Config{
 		Secrets: &Secrets{
 			AccessKey: accessKey,
@@ -106,6 +110,7 @@ func ConfigureStorage(
 			BufferSize: bufferSize,
 			Buffers:    buffers,
 		},
+		BlobStoreAPIVersion: blobStoreAPIVersion,
 	}
 
 	st, err := NewStorage(config, rootWraps...)

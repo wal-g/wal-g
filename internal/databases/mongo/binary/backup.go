@@ -2,14 +2,12 @@ package binary
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/wal-g/tracelog"
-
 	"github.com/pkg/errors"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
@@ -149,17 +147,39 @@ type DoBackupArgs struct {
 	CountJournals bool
 	Permanent     bool
 	SkipMetadata  bool
+	UserData      interface{}
+}
+
+func uploadExtendBackupCursorFiles(cursor *BackupCursor, uploader *internal.ConcurrentUploader) error {
+	extendedBackupFiles, err := cursor.LoadExtendedBackupCursorFiles()
+	if err != nil {
+		return errors.Wrapf(err, "unable to load data from backup cursor")
+	}
+
+	err = uploader.UploadBackupFiles(extendedBackupFiles)
+	if err != nil {
+		return errors.Wrapf(err, "unable to upload backup files")
+	}
+
+	return nil
 }
 
 func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
-	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent)
+	err := backupService.InitializeMongodBackupMeta(args.BackupName, args.Permanent, args.UserData)
 	if err != nil {
 		return err
 	}
 
-	tarsChan := make(chan internal.TarFileSets)
-	errsChan := make(chan error)
-	go backupService.BackgroundMetadata(tarsChan, errsChan, args.SkipMetadata)
+	var metadataCollector *StorageMetadataCollector
+	if !args.SkipMetadata {
+		bgCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		metadataCollector, err = backupService.BackgroundMetadata(bgCtx, args.SkipMetadata)
+		if err != nil {
+			return err
+		}
+		go metadataCollector.GetStats()
+	}
 
 	backupCursor, err := CreateBackupCursor(backupService.MongodService)
 	if err != nil {
@@ -197,14 +217,8 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	}
 
 	if extendBackupCursor {
-		extendedBackupFiles, err := backupCursor.LoadExtendedBackupCursorFiles()
-		if err != nil {
-			return errors.Wrapf(err, "unable to load data from backup cursor")
-		}
-
-		err = concurrentUploader.UploadBackupFiles(extendedBackupFiles)
-		if err != nil {
-			return errors.Wrapf(err, "unable to upload backup files")
+		if err = uploadExtendBackupCursorFiles(backupCursor, concurrentUploader); err != nil {
+			return err
 		}
 	}
 
@@ -214,23 +228,19 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 	}
 
 	if !args.SkipMetadata {
-		tarsChan <- tarFileSets
-		err = <-errsChan
-		if err != nil {
+		metadataCollector.TarsChan <- tarFileSets
+		if err = <-metadataCollector.ErrsChan; err != nil {
 			return err
 		}
+		backupService.Sentinel.Top100Namespaces = *metadataCollector.top100Ns
+		backupService.Sentinel.NamespacesCount = metadataCollector.counter
 	}
 
 	return backupService.Finalize(concurrentUploader, backupCursor.BackupCursorMeta, args.CountJournals)
 }
 
-func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool) error {
+func (backupService *BackupService) InitializeMongodBackupMeta(backupName string, permanent bool, userData interface{}) error {
 	mongodVersion, err := backupService.MongodService.MongodVersion()
-	if err != nil {
-		return err
-	}
-
-	userData, err := internal.GetSentinelUserData()
 	if err != nil {
 		return err
 	}
@@ -278,42 +288,25 @@ func (backupService *BackupService) Finalize(uploader *internal.ConcurrentUpload
 	return nil
 }
 
-func (backupService *BackupService) BackgroundMetadata(
-	tarsChan <-chan internal.TarFileSets,
-	errChan chan<- error,
-	skip bool,
-) {
+func (backupService *BackupService) BackgroundMetadata(ctx context.Context, skip bool) (*StorageMetadataCollector, error) {
 	if skip {
-		errChan <- nil
-		return
+		return nil, nil
 	}
-
-	bgCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
-		errChan <- err
-		return
+		return nil, err
 	}
 
-	bgMongoService, err := CreateBackgroundMongodService(bgCtx, "bg-metadata", mongodbURI)
+	bgMongoService, err := CreateBackgroundMongodService(ctx, "bg-metadata", mongodbURI)
 	if err != nil {
-		errChan <- err
-		return
+		return nil, err
 	}
 
-	backupRoutes, err := CreateBackupRoutesInfo(bgMongoService)
-	if err != nil {
-		errChan <- err
-		return
-	}
-
-	tarsFileSet := <-tarsChan
-	if err = partial.EnrichWithTarPaths(backupRoutes, tarsFileSet.Get()); err != nil {
-		errChan <- err
-		return
-	}
-
-	errChan <- internal.UploadMetadata(backupService.Uploader, backupRoutes, backupService.Sentinel.BackupName)
+	return NewStorageMetadataCollector(bgMongoService, func(routes *models.BackupRoutesInfo) error {
+		tracelog.InfoLogger.Printf("ROUTES BEFORE DOWNLOADING: %v", routes)
+		err = internal.UploadMetadata(backupService.Uploader, routes, backupService.Sentinel.BackupName)
+		tracelog.InfoLogger.Printf("DOWNLOADED OR ERR: %v", err)
+		return err
+	}), nil
 }

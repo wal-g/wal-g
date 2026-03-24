@@ -89,7 +89,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	if err != nil {
 		return err
 	}
-	since, err := discovery.ResolveStartingTS(ctx, downloader, mongoClient)
+	since, initial, err := discovery.ResolveStartingTS(ctx, downloader, mongoClient)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,8 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 		memoryBatchBuffer,
 		pushArgs.archiveAfterSize,
 		pushArgs.archiveTimeout,
-		uploadStatsUpdater)
+		uploadStatsUpdater,
+		!initial)
 	oplogFetcher := stages.NewCursorMajFetcher(mongoClient, oplogCursor, pushArgs.lwUpdate)
 
 	// run working cycle

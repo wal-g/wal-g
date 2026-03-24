@@ -1,4 +1,4 @@
-FROM wal-g/golang:latest as build
+FROM wal-g/golang:latest AS build
 ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
@@ -27,9 +27,9 @@ RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache
 RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go test -v -c
 
 
-FROM wal-g/ubuntu:20.04
+FROM wal-g/ubuntu:22.04
 
-ENV PGDATA /var/lib/postgresql/16/main
+ENV PGDATA=/var/lib/postgresql/16/main
 
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends --no-install-suggests \
@@ -88,8 +88,6 @@ RUN set -eux; \
 		uuid-dev \
 		wget
 
-RUN apt search zstd
-
 WORKDIR /usr/src/postgresql
 ENV PATH="$PATH:/usr/local/bin"
 ENV LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/lib"
@@ -118,7 +116,7 @@ RUN set -eux; \
 		--with-llvm \
 		--with-lz4 \
 		--with-zstd \
-		--with-extra-version=" ${ORIOLEDB_VERSION} PGTAG=${PGTAG} ubuntu:focal+clang build:${ORIOLEDB_BUILDTIME}" \
+		--with-extra-version=" ${ORIOLEDB_VERSION} PGTAG=${PGTAG} ubuntu:jammy+clang build:${ORIOLEDB_BUILDTIME}" \
 	|| cat config.log ); \
 	echo "ORIOLEDB_PATCHSET_VERSION = `echo $PGTAG | cut -d'_' -f2`" >> src/Makefile.global; \
 	make -j "$(nproc)"; \
@@ -158,4 +156,4 @@ COPY docker/orioledb/scripts/ /tmp
 
 RUN mkdir -p /tmp/logs/ && chmod 777 /tmp/configs/ && chmod 777 /tmp/logs/
 RUN mkdir -p /var/run/postgresql && chmod 777 /var/run/postgresql
-ENV PGHOST /var/run/postgresql
+ENV PGHOST=/var/run/postgresql

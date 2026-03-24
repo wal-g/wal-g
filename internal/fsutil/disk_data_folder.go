@@ -56,9 +56,11 @@ func (folder *DiskDataFolder) FileExists(filename string) bool {
 
 func (folder *DiskDataFolder) CreateFile(filename string) error {
 	filePath := filepath.Join(folder.Path, filename)
-	_, err := os.Create(filePath)
-
-	return err
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	return file.Close()
 }
 
 func (folder *DiskDataFolder) DeleteFile(filename string) error {

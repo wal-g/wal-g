@@ -10,7 +10,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"io"
 	"strings"
@@ -80,8 +79,8 @@ type DBApplier struct {
 	preserveUUID          bool
 	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
-	lastTS                primitive.Timestamp
-	reconfig              bool
+	lastOpTime            models.OpTime
+	catchUp               bool
 	initMongo             bool
 }
 
@@ -100,7 +99,7 @@ func NewDBApplier(m client.MongoDriver, args DBApplierArgs) *DBApplier {
 		txnBuffer:             txn.NewBuffer(),
 		preserveUUID:          args.PreserveUUID,
 		partial:               args.Partial,
-		reconfig:              args.Reconfig,
+		catchUp:               args.Reconfig,
 		applyIgnoreErrorCodes: args.IgnoreErrCodes,
 		initMongo:             args.InitMongo,
 	}
@@ -116,9 +115,11 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
-	if err := ap.shouldSkip(&op); err != nil {
-		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
-		return nil
+	if !ap.catchUp {
+		if err := ap.shouldSkip(&op); err != nil {
+			tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+			return nil
+		}
 	}
 
 	meta, err := txn.NewMeta(op)
@@ -135,14 +136,18 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	if err != nil {
 		return err
 	}
-	ap.lastTS = op.Timestamp
+	var term int64
+	if op.Term != nil {
+		term = *op.Term
+	}
+	ap.lastOpTime = models.OpTime{TS: models.TimestampFromBson(op.Timestamp), Term: term}
 
 	return nil
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {
-	if ap.reconfig {
-		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastTS); err != nil {
+	if ap.catchUp {
+		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastOpTime); err != nil {
 			return err
 		}
 	}

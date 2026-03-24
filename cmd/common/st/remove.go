@@ -1,6 +1,8 @@
 package st
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
@@ -11,6 +13,7 @@ import (
 const removeShortDescription = "Removes objects by the prefix from the specified storage"
 
 var removeAllVersions bool
+var removeVersionID string
 
 // removeCmd represents the deleteObject command
 var removeCmd = &cobra.Command{
@@ -19,6 +22,18 @@ var removeCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
+			if removeVersionID != "" && removeAllVersions {
+				return fmt.Errorf("--version-id cannot be used together with --all-versions ")
+			}
+			if removeVersionID != "" && glob {
+				return fmt.Errorf("--version-id cannot be used together with --glob")
+			}
+
+			if removeVersionID != "" {
+				folder.SetVersioningEnabled(true)
+				return storagetools.HandleRemoveVersion(args[0], removeVersionID, folder)
+			}
+
 			folder.SetVersioningEnabled(removeAllVersions)
 			if glob {
 				return storagetools.HandleRemoveWithGlobPattern(args[0], folder)
@@ -31,5 +46,6 @@ var removeCmd = &cobra.Command{
 
 func init() {
 	removeCmd.Flags().BoolVar(&removeAllVersions, "all-versions", false, "Remove all file versions if versioning is enabled in storage")
+	removeCmd.Flags().StringVar(&removeVersionID, "version-id", "", "Remove a specific object version by its version ID")
 	StorageToolsCmd.AddCommand(removeCmd)
 }

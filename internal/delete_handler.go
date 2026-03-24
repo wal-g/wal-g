@@ -472,27 +472,34 @@ func DeleteObjectsWhere(
 	objFilter func(object1 storage.Object) bool,
 	folderFilter func(name string) bool,
 ) error {
+	// if folder has uncurrent versions we need to clean them as well
+	storage.SetShowAllVersions(folder, true)
 	relativePathObjects, err := multistorage.ListFolderRecursivelyWithFilter(folder, folderFilter)
 	if err != nil {
 		return err
 	}
-	filteredRelativePaths := make([]string, 0)
+	filteredRelativePathsObjects := make([]storage.Object, 0)
 	tracelog.InfoLogger.Println("Objects in folder:")
 	for _, object := range relativePathObjects {
 		if objFilter(object) {
 			tracelog.InfoLogger.Printf("\twill be deleted: %s, from storage: %s\n", object.GetName(), multistorage.GetStorage(object))
-			filteredRelativePaths = append(filteredRelativePaths, object.GetName())
+			filteredRelativePathsObjects = append(filteredRelativePathsObjects, object)
 		} else {
 			tracelog.DebugLogger.Printf("\tskipped: %s, in storage: %s\n", object.GetName(), multistorage.GetStorage(object))
 		}
 	}
-	if len(filteredRelativePaths) == 0 {
+	if len(filteredRelativePathsObjects) == 0 {
+		tracelog.InfoLogger.Println("No backup sets matched the deletion criteria.")
 		return nil
 	}
 	if confirm {
-		return folder.DeleteObjects(filteredRelativePaths)
+		err := folder.DeleteObjects(filteredRelativePathsObjects)
+		if err == nil {
+			tracelog.InfoLogger.Printf("Succession: %d objects were successfully deleted.", len(filteredRelativePathsObjects))
+		}
+		return err
 	}
-	tracelog.InfoLogger.Println("Dry run, nothing were deleted")
+	tracelog.InfoLogger.Printf("Dry run: %d objects would be deleted. Run with --confirm to execute.", len(filteredRelativePathsObjects))
 	return nil
 }
 

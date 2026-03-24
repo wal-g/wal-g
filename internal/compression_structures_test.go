@@ -144,15 +144,18 @@ func testCompressAndEncryptErrorPropagation(compressor compression.Compressor, t
 	compressed := internal.CompressAndEncrypt(in, compressor, nil)
 
 	decompressor := compression.GetDecompressorByCompressor(compressor)
-	decompressed, err := decompressor.Decompress(&DelayedErrorReader{compressed, L})
+	decompressed, err := decompressor.Decompress(&DelayedErrorReader{compressed, L - 1})
 	assert.NoError(t, err)
 	_, err = io.ReadAll(decompressed)
 	assert.Errorf(t, err, "%v did not propagate error of the buffer", compressor.FileExtension())
 }
 
 func TestCompressAndEncryptErrorPropagation(t *testing.T) {
-	for _, compressor := range compression.Compressors {
-		go testCompressAndEncryptErrorPropagation(compressor, t)
+	for name, compressor := range compression.Compressors {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			testCompressAndEncryptErrorPropagation(compressor, t)
+		})
 	}
 }
 

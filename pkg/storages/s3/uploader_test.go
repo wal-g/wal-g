@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 var (
@@ -136,6 +137,30 @@ func TestPartitionStrings(t *testing.T) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
 			actual := partitionStrings(tc.strings, tc.blockSize)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
+func TestPartitionObjects(t *testing.T) {
+	testCases := []struct {
+		strings   []storage.Object
+		blockSize int
+		expected  [][]storage.Object
+	}{
+		{[]storage.Object{nil, nil, nil, nil, nil}, 2, [][]storage.Object{{nil, nil}, {nil, nil}, {nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil, nil}, 3, [][]storage.Object{{nil, nil, nil}, {nil, nil, nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, 1000, [][]storage.Object{{nil, nil, nil, nil, nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, 1, [][]storage.Object{{nil}, {nil}, {nil}, {nil}, {nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, 0, [][]storage.Object{{nil, nil, nil, nil, nil}}},
+		{[]storage.Object{nil, nil, nil, nil, nil}, -1, [][]storage.Object{{nil, nil, nil, nil, nil}}},
+		{[]storage.Object{nil, nil}, 5, [][]storage.Object{{nil, nil}}},
+		{[]storage.Object{nil}, 1, [][]storage.Object{{nil}}},
+		{[]storage.Object{}, 1, [][]storage.Object{}},
+	}
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
+			actual := partitionObjects(tc.strings, tc.blockSize)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}

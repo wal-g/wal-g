@@ -37,7 +37,11 @@ func (dba *GenericApplier) Apply(ctx context.Context, ch chan *models.Oplog) (ch
 	errc := make(chan error)
 	go func() {
 		defer close(errc)
-		defer func() { _ = dba.applier.Close(ctx) }()
+		defer func() {
+			if err := dba.applier.Close(ctx); err != nil {
+				errc <- fmt.Errorf("can not close applier: %w", err)
+			}
+		}()
 
 		for opr := range ch {
 			// we still pass oplog records in generic appliers by value
@@ -58,6 +62,7 @@ type StorageApplier struct {
 	size         int
 	timeout      time.Duration
 	statsUpdater stats.OplogUploadStatsUpdater
+	resume       bool
 }
 
 // NewStorageApplier builds StorageApplier.
@@ -66,8 +71,10 @@ func NewStorageApplier(uploader archive.Uploader,
 	buf Buffer,
 	archiveAfterSize int,
 	archiveTimeout time.Duration,
-	statsUpdater stats.OplogUploadStatsUpdater) *StorageApplier {
-	return &StorageApplier{uploader, buf, archiveAfterSize, archiveTimeout, statsUpdater}
+	statsUpdater stats.OplogUploadStatsUpdater,
+	resume bool,
+) *StorageApplier {
+	return &StorageApplier{uploader, buf, archiveAfterSize, archiveTimeout, statsUpdater, resume}
 }
 
 // Apply runs working cycle that sends oplog records to storage.
@@ -94,6 +101,10 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) 
 				}
 				if restartBatch {
 					batchStartTS = op.TS
+					if sa.resume {
+						sa.resume = false
+						continue
+					}
 					restartBatch = false
 				}
 				lastKnownTS = op.TS

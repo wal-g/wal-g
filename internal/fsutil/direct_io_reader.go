@@ -10,7 +10,6 @@ import (
 
 	"github.com/ncw/directio"
 	"github.com/spf13/viper"
-
 	conf "github.com/wal-g/wal-g/internal/config"
 )
 
@@ -50,7 +49,7 @@ func (r *reader) readBuff() error {
 	if n, err := io.ReadFull(r.fd, r.alignedBlock); err != nil {
 		r.buff = append(r.buff[r.buffOffset:], r.alignedBlock[0:n]...)
 		r.buffOffset = 0
-		if errors.Is(err, io.ErrUnexpectedEOF) {
+		if isEOFError(err) {
 			err = io.EOF
 		}
 		return err

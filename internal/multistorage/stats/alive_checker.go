@@ -136,7 +136,7 @@ func (wc *writeCheck) Check(ctx context.Context, folder storage.Folder) error {
 	if err != nil {
 		return fmt.Errorf("write check: put object %q: %w", objPath, err)
 	}
-	err = folder.DeleteObjects([]string{checkObjectName})
+	err = folder.DeleteObjects([]storage.Object{storage.NewLocalObject(checkObjectName, time.Time{}, 0)})
 	if err != nil {
 		return fmt.Errorf("write check: delete object %q: %w", objPath, err)
 	}

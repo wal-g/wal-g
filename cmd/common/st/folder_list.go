@@ -11,6 +11,7 @@ import (
 const folderListShortDescription = "Prints objects in the provided storage folder"
 const recursiveFlag = "recursive"
 const recursiveShortHand = "r"
+const allVersionsFlag = "all-versions"
 
 // folderListCmd represents the folderList command
 var folderListCmd = &cobra.Command{
@@ -26,6 +27,9 @@ var folderListCmd = &cobra.Command{
 		}
 
 		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
+			if showAllVersions {
+				storage.SetShowAllVersions(folder, true)
+			}
 			if glob {
 				return storagetools.HandleFolderListWithGlob(folder, path, recursive)
 			}
@@ -39,8 +43,10 @@ var folderListCmd = &cobra.Command{
 }
 
 var recursive bool
+var showAllVersions bool
 
 func init() {
 	folderListCmd.Flags().BoolVarP(&recursive, recursiveFlag, recursiveShortHand, false, "List folder recursively")
+	folderListCmd.Flags().BoolVar(&showAllVersions, allVersionsFlag, false, "Show all object versions including deleted (S3 with versioning)")
 	StorageToolsCmd.AddCommand(folderListCmd)
 }

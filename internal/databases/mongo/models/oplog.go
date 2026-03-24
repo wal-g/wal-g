@@ -72,6 +72,11 @@ func LessTS(ots1, ots2 Timestamp) bool {
 	return ots1.Inc < ots2.Inc
 }
 
+// Equal returns if timestamps are equal
+func Equal(ots1, ots2 Timestamp) bool {
+	return ots1.TS == ots2.TS && ots1.Inc == ots2.Inc
+}
+
 // TimestampFromBson builds Timestamp from BSON primitive
 func TimestampFromBson(bts primitive.Timestamp) Timestamp {
 	return Timestamp{TS: bts.T, Inc: bts.I}

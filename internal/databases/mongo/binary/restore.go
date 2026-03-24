@@ -2,7 +2,6 @@ package binary
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"time"
 
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -50,6 +49,7 @@ func (restoreService *RestoreService) DoRestore(
 	if err != nil {
 		return err
 	}
+	tracelog.InfoLogger.Printf("Sentinel %v", sentinel)
 
 	var onHostFilesFilter, tarFilesFilter map[string]struct{}
 
@@ -58,7 +58,7 @@ func (restoreService *RestoreService) DoRestore(
 		if err != nil {
 			return err
 		}
-		onHostFilesFilter, tarFilesFilter = partial.GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
+		onHostFilesFilter, tarFilesFilter = GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
 	}
 
 	if !args.SkipChecks {
@@ -123,6 +123,7 @@ func (restoreService *RestoreService) reconfigMongo(
 	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig, partial); err != nil {
 		return err
 	}
+
 	if err := restoreService.recoverFromOplogAsStandalone(sentinel, partial); err != nil {
 		return err
 	}
@@ -178,6 +179,10 @@ func (restoreService *RestoreService) fixSystemData(
 	}
 
 	if err = mongodService.CleanCacheAndSessions(shConfig); err != nil {
+		return err
+	}
+
+	if err = mongodService.ClearMinvalid(); err != nil {
 		return err
 	}
 
