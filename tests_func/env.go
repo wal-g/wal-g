@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/wal-g/wal-g/tests_func/utils"
-	"golang.org/x/mod/semver"
 )
 
 const (
@@ -89,14 +88,6 @@ func DynConf(env map[string]string, osEnviron map[string]string) (map[string]str
 		"DOCKER_BRIDGE_ID": strconv.Itoa(rand.Intn(65535)),
 		"PORT_FACTOR":      portFactor,
 		"NETWORK_NAME":     netName,
-	}
-
-	if mongoVersion, ok := osEnviron["MONGO_VERSION"]; ok {
-		if semver.Compare(fmt.Sprintf("v%s", mongoVersion), "v6.1") < 0 {
-			res["MONGO_CONF_FILE"] = "mongod-4.4-6.0.conf"
-		} else {
-			res["MONGO_CONF_FILE"] = "mongod-6.1-plus.conf"
-		}
 	}
 
 	if imageType, ok := osEnviron["IMAGE_TYPE"]; ok {
