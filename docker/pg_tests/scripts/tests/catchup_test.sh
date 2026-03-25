@@ -117,5 +117,41 @@ pg_ctl -D ${PGDATA_BETA} -w stop
 
 diff ${ALPHA_DUMP} ${BETA_DUMP}
 
+# test catchup-send to a fresh empty directory (full copy, no prior pg_control)
+PGDATA_GAMMA="${PGDATA}_gamma"
+GAMMA_DUMP="/tmp/gamma_dump"
+GAMMA_PORT=5434
+
+mkdir ${PGDATA_GAMMA}
+
+wal-g catchup-receive ${PGDATA_GAMMA} 1337 &
+RCV_PID=$!
+
+while netstat -lnt | awk '$4 ~ /:1337$/ {exit 1}'; do sleep 1; done
+
+wal-g --config=${TMP_CONFIG} catchup-send ${PGDATA_ALPHA} localhost:1337
+
+wait ${RCV_PID}
+
+pushd ${PGDATA_GAMMA}
+echo "port = ${GAMMA_PORT}" >> postgresql.conf
+echo "hot_standby = on" >> postgresql.conf
+cat > recovery.conf << EOF
+standby_mode = 'on'
+primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
+restore_command = 'cp ${PGDATA_GAMMA}/archive/%f %p'
+trigger_file = '/tmp/postgresql.trigger.${GAMMA_PORT}'
+EOF
+popd
+
+pg_ctl -D ${PGDATA_GAMMA} -w start
+PGDATA=${PGDATA_GAMMA} /tmp/scripts/wait_while_pg_not_ready.sh
+
+pg_dump -h 127.0.0.1 -p ${GAMMA_PORT} -f ${GAMMA_DUMP} postgres
+
+pg_ctl -D ${PGDATA_GAMMA} -w stop
+
+diff ${ALPHA_DUMP} ${GAMMA_DUMP}
+
 /tmp/scripts/drop_pg.sh
-rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA}
+rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA} ${PGDATA_GAMMA}
