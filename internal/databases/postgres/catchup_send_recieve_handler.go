@@ -23,10 +23,10 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Sending %v to %v\n", pgDataDirectory, destination)
 	info, runner, err := GetPgServerInfo(true)
+	tracelog.ErrorLogger.FatalOnError(err)
 	if info.systemIdentifier == nil {
 		tracelog.ErrorLogger.Fatal("Our system lacks System Identifier, cannot proceed")
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
 	writer, decoder, encoder := startSendConnection(destination)
 
 	var control PgControlData
