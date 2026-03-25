@@ -373,8 +373,8 @@ type pgDataState int
 
 const (
 	pgDataStateNormal  pgDataState = iota // pg_control exists
-	pgDataStateEmpty                       // no pg_control, directory is empty
-	pgDataStateCorrupt                     // no pg_control, but directory has files
+	pgDataStateEmpty                      // no pg_control, directory is empty
+	pgDataStateCorrupt                    // no pg_control, but directory has files
 )
 
 func classifyDataDirectory(pgDataDirectory string) pgDataState {
