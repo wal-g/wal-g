@@ -244,6 +244,7 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	tracelog.InfoLogger.Printf("Receiving %v on port %v\n", pgDataDirectory, port)
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
 	tracelog.ErrorLogger.FatalOnError(err)
+	defer listen.Close()
 	conn, err := listen.Accept()
 	tracelog.ErrorLogger.FatalOnError(err)
 
