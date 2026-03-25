@@ -398,6 +398,9 @@ func receiveFileList(directory string) internal.BackupFileList {
 		if isDir && excluded {
 			return filepath.SkipDir
 		}
+		if isDir {
+			return nil
+		}
 		if excluded {
 			return nil
 		}
