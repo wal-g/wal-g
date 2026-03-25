@@ -145,7 +145,6 @@ EOF
 popd
 
 pg_ctl -D ${PGDATA_GAMMA} -w start
-PGDATA=${PGDATA_GAMMA} /tmp/scripts/wait_while_pg_not_ready.sh
 
 pg_dump -h 127.0.0.1 -p ${GAMMA_PORT} -f ${GAMMA_DUMP} postgres
 
