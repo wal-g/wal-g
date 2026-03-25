@@ -307,14 +307,20 @@ func (d *DecoderReader) Read(bytes []byte) (n int, err error) {
 func doRcvCommand(cmd CatchupCommandDto, directory string, decoder *gob.Decoder) {
 	if cmd.IsBinContents {
 		tracelog.InfoLogger.Printf("Writing file %v", cmd.FileName)
-		err := os.WriteFile(path.Join(directory, cmd.FileName), cmd.BinaryContents, 0666)
+		fullPath := path.Join(directory, cmd.FileName)
+		err := os.MkdirAll(filepath.Dir(fullPath), 0700)
+		tracelog.ErrorLogger.FatalOnError(err)
+		err = os.WriteFile(fullPath, cmd.BinaryContents, 0666)
 		tracelog.ErrorLogger.FatalOnError(err)
 		return
 	}
 
 	if cmd.IsFull {
 		tracelog.InfoLogger.Printf("Full file %v", cmd.FileName)
-		fd, err := os.Create(path.Join(directory, cmd.FileName))
+		fullPath := path.Join(directory, cmd.FileName)
+		err := os.MkdirAll(filepath.Dir(fullPath), 0700)
+		tracelog.ErrorLogger.FatalOnError(err)
+		fd, err := os.Create(fullPath)
 		tracelog.ErrorLogger.FatalOnError(err)
 		size := int64(cmd.FileSize)
 		for size != 0 {
