@@ -30,6 +30,21 @@ func TestClassifyDataDirectory_Corrupt(t *testing.T) {
 	assert.Equal(t, pgDataStateCorrupt, classifyDataDirectory(dir))
 }
 
+func TestClassifyDataDirectory_Interrupted(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "global"), 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "global", "pg_control.catchup"), []byte{}, 0600))
+	assert.Equal(t, pgDataStateInterrupted, classifyDataDirectory(dir))
+}
+
+func TestClassifyDataDirectory_NormalBeatsInterrupted(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "global"), 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "global", "pg_control"), []byte("fake"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "global", "pg_control.catchup"), []byte("old"), 0600))
+	assert.Equal(t, pgDataStateNormal, classifyDataDirectory(dir))
+}
+
 func TestSendControlAndFileList_EmptyDir(t *testing.T) {
 	dir := t.TempDir()
 
