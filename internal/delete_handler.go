@@ -478,28 +478,29 @@ func DeleteObjectsWhere(
 	if err != nil {
 		return err
 	}
-	filteredRelativePathsObjects := make([]storage.Object, 0)
-	tracelog.InfoLogger.Println("Objects in folder:")
+	markedForDeletion := make([]storage.Object, 0, len(relativePathObjects))
+	tracelog.InfoLogger.Println("Evaluating objects for deletion...")
 	for _, object := range relativePathObjects {
 		if objFilter(object) {
-			tracelog.InfoLogger.Printf("\twill be deleted: %s, from storage: %s\n", object.GetName(), multistorage.GetStorage(object))
-			filteredRelativePathsObjects = append(filteredRelativePathsObjects, object)
+			tracelog.InfoLogger.Printf("Object marked for deletion: %s (Storage: %s)\n", object.GetName(), multistorage.GetStorage(object))
+			markedForDeletion = append(markedForDeletion, object)
 		} else {
-			tracelog.DebugLogger.Printf("\tskipped: %s, in storage: %s\n", object.GetName(), multistorage.GetStorage(object))
+			tracelog.DebugLogger.Printf("Object skipped: %s (Storage: %s)\n", object.GetName(), multistorage.GetStorage(object))
 		}
 	}
-	if len(filteredRelativePathsObjects) == 0 {
-		tracelog.InfoLogger.Println("No backup sets matched the deletion criteria.")
+	deletionCount := len(markedForDeletion)
+	if deletionCount == 0 {
+		tracelog.InfoLogger.Println("No objects matched the deletion criteria.")
 		return nil
 	}
 	if confirm {
-		err := folder.DeleteObjects(filteredRelativePathsObjects)
+		err := folder.DeleteObjects(markedForDeletion)
 		if err == nil {
-			tracelog.InfoLogger.Printf("Succession: %d objects were successfully deleted.", len(filteredRelativePathsObjects))
+			tracelog.InfoLogger.Printf("Objects deleted successfully: %d.\n", deletionCount)
 		}
 		return err
 	}
-	tracelog.InfoLogger.Printf("Dry run: %d objects would be deleted. Run with --confirm to execute.", len(filteredRelativePathsObjects))
+	tracelog.InfoLogger.Printf("Dry run: %d objects would be deleted. Run with --confirm to execute.\n", deletionCount)
 	return nil
 }
 
