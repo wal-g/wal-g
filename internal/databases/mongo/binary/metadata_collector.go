@@ -2,7 +2,6 @@ package binary
 
 import (
 	"container/heap"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 
 	"github.com/mongodb/mongo-tools/common/util"
@@ -64,7 +63,6 @@ func (smc *StorageMetadataCollector) GetStats() {
 			smc.ErrsChan <- err
 			return
 		}
-		tracelog.DebugLogger.Printf("NsInfo: %v", nsInfo)
 
 		smc.handleTop100Info(&nsInfo)
 		smc.pmc.HandleNsInfo(&nsInfo)
