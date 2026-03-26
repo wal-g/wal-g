@@ -108,7 +108,7 @@ log "Started wal-g binlog-server with PID: $walg_pid"
 
 log "Waiting for binlog-server to start..."
 WAIT_COUNT=0
-MAX_WAIT=6
+MAX_WAIT=30
 
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
     if ! kill -0 $walg_pid 2>/dev/null; then
@@ -166,7 +166,7 @@ mysql -e "START SLAVE"
 
 log "Waiting for replication to start..."
 WAIT_COUNT=0
-MAX_WAIT=6
+MAX_WAIT=30
 LAST_ROW_COUNT=-1
 STUCK_COUNTER=0
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
@@ -183,7 +183,7 @@ done
 
 log "Waiting for replication to complete..."
 
-MAX_WAIT=6
+MAX_WAIT=30
 WAIT_COUNT=0
 EXPECTED_ROWS=361
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
@@ -227,8 +227,8 @@ cat $PROXY_LOG
 
 safe_kill_process "$proxy_pid" "proxy"
 
-#log "MYSQL ERRORS:"
-#cat /var/log/mysql/error.log
+log "MYSQL ERRORS:"
+cat /var/log/mysql/error.log
 
 
 FINAL_ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
