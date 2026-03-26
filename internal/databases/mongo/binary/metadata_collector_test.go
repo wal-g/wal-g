@@ -23,7 +23,7 @@ func TestNewStorageMetadataCollector_Initialization(t *testing.T) {
 	assert.NotNil(t, collector.TarsChan)
 	assert.NotNil(t, collector.ErrsChan)
 	assert.Equal(t, 0, collector.heap.Len())
-	assert.Equal(t, 0, collector.counter)
+	assert.Equal(t, int64(0), collector.counter)
 	assert.Nil(t, collector.top100Ns)
 }
 
@@ -39,7 +39,7 @@ func TestHandleTop100Info_SystemDBsSkipped(t *testing.T) {
 		collector.handleTop100Info(nsInfo)
 	}
 
-	assert.Equal(t, 0, collector.counter, "system DBs should be skipped")
+	assert.Equal(t, int64(0), collector.counter, "system DBs should be skipped")
 	assert.Equal(t, 0, collector.heap.Len(), "heap should be empty for system DBs")
 }
 
@@ -55,7 +55,7 @@ func TestHandleTop100Info_FillHeapUnderTopK(t *testing.T) {
 		collector.handleTop100Info(nsInfo)
 	}
 
-	assert.Equal(t, topK-1, collector.counter)
+	assert.Equal(t, int64(topK-1), collector.counter)
 	assert.Equal(t, topK-1, collector.heap.Len())
 }
 
@@ -71,7 +71,7 @@ func TestHandleTop100Info_FillHeapExactlyTopK(t *testing.T) {
 		collector.handleTop100Info(nsInfo)
 	}
 
-	assert.Equal(t, topK, collector.counter)
+	assert.Equal(t, int64(topK), collector.counter)
 	assert.Equal(t, topK, collector.heap.Len())
 }
 
@@ -91,7 +91,7 @@ func TestHandleTop100Info_ReplaceSmallestWhenFull(t *testing.T) {
 	bigNsInfo.StorageStats.TotalSize = 999999
 	collector.handleTop100Info(bigNsInfo)
 
-	assert.Equal(t, topK+1, collector.counter)
+	assert.Equal(t, int64(topK+1), collector.counter)
 	assert.Equal(t, topK, collector.heap.Len())
 
 	found := false

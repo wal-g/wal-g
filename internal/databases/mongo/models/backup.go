@@ -25,7 +25,7 @@ type Backup struct {
 	UncompressedSize int64       `json:"UncompressedSize,omitempty"`
 	CompressedSize   int64       `json:"DataSize,omitempty"`
 	Top100Namespaces []string    `json:"Top100Namespaces,omitempty"`
-	NamespacesCount  int         `json:"NamespacesCount,omitempty"`
+	NamespacesCount  int64       `json:"NamespacesCount,omitempty"`
 }
 
 func (b *Backup) Name() string {
