@@ -15,7 +15,7 @@ type StorageMetadataCollector struct {
 	mongodService *MongodService
 	pmc           *PartialMetadataCollector
 	heap          *NsSizeHeap
-	counter       int
+	counter       int64
 	top100Ns      *[]string
 	TarsChan      chan internal.TarFileSets
 	ErrsChan      chan error
