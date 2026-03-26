@@ -39,7 +39,7 @@ type Handler struct {
 	rootFolder    storage.Folder
 	dstDir        string
 
-	lastSentGTID string
+	lastSentGTIDs map[string]int64
 }
 
 func newHandler(replicaSource string, root storage.Folder, dst string) *Handler {
@@ -50,6 +50,7 @@ func newHandler(replicaSource string, root storage.Folder, dst string) *Handler 
 		replicaSource: replicaSource,
 		rootFolder:    root,
 		dstDir:        dst,
+		lastSentGTIDs: make(map[string]int64),
 	}
 }
 
@@ -67,13 +68,10 @@ func handleEventError(err error, s *replication.BinlogStreamer) {
 // https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L53-L108
 func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
-	if err != nil {
-		return err
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	serverIDNum, err := strconv.Atoi(serverID)
-	if err != nil {
-		return err
-	}
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	// create rotate event
 	rotateBinlogEvent := replication.BinlogEvent{}
@@ -117,43 +115,28 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	return s.AddEventToStreamer(&rotateBinlogEvent)
 }
 
-func extractMaxGTID(binlogPath string) string {
-	result := ""
-
-	p := replication.NewBinlogParser()
-	p.SetRawMode(true)
-	p.SetFlavor(mysql.MySQLFlavor)
-	// check checksum on our side - we should exit with error here rather than stuck waiting for MySQL apply all binlogs till `lastSentGTID`.
-	p.SetVerifyChecksum(true)
-
-	err := p.ParseFile(binlogPath, 4, func(e *replication.BinlogEvent) error {
-		if e.Header.EventType == replication.GTID_EVENT {
-			gtidEvent := &replication.GTIDEvent{}
-			if err := gtidEvent.Decode(e.RawData[replication.EventHeaderSize:]); err == nil {
-				u, _ := uuid.FromBytes(gtidEvent.SID)
-				result = u.String() + ":1-" + strconv.Itoa(int(gtidEvent.GNO))
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		tracelog.WarningLogger.Printf("extractMaxGTID: failed to parse %s: %v", binlogPath, err)
-	}
-
-	return result
-}
-
 func (h *Handler) waitReplicationIsDoneSafe() {
-	if h.lastSentGTID == "" {
+	if len(h.lastSentGTIDs) == 0 {
 		tracelog.InfoLogger.Println("S3 objects finished. No GTIDs were sent. Shutting down immediately.")
 		os.Exit(0)
 	}
 
-	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", h.lastSentGTID)
+	var sb strings.Builder
+	first := true
+	for u, gno := range h.lastSentGTIDs {
+		if !first {
+			sb.WriteString(",")
+		}
+		sb.WriteString(fmt.Sprintf("%s:1-%d", u, gno))
+		first = false
+	}
+	targetGTIDStr := sb.String()
 
-	targetGTIDSet, err := mysql.ParseGTIDSet("mysql", h.lastSentGTID)
+	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", targetGTIDStr)
+
+	targetGTIDSet, err := mysql.ParseGTIDSet("mysql", targetGTIDStr)
 	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to parse last sent GTID (%s): %v. Shutting down.", h.lastSentGTID, err)
+		tracelog.WarningLogger.Printf("Failed to parse last sent GTID (%s): %v. Shutting down.", targetGTIDStr, err)
 		os.Exit(1)
 	}
 
@@ -183,25 +166,6 @@ func (h *Handler) waitReplicationIsDoneSafe() {
 
 		time.Sleep(1 * time.Second)
 	}
-}
-
-func (h *Handler) shouldSkipBinlog(binlogPath, binlogName string, clientGTIDSet mysql.GTIDSet) bool {
-	if clientGTIDSet == nil {
-		return false
-	}
-	maxGTID := extractMaxGTID(binlogPath)
-	if maxGTID == "" {
-		return false
-	}
-	fileSet, parseErr := mysql.ParseGTIDSet("mysql", maxGTID)
-	if parseErr != nil {
-		return false
-	}
-	if clientGTIDSet.Contain(fileSet) {
-		tracelog.InfoLogger.Printf("Skipping %s (replica already applied these events)", binlogName)
-		return true
-	}
-	return false
 }
 
 func (h *Handler) downloadBinlog(logFolder storage.Folder, logFile storage.Object) (string, func(), error) {
@@ -244,7 +208,11 @@ func (h *Handler) updateLastSentGTID(e *replication.BinlogEvent) {
 	gtidEvent := &replication.GTIDEvent{}
 	if errDecode := gtidEvent.Decode(e.RawData[replication.EventHeaderSize:]); errDecode == nil {
 		u, _ := uuid.FromBytes(gtidEvent.SID)
-		h.lastSentGTID = u.String() + ":1-" + strconv.FormatUint(uint64(gtidEvent.GNO), 10)
+		uuidStr := u.String()
+		gno := gtidEvent.GNO
+		if gno > h.lastSentGTIDs[uuidStr] {
+			h.lastSentGTIDs[uuidStr] = gno
+		}
 	}
 }
 
@@ -252,7 +220,6 @@ func (h *Handler) streamSingleBinlog(
 	p *replication.BinlogParser,
 	logFolder storage.Folder,
 	logFile storage.Object,
-	clientGTIDSet mysql.GTIDSet,
 	startPos *mysql.Position,
 	s *replication.BinlogStreamer,
 ) error {
@@ -264,10 +231,6 @@ func (h *Handler) streamSingleBinlog(
 	}
 	defer deleteFile()
 
-	if h.shouldSkipBinlog(binlogPath, binlogName, clientGTIDSet) {
-		return nil
-	}
-
 	tracelog.InfoLogger.Printf("Streaming %s to replica", binlogName)
 	processPos := int64(startPos.Pos)
 	startPos.Pos = 4
@@ -275,7 +238,7 @@ func (h *Handler) streamSingleBinlog(
 	return p.ParseFile(binlogPath, processPos, h.makeEventHandler(s))
 }
 
-func (h *Handler) streamBinlogFiles(clientGTIDSet mysql.GTIDSet, startPos mysql.Position, s *replication.BinlogStreamer) {
+func (h *Handler) streamBinlogFiles(startPos mysql.Position, s *replication.BinlogStreamer) {
 	if err := addRotateEvent(s, startPos); err != nil {
 		handleEventError(err, s)
 	}
@@ -302,7 +265,7 @@ func (h *Handler) streamBinlogFiles(clientGTIDSet mysql.GTIDSet, startPos mysql.
 			return
 		}
 
-		err := h.streamSingleBinlog(p, logFolder, logFile, clientGTIDSet, &startPos, s)
+		err := h.streamSingleBinlog(p, logFolder, logFile, &startPos, s)
 		if err != nil && h.ctx.Err() == nil {
 			handleEventError(err, s)
 			return
@@ -319,14 +282,14 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
 	s := replication.NewBinlogStreamer()
-	go h.streamBinlogFiles(nil, pos, s)
+	go h.streamBinlogFiles(pos, s)
 	return s, nil
 }
 
 func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: GTID=%s", gtidSet.String())
 	s := replication.NewBinlogStreamer()
-	go h.streamBinlogFiles(gtidSet, mysql.Position{Name: "host-binlog-file", Pos: 4}, s)
+	go h.streamBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, s)
 	return s, nil
 }
 
