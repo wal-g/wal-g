@@ -39,8 +39,8 @@ func (r *SegCmdRunner) Run() {
 	args := []string{r.cmdName, fmt.Sprintf("--content-id=%d", r.contentID)}
 	args = append(args, strings.Fields(r.cmdArgs)...)
 
-	if conf.CfgFile != "" {
-		args = append(args, "--config", conf.CfgFile)
+	if configFile := conf.GetConfigFilePath(); configFile != "" {
+		args = append(args, "--config", configFile)
 	}
 
 	segCmdStatesPath := FormatSegmentStateFolderPath(r.contentID)

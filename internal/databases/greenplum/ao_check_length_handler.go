@@ -95,14 +95,15 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 	cmd := []string{
 		// nohup to avoid the SIGHUP on SSH session disconnect
 		"nohup", "wal-g",
-		// config for wal-g
-		fmt.Sprintf("--config=%s", conf.CfgFile),
 		// method
 		"check-ao-aocs-length-segment",
 		// actual arguments to be passed to the check-ao command
 		runCheckArgsLine,
 		// forward stdout and stderr to the log file
 		"&>>", formatSegmentLogPath(contentID),
+	}
+	if configFile := conf.GetConfigFilePath(); configFile != "" {
+		cmd = append(cmd[:2], append([]string{fmt.Sprintf("--config=%s", configFile)}, cmd[2:]...)...)
 	}
 	cmdLine := strings.Join(cmd, " ")
 	tracelog.InfoLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)

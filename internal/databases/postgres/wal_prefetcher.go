@@ -31,8 +31,8 @@ func (p RegularPrefetcher) Prefetch(_ internal.StorageFolderReader, walFileName 
 		return
 	}
 	prefetchArgs := []string{"wal-prefetch", walFileName, location}
-	if conf.CfgFile != "" {
-		prefetchArgs = append(prefetchArgs, "--config", conf.CfgFile)
+	if configFile := conf.GetConfigFilePath(); configFile != "" {
+		prefetchArgs = append(prefetchArgs, "--config", configFile)
 	}
 	storagePrefix := viper.GetString(conf.StoragePrefixSetting)
 	if storagePrefix != "" {

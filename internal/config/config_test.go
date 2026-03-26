@@ -63,6 +63,21 @@ func TestConfigureLogging_WhenLogDestinationSettingIsSet(t *testing.T) {
 	resetToDefaults()
 }
 
+func TestGetConfigFilePath(t *testing.T) {
+	beforeCfgFile := config.CfgFile
+	t.Cleanup(func() {
+		config.CfgFile = beforeCfgFile
+		_ = os.Unsetenv("WALG_CONFIGFILE")
+	})
+
+	config.CfgFile = ""
+	assert.NoError(t, os.Setenv("WALG_CONFIGFILE", "/tmp/from-env.json"))
+	assert.Equal(t, "/tmp/from-env.json", config.GetConfigFilePath())
+
+	config.CfgFile = "/tmp/from-flag.json"
+	assert.Equal(t, "/tmp/from-flag.json", config.GetConfigFilePath())
+}
+
 func resetToDefaults() {
 	viper.Reset()
 	internal.ConfigureSettings(config.PG)
