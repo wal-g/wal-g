@@ -12,6 +12,9 @@ func ExtractBlockLocations(records []XLogRecord) []BlockLocation {
 			continue
 		}
 		for _, block := range record.Blocks {
+			if block.Header.ForkNum() != MainForkNum {
+				continue
+			}
 			locations = append(locations, block.Header.BlockLocation)
 		}
 	}
