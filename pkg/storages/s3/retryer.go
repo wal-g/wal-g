@@ -19,8 +19,12 @@ type ConnResetRetryer struct {
 
 func (r ConnResetRetryer) ShouldRetry(req *request.Request) bool {
 	if req.Error != nil {
-		if strings.Contains(req.Error.Error(), "connection reset by peer") ||
-			strings.Contains(req.Error.Error(), "connection refused") {
+		errMsg := req.Error.Error()
+		if strings.Contains(errMsg, "connection reset by peer") ||
+			strings.Contains(errMsg, "connection refused") ||
+			strings.Contains(errMsg, "connection timed out") ||
+			strings.Contains(errMsg, "i/o timeout") {
+			tracelog.InfoLogger.Printf("Retrying S3 request due to transient network error: %v", req.Error)
 			return true
 		}
 	}
