@@ -67,11 +67,11 @@ func TestGetConfigFilePath(t *testing.T) {
 	beforeCfgFile := config.CfgFile
 	t.Cleanup(func() {
 		config.CfgFile = beforeCfgFile
-		_ = os.Unsetenv("WALG_CONFIGFILE")
+		_ = os.Unsetenv(config.ConfigPathEnvVar)
 	})
 
 	config.CfgFile = ""
-	assert.NoError(t, os.Setenv("WALG_CONFIGFILE", "/tmp/from-env.json"))
+	assert.NoError(t, os.Setenv(config.ConfigPathEnvVar, "/tmp/from-env.json"))
 	assert.Equal(t, "/tmp/from-env.json", config.GetConfigFilePath())
 
 	config.CfgFile = "/tmp/from-flag.json"

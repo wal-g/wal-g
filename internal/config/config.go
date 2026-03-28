@@ -672,11 +672,13 @@ var (
 	}
 )
 
+const ConfigPathEnvVar = "WALG_CONFIG_PATH"
+
 func GetConfigFilePath() string {
 	if CfgFile != "" {
 		return CfgFile
 	}
-	return os.Getenv("WALG_CONFIGFILE")
+	return os.Getenv(ConfigPathEnvVar)
 }
 
 const MinAllowedConcurrency = 1
@@ -878,9 +880,7 @@ func InitConfig() {
 	globalViper.AutomaticEnv() // read in environment variables that match
 	SetDefaultValues(globalViper)
 	SetGoMaxProcs(globalViper)
-
 	configFile := GetConfigFilePath()
-
 	ReadConfigFromFile(globalViper, configFile)
 	CheckAllowedSettings(globalViper)
 
