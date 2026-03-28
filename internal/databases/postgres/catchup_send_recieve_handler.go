@@ -23,23 +23,29 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Sending %v to %v\n", pgDataDirectory, destination)
 	info, runner, err := GetPgServerInfo(true)
+	tracelog.ErrorLogger.FatalOnError(err)
 	if info.systemIdentifier == nil {
 		tracelog.ErrorLogger.Fatal("Our system lacks System Identifier, cannot proceed")
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
 	writer, decoder, encoder := startSendConnection(destination)
 
 	var control PgControlData
 	err = decoder.Decode(&control)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.InfoLogger.Printf("Destination control file %v", control)
-	tracelog.InfoLogger.Printf("Our system id %v", *info.systemIdentifier)
-	if *info.systemIdentifier != control.SystemIdentifier {
-		tracelog.ErrorLogger.Fatal("System identifiers do not match")
-	}
-	if control.CurrentTimeline != info.Timeline {
-		tracelog.ErrorLogger.Fatalf("Destination is on timeline %v, but we are on %v",
-			control.CurrentTimeline, info.Timeline)
+
+	receiverIsEmpty := control.SystemIdentifier == 0
+	if receiverIsEmpty {
+		tracelog.InfoLogger.Printf("Receiver has empty data directory, performing full copy")
+	} else {
+		tracelog.InfoLogger.Printf("Destination control file %v", control)
+		tracelog.InfoLogger.Printf("Our system id %v", *info.systemIdentifier)
+		if *info.systemIdentifier != control.SystemIdentifier {
+			tracelog.ErrorLogger.Fatal("System identifiers do not match")
+		}
+		if control.CurrentTimeline != info.Timeline {
+			tracelog.ErrorLogger.Fatalf("Destination is on timeline %v, but we are on %v",
+				control.CurrentTimeline, info.Timeline)
+		}
 	}
 	var fileList internal.BackupFileList
 	err = decoder.Decode(&fileList)
@@ -49,7 +55,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	tracelog.ErrorLogger.FatalOnError(err)
 	lsn, err := ParseLSN(lsnStr)
 	tracelog.ErrorLogger.FatalOnError(err)
-	if lsn <= control.Checkpoint {
+	if !receiverIsEmpty && lsn <= control.Checkpoint {
 		tracelog.ErrorLogger.Fatalf("Catchup destination is already ahead (our LSN %v, destination LSN %v).",
 			lsn, control.Checkpoint)
 	}
@@ -280,6 +286,18 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 		}
 		doRcvCommand(cmd, pgDataDirectory, decoder)
 	}
+
+	// Atomically make the database startable: move the new pg_control into
+	// place first, then remove the sentinel that was blocking startup.
+	pgControlNew := path.Join(pgDataDirectory, PgControlNewPath)
+	if _, err := os.Stat(pgControlNew); err == nil {
+		tracelog.ErrorLogger.FatalOnError(
+			os.Rename(pgControlNew, path.Join(pgDataDirectory, PgControlPath)))
+	}
+	catchupSentinel := path.Join(pgDataDirectory, PgControlCatchupPath)
+	if _, err := os.Stat(catchupSentinel); err == nil {
+		tracelog.ErrorLogger.FatalOnError(os.Remove(catchupSentinel))
+	}
 	tracelog.InfoLogger.Printf("Receive done")
 }
 
@@ -306,8 +324,16 @@ func (d *DecoderReader) Read(bytes []byte) (n int, err error) {
 
 func doRcvCommand(cmd CatchupCommandDto, directory string, decoder *gob.Decoder) {
 	if cmd.IsBinContents {
-		tracelog.InfoLogger.Printf("Writing file %v", cmd.FileName)
-		err := os.WriteFile(path.Join(directory, cmd.FileName), cmd.BinaryContents, 0666)
+		targetFileName := cmd.FileName
+		if path.Base(targetFileName) == PgControl {
+			// Delay writing pg_control until IsDone so the database is only
+			// startable after the full transfer completes successfully.
+			targetFileName = utility.SanitizePath(PgControlNewPath)
+		}
+		tracelog.InfoLogger.Printf("Writing file %v", targetFileName)
+		err := os.MkdirAll(path.Dir(path.Join(directory, targetFileName)), 0700)
+		tracelog.ErrorLogger.FatalOnError(err)
+		err = os.WriteFile(path.Join(directory, targetFileName), cmd.BinaryContents, 0666)
 		tracelog.ErrorLogger.FatalOnError(err)
 		return
 	}
@@ -363,17 +389,68 @@ type CatchupCommandDto struct {
 	FilesToDelete  []string
 }
 
+const (
+	PgControlCatchupPath = "/global/pg_control.catchup"
+	PgControlNewPath     = "/global/pg_control.new"
+)
+
+type pgDataState int
+
+const (
+	pgDataStateNormal      pgDataState = iota // pg_control exists
+	pgDataStateEmpty                          // directory is empty, no pg_control
+	pgDataStateInterrupted                    // pg_control.catchup exists, no pg_control
+	pgDataStateCorrupt                        // files exist but no pg_control
+)
+
+func classifyDataDirectory(pgDataDirectory string) pgDataState {
+	if _, err := os.Stat(path.Join(pgDataDirectory, PgControlPath)); err == nil {
+		return pgDataStateNormal
+	}
+	if _, err := os.Stat(path.Join(pgDataDirectory, PgControlCatchupPath)); err == nil {
+		return pgDataStateInterrupted
+	}
+	isEmpty, err := utility.IsDirectoryEmpty(pgDataDirectory, nil)
+	tracelog.ErrorLogger.FatalOnError(err)
+	if isEmpty {
+		return pgDataStateEmpty
+	}
+	return pgDataStateCorrupt
+}
+
 func sendControlAndFileList(pgDataDirectory string, encoder *gob.Encoder) {
+	controlPath := path.Join(pgDataDirectory, PgControlPath)
+	catchupPath := path.Join(pgDataDirectory, PgControlCatchupPath)
+
+	switch classifyDataDirectory(pgDataDirectory) {
+	case pgDataStateCorrupt:
+		tracelog.ErrorLogger.Fatalf(
+			"Data directory %v has files but no pg_control; remove stale files or restore from backup first",
+			pgDataDirectory)
+
+	case pgDataStateEmpty:
+		tracelog.InfoLogger.Printf("Data directory is empty, requesting full copy from sender")
+		tracelog.ErrorLogger.FatalOnError(os.MkdirAll(path.Dir(catchupPath), 0700))
+		tracelog.ErrorLogger.FatalOnError(os.WriteFile(catchupPath, []byte{}, 0600))
+		tracelog.ErrorLogger.FatalOnError(encoder.Encode(PgControlData{}))
+		tracelog.ErrorLogger.FatalOnError(encoder.Encode(internal.BackupFileList{}))
+		return
+
+	case pgDataStateInterrupted:
+		tracelog.ErrorLogger.Fatalf(
+			"Data directory %v has an interrupted catchup (pg_control.catchup exists but pg_control is absent)."+
+				" Remove the directory contents and run catchup-receive again.",
+			pgDataDirectory)
+	}
+
+	// pgDataStateNormal: read control, protect directory, send both.
 	control, err := ExtractPgControl(pgDataDirectory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Our system id %v, need catchup from %v",
 		control.SystemIdentifier, control.Checkpoint)
-	tracelog.ErrorLogger.FatalOnError(err)
-	err = encoder.Encode(control)
-	tracelog.ErrorLogger.FatalOnError(err)
-	rcvFileList := receiveFileList(pgDataDirectory)
-	err = encoder.Encode(rcvFileList)
-	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(encoder.Encode(control))
+	tracelog.ErrorLogger.FatalOnError(encoder.Encode(receiveFileList(pgDataDirectory)))
+	tracelog.ErrorLogger.FatalOnError(os.Rename(controlPath, catchupPath))
 }
 
 func receiveFileList(directory string) internal.BackupFileList {
@@ -383,7 +460,7 @@ func receiveFileList(directory string) internal.BackupFileList {
 			tracelog.WarningLogger.Println("Apparent concurrent modification")
 			return err
 		}
-		if info.Name() == PgControl {
+		if info.Name() == PgControl || info.Name() == "pg_control.catchup" {
 			return nil
 		}
 		fileName := info.Name()
