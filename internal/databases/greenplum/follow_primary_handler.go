@@ -136,7 +136,7 @@ func (fh *FollowPrimaryHandler) updateRecoveryConfigs() {
 	recoveryTarget := fh.stopAtRestorePoint
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
 	restoreCfgMaker := NewRecoveryConfigMaker(
-		"wal-g", conf.GetConfigFilePath(), recoveryTarget, true)
+		"wal-g", conf.CfgFile, recoveryTarget, true)
 
 	remoteOutput := fh.cluster.GenerateAndExecuteCommand("Updating recovery.conf on segments and master",
 		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,

@@ -63,7 +63,7 @@ func TestConfigureLogging_WhenLogDestinationSettingIsSet(t *testing.T) {
 	resetToDefaults()
 }
 
-func TestGetConfigFilePath(t *testing.T) {
+func TestInitConfigSetsConfigFilePath(t *testing.T) {
 	beforeCfgFile := config.CfgFile
 	t.Cleanup(func() {
 		config.CfgFile = beforeCfgFile
@@ -72,10 +72,12 @@ func TestGetConfigFilePath(t *testing.T) {
 
 	config.CfgFile = ""
 	assert.NoError(t, os.Setenv(config.ConfigPathEnvVar, "/tmp/from-env.json"))
-	assert.Equal(t, "/tmp/from-env.json", config.GetConfigFilePath())
+	config.InitConfig()
+	assert.Equal(t, "/tmp/from-env.json", config.CfgFile)
 
 	config.CfgFile = "/tmp/from-flag.json"
-	assert.Equal(t, "/tmp/from-flag.json", config.GetConfigFilePath())
+	config.InitConfig()
+	assert.Equal(t, "/tmp/from-flag.json", config.CfgFile)
 }
 
 func resetToDefaults() {

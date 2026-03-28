@@ -674,13 +674,6 @@ var (
 
 const ConfigPathEnvVar = "WALG_CONFIG_PATH"
 
-func GetConfigFilePath() string {
-	if CfgFile != "" {
-		return CfgFile
-	}
-	return os.Getenv(ConfigPathEnvVar)
-}
-
 const MinAllowedConcurrency = 1
 
 type InvalidConcurrencyValueError struct {
@@ -880,8 +873,10 @@ func InitConfig() {
 	globalViper.AutomaticEnv() // read in environment variables that match
 	SetDefaultValues(globalViper)
 	SetGoMaxProcs(globalViper)
-	configFile := GetConfigFilePath()
-	ReadConfigFromFile(globalViper, configFile)
+	if CfgFile == "" {
+		CfgFile = os.Getenv(ConfigPathEnvVar)
+	}
+	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
 
 	bindConfigToEnv(globalViper)

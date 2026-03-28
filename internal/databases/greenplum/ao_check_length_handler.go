@@ -102,8 +102,8 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 		// forward stdout and stderr to the log file
 		"&>>", formatSegmentLogPath(contentID),
 	}
-	if configFile := conf.GetConfigFilePath(); configFile != "" {
-		cmd = append(cmd[:2], append([]string{fmt.Sprintf("--config=%s", configFile)}, cmd[2:]...)...)
+	if conf.CfgFile != "" {
+		cmd = append(cmd[:2], append([]string{fmt.Sprintf("--config=%s", conf.CfgFile)}, cmd[2:]...)...)
 	}
 	cmdLine := strings.Join(cmd, " ")
 	tracelog.InfoLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)

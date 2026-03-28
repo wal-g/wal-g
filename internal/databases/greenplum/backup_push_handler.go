@@ -116,7 +116,6 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 	segment := bh.globalCluster.ByContent[contentID][0]
 	segUserData := NewSegmentUserData()
 	bh.currBackupInfo.segmentBackups[segUserData.ID] = segment
-	configFile := conf.GetConfigFilePath()
 
 	backupPushArgs := []string{
 		segment.DataDir,
@@ -140,8 +139,8 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 		// actual arguments to be passed to the backup-push command
 		backupPushArgsLine,
 	}
-	if configFile != "" {
-		cmd = append(cmd, fmt.Sprintf("--config=%s", configFile))
+	if conf.CfgFile != "" {
+		cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
 	}
 	cmd = append(cmd,
 		// forward stdout and stderr to the log file

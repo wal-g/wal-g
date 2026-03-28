@@ -214,7 +214,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 		recoveryTarget = fh.restorePoint
 	}
 	tracelog.InfoLogger.Printf("Recovery target is %s", recoveryTarget)
-	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.GetConfigFilePath(), recoveryTarget, false)
+	restoreCfgMaker := NewRecoveryConfigMaker("wal-g", conf.CfgFile, recoveryTarget, false)
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 
@@ -291,8 +291,8 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
 	}
-	if configFile := conf.GetConfigFilePath(); configFile != "" {
-		cmd = append(cmd, fmt.Sprintf("--config=%s", configFile))
+	if conf.CfgFile != "" {
+		cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
 	}
 	if fh.partialRestoreArgs != nil {
 		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))
