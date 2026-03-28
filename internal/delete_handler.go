@@ -482,10 +482,10 @@ func DeleteObjectsWhere(
 	tracelog.InfoLogger.Println("Evaluating objects for deletion...")
 	for _, object := range relativePathObjects {
 		if objFilter(object) {
-			tracelog.InfoLogger.Printf("Object marked for deletion: %s (Storage: %s)\n", object.GetName(), multistorage.GetStorage(object))
+			tracelog.InfoLogger.Printf("Object marked for deletion: %s storage=%s\n", object.GetName(), multistorage.GetStorage(object))
 			markedForDeletion = append(markedForDeletion, object)
 		} else {
-			tracelog.DebugLogger.Printf("Object skipped: %s (Storage: %s)\n", object.GetName(), multistorage.GetStorage(object))
+			tracelog.DebugLogger.Printf("Object skipped: %s storage=%s\n", object.GetName(), multistorage.GetStorage(object))
 		}
 	}
 	deletionCount := len(markedForDeletion)
@@ -496,11 +496,11 @@ func DeleteObjectsWhere(
 	if confirm {
 		err := folder.DeleteObjects(markedForDeletion)
 		if err == nil {
-			tracelog.InfoLogger.Printf("Objects deleted successfully: %d.\n", deletionCount)
+			tracelog.InfoLogger.Printf("Objects deleted successfully: count=%d\n", deletionCount)
 		}
 		return err
 	}
-	tracelog.InfoLogger.Printf("Dry run: %d objects would be deleted. Run with --confirm to execute.\n", deletionCount)
+	tracelog.InfoLogger.Printf("Dry run: objects would be deleted count=%d, Run with --confirm to execute\n", deletionCount)
 	return nil
 }
 
