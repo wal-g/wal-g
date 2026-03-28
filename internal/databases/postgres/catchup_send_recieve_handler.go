@@ -23,10 +23,10 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Sending %v to %v\n", pgDataDirectory, destination)
 	info, runner, err := GetPgServerInfo(true)
+	tracelog.ErrorLogger.FatalOnError(err)
 	if info.systemIdentifier == nil {
 		tracelog.ErrorLogger.Fatal("Our system lacks System Identifier, cannot proceed")
 	}
-	tracelog.ErrorLogger.FatalOnError(err)
 	writer, decoder, encoder := startSendConnection(destination)
 
 	var control PgControlData
@@ -244,6 +244,7 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	tracelog.InfoLogger.Printf("Receiving %v on port %v\n", pgDataDirectory, port)
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
 	tracelog.ErrorLogger.FatalOnError(err)
+	defer listen.Close()
 	conn, err := listen.Accept()
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -307,14 +308,20 @@ func (d *DecoderReader) Read(bytes []byte) (n int, err error) {
 func doRcvCommand(cmd CatchupCommandDto, directory string, decoder *gob.Decoder) {
 	if cmd.IsBinContents {
 		tracelog.InfoLogger.Printf("Writing file %v", cmd.FileName)
-		err := os.WriteFile(path.Join(directory, cmd.FileName), cmd.BinaryContents, 0666)
+		fullPath := path.Join(directory, cmd.FileName)
+		err := os.MkdirAll(filepath.Dir(fullPath), 0700)
+		tracelog.ErrorLogger.FatalOnError(err)
+		err = os.WriteFile(fullPath, cmd.BinaryContents, 0666)
 		tracelog.ErrorLogger.FatalOnError(err)
 		return
 	}
 
 	if cmd.IsFull {
 		tracelog.InfoLogger.Printf("Full file %v", cmd.FileName)
-		fd, err := os.Create(path.Join(directory, cmd.FileName))
+		fullPath := path.Join(directory, cmd.FileName)
+		err := os.MkdirAll(filepath.Dir(fullPath), 0700)
+		tracelog.ErrorLogger.FatalOnError(err)
+		fd, err := os.Create(fullPath)
 		tracelog.ErrorLogger.FatalOnError(err)
 		size := int64(cmd.FileSize)
 		for size != 0 {
@@ -391,6 +398,9 @@ func receiveFileList(directory string) internal.BackupFileList {
 		isDir := info.IsDir()
 		if isDir && excluded {
 			return filepath.SkipDir
+		}
+		if isDir {
+			return nil
 		}
 		if excluded {
 			return nil
