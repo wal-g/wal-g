@@ -1,8 +1,11 @@
-name: Run govulncheck
+name: Run vulnerability check
 on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+  
 env:
   GO_VERSION: "1.25"
   USE_BROTLI: 1
@@ -32,3 +35,17 @@ jobs:
           go get -v -t -d ./...
       - id: govulncheck
         uses: golang/govulncheck-action@31f7c5463448f83528bd771c2d978d940080c9fd
+
+      - name: Run Trivy scanner
+        if: always()
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          cache: 'false'
+          format: 'table'
+          exit-code: '1'
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+        env:
+          TRIVY_SCANNERS: vuln
