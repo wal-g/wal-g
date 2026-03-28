@@ -138,13 +138,16 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		// actual arguments to be passed to the backup-push command
 		backupPushArgsLine,
-		// pass the config file location
-		fmt.Sprintf("--config=%s", conf.CfgFile),
+	}
+	if conf.CfgFile != "" {
+		cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
+	}
+	cmd = append(cmd,
 		// forward stdout and stderr to the log file
 		"&>>", formatSegmentLogPath(contentID),
 		// run in the background and get the launched process PID
 		"& echo $!",
-	}
+	)
 
 	cmdLine := strings.Join(cmd, " ")
 	tracelog.InfoLogger.Printf("Command to run on segment %d: %s", contentID, cmdLine)
