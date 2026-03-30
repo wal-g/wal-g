@@ -31,9 +31,9 @@ mysql -e "SELECT UNIX_TIMESTAMP();"
 mysql -e "SELECT @@GLOBAL.SERVER_UUID;"
 mysql -e "SELECT @@global.binlog_checksum; SET @master_binlog_checksum:=@@global.binlog_checksum; SELECT @master_binlog_checksum;"
 
-mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
 wal-g backup-push
 
+mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"
 mysql -e "FLUSH LOGS"
 wal-g binlog-push
