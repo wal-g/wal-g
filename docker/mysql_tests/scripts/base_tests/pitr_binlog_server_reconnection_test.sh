@@ -145,7 +145,7 @@ python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT $PLANNED_DIS
 log "Started proxy with PID: $proxy_pid"
 
 log "Waiting for proxy to start..."
-sleep 5
+sleep 15
 if ! kill -0 $proxy_pid 2>/dev/null; then
     log "ERROR: Proxy process died"
     cat $PROXY_LOG
@@ -253,3 +253,4 @@ fi
 
 
 log "Test completed successfully!"
+sleep 11
