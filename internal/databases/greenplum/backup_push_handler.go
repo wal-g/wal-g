@@ -138,9 +138,8 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		// actual arguments to be passed to the backup-push command
 		backupPushArgsLine,
-	}
-	if conf.CfgFile != "" {
-		cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
+		// pass the config file location
+		fmt.Sprintf("--config=%s", conf.CfgFile),
 	}
 	cmd = append(cmd,
 		// forward stdout and stderr to the log file

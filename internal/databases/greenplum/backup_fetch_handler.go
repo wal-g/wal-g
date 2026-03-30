@@ -290,9 +290,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		fmt.Sprint(segment.DataDir),
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()),
-	}
-	if conf.CfgFile != "" {
-		cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
+		fmt.Sprintf("--config=%s", conf.CfgFile),
 	}
 	if fh.partialRestoreArgs != nil {
 		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))
