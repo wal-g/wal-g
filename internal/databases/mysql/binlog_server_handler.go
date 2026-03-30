@@ -115,7 +115,12 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	return s.AddEventToStreamer(&rotateBinlogEvent)
 }
 
-func (h *Handler) buildGTIDSetString() string {
+func (h *Handler) waitReplicationIsDoneSafe() {
+	if len(h.lastSentGTIDs) == 0 {
+		tracelog.InfoLogger.Println("S3 objects finished. No GTIDs were sent. Shutting down immediately.")
+		os.Exit(0)
+	}
+
 	var sb strings.Builder
 	first := true
 	for u, gno := range h.lastSentGTIDs {
@@ -125,16 +130,7 @@ func (h *Handler) buildGTIDSetString() string {
 		sb.WriteString(fmt.Sprintf("%s:1-%d", u, gno))
 		first = false
 	}
-	return sb.String()
-}
-
-func (h *Handler) waitReplicationIsDoneSafe() {
-	if len(h.lastSentGTIDs) == 0 {
-		tracelog.InfoLogger.Println("S3 objects finished. No GTIDs were sent. Shutting down immediately.")
-		os.Exit(0)
-	}
-
-	targetGTIDStr := h.buildGTIDSetString()
+	targetGTIDStr := sb.String()
 
 	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", targetGTIDStr)
 
