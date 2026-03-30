@@ -107,6 +107,6 @@ func (p *ObjectProvider) Close() {
 	if p.closed {
 		return
 	}
-	p.closed = true
 	close(p.ch)
+	p.closed = true
 }

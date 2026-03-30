@@ -138,14 +138,14 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     exit 1
 fi
 
-sleep 5
+sleep 3
 
 log "Starting proxy with reconnections..."
 python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT $PLANNED_DISCONNECTS > $PROXY_LOG 2>&1 & proxy_pid=$!
 log "Started proxy with PID: $proxy_pid"
 
 log "Waiting for proxy to start..."
-sleep 15
+sleep 7
 if ! kill -0 $proxy_pid 2>/dev/null; then
     log "ERROR: Proxy process died"
     cat $PROXY_LOG
@@ -253,4 +253,3 @@ fi
 
 
 log "Test completed successfully!"
-sleep 11
