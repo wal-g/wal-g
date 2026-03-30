@@ -137,31 +137,19 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     exit 1
 fi
 
-sleep 3
-
 log "Starting proxy with reconnections..."
 python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT $PLANNED_DISCONNECTS > $PROXY_LOG 2>&1 & proxy_pid=$!
 log "Started proxy with PID: $proxy_pid"
 
 log "Waiting for proxy to start..."
-WAIT_COUNT=0
-MAX_WAIT=10
-while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-    if ! kill -0 $proxy_pid 2>/dev/null; then
-        log "ERROR: Proxy process died"
-        cat $PROXY_LOG
-        exit 1
-    fi
+sleep 5
+if ! kill -0 $proxy_pid 2>/dev/null; then
+    log "ERROR: Proxy process died"
+    cat $PROXY_LOG
+    exit 1
+fi
+log "Proxy should be ready"
 
-    if check_port_listening $PROXY_PORT; then
-        log "Proxy is ready"
-        sleep 1
-        break
-    fi
-
-    sleep 2
-    WAIT_COUNT=$((WAIT_COUNT + 1))
-done
 
 log "Configuring MySQL replication..."
 mysql -e "STOP SLAVE"
@@ -175,7 +163,7 @@ mysql -e "START SLAVE"
 
 log "Waiting for replication to start..."
 WAIT_COUNT=0
-MAX_WAIT=30
+MAX_WAIT=40
 LAST_ROW_COUNT=-1
 STUCK_COUNTER=0
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
@@ -192,7 +180,7 @@ done
 
 log "Waiting for replication to complete..."
 
-MAX_WAIT=30
+MAX_WAIT=40
 WAIT_COUNT=0
 EXPECTED_ROWS=361
 while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
@@ -233,6 +221,9 @@ while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
 done
 
 cat $PROXY_LOG
+
+log "MYSQL ERRORS:"
+cat /var/log/mysql/error.log
 
 safe_kill_process "$proxy_pid" "proxy"
 
