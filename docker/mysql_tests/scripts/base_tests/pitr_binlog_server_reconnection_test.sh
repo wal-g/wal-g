@@ -47,9 +47,8 @@ for i in $(seq 1 360); do
     fi
 done
 
-sleep 3
+sleep 2
 DT1=$(date3339)
-sleep 3
 
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_after', NOW())"
 mysql -e "FLUSH LOGS"
@@ -138,21 +137,31 @@ if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
     exit 1
 fi
 
-sleep 5
+sleep 3
 
 log "Starting proxy with reconnections..."
 python3 "$PROXY_SCRIPT" $PROXY_PORT "127.0.0.1" $BINLOG_SERVER_PORT $PLANNED_DISCONNECTS > $PROXY_LOG 2>&1 & proxy_pid=$!
 log "Started proxy with PID: $proxy_pid"
 
 log "Waiting for proxy to start..."
-sleep 15
-if ! kill -0 $proxy_pid 2>/dev/null; then
-    log "ERROR: Proxy process died"
-    cat $PROXY_LOG
-    exit 1
-fi
-log "Proxy should be ready"
+WAIT_COUNT=0
+MAX_WAIT=10
+while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+    if ! kill -0 $proxy_pid 2>/dev/null; then
+        log "ERROR: Proxy process died"
+        cat $PROXY_LOG
+        exit 1
+    fi
 
+    if check_port_listening $PROXY_PORT; then
+        log "Proxy is ready"
+        sleep 1
+        break
+    fi
+
+    sleep 2
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+done
 
 log "Configuring MySQL replication..."
 mysql -e "STOP SLAVE"
@@ -227,10 +236,6 @@ cat $PROXY_LOG
 
 safe_kill_process "$proxy_pid" "proxy"
 
-log "MYSQL ERRORS:"
-cat /var/log/mysql/error.log
-
-
 FINAL_ROW_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr")
 AFTER_COUNT=$(mysql -N -e "SELECT COUNT(*) FROM sbtest.pitr WHERE id = 'testpitr_after'")
 
@@ -253,4 +258,3 @@ fi
 
 
 log "Test completed successfully!"
-sleep 11
