@@ -13,6 +13,7 @@ import (
 type StreamSentinelDto struct {
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 	IsPermanent    bool      `json:"IsPermanent"`
+	SnapshotSize   int64     `json:"SnapshotSize"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 }
@@ -36,10 +37,14 @@ func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd, permanent
 	userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
+	dataSize, err := internal.FolderSize(uploader.Folder(), fileName)
+	tracelog.ErrorLogger.FatalfOnError("can not get backup size: %+v", err)
+
 	sentinel := StreamSentinelDto{
 		StartLocalTime: timeStart,
 		IsPermanent:    permanent,
 		UserData:       userData,
+		SnapshotSize:   dataSize,
 	}
 
 	err = internal.UploadSentinel(uploader, &sentinel, fileName)
