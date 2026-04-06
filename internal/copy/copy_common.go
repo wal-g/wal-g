@@ -37,13 +37,6 @@ func Infos(chs []InfoProvider) error {
 	var wg sync.WaitGroup
 
 	for _, ch := range chs {
-		// do we have any errs yet?
-		for len(errors) > 0 {
-			if err := <-errors; err != nil {
-				return err
-			}
-		}
-
 		// block here
 		<-tickets
 		wg.Add(1)
