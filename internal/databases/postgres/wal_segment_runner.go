@@ -99,12 +99,21 @@ func (r *WalSegmentRunner) ForceMoveNext() {
 // getNextSegment calculates the next segment
 func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
 	nextTimeline := r.currentWalSegment.Timeline
-	if record, ok := r.timelineSwitchMap[r.currentWalSegment.Number]; ok {
-		// switch timeline if current WAL segment number found in .history record
-		nextTimeline = record.timeline
-	}
 	nextSegmentNo := r.currentWalSegment.Number.previous()
-	return WalSegmentDescription{Timeline: nextTimeline, Number: nextSegmentNo}
+	nextSegment := WalSegmentDescription{Timeline: nextTimeline, Number: nextSegmentNo}
+	if record, ok := r.timelineSwitchMap[r.currentWalSegment.Number]; ok {
+		tracelog.DebugLogger.Printf("found timeline switch at LSN %s\n", record.lsn.String())
+		// Sometimes there are records in .history that are not actually present in cluster history
+		// for example after restoring cluster
+		// We will skip such records
+		if _, fileExists := r.walFolderSegments[nextSegment]; fileExists {
+			tracelog.WarningLogger.Printf("timeline switch at LSN %s is invalid. Skipping it\n", record.lsn.String())
+			return nextSegment
+		}
+		// switch timeline if current WAL segment number found in .history record
+		nextSegment.Timeline = record.timeline
+	}
+	return nextSegment
 }
 
 // getFolderFilenames returns a set of filenames in provided storage folder
