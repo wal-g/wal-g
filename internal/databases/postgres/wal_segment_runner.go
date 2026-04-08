@@ -107,7 +107,7 @@ func (r *WalSegmentRunner) getNextSegment() WalSegmentDescription {
 		// for example after restoring cluster
 		// We will skip such records
 		if _, fileExists := r.walFolderSegments[nextSegment]; fileExists {
-			tracelog.WarningLogger.Printf("timeline switch at LSN %s is invalid. Skipping it\n", record.lsn.String())
+			tracelog.WarningLogger.Printf("timeline switch at LSN %s is not from our history. Skipping it\n", record.lsn.String())
 			return nextSegment
 		}
 		// switch timeline if current WAL segment number found in .history record
