@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -68,39 +69,39 @@ func HandleBackupImport(externalConfig string, importDatabases map[string]string
 	defer func() { _ = signalHandler.Close() }()
 
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	folder := st.RootFolder()
 
 	externalSt, err := internal.StorageFromConfig(externalConfig)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	externalFolder := externalSt.RootFolder()
 
 	dbnames, databaseFiles, err := prepareBackupImportSpec(externalFolder, importDatabases)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer lock.Close()
 
 	var backupName string
 	var sentinel *SentinelDto
 	backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
+	logging.FatalfOnError("can't find latest backup: %v", err)
 	backupName = backup.Name
 	sentinel = new(SentinelDto)
 	err = backup.FetchSentinel(sentinel)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = runParallel(func(i int) error {
 		return importSingleDatabaseBackup(ctx, backupName, dbnames[i], externalFolder, databaseFiles[dbnames[i]])
 	}, len(dbnames), getDBConcurrency())
-	tracelog.ErrorLogger.FatalfOnError("overall import failed: %v", err)
+	logging.FatalfOnError("overall import failed: %v", err)
 
 	sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	uploader := internal.NewRegularUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
 	err = internal.UploadSentinel(uploader, sentinel, backupName)
-	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)
+	logging.FatalfOnError("failed to save sentinel: %v", err)
 
 	tracelog.InfoLogger.Printf("import finished")
 }

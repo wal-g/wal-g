@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -155,7 +156,7 @@ func (h *Handler) transferConcurrently(workers int, files []FilesGroup, filesNum
 				finErr = e
 				break
 			}
-			tracelog.ErrorLogger.PrintError(e)
+			logging.PrintError(e)
 			errsNum++
 			finErr = fmt.Errorf("finished with %d errors", errsNum)
 		}

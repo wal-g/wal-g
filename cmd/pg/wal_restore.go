@@ -2,9 +2,9 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -21,7 +21,7 @@ var walRestoreCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalfOnError("Error on configure external folder %v\n", err)
+		logging.FatalfOnError("Error on configure external folder %v\n", err)
 		postgres.HandleWALRestore(args[0], args[1], storage.RootFolder())
 	},
 }

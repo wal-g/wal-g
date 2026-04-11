@@ -3,6 +3,7 @@ package internal
 import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -26,11 +27,11 @@ func (h *BackupMarkHandler) MarkBackup(backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
 	backupsToMark, err := h.GetBackupsToMark(backupName, toPermanent)
 
-	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
+	logging.FatalfOnError("Failed to get previous backups: %v", err)
 	tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", backupsToMark)
 	for _, backupName := range backupsToMark {
 		err = h.metaInteractor.SetIsPermanent(backupName, h.baseBackupFolder, toPermanent)
-		tracelog.ErrorLogger.FatalfOnError("Failed to mark backups: %v", err)
+		logging.FatalfOnError("Failed to mark backups: %v", err)
 	}
 }
 

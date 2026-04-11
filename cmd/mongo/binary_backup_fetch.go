@@ -6,9 +6,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -81,7 +81,7 @@ var binaryBackupFetchCmd = &cobra.Command{
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
 			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
 			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil, whitelist, blacklist)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

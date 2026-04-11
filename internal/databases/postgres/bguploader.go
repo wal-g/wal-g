@@ -2,13 +2,14 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -142,7 +143,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 	for {
 		files, err := os.ReadDir(filepath.Join(b.dir, archiveStatusDir))
 		if err != nil {
-			tracelog.ErrorLogger.Print("Error of parallel upload: ", err)
+			logging.PrintError(fmt.Errorf("Error of parallel upload: %w", err))
 			return
 		}
 
@@ -213,20 +214,20 @@ func (b *BgUploader) upload(ctx context.Context, walStatusFilename string) bool 
 	walFilename := strings.TrimSuffix(walStatusFilename, readySuffix)
 	err := uploadWALFile(ctx, b.uploader.clone(), filepath.Join(b.dir, walFilename), b.preventWalOverwrite)
 	if err != nil {
-		tracelog.ErrorLogger.Print("Error of background uploader: ", err)
+		logging.PrintError(fmt.Errorf("Error of background uploader: ", err))
 		return false
 	}
 
 	err = b.uploader.ArchiveStatusManager.MarkWalUploaded(walFilename)
 	if err != nil {
-		tracelog.ErrorLogger.Printf("Error marking wal file %s as uploaded: %v", walFilename, err)
+		logging.PrintError(fmt.Errorf("Error marking wal file %s as uploaded: %v", walFilename, err))
 	}
 
 	// rename WAL status file ".ready" to ".done" if requested
 	if b.readyRename && err == nil {
 		err := b.uploader.PGArchiveStatusManager.RenameReady(walFilename)
 		// error here is not a fatal thing, just a bit more work for the next wal-push
-		tracelog.ErrorLogger.PrintOnError(err)
+		logging.PrintOnError(err)
 	}
 
 	return true

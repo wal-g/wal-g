@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var (
@@ -24,7 +24,7 @@ var oplogPurgeCmd = &cobra.Command{
 
 func pitrDiscoveryAfterTime() *time.Time {
 	pitrDur, err := conf.GetOplogPITRDiscoveryIntervalSetting()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if pitrDur == nil {
 		return nil
 	}
@@ -37,14 +37,14 @@ func runOplogPurge(cmd *cobra.Command, args []string) {
 	pitrAfterTime := pitrDiscoveryAfterTime()
 	// set up storage downloader client
 	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	// set up storage purger client
 	purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = mongo.HandleOplogPurge(downloader, purger, pitrAfterTime, !confirmedOplogPurge)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func init() {

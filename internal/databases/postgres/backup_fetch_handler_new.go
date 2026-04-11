@@ -5,6 +5,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -15,7 +16,7 @@ func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedund
 	return func(rootFolder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(fileMask)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		logging.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 		var spec *TablespaceSpec
 		if restoreSpecPath != "" {
@@ -23,15 +24,15 @@ func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedund
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
 			errMessege := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-			tracelog.ErrorLogger.FatalfOnError(errMessege, err)
+			logging.FatalfOnError(errMessege, err)
 		}
 
 		// directory must be empty before starting a deltaFetch
 		isEmpty, err := utility.IsDirectoryEmpty(dbDataDirectory, nil)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		logging.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 		if !isEmpty {
-			tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n",
+			logging.FatalfOnError("Failed to fetch backup: %v\n",
 				NewNonEmptyDBDataDirectoryError(dbDataDirectory))
 		}
 		config := NewFetchConfig(
@@ -44,7 +45,7 @@ func GetFetcherNew(dbDataDirectory, fileMask, restoreSpecPath string, skipRedund
 			extractProv,
 		)
 		err = deltaFetchRecursionNew(config)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		logging.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }
 

@@ -7,12 +7,12 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/cmd/common"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
@@ -31,7 +31,7 @@ var (
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if _, ok := cmd.Annotations["NoStorage"]; !ok {
 				err := internal.AssertRequiredSettingsSet()
-				tracelog.ErrorLogger.FatalOnError(err)
+				logging.FatalOnError(err)
 			}
 
 			if viper.IsSet(conf.PgWalSize) {

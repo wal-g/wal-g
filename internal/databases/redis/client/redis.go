@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const dontPanic = false
@@ -35,7 +36,7 @@ func getRedisConnection(strict bool) *redis.Client {
 		redisDBValue, err := strconv.Atoi(redisDBStr)
 		// DISCUSS: could redisDB changed on success without additional variable redisDBValue?
 		if strict {
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 		redisDB = redisDBValue
 	}

@@ -3,7 +3,7 @@ package internal
 import (
 	"os"
 
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -11,7 +11,7 @@ import (
 func HandleDefaultBackupList(folder storage.Folder, pretty, json bool) {
 	backupTimes, err := GetBackups(folder)
 	err = FilterOutNoBackupFoundError(err, json)
-	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
+	logging.FatalfOnError("Get backups from folder: %v", err)
 
 	SortBackupTimeSlices(backupTimes)
 
@@ -20,5 +20,5 @@ func HandleDefaultBackupList(folder storage.Folder, pretty, json bool) {
 		printableEntities[i] = backupTimes[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
-	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
+	logging.FatalfOnError("Print backups: %v", err)
 }

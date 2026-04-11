@@ -4,10 +4,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/constants"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const WalFetchShortDescription = "Fetches a WAL file from storage"
@@ -19,17 +19,17 @@ var walFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		storage, err := internal.ConfigureMultiStorage(false)
-		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
+		logging.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 		folderReader, err := internal.PrepareMultiStorageFolderReader(storage.RootFolder(), targetStorage)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = postgres.HandleWALFetch(folderReader, args[0], args[1], postgres.RegularPrefetcher{})
 		if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
-			tracelog.ErrorLogger.Print(err.Error())
+			logging.PrintError(err)
 			os.Exit(constants.ExIoError)
 		}
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -33,12 +33,12 @@ func HandleWalShow(rootFolder storage.Folder, stanza string, outputWriter postgr
 		historyRecords, err := postgres.GetTimeLineHistoryRecords(segmentsSequence.TimelineID, archiveFolder)
 		if err != nil {
 			if _, ok := err.(postgres.HistoryFileNotFoundError); !ok {
-				tracelog.ErrorLogger.Fatalf("Error while loading .history file %v\n", err)
+				logging.Fatalf("Error while loading .history file %v\n", err)
 			}
 		}
 
 		info, err := postgres.NewTimelineInfo(segmentsSequence, historyRecords)
-		tracelog.ErrorLogger.FatalfOnError("Error while creating TimeLineInfo %v\n", err)
+		logging.FatalfOnError("Error while creating TimeLineInfo %v\n", err)
 		timelineInfos = append(timelineInfos, info)
 	}
 

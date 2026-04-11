@@ -4,10 +4,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -30,11 +30,11 @@ var backupListCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		backupFolder, err := common.GetBackupFolder()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		if detail {
 			err := mongo.HandleDetailedBackupList(backupFolder, os.Stdout, prettyPrint, jsonFormat)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		} else {
 			internal.HandleDefaultBackupList(backupFolder, prettyPrint, jsonFormat)
 		}

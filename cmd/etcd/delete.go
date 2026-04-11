@@ -2,9 +2,9 @@ package etcd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/etcd"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var confirmed = false
@@ -48,42 +48,42 @@ var deleteTargetCmd = &cobra.Command{
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, etcd.NewGenericMetaFetcher())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteTarget(targetBackupSelector, confirmed, false)
 }

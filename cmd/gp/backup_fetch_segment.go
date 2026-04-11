@@ -5,11 +5,11 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
@@ -41,17 +41,17 @@ var segBackupFetchCmd = &cobra.Command{
 		greenplum.SetSegmentStoragePrefix(contentID)
 
 		targetBackupSelector, err := createTargetFetchSegBackupSelector(cmd, args, fetchTargetUserData)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		reverseDeltaUnpack := viper.GetBool(conf.UseReverseUnpackSetting)
 		skipRedundantTars := viper.GetBool(conf.SkipRedundantTarsSetting)
 
 		if reverseDeltaUnpack || skipRedundantTars {
-			tracelog.ErrorLogger.Fatalf("%s and %s settings are not supported yet",
-				conf.UseReverseUnpackSetting, conf.SkipRedundantTarsSetting)
+			logging.FatalError(fmt.Errorf("%s and %s settings are not supported yet",
+				conf.UseReverseUnpackSetting, conf.SkipRedundantTarsSetting))
 		}
 
 		var extractProv postgres.ExtractProvider

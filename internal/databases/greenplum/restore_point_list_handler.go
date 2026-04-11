@@ -3,8 +3,8 @@ package greenplum
 import (
 	"os"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -16,7 +16,7 @@ func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
 	if _, ok := err.(NoRestorePointsFoundError); ok {
 		err = nil
 	}
-	tracelog.ErrorLogger.FatalfOnError("Get restore points from folder: %v", err)
+	logging.FatalfOnError("Get restore points from folder: %v", err)
 
 	// TODO: remove this ugly hack to make current restore-point-list work
 	backupTimes := make([]internal.BackupTime, 0)
@@ -36,5 +36,5 @@ func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
 		printableEntities[i] = backupTimes[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
-	tracelog.ErrorLogger.FatalfOnError("Print restore points: %v", err)
+	logging.FatalfOnError("Print restore points: %v", err)
 }

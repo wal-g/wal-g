@@ -11,6 +11,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -100,7 +101,7 @@ func (idx *Index) saver() {
 		idx.Unlock()
 		if needSave {
 			err := idx.Save()
-			tracelog.ErrorLogger.PrintOnError(err)
+			logging.PrintOnError(err)
 		}
 	}
 }

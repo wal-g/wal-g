@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -75,19 +76,19 @@ func (rh *replayHandler) handleBinlog(binlogPath string) error {
 
 func HandleBinlogReplay(folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
 	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	handler := newReplayHandler(endTS)
 
 	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
 	err = fetchLogs(folder, dstDir, startTS, endTS, endBinlogTS, handler)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
+	logging.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.wait()
-	tracelog.ErrorLogger.FatalfOnError("Failed to apply binlogs: %v", err)
+	logging.FatalfOnError("Failed to apply binlogs: %v", err)
 }
 
 func getTimestamps(folder storage.Folder, backupName, untilTS, untilBinlogLastModifiedTS string) (time.Time, time.Time, time.Time, error) {

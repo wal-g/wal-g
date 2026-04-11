@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -151,7 +152,7 @@ func NewRangeReader(body io.ReadCloser, objectPath string, retriesCount int, fol
 func getHash(objectPath string, id int) string {
 	hash := fnv.New32a()
 	_, err := hash.Write([]byte(objectPath))
-	tracelog.ErrorLogger.FatalfOnError("Fatal, can't write buffer to hash %v", err)
+	logging.FatalfOnError("Fatal, can't write buffer to hash %v", err)
 
 	return fmt.Sprintf("%x_%d", hash.Sum32(), id)
 }

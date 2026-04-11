@@ -6,10 +6,10 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -33,14 +33,14 @@ var backupDeleteCmd = &cobra.Command{
 
 		// set up storage downloader client
 		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		// set up storage downloader client
 		purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		err = mongo.HandleBackupDelete(backupName, downloader, purger, !confirmedBackupDelete)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

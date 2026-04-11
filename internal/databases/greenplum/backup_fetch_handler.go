@@ -14,6 +14,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -88,7 +89,7 @@ func NewFetchHandler(
 			// Hostname, Port and DataDir specified in the restore config
 			backupIDByContentID[segMeta.ContentID] = segMeta.BackupID
 			segmentCfg, err := segCfgMaker.Make(segMeta)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			segmentConfigs = append(segmentConfigs, segmentCfg)
 		} else {
@@ -225,7 +226,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	pgVersion := NewVersion(semVer, fh.sentinel.GpFlavor).EstimatePostgreSQLVersion()
 	if pgVersion > 120000 && pathToRecoveryConf == "recovery.conf" {
 		// Starting from PostgreSQL 12.0 - the server will not start if a recovery.conf exists.
-		tracelog.ErrorLogger.Print(
+		logging.Print(
 			"WALG_GP_RELATIVE_RECOVERY_CONF_PATH is set to 'recovery.conf'. " +
 				"PostgreSQL 12+ will not start in this configuration. " +
 				"Set WALG_GP_RELATIVE_RECOVERY_CONF_PATH to `conf.d/recovery.conf`, " +
@@ -280,7 +281,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	backupID, ok := fh.backupIDByContentID[contentID]
 	if !ok {
 		// this should never happen
-		tracelog.ErrorLogger.Fatalf("Failed to load backup id by content id %d", contentID)
+		logging.Fatalf("Failed to load backup id by content id %d", contentID)
 	}
 
 	segUserData := NewSegmentUserDataFromID(backupID)
@@ -309,18 +310,18 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 	return func(folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
 		if restorePoint != "" {
-			tracelog.ErrorLogger.FatalOnError(ValidateMatch(folder, backup.Name, restorePoint, backup.GetStorageName()))
+			logging.FatalOnError(ValidateMatch(folder, backup.Name, restorePoint, backup.GetStorageName()))
 		}
 		var sentinel BackupSentinelDto
 		err := backup.FetchSentinel(&sentinel)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs)
 		err = handler.Fetch()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 }
 

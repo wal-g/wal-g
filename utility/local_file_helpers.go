@@ -10,6 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 func GetLocalFile(targetPath string, header *tar.Header) (localFile *os.File, isNewFile bool, err error) {
@@ -63,7 +64,7 @@ func WriteLocalFile(fileReader io.Reader, header *tar.Header, localFile *os.File
 	if err != nil {
 		err1 := os.Remove(localFile.Name())
 		if err1 != nil {
-			tracelog.ErrorLogger.Fatalf("failed to remove localFile '%s' because of error: %v",
+			logging.Fatalf("failed to remove localFile '%s' because of error: %v",
 				localFile.Name(), err1)
 		}
 		return errors.Wrap(err, "copy failed")

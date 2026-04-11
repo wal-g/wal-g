@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/asm"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -100,7 +101,7 @@ func PrepareMultiStorageWalUploader(folder storage.Folder, targetStorage string)
 	if err == nil {
 		walUploader.ArchiveStatusManager = asm.NewDataFolderASM(archiveStatusManager)
 	} else {
-		tracelog.ErrorLogger.PrintError(err)
+		logging.PrintError(err)
 		walUploader.ArchiveStatusManager = asm.NewNopASM()
 	}
 
@@ -108,7 +109,7 @@ func PrepareMultiStorageWalUploader(folder storage.Folder, targetStorage string)
 	if err == nil {
 		walUploader.PGArchiveStatusManager = asm.NewDataFolderASM(PGArchiveStatusManager)
 	} else {
-		tracelog.ErrorLogger.PrintError(err)
+		logging.PrintError(err)
 		walUploader.PGArchiveStatusManager = asm.NewNopASM()
 	}
 

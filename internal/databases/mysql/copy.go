@@ -7,6 +7,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -19,7 +20,7 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 		return
 	}
 	infos, err := backupCopyingInfo(backupName, prefix, from.RootFolder(), to.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.DebugLogger.Printf("copying files %s\n", strings.Join(func() []string {
 		ret := make([]string, 0)
@@ -30,7 +31,7 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 		return ret
 	}(), ","))
 
-	tracelog.ErrorLogger.FatalOnError(copy.Infos(infos))
+	logging.FatalOnError(copy.Infos(infos))
 
 	tracelog.InfoLogger.Printf("Success copyed backup %s.\n", backupName)
 }
@@ -43,9 +44,9 @@ func HandleCopyAll(fromConfigFile string, toConfigFile string) {
 		return
 	}
 	infos, err := WildcardInfo(from.RootFolder(), to.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = copy.Infos(infos)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Success copyed all backups\n")
 }
 

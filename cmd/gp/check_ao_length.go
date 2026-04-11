@@ -3,10 +3,10 @@ package gp
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
@@ -21,9 +21,9 @@ var checkAOTableLengthMasterCmd = &cobra.Command{
 	Short: "Runs on master and checks ao and aocs tables` EOF on disk is no less than in metadata for all segments",
 	Run: func(cmd *cobra.Command, args []string) {
 		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		handler, err := greenplum.NewAOLengthCheckHandler(logsDir, runBackupCheck, name, rootFolder)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		handler.CheckAOTableLength()
 	},
 }
