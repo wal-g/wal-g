@@ -9,6 +9,9 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/pg_scripts/wrap_config_file.sh ${TMP_CONFIG}
 source /tmp/tests/test_functions/util.sh
 
+export WITH_MIRRORS
+export WITH_STANDBY
+export HBA_HOSTNAMES=1
 bootstrap_gp_cluster
 enable_pitr_extension
 setup_wal_archiving
@@ -31,18 +34,26 @@ stop_and_delete_cluster_dir
 
 RESTORE_CONFIG="/tmp/configs/follow_primary_restore_config.json"
 
-wal-g backup-fetch LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
-wal-g recovery-action shutdown --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
-wal-g follow-primary rp1 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
+wal-g backup-fetch LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
+wal-g recovery-action shutdown --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
+wal-g follow-primary rp1 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
 wait_postgres_shutdown
-wal-g follow-primary rp2 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
+wal-g follow-primary rp2 --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
 wait_postgres_shutdown
-wal-g follow-primary LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
+wal-g follow-primary LATEST --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG} --with-mirrors
 wait_postgres_shutdown
 wal-g recovery-action promote --restore-config=${RESTORE_CONFIG} --config=${TMP_CONFIG}
 prepare_cluster
+
+# FIXME:
+echo 'port=6001' >> /usr/local/gpdb_src/gpAux/gpdemo/datadirs/standby/postgresql.conf
+echo 'port=6005' >> /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror1/demoDataDir0/postgresql.conf
+echo 'port=6006' >> /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror2/demoDataDir1/postgresql.conf
+echo 'port=6007' >> /usr/local/gpdb_src/gpAux/gpdemo/datadirs/dbfast_mirror3/demoDataDir2/postgresql.conf
+
 start_cluster
 test "$(psql -p 6000 -d test -t -A -c "SELECT count(*) FROM heap;")" -eq 30 || { echo "Test failed: The count is not equal to 30."; exit 1; }
 
+psql -p 6000 -c "CREATE DATABASE writable_check"
 cleanup
 rm ${TMP_CONFIG}
