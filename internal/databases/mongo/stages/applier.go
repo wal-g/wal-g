@@ -101,11 +101,11 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) 
 				}
 				if restartBatch {
 					batchStartTS = op.TS
+					restartBatch = false
 					if sa.resume {
 						sa.resume = false
 						continue
 					}
-					restartBatch = false
 				}
 				lastKnownTS = op.TS
 				if _, err := sa.buf.Write(op.Data); err != nil {
