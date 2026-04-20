@@ -18,6 +18,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	pg_errors "github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -93,9 +94,9 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 	}
 	tracelog.InfoLogger.Println("Walking for prefault...")
 	err = filepath.Walk(archiveDirectory, bundle.prefaultWalkedFSObject)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = bundle.FinishQueue()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 // TODO : unit tests

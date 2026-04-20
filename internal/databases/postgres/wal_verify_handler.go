@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -91,16 +92,16 @@ type BackupSearchParams struct {
 // QueryCurrentWalSegment() gets start WAL segment from Postgres cluster
 func QueryCurrentWalSegment() WalSegmentDescription {
 	conn, err := Connect()
-	tracelog.ErrorLogger.FatalfOnError("Failed to establish a connection to Postgres cluster %v", err)
+	logging.FatalfOnError("Failed to establish a connection to Postgres cluster %v", err)
 
 	queryRunner, err := NewPgQueryRunner(conn)
-	tracelog.ErrorLogger.FatalfOnError("Failed to initialize PgQueryRunner %v", err)
+	logging.FatalfOnError("Failed to initialize PgQueryRunner %v", err)
 
 	currentSegmentNo, err := getCurrentWalSegmentNo(queryRunner)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get current WAL segment number %v", err)
+	logging.FatalfOnError("Failed to get current WAL segment number %v", err)
 
 	currentTimeline, err := queryRunner.ReadTimeline()
-	tracelog.ErrorLogger.FatalfOnError("Failed to get current timeline %v", err)
+	logging.FatalfOnError("Failed to get current timeline %v", err)
 
 	tracelog.InfoLogger.Printf("Current WAL segment: %s\n", currentSegmentNo.GetFilename(currentTimeline))
 
@@ -148,24 +149,24 @@ func HandleWalVerify(
 
 	// pre-fetch WAL folder filenames to reduce storage load
 	walFolderFilenames, err := getFolderFilenames(rootFolder.GetSubFolder(utility.WalPath))
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch WAL folder filenames: %v", err)
+	logging.FatalfOnError("Failed to fetch WAL folder filenames: %v", err)
 
 	for _, checkType := range checkTypes {
 		tracelog.InfoLogger.Printf("Building check runner: %s\n", checkType)
 		runner, err := BuildWalVerifyCheckRunner(checkType, rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
-		tracelog.ErrorLogger.FatalfOnError(
+		logging.FatalfOnError(
 			fmt.Sprintf("Failed to build check runner %s:", checkType), err)
 
 		tracelog.InfoLogger.Printf("Running the check: %s\n", runner.Type().String())
 		result, err := runner.Run()
-		tracelog.ErrorLogger.FatalfOnError(
+		logging.FatalfOnError(
 			fmt.Sprintf("Failed to run the check %s:", checkType), err)
 
 		checkResults[runner.Type()] = result
 	}
 
 	err = outputWriter.Write(checkResults)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 // get the current wal segment number of the cluster

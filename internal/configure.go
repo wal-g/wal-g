@@ -13,6 +13,7 @@ import (
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto/yckms"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 
 	"github.com/pkg/errors"
@@ -269,7 +270,7 @@ func ConfigureSplitUploader() (Uploader, error) {
 func ConfigureCrypter() crypto.Crypter {
 	crypter, err := ConfigureCrypterForSpecificConfig(viper.GetViper())
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("can't configure crypter: %v", err)
+		logging.FatalfOnError("can't configure crypter: %v", err)
 	}
 	return crypter
 }
@@ -282,7 +283,7 @@ func CrypterFromConfig(configFile string) crypto.Crypter {
 
 	crypter, err := ConfigureCrypterForSpecificConfig(config)
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("can't configure crypter: %v", err)
+		logging.FatalfOnError("can't configure crypter: %v", err)
 	}
 	return crypter
 }
@@ -381,7 +382,7 @@ func GetDeltaConfig() (maxDeltas int, fromFull bool) {
 		case "LATEST_FULL":
 			fromFull = true
 		default:
-			tracelog.ErrorLogger.Fatalf("Unknown %s: %s\n", conf.DeltaOriginSetting, origin)
+			logging.Fatalf("Unknown %s: %s\n", conf.DeltaOriginSetting, origin)
 		}
 	}
 	return
@@ -415,7 +416,7 @@ func GetCommandSettingContext(ctx context.Context, variableName string, args ...
 		return nil, errors.New("command not configured")
 	}
 	if len(dataStr) == 0 {
-		tracelog.ErrorLogger.Print(variableName + " expected.")
+		logging.Print(variableName + " expected.")
 		return nil, errors.New(variableName + " not configured")
 	}
 	shell := os.Getenv("SHELL")
@@ -515,8 +516,8 @@ func StorageFromConfig(configFile string) (storage.Storage, error) {
 	folder, err := ConfigureStorageForSpecificConfig(config)
 
 	if err != nil {
-		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
-		tracelog.ErrorLogger.FatalError(err)
+		logging.PrintError(fmt.Errorf("Failed configure folder according to config %s", configFile))
+		logging.FatalError(err)
 	}
 	return folder, err
 }

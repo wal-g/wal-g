@@ -12,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type GpgKeyExportError struct {
@@ -47,7 +48,7 @@ func GetPubRingArmor(keyID string) ([]byte, error) {
 		// here we ignore whatever error can occur
 		if err == nil {
 			err = json.Unmarshal(file, &cache)
-			tracelog.ErrorLogger.PrintOnError(err)
+			logging.PrintOnError(err)
 			if err == nil && cache.KeyID == keyID && len(cache.Body) > 0 { // don't return an empty cached value
 				return cache.Body, nil
 			}
@@ -70,7 +71,7 @@ func GetPubRingArmor(keyID string) ([]byte, error) {
 	marshal, err := json.Marshal(&cache)
 	if err == nil && len(cacheFilename) > 0 {
 		err = os.WriteFile(cacheFilename, marshal, 0644)
-		tracelog.ErrorLogger.PrintOnError(err)
+		logging.PrintOnError(err)
 	}
 
 	return out, nil

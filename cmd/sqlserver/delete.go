@@ -2,8 +2,8 @@ package sqlserver
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -41,21 +41,21 @@ var deleteEverythingCmd = &cobra.Command{
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	deleteHandler, err := newSQLServerDeleteHandler()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.DeleteEverything(confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	deleteHandler, err := newSQLServerDeleteHandler()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	deleteHandler, err := newSQLServerDeleteHandler()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
 }
@@ -68,7 +68,7 @@ func init() {
 
 func newSQLServerDeleteHandler() (*internal.DeleteHandler, error) {
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	folder := st.RootFolder()
 

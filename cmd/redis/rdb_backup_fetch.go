@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -36,11 +37,11 @@ var backupFetchCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		var cmdArgs []string
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd, cmdArgs...)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		tracelog.InfoLogger.Print(restoreCmd.String())
 
 		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
@@ -52,7 +53,7 @@ var backupFetchCmd = &cobra.Command{
 		restoreCmd.Stderr = os.Stderr
 
 		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd, skipClean)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

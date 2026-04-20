@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -79,7 +80,7 @@ func (ac *AliveChecker) CheckForAlive(storageNames ...string) map[string]bool {
 			continue
 		}
 		results[res.name] = false
-		tracelog.ErrorLogger.Print(res.err)
+		logging.PrintError(res.err)
 	}
 
 	tracelog.DebugLogger.Printf("Found %d alive storages among requested: %v", aliveCount, results)

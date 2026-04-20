@@ -18,6 +18,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/daemon"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -295,7 +296,7 @@ func failAndLogError(c net.Conn, err error) {
 func SendSdNotify(c <-chan time.Time) {
 	for {
 		<-c
-		tracelog.ErrorLogger.PrintOnError(SdNotify(SdNotifyWatchdog))
+		logging.PrintOnError(SdNotify(SdNotifyWatchdog))
 	}
 }
 

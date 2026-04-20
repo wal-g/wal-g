@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -21,32 +22,32 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 	defer func() { _ = signalHandler.Close() }()
 
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	folder := st.RootFolder()
 
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
 	err = backup.FetchSentinel(sentinel)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
-	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
+	logging.FatalfOnError("failed to connect to SQLServer: %v", err)
 
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
-	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore logs: %v", err)
+	logging.FatalfOnError("failed to list databases to restore logs: %v", err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer lock.Close()
 
 	stopAt, err := utility.ParseUntilTS(untilTS)
-	tracelog.ErrorLogger.FatalfOnError("invalid util timestamp: %v", err)
+	logging.FatalfOnError("invalid util timestamp: %v", err)
 
 	logs, err := getLogsSinceBackup(folder, backup.Name, stopAt)
-	tracelog.ErrorLogger.FatalfOnError("failed to list log backups: %v", err)
+	logging.FatalfOnError("failed to list log backups: %v", err)
 
 	err = runParallel(func(i int) error {
 		dbname := dbnames[i]
@@ -99,7 +100,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 		}
 		return nil
 	}, len(dbnames), getDBConcurrency())
-	tracelog.ErrorLogger.FatalfOnError("overall log restore failed: %v", err)
+	logging.FatalfOnError("overall log restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log restore finished")
 }

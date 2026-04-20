@@ -11,6 +11,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -43,25 +44,25 @@ func NewAOLengthCheckSegmentHandler(port, segnum string, rootFolder storage.Fold
 func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 	DBNames, err := checker.getDatabasesInfo()
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
+		logging.FatalfOnError("unable to list databases %v", err)
 	}
 
 	for _, db := range DBNames {
 		tracelog.DebugLogger.Println(db.DBName)
 		conn, err := checker.connect(db.DBName)
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
+			logging.FatalfOnError("unable to get connection %v", err)
 		}
 
 		AOTablesSize, err := checker.getTablesSizes(conn, db.Oid)
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("unable to get metadata EOF %v", err)
+			logging.FatalfOnError("unable to get metadata EOF %v", err)
 		}
 		tracelog.DebugLogger.Printf("AO/AOCS relations in db: %d", len(AOTablesSize))
 
 		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), db.Oid))
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("unable to list tables` file directory %v", err)
+			logging.FatalfOnError("unable to list tables` file directory %v", err)
 		}
 
 		for _, file := range entries {
@@ -71,7 +72,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 				if os.IsNotExist(err) {
 					tracelog.WarningLogger.Println(fileName, " deleted during filepath walk")
 				} else {
-					tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
+					logging.FatalfOnError("unable to get file data %v", err)
 				}
 			}
 			if !fileInfo.IsDir() {
@@ -87,7 +88,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 
 		errors := checker.checkFileSizes(AOTablesSize)
 		if len(errors) > 0 {
-			tracelog.ErrorLogger.Fatalf("ao table length check failed, tables files are too short:\n%s\n", strings.Join(errors, "\n"))
+			logging.Fatalf("ao table length check failed, tables files are too short:\n%s\n", strings.Join(errors, "\n"))
 		}
 
 		err = conn.Close(context.TODO())
@@ -101,17 +102,17 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment() {
 func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupName string) {
 	DBNames, err := checker.getDatabasesInfo()
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
+		logging.FatalfOnError("unable to list databases %v", err)
 	}
 
 	s3Files, err := checker.getAOBackupFilesData()
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to get files data from s3 %v", err)
+		logging.FatalfOnError("unable to get files data from s3 %v", err)
 	}
 
 	backupFilesMetadata, err := checker.getAOMetadata(backupName)
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
+		logging.FatalfOnError("unable to get backup data %v", err)
 	}
 	tracelog.DebugLogger.Printf("AO/AOCS backupped files count: %d", len(backupFilesMetadata))
 
@@ -120,7 +121,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 	for _, db := range DBNames {
 		entries, err := os.ReadDir(fmt.Sprintf("/var/lib/greenplum/data1/primary/%s/base/%d/", fmt.Sprintf("gpseg%s", checker.segnum), db.Oid))
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("unable to list tables` file directory %v", err)
+			logging.FatalfOnError("unable to list tables` file directory %v", err)
 		}
 
 		for _, file := range entries {
@@ -130,7 +131,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 				if os.IsNotExist(err) {
 					tracelog.WarningLogger.Println(fileName, " deleted during filepath walk")
 				} else {
-					tracelog.ErrorLogger.FatalfOnError("unable to get file data %v", err)
+					logging.FatalfOnError("unable to get file data %v", err)
 				}
 			}
 			backupFile, ok := backupFilesMetadata[fileName]
@@ -150,7 +151,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(backupNam
 	}
 
 	if len(errors) > 0 {
-		tracelog.ErrorLogger.Fatalf("ao backup length check failed, backup is too long:\n%s\n", strings.Join(errors, "\n"))
+		logging.Fatalf("ao backup length check failed, backup is too long:\n%s\n", strings.Join(errors, "\n"))
 	}
 	tracelog.InfoLogger.Println("ao backup length check passed")
 }
@@ -213,7 +214,7 @@ func (checker *AOLengthCheckSegmentHandler) getTablesSizes(conn *pgx.Conn, dbOID
 func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo() ([]dbInfo, error) {
 	conn, err := checker.connect("")
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
+		logging.FatalfOnError("unable to get connection %v", err)
 	}
 	defer func() {
 		if err := conn.Close(context.TODO()); err != nil {

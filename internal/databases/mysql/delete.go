@@ -1,8 +1,8 @@
 package mysql
 
 import (
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -33,7 +33,7 @@ func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
 	}
 
 	backupObjects, err := MakeMySQLBackupObjects(folder, backupSentinels)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
 	permanentBackupNames := make([]string, 0, len(permanentBackups))

@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -107,7 +108,7 @@ func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractPro
 	return func(rootFolder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
 		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(fileMask)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		logging.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 		var spec *TablespaceSpec
 		if restoreSpecPath != "" {
@@ -115,11 +116,11 @@ func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractPro
 			spec = &TablespaceSpec{}
 			err := readRestoreSpec(restoreSpecPath, spec)
 			errMessage := fmt.Sprintf("Invalid restore specification path %s\n", restoreSpecPath)
-			tracelog.ErrorLogger.FatalfOnError(errMessage, err)
+			logging.FatalfOnError(errMessage, err)
 		}
 
 		err = deltaFetchRecursionOld(pgBackup, rootFolder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap, extractProv)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		logging.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }
 

@@ -1,8 +1,8 @@
 package xbstream
 
 import (
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"gopkg.in/ini.v1"
 )
 
@@ -39,7 +39,7 @@ func parseDiffMetadata(rows []byte) (deltaMetadata, error) {
 	}
 
 	if result.PageSize > 64*1024 {
-		tracelog.ErrorLogger.Fatalf("page_size in diff is greater than supported. page_size = %v", result.PageSize)
+		logging.Fatalf("page_size in diff is greater than supported. page_size = %v", result.PageSize)
 	}
 	return result, nil
 }

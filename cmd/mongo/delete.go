@@ -4,10 +4,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -39,10 +39,10 @@ func runPurge(cmd *cobra.Command, args []string) {
 		mongo.PurgeGarbage(purgeGarbage)}
 	if cmd.Flags().Changed(retainAfterFlag) {
 		retainAfterTime, err := time.Parse(time.RFC3339, retainAfter)
-		tracelog.ErrorLogger.FatalfOnError("Can not parse retain time: %v", err)
+		logging.FatalfOnError("Can not parse retain time: %v", err)
 		opts = append(opts, mongo.PurgeRetainAfter(retainAfterTime))
 	} else if cmd.Flags().Changed(purgeOplogFlag) {
-		tracelog.ErrorLogger.Fatalf("Flag %q requires %q to be passed\n", purgeOplogFlag, retainAfterFlag)
+		logging.Fatalf("Flag %q requires %q to be passed\n", purgeOplogFlag, retainAfterFlag)
 	}
 
 	if cmd.Flags().Changed(retainCountFlag) {
@@ -51,14 +51,14 @@ func runPurge(cmd *cobra.Command, args []string) {
 
 	// set up storage downloader client
 	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	// set up storage downloader client
 	purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = mongo.HandlePurge(downloader, purger, opts...)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func init() {

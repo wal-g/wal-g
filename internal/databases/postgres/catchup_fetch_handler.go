@@ -1,8 +1,8 @@
 package postgres
 
 import (
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -12,14 +12,14 @@ func HandleCatchupFetch(folder storage.Folder, dbDirectory, backupName string, u
 	dbDirectory = utility.ResolveSymlink(dbDirectory)
 
 	backup, err := internal.GetBackupByName(backupName, utility.CatchupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed get backup by name: %v", err)
+	logging.FatalfOnError("Failed get backup by name: %v", err)
 
 	pgBackup := ToPgBackup(backup)
 	filesToUnwrap, err := pgBackup.GetFilesToUnwrap("")
-	tracelog.ErrorLogger.FatalfOnError("Failed get files to unwrap from backup: %v", err)
+	logging.FatalfOnError("Failed get files to unwrap from backup: %v", err)
 
 	_, _, err = pgBackup.GetSentinelAndFilesMetadata()
-	tracelog.ErrorLogger.FatalfOnError("Failed get backup sentinel: %v", err)
+	logging.FatalfOnError("Failed get backup sentinel: %v", err)
 
 	// testing the new unwrap implementation
 	if useNewUnwrap {
@@ -28,5 +28,5 @@ func HandleCatchupFetch(folder storage.Folder, dbDirectory, backupName string, u
 		err = pgBackup.unwrapOld(dbDirectory, filesToUnwrap, true, ExtractProviderImpl{})
 	}
 
-	tracelog.ErrorLogger.FatalfOnError("Failed unwrap backup: %v", err)
+	logging.FatalfOnError("Failed unwrap backup: %v", err)
 }

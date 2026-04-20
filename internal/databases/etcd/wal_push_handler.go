@@ -16,6 +16,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/wal-g/wal-g/utility"
 )
@@ -70,7 +71,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 
 		// Upload wals:
 		err = archiveWal(uploader, walDir, wal)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		cache.LastArchivedWal = wal
 		putCache(cache)

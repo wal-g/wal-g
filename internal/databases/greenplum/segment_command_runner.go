@@ -11,6 +11,7 @@ import (
 	"time"
 
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/wal-g/tracelog"
 )
@@ -44,8 +45,8 @@ func (r *SegCmdRunner) Run() {
 	}
 
 	segCmdStatesPath := FormatSegmentStateFolderPath(r.contentID)
-	tracelog.ErrorLogger.FatalOnError(os.RemoveAll(segCmdStatesPath))
-	tracelog.ErrorLogger.FatalOnError(os.MkdirAll(segCmdStatesPath, os.ModePerm))
+	logging.FatalOnError(os.RemoveAll(segCmdStatesPath))
+	logging.FatalOnError(os.MkdirAll(segCmdStatesPath, os.ModePerm))
 
 	cmd := exec.Command(os.Args[0], args...)
 	cmd.Env = os.Environ()
@@ -56,7 +57,7 @@ func (r *SegCmdRunner) Run() {
 	tracelog.InfoLogger.Printf("starting the command: %v", cmd)
 
 	err := cmd.Start()
-	tracelog.ErrorLogger.FatalfOnError("command start failed: %v", err)
+	logging.FatalfOnError("command start failed: %v", err)
 
 	done := make(chan error)
 	go func() {
@@ -64,7 +65,7 @@ func (r *SegCmdRunner) Run() {
 	}()
 
 	err = r.waitCmd(cmd, done)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (r *SegCmdRunner) waitCmd(cmd *exec.Cmd, doneCh chan error) error {

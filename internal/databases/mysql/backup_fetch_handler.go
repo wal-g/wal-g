@@ -3,9 +3,8 @@ package mysql
 import (
 	"os/exec"
 
-	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -17,11 +16,11 @@ func HandleBackupFetch(folder storage.Folder,
 	inplace bool,
 ) {
 	backup, err := targetBackupSelector.Select(folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get backup: %v", err)
+	logging.FatalfOnError("Failed to get backup: %v", err)
 
 	var sentinel StreamSentinelDto
 	err = backup.FetchSentinel(&sentinel)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
+	logging.FatalfOnError("Failed to fetch sentinel: %v", err)
 
 	// we should ba able to read & restore any backup we ever created:
 	if sentinel.Tool == WalgXtrabackupTool {
@@ -30,7 +29,7 @@ func HandleBackupFetch(folder storage.Folder,
 		internal.HandleBackupFetch(folder, targetBackupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 		if prepareCmd != nil {
 			err = prepareCmd.Run()
-			tracelog.ErrorLogger.FatalfOnError("failed to prepare fetched backup: %v", err)
+			logging.FatalfOnError("failed to prepare fetched backup: %v", err)
 		}
 	}
 }

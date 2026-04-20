@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -29,28 +30,28 @@ func (err BackupNonExistenceError) Error() string {
 func GetBackupToCommandFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
 	return func(folder storage.Folder, backup Backup) {
 		stdin, err := cmd.StdinPipe()
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		logging.FatalfOnError("Failed to fetch backup: %v\n", err)
 		stderr := &bytes.Buffer{}
 		cmd.Stderr = stderr
 		err = cmd.Start()
-		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
+		logging.FatalfOnError("Failed to start restore command: %v\n", err)
 
 		fetcher, err := GetBackupStreamFetcher(backup)
-		tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
+		logging.FatalfOnError("Failed to detect backup format: %v\n", err)
 
 		err = fetcher(backup, stdin)
 
 		cmdErr := cmd.Wait()
 		if err != nil || cmdErr != nil {
-			tracelog.ErrorLogger.Printf("Restore command output:\n%s", stderr.String())
+			logging.PrintError(fmt.Errorf("Restore command output:\n%s", stderr.String()))
 		}
 		if cmdErr != nil {
 			if err != nil {
-				tracelog.ErrorLogger.Printf("Failed to fetch backup: %v\n", err)
+				logging.PrintError(fmt.Errorf("Failed to fetch backup: %v\n", err))
 			}
 			err = cmdErr
 		}
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
+		logging.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }
 
@@ -85,7 +86,7 @@ type Fetcher func(rootFolder storage.Folder, backup Backup)
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
 func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher Fetcher) {
 	backup, err := targetBackupSelector.Select(folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to select backup: %v\n", err)
+	logging.FatalfOnError("Failed to select backup: %v\n", err)
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backup.Name)
 
 	fetcher(folder, backup)

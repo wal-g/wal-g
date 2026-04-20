@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/wal-g/wal-g/internal/databases/mysql/xbstream"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -76,7 +77,7 @@ func prepareTemporaryDirectory(tmpDirRoot string) (string, error) {
 
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to create temporary directory like %s/%s", tmpDirRoot, tmpDirPattern)
-		tracelog.ErrorLogger.Fatalf("Failed to create temporary directory: %v", err)
+		logging.Fatalf("Failed to create temporary directory: %v", err)
 	}
 
 	return tmpPath, nil
@@ -101,7 +102,7 @@ func readXtrabackupInfo(xtrabackupExtraDirectory string) (XtrabackupInfo, error)
 
 func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFullBackup bool, prevBackupInfo *PrevBackupInfo) {
 	if prevBackupInfo == nil {
-		tracelog.ErrorLogger.Fatalf("PrevBackupInfo is null")
+		logging.Fatalf("PrevBackupInfo is null")
 	}
 	// -–extra-lsndir=DIRECTORY - save an extra copy of the xtrabackup_checkpoints and xtrabackup_info files in this directory.
 	injectCommandArgument(backupCmd, "--extra-lsndir="+xtrabackupExtraDirectory)
@@ -115,7 +116,7 @@ func enrichBackupArgs(backupCmd *exec.Cmd, xtrabackupExtraDirectory string, isFu
 func GetXtrabackupFetcher(restoreCmd, prepareCmd *exec.Cmd, useXbtoolExtract bool, inplace bool) internal.Fetcher {
 	return func(folder storage.Folder, backup internal.Backup) {
 		err := xtrabackupFetch(backup.Name, folder, restoreCmd, prepareCmd, useXbtoolExtract, inplace, true)
-		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
+		logging.FatalfOnError("Failed to fetch backup: %v", err)
 	}
 }
 
@@ -128,18 +129,18 @@ func xtrabackupFetch(
 	inplace bool,
 	isLast bool) error {
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
+	logging.FatalfOnError("Failed to fetch backup: %v", err)
 
 	var sentinel StreamSentinelDto
 	err = backup.FetchSentinel(&sentinel)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
+	logging.FatalfOnError("Failed to fetch sentinel: %v", err)
 
 	// common procedure: start from base backup & apply diffs one by one
 	// recursively, find base backup and start from it:
 	if sentinel.IsIncremental {
 		// check required configs earlier:
 		_, err = internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
-		tracelog.ErrorLogger.FatalfOnError("%v", err)
+		logging.FatalfOnError("%v", err)
 
 		tracelog.InfoLogger.Printf("Delta from %v at LSN %x \n", *sentinel.IncrementFrom, *sentinel.IncrementFromLSN)
 		err = xtrabackupFetch(*sentinel.IncrementFrom, folder, restoreCmd, prepareCmd, useXbtoolExtract, inplace, false)
@@ -168,11 +169,11 @@ func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepar
 
 	var sentinel StreamSentinelDto
 	err := backup.FetchSentinel(&sentinel)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
+	logging.FatalfOnError("Failed to fetch sentinel: %v", err)
 
 	incrementalBackupDir := viper.GetString(conf.MysqlIncrementalBackupDst)
 	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
+	logging.FatalfOnError("Failed to prepare temp dir: %v", err)
 
 	if sentinel.IsIncremental {
 		restoreCmd = cloneCommand(restoreCmd)
@@ -188,7 +189,7 @@ func xtrabackupFetchClassic(backup internal.Backup, restoreCmd *exec.Cmd, prepar
 	}
 
 	stdin, err := restoreCmd.StdinPipe()
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v", err)
+	logging.FatalfOnError("Failed to fetch backup: %v", err)
 	stderr := &bytes.Buffer{}
 	restoreCmd.Stderr = stderr
 
@@ -244,15 +245,15 @@ func xtrabackupFetchInhouse(backup internal.Backup, prepareCmd *exec.Cmd, inplac
 
 	var sentinel StreamSentinelDto
 	err := backup.FetchSentinel(&sentinel)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
+	logging.FatalfOnError("Failed to fetch sentinel: %v", err)
 
 	dataDir, err := internal.GetLogsDstSettings(conf.MysqlDataDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get config value: %v", err)
+	logging.FatalfOnError("Failed to get config value: %v", err)
 
 	incrementalBackupDir, err := internal.GetLogsDstSettings(conf.MysqlIncrementalBackupDst)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get config value: %v", err)
+	logging.FatalfOnError("Failed to get config value: %v", err)
 	tempDeltaDir, err := prepareTemporaryDirectory(incrementalBackupDir)
-	tracelog.ErrorLogger.FatalfOnError("Failed to prepare temp dir: %v", err)
+	logging.FatalfOnError("Failed to prepare temp dir: %v", err)
 
 	if sentinel.IsIncremental {
 		prepareCmd = cloneCommand(prepareCmd)

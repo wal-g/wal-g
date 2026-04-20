@@ -2,9 +2,9 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -26,7 +26,7 @@ var (
 		Args:  cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			uploader, err := internal.ConfigureUploader()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			mysql.MarkBackup(uploader, name, !toImpermanent)
 		},
 	}

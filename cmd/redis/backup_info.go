@@ -6,9 +6,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -26,7 +26,7 @@ var backupInfoCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		backupName := args[0]
 		redis.HandleBackupInfo(storage.RootFolder(), backupName, os.Stdout, tag)

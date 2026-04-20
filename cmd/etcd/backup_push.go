@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/etcd"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -29,7 +29,7 @@ var backupPushCmd = &cobra.Command{
 	PreRun: func(cmd *cobra.Command, args []string) {
 		conf.RequiredSettings[conf.NameStreamCreateCmd] = true
 		err := internal.AssertRequiredSettingsSet()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
@@ -39,11 +39,11 @@ var backupPushCmd = &cobra.Command{
 		defer func() { _ = signalHandler.Close() }()
 
 		uploader, err := internal.ConfigureUploader()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		uploader.ChangeDirectory(utility.BaseBackupPath)
 
 		backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		if userDataRaw == "" {
 			userDataRaw = viper.GetString(conf.SentinelUserDataSetting)

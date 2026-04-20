@@ -15,6 +15,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 )
 
@@ -77,7 +78,7 @@ func newDiffFileSink(
 
 	if decompressor != nil {
 		readHere, err := decompressor.Decompress(splitmerge.NewChannelReader(sink.writeHere))
-		tracelog.ErrorLogger.FatalfOnError("Cannot decompress: %v", err)
+		logging.FatalfOnError("Cannot decompress: %v", err)
 		sink.readHere = readHere
 	} else {
 		sink.readHere = splitmerge.NewChannelReader(sink.writeHere)
@@ -103,7 +104,7 @@ func (sink *diffFileSink) Process(chunk *Chunk) error {
 		// synchronously read data & send it to writer
 		buffer := make([]byte, chunk.PayloadLen)
 		_, err := io.ReadFull(chunk, buffer)
-		tracelog.ErrorLogger.FatalfOnError(fmt.Sprintf("ReadFull on file %v", chunk.Path), err)
+		logging.FatalfOnError(fmt.Sprintf("ReadFull on file %v", chunk.Path), err)
 		sink.writeHere <- buffer
 		return nil
 	}
@@ -138,11 +139,11 @@ func (sink *diffFileSink) ProcessMeta(chunk *Chunk) error {
 	sink.strategy = strategy
 
 	file, err := safeFileCreate(sink.strategy.destinationDir, sink.strategy.destinationFilePath)
-	tracelog.ErrorLogger.FatalfOnError("Cannot create new file: %v", err)
+	logging.FatalfOnError("Cannot create new file: %v", err)
 	sink.file = file
 
 	err = strategy.AsyncRun(sink)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	return nil
 }
@@ -150,7 +151,7 @@ func (sink *diffFileSink) ProcessMeta(chunk *Chunk) error {
 func (sink *diffFileSink) startSimpleCopyStrategy() {
 	go func() {
 		_, err := io.Copy(sink.file, sink.readHere)
-		tracelog.ErrorLogger.FatalfOnError("Cannot copy data: %v", err)
+		logging.FatalfOnError("Cannot copy data: %v", err)
 		// copying to INCR dir - we don't need to fix Sparse files
 		utility.LoggedClose(sink.file, "sink.Close()")
 		close(sink.fileCloseChan)
@@ -160,7 +161,7 @@ func (sink *diffFileSink) startSimpleCopyStrategy() {
 func (sink *diffFileSink) startApplyDiffStrategy() {
 	go func() {
 		err := sink.applyDiff()
-		tracelog.ErrorLogger.FatalfOnError("Cannot handle diff: %v", err)
+		logging.FatalfOnError("Cannot handle diff: %v", err)
 		err = innodb.RepairSparse(sink.file)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Error during repairSparse(): %v", err)
@@ -308,7 +309,7 @@ func (sink *diffFileSink) applyDiff() error {
 
 func (sink *diffFileSink) writeToFile(dir string, relFilePath string, bytes []byte) error {
 	file, err := safeFileCreate(dir, relFilePath)
-	tracelog.ErrorLogger.FatalfOnError("Cannot open new file for write: %v", err)
+	logging.FatalfOnError("Cannot open new file for write: %v", err)
 
 	_, err = file.Write(bytes)
 	if err != nil {

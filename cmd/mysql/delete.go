@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var confirmed = false
@@ -47,17 +48,17 @@ var deleteTargetCmd = &cobra.Command{
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteEverything(args, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	findFullBackup := false
 	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
@@ -68,11 +69,11 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	}
 
 	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	backupName := args[0]
 	backupSelector, err := internal.NewBackupNameSelector(backupName, true) //todo: add selection by userdata
-	tracelog.ErrorLogger.PrintOnError(err)
+	logging.PrintOnError(err)
 
 	deleteHandler.HandleDeleteTarget(backupSelector, confirmed, findFullBackup)
 
@@ -94,7 +95,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 
 	err = journalInfo.Delete(storage.RootFolder())
 	if err != nil {
-		tracelog.ErrorLogger.Print(err)
+		logging.PrintError(err)
 	} else {
 		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
 	}
@@ -102,20 +103,20 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler, err := mysql.NewDeleteHandler(storage.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args, confirmed)
 }

@@ -6,9 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -147,7 +146,7 @@ func MakeBackupDetails(backups []Backup) []BackupDetail {
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backups, err := ListStorageBackups(folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	backupDetails := MakeBackupDetails(backups)
 
@@ -156,5 +155,5 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 		printableEntities[i] = &backupDetails[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
-	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
+	logging.FatalfOnError("Print backups: %v", err)
 }

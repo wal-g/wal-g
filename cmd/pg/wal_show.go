@@ -4,9 +4,9 @@ import (
 	"os"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -32,7 +32,7 @@ var (
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			storage, err := internal.ConfigureStorage()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			outputType := postgres.TableOutput
 			if detailedJSONOutput {
 				outputType = postgres.JSONOutput

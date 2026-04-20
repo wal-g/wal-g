@@ -32,7 +32,7 @@ func purgeJournalInfo(backupName string, dryRun bool) {
 
 	err = journalInfo.Delete(storage.RootFolder())
 	if err != nil {
-		tracelog.ErrorLogger.Print(err)
+		tracelog.ErrorLogger.PrintError(err)
 	} else {
 		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
 	}

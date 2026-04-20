@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
+	"github.com/wal-g/wal-g/internal/logging"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -20,18 +21,18 @@ func HandleLogPush(dbnames []string, norecovery bool) {
 	defer func() { _ = signalHandler.Close() }()
 
 	folder, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
-	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
+	logging.FatalfOnError("failed to connect to SQLServer: %v", err)
 
 	dbnames, err = getDatabasesToBackup(db, dbnames)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
-	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
+	logging.FatalfOnError("failed to list databases to backup: %v", err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder.RootFolder())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer lock.Close()
 
 	builtinCompression := blob.UseBuiltinCompression()
@@ -39,7 +40,7 @@ func HandleLogPush(dbnames []string, norecovery bool) {
 	err = runParallel(func(i int) error {
 		return backupSingleLog(ctx, db, logBackupName, dbnames[i], builtinCompression, norecovery)
 	}, len(dbnames), getDBConcurrency())
-	tracelog.ErrorLogger.FatalfOnError("overall log backup failed: %v", err)
+	logging.FatalfOnError("overall log backup failed: %v", err)
 
 	tracelog.InfoLogger.Printf("log backup finished")
 }

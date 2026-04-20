@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 // DiffBackupSink doesn't try to replicate sophisticated xtrabackup logic
@@ -18,10 +19,10 @@ import (
 // * let xtrabackup do its job
 func DiffBackupSink(stream *Reader, dataDir string, incrementalDir string) {
 	err := os.MkdirAll(dataDir, 0777) // FIXME: permission & UMASK
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	spaceIDCollector, err := innodb.NewSpaceIDCollector(dataDir)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	factory := fileSinkFactory{
 		dataDir:          dataDir,
@@ -37,7 +38,7 @@ func DiffBackupSink(stream *Reader, dataDir string, incrementalDir string) {
 		if err == io.EOF {
 			break
 		}
-		tracelog.ErrorLogger.FatalfOnError("Cannot read next chunk: %v", err)
+		logging.FatalfOnError("Cannot read next chunk: %v", err)
 
 		dsKey := factory.MapDataSinkKey(chunk.Path)
 		sink, ok := sinks[dsKey]
@@ -50,7 +51,7 @@ func DiffBackupSink(stream *Reader, dataDir string, incrementalDir string) {
 		if errors.Is(err, ErrSinkEOF) {
 			delete(sinks, dsKey)
 		} else if err != nil {
-			tracelog.ErrorLogger.Fatalf("Error in chunk %v: %v", chunk.Path, err)
+			logging.Fatalf("Error in chunk %v: %v", chunk.Path, err)
 		}
 	}
 

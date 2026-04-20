@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/internal/storagetools"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -31,7 +31,7 @@ var putObjectCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if len(args) == 1 && !readStdin {
-			tracelog.ErrorLogger.Fatal("should specify localPath on read-from stdin flag")
+			logging.Fatal("should specify localPath on read-from stdin flag")
 		}
 
 		var dstPath string
@@ -42,7 +42,7 @@ var putObjectCmd = &cobra.Command{
 			dstPath = args[1]
 			fileReadCloser, err := storagetools.OpenLocalFile(localPath)
 			if err != nil {
-				tracelog.ErrorLogger.FatalOnError(err)
+				logging.FatalOnError(err)
 			}
 
 			reader = fileReadCloser
@@ -60,7 +60,7 @@ var putObjectCmd = &cobra.Command{
 			}
 			return storagetools.HandlePutObject(cmd.Context(), reader, dstPath, uploader, overwrite, !noEncrypt, !noCompress)
 		})
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"golang.org/x/sync/errgroup"
@@ -74,39 +75,39 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string) {
 	modifier, beforeStr := internal.ExtractDeleteModifierFromArgs(args)
 
 	target, err := h.FindTargetBefore(beforeStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetain(args []string) {
 	modifier, retentionStr := internal.ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetain(retentionCount, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetainAfter(args []string) {
 	modifier, retentionSir, afterStr := internal.ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetainAfter(retentionCount, afterStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
@@ -114,7 +115,7 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string) {
 	}
 
 	err = h.DeleteBeforeTarget(target)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteEverything(args []string) {
@@ -136,7 +137,7 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 
 func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelector) {
 	target, err := h.FindTargetBySelector(targetSelector)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
 		// since we want to delete the target backup, we should fail if
@@ -147,13 +148,13 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelecto
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
 	err = h.dispatchDeleteCmd(target, SegDeleteTarget)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
+		logging.Fatalf("Failed to delete the segments backups: %v", err)
 	}
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(target, h.args.Confirmed, h.args.FindFull, folderFilter)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {

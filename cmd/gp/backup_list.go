@@ -2,9 +2,9 @@ package gp
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -24,7 +24,7 @@ var (
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
 			rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			if detail {
 				greenplum.HandleDetailedBackupList(rootFolder, pretty, jsonOutput)
 			} else {

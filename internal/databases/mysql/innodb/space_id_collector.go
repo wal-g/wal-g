@@ -11,6 +11,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -77,10 +78,10 @@ func (c *spaceIDCollectorImpl) collect(filePath string) (SpaceID, error) {
 
 	// FIXME: use os.Root [go 1.24] https://github.com/golang/go/issues/67002
 	if !strings.HasPrefix(filePath, c.dataDir) {
-		tracelog.ErrorLogger.Fatalf("File %v is out of data dir %v", filePath, c.dataDir)
+		logging.Fatalf("File %v is out of data dir %v", filePath, c.dataDir)
 	}
 	if prevPath, ok := c.collected[reader.SpaceID]; ok {
-		tracelog.ErrorLogger.Fatalf("duplicate SpaceID %v found '%v' and '%v'", reader.SpaceID, prevPath, filePath)
+		logging.Fatalf("duplicate SpaceID %v found '%v' and '%v'", reader.SpaceID, prevPath, filePath)
 	}
 	fileName := filePath[len(c.dataDir):]
 	c.collected[reader.SpaceID] = strings.TrimPrefix(fileName, "/")

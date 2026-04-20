@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type segmentError struct {
@@ -111,7 +112,7 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 		switch msg.Data[0] {
 		case pglogrepl.PrimaryKeepaliveMessageByteID:
 			pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			tracelog.DebugLogger.Println("Primary Keepalive Message =>",
 				"ServerWALEnd:", pkm.ServerWALEnd, "ServerTime:", pkm.ServerTime,
 				"ReplyRequested:", pkm.ReplyRequested)
@@ -121,7 +122,7 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 			}
 		case pglogrepl.XLogDataByteID:
 			xld, err := pglogrepl.ParseXLogData(msg.Data[1:])
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			if xld.WALStart > seg.endLSN {
 				// This message started after this segment ended
 				return ProcessMessageMismatch, segmentError{
@@ -171,7 +172,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 			err = pglogrepl.SendStandbyStatusUpdate(context.Background(),
 				conn,
 				pglogrepl.StandbyStatusUpdate{WALWritePosition: seg.StartLSN})
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			tracelog.DebugLogger.Println("Sent Standby status message")
 			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
 		}
@@ -182,7 +183,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 		if pgconn.Timeout(err) {
 			continue
 		}
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		result, err := seg.processMessage(msg)
 		switch result {
@@ -194,7 +195,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 			return result, err
 		case ProcessMessageCopyDone:
 			cdr, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			tracelog.DebugLogger.Printf("CopyDoneResult => %v", cdr)
 			return result, nil
 		case ProcessMessageReplyRequested:

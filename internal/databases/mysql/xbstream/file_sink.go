@@ -9,6 +9,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var ErrSinkEOF = errors.New("ErrSinkEOF")
@@ -58,7 +59,7 @@ func (fsf *fileSinkFactory) MapDataSinkPath(chunkPath string) string {
 func (fsf *fileSinkFactory) NewDataSink(chunkPath string) fileSink {
 	ext := filepath.Ext(chunkPath)
 	if ext == ".xbcrypt" {
-		tracelog.ErrorLogger.Fatalf("xbstream contains encrypted files. We don't support it. Use xbstream instead: %v", chunkPath)
+		logging.Fatalf("xbstream contains encrypted files. We don't support it. Use xbstream instead: %v", chunkPath)
 	}
 
 	filePath := fsf.MapDataSinkPath(chunkPath)

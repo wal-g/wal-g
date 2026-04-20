@@ -8,9 +8,9 @@ import (
 	"github.com/wal-g/wal-g/cmd/common"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var ShortDescription = "Redis backup tool"
@@ -26,7 +26,7 @@ var cmd = &cobra.Command{
 	Version: strings.Join([]string{walgVersion, gitRevision, buildDate, "Redis"}, "\t"),
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		err := internal.AssertRequiredSettingsSet()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

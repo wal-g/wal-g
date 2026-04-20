@@ -5,6 +5,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -119,7 +120,7 @@ func (seq *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, 
 func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter WalShowOutputWriter) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 	filenames, err := getFolderFilenames(walFolder)
-	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL folder filenames %v\n", err)
+	logging.FatalfOnError("Failed to get the WAL folder filenames %v\n", err)
 
 	walSegments := getSegmentsFromFiles(filenames)
 	segmentsByTimelines := groupSegmentsByTimelines(walSegments)
@@ -129,18 +130,18 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 		historyRecords, err := GetTimeLineHistoryRecords(segmentsSequence.TimelineID, walFolder)
 		if err != nil {
 			if _, ok := err.(HistoryFileNotFoundError); !ok {
-				tracelog.ErrorLogger.Fatalf("Error while loading .history file %v\n", err)
+				logging.Fatalf("Error while loading .history file %v\n", err)
 			}
 		}
 
 		info, err := NewTimelineInfo(segmentsSequence, historyRecords)
-		tracelog.ErrorLogger.FatalfOnError("Error while creating TimeLineInfo %v\n", err)
+		logging.FatalfOnError("Error while creating TimeLineInfo %v\n", err)
 		timelineInfos = append(timelineInfos, info)
 	}
 
 	if showBackups {
 		timelineInfos, err = addBackupsInfo(timelineInfos, rootFolder)
-		tracelog.ErrorLogger.FatalfOnError("Failed to add backups info: %v\n", err)
+		logging.FatalfOnError("Failed to add backups info: %v\n", err)
 	}
 
 	// order timelines by ID
@@ -149,7 +150,7 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 	})
 
 	err = outputWriter.Write(timelineInfos)
-	tracelog.ErrorLogger.FatalfOnError("Error writing output: %v\n", err)
+	logging.FatalfOnError("Error writing output: %v\n", err)
 }
 
 func groupSegmentsByTimelines(segments map[WalSegmentDescription]bool) map[uint32]*WalSegmentsSequence {

@@ -18,6 +18,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
 
@@ -349,5 +350,5 @@ func (inf *Infra) callCompose(actions []string) error {
 func init() {
 	var err error
 	Docker, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }

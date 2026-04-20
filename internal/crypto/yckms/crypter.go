@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	ycsdk "github.com/yandex-cloud/go-sdk"
 )
 
@@ -23,7 +24,7 @@ func (crypter *YcCrypter) Name() string {
 func (crypter *YcCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	if crypter.symmetricKey.GetKey() == nil {
 		err := crypter.symmetricKey.CreateKey()
-		tracelog.ErrorLogger.FatalfOnError("Can't generate symmetric key: %v", err)
+		logging.FatalfOnError("Can't generate symmetric key: %v", err)
 	}
 
 	bufferedWriter := bufio.NewWriter(writer)
@@ -47,10 +48,10 @@ func (crypter *YcCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 
 func (crypter *YcCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	err := crypter.symmetricKey.ReadEncryptedKey(reader)
-	tracelog.ErrorLogger.FatalfOnError("Can't read encryption key from archive file header: %v", err)
+	logging.FatalfOnError("Can't read encryption key from archive file header: %v", err)
 
 	err = crypter.symmetricKey.Decrypt()
-	tracelog.ErrorLogger.FatalfOnError("Can't decrypt data encryption key from archive file header: %v", err)
+	logging.FatalfOnError("Can't decrypt data encryption key from archive file header: %v", err)
 
 	return sio.DecryptReader(reader, sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_256_GCM}})
 }
@@ -60,7 +61,7 @@ func YcCrypterFromKeyIDAndCredential(keyID string, saFilePath string) crypto.Cry
 	sdk, err := ycsdk.Build(context.Background(), ycsdk.Config{
 		Credentials: credentials,
 	})
-	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
+	logging.FatalfOnError("Can't initialize yc sdk: %v", err)
 
 	return &YcCrypter{symmetricKey: YcSymmetricKeyFromKeyIDAndSdk(keyID, sdk)}
 }

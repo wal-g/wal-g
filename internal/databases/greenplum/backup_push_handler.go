@@ -19,6 +19,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -177,10 +178,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 	initGpLog(bh.arguments.logsDir)
 
 	err := bh.checkPrerequisites()
-	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
+	logging.FatalfOnError("Backup prerequisites check failed: %v\n", err)
 
 	err = bh.configureDeltaBackup()
-	tracelog.ErrorLogger.FatalfOnError("Failed to configure delta backup: %v\n", err)
+	logging.FatalfOnError("Failed to configure delta backup: %v\n", err)
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
@@ -200,7 +201,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 
 	bh.currBackupInfo.backupPidByContentID, err = extractBackupPids(remoteOutput)
 	// this is a non-critical error since backup PIDs are only useful if backup is aborted
-	tracelog.ErrorLogger.PrintOnError(err)
+	logging.PrintOnError(err)
 	if remoteOutput.NumErrors > 0 {
 		bh.abortBackup()
 	}
@@ -213,10 +214,10 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 
 	restoreLSNs, _, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	bh.currBackupInfo.finishTime = utility.TimeNowCrossPlatformUTC()
 
@@ -229,7 +230,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 	}
 
 	err = bh.uploadRestorePointMetadata(restoreLSNs)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 	bh.disconnect()
@@ -732,9 +733,9 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 	}
 
 	previousGpBackup, err := NewBackup(folder, previousBackup.Name)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	prevBackupSentinelDto, err := previousGpBackup.GetSentinel()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	bh.currBackupInfo.incrementCount = 1
 	if prevBackupSentinelDto.IncrementCount != nil {
@@ -760,7 +761,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 		}
 
 		previousGpBackup, err = NewBackup(folder, prevName)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		prevBackupSentinelDto, err = previousGpBackup.GetSentinel()
 		if err != nil {
 			return err

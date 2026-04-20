@@ -2,10 +2,10 @@ package gp
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
@@ -61,40 +61,40 @@ var deleteGarbageCmd = &cobra.Command{
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
 	rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, Force: forceDelete}
 	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteBefore(args)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
 	rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, Force: forceDelete}
 	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteRetain(args)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
 	rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, Force: forceDelete}
 	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteEverything(args)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
 	rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	findFullBackup := false
 	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
@@ -106,25 +106,25 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 
 	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, FindFull: findFullBackup, Force: forceDelete}
 	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(
 		cmd, args, deleteTargetUserData, greenplum.NewGenericMetaFetcher())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	deleteHandler.HandleDeleteTarget(targetBackupSelector)
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
 	rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	delArgs := greenplum.DeleteArgs{Confirmed: confirmed, Force: true}
 	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = deleteHandler.HandleDeleteGarbage(args)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func init() {

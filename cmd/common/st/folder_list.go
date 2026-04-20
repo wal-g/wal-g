@@ -2,7 +2,7 @@ package st
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/internal/storagetools"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -37,7 +37,7 @@ var folderListCmd = &cobra.Command{
 			return storagetools.HandleFolderList(subfolder, recursive)
 		})
 		if err != nil {
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 	},
 }

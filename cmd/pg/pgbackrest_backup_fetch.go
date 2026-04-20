@@ -2,9 +2,9 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres/pgbackrest"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var pgbackrestBackupFetchCmd = &cobra.Command{
@@ -19,7 +19,7 @@ var pgbackrestBackupFetchCmd = &cobra.Command{
 		folder, stanza := configurePgbackrestSettings()
 		backupSelector := pgbackrest.NewBackupSelector(backupName, stanza)
 		err := pgbackrest.HandlePgbackrestBackupFetch(folder, stanza, destinationDirectory, backupSelector)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

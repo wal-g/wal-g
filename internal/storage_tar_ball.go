@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -96,8 +97,8 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 			tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", path)
 			tracelog.ErrorLogger.Printf("%v\n", err)
 			err = pipeReader.Close()
-			tracelog.ErrorLogger.FatalfOnError("Failed to close pipe: %v", err)
-			tracelog.ErrorLogger.Fatalf(
+			logging.FatalfOnError("Failed to close pipe: %v", err)
+			logging.Fatalf(
 				"Unable to continue the backup process because of the loss of a part %d.\n",
 				tarBall.partNumber)
 		}

@@ -4,9 +4,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/databases/mysql/xbstream"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -26,11 +26,11 @@ var (
 				src = os.Stdin
 			} else {
 				src, err = os.Open(args[0])
-				tracelog.ErrorLogger.FatalfOnError("Cannot open input file: %v", err)
+				logging.FatalfOnError("Cannot open input file: %v", err)
 			}
 
 			err = os.MkdirAll(dataDir, 0777) // FIXME: 0777? use UMASK?
-			tracelog.ErrorLogger.FatalfOnError("Cannot create destination folder: %v", err)
+			logging.FatalfOnError("Cannot create destination folder: %v", err)
 
 			streamReader := xbstream.NewReader(src, false)
 			xbstream.DiffBackupSink(streamReader, dataDir, incrementalDir)

@@ -3,6 +3,7 @@ package postgres
 import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -39,7 +40,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 
 	previousPgBackup := ToPgBackup(previousBackup)
 	prevBackupSentinelDto, err := previousPgBackup.GetSentinel()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
 		incrementCount = *prevBackupSentinelDto.IncrementCount + 1

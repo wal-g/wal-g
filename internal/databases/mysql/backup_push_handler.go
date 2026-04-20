@@ -13,6 +13,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/limiters"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -34,23 +35,23 @@ func HandleBackupPush(
 	}
 
 	db, err := getMySQLConnection()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
 
 	version, err := getMySQLVersion(db)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	flavor, err := getMySQLFlavor(db)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	serverUUID, err := getServerUUID(db, flavor)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	gtidStart, err := getMySQLGTIDExecuted(db, flavor)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	binlogStart, err := getLastUploadedBinlogBeforeGTID(folder, gtidStart, flavor)
-	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog: %v", err)
+	logging.FatalfOnError("failed to get last uploaded binlog: %v", err)
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	var backupName string
@@ -59,16 +60,16 @@ func HandleBackupPush(
 	var xtrabackupInfo XtrabackupExtInfo
 	if isXtrabackup(backupCmd) {
 		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
-		tracelog.ErrorLogger.FatalfOnError("failed to get previous backup for delta backup: %v", err)
+		logging.FatalfOnError("failed to get previous backup for delta backup: %v", err)
 
 		backupName, xtrabackupInfo, err = handleXtrabackupBackup(uploader, backupCmd, isFullBackup, &prevBackupInfo)
 	} else {
 		backupName, err = handleRegularBackup(uploader, backupCmd)
 	}
-	tracelog.ErrorLogger.FatalfOnError("backup create command failed: %v", err)
+	logging.FatalfOnError("backup create command failed: %v", err)
 
 	binlogEnd, err := getLastUploadedBinlog(folder)
-	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog (after): %v", err)
+	logging.FatalfOnError("failed to get last uploaded binlog (after): %v", err)
 	timeStop := utility.TimeNowCrossPlatformLocal()
 
 	uploadedSize, err := uploader.UploadedDataSize()
@@ -82,7 +83,7 @@ func HandleBackupPush(
 	}
 
 	userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
-	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
+	logging.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
 	var incrementFrom *string
 	if (prevBackupInfo != PrevBackupInfo{}) {
@@ -119,7 +120,7 @@ func HandleBackupPush(
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
 	err = internal.UploadSentinel(uploader, &sentinel, backupName)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if !countJournals {
 		tracelog.InfoLogger.Printf("binlog counting mode is disabled: option is disabled")
@@ -164,10 +165,10 @@ func HandleBackupPush(
 
 func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backupName string, err error) {
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
-	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
+	logging.FatalfOnError("failed to start backup create command: %v", err)
 
 	backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
-	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	logging.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
 	if err != nil {
@@ -183,21 +184,21 @@ func handleXtrabackupBackup(
 	prevBackupInfo *PrevBackupInfo,
 ) (backupName string, backupExtInfo XtrabackupExtInfo, err error) {
 	if prevBackupInfo == nil {
-		tracelog.ErrorLogger.Fatalf("PrevBackupInfo is null")
+		logging.Fatalf("PrevBackupInfo is null")
 	}
 
 	tmpDirRoot := "/tmp" // There is no Percona XtraBackup for Windows (c) @PeterZaitsev
 	xtrabackupExtraDirectory, err := prepareTemporaryDirectory(tmpDirRoot)
-	tracelog.ErrorLogger.FatalfOnError("failed to prepare tmp directory for diff-backup: %v", err)
+	logging.FatalfOnError("failed to prepare tmp directory for diff-backup: %v", err)
 
 	enrichBackupArgs(backupCmd, xtrabackupExtraDirectory, isFullBackup, prevBackupInfo)
 	tracelog.InfoLogger.Printf("Command to execute: %v", strings.Join(backupCmd.Args, " "))
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
-	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
+	logging.FatalfOnError("failed to start backup create command: %v", err)
 
 	backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
-	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
+	logging.FatalfOnError("failed to push backup: %v", err)
 
 	cmdErr := backupCmd.Wait()
 	if cmdErr != nil {

@@ -2,7 +2,7 @@ package st
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage/exec"
 	"github.com/wal-g/wal-g/internal/storagetools"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -27,7 +27,7 @@ var catObjectCmd = &cobra.Command{
 			}
 			return storagetools.HandleCatObject(args[0], folder, decrypt, decompress)
 		})
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	},
 }
 

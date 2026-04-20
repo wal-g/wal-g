@@ -2,9 +2,9 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const (
@@ -23,7 +23,7 @@ var catchupFetchCmd = &cobra.Command{
 		internal.ConfigureLimiters()
 
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		postgres.HandleCatchupFetch(storage.RootFolder(), args[0], args[1], useNewUnwrap)
 	},
 }

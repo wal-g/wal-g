@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -37,7 +38,7 @@ func NewAOLengthCheckHandler(
 func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 	conn, err := postgres.Connect()
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
+		logging.FatalfOnError("unable to get connection %v", err)
 	}
 	defer func() {
 		err := conn.Close(context.TODO())
@@ -48,14 +49,14 @@ func (checker *AOLengthCheckHandler) CheckAOTableLength() {
 
 	globalCluster, _, _, err := getGpClusterInfo(conn)
 	if err != nil {
-		tracelog.ErrorLogger.FatalfOnError("could not get cluster info %v", err)
+		logging.FatalfOnError("could not get cluster info %v", err)
 	}
 
 	segmentsBackups := make(map[int]string)
 	if checker.checkBackup {
 		segmentsBackups, err = getSegmentBackupNames(checker.backupName, checker.rootFolder)
 		if err != nil {
-			tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
+			logging.FatalfOnError("could not get segment`s backups %v", err)
 		}
 	}
 

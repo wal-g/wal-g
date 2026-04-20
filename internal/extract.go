@@ -14,6 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/sync/semaphore"
 )
@@ -64,7 +65,7 @@ func (e *DevNullWriter) Write(p []byte) (int, error) {
 		go func() {
 			for {
 				time.Sleep(1 * time.Second)
-				tracelog.ErrorLogger.Printf("/dev/null size %d", e.totalBytes)
+				logging.PrintError(fmt.Errorf("/dev/null size %d", e.totalBytes))
 			}
 		}()
 	})
@@ -209,7 +210,7 @@ func tryExtractFiles(files []ReaderMaker,
 	for _, file := range files {
 		err := downloadingSemaphore.Acquire(downloadingContext, 1)
 		if err != nil {
-			tracelog.ErrorLogger.Println(err)
+			logging.PrintError(err)
 			return files //Should never happen, but if we are asked to cancel - consider all files unfinished
 		}
 		fileClosure := file
@@ -234,14 +235,14 @@ func tryExtractFiles(files []ReaderMaker,
 
 			if err != nil {
 				isFailed.Store(fileClosure, true)
-				tracelog.ErrorLogger.Println(err)
+				logging.PrintError(err)
 			}
 		}()
 	}
 
 	err := downloadingSemaphore.Acquire(downloadingContext, int64(downloadingConcurrency))
 	if err != nil {
-		tracelog.ErrorLogger.Println(err)
+		logging.PrintError(err)
 		return files //Should never happen, but if we are asked to cancel - consider all files unfinished
 	}
 

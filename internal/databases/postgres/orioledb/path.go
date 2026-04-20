@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 var pagedFilenameRegexp *regexp.Regexp
@@ -43,7 +43,7 @@ func GetChkpNum(PgDataDirectory string) (chkpNum uint32) {
 	OrioledbDataDirectory := PgDataDirectory + "/orioledb_data"
 	xidRegEx, err := regexp.Compile(`^.+\.(xid)$`)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Cannot compile xid regex")
+		logging.Fatalf("Cannot compile xid regex")
 	}
 
 	chkpNum = uint32(0)
@@ -52,7 +52,7 @@ func GetChkpNum(PgDataDirectory string) (chkpNum uint32) {
 			xid := strings.Split(info.Name(), ".")[0]
 			tempChkpNum, err := strconv.Atoi(xid)
 			if err != nil {
-				tracelog.ErrorLogger.Fatalf("Cannot parse chkpNum: %s", xid)
+				logging.Fatalf("Cannot parse chkpNum: %s", xid)
 			}
 			chkpNum = uint32(tempChkpNum)
 			return filepath.SkipAll
@@ -63,7 +63,7 @@ func GetChkpNum(PgDataDirectory string) (chkpNum uint32) {
 		return nil
 	})
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Cannot find any xid file")
+		logging.Fatalf("Cannot find any xid file")
 	}
 	return chkpNum
 }

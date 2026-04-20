@@ -9,6 +9,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -44,11 +45,11 @@ func HandleBinlogList(folder storage.Folder, since, until string, pretty, json b
 	binlogFolder := folder.GetSubFolder(BinlogPath)
 
 	startTime, endTime, err := parseTimeRange(folder, since, until)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	logFiles, err := getLogsCoveringInterval(binlogFolder, startTime, true, endTime)
 	if err != nil {
-		tracelog.ErrorLogger.FatalOnError(fmt.Errorf("failed to list binlog files: %w", err))
+		logging.FatalOnError(fmt.Errorf("failed to list binlog files: %w", err))
 	}
 
 	if len(logFiles) == 0 {
@@ -72,7 +73,7 @@ func HandleBinlogList(folder storage.Folder, since, until string, pretty, json b
 	}
 
 	err = printlist.List(binlogs, os.Stdout, pretty, json)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func parseTimeRange(folder storage.Folder, since, until string) (time.Time, time.Time, error) {

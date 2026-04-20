@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -44,7 +44,7 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	case SingleStreamStreamBackup, "":
 		return DownloadAndDecompressStream, nil
 	}
-	tracelog.ErrorLogger.Fatalf("Unknown backup type %s", metadata.Type)
+	logging.Fatalf("Unknown backup type %s", metadata.Type)
 	return nil, nil // unreachable
 }
 

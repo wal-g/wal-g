@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const transferShortDescription = "Moves objects from one storage to another (Postgres only)"
@@ -20,7 +20,7 @@ var transferCmd = &cobra.Command{
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		err := validateCommonFlags()
 		if err != nil {
-			tracelog.ErrorLogger.FatalError(fmt.Errorf("invalid flags: %w", err))
+			logging.FatalError(fmt.Errorf("invalid flags: %w", err))
 		}
 		return nil
 	},

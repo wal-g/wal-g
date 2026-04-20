@@ -9,16 +9,17 @@ import (
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 // xbstream BackupSink will unpack archive to disk.
 // Note: files may be compressed(quicklz,lz4,zstd) / encrypted("NONE", "AES128", "AES192","AES256")
 func BackupSink(stream *Reader, output string, decompress bool) {
 	err := os.MkdirAll(output, 0777) // FIXME: permission & UMASK
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	spaceIDCollector, err := innodb.NewSpaceIDCollector(output)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	factory := fileSinkFactory{
 		dataDir:          output,
@@ -34,7 +35,7 @@ func BackupSink(stream *Reader, output string, decompress bool) {
 		if err == io.EOF {
 			break
 		}
-		tracelog.ErrorLogger.FatalfOnError("Cannot read next chunk: %v", err)
+		logging.FatalfOnError("Cannot read next chunk: %v", err)
 
 		dsKey := factory.MapDataSinkKey(chunk.Path)
 		sink, ok := sinks[dsKey]

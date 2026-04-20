@@ -8,6 +8,7 @@ import (
 
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/splitmerge"
 
 	"github.com/wal-g/tracelog"
@@ -94,7 +95,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 			for _, fileName := range files {
 				err := downloadAndDecompressFile(backup, decompressor, fileName, writer, maxDownloadRetry)
 				if err != nil {
-					tracelog.ErrorLogger.PrintOnError(writer.Close())
+					logging.PrintOnError(writer.Close())
 					errCh <- err
 					return
 				}
@@ -106,7 +107,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	var lastErr error
 	for _, ch := range errorsPerWorker {
 		err := <-ch
-		tracelog.ErrorLogger.PrintOnError(err)
+		logging.PrintOnError(err)
 		if (lastErr == nil && err != nil) || (lastErr == io.ErrShortWrite && err != io.ErrShortWrite) {
 			lastErr = err
 		}

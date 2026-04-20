@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 type BackupFilesListProvider struct {
@@ -36,19 +36,19 @@ func copyManifestToUpload(lines []string, path string) {
 	folder := filepath.Dir(path)
 	err := os.MkdirAll(folder, 0644)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("error creating temp folder %s: %v", folder, err)
+		logging.Fatalf("error creating temp folder %s: %v", folder, err)
 	}
 
 	file, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("error creating temp manifest %s: %v", path, err)
+		logging.Fatalf("error creating temp manifest %s: %v", path, err)
 	}
 	defer file.Close()
 
 	for _, line := range lines {
 		_, err := file.Write([]byte(line + "\n"))
 		if err != nil {
-			tracelog.ErrorLogger.Fatalf("error writing line %s to temp manifest %s: %v", line, path, err)
+			logging.Fatalf("error writing line %s to temp manifest %s: %v", line, path, err)
 		}
 	}
 }
@@ -56,7 +56,7 @@ func copyManifestToUpload(lines []string, path string) {
 func readManifest(manifestPath string) []string {
 	manifest, err := os.Open(manifestPath)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("failed to open manifest file %s: %v", manifestPath, err)
+		logging.Fatalf("failed to open manifest file %s: %v", manifestPath, err)
 	}
 	defer manifest.Close()
 
@@ -66,10 +66,10 @@ func readManifest(manifestPath string) []string {
 		res = append(res, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		tracelog.ErrorLogger.Fatalf("error scanning manifest file %s: %v", manifestPath, err)
+		logging.Fatalf("error scanning manifest file %s: %v", manifestPath, err)
 	}
 	if len(res) == 0 {
-		tracelog.ErrorLogger.Fatalf("no records in manifest file %s: %v", manifestPath, err)
+		logging.Fatalf("no records in manifest file %s: %v", manifestPath, err)
 	}
 
 	return res
@@ -82,7 +82,7 @@ func parseManifest(lines []string, folder string) []string {
 	for _, line := range lines {
 		chunks := strings.Fields(line)
 		if len(chunks) != 6 {
-			tracelog.ErrorLogger.Fatalf("unexpected line format in manifest file: %s", line)
+			logging.Fatalf("unexpected line format in manifest file: %s", line)
 		}
 		res = append(res, filepath.Join(folder, chunks[1]))
 	}

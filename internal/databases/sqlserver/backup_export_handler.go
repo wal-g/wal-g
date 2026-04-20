@@ -7,6 +7,7 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -32,40 +33,40 @@ func HandleBackupExport(externalConfig string, exportPrefixes map[string]string)
 	defer func() { _ = signalHandler.Close() }()
 
 	st, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	folder := st.RootFolder()
 
 	externalStorage, err := internal.StorageFromConfig(externalConfig)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	externalFolder := externalStorage.RootFolder()
 
 	dbnames, exportPrefixes := prepareBackupExportSpec(exportPrefixes)
 	_, err = resolveExternalStorageFiles(externalFolder, nil)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer lock.Close()
 
 	var backupName string
 	var sentinel *SentinelDto
 	backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
+	logging.FatalfOnError("can't find latest backup: %v", err)
 	backupName = backup.Name
 	sentinel = new(SentinelDto)
 	err = backup.FetchSentinel(sentinel)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = runParallel(func(i int) error {
 		return exportSingleDatabaseBackup(ctx, folder, backupName, dbnames[i], externalFolder, exportPrefixes[dbnames[i]])
 	}, len(dbnames), getDBConcurrency())
-	tracelog.ErrorLogger.FatalfOnError("overall export failed: %v", err)
+	logging.FatalfOnError("overall export failed: %v", err)
 
 	sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	uploader := internal.NewRegularUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
 	err = internal.UploadSentinel(uploader, sentinel, backupName)
-	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)
+	logging.FatalfOnError("failed to save sentinel: %v", err)
 
 	tracelog.InfoLogger.Printf("export finished")
 }

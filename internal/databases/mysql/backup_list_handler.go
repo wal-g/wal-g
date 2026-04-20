@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -116,16 +116,16 @@ func NewBackupDetail(backupTime internal.BackupTime, sentinel StreamSentinelDto)
 func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 	backupTimes, err := internal.GetBackups(folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)
-	tracelog.ErrorLogger.FatalfOnError("Failed to fetch list of backups in storage: %s", err)
+	logging.FatalfOnError("Failed to fetch list of backups in storage: %s", err)
 
 	backupDetails := make([]BackupDetail, 0, len(backupTimes))
 	for _, backupTime := range backupTimes {
 		backup, err := internal.NewBackup(folder, backupTime.BackupName)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		var sentinel StreamSentinelDto
 		err = backup.FetchSentinel(&sentinel)
-		tracelog.ErrorLogger.FatalfOnError("Failed to load sentinel for backup %s", err)
+		logging.FatalfOnError("Failed to load sentinel for backup %s", err)
 
 		backupDetails = append(backupDetails, NewBackupDetail(backupTime, sentinel))
 	}
@@ -135,5 +135,5 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 		printableEntities[i] = &backupDetails[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
-	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
+	logging.FatalfOnError("Print backups: %v", err)
 }

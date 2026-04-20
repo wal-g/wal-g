@@ -19,6 +19,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 
 	"github.com/pkg/errors"
@@ -170,27 +171,27 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 
 	err = bh.startBackup()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = bh.checkDataChecksums()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	err = bh.CheckArchiveCommand()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if orioledbEnabled {
 		chkpNum := orioledb.GetChkpNum(bh.PgInfo.PgDataDirectory)
 		bh.CurBackupInfo.StartChkpNum = &chkpNum
 	}
 	err = bh.handleDeltaBackup(folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tarFileSets := bh.uploadBackup()
 	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	bh.markBackups(folder, sentinelDto)
 	bh.uploadMetadata(ctx, sentinelDto, filesMetaDto)
 
 	storageNames := multistorage.UsedStorages(folder)
 	if len(storageNames) == 0 {
-		tracelog.ErrorLogger.Fatalf("No storages are used in the uploading folder")
+		logging.Fatalf("No storages are used in the uploading folder")
 	}
 
 	// logging backup set Name
@@ -258,16 +259,16 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) error {
 		tracelog.DebugLogger.Printf("Previous backup: %s\nBackup start LSN: %s", bh.prevBackupInfo.name,
 			bh.prevBackupInfo.sentinelDto.BackupStartLSN)
 		if *bh.prevBackupInfo.sentinelDto.BackupFinishLSN > bh.CurBackupInfo.startLSN {
-			tracelog.ErrorLogger.FatalOnError(newBackupFromFuture(bh.prevBackupInfo.name))
+			logging.FatalOnError(newBackupFromFuture(bh.prevBackupInfo.name))
 		}
 		if bh.prevBackupInfo.sentinelDto.SystemIdentifier != nil &&
 			bh.PgInfo.systemIdentifier != nil &&
 			*bh.PgInfo.systemIdentifier != *bh.prevBackupInfo.sentinelDto.SystemIdentifier {
-			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
+			logging.FatalOnError(newBackupFromOtherBD())
 		}
 
 		useWalDelta, _, err := configureWalDeltaUsage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		if useWalDelta {
 			ForceWalDetal, _ := conf.GetBoolSettingDefault(conf.ForceWalDetal, false)
@@ -333,38 +334,38 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
 	err := bundle.StartQueue(internal.NewStorageTarBallMaker(bh.CurBackupInfo.Name, bh.Arguments.Uploader))
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	err = bh.Arguments.composerInitFunc(bh)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Walking ...")
 	err = filepath.Walk(bh.PgInfo.PgDataDirectory, bundle.HandleWalkedFSObject)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Packing ...")
 	tarFileSets, err := bundle.FinishTarComposer()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Finishing queue ...")
 	err = bundle.FinishQueue()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Uploading pg_control ...")
 	err = bundle.UploadPgControl(bh.Arguments.Uploader.Compression().FileExtension())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	tracelog.DebugLogger.Println("Stop backup and upload backup_label and tablespace_map")
 	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(
 		bh.Workers.QueryRunner,
 		bh.Arguments.Uploader.Compression().FileExtension())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	bh.CurBackupInfo.endLSN = finishLsn
 	bh.CurBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
 	bh.CurBackupInfo.compressedSize, err = bh.Arguments.Uploader.UploadedDataSize()
 	bh.CurBackupInfo.dataCatalogSize = atomic.LoadInt64(bundle.DataCatalogSize)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
 	timelineChanged := bundle.checkTimelineChanged(bh.Workers.QueryRunner)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
@@ -377,10 +378,10 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	tracelog.DebugLogger.Println("Waiting for all uploads to finish")
 	bh.Arguments.Uploader.Finish()
 	if bh.Arguments.Uploader.Failed() {
-		tracelog.ErrorLogger.Fatalf("Uploading failed during '%s' backup.\n", bh.CurBackupInfo.Name)
+		logging.Fatalf("Uploading failed during '%s' backup.\n", bh.CurBackupInfo.Name)
 	}
 	if timelineChanged {
-		tracelog.ErrorLogger.Fatalf("Cannot finish backup because of changed timeline.")
+		logging.Fatalf("Cannot finish backup because of changed timeline.")
 	}
 	return tarFileSets
 }
@@ -420,7 +421,7 @@ func (bh *BackupHandler) handleBackupPushLocal(ctx context.Context) {
 		fromCli := bh.Arguments.pgDataDirectory
 		fromServer := bh.PgInfo.PgDataDirectory // that value is expected to already be absolute and "unsymlinked"
 		if utility.AbsResolveSymlink(fromCli) != fromServer {
-			tracelog.ErrorLogger.Fatalf("Data directory from command line '%s' is not the same as Postgres' one '%s'", fromCli, fromServer)
+			logging.Fatalf("Data directory from command line '%s' is not the same as Postgres' one '%s'", fromCli, fromServer)
 		}
 	}
 
@@ -436,7 +437,7 @@ func (bh *BackupHandler) handleBackupPushLocal(ctx context.Context) {
 		var err error
 		bh.prevBackupInfo, bh.CurBackupInfo.incrementCount, err = bh.Arguments.deltaConfigurator.Configure(
 			folder, bh.Arguments.isPermanent)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 	}
 
 	bh.createAndPushBackup(ctx)
@@ -462,7 +463,7 @@ func (bh *BackupHandler) createAndPushRemoteBackup(ctx context.Context) {
 
 	bh.CurBackupInfo.uncompressedSize = baseBackup.UncompressedSize
 	bh.CurBackupInfo.compressedSize, err = bh.Arguments.Uploader.UploadedDataSize()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	sentinelDto := NewBackupSentinelDto(bh, baseBackup.GetTablespaceSpec())
 	filesMetadataDto := NewFilesMetadataDto(baseBackup.Files, tarFileSets)
 	bh.CurBackupInfo.Name = baseBackup.BackupName()
@@ -479,15 +480,15 @@ func (bh *BackupHandler) uploadMetadata(ctx context.Context, sentinelDto BackupS
 
 	err := bh.uploadExtendedMetadata(ctx, meta)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to upload metadata file for backup %s: %v", curBackupName, err)
+		logging.Fatalf("Failed to upload metadata file for backup %s: %v", curBackupName, err)
 	}
 	err = bh.uploadFilesMetadata(ctx, filesMetaDto)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to upload files metadata for backup %s: %v", curBackupName, err)
+		logging.Fatalf("Failed to upload files metadata for backup %s: %v", curBackupName, err)
 	}
 	err = internal.UploadSentinel(bh.Arguments.Uploader, NewBackupSentinelDtoV2(sentinelDto, meta), bh.CurBackupInfo.Name)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
+		logging.Fatalf("Failed to upload sentinel file for backup %s: %v", curBackupName, err)
 	}
 }
 
@@ -542,7 +543,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	// Connect to postgres and start/finish a nonexclusive backup.
 	tracelog.DebugLogger.Println("Connecting to Postgres (replication connection)")
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), conn)
 	var bundleFiles internal.BundleFiles
@@ -553,20 +554,20 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	}
 	tracelog.InfoLogger.Println("Starting remote backup")
 	err = baseBackup.Start(bh.Arguments.verifyPageChecksums, diskLimit)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Streaming remote backup")
 	err = baseBackup.Upload(ctx, bh.Arguments.Uploader, bundleFiles)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Finishing backup")
 	tracelog.InfoLogger.Println("If wal-g hangs during this step, please Postgres log file for details.")
 	err = baseBackup.Finish()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	tracelog.DebugLogger.Println("Closing Postgres connection (replication connection)")
 	err = conn.Close(context.Background())
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	return baseBackup
 }
 
@@ -640,10 +641,10 @@ func (bh *BackupHandler) uploadFilesMetadata(ctx context.Context, filesMetaDto F
 
 func (bh *BackupHandler) checkPgVersionAndPgControl() {
 	_, err := os.ReadFile(filepath.Join(bh.PgInfo.PgDataDirectory, PgControlPath))
-	tracelog.ErrorLogger.FatalfOnError(
+	logging.FatalfOnError(
 		"It looks like you are trying to backup not pg_data. PgControl file not found: %v\n", err)
 	_, err = os.ReadFile(filepath.Join(bh.PgInfo.PgDataDirectory, "PG_VERSION"))
-	tracelog.ErrorLogger.FatalfOnError(
+	logging.FatalfOnError(
 		"It looks like you are trying to backup not pg_data. PG_VERSION file not found: %v\n", err)
 }
 
@@ -753,7 +754,7 @@ func addPgIsAliveChecker(queryRunner *PgQueryRunner, errCh chan error) {
 		return
 	}
 	stateUpdateInterval, err := conf.GetDurationSetting(conf.PgAliveCheckInterval)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Initializing the PG alive checker (interval=%s)...", stateUpdateInterval)
 	pgWatcher := NewPgWatcher(queryRunner, stateUpdateInterval)
 

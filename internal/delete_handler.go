@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -115,38 +116,38 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
 	modifier, beforeStr := ExtractDeleteModifierFromArgs(args)
 
 	target, err := h.FindTargetBefore(beforeStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
 		os.Exit(0)
 	}
 
 	err = h.DeleteBeforeTarget(target, confirmed)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
 	modifier, retentionStr := ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetain(retentionCount, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
 		os.Exit(0)
 	}
 	err = h.DeleteBeforeTarget(target, confirmed)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 	modifier, retentionSir, afterStr := ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	target, err := h.FindTargetRetainAfter(retentionCount, afterStr, modifier)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
@@ -154,12 +155,12 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 	}
 
 	err = h.DeleteBeforeTarget(target, confirmed)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
 	target, err := h.FindTargetBySelector(targetSelector)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	if target == nil {
 		// since we want to delete the target backup, we should fail if
@@ -169,7 +170,7 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(target, confirmed, findFull, folderFilter)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups []string, confirmed bool) {
@@ -181,7 +182,7 @@ func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups [
 
 	if len(permanentBackups) > 0 {
 		if !forceModifier {
-			tracelog.ErrorLogger.Fatalf("Found permanent backups=%v\n", permanentBackups)
+			logging.Fatalf("Found permanent backups=%v\n", permanentBackups)
 		}
 		tracelog.InfoLogger.Printf("Found permanent backups=%v\n", permanentBackups)
 	}
@@ -355,7 +356,7 @@ func (h *DeleteHandler) DeleteEverything(confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
 	folderFilter := func(path string) bool { return true }
 	err := DeleteObjectsWhere(h.Folder, confirmed, filter, folderFilter)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
@@ -397,7 +398,7 @@ func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bo
 	backupNamesToDelete := make(map[string]bool)
 	for _, bTarget := range backupsToDelete {
 		if h.isPermanent(bTarget) {
-			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", bTarget.GetName())
+			logging.Fatalf("Unable to delete permanent backup %s\n", bTarget.GetName())
 		}
 		backupNamesToDelete[bTarget.GetBackupName()] = true
 	}

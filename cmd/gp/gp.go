@@ -16,6 +16,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/internal/walparser"
@@ -44,9 +45,9 @@ var (
 			postgres.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
 			orioledb.SetDatabasePageSize(viper.GetUint64(conf.PgBlockSize))
 			err := internal.AssertRequiredSettingsSet()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 			err = conf.ConfigureAndRunDefaultWebServer()
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 
 			// In case the --target-storage flag isn't specified (the variable is set in commands' init() funcs),
 			// we take the value from the config.
@@ -84,7 +85,7 @@ func init() {
 	wrappedPgCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		// segment content ID is required in order to get the corresponding segment subfolder
 		contentID, err := greenplum.ConfigureSegContentID(SegContentID)
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		greenplum.SetSegmentStoragePrefix(contentID)
 		wrappedPreRun(cmd, args)
 	}
@@ -97,7 +98,7 @@ func init() {
 	// since WAL-G prefetch fork logic does not know anything about the "wal-g seg" subcommand
 	pg.WalPrefetchCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		conf.RequiredSettings[conf.StoragePrefixSetting] = true
-		tracelog.ErrorLogger.FatalOnError(internal.AssertRequiredSettingsSet())
+		logging.FatalOnError(internal.AssertRequiredSettingsSet())
 	}
 	cmd.AddCommand(pg.WalPrefetchCmd)
 }

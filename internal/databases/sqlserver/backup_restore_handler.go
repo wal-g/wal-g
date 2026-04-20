@@ -7,6 +7,7 @@ import (
 	"os"
 	"syscall"
 
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
@@ -20,25 +21,25 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 	defer func() { _ = signalHandler.Close() }()
 
 	storage, err := internal.ConfigureStorage()
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	folder := storage.RootFolder()
 
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
 	err = backup.FetchSentinel(sentinel)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
-	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
+	logging.FatalfOnError("failed to connect to SQLServer: %v", err)
 
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
-	tracelog.ErrorLogger.FatalfOnError("failed to list databases to restore: %v", err)
+	logging.FatalfOnError("failed to list databases to restore: %v", err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 	defer lock.Close()
 
 	backupName = backup.Name
@@ -55,7 +56,7 @@ func HandleBackupRestore(backupName string, dbnames []string, fromnames []string
 		}
 		return nil
 	}, len(dbnames), getDBConcurrency())
-	tracelog.ErrorLogger.FatalfOnError("overall restore failed: %v", err)
+	logging.FatalfOnError("overall restore failed: %v", err)
 
 	tracelog.InfoLogger.Printf("restore finished")
 }

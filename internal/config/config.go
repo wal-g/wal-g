@@ -2,7 +2,9 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/user"
 	"runtime"
@@ -16,7 +18,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/webserver"
@@ -60,6 +61,7 @@ const (
 	FetchTargetUserDataSetting    = "WALG_FETCH_TARGET_USER_DATA"
 	LogLevelSetting               = "WALG_LOG_LEVEL"
 	LogDestinationSetting         = "WALG_LOG_DESTINATION"
+	LogFormatSetting              = "WALG_LOG_FORMAT"
 	TarSizeThresholdSetting       = "WALG_TAR_SIZE_THRESHOLD"
 	TarDisableFsyncSetting        = "WALG_TAR_DISABLE_FSYNC"
 	CseKmsIDSetting               = "WALG_CSE_KMS_ID"
@@ -283,6 +285,7 @@ var (
 		PgpEnvelopeCacheExpiration:   "0",
 		DirectIO:                     "false",
 		LogLevelSetting:              "NORMAL",
+		LogFormatSetting:             "LEGACY",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -369,6 +372,7 @@ var (
 		UseWalDeltaSetting:            true,
 		LogLevelSetting:               true,
 		LogDestinationSetting:         true,
+		LogFormatSetting:              true,
 		TarSizeThresholdSetting:       true,
 		TarDisableFsyncSetting:        true,
 		"WALG_" + GpgKeyIDSetting:     true,
@@ -690,7 +694,7 @@ func newInvalidConcurrencyValueError(concurrencyType string, value int) InvalidC
 }
 
 func (err InvalidConcurrencyValueError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 type UnsetRequiredSettingError struct {
@@ -702,7 +706,7 @@ func NewUnsetRequiredSettingError(settingName string) UnsetRequiredSettingError 
 }
 
 func (err UnsetRequiredSettingError) Error() string {
-	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+	return fmt.Sprintf(logging.GetErrorFormatter(), err.error)
 }
 
 func AddTurboFlag(cmd *cobra.Command) {
@@ -752,24 +756,29 @@ func GetWaleCompatibleSettingFrom(key string, config *viper.Viper) (value string
 func ConfigureLogging() error {
 	var logFile *os.File
 	logLevel := CommonDefaultConfigValues[LogLevelSetting]
+	logFormat := CommonDefaultConfigValues[LogFormatSetting]
 	var err error
 
 	if viper.IsSet(LogLevelSetting) {
 		logLevel = viper.GetString(LogLevelSetting)
 	}
 
+	if viper.IsSet(LogFormatSetting) {
+		logFormat = viper.GetString(LogFormatSetting)
+	}
+
 	if viper.IsSet(LogDestinationSetting) && viper.GetString(LogDestinationSetting) != "stderr" {
 		logFileName := viper.GetString(LogDestinationSetting)
 		logFile, err = os.OpenFile(logFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err != nil {
-			return fmt.Errorf("could not open log file: %s", err)
+			return fmt.Errorf("could not open log file: %w", err)
 		}
 	} else {
 		logFile = os.Stderr
 	}
 
-	if err := tracelog.Setup(logFile, logLevel); err != nil {
-		return fmt.Errorf("failed to setup logging: %s", err)
+	if err := logging.SetupLogger(logFile, logLevel, logFormat); err != nil {
+		return fmt.Errorf("failed to setup logging: %w", err)
 	}
 
 	if logging.LogFile != nil {
@@ -784,12 +793,12 @@ func ConfigureLogging() error {
 func Configure() {
 	err := ConfigureLogging()
 	if err != nil {
-		tracelog.ErrorLogger.Println("Failed to configure logging.")
-		tracelog.ErrorLogger.FatalError(err)
+		slog.Error("Failed to configure logging.")
+		logging.FatalError(err)
 	}
 
 	// Show all relevant ENV vars in DEVEL Logging Mode
-	{
+	if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 		var buff bytes.Buffer
 		buff.WriteString("--- COMPILED ENVIRONMENT VARS ---\n")
 
@@ -811,8 +820,7 @@ func Configure() {
 			}
 			fmt.Fprintf(&buff, "\t%s=%s\n", k, val)
 		}
-
-		tracelog.DebugLogger.Print(buff.String())
+		slog.Debug(buff.String())
 	}
 }
 
@@ -892,7 +900,7 @@ func ReadConfigFromFile(config *viper.Viper, configFile string) {
 	} else {
 		// Find home directory.
 		usr, err := user.Current()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 
 		// Search config in home directory with name ".walg" (without extension).
 		config.AddConfigPath(usr.HomeDir)
@@ -902,11 +910,11 @@ func ReadConfigFromFile(config *viper.Viper, configFile string) {
 	// If a config file is found, read it in.
 	err := config.ReadInConfig()
 	if err == nil {
-		tracelog.DebugLogger.Println("Using config file:", config.ConfigFileUsed())
+		slog.Debug("Using config file:", config.ConfigFileUsed())
 	} else {
 		if config.ConfigFileUsed() != "" {
 			// Config file is found, but parsing failed
-			tracelog.WarningLogger.Printf("Failed to parse config file %s. %s.", config.ConfigFileUsed(), err)
+			slog.Warn(fmt.Sprintf("Failed to parse config file %s. %s.", config.ConfigFileUsed(), err))
 		}
 	}
 }
@@ -931,7 +939,7 @@ func CheckAllowedSettings(config *viper.Viper) {
 	for k := range config.AllSettings() {
 		k = strings.ToUpper(k)
 		if !isAllowedSetting(k, AllowedSettings) {
-			tracelog.WarningLogger.Println(k + " is unknown")
+			slog.Warn(k + " is unknown")
 			foundNotAllowed = true
 		}
 	}
@@ -939,7 +947,7 @@ func CheckAllowedSettings(config *viper.Viper) {
 	// TODO delete in the future
 	// Message for the first time.
 	if foundNotAllowed {
-		tracelog.WarningLogger.Println("We found that some variables in your config file detected as 'Unknown'. \n  " +
+		slog.Warn("We found that some variables in your config file detected as 'Unknown'. \n  " +
 			"If this is not right, please create issue https://github.com/wal-g/wal-g/issues/new")
 	}
 }
@@ -969,7 +977,7 @@ func bindConfigToEnv(globalViper *viper.Viper) {
 		err := os.Setenv(k, val)
 		if err != nil {
 			err = errors.Wrap(err, "Failed to bind config to env variable")
-			tracelog.ErrorLogger.FatalOnError(err)
+			logging.FatalOnError(err)
 		}
 	}
 }

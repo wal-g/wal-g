@@ -3,8 +3,8 @@ package postgres
 import (
 	"os"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/logging"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -12,10 +12,10 @@ import (
 func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	backups, err := internal.GetBackups(folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)
-	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
+	logging.FatalfOnError("Get backups from folder: %v", err)
 
 	backupDetails, err := GetBackupsDetails(folder, backups)
-	tracelog.ErrorLogger.FatalOnError(err)
+	logging.FatalOnError(err)
 
 	SortBackupDetails(backupDetails)
 
@@ -24,5 +24,5 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 		printableEntities[i] = &backupDetails[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
-	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
+	logging.FatalfOnError("Print backups: %v", err)
 }

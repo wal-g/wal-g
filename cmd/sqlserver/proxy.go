@@ -2,9 +2,9 @@ package sqlserver
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver"
+	"github.com/wal-g/wal-g/internal/logging"
 )
 
 const proxyShortDescription = "Run local azure blob emulator"
@@ -16,7 +16,7 @@ var proxyCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
 		storage, err := internal.ConfigureStorage()
-		tracelog.ErrorLogger.FatalOnError(err)
+		logging.FatalOnError(err)
 		sqlserver.RunProxy(storage.RootFolder())
 	},
 }
