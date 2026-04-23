@@ -137,7 +137,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 	if err != nil {
 		return nil, err
 	}
-	remainingData := make([]byte, minUint32(pageHeader.RemainingDataLen, uint32(WalPageSize)))
+	remainingData := make([]byte, min(pageHeader.RemainingDataLen, uint32(WalPageSize)))
 	readCount, err := alignedReader.Read(remainingData)
 	if err != nil && errors.Cause(err) != io.EOF {
 		return nil, err
