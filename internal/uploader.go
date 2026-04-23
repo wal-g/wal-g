@@ -53,8 +53,8 @@ type RegularUploader struct {
 	Compressor      compression.Compressor
 	waitGroup       *sync.WaitGroup
 	failed          atomic.Bool
-	tarSize         *int64
-	dataSize        *int64
+	tarSize         *atomic.Int64
+	dataSize        *atomic.Int64
 }
 
 var _ Uploader = &RegularUploader{}
@@ -85,8 +85,8 @@ func NewRegularUploader(
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
-		tarSize:         new(int64),
-		dataSize:        new(int64),
+		tarSize:         new(atomic.Int64),
+		dataSize:        new(atomic.Int64),
 		failed:          atomic.Bool{},
 	}
 	return uploader
@@ -116,7 +116,7 @@ func (uploader *RegularUploader) UploadedDataSize() (int64, error) {
 	if uploader.tarSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
-	return atomic.LoadInt64(uploader.tarSize), nil
+	return uploader.tarSize.Load(), nil
 }
 
 // RawDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
@@ -124,7 +124,7 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 	if uploader.dataSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
-	return atomic.LoadInt64(uploader.dataSize), nil
+	return uploader.dataSize.Load(), nil
 }
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,

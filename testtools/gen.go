@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 )
 
-var counter int32
+var counter atomic.Int32
 
 // StrideByteReader allows for customizable "strides" of
 // random bytes. Creates an infinite stream.
@@ -48,15 +48,13 @@ func (sb *StrideByteReader) Read(p []byte) (int, error) {
 // CreateTar creates a new tarball from the passed in reader
 // and writes to a destination writer.
 func CreateTar(w io.Writer, r *io.LimitedReader) {
-	tmp := atomic.AddInt32(&counter, 1)
-	_ = tmp
+	counter.Add(1)
 
-	CreateNamedTar(w, r, strconv.Itoa(int(counter)))
+	CreateNamedTar(w, r, strconv.Itoa(int(counter.Load())))
 }
 
 func CreateNamedTar(w io.Writer, r *io.LimitedReader, name string) {
-	tmp := atomic.AddInt32(&counter, 1)
-	_ = tmp
+	counter.Add(1)
 	tw := tar.NewWriter(w)
 
 	hdr := &tar.Header{

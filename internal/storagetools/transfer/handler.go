@@ -21,7 +21,7 @@ type Handler struct {
 	fileLister      FileLister
 	cfg             *HandlerConfig
 	fileStatuses    *sync.Map
-	filesLeft       int32
+	filesLeft       atomic.Int32
 	jobRequirements map[jobKey][]jobRequirement
 }
 
@@ -120,7 +120,7 @@ func (ts transferStatus) String() string {
 
 func (h *Handler) transferConcurrently(workers int, files []FilesGroup, filesNum int) (finErr error) {
 	jobsQueue := make(chan transferJob, filesNum)
-	h.filesLeft += int32(filesNum)
+	h.filesLeft.Add(int32(filesNum))
 	for _, group := range files {
 		for _, file := range group {
 			h.saveRequirements(file)
@@ -247,7 +247,7 @@ func (h *Handler) transferFilesWorker(
 		}
 
 		if err != nil {
-			atomic.AddInt32(&h.filesLeft, -1)
+			h.filesLeft.Add(-1)
 			errs <- fmt.Errorf("error with file %q: %s failed: %w", job.key.filePath, job.key.jobType, err)
 			continue
 		}
@@ -258,8 +258,8 @@ func (h *Handler) transferFilesWorker(
 			continue
 		}
 
-		atomic.AddInt32(&h.filesLeft, -1)
-		tracelog.InfoLogger.Printf("File is transferred (%d left): %q", atomic.LoadInt32(&h.filesLeft), job.key.filePath)
+		h.filesLeft.Add(-1)
+		tracelog.InfoLogger.Printf("File is transferred (%d left): %q", h.filesLeft.Load(), job.key.filePath)
 	}
 }
 
