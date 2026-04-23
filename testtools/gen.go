@@ -26,9 +26,8 @@ func NewStrideByteReader(s int) *StrideByteReader {
 		randBytes: make([]byte, s),
 	}
 
-	rand.Seed(0)
-	// rand.Seed(time.Now().UTC().UnixNano())
-	rand.Read(sb.randBytes)
+	r := rand.New(rand.NewSource(0))
+	r.Read(sb.randBytes)
 	return &sb
 }
 
