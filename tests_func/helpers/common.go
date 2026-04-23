@@ -3,7 +3,7 @@ package helpers
 import (
 	"context"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 )
 
 func Retry(ctx context.Context, maxRetries uint64, op func() error) error {
