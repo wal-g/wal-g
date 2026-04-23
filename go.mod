@@ -20,7 +20,6 @@ require (
 	github.com/go-mysql-org/go-mysql v1.14.1-0.20260227075927-498f8104b8ff
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gofrs/flock v0.8.0
-	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.6.0
 	github.com/greenplum-db/gp-common-go-libs v1.0.22
 	github.com/hashicorp/golang-lru v0.5.4
@@ -64,6 +63,7 @@ require (
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/redis/go-redis/v9 v9.7.3
+	go.uber.org/mock v0.6.0
 	golang.org/x/mod v0.35.0
 	golang.org/x/net v0.53.0
 	golang.org/x/sys v0.43.0
