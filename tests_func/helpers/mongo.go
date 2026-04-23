@@ -1,8 +1,10 @@
 package helpers
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,12 +61,7 @@ var (
 )
 
 func isSystemDatabase(db string) bool {
-	for _, sysdb := range SystemDatabases {
-		if db == sysdb {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(SystemDatabases, db)
 }
 
 type CmdResponse struct {
@@ -328,8 +325,8 @@ func ListCollections(ctx context.Context, conn *mongo.Client, database string) (
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(colls, func(i, j int) bool {
-		return colls[i]["name"].(string) < colls[j]["name"].(string)
+	slices.SortFunc(colls, func(a, b bson.M) int {
+		return cmp.Compare(a["name"].(string), b["name"].(string))
 	})
 	return colls, nil
 }

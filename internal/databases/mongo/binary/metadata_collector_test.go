@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -94,14 +95,9 @@ func TestHandleTop100Info_ReplaceSmallestWhenFull(t *testing.T) {
 	assert.Equal(t, int64(topK+1), collector.counter)
 	assert.Equal(t, topK, collector.heap.Len())
 
-	found := false
-	for _, item := range *collector.heap {
-		if item.NS == "userdb.bigcol" {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "big collection should be in top-K heap")
+	assert.True(t, slices.ContainsFunc(*collector.heap, func(item CollStats) bool {
+		return item.NS == "userdb.bigcol"
+	}), "big collection should be in top-K heap")
 }
 
 func TestHandleTop100Info_SmallElementNotReplaced(t *testing.T) {

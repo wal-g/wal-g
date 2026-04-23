@@ -17,9 +17,10 @@ Furthermore it can be read as an IOReader (having a Name() and Read() function) 
 */
 
 import (
+	"cmp"
 	"io"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -84,8 +85,8 @@ func (tlh TimeLineHistFile) LSNToTimeLine(lsn pglogrepl.LSN) (uint32, error) {
 		return 0, err
 	}
 	// Sorting makes LSNToTimeLine more efficient
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i].TimeLineID < rows[j].TimeLineID
+	slices.SortFunc(rows, func(a, b TimeLineHistFileRow) int {
+		return cmp.Compare(a.TimeLineID, b.TimeLineID)
 	})
 	for _, row := range rows {
 		if lsn < row.StartLSN {

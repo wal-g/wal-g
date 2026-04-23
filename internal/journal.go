@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -329,10 +329,8 @@ func filterJournalsInfoNewerThen(objects []storage.Object, timestamp time.Time) 
 }
 
 func sortJournalsInfo(objects []storage.Object) []storage.Object {
-	sort.Slice(objects, func(i, j int) bool {
-		ti := getJournalTimestamp(objects[i].GetName())
-		tj := getJournalTimestamp(objects[j].GetName())
-		return ti.Before(tj)
+	slices.SortFunc(objects, func(a, b storage.Object) int {
+		return getJournalTimestamp(a.GetName()).Compare(getJournalTimestamp(b.GetName()))
 	})
 	return objects
 }

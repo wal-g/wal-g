@@ -2,8 +2,9 @@ package postgres_test
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -255,11 +256,11 @@ func testMultipleTimelines(t *testing.T, timelineSetups []*TestTimelineSetup, wa
 	walFilenames := concatWalFilenames(timelineSetups)
 	timelineInfos := executeWalShow(walFilenames, walFolderFiles)
 
-	sort.Slice(timelineInfos, func(i, j int) bool {
-		return timelineInfos[i].ID < timelineInfos[j].ID
+	slices.SortFunc(timelineInfos, func(a, b *postgres.TimelineInfo) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
-	sort.Slice(timelineSetups, func(i, j int) bool {
-		return timelineSetups[i].id < timelineSetups[j].id
+	slices.SortFunc(timelineSetups, func(a, b *TestTimelineSetup) int {
+		return cmp.Compare(a.id, b.id)
 	})
 
 	assert.Len(t, timelineInfos, len(timelineSetups))
@@ -272,9 +273,7 @@ func testMultipleTimelines(t *testing.T, timelineSetups []*TestTimelineSetup, wa
 // verifySingleTimeline checks that setup values for timeline matches the output timeline info values
 func verifySingleTimeline(t *testing.T, setup *TestTimelineSetup, timelineInfo *postgres.TimelineInfo) {
 	// sort setup.existSegments to pick the correct start and end segment
-	sort.Slice(setup.existSegments, func(i, j int) bool {
-		return setup.existSegments[i] < setup.existSegments[j]
-	})
+	slices.Sort(setup.existSegments)
 
 	expectedStatus := postgres.TimelineOkStatus
 	if len(setup.missingSegments) > 0 {

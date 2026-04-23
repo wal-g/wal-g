@@ -1,7 +1,8 @@
 package postgres
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -140,8 +141,8 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 	}
 
 	// order timelines by ID
-	sort.Slice(timelineInfos, func(i, j int) bool {
-		return timelineInfos[i].ID < timelineInfos[j].ID
+	slices.SortFunc(timelineInfos, func(a, b *TimelineInfo) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 
 	err = outputWriter.Write(timelineInfos)

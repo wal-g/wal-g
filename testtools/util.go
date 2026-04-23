@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -110,15 +111,6 @@ func CreateMockStorageFolder() storage.Folder {
 	return folder
 }
 
-func find(source []int, value int) bool {
-	for _, item := range source {
-		if item == value {
-			return true
-		}
-	}
-	return false
-}
-
 func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling DataFilling) storage.Folder {
 	backupsCount := 3
 	creationTimeYears := []int{1997, 1999, 1998}
@@ -151,7 +143,7 @@ func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling D
 	objects := make([]storage.Object, backupsCount)
 	for i := 0; i < backupsCount; i++ {
 		var timeData time.Time
-		if find(modificationTimeGaps, i) {
+		if slices.Contains(modificationTimeGaps, i) {
 			timeData = time.Time{}
 		} else {
 			timeData = time.Date(modificationTimeYears[i], time.January, 1, 1, 1, 1, 1, time.UTC)
@@ -164,7 +156,7 @@ func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling D
 
 	for i := 0; i < backupsCount; i++ {
 		var timeData time.Time
-		if find(creationTimeGaps, i) {
+		if slices.Contains(creationTimeGaps, i) {
 			timeData = time.Time{}
 		} else {
 			timeData = time.Date(creationTimeYears[i], time.January, 1, 1, 1, 1, 1, time.UTC)

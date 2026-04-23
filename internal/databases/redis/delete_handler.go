@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -125,8 +125,8 @@ func LoadBackups(folder storage.Folder, names []string) ([]archive.Backup, error
 		}
 		backups = append(backups, backup)
 	}
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].FinishLocalTime.After(backups[j].FinishLocalTime)
+	slices.SortFunc(backups, func(a, b archive.Backup) int {
+		return b.FinishLocalTime.Compare(a.FinishLocalTime)
 	})
 	return backups, nil
 }

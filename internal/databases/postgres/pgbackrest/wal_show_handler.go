@@ -1,8 +1,9 @@
 package pgbackrest
 
 import (
+	"cmp"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/wal-g/tracelog"
@@ -42,8 +43,8 @@ func HandleWalShow(rootFolder storage.Folder, stanza string, outputWriter postgr
 		timelineInfos = append(timelineInfos, info)
 	}
 
-	sort.Slice(timelineInfos, func(i, j int) bool {
-		return timelineInfos[i].ID < timelineInfos[j].ID
+	slices.SortFunc(timelineInfos, func(a, b *postgres.TimelineInfo) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 
 	return outputWriter.Write(timelineInfos)

@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -205,12 +206,7 @@ func (ap *DBApplier) shouldIgnore(op string, err error) bool {
 		return false
 	}
 
-	for i := range ignoreErrorCodes {
-		if ce.Code == (ignoreErrorCodes[i]) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ignoreErrorCodes, ce.Code)
 }
 
 var ConfigCollectionsToKeep = []string{
@@ -235,26 +231,13 @@ var selectedNSSupportedCommands = map[string]struct{}{
 	"commitIndexBuild": {},
 }
 
-func Index[S ~[]E, E comparable](s S, v E) int {
-	for i := range s {
-		if v == s[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-func Contains[S ~[]E, E comparable](s S, v E) bool {
-	return Index(s, v) >= 0
-}
-
 func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
 	coll, ok := strings.CutPrefix(oplog.Namespace, "config.")
 	if !ok {
 		return true // OK: not a "config" database. allow any ops
 	}
 
-	if Contains(ConfigCollectionsToKeep, coll) {
+	if slices.Contains(ConfigCollectionsToKeep, coll) {
 		return true // OK: create/update/delete a doc
 	}
 
@@ -269,7 +252,7 @@ func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
 		}
 		if _, ok := selectedNSSupportedCommands[op]; ok {
 			s, _ := oplog.Object[0].Value.(string)
-			return Contains(ConfigCollectionsToKeep, s)
+			return slices.Contains(ConfigCollectionsToKeep, s)
 		}
 	}
 

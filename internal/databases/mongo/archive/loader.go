@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -101,8 +101,8 @@ func (sd *StorageDownloader) LoadBackups(names []string) ([]*models.Backup, erro
 		}
 		backups = append(backups, backup)
 	}
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].FinishLocalTime.After(backups[j].FinishLocalTime)
+	slices.SortFunc(backups, func(a, b *models.Backup) int {
+		return b.FinishLocalTime.Compare(a.FinishLocalTime)
 	})
 	return backups, nil
 }

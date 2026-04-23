@@ -6,7 +6,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -61,8 +61,8 @@ func TestSortLatestTime(t *testing.T) {
 		sortTimes[i] = val.input
 	}
 
-	sort.Slice(sortTimes, func(i, j int) bool {
-		return sortTimes[i].Time.After(sortTimes[j].Time)
+	slices.SortFunc(sortTimes, func(a, b internal.BackupTime) int {
+		return b.Time.Compare(a.Time)
 	})
 
 	for i, val := range sortTimes {

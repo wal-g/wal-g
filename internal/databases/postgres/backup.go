@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -329,12 +330,10 @@ func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap m
 		return true
 	}
 
-	tarFiles := filesMeta.TarFileSets[tarName]
-
-	for _, file := range tarFiles {
-		if filesToUnwrap[file] {
-			return true
-		}
+	if slices.ContainsFunc(filesMeta.TarFileSets[tarName], func(file string) bool {
+		return filesToUnwrap[file]
+	}) {
+		return true
 	}
 
 	tracelog.DebugLogger.Printf("Skipping archive '%s'\n", tarName)

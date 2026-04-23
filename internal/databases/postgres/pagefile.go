@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/RoaringBitmap/roaring"
@@ -107,12 +108,9 @@ var transactionStateDirectories = []string{
 
 // isTransactionStatePath checks if the given path contains any transaction state related directories
 func isTransactionStatePath(filePath string) bool {
-	for _, dir := range transactionStateDirectories {
-		if strings.Contains(filePath, dir) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(transactionStateDirectories, func(dir string) bool {
+		return strings.Contains(filePath, dir)
+	})
 }
 
 // isPagedFile checks basic expectations for paged file

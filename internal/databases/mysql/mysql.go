@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -123,8 +123,8 @@ func getLastUploadedBinlog(folder storage.Folder) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sort.Slice(logFiles, func(i, j int) bool {
-		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	slices.SortFunc(logFiles, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
 	})
 	if len(logFiles) == 0 {
 		return "", nil
@@ -143,8 +143,8 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 	if err != nil {
 		return "", err
 	}
-	sort.Slice(logFiles, func(i, j int) bool {
-		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	slices.SortFunc(logFiles, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
 	})
 	if len(logFiles) == 0 {
 		return "", nil
@@ -358,8 +358,8 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStar
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(logFiles, func(i, j int) bool {
-		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	slices.SortFunc(logFiles, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
 	})
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {

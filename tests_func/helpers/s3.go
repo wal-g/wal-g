@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -181,10 +182,10 @@ func (s *S3Storage) ArchTsExists(ts OpTimestamp) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, arch := range archives {
-		if (LessTS(arch.StartTS, ts) && LessTS(ts, arch.EndTS)) || arch.EndTS == ts {
-			return true, nil
-		}
+	if slices.ContainsFunc(archives, func(a Archive) bool {
+		return (LessTS(a.StartTS, ts) && LessTS(ts, a.EndTS)) || a.EndTS == ts
+	}) {
+		return true, nil
 	}
 
 	return false, fmt.Errorf("archive with ts '%v' was not found", ts)

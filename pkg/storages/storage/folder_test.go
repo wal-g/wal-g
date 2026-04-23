@@ -3,6 +3,7 @@ package storage_test
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -32,14 +33,9 @@ func TestListFolderRecursively(t *testing.T) {
 	fullPathObjects, err := storage.ListFolderRecursively(folder)
 	assert.NoError(t, err)
 	for _, relativePath := range paths {
-		found := false
-		for _, object := range fullPathObjects {
-			if object.GetName() == relativePath {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found)
+		assert.True(t, slices.ContainsFunc(fullPathObjects, func(o storage.Object) bool {
+			return o.GetName() == relativePath
+		}))
 	}
 }
 
