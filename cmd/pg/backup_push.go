@@ -16,7 +16,7 @@ import (
 
 const (
 	backupPushShortDescription = "Makes backup and uploads it to storage"
-
+	// JSONFlag                   = "json"
 	permanentFlag             = "permanent"
 	fullBackupFlag            = "full"
 	verifyPagesFlag           = "verify"
@@ -128,6 +128,9 @@ var (
 	deltaFromUserData     = ""
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
+	// pretty                = false
+	// json                  = false
+	// detail                = false
 )
 
 func chooseTarBallComposer() postgres.TarBallComposerType {
@@ -155,6 +158,10 @@ func chooseTarBallComposer() postgres.TarBallComposerType {
 func init() {
 	Cmd.AddCommand(backupPushCmd)
 
+	backupPushCmd.Flags().BoolVar(&pretty, PrettyFlag, false,
+		"Prints more readable output in table format")
+	backupPushCmd.Flags().BoolVar(&json, JSONFlag, false,
+		"Prints output in JSON format, multiline and indented if combined with --pretty flag")
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,

@@ -20,6 +20,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/printlist"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -28,6 +29,26 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
+
+type BackupInfo struct {
+	Name    string
+	Storage string
+}
+
+func (b BackupInfo) PrintableFields() []printlist.TableField {
+	return []printlist.TableField{
+		{
+			Name:       "name",
+			PrettyName: "Name of backup",
+			Value:      b.Name,
+		},
+		{
+			Name:       "storage",
+			PrettyName: "Name of storage",
+			Value:      b.Storage,
+		},
+	}
+}
 
 type backupFromFuture struct {
 	error
@@ -68,6 +89,8 @@ type BackupArguments struct {
 	withoutFilesMetadata     bool
 	composerInitFunc         func(handler *BackupHandler) error
 	preventConcurrentBackups bool
+	json                     bool
+	pretty                   bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -140,6 +163,8 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 			return configureTarBallComposer(handler, tarBallComposerType)
 		},
 		preventConcurrentBackups: false,
+		json:                     false,
+		pretty:                   false,
 	}
 }
 
@@ -194,7 +219,13 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 
 	// logging backup set Name
-	tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
+	createdBackup := BackupInfo{Name: bh.CurBackupInfo.Name, Storage: storageNames[0]}
+	if bh.Arguments.json {
+		err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.json, bh.Arguments.pretty)
+	} else {
+		tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
+	}
+
 }
 
 func (bh *BackupHandler) startBackup() error {
