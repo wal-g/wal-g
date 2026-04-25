@@ -118,18 +118,6 @@ func pgChecksumBlock(page *PgDatabasePage) uint32 {
 	return result
 }
 
-// pageVerifier holds backup-level context for page checksum validation.
-// fullPageWrites and backupStartLSN are invariant across all pages in a single backup,
-// so they live in the struct rather than being threaded through every call.
-type pageVerifier struct {
-	fullPageWrites bool
-	backupStartLSN LSN
-}
-
-func newPageVerifier(fullPageWrites bool, backupStartLSN LSN) *pageVerifier {
-	return &pageVerifier{fullPageWrites: fullPageWrites, backupStartLSN: backupStartLSN}
-}
-
 // This function is an adaptation of is_page_corrupted() from
 // https://github.com/google/pg_page_verification/blob/master/pg_page_verification.c
 
@@ -139,7 +127,7 @@ func newPageVerifier(fullPageWrites bool, backupStartLSN LSN) *pageVerifier {
 // checking pages before they are loaded into buffer pool.
 //
 // see:  src/backend/storage/page/bufpage.info
-func (v *pageVerifier) isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, error) {
+func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage, fullPageWrites bool, backupStartLSN LSN) (bool, error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {
 		return false, err
@@ -165,12 +153,12 @@ func (v *pageVerifier) isPageCorrupted(path string, blockNo uint32, page *PgData
 	}
 
 	// Skip validation for pages modified after backup start when full_page_writes is on.
-	// Such pages will be recovered via Full Page Images in WAL during restore,
+	// Such pages will be recovered via Full Page Images (FPI) in WAL during restore,
 	// so torn pages or transient corruption cannot cause data loss.
-	if v.fullPageWrites && pageHeader.lsn() > v.backupStartLSN {
+	if fullPageWrites && pageHeader.lsn() > backupStartLSN {
 		tracelog.DebugLogger.Printf(
 			"isPageCorrupted: skipping %s/[%d], page LSN %s > backupStartLSN %s (full_page_writes on)",
-			path, blockNo, pageHeader.lsn(), v.backupStartLSN)
+			path, blockNo, pageHeader.lsn(), backupStartLSN)
 		return false, nil
 	}
 
@@ -200,7 +188,7 @@ func (v *pageVerifier) isPageCorrupted(path string, blockNo uint32, page *PgData
 }
 
 // VerifyPagedFileIncrement verifies pages of an increment
-func (v *pageVerifier) VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Reader) ([]uint32, error) {
+func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Reader, fullPageWrites bool, backupStartLSN LSN) ([]uint32, error) {
 	_, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {
 		return nil, err
@@ -210,29 +198,29 @@ func (v *pageVerifier) VerifyPagedFileIncrement(path string, fileInfo os.FileInf
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		blockNumbers = append(blockNumbers, blockNo)
 	}
-	return v.verifyPageBlocks(path, fileInfo, increment, blockNumbers)
+	return verifyPageBlocks(path, fileInfo, increment, blockNumbers, fullPageWrites, backupStartLSN)
 }
 
 // VerifyPagedFileBase verifies pages of a standard paged file
-func (v *pageVerifier) VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader) ([]uint32, error) {
+func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader, fullPageWrites bool, backupStartLSN LSN) ([]uint32, error) {
 	size := fileInfo.Size()
 	filePageCount := uint32((size + DatabasePageSize - 1) / DatabasePageSize)
 	blockNumbers := make([]uint32, 0, filePageCount)
 	for i := uint32(0); i < filePageCount; i++ {
 		blockNumbers = append(blockNumbers, i)
 	}
-	return v.verifyPageBlocks(path, fileInfo, pagedFile, blockNumbers)
+	return verifyPageBlocks(path, fileInfo, pagedFile, blockNumbers, fullPageWrites, backupStartLSN)
 }
 
 // verifyPageBlocks verifies provided page blocks from the pagedBlocks reader
-func (v *pageVerifier) verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
-	blockNumbers []uint32) (corruptBlockNumbers []uint32, err error) {
+func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
+	blockNumbers []uint32, fullPageWrites bool, backupStartLSN LSN) (corruptBlockNumbers []uint32, err error) {
 	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored || !isChecksumValidatableFile(fileInfo, path) {
 		_, err = io.Copy(io.Discard, pageBlocks)
 		return nil, err
 	}
 	for _, blockNo := range blockNumbers {
-		corrupted, err := v.verifySinglePage(path, blockNo, pageBlocks)
+		corrupted, err := verifySinglePage(path, blockNo, pageBlocks, fullPageWrites, backupStartLSN)
 		if corrupted {
 			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
 		}
@@ -258,11 +246,11 @@ func (v *pageVerifier) verifyPageBlocks(path string, fileInfo os.FileInfo, pageB
 }
 
 // verifySinglePage reads and verifies single paged file block
-func (v *pageVerifier) verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, error) {
+func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader, fullPageWrites bool, backupStartLSN LSN) (bool, error) {
 	page := PgDatabasePage{}
 	_, err := io.ReadFull(pageBlocks, page[:DatabasePageSize])
 	if err != nil {
 		return false, err
 	}
-	return v.isPageCorrupted(path, blockNo, &page)
+	return isPageCorrupted(path, blockNo, &page, fullPageWrites, backupStartLSN)
 }
