@@ -727,6 +727,15 @@ func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
 	return dataChecksums, nil
 }
 
+// GetFullPageWrites retrieves the full_page_writes PostgreSQL setting.
+func (queryRunner *PgQueryRunner) GetFullPageWrites() (bool, error) {
+	value, err := queryRunner.GetParameter("full_page_writes")
+	if err != nil {
+		return false, errors.Wrap(err, "GetFullPageWrites: failed to retrieve full_page_writes")
+	}
+	return value == "on", nil
+}
+
 // GetArchiveMode retrieves the current archive_mode setting.
 func (queryRunner *PgQueryRunner) GetArchiveMode() (string, error) {
 	queryRunner.Mu.Lock()

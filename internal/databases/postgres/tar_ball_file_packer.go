@@ -33,12 +33,17 @@ func (err SkippedFileError) Error() string {
 type TarBallFilePackerOptions struct {
 	verifyPageChecksums   bool
 	storeAllCorruptBlocks bool
+	fullPageWrites        bool
+	backupStartLSN        LSN
 }
 
-func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool) TarBallFilePackerOptions {
+func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks, fullPageWrites bool,
+	backupStartLSN LSN) TarBallFilePackerOptions {
 	return TarBallFilePackerOptions{
 		verifyPageChecksums:   verifyPageChecksums,
 		storeAllCorruptBlocks: storeAllCorruptBlocks,
+		fullPageWrites:        fullPageWrites,
+		backupStartLSN:        backupStartLSN,
 	}
 }
 
@@ -49,6 +54,7 @@ type TarBallFilePackerImpl struct {
 	files                internal.BundleFiles
 	options              TarBallFilePackerOptions
 	IncrementFromChkpNum *uint32
+	pageVerifier         *pageVerifier
 }
 
 func NewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
@@ -58,6 +64,7 @@ func NewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, fil
 		incrementFromLsn: incrementFromLsn,
 		files:            files,
 		options:          options,
+		pageVerifier:     newPageVerifier(options.fullPageWrites, options.backupStartLSN),
 	}
 }
 
@@ -97,7 +104,7 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, t
 		// fileReadCloser is needed for PackFileTo, secondReadCloser is for the page verification
 		fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
 		errorGroup.Go(func() (err error) {
-			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented)
+			corruptBlocks, err := p.pageVerifier.verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented)
 			if err != nil {
 				return err
 			}
@@ -171,7 +178,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 	return fileReadCloser, nil
 }
 
-func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {
+func (v *pageVerifier) verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {
 	if !isChecksumValidatableFile(fileInfo, path) {
 		tracelog.DebugLogger.Printf(
 			"verifyFile: %s does not meet the criteria for checksum validation. "+
@@ -193,9 +200,9 @@ func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncre
 	}
 
 	if isIncremented {
-		return VerifyPagedFileIncrement(path, fileInfo, fileReader)
+		return v.VerifyPagedFileIncrement(path, fileInfo, fileReader)
 	}
-	return VerifyPagedFileBase(path, fileInfo, fileReader)
+	return v.VerifyPagedFileBase(path, fileInfo, fileReader)
 }
 
 // TeeReadCloser creates two io.ReadClosers from one
