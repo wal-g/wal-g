@@ -10,6 +10,8 @@ import (
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/compression/lzma"
 	"github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/limiters"
+	"golang.org/x/time/rate"
 
 	"github.com/wal-g/wal-g/testtools"
 
@@ -230,4 +232,138 @@ func TestGetDeltaConfig_DefaultOrigin(t *testing.T) {
 	assert.False(t, gotFull)
 
 	resetToDefaults()
+}
+
+func TestConfigureLimiters_NoSettings(t *testing.T) {
+	limiters.DiskLimiter = nil
+	limiters.NetworkLimiter = nil
+	defer func() {
+		limiters.DiskLimiter = nil
+		limiters.NetworkLimiter = nil
+	}()
+
+	internal.ConfigureLimiters()
+
+	assert.Nil(t, limiters.DiskLimiter)
+	assert.Nil(t, limiters.NetworkLimiter)
+}
+
+func TestConfigureLimiters_DiskRateLimit(t *testing.T) {
+	limiters.DiskLimiter = nil
+	defer func() { limiters.DiskLimiter = nil }()
+
+	const diskLimit = int64(1024)
+	viper.Set(config.DiskRateLimitSetting, diskLimit)
+	defer resetToDefaults()
+
+	internal.ConfigureLimiters()
+
+	assert.NotNil(t, limiters.DiskLimiter)
+	assert.Equal(t, rate.Limit(diskLimit), limiters.DiskLimiter.Limit())
+	assert.Equal(t, int(diskLimit+internal.DefaultDataBurstRateLimit), limiters.DiskLimiter.Burst())
+}
+
+func TestConfigureLimiters_NetworkRateLimit(t *testing.T) {
+	limiters.NetworkLimiter = nil
+	defer func() { limiters.NetworkLimiter = nil }()
+
+	const netLimit = int64(2048)
+	viper.Set(config.NetworkRateLimitSetting, netLimit)
+	defer resetToDefaults()
+
+	internal.ConfigureLimiters()
+
+	assert.NotNil(t, limiters.NetworkLimiter)
+	assert.Equal(t, rate.Limit(netLimit), limiters.NetworkLimiter.Limit())
+	assert.Equal(t, int(netLimit+internal.DefaultDataBurstRateLimit), limiters.NetworkLimiter.Burst())
+}
+
+func TestConfigureLimiters_BothLimits(t *testing.T) {
+	limiters.DiskLimiter = nil
+	limiters.NetworkLimiter = nil
+	defer func() {
+		limiters.DiskLimiter = nil
+		limiters.NetworkLimiter = nil
+	}()
+
+	viper.Set(config.DiskRateLimitSetting, int64(512))
+	viper.Set(config.NetworkRateLimitSetting, int64(1024))
+	defer resetToDefaults()
+
+	internal.ConfigureLimiters()
+
+	assert.NotNil(t, limiters.DiskLimiter)
+	assert.NotNil(t, limiters.NetworkLimiter)
+}
+
+func TestConfigureLimiters_TurboSkipsLimiters(t *testing.T) {
+	limiters.DiskLimiter = nil
+	limiters.NetworkLimiter = nil
+	defer func() {
+		limiters.DiskLimiter = nil
+		limiters.NetworkLimiter = nil
+		config.Turbo = false
+	}()
+
+	viper.Set(config.DiskRateLimitSetting, int64(1024))
+	viper.Set(config.NetworkRateLimitSetting, int64(1024))
+	config.Turbo = true
+	defer resetToDefaults()
+
+	internal.ConfigureLimiters()
+
+	assert.Nil(t, limiters.DiskLimiter)
+	assert.Nil(t, limiters.NetworkLimiter)
+}
+
+func TestConfigureStorage_NoStorageConfigured(t *testing.T) {
+	resetToDefaults()
+
+	st, err := internal.ConfigureStorage()
+
+	assert.Error(t, err)
+	assert.IsType(t, internal.UnconfiguredStorageError{}, err)
+	assert.Nil(t, st)
+}
+
+func TestConfigureStorage_FileStorage(t *testing.T) {
+	dir := t.TempDir()
+	viper.Set("WALG_FILE_PREFIX", dir)
+	defer resetToDefaults()
+
+	st, err := internal.ConfigureStorage()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, st)
+	assert.NotEmpty(t, st.ConfigHash())
+}
+
+func TestConfigureStorage_FileStorageWithPrefix(t *testing.T) {
+	dir := t.TempDir()
+	viper.Set("WALG_FILE_PREFIX", dir)
+	viper.Set(config.StoragePrefixSetting, "myprefix")
+	defer resetToDefaults()
+
+	st, err := internal.ConfigureStorage()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, st)
+	assert.Contains(t, st.RootFolder().GetPath(), "myprefix")
+}
+
+func TestConfigureStorage_WithNetworkLimiter(t *testing.T) {
+	dir := t.TempDir()
+	viper.Set("WALG_FILE_PREFIX", dir)
+	limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(1024), 1024)
+	defer func() {
+		limiters.NetworkLimiter = nil
+		resetToDefaults()
+	}()
+
+	st, err := internal.ConfigureStorage()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, st)
+	_, isLimited := st.RootFolder().(*internal.LimitedFolder)
+	assert.True(t, isLimited, "expected root folder to be wrapped in LimitedFolder")
 }
