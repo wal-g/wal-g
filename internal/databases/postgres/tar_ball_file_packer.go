@@ -54,7 +54,6 @@ type TarBallFilePackerImpl struct {
 	files                internal.BundleFiles
 	options              TarBallFilePackerOptions
 	IncrementFromChkpNum *uint32
-	pageVerifier         *pageVerifier
 }
 
 func NewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, files internal.BundleFiles,
@@ -64,7 +63,6 @@ func NewTarBallFilePacker(deltaMap PagedFileDeltaMap, incrementFromLsn *LSN, fil
 		incrementFromLsn: incrementFromLsn,
 		files:            files,
 		options:          options,
-		pageVerifier:     newPageVerifier(options.fullPageWrites, options.backupStartLSN),
 	}
 }
 
@@ -104,7 +102,7 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, t
 		// fileReadCloser is needed for PackFileTo, secondReadCloser is for the page verification
 		fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
 		errorGroup.Go(func() (err error) {
-			corruptBlocks, err := p.pageVerifier.verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented)
+			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented, p.options.fullPageWrites, p.options.backupStartLSN)
 			if err != nil {
 				return err
 			}
@@ -178,7 +176,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 	return fileReadCloser, nil
 }
 
-func (v *pageVerifier) verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {
+func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool, fullPageWrites bool, backupStartLSN LSN) ([]uint32, error) {
 	if !isChecksumValidatableFile(fileInfo, path) {
 		tracelog.DebugLogger.Printf(
 			"verifyFile: %s does not meet the criteria for checksum validation. "+
@@ -200,9 +198,9 @@ func (v *pageVerifier) verifyFile(path string, fileInfo os.FileInfo, fileReader 
 	}
 
 	if isIncremented {
-		return v.VerifyPagedFileIncrement(path, fileInfo, fileReader)
+		return VerifyPagedFileIncrement(path, fileInfo, fileReader, fullPageWrites, backupStartLSN)
 	}
-	return v.VerifyPagedFileBase(path, fileInfo, fileReader)
+	return VerifyPagedFileBase(path, fileInfo, fileReader, fullPageWrites, backupStartLSN)
 }
 
 // TeeReadCloser creates two io.ReadClosers from one

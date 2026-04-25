@@ -37,8 +37,7 @@ func TestPageVerifier_DetectsReplacement(t *testing.T) {
 
 	copy(page[6000:6004], []byte{0xDE, 0xAD, 0xBE, 0xEF})
 
-	v := newPageVerifier(false /* fullPageWrites */, LSN(0))
-	corrupted, err := v.isPageCorrupted("base/1/16384", 0, &page)
+	corrupted, err := isPageCorrupted("base/1/16384", 0, &page, false /* fullPageWrites */, LSN(0))
 	require.NoError(t, err)
 	require.True(t, corrupted)
 }
@@ -63,8 +62,7 @@ func TestPageVerifier_InvalidSizeOnInsertion(t *testing.T) {
 	require.NoError(t, err)
 	defer f.Close()
 
-	v := newPageVerifier(false, LSN(0))
-	corruptBlocks, err := v.verifyFile(filePath, fileInfo, f, false)
+	corruptBlocks, err := verifyFile(filePath, fileInfo, f, false, false, LSN(0))
 	require.NoError(t, err)
 	require.Empty(t, corruptBlocks)
 }
@@ -76,8 +74,7 @@ func TestPageVerifier_SkipsTornPage(t *testing.T) {
 	page := buildValidChecksummedPage(t, 0, "base/1/16384")
 	copy(page[6000:6004], []byte{0xDE, 0xAD, 0xBE, 0xEF})
 
-	v := newPageVerifier(true, LSN(1))
-	corrupted, err := v.isPageCorrupted("base/1/16384", 0, &page)
+	corrupted, err := isPageCorrupted("base/1/16384", 0, &page, true, LSN(1))
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -89,8 +86,7 @@ func TestPageVerifier_DetectsCorruptionWhenLSNBeforeBackup(t *testing.T) {
 	copy(page[6000:6004], []byte{0xDE, 0xAD, 0xBE, 0xEF})
 
 	// Page LSN = 100, backupStartLSN = 200 → lsn() < backupStartLSN.
-	v := newPageVerifier(true, LSN(200))
-	corrupted, err := v.isPageCorrupted("base/1/16384", 0, &page)
+	corrupted, err := isPageCorrupted("base/1/16384", 0, &page, true, LSN(200))
 	require.NoError(t, err)
 	require.True(t, corrupted)
 }
