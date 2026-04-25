@@ -188,7 +188,9 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage, fullPage
 }
 
 // VerifyPagedFileIncrement verifies pages of an increment
-func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Reader, fullPageWrites bool, backupStartLSN LSN) ([]uint32, error) {
+func VerifyPagedFileIncrement(
+	path string, fileInfo os.FileInfo, increment io.Reader, fullPageWrites bool, backupStartLSN LSN,
+) ([]uint32, error) {
 	_, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {
 		return nil, err
@@ -202,7 +204,9 @@ func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Re
 }
 
 // VerifyPagedFileBase verifies pages of a standard paged file
-func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader, fullPageWrites bool, backupStartLSN LSN) ([]uint32, error) {
+func VerifyPagedFileBase(
+	path string, fileInfo os.FileInfo, pagedFile io.Reader, fullPageWrites bool, backupStartLSN LSN,
+) ([]uint32, error) {
 	size := fileInfo.Size()
 	filePageCount := uint32((size + DatabasePageSize - 1) / DatabasePageSize)
 	blockNumbers := make([]uint32, 0, filePageCount)

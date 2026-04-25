@@ -102,7 +102,9 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, t
 		// fileReadCloser is needed for PackFileTo, secondReadCloser is for the page verification
 		fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
 		errorGroup.Go(func() (err error) {
-			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented, p.options.fullPageWrites, p.options.backupStartLSN)
+			corruptBlocks, err := verifyFile(
+				cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented,
+				p.options.fullPageWrites, p.options.backupStartLSN)
 			if err != nil {
 				return err
 			}
@@ -176,7 +178,9 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 	return fileReadCloser, nil
 }
 
-func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool, fullPageWrites bool, backupStartLSN LSN) ([]uint32, error) {
+func verifyFile(
+	path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool, fullPageWrites bool, backupStartLSN LSN,
+) ([]uint32, error) {
 	if !isChecksumValidatableFile(fileInfo, path) {
 		tracelog.DebugLogger.Printf(
 			"verifyFile: %s does not meet the criteria for checksum validation. "+
