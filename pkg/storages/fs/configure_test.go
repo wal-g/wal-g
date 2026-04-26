@@ -48,7 +48,7 @@ func TestConfigureStorageAppliesRootWraps(t *testing.T) {
 
 	st, err := ConfigureStorage(tmpDir, nil, wrap)
 	require.NoError(t, err)
-	assert.True(t, wrapCalled)
+	require.True(t, wrapCalled)
 	require.NotNil(t, st)
 
 	err = st.RootFolder().PutObject("wrapped-check.txt", strings.NewReader(""))
