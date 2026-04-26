@@ -32,6 +32,7 @@ func TestConfigureStorageReturnsWrappedErrorForMissingRoot(t *testing.T) {
 
 	assert.Nil(t, st)
 	require.Error(t, err)
+	assert.ErrorIs(t, err, os.ErrNotExist)
 	assert.ErrorContains(t, err, "create FS storage")
 	assert.ErrorContains(t, err, "FS storage root directory doesn't exist or is inaccessible")
 }
