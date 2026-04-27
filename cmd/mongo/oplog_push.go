@@ -2,8 +2,6 @@ package mongo
 
 import (
 	"context"
-	"os"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,7 +16,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
 	"github.com/wal-g/wal-g/internal/webserver"
-	"github.com/wal-g/wal-g/utility"
 )
 
 // oplogPushCmd represents the continuous oplog archiving procedure
@@ -29,10 +26,7 @@ var oplogPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		var err error
 		defer func() { tracelog.ErrorLogger.FatalOnError(err) }()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
+		ctx := cmd.Context()
 
 		pushArgs, err := buildOplogPushRunArgs()
 		if err != nil {

@@ -1,17 +1,14 @@
 package redis
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis"
-	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -30,10 +27,7 @@ var backupFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
+		ctx := cmd.Context()
 
 		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)

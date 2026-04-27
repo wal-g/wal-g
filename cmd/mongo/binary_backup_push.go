@@ -1,15 +1,10 @@
 package mongo
 
 import (
-	"context"
-	"os"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -33,10 +28,6 @@ var binaryBackupPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
 		pushArgs := mongo.HandleBinaryBackupPushArgs{
 			Permanent:     permanent,
 			SkipMetadata:  skipMetadata,
@@ -44,7 +35,7 @@ var binaryBackupPushCmd = &cobra.Command{
 			CountJournals: countJournals,
 			UserDataRaw:   userDataRaw,
 		}
-		err := mongo.HandleBinaryBackupPush(ctx, pushArgs)
+		err := mongo.HandleBinaryBackupPush(cmd.Context(), pushArgs)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
