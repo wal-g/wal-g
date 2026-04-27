@@ -1,10 +1,8 @@
 package redis
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -33,10 +31,7 @@ var backupPushCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
-
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
+		ctx := cmd.Context()
 
 		uploader, err := internal.ConfigureUploader()
 		tracelog.ErrorLogger.FatalOnError(err)
