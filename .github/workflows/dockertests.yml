@@ -78,6 +78,7 @@ jobs:
     name: test
     runs-on: ubuntu-latest
     needs: [ buildimages ]
+    timeout-minutes: 60
     strategy:
       matrix:
         # GH Actions lack of complex types support for inputs.
@@ -122,6 +123,37 @@ jobs:
 
       - name: Run test
         run: ${{ matrix.command }}
+
+      - name: Collect container logs
+        if: always()
+        run: |
+          set +e
+          mkdir -p container-logs
+          containers=$(docker ps -a --filter 'name=wal-g_' --format '{{.Names}}')
+          for c in $containers; do
+            mkdir -p "container-logs/$c"
+            docker logs "$c" >"container-logs/$c/stdout.log" 2>"container-logs/$c/stderr.log"
+            docker cp "$c:/var/log" "container-logs/$c/var-log" 2>/dev/null
+          done
+          ls -R container-logs || true
+
+      - name: Sanitize artifact name
+        if: always()
+        id: artifact
+        env:
+          COMMAND: ${{ matrix.command }}
+        run: |
+          slug=$(printf '%s' "$COMMAND" | tr -c 'A-Za-z0-9._-' '_' | cut -c1-80)
+          echo "slug=$slug" >>"$GITHUB_OUTPUT"
+
+      - name: Upload container logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ steps.artifact.outputs.slug }}
+          path: container-logs
+          if-no-files-found: ignore
+          retention-days: 14
     env:
       USE_BROTLI: 1
       USE_LIBSODIUM: 1
