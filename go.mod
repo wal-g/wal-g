@@ -28,7 +28,7 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/minio/sio v0.2.0
-	github.com/pierrec/lz4/v4 v4.1.26
+	github.com/pierrec/lz4/v4 v4.1.21
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
 	github.com/spf13/cobra v1.4.0
