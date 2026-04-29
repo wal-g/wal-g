@@ -202,7 +202,7 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
-		uploader.failed.Load()
+		uploader.failed.Store(true)
 		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 		return err
 	}
