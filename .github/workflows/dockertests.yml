@@ -134,6 +134,11 @@ jobs:
             mkdir -p "container-logs/$c"
             docker logs "$c" >"container-logs/$c/stdout.log" 2>"container-logs/$c/stderr.log"
             docker cp "$c:/var/log" "container-logs/$c/var-log" 2>/dev/null
+            # gpdemo: postgres server logs and WAL archive_status (skip data files)
+            docker exec "$c" sh -c '
+              find /usr/local/gpdb_src/gpAux/gpdemo/datadirs -type d \( -name log -o -name pg_log -o -name archive_status \) -print0 2>/dev/null |
+                tar --null -cf - -T - 2>/dev/null
+            ' 2>/dev/null | tar -xf - -C "container-logs/$c/" 2>/dev/null
           done
           ls -R container-logs || true
 
