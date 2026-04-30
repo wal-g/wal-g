@@ -15,7 +15,7 @@ type PermanentObject struct {
 }
 
 func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool, map[PermanentObject]bool) {
-	tracelog.InfoLogger.Println("retrieving permanent objects")
+	tracelog.InfoLogger.Println("retrieving permanent objects and snapshot backups")
 	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return map[PermanentObject]bool{}, map[PermanentObject]bool{}
@@ -25,6 +25,8 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool
 
 	permanentBackups := map[PermanentObject]bool{}
 	permanentWals := map[PermanentObject]bool{}
+	snapshotBackupCount := 0
+	
 	for _, backupTime := range backupTimes {
 		backup, err := NewBackupInStorage(backupsFolder, backupTime.BackupName, backupTime.StorageName)
 		if err != nil {
@@ -36,7 +38,18 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
 		}
-		if meta.IsPermanent {
+		
+		sentinel := backup.SentinelDto
+		if sentinel == nil {
+			tracelog.WarningLogger.Printf("Backup %s has no sentinel, skipping WAL protection", backupTime.BackupName)
+			continue
+		}
+		
+		// Check if this is a snapshot backup (WAL files are critical for snapshot backups)
+		isSnapshotBackup := IsSnapshotBackup(backupTime.BackupName, *sentinel)
+		
+		// Protect WAL files for permanent backups OR snapshot backups
+		if meta.IsPermanent || isSnapshotBackup {
 			timelineID, err := ParseTimelineFromBackupName(backup.Name)
 			if err != nil {
 				tracelog.ErrorLogger.Printf("failed to parse backup timeline for backup %s with error %s, ignoring...",
@@ -54,17 +67,29 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool
 				}
 				permanentWals[walObj] = true
 			}
-			backupObj := PermanentObject{
-				Name:        backupTime.BackupName,
-				StorageName: backupTime.StorageName,
+			
+			if meta.IsPermanent {
+				backupObj := PermanentObject{
+					Name:        backupTime.BackupName,
+					StorageName: backupTime.StorageName,
+				}
+				permanentBackups[backupObj] = true
 			}
-			permanentBackups[backupObj] = true
+			
+			if isSnapshotBackup {
+				snapshotBackupCount++
+			}
 		}
 	}
+	
 	if len(permanentBackups) > 0 {
-		tracelog.InfoLogger.Printf("Found permanent objects: backups=%v, wals=%v\n",
-			permanentBackups, permanentWals)
+		tracelog.InfoLogger.Printf("Found permanent backups: %d, protected WALs: %d\n",
+			len(permanentBackups), len(permanentWals))
 	}
+	if snapshotBackupCount > 0 {
+		tracelog.InfoLogger.Printf("Found snapshot backups: %d (WAL segments protected)\n", snapshotBackupCount)
+	}
+	
 	return permanentBackups, permanentWals
 }
 
