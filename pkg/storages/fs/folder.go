@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -44,10 +46,15 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			// I do not use GetSubfolder() intentially
 			subPath := path.Join(folder.subPath, fileInfo.Name()) + "/"
 			subFolders = append(subFolders, NewFolder(folder.rootPath, subPath))
-		} else {
-			info, _ := fileInfo.Info()
-			objects = append(objects, storage.NewLocalObject(fileInfo.Name(), info.ModTime(), info.Size()))
+			continue
 		}
+
+		if storage.HasTimestampRandomTmpSuffix(fileInfo.Name()) {
+			continue // Do not list objects that have not been written yet, like S3.
+		}
+
+		info, _ := fileInfo.Info()
+		objects = append(objects, storage.NewLocalObject(fileInfo.Name(), info.ModTime(), info.Size()))
 	}
 	return
 }
@@ -101,9 +108,14 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 func (folder *Folder) PutObject(name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subPath)
 	filePath := folder.GetFilePath(name)
-	file, err := OpenFileWithDir(filePath)
+	randomSuffix, err := storage.NewTimestampRandomTag()
 	if err != nil {
-		return fmt.Errorf("unable to open file %q: %w", filePath, err)
+		return fmt.Errorf("failed to generate random postfix: %w", err)
+	}
+	tmpFilePath := filePath + randomSuffix
+	file, err := OpenFileWithDir(tmpFilePath)
+	if err != nil {
+		return fmt.Errorf("unable to open file %q: %w", tmpFilePath, err)
 	}
 	_, err = io.Copy(file, content)
 	if err != nil {
@@ -111,11 +123,32 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		if closerErr != nil {
 			tracelog.InfoLogger.Println("Error during closing failed upload ", closerErr)
 		}
-		return fmt.Errorf("unable to copy data to file %q: %w", filePath, err)
+		return fmt.Errorf("unable to copy data to file %q: %w", tmpFilePath, err)
+	}
+	if err := file.Sync(); err != nil {
+		closerErr := file.Close()
+		if closerErr != nil {
+			tracelog.InfoLogger.Println("Error during closing failed upload ", closerErr)
+		}
+		return fmt.Errorf("unable to flush file contents to disk %q: %w", tmpFilePath, err)
 	}
 	err = file.Close()
 	if err != nil {
-		return fmt.Errorf("unable to close file %q: %w", filePath, err)
+		return fmt.Errorf("unable to close file %q: %w", tmpFilePath, err)
+	}
+	if err := os.Rename(tmpFilePath, filePath); err != nil {
+		return fmt.Errorf("unable to rename tmp file %q to %q: %w", tmpFilePath, filePath, err)
+	}
+	if runtime.GOOS == "windows" {
+		return nil // Windows cannot guarantee that folder entries are durable
+	}
+	dir, err := os.Open(filepath.Dir(filePath))
+	if err != nil {
+		return fmt.Errorf("unable to open directory for fsync: %w", err)
+	}
+	defer dir.Close()
+	if err := dir.Sync(); err != nil {
+		return fmt.Errorf("unable to fsync directory: %w", err)
 	}
 	return nil
 }

@@ -1,8 +1,10 @@
 package sh
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/pkg/sftp"
@@ -15,6 +17,8 @@ type SFTPClient interface {
 	ReadDir(path string) ([]os.FileInfo, error)
 	Join(elem ...string) string
 	Remove(path string) error
+	Rename(oldname, newname string) error
+	PosixRename(oldname, newname string) error
 	Stat(p string) (os.FileInfo, error)
 	Open(path string) (*sftp.File, error)
 	Create(path string) (*sftp.File, error)
@@ -62,4 +66,27 @@ func connect(addr string, config *ssh.ClientConfig) (*sftp.Client, error) {
 	}
 
 	return sftpClient, nil
+}
+
+// This could be made cleaner using client.HasExtension in sftp 1.13
+func renameSFTP(client SFTPClient, oldpath, newpath string) error {
+	err := client.PosixRename(oldpath, newpath)
+	if err == nil {
+		return nil
+	}
+
+	if isUnsupportedPosixRename(err) {
+		return client.Rename(oldpath, newpath)
+	}
+
+	return err
+}
+
+func isUnsupportedPosixRename(err error) bool {
+	var statusErr *sftp.StatusError
+	if errors.As(err, &statusErr) && statusErr.FxCode() == sftp.ErrSSHFxOpUnsupported {
+		return true
+	}
+
+	return strings.HasPrefix(err.Error(), "sftp: unimplemented packet type")
 }
