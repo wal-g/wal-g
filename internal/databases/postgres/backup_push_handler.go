@@ -543,7 +543,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), conn)
+	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), bh.PgInfo.PgVersion, conn)
 	var bundleFiles internal.BundleFiles
 	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}
