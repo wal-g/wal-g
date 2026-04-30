@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"github.com/apache/cloudberry-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/wal-g/tracelog"
 

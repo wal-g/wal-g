@@ -3,11 +3,12 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/apache/cloudberry-go-libs/cluster"
 
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"

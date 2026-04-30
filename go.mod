@@ -22,7 +22,6 @@ require (
 	github.com/gofrs/flock v0.8.0
 	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.6.0
-	github.com/greenplum-db/gp-common-go-libs v1.0.22
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/jackc/pglogrepl v0.0.0-20260401131349-e37c41485510
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
@@ -54,6 +53,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.3.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.3
 	github.com/aliyun/credentials-go v1.4.5
+	github.com/apache/cloudberry-go-libs v1.0.12-0.20250910014224-fc376e8a1056
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v1.1.0
 	github.com/klauspost/compress v1.18.5
