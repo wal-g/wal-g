@@ -68,7 +68,7 @@ func GetFolder(networkErrorAfterByteSize int) (storage.Folder, func() error, err
 	if err != nil {
 		return nil, nil, err
 	}
-	// Create temp directory.
+	// Create temp Directory.
 	tmpDir, err := os.MkdirTemp(cwd, "data")
 	if err != nil {
 		return nil, nil, err
@@ -172,7 +172,7 @@ func GetS3Folder(networkErrorAfterByteSize int) (storage.Folder, func() error, e
 	if err != nil {
 		return nil, nil, err
 	}
-	// Create temp directory.
+	// Create temp Directory.
 	tmpDir, err := os.MkdirTemp(cwd, "data")
 	if err != nil {
 		return nil, nil, err

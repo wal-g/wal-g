@@ -42,7 +42,7 @@ func NewWalUploader(
 // Clone creates similar WalUploader with new WaitGroup
 func (walUploader *WalUploader) clone() *WalUploader {
 	return &WalUploader{
-		Uploader:               walUploader.Uploader.Clone(),
+		Uploader:               walUploader.Clone(),
 		ArchiveStatusManager:   walUploader.ArchiveStatusManager,
 		PGArchiveStatusManager: walUploader.PGArchiveStatusManager,
 		DeltaFileManager:       walUploader.DeltaFileManager,

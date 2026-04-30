@@ -36,9 +36,13 @@ import (
 const (
 	pgDefaultDatabasePageSize = 8192
 	DefaultDataBurstRateLimit = 8 * pgDefaultDatabasePageSize
-	DefaultDataFolderPath     = "/tmp"
 	WaleFileHost              = "file://localhost"
 )
+
+// GetDefaultDataFolderPath is typically "/tmp"
+func GetDefaultDataFolderPath() string {
+	return filepath.ToSlash(os.TempDir())
+}
 
 var DeprecatedExternalGpgMessage = fmt.Sprintf(
 	`You are using deprecated functionality that uses an external gpg library.
@@ -158,7 +162,7 @@ func ConfigureStorageForSpecificConfig(
 
 func getWalFolderPath() string {
 	if !viper.IsSet(conf.PgDataSetting) {
-		return DefaultDataFolderPath
+		return GetDefaultDataFolderPath()
 	}
 	return getRelativeWalFolderPath(viper.GetString(conf.PgDataSetting))
 }
@@ -170,11 +174,11 @@ func getRelativeWalFolderPath(pgdata string) string {
 			return dataFolderPath
 		}
 	}
-	return DefaultDataFolderPath
+	return GetDefaultDataFolderPath()
 }
 
 func GetDataFolderPath() string {
-	return filepath.Join(getWalFolderPath(), "walg_data")
+	return filepath.ToSlash(filepath.Join(getWalFolderPath(), "walg_data"))
 }
 
 // GetPgSlotName reads the slot name from the environment
@@ -226,7 +230,7 @@ func ConfigureUploader() (*RegularUploader, error) {
 	return uploader, err
 }
 
-// ConfigureUploaderToFolder connects to storage with the specified folder and creates an uploader.
+// ConfigureUploaderToFolder connects to storage with the specified folder and creates an Uploader.
 // It makes sure that a valid session has started; if invalid, returns AWS error and `<nil>` value.
 func ConfigureUploaderToFolder(folder storage.Folder) (uploader *RegularUploader, err error) {
 	compressor, err := ConfigureCompressor()
@@ -369,7 +373,6 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	return nil, errors.New("there is no any supported envelope gpg crypter configuration")
 }
 
-// TODO : unit tests
 func GetDeltaConfig() (maxDeltas int, fromFull bool) {
 	maxDeltas = viper.GetInt(conf.DeltaMaxStepsSetting)
 	if origin, hasOrigin := conf.GetSetting(conf.DeltaOriginSetting); hasOrigin {

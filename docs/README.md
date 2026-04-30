@@ -57,7 +57,7 @@ There are two ways how you can configure WAL-G:
 
 2. Using a config file
 
-   `--config /path` flag can be used to specify the path where the config file is located.
+   `--config /path` flag can be used to specify the path where the config file is located. Alternatively, you can set the `WALG_CONFIG_PATH` environment variable to specify the config file path, so you don't need to pass the flag every time.
 
     We support every format that the [viper package](https://github.com/spf13/viper) supports: JSON, YAML, envfile and [others](https://github.com/spf13/viper#reading-config-files).
 
@@ -69,8 +69,8 @@ To configure where WAL-G stores backups, please consult the [Storages](STORAGES.
 ### Compression
 * `WALG_COMPRESSION_METHOD`
 
-To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `zstd`, `brotli`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
-LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli and zstd are a good trade-off between speed and compression ratio, which is about 3 times better than LZ4.
+To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `zstd`, `brotli`, `none`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
+LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli and zstd are a good trade-off between speed and compression ratio, which is about 3 times better than LZ4. None compression method disables compression.
 
 ### Encryption
 
@@ -270,7 +270,7 @@ Databases
 ### Redis [Beta]
 [Information about installing, configuration and usage](Redis.md)
 
-### Greenplum [Production ready]
+### Greenplum / Cloudberry [Production ready]
 [Information about installing, configuration and usage](Greenplum.md)
 
 ### ETCD [Work in progress]
@@ -371,6 +371,7 @@ The compiled binary to run is `main/pg/wal-g`
 
 WAL-G relies heavily on unit tests. These tests do not require S3 configuration as the upload/download parts are tested using mocked objects. Unit tests can be run using
 ```bash
+./link_brotli.sh
 export USE_BROTLI=1
 make unittest
 ```

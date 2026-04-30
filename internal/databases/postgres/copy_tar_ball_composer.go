@@ -235,23 +235,15 @@ func (c *CopyTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	if err != nil {
 		return nil, err
 	}
-	var tarBall internal.TarBall
 	for fileName := range c.fileInfo {
 		file := c.fileInfo[fileName]
 		if file.status == doNotCopy || file.status == fromNew {
-			tarBall = c.getTarBall()
-			c.errorGroup.Go(func() error {
-				err := c.tarFilePacker.PackFileIntoTar(file.info, tarBall)
-				if err != nil {
-					return err
-				}
-				return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
-			})
-			c.tarFileSets.AddFile(tarBall.Name(), fileName)
+			c.addFileToTarBall(fileName)
 			file.status = processed
 		}
 	}
 
+	var tarBall internal.TarBall
 	for headerName := range c.headerInfos {
 		header := c.headerInfos[headerName]
 		if header.status == doNotCopy || header.status == fromNew {
@@ -271,6 +263,19 @@ func (c *CopyTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 		return nil, err
 	}
 	return c.tarFileSets, nil
+}
+
+func (c *CopyTarBallComposer) addFileToTarBall(fileName string) {
+	file := c.fileInfo[fileName]
+	tarBall := c.getTarBall()
+	c.errorGroup.Go(func() error {
+		err := c.tarFilePacker.PackFileIntoTar(file.info, tarBall)
+		if err != nil {
+			return err
+		}
+		return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
+	})
+	c.tarFileSets.AddFile(tarBall.Name(), fileName)
 }
 
 func (c *CopyTarBallComposer) GetFiles() internal.BundleFiles {

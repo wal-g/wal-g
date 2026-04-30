@@ -1,0 +1,15 @@
+[
+  {"op":"c", "db":"partial", "id": 1, "dc":{"insert":"coll", "documents": [{"after_oplog": "val1", "after_oplog2": 1}]}},
+  {"op":"c", "db":"partial", "id": 2, "dc":{"insert":"coll2", "documents": [{"after_oplog": "val2"}, {"after_oplog2": "val3", "after_oplog3":  2}]}},
+  {"op":"c", "db":"partial", "dc":{ "createIndexes": "coll", "indexes": [{"key": { "foo1": 1, "foo2": 1 }, "name": "foo1_1_foo2_1" }]}},
+  {"op":"c", "db":"partial", "dc":{ "createIndexes": "coll", "indexes": [{"key": { "foo1": 1 }, "name": "foo1_1", "background": true}]}},
+  {"op":"c", "db":"partial", "dc":{ "dropIndexes": "coll", "index": "foo1_1"}},
+  {"op":"c", "db":"admin", "dc":{ "renameCollection": "partial.coll", "to": "partial.coll_new"}},
+  {"op":"c", "db":"partial", "dc":{ "insert": "coll_new", "documents": [{"after_oplog_test": 1, "after_oplog_test2": "value23"}]}},
+  {"op":"c", "db":"partial", "dc":{ "create": "coll_fr_capped", "collation": { "locale": "fr"}, "capped": true, "size": 65536 }},
+  {"op":"c", "db":"partial", "dc":{ "insert": "coll_fr_capped", "documents": [{"iam": "capped", "key1": 1}]}},
+  {"op":"c", "db":"partial", "dc":{ "insert": "coll_fr_capped", "documents": [{"iam": "capped too", "key2": 2}]}},
+  {"op":"c", "db":"partial", "dc":{ "insert": "coll_new", "documents": [{"key1": 1, "key2": "val20"}]}},
+  {"op":"c", "db":"partial", "dc":{ "create" : "view_1", "viewOn" : "coll_new", "pipeline" : [{ "$project" : { "coll_new_key1" : "key1" } }]}},
+  {"op":"c", "db":"partial", "dc":{ "create" : "view_2", "viewOn" : "coll_new", "pipeline" : [{ "$lookup": { "from": "coll_fr_capped", "localField": "key1", "foreignField": "key1", "as": "docs" } }, { "$project": { "docs._id": 1, "docs.key2": 1 }}] }}
+]

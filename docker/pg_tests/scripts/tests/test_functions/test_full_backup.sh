@@ -54,14 +54,12 @@ test_wal_overwrites() {
 test_full_backup()
 {
   TMP_CONFIG=$1
-  /usr/lib/postgresql/10/bin/initdb ${PGDATA}
+  initdb ${PGDATA}
 
   PG_VERSION=$(cat "${PGDATA}/PG_VERSION")
   archive_conf >> ${PGDATA}/postgresql.conf
 
-  /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
-
-  /tmp/scripts/wait_while_pg_not_ready.sh
+  pg_ctl -D ${PGDATA} -w start
 
   wal-g --config=${TMP_CONFIG} st rm / --target=all || true
 
@@ -99,7 +97,7 @@ test_full_backup()
     recovery_conf > "$PGDATA/recovery.conf"
   fi
 
-  /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
+  pg_ctl -D ${PGDATA} -w start
   /tmp/scripts/wait_while_pg_not_ready.sh
   pg_dumpall -f /tmp/dump2
 

@@ -5,14 +5,16 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/wal-g/wal-g/utility"
 	"hash/crc32"
 	"io"
+	"sync/atomic"
+
+	"github.com/wal-g/wal-g/utility"
 )
 
 type Reader struct {
 	reader       io.Reader
-	readPosition int64
+	readPosition atomic.Int64
 	withChecksum bool
 }
 
@@ -40,7 +42,7 @@ func (xbs *Reader) Next() (*Chunk, error) {
 	}
 
 	if !bytes.Equal(chunk.Magic, chunkMagic) {
-		return nil, fmt.Errorf("wrong chunk magic at offset %v", xbs.readPosition)
+		return nil, fmt.Errorf("wrong chunk magic at offset %v", xbs.readPosition.Load())
 	}
 
 	// Chunk Flags
@@ -55,6 +57,7 @@ func (xbs *Reader) Next() (*Chunk, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	chunk.Type = validateChunkType(chunk.Type)
+	// nolint : staticcheck
 	if chunk.Type == ChunkTypeUnknown && !(chunk.Flags&StreamFlagIgnorable == 1) {
 		return nil, errors.New("unknown chunk type")
 	}
@@ -66,7 +69,7 @@ func (xbs *Reader) Next() (*Chunk, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	if pathLen > MaxPathLen {
-		return nil, fmt.Errorf("path length %v is too large at offset %v", pathLen, xbs.readPosition)
+		return nil, fmt.Errorf("path length %v is too large at offset %v", pathLen, xbs.readPosition.Load())
 	}
 
 	// Path

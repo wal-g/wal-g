@@ -11,11 +11,20 @@ import (
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
-const (
-	WalPageSize         uint16 = 8192
-	BlockSize           uint16 = 8192
-	XLogRecordAlignment        = 8
+const XLogRecordAlignment = 8
+
+var (
+	WalPageSize uint16 = 8192
+	BlockSize   uint16 = 8192
 )
+
+func SetWalPageSize(sizeByte uint64) {
+	WalPageSize = uint16(sizeByte)
+}
+
+func SetBlockSize(sizeByte uint64) {
+	BlockSize = uint16(sizeByte)
+}
 
 type ZeroPageError struct {
 	error
@@ -128,7 +137,7 @@ func (parser *WalParser) parsePage(reader io.Reader) (*XLogPage, error) {
 	if err != nil {
 		return nil, err
 	}
-	remainingData := make([]byte, minUint32(pageHeader.RemainingDataLen, uint32(WalPageSize)))
+	remainingData := make([]byte, min(pageHeader.RemainingDataLen, uint32(WalPageSize)))
 	readCount, err := alignedReader.Read(remainingData)
 	if err != nil && errors.Cause(err) != io.EOF {
 		return nil, err

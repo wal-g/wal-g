@@ -3,7 +3,6 @@ package mongo
 import (
 	"context"
 	"fmt"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/utility"
@@ -18,6 +17,7 @@ func HandleBinaryFetchPush(
 	shardConnectionStrings []string,
 	skipBackupDownload, skipReconfig, skipChecks bool,
 	pitrSince, pitrUntil string,
+	whitelist, blacklist []string,
 ) error {
 	config, err := binary.CreateMongodConfig(mongodConfigPath)
 	if err != nil {
@@ -25,7 +25,6 @@ func HandleBinaryFetchPush(
 	}
 
 	localStorage := binary.CreateLocalStorage(config.GetDBPath())
-
 	uploader, err := internal.ConfigureUploader()
 	if err != nil {
 		return err
@@ -48,14 +47,17 @@ func HandleBinaryFetchPush(
 	if err = rsConfig.Validate(); err != nil {
 		return err
 	}
+
 	shConfig := binary.NewShConfig(shardName, mongoCfgConnectionString)
 	if err = shConfig.Validate(); err != nil {
 		return fmt.Errorf("ShConfig validation failed: %v", err)
 	}
+
 	mongocfgConfig, err := binary.NewMongoCfgConfig(shardConnectionStrings)
 	if err != nil {
 		return err
 	}
+
 	// check backup existence and resolve flag LATEST
 	backup, err := internal.GetBackupByName(backupName, "", uploader.Folder())
 	if err != nil {
@@ -64,7 +66,7 @@ func HandleBinaryFetchPush(
 
 	var replyOplogConfig binary.ReplyOplogConfig
 	if pitrSince != "" && pitrUntil != "" {
-		replyOplogConfig, err = binary.NewReplyOplogConfig(pitrSince, pitrUntil)
+		replyOplogConfig, err = binary.NewReplyOplogConfig(pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "")
 		if err != nil {
 			return err
 		}
@@ -82,6 +84,9 @@ func HandleBinaryFetchPush(
 			SkipChecks:         skipChecks,
 			SkipBackupDownload: skipBackupDownload,
 			SkipMongoReconfig:  skipReconfig,
+
+			Whitelist: whitelist,
+			Blacklist: blacklist,
 		},
 	)
 }

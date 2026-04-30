@@ -2,8 +2,6 @@
 set -e -x
 . /tmp/lib.sh
 
-export WALG_COMPRESSION_METHOD=lz4
-
 sleep $REDIS_TIMEOUT
 redis-server --save "" --appendonly "yes" --dir "/var/lib/redis" &
 sleep $REDIS_TIMEOUT

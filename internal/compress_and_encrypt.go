@@ -17,8 +17,12 @@ type CompressAndEncryptError struct {
 	error
 }
 
-func newCompressingPipeWriterError(reason string) CompressAndEncryptError {
-	return CompressAndEncryptError{errors.New(reason)}
+func newCompressingPipeWriterError(reason string, cause error) CompressAndEncryptError {
+	err := errors.Wrap(cause, reason)
+	if err == nil {
+		err = errors.New(reason)
+	}
+	return CompressAndEncryptError{err}
 }
 
 func (err CompressAndEncryptError) Error() string {
@@ -49,23 +53,19 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 	}
 
 	go func() {
-		_, err := utility.FastCopy(compressedWriter, source)
-
-		if err != nil {
-			e := newCompressingPipeWriterError("CompressAndEncrypt: compression failed")
+		if _, err := utility.FastCopy(compressedWriter, source); err != nil {
+			e := newCompressingPipeWriterError("CompressAndEncrypt: compression failed", err)
 			_ = dstWriter.CloseWithError(e)
 		}
 
 		if err := compressedWriter.Close(); err != nil {
-			e := newCompressingPipeWriterError("CompressAndEncrypt: writer close failed")
+			e := newCompressingPipeWriterError("CompressAndEncrypt: writer close failed", err)
 			_ = dstWriter.CloseWithError(e)
 			return
 		}
 		if crypter != nil {
-			err := writeCloser.Close()
-
-			if err != nil {
-				e := newCompressingPipeWriterError("CompressAndEncrypt: encryption failed")
+			if err := writeCloser.Close(); err != nil {
+				e := newCompressingPipeWriterError("CompressAndEncrypt: encryption failed", err)
 				_ = dstWriter.CloseWithError(e)
 				return
 			}

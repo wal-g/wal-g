@@ -34,7 +34,7 @@ func (t ExtractProviderImpl) getTarInterpreter(dbDataDir string, backup SegBacku
 		return nil, err
 	}
 
-	_, _, err = backup.Backup.GetSentinelAndFilesMetadata()
+	_, _, err = backup.GetSentinelAndFilesMetadata()
 	if err != nil {
 		return nil, err
 	}

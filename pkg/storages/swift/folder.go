@@ -133,9 +133,9 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	return nil
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
-	for _, objectRelativePath := range objectRelativePaths {
-		path := storage.JoinPath(folder.path, objectRelativePath)
+func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+	for _, object := range objectsWithRelativePaths {
+		path := storage.JoinPath(folder.path, object.GetName())
 		tracelog.DebugLogger.Printf("Delete object %v\n", path)
 		err := folder.connection.ObjectDelete(context.Background(), folder.container.Name, path)
 		if err == swift.ObjectNotFound {
@@ -154,3 +154,8 @@ func (folder *Folder) Validate() error {
 
 // NOT IMPLEMENTED
 func (folder *Folder) SetVersioningEnabled(enable bool) {}
+
+// NOT IMPLEMENTED
+func (folder *Folder) GetVersioningEnabled() bool {
+	return false
+}

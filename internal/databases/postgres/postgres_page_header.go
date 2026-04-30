@@ -21,6 +21,7 @@ func (header *PageHeader) lsn() LSN {
 	return LSN(((uint64(header.pdLsnH)) << 32) + uint64(header.pdLsnL))
 }
 
+// nolint : staticcheck
 func (header *PageHeader) isValid() bool {
 	return !((header.pdFlags&validFlags) != header.pdFlags ||
 		header.pdLower < headerSize ||
@@ -28,7 +29,8 @@ func (header *PageHeader) isValid() bool {
 		header.pdUpper > header.pdSpecial ||
 		int64(header.pdSpecial) > DatabasePageSize ||
 		(header.lsn() == invalidLsn) ||
-		int64(header.pdPageSizeVersion) != DatabasePageSize+layoutVersion)
+		int64(header.pdPageSizeVersion&0xFF00) != DatabasePageSize ||
+		int64(header.pdPageSizeVersion&0xFF) > layoutVersion)
 }
 
 func (header *PageHeader) isNew() bool {

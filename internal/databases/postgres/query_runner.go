@@ -208,7 +208,16 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 		return nil
 	}
 	conn := queryRunner.Connection
-	err = conn.QueryRow(context.TODO(), queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
+	var systemIdentifier int64
+	err = conn.QueryRow(context.TODO(), queryRunner.buildGetSystemIdentifier()).Scan(&systemIdentifier)
+	if err == nil {
+		// Intentionally scan into int64 and then convert to uint64 so negative
+		// int64 values are reinterpreted via two's-complement wraparound. This
+		// preserves the system identifier representation expected by PostgreSQL
+		// tooling; do not replace this with a direct uint64 scan.
+		converted := uint64(systemIdentifier)
+		queryRunner.SystemIdentifier = &converted
+	}
 	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
 }
 
@@ -459,7 +468,7 @@ func (queryRunner *PgQueryRunner) IsTablespaceMapExists() bool {
 	return queryRunner.Version >= 90600
 }
 
-func (queryRunner *PgQueryRunner) readTimeline() (timeline uint32, err error) {
+func (queryRunner *PgQueryRunner) ReadTimeline() (timeline uint32, err error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
@@ -725,4 +734,43 @@ func (queryRunner *PgQueryRunner) GetDataChecksums() (string, error) {
 	}
 
 	return dataChecksums, nil
+}
+
+// GetArchiveMode retrieves the current archive_mode setting.
+func (queryRunner *PgQueryRunner) GetArchiveMode() (string, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var archiveMode string
+	err := queryRunner.Connection.QueryRow(context.TODO(), "SHOW archive_mode").Scan(&archiveMode)
+	if err != nil {
+		return "", errors.Wrap(err, "GetArchiveMode: failed to retrieve archive_mode")
+	}
+	return archiveMode, nil
+}
+
+// GetArchiveCommand retrieves the current archive_command setting.
+func (queryRunner *PgQueryRunner) GetArchiveCommand() (string, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var archiveCommand string
+	err := queryRunner.Connection.QueryRow(context.TODO(), "SHOW archive_command").Scan(&archiveCommand)
+	if err != nil {
+		return "", errors.Wrap(err, "GetArchiveCommand: failed to retrieve archive_command")
+	}
+	return archiveCommand, nil
+}
+
+// IsStandby checks if the PostgreSQL server is in recovery mode (standby).
+func (queryRunner *PgQueryRunner) IsStandby() (bool, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var standby bool
+	err := queryRunner.Connection.QueryRow(context.TODO(), "SELECT pg_is_in_recovery()").Scan(&standby)
+	if err != nil {
+		return false, errors.Wrap(err, "IsStandby: failed to determine recovery mode")
+	}
+	return standby, nil
 }

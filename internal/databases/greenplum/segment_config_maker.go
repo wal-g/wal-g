@@ -67,3 +67,24 @@ func NewSegConfigMaker(restoreCfgPath string, inPlaceRestore bool) (SegConfigMak
 
 	return NewRestoreCfgSegMaker(file)
 }
+
+func readRestoreConfig(path string) (ClusterRestoreConfig, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return ClusterRestoreConfig{}, fmt.Errorf("failed to open the provided restore config file: %v", err)
+	}
+	defer utility.LoggedClose(file, "")
+
+	restoreCfgBytes, err := io.ReadAll(file)
+	if err != nil {
+		return ClusterRestoreConfig{}, err
+	}
+
+	var restoreCfg ClusterRestoreConfig
+	err = json.Unmarshal(restoreCfgBytes, &restoreCfg)
+	if err != nil {
+		return ClusterRestoreConfig{}, fmt.Errorf("failed to unmarshal the provided restore config: %v", err)
+	}
+
+	return restoreCfg, nil
+}

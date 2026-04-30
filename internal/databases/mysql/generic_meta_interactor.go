@@ -24,7 +24,6 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 	return GenericMetaFetcher{}
 }
 
-// TODO: Unit tests
 func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
 	backup, err := internal.NewBackup(backupFolder, backupName)
 	if err != nil {
@@ -62,7 +61,6 @@ func NewGenericMetaSetter() GenericMetaSetter {
 	return GenericMetaSetter{}
 }
 
-// TODO: Unit tests
 func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
 	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
 		dto.UserData = userData

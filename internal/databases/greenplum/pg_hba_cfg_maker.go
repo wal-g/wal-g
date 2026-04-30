@@ -3,6 +3,7 @@ package greenplum
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sort"
 	"strings"
 
@@ -43,7 +44,7 @@ func (m PgHbaMaker) Make() (string, error) {
 
 	// add entries for both mdw and mdws hosts
 	for _, cfg := range masters {
-		row := fmt.Sprintf("host    all             all             %s              trust", cfg.Hostname)
+		row := fmt.Sprintf("host    all             all             %s              trust", m.TransformHostName(cfg.Hostname))
 		pgHbaRows = append(pgHbaRows, row)
 	}
 
@@ -53,7 +54,7 @@ func (m PgHbaMaker) Make() (string, error) {
 		if writtenHosts[primary.Hostname] {
 			continue // do not write duplicate entries
 		}
-		row := fmt.Sprintf("host    all             gpadmin         %s              trust", primary.Hostname)
+		row := fmt.Sprintf("host    all             gpadmin         %s              trust", m.TransformHostName(primary.Hostname))
 		writtenHosts[primary.Hostname] = true
 		pgHbaRows = append(pgHbaRows, row)
 	}
@@ -67,7 +68,7 @@ func (m PgHbaMaker) Make() (string, error) {
 		if writtenHosts[primary.Hostname] {
 			continue // do not write duplicate entries
 		}
-		row := fmt.Sprintf("host    replication     gpadmin         %s              trust", primary.Hostname)
+		row := fmt.Sprintf("host    replication     gpadmin         %s              trust", m.TransformHostName(primary.Hostname))
 		writtenHosts[primary.Hostname] = true
 		pgHbaRows = append(pgHbaRows, row)
 	}
@@ -92,4 +93,13 @@ func (m PgHbaMaker) primarySegments() []*cluster.SegConfig {
 
 	sort.Slice(primarySegments, func(i, j int) bool { return primarySegments[i].ContentID < primarySegments[j].ContentID })
 	return primarySegments
+}
+
+// If the network mapping is not modified in the /etc/hosts file, the hostname will be set to the IP address.
+// In this case, a subnet mask needs to be added to the IP address.
+func (m PgHbaMaker) TransformHostName(hostName string) string {
+	if net.ParseIP(hostName) != nil {
+		return hostName + "/32"
+	}
+	return hostName
 }

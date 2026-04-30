@@ -5,20 +5,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/storage/setting"
 )
 
 const (
-	AccountSetting    = "AZURE_STORAGE_ACCOUNT"
-	AccessKeySetting  = "AZURE_STORAGE_ACCESS_KEY"
-	SASTokenSetting   = "AZURE_STORAGE_SAS_TOKEN"
-	EndpointSuffix    = "AZURE_ENDPOINT_SUFFIX"
-	EnvironmentName   = "AZURE_ENVIRONMENT_NAME"
-	BufferSizeSetting = "AZURE_BUFFER_SIZE"
-	BuffersSetting    = "AZURE_MAX_BUFFERS"
-	TryTimeoutSetting = "AZURE_TRY_TIMEOUT"
+	AccountSetting      = "AZURE_STORAGE_ACCOUNT"
+	AccessKeySetting    = "AZURE_STORAGE_ACCESS_KEY"
+	SASTokenSetting     = "AZURE_STORAGE_SAS_TOKEN"
+	EndpointSuffix      = "AZURE_ENDPOINT_SUFFIX"
+	EnvironmentName     = "AZURE_ENVIRONMENT_NAME"
+	BufferSizeSetting   = "AZURE_BUFFER_SIZE"
+	BuffersSetting      = "AZURE_MAX_BUFFERS"
+	TryTimeoutSetting   = "AZURE_TRY_TIMEOUT"
+	BlobStoreAPIVersion = "AZURE_BLOB_STORE_API_VERSION"
 )
 
 // SettingList provides a list of GCS folder settings.
@@ -31,6 +31,7 @@ var SettingList = []string{
 	BufferSizeSetting,
 	BuffersSetting,
 	TryTimeoutSetting,
+	BlobStoreAPIVersion,
 }
 
 const (
@@ -76,7 +77,7 @@ func ConfigureStorage(
 		endpointSuffix = getStorageEndpointSuffix(environmentName)
 	}
 
-	bufferSize, err := setting.IntOptional(settings, BufferSizeSetting, defaultBufferSize)
+	bufferSize, err := setting.Int64Optional(settings, BufferSizeSetting, defaultBufferSize)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +92,8 @@ func ConfigureStorage(
 	if buffers < minBuffers {
 		buffers = minBuffers
 	}
+
+	blobStoreAPIVersion := settings[BlobStoreAPIVersion]
 
 	config := &Config{
 		Secrets: &Secrets{
@@ -107,6 +110,7 @@ func ConfigureStorage(
 			BufferSize: bufferSize,
 			Buffers:    buffers,
 		},
+		BlobStoreAPIVersion: blobStoreAPIVersion,
 	}
 
 	st, err := NewStorage(config, rootWraps...)
@@ -136,13 +140,13 @@ func configureAuthType(settings map[string]string) (authType authType, token, ke
 // the Azure storage account endpoint suffix for AzurePublicCloud.
 func getStorageEndpointSuffix(environmentName string) string {
 	switch environmentName {
-	case azure.USGovernmentCloud.Name:
-		return azure.USGovernmentCloud.StorageEndpointSuffix
-	case azure.ChinaCloud.Name:
-		return azure.ChinaCloud.StorageEndpointSuffix
-	case azure.GermanCloud.Name:
-		return azure.GermanCloud.StorageEndpointSuffix
+	case "AzureUSGovernmentCloud":
+		return "core.usgovcloudapi.net"
+	case "AzureChinaCloud":
+		return "core.chinacloudapi.cn"
+	case "AzureGermanCloud":
+		return "core.cloudapi.de"
 	default:
-		return azure.PublicCloud.StorageEndpointSuffix
+		return "core.windows.net"
 	}
 }

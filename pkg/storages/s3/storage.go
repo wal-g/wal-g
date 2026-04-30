@@ -43,6 +43,8 @@ type Config struct {
 	MaxThrottlingRetryDelay  time.Duration
 	Disable100Continue       bool
 	EnableVersioning         string
+	DeleteBatchSize          int
+	showAllVersions          bool // When true, include deleted objects in listing (for st ls --all-versions)
 }
 
 type Secrets struct {

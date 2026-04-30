@@ -10,6 +10,19 @@ import (
 const LogicalBackupType = "logical"
 const BinaryBackupType = "binary"
 
+func DownloadMetadata(folder storage.Folder, backupName string) (*models.BackupRoutesInfo, error) {
+	var metadata models.BackupRoutesInfo
+	backup, err := internal.GetBackupByName(backupName, "", folder)
+	if err != nil {
+		return nil, err
+	}
+	if err := backup.FetchMetadata(&metadata); err != nil {
+		return nil, err
+	}
+
+	return &metadata, nil
+}
+
 func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup, error) {
 	var sentinel models.Backup
 	backup, err := internal.GetBackupByName(backupName, "", folder)

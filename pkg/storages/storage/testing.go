@@ -2,10 +2,11 @@ package storage
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io"
-	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -15,9 +16,10 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	sub1 := storageFolder.GetSubFolder("Sub1")
 
 	token := make([]byte, 1024*1024) //Send 1 Mb
-	rand.Read(token)
+	_, err := rand.Read(token)
+	assert.NoError(t, err)
 
-	err := storageFolder.PutObject("file0", bytes.NewBuffer(token))
+	err = storageFolder.PutObject("file0", bytes.NewBuffer(token))
 	assert.NoError(t, err)
 
 	readCloser, err := storageFolder.ReadObject("file0")
@@ -26,6 +28,7 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 		all, err := io.ReadAll(readCloser)
 		assert.NoError(t, err)
 		assert.Equal(t, token, all)
+		assert.NoError(t, readCloser.Close())
 	}
 
 	err = sub1.PutObject("file1", strings.NewReader("data1"))
@@ -90,11 +93,11 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	err = sub1.DeleteObjects([]string{"file1"})
+	err = sub1.DeleteObjects([]Object{NewLocalObject("file1", time.Time{}, 0)})
 	assert.NoError(t, err)
-	err = storageFolder.DeleteObjects([]string{"Sub1"})
+	err = storageFolder.DeleteObjects([]Object{NewLocalObject("Sub1", time.Time{}, 0)})
 	assert.NoError(t, err)
-	err = storageFolder.DeleteObjects([]string{"file0"})
+	err = storageFolder.DeleteObjects([]Object{NewLocalObject("file0", time.Time{}, 0)})
 	assert.NoError(t, err)
 
 	b, err = storageFolder.Exists("file0")

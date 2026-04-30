@@ -10,14 +10,20 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string) error {
-	backupName := binary.GenerateNewBackupName()
+type HandleBinaryBackupPushArgs struct {
+	AppName       string
+	CountJournals bool
+	Permanent     bool
+	SkipMetadata  bool
+	UserDataRaw   string
+}
 
+func HandleBinaryBackupPush(ctx context.Context, args HandleBinaryBackupPushArgs) error {
 	mongodbURI, err := conf.GetRequiredSetting(conf.MongoDBUriSetting)
 	if err != nil {
 		return err
 	}
-	mongodService, err := binary.CreateMongodService(ctx, appName, mongodbURI, 10*time.Minute)
+	mongodService, err := binary.CreateMongodService(ctx, args.AppName, mongodbURI, 10*time.Minute)
 	if err != nil {
 		return err
 	}
@@ -33,5 +39,23 @@ func HandleBinaryBackupPush(ctx context.Context, permanent bool, appName string)
 		return err
 	}
 
-	return backupService.DoBackup(backupName, permanent)
+	var userData interface{}
+	if args.UserDataRaw == "" {
+		if userData, err = internal.GetSentinelUserData(); err != nil {
+			return err
+		}
+	} else {
+		if userData, err = internal.UnmarshalSentinelUserData(args.UserDataRaw); err != nil {
+			return err
+		}
+	}
+
+	doBackupArgs := binary.DoBackupArgs{
+		BackupName:    binary.GenerateNewBackupName(),
+		CountJournals: args.CountJournals,
+		Permanent:     args.Permanent,
+		SkipMetadata:  args.SkipMetadata,
+		UserData:      userData,
+	}
+	return backupService.DoBackup(doBackupArgs)
 }

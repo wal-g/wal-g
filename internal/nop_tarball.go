@@ -11,7 +11,7 @@ import (
 // NOPTarBall mocks a tarball. Used for prefault logic.
 type NOPTarBall struct {
 	number    int
-	partSize  *int64
+	partSize  *atomic.Int64
 	tarWriter *tar.Writer
 }
 
@@ -22,8 +22,8 @@ func (tarBall *NOPTarBall) Name() string {
 func (tarBall *NOPTarBall) SetUp(crypter crypto.Crypter, params ...string) {}
 func (tarBall *NOPTarBall) CloseTar() error                                { return nil }
 
-func (tarBall *NOPTarBall) Size() int64            { return atomic.LoadInt64(tarBall.partSize) }
-func (tarBall *NOPTarBall) AddSize(i int64)        { atomic.AddInt64(tarBall.partSize, i) }
+func (tarBall *NOPTarBall) Size() int64            { return tarBall.partSize.Load() }
+func (tarBall *NOPTarBall) AddSize(i int64)        { tarBall.partSize.Add(i) }
 func (tarBall *NOPTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 func (tarBall *NOPTarBall) AwaitUploads()          {}
 
@@ -31,7 +31,7 @@ func (tarBall *NOPTarBall) AwaitUploads()          {}
 // for testing purposes.
 type NOPTarBallMaker struct {
 	number   int
-	partSize *int64
+	partSize *atomic.Int64
 }
 
 // Make creates a new NOPTarBall.
@@ -45,6 +45,5 @@ func (tarBallMaker *NOPTarBallMaker) Make(inheritState bool) TarBall {
 }
 
 func NewNopTarBallMaker() TarBallMaker {
-	size := int64(0)
-	return &NOPTarBallMaker{0, &size}
+	return &NOPTarBallMaker{0, new(atomic.Int64)}
 }

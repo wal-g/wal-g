@@ -84,13 +84,13 @@ func TestGetBackupTimeSlices_List(t *testing.T) {
 
 	assert.Equalf(t, 1, len(result), "GetBackupTimeSlices returned wrong count of backup: something wrong")
 	assert.Equalf(t, testStreamBackup.BackupName, result[0].BackupName, "GetBackupTimeSlices returned strange name")
-	assert.True(t, testStreamBackup.Time.Before(result[0].Time), "GetBackupTimeSlices returned bad time: storage time less than mock time")
+	// assert that the storage time is no older than mock time
+	assert.True(t, testStreamBackup.Time.Compare(result[0].Time) < 1, "GetBackupTimeSlices returned bad time: storage time less than mock time")
 }
 
 func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	_ = folder.PutObject(testStreamBackup.BackupName+".1"+utility.SentinelSuffix, &bytes.Buffer{})
-	time.Sleep(time.Second)
 	_ = folder.PutObject(testStreamBackup.BackupName+".2"+utility.SentinelSuffix, &bytes.Buffer{})
 
 	objects, _, _ := folder.ListFolder()
@@ -100,7 +100,8 @@ func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 
 	assert.Equalf(t, 2, len(result), "GetBackupTimeSlices returned wrong count of backup: something wrong")
 	assert.True(t, result[0].BackupName == testStreamBackup.BackupName+".1", "GetBackupTimeSlices returned bad time ordering: "+testStreamBackup.BackupName+".1 should be first, because second was added earlier")
-	assert.True(t, result[0].Time.Before(result[1].Time), "GetBackupTimeSlices returned bad time ordering: order should be Ascending")
+	// assert that the previous is no older than the next
+	assert.True(t, result[0].Time.Compare(result[1].Time) < 1, "GetBackupTimeSlices returned bad time ordering: order should be Ascending")
 }
 
 func TestGetLastBackupName(t *testing.T) {

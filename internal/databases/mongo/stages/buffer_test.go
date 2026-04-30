@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal"
 )
 
 func buildFileBuffer(path string) *FileBuffer {
@@ -28,7 +29,7 @@ func TestBuffers_ReadWriteLen(t *testing.T) {
 		},
 		{
 			name: "file_buffer",
-			b:    buildFileBuffer("/tmp"),
+			b:    buildFileBuffer(internal.GetDefaultDataFolderPath()),
 		},
 	}
 
@@ -97,7 +98,7 @@ func TestFileBuffer_NewClose(t *testing.T) {
 	}{
 		{
 			name:        "tmp_dir",
-			path:        "/tmp/",
+			path:        internal.GetDefaultDataFolderPath() + "/",
 			expectedErr: false,
 		},
 		{

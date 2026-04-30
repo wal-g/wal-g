@@ -1,0 +1,39 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unused
+  disable:
+    - errcheck
+    - gosec
+    - gosimple
+
+linters-settings:
+  revive:
+    rules:
+      - name: unused-parameter
+        disabled: true
+      - name: exported
+        disabled: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  
+  exclude-rules:
+    - text: "should have comment"
+      linters:
+        - revive
+    - text: "comment on exported"
+      linters:
+        - revive 

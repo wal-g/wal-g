@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync/atomic"
-	"syscall"
 	"time"
-
-	"github.com/wal-g/tracelog"
 )
 
 type DiskWatcher struct {
@@ -49,25 +46,4 @@ func (w *DiskWatcher) Start() {
 func (w *DiskWatcher) Stop() {
 	close(w.Signaling)
 	w.closed.Store(true)
-}
-
-func (w *DiskWatcher) CheckUpperLimit() {
-	fs := syscall.Statfs_t{}
-	err := syscall.Statfs(w.Path, &fs)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Tried to get %s path sys data, but got error: '%v'\n", w.Path, err)
-		return
-	}
-
-	total := fs.Blocks
-	if total == 0 {
-		tracelog.ErrorLogger.Printf("Total disk size of path %s is zero somehow\n", w.Path)
-		return
-	}
-
-	free := fs.Bfree
-	tracelog.InfoLogger.Printf("free:%d; total:%d; thresh:%d", free, total, w.Threshold)
-	if free*100/total < (100 - uint64(w.Threshold)) {
-		w.Signaling <- true
-	}
 }

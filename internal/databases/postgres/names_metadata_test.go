@@ -256,7 +256,7 @@ func TestFetchDtoWithFilesMetadata(t *testing.T) {
 	}
 
 	oldObjects := DatabaseObjectsInfoOld{Oid: 12, Tables: map[string]uint32{"t1": 1, "t2": 2}}
-	newObjects := postgres.DatabaseObjectsInfo{Oid: 12, Tables: map[string]postgres.TableInfo{"t1": postgres.TableInfo{Oid: 1, Relfilenode: 2}, "t2": postgres.TableInfo{Oid: 3, Relfilenode: 4}}}
+	newObjects := postgres.DatabaseObjectsInfo{Oid: 12, Tables: map[string]postgres.TableInfo{"t1": {Oid: 1, Relfilenode: 2}, "t2": {Oid: 3, Relfilenode: 4}}}
 
 	bytesOld, _ := json.Marshal(oldObjects)
 	bytesNew, _ := json.Marshal(newObjects)

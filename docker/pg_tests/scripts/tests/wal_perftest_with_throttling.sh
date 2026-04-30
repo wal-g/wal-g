@@ -1,38 +1,29 @@
 #!/bin/sh
 set -e -x
 
-rm -rf /var/lib/postgresql/10/main
+rm -rf ${PGDATA}
 
-CONFIG_FILE="/tmp/configs/wal_perftest_throttling_config.json"
-
-COMMON_CONFIG="/tmp/configs/common_config.json"
-TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+. /tmp/tests/test_functions/prepare_config.sh
+prepare_config "/tmp/configs/wal_perftest_throttling_config.json"
 
 WAL_PUSH_LOGS="/tmp/logs/pg_wal_perftest_push"
 WAL_FETCH_LOGS="/tmp/logs/pg_wal_perftest_fetch"
 echo "" > ${WAL_PUSH_LOGS}
 echo "" > ${WAL_FETCH_LOGS}
 
-/usr/lib/postgresql/10/bin/initdb "${PGDATA}"
-/usr/lib/postgresql/10/bin/pg_ctl -D "${PGDATA}" -w start
-
-/tmp/scripts/wait_while_pg_not_ready.sh
+initdb "${PGDATA}"
+pg_ctl -D "${PGDATA}" -w start
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 pgbench -i -s 50 postgres
 pgbench -c 100 -t 100 postgres
 
-du -hs ${PGDATA}
+du -hs ${PGDATA} 2>/dev/null || true
 sleep 1
 WAL=$(ls -l ${PGDATA}/pg_wal | head -n2 | tail -n1 | egrep -o "[0-9A-F]{24}")
 
-du -hs "${PGDATA}"
+du -hs "${PGDATA}" 2>/dev/null || true
 
 i=0
 START=$(date +%s)

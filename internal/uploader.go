@@ -2,7 +2,10 @@ package internal
 
 import (
 	"context"
+	json2 "encoding/json/v2"
 	"fmt"
+	"golang.org/x/sync/errgroup"
+
 	"io"
 	"path/filepath"
 	"sync"
@@ -11,6 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal/statistics"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -20,10 +24,17 @@ import (
 var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")
 
 type Uploader interface {
+	// Upload uploads stream AS IS
 	Upload(ctx context.Context, path string, content io.Reader) error
+	UploadJSON(ctx context.Context, path string, data any) error
+	// UploadFile compresses a file and uploads it
 	UploadFile(ctx context.Context, file ioextensions.NamedReader) error
+	UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error
+	// PushStream compresses a stream and push it
 	PushStream(ctx context.Context, stream io.Reader) (string, error)
+	// PushStreamToDestination compresses a stream and push it to specifyed destination
 	PushStreamToDestination(ctx context.Context, stream io.Reader, dstPath string) error
+	// Compression returns configured compressor
 	Compression() compression.Compressor
 	DisableSizeTracking()
 	UploadedDataSize() (int64, error)
@@ -36,14 +47,14 @@ type Uploader interface {
 }
 
 // RegularUploader contains fields associated with uploading tarballs.
-// Multiple tarballs can share one uploader.
+// Multiple tarballs can share one Uploader.
 type RegularUploader struct {
 	UploadingFolder storage.Folder
 	Compressor      compression.Compressor
 	waitGroup       *sync.WaitGroup
 	failed          atomic.Bool
-	tarSize         *int64
-	dataSize        *int64
+	tarSize         *atomic.Int64
+	dataSize        *atomic.Int64
 }
 
 var _ Uploader = &RegularUploader{}
@@ -74,8 +85,8 @@ func NewRegularUploader(
 		UploadingFolder: uploadingLocation,
 		Compressor:      compressor,
 		waitGroup:       &sync.WaitGroup{},
-		tarSize:         new(int64),
-		dataSize:        new(int64),
+		tarSize:         new(atomic.Int64),
+		dataSize:        new(atomic.Int64),
 		failed:          atomic.Bool{},
 	}
 	return uploader
@@ -105,7 +116,7 @@ func (uploader *RegularUploader) UploadedDataSize() (int64, error) {
 	if uploader.tarSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
-	return atomic.LoadInt64(uploader.tarSize), nil
+	return uploader.tarSize.Load(), nil
 }
 
 // RawDataSize returns 0 and error when SizeTracking disabled (see DisableSizeTracking)
@@ -113,7 +124,7 @@ func (uploader *RegularUploader) RawDataSize() (int64, error) {
 	if uploader.dataSize == nil {
 		return 0, ErrorSizeTrackingDisabled
 	}
-	return atomic.LoadInt64(uploader.dataSize), nil
+	return uploader.dataSize.Load(), nil
 }
 
 // Finish waits for all waiting parts to be uploaded. If an error occurs,
@@ -141,7 +152,7 @@ func (uploader *RegularUploader) Clone() Uploader {
 
 // TODO : unit tests
 // UploadFile compresses a file and uploads it.
-func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
+func (uploader *RegularUploader) uploadFile(ctx context.Context, file ioextensions.NamedReader, isExactPath bool) error {
 	filename := file.Name()
 
 	fileReader := file.(io.Reader)
@@ -149,11 +160,24 @@ func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensio
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
 	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
-	dstPath := utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
+
+	dstPath := utility.SanitizePath(filename)
+	if !isExactPath {
+		dstPath = utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
+	}
 
 	err := uploader.Upload(ctx, dstPath, compressedFile)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 	return err
+}
+
+func (uploader *RegularUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
+	return uploader.uploadFile(ctx, file, false)
+}
+
+// UploadFile compresses a file and uploads it by exact path.
+func (uploader *RegularUploader) UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error {
+	return uploader.uploadFile(ctx, file, true)
 }
 
 // DisableSizeTracking stops bandwidth tracking
@@ -178,11 +202,35 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
-		uploader.failed.Load()
+		uploader.failed.Store(true)
 		tracelog.ErrorLogger.Printf(tracelog.GetErrorFormatter()+"\n", err)
 		return err
 	}
 	return nil
+}
+
+// UploadJSON uploads raw JSON to storage without allocating memory for whole JSON.
+func (uploader *RegularUploader) UploadJSON(ctx context.Context, path string, data any) error {
+	reader, writer := io.Pipe()
+
+	errorGroup, _ := errgroup.WithContext(ctx)
+	errorGroup.Go(func() error {
+		err := json2.MarshalWrite(writer, data)
+		if err != nil {
+			_ = writer.CloseWithError(err)
+			return err
+		}
+		return writer.Close()
+	})
+	errorGroup.Go(func() error {
+		err := uploader.Upload(ctx, path, reader)
+		if err != nil {
+			_ = reader.CloseWithError(err)
+			return err
+		}
+		return reader.Close()
+	})
+	return errorGroup.Wait()
 }
 
 // UploadMultiple uploads multiple objects from the start of the slice,

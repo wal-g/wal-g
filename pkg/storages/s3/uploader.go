@@ -2,8 +2,6 @@ package s3
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"time"
@@ -14,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"github.com/pkg/errors"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type UploaderConfig struct {
@@ -85,8 +84,7 @@ func (uploader *Uploader) createUploadInput(bucket, path string, content io.Read
 		if uploader.SSECustomerKey != "" {
 			uploadInput.SSECustomerAlgorithm = aws.String(uploader.serverSideEncryption)
 			uploadInput.SSECustomerKey = aws.String(uploader.SSECustomerKey)
-			hash := md5.Sum([]byte(uploader.SSECustomerKey))
-			customerKeyMD5 := base64.StdEncoding.EncodeToString(hash[:])
+			customerKeyMD5 := GetSSECustomerKeyMD5(uploader.SSECustomerKey)
 			uploadInput.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 		} else {
 			uploadInput.ServerSideEncryption = aws.String(uploader.serverSideEncryption)
@@ -128,6 +126,21 @@ func partitionStrings(strings []string, blockSize int) [][]string {
 			partition = append(partition, strings[i:])
 		} else {
 			partition = append(partition, strings[i:i+blockSize])
+		}
+	}
+	return partition
+}
+
+func partitionObjects(objects []storage.Object, blockSize int) [][]storage.Object {
+	if blockSize <= 0 {
+		return [][]storage.Object{objects}
+	}
+	partition := make([][]storage.Object, 0)
+	for i := 0; i < len(objects); i += blockSize {
+		if i+blockSize > len(objects) {
+			partition = append(partition, objects[i:])
+		} else {
+			partition = append(partition, objects[i:i+blockSize])
 		}
 	}
 	return partition

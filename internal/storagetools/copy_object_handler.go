@@ -23,6 +23,8 @@ func Encrypt(source io.Reader, crypter crypto.Crypter) (io.Reader, error) {
 	writeCloser, err := crypter.Encrypt(dstWriter)
 
 	if err != nil {
+		_ = cryptReader.Close()
+		_ = dstWriter.Close()
 		return nil, err
 	}
 

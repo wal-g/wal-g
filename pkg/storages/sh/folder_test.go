@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -21,7 +23,7 @@ func TestSHFolder(t *testing.T) {
 		map[string]string{
 			usernameSetting:       "root",
 			portSetting:           "6942",
-			privateKeyPathSetting: "/tmp/SSH_KEY", // run in docker on dev machine or CI
+			privateKeyPathSetting: filepath.ToSlash(path.Join(os.TempDir(), "SSH_KEY")), // run in docker on dev machine or CI
 			// PrivateKeyPath: "../../../docker/pg/SSH_KEY", // local manual run on dev machine
 		},
 	)

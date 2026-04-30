@@ -47,10 +47,8 @@ func (reader *RangeReader) getObjectRange(from, to int64) (*s3.GetObjectOutput, 
 }
 
 func (reader *RangeReader) Read(p []byte) (n int, err error) {
-	reconnect := false
-	if reader.lastBody == nil { // initial connect, if lastBody wasn't provided
-		reconnect = true
-	}
+	reconnect := reader.lastBody == nil // initial connect, if lastBody wasn't provided
+
 	for {
 		if reconnect {
 			connErr := reader.reconnect()

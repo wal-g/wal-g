@@ -21,6 +21,15 @@ const (
 	useJSONOutputFlag        = "json"
 	useJSONOutputDescription = "Show output in JSON format."
 
+	useSpecifiedTimelineFlag        = "timeline"
+	useSpecifiedTimelineDescription = "Verify WAL for the specified timeline. Works only in conjunction with the \"--lsn\" flag."
+
+	useSpecifiedLsnFlag        = "lsn"
+	useSpecifiedLsnDescription = "Verify WAL for the specified lsn. Works only in conjunction with the \"--timeline\" flag."
+
+	useSpecifiedBackupFlag        = "backup-name"
+	useSpecifiedBackupDescription = "Verify WAL starting from the specified backup."
+
 	checkIntegrityArg = "integrity"
 	checkTimelineArg  = "timeline"
 )
@@ -46,11 +55,41 @@ var (
 			outputWriter := postgres.NewWalVerifyOutputWriter(outputType, os.Stdout)
 			checkTypes := parseChecks(checks)
 
-			postgres.HandleWalVerify(checkTypes, storage.RootFolder(), postgres.QueryCurrentWalSegment(), outputWriter)
+			walSegmentDescription := getWalSegmentDescription(cmd, lsnStr, timeline)
+			backupSearchParams := getBackupSearchParams(cmd, backupNameStr)
+			postgres.HandleWalVerify(checkTypes, storage.RootFolder(), walSegmentDescription, backupSearchParams, outputWriter)
 		},
 	}
 	useJSONOutput bool
+	timeline      uint32
+	lsnStr        string
+	backupNameStr string
 )
+
+func getWalSegmentDescription(cmd *cobra.Command, lsnStr string, timeline uint32) postgres.WalSegmentDescription {
+	if !cmd.Flags().Changed(useSpecifiedLsnFlag) {
+		return postgres.QueryCurrentWalSegment()
+	}
+	lsn, err := postgres.ParseLSN(lsnStr)
+	tracelog.ErrorLogger.FatalOnError(err)
+	return postgres.WalSegmentDescription{
+		Timeline: timeline,
+		Number:   postgres.NewWalSegmentNo(lsn - 1),
+	}
+}
+
+func getBackupSearchParams(cmd *cobra.Command, backupName string) postgres.BackupSearchParams {
+	if cmd.Flags().Changed(useSpecifiedBackupFlag) {
+		return postgres.BackupSearchParams{
+			FindEarliestBackup:  false,
+			SpecifiedBackupName: &backupName,
+		}
+	}
+	return postgres.BackupSearchParams{
+		FindEarliestBackup:  true,
+		SpecifiedBackupName: nil,
+	}
+}
 
 func parseChecks(checks []string) []postgres.WalVerifyCheckType {
 	// filter the possible duplicates
@@ -84,10 +123,22 @@ func checkArgs(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid check specified: %s", arg)
 		}
 	}
+	isTimelineSpecified := cmd.Flags().Changed(useSpecifiedTimelineFlag)
+	isLsnSpecified := cmd.Flags().Changed(useSpecifiedLsnFlag)
+
+	if isLsnSpecified && !isTimelineSpecified {
+		return fmt.Errorf("\"--lsn\" flag works only in conjunction with the \"--timeline\" flag")
+	}
+	if !isLsnSpecified && isTimelineSpecified {
+		return fmt.Errorf("\"--timeline\" flag works only in conjunction with the \"--lsn\" flag")
+	}
 	return nil
 }
 
 func init() {
 	Cmd.AddCommand(walVerifyCmd)
 	walVerifyCmd.Flags().BoolVar(&useJSONOutput, useJSONOutputFlag, false, useJSONOutputDescription)
+	walVerifyCmd.Flags().Uint32Var(&timeline, useSpecifiedTimelineFlag, 0, useSpecifiedTimelineDescription)
+	walVerifyCmd.Flags().StringVar(&lsnStr, useSpecifiedLsnFlag, "", useSpecifiedLsnDescription)
+	walVerifyCmd.Flags().StringVar(&backupNameStr, useSpecifiedBackupFlag, "", useSpecifiedBackupDescription)
 }

@@ -63,6 +63,23 @@ func TestConfigureLogging_WhenLogDestinationSettingIsSet(t *testing.T) {
 	resetToDefaults()
 }
 
+func TestInitConfigSetsConfigFilePath(t *testing.T) {
+	beforeCfgFile := config.CfgFile
+	t.Cleanup(func() {
+		config.CfgFile = beforeCfgFile
+		_ = os.Unsetenv(config.ConfigPathEnvVar)
+	})
+
+	config.CfgFile = ""
+	assert.NoError(t, os.Setenv(config.ConfigPathEnvVar, "/tmp/from-env.json"))
+	config.InitConfig()
+	assert.Equal(t, "/tmp/from-env.json", config.CfgFile)
+
+	config.CfgFile = "/tmp/from-flag.json"
+	config.InitConfig()
+	assert.Equal(t, "/tmp/from-flag.json", config.CfgFile)
+}
+
 func resetToDefaults() {
 	viper.Reset()
 	internal.ConfigureSettings(config.PG)

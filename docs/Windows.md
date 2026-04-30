@@ -13,7 +13,7 @@ Since Go version 1.5 cross-compiling of pure Go executables has become very easy
 
 * make install
 * make deps
-* make sqlserver_build
+* make sqlserver_build pg_build
 
 * mv main/sqlserver/wal-g{,.exe}
 

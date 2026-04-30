@@ -32,9 +32,9 @@ func HandleCheckRead(folder storage.Folder, filenames []string) error {
 }
 
 func randomName(length int) string {
-	rand.Seed(time.Now().UnixNano())
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, length)
-	rand.Read(b)
+	r.Read(b)
 	return fmt.Sprintf("%x", b)[:length]
 }
 
@@ -51,7 +51,7 @@ func HandleCheckWrite(folder storage.Folder) error {
 		}
 	}
 	err := folder.PutObject(filename, bytes.NewBufferString("test"))
-	if folder.DeleteObjects([]string{filename}) != nil {
+	if folder.DeleteObjects([]storage.Object{storage.NewLocalObject(filename, time.Time{}, 0)}) != nil {
 		tracelog.WarningLogger.Printf("failed to clean temp files, %s left in storage", filename)
 	}
 	if err != nil {

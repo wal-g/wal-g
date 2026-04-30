@@ -24,7 +24,7 @@ func ExistingDiskDataFolder(folderPath string) (*DiskDataFolder, error) {
 
 func (folder *DiskDataFolder) OpenReadonlyFile(filename string) (io.ReadCloser, error) {
 	filePath := filepath.Join(folder.Path, filename)
-	file, err := os.Open(filePath)
+	file, err := OpenReadOnlyMayBeDirectIO(filePath)
 	if err != nil && os.IsNotExist(err) {
 		return file, NewNoSuchFileError(filename)
 	}
@@ -56,9 +56,11 @@ func (folder *DiskDataFolder) FileExists(filename string) bool {
 
 func (folder *DiskDataFolder) CreateFile(filename string) error {
 	filePath := filepath.Join(folder.Path, filename)
-	_, err := os.Create(filePath)
-
-	return err
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	return file.Close()
 }
 
 func (folder *DiskDataFolder) DeleteFile(filename string) error {

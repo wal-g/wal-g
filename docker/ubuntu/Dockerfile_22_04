@@ -1,7 +1,7 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
-ENV DEBIAN_FRONTEND noninteractive
-ENV TERM xterm-256color
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=xterm-256color
 
 # Configure apt:
 COPY docker/ubuntu/config/apt/ /var/lib/dist/config/apt
@@ -11,7 +11,5 @@ RUN apt-get update && \
     apt-get install --yes \
         wget curl \
         git \
-        ca-certificates \
-        htop \
-        nano less && \
+        ca-certificates && \
   rm -rf /var/lib/apt/lists/*

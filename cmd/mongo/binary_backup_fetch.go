@@ -39,6 +39,13 @@ const (
 	PitrSinceDescription          = "Timestamp point in time recovery start"
 	PitrUntilFlag                 = "pitr-until"
 	PitrUntilDescription          = "Timestamp point in time recovery finish"
+
+	BlacklistFlag        = "blacklist"
+	BlacklistDescription = "Comma separated dbname.colname records from wished databases " +
+		"and collections which will NOT be restored partially."
+	WhitelistFlag        = "whitelist"
+	WhitelistDescription = "Comma separated dbname.colname records from wished databases " +
+		"and collections which will be restored partially."
 )
 
 var (
@@ -54,6 +61,8 @@ var (
 	skipCheckFlag            bool
 	pitrSince                string
 	pitrUntil                string
+	whitelist                []string
+	blacklist                []string
 )
 
 var binaryBackupFetchCmd = &cobra.Command{
@@ -62,7 +71,6 @@ var binaryBackupFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
-
 		ctx, cancel := context.WithCancel(context.Background())
 		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
 		defer func() { _ = signalHandler.Close() }()
@@ -70,10 +78,9 @@ var binaryBackupFetchCmd = &cobra.Command{
 		backupName := args[0]
 		mongodConfigPath := args[1]
 		mongodVersion := args[2]
-
 		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
 			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
-			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil)
+			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil, whitelist, blacklist)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
@@ -91,5 +98,9 @@ func init() {
 	binaryBackupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrSince, PitrSinceFlag, "", PitrSinceDescription)
 	binaryBackupFetchCmd.Flags().StringVar(&pitrUntil, PitrUntilFlag, "", PitrUntilDescription)
+	binaryBackupFetchCmd.Flags().StringSliceVar(&blacklist, BlacklistFlag,
+		[]string{}, BlacklistDescription)
+	binaryBackupFetchCmd.Flags().StringSliceVar(&whitelist, WhitelistFlag,
+		[]string{}, WhitelistDescription)
 	cmd.AddCommand(binaryBackupFetchCmd)
 }

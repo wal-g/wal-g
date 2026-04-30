@@ -17,37 +17,36 @@ type MongodProcess struct {
 	parameters        []string
 	replsetID         string
 	isMongoCfg        bool
+	restore           bool
+	repair            bool
 	port              int
 	cancel            context.CancelFunc
 	cmd               *exec.Cmd
 }
 
-func StartMongodWithDisableLogicalSessionCacheRefresh(minimalConfigPath string) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, "", false,
-		"disableLogicalSessionCacheRefresh=true", "skipShardingConfigurationChecks=true")
-}
-
-func StartMongodWithRecoverFromOplogAsStandalone(minimalConfigPath string) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, "", false,
-		"recoverFromOplogAsStandalone=true", "takeUnstableCheckpointOnShutdown=true")
-}
-
-func StartMongodWithReplyOplogAsStandalone(minimalConfigPath string, replsetID string, isMongoCfg bool) (*MongodProcess, error) {
-	return StartMongo(minimalConfigPath, replsetID, isMongoCfg,
-		"disableLogicalSessionCacheRefresh=true", "takeUnstableCheckpointOnShutdown=true")
-}
-
-func StartMongo(minimalConfigPath string, replsetID string, isMongoCfg bool, parameters ...string) (*MongodProcess, error) {
-	mongodProcess := &MongodProcess{
+func Mongod(minimalConfigPath string) *MongodProcess {
+	return &MongodProcess{
 		minimalConfigPath: minimalConfigPath,
-		parameters:        parameters,
 	}
+}
 
-	err := mongodProcess.start()
-	if err != nil {
-		return nil, err
-	}
-	return mongodProcess, nil
+func (mongodProcess *MongodProcess) WithRestore() *MongodProcess {
+	mongodProcess.restore = true
+	return mongodProcess
+}
+
+func (mongodProcess *MongodProcess) WithRepair() *MongodProcess {
+	mongodProcess.repair = true
+	return mongodProcess
+}
+
+func (mongodProcess *MongodProcess) WithParams(params ...string) *MongodProcess {
+	mongodProcess.parameters = params
+	return mongodProcess
+}
+
+func (mongodProcess *MongodProcess) Start() (*MongodProcess, error) {
+	return mongodProcess, mongodProcess.start()
 }
 
 func (mongodProcess *MongodProcess) GetHostWithPort() string {
@@ -86,8 +85,15 @@ func (mongodProcess *MongodProcess) start() (err error) {
 	if len(mongodProcess.replsetID) != 0 {
 		cliArgs = append(cliArgs, "--replSet", mongodProcess.replsetID)
 	}
+
 	if mongodProcess.isMongoCfg {
 		cliArgs = append(cliArgs, "--configsvr")
+	}
+	if mongodProcess.restore {
+		cliArgs = append(cliArgs, "--restore")
+	}
+	if mongodProcess.repair {
+		cliArgs = append(cliArgs, "--repair")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

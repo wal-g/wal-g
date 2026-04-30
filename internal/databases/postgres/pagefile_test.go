@@ -16,11 +16,12 @@ import (
 const (
 	pagedFileName            = "../../../test/testdata/base_paged_file.bin"
 	pagedFileSizeInBytes     = 65536
-	pagedFileBlockCount      = pagedFileSizeInBytes / DatabasePageSize
 	sampleLSN            LSN = 0xc6bd4600
 	smallLSN             LSN = 0
 	bigLSN                   = sampleLSN * 2
 )
+
+var pagedFileBlockCount = pagedFileSizeInBytes / DatabasePageSize
 
 // TestIncrement holds information about some increment for easy testing
 type TestIncrement struct {

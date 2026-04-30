@@ -1,35 +1,26 @@
 #!/bin/sh
 set -e -x
 
-CONFIG_FILE="/tmp/configs/backup_perftest_config.json"
-
-COMMON_CONFIG="/tmp/configs/common_config.json"
-TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+. /tmp/tests/test_functions/prepare_config.sh
+prepare_config "/tmp/configs/backup_perftest_config.json"
 
 BACKUP_PUSH_LOGS="/tmp/logs/pg_backup_perftest_push"
 BACKUP_FETCH_LOGS="/tmp/logs/pg_backup_perftest_fetch"
 echo "" > ${BACKUP_PUSH_LOGS}
 echo "" > ${BACKUP_FETCH_LOGS}
 
-/usr/lib/postgresql/10/bin/initdb "${PGDATA}"
+initdb "${PGDATA}"
 
-/usr/lib/postgresql/10/bin/pg_ctl -D "${PGDATA}" -w start
-
-/tmp/scripts/wait_while_pg_not_ready.sh
+pg_ctl -D "${PGDATA}" -w start
 
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 # push permanent and impermanent delta backups
-du -hs "${PGDATA}"
+du -hs "${PGDATA}" 2>/dev/null || true
 sleep 1
 pgbench -i -s 10 postgres
 sleep 1
-du -hs "${PGDATA}"
+du -hs "${PGDATA}" 2>/dev/null || true
 
 sleep 1
 /usr/bin/time -v -a --output ${BACKUP_PUSH_LOGS} wal-g --config=${TMP_CONFIG} backup-push "${PGDATA}"

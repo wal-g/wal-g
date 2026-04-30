@@ -15,7 +15,17 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-const aofBackupPushCommandName = "aof-backup-push"
+var (
+	sharded = false
+)
+
+const (
+	aofBackupPushCommandName = "aof-backup-push"
+
+	shardedShortDescription = "Turns on collecting slots info (use for sharded restore of sharded cluster only)"
+	shardedFlag             = "sharded"
+	shardedShorthand        = "s"
+)
 
 var aofBackupPushCmd = &cobra.Command{
 	Use:   aofBackupPushCommandName,
@@ -47,12 +57,19 @@ var aofBackupPushCmd = &cobra.Command{
 			memoryDataGetter,
 		)
 
-		err = redis.HandleAOFBackupPush(ctx, permanent, uploader, metaConstructor)
+		pushArgs := redis.AOFBackupPushArgs{
+			Uploader:        uploader,
+			MetaConstructor: metaConstructor,
+			Sharded:         sharded,
+		}
+
+		err = redis.HandleAOFBackupPush(ctx, pushArgs)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
 
 func init() {
 	aofBackupPushCmd.Flags().BoolVarP(&permanent, PermanentFlag, PermanentShorthand, false, "Pushes permanent backup")
+	aofBackupPushCmd.Flags().BoolVarP(&sharded, shardedFlag, shardedShorthand, false, "Pushes sharded backup")
 	cmd.AddCommand(aofBackupPushCmd)
 }

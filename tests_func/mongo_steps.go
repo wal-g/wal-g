@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/cucumber/godog"
@@ -22,6 +24,7 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^mongodb auth initialized on ([^\s]*)$`, tctx.mongoEnableAuth)
 	ctx.Step(`^mongodb initialized on ([^\s]*)$`, tctx.mongoInit)
 	ctx.Step(`^([^\s]*) has no data$`, tctx.purgeMongoDataDir)
+	ctx.Step(`^mongodb replica ([^\s]*) initialized with ([^\s]*) master$`, tctx.initiateReplica)
 
 	ctx.Step(`^([^\s]*) has test mongodb data test(\d+)$`, tctx.fillMongodbWithTestData)
 	ctx.Step(`^([^\s]*) has been loaded with "([^"]*)"$`, tctx.loadMongodbOpsFromConfig)
@@ -37,6 +40,15 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
 	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
 
+	ctx.Step(`^([^\s]*) has partial test mongodb data$`, tctx.addPartiallyData)
+	ctx.Step(`^([^\s]*) and ([^\s]*) has same data in db "([^"]*)" and col "([^"]*)"$`,
+		tctx.equalCollectionOnMongoDBHosts)
+	ctx.Step(`^([^\s]*) has only db "([^"]*)" and col "([^"]*)"$`, tctx.onlyOneColOnHost)
+
+	ctx.Step(`we stop mongo on ([^\s]*)$`, tctx.StopMongodb)
+	ctx.Step(`we fill oplog on ([^\s]*)$`, tctx.FillOplog)
+	ctx.Step(`we run oplog-replay on ([^\s]*)$`, tctx.RunOplogReplay)
+
 	SetupMongodbLogicalSteps(ctx, tctx)
 }
 
@@ -50,6 +62,7 @@ func SetupMongodbLogicalSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we purge oplog archives via ([^\s]*)$`, tctx.purgeOplogArchives)
 	ctx.Step(`^oplog archiving is enabled on ([^\s]*)$`, tctx.enableOplogPush)
 	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*)$`, tctx.replayOplog)
+	ctx.Step(`^we restore from #(\d+) backup to "([^"]*)" timestamp to ([^\s]*) partial$`, tctx.replayOplogPartial)
 }
 
 func (tctx *TestContext) createMongoBackup(container string) error {
@@ -178,6 +191,8 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 	if err != nil {
 		return err
 	}
+
+	time.Sleep(1 * time.Minute)
 
 	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
 		tsMaj, err := mc.LastMajTS()
@@ -319,9 +334,21 @@ func (tctx *TestContext) enableOplogPush(container string) error {
 	}
 	tctx.AuxData.OplogPushEnabled = true
 	walg := WalgUtilFromTestContext(tctx, container)
+	runtime.GOMAXPROCS(6) // to surely run oplog-push in background
 	go func() {
-		err := walg.OplogPush() // TODO: run in background with supervisord?
-		tracelog.DebugLogger.Println(err)
+		for {
+			err := walg.OplogPush()
+			if err != nil {
+				tracelog.DebugLogger.Println(err)
+				if strings.HasSuffix(strings.Trim(err.Error(), "\n \t"), "exit code: 1") {
+					continue
+				}
+				// OplogPush fails with exit code 1 with error CappedPositionLost if oplog overflows,
+				// but this type of wal-g starts does not return certain error.
+				// So now it restarts if exit code 1, but not restarts if exit code is 127 (container deleted) e.g.
+				break
+			}
+		}
 	}()
 	return nil
 }
@@ -337,6 +364,10 @@ func (tctx *TestContext) restoreBackupToMongodb(backupNum int, container string)
 }
 
 func (tctx *TestContext) replayOplog(backupId int, timestampId string, container string) error {
+	return tctx.replayOplogImpl(backupId, timestampId, container, false)
+}
+
+func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container string, partial bool) error {
 	walg := WalgUtilFromTestContext(tctx, container)
 
 	backupMeta, err := walg.BackupMeta(backupId)
@@ -365,6 +396,197 @@ func (tctx *TestContext) replayOplog(backupId int, timestampId string, container
 		return err
 	}
 
-	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v", from, until)
-	return walg.OplogReplay(from, until)
+	withPartial := ""
+	if partial {
+		withPartial = "with partial"
+	}
+
+	tracelog.DebugLogger.Printf("Starting oplog replay from %v until %v %v", from, until, withPartial)
+	return walg.OplogReplay(from.String(), until.String(), partial, false, "")
+}
+
+func (tctx *TestContext) addPartiallyData(host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	if err = mc.AddDataToCollection("part1", "col1", "partially1", 1, 1); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part1", "col2", "partially2", 1, 1); err != nil {
+		return err
+	}
+
+	if err = mc.AddDataToCollection("part2", "col3", "partially3", 1, 1); err != nil {
+		return err
+	}
+	if err = mc.AddDataToCollection("part2", "col4", "partially4", 1, 1); err != nil {
+		return err
+	}
+
+	// we wait for wt checkpoint, which wt does every 60 secs
+	time.Sleep(time.Minute)
+
+	return nil
+}
+
+func (tctx *TestContext) equalCollectionOnMongoDBHosts(host1, host2, db, col string) error {
+	mc1, err := MongoCtlFromTestContext(tctx, host1)
+	if err != nil {
+		return err
+	}
+	mc2, err := MongoCtlFromTestContext(tctx, host2)
+	if err != nil {
+		return err
+	}
+
+	snap1, err := mc1.Snapshot()
+	if err != nil {
+		return err
+	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap1) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host1, snap1)
+	}
+
+	snap2, err := mc2.Snapshot()
+	if err != nil {
+		return err
+	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap2) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host2, snap2)
+	}
+
+	var ns1 helpers.NsSnapshot
+	var ns2 helpers.NsSnapshot
+
+	ns := fmt.Sprintf("%s.%s", db, col)
+
+	for _, snap := range snap1 {
+		if snap.NS == ns {
+			ns1 = snap
+		}
+	}
+
+	for _, snap := range snap2 {
+		if snap.NS == ns {
+			ns2 = snap
+		}
+	}
+
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), ns1, ns2) {
+		return fmt.Errorf("expected the same data in snapshot %s at hosts %s and %s", ns, host1, host2)
+	}
+
+	return nil
+}
+
+func (tctx *TestContext) onlyOneColOnHost(host, db, col string) error {
+	mc1, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	ns := fmt.Sprintf("%s.%s", db, col)
+	snap, err := mc1.Snapshot()
+	if err != nil {
+		return err
+	}
+	if !assert.NotEmpty(TestingfWrap(tracelog.ErrorLogger.Printf), snap) {
+		return fmt.Errorf("host %s snapshot is empty: %+v", host, snap)
+	}
+
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), 1, len(snap)) {
+		return fmt.Errorf("only one snapshot on host %s expected but was %d: %v", host, len(snap), snap)
+	}
+
+	if !assert.Equal(TestingfWrap(tracelog.ErrorLogger.Printf), snap[0].NS, ns) {
+		return fmt.Errorf("snapshot name on host %s was %s, expected %s", host, snap[0].NS, ns)
+	}
+
+	return nil
+}
+
+func (tctx *TestContext) replayOplogPartial(backupId int, timestampId, container string) error {
+	return tctx.replayOplogImpl(backupId, timestampId, container, true)
+}
+
+func (tctx *TestContext) FillOplog(host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	start := time.Now()
+
+	for i := 0; ; i++ {
+		if err = mc.AddDataToCollection("oplog_fill", "oplog_coll", "oplog", 5000, 10000); err != nil {
+			return err
+		}
+		if err = mc.AddDataToCollection(fmt.Sprintf("checkpoint%d", i), "checkpoint_col", "", 1, 10); err != nil {
+			return err
+		}
+		if err = mc.DeleteCollection("oplog_fill", "oplog_coll"); err != nil {
+			return err
+		}
+		oplogTimeDiff, err := mc.OplogTimeDiff()
+		if err != nil {
+			return err
+		}
+		if time.Now().Sub(start).Seconds()-oplogTimeDiff > 60 {
+			break
+		}
+	}
+
+	time.Sleep(time.Minute) // wait for WiredTiger checkpoint (60 secs as a default)
+
+	return nil
+}
+
+func (tctx *TestContext) StopMongodb(host string) error {
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+	return mc.StopMongod()
+}
+
+func (tctx *TestContext) RunOplogReplay(host string) error {
+	walg := WalgUtilFromTestContext(tctx, host)
+	if err := walg.OplogReplay("LATEST_ON_REPLICA", "LATEST", false, true, "/config/mongod-minimal.conf"); err != nil {
+		return err
+	}
+
+	mc, err := MongoCtlFromTestContext(tctx, host)
+	if err != nil {
+		return err
+	}
+
+	if err = mc.ChownDBPath(); err != nil {
+		return err
+	}
+
+	return mc.StartMongod()
+}
+
+func (tctx *TestContext) addHostToReplicaSet(replica, master string) error {
+	mc, err := MongoCtlFromTestContext(tctx, master)
+	if err != nil {
+		return err
+	}
+	return mc.AddToReplicaset(replica)
+}
+
+func (tctx *TestContext) initiateReplica(replica, master string) error {
+	mc, err := MongoCtlFromTestContext(tctx, replica)
+	if err != nil {
+		return err
+	}
+	if err = mc.ChangeReplSet(master); err != nil {
+		return err
+	}
+	if err = tctx.testMongoConnect(replica); err != nil {
+		return err
+	}
+	return tctx.addHostToReplicaSet(replica, master)
 }

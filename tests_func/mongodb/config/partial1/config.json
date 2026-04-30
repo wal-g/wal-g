@@ -1,0 +1,14 @@
+[
+  {"op": "c", "db": "partial", "dc": {"create":  "coll"}},
+  {"op":"c", "db":"partial", "dc":{"insert":"coll", "documents": [{"key1": "foo1", "i": 1}]}},
+  {"op":"c", "db":"partial", "dc":{"insert":"coll", "documents": [{"key1": "foo2"}, {"key2": "foo3", "i":  2}]}},
+  {"op":"c", "db":"partial", "dc":{"update":"coll", "updates": [{"q": {"key2": "foo3"}, "u": {"$inc": {"i": 2 }}} ]}},
+  {"op":"c", "db":"partial", "dc":{"delete":"coll", "deletes": [{"q": {"key1": "foo2"}, "limit": 0}]}},
+  {"op": "c", "db": "partial", "dc": {"create":  "coll2"}},
+  {"op":"c", "db":"partial", "dc":{"insert":"coll2", "documents": [{"key1": "bar1", "i": 1}]}},
+  {"op":"c", "db":"partial", "dc":{"insert":"coll2", "documents": [{"key1": "bar2"}, {"key2": "bar3", "i":  2}]}},
+  {"op":"c", "db":"partial", "dc":{"update":"coll2", "updates": [{"q": {"key2": "bar3"}, "u": {"$inc": {"i": 2 }}} ]}},
+  {"op":"c", "db":"partial", "dc":{"delete":"coll2", "deletes": [{"q": {"key1": "bar2"}, "limit": 0}]}},
+  {"op":"c", "db":"partial", "dc":{ "createIndexes": "coll", "indexes": [{"key": { "foo1": 1 }, "name": "foo1_1"}]}},
+  {"op":"c", "db":"partial", "dc":{ "createIndexes": "coll2", "indexes": [{"key": { "bar1": 1 }, "name": "foo1_1"}]}}
+]

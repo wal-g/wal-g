@@ -5,11 +5,11 @@ import (
 	"sync/atomic"
 )
 
-func NewWithSizeReader(underlying io.Reader, readSize *int64) *WithSizeReader {
+func NewWithSizeReader(underlying io.Reader, readSize *atomic.Int64) *WithSizeReader {
 	return &WithSizeReader{underlying: underlying, readSize: readSize}
 }
 
-func NewWithSizeReadCloser(underlying io.ReadCloser, readSize *int64) *WithSizeReadCloser {
+func NewWithSizeReadCloser(underlying io.ReadCloser, readSize *atomic.Int64) *WithSizeReadCloser {
 	return &WithSizeReadCloser{
 		WithSizeReader: WithSizeReader{
 			underlying: underlying,
@@ -21,7 +21,7 @@ func NewWithSizeReadCloser(underlying io.ReadCloser, readSize *int64) *WithSizeR
 
 type WithSizeReader struct {
 	underlying io.Reader
-	readSize   *int64
+	readSize   *atomic.Int64
 }
 
 type WithSizeReadCloser struct {
@@ -31,7 +31,7 @@ type WithSizeReadCloser struct {
 
 func (reader *WithSizeReader) Read(p []byte) (n int, err error) {
 	n, err = reader.underlying.Read(p)
-	atomic.AddInt64(reader.readSize, int64(n))
+	reader.readSize.Add(int64(n))
 	return
 }
 

@@ -314,57 +314,6 @@ outer:
 	return nil
 }
 
-func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time, p *storage.ObjectProvider) {
-	defer p.Close()
-	_, err := os.Stat(dstDir)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(dstDir, 0777)
-		p.HandleError(err)
-		if err != nil {
-			return
-		}
-	}
-
-	logFolder := folder.GetSubFolder(BinlogPath)
-	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, utility.MaxTime)
-	p.HandleError(err)
-	if err != nil {
-		return
-	}
-
-	for _, logFile := range logsToFetch {
-		// download log files
-		binlogName := utility.TrimFileExtension(logFile.GetName())
-		binlogPath := path.Join(dstDir, binlogName)
-		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-		if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
-			if os.IsExist(err) {
-				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
-			} else {
-				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
-				p.HandleError(err)
-				return
-			}
-		}
-
-		// add file to provider
-		err = p.AddObject(logFile)
-		p.HandleError(err)
-		if err != nil {
-			return
-		}
-
-		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
-		p.HandleError(err)
-		if err != nil {
-			return
-		}
-		if timestamp.After(endTS) {
-			return
-		}
-	}
-}
-
 func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time, error) {
 	startTS := utility.MaxTime // far future
 	var streamSentinel StreamSentinelDto

@@ -4,7 +4,6 @@ set -e -x
 
 export WALG_STREAM_CREATE_COMMAND="redis_cli.sh --rdb /dev/stdout"
 export WALG_STREAM_RESTORE_COMMAND="cat > /var/lib/redis/dump.rdb"
-export WALG_COMPRESSION_METHOD=lz4
 
 sleep $REDIS_TIMEOUT
 redis-server --save "900 0" --appendonly "no" --dir "/var/lib/redis" &

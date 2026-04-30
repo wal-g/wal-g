@@ -10,11 +10,7 @@ import (
 
 func HandleDefaultBackupList(folder storage.Folder, pretty, json bool) {
 	backupTimes, err := GetBackups(folder)
-	_, noBackupsErr := err.(NoBackupsFoundError)
-	if noBackupsErr {
-		tracelog.InfoLogger.Println("No backups found")
-		return
-	}
+	err = FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
 
 	SortBackupTimeSlices(backupTimes)

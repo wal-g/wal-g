@@ -33,6 +33,7 @@ var Env = map[string]string{
 	"MONGO_ADMIN_PASSWORD": "password",
 	"MONGO_ADMIN_DB_NAME":  "admin",
 	"MONGO_EXPOSE_MONGOD":  "27018",
+	"MONGO_CONF_FILE":      "mongod-6.1-plus.conf",
 
 	// Redis specific
 	"REDIS_EXPOSE_PORT": "6379",

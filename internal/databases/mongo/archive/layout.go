@@ -2,9 +2,9 @@ package archive
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -18,6 +18,30 @@ func (p Sequence) Reverse() {
 	for i, j := 0, len(p)-1; i < j; i, j = i+1, j-1 {
 		p[i], p[j] = p[j], p[i]
 	}
+}
+
+func buildSequence(
+	seqEnd *models.Archive,
+	since models.Timestamp,
+	archives []models.Archive,
+	lastTSArch map[models.Timestamp]*models.Archive,
+) (Sequence, error) {
+	archPath := Sequence{}
+	ok := true
+	ts := models.Timestamp{}
+	for i := 0; ok && i <= len(archives); i++ {
+		archPath = append(archPath, *seqEnd)
+		if seqEnd.In(since) {
+			archPath.Reverse()
+			return archPath, nil
+		}
+		ts = seqEnd.Start
+		seqEnd, ok = lastTSArch[ts]
+	}
+	if !ok {
+		return nil, fmt.Errorf("previous archive in sequence with last ts '%s' does not exist", ts)
+	}
+	return nil, fmt.Errorf("cycles in archive sequence detected")
 }
 
 // SequenceBetweenTS builds archive order between since and until timestamps
@@ -38,6 +62,12 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 			continue
 		}
 		if _, ok := lastTSArch[arch.End]; ok {
+			if models.Equal(arch.Start, arch.End) {
+				// we know, that in any arch there is an oplog entry with arch.End timestamp
+				// timestamps are unique for every entry, so if any two archs have same arch.End timestamp and one of
+				// them has only one oplog entry, then this entry contains in other arch for sure, so we can skip this arch
+				continue
+			}
 			return nil, errors.Errorf("duplicate archives with the same end %+v (archives: %+v)", arch.End, archives)
 		}
 		lastTSArch[arch.End] = &arch
@@ -55,22 +85,7 @@ func SequenceBetweenTS(archives []models.Archive, since, until models.Timestamp)
 		return nil, fmt.Errorf("can not find archive with until timestamp '%s'", until)
 	}
 
-	archPath := Sequence{}
-	ok := true
-	ts := models.Timestamp{}
-	for i := 0; ok && i <= len(archives); i++ {
-		archPath = append(archPath, *seqEnd)
-		if seqEnd.In(since) {
-			archPath.Reverse()
-			return archPath, nil
-		}
-		ts = seqEnd.Start
-		seqEnd, ok = lastTSArch[ts]
-	}
-	if !ok {
-		return nil, fmt.Errorf("previous archive in sequence with last ts '%s' does not exist", ts)
-	}
-	return nil, fmt.Errorf("cycles in archive sequence detected")
+	return buildSequence(seqEnd, since, archives, lastTSArch)
 }
 
 // BackupNamesFromBackupTimes forms list of backup names from BackupTime

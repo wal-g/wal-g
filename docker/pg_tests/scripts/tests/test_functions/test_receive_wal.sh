@@ -3,11 +3,9 @@ set -e
 test_receive_wal()
 {
   TMP_CONFIG=$1
-  /usr/lib/postgresql/10/bin/initdb ${PGDATA}
+  initdb ${PGDATA}
 
-  /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w start
-
-  /tmp/scripts/wait_while_pg_not_ready.sh
+  pg_ctl -D ${PGDATA} -w start
 
   wal-g --config=${TMP_CONFIG} wal-receive &
 
@@ -18,7 +16,7 @@ test_receive_wal()
   VERIFY_OUTPUT=$(mktemp)
   # Verify and store in temp file
   wal-g --config=${TMP_CONFIG} wal-verify integrity > "${VERIFY_OUTPUT}"
-  /usr/lib/postgresql/10/bin/pg_ctl -D ${PGDATA} -w stop -m immediate
+  pg_ctl -D ${PGDATA} -w stop -m immediate
 
   # parse verify results
   VERIFY_RESULT=$(awk 'BEGIN{FS=":"}$1~/integrity check status/{print $2}' $VERIFY_OUTPUT)

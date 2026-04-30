@@ -82,9 +82,7 @@ func tryFindHighestTimelineID(filenames []string) (highestTimelineID uint32) {
 			continue
 		}
 
-		if highestTimelineID < fileTimeline {
-			highestTimelineID = fileTimeline
-		}
+		highestTimelineID = max(highestTimelineID, fileTimeline)
 	}
 	return highestTimelineID
 }

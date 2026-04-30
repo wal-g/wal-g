@@ -61,12 +61,8 @@ func NewBackupInStorage(baseBackupFolder storage.Folder, name, storage string) (
 	return Backup{Backup: backup}, nil
 }
 
-func (backup *Backup) getTarPartitionFolder() storage.Folder {
-	return backup.Folder.GetSubFolder(backup.Name + internal.TarPartitionFolderName)
-}
-
 func (backup *Backup) GetTarNames() ([]string, error) {
-	tarPartitionFolder := backup.getTarPartitionFolder()
+	tarPartitionFolder := backup.GetTarPartitionFolder()
 	objects, _, err := tarPartitionFolder.ListFolder()
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to list backup '%s' for deletion", backup.Name)

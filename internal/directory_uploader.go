@@ -2,7 +2,6 @@ package internal
 
 import (
 	"path/filepath"
-	"sync/atomic"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
@@ -42,7 +41,7 @@ func NewCommonDirectoryUploader(
 }
 
 func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
-	bundle := NewBundle([]string{path}, u.crypter, u.tarSizeThreshold, u.excludedFiles)
+	bundle := NewBundle(path, u.crypter, u.tarSizeThreshold, u.excludedFiles)
 
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
@@ -64,7 +63,7 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 	err = bundle.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	uncompressedSize := atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
+	uncompressedSize := bundle.TarBallQueue.AllTarballsSize.Load()
 	compressedSize, err := u.uploader.UploadedDataSize()
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("Uncompressed size: %d", uncompressedSize)

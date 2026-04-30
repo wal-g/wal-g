@@ -3,10 +3,12 @@ package multistorage
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 // TODO: Unit tests: check Folder.statsCollector.ReportOperationResult calls
@@ -15,7 +17,7 @@ func TestDeleteObjects(t *testing.T) {
 		folder := newTestFolder(t)
 		folder.policies.Delete = policies.DeletePolicyFirst
 
-		err := folder.DeleteObjects([]string{"a/b/c/file"})
+		err := folder.DeleteObjects([]storage.Object{storage.NewLocalObject("a/b/c/file", time.Time{}, 0)})
 		assert.ErrorIs(t, err, ErrNoUsedStorages)
 	})
 
@@ -28,7 +30,7 @@ func TestDeleteObjects(t *testing.T) {
 		_ = folder.usedFolders[1].PutObject("a/b/c/file1", &bytes.Buffer{})
 		_ = folder.usedFolders[1].PutObject("a/b/c/file2", &bytes.Buffer{})
 
-		err := folder.DeleteObjects([]string{"a/b/c/file1", "a/b/c/file2"})
+		err := folder.DeleteObjects([]storage.Object{storage.NewLocalObject("a/b/c/file1", time.Time{}, 0), storage.NewLocalObject("a/b/c/file2", time.Time{}, 0)})
 		require.NoError(t, err)
 
 		exists, err := folder.usedFolders[0].Exists("a/b/c/file1")
@@ -51,7 +53,7 @@ func TestDeleteObjects(t *testing.T) {
 		_ = folder.usedFolders[1].PutObject("a/b/c/file1", &bytes.Buffer{})
 		_ = folder.usedFolders[1].PutObject("a/b/c/file2", &bytes.Buffer{})
 
-		err := folder.DeleteObjects([]string{"a/b/c/file1", "a/b/c/file2"})
+		err := folder.DeleteObjects([]storage.Object{storage.NewLocalObject("a/b/c/file1", time.Time{}, 0), storage.NewLocalObject("a/b/c/file2", time.Time{}, 0)})
 		require.NoError(t, err)
 
 		for storageIdx := 0; storageIdx < 2; storageIdx++ {
@@ -69,7 +71,7 @@ func TestDeleteObjects(t *testing.T) {
 
 		_ = folder.usedFolders[0].PutObject("a/b/c/file1", &bytes.Buffer{})
 
-		err := folder.DeleteObjects([]string{"a/b/c/file1", "a/b/c/file2"})
+		err := folder.DeleteObjects([]storage.Object{storage.NewLocalObject("a/b/c/file1", time.Time{}, 0), storage.NewLocalObject("a/b/c/file2", time.Time{}, 0)})
 		require.NoError(t, err)
 
 		for storageIdx := 0; storageIdx < 2; storageIdx++ {

@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM walg-func-test-base as build
+FROM walg-func-test-base AS build
 
 ARG WALG_REPO=${GOPATH}/src/github.com/wal-g/wal-g
 ENV USE_BROTLI=1

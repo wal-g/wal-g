@@ -9,44 +9,54 @@ on:
 
 env:
   CACHE_FOLDER: ~/docker-images-${{ github.sha }}
-  CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tgz
-  CACHE_FILE_UBUNTU_20_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-20.04.tgz
-  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tgz
-  CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tgz
+  CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
+  CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
+  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
+  CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tar
   IMAGE: wal-g/docker_prefix
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: "1.22.8"
+  GO_VERSION: "1.25"
   LIBSODIUM_VERSION: "1.0.20"
 
 jobs:
   buildimages:
     name: Build images
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
-            ${{ env.CACHE_FILE_UBUNTU_20_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
+      - name: Cleanup space on runner
+        run: |
+          swapon --show=NAME --noheadings | while read swap_device; do
+            sudo swapoff $swap_device
+          done
+  
+          if [ -e /swapfile ]; then
+            sudo rm /swapfile
+          fi
+
       - name: Install deps
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: sudo apt-get install liblzo2-dev
+        run: sudo apt clean && sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
@@ -54,7 +64,7 @@ jobs:
       - name: Get dependencies
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: |
-          go get -v -t -d ./...
+          go get -v -t ./...
 
       # build images
       - name: Build images
@@ -66,7 +76,7 @@ jobs:
 
   test:
     name: test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs: [ buildimages ]
     strategy:
       matrix:
@@ -80,10 +90,10 @@ jobs:
         run: sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go 1.x
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
@@ -95,12 +105,12 @@ jobs:
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ${{ env.CACHE_FILE_DOCKER_PREFIX }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
-            ${{ env.CACHE_FILE_UBUNTU_20_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 

@@ -93,14 +93,14 @@ func TestGetHistoryCopyingInfo_WithAllHistory(t *testing.T) {
 	assert.NoError(t, err)
 	from.PutObject("base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
 	subFolderWals := from.GetSubFolder(utility.WalPath)
-	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{}) //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})             //nolint:errcheck
 	assert.NoError(t, err)
 	infos, err := postgres.HistoryCopyingInfo(backup, from, to, true)
 	assert.NoError(t, err)
@@ -118,14 +118,14 @@ func TestGetHistoryCopyingInfo_WithoutAllHistory(t *testing.T) {
 	assert.NoError(t, err)
 	from.PutObject("base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
 	subFolderWals := from.GetSubFolder(utility.WalPath)
-	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})         //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})         //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{}) //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})             //nolint:errcheck
 	assert.NoError(t, err)
 	infos, err := postgres.HistoryCopyingInfo(backup, from, to, false)
 	assert.NoError(t, err)

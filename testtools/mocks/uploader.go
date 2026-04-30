@@ -189,6 +189,20 @@ func (mr *MockUploaderMockRecorder) Upload(ctx, path, content interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockUploader)(nil).Upload), ctx, path, content)
 }
 
+// UploadExactFile mocks base method.
+func (m *MockUploader) UploadExactFile(ctx context.Context, file ioextensions.NamedReader) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UploadExactFile", ctx, file)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UploadExactFile indicates an expected call of UploadExactFile.
+func (mr *MockUploaderMockRecorder) UploadExactFile(ctx, file interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadExactFile", reflect.TypeOf((*MockUploader)(nil).UploadExactFile), ctx, file)
+}
+
 // UploadFile mocks base method.
 func (m *MockUploader) UploadFile(ctx context.Context, file ioextensions.NamedReader) error {
 	m.ctrl.T.Helper()
@@ -201,6 +215,20 @@ func (m *MockUploader) UploadFile(ctx context.Context, file ioextensions.NamedRe
 func (mr *MockUploaderMockRecorder) UploadFile(ctx, file interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadFile", reflect.TypeOf((*MockUploader)(nil).UploadFile), ctx, file)
+}
+
+// UploadJSON mocks base method.
+func (m *MockUploader) UploadJSON(ctx context.Context, path string, data any) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UploadJSON", ctx, path, data)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UploadJSON indicates an expected call of UploadJSON.
+func (mr *MockUploaderMockRecorder) UploadJSON(ctx, path, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UploadJSON", reflect.TypeOf((*MockUploader)(nil).UploadJSON), ctx, path, data)
 }
 
 // UploadedDataSize mocks base method.

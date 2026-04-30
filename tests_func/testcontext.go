@@ -116,22 +116,22 @@ func CreateTestContext(database string) (tctx *TestContext, err error) {
 		}
 	}
 
+	full := ""
 	var version DBVersion
 	if database == "mongodb" {
-		version = DBVersion{
-			Major: environ["MONGO_MAJOR"],
-			Full:  environ["MONGO_VERSION"],
-		}
+		full = environ["MONGO_VERSION"]
 	} else if database == "redis" {
-		full := environ["REDIS_VERSION"]
-		parts := strings.Split(full, ".")
-		major := strings.Join(parts[:2], ".")
-		version = DBVersion{
-			Major: major,
-			Full:  full,
-		}
+		full = environ["REDIS_VERSION"]
 	} else {
 		return nil, fmt.Errorf("database %s is not expected here", database)
+	}
+
+	parts := strings.Split(full, ".")
+	major := strings.Join(parts[:2], ".")
+
+	version = DBVersion{
+		Major: major,
+		Full:  full,
 	}
 
 	tctx = &TestContext{

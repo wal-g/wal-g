@@ -10,6 +10,7 @@ type LocalObject struct {
 	name           string
 	lastModified   time.Time
 	size           int64
+	versionID      string
 	additionalInfo string
 }
 
@@ -17,8 +18,8 @@ func NewLocalObject(name string, lastModified time.Time, size int64) *LocalObjec
 	return &LocalObject{name: name, lastModified: lastModified, size: size}
 }
 
-func NewLocalObjectWithAdditionalInfo(name string, lastModified time.Time, size int64, info string) *LocalObject {
-	return &LocalObject{name: name, lastModified: lastModified, size: size, additionalInfo: info}
+func NewLocalObjectWithVersion(name string, lastModified time.Time, size int64, version string, additionalInfo string) *LocalObject {
+	return &LocalObject{name: name, lastModified: lastModified, size: size, versionID: version, additionalInfo: additionalInfo}
 }
 
 func (object LocalObject) GetName() string {
@@ -31,6 +32,10 @@ func (object LocalObject) GetLastModified() time.Time {
 
 func (object LocalObject) GetSize() int64 {
 	return object.size
+}
+
+func (object LocalObject) GetVersionID() string {
+	return object.versionID
 }
 
 func (object LocalObject) GetAdditionalInfo() string {

@@ -72,7 +72,7 @@ type Bundle struct {
 	IncrementFromName  string
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
-	DataCatalogSize    *int64
+	DataCatalogSize    atomic.Int64
 
 	forceIncremental bool
 
@@ -87,7 +87,7 @@ func NewBundle(
 ) *Bundle {
 	return &Bundle{
 		Bundle: internal.Bundle{
-			Directories:       []string{directory},
+			Directory:         directory,
 			Crypter:           crypter,
 			TarSizeThreshold:  tarSizeThreshold,
 			ExcludedFilenames: ExcludedFilenames,
@@ -97,7 +97,6 @@ func NewBundle(
 		IncrementFromName:  incrementFromName,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
-		DataCatalogSize:    new(int64),
 	}
 }
 
@@ -127,7 +126,7 @@ func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
 // checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
 func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 	if bundle.Replica {
-		timeline, err := queryRunner.readTimeline()
+		timeline, err := queryRunner.ReadTimeline()
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
@@ -168,7 +167,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 			return "", 0, err
 		}
 	} else {
-		bundle.Timeline, err = queryRunner.readTimeline()
+		bundle.Timeline, err = queryRunner.ReadTimeline()
 		if err != nil {
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
@@ -184,6 +183,7 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 // ExcludedFilenames. Excluded directories will be created but their
 // contents will not be included in the tar bundle.
 func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err error) error {
+	path = filepath.ToSlash(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			tracelog.WarningLogger.Println(path, " deleted during filepath walk")
@@ -192,7 +192,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
 
-	atomic.AddInt64(bundle.DataCatalogSize, info.Size())
+	bundle.DataCatalogSize.Add(info.Size())
 
 	path, err = bundle.TablespaceSpec.makeTablespaceSymlinkPath(path)
 	if err != nil {

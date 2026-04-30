@@ -2,12 +2,14 @@ package azure
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -19,14 +21,15 @@ type Storage struct {
 }
 
 type Config struct {
-	Secrets        *Secrets `json:"-"`
-	RootPath       string
-	Container      string
-	AuthType       authType
-	AccountName    string
-	EndpointSuffix string
-	TryTimeout     time.Duration
-	Uploader       *UploaderConfig
+	Secrets             *Secrets `json:"-"`
+	RootPath            string
+	Container           string
+	AuthType            authType
+	AccountName         string
+	EndpointSuffix      string
+	TryTimeout          time.Duration
+	Uploader            *UploaderConfig
+	BlobStoreAPIVersion string
 }
 
 type Secrets struct {
@@ -35,7 +38,7 @@ type Secrets struct {
 }
 
 type UploaderConfig struct {
-	BufferSize int
+	BufferSize int64
 	Buffers    int
 }
 
@@ -47,9 +50,40 @@ const (
 	authTypeSASToken     authType = "AzureSASTokenAuth"
 )
 
+// apiVersionPolicy overrides the x-ms-version header sent to Azure Storage.
+// This allows compatibility with Azure environments that don't support the
+// latest API version used by the SDK.
+type apiVersionPolicy struct {
+	apiVersion string
+}
+
+func (p *apiVersionPolicy) Do(req *policy.Request) (*http.Response, error) {
+	if p.apiVersion != "" {
+		req.Raw().Header["x-ms-version"] = []string{p.apiVersion}
+	}
+	return req.Next()
+}
+
+// buildClientOptions creates container.ClientOptions with the configured
+// retry timeout and optional API version override.
+func buildClientOptions(config *Config) *container.ClientOptions {
+	opts := &container.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
+		},
+	}
+	if config.BlobStoreAPIVersion != "" {
+		opts.PerCallPolicies = append(
+			opts.PerCallPolicies,
+			&apiVersionPolicy{apiVersion: config.BlobStoreAPIVersion},
+		)
+	}
+	return opts
+}
+
 // TODO: Unit tests
 func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
-	var containerClient *azblob.ContainerClient
+	var containerClient *container.Client
 	var err error
 	switch config.AuthType {
 	case authTypeSASToken:
@@ -65,11 +99,11 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 	}
 
 	uploadStreamOpts := azblob.UploadStreamOptions{
-		BufferSize: config.Uploader.BufferSize,
-		MaxBuffers: config.Uploader.Buffers,
+		BlockSize:   config.Uploader.BufferSize,
+		Concurrency: config.Uploader.Buffers,
 	}
 
-	var folder storage.Folder = NewFolder(config.RootPath, *containerClient, uploadStreamOpts, config.TryTimeout)
+	var folder storage.Folder = NewFolder(config.RootPath, containerClient, uploadStreamOpts, config.TryTimeout)
 
 	for _, wrap := range rootWraps {
 		folder = wrap(folder)
@@ -83,7 +117,7 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 	return &Storage{folder, hash}, nil
 }
 
-func containerClientWithSASToken(config *Config) (*azblob.ContainerClient, error) {
+func containerClientWithSASToken(config *Config) (*container.Client, error) {
 	containerURLString := fmt.Sprintf(
 		"https://%s.blob.%s/%s%s",
 		config.AccountName,
@@ -96,13 +130,11 @@ func containerClientWithSASToken(config *Config) (*azblob.ContainerClient, error
 		return nil, fmt.Errorf("parse service URL with SAS token: %w", err)
 	}
 
-	containerClient, err := azblob.NewContainerClientWithNoCredential(containerURLString, &azblob.ClientOptions{
-		Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
-	})
+	containerClient, err := container.NewClientWithNoCredential(containerURLString, buildClientOptions(config))
 	return containerClient, err
 }
 
-func containerClientWithAccessKey(config *Config) (*azblob.ContainerClient, error) {
+func containerClientWithAccessKey(config *Config) (*container.Client, error) {
 	credential, err := azblob.NewSharedKeyCredential(config.AccountName, config.Secrets.AccessKey)
 	if err != nil {
 		return nil, fmt.Errorf("create shared key credentials: %w", err)
@@ -113,18 +145,15 @@ func containerClientWithAccessKey(config *Config) (*azblob.ContainerClient, erro
 		config.EndpointSuffix,
 		config.Container,
 	)
-	_, err = url.Parse(containerURLString)
-	if err != nil {
+	if _, err := url.Parse(containerURLString); err != nil {
 		return nil, fmt.Errorf("parse service URL: %w", err)
 	}
 
-	containerClient, err := azblob.NewContainerClientWithSharedKey(containerURLString, credential, &azblob.ClientOptions{
-		Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
-	})
+	containerClient, err := container.NewClientWithSharedKeyCredential(containerURLString, credential, buildClientOptions(config))
 	return containerClient, err
 }
 
-func containerClientWithDefaultAuth(config *Config) (*azblob.ContainerClient, error) {
+func containerClientWithDefaultAuth(config *Config) (*container.Client, error) {
 	defaultCredential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("construct the default Azure credential chain: %w", err)
@@ -141,9 +170,7 @@ func containerClientWithDefaultAuth(config *Config) (*azblob.ContainerClient, er
 		return nil, fmt.Errorf("parse service URL: %w", err)
 	}
 
-	containerClient, err := azblob.NewContainerClient(containerURLString, defaultCredential, &azblob.ClientOptions{
-		Retry: policy.RetryOptions{TryTimeout: config.TryTimeout},
-	})
+	containerClient, err := container.NewClient(containerURLString, defaultCredential, buildClientOptions(config))
 	return containerClient, err
 }
 

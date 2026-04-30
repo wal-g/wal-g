@@ -7,7 +7,9 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -38,6 +40,7 @@ type Downloader interface {
 	BackupMeta(name string) (*models.Backup, error)
 	DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error
 	ListOplogArchives() ([]models.Archive, error)
+	ListOplogArchivesSegment(startAfter *string, endBefore *string) ([]models.Archive, error)
 	LoadBackups(names []string) ([]*models.Backup, error)
 	ListBackups() ([]internal.BackupTime, []string, error)
 	LastKnownArchiveTS() (models.Timestamp, error)
@@ -125,9 +128,30 @@ func (sd *StorageDownloader) DownloadOplogArchive(arch models.Archive, writeClos
 
 // ListOplogArchives fetches all oplog archives existed in storage.
 func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
-	objects, _, err := sd.oplogsFolder.ListFolder()
-	if err != nil {
-		return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
+	return sd.ListOplogArchivesSegment(nil, nil)
+}
+
+// ListOplogArchivesSegment fetches all oplog archives existed in storage after the given startAfter.
+func (sd *StorageDownloader) ListOplogArchivesSegment(startAfter *string, endBefore *string) ([]models.Archive, error) {
+	tracelog.DebugLogger.Printf("Listing %s with startAfter `%s` and endBefore `%s`",
+		sd.oplogsFolder.GetPath(),
+		aws.StringValue(startAfter),
+		aws.StringValue(endBefore),
+	)
+	var objects []storage.Object
+	var err error
+
+	if folder, ok := sd.oplogsFolder.(storage.FolderExt); !ok {
+		tracelog.WarningLogger.Printf("doesn't support ListFolderSegment %s fallback to ListFolder", sd.oplogsFolder.GetPath())
+		objects, _, err = sd.oplogsFolder.ListFolder()
+		if err != nil {
+			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
+		}
+	} else {
+		objects, _, err = folder.ListFolderSegment(startAfter, endBefore)
+		if err != nil {
+			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
+		}
 	}
 
 	archives := make([]models.Archive, 0, len(objects))
@@ -139,15 +163,28 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 		}
 		archives = append(archives, arch)
 	}
+
+	tracelog.DebugLogger.Printf("%s listed", sd.oplogsFolder.GetPath())
 	return archives, nil
 }
 
 // LastKnownArchiveTS returns the most recent existed timestamp in storage folder.
 func (sd *StorageDownloader) LastKnownArchiveTS() (models.Timestamp, error) {
 	maxTS := models.Timestamp{}
-	keys, _, err := sd.oplogsFolder.ListFolder()
-	if err != nil {
-		return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
+	var keys []storage.Object
+	var err error
+
+	if folder, ok := sd.oplogsFolder.(storage.FolderExt); !ok {
+		tracelog.WarningLogger.Printf("doesn't support ListFolderSegment %s fallback to ListFolder", sd.oplogsFolder.GetPath())
+		keys, _, err = sd.oplogsFolder.ListFolder()
+		if err != nil {
+			return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
+		}
+	} else {
+		keys, err = findLastRecordsByStep(folder)
+		if err != nil {
+			return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
+		}
 	}
 	for _, key := range keys {
 		filename := key.GetName()
@@ -158,6 +195,28 @@ func (sd *StorageDownloader) LastKnownArchiveTS() (models.Timestamp, error) {
 		maxTS = models.MaxTS(maxTS, arch.End)
 	}
 	return maxTS, nil
+}
+
+// try to find the last record by steps in last 15minutes, 3hours, 1.1day, 10days to improve performance
+func findLastRecordsByStep(folder storage.FolderExt) ([]storage.Object, error) {
+	keyPrefix := fmt.Sprintf("%s_%d", models.ArchiveTypeOplog, time.Now().Unix())
+	keyPrefix = keyPrefix[:len(keyPrefix)-3]
+	// make 4 steps to find the last record 1step~15minutes, 2step~3hour, 3step~1.1day, 4step~10day
+	// next step is 3 month so just fallback to list all archives
+	for i := 0; i < 4; i++ {
+		tracelog.DebugLogger.Printf("try oplog prefix to find the last record: %s", keyPrefix)
+		keys, _, err := folder.ListFolderSegment(&keyPrefix, nil)
+		if err != nil {
+			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
+		}
+		if len(keys) > 0 {
+			return keys, nil
+		}
+		keyPrefix = keyPrefix[:len(keyPrefix)-1]
+	}
+	tracelog.WarningLogger.Println("fallback to ListFolder to find the last record")
+	keys, _, err := folder.ListFolder()
+	return keys, err
 }
 
 // DiscardUploader reads provided data and returns success
@@ -216,7 +275,7 @@ func (su *StorageUploader) UploadOplogArchive(ctx context.Context, stream io.Rea
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Uploader.Compression(), su.crypter))
+	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Compression(), su.crypter))
 	// TODO: warn if read > 2 * models.MaxDocumentSize and shrink buf capacity if it's too high
 	defer su.buf.Reset()
 	if err != nil {
@@ -301,9 +360,9 @@ func (sp *StoragePurger) DeleteGarbage(garbage []string) error {
 
 // DeleteOplogArchives purges given oplogs files
 func (sp *StoragePurger) DeleteOplogArchives(archives []models.Archive) error {
-	oplogKeys := make([]string, 0, len(archives))
+	oplogKeys := make([]storage.Object, 0, len(archives))
 	for _, arch := range archives {
-		oplogKeys = append(oplogKeys, arch.Filename())
+		oplogKeys = append(oplogKeys, storage.NewLocalObject(arch.Filename(), time.Time{}, 0))
 	}
 	tracelog.DebugLogger.Printf("Oplog keys will be deleted: %+v\n", oplogKeys)
 	return sp.oplogsFolder.DeleteObjects(oplogKeys)

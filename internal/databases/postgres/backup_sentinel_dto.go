@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"encoding/json"
 	"os"
 	"sync"
 	"time"
@@ -25,10 +26,11 @@ type BackupSentinelDto struct {
 	BackupFinishLSN  *LSN    `json:"FinishLSN"`
 	SystemIdentifier *uint64 `json:"SystemIdentifier,omitempty"`
 
-	UncompressedSize int64           `json:"UncompressedSize"`
-	CompressedSize   int64           `json:"CompressedSize"`
-	DataCatalogSize  int64           `json:"DataCatalogSize,omitempty"`
-	TablespaceSpec   *TablespaceSpec `json:"Spec"`
+	UncompressedSize int64 `json:"UncompressedSize"`
+	CompressedSize   int64 `json:"CompressedSize"`
+	DataCatalogSize  int64 `json:"DataCatalogSize,omitempty"`
+	// TablespaceSpec holds tablespace locations. UnmarshalJSON handles both "Spec" and "spec" (WAL-E).
+	TablespaceSpec *TablespaceSpec `json:"Spec,omitempty"`
 
 	UserData interface{} `json:"UserData,omitempty"`
 
@@ -119,6 +121,39 @@ func (dto *BackupSentinelDto) IsIncremental() (isIncremental bool) {
 		}
 	}
 	return dto.IncrementFrom != nil
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for BackupSentinelDto.
+// It handles both "Spec" (WAL-G format) and "spec" (WAL-E format) keys
+// for the TablespaceSpec field to ensure compatibility with both tools.
+func (dto *BackupSentinelDto) UnmarshalJSON(data []byte) error {
+	// Use an alias type to avoid infinite recursion
+	type backupSentinelDtoAlias BackupSentinelDto
+
+	// First, unmarshal using the standard method (handles "Spec" uppercase - WAL-G format)
+	alias := (*backupSentinelDtoAlias)(dto)
+	if err := json.Unmarshal(data, alias); err != nil {
+		return err
+	}
+
+	// If TablespaceSpec is still nil, try to find it under "spec" (lowercase, WAL-E format)
+	if dto.TablespaceSpec == nil {
+		var rawMap map[string]json.RawMessage
+		if err := json.Unmarshal(data, &rawMap); err != nil {
+			return err
+		}
+
+		// Check for lowercase "spec" key (WAL-E format)
+		if specData, ok := rawMap["spec"]; ok {
+			var spec TablespaceSpec
+			if err := json.Unmarshal(specData, &spec); err != nil {
+				return err
+			}
+			dto.TablespaceSpec = &spec
+		}
+	}
+
+	return nil
 }
 
 // FilesMetadataDto contains the information about the backup files.
