@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"

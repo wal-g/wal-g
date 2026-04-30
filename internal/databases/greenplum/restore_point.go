@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"

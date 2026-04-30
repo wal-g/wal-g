@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	conf "github.com/wal-g/wal-g/internal/config"
 )
 

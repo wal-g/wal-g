@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 )
 
 const PgHbaTemplate = `# TYPE  DATABASE        USER            ADDRESS                 METHOD
