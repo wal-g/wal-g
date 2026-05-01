@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/apache/cloudberry-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/google/uuid"
 
 	"github.com/wal-g/wal-g/internal/config"
@@ -71,7 +72,7 @@ func TestBuildBackupPushCommand(t *testing.T) {
 					startTime:            currentTime.UTC(),
 					finishTime:           currentTime.Add(10 * time.Second).UTC(),
 					systemIdentifier:     nil,
-					gpVersion:            Version{},
+					gpVersion:            dbconn.GPDBVersion{},
 					segmentsMetadata:     nil,
 					backupPidByContentID: nil,
 					incrementCount:       0,
@@ -129,7 +130,7 @@ func TestBuildBackupPushCommand(t *testing.T) {
 					startTime:            currentTime.UTC(),
 					finishTime:           currentTime.Add(10 * time.Second).UTC(),
 					systemIdentifier:     nil,
-					gpVersion:            Version{},
+					gpVersion:            dbconn.GPDBVersion{},
 					segmentsMetadata:     nil,
 					backupPidByContentID: nil,
 					incrementCount:       0,
@@ -187,7 +188,7 @@ func TestBuildBackupPushCommand(t *testing.T) {
 					startTime:            currentTime.UTC(),
 					finishTime:           currentTime.Add(10 * time.Second).UTC(),
 					systemIdentifier:     nil,
-					gpVersion:            Version{},
+					gpVersion:            dbconn.GPDBVersion{},
 					segmentsMetadata:     nil,
 					backupPidByContentID: nil,
 					incrementCount:       0,

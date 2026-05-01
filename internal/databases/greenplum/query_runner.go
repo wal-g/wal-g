@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/apache/cloudberry-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -80,7 +81,26 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(ctx context.Contex
 	return restoreLSNs, nil
 }
 
-const getGreenplumSegmentsInfoQuery = `SELECT
+// BuildGetGreenplumSegmentsInfo formats a query to retrieve information about segments
+func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(version dbconn.GPDBVersion) string {
+	validRange := version.StringToSemVerRange("<6")
+	if version.IsGPDB() && validRange(version.SemVer) {
+		return `
+SELECT
+	s.dbid,
+	s.content,
+	s.role::text,
+	s.port,
+	s.hostname,
+	e.fselocation
+FROM gp_segment_configuration s
+JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
+JOIN pg_filespace f ON e.fsefsoid = f.oid
+WHERE s.role = 'p' AND f.fsname = 'pg_system'
+ORDER BY s.content, s.role DESC;`
+	}
+	return `
+SELECT
 	dbid,
 	content,
 	role::text,
@@ -90,11 +110,12 @@ const getGreenplumSegmentsInfoQuery = `SELECT
 FROM pg_catalog.gp_segment_configuration
 WHERE role OPERATOR(pg_catalog.=) 'p'
 ORDER BY content, role DESC;`
+}
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context, version dbconn.GPDBVersion) (segments []cluster.SegConfig, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(ctx, getGreenplumSegmentsInfoQuery)
+	rows, err := conn.Query(ctx, queryRunner.buildGetGreenplumSegmentsInfo(version))
 	if err != nil {
 		return nil, err
 	}
@@ -412,13 +433,10 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (s
 	if err != nil {
 		return "", err
 	}
-	version, err := parseGreenplumVersion(versionStr)
-	if err != nil {
-		return "", err
-	}
+	version := ParseVersionInfo(versionStr)
 
-	switch version.Flavor {
-	case Greenplum:
+	switch version.Type {
+	case dbconn.GPDB:
 		{
 			switch {
 			case queryRunner.Version >= 120000:
@@ -431,10 +449,10 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (s
 				return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
 			}
 		}
-	case Cloudberry:
+	case dbconn.CBDB:
 		return cbAoRelationPgClassQuery, nil
 	default:
-		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.Flavor.String())
+		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.VersionString)
 	}
 }
 
