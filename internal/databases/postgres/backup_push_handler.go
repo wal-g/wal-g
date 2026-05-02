@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -361,9 +360,9 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 		bh.Arguments.Uploader.Compression().FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.CurBackupInfo.endLSN = finishLsn
-	bh.CurBackupInfo.uncompressedSize = atomic.LoadInt64(bundle.TarBallQueue.AllTarballsSize)
+	bh.CurBackupInfo.uncompressedSize = bundle.TarBallQueue.AllTarballsSize.Load()
 	bh.CurBackupInfo.compressedSize, err = bh.Arguments.Uploader.UploadedDataSize()
-	bh.CurBackupInfo.dataCatalogSize = atomic.LoadInt64(bundle.DataCatalogSize)
+	bh.CurBackupInfo.dataCatalogSize = bundle.DataCatalogSize.Load()
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
 	timelineChanged := bundle.checkTimelineChanged(bh.Workers.QueryRunner)

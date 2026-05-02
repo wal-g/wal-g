@@ -17,6 +17,9 @@ func testInterpret(t *testing.T,
 	dbDataDirectory, name string, typeflag byte,
 	create, delete func(string) error, assertFiles func(os.FileInfo, os.FileInfo)) {
 
+	// keep cwd on same FS as dbDataDirectory so os.Link doesn't hit EXDEV
+	t.Chdir(t.TempDir())
+
 	dbDataDirectory = filepath.ToSlash(dbDataDirectory)
 	tarInterpreter := &postgres.FileTarInterpreter{
 		DBDataDirectory: dbDataDirectory,

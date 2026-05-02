@@ -83,12 +83,8 @@ func NewSegmentsSequence(id uint32, segmentNo WalSegmentNo) *WalSegmentsSequence
 // AddWalSegmentNo adds the provided segment number to collection
 func (seq *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
 	seq.WalSegmentNumbers[number] = true
-	if seq.MinSegmentNo > number {
-		seq.MinSegmentNo = number
-	}
-	if seq.MaxSegmentNo < number {
-		seq.MaxSegmentNo = number
-	}
+	seq.MinSegmentNo = min(seq.MinSegmentNo, number)
+	seq.MaxSegmentNo = max(seq.MaxSegmentNo, number)
 }
 
 // FindMissingSegments finds missing segments in range [minSegmentNo, maxSegmentNo]

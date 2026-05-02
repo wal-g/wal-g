@@ -3,6 +3,7 @@ package testutils
 import (
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/wal-g/wal-g/utility"
 
@@ -46,14 +47,14 @@ func NewNetworkErrorFolder(sourceFolder storage.Folder, networkErrorAfterByteSiz
 	return &TestFolder{
 		Folder:       sourceFolder,
 		maxReadSize:  int64(networkErrorAfterByteSize),
-		readFromFile: make(map[string]*int64),
+		readFromFile: make(map[string]*atomic.Int64),
 	}
 }
 
 type TestFolder struct {
 	storage.Folder
 	maxReadSize  int64
-	readFromFile map[string]*int64
+	readFromFile map[string]*atomic.Int64
 	mutex        sync.Mutex
 }
 
@@ -63,10 +64,10 @@ func (tf *TestFolder) ReadObject(path string) (io.ReadCloser, error) {
 		tf.mutex.Lock()
 		defer tf.mutex.Unlock()
 		if _, ok := tf.readFromFile[path]; !ok {
-			tf.readFromFile[path] = new(int64)
+			tf.readFromFile[path] = new(atomic.Int64)
 		}
 		reader = utility.NewWithSizeReadCloser(reader, tf.readFromFile[path])
-		reader = NewUnexpectedEOFLimitReader(reader, *tf.readFromFile[path]+tf.maxReadSize)
+		reader = NewUnexpectedEOFLimitReader(reader, tf.readFromFile[path].Load()+tf.maxReadSize)
 	}
 	return reader, err
 }

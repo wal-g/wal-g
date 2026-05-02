@@ -87,7 +87,7 @@ func (concurrentUploader *ConcurrentUploader) Finalize() (TarFileSets, error) {
 		return nil, err
 	}
 
-	concurrentUploader.UncompressedSize = *concurrentUploader.bundle.TarBallQueue.AllTarballsSize
+	concurrentUploader.UncompressedSize = concurrentUploader.bundle.TarBallQueue.AllTarballsSize.Load()
 	concurrentUploader.CompressedSize, err = concurrentUploader.uploader.UploadedDataSize()
 	return tarFileSets, err
 }
