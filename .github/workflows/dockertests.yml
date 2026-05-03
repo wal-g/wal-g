@@ -13,7 +13,9 @@ env:
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
   CACHE_FILE_PG_TESTS: ~/docker-images-${{ github.sha }}/pg_tests.tar
+  CACHE_FILE_PG_TESTS_MODERN: ~/docker-images-${{ github.sha }}/pg_tests_modern.tar
   IMAGE_PG_TESTS: wal-g/pg_tests
+  IMAGE_PG_TESTS_MODERN: wal-g/pg_tests_modern
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.25"
@@ -31,6 +33,7 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_PG_TESTS }}
+            ${{ env.CACHE_FILE_PG_TESTS_MODERN }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
@@ -53,6 +56,8 @@ jobs:
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -91,6 +96,8 @@ jobs:
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6
@@ -109,6 +116,7 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_PG_TESTS }}
+            ${{ env.CACHE_FILE_PG_TESTS_MODERN }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}

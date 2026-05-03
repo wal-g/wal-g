@@ -69,10 +69,16 @@ pg_build_image:
 	docker compose build pg
 	docker compose build pg_tests_template
 
-pg_save_image: install_and_build_pg pg_build_image
+pg_build_image_modern:
+	docker compose build $(DOCKER_COMMON)
+	docker compose build pg_modern
+	docker compose build pg_tests_template_modern
+
+pg_save_image: install_and_build_pg pg_build_image pg_build_image_modern
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE_PG_TESTS}  > ${CACHE_FILE_PG_TESTS}
+	docker save ${IMAGE_PG_TESTS}        > ${CACHE_FILE_PG_TESTS}
+	docker save ${IMAGE_PG_TESTS_MODERN} > ${CACHE_FILE_PG_TESTS_MODERN}
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
@@ -85,6 +91,13 @@ pg_integration_test: clean_compose
 		make pg_build_image;\
 	else\
 		docker load -i ${CACHE_FILE_PG_TESTS} && rm ${CACHE_FILE_PG_TESTS};\
+	fi
+	@if echo "$(TEST)" | grep -Fqe "_modern"; then\
+		if [ -f ${CACHE_FILE_PG_TESTS_MODERN} ]; then\
+			docker load -i ${CACHE_FILE_PG_TESTS_MODERN} && rm ${CACHE_FILE_PG_TESTS_MODERN};\
+		else\
+			make pg_build_image_modern;\
+		fi;\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
