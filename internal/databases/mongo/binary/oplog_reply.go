@@ -75,7 +75,10 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	}
 
 	dbApplier := oplog.NewDBApplier(mongoClient, oplog.DBApplierArgs{
-		PreserveUUID:   false,
+		// Catch-up replays onto an existing replica synced from master, so collection
+		// UUIDs already match. Preserving 'ui' keeps them aligned through replay so
+		// the replica can rejoin replSet without NamespaceNotFound on master's UUIDs
+		PreserveUUID:   replayArgs.WithCatchUpReconfig,
 		Partial:        replayArgs.Partial,
 		InitMongo:      initMongo,
 		Reconfig:       replayArgs.WithCatchUpReconfig,

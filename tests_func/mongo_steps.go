@@ -425,7 +425,7 @@ func (tctx *TestContext) addPartiallyData(host string) error {
 		return err
 	}
 
-	// we wait for wt checkpoint, which wt does every 60 secs
+	// wait for wt checkpoint, which wt does every 60 secs
 	time.Sleep(time.Minute)
 
 	return nil
@@ -533,7 +533,7 @@ func (tctx *TestContext) FillOplog(host string) error {
 		if err != nil {
 			return err
 		}
-		if time.Now().Sub(start).Seconds()-oplogTimeDiff > 60 {
+		if time.Since(start).Seconds()-oplogTimeDiff > 60 {
 			break
 		}
 	}
