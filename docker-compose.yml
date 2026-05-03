@@ -243,21 +243,21 @@ services:
     image: wal-g/pg
     container_name: wal-g_pg
 
-  pg_build_docker_prefix:
+  pg_tests_template:
     build:
       dockerfile: docker/pg_tests/Dockerfile_prefix
       context: .
-    image: wal-g/docker_prefix
-    container_name: wal-g_pg_docker_prefix
+    image: wal-g/pg_tests
+    container_name: wal-g_pg_tests_template
     <<: *s3_common_depends
 
   pg_test_common: &pg_test_common
-    image: wal-g/docker_prefix
+    image: wal-g/pg_tests
     user: postgres
     <<: *s3_common_depends
 
   pg_test_throttling: &pg_test_throttling
-    image: wal-g/docker_prefix
+    image: wal-g/pg_tests
     user: postgres
     <<: *s3_throttling_depends
 
@@ -267,7 +267,7 @@ services:
     command: /tmp/run_integration_tests.sh
 
   pg_storage_swift_test:
-    image: wal-g/docker_prefix
+    image: wal-g/pg_tests
     container_name: wal-g_pg_storage_swift_test
     command: /tmp/test_bins/swift.test -test.v
     depends_on:
@@ -281,7 +281,7 @@ services:
       - "OS_AUTH_URL=http://swift:8080/auth/v1.0"
 
   pg_storage_ssh_test:
-    image: wal-g/docker_prefix
+    image: wal-g/pg_test
     container_name: wal-g_pg_storage_ssh_test
     command: /tmp/test_bins/sh.test -test.v
     depends_on:
@@ -397,7 +397,7 @@ services:
     command: /tmp/tests/prefetch_test.sh
 
   pg_ssh_backup_test:
-    image: wal-g/docker_prefix
+    image: wal-g/pg_tests
     user: postgres
     container_name: wal-g_pg_ssh_backup_test
     command: /tmp/tests/ssh_backup_test.sh

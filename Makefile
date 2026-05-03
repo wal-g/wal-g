@@ -67,24 +67,24 @@ pg_build_image:
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
 	docker compose build pg
-	docker compose build pg_build_docker_prefix
+	docker compose build pg_tests_template
 
 pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE} > ${CACHE_FILE_DOCKER_PREFIX}
+	docker save ${IMAGE_PG_TESTS}  > ${CACHE_FILE_PG_TESTS}
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
-	docker save ${IMAGE_GOLANG} > ${CACHE_FILE_GOLANG}
+	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
-	@if [ "x" = "${CACHE_FILE_DOCKER_PREFIX}x" ]; then\
+	@if [ "x" = "${CACHE_FILE_PG_TESTS}x" ]; then\
 		echo "Rebuild";\
 		make install_and_build_pg;\
 		make pg_build_image;\
 	else\
-		docker load -i ${CACHE_FILE_DOCKER_PREFIX} && rm ${CACHE_FILE_DOCKER_PREFIX};\
+		docker load -i ${CACHE_FILE_PG_TESTS} && rm ${CACHE_FILE_PG_TESTS};\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
