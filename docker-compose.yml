@@ -252,8 +252,35 @@ services:
     container_name: wal-g_pg_tests_template
     <<: *s3_common_depends
 
+  pg_modern:
+    build:
+      dockerfile: docker/pg/Dockerfile
+      context: .
+      args:
+        UBUNTU_TAG: "22.04"
+        PG_MAJOR: "18"
+        USE_PGDG: "1"
+        INSTALL_WALE: "0"
+    image: wal-g/pg_modern
+    container_name: wal-g_pg_modern
+
+  pg_tests_template_modern:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_prefix
+      context: .
+      args:
+        PG_IMAGE: wal-g/pg_modern:latest
+    image: wal-g/pg_tests_modern
+    container_name: wal-g_pg_tests_template_modern
+    <<: *s3_common_depends
+
   pg_test_common: &pg_test_common
     image: wal-g/pg_tests
+    user: postgres
+    <<: *s3_common_depends
+
+  pg_test_modern_common: &pg_test_modern_common
+    image: wal-g/pg_tests_modern
     user: postgres
     <<: *s3_common_depends
 
@@ -391,6 +418,21 @@ services:
     <<: *pg_test_common
     container_name: wal-g_pg_remote_backup_without_files_metadata_test
     command: /tmp/tests/remote_backup_without_files_metadata_test.sh
+
+  pg_remote_backup_test_modern:
+    <<: *pg_test_modern_common
+    container_name: wal-g_pg_remote_backup_test_modern
+    command: /tmp/tests/remote_backup_test.sh
+
+  pg_remote_backup_without_files_metadata_test_modern:
+    <<: *pg_test_modern_common
+    container_name: wal-g_pg_remote_backup_without_files_metadata_test_modern
+    command: /tmp/tests/remote_backup_without_files_metadata_test.sh
+
+  pg_full_backup_test_modern:
+    <<: *pg_test_modern_common
+    container_name: wal-g_pg_full_backup_test_modern
+    command: /tmp/tests/full_backup_test.sh
 
   prefetch_test:
     <<: *pg_test_common
