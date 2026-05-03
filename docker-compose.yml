@@ -281,7 +281,7 @@ services:
       - "OS_AUTH_URL=http://swift:8080/auth/v1.0"
 
   pg_storage_ssh_test:
-    image: wal-g/pg_test
+    image: wal-g/pg_tests
     container_name: wal-g_pg_storage_ssh_test
     command: /tmp/test_bins/sh.test -test.v
     depends_on:
