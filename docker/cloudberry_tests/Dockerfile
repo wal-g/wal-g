@@ -12,8 +12,11 @@ COPY utility/ utility/
 COPY Makefile Makefile
 
 # we test wal-g logic, not our deps. So, no brotli in these tests.
+# Note: `-race` fails on ARM64 when ubuntu:bionic used: race runtime needs outline-atomics
+# helpers from libgcc 10+, which the bionic-based wal-g/golang base doesn't have.
 RUN cd main/gp && \
-    go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+    if [ "$(uname -m)" = "x86_64" ]; then RACE="-race"; else RACE=""; fi && \
+    go build -mod vendor $RACE -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
 
 FROM wal-g/cloudberry:latest
 
