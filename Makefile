@@ -61,17 +61,27 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 install_and_build_pg: deps pg_build
 
 pg10_build_image:
+ifeq ($(COMPOSE_BAKE),true)
+	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
+	docker compose build $(DOCKER_COMMON) pg10 pg10_tests_template
+else
 	# There are dependencies between container images.
 	# Running in one command leads to using outdated images and fails on clean system.
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
 	docker compose build pg10
 	docker compose build pg10_tests_template
+endif
 
 pg18_build_image:
+ifeq ($(COMPOSE_BAKE),true)
+	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
+	docker compose build $(DOCKER_COMMON) pg18 pg18_tests_template
+else
 	docker compose build $(DOCKER_COMMON)
 	docker compose build pg18
 	docker compose build pg18_tests_template
+endif
 
 pg_save_image: install_and_build_pg pg10_build_image pg18_build_image
 	mkdir -p ${CACHE_FOLDER}
