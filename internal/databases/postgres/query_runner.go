@@ -123,7 +123,7 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	switch {
 	case queryRunner.Version >= 150000:
-		return "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop(false)", nil
+		return "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop()", nil
 	case queryRunner.Version >= 90600:
 		return "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", nil
 	case queryRunner.Version >= 90000:
