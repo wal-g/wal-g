@@ -12,7 +12,7 @@ require (
 	github.com/RoaringBitmap/roaring v0.4.21
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/blang/semver v3.5.1+incompatible
-	github.com/cenkalti/backoff v2.2.1+incompatible
+	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cucumber/godog v0.12.5
 	github.com/cyberdelia/lzo v1.0.0
 	github.com/denisenkom/go-mssqldb v0.10.0

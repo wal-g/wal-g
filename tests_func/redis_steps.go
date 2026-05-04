@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"github.com/cucumber/godog"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -87,18 +88,19 @@ func (tctx *TestContext) manifestIsNotEmpty(hostName string) error {
 	}
 	host := rc.Host()
 
-	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
 		cmd := []string{"stat", "--printf=\"%s\"", "/data/appendonlydir/appendonly.aof.manifest"}
 		res, err := helpers.RunCommandStrict(tctx.Context, host, cmd)
 		if err != nil {
-			return fmt.Errorf("manifest is missing")
+			return struct{}{}, fmt.Errorf("manifest is missing")
 		}
 		if res.Stdout() == "0" {
-			return fmt.Errorf("manifest is empty")
+			return struct{}{}, fmt.Errorf("manifest is empty")
 		}
 
-		return nil
-	})
+		return struct{}{}, nil
+	}, backoff.WithMaxTries(MAX_TRIES_COUNT))
+	return err
 }
 
 func (tctx *TestContext) redisStoppedOn(hostName string) error {
@@ -123,19 +125,20 @@ func (tctx *TestContext) isWorkingRedis(hostName string) error {
 		return err
 	}
 
-	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
 		tracelog.DebugLogger.Printf("Redis client connect to host '%s'", redisCtl.Addr())
 		status := redisCtl.Ping(tctx.Context)
 		err = status.Err()
 		if err != nil {
-			return fmt.Errorf("Client on ping returned err: %v\n", err)
+			return struct{}{}, fmt.Errorf("Client on ping returned err: %v\n", err)
 		}
 		if status.Val() != "PONG" {
-			return fmt.Errorf("Client on ping does not returned PONG: %v\n", err)
+			return struct{}{}, fmt.Errorf("Client on ping does not returned PONG: %v\n", err)
 		}
 		tracelog.DebugLogger.Printf("Redis: Got PONG on PING from %s", hostName)
-		return nil
-	})
+		return struct{}{}, nil
+	}, backoff.WithMaxTries(MAX_TRIES_COUNT))
+	return err
 }
 
 func (tctx *TestContext) redisHasTestRedisDataTest(host string, testId int) error {
