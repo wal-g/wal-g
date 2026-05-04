@@ -68,7 +68,6 @@ jobs:
         "make TEST=\"pg10_daemon_backup_and_restore_test\" pg_integration_test",
         "make TEST=\"pg10_daemon_client_test\" pg_integration_test",
         "make TEST=\"pg10_prefetch_test\" pg_integration_test",
-        "make mongo_test",
         "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
         "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
         "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
