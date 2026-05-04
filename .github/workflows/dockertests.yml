@@ -36,6 +36,7 @@ jobs:
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
+            ${{ env.CACHE_FOLDER }}/wal-g_mongo-base-*.tar
           key: ${{ env.IMAGES_CACHE_KEY }}
 
       - name: Cleanup space on runner
@@ -72,7 +73,7 @@ jobs:
       # build images
       - name: Build images
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: make pg_save_image
+        run: make pg_save_image mongo_save_images
     env:
       USE_BROTLI: 1
       USE_LZO: 1
@@ -117,6 +118,7 @@ jobs:
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
+            ${{ env.CACHE_FOLDER }}/wal-g_mongo-base-*.tar
           key: ${{ env.IMAGES_CACHE_KEY }}
 
       - name: Fail if no cached images
