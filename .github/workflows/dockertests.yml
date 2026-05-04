@@ -122,6 +122,38 @@ jobs:
 
       - name: Run test
         run: ${{ matrix.command }}
+
+      - name: Collect container logs
+        if: always()
+        run: |
+          set +e
+          mkdir -p container-logs
+          # wal-g_* covers pg/mysql/etcd/etc; *.test_net_* covers mongo/redis
+          containers=$(docker ps -a --filter 'name=wal-g_' --filter 'name=test_net_' --format '{{.Names}}')
+          for c in $containers; do
+            mkdir -p "container-logs/$c"
+            docker logs "$c" >"container-logs/$c/stdout.log" 2>"container-logs/$c/stderr.log"
+            docker cp "$c:/var/log" "container-logs/$c/var-log" 2>/dev/null
+          done
+          ls -R container-logs || true
+
+      - name: Sanitize artifact name
+        if: always()
+        id: artifact
+        env:
+          COMMAND: ${{ matrix.command }}
+        run: |
+          slug=$(printf '%s' "$COMMAND" | tr -c 'A-Za-z0-9._-' '_')
+          echo "slug=$slug" >>"$GITHUB_OUTPUT"
+
+      - name: Upload container logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ steps.artifact.outputs.slug }}
+          path: container-logs
+          if-no-files-found: ignore
+          retention-days: 14
     env:
       USE_BROTLI: 1
       USE_LIBSODIUM: 1
