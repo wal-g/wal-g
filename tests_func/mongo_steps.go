@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v5"
 	"github.com/cucumber/godog"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
@@ -97,16 +98,17 @@ func (tctx *TestContext) createMongoBackup(container string) error {
 func (tctx *TestContext) oplogArchiveIsNotEmpty() error {
 	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
 
-	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+	_, err := backoff.Retry(tctx.Context, func() (struct{}, error) {
 		archives, err := s3.Archives()
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 		if len(archives) < 1 {
-			return fmt.Errorf("oplog archives are not exist")
+			return struct{}{}, fmt.Errorf("oplog archives are not exist")
 		}
-		return nil
-	})
+		return struct{}{}, nil
+	}, backoff.WithMaxTries(MAX_TRIES_COUNT))
+	return err
 }
 
 func (tctx *TestContext) testEqualMongodbDataAtHosts(host1, host2 string) error {
@@ -194,18 +196,19 @@ func (tctx *TestContext) loadMongodbOpsFromConfig(host string, loadId string) er
 
 	time.Sleep(1 * time.Minute)
 
-	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
 		tsMaj, err := mc.LastMajTS()
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 		if helpers.LessTS(tsMaj, tsLast) {
-			return fmt.Errorf("last maj (%v) < last ts (%v)", tsLast, tsMaj)
+			return struct{}{}, fmt.Errorf("last maj (%v) < last ts (%v)", tsLast, tsMaj)
 		}
 		tracelog.DebugLogger.Printf("last ts (%v) == last maj (%v)\n", tsLast, tsMaj)
 
-		return nil
-	})
+		return struct{}{}, nil
+	}, backoff.WithMaxTries(MAX_TRIES_COUNT))
+	return err
 }
 
 func (tctx *TestContext) fillMongodbWithTestData(host string, testId int) error {
@@ -223,16 +226,17 @@ func (tctx *TestContext) testMongoConnect(host string) error {
 	if err != nil {
 		return err
 	}
-	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
 		conn, err := mc.Connect(nil)
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 		if err := conn.Ping(tctx.Context, nil); err != nil {
-			return err
+			return struct{}{}, err
 		}
-		return nil
-	})
+		return struct{}{}, nil
+	}, backoff.WithMaxTries(MAX_TRIES_COUNT))
+	return err
 }
 
 func (tctx *TestContext) initiateReplSet(host string) error {
@@ -241,11 +245,10 @@ func (tctx *TestContext) initiateReplSet(host string) error {
 		return err
 	}
 
-	if err := helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, mc.InitReplSet); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
+		return struct{}{}, mc.InitReplSet()
+	}, backoff.WithMaxTries(MAX_TRIES_COUNT))
+	return err
 }
 
 func (tctx *TestContext) isMongoPrimary(host string) error {
@@ -254,16 +257,17 @@ func (tctx *TestContext) isMongoPrimary(host string) error {
 		return err
 	}
 
-	return helpers.Retry(tctx.Context, MAX_RETRIES_COUNT, func() error {
+	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
 		isMaster, err := mc.IsMaster()
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 		if !isMaster {
-			return fmt.Errorf("is not master")
+			return struct{}{}, fmt.Errorf("is not master")
 		}
-		return nil
-	})
+		return struct{}{}, nil
+	}, backoff.WithMaxTries(MAX_TRIES_COUNT))
+	return err
 }
 
 func (tctx *TestContext) mongoInit(host string) error {
@@ -382,16 +386,16 @@ func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container st
 	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
 	tracelog.DebugLogger.Printf("Waiting until ts %v appears in storage", until)
 
-	err = helpers.Retry(tctx.Context, 30, func() error {
+	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
 		exists, err := s3.ArchTsExists(until)
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 		if !exists {
-			return fmt.Errorf("ts %v does not exists", until)
+			return struct{}{}, fmt.Errorf("ts %v does not exists", until)
 		}
-		return nil
-	})
+		return struct{}{}, nil
+	}, backoff.WithMaxTries(30))
 	if err != nil {
 		return err
 	}
