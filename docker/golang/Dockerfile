@@ -5,7 +5,10 @@ FROM ubuntu:bionic
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=xterm-256color
 
-RUN apt-get update && \
+# bionic is EOL, archive.ubuntu.com mirrors are flaky; retry & lengthen timeouts
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+        > /etc/apt/apt.conf.d/80-retries && \
+    apt-get update && \
     apt-get -y install \
         build-essential cmake \
         iputils-ping \
