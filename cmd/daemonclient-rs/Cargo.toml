@@ -1,0 +1,16 @@
+[package]
+name = "walg-daemon-client"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "walg-daemon-client"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

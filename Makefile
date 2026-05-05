@@ -362,6 +362,15 @@ build_client:
 	cd cmd/daemonclient && \
 	go build -o ../../bin/walg-daemon-client -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=$(GIT_REVISION) -X main.version=$(WALG_VERSION)"
 
+build_client_rs:
+	mkdir -p bin
+	cd cmd/daemonclient-rs && \
+	WALG_VERSION="$(WALG_VERSION)" \
+	WALG_REVISION="$(GIT_REVISION)" \
+	WALG_BUILD_DATE="`date -u +%Y.%m.%d_%H:%M:%S`" \
+	cargo build --release --quiet
+	cp cmd/daemonclient-rs/target/release/walg-daemon-client bin/walg-daemon-client
+
 .PHONY: mocks
 # put the files with interfaces you'd like to mock in prerequisites
 # wildcards are allowed
