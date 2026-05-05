@@ -28,7 +28,9 @@ services:
   # additional_contexts wires FROM references to sibling bake targets. The
   # docker-container builder's content store is digest-addressed and does not
   # resolve image names like the local docker daemon does, so without this
-  # FROM wal-g/ubuntu:18.04 falls through to docker.io and fails authorization
+  # FROM wal-g/ubuntu:18.04 falls through to docker.io and fails authorization.
+  # Keys must omit :latest, buildx strips the tag from FROM identifiers before
+  # matching against the contexts map and a literal :latest key never hits
   pg:
     build:
       additional_contexts:
@@ -42,8 +44,8 @@ services:
   pg_tests_template:
     build:
       additional_contexts:
-        wal-g/golang:latest: service:golang
-        wal-g/pg:latest: service:pg
+        wal-g/golang: service:golang
+        wal-g/pg: service:pg
       cache_from:
         - type=gha,scope=walg-pg-tests
         - type=gha,scope=walg-pg
