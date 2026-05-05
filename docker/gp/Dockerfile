@@ -12,8 +12,9 @@ RUN apt-get update && \
 
 ADD docker/gp/run_greenplum.sh /home/gpadmin/run_greenplum.sh
 
+ARG GPDB_REF=6X_STABLE
 WORKDIR /usr/local
-RUN git clone https://github.com/open-gpdb/gpdb.git gpdb_src --single-branch --branch 6X_STABLE --depth 1 \
+RUN git clone https://github.com/open-gpdb/gpdb.git gpdb_src --single-branch --branch ${GPDB_REF} --depth 1 \
  && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
 
 WORKDIR /usr/local/gpdb_src

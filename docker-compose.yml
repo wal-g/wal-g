@@ -762,6 +762,112 @@ services:
     links:
       - s3
 
+  # Per-script split. Image already built via gp_tests above; entries below
+  # reuse it and override CMD to bootstrap gpdb then run one script.
+  gp_test_common: &gp_test_common
+    image: wal-g/gp_tests
+    <<: *s3_common_depends
+
+  gp_ao_storage_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_ao_storage_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/ao_storage_test.sh'
+
+  gp_ao_storage_without_metadata_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_ao_storage_without_metadata_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/ao_storage_without_metadata_test.sh'
+
+  gp_backup_after_failed_backup_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_backup_after_failed_backup_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/backup_after_failed_backup_test.sh'
+
+  gp_delete_before_name_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_before_name_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_before_name_test.sh'
+
+  gp_delete_before_permanent_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_before_permanent_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_before_permanent_test.sh'
+
+  gp_delete_before_time_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_before_time_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_before_time_test.sh'
+
+  gp_delete_garbage_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_garbage_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_garbage_test.sh'
+
+  gp_delete_retain_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_retain_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_retain_test.sh'
+
+  gp_delete_target_delta_find_full_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_target_delta_find_full_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_target_delta_find_full_test.sh'
+
+  gp_delete_target_delta_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_target_delta_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_target_delta_test.sh'
+
+  gp_delete_target_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_target_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_target_test.sh'
+
+  gp_delete_without_confirm_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delete_without_confirm_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_without_confirm_test.sh'
+
+  gp_delta_backup_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_delta_backup_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delta_backup_test.sh'
+
+  gp_follow_primary_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_follow_primary_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/follow_primary.sh'
+
+  gp_full_backup_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_full_backup_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/gp_full_backup_test.sh'
+
+  gp_partial_database_restore_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_partial_database_restore_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_database_restore_test.sh'
+
+  gp_partial_namespace_restore_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_partial_namespace_restore_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_namespace_restore.sh'
+
+  gp_partial_restore_wildcard_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_partial_restore_wildcard_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_restore_wildcard.sh'
+
+  gp_partial_table_restore_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_partial_table_restore_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_table_restore_test.sh'
+
+  gp_restore_point_test:
+    <<: *gp_test_common
+    container_name: wal-g_gp_restore_point_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/restore_point.sh'
+
   cloudberry:
     build:
       dockerfile: docker/cloudberry/Dockerfile
@@ -780,6 +886,110 @@ services:
       - s3
     links:
       - s3
+
+  cloudberry_test_common: &cloudberry_test_common
+    image: wal-g/cloudberry_tests
+    <<: *s3_common_depends
+
+  cloudberry_ao_storage_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_ao_storage_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/ao_storage_test.sh'
+
+  cloudberry_ao_storage_without_metadata_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_ao_storage_without_metadata_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/ao_storage_without_metadata_test.sh'
+
+  cloudberry_backup_after_failed_backup_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_backup_after_failed_backup_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/backup_after_failed_backup_test.sh'
+
+  cloudberry_delete_before_name_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_before_name_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_before_name_test.sh'
+
+  cloudberry_delete_before_permanent_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_before_permanent_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_before_permanent_test.sh'
+
+  cloudberry_delete_before_time_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_before_time_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_before_time_test.sh'
+
+  cloudberry_delete_garbage_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_garbage_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_garbage_test.sh'
+
+  cloudberry_delete_retain_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_retain_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_retain_test.sh'
+
+  cloudberry_delete_target_delta_find_full_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_target_delta_find_full_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_target_delta_find_full_test.sh'
+
+  cloudberry_delete_target_delta_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_target_delta_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_target_delta_test.sh'
+
+  cloudberry_delete_target_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_target_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_target_test.sh'
+
+  cloudberry_delete_without_confirm_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delete_without_confirm_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delete_without_confirm_test.sh'
+
+  cloudberry_delta_backup_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_delta_backup_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/delta_backup_test.sh'
+
+  cloudberry_follow_primary_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_follow_primary_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/follow_primary.sh'
+
+  cloudberry_full_backup_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_full_backup_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/gp_full_backup_test.sh'
+
+  cloudberry_partial_database_restore_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_partial_database_restore_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_database_restore_test.sh'
+
+  cloudberry_partial_namespace_restore_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_partial_namespace_restore_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_namespace_restore.sh'
+
+  cloudberry_partial_restore_wildcard_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_partial_restore_wildcard_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_restore_wildcard.sh'
+
+  cloudberry_partial_table_restore_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_partial_table_restore_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/partial_table_restore_test.sh'
+
+  cloudberry_restore_point_test:
+    <<: *cloudberry_test_common
+    container_name: wal-g_cloudberry_restore_point_test
+    command: su gpadmin bash -c '/home/gpadmin/run_greenplum.sh && /tmp/tests/restore_point.sh'
 
   st_tests:
     build:

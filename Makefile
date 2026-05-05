@@ -15,6 +15,8 @@ TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
 TEST := "pg_tests"
+GP_TEST ?= gp_tests
+CLOUDBERRY_TEST ?= cloudberry_tests
 MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
 MONGO_VERSION ?= "8.0.3"
@@ -69,13 +71,53 @@ pg_build_image:
 	docker compose build pg
 	docker compose build pg_tests_template
 
-pg_save_image: install_and_build_pg pg_build_image
+.PHONY: prepare_cache_folder save_common_images \
+	gp_build_image gp_save_image \
+	cloudberry_build_image cloudberry_save_image \
+	save_images
+
+prepare_cache_folder:
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE_PG_TESTS}  > ${CACHE_FILE_PG_TESTS}
+
+save_common_images:
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
+
+pg_save_image: install_and_build_pg pg_build_image prepare_cache_folder save_common_images
+	docker save ${IMAGE_PG_TESTS} > ${CACHE_FILE_PG_TESTS}
+	ls ${CACHE_FOLDER}
+
+# Builds gp + gp_tests images; gp is needed at runtime because gp_tests'
+# compose entry depends_on it (a no-op container, but tag must be present).
+gp_build_image: deps
+	docker compose build $(DOCKER_COMMON)
+	docker compose build gp
+	docker compose build gp_tests
+
+gp_save_image: gp_build_image prepare_cache_folder save_common_images
+	docker save ${IMAGE_GP}       > ${CACHE_FILE_GP}
+	docker save ${IMAGE_GP_TESTS} > ${CACHE_FILE_GP_TESTS}
+	ls ${CACHE_FOLDER}
+
+cloudberry_build_image: deps
+	docker compose build $(DOCKER_COMMON)
+	docker compose build cloudberry
+	docker compose build cloudberry_tests
+
+cloudberry_save_image: cloudberry_build_image prepare_cache_folder save_common_images
+	docker save ${IMAGE_CLOUDBERRY}       > ${CACHE_FILE_CLOUDBERRY}
+	docker save ${IMAGE_CLOUDBERRY_TESTS} > ${CACHE_FILE_CLOUDBERRY_TESTS}
+	ls ${CACHE_FOLDER}
+
+# Umbrella for CI: build & save every cached image set in one runner pass.
+save_images: install_and_build_pg pg_build_image gp_build_image cloudberry_build_image prepare_cache_folder save_common_images
+	docker save ${IMAGE_PG_TESTS}         > ${CACHE_FILE_PG_TESTS}
+	docker save ${IMAGE_GP}               > ${CACHE_FILE_GP}
+	docker save ${IMAGE_GP_TESTS}         > ${CACHE_FILE_GP_TESTS}
+	docker save ${IMAGE_CLOUDBERRY}       > ${CACHE_FILE_CLOUDBERRY}
+	docker save ${IMAGE_CLOUDBERRY_TESTS} > ${CACHE_FILE_CLOUDBERRY_TESTS}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
@@ -267,10 +309,16 @@ gp_install: gp_build
 
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
-gp_integration_test: load_docker_common
-	docker compose build gp
-	docker compose build gp_tests
-	docker compose up --exit-code-from gp_tests gp_tests
+gp_integration_test: clean_compose
+	@if [ "x" = "${CACHE_FILE_GP_TESTS}x" ]; then\
+		echo "Rebuild";\
+		make gp_build_image;\
+	else\
+		docker load -i ${CACHE_FILE_GP}       && rm ${CACHE_FILE_GP};\
+		docker load -i ${CACHE_FILE_GP_TESTS} && rm ${CACHE_FILE_GP_TESTS};\
+	fi
+	docker compose up --exit-code-from $(GP_TEST) $(GP_TEST)
+	make clean_compose
 
 cloudberry_build: gp_build
 
@@ -280,10 +328,16 @@ cloudberry_install: gp_install
 
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
-cloudberry_integration_test: load_docker_common
-	docker compose build cloudberry
-	docker compose build cloudberry_tests
-	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
+cloudberry_integration_test: clean_compose
+	@if [ "x" = "${CACHE_FILE_CLOUDBERRY_TESTS}x" ]; then\
+		echo "Rebuild";\
+		make cloudberry_build_image;\
+	else\
+		docker load -i ${CACHE_FILE_CLOUDBERRY}       && rm ${CACHE_FILE_CLOUDBERRY};\
+		docker load -i ${CACHE_FILE_CLOUDBERRY_TESTS} && rm ${CACHE_FILE_CLOUDBERRY_TESTS};\
+	fi
+	docker compose up s3 $(CLOUDBERRY_TEST) --force-recreate --exit-code-from $(CLOUDBERRY_TEST)
+	make clean_compose
 
 st_test: deps pg_build unlink_brotli st_integration_test
 

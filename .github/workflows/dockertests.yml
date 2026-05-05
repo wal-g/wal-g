@@ -13,7 +13,15 @@ env:
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
   CACHE_FILE_PG_TESTS: ~/docker-images-${{ github.sha }}/pg_tests.tar
+  CACHE_FILE_GP: ~/docker-images-${{ github.sha }}/gp.tar
+  CACHE_FILE_GP_TESTS: ~/docker-images-${{ github.sha }}/gp_tests.tar
+  CACHE_FILE_CLOUDBERRY: ~/docker-images-${{ github.sha }}/cloudberry.tar
+  CACHE_FILE_CLOUDBERRY_TESTS: ~/docker-images-${{ github.sha }}/cloudberry_tests.tar
   IMAGE_PG_TESTS: wal-g/pg_tests
+  IMAGE_GP: wal-g/gp
+  IMAGE_GP_TESTS: wal-g/gp_tests
+  IMAGE_CLOUDBERRY: wal-g/cloudberry
+  IMAGE_CLOUDBERRY_TESTS: wal-g/cloudberry_tests
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.25"
@@ -31,6 +39,10 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_PG_TESTS }}
+            ${{ env.CACHE_FILE_GP }}
+            ${{ env.CACHE_FILE_GP_TESTS }}
+            ${{ env.CACHE_FILE_CLOUDBERRY }}
+            ${{ env.CACHE_FILE_CLOUDBERRY_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
@@ -69,7 +81,7 @@ jobs:
       # build images
       - name: Build images
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: make pg_save_image
+        run: make save_images
     env:
       USE_BROTLI: 1
       USE_LZO: 1
@@ -109,6 +121,10 @@ jobs:
         with:
           path: |
             ${{ env.CACHE_FILE_PG_TESTS }}
+            ${{ env.CACHE_FILE_GP }}
+            ${{ env.CACHE_FILE_GP_TESTS }}
+            ${{ env.CACHE_FILE_CLOUDBERRY }}
+            ${{ env.CACHE_FILE_CLOUDBERRY_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
