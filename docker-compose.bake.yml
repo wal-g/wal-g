@@ -32,7 +32,7 @@ services:
   pg:
     build:
       additional_contexts:
-        wal-g/ubuntu:18.04: target:ubuntu
+        wal-g/ubuntu:18.04: service:ubuntu
       cache_from:
         - type=gha,scope=walg-pg
         - type=gha,scope=walg-ubuntu-bionic
@@ -42,8 +42,8 @@ services:
   pg_tests_template:
     build:
       additional_contexts:
-        wal-g/golang:latest: target:golang
-        wal-g/pg:latest: target:pg
+        wal-g/golang:latest: service:golang
+        wal-g/pg:latest: service:pg
       cache_from:
         - type=gha,scope=walg-pg-tests
         - type=gha,scope=walg-pg
