@@ -17,27 +17,31 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"golang.org/x/sync/errgroup"
 )
 
 type GpTarBallComposerMaker struct {
-	relStorageMap AoRelFileStorageMap
-	bundleFiles   internal.BundleFiles
-	TarFileSets   internal.TarFileSets
-	uploader      internal.Uploader
-	backupName    string
+	relStorageMap    AoRelFileStorageMap
+	paxRelStorageMap pax.RelFileStorageMap
+	bundleFiles      internal.BundleFiles
+	TarFileSets      internal.TarFileSets
+	uploader         internal.Uploader
+	backupName       string
 }
 
-func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader internal.Uploader, backupName string,
+func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, paxRelStorageMap pax.RelFileStorageMap,
+	uploader internal.Uploader, backupName string,
 ) (*GpTarBallComposerMaker, error) {
 	return &GpTarBallComposerMaker{
-		relStorageMap: relStorageMap,
-		bundleFiles:   &internal.RegularBundleFiles{},
-		TarFileSets:   internal.NewRegularTarFileSets(),
-		uploader:      uploader,
-		backupName:    backupName,
+		relStorageMap:    relStorageMap,
+		paxRelStorageMap: paxRelStorageMap,
+		bundleFiles:      &internal.RegularBundleFiles{},
+		TarFileSets:      internal.NewRegularTarFileSets(),
+		uploader:         uploader,
+		backupName:       backupName,
 	}, nil
 }
 
@@ -52,26 +56,84 @@ func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.Tar
 	}
 
 	filePacker := postgres.NewTarBallFilePacker(bundle.DeltaMap, bundle.IncrementFromLsn, maker.bundleFiles, filePackerOptions)
-	deduplicationAgeLimit, err := conf.GetDurationSetting(conf.GPAoDeduplicationAgeLimit)
+	aoDedupAgeLimit, err := conf.GetDurationSetting(conf.GPAoDeduplicationAgeLimit)
 	if err != nil {
 		return nil, err
 	}
 
-	newAoSegFilesID := strconv.FormatInt(time.Now().UnixNano(), 10)
+	now := time.Now().UnixNano()
+	newAoSegFilesID := strconv.FormatInt(now, 10)
 	aoStorageUploader := NewAoStorageUploader(
-		maker.uploader, baseFiles, bundle.Crypter, maker.bundleFiles, bundle.IncrementFromName != "", deduplicationAgeLimit, newAoSegFilesID)
+		maker.uploader, baseFiles, bundle.Crypter, maker.bundleFiles, bundle.IncrementFromName != "", aoDedupAgeLimit, newAoSegFilesID)
+
+	basePaxFiles, err := maker.loadBasePaxFiles(bundle.IncrementFromName)
+	if err != nil {
+		return nil, err
+	}
+	paxDedupAgeLimit, err := conf.GetDurationSetting(conf.GPPaxDeduplicationAgeLimit)
+	if err != nil {
+		return nil, err
+	}
+	newPaxFilesID := strconv.FormatInt(now, 10)
+	paxStorageUploader := pax.NewStorageUploader(
+		maker.uploader, basePaxFiles, bundle.Crypter, maker.bundleFiles, paxDedupAgeLimit, newPaxFilesID)
 
 	return NewGpTarBallComposer(
 		bundle.TarBallQueue,
 		bundle.Crypter,
 		maker.relStorageMap,
+		maker.paxRelStorageMap,
 		maker.bundleFiles,
 		filePacker,
 		aoStorageUploader,
+		paxStorageUploader,
 		maker.TarFileSets,
 		maker.uploader,
 		maker.backupName,
 	)
+}
+
+func (maker *GpTarBallComposerMaker) loadBasePaxFiles(incrementFromName string) (pax.BackupFiles, error) {
+	var base SegBackup
+	if incrementFromName != "" {
+		folder := maker.uploader.Folder()
+		stor, err := multistorage.UsedStorage(folder)
+		if err != nil {
+			return nil, err
+		}
+		base, err = NewSegBackup(folder, incrementFromName, stor)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		backup, err := internal.GetLatestBackup(maker.uploader.Folder())
+		if err != nil {
+			if _, ok := err.(internal.NoBackupsFoundError); ok {
+				tracelog.InfoLogger.Println("No previous backup, leaving the base PAX files empty.")
+				return pax.BackupFiles{}, nil
+			}
+			return nil, err
+		}
+		stor, err := multistorage.UsedStorage(backup.Folder)
+		if err != nil {
+			return nil, err
+		}
+		base, err = NewSegBackup(maker.uploader.Folder(), backup.Name, stor)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	baseFilesMetadata, err := base.LoadPaxFilesMetadata()
+	if err != nil {
+		if _, ok := err.(storage.ObjectNotFoundError); !ok {
+			return nil, fmt.Errorf("failed to fetch PAX files metadata for backup %s: %w", base.Name, err)
+		}
+		tracelog.WarningLogger.Printf(
+			"PAX files metadata was not found for backup %s, leaving the base PAX files empty.", base.Name)
+		return pax.BackupFiles{}, nil
+	}
+	return baseFilesMetadata.Files, nil
 }
 
 func (maker *GpTarBallComposerMaker) loadBaseFiles(incrementFromName string) (files BackupAOFiles, err error) {
@@ -137,31 +199,39 @@ type GpTarBallComposer struct {
 	tarFileSets      internal.TarFileSets
 	tarFileSetsMutex sync.Mutex
 
-	relStorageMap      AoRelFileStorageMap
-	aoStorageUploader  *AoStorageUploader
-	aoSegSizeThreshold int64
+	relStorageMap        AoRelFileStorageMap
+	aoStorageUploader    *AoStorageUploader
+	aoSegSizeThreshold   int64
+	paxRelStorageMap     pax.RelFileStorageMap
+	paxStorageUploader   *pax.StorageUploader
+	paxFileSizeThreshold int64
 }
 
 func NewGpTarBallComposer(
 	tarBallQueue *internal.TarBallQueue, crypter crypto.Crypter, relStorageMap AoRelFileStorageMap,
+	paxRelStorageMap pax.RelFileStorageMap,
 	bundleFiles internal.BundleFiles, packer *postgres.TarBallFilePackerImpl, aoStorageUploader *AoStorageUploader,
+	paxStorageUploader *pax.StorageUploader,
 	tarFileSets internal.TarFileSets, uploader internal.Uploader, backupName string,
 ) (*GpTarBallComposer, error) {
 	errorGroup, ctx := errgroup.WithContext(context.Background())
 
 	composer := &GpTarBallComposer{
-		backupName:         backupName,
-		tarBallQueue:       tarBallQueue,
-		tarFilePacker:      packer,
-		crypter:            crypter,
-		relStorageMap:      relStorageMap,
-		files:              bundleFiles,
-		aoStorageUploader:  aoStorageUploader,
-		aoSegSizeThreshold: viper.GetInt64(conf.GPAoSegSizeThreshold),
-		uploader:           uploader.Clone(),
-		tarFileSets:        tarFileSets,
-		errorGroup:         errorGroup,
-		ctx:                ctx,
+		backupName:           backupName,
+		tarBallQueue:         tarBallQueue,
+		tarFilePacker:        packer,
+		crypter:              crypter,
+		relStorageMap:        relStorageMap,
+		files:                bundleFiles,
+		aoStorageUploader:    aoStorageUploader,
+		aoSegSizeThreshold:   viper.GetInt64(conf.GPAoSegSizeThreshold),
+		paxRelStorageMap:     paxRelStorageMap,
+		paxStorageUploader:   paxStorageUploader,
+		paxFileSizeThreshold: viper.GetInt64(conf.GPPaxFileSizeThreshold),
+		uploader:             uploader.Clone(),
+		tarFileSets:          tarFileSets,
+		errorGroup:           errorGroup,
+		ctx:                  ctx,
 	}
 
 	maxUploadDiskConcurrency, err := conf.GetMaxUploadDiskConcurrency()
@@ -217,6 +287,11 @@ func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload AO files metadata: %v", err)
 	}
+
+	err = internal.UploadDto(c.uploader.Folder(), c.paxStorageUploader.GetFiles(), pax.GetFilesMetadataPath(c.backupName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload PAX files metadata: %v", err)
+	}
 	return c.tarFileSets, nil
 }
 
@@ -252,7 +327,15 @@ func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 		return c.aoStorageUploader.AddFile(cfi, meta, location)
 	}
 
-	tracelog.DebugLogger.Printf("%s is not an AO/AOCS file, will process it through a regular tar file packer",
+	// PAX files (Cloudberry) go to a separate storage prefix as well, with file-level dedup.
+	isPax, paxMeta, paxKey := c.paxRelStorageMap.Lookup(cfi.Path)
+	if isPax && cfi.FileInfo.Size() >= c.paxFileSizeThreshold {
+		tracelog.DebugLogger.Printf("%s is a PAX file, will process it through the PAX storage manager",
+			cfi.Path)
+		return c.paxStorageUploader.AddFile(cfi, paxMeta, paxKey)
+	}
+
+	tracelog.DebugLogger.Printf("%s is not an AO/AOCS/PAX file, will process it through a regular tar file packer",
 		cfi.Path)
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -73,14 +74,19 @@ func (h SegDeleteBeforeHandler) Delete(segBackup SegBackup) error {
 	filterFunc := func(object storage.Object) bool { return true }
 	folderFilter := func(folderPath string) bool {
 		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
-		return !strings.HasPrefix(folderPath, aoSegFolderPrefix)
+		paxFolderPrefix := path.Join(utility.BaseBackupPath, pax.StoragePath)
+		return !strings.HasPrefix(folderPath, aoSegFolderPrefix) &&
+			!strings.HasPrefix(folderPath, paxFolderPrefix)
 	}
 	err = h.DeleteBeforeTargetWhere(segTarget, h.args.Confirmed, filterFunc, folderFilter)
 	if err != nil {
 		return err
 	}
 
-	return cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed)
+	if err := cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed); err != nil {
+		return err
+	}
+	return cleanupPaxFiles(segTarget, h.Folder, h.args.Confirmed)
 }
 
 type SegDeleteTargetHandler struct {
@@ -99,14 +105,18 @@ func (h SegDeleteTargetHandler) Delete(segBackup SegBackup) error {
 		segTarget.GetBackupName(), h.contentID)
 
 	folderFilter := func(folderPath string) bool {
-		return !strings.HasPrefix(folderPath, AoStoragePath)
+		return !strings.HasPrefix(folderPath, AoStoragePath) &&
+			!strings.HasPrefix(folderPath, pax.StoragePath)
 	}
 	err = h.DeleteTarget(segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
 	if err != nil {
 		return err
 	}
 
-	return cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed)
+	if err := cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed); err != nil {
+		return err
+	}
+	return cleanupPaxFiles(segTarget, h.Folder, h.args.Confirmed)
 }
 
 // TODO: unit tests
@@ -216,6 +226,59 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 			permanentBackups, permanentWals)
 	}
 	return permanentBackups, permanentWals
+}
+
+// TODO: unit tests
+func cleanupPaxFiles(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
+	paxFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(pax.StoragePath)
+	paxFilesToRetain, err := pax.LoadStoragePaxFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return err
+	}
+
+	for paxPath := range paxFilesToRetain {
+		tracelog.DebugLogger.Printf("%s is still used, retaining...\n", paxPath)
+	}
+
+	tracelog.InfoLogger.Printf("Cleaning up the PAX file objects")
+	paxFilesToDelete, err := findPaxFilesToDelete(target, paxFilesToRetain, paxFolder)
+	if err != nil {
+		return err
+	}
+
+	if !confirmed {
+		return nil
+	}
+
+	return paxFolder.DeleteObjects(paxFilesToDelete)
+}
+
+// TODO: unit tests
+func findPaxFilesToDelete(target internal.BackupObject,
+	paxFilesToRetain map[string]struct{}, paxFolder storage.Folder) ([]storage.Object, error) {
+	paxObjects, _, err := paxFolder.ListFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	paxFilesToDelete := make([]storage.Object, 0)
+	for _, obj := range paxObjects {
+		if !strings.HasSuffix(obj.GetName(), pax.KeySuffix) && obj.GetLastModified().After(target.GetLastModified()) {
+			tracelog.DebugLogger.Println(
+				"\tis not a PAX file, will not delete (modify time is too recent): " + obj.GetName())
+			continue
+		}
+
+		if _, ok := paxFilesToRetain[obj.GetName()]; ok {
+			tracelog.DebugLogger.Println("\tis still referenced by some backups, will not delete: " + obj.GetName())
+			continue
+		}
+
+		tracelog.InfoLogger.Println("\twill be deleted: " + obj.GetName())
+		paxFilesToDelete = append(paxFilesToDelete, obj)
+	}
+
+	return paxFilesToDelete, nil
 }
 
 // TODO: unit tests

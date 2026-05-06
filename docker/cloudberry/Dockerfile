@@ -63,7 +63,12 @@ RUN apt-get install --yes --no-install-recommends --no-install-suggests \
     python3-pygresql \
     zlib1g-dev \
     libpstreams-dev \
-    libxerces-c-dev
+    libxerces-c-dev \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libprotobuf-c-dev \
+    protobuf-c-compiler \
+    liburing-dev
 
 ADD docker/cloudberry/run_greenplum.sh /home/gpadmin/run_greenplum.sh
 
@@ -74,8 +79,10 @@ WORKDIR /usr/local
 #RUN git clone https://github.com/arenadata/gpdb.git gpdb_src --single-branch --branch adb-7.2.0 --depth 1 \
 # && ./gpdb_src/concourse/scripts/setup_gpadmin_user.bash
 
-# Use REL_2_STABLE as oldest-supported version of cloudberry
-RUN git clone https://github.com/cloudberrydb/cloudberrydb.git gpdb_src --single-branch --branch REL_2_STABLE --depth 1
+# Use 2.1.0-incubating as oldest-supported version of cloudberry
+RUN git clone https://github.com/cloudberrydb/cloudberrydb.git gpdb_src \
+    --single-branch --branch 2.1.0-incubating --depth 1 \
+    --recurse-submodules --shallow-submodules
 
 COPY docker/cloudberry/setup_gpadmin_user.bash /root/setup_gpadmin_user.bash
 RUN chmod +x /root/setup_gpadmin_user.bash \
@@ -84,7 +91,7 @@ RUN chmod +x /root/setup_gpadmin_user.bash \
 WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
  && git log -1 \
- && ./configure --with-perl --with-python --with-libxml --with-gssapi --enable-debug --disable-pxf --disable-orca --disable-pax --prefix=/usr/local/gpdb_src  > /dev/null \
+ && ./configure --with-perl --with-python --with-libxml --with-gssapi --enable-debug --disable-pxf --disable-orca --enable-pax --prefix=/usr/local/gpdb_src  > /dev/null \
  && make -j$(nproc) > /dev/null \
  && make -j$(nproc) install > /dev/null \
  && chown gpadmin:gpadmin /home/gpadmin/run_greenplum.sh \

@@ -188,6 +188,8 @@ const (
 	GPDeleteConcurrency          = "WALG_GP_DELETE_CONCURRENCY"
 	GPAoSegSizeThreshold         = "WALG_GP_AOSEG_SIZE_THRESHOLD"
 	GPAoDeduplicationAgeLimit    = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
+	GPPaxFileSizeThreshold       = "WALG_GP_PAXFILE_SIZE_THRESHOLD"
+	GPPaxDeduplicationAgeLimit   = "WALG_GP_PAXFILE_DEDUPLICATION_AGE_LIMIT"
 	GPRelativeRecoveryConfPath   = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
 	GPRelativePostgresqlConfPath = "WALG_GP_RELATIVE_POSTGRESQL_CONF_PATH"
 	GPHome                       = "GPHOME"
@@ -342,6 +344,8 @@ var (
 		GPDeleteConcurrency:          "1",
 		GPAoSegSizeThreshold:         "1048576", // (1 << 20)
 		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
+		GPPaxFileSizeThreshold:       "1048576", // (1 << 20)
+		GPPaxDeduplicationAgeLimit:   "720h",    // 30 days
 		GPRelativeRecoveryConfPath:   "recovery.conf",
 		GPRelativePostgresqlConfPath: "postgresql.conf",
 		ForceWalDetal:                "false",
@@ -619,6 +623,8 @@ var (
 		GPDeleteConcurrency:                  true,
 		GPAoSegSizeThreshold:                 true,
 		GPAoDeduplicationAgeLimit:            true,
+		GPPaxFileSizeThreshold:               true,
+		GPPaxDeduplicationAgeLimit:           true,
 		GPRelativeRecoveryConfPath:           true,
 		GPRelativePostgresqlConfPath:         true,
 		FailoverStorages:                     true,
