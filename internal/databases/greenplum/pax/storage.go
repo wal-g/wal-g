@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -14,20 +15,32 @@ const (
 	KeySuffix   = "_pax"
 )
 
-// MakeFileStorageKey builds the object name (without StoragePath prefix) for a single
-// PAX file. The key embeds the relation identity, the leaf filename inside `_pax/`,
+// MakeFileStorageKey builds the object name for a single PAX file.
+// The key embeds the relation identity, the leaf filename inside `_pax/`,
 // and a per-backup uniquifier so subsequent backups never overwrite an earlier one's
 // upload of the same file.
-//
-// Dots in the filename (`<id>.toast`, `<id>_<gen>_<xid>.visimap`) are replaced with
-// underscores so that path.Ext on the resulting storage path returns "" — otherwise
-// the extract path treats e.g. `.visimap_<ts>_pax` as a file extension and rejects it
-// as an unsupported format.
 func MakeFileStorageKey(relNameMd5 string, key FileKey, paxFilesID string) string {
+	//Storage object names are built from `<spc>_<db>_<md5>_<rel>_<filename>_<id>_pax`.
+	//* `<spc>` - Tablespace OID. 1663 for pg_default, 1664 for pg_global, otherwise the OID of a user-defined tablespace.
+	//			Comes from the standard PostgreSQL relfile path base/<dbOid>/<relfilenode> or pg_tblspc/<spc>/<...>/<dbOid>/<relfilenode>.
+	//* `<db>`  - Database OID - the <dbOid> segment of the relfile path. Disambiguates files that happen to share the same <rel> value across databases.
+	//* `<md5>` - MD5 of the fully-qualified relation name (<schema>.<table>). Stable across VACUUM FULL / CLUSTER
+	//			even though those rotate the relfilenode, so a re-clustered table can still match its own previously-uploaded
+	//			files for dedup purposes.
+	//* `<rel>` - Relfilenode - the directory name <relfilenode> in base/<dbOid>/<relfilenode>_pax/. The on-disk identifier of the
+	//			current physical relation file set.
+	//* `<filename>` - sanitized file name
+	//* `<id>`  - Per-backup uniquifier - the nanosecond-precision timestamp captured when the backup started (newPaxFilesID).
+	//			Two backups uploading the same file produce two different keys, so the older object survives until its owning backup is deleted.
+	//            When dedup kicks in, the new backup reuses the old key - the uniquifier is stable per object, not regenerated.
+	//* `_pax`  - Fixed suffix, mirrors _aoseg for AO/AOCS objects. Marks the object as belonging to the PAX shared storage and
+	//			protects against accidental overlap with any other key shape under paxfiles/.
+
 	return fmt.Sprintf("%d_%d_%s_%d_%s_%s%s",
 		key.SpcNode, key.DBNode,
 		relNameMd5,
 		key.RelFileNode,
+		// sanitize dots in the filename (`<id>.toast`, `<id>_<gen>_<xid>.visimap`)
 		strings.ReplaceAll(key.Filename, ".", "_"),
 		paxFilesID,
 		KeySuffix)
