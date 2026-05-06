@@ -136,7 +136,7 @@ transaction commit. PiTR, however, applies all WAL-records during replay.
 
 # WAL-G Backup / Restore
 
-### What to back up, per segment, per relation
+### What to back up, per segment
 
 1. Start backup.
 2. From `pg_ext_aux.pg_pax_tables`, resolve `auxrelid` for each PAX relation.
@@ -180,7 +180,7 @@ segments_005/
 
 PORC files already compressed. So, PAX files are **not re-compressed** by WAL-G when uploaded to `paxfiles/`.
 
-However they are compressed when they fall through to the regular tar stream.
+However, they are compressed when they fall through to the regular tar stream.
 
 Encryption (when configured) is applied in both cases.
 
