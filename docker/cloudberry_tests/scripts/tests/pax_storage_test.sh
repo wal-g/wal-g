@@ -88,4 +88,3 @@ if [ "$EXIT_STATUS" -ne 0 ] ; then
 fi
 
 cleanup
-rm ${TMP_CONFIG}
