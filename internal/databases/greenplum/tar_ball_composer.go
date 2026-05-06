@@ -14,13 +14,14 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 
 	"github.com/wal-g/tracelog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
-	"golang.org/x/sync/errgroup"
 )
 
 type GpTarBallComposerMaker struct {
@@ -332,11 +333,17 @@ func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 	if isPax && cfi.FileInfo.Size() >= c.paxFileSizeThreshold {
 		tracelog.DebugLogger.Printf("%s is a PAX file, will process it through the PAX storage manager",
 			cfi.Path)
+		// this PAX file visible in catalog => it was durably saved to disk. No partial file reads.
 		return c.paxStorageUploader.AddFile(cfi, paxMeta, paxKey)
 	}
 
-	tracelog.DebugLogger.Printf("%s is not an AO/AOCS/PAX file, will process it through a regular tar file packer",
-		cfi.Path)
+	if isAo || isPax {
+		tracelog.DebugLogger.Printf("%s is an AO/AOCS/PAX file, however it will be archived through a regular tar file packer",
+			cfi.Path)
+	} else {
+		tracelog.DebugLogger.Printf("%s is not an AO/AOCS/PAX file, will process it through a regular tar file packer",
+			cfi.Path)
+	}
 	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
 	if err != nil {
 		return err

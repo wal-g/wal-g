@@ -32,7 +32,7 @@ type RelFileMetadata struct {
 // RelFileStorageMap maps a path-derived FileKey to its catalog metadata. A miss means
 // the on-disk file is not currently referenced by the aux catalog (e.g. an orphan from
 // an aborted transaction or an earlier visimap generation) and should not be routed to
-// the dedicated PAX storage.
+// the dedicated wal-g PAX storage.
 type RelFileStorageMap map[FileKey]RelFileMetadata
 
 // Lookup parses filePath, classifies it as a PAX file, and returns its catalog metadata

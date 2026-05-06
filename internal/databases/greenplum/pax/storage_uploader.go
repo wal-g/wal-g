@@ -13,7 +13,7 @@ import (
 	"github.com/wal-g/wal-g/internal/crypto"
 )
 
-// StorageUploader routes PAX files to the dedicated `paxfiles/` storage prefix
+// StorageUploader routes PAX files to the dedicated wal-g `paxfiles/` storage prefix
 // and decides per file whether to skip (already in storage from a prior backup)
 // or upload whole.
 //

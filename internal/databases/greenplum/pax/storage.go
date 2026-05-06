@@ -37,7 +37,8 @@ func MakeFileStorageKey(relNameMd5 string, key FileKey, paxFilesID string) strin
 	//			protects against accidental overlap with any other key shape under paxfiles/.
 
 	return fmt.Sprintf("%d_%d_%s_%d_%s_%s%s",
-		key.SpcNode, key.DBNode,
+		key.SpcNode,
+		key.DBNode,
 		relNameMd5,
 		key.RelFileNode,
 		// sanitize dots in the filename (`<id>.toast`, `<id>_<gen>_<xid>.visimap`)
@@ -51,7 +52,7 @@ func MakeFileStorageKey(relNameMd5 string, key FileKey, paxFilesID string) strin
 // to decide whether a file may be skipped (already in storage) or must be uploaded.
 func LoadStoragePaxFiles(baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
 	known := make(map[string]struct{})
-	err := IterateStoragePaxFilesWithFunc(baseBackupsFolder, func(_ string, desc BackupFileDesc) {
+	err := iterateStoragePaxFilesWithFunc(baseBackupsFolder, func(_ string, desc BackupFileDesc) {
 		known[desc.StoragePath] = struct{}{}
 	})
 	if err != nil {
@@ -60,10 +61,10 @@ func LoadStoragePaxFiles(baseBackupsFolder storage.Folder) (map[string]struct{},
 	return known, nil
 }
 
-// IterateStoragePaxFilesWithFunc visits every PAX file referenced by any backup that
+// iterateStoragePaxFilesWithFunc visits every PAX file referenced by any backup that
 // has a `pax_files_metadata.json` next to its sentinel. Backups without the metadata
 // (older format, or non-PAX clusters) are silently skipped.
-func IterateStoragePaxFilesWithFunc(baseBackupsFolder storage.Folder, fn func(string, BackupFileDesc)) error {
+func iterateStoragePaxFilesWithFunc(baseBackupsFolder storage.Folder, fn func(string, BackupFileDesc)) error {
 	backupObjects, _, err := baseBackupsFolder.ListFolder()
 	if err != nil {
 		return err
@@ -73,7 +74,8 @@ func IterateStoragePaxFilesWithFunc(baseBackupsFolder storage.Folder, fn func(st
 		err := internal.FetchDto(baseBackupsFolder, &meta, GetFilesMetadataPath(b.BackupName))
 		if err != nil {
 			if _, ok := err.(storage.ObjectNotFoundError); ok {
-				tracelog.DebugLogger.Printf("No PAX files metadata for backup %s, skipping", b.BackupName)
+				tracelog.DebugLogger.Printf("No PAX files metadata for backup %s in folder %s, skipping",
+					b.BackupName, baseBackupsFolder.GetPath())
 				continue
 			}
 			return err

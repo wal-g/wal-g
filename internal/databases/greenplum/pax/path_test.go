@@ -52,10 +52,3 @@ func TestParseFilePath_NonDefaultTablespace(t *testing.T) {
 	assert.Equal(t, uint32(16384), uint32(rfn.DBNode))
 	assert.Equal(t, uint32(16385), uint32(rfn.RelNode))
 }
-
-func TestIsPaxPath(t *testing.T) {
-	assert.True(t, IsPaxPath("/data/base/16384/16385_pax/3"))
-	assert.True(t, IsPaxPath("/data/base/16384/16385_pax/3.toast"))
-	assert.False(t, IsPaxPath("/data/base/16384/16385/3"))
-	assert.False(t, IsPaxPath("/data/base/16384/16385.1"))
-}

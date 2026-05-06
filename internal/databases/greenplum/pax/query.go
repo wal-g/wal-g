@@ -82,7 +82,7 @@ func fetchPaxRelations(ctx context.Context, conn *pgx.Conn) ([]paxRelation, erro
 
 func fetchPaxBlocks(ctx context.Context, conn *pgx.Conn, dbInfo postgres.PgDatabaseInfo,
 	spcNode walparser.Oid, r paxRelation, dst RelFileStorageMap) error {
-	// auxTableFqn comes from regclass::text, which schema-qualifies and quotes safely.
+	// table FQN comes from regclass::text, which is pre-escaped by Postgres. It is safe to put into queries.
 	query := fmt.Sprintf("SELECT ptblockname, ptvisimapname, ptexistexttoast FROM %s", r.auxTableFqn)
 	rows, err := conn.Query(ctx, query)
 	if err != nil {

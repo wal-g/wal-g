@@ -10,14 +10,6 @@ import (
 
 const dirSuffix = "_pax"
 
-// IsPaxPath reports whether filePath looks like a file inside a `<relfilenode>_pax/`
-// directory. It does not validate that the file is referenced by the aux catalog.
-func IsPaxPath(filePath string) bool {
-	dir, _ := path.Split(filePath)
-	dir = strings.TrimSuffix(dir, "/")
-	return strings.HasSuffix(path.Base(dir), dirSuffix)
-}
-
 // ParseFilePath extracts (RelFileNode, filename) from a path of the form
 // `.../base/<dbOid>/<relfilenode>_pax/<filename>` or the equivalent under pg_tblspc.
 // Returns ok=false for any path that is not under a `<n>_pax/` directory or whose

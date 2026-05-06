@@ -17,9 +17,8 @@ insert_data() {
 	psql -p 7000 -d test -c "CREATE TABLE co(a int, b int) WITH (appendoptimized = true, orientation = column) DISTRIBUTED BY (a);"
 	psql -p 7000 -d test -c "INSERT INTO ao select i, i FROM generate_series(1,10)i;"
 	psql -p 7000 -d test -c "INSERT INTO co select i, i FROM generate_series(1,10)i;"
-	# PAX table is Cloudberry-only; create best-effort so the same helper still works on Greenplum.
-	psql -p 7000 -d test -c "CREATE TABLE pax_t(a int, b int) USING pax DISTRIBUTED BY (a);" || true
-	psql -p 7000 -d test -c "INSERT INTO pax_t select i, i FROM generate_series(1,10)i;" || true
+	psql -p 7000 -d test -c "CREATE TABLE pax_t(a int, b int) USING pax DISTRIBUTED BY (a);"
+	psql -p 7000 -d test -c "INSERT INTO pax_t select i, i FROM generate_series(1,10)i;"
 }
 
 insert_a_lot_of_data() {

@@ -17,9 +17,9 @@ func GetFilesMetadataPath(backupName string) string {
 // from `pg_ext_aux.pg_pax_blocks_*` at backup-start.
 type BackupFileDesc struct {
 	StoragePath     string    `json:"StoragePath"`
-	RelNameMd5      string    `json:"RelNameMd5"`
 	IsSkipped       bool      `json:"IsSkipped,omitempty"`
 	MTime           time.Time `json:"MTime"`
+	RelNameMd5      string    `json:"RelNameMd5"`
 	Kind            FileKind  `json:"Kind"`
 	BlockID         int64     `json:"BlockID,omitempty"`
 	FileMode        int64     `json:"FileMode"`
