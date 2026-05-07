@@ -6,15 +6,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/spf13/viper"
-
+	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/wal-g/tracelog"
 )
 
 type FollowPrimaryHandler struct {

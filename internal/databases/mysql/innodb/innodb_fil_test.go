@@ -1,9 +1,10 @@
 package innodb
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/testutils"
-	"testing"
 )
 
 func TestFILHeader(t *testing.T) {

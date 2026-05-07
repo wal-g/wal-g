@@ -6,9 +6,8 @@ package brotli
 import (
 	"io"
 
-	"github.com/wal-g/wal-g/internal/ioextensions"
-
 	"github.com/google/brotli/go/cbrotli"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
 const (

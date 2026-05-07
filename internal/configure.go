@@ -11,25 +11,24 @@ import (
 	"strconv"
 	"strings"
 
-	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/crypto/yckms"
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
 	cachenvlpr "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/cached"
 	yckmsenvlpr "github.com/wal-g/wal-g/internal/crypto/envelope/enveloper/yckms"
 	envopenpgp "github.com/wal-g/wal-g/internal/crypto/envelope/openpgp"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
+	"github.com/wal-g/wal-g/internal/crypto/yckms"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/time/rate"
 )
 

@@ -12,9 +12,8 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
-
-	"go.uber.org/mock/gomock"
 	"github.com/wal-g/wal-g/test/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 func TestConfigure(t *testing.T) {
