@@ -23,7 +23,8 @@ func MakeFileStorageKey(relNameMd5 string, key FileKey, paxFilesID string) strin
 	//Storage object names are built from `<spc>_<db>_<md5>_<rel>_<filename>_<id>_pax`.
 	//* `<spc>` - Tablespace OID. 1663 for pg_default, 1664 for pg_global, otherwise the OID of a user-defined tablespace.
 	//			Comes from the standard PostgreSQL relfile path base/<dbOid>/<relfilenode> or pg_tblspc/<spc>/<...>/<dbOid>/<relfilenode>.
-	//* `<db>`  - Database OID - the <dbOid> segment of the relfile path. Disambiguates files that happen to share the same <rel> value across databases.
+	//* `<db>`  - Database OID - the <dbOid> segment of the relfile path. Disambiguates files that happen to share
+	//          the same <rel> value across databases.
 	//* `<md5>` - MD5 of the fully-qualified relation name (<schema>.<table>). Stable across VACUUM FULL / CLUSTER
 	//			even though those rotate the relfilenode, so a re-clustered table can still match its own previously-uploaded
 	//			files for dedup purposes.
