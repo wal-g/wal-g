@@ -1,43 +1,78 @@
 package s3_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	walgs3 "github.com/wal-g/wal-g/pkg/storages/s3"
 )
 
-// mockS3ClientVersioning is a mock S3 client that supports ListObjectVersionsPages
-// for testing versioning-related functionality.
+// mockS3ClientVersioning is a minimal walgs3.API used to drive ListObjectVersions
+// in versioning tests. v2 paginators consume the API directly and call NextPage
+// until IsTruncated is false; we leave IsTruncated nil so a single page returns.
 type mockS3ClientVersioning struct {
-	s3iface.S3API
-	versions       []*s3.ObjectVersion
-	deleteMarkers  []*s3.DeleteMarkerEntry
-	commonPrefixes []*s3.CommonPrefix
+	versions       []types.ObjectVersion
+	deleteMarkers  []types.DeleteMarkerEntry
+	commonPrefixes []types.CommonPrefix
 }
 
-func (m *mockS3ClientVersioning) ListObjectVersionsPages(
-	input *s3.ListObjectVersionsInput,
-	fn func(*s3.ListObjectVersionsOutput, bool) bool,
-) error {
-	output := &s3.ListObjectVersionsOutput{
+var _ walgs3.API = (*mockS3ClientVersioning)(nil)
+
+func (m *mockS3ClientVersioning) ListObjectVersions(_ context.Context, _ *s3.ListObjectVersionsInput,
+	_ ...func(*s3.Options)) (*s3.ListObjectVersionsOutput, error) {
+	return &s3.ListObjectVersionsOutput{
 		CommonPrefixes: m.commonPrefixes,
 		Versions:       m.versions,
 		DeleteMarkers:  m.deleteMarkers,
-	}
-	fn(output, true)
-	return nil
+	}, nil
 }
 
-func (m *mockS3ClientVersioning) GetBucketVersioning(input *s3.GetBucketVersioningInput) (*s3.GetBucketVersioningOutput, error) {
+func (m *mockS3ClientVersioning) GetBucketVersioning(_ context.Context, _ *s3.GetBucketVersioningInput,
+	_ ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
 	return &s3.GetBucketVersioningOutput{
-		Status: aws.String(s3.BucketVersioningStatusEnabled),
+		Status: types.BucketVersioningStatusEnabled,
 	}, nil
+}
+
+func (m *mockS3ClientVersioning) GetObject(_ context.Context, _ *s3.GetObjectInput,
+	_ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
+	return &s3.GetObjectOutput{}, nil
+}
+
+func (m *mockS3ClientVersioning) HeadObject(_ context.Context, _ *s3.HeadObjectInput,
+	_ ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
+	return &s3.HeadObjectOutput{}, nil
+}
+
+func (m *mockS3ClientVersioning) CopyObject(_ context.Context, _ *s3.CopyObjectInput,
+	_ ...func(*s3.Options)) (*s3.CopyObjectOutput, error) {
+	return &s3.CopyObjectOutput{}, nil
+}
+
+func (m *mockS3ClientVersioning) DeleteObjects(_ context.Context, _ *s3.DeleteObjectsInput,
+	_ ...func(*s3.Options)) (*s3.DeleteObjectsOutput, error) {
+	return &s3.DeleteObjectsOutput{}, nil
+}
+
+func (m *mockS3ClientVersioning) ListObjects(_ context.Context, _ *s3.ListObjectsInput,
+	_ ...func(*s3.Options)) (*s3.ListObjectsOutput, error) {
+	return &s3.ListObjectsOutput{}, nil
+}
+
+func (m *mockS3ClientVersioning) ListObjectsV2(_ context.Context, _ *s3.ListObjectsV2Input,
+	_ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	return &s3.ListObjectsV2Output{}, nil
+}
+
+func (m *mockS3ClientVersioning) GetBucketLocation(_ context.Context, _ *s3.GetBucketLocationInput,
+	_ ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+	return &s3.GetBucketLocationOutput{}, nil
 }
 
 func TestListFolder_VersioningEnabled_ExcludesDeletedObjects(t *testing.T) {
@@ -48,7 +83,7 @@ func TestListFolder_VersioningEnabled_ExcludesDeletedObjects(t *testing.T) {
 	// - object2.txt: has a delete marker (LATEST) - should be EXCLUDED
 	// - object3.txt: has a version (LATEST) - should be included
 	mockClient := &mockS3ClientVersioning{
-		versions: []*s3.ObjectVersion{
+		versions: []types.ObjectVersion{
 			{
 				Key:          aws.String("object1.txt"),
 				VersionId:    aws.String("v1"),
@@ -71,7 +106,7 @@ func TestListFolder_VersioningEnabled_ExcludesDeletedObjects(t *testing.T) {
 				Size:         aws.Int64(300),
 			},
 		},
-		deleteMarkers: []*s3.DeleteMarkerEntry{
+		deleteMarkers: []types.DeleteMarkerEntry{
 			{
 				Key:          aws.String("object2.txt"),
 				VersionId:    aws.String("dm2"),
@@ -109,10 +144,8 @@ func TestListFolder_VersioningEnabled_ExcludesDeletedObjects(t *testing.T) {
 func TestListFolder_VersioningEnabled_IncludesAllVersionsOfNonDeletedObjects(t *testing.T) {
 	now := time.Now()
 
-	// Create mock data:
-	// - object1.txt: has multiple versions, none deleted - all should be included
 	mockClient := &mockS3ClientVersioning{
-		versions: []*s3.ObjectVersion{
+		versions: []types.ObjectVersion{
 			{
 				Key:          aws.String("object1.txt"),
 				VersionId:    aws.String("v1-latest"),
@@ -128,7 +161,7 @@ func TestListFolder_VersioningEnabled_IncludesAllVersionsOfNonDeletedObjects(t *
 				Size:         aws.Int64(90),
 			},
 		},
-		deleteMarkers: []*s3.DeleteMarkerEntry{},
+		deleteMarkers: []types.DeleteMarkerEntry{},
 	}
 
 	config := &walgs3.Config{
@@ -141,7 +174,6 @@ func TestListFolder_VersioningEnabled_IncludesAllVersionsOfNonDeletedObjects(t *
 
 	require.NoError(t, err)
 
-	// Should have 2 versions of object1.txt
 	assert.Len(t, objects, 2)
 
 	for _, obj := range objects {
@@ -152,15 +184,12 @@ func TestListFolder_VersioningEnabled_IncludesAllVersionsOfNonDeletedObjects(t *
 func TestListFolder_VersioningEnabled_ExcludesAllVersionsOfDeletedObject(t *testing.T) {
 	now := time.Now()
 
-	// Create mock data:
-	// - object1.txt: has multiple versions BUT also has a delete marker as LATEST
-	//   All versions should be excluded
 	mockClient := &mockS3ClientVersioning{
-		versions: []*s3.ObjectVersion{
+		versions: []types.ObjectVersion{
 			{
 				Key:          aws.String("object1.txt"),
 				VersionId:    aws.String("v1-before-delete"),
-				IsLatest:     aws.Bool(false), // Not latest because delete marker is latest
+				IsLatest:     aws.Bool(false),
 				LastModified: aws.Time(now.Add(-time.Minute)),
 				Size:         aws.Int64(100),
 			},
@@ -172,11 +201,11 @@ func TestListFolder_VersioningEnabled_ExcludesAllVersionsOfDeletedObject(t *test
 				Size:         aws.Int64(90),
 			},
 		},
-		deleteMarkers: []*s3.DeleteMarkerEntry{
+		deleteMarkers: []types.DeleteMarkerEntry{
 			{
 				Key:          aws.String("object1.txt"),
 				VersionId:    aws.String("dm1"),
-				IsLatest:     aws.Bool(true), // Delete marker is LATEST
+				IsLatest:     aws.Bool(true),
 				LastModified: aws.Time(now),
 			},
 		},
@@ -192,32 +221,27 @@ func TestListFolder_VersioningEnabled_ExcludesAllVersionsOfDeletedObject(t *test
 
 	require.NoError(t, err)
 
-	// Should have 0 objects - all versions of object1.txt should be excluded
-	// because the LATEST version is a delete marker
 	assert.Len(t, objects, 0, "All versions of a deleted object should be excluded")
 }
 
 func TestListFolder_VersioningEnabled_HandlesOldDeleteMarkers(t *testing.T) {
 	now := time.Now()
 
-	// Create mock data:
-	// - object1.txt: was deleted (old delete marker) but then recreated (new version is LATEST)
-	//   The object should be included
 	mockClient := &mockS3ClientVersioning{
-		versions: []*s3.ObjectVersion{
+		versions: []types.ObjectVersion{
 			{
 				Key:          aws.String("object1.txt"),
 				VersionId:    aws.String("v1-recreated"),
-				IsLatest:     aws.Bool(true), // Object was recreated, this is LATEST
+				IsLatest:     aws.Bool(true),
 				LastModified: aws.Time(now),
 				Size:         aws.Int64(100),
 			},
 		},
-		deleteMarkers: []*s3.DeleteMarkerEntry{
+		deleteMarkers: []types.DeleteMarkerEntry{
 			{
 				Key:          aws.String("object1.txt"),
 				VersionId:    aws.String("dm1-old"),
-				IsLatest:     aws.Bool(false), // Old delete marker, not LATEST
+				IsLatest:     aws.Bool(false),
 				LastModified: aws.Time(now.Add(-time.Hour)),
 			},
 		},
@@ -233,7 +257,6 @@ func TestListFolder_VersioningEnabled_HandlesOldDeleteMarkers(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// Should have 1 object - the recreated version
 	assert.Len(t, objects, 1)
 	assert.Equal(t, "object1.txt", objects[0].GetName())
 }
@@ -241,11 +264,8 @@ func TestListFolder_VersioningEnabled_HandlesOldDeleteMarkers(t *testing.T) {
 func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.T) {
 	now := time.Now()
 
-	// Create mock data:
-	// - object1.txt: has a version (LATEST) - should be included
-	// - object2.txt: has a delete marker (LATEST) - normally excluded, but with ShowAllVersions should be included
 	mockClient := &mockS3ClientVersioning{
-		versions: []*s3.ObjectVersion{
+		versions: []types.ObjectVersion{
 			{
 				Key:          aws.String("object1.txt"),
 				VersionId:    aws.String("v1"),
@@ -256,16 +276,16 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.
 			{
 				Key:          aws.String("object2.txt"),
 				VersionId:    aws.String("v2-old"),
-				IsLatest:     aws.Bool(false), // Old version before deletion
+				IsLatest:     aws.Bool(false),
 				LastModified: aws.Time(now.Add(-time.Hour)),
 				Size:         aws.Int64(200),
 			},
 		},
-		deleteMarkers: []*s3.DeleteMarkerEntry{
+		deleteMarkers: []types.DeleteMarkerEntry{
 			{
 				Key:          aws.String("object2.txt"),
 				VersionId:    aws.String("dm2"),
-				IsLatest:     aws.Bool(true), // Object is deleted
+				IsLatest:     aws.Bool(true),
 				LastModified: aws.Time(now),
 			},
 		},
@@ -277,20 +297,14 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.
 	}
 	folder := walgs3.NewFolder(mockClient, nil, "", config)
 
-	// Enable show all versions
 	folder.SetShowAllVersions(true)
 
 	objects, _, err := folder.ListFolder()
 
 	require.NoError(t, err)
 
-	// Should have 3 entries:
-	// - object1.txt (version)
-	// - object2.txt (old version)
-	// - object2.txt (delete marker)
 	assert.Len(t, objects, 3, "Should include all versions and delete markers")
 
-	// Check that delete marker is included with DELETE info
 	foundDeleteMarker := false
 	for _, obj := range objects {
 		info := obj.GetAdditionalInfo()
@@ -306,18 +320,11 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.
 func TestListFolder_VersioningEnabled_ShowAllVersionsPropagatesToSubfoldersFromListing(t *testing.T) {
 	now := time.Now()
 
-	// Root listing returns a subfolder via CommonPrefixes. We validate that the returned
-	// subfolder inherits showAllVersions=true, so listing that subfolder includes delete markers.
-	//
-	// S3 list versions returns:
-	// - CommonPrefixes: "dir/"
-	// - Versions: "dir/object2.txt" (old version)
-	// - DeleteMarkers: "dir/object2.txt" (LATEST delete marker)
 	mockClient := &mockS3ClientVersioning{
-		commonPrefixes: []*s3.CommonPrefix{
+		commonPrefixes: []types.CommonPrefix{
 			{Prefix: aws.String("dir/")},
 		},
-		versions: []*s3.ObjectVersion{
+		versions: []types.ObjectVersion{
 			{
 				Key:          aws.String("dir/object2.txt"),
 				VersionId:    aws.String("v2-old"),
@@ -326,7 +333,7 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsPropagatesToSubfoldersFromL
 				Size:         aws.Int64(200),
 			},
 		},
-		deleteMarkers: []*s3.DeleteMarkerEntry{
+		deleteMarkers: []types.DeleteMarkerEntry{
 			{
 				Key:          aws.String("dir/object2.txt"),
 				VersionId:    aws.String("dm2"),
@@ -347,15 +354,10 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsPropagatesToSubfoldersFromL
 	require.NoError(t, err)
 	require.Len(t, subFolders, 1)
 
-	// This is the critical part: the subfolder was created by ListFolder() from CommonPrefixes,
-	// not via GetSubFolder(). It must still have showAllVersions enabled.
 	sub := subFolders[0]
 	objects, _, err := sub.ListFolder()
 	require.NoError(t, err)
 
-	// Expect:
-	// - object2.txt (old version)
-	// - object2.txt (delete marker)
 	require.Len(t, objects, 2)
 
 	foundDelete := false

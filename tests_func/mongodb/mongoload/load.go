@@ -6,7 +6,7 @@ import (
 	"io"
 	"sync"
 
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/internal"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/models"

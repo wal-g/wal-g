@@ -3,53 +3,50 @@ package testtools
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	walgs3 "github.com/wal-g/wal-g/pkg/storages/s3"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 )
 
-type mockMultiFailureError struct {
-	s3manager.MultiUploadFailure
-	err awserr.Error
-}
-
-func (err mockMultiFailureError) UploadID() string {
-	return "mock ID"
-}
-
-func (err mockMultiFailureError) Error() string {
-	return err.err.Error()
-}
-
-// MockS3Uploader client for S3. Must implement UploadWithContext method.
+// MockS3Uploader implements walgs3.UploaderAPI.
 type MockS3Uploader struct {
-	s3manageriface.UploaderAPI
 	multiErr bool
 	err      bool
 	storage  *memory.KVS
 }
 
+var _ walgs3.UploaderAPI = (*MockS3Uploader)(nil)
+
 func NewMockS3Uploader(multiErr, err bool, storage *memory.KVS) *MockS3Uploader {
 	return &MockS3Uploader{multiErr: multiErr, err: err, storage: storage}
 }
 
-func (uploader *MockS3Uploader) UploadWithContext(_ context.Context, input *s3manager.UploadInput,
-	_ ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error) {
+// mockMultiUploadFailure mimics manager.MultiUploadFailure for tests that branch
+// on multipart-upload failure detection.
+type mockMultiUploadFailure struct {
+	err error
+}
+
+func (m mockMultiUploadFailure) Error() string  { return m.err.Error() }
+func (m mockMultiUploadFailure) UploadID() string { return "mock ID" }
+
+var _ manager.MultiUploadFailure = mockMultiUploadFailure{}
+
+func (uploader *MockS3Uploader) Upload(_ context.Context, input *s3.PutObjectInput,
+	_ ...func(*manager.Uploader)) (*manager.UploadOutput, error) {
 	if uploader.err {
-		return nil, awserr.New("UploadFailed", "mock Upload error", nil)
+		return nil, errors.New("mock Upload error")
 	}
 
 	if uploader.multiErr {
-		e := mockMultiFailureError{
-			err: awserr.New("UploadFailed", "multiupload failure error", nil),
-		}
-		return nil, e
+		return nil, mockMultiUploadFailure{err: errors.New("multiupload failure error")}
 	}
 
-	output := &s3manager.UploadOutput{
+	output := &manager.UploadOutput{
 		Location:  *input.Bucket,
 		VersionID: input.Key,
 	}

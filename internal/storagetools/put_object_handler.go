@@ -28,7 +28,7 @@ func HandlePutObject(
 	}
 
 	storageFolderPath := utility.SanitizePath(filepath.Dir(dstPath))
-	if storageFolderPath != "" {
+	if storageFolderPath != "" && storageFolderPath != "." {
 		uploader.ChangeDirectory(storageFolderPath)
 	}
 

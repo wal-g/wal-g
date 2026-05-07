@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type CommandOp struct {
@@ -100,7 +99,7 @@ func NewTxnExec(client *mongo.Client, op *TxnOp) ExecFunc {
 			return NewOpInfo("transaction", op.ID, tm, time.Now(), err)
 		}
 		defer session.EndSession(context.Background())
-		tres, err := session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
+		tres, err := session.WithTransaction(ctx, func(sessCtx context.Context) (interface{}, error) {
 			return op.callback(sessCtx, client)
 		})
 
@@ -142,9 +141,9 @@ func NewSleepExec(client *mongo.Client, op *SleepOp) ExecFunc {
 				var result bson.M
 				tm := time.Now()
 				doc := bson.D{
-					primitive.E{Key: "find", Value: "sleep_temp"},
-					primitive.E{Key: "filter", Value: bson.D{
-						primitive.E{Key: "$where", Value: fmt.Sprintf("sleep(%f)", op.Duration)}}},
+					bson.E{Key: "find", Value: "sleep_temp"},
+					bson.E{Key: "filter", Value: bson.D{
+						bson.E{Key: "$where", Value: fmt.Sprintf("sleep(%f)", op.Duration)}}},
 				}
 				err := db.RunCommand(ctx, doc).Decode(&result)
 				info := NewOpInfo(doc[0].Key, op.ID, tm, time.Now(), err)
@@ -170,12 +169,12 @@ func NewAbortOp(cd RawMongoOp) (*AbortOp, error) {
 func NewAbortExec(_ *mongo.Client, op *AbortOp) ExecFunc {
 	return func(ctx context.Context) OpInfo {
 		t := time.Time{}
-		sessCtx, ok := ctx.(mongo.SessionContext)
-		if !ok {
-			return OpInfo{err: fmt.Errorf("expected sessioinContext instance")}
+		sess := mongo.SessionFromContext(ctx)
+		if sess == nil {
+			return OpInfo{err: fmt.Errorf("expected mongo session in context")}
 		}
 
-		err := sessCtx.AbortTransaction(sessCtx)
+		err := sess.AbortTransaction(ctx)
 		return NewOpInfo("abort", op.ID, t, time.Time{}, err)
 	}
 }
