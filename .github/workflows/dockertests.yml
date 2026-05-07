@@ -16,7 +16,7 @@ env:
   IMAGE_PG_TESTS: wal-g/pg_tests
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
   LIBSODIUM_VERSION: "1.0.20"
 
 jobs:

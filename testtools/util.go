@@ -16,7 +16,6 @@ import (
 
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
 	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -43,7 +42,7 @@ func MakeDefaultInMemoryStorageFolder() *memory.Folder {
 	return memory.NewFolder("in_memory/", memory.NewKVS())
 }
 
-func MakeDefaultUploader(uploaderAPI s3manageriface.UploaderAPI) *s3.Uploader {
+func MakeDefaultUploader(uploaderAPI s3.UploaderAPI) *s3.Uploader {
 	return s3.NewUploader(uploaderAPI, "", "", "", "STANDARD", "", -1)
 }
 

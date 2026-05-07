@@ -3,7 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mariadb_full_mysqldump
+export WALE_S3_PREFIX=s3://mariadb-full-mysqldump
 export WALG_STREAM_CREATE_COMMAND="mysqldump --all-databases --single-transaction"
 export WALG_STREAM_RESTORE_COMMAND="mysql"
 export WALG_MYSQL_BACKUP_PREPARE_COMMAND=

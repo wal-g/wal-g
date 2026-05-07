@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/wal-g/tracelog"
 )
 
@@ -21,24 +21,43 @@ const (
 )
 
 type S3Client struct {
-	sess       *session.Session
-	s3         *s3.S3
-	downloader *s3manager.Downloader
+	s3         *s3.Client
+	downloader *manager.Downloader
 	bucket     string
 }
 
-func NewS3Client(conf aws.Config, bucket string) (*S3Client, error) {
-	sess, err := session.NewSession(&conf)
+// s3ClientConfig collects the v2-style settings the test S3 client needs.
+// In v1 these all lived on session.Session/aws.Config; in v2 endpoint and
+// path-style settings move to per-client functional options.
+type s3ClientConfig struct {
+	accessKey string
+	secretKey string
+	endpoint  string
+	region    string
+}
+
+func NewS3Client(cfg s3ClientConfig, bucket string) (*S3Client, error) {
+	awsCfg, err := config.LoadDefaultConfig(context.Background(),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.accessKey, cfg.secretKey, "")),
+		config.WithRegion(cfg.region),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return &S3Client{sess, s3.New(sess), s3manager.NewDownloader(sess), bucket}, nil
+	cli := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.UsePathStyle = true
+		if cfg.endpoint != "" {
+			o.BaseEndpoint = aws.String(cfg.endpoint)
+		}
+	})
+
+	return &S3Client{s3: cli, downloader: manager.NewDownloader(cli), bucket: bucket}, nil
 }
 
 func (cl *S3Client) FileContents(key string) ([]byte, error) {
-	buf := aws.NewWriteAtBuffer([]byte{})
-	_, err := cl.downloader.Download(buf,
+	buf := manager.NewWriteAtBuffer([]byte{})
+	_, err := cl.downloader.Download(context.Background(), buf,
 		&s3.GetObjectInput{
 			Key:    aws.String(key),
 			Bucket: aws.String(cl.bucket),
@@ -50,7 +69,7 @@ func (cl *S3Client) FileContents(key string) ([]byte, error) {
 }
 
 func (cl *S3Client) List(path string) ([]string, error) {
-	resp, err := cl.s3.ListObjects(
+	resp, err := cl.s3.ListObjects(context.Background(),
 		&s3.ListObjectsInput{
 			Bucket:    aws.String(cl.bucket),
 			Prefix:    aws.String(path),
@@ -110,15 +129,14 @@ func (s *S3Storage) Client() (*S3Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		conf := aws.Config{
-			Credentials:      credentials.NewStaticCredentials(s.access, s.secret, ""),
-			Endpoint:         aws.String(fmt.Sprintf("http://%s:%d", host, port)),
-			DisableSSL:       aws.Bool(true),
-			S3ForcePathStyle: aws.Bool(true),
-			Region:           aws.String("test_region"),
+		cfg := s3ClientConfig{
+			accessKey: s.access,
+			secretKey: s.secret,
+			endpoint:  fmt.Sprintf("http://%s:%d", host, port),
+			region:    "test-region",
 		}
 
-		client, err := NewS3Client(conf, s.bucket)
+		client, err := NewS3Client(cfg, s.bucket)
 		if err != nil {
 			return nil, err
 		}

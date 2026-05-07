@@ -8,13 +8,12 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConnResetRetryerRetry(t *testing.T) {
-	retryer := NewConnResetRetryer(client.DefaultRetryer{})
+func TestWalgRetryablesConnReset(t *testing.T) {
 	err := &net.OpError{
 		Op:     "mock",
 		Net:    "mock",
@@ -22,35 +21,22 @@ func TestConnResetRetryerRetry(t *testing.T) {
 		Addr:   &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12340},
 		Err:    &os.SyscallError{Syscall: "read", Err: syscall.ECONNRESET},
 	}
+	assert.Equal(t, aws.TrueTernary, walgRetryables{}.IsErrorRetryable(err))
+}
 
-	req := &request.Request{
-		Error: err,
+func TestWalgRetryablesRandomError(t *testing.T) {
+	err := fmt.Errorf("some strange unknown error")
+	assert.Equal(t, aws.UnknownTernary, walgRetryables{}.IsErrorRetryable(err))
+}
+
+func TestWalgRetryablesNoError(t *testing.T) {
+	assert.Equal(t, aws.UnknownTernary, walgRetryables{}.IsErrorRetryable(nil))
+}
+
+func TestWalgRetryablesOperationAborted(t *testing.T) {
+	respErr := &smithyhttp.ResponseError{
+		Response: &smithyhttp.Response{Response: &http.Response{StatusCode: 409}},
+		Err:      fmt.Errorf("operation aborted"),
 	}
-
-	assert.True(t, retryer.ShouldRetry(req))
-}
-
-func TestConnResetRetryerRandomError(t *testing.T) {
-	retryer := NewConnResetRetryer(client.DefaultRetryer{})
-	req := &request.Request{
-		Error: fmt.Errorf("some strange unknown error"),
-	}
-	assert.False(t, retryer.ShouldRetry(req))
-}
-
-func TestConnResetRetryerNoError(t *testing.T) {
-	retryer := NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: 15})
-	assert.False(t, retryer.ShouldRetry(&request.Request{}))
-}
-
-func TestConnResetRetryerOperationAborted(t *testing.T) {
-	retryer := NewConnResetRetryer(client.DefaultRetryer{NumMaxRetries: 15})
-	resp := &http.Response{StatusCode: 409}
-	assert.True(t, retryer.ShouldRetry(&request.Request{HTTPResponse: resp}))
-}
-
-func TestConnResetRetryerThrottling(t *testing.T) {
-	retryer := client.DefaultRetryer{NumMaxRetries: 15}
-	resp := &http.Response{StatusCode: 429}
-	assert.True(t, retryer.ShouldRetry(&request.Request{HTTPResponse: resp}))
+	assert.Equal(t, aws.TrueTernary, walgRetryables{}.IsErrorRetryable(respErr))
 }

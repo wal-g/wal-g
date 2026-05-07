@@ -2,6 +2,7 @@ package oplog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/txn"
@@ -9,8 +10,8 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"io"
 	"slices"
 	"strings"
@@ -157,9 +158,7 @@ func (ap *DBApplier) Close(ctx context.Context) error {
 		return err
 	}
 
-	if err := ap.txnBuffer.Stop(); err != nil {
-		return err
-	}
+	ap.txnBuffer.Stop()
 
 	return nil
 }
@@ -192,7 +191,7 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 
 // shouldIgnore checks if error should be ignored
 func (ap *DBApplier) shouldIgnore(op string, err error) bool {
-	ce, ok := err.(mongo.CommandError)
+	ce, ok := errors.AsType[mongo.CommandError](err)
 	if !ok {
 		return false
 	}
