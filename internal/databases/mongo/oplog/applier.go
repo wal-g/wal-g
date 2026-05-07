@@ -2,6 +2,7 @@ package oplog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -191,7 +192,7 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 
 // shouldIgnore checks if error should be ignored
 func (ap *DBApplier) shouldIgnore(op string, err error) bool {
-	ce, ok := err.(mongo.CommandError)
+	ce, ok := errors.AsType[mongo.CommandError](err)
 	if !ok {
 		return false
 	}

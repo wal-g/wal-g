@@ -45,7 +45,7 @@ RUN ARCH="$(uname -m)" && \
         aarch64) GO_ARCH="arm64" ;; \
         *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
     esac && \
-    curl -fsSL "https://go.dev/dl/go1.25.11.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
+    curl -fsSL "https://go.dev/dl/go1.26.7.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
     export PATH="/usr/local/go/bin:$PATH" && \
     go version
 

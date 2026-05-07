@@ -97,7 +97,7 @@ func makeCorruptedTar(name string) (BufferReaderMaker, []byte) {
 		crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 
 		compressor := GetLz4Compressor()
-		compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+		compressed := internal.CompressAndEncrypt(context.Background(), bytes.NewReader(b), compressor, crypter)
 
 		temp, err := io.ReadAll(compressed)
 		if err != nil {
@@ -243,12 +243,12 @@ func TestDecryptAndDecompressTar_unencrypted(t *testing.T) {
 	copy(bCopy, b)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, nil)
+	compressed := internal.CompressAndEncrypt(t.Context(), bytes.NewReader(b), compressor, nil)
 
 	compressedBuffer := &bytes.Buffer{}
 	_, _ = compressedBuffer.ReadFrom(compressed)
 
-	reader, err := internal.DecryptAndDecompressTar(compressedBuffer, "/usr/local/test.tar.lz4", nil)
+	reader, err := internal.DecryptAndDecompressTar(t.Context(), compressedBuffer, "/usr/local/test.tar.lz4", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -271,9 +271,9 @@ func TestDecryptAndDecompressTar_encrypted(t *testing.T) {
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+	compressed := internal.CompressAndEncrypt(t.Context(), bytes.NewReader(b), compressor, crypter)
 
-	reader, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lz4", crypter)
+	reader, err := internal.DecryptAndDecompressTar(t.Context(), compressed, "/usr/local/test.tar.lz4", crypter)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -296,9 +296,9 @@ func TestDecryptAndDecompressTar_noCrypter(t *testing.T) {
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+	compressed := internal.CompressAndEncrypt(t.Context(), bytes.NewReader(b), compressor, crypter)
 
-	reader, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lz4", nil)
+	reader, err := internal.DecryptAndDecompressTar(t.Context(), compressed, "/usr/local/test.tar.lz4", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -321,9 +321,9 @@ func TestDecryptAndDecompressTar_wrongCrypter(t *testing.T) {
 	crypter := openpgp.CrypterFromKeyPath(PrivateKeyFilePath, noPassphrase)
 
 	compressor := GetLz4Compressor()
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), compressor, crypter)
+	compressed := internal.CompressAndEncrypt(t.Context(), bytes.NewReader(b), compressor, crypter)
 
-	_, err := internal.DecryptAndDecompressTar(compressed, "/usr/local/test.tar.lzma", crypter)
+	_, err := internal.DecryptAndDecompressTar(t.Context(), compressed, "/usr/local/test.tar.lzma", crypter)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -338,7 +338,7 @@ func TestDecryptAndDecompressTar_unknownFormat(t *testing.T) {
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
 
-	_, err := internal.DecryptAndDecompressTar(bytes.NewBuffer(b), "/usr/local/test.some_unsupported_file_format", nil)
+	_, err := internal.DecryptAndDecompressTar(t.Context(), bytes.NewBuffer(b), "/usr/local/test.some_unsupported_file_format", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}
@@ -352,12 +352,12 @@ func TestDecryptAndDecompressTar_uncompressed(t *testing.T) {
 	bCopy := make([]byte, len(b))
 	copy(bCopy, b)
 
-	compressed := internal.CompressAndEncrypt(bytes.NewReader(b), nil, nil)
+	compressed := internal.CompressAndEncrypt(t.Context(), bytes.NewReader(b), nil, nil)
 
 	compressedBuffer := &bytes.Buffer{}
 	_, _ = compressedBuffer.ReadFrom(compressed)
 
-	reader, err := internal.DecryptAndDecompressTar(compressedBuffer, "/usr/local/test.tar", nil)
+	reader, err := internal.DecryptAndDecompressTar(t.Context(), compressedBuffer, "/usr/local/test.tar", nil)
 	if err != nil {
 		t.Logf("%+v\n", err)
 	}

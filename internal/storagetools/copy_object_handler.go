@@ -13,14 +13,14 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func Encrypt(source io.Reader, crypter crypto.Crypter) (io.Reader, error) {
+func Encrypt(ctx context.Context, source io.Reader, crypter crypto.Crypter) (io.Reader, error) {
 	if crypter == nil {
 		return source, nil
 	}
 
 	cryptReader, dstWriter := io.Pipe()
 
-	writeCloser, err := crypter.Encrypt(dstWriter)
+	writeCloser, err := crypter.Encrypt(ctx, dstWriter)
 
 	if err != nil {
 		_ = cryptReader.Close()
@@ -81,7 +81,7 @@ func collectCopyingInfo(
 		},
 		func(r io.Reader) (io.Reader, error) {
 			if decryptSource {
-				r, err = internal.DecryptBytes(r)
+				r, err = internal.DecryptBytes(ctx, r)
 				if err != nil {
 					return nil, err
 				}
@@ -89,7 +89,7 @@ func collectCopyingInfo(
 
 			if encryptTarget {
 				crypter := internal.CrypterFromConfig(toConfigFile)
-				r, err = Encrypt(r, crypter)
+				r, err = Encrypt(ctx, r, crypter)
 				if err != nil {
 					return nil, err
 				}

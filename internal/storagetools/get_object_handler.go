@@ -65,7 +65,7 @@ func downloadObject(ctx context.Context, objectPath string, folder storage.Folde
 	var objReader io.Reader = objReadCloser
 
 	if decrypt {
-		objReader, err = internal.DecryptBytes(objReader)
+		objReader, err = internal.DecryptBytes(ctx, objReader)
 		if err != nil {
 			return err
 		}

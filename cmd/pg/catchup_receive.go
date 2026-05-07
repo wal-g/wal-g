@@ -20,7 +20,7 @@ var catchupReceiveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		port, err := strconv.Atoi(args[1])
 		tracelog.ErrorLogger.FatalOnError(err)
-		postgres.HandleCatchupReceive(args[0], port)
+		postgres.HandleCatchupReceive(cmd.Context(), args[0], port)
 	},
 	Annotations: map[string]string{"NoStorage": ""},
 }

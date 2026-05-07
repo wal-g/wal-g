@@ -108,7 +108,7 @@ func (tarBall *StorageTarBall) startUpload(ctx context.Context, name string, cry
 	var writerToCompress io.WriteCloser = pipeWriter
 
 	if crypter != nil {
-		encryptedWriter, err := crypter.Encrypt(pipeWriter)
+		encryptedWriter, err := crypter.Encrypt(ctx, pipeWriter)
 
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("upload: encryption error ", err)
