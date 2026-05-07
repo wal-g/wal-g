@@ -201,6 +201,8 @@ Lists names and creation time of available backups.
 
 Is used to delete backups and WALs before them. By default, ``delete`` will perform a dry run. If you want to execute deletion, you have to add ``--confirm`` flag at the end of the command. Backups marked as permanent will not be deleted.
 
+For **PostgreSQL**, ``delete retain`` and ``delete before`` order backups using the timeline and WAL segment embedded in each backup name by default. After a **major upgrade** (e.g. ``pg_upgrade``) the timeline often resets while older backups stay in the same storage, so that order may **not** be chronological and ``retain`` can remove **new** backups by mistake. Pass the global flag ``--use-sentinel-time`` on ``delete`` to order by backup start time from sentinel/metadata when it is available; see [PostgreSQL.md](PostgreSQL.md#delete-retention-ordering-and-use-sentinel-time).
+
 ``delete`` can operate in four modes: ``retain``, ``before``, ``everything`` and ``target``.
 
 ``retain`` [FULL|FIND_FULL] %number% [--after %name|time%]
@@ -231,6 +233,8 @@ If `FIND_FULL` is specified, WAL-G will calculate minimum backup needed to keep 
 ``retain FIND_FULL 5`` will find necessary full for 5th and keep everything after it
 
 ``retain 5 --after 2019-12-12T12:12:12`` keep 5 most recent backups and backups made after 2019-12-12 12:12:12
+
+``retain FULL 5 --use-sentinel-time`` (PostgreSQL) same as ``retain FULL 5`` but order backups by sentinel start time—use when mixing backups across a timeline reset (e.g. after major upgrade); still add ``--confirm`` to run deletion
 
 ``before base_000010000123123123`` will fail if `base_000010000123123123` is delta
 
