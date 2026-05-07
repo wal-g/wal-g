@@ -11,15 +11,12 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // StorageUploader routes PAX files to the dedicated wal-g `paxfiles/` storage prefix
 // and decides per file whether to skip (already in storage from a prior backup)
 // or upload whole.
-//
-// Unlike the AO uploader, there is no "incremental" branch: PAX files are
-// immutable after close, so two files with the same FileKey are bit-identical
-// and the only meaningful operation is "upload once, skip thereafter".
 type StorageUploader struct {
 	uploader            internal.Uploader
 	baseFiles           BackupFiles
@@ -33,8 +30,7 @@ type StorageUploader struct {
 
 func NewStorageUploader(uploader internal.Uploader, baseFiles BackupFiles, crypter crypto.Crypter,
 	files internal.BundleFiles, deduplicationAgeLimit time.Duration, newPaxFilesID string) *StorageUploader {
-	// Separate uploader for PAX files with disabled file size tracking,
-	// matching the AO/AOCS handling path.
+	// Separate uploader for PAX files with disabled file size tracking, matching the AO/AOCS handling path.
 	paxFileUploader := uploader.Clone()
 	paxFileUploader.DisableSizeTracking()
 
@@ -76,8 +72,7 @@ func (u *StorageUploader) addFile(cfi *internal.ComposeFileInfo, meta RelFileMet
 		return u.regularUpload(cfi, meta, fileKey)
 	}
 
-	// Stable identity check: same relation + same block_id + same kind means the file
-	// is the byte-identical immutable PORC/visimap. Anything mismatched -> re-upload.
+	// if dedup check failed -> upload new file
 	if remoteFile.RelNameMd5 != meta.RelNameMd5 || remoteFile.BlockID != meta.BlockID || remoteFile.Kind != meta.Kind {
 		tracelog.DebugLogger.Printf(
 			"%s: PAX identity mismatch (remote md5=%s blockid=%d kind=%s vs local md5=%s blockid=%d kind=%s), will re-upload",
@@ -108,7 +103,7 @@ func (u *StorageUploader) regularUpload(cfi *internal.ComposeFileInfo, meta RelF
 	if err != nil {
 		return err
 	}
-	defer fileReadCloser.Close()
+	defer utility.LoggedClose(fileReadCloser, "Failed to close PAX file")
 
 	// PAX/PORC files are already compressed internally; do not re-compress.
 	var compressor compression.Compressor

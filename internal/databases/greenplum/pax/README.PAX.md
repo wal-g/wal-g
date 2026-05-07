@@ -1,6 +1,6 @@
 # PAX Storage - Internals Reference
 
-This document summarizes how PAX storage works in Cloudberry. Original documentation located at `contrib/pax_storage/doc/`[(src)](https://github.com/apache/cloudberry/tree/2.1.0-incubating/contrib/pax_storage/doc).
+Cloudberry documentation on PAX located at `contrib/pax_storage/doc/`[(src)](https://github.com/apache/cloudberry/tree/2.1.0-incubating/contrib/pax_storage/doc).
 
 ## 1. Overview
 
@@ -29,34 +29,30 @@ Block files are named by a monotonically increasing integer allocated from `pg_e
 
 For a block numbered `N` the following files may exist:
 
-| File | Present when | Purpose |
-|---|---|---|
-| `N` | always | PORC data file |
-| `N.toast` | `ptexistexttoast = true` | External TOAST sidecar |
-| `N_<gen-hex>_<xid-hex>.visimap` | block has had at least one DELETE | Row-level deletion bitmap |
+| File | Present when                | Purpose |
+|---|-----------------------------|---|
+| `N` | always                      | PORC data file |
+| `N.toast` | `ptexistexttoast = true`    | External TOAST |
+| `N_<gen-hex>_<xid-hex>.visimap` | `ptvisimapname is not NULL` | Row-level deletion bitmap |
 
 ## 3. PORC File Immutability
 
 PORC files are **immutable after close** - not append-only, not mutable.
 
 - INSERT: a new file is created with a new `block_id`.
-- DELETE: the PORC file is not touched. A new visimap file is written instead (see #5).
-- UPDATE: implemented as DELETE + INSERT (split update, see `README_CTID_in_pax.md`[(src)](https://github.com/apache/cloudberry/blob/2.1.0-incubating/contrib/pax_storage/src/cpp/storage/README_CTID_in_pax.md)).
-- Compaction / reclustering: the entire file is re-read, filtered through
-  visimap, and written to a new file with a new block_id; the old file is
-  unlinked.
-
-This is the same model as Apache Iceberg / Parquet / ORC: data files are
-write-once, and mutations produce new files plus metadata updates.
+- DELETE: the PORC file is not touched. A new visimap file is written instead.
+- UPDATE: implemented as DELETE + INSERT.
+- Compaction / reclustering: the entire file is re-read, filtered through visimap, and written to a new file with a new block_id; the old file is unlinked.
 
 ## 4. Auxiliary Catalog
 
-PAX stores per-file metadata in heap-backed catalog tables under the `pg_ext_aux` namespace (see
-`README.catalog.md`[(src)](https://github.com/apache/cloudberry/blob/2.1.0-incubating/contrib/pax_storage/doc/README.catalog.md)):
+`README.catalog.md`[(src)](https://github.com/apache/cloudberry/blob/2.1.0-incubating/contrib/pax_storage/doc/README.catalog.md)
 
-- **`pg_ext_aux.pg_pax_tables`** - maps PAX relation OID to auxiliary blocks relation OID.
-- **`pg_ext_aux.pg_pax_blocks_<relid>`** - one row per file. Columns:
-    - `ptblockname` (int) - block id, equal to the file name on disk.
+PAX creates an auxiliary HEAP-table for each PAX table. It located under the `pg_ext_aux` namespace:
+
+- **`pg_ext_aux.pg_pax_tables`** - used to associate the PAX table (user table) and auxiliary blocks table (e.g. `pg_ext_aux.pg_pax_blocks_17025`).
+- **`pg_ext_aux.pg_pax_blocks_<relid>`** - one row per block-file on disk. Columns:
+    - `ptblockname` (int) - block id, equal to the file name on disk (0, 1, 2, etc).
     - `pttupcount` (int) - number of tuples in the file.
     - `ptblocksize` (int) - estimated file size.
     - `ptstatistics` (paxauxstats) - serialized protobuf with column stats.
@@ -81,13 +77,9 @@ transactions stop seeing them.
 
 ### Row-level visibility (visimap)
 
-Row-level deletions are recorded in separate bitmap files. Naming `<block_id>_<generation-hex>_<xid-hex>.visimap`
+Row-level deletions are recorded in separate bitmap files. Naming `<block_id>_<generation-hex>_<xid-hex>.visimap`. Each bit corresponds to one tuple offset within the block; 1 = deleted.
 
-Each bit corresponds to one tuple offset within the block; 1 = deleted.
-
-Each DELETE operation creates new visimap file and saves it in `ptvisimapname`
-
-The heap MVCC on the aux row update gives atomicity: older snapshots still see the old `ptvisimapname`; newer snapshots see the new one. Visimap files themselves are immutable after close.
+Each DELETE operation creates new visimap file and saves it in `ptvisimapname`. The heap MVCC on the aux row update gives atomicity: older snapshots still see the old `ptvisimapname`; newer snapshots see the new one. Visimap files themselves are immutable after close.
 
 ### Concurrent DML
 
@@ -111,9 +103,7 @@ PAX implements its own TOAST and does **not** use PostgreSQL's toasts.
 
 ### Compress TOAST
 
-Values above `pax.min_size_of_compress_toast` (default 512 KiB) that fit
-under 1 GiB are stored inline in the PORC file as compressed `varattrib_4b`
-- the same layout heap uses. No separate file. Transparent to backup.
+Values above `pax.min_size_of_compress_toast` (default 512 KiB) are stored inline in the PORC file as compressed `varattrib_4b`.
 
 ### External TOAST
 
@@ -143,8 +133,7 @@ transaction commit. PiTR, however, applies all WAL-records during replay.
 3. Dump:
     - The relevant row of `pg_ext_aux.pg_pax_tables`.
     - All rows of `pg_ext_aux.pg_pax_blocks_<relid>`.
-    - The relevant row of `pg_ext_aux.pg_pax_fastsequence`.
-4. Copy all files from disk (`filepath.Walk`). If file has records in `pg_ext_aux` - route it to shared `/paxfiles/` directory.
+4. Copy all files from disk (`filepath.Walk`). If file has records in `pg_ext_aux` - route it to the shared `/paxfiles/` directory.
 5. Upload all metadata.
 6. Stop backup.
 
