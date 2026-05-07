@@ -148,8 +148,7 @@ func (f *Folder) Exists(objectRelativePath string) (bool, error) {
 	})
 
 	if err != nil {
-		var serviceError *oss.ServiceError
-		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
+		if serviceError, ok := errors.AsType[*oss.ServiceError](err); ok && serviceError.Code == "NoSuchKey" {
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to check oss object '%s' existence: %w", objectPath, err)
@@ -170,8 +169,7 @@ func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	}
 	result, err := f.ossAPI.GetObject(context.Background(), req)
 	if err != nil {
-		var serviceError *oss.ServiceError
-		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
+		if serviceError, ok := errors.AsType[*oss.ServiceError](err); ok && serviceError.Code == "NoSuchKey" {
 			return nil, storage.NewObjectNotFoundError(objectPath)
 		}
 		return nil, fmt.Errorf("failed to read oss object '%s': %w", objectPath, err)

@@ -1,40 +1,82 @@
 package s3_test
 
 import (
+	"context"
+	"encoding/base64"
 	"io"
 	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	walgs3 "github.com/wal-g/wal-g/pkg/storages/s3"
 )
 
+// MockS3ClientSSEC implements walgs3.API and records the inputs of the three
+// methods exercised by SSE-C tests. All other methods return zero values.
 type MockS3ClientSSEC struct {
-	s3iface.S3API
 	LastGetObjectInput  *s3.GetObjectInput
 	LastHeadObjectInput *s3.HeadObjectInput
 	LastCopyObjectInput *s3.CopyObjectInput
 }
 
-func (m *MockS3ClientSSEC) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
+var _ walgs3.API = (*MockS3ClientSSEC)(nil)
+
+func (m *MockS3ClientSSEC) GetObject(_ context.Context, input *s3.GetObjectInput,
+	_ ...func(*s3.Options)) (*s3.GetObjectOutput, error) {
 	m.LastGetObjectInput = input
-	output := &s3.GetObjectOutput{
+	return &s3.GetObjectOutput{
 		Body: io.NopCloser(strings.NewReader("mock encrypted content")),
-	}
-	return output, nil
+	}, nil
 }
 
-func (m *MockS3ClientSSEC) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
+func (m *MockS3ClientSSEC) HeadObject(_ context.Context, input *s3.HeadObjectInput,
+	_ ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
 	m.LastHeadObjectInput = input
 	return &s3.HeadObjectOutput{}, nil
 }
 
-func (m *MockS3ClientSSEC) CopyObject(input *s3.CopyObjectInput) (*s3.CopyObjectOutput, error) {
+func (m *MockS3ClientSSEC) CopyObject(_ context.Context, input *s3.CopyObjectInput,
+	_ ...func(*s3.Options)) (*s3.CopyObjectOutput, error) {
 	m.LastCopyObjectInput = input
 	return &s3.CopyObjectOutput{}, nil
+}
+
+func (m *MockS3ClientSSEC) DeleteObjects(_ context.Context, _ *s3.DeleteObjectsInput,
+	_ ...func(*s3.Options)) (*s3.DeleteObjectsOutput, error) {
+	return &s3.DeleteObjectsOutput{}, nil
+}
+
+func (m *MockS3ClientSSEC) GetBucketVersioning(_ context.Context, _ *s3.GetBucketVersioningInput,
+	_ ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
+	return &s3.GetBucketVersioningOutput{}, nil
+}
+
+func (m *MockS3ClientSSEC) ListObjects(_ context.Context, _ *s3.ListObjectsInput,
+	_ ...func(*s3.Options)) (*s3.ListObjectsOutput, error) {
+	return &s3.ListObjectsOutput{}, nil
+}
+
+func (m *MockS3ClientSSEC) ListObjectsV2(_ context.Context, _ *s3.ListObjectsV2Input,
+	_ ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	return &s3.ListObjectsV2Output{}, nil
+}
+
+func (m *MockS3ClientSSEC) ListObjectVersions(_ context.Context, _ *s3.ListObjectVersionsInput,
+	_ ...func(*s3.Options)) (*s3.ListObjectVersionsOutput, error) {
+	return &s3.ListObjectVersionsOutput{}, nil
+}
+
+func (m *MockS3ClientSSEC) GetBucketLocation(_ context.Context, _ *s3.GetBucketLocationInput,
+	_ ...func(*s3.Options)) (*s3.GetBucketLocationOutput, error) {
+	return &s3.GetBucketLocationOutput{}, nil
+}
+
+// expectedSSECustomerKey returns the on-the-wire SSE-C key value: v2 requires
+// the caller to base64-encode the raw key (v1 did this internally).
+func expectedSSECustomerKey(raw string) string {
+	return base64.StdEncoding.EncodeToString([]byte(raw))
 }
 
 func createSSECUploader(sseAlgorithm, sseKey string) *walgs3.Uploader {
@@ -61,7 +103,7 @@ func TestReadObject_WithSSEC_AddsCorrectHeaders(t *testing.T) {
 	assert.NotNil(t, mockClient.LastGetObjectInput.SSECustomerAlgorithm)
 	assert.Equal(t, sseAlgorithm, *mockClient.LastGetObjectInput.SSECustomerAlgorithm)
 	assert.NotNil(t, mockClient.LastGetObjectInput.SSECustomerKey)
-	assert.Equal(t, sseKey, *mockClient.LastGetObjectInput.SSECustomerKey)
+	assert.Equal(t, expectedSSECustomerKey(sseKey), *mockClient.LastGetObjectInput.SSECustomerKey)
 	assert.NotNil(t, mockClient.LastGetObjectInput.SSECustomerKeyMD5)
 	assert.Equal(t, expectedMD5, *mockClient.LastGetObjectInput.SSECustomerKeyMD5)
 }
@@ -103,7 +145,7 @@ func TestExists_WithSSEC_AddsCorrectHeaders(t *testing.T) {
 	assert.NotNil(t, mockClient.LastHeadObjectInput.SSECustomerAlgorithm)
 	assert.Equal(t, sseAlgorithm, *mockClient.LastHeadObjectInput.SSECustomerAlgorithm)
 	assert.NotNil(t, mockClient.LastHeadObjectInput.SSECustomerKey)
-	assert.Equal(t, sseKey, *mockClient.LastHeadObjectInput.SSECustomerKey)
+	assert.Equal(t, expectedSSECustomerKey(sseKey), *mockClient.LastHeadObjectInput.SSECustomerKey)
 	assert.NotNil(t, mockClient.LastHeadObjectInput.SSECustomerKeyMD5)
 	assert.Equal(t, expectedMD5, *mockClient.LastHeadObjectInput.SSECustomerKeyMD5)
 }
@@ -130,6 +172,7 @@ func TestCopyObject_WithSSEC_AddsCorrectHeadersForSourceAndDestination(t *testin
 	sseKey := "MySecretKey32BytesLongForSSE!123"
 	sseAlgorithm := "AES256"
 	expectedMD5 := walgs3.GetSSECustomerKeyMD5(sseKey)
+	encodedKey := expectedSSECustomerKey(sseKey)
 
 	uploader := createSSECUploader(sseAlgorithm, sseKey)
 	config := &walgs3.Config{Bucket: "test-bucket"}
@@ -143,14 +186,14 @@ func TestCopyObject_WithSSEC_AddsCorrectHeadersForSourceAndDestination(t *testin
 	assert.NotNil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerAlgorithm)
 	assert.Equal(t, sseAlgorithm, *mockClient.LastCopyObjectInput.CopySourceSSECustomerAlgorithm)
 	assert.NotNil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerKey)
-	assert.Equal(t, sseKey, *mockClient.LastCopyObjectInput.CopySourceSSECustomerKey)
+	assert.Equal(t, encodedKey, *mockClient.LastCopyObjectInput.CopySourceSSECustomerKey)
 	assert.NotNil(t, mockClient.LastCopyObjectInput.CopySourceSSECustomerKeyMD5)
 	assert.Equal(t, expectedMD5, *mockClient.LastCopyObjectInput.CopySourceSSECustomerKeyMD5)
 
 	assert.NotNil(t, mockClient.LastCopyObjectInput.SSECustomerAlgorithm)
 	assert.Equal(t, sseAlgorithm, *mockClient.LastCopyObjectInput.SSECustomerAlgorithm)
 	assert.NotNil(t, mockClient.LastCopyObjectInput.SSECustomerKey)
-	assert.Equal(t, sseKey, *mockClient.LastCopyObjectInput.SSECustomerKey)
+	assert.Equal(t, encodedKey, *mockClient.LastCopyObjectInput.SSECustomerKey)
 	assert.NotNil(t, mockClient.LastCopyObjectInput.SSECustomerKeyMD5)
 	assert.Equal(t, expectedMD5, *mockClient.LastCopyObjectInput.SSECustomerKeyMD5)
 }
@@ -238,8 +281,9 @@ func TestCopyObject_WithSSEKMS_AddsCorrectHeadersForKMS(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, mockClient.LastCopyObjectInput)
 
-	assert.NotNil(t, mockClient.LastCopyObjectInput.ServerSideEncryption)
-	assert.Equal(t, sseAlgorithm, *mockClient.LastCopyObjectInput.ServerSideEncryption)
+	// In v2, ServerSideEncryption is a typed enum (types.ServerSideEncryption),
+	// so it's the string value itself, not a pointer.
+	assert.Equal(t, sseAlgorithm, string(mockClient.LastCopyObjectInput.ServerSideEncryption))
 
 	assert.NotNil(t, mockClient.LastCopyObjectInput.SSEKMSKeyId)
 	assert.Equal(t, sseKMSKeyID, *mockClient.LastCopyObjectInput.SSEKMSKeyId)
@@ -265,8 +309,7 @@ func TestCopyObject_WithSSES3_AddsCorrectHeadersForS3(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, mockClient.LastCopyObjectInput)
 
-	assert.NotNil(t, mockClient.LastCopyObjectInput.ServerSideEncryption)
-	assert.Equal(t, sseAlgorithm, *mockClient.LastCopyObjectInput.ServerSideEncryption)
+	assert.Equal(t, sseAlgorithm, string(mockClient.LastCopyObjectInput.ServerSideEncryption))
 
 	assert.Nil(t, mockClient.LastCopyObjectInput.SSEKMSKeyId)
 
@@ -277,3 +320,4 @@ func TestCopyObject_WithSSES3_AddsCorrectHeadersForS3(t *testing.T) {
 	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerKey)
 	assert.Nil(t, mockClient.LastCopyObjectInput.SSECustomerKeyMD5)
 }
+

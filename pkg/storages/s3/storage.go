@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -33,7 +33,6 @@ type Config struct {
 	UseYCSessionToken        string
 	ForcePathStyle           bool
 	RequestAdditionalHeaders string
-	UseListObjectsV1         bool
 	MaxRetries               int
 	LogLevel                 string
 	Uploader                 *UploaderConfig
@@ -53,12 +52,12 @@ type Secrets struct {
 
 // TODO: Unit tests
 func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
-	sess, err := createSession(config)
+	awsCfg, s3Opts, err := loadAWSConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("create new AWS session: %w", err)
+		return nil, fmt.Errorf("create new AWS config: %w", err)
 	}
 
-	s3Client := s3.New(sess)
+	s3Client := s3.NewFromConfig(awsCfg, s3Opts...)
 
 	uploader, err := createUploader(s3Client, config.Uploader)
 	if err != nil {
@@ -95,6 +94,6 @@ func (s *Storage) ConfigHash() string {
 }
 
 func (s *Storage) Close() error {
-	// Nothing to close: the S3 session doesn't require to be closed
+	// Nothing to close: the v2 S3 client doesn't require explicit shutdown
 	return nil
 }

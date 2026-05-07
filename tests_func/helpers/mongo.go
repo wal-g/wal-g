@@ -14,10 +14,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/utils"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/mod/semver"
 )
 
@@ -72,7 +71,7 @@ type CmdResponse struct {
 
 // OpTime ...
 type OpTime struct {
-	TS   primitive.Timestamp `bson:"ts" json:"ts"`
+	TS   bson.Timestamp `bson:"ts" json:"ts"`
 	Term int64               `bson:"t" json:"t"`
 }
 
@@ -191,7 +190,9 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	uri := fmt.Sprintf("mongodb://%s%s:%d/%s"+
 		"?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000%s",
 		auth, mc.expHost, mc.expPort, dbase, restore)
-	client, err := mongo.Connect(mc.ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().
+		ApplyURI(uri).
+		SetBSONOptions(&options.BSONOptions{DefaultDocumentM: true}))
 	if err != nil {
 		return nil, fmt.Errorf("can not create mongo client: %v", err)
 	}

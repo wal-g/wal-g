@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -9,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 )
@@ -43,7 +44,7 @@ func (reader *RangeReader) getObjectRange(from, to int64) (*s3.GetObjectOutput, 
 		Range:  aws.String(bytesRange),
 	}
 	reader.debugLog("GetObject with range %s", bytesRange)
-	return reader.folder.s3API.GetObject(input)
+	return reader.folder.s3API.GetObject(context.Background(), input)
 }
 
 func (reader *RangeReader) Read(p []byte) (n int, err error) {
@@ -110,7 +111,7 @@ func (reader *RangeReader) reconnect() error {
 	return nil
 }
 
-// THIS COde stolen from s3 lib, from vendor/github.com/aws/aws-sdk-go/aws/client/default_retryer.go
+// This code stolen from s3 lib, from vendor/github.com/aws/aws-sdk-go/aws/client/default_retryer.go
 // func (d DefaultRetryer) RetryRules( .. ) time.Duration
 // this calculate sleep duration (jitter and exponential backoff)
 func (reader *RangeReader) getIncrSleep(retryCount int) time.Duration {

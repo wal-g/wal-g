@@ -4,16 +4,17 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/base64"
+	stderrors "errors"
 	"fmt"
 	"io"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -30,7 +31,7 @@ const (
 
 // TODO: Unit tests
 type Folder struct {
-	s3API    s3iface.S3API
+	s3API    API
 	uploader *Uploader
 	bucket   *string
 	path     string
@@ -38,7 +39,7 @@ type Folder struct {
 }
 
 func NewFolder(
-	s3API s3iface.S3API,
+	s3API API,
 	uploader *Uploader,
 	path string,
 	config *Config,
@@ -68,13 +69,13 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 
 	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
 		stopSentinelObjectInput.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
-		stopSentinelObjectInput.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+		stopSentinelObjectInput.SSECustomerKey = aws.String(sseCustomerKeyB64(folder.uploader.SSECustomerKey))
 
 		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
 		stopSentinelObjectInput.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
-	_, err := folder.s3API.HeadObject(stopSentinelObjectInput)
+	_, err := folder.s3API.HeadObject(context.Background(), stopSentinelObjectInput)
 	if err != nil {
 		if isAwsNotExist(err) {
 			return false, nil
@@ -106,16 +107,17 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if folder.uploader.serverSideEncryption != "" {
 		if folder.uploader.SSECustomerKey != "" {
 			customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
+			encodedKey := sseCustomerKeyB64(folder.uploader.SSECustomerKey)
 
 			input.CopySourceSSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
-			input.CopySourceSSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+			input.CopySourceSSECustomerKey = aws.String(encodedKey)
 			input.CopySourceSSECustomerKeyMD5 = aws.String(customerKeyMD5)
 
 			input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
-			input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+			input.SSECustomerKey = aws.String(encodedKey)
 			input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 		} else {
-			input.ServerSideEncryption = aws.String(folder.uploader.serverSideEncryption)
+			input.ServerSideEncryption = types.ServerSideEncryption(folder.uploader.serverSideEncryption)
 		}
 
 		if folder.uploader.SSEKMSKeyID != "" {
@@ -123,7 +125,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 		}
 	}
 
-	_, err := folder.s3API.CopyObject(input)
+	_, err := folder.s3API.CopyObject(context.Background(), input)
 	return err
 }
 
@@ -136,13 +138,13 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 
 	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
 		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
-		input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+		input.SSECustomerKey = aws.String(sseCustomerKeyB64(folder.uploader.SSECustomerKey))
 
 		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
 		input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
-	object, err := folder.s3API.GetObject(input)
+	object, err := folder.s3API.GetObject(context.Background(), input)
 	if err != nil {
 		if isAwsNotExist(err) {
 			return nil, storage.NewObjectNotFoundError(objectPath)
@@ -153,7 +155,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	if folder.config.RangeBatchEnabled {
 		reader = NewRangeReader(object.Body, objectPath, folder.config.RangeMaxRetries, folder)
 	}
-	return NewContentLengthValidator(reader, aws.Int64Value(object.ContentLength), objectPath), nil
+	return NewContentLengthValidator(reader, aws.ToInt64(object.ContentLength), objectPath), nil
 }
 
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
@@ -187,7 +189,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			return nil, nil, err
 		}
 	} else {
-		listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool {
+		listFunc := func(commonPrefixes []types.CommonPrefix, contents []types.Object) bool {
 			for _, prefix := range commonPrefixes {
 				subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
 				subFolders = append(subFolders, subFolder)
@@ -201,7 +203,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 				}
 
 				objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-				objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
+				objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, aws.ToInt64(object.Size)))
 			}
 			return true
 		}
@@ -229,7 +231,7 @@ func (folder *Folder) ListFolderSegment(
 		startAfterPrefix = aws.String(*prefix + *startAfterKey)
 	}
 
-	listFunc := func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool {
+	listFunc := func(commonPrefixes []types.CommonPrefix, contents []types.Object) bool {
 		cont := true
 		for _, prefix := range commonPrefixes {
 			subFolder := NewFolder(folder.s3API, folder.uploader, *prefix.Prefix, folder.config)
@@ -249,7 +251,7 @@ func (folder *Folder) ListFolderSegment(
 			}
 
 			objectRelativePath := strings.TrimPrefix(*object.Key, folder.path)
-			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, *object.Size))
+			objects = append(objects, storage.NewLocalObject(objectRelativePath, *object.LastModified, aws.ToInt64(object.Size)))
 		}
 		return cont
 	}
@@ -276,7 +278,7 @@ type versionInfo struct {
 
 // addListedSubfolders converts S3 CommonPrefixes to Folder handles.
 // These handles are used by callers (e.g. `st ls` non-recursive output, or recursive listing via subfolders).
-func (folder *Folder) addListedSubfolders(subFolders *[]storage.Folder, commonPrefixes []*s3.CommonPrefix) {
+func (folder *Folder) addListedSubfolders(subFolders *[]storage.Folder, commonPrefixes []types.CommonPrefix) {
 	for _, p := range commonPrefixes {
 		subFolder := NewFolder(folder.s3API, folder.uploader, *p.Prefix, folder.config)
 		*subFolders = append(*subFolders, subFolder)
@@ -288,14 +290,15 @@ func (folder *Folder) addListedSubfolders(subFolders *[]storage.Folder, commonPr
 func (folder *Folder) collectDeleteMarkers(
 	deleteMarkers *[]versionInfo,
 	deletedKeys map[string]bool,
-	markers []*s3.DeleteMarkerEntry,
+	markers []types.DeleteMarkerEntry,
 ) {
 	for _, marker := range markers {
 		if *marker.Key == folder.path {
 			continue
 		}
 		objectRelativePath := strings.TrimPrefix(*marker.Key, folder.path)
-		if *marker.IsLatest {
+		isLatest := aws.ToBool(marker.IsLatest)
+		if isLatest {
 			deletedKeys[objectRelativePath] = true
 		}
 		// Also collect delete marker info for --all-versions mode
@@ -304,15 +307,16 @@ func (folder *Folder) collectDeleteMarkers(
 			lastModified: *marker.LastModified,
 			size:         0,
 			versionID:    *marker.VersionId,
-			isLatest:     *marker.IsLatest,
+			isLatest:     isLatest,
 		})
 	}
 }
 
 // collectVersions gathers object versions from S3. Filtering happens later to correctly handle pagination
 // (delete markers and corresponding versions can appear on different pages).
-func (folder *Folder) collectVersions(allVersions *[]versionInfo, versions []*s3.ObjectVersion) {
-	for _, object := range versions {
+func (folder *Folder) collectVersions(allVersions *[]versionInfo, versions []types.ObjectVersion) {
+	for i := range versions {
+		object := &versions[i]
 		// Some storages return root tar_partitions folder as a Key.
 		if *object.Key == folder.path {
 			continue
@@ -321,9 +325,9 @@ func (folder *Folder) collectVersions(allVersions *[]versionInfo, versions []*s3
 		*allVersions = append(*allVersions, versionInfo{
 			relativePath: objectRelativePath,
 			lastModified: *object.LastModified,
-			size:         *object.Size,
+			size:         aws.ToInt64(object.Size),
 			versionID:    *object.VersionId,
-			isLatest:     *object.IsLatest,
+			isLatest:     aws.ToBool(object.IsLatest),
 		})
 	}
 }
@@ -366,25 +370,25 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	// These objects are effectively deleted and should not appear in the listing.
 	deletedKeys := make(map[string]bool)
 
-	// Keep the page callback small and side-effect-only: collect state; build output after paging completes.
-	versionsListFunc := func(out *s3.ListObjectVersionsOutput, _ bool) bool {
-		folder.addListedSubfolders(&subFolders, out.CommonPrefixes)
-		folder.collectDeleteMarkers(&deleteMarkers, deletedKeys, out.DeleteMarkers)
-		folder.collectVersions(&allVersions, out.Versions)
-		return true
-	}
-
 	input := &s3.ListObjectVersionsInput{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
-	err := folder.s3API.ListObjectVersionsPages(input, versionsListFunc)
-
-	// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
-	// which don't yet exist.
-	if err != nil && !isAwsNotExist(err) {
-		return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
+	paginator := s3.NewListObjectVersionsPaginator(folder.s3API, input)
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(context.Background())
+		if err != nil {
+			// DigitalOcean Spaces compatibility: DO's API complains about NoSuchKey when trying to list folders
+			// which don't yet exist.
+			if !isAwsNotExist(err) {
+				return nil, nil, errors.Wrapf(err, "failed to list s3 folder: '%s'", folder.path)
+			}
+			break
+		}
+		folder.addListedSubfolders(&subFolders, out.CommonPrefixes)
+		folder.collectDeleteMarkers(&deleteMarkers, deletedKeys, out.DeleteMarkers)
+		folder.collectVersions(&allVersions, out.Versions)
 	}
 
 	// Convert collected versions to storage objects, applying delete-marker filtering unless requested otherwise.
@@ -407,45 +411,26 @@ func (folder *Folder) listVersions(prefix *string, delimiter *string) ([]storage
 	return objects, subFolders, nil
 }
 
-func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int64, startAfter *string,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool) (err error) {
-	if folder.config.UseListObjectsV1 {
-		err = folder.listObjectsPagesV1(prefix, delimiter, maxKeys, startAfter, listFunc)
-	} else {
-		err = folder.listObjectsPagesV2(prefix, delimiter, maxKeys, startAfter, listFunc)
-	}
-	return
-}
-
-func (folder *Folder) listObjectsPagesV1(prefix *string, delimiter *string, maxKeys *int64, startAfter *string,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool) error {
-	s3Objects := &s3.ListObjectsInput{
-		Bucket:    folder.bucket,
-		Prefix:    prefix,
-		Delimiter: delimiter,
-		MaxKeys:   maxKeys,
-		Marker:    startAfter,
-	}
-
-	err := folder.s3API.ListObjectsPages(s3Objects, func(files *s3.ListObjectsOutput, lastPage bool) bool {
-		return listFunc(files.CommonPrefixes, files.Contents)
-	})
-	return err
-}
-
-func (folder *Folder) listObjectsPagesV2(prefix *string, delimiter *string, maxKeys *int64, startAfter *string,
-	listFunc func(commonPrefixes []*s3.CommonPrefix, contents []*s3.Object) bool) error {
-	s3Objects := &s3.ListObjectsV2Input{
+func (folder *Folder) listObjectsPages(prefix *string, delimiter *string, maxKeys *int32, startAfter *string,
+	listFunc func(commonPrefixes []types.CommonPrefix, contents []types.Object) bool) error {
+	input := &s3.ListObjectsV2Input{
 		Bucket:     folder.bucket,
 		Prefix:     prefix,
 		Delimiter:  delimiter,
 		MaxKeys:    maxKeys,
 		StartAfter: startAfter,
 	}
-	err := folder.s3API.ListObjectsV2Pages(s3Objects, func(files *s3.ListObjectsV2Output, lastPage bool) bool {
-		return listFunc(files.CommonPrefixes, files.Contents)
-	})
-	return err
+	paginator := s3.NewListObjectsV2Paginator(folder.s3API, input)
+	for paginator.HasMorePages() {
+		out, err := paginator.NextPage(context.Background())
+		if err != nil {
+			return err
+		}
+		if !listFunc(out.CommonPrefixes, out.Contents) {
+			return nil
+		}
+	}
+	return nil
 }
 
 func (folder *Folder) DeleteObjects(objects []storage.Object) error {
@@ -453,15 +438,16 @@ func (folder *Folder) DeleteObjects(objects []storage.Object) error {
 
 	for _, part := range parts {
 		tracelog.DebugLogger.Printf("len of part  %d", len(part))
-		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &s3.Delete{
-			Objects: []*s3.ObjectIdentifier{},
+		input := &s3.DeleteObjectsInput{Bucket: folder.bucket, Delete: &types.Delete{
+			Objects: []types.ObjectIdentifier{},
 		}}
 		for _, obj := range part {
-			input.Delete.Objects = append(input.Delete.Objects, &s3.ObjectIdentifier{Key: aws.String(folder.path + obj.GetName()),
+			input.Delete.Objects = append(input.Delete.Objects, types.ObjectIdentifier{
+				Key:       aws.String(folder.path + obj.GetName()),
 				VersionId: aws.String(obj.GetVersionID()),
 			})
 		}
-		_, err := folder.s3API.DeleteObjects(input)
+		_, err := folder.s3API.DeleteObjects(context.Background(), input)
 		if err != nil {
 			for _, obj := range part {
 				tracelog.DebugLogger.Printf("object %s version %s", obj.GetName(), obj.GetVersionID())
@@ -479,14 +465,14 @@ func (folder *Folder) isVersioningEnabled() bool {
 	case VersioningDisabled:
 		return false
 	case VersioningDefault:
-		result, err := folder.s3API.GetBucketVersioning(&s3.GetBucketVersioningInput{
+		result, err := folder.s3API.GetBucketVersioning(context.Background(), &s3.GetBucketVersioningInput{
 			Bucket: folder.bucket,
 		})
 		if err != nil {
 			return false
 		}
 
-		if result.Status != nil && *result.Status == s3.BucketVersioningStatusEnabled {
+		if result.Status == types.BucketVersioningStatusEnabled {
 			folder.config.EnableVersioning = VersioningEnabled
 			return true
 		}
@@ -498,14 +484,14 @@ func (folder *Folder) isVersioningEnabled() bool {
 func (folder *Folder) Validate() error {
 	prefix := aws.String(folder.path)
 	delimiter := aws.String("/")
-	int64One := int64(1)
+	int32One := int32(1)
 	input := &s3.ListObjectsInput{
 		Bucket:    folder.bucket,
 		Prefix:    prefix,
 		Delimiter: delimiter,
-		MaxKeys:   &int64One,
+		MaxKeys:   &int32One,
 	}
-	_, err := folder.s3API.ListObjects(input)
+	_, err := folder.s3API.ListObjects(context.Background(), input)
 	if err != nil {
 		return fmt.Errorf("bad credentials: %v", err)
 	}
@@ -524,11 +510,20 @@ func (folder *Folder) GetVersioningEnabled() bool {
 	return folder.isVersioningEnabled()
 }
 
+// isAwsNotExist returns true when err carries an S3 NotFound or NoSuchKey
+// signal. v2 surfaces these as typed errors (*types.NotFound, *types.NoSuchKey)
+// which v1's Code()-based check no longer reaches; fall back to smithy.APIError
+// for compatibility with non-AWS S3 servers that return only the error code.
 func isAwsNotExist(err error) bool {
-	if awsErr, ok := err.(awserr.Error); ok {
-		if awsErr.Code() == NotFoundAWSErrorCode || awsErr.Code() == NoSuchKeyAWSErrorCode {
-			return true
-		}
+	if _, ok := stderrors.AsType[*types.NotFound](err); ok {
+		return true
+	}
+	if _, ok := stderrors.AsType[*types.NoSuchKey](err); ok {
+		return true
+	}
+	if apiErr, ok := stderrors.AsType[smithy.APIError](err); ok {
+		code := apiErr.ErrorCode()
+		return code == NotFoundAWSErrorCode || code == NoSuchKeyAWSErrorCode
 	}
 	return false
 }

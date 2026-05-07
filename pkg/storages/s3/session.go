@@ -1,6 +1,9 @@
 package s3
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -9,216 +12,314 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/client"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/defaults"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/wal-g/tracelog"
 	"gopkg.in/yaml.v3"
-
-	"github.com/wal-g/wal-g/utility"
 )
 
-func createSession(config *Config) (*session.Session, error) {
-	sessOpts := session.Options{}
-	if config.CACertFile != "" {
-		file, err := os.Open(config.CACertFile)
-		if err != nil {
-			return nil, err
-		}
-		defer utility.LoggedClose(file, "S3 CA cert file")
-		sessOpts.CustomCABundle = file
-	}
-
-	sess, err := session.NewSessionWithOptions(sessOpts)
+// loadAWSConfig builds the v2 aws.Config from wal-g's S3 Config and returns
+// the per-S3-client functional options that customize endpoint, path-style etc.
+// In v1 these were knobs on session.Config; in v2 they live on s3.Options and
+// are applied per service client at construction time.
+func loadAWSConfig(cfg *Config) (aws.Config, []func(*s3.Options), error) {
+	httpClient, err := buildHTTPClient(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("init new session: %w", err)
+		return aws.Config{}, nil, err
 	}
 
-	err = configureSession(sess, config)
+	loadOpts := []func(*config.LoadOptions) error{
+		config.WithHTTPClient(httpClient),
+	}
+
+	if cfg.DualStack {
+		loadOpts = append(loadOpts, config.WithUseDualStackEndpoint(aws.DualStackEndpointStateEnabled))
+	}
+
+	if cfg.LogLevel == "DEVEL" {
+		loadOpts = append(loadOpts, config.WithClientLogMode(aws.LogRequest|aws.LogResponse|aws.LogRetries))
+	}
+
+	awsCfg, err := config.LoadDefaultConfig(context.Background(), loadOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("configure session: %w", err)
+		return aws.Config{}, nil, fmt.Errorf("load default AWS config: %w", err)
 	}
 
-	if config.UseYCSessionToken != "" {
-		useYcSessionToken, err := strconv.ParseBool(config.UseYCSessionToken)
-		if err != nil {
-			return nil, fmt.Errorf("invalid YC session token: %w", err)
-		}
-		if useYcSessionToken {
-			// Yandex Cloud mimic metadata service, so we can use default AWS credentials, but set token to another header
-			cred := credentials.NewCredentials(defaults.RemoteCredProvider(*defaults.Config(), defaults.Handlers()))
-			sess.Config.WithCredentials(cred)
-			sess.Handlers.Send.PushFront(func(r *request.Request) {
-				token := r.HTTPRequest.Header.Get("X-Amz-Security-Token")
-				r.HTTPRequest.Header.Set("X-YaCloud-SubjectToken", token)
-			})
-		}
+	if err := configureCredentials(&awsCfg, cfg); err != nil {
+		return aws.Config{}, nil, err
 	}
 
-	if config.EndpointSource != "" {
-		sess.Handlers.Validate.PushBack(func(request *request.Request) {
-			endpoint := requestEndpointFromSource(config.EndpointSource, config.EndpointPort)
-			if endpoint != nil {
-				tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
-				host := strings.TrimPrefix(*sess.Config.Endpoint, "https://")
-				request.HTTPRequest.Host = host
-				request.HTTPRequest.URL.Host = *endpoint
-				request.HTTPRequest.URL.Scheme = "http"
-			} else {
-				tracelog.DebugLogger.Printf("using S3 endpoint %s", *sess.Config.Endpoint)
-			}
+	region, err := resolveRegion(&awsCfg, cfg)
+	if err != nil {
+		return aws.Config{}, nil, err
+	}
+	awsCfg.Region = region
+
+	awsCfg.Retryer = newRetryerFunc(cfg)
+
+	s3Opts := []func(*s3.Options){
+		func(o *s3.Options) {
+			o.UsePathStyle = cfg.ForcePathStyle
+		},
+	}
+	if cfg.Endpoint != "" {
+		endpoint := cfg.Endpoint
+		s3Opts = append(s3Opts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
 		})
 	}
 
-	if config.RequestAdditionalHeaders != "" {
-		headers, err := decodeHeaders(config.RequestAdditionalHeaders)
-		if err != nil {
-			return nil, fmt.Errorf("decode additional headers for S3 requests: %w", err)
-		}
-
-		sess.Handlers.Validate.PushBack(func(request *request.Request) {
-			for k, v := range headers {
-				request.HTTPRequest.Header.Add(k, v)
-			}
-		})
+	if cfg.EndpointSource != "" {
+		s3Opts = append(s3Opts, withDynamicEndpoint(cfg.EndpointSource, cfg.EndpointPort, cfg.Endpoint))
 	}
 
-	return sess, err
+	if cfg.RequestAdditionalHeaders != "" {
+		headers, err := decodeHeaders(cfg.RequestAdditionalHeaders)
+		if err != nil {
+			return aws.Config{}, nil, fmt.Errorf("decode additional headers for S3 requests: %w", err)
+		}
+		s3Opts = append(s3Opts, withAdditionalHeaders(headers))
+	}
+
+	if cfg.Disable100Continue {
+		s3Opts = append(s3Opts, withDisable100Continue())
+	}
+
+	if cfg.UseYCSessionToken != "" {
+		useYC, err := strconv.ParseBool(cfg.UseYCSessionToken)
+		if err != nil {
+			return aws.Config{}, nil, fmt.Errorf("invalid YC session token: %w", err)
+		}
+		if useYC {
+			// Yandex Cloud mimics the EC2 metadata service. Override default credentials
+			// with the IMDS provider, then copy X-Amz-Security-Token to X-YaCloud-SubjectToken
+			// after AWS signing has stamped the former onto the request.
+			awsCfg.Credentials = aws.NewCredentialsCache(ec2rolecreds.New())
+			s3Opts = append(s3Opts, withYCSubjectToken())
+		}
+	}
+
+	return awsCfg, s3Opts, nil
 }
 
-func configureSession(sess *session.Session, config *Config) error {
-	awsConfig := sess.Config
+func buildHTTPClient(cfg *Config) (aws.HTTPClient, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
 
-	// DefaultRetryer implements basic retry logic using exponential backoff for
-	// most services. If you want to implement custom retry logic, you can implement the
-	// request.Retryer interface.
-	awsConfig = request.WithRetryer(awsConfig, NewConnResetRetryer(
-		client.DefaultRetryer{
-			NumMaxRetries:    config.MaxRetries,
-			MinThrottleDelay: config.MinThrottlingRetryDelay,
-			MaxThrottleDelay: config.MaxThrottlingRetryDelay,
-		}))
+	if cfg.CACertFile != "" {
+		certs, err := os.ReadFile(cfg.CACertFile)
+		if err != nil {
+			return nil, fmt.Errorf("read S3 CA cert file: %w", err)
+		}
+		pool, err := x509.SystemCertPool()
+		if err != nil || pool == nil {
+			pool = x509.NewCertPool()
+		}
+		if !pool.AppendCertsFromPEM(certs) {
+			return nil, fmt.Errorf("no PEM certs found in %q", cfg.CACertFile)
+		}
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+		}
+		transport.TLSClientConfig.RootCAs = pool
+	}
 
-	awsConfig.HTTPClient.Transport = NewRoundTripperWithLogging(awsConfig.HTTPClient.Transport)
-	accessKey := config.AccessKey
-	secretKey := config.Secrets.SecretKey
-	sessionToken := config.SessionToken
+	return &http.Client{Transport: NewRoundTripperWithLogging(transport)}, nil
+}
 
-	if config.RoleARN != "" {
+func configureCredentials(awsCfg *aws.Config, cfg *Config) error {
+	accessKey := cfg.AccessKey
+	secretKey := cfg.Secrets.SecretKey
+	sessionToken := cfg.SessionToken
+
+	if cfg.RoleARN != "" {
 		if os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE") != "" && os.Getenv("AWS_ROLE_ARN") != "" {
-			// Skip explicit role assumption when using IRSA
 			tracelog.InfoLogger.Printf("Running with IRSA, skipping explicit role assumption")
 		} else {
-			stsSession := sts.New(sess)
-			assumedRole, err := stsSession.AssumeRole(&sts.AssumeRoleInput{
-				RoleArn:         aws.String(config.RoleARN),
-				RoleSessionName: aws.String(config.SessionName),
+			stsClient := sts.NewFromConfig(*awsCfg)
+			out, err := stsClient.AssumeRole(context.Background(), &sts.AssumeRoleInput{
+				RoleArn:         aws.String(cfg.RoleARN),
+				RoleSessionName: aws.String(cfg.SessionName),
 			})
 			if err != nil {
 				return fmt.Errorf("assume role by ARN: %w", err)
 			}
-			accessKey = *assumedRole.Credentials.AccessKeyId
-			secretKey = *assumedRole.Credentials.SecretAccessKey
-			sessionToken = *assumedRole.Credentials.SessionToken
+			accessKey = aws.ToString(out.Credentials.AccessKeyId)
+			secretKey = aws.ToString(out.Credentials.SecretAccessKey)
+			sessionToken = aws.ToString(out.Credentials.SessionToken)
 		}
 	}
 
 	if accessKey != "" && secretKey != "" {
-		provider := &credentials.StaticProvider{Value: credentials.Value{
-			AccessKeyID:     accessKey,
-			SecretAccessKey: secretKey,
-			SessionToken:    sessionToken,
-		}}
-		providers := make([]credentials.Provider, 0)
-		providers = append(providers, provider)
-		providers = append(providers, defaults.CredProviders(awsConfig, defaults.Handlers())...)
-		newCredentials := credentials.NewCredentials(&credentials.ChainProvider{
-			VerboseErrors: aws.BoolValue(awsConfig.CredentialsChainVerboseErrors),
-			Providers:     providers,
-		})
-
-		awsConfig = awsConfig.WithCredentials(newCredentials)
+		awsCfg.Credentials = aws.NewCredentialsCache(
+			credentials.NewStaticCredentialsProvider(accessKey, secretKey, sessionToken),
+		)
 	}
-
-	if config.LogLevel != "" {
-		awsConfig = awsConfig.WithLogLevel(func(s string) aws.LogLevelType {
-			switch s {
-			case "DEVEL":
-				return aws.LogDebug
-			default:
-				return aws.LogOff
-			}
-		}(config.LogLevel))
-	}
-
-	if config.Endpoint != "" {
-		awsConfig = awsConfig.WithEndpoint(config.Endpoint)
-	}
-
-	if config.DualStack {
-		awsConfig.UseDualStackEndpoint = endpoints.DualStackEndpointStateEnabled
-	}
-	awsConfig.S3ForcePathStyle = &config.ForcePathStyle
-
-	if config.Region == "" {
-		region, err := detectAWSRegion(config.Bucket, awsConfig)
-		if err != nil {
-			return fmt.Errorf("AWS region isn't configured explicitly: detect region: %w", err)
-		}
-		awsConfig = awsConfig.WithRegion(region)
-	} else {
-		awsConfig = awsConfig.WithRegion(config.Region)
-	}
-	tracelog.DebugLogger.Printf("disable 100 continue %t", config.Disable100Continue)
-	awsConfig.S3Disable100Continue = aws.Bool(config.Disable100Continue)
-
-	sess.Config = awsConfig
 	return nil
 }
 
-func detectAWSRegion(bucket string, awsConfig *aws.Config) (string, error) {
-	if awsConfig.Endpoint == nil ||
-		*awsConfig.Endpoint == "" ||
-		strings.HasSuffix(*awsConfig.Endpoint, ".amazonaws.com") {
-		region, err := detectAWSRegionByBucket(bucket, awsConfig)
+func resolveRegion(awsCfg *aws.Config, cfg *Config) (string, error) {
+	if cfg.Region != "" {
+		return cfg.Region, nil
+	}
+	if cfg.Endpoint == "" || strings.HasSuffix(cfg.Endpoint, ".amazonaws.com") {
+		region, err := detectAWSRegionByBucket(awsCfg, cfg.Bucket, cfg.Endpoint)
 		if err != nil {
-			return "", fmt.Errorf("detect region by bucket: %w", err)
+			return "", fmt.Errorf("AWS region isn't configured explicitly: detect region: %w", err)
 		}
 		return region, nil
 	}
-	// For S3 compatible services like Minio, Ceph etc. use `us-east-1` as region
+	// S3-compatible services (Minio, Ceph, etc.) accept us-east-1 as a stand-in.
 	// ref: https://github.com/minio/cookbook/blob/master/docs/aws-sdk-for-go-with-minio.md
 	return "us-east-1", nil
 }
 
-// detectAWSRegionByBucket attempts to detect the AWS region by the bucket name
-func detectAWSRegionByBucket(bucket string, config *aws.Config) (string, error) {
-	input := s3.GetBucketLocationInput{
+func detectAWSRegionByBucket(awsCfg *aws.Config, bucket, endpoint string) (string, error) {
+	probe := *awsCfg
+	probe.Region = "us-east-1"
+	client := s3.NewFromConfig(probe, func(o *s3.Options) {
+		if endpoint != "" {
+			o.BaseEndpoint = aws.String(endpoint)
+		}
+	})
+	out, err := client.GetBucketLocation(context.Background(), &s3.GetBucketLocationInput{
 		Bucket: aws.String(bucket),
-	}
-
-	sess, err := session.NewSession(config.WithRegion("us-east-1"))
+	})
 	if err != nil {
 		return "", err
 	}
-
-	output, err := s3.New(sess).GetBucketLocation(&input)
-	if err != nil {
-		return "", err
-	}
-
-	if output.LocationConstraint == nil {
-		// buckets in "US Standard", a.k.a. us-east-1, are returned as a nil region
+	if out.LocationConstraint == "" {
+		// "US Standard" buckets (us-east-1) return an empty constraint.
 		return "us-east-1", nil
 	}
-	// all other regions are strings
-	return *output.LocationConstraint, nil
+	return string(out.LocationConstraint), nil
+}
+
+// withDynamicEndpoint rewrites the request URL host using a value fetched from
+// EndpointSource on each request. It runs as a Build middleware so the rewrite
+// happens before signing, matching v1's Validate handler timing.
+func withDynamicEndpoint(endpointSource, port, staticEndpoint string) func(*s3.Options) {
+	mw := &dynamicEndpointMiddleware{
+		source:         endpointSource,
+		port:           port,
+		staticEndpoint: staticEndpoint,
+	}
+	return func(o *s3.Options) {
+		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
+			return s.Build.Add(mw, middleware.After)
+		})
+	}
+}
+
+type dynamicEndpointMiddleware struct {
+	source         string
+	port           string
+	staticEndpoint string
+}
+
+func (*dynamicEndpointMiddleware) ID() string { return "walgDynamicEndpoint" }
+
+func (m *dynamicEndpointMiddleware) HandleBuild(
+	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
+) (middleware.BuildOutput, middleware.Metadata, error) {
+	req, ok := in.Request.(*smithyhttp.Request)
+	if !ok {
+		return next.HandleBuild(ctx, in)
+	}
+	endpoint := requestEndpointFromSource(m.source, m.port)
+	if endpoint != nil {
+		tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
+		host := strings.TrimPrefix(m.staticEndpoint, "https://")
+		req.Host = host
+		req.URL.Host = *endpoint
+		req.URL.Scheme = "http"
+	} else {
+		tracelog.DebugLogger.Printf("using S3 endpoint %s", m.staticEndpoint)
+	}
+	return next.HandleBuild(ctx, in)
+}
+
+func withAdditionalHeaders(headers map[string]string) func(*s3.Options) {
+	mw := &additionalHeadersMiddleware{headers: headers}
+	return func(o *s3.Options) {
+		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
+			return s.Build.Add(mw, middleware.After)
+		})
+	}
+}
+
+type additionalHeadersMiddleware struct {
+	headers map[string]string
+}
+
+func (*additionalHeadersMiddleware) ID() string { return "walgAdditionalHeaders" }
+
+func (m *additionalHeadersMiddleware) HandleBuild(
+	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
+) (middleware.BuildOutput, middleware.Metadata, error) {
+	req, ok := in.Request.(*smithyhttp.Request)
+	if !ok {
+		return next.HandleBuild(ctx, in)
+	}
+	for k, v := range m.headers {
+		req.Header.Add(k, v)
+	}
+	return next.HandleBuild(ctx, in)
+}
+
+func withDisable100Continue() func(*s3.Options) {
+	mw := disable100ContinueMiddleware{}
+	return func(o *s3.Options) {
+		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
+			return s.Build.Add(mw, middleware.After)
+		})
+	}
+}
+
+type disable100ContinueMiddleware struct{}
+
+func (disable100ContinueMiddleware) ID() string { return "walgDisable100Continue" }
+
+func (disable100ContinueMiddleware) HandleBuild(
+	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
+) (middleware.BuildOutput, middleware.Metadata, error) {
+	if req, ok := in.Request.(*smithyhttp.Request); ok {
+		req.Header.Del("Expect")
+	}
+	return next.HandleBuild(ctx, in)
+}
+
+// withYCSubjectToken copies the X-Amz-Security-Token header (set by the AWS
+// SigV4 signer) to X-YaCloud-SubjectToken. Yandex Cloud's S3-compatible API
+// reads the YaCloud header instead of the AWS one. Must run AFTER the Sign
+// middleware in the Finalize step.
+func withYCSubjectToken() func(*s3.Options) {
+	mw := ycSubjectTokenMiddleware{}
+	return func(o *s3.Options) {
+		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
+			return s.Finalize.Add(mw, middleware.After)
+		})
+	}
+}
+
+type ycSubjectTokenMiddleware struct{}
+
+func (ycSubjectTokenMiddleware) ID() string { return "walgYCSubjectToken" }
+
+func (ycSubjectTokenMiddleware) HandleFinalize(
+	ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler,
+) (middleware.FinalizeOutput, middleware.Metadata, error) {
+	if req, ok := in.Request.(*smithyhttp.Request); ok {
+		if token := req.Header.Get("X-Amz-Security-Token"); token != "" {
+			req.Header.Set("X-YaCloud-SubjectToken", token)
+		}
+	}
+	return next.HandleFinalize(ctx, in)
 }
 
 func requestEndpointFromSource(endpointSource, port string) *string {
