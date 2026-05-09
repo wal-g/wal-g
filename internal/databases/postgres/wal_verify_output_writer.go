@@ -65,8 +65,8 @@ func NewWalVerifyOutputWriter(outputType WalVerifyOutputType, output io.Writer) 
 
 func newPrettyOutputReader(checkType WalVerifyCheckType, checkResult WalVerifyCheckResult) (io.Reader, error) {
 	var outputBuffer bytes.Buffer
-	outputBuffer.WriteString(fmt.Sprintf("[wal-verify] %s check status: %s\n", checkType, checkResult.Status))
-	outputBuffer.WriteString(fmt.Sprintf("[wal-verify] %s check details:\n", checkType))
+	fmt.Fprintf(&outputBuffer, "[wal-verify] %s check status: %s\n", checkType, checkResult.Status)
+	fmt.Fprintf(&outputBuffer, "[wal-verify] %s check details:\n", checkType)
 
 	checkDetails, err := checkResult.Details.NewPlainTextReader()
 	if err != nil {
