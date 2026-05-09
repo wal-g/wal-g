@@ -208,7 +208,6 @@ func GetRelativeArchiveDataFolderPath() string {
 	return filepath.Join(getRelativeWalFolderPath(""), "walg_data", "walg_archive_status")
 }
 
-// TODO : unit tests
 func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
 	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
 }

@@ -120,6 +120,31 @@ func TestGetDataFolderPath_WalIgnoreXlog(t *testing.T) {
 	resetToDefaults()
 }
 
+func TestConfigureArchiveStatusManager(t *testing.T) {
+	parentDir := prepareDataFolder(t, "pg_wal")
+	defer testtools.Cleanup(t, parentDir)
+	defer resetToDefaults()
+
+	viper.Set(config.PgDataSetting, parentDir)
+
+	manager, err := internal.ConfigureArchiveStatusManager()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, manager)
+
+	expectedDir := filepath.Join(parentDir, "pg_wal", "walg_data", "walg_archive_status")
+	info, err := os.Stat(expectedDir)
+
+	assert.NoError(t, err)
+	assert.True(t, info.IsDir())
+
+	fileName := "test_status"
+	err = manager.CreateFile(fileName)
+
+	assert.NoError(t, err)
+	assert.True(t, manager.FileExists(fileName))
+}
+
 func TestConfigureCompressor_Lz4Method(t *testing.T) {
 	viper.Set(config.CompressionMethodSetting, "lz4")
 	compressor, err := internal.ConfigureCompressor()
