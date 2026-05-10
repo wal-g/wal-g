@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/blang/semver"
+	"github.com/hashicorp/go-version"
 )
 
 type Flavor string
@@ -19,24 +19,26 @@ const (
 )
 
 type Version struct {
-	semver.Version
+	*version.Version
+	Major  int
 	Flavor Flavor // Note: can be '' for old backups
 }
 
-func NewVersion(version semver.Version, flavor Flavor) Version {
+func NewVersion(v *version.Version, flavor Flavor) Version {
 	return Version{
-		Version: version,
+		Version: v,
+		Major:   v.Segments()[0],
 		Flavor:  flavor,
 	}
 }
 
-func parseGreenplumVersion(version string) (Version, error) {
+func parseGreenplumVersion(versionStr string) (Version, error) {
 	pattern := regexp.MustCompile(`(Greenplum Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
-	groups := pattern.FindStringSubmatch(version)
+	groups := pattern.FindStringSubmatch(versionStr)
 	if groups == nil {
-		return Version{}, fmt.Errorf("unknown flavor: %s", version)
+		return Version{}, fmt.Errorf("unknown flavor: %s", versionStr)
 	}
-	semVer, err := semver.Make(groups[2])
+	semVer, err := version.NewVersion(groups[2])
 	if err != nil {
 		return Version{}, err
 	}

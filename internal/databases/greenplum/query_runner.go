@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -82,8 +81,7 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName s
 
 // BuildGetGreenplumSegmentsInfo formats a query to retrieve information about segments
 func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(version Version) string {
-	validRange := dbconn.StringToSemVerRange("<6")
-	if version.Flavor == Greenplum && validRange(version.Version) {
+	if version.Flavor == Greenplum && version.Major < 6 {
 		return `
 SELECT
 	s.dbid,
