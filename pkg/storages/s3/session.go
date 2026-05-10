@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
@@ -105,6 +106,7 @@ func configureSession(sess *session.Session, config *Config) error {
 			MaxThrottleDelay: config.MaxThrottlingRetryDelay,
 		}))
 
+	applyRequestTimeout(awsConfig.HTTPClient, config.RequestTimeout)
 	awsConfig.HTTPClient.Transport = NewRoundTripperWithLogging(awsConfig.HTTPClient.Transport)
 	accessKey := config.AccessKey
 	secretKey := config.Secrets.SecretKey
@@ -180,6 +182,28 @@ func configureSession(sess *session.Session, config *Config) error {
 
 	sess.Config = awsConfig
 	return nil
+}
+
+// applyRequestTimeout sets ResponseHeaderTimeout on the AWS SDK's HTTP client
+// when the user has opted in via S3_REQUEST_TIMEOUT. Bounding header receipt
+// (not body transfer) is what lets large uploads still complete while still
+// catching dead/wrong endpoints that would otherwise hang indefinitely.
+//
+// We clone the underlying transport rather than mutating it in place so we
+// don't touch http.DefaultTransport (a process-wide singleton) or any
+// user-supplied transport that may be shared across other clients.
+func applyRequestTimeout(client *http.Client, timeout time.Duration) {
+	if timeout <= 0 {
+		return
+	}
+	var base *http.Transport
+	if existing, ok := client.Transport.(*http.Transport); ok && existing != nil {
+		base = existing.Clone()
+	} else {
+		base = http.DefaultTransport.(*http.Transport).Clone()
+	}
+	base.ResponseHeaderTimeout = timeout
+	client.Transport = base
 }
 
 func detectAWSRegion(bucket string, awsConfig *aws.Config) (string, error) {
