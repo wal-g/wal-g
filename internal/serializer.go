@@ -3,11 +3,11 @@ package internal
 import (
 	"bytes"
 	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"io"
 
 	"github.com/spf13/viper"
-	streamJSON "github.com/wal-g/json"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 )
@@ -74,13 +74,11 @@ type StreamedJSON struct{}
 func (s StreamedJSON) Marshal(dto interface{}) (io.Reader, error) {
 	r, w := io.Pipe()
 	go func() {
-		if err := streamJSON.Marshal(dto, w); err != nil {
-			_ = w.CloseWithError(err)
-		}
+		_ = w.CloseWithError(jsonv2.MarshalWrite(w, dto, json.DefaultOptionsV1()))
 	}()
 	return r, nil
 }
 
 func (s StreamedJSON) Unmarshal(reader io.Reader, dto interface{}) error {
-	return streamJSON.Unmarshal(reader, dto)
+	return jsonv2.UnmarshalRead(reader, dto, json.DefaultOptionsV1())
 }
