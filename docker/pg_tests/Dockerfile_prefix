@@ -1,4 +1,4 @@
-ARG PG_IMAGE=wal-g/pg:latest
+ARG PG_IMAGE=wal-g/pg10:latest
 
 FROM wal-g/golang:latest AS build
 ENV GOEXPERIMENT=jsonv2
