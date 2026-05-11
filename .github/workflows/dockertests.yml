@@ -12,10 +12,10 @@ env:
   CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
-  CACHE_FILE_PG_TESTS: ~/docker-images-${{ github.sha }}/pg_tests.tar
-  CACHE_FILE_PG_TESTS_MODERN: ~/docker-images-${{ github.sha }}/pg_tests_modern.tar
-  IMAGE_PG_TESTS: wal-g/pg_tests
-  IMAGE_PG_TESTS_MODERN: wal-g/pg_tests_modern
+  CACHE_FILE_PG10_TESTS: ~/docker-images-${{ github.sha }}/pg10_tests.tar
+  CACHE_FILE_PG18_TESTS: ~/docker-images-${{ github.sha }}/pg18_tests.tar
+  IMAGE_PG10_TESTS: wal-g/pg10_tests
+  IMAGE_PG18_TESTS: wal-g/pg18_tests
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.25"
@@ -32,8 +32,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            ${{ env.CACHE_FILE_PG_TESTS }}
-            ${{ env.CACHE_FILE_PG_TESTS_MODERN }}
+            ${{ env.CACHE_FILE_PG10_TESTS }}
+            ${{ env.CACHE_FILE_PG18_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
@@ -115,8 +115,8 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            ${{ env.CACHE_FILE_PG_TESTS }}
-            ${{ env.CACHE_FILE_PG_TESTS_MODERN }}
+            ${{ env.CACHE_FILE_PG10_TESTS }}
+            ${{ env.CACHE_FILE_PG18_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
