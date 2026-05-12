@@ -49,9 +49,7 @@ func TestFetch(t *testing.T) {
 		UserData: data,
 	}
 
-	marshaller, _ := internal.NewDtoSerializer()
-	file, _ := marshaller.Marshal(testObject)
-	_ = folder.PutObject(internal.MetadataNameFromBackup(backupName), file)
+	_ = internal.UploadDto(folder, testObject, internal.MetadataNameFromBackup(backupName))
 
 	actualResult, err := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
 
@@ -100,9 +98,7 @@ func TestSetUserData(t *testing.T) {
 
 	newUserData := "NewUserData"
 
-	marshaller, _ := internal.NewDtoSerializer()
-	file, _ := marshaller.Marshal(testObject)
-	_ = folder.PutObject(internal.MetadataNameFromBackup(backupName), file)
+	_ = internal.UploadDto(folder, testObject, internal.MetadataNameFromBackup(backupName))
 
 	setDataErr := postgres.NewGenericMetaSetter().SetUserData(backupName, folder, newUserData)
 	fetchResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
@@ -151,9 +147,7 @@ func TestSetIsPermanent(t *testing.T) {
 		IsPermanent: false,
 	}
 
-	marshaller, _ := internal.NewDtoSerializer()
-	file, _ := marshaller.Marshal(testObject)
-	_ = folder.PutObject(internal.MetadataNameFromBackup(backupName), file)
+	_ = internal.UploadDto(folder, testObject, internal.MetadataNameFromBackup(backupName))
 
 	setErr := postgres.NewGenericMetaInteractor().SetIsPermanent(backupName, folder, true)
 	actualResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)

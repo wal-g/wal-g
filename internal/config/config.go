@@ -79,29 +79,30 @@ const (
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
 	DirectIO                      = "WALG_DIRECT_IO"
 
-	PgDataSetting                        = "PGDATA"
-	UserSetting                          = "USER" // TODO : do something with it
-	PgPortSetting                        = "PGPORT"
-	PgUserSetting                        = "PGUSER"
-	PgHostSetting                        = "PGHOST"
-	PgPasswordSetting                    = "PGPASSWORD"
-	PgPassfileSetting                    = "PGPASSFILE"
-	PgDatabaseSetting                    = "PGDATABASE"
-	PgSslModeSetting                     = "PGSSLMODE"
-	PgSslKey                             = "PGSSLKEY"
-	PgSslCert                            = "PGSSLCERT"
-	PgSslRootCert                        = "PGSSLROOTCERT"
-	PgAppName                            = "PGAPPNAME"
-	PgSlotName                           = "WALG_SLOTNAME"
-	PgWalSize                            = "WALG_PG_WAL_SIZE"
-	PgWalPageSize                        = "WALG_PG_WAL_PAGE_SIZE"
-	PgBlockSize                          = "WALG_PG_BLOCK_SIZE"
-	TotalBgUploadedLimit                 = "TOTAL_BG_UPLOADED_LIMIT"
-	NameStreamCreateCmd                  = "WALG_STREAM_CREATE_COMMAND"
-	NameStreamRestoreCmd                 = "WALG_STREAM_RESTORE_COMMAND"
-	MaxDelayedSegmentsCount              = "WALG_INTEGRITY_MAX_DELAYED_WALS"
-	PrefetchDir                          = "WALG_PREFETCH_DIR"
-	PgReadyRename                        = "PG_READY_RENAME"
+	PgDataSetting           = "PGDATA"
+	UserSetting             = "USER" // TODO : do something with it
+	PgPortSetting           = "PGPORT"
+	PgUserSetting           = "PGUSER"
+	PgHostSetting           = "PGHOST"
+	PgPasswordSetting       = "PGPASSWORD"
+	PgPassfileSetting       = "PGPASSFILE"
+	PgDatabaseSetting       = "PGDATABASE"
+	PgSslModeSetting        = "PGSSLMODE"
+	PgSslKey                = "PGSSLKEY"
+	PgSslCert               = "PGSSLCERT"
+	PgSslRootCert           = "PGSSLROOTCERT"
+	PgAppName               = "PGAPPNAME"
+	PgSlotName              = "WALG_SLOTNAME"
+	PgWalSize               = "WALG_PG_WAL_SIZE"
+	PgWalPageSize           = "WALG_PG_WAL_PAGE_SIZE"
+	PgBlockSize             = "WALG_PG_BLOCK_SIZE"
+	TotalBgUploadedLimit    = "TOTAL_BG_UPLOADED_LIMIT"
+	NameStreamCreateCmd     = "WALG_STREAM_CREATE_COMMAND"
+	NameStreamRestoreCmd    = "WALG_STREAM_RESTORE_COMMAND"
+	MaxDelayedSegmentsCount = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir             = "WALG_PREFETCH_DIR"
+	PgReadyRename           = "PG_READY_RENAME"
+	// Deprecated: streaming JSON is the only mode; setting is retained to suppress unknown-setting warnings
 	SerializerTypeSetting                = "WALG_SERIALIZER_TYPE"
 	StreamSplitterPartitions             = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize              = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
@@ -276,7 +277,6 @@ var (
 		UseDatabaseComposerSetting:   "false",
 		WithoutFilesMetadataSetting:  "false",
 		MaxDelayedSegmentsCount:      "0",
-		SerializerTypeSetting:        "json_default",
 		LibsodiumKeyTransform:        "none",
 		FailoverStoragesCheckTimeout: "30s",
 		FailoverStorageCacheLifetime: "15m",
@@ -881,6 +881,7 @@ func InitConfig() {
 	}
 	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
+	WarnDeprecatedSettings(globalViper)
 
 	bindConfigToEnv(globalViper)
 }
@@ -922,6 +923,19 @@ func SetGoMaxProcs(config *viper.Viper) {
 	gomaxprocs := config.GetInt(GoMaxProcs)
 	if !Turbo && gomaxprocs > 0 {
 		runtime.GOMAXPROCS(gomaxprocs)
+	}
+}
+
+// WarnDeprecatedSettings warns when retired settings are present in user config or env
+func WarnDeprecatedSettings(config *viper.Viper) {
+	if config.IsSet(SerializerTypeSetting) {
+		v := config.GetString(SerializerTypeSetting)
+		tracelog.DebugLogger.Printf("%s is deprecated and no longer has effect; streaming JSON is always used",
+			SerializerTypeSetting)
+		if v != "" && v != "json_streamed" {
+			tracelog.WarningLogger.Printf("%s=%q selected non-streaming serialization, which is no longer available",
+				SerializerTypeSetting, v)
+		}
 	}
 }
 
