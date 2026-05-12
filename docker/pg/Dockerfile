@@ -1,26 +1,43 @@
-FROM wal-g/ubuntu:18.04
+ARG UBUNTU_TAG=18.04
+FROM wal-g/ubuntu:${UBUNTU_TAG}
 
-ENV PGDATA=/var/lib/postgresql/10/main
-ENV PATH=/usr/lib/postgresql/10/bin:$PATH
+ARG PG_MAJOR=10
+ARG USE_PGDG=0
+ARG INSTALL_WALE=1
+
+ENV PG_MAJOR=${PG_MAJOR}
+ENV PGDATA=/var/lib/postgresql/${PG_MAJOR}/main
+ENV PATH=/usr/lib/postgresql/${PG_MAJOR}/bin:$PATH
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    postgresql-10 \
-    postgresql-contrib \
-    gnupg \
-    gpg-agent \
+    gnupg gpg-agent ca-certificates && \
+    if [ "${USE_PGDG}" = "1" ]; then \
+        apt-get install --yes --no-install-recommends --no-install-suggests lsb-release && \
+        install -d /usr/share/postgresql-common/pgdg && \
+        curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc && \
+        echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            > /etc/apt/sources.list.d/pgdg.list && \
+        apt-get update; \
+    fi && \
+    apt-get install --yes --no-install-recommends --no-install-suggests \
+    postgresql-${PG_MAJOR} \
+    postgresql-contrib-${PG_MAJOR} \
     time \
     bc \
     jq \
     s3cmd \
-    python3.7 \
-    python3-setuptools \
-    python3-pip \
     lzop \
-    pv && \
-    python3.7 -m pip install --upgrade pip && \
-    python3.7 -m pip install git+https://github.com/wal-e/wal-e.git && \
-    python3.7 -m pip install boto
+    pv
+
+RUN if [ "${INSTALL_WALE}" = "1" ]; then \
+        apt-get install --yes --no-install-recommends --no-install-suggests \
+            python3.7 python3-setuptools python3-pip && \
+        python3.7 -m pip install --upgrade pip && \
+        python3.7 -m pip install git+https://github.com/wal-e/wal-e.git && \
+        python3.7 -m pip install boto; \
+    fi
 
 COPY docker/pg/PGP_KEY /tmp/PGP_KEY
 COPY docker/pg/SSH_KEY /tmp/SSH_KEY

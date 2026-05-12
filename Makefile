@@ -14,7 +14,7 @@ PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go intern
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
-TEST := "pg_tests"
+TEST := "pg10_tests"
 MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
 MONGO_VERSION ?= "8.0.3"
@@ -61,48 +61,61 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 
 install_and_build_pg: deps pg_build
 
-pg_build_image:
+pg10_build_image:
 	# There are dependencies between container images.
 	# Running in one command leads to using outdated images and fails on clean system.
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
-	docker compose build pg
-	docker compose build pg_tests_template
+	docker compose build pg10
+	docker compose build pg10_tests_template
 
-pg_save_image: install_and_build_pg pg_build_image
+pg18_build_image:
+	docker compose build $(DOCKER_COMMON)
+	docker compose build pg18
+	docker compose build pg18_tests_template
+
+pg_save_image: install_and_build_pg pg10_build_image pg18_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE_PG_TESTS}  > ${CACHE_FILE_PG_TESTS}
+	docker save ${IMAGE_PG10_TESTS} > ${CACHE_FILE_PG10_TESTS}
+	docker save ${IMAGE_PG18_TESTS} > ${CACHE_FILE_PG18_TESTS}
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
-	@if [ "x" = "${CACHE_FILE_PG_TESTS}x" ]; then\
+	@if [ "x" = "${CACHE_FILE_PG10_TESTS}x" ]; then\
 		echo "Rebuild";\
 		make install_and_build_pg;\
-		make pg_build_image;\
+		make pg10_build_image;\
 	else\
-		docker load -i ${CACHE_FILE_PG_TESTS} && rm ${CACHE_FILE_PG_TESTS};\
+		docker load -i ${CACHE_FILE_PG10_TESTS} && rm ${CACHE_FILE_PG10_TESTS};\
+	fi
+	@if echo "$(TEST)" | grep -Fqe "pg18"; then\
+		if [ -f ${CACHE_FILE_PG18_TESTS} ]; then\
+			docker load -i ${CACHE_FILE_PG18_TESTS} && rm ${CACHE_FILE_PG18_TESTS};\
+		else\
+			make pg18_build_image;\
+		fi;\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
-		docker compose build pg_pgbackrest;\
+		docker compose build pg10_pgbackrest;\
 	fi
-	@if echo "$(TEST)" | grep -Fq -e "pg_ssh_" -e "pg_storage_ssh_"; then\
+	@if echo "$(TEST)" | grep -Fq -e "pg10_ssh_" -e "pg10_storage_ssh_"; then\
 		docker compose build ssh;\
 	fi
 
 	docker compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
-	@if [ "$(TEST)" = "pg_tests" ]; then\
-		docker compose build pg_pgbackrest ssh swift pg_wal_perftest_with_throttling &&\
-		docker compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
-		docker compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
-		docker compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
-		docker compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
+	@if [ "$(TEST)" = "pg10_tests" ]; then\
+		docker compose build pg10_pgbackrest ssh swift pg10_wal_perftest_with_throttling &&\
+		docker compose up --exit-code-from pg10_ssh_backup_test pg10_ssh_backup_test &&\
+		docker compose up --exit-code-from pg10_storage_swift_test pg10_storage_swift_test &&\
+		docker compose up --exit-code-from pg10_storage_ssh_test pg10_storage_ssh_test &&\
+		docker compose up --exit-code-from pg10_pgbackrest_backup_fetch_test pg10_pgbackrest_backup_fetch_test &&\
 		docker compose down &&\
-		docker compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
+		docker compose up --exit-code-from pg10_wal_perftest_with_throttling pg10_wal_perftest_with_throttling ;\
 	fi
 	make clean_compose
 
@@ -120,8 +133,8 @@ all_unittests: deps unittest
 
 # todo Should we remove this target as a duplicate of pg_integration_test?
 pg_int_tests_only:
-	docker compose build pg_tests
-	docker compose up --exit-code-from pg_tests pg_tests
+	docker compose build pg10_tests
+	docker compose up --exit-code-from pg10_tests pg10_tests
 
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)

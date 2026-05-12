@@ -236,39 +236,66 @@ services:
     ports:
       - "6942:6942"
 
-  pg:
+  pg10:
     build:
       dockerfile: docker/pg/Dockerfile
       context: .
-    image: wal-g/pg
-    container_name: wal-g_pg
+    image: wal-g/pg10
+    container_name: wal-g_pg10
 
-  pg_tests_template:
+  pg10_tests_template:
     build:
       dockerfile: docker/pg_tests/Dockerfile_prefix
       context: .
-    image: wal-g/pg_tests
-    container_name: wal-g_pg_tests_template
+    image: wal-g/pg10_tests
+    container_name: wal-g_pg10_tests_template
     <<: *s3_common_depends
 
-  pg_test_common: &pg_test_common
-    image: wal-g/pg_tests
+  pg18:
+    build:
+      dockerfile: docker/pg/Dockerfile
+      context: .
+      args:
+        UBUNTU_TAG: "22.04"
+        PG_MAJOR: "18"
+        USE_PGDG: "1"
+        INSTALL_WALE: "0"
+    image: wal-g/pg18
+    container_name: wal-g_pg18
+
+  pg18_tests_template:
+    build:
+      dockerfile: docker/pg_tests/Dockerfile_prefix
+      context: .
+      args:
+        PG_IMAGE: wal-g/pg18:latest
+    image: wal-g/pg18_tests
+    container_name: wal-g_pg18_tests_template
+    <<: *s3_common_depends
+
+  pg10_test_common: &pg10_test_common
+    image: wal-g/pg10_tests
     user: postgres
     <<: *s3_common_depends
 
-  pg_test_throttling: &pg_test_throttling
-    image: wal-g/pg_tests
+  pg18_test_common: &pg18_test_common
+    image: wal-g/pg18_tests
+    user: postgres
+    <<: *s3_common_depends
+
+  pg10_test_throttling: &pg10_test_throttling
+    image: wal-g/pg10_tests
     user: postgres
     <<: *s3_throttling_depends
 
-  pg_tests:
-    <<: *pg_test_common
-    container_name: wal-g_pg_tests
+  pg10_tests:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_tests
     command: /tmp/run_integration_tests.sh
 
-  pg_storage_swift_test:
-    image: wal-g/pg_tests
-    container_name: wal-g_pg_storage_swift_test
+  pg10_storage_swift_test:
+    image: wal-g/pg10_tests
+    container_name: wal-g_pg10_storage_swift_test
     command: /tmp/test_bins/swift.test -test.v
     depends_on:
       - swift
@@ -280,9 +307,9 @@ services:
       - "OS_PASSWORD=testing"
       - "OS_AUTH_URL=http://swift:8080/auth/v1.0"
 
-  pg_storage_ssh_test:
-    image: wal-g/pg_tests
-    container_name: wal-g_pg_storage_ssh_test
+  pg10_storage_ssh_test:
+    image: wal-g/pg10_tests
+    container_name: wal-g_pg10_storage_ssh_test
     command: /tmp/test_bins/sh.test -test.v
     depends_on:
       - ssh
@@ -291,305 +318,320 @@ services:
     environment:
       - "PG_TEST_STORAGE=ssh"
 
-  pg_ready_rename_test:
-    <<: *pg_test_common
+  pg10_ready_rename_test:
+    <<: *pg10_test_common
     container_name: archiving_ready_rename_test
     command: /tmp/tests/archiving_ready_rename.sh
 
-  pg_delete_before_permanent_full_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_before_permanent_full_test
+  pg10_delete_before_permanent_full_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_before_permanent_full_test
     command: /tmp/tests/delete_before_permanent_full_test.sh
 
-  pg_backup_mark_permanent_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_backup_mark_permanent_test
+  pg10_backup_mark_permanent_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_backup_mark_permanent_test
     command: /tmp/tests/backup_mark_permanent_test.sh
 
-  pg_backup_mark_permanent_no_error_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_backup_mark_permanent_no_error_test
+  pg10_backup_mark_permanent_no_error_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_backup_mark_permanent_no_error_test
     command: /tmp/tests/backup_mark_permanent_no_error_test.sh
 
-  pg_backup_mark_impermanent_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_backup_mark_impermanent_test
+  pg10_backup_mark_impermanent_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_backup_mark_impermanent_test
     command: /tmp/tests/backup_mark_impermanent_test.sh
 
-  pg_delete_before_permanent_delta_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_before_permanent_delta_test
+  pg10_delete_before_permanent_delta_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_before_permanent_delta_test
     command: /tmp/tests/delete_before_permanent_delta_test.sh
 
-  pg_delete_before_permanent_delta_multist_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_before_permanent_delta_multist_test
+  pg10_delete_before_permanent_delta_multist_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_before_permanent_delta_multist_test
     command: /tmp/tests/delete_before_permanent_delta_multist_test.sh
 
-  pg_wal_perftest:
-    <<: *pg_test_common
-    container_name: wal-g_pg_wal_perftest
+  pg10_wal_perftest:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_wal_perftest
     command: /tmp/tests/wal_perftest.sh
 
-  pg_wal_perftest_with_throttling:
-    <<: *pg_test_throttling
-    container_name: wal-g_pg_wal_perftest_with_throttling
+  pg10_wal_perftest_with_throttling:
+    <<: *pg10_test_throttling
+    container_name: wal-g_pg10_wal_perftest_with_throttling
     command: /tmp/tests/wal_perftest_with_throttling.sh
 
-  pg_backup_perftest:
-    <<: *pg_test_common
-    container_name: wal-g_pg_backup_perftest
+  pg10_backup_perftest:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_backup_perftest
     command: /tmp/tests/backup_perftest.sh
 
-  pg_delete_before_name_find_full_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_before_name_find_full_test
+  pg10_delete_before_name_find_full_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_before_name_find_full_test
     command: /tmp/tests/delete_before_name_find_full_test.sh
 
-  pg_delete_retain_full_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_retain_full_test
+  pg10_delete_retain_full_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_retain_full_test
     command: /tmp/tests/delete_retain_full_test.sh
 
-  pg_delete_retain_full_multist_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_retain_full_multist_test
+  pg10_delete_retain_full_multist_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_retain_full_multist_test
     command: /tmp/tests/delete_retain_full_multist_test.sh
 
-  pg_delete_retain_after_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_retain_after_test
+  pg10_delete_retain_after_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_retain_after_test
     command: /tmp/tests/delete_retain_after_test.sh
 
-  pg_full_backup_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_full_backup_test
+  pg10_full_backup_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_test
     command: /tmp/tests/full_backup_test.sh
 
-  pg_full_backup_failover_storage_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_full_backup_failover_storage_test
+  pg10_full_backup_failover_storage_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_failover_storage_test
     command: /tmp/tests/full_backup_failover_storages_test.sh
 
-  pg_full_backup_streamed_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_full_backup_streamed_test
+  pg10_full_backup_streamed_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_streamed_test
     command: /tmp/tests/full_backup_streamed_test.sh
 
-  pg_partial_restore_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_partial_restore_test
+  pg10_partial_restore_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_partial_restore_test
     command: /tmp/tests/partial_restore_test.sh
 
-  pg_remote_backup_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_remote_backup_test
+  pg10_remote_backup_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_remote_backup_test
     command: /tmp/tests/remote_backup_test.sh
 
-  pg_remote_backup_without_files_metadata_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_remote_backup_without_files_metadata_test
+  pg10_remote_backup_without_files_metadata_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_remote_backup_without_files_metadata_test
     command: /tmp/tests/remote_backup_without_files_metadata_test.sh
 
-  prefetch_test:
-    <<: *pg_test_common
-    container_name: wal-g_prefetch_test
+  pg18_remote_backup_test:
+    <<: *pg18_test_common
+    container_name: wal-g_pg18_remote_backup_test
+    command: /tmp/tests/remote_backup_test.sh
+
+  pg18_remote_backup_without_files_metadata_test:
+    <<: *pg18_test_common
+    container_name: wal-g_pg18_remote_backup_without_files_metadata_test
+    command: /tmp/tests/remote_backup_without_files_metadata_test.sh
+
+  pg18_full_backup_test:
+    <<: *pg18_test_common
+    container_name: wal-g_pg18_full_backup_test
+    command: /tmp/tests/full_backup_test.sh
+
+  pg10_prefetch_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_prefetch_test
     command: /tmp/tests/prefetch_test.sh
 
-  pg_ssh_backup_test:
-    image: wal-g/pg_tests
+  pg10_ssh_backup_test:
+    image: wal-g/pg10_tests
     user: postgres
-    container_name: wal-g_pg_ssh_backup_test
+    container_name: wal-g_pg10_ssh_backup_test
     command: /tmp/tests/ssh_backup_test.sh
     depends_on:
       - ssh
     links:
       - ssh
 
-  pg_receive_wal_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_receive_wal_test
+  pg10_receive_wal_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_receive_wal_test
     command: /tmp/tests/receive_wal_test.sh
 
-  pg_full_backup_copy_composer_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_full_backup_copy_composer_test
+  pg10_full_backup_copy_composer_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_copy_composer_test
     command: /tmp/tests/full_backup_copy_composer_test.sh
 
-  pg_full_backup_rating_composer_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_full_backup_rating_composer_test
+  pg10_full_backup_rating_composer_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_rating_composer_test
     command: /tmp/tests/full_backup_rating_composer_test.sh
 
-  pg_full_backup_database_composer_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_full_backup_database_composer_test
+  pg10_full_backup_database_composer_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_database_composer_test
     command: /tmp/tests/full_backup_database_composer_test.sh
 
-  pg_full_backup_without_files_metadata_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_full_backup_without_files_metadata_test
+  pg10_full_backup_without_files_metadata_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_without_files_metadata_test
     command: /tmp/tests/full_backup_without_files_metadata_test.sh
 
-  pg_delete_before_time_find_full_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_before_time_find_full_test
+  pg10_delete_before_time_find_full_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_before_time_find_full_test
     command: /tmp/tests/delete_before_time_find_full_test.sh
 
-  pg_delete_without_confirm_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_without_confirm_test
+  pg10_delete_without_confirm_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_without_confirm_test
     command: /tmp/tests/delete_without_confirm_test.sh
 
-  pg_delete_garbage_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_garbage_test
+  pg10_delete_garbage_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_garbage_test
     command: /tmp/tests/delete_garbage_test.sh
 
-  pg_delete_garbage_multist_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_garbage_multist_test
+  pg10_delete_garbage_multist_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_garbage_multist_test
     command: /tmp/tests/delete_garbage_multist_test.sh
 
-  pg_delete_target_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_target_test
+  pg10_delete_target_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_target_test
     command: /tmp/tests/delete_target_test.sh
 
-  pg_delete_target_delta_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_target_delta_test
+  pg10_delete_target_delta_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_target_delta_test
     command: /tmp/tests/delete_target_delta_test.sh
 
-  pg_delete_target_delta_multist_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_target_delta_multist_test
+  pg10_delete_target_delta_multist_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_target_delta_multist_test
     command: /tmp/tests/delete_target_delta_multist_test.sh
 
-  pg_delete_target_delta_find_full_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_target_delta_find_full_test
+  pg10_delete_target_delta_find_full_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_target_delta_find_full_test
     command: /tmp/tests/delete_target_delta_find_full_test.sh
 
-  pg_ghost_table_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_ghost_table_test
+  pg10_ghost_table_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_ghost_table_test
     command: /tmp/tests/ghost_table_test.sh
 
-  pg_config_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_config_test
+  pg10_config_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_config_test
     command: /tmp/tests/config_test.sh
 
-  pg_copy_all_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_copy_all_test
+  pg10_copy_all_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_copy_all_test
     command: /tmp/tests/copy_all_test.sh
 
-  pg_copy_backup_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_copy_backup_test
+  pg10_copy_backup_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_copy_backup_test
     command: /tmp/tests/copy_backup_test.sh
 
-  pg_delete_end_to_end_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_end_to_end_test
+  pg10_delete_end_to_end_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_end_to_end_test
     command: /tmp/tests/delete_end_to_end_test.sh
 
-  pg_delta_backup_fullscan_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delta_backup_fullscan_test
+  pg10_delta_backup_fullscan_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delta_backup_fullscan_test
     command: /tmp/tests/delta_backup_fullscan_test.sh
 
-  pg_several_delta_backups_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_several_delta_backups_test
+  pg10_several_delta_backups_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_several_delta_backups_test
     command: /tmp/tests/several_delta_backups_test.sh
 
-  pg_several_delta_backups_reverse_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_several_delta_backups_reverse_test
+  pg10_several_delta_backups_reverse_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_several_delta_backups_reverse_test
     command: /tmp/tests/several_delta_backups_reverse_test.sh
 
-  pg_crypto_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_crypto_test
+  pg10_crypto_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_crypto_test
     command: /tmp/tests/crypto_test.sh
 
-  pg_delete_retain_find_full_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delete_retain_find_full_test
+  pg10_delete_retain_find_full_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delete_retain_find_full_test
     command: /tmp/tests/delete_retain_find_full_test.sh
 
-  pg_delta_backup_wal_delta_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_delta_backup_wal_delta_test
+  pg10_delta_backup_wal_delta_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_delta_backup_wal_delta_test
     command: /tmp/tests/delta_backup_wal_delta_test.sh
 
-  pg_wale_compatibility_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_wale_compatibility_test
+  pg10_wale_compatibility_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_wale_compatibility_test
     command: /tmp/tests/wale_compatibility_test.sh
 
-  pg_wale_tablespace_compatibility_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_wale_tablespace_compatibility_test
+  pg10_wale_tablespace_compatibility_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_wale_tablespace_compatibility_test
     command: /tmp/tests/wale_tablespace_compatibility_test.sh
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
 
-  pg_tablespace_support_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_tablespace_support_test
+  pg10_tablespace_support_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_tablespace_support_test
     command: /tmp/tests/tablespace_support_test.sh
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
 
-  pg_walg_tablespace_restore_spec_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_walg_tablespace_restore_spec_test
+  pg10_walg_tablespace_restore_spec_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_walg_tablespace_restore_spec_test
     command: /tmp/tests/walg_tablespace_restore_spec_test.sh
     env_file:
       - docker/common/common_walg.env
       - docker/pg_tests/walg.env
 
-  pg_transfer_backup_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_transfer_backup_test
+  pg10_transfer_backup_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_transfer_backup_test
     command: /tmp/tests/transfer_backup_test.sh
 
-  pg_catchup_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_catchup_test
+  pg10_catchup_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_catchup_test
     command: /tmp/tests/catchup_test.sh
 
-  pg_wal_restore_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_wal_restore_test
+  pg10_wal_restore_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_wal_restore_test
     command: /tmp/tests/wal_restore_test.sh
 
-  pg_daemon_test:
-    <<: *pg_test_common
-    container_name: wal-g_pg_daemon_test
+  pg10_daemon_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_daemon_test
     command: /tmp/tests/daemon_test.sh
 
-  pg_daemon_backup_and_restore_test:
-    <<: *pg_test_common
+  pg10_daemon_backup_and_restore_test:
+    <<: *pg10_test_common
     command: /tmp/tests/daemon_backup_and_restore_test.sh
 
-  pg_daemon_client_test:
-    <<: *pg_test_common
+  pg10_daemon_client_test:
+    <<: *pg10_test_common
     command: /tmp/tests/daemon_client_test.sh
 
-  pg_pgbackrest:
+  pg10_pgbackrest:
     build:
       dockerfile: docker/pg_tests/Dockerfile_pgbackrest
       context: .
     image: wal-g/docker_pgbackrest
 
-  pg_pgbackrest_backup_fetch_test:
+  pg10_pgbackrest_backup_fetch_test:
     image: wal-g/docker_pgbackrest
     user: postgres
     container_name: wal-g_pgbackrest_backup_fetch_test

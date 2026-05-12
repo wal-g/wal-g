@@ -60,7 +60,7 @@ func TestBuildStopBackup(t *testing.T) {
 
 	queryBuilder.Version = 150000
 	queryString, err = queryBuilder.BuildStopBackup()
-	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop(false)", queryString)
+	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop()", queryString)
 }
 
 func TestIsTablespaceMapExists(t *testing.T) {
