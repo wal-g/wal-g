@@ -72,6 +72,26 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 	}
 
 	if uploader.getUseWalDelta() {
+		// The `uploader.FlushFiles` method assumes that we have already read the WAL part files into
+		// memory before calling it. Its first step is to delete the WAL part files from disk, then
+		// write the latest in-memory WAL part file back to disk. However, since we are currently
+		// handling a backup history file, it will not trigger the action of reading WAL part files
+		// into memory. This will cause some WAL parts within the WAL part file to be lost. As a result:
+
+		// 1. The WAL part file becomes incomplete (see WalPartFile.IsComplete())
+
+		// 2. Due to the incomplete WAL parts, the WAL part file can never be marked as completed,
+		//    and consequently its corresponding delta file will not be uploaded
+		//    (see DeltaFileManager.FlushPartFiles(), DeltaFileManager.FlushDeltaFiles())
+
+		// 3. When performing delta backup, since the required delta file is missing, it will fail to
+		//    generate delta map and fall back to full backup
+
+		// Therefore, we need to place `HandleBackupHistoryFile` before `FlushFiles` here to avoid
+		// this issue.
+		if err := uploader.HandleBackupHistoryFile(walFilePath); err != nil {
+			tracelog.WarningLogger.Printf("handle backup history file failed due to following error %v", err)
+		}
 		uploader.FlushFiles(ctx)
 	}
 	return nil

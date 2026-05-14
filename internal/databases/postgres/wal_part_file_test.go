@@ -72,3 +72,50 @@ func TestCombineRecords(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []walparser.XLogRecord{xLogRecord}, actualRecords)
 }
+
+func TestIsPartiallyFilledPartFile(t *testing.T) {
+	t.Run("not partially filled part file when PreviousWalHead is not nil", func(t *testing.T) {
+		partFile := postgres.NewWalPartFile()
+		// Set PreviousWalHead to indicate this is not the partially filled part file
+		partFile.PreviousWalHead = []byte{1, 2, 3}
+
+		isPartiallyFilled, index, err := partFile.IsPartiallyFilledPartFile()
+		assert.NoError(t, err)
+		assert.False(t, isPartiallyFilled)
+		assert.Equal(t, -1, index)
+	})
+
+	t.Run("partially filled part file with valid index", func(t *testing.T) {
+		partFile := postgres.NewWalPartFile()
+		// Set both WalHead and WalTail at index 1
+		partFile.WalHeads[1] = []byte{1, 2, 3}
+		partFile.WalTails[1] = []byte{4, 5, 6}
+
+		isPartiallyFilled, index, err := partFile.IsPartiallyFilledPartFile()
+		assert.NoError(t, err)
+		assert.True(t, isPartiallyFilled)
+		assert.Equal(t, 1, index)
+	})
+
+	t.Run("inconsistent state between WalHead and WalTail", func(t *testing.T) {
+		partFile := postgres.NewWalPartFile()
+		// Create inconsistent state by setting only WalHead
+		partFile.WalHeads[0] = []byte{1, 2, 3}
+
+		isPartiallyFilled, index, err := partFile.IsPartiallyFilledPartFile()
+		assert.Error(t, err)
+		assert.False(t, isPartiallyFilled)
+		assert.Equal(t, -1, index)
+		assert.Contains(t, err.Error(), "inconsistent state between wal heads and wal tails")
+	})
+
+	t.Run("all nil elements", func(t *testing.T) {
+		partFile := postgres.NewWalPartFile()
+		// Test with a newly created part file where all elements are nil
+
+		isPartiallyFilled, index, err := partFile.IsPartiallyFilledPartFile()
+		assert.NoError(t, err)
+		assert.False(t, isPartiallyFilled)
+		assert.Equal(t, -1, index)
+	})
+}
