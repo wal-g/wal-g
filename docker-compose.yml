@@ -526,6 +526,11 @@ services:
     container_name: wal-g_pg_delta_backup_wal_delta_test
     command: /tmp/tests/delta_backup_wal_delta_test.sh
 
+  pg_delta_backup_vacuum_wal_delta_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_delta_backup_vacuum_wal_delta_test
+    command: /tmp/tests/delta_backup_vacuum_wal_delta_test.sh
+
   pg_wale_compatibility_test:
     <<: *pg_test_common
     container_name: wal-g_pg_wale_compatibility_test
