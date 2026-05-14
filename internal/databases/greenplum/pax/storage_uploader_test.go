@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
@@ -256,7 +257,8 @@ func TestUpload_FileDeletedBetweenWalkAndOpen(t *testing.T) {
 	header.Name = name
 
 	cfi := internal.NewComposeFileInfo(f.Name(), info, false, false, header)
-	_ = os.Remove(f.Name())
+	assert.NoError(t, f.Close())
+	assert.NoError(t, os.Remove(f.Name()))
 
 	err = uploader.AddFile(cfi, pax.RelFileMetadata{}, pax.FileKey{})
 	assert.NoError(t, err)
