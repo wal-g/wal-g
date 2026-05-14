@@ -58,6 +58,10 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			continue
 		}
 
+		if storage.HasTimestampRandomTmpSuffix(fileInfo.Name()) {
+			continue // Do not list objects that have not been written yet, like S3.
+		}
+
 		object := storage.NewLocalObject(
 			fileInfo.Name(),
 			fileInfo.ModTime(),
@@ -155,30 +159,41 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		return err
 	}
 
-	absolutePath := filepath.Join(folder.path, name)
+	randomSuffix, err := storage.NewTimestampRandomTag()
+	if err != nil {
+		return fmt.Errorf("error generating random postfix: %w", err)
+	}
 
+	absolutePath := filepath.Join(folder.path, name)
 	dirPath := filepath.Dir(absolutePath)
+	tmpFilePath := absolutePath + randomSuffix
 	err = client.MkdirAll(dirPath)
 	if err != nil {
 		return fmt.Errorf("create directory %q via SFTP: %w", dirPath, err)
 	}
 
-	file, err := client.Create(absolutePath)
+	file, err := client.Create(tmpFilePath)
 	if err != nil {
-		return fmt.Errorf("create file %q via SFTP: %w", absolutePath, err)
+		return fmt.Errorf("create file %q via SFTP: %w", tmpFilePath, err)
 	}
 
 	_, err = io.Copy(file, content)
 	if err != nil {
 		closerErr := file.Close()
 		if closerErr != nil {
-			tracelog.InfoLogger.Println("Error during closing failed upload ", closerErr)
+			tracelog.InfoLogger.Println("error during closing failed upload ", closerErr)
 		}
-		return fmt.Errorf("write data to file %q via SFTP: %w", absolutePath, err)
+		return fmt.Errorf("write data to file %q via SFTP: %w", tmpFilePath, err)
 	}
+
 	err = file.Close()
 	if err != nil {
-		return fmt.Errorf("close file %q opened via SFTP: %w", absolutePath, err)
+		return fmt.Errorf("close file %q opened via SFTP: %w", tmpFilePath, err)
+	}
+
+	err = renameSFTP(client, tmpFilePath, absolutePath)
+	if err != nil {
+		return fmt.Errorf("unable to rename tmp file %q to %q: %w", tmpFilePath, absolutePath, err)
 	}
 	return nil
 }
