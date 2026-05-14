@@ -180,7 +180,41 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
-mongo_features:
+# variants are pkg:version:repo, four entries cover the matrix
+MONGO_BASE_VARIANTS := \
+	mongodb-org:8.0.3:repo.mongodb.org \
+	mongodb-enterprise:8.0.3:repo.mongodb.com \
+	mongodb-org:7.0.15:repo.mongodb.org \
+	mongodb-enterprise:7.0.15:repo.mongodb.com
+
+mongo_save_images:
+	mkdir -p ${CACHE_FOLDER}
+	@for v in $(MONGO_BASE_VARIANTS); do \
+		pkg=$${v%%:*}; rest=$${v#*:}; ver=$${rest%%:*}; repo=$${rest#*:}; \
+		tag=$$pkg-$$ver; \
+		echo "Building wal-g/mongo-base:$$tag"; \
+		docker build -f tests_func/Dockerfile.mongodb-base \
+			--build-arg MONGO_VERSION=$$ver \
+			--build-arg MONGO_PACKAGE=$$pkg \
+			--build-arg MONGO_REPO=$$repo \
+			-t wal-g/mongo-base:$$tag \
+			tests_func/ || exit 1; \
+		docker save wal-g/mongo-base:$$tag > ${CACHE_FOLDER}/wal-g_mongo-base-$$tag.tar || exit 1; \
+	done
+
+mongo_load_base:
+	@if [ -n "${CACHE_FOLDER}" ] && [ -f ${CACHE_FOLDER}/wal-g_mongo-base-$(MONGO_PACKAGE)-$(MONGO_VERSION).tar ]; then \
+		docker load -i ${CACHE_FOLDER}/wal-g_mongo-base-$(MONGO_PACKAGE)-$(MONGO_VERSION).tar; \
+	else \
+		docker build -f tests_func/Dockerfile.mongodb-base \
+			--build-arg MONGO_VERSION=$(MONGO_VERSION) \
+			--build-arg MONGO_PACKAGE=$(MONGO_PACKAGE) \
+			--build-arg MONGO_REPO=$(MONGO_REPO) \
+			-t wal-g/mongo-base:$(MONGO_PACKAGE)-$(MONGO_VERSION) \
+			tests_func/; \
+	fi
+
+mongo_features: mongo_load_base
 	set -e
 	make go_deps
 	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) MONGO_TEST_TYPE=$(MONGO_TEST_TYPE) go test -v -count=1 -timeout 45m  --tf.test=true --tf.debug=true --tf.clean=false --tf.stop=false --tf.database=mongodb
