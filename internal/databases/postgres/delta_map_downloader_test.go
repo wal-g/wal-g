@@ -133,3 +133,47 @@ func TestGetWalSegmentRange(t *testing.T) {
 		})
 	}
 }
+
+func TestGetWalSegmentRangeForDelta(t *testing.T) {
+
+	walSegNo000000010000011100000014, _ := newWalSegmentNoFromFilename("000000010000011100000014")
+	walSegNo000000010000011100000015 := walSegNo000000010000011100000014.Next()
+	type args struct {
+		firstUsedLsn    LSN
+		firstNotUsedLsn LSN
+	}
+	tests := []struct {
+		name                     string
+		args                     args
+		firstUsedWalSegmentNo    WalSegmentNo
+		firstNotUsedWalSegmentNo WalSegmentNo
+	}{
+		{"firstUsedLsn and firstNotUsedLsn from the same WAL Segment",
+			args{
+				walSegNo000000010000011100000014.firstLsn(),
+				walSegNo000000010000011100000014.Next().firstLsn(),
+			},
+			walSegNo000000010000011100000014,
+			walSegNo000000010000011100000014.Next(),
+		},
+		{"irstUsedLsn and firstNotUsedLsn from the different WAL Segment",
+			args{
+				walSegNo000000010000011100000014.firstLsn(),
+				walSegNo000000010000011100000015.Next().firstLsn(),
+			},
+			walSegNo000000010000011100000014,
+			walSegNo000000010000011100000015.Next(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := getWalSegmentRangeForDelta(tt.args.firstUsedLsn, tt.args.firstNotUsedLsn)
+			if got != tt.firstUsedWalSegmentNo {
+				t.Errorf("GetDeltaRange() got = %v, firstUsedDeltaNo %v", got, tt.firstUsedWalSegmentNo)
+			}
+			if got1 != tt.firstNotUsedWalSegmentNo {
+				t.Errorf("GetDeltaRange() got1 = %v, firstUsedDeltaNo %v", got1, tt.firstNotUsedWalSegmentNo)
+			}
+		})
+	}
+}
