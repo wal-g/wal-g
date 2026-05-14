@@ -184,7 +184,7 @@ func (bh *BackupHandler) HandleBackupPush() {
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Running wal-g",
-		cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+		cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR,
 		func(contentID int) string {
 			return bh.buildBackupPushCommand(contentID)
 		})
@@ -344,7 +344,7 @@ func extractBackupPids(output *cluster.RemoteOutput) (map[int]int, error) {
 func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 	segmentStates := make(map[int]SegCmdState)
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Polling the segment backup-push statuses...",
-		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_COORDINATOR,
 		func(contentID int) string {
 			cmd := fmt.Sprintf("cat %s", FormatCmdStatePath(contentID, SegBackupPushCmdName))
 			tracelog.DebugLogger.Printf("Command to run on segment %d: %s", contentID, cmd)
@@ -685,7 +685,7 @@ func (bh *BackupHandler) terminateWalgProcesses() error {
 	}
 
 	remoteOutput := bh.globalCluster.GenerateAndExecuteCommand("Terminating the segment backup-push processes...",
-		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_MASTER,
+		cluster.ON_SEGMENTS|cluster.EXCLUDE_MIRRORS|cluster.INCLUDE_COORDINATOR,
 		func(contentID int) string {
 			backupPid, ok := bh.currBackupInfo.backupPidByContentID[contentID]
 			if !ok {

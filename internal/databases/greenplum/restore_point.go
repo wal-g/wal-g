@@ -171,7 +171,7 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 				return nil, 0, err
 			}
 			tracelog.InfoLogger.Println("Switch xlog on cluster")
-			remoteOutput := globalCluster.GenerateAndExecuteCommand("Running wal-g", cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
+			remoteOutput := globalCluster.GenerateAndExecuteCommand("Running wal-g", cluster.ON_SEGMENTS|cluster.INCLUDE_COORDINATOR,
 				func(contentID int) string {
 					seg, ok := globalCluster.ByContent[contentID]
 					if ok {

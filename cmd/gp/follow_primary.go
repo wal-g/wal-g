@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -24,8 +25,7 @@ var (
 			logsDir := viper.GetString(conf.GPLogsDirectory)
 			rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
 			tracelog.ErrorLogger.FatalOnError(err)
-			follower := greenplum.NewFollowPrimaryHandler(rootFolder,
-				logsDir, restoreConfigPath, args[0], timeout)
+			follower := greenplum.NewFollowPrimaryHandler(rootFolder, logsDir, restoreConfigPath, args[0], timeout, withMirrors)
 			follower.Follow()
 		},
 	}
@@ -36,5 +36,6 @@ func init() {
 	followPrimaryCmd.Flags().StringVar(&restoreConfigPath, "restore-config", "", restoreConfigPathDescription)
 	followPrimaryCmd.Flags().IntVarP(&timeout, "timeout", "t", 60000, "timeout (in seconds)")
 	_ = followPrimaryCmd.MarkFlagRequired("restore-config")
+	followPrimaryCmd.Flags().BoolVar(&withMirrors, "with-mirrors", false, withMirrorsFlagDescription)
 	cmd.AddCommand(followPrimaryCmd)
 }

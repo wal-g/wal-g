@@ -28,7 +28,7 @@ RUN locale-gen en_US.utf8 \
  && chown gpadmin:gpadmin /home/gpadmin/run_greenplum.sh \
  && chmod a+x /home/gpadmin/run_greenplum.sh \
  && echo "export MASTER_DATA_DIRECTORY=/usr/local/gpdb_src/gpAux/gpdemo/datadirs/qddir/demoDataDir-1" > /home/gpadmin/.bash_profile \
- && echo "source /usr/local/gpdb_src/greenplum_path.sh" > /home/gpadmin/.bash_profile \
+ && echo "source /usr/local/gpdb_src/greenplum_path.sh" >> /home/gpadmin/.bash_profile \
  && chown gpadmin:gpadmin /home/gpadmin/.bash_profile \
  && echo "gpadmin ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers \
  && echo "root ALL=NOPASSWD: ALL" >> /etc/sudoers \

@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
+
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -35,16 +36,30 @@ func NewRestoreCfgSegMaker(restoreConfigReader io.Reader) (SegConfigMaker, error
 
 func (c *RestoreCfgSegMaker) Make(metadata SegmentMetadata) (cluster.SegConfig, error) {
 	segmentCfg := metadata.ToSegConfig()
-	segRestoreCfg, ok := c.restoreCfg.Segments[metadata.ContentID]
+
+	var segments map[int]SegmentRestoreConfig
+	switch metadata.Role {
+	case Primary:
+		segments = c.restoreCfg.Segments
+	case Mirror:
+		segments = c.restoreCfg.Mirrors
+	default:
+		return cluster.SegConfig{}, fmt.Errorf("no segment role specified in %v", metadata)
+	}
+
+	segRestoreCfg, ok := segments[metadata.ContentID]
 	if !ok {
 		return cluster.SegConfig{},
 			fmt.Errorf(
-				"could not find content ID %d in the provided restore configuration",
-				metadata.ContentID)
+				"could not find content ID %d with role '%s' in the provided restore configuration",
+				metadata.ContentID, metadata.Role)
 	}
 	segmentCfg.Hostname = segRestoreCfg.Hostname
 	segmentCfg.Port = segRestoreCfg.Port
 	segmentCfg.DataDir = segRestoreCfg.DataDir
+	if segRestoreCfg.DatabaseID != 0 {
+		segmentCfg.DbID = segRestoreCfg.DatabaseID
+	}
 	return segmentCfg, nil
 }
 

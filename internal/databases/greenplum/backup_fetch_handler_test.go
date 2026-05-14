@@ -7,6 +7,7 @@ import (
 
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/stretchr/testify/assert"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/config"
 )
@@ -63,9 +64,9 @@ func TestBuildFetchCommand(t *testing.T) {
 	config.CfgFile = "testConfig"
 
 	testcases := []struct {
-		handler   *FetchHandler
-		contentID int
-		cmdLine   string
+		handler *FetchHandler
+		segment cluster.SegConfig
+		cmdLine string
 	}{
 		{
 			&FetchHandler{
@@ -77,7 +78,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				restorePoint:        "",
 				partialRestoreArgs:  nil,
 			},
-			1,
+			cluster.SegConfig{ContentID: 1},
 			newSkippedSegmentMsg(1),
 		},
 		{
@@ -90,7 +91,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				restorePoint:        "",
 				partialRestoreArgs:  nil,
 			},
-			1,
+			cluster.SegConfig{ContentID: 1},
 			newSkippedSegmentMsg(1),
 		},
 		{
@@ -123,7 +124,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				restorePoint:       "",
 				partialRestoreArgs: nil,
 			},
-			1,
+			cluster.SegConfig{ContentID: 1},
 			"PGPORT=1234 " +
 				"wal-g " +
 				"seg-backup-fetch " +
@@ -164,7 +165,7 @@ func TestBuildFetchCommand(t *testing.T) {
 					"test1", "test2",
 				},
 			},
-			1,
+			cluster.SegConfig{ContentID: 1},
 			"PGPORT=1234 " +
 				"wal-g " +
 				"seg-backup-fetch " +
@@ -178,7 +179,7 @@ func TestBuildFetchCommand(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		cmdLine := tc.handler.buildFetchCommand(tc.contentID)
+		cmdLine := tc.handler.buildFetchCommand(tc.segment)
 		assert.Equal(t, tc.cmdLine, cmdLine)
 	}
 }
@@ -205,7 +206,7 @@ func TestBuildFetchCommandCrushes(t *testing.T) {
 	}
 
 	if os.Getenv("FROM_TEST_BUILD_FETCH_COMMAND") == "1" {
-		handler.buildFetchCommand(1)
+		handler.buildFetchCommand(cluster.SegConfig{ContentID: 1})
 		return
 	}
 
