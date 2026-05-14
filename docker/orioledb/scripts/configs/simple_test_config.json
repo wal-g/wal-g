@@ -1,2 +1,4 @@
-"WALE_S3_PREFIX": "s3://orioledb_simple",
-"WALG_DELTA_MAX_STEPS": "6"
+{
+  "WALE_S3_PREFIX": "s3://orioledb_simple",
+  "WALG_DELTA_MAX_STEPS": "6"
+}
