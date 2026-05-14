@@ -1,0 +1,55 @@
+# Build cache overrides for CI, layered onto docker-compose.yml via COMPOSE_FILE
+# Persists BuildKit layer cache for slow base images across commits using GitHub
+# Actions cache backend, so apt-get doesn't refetch from EOL bionic mirrors on
+# every push. Requires a docker-container builder (setup-buildx-action) and
+# COMPOSE_BAKE=true. cache_to=gha is a no-op outside Actions
+services:
+  golang:
+    build:
+      cache_from:
+        - type=gha,scope=walg-golang
+      cache_to:
+        - type=gha,mode=max,scope=walg-golang
+
+  ubuntu:
+    build:
+      cache_from:
+        - type=gha,scope=walg-ubuntu-bionic
+      cache_to:
+        - type=gha,mode=max,scope=walg-ubuntu-bionic
+
+  ubuntu_22_04:
+    build:
+      cache_from:
+        - type=gha,scope=walg-ubuntu-2204
+      cache_to:
+        - type=gha,mode=max,scope=walg-ubuntu-2204
+
+  # additional_contexts wires FROM references to sibling bake targets. The
+  # docker-container builder's content store is digest-addressed and does not
+  # resolve image names like the local docker daemon does, so without this
+  # FROM wal-g/ubuntu:18.04 falls through to docker.io and fails authorization.
+  # Keys must omit :latest, buildx strips the tag from FROM identifiers before
+  # matching against the contexts map and a literal :latest key never hits
+  pg:
+    build:
+      additional_contexts:
+        wal-g/ubuntu:18.04: service:ubuntu
+      cache_from:
+        - type=gha,scope=walg-pg
+        - type=gha,scope=walg-ubuntu-bionic
+      cache_to:
+        - type=gha,mode=max,scope=walg-pg
+
+  pg_tests_template:
+    build:
+      additional_contexts:
+        wal-g/golang: service:golang
+        wal-g/pg: service:pg
+      cache_from:
+        - type=gha,scope=walg-pg-tests
+        - type=gha,scope=walg-pg
+        - type=gha,scope=walg-golang
+        - type=gha,scope=walg-ubuntu-bionic
+      cache_to:
+        - type=gha,mode=max,scope=walg-pg-tests
