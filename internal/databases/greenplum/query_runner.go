@@ -10,8 +10,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/greenplum-db/gp-common-go-libs/dbconn"
+	"github.com/apache/cloudberry-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/wal-g/tracelog"
 
@@ -84,9 +84,9 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName s
 }
 
 // BuildGetGreenplumSegmentsInfo formats a query to retrieve information about segments
-func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(version Version) string {
-	validRange := dbconn.StringToSemVerRange("<6")
-	if version.Flavor == Greenplum && validRange(version.Version) {
+func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(version dbconn.GPDBVersion) string {
+	validRange := version.StringToSemVerRange("<6")
+	if version.IsGPDB() && validRange(version.SemVer) {
 		return `
 SELECT
 	s.dbid,
@@ -115,7 +115,7 @@ ORDER BY content, role DESC;`
 }
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(version Version) (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(version dbconn.GPDBVersion) (segments []cluster.SegConfig, err error) {
 	conn := queryRunner.Connection
 	rows, err := conn.Query(context.TODO(), queryRunner.buildGetGreenplumSegmentsInfo(version))
 	if err != nil {
@@ -425,13 +425,11 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	version, err := parseGreenplumVersion(versionStr)
-	if err != nil {
-		return "", err
-	}
+	var version dbconn.GPDBVersion
+	version.ParseVersionInfo(versionStr)
 
-	switch version.Flavor {
-	case Greenplum:
+	switch version.Type {
+	case dbconn.GPDB:
 		{
 			switch {
 			case queryRunner.Version >= 120000:
@@ -444,10 +442,10 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
 				return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
 			}
 		}
-	case Cloudberry:
+	case dbconn.CBDB:
 		return cbAoRelationPgClassQuery, nil
 	default:
-		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.Flavor.String())
+		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.VersionString)
 	}
 }
 

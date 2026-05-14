@@ -5,10 +5,11 @@ import (
 	"path"
 	"strings"
 
+	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/blang/semver"
 	"github.com/pkg/errors"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 
@@ -222,7 +223,11 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to parse GP version: %s,  %s", fh.sentinel.GpVersion, err)
 	}
-	pgVersion := NewVersion(semVer, fh.sentinel.GpFlavor).EstimatePostgreSQLVersion()
+	gpdbVersion := dbconn.GPDBVersion{
+		SemVer: semVer,
+		Type:   fh.sentinel.GpFlavor.ToDBType(),
+	}
+	pgVersion := EstimatePostgreSQLVersion(gpdbVersion)
 	if pgVersion > 120000 && pathToRecoveryConf == "recovery.conf" {
 		// Starting from PostgreSQL 12.0 - the server will not start if a recovery.conf exists.
 		tracelog.ErrorLogger.Print(

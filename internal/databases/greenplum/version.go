@@ -1,69 +1,51 @@
 package greenplum
 
 import (
-	"fmt"
-	"regexp"
-
-	"github.com/blang/semver"
+	"github.com/apache/cloudberry-go-libs/dbconn"
 )
 
 type Flavor string
+
+func NewFlavor(t dbconn.DBType) Flavor {
+	switch t {
+	case dbconn.GPDB:
+		return Greenplum
+	case dbconn.CBDB:
+		return Cloudberry
+	default:
+		return Unknown
+	}
+}
 
 func (f Flavor) String() string {
 	return string(f)
 }
 
+func (f Flavor) ToDBType() dbconn.DBType {
+	switch f {
+	case Greenplum:
+		return dbconn.GPDB
+	case Cloudberry:
+		return dbconn.CBDB
+	default:
+		return dbconn.Unknown
+	}
+}
+
 const (
 	Greenplum  Flavor = "greenplum"
 	Cloudberry Flavor = "cloudberry"
+	Unknown    Flavor = "unknown"
 )
 
-type Version struct {
-	semver.Version
-	Flavor Flavor // Note: can be '' for old backups
-}
-
-func NewVersion(version semver.Version, flavor Flavor) Version {
-	return Version{
-		Version: version,
-		Flavor:  flavor,
-	}
-}
-
-func parseGreenplumVersion(version string) (Version, error) {
-	pattern := regexp.MustCompile(`(Greenplum Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
-	groups := pattern.FindStringSubmatch(version)
-	if groups == nil {
-		return Version{}, fmt.Errorf("unknown flavor: %s", version)
-	}
-	semVer, err := semver.Make(groups[2])
-	if err != nil {
-		return Version{}, err
-	}
-
-	var flavor Flavor
-	switch groups[1] {
-	case "Greenplum Database":
-		flavor = Greenplum
-	case "Cloudberry Database":
-		flavor = Cloudberry
-	case "Apache Cloudberry":
-		flavor = Cloudberry
-	default:
-		return Version{}, fmt.Errorf("unknown flavor: %s", groups[1])
-	}
-
-	return NewVersion(semVer, flavor), nil
-}
-
-func (v Version) EstimatePostgreSQLVersion() int {
-	if v.Flavor == Cloudberry {
+func EstimatePostgreSQLVersion(v dbconn.GPDBVersion) int {
+	if v.IsCBDB() {
 		return 140000
 	}
-	if v.Major == 7 {
+	if v.SemVer.Major == 7 {
 		return 120000
 	}
-	if v.Major == 6 {
+	if v.SemVer.Major == 6 {
 		return 90400
 	}
 	return 0
