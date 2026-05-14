@@ -361,6 +361,11 @@ services:
     container_name: wal-g_pg_delete_retain_after_test
     command: /tmp/tests/delete_retain_after_test.sh
 
+  pg_checksum_corruption_test:
+    <<: *pg_test_common
+    container_name: wal-g_pg_checksum_corruption_test
+    command: /tmp/tests/checksum_corruption_test.sh
+
   pg_full_backup_test:
     <<: *pg_test_common
     container_name: wal-g_pg_full_backup_test

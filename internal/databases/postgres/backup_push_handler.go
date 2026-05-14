@@ -80,6 +80,7 @@ type CurBackupInfo struct {
 	dataCatalogSize  int64
 	incrementCount   int
 	StartChkpNum     *uint32
+	fullPageWrites   bool
 }
 
 func NewPrevBackupInfo(name string, sentinel BackupSentinelDto, filesMeta FilesMetadataDto) PrevBackupInfo {
@@ -318,7 +319,8 @@ func (bh *BackupHandler) SetComposerInitFunc(initFunc func(handler *BackupHandle
 func configureTarBallComposer(bh *BackupHandler, tarBallComposerType TarBallComposerType) error {
 	maker, err := NewTarBallComposerMaker(tarBallComposerType, bh.Workers.QueryRunner,
 		bh.Arguments.Uploader, bh.CurBackupInfo.Name,
-		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks),
+		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks,
+			bh.CurBackupInfo.fullPageWrites, bh.CurBackupInfo.startLSN),
 		bh.Arguments.withoutFilesMetadata)
 	if err != nil {
 		return err
@@ -680,6 +682,15 @@ func (bh *BackupHandler) checkDataChecksums() error {
 			bh.Arguments.verifyPageChecksums = false
 		} else {
 			tracelog.InfoLogger.Println("data_checksums is enabled in DB.")
+			fullPageWrites, err := bh.Workers.QueryRunner.GetFullPageWrites()
+			if err != nil {
+				return err
+			}
+			bh.CurBackupInfo.fullPageWrites = fullPageWrites
+			if fullPageWrites {
+				tracelog.InfoLogger.Println(
+					"full_page_writes is enabled. Pages modified after backup start will skip checksum validation.")
+			}
 		}
 	} else {
 		tracelog.DebugLogger.Println(

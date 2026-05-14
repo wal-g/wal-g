@@ -44,7 +44,7 @@ func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, uploader inter
 func (maker *GpTarBallComposerMaker) Make(bundle *postgres.Bundle) (internal.TarBallComposer, error) {
 	// checksums verification is not supported in Greenplum (yet)
 	// TODO: Add support for checksum verification
-	filePackerOptions := postgres.NewTarBallFilePackerOptions(false, false)
+	filePackerOptions := postgres.NewTarBallFilePackerOptions(false, false, false, postgres.LSN(0))
 
 	baseFiles, err := maker.loadBaseFiles(bundle.IncrementFromName)
 	if err != nil {
