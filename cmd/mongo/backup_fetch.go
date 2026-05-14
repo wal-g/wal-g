@@ -1,15 +1,12 @@
 package mongo
 
 import (
-	"context"
 	"os"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/utility"
 )
 
 const backupFetchShortDescription = "Fetches desired backup from storage"
@@ -22,14 +19,10 @@ var backupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
 		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)
+		restoreCmd, err := internal.GetCommandSettingContext(cmd.Context(), conf.NameStreamRestoreCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		restoreCmd.Stdout = os.Stdout
 		restoreCmd.Stderr = os.Stderr

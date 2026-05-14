@@ -1,8 +1,6 @@
 package pg
 
 import (
-	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -61,10 +59,7 @@ var (
 // This is called by main.main(). It only needs to happen once to the PgCmd.
 func Execute() {
 	configureCommand()
-	if err := Cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	common.ExecuteContext(Cmd)
 }
 
 func GetCmd() *cobra.Command {
