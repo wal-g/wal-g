@@ -112,7 +112,7 @@ var (
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata)
 
-			backupHandler, err := postgres.NewBackupHandler(arguments)
+			backupHandler, err := postgres.NewBackupHandler(arguments) // No configOptions for pure Postgres
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
 		},

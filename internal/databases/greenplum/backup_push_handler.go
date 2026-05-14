@@ -18,7 +18,6 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -441,7 +440,7 @@ func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err erro
 // nolint:unused
 func (bh *BackupHandler) connect() (err error) {
 	tracelog.InfoLogger.Println("Connecting to Greenplum master.")
-	bh.workers.Conn, err = postgres.Connect()
+	bh.workers.Conn, err = Connect()
 	return err
 }
 
@@ -533,7 +532,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) {
 	uploader := arguments.Uploader
 
-	conn, err := postgres.Connect()
+	conn, err := Connect()
 	if err != nil {
 		return nil, err
 	}
