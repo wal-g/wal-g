@@ -22,16 +22,45 @@ type BackupSelector interface {
 	Select(folder storage.Folder) (Backup, error)
 }
 
-// LatestBackupSelector selects the latest backup from storage
+// LatestBackupSelector selects the latest backup from storage.
+// When a metaFetcher is provided, it uses backup creation time (StartTime from metadata)
+// instead of storage modification time (fixes issue #694).
 type LatestBackupSelector struct {
+	metaFetcher GenericMetaFetcher
 }
 
 func NewLatestBackupSelector() LatestBackupSelector {
 	return LatestBackupSelector{}
 }
 
+func NewLatestBackupSelectorWithMetaFetcher(metaFetcher GenericMetaFetcher) LatestBackupSelector {
+	return LatestBackupSelector{metaFetcher: metaFetcher}
+}
+
 func (s LatestBackupSelector) Select(folder storage.Folder) (Backup, error) {
-	return GetLatestBackup(folder.GetSubFolder(utility.BaseBackupPath))
+	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
+
+	if s.metaFetcher == nil {
+		return GetLatestBackup(baseBackupFolder)
+	}
+
+	// Find latest by creation time using metadata
+	allBackups := func(d GenericMetadata) bool { return true }
+	metas, err := searchInMetadata(allBackups, folder, s.metaFetcher)
+	if err != nil || len(metas) == 0 {
+		tracelog.WarningLogger.Println("Failed to get metadata, falling back to modification time")
+		return GetLatestBackup(baseBackupFolder)
+	}
+
+	latest := metas[0]
+	for i := range metas {
+		if metas[i].StartTime.After(latest.StartTime) {
+			latest = metas[i]
+		}
+	}
+
+	tracelog.InfoLogger.Printf("LATEST backup is: '%s' (by creation time)\n", latest.BackupName)
+	return NewBackupInStorage(baseBackupFolder, latest.BackupName, latest.StorageName)
 }
 
 // UserDataBackupSelector selects a backup which has the provided user data
@@ -158,7 +187,7 @@ func NewTargetBackupSelector(targetUserData, targetName string, metaFetcher Gene
 
 	case targetName == LatestString:
 		tracelog.InfoLogger.Printf("Selecting the latest backup...\n")
-		return NewLatestBackupSelector(), nil
+		return NewLatestBackupSelectorWithMetaFetcher(metaFetcher), nil
 
 	case targetName != "":
 		tracelog.InfoLogger.Printf("Selecting the backup with name %s...\n", targetName)
@@ -192,7 +221,7 @@ func NewDeltaBaseSelector(
 		return NewUserDataBackupSelector(targetUserData, metaFetcher)
 
 	default:
-		return NewLatestBackupSelector(), nil
+		return NewLatestBackupSelectorWithMetaFetcher(metaFetcher), nil
 	}
 }
 
