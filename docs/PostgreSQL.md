@@ -601,18 +601,48 @@ wal-g wal-restore path/to/target-pgdata path/to/source-pgdata
 
 ### ``daemon``
 
-Archives and fetch all WAL segments in the background. Works with the PostgreSQL archive library `walg_archive` or `walg-daemon-client`.
+Long-running process that archives and fetches WAL segments in response to commands sent over a UNIX socket. The daemon stays warm so PostgreSQL avoids paying WAL-G's startup cost (config reload, storage connect) once per WAL segment.
 
 Usage:
 ```bash
-wal-g daemon path/to/socket-descriptor
+wal-g daemon path/to/socket
 ```
 
 Configuration:
 
 * `WALG_DAEMON_WAL_UPLOAD_TIMEOUT`
 
-To configure time limit for every WAL archive in daemon. Hanging for a longer time operations will be interrupted. Default value is 60s. 
+Per-archive operation time limit. Operations exceeding it are interrupted. Default `60s`.
+
+##### ``walg-daemon-client``
+
+Lightweight CLI in [`cmd/daemonclient`](https://github.com/wal-g/wal-g/tree/master/cmd/daemonclient), built via `make build_client`. Intended to be invoked from [`archive_command`](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-COMMAND) and [`restore_command`](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RESTORE-COMMAND), so PostgreSQL forks the small client per segment instead of the full `wal-g` binary.
+
+Usage:
+```bash
+walg-daemon-client socket command [command_args] [-timeout duration] [-connection-timeout duration]
+```
+
+Commands:
+- `wal-push wal_filepath` — relays to `wal-g wal-push`
+- `wal-fetch wal_name destination_filename` — relays to `wal-g wal-fetch`. On a missing archive, exits `74` (`EX_IOERR`) so PostgreSQL keeps recovering rather than treating it as fatal; matches `wal-fetch` behaviour, see [PR #1195](https://github.com/wal-g/wal-g/pull/1195).
+
+`postgresql.conf` example:
+```conf
+archive_mode = on
+archive_command = 'walg-daemon-client /var/run/wal-g.sock wal-push %p'
+restore_command = 'walg-daemon-client /var/run/wal-g.sock wal-fetch %f %p'
+```
+
+##### ``walg_archive``
+
+PostgreSQL extension hosted at https://github.com/wal-g/walg_archive. Targets PostgreSQL 15+ via the [`archive_library`](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-LIBRARY) GUC, replacing `archive_command` shell invocation with an in-process callback. Build it from that repo, install the resulting `.so`, then in `postgresql.conf`:
+```conf
+archive_mode = on
+archive_library = 'walg_archive'
+walg_archive.walg_socket = '/var/run/wal-g.sock'
+```
+`walg_archive.walg_socket` must point at the same path passed to `wal-g daemon`.
 
 pgBackRest backups support (beta version)
 -----------
