@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -54,15 +55,61 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 
 func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
-		err := os.RemoveAll(folder.GetFilePath(object.GetName()))
+		filePath := folder.GetFilePath(object.GetName())
+		err := os.RemoveAll(filePath)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
 			return fmt.Errorf("unable to delete file %q: %w", object.GetName(), err)
 		}
+		folder.removeEmptyDirs(path.Dir(filePath))
 	}
 	return nil
+}
+
+// removeEmptyDirs removes empty directories starting from dirPath and going up
+// to (but not including) the folder's base directory.
+func (folder *Folder) removeEmptyDirs(dirPath string) {
+	baseDir := path.Clean(path.Join(folder.rootPath, folder.subPath))
+
+	for {
+		dirPath = path.Clean(dirPath)
+
+		// Stop if we've reached the base directory; we never remove baseDir itself.
+		if dirPath == baseDir {
+			return
+		}
+
+		// Safety check: ensure dirPath is strictly contained within baseDir.
+		rel, err := filepath.Rel(baseDir, dirPath)
+		if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+			return
+		}
+
+		entries, err := os.ReadDir(dirPath)
+		if err != nil {
+			tracelog.WarningLogger.Printf("FS storage: unable to read dir %q during cleanup: %v", dirPath, err)
+			return
+		}
+		if len(entries) > 0 {
+			return
+		}
+
+		if err = os.Remove(dirPath); err != nil {
+			if !os.IsNotExist(err) {
+				tracelog.WarningLogger.Printf("FS storage: unable to remove empty dir %q: %v", dirPath, err)
+			}
+			return
+		}
+
+		parent := path.Dir(dirPath)
+		// Stop if we've reached filesystem root or cannot go higher safely.
+		if parent == dirPath {
+			return
+		}
+		dirPath = parent
+	}
 }
 
 func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
