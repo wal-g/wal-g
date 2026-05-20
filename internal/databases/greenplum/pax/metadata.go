@@ -38,7 +38,7 @@ func NewFilesMetadataDTO() *FilesMetadataDTO {
 	return &FilesMetadataDTO{Files: make(BackupFiles)}
 }
 
-func (m *FilesMetadataDTO) AddFile(localPath, storagePath string, mTime, initialUplTS time.Time,
+func (m *FilesMetadataDTO) AddFile(localPath string, storagePath string, mTime time.Time, initialUplTS time.Time,
 	meta RelFileMetadata, fileMode int64, isSkipped bool) {
 	m.Files[localPath] = BackupFileDesc{
 		StoragePath:     storagePath,

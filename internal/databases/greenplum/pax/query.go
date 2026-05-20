@@ -3,6 +3,7 @@ package pax
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
@@ -53,11 +54,13 @@ func FetchStorageMetadata(ctx context.Context, conn *pgx.Conn, dbInfo postgres.P
 		if spc == 0 {
 			spc = dbInfo.TblSpcOid
 		}
-		if err := fetchPaxBlocks(ctx, conn, dbInfo, spc, r, result); err != nil {
+		blocks, err := fetchPaxBlocks(ctx, conn, dbInfo, spc, r)
+		if err != nil {
 			tracelog.WarningLogger.Printf(
 				"failed to load PAX blocks for relation oid=%d (%s) in db=%s: %v",
 				r.oid, r.auxTableFqn, dbInfo.Name, err)
 		}
+		maps.Copy(result, blocks)
 	}
 	return result, nil
 }
@@ -81,12 +84,13 @@ func fetchPaxRelations(ctx context.Context, conn *pgx.Conn) ([]paxRelation, erro
 }
 
 func fetchPaxBlocks(ctx context.Context, conn *pgx.Conn, dbInfo postgres.PgDatabaseInfo,
-	spcNode walparser.Oid, r paxRelation, dst RelFileStorageMap) error {
+	spcNode walparser.Oid, r paxRelation) (RelFileStorageMap, error) {
+	result := make(RelFileStorageMap)
 	// table FQN comes from regclass::text, which is pre-escaped by Postgres. It is safe to put into queries.
 	query := fmt.Sprintf("SELECT ptblockname, ptvisimapname, ptexistexttoast FROM %s", r.auxTableFqn)
 	rows, err := conn.Query(ctx, query)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -101,12 +105,12 @@ func fetchPaxBlocks(ctx context.Context, conn *pgx.Conn, dbInfo postgres.PgDatab
 		var visimapName *string
 		var hasToast bool
 		if err := rows.Scan(&blockID, &visimapName, &hasToast); err != nil {
-			return err
+			return nil, err
 		}
 
 		dataKey := keyBase
 		dataKey.Filename = fmt.Sprintf("%d", blockID)
-		dst[dataKey] = RelFileMetadata{
+		result[dataKey] = RelFileMetadata{
 			RelNameMd5: r.relMd5,
 			BlockID:    blockID,
 			Kind:       FileKindData,
@@ -115,7 +119,7 @@ func fetchPaxBlocks(ctx context.Context, conn *pgx.Conn, dbInfo postgres.PgDatab
 		if hasToast {
 			toastKey := keyBase
 			toastKey.Filename = fmt.Sprintf("%d.toast", blockID)
-			dst[toastKey] = RelFileMetadata{
+			result[toastKey] = RelFileMetadata{
 				RelNameMd5: r.relMd5,
 				BlockID:    blockID,
 				Kind:       FileKindToast,
@@ -125,12 +129,12 @@ func fetchPaxBlocks(ctx context.Context, conn *pgx.Conn, dbInfo postgres.PgDatab
 		if visimapName != nil && *visimapName != "" {
 			visimapKey := keyBase
 			visimapKey.Filename = *visimapName
-			dst[visimapKey] = RelFileMetadata{
+			result[visimapKey] = RelFileMetadata{
 				RelNameMd5: r.relMd5,
 				BlockID:    blockID,
 				Kind:       FileKindVisimap,
 			}
 		}
 	}
-	return rows.Err()
+	return result, rows.Err()
 }
