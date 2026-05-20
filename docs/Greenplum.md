@@ -214,6 +214,14 @@ To control the minimal size of the AO/AOCS segment file to be uploaded into the 
 #### AO/AOCS deduplication age limit
 To control the maximum possible time starting from the initial upload of the AO/AOCS segment files for their reuse in the following backups, use the `WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT`. Smaller values will result in AO/AOCS files being reuploaded more frequently, leading to larger backups, and vice versa. Default value is `720h` (30 days).
 
+#### PAX file size threshold (Cloudberry only)
+PAX is a Cloudberry-only table access method whose data, external TOAST and visimap files live under `<relfilenode>_pax/` directories. WAL-G handles PAX similarly to AO/AOCS: files above a configurable size go to a dedicated `paxfiles/` storage prefix where they can be deduplicated across backups; smaller files are packed into the regular tar stream.
+
+To control the minimal size of a PAX file (data, `.toast`, or `.visimap`) to be uploaded into the dedicated shared storage, use the `WALG_GP_PAXFILE_SIZE_THRESHOLD` setting. The higher this value, the bigger the size of a single backup and the smaller the size of the shared PAX storage folder. Default value is `1048576 (1MB)`.
+
+#### PAX deduplication age limit (Cloudberry only)
+To control the maximum possible time starting from the initial upload of a PAX file for its reuse in the following backups, use the `WALG_GP_PAXFILE_DEDUPLICATION_AGE_LIMIT`. When the limit elapses, the file is re-uploaded under a new storage key on the next backup; the previous object stays in `paxfiles/` until the backup that owns it is deleted. Smaller values therefore lead to more re-uploads and larger backups. Default value is `720h` (30 days).
+
 ### ``restore-point-list``
 
 Lists currently available restore points in storage.
