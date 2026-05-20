@@ -79,25 +79,7 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName s
 	return restoreLSNs, nil
 }
 
-// BuildGetGreenplumSegmentsInfo formats a query to retrieve information about segments
-func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(version Version) string {
-	if version.Flavor == Greenplum && version.Major < 6 {
-		return `
-SELECT
-	s.dbid,
-	s.content,
-	s.role::text,
-	s.port,
-	s.hostname,
-	e.fselocation
-FROM gp_segment_configuration s
-JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
-JOIN pg_filespace f ON e.fsefsoid = f.oid
-WHERE s.role = 'p' AND f.fsname = 'pg_system'
-ORDER BY s.content, s.role DESC;`
-	}
-	return `
-SELECT
+const getGreenplumSegmentsInfoQuery = `SELECT
 	dbid,
 	content,
 	role::text,
@@ -107,12 +89,11 @@ SELECT
 FROM gp_segment_configuration
 WHERE role = 'p'
 ORDER BY content, role DESC;`
-}
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(version Version) (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo() (segments []cluster.SegConfig, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(context.TODO(), queryRunner.buildGetGreenplumSegmentsInfo(version))
+	rows, err := conn.Query(context.TODO(), getGreenplumSegmentsInfoQuery)
 	if err != nil {
 		return nil, err
 	}
