@@ -6,8 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/stretchr/testify/assert"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func TestFilterUUIDs(t *testing.T) {
@@ -17,7 +16,7 @@ func TestFilterUUIDs(t *testing.T) {
 	}{
 		{
 			withUUIDs: db.Oplog{
-				Timestamp: primitive.Timestamp{T: 4242, I: 1},
+				Timestamp: bson.Timestamp{T: 4242, I: 1},
 				Version:   2,
 				Operation: "c",
 				Namespace: "config.$cmd",
@@ -32,7 +31,7 @@ func TestFilterUUIDs(t *testing.T) {
 				UI: newUUIDBytes(t),
 			},
 			withoutUUIDsExpected: db.Oplog{
-				Timestamp: primitive.Timestamp{T: 4242, I: 1},
+				Timestamp: bson.Timestamp{T: 4242, I: 1},
 				Version:   2,
 				Operation: "c",
 				Namespace: "config.$cmd",
@@ -48,7 +47,7 @@ func TestFilterUUIDs(t *testing.T) {
 		},
 		{
 			withUUIDs: db.Oplog{
-				Timestamp: primitive.Timestamp{T: 4242, I: 1},
+				Timestamp: bson.Timestamp{T: 4242, I: 1},
 				Version:   2,
 				Operation: "c",
 				Namespace: "admin.$cmd",
@@ -70,7 +69,7 @@ func TestFilterUUIDs(t *testing.T) {
 				},
 			},
 			withoutUUIDsExpected: db.Oplog{
-				Timestamp: primitive.Timestamp{T: 4242, I: 1},
+				Timestamp: bson.Timestamp{T: 4242, I: 1},
 				Version:   2,
 				Operation: "c",
 				Namespace: "admin.$cmd",
@@ -79,7 +78,7 @@ func TestFilterUUIDs(t *testing.T) {
 						// We're getting some extra fields here (ts, v), but it's ok:
 						// operation is valid, parent's (ts, v) have priority
 						bson.D{
-							{Key: "ts", Value: primitive.Timestamp{T: 0, I: 0}},
+							{Key: "ts", Value: bson.Timestamp{T: 0, I: 0}},
 							{Key: "t", Value: nil},
 							{Key: "v", Value: int32(0)},
 							{Key: "op", Value: "d"},
@@ -87,7 +86,7 @@ func TestFilterUUIDs(t *testing.T) {
 							{Key: "o", Value: bson.D{{Key: "_id", Value: newObjectID(t, "6554e57e27da07dc9041f340")}}},
 						},
 						bson.D{
-							{Key: "ts", Value: primitive.Timestamp{T: 0, I: 0}},
+							{Key: "ts", Value: bson.Timestamp{T: 0, I: 0}},
 							{Key: "t", Value: nil},
 							{Key: "v", Value: int32(0)},
 							{Key: "op", Value: "d"},
@@ -109,18 +108,18 @@ func TestFilterUUIDs(t *testing.T) {
 	}
 }
 
-func newUUIDBytes(t *testing.T) *primitive.Binary {
+func newUUIDBytes(t *testing.T) *bson.Binary {
 	uuidBytes, err := uuid.New().MarshalBinary()
 	assert.NoError(t, err)
 
-	return &primitive.Binary{
+	return &bson.Binary{
 		Subtype: 4,
 		Data:    uuidBytes,
 	}
 }
 
-func newObjectID(t *testing.T, hex string) primitive.ObjectID {
-	objectID, err := primitive.ObjectIDFromHex(hex)
+func newObjectID(t *testing.T, hex string) bson.ObjectID {
+	objectID, err := bson.ObjectIDFromHex(hex)
 	assert.NoError(t, err)
 
 	return objectID

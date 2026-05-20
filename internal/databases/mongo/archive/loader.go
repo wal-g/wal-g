@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -135,8 +135,8 @@ func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
 func (sd *StorageDownloader) ListOplogArchivesSegment(startAfter *string, endBefore *string) ([]models.Archive, error) {
 	tracelog.DebugLogger.Printf("Listing %s with startAfter `%s` and endBefore `%s`",
 		sd.oplogsFolder.GetPath(),
-		aws.StringValue(startAfter),
-		aws.StringValue(endBefore),
+		aws.ToString(startAfter),
+		aws.ToString(endBefore),
 	)
 	var objects []storage.Object
 	var err error

@@ -3,7 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mariadb_full_maria_backup
+export WALE_S3_PREFIX=s3://mariadb-full-maria-backup
 
 
 mariadb_installdb

@@ -7,8 +7,8 @@ log() {
     echo "$(date '+%Y/%m/%d %H:%M:%S.%N' | cut -b1-26) $*"
 }
 
-s3cmd s3://mysql_pitr_binlogserver_reconnection_bucket || true
-export WALE_S3_PREFIX=s3://mysql_pitr_binlogserver_reconnection_bucket
+s3cmd s3://mysql-pitr-binlogserver-reconnection-bucket || true
+export WALE_S3_PREFIX=s3://mysql-pitr-binlogserver-reconnection-bucket
 export WALG_MYSQL_BINLOG_SERVER_HOST="127.0.0.1"
 export WALG_MYSQL_BINLOG_SERVER_PORT=9306
 export WALG_MYSQL_BINLOG_SERVER_USER="walg"

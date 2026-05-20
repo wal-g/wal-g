@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.25"
+  go: "1.26"
   modules-download-mode: readonly
 linters:
   default: none
@@ -71,8 +71,8 @@ linters:
         - name: redefines-builtin-id
     staticcheck:
       checks:
-        - -SA1019
         - all
+        - -SA1019
   exclusions:
     generated: lax
     presets:

@@ -3,7 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mysql_journal_test_bucket
+export WALE_S3_PREFIX=s3://mysql-journal-test-bucket
 
 get_journal_count() {
     wal-g st ls basebackups_005/ 2>&1 | grep journal_ | awk '{ printf $7 "\n" }' | wc -l

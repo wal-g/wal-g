@@ -25,8 +25,7 @@ type BackupStreamMetadata struct {
 func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	var metadata BackupStreamMetadata
 	err := FetchDto(backup.Folder, &metadata, StreamMetadataNameFromBackup(backup.Name))
-	var test storage.ObjectNotFoundError
-	if errors.As(err, &test) {
+	if _, ok := errors.AsType[storage.ObjectNotFoundError](err); ok {
 		return DownloadAndDecompressStream, nil
 	}
 	if err != nil {

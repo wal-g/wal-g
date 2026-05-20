@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Sentinel struct {
@@ -30,7 +31,7 @@ type BackupMeta struct {
 	Before NodeMeta `json:"Before,omitempty"`
 	After  NodeMeta `json:"After,omitempty"`
 
-	BackupLastTS primitive.Timestamp `json:"BackupLastTS,omitempty"` // for binary backup
+	BackupLastTS bson.Timestamp `json:"BackupLastTS,omitempty"` // for binary backup
 }
 
 func (backupMeta BackupMeta) GetBackupLastTS() OpTimestamp {
@@ -45,7 +46,7 @@ func (backupMeta BackupMeta) GetBackupLastTS() OpTimestamp {
 	return emptyTS
 }
 
-func ToOpTimestamp(ts primitive.Timestamp) OpTimestamp {
+func ToOpTimestamp(ts bson.Timestamp) OpTimestamp {
 	return OpTimestamp{TS: ts.T, Inc: ts.I}
 }
 

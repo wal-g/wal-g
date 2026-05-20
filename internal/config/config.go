@@ -444,7 +444,6 @@ var (
 		"WALG_S3_MAX_PART_SIZE":       true,
 		"WALG_S3_ENDPOINT_SOURCE":     true,
 		"WALG_S3_ENDPOINT_PORT":       true,
-		"WALG_S3_USE_LIST_OBJECTS_V1": true,
 		"WALG_S3_LOG_LEVEL":           true,
 		"WALG_S3_RANGE_BATCH_ENABLED": true,
 		"WALG_S3_RANGE_MAX_RETRIES":   true,
