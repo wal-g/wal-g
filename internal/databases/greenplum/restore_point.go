@@ -3,11 +3,12 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"os"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
 
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -183,7 +184,7 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 							pgOptions = "-c gp_role=utility"
 							switchFunction = "pg_switch_wal()"
 						}
-						return fmt.Sprintf("PGOPTIONS='%s' psql -p %d -d postgres -c 'select %s;'", pgOptions, seg[0].Port, switchFunction)
+						return fmt.Sprintf("PGOPTIONS='%s' psql -h localhost -p %d -d postgres -c 'select %s;'", pgOptions, seg[0].Port, switchFunction)
 					}
 					return ""
 				})
