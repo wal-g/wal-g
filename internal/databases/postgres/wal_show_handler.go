@@ -1,7 +1,8 @@
 package postgres
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -83,12 +84,8 @@ func NewSegmentsSequence(id uint32, segmentNo WalSegmentNo) *WalSegmentsSequence
 // AddWalSegmentNo adds the provided segment number to collection
 func (seq *WalSegmentsSequence) AddWalSegmentNo(number WalSegmentNo) {
 	seq.WalSegmentNumbers[number] = true
-	if seq.MinSegmentNo > number {
-		seq.MinSegmentNo = number
-	}
-	if seq.MaxSegmentNo < number {
-		seq.MaxSegmentNo = number
-	}
+	seq.MinSegmentNo = min(seq.MinSegmentNo, number)
+	seq.MaxSegmentNo = max(seq.MaxSegmentNo, number)
 }
 
 // FindMissingSegments finds missing segments in range [minSegmentNo, maxSegmentNo]
@@ -144,8 +141,8 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 	}
 
 	// order timelines by ID
-	sort.Slice(timelineInfos, func(i, j int) bool {
-		return timelineInfos[i].ID < timelineInfos[j].ID
+	slices.SortFunc(timelineInfos, func(a, b *TimelineInfo) int {
+		return cmp.Compare(a.ID, b.ID)
 	})
 
 	err = outputWriter.Write(timelineInfos)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -61,12 +62,9 @@ func NewXtrabackupInfo(content string) XtrabackupInfo {
 }
 
 func isXtrabackup(cmd *exec.Cmd) bool {
-	for _, arg := range cmd.Args {
-		if strings.Contains(arg, "xtrabackup") || strings.Contains(arg, "xbstream") {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(cmd.Args, func(arg string) bool {
+		return strings.Contains(arg, "xtrabackup") || strings.Contains(arg, "xbstream")
+	})
 }
 
 //nolint:unparam

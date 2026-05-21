@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,10 +26,8 @@ type TimedBackup interface {
 }
 
 func SortTimedBackup(backups []TimedBackup) {
-	sort.Slice(backups, func(i, j int) bool {
-		b1 := backups[i]
-		b2 := backups[j]
-		return b1.StartTime().After(b2.StartTime())
+	slices.SortFunc(backups, func(a, b TimedBackup) int {
+		return b.StartTime().Compare(a.StartTime())
 	})
 }
 
@@ -147,8 +145,8 @@ func GetBackupTimeSlices(backupObjects []storage.Object) []BackupTime {
 }
 
 func SortBackupTimeSlices(backupTimes []BackupTime) {
-	sort.Slice(backupTimes, func(i, j int) bool {
-		return backupTimes[i].Time.Before(backupTimes[j].Time)
+	slices.SortFunc(backupTimes, func(a, b BackupTime) int {
+		return a.Time.Compare(b.Time)
 	})
 }
 

@@ -2,6 +2,7 @@ package oplog
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/mongodb/mongo-tools/common/db"
 	"go.mongodb.org/mongo-driver/bson"
@@ -50,12 +51,7 @@ func newFilteredApplyOps(cmd *bson.D) (bson.D, error) {
 
 // isApplyOpsCmd returns true if a document seems to be an applyOps command.
 func isApplyOpsCmd(cmd bson.D) bool {
-	for _, v := range cmd {
-		if v.Key == "applyOps" {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(cmd, func(v bson.E) bool { return v.Key == "applyOps" })
 }
 
 type nestedApplyOps struct {

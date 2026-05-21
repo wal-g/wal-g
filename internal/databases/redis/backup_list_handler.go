@@ -2,7 +2,7 @@ package redis
 
 import (
 	"os"
-	"sort"
+	"slices"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -37,8 +37,8 @@ func GetBackupDetails(folder storage.Folder, backups []internal.BackupTime) ([]a
 		backupDetails = append(backupDetails, details)
 	}
 
-	sort.Slice(backupDetails, func(i, j int) bool {
-		return backupDetails[i].FinishLocalTime.Before(backupDetails[j].FinishLocalTime)
+	slices.SortFunc(backupDetails, func(a, b archive.Backup) int {
+		return a.FinishLocalTime.Compare(b.FinishLocalTime)
 	})
 
 	return backupDetails, nil

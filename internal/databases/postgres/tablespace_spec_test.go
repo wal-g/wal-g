@@ -1,9 +1,10 @@
 package postgres
 
 import (
+	"cmp"
 	"encoding/json"
 	"path"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,9 +57,7 @@ func TestTablespaceNames(t *testing.T) {
 	marshalAndUnmarshal(t, &spec)
 
 	names := spec.TablespaceNames()
-	sort.Slice(names, func(i, j int) bool {
-		return names[i] < names[j]
-	})
+	slices.Sort(names)
 
 	assert.Equal(t, "100", names[0])
 	assert.Equal(t, "101", names[1])
@@ -176,11 +175,11 @@ func TestTablespaceLocations(t *testing.T) {
 	formatLocations(tablespaceLocations)
 
 	returnedLocations := spec.tablespaceLocations()
-	sort.Slice(returnedLocations, func(i, j int) bool {
-		return returnedLocations[i].Symlink < returnedLocations[j].Symlink
+	slices.SortFunc(returnedLocations, func(a, b TablespaceLocation) int {
+		return cmp.Compare(a.Symlink, b.Symlink)
 	})
-	sort.Slice(tablespaceLocations, func(i, j int) bool {
-		return tablespaceLocations[i].Symlink < tablespaceLocations[j].Symlink
+	slices.SortFunc(tablespaceLocations, func(a, b TablespaceLocation) int {
+		return cmp.Compare(a.Symlink, b.Symlink)
 	})
 
 	assert.Equal(t, tablespaceLocations, returnedLocations)

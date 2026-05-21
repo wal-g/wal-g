@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -47,22 +48,9 @@ func EnvToList(env map[string]string) []string {
 
 func MergeEnvs(env1, env2 map[string]string) map[string]string {
 	env := make(map[string]string)
-	for k, v := range env1 {
-		env[k] = v
-	}
-	for k, v := range env2 {
-		env[k] = v
-	}
+	maps.Copy(env, env1)
+	maps.Copy(env, env2)
 	return env
-}
-
-func StringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }
 
 func SplitEnvLine(line string) (string, string) {

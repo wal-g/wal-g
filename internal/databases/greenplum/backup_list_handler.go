@@ -3,7 +3,7 @@ package greenplum
 import (
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -129,8 +129,8 @@ func ListStorageBackups(folder storage.Folder) ([]Backup, error) {
 		backups = append(backups, backup)
 	}
 
-	sort.Slice(backups, func(i, j int) bool {
-		return backups[i].SentinelDto.FinishTime.Before(backups[j].SentinelDto.FinishTime)
+	slices.SortFunc(backups, func(a, b Backup) int {
+		return a.SentinelDto.FinishTime.Compare(b.SentinelDto.FinishTime)
 	})
 
 	return backups, nil

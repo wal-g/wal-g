@@ -3,6 +3,7 @@ package binary
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
@@ -12,6 +13,8 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"golang.org/x/sync/errgroup"
 )
+
+const inlineMongodShutdownTimeout = 30 * time.Second
 
 func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
 	// set up mongodb client and oplog applier
@@ -31,7 +34,26 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		if err != nil {
 			return err
 		}
-		defer mongodProcess.Close()
+		// Wait for inline mongod to actually exit before unwind: applier.Close
+		// issues graceful `shutdown` admin command on happy path (db.Close with
+		// initMongo=true), but Close() alone only SIGKILLs and races WiredTiger
+		// checkpoint, leaving mongod.lock that breaks subsequent restart (e.g.
+		// chown + supervisorctl in catch_up_stale_replica.feature). SIGKILL
+		// fallback covers early-error paths where shutdown is never sent.
+		defer func() {
+			done := make(chan struct{})
+			go func() {
+				_ = mongodProcess.Wait()
+				close(done)
+			}()
+			select {
+			case <-done:
+			case <-time.After(inlineMongodShutdownTimeout):
+				tracelog.WarningLogger.Printf("inline mongod did not exit gracefully within %s, killing", inlineMongodShutdownTimeout)
+				mongodProcess.Close()
+				<-done
+			}
+		}()
 		mongodbURL = mongodProcess.GetURI()
 	}
 
@@ -53,7 +75,10 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	}
 
 	dbApplier := oplog.NewDBApplier(mongoClient, oplog.DBApplierArgs{
-		PreserveUUID:   false,
+		// Catch-up replays onto an existing replica synced from master, so collection
+		// UUIDs already match. Preserving 'ui' keeps them aligned through replay so
+		// the replica can rejoin replSet without NamespaceNotFound on master's UUIDs
+		PreserveUUID:   replayArgs.WithCatchUpReconfig,
 		Partial:        replayArgs.Partial,
 		InitMongo:      initMongo,
 		Reconfig:       replayArgs.WithCatchUpReconfig,

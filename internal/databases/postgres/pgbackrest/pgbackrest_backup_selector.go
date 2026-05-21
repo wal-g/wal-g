@@ -1,7 +1,7 @@
 package pgbackrest
 
 import (
-	"sort"
+	"slices"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -22,8 +22,8 @@ func (selector LatestBackupSelector) Select(folder storage.Folder) (internal.Bac
 	if err != nil {
 		return internal.Backup{}, err
 	}
-	sort.Slice(backupList, func(i, j int) bool {
-		return backupList[i].Time.Before(backupList[j].Time)
+	slices.SortFunc(backupList, func(a, b internal.BackupTime) int {
+		return a.Time.Compare(b.Time)
 	})
 
 	latest := backupList[len(backupList)-1]

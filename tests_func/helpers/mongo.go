@@ -1,8 +1,10 @@
 package helpers
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,12 +61,7 @@ var (
 )
 
 func isSystemDatabase(db string) bool {
-	for _, sysdb := range SystemDatabases {
-		if db == sysdb {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(SystemDatabases, db)
 }
 
 type CmdResponse struct {
@@ -328,8 +325,8 @@ func ListCollections(ctx context.Context, conn *mongo.Client, database string) (
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(colls, func(i, j int) bool {
-		return colls[i]["name"].(string) < colls[j]["name"].(string)
+	slices.SortFunc(colls, func(a, b bson.M) int {
+		return cmp.Compare(a["name"].(string), b["name"].(string))
 	})
 	return colls, nil
 }
@@ -604,12 +601,10 @@ func (mc *MongoCtl) GetLogs() error {
 }
 
 func (mc *MongoCtl) PurgeDatadir() error {
-	err := mc.StopMongod()
-	if err != nil {
+	if err := mc.StopMongod(); err != nil {
 		return err
 	}
-	_, err = mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*")
-	if err != nil {
+	if _, err := mc.runCmd("bash", "-c", "rm -rf /var/lib/mongodb/*"); err != nil {
 		return err
 	}
 
@@ -622,23 +617,20 @@ func (mc *MongoCtl) ChownDBPath() error {
 }
 
 func (mc *MongoCtl) ChangeReplSet(rs string) error {
-	_, err := mc.runCmd("bash", "-c",
+	if _, err := mc.runCmd("bash", "-c",
 		fmt.Sprintf("sed -i 's/--replSet [^ ]*/--replSet %s/' /etc/supervisor/conf.d/mongodb.conf", rs),
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
-	_, err = mc.runCmd("supervisorctl", "reread")
-	if err != nil {
+	if _, err := mc.runCmd("supervisorctl", "reread"); err != nil {
 		return err
 	}
-	_, err = mc.runCmd("supervisorctl", "update")
-	if err != nil {
+	if _, err := mc.runCmd("supervisorctl", "update"); err != nil {
 		return err
 	}
-	err = mc.StopMongod()
-	if err != nil {
+	if err := mc.StopMongod(); err != nil {
 		return err
 	}
 	return mc.StartMongod()
 }
+

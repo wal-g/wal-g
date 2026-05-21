@@ -1,8 +1,9 @@
 package multistorage
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -128,7 +129,7 @@ func NameAndOrderStorages(
 			HashableStorage: fo,
 		})
 	}
-	sort.Slice(namedFailovers, func(i, j int) bool { return namedFailovers[i].Key.String() < namedFailovers[j].Key.String() })
+	slices.SortFunc(namedFailovers, func(a, b NamedStorage) int { return cmp.Compare(a.Key.String(), b.Key.String()) })
 
 	return append(
 		NamedStorages{

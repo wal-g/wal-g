@@ -2,9 +2,10 @@ package postgres
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 
 	"github.com/wal-g/wal-g/internal"
 
@@ -215,8 +216,8 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 	}
 
 	// make sure that ScannedSegments are ordered
-	sort.Slice(scannedSegments, func(i, j int) bool {
-		return scannedSegments[i].Number < scannedSegments[j].Number
+	slices.SortFunc(scannedSegments, func(a, b ScannedSegmentDescription) int {
+		return cmp.Compare(a.Number, b.Number)
 	})
 
 	segmentSequences := make([]*IntegrityScanSegmentSequence, 0)

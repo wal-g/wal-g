@@ -9,7 +9,7 @@ RUN apt-get install -y make gcc libpq-dev libssl-dev libxml2-dev pkg-config libl
 
 RUN cd /build/pgbackrest-release-2.36/src && ./configure && make
 
-FROM wal-g/docker_prefix:latest
+FROM wal-g/pg_tests:latest
 
 COPY --from=build /build/pgbackrest-release-2.36/src/pgbackrest /usr/bin
 

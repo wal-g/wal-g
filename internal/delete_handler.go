@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -507,8 +507,14 @@ func DeleteObjectsWhere(
 func findTarget(objects []BackupObject,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object BackupObject) bool) (BackupObject, error) {
-	sort.Slice(objects, func(i, j int) bool {
-		return compare(objects[i], objects[j])
+	slices.SortFunc(objects, func(a, b BackupObject) int {
+		if compare(a, b) {
+			return -1
+		}
+		if compare(b, a) {
+			return 1
+		}
+		return 0
 	})
 	for _, object := range objects {
 		tracelog.DebugLogger.Printf("processing %s\n", object.GetName())
@@ -681,14 +687,7 @@ func DeleteArgsValidator(args, stringModifiers []string, minArgs int, maxArgs in
 		return fmt.Errorf("accepts between %d and %d arg(s), received %d", minArgs, maxArgs, len(args))
 	}
 	if len(args) == maxArgs {
-		expectedModifier := args[0]
-		isModifierInList := false
-		for _, modifier := range stringModifiers {
-			if isModifierInList = modifier == expectedModifier; isModifierInList {
-				break
-			}
-		}
-		if !isModifierInList {
+		if !slices.Contains(stringModifiers, args[0]) {
 			return fmt.Errorf("expected to get one of modifiers: %v as first argument", stringModifiers)
 		}
 	}

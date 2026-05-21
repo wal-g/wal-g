@@ -3,7 +3,7 @@ package greenplum
 import (
 	"fmt"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -52,8 +52,8 @@ func NewFollowPrimaryHandler(
 			err = nil
 		}
 		tracelog.ErrorLogger.FatalfOnError("Get restore points from folder: %v", err)
-		sort.Slice(restorePoints, func(i, j int) bool {
-			return restorePoints[i].Time.After(restorePoints[j].Time)
+		slices.SortFunc(restorePoints, func(a, b RestorePointTime) int {
+			return b.Time.Compare(a.Time)
 		})
 		stopAtRestorePoint = restorePoints[0].Name
 		tracelog.InfoLogger.Printf("Selected latest restore point: %s", stopAtRestorePoint)

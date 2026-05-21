@@ -2,7 +2,9 @@ package transfer
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
+	"slices"
 	"sort"
 	"testing"
 
@@ -227,11 +229,11 @@ func TestBackupFileLister_ListFilesToMove(t *testing.T) {
 }
 
 func sortGroups(groups []FilesGroup) {
-	sort.Slice(groups, func(i, j int) bool { return groups[i][0].path < groups[j][0].path })
+	slices.SortFunc(groups, func(a, b FilesGroup) int { return cmp.Compare(a[0].path, b[0].path) })
 }
 
 func sortFiles(group FilesGroup) {
-	sort.Slice(group, func(i, j int) bool { return group[i].path < group[j].path })
+	slices.SortFunc(group, func(a, b FileToMove) int { return cmp.Compare(a.path, b.path) })
 	for _, f := range group {
 		sort.Strings(f.copyAfter)
 		sort.Strings(f.deleteAfter)

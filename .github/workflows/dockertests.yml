@@ -12,8 +12,8 @@ env:
   CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
-  CACHE_FILE_DOCKER_PREFIX: ~/docker-images-${{ github.sha }}/docker_prefix.tar
-  IMAGE: wal-g/docker_prefix
+  CACHE_FILE_PG_TESTS: ~/docker-images-${{ github.sha }}/pg_tests.tar
+  IMAGE_PG_TESTS: wal-g/pg_tests
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.25"
@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            ${{ env.CACHE_FILE_DOCKER_PREFIX }}
+            ${{ env.CACHE_FILE_PG_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
@@ -108,7 +108,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            ${{ env.CACHE_FILE_DOCKER_PREFIX }}
+            ${{ env.CACHE_FILE_PG_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
@@ -122,6 +122,38 @@ jobs:
 
       - name: Run test
         run: ${{ matrix.command }}
+
+      - name: Collect container logs
+        if: always()
+        run: |
+          set +e
+          mkdir -p container-logs
+          # wal-g_* covers pg/mysql/etcd/etc; *.test_net_* covers mongo/redis
+          containers=$(docker ps -a --filter 'name=wal-g_' --filter 'name=test_net_' --format '{{.Names}}')
+          for c in $containers; do
+            mkdir -p "container-logs/$c"
+            docker logs "$c" >"container-logs/$c/stdout.log" 2>"container-logs/$c/stderr.log"
+            docker cp "$c:/var/log" "container-logs/$c/var-log" 2>/dev/null
+          done
+          ls -R container-logs || true
+
+      - name: Sanitize artifact name
+        if: always()
+        id: artifact
+        env:
+          COMMAND: ${{ matrix.command }}
+        run: |
+          slug=$(printf '%s' "$COMMAND" | tr -c 'A-Za-z0-9._-' '_')
+          echo "slug=$slug" >>"$GITHUB_OUTPUT"
+
+      - name: Upload container logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logs-${{ steps.artifact.outputs.slug }}
+          path: container-logs
+          if-no-files-found: ignore
+          retention-days: 14
     env:
       USE_BROTLI: 1
       USE_LIBSODIUM: 1

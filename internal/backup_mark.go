@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"slices"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -129,13 +131,10 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string,
 	}
 
 	//if one of the next backups is permanent
-	for _, b := range (*reverseLinks)[backupName] {
-		if _, ok := (*permanentBackups)[b]; ok {
-			return true
-		}
-	}
-
-	return false
+	return slices.ContainsFunc((*reverseLinks)[backupName], func(b string) bool {
+		_, ok := (*permanentBackups)[b]
+		return ok
+	})
 }
 
 // return graph where nodes - backup names, edges - links from base backups to increment backups

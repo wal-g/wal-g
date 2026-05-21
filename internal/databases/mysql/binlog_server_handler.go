@@ -17,7 +17,6 @@ import (
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/go-mysql-org/go-mysql/server"
 	mysqldriver "github.com/go-sql-driver/mysql"
-	"github.com/google/uuid"
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
@@ -39,18 +38,25 @@ type Handler struct {
 	rootFolder    storage.Folder
 	dstDir        string
 
-	lastSentGTIDs map[string]int64
+	// requiredGTIDs is the replica's already-executed set from
+	// COM_BINLOG_DUMP_GTID; transactions it contains are skipped. This
+	// command is MySQL-only; MariaDB replicas negotiate GTID state via
+	// session variables and COM_BINLOG_DUMP, which is not wired up here.
+	sentGTIDs      mysql.GTIDSet
+	requiredGTIDs  *mysql.MysqlGTIDSet
+	skipCurrentTxn bool
 }
 
 func newHandler(replicaSource string, root storage.Folder, dst string) *Handler {
 	ctx, cancel := context.WithCancel(context.Background())
+	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
 	return &Handler{
 		ctx:           ctx,
 		cancel:        cancel,
 		replicaSource: replicaSource,
 		rootFolder:    root,
 		dstDir:        dst,
-		lastSentGTIDs: make(map[string]int64),
+		sentGTIDs:     sent,
 	}
 }
 
@@ -115,29 +121,13 @@ func addRotateEvent(s *replication.BinlogStreamer, pos mysql.Position) error {
 	return s.AddEventToStreamer(&rotateBinlogEvent)
 }
 
-func (h *Handler) buildGTIDStr() string {
-	parts := make([]string, 0, len(h.lastSentGTIDs))
-	for u, gno := range h.lastSentGTIDs {
-		parts = append(parts, fmt.Sprintf("%s:1-%d", u, gno))
-	}
-	return strings.Join(parts, ",")
-}
-
 func (h *Handler) waitReplicationIsDoneSafe() {
-	if len(h.lastSentGTIDs) == 0 {
+	if h.sentGTIDs.IsEmpty() {
 		tracelog.InfoLogger.Println("S3 objects finished. No GTIDs were sent. Shutting down immediately.")
 		os.Exit(0)
 	}
 
-	targetGTIDStr := h.buildGTIDStr()
-
-	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", targetGTIDStr)
-
-	targetGTIDSet, err := mysql.ParseGTIDSet("mysql", targetGTIDStr)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Failed to parse last sent GTID (%s): %v. Shutting down.", targetGTIDStr, err)
-		os.Exit(1)
-	}
+	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", h.sentGTIDs.String())
 
 	db, err := sql.Open("mysql", h.replicaSource)
 	if err != nil {
@@ -155,7 +145,7 @@ func (h *Handler) waitReplicationIsDoneSafe() {
 		err := db.QueryRowContext(h.ctx, "SELECT @@global.gtid_executed").Scan(&executedStr)
 		if err == nil {
 			replicaSet, _ := mysql.ParseGTIDSet("mysql", executedStr)
-			if replicaSet != nil && replicaSet.Contain(targetGTIDSet) {
+			if replicaSet != nil && replicaSet.Contain(h.sentGTIDs) {
 				tracelog.InfoLogger.Println("Replica has successfully caught up! We are safely done.")
 				os.Exit(0)
 			}
@@ -196,23 +186,46 @@ func (h *Handler) makeEventHandler(s *replication.BinlogStreamer) func(*replicat
 		if int64(e.Header.Timestamp) > untilTS.Unix() {
 			return nil
 		}
-		if e.Header.EventType == replication.GTID_EVENT {
-			h.updateLastSentGTID(e)
+		switch e.Header.EventType {
+		case replication.GTID_EVENT:
+			if h.decideSkipForGTID(e) {
+				return nil
+			}
+		case replication.ANONYMOUS_GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT,
+			replication.FORMAT_DESCRIPTION_EVENT, replication.PREVIOUS_GTIDS_EVENT,
+			replication.ROTATE_EVENT, replication.STOP_EVENT, replication.INCIDENT_EVENT:
+			// txn boundary or file-boundary marker; never appears inside a txn
+			h.skipCurrentTxn = false
+		default:
+			if h.skipCurrentTxn {
+				return nil
+			}
 		}
 		return s.AddEventToStreamer(e)
 	}
 }
 
-func (h *Handler) updateLastSentGTID(e *replication.BinlogEvent) {
-	gtidEvent := &replication.GTIDEvent{}
-	if errDecode := gtidEvent.Decode(e.RawData[replication.EventHeaderSize:]); errDecode == nil {
-		u, _ := uuid.FromBytes(gtidEvent.SID)
-		uuidStr := u.String()
-		gno := gtidEvent.GNO
-		if gno > h.lastSentGTIDs[uuidStr] {
-			h.lastSentGTIDs[uuidStr] = gno
-		}
+// decideSkipForGTID updates skip state from a GTID_EVENT; returns true if
+// the caller should drop the event because the replica already applied it.
+func (h *Handler) decideSkipForGTID(e *replication.BinlogEvent) bool {
+	h.skipCurrentTxn = false
+	ge := &replication.GTIDEvent{}
+	if ge.Decode(e.RawData[replication.EventHeaderSize:]) != nil {
+		return false
 	}
+	one, err := ge.GTIDNext()
+	if err != nil {
+		return false
+	}
+	if h.requiredGTIDs != nil && h.requiredGTIDs.Contain(one) {
+		tracelog.DebugLogger.Printf("Skipping already-applied transaction %s", one)
+		h.skipCurrentTxn = true
+		return true
+	}
+	if err := h.sentGTIDs.Update(one.String()); err != nil {
+		tracelog.WarningLogger.Printf("Failed to record sent GTID %s: %v", one, err)
+	}
+	return false
 }
 
 func (h *Handler) streamSingleBinlog(
@@ -287,6 +300,7 @@ func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStrea
 
 func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: GTID=%s", gtidSet.String())
+	h.requiredGTIDs = gtidSet
 	s := replication.NewBinlogStreamer()
 	go h.streamBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4}, s)
 	return s, nil

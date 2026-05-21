@@ -21,10 +21,13 @@ type metrics struct {
 	S3Codes        prometheus.GaugeVec
 	S3BytesWritten prometheus.Gauge
 	S3BytesRead    prometheus.Gauge
+	S3UploadTime   prometheus.Gauge
 }
 
 var (
 	WalgMetricsPrefix = "walg_"
+
+	s3UploadTimeMetricName = WalgMetricsPrefix + "s3_upload_time"
 
 	WalgMetrics = metrics{
 		UploadedFilesTotal: prometheus.NewCounter(
@@ -58,6 +61,12 @@ var (
 				Help: "Amount of bytes read from S3.",
 			},
 		),
+		S3UploadTime: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: s3UploadTimeMetricName,
+				Help: "WAL upload time to S3.",
+			},
+		),
 	}
 )
 
@@ -72,6 +81,7 @@ func init() {
 	prometheus.MustRegister(WalgMetrics.S3Codes)
 	prometheus.MustRegister(WalgMetrics.S3BytesWritten)
 	prometheus.MustRegister(WalgMetrics.S3BytesRead)
+	prometheus.MustRegister(WalgMetrics.S3UploadTime)
 }
 
 func PushMetrics() {
@@ -90,6 +100,10 @@ func PushMetrics() {
 
 func WriteStatusCodeMetric(code int) {
 	WalgMetrics.S3Codes.WithLabelValues(strconv.Itoa(code)).Inc()
+}
+
+func WriteS3UploadTimeMetric(d time.Duration) {
+	WalgMetrics.S3UploadTime.Set(float64(d.Milliseconds()))
 }
 
 func pushMetrics(address string, extraTags map[string]string) error {
@@ -148,9 +162,16 @@ func writeMetricFamilyToStatsd(client statsd.Statter, in *dto.MetricFamily, extr
 				return fmt.Errorf("expected gauge in metric %s %s", name, metric)
 			}
 			tracelog.DebugLogger.Printf("writing metric: %s", metric.String())
-			err := client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
-			if err != nil {
-				return err
+			if name == s3UploadTimeMetricName {
+				err := client.Timing(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
+				if err != nil {
+					return err
+				}
+			} else {
+				err := client.Gauge(name, int64(metric.Gauge.GetValue()), 1.0, tags...)
+				if err != nil {
+					return err
+				}
 			}
 		case dto.MetricType_UNTYPED:
 			return fmt.Errorf("expected untyped in metric %s %s", name, metric)

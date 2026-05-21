@@ -20,7 +20,7 @@ const TarPartitionFolderName = "/tar_partitions/"
 type StorageTarBall struct {
 	backupName  string
 	partNumber  int
-	partSize    *int64
+	partSize    atomic.Int64
 	writeCloser io.Closer
 	tarWriter   *tar.Writer
 	uploader    Uploader
@@ -120,9 +120,9 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 }
 
 // Size accumulated in this tarball
-func (tarBall *StorageTarBall) Size() int64 { return atomic.LoadInt64(tarBall.partSize) }
+func (tarBall *StorageTarBall) Size() int64 { return tarBall.partSize.Load() }
 
 // AddSize to total Size
-func (tarBall *StorageTarBall) AddSize(i int64) { atomic.AddInt64(tarBall.partSize, i) }
+func (tarBall *StorageTarBall) AddSize(i int64) { tarBall.partSize.Add(i) }
 
 func (tarBall *StorageTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }

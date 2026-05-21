@@ -20,10 +20,3 @@ func ParseLSN(s string) (LSN, error) {
 
 	return LSN(lsn), nil
 }
-
-func lsnMin(a, b LSN) LSN {
-	if a < b {
-		return a
-	}
-	return b
-}
