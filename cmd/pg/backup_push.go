@@ -110,7 +110,7 @@ var (
 				permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
-				userData, withoutFilesMetadata)
+				userData, withoutFilesMetadata, json, pretty)
 
 			backupHandler, err := postgres.NewBackupHandler(arguments)
 			tracelog.ErrorLogger.FatalOnError(err)

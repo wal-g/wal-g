@@ -146,7 +146,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
 	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool) BackupArguments {
+	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool, json bool, pretty bool) BackupArguments {
 	return BackupArguments{
 		Uploader:              uploader,
 		pgDataDirectory:       pgDataDirectory,
@@ -162,8 +162,8 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 			return configureTarBallComposer(handler, tarBallComposerType)
 		},
 		preventConcurrentBackups: false,
-		json:                     false,
-		pretty:                   false,
+		json:                     json,
+		pretty:                   pretty,
 	}
 }
 
@@ -220,7 +220,7 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	// logging backup set Name
 	createdBackup := BackupInfo{Name: bh.CurBackupInfo.Name, Storage: storageNames[0]}
 	if bh.Arguments.json {
-		err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.json, bh.Arguments.pretty)
+		err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
 	} else {
 		tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
 	}
