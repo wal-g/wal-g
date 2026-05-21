@@ -184,7 +184,7 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 							pgOptions = "-c gp_role=utility"
 							switchFunction = "pg_switch_wal()"
 						}
-						return fmt.Sprintf("PGOPTIONS='%s' psql -h localhost -p %d -d postgres -c 'select %s;'", pgOptions, seg[0].Port, switchFunction)
+						return fmt.Sprintf("PGOPTIONS='%s' psql -h %s -p %d -d postgres -c 'select %s;'", pgOptions, seg[0].Hostname, seg[0].Port, switchFunction)
 					}
 					return ""
 				})
