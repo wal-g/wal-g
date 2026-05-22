@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/wal-g/tracelog"
@@ -171,14 +172,10 @@ func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFi
 		if _, ok := seenFiles[k]; ok {
 			continue
 		}
-		excluded := false
-		for _, e := range strings.Split(k, string(os.PathSeparator)) {
-			if _, ok := ExcludedFilenames[e]; ok {
-				excluded = true
-				break
-			}
-		}
-		if excluded {
+		if slices.ContainsFunc(strings.Split(k, string(os.PathSeparator)), func(e string) bool {
+			_, ok := ExcludedFilenames[e]
+			return ok
+		}) {
 			continue
 		}
 		filesToDelete = append(filesToDelete, k)

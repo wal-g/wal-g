@@ -24,16 +24,19 @@ wal-g create-restore-point rp2 --config=${TMP_CONFIG}
 # obj  4624920 2025-05-21 07:17:16.052 +0000 UTC 000000010000000000000001.lz4
 # obj  264275  2025-05-21 07:26:06.265 +0000 UTC 000000010000000000000002.lz4
 
-#wait for wal-g to upload WALs
-sleep 5
-
+# archive_command runs serially in PG, poll until both WALs land
 check_wal_upload() {
     local path=$1
-
+    for _ in {1..30}; do
+        if wal-g st ls "$path" --config=${TMP_CONFIG} \
+            | awk '/^obj/ {count++} END {exit !(count >= 2)}'; then
+            wal-g st ls "$path" --config=${TMP_CONFIG}
+            return 0
+        fi
+        sleep 1
+    done
     wal-g st ls "$path" --config=${TMP_CONFIG}
-
-    wal-g st ls "$path" --config=${TMP_CONFIG} \
-        | awk '/^obj/ {count++} END {exit !(count >= 2)}'
+    return 1
 }
 
 # Check each segment

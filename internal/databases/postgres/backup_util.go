@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/wal-g/wal-g/internal"
@@ -48,12 +48,12 @@ func SortBackupDetails(backupDetails []BackupDetail) {
 		}
 	}
 	if sortOrder == ByCreationTime {
-		sort.Slice(backupDetails, func(i, j int) bool {
-			return backupDetails[i].StartTime.Before(backupDetails[j].StartTime)
+		slices.SortFunc(backupDetails, func(a, b BackupDetail) int {
+			return a.StartTime.Compare(b.StartTime)
 		})
 	} else {
-		sort.Slice(backupDetails, func(i, j int) bool {
-			return backupDetails[i].Time.Before(backupDetails[j].Time)
+		slices.SortFunc(backupDetails, func(a, b BackupDetail) int {
+			return a.Time.Compare(b.Time)
 		})
 	}
 }

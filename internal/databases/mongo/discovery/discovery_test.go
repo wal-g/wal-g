@@ -45,6 +45,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 	type args struct {
 		ctx      context.Context
 		since    models.Timestamp
+		initial  bool
 		uploader *archivemocks.Uploader
 		mongo    MongoDriverFields
 	}
@@ -62,8 +63,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				newestTS := models.Timestamp{TS: 1579005001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						upl := archivemocks.Uploader{}
 						upl.On("UploadGapArchive",
@@ -113,8 +115,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
@@ -145,8 +148,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 			args: func() args {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
@@ -168,8 +172,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
@@ -196,8 +201,9 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				oldestTS := models.Timestamp{TS: 1579003001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
-					since: reqTS,
+					ctx:     context.TODO(),
+					since:   reqTS,
+					initial: true,
 					uploader: func() *archivemocks.Uploader {
 						return &archivemocks.Uploader{}
 					}(),
@@ -431,7 +437,7 @@ func TestResolveStartingTS(t *testing.T) {
 			defer tc.args.downloader.AssertExpectations(t)
 			defer tc.args.mongoClient.AssertExpectations(t)
 
-			ts, err := ResolveStartingTS(tc.args.ctx, tc.args.downloader, tc.args.mongoClient)
+			ts, _, err := ResolveStartingTS(tc.args.ctx, tc.args.downloader, tc.args.mongoClient)
 			if tc.err != nil {
 				assert.EqualError(t, err, tc.err.Error())
 				return

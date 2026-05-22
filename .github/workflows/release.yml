@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
@@ -91,7 +91,7 @@ jobs:
         run: sha256sum wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ steps.determine-arch.outputs.arch }}.tar.gz > wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ steps.determine-arch.outputs.arch }}.tar.gz.sha256
 
       - name: Upload WAL-G binary
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             wal-g-${{ matrix.db }}-${{ matrix.os }}-${{ steps.determine-arch.outputs.arch }}

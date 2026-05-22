@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -122,12 +123,9 @@ func (spec *TablespaceSpec) isTablespaceSymlink(tblPath string) (bool, error) {
 		return false, ErrorBasePrefixMissing
 	}
 
-	for _, location := range spec.tablespaceLocations() {
-		if utility.PathsEqual(tblPath, path.Join(basePrefix, location.Symlink)) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.ContainsFunc(spec.tablespaceLocations(), func(l TablespaceLocation) bool {
+		return utility.PathsEqual(tblPath, path.Join(basePrefix, l.Symlink))
+	}), nil
 }
 
 func (spec *TablespaceSpec) UnmarshalJSON(b []byte) error {

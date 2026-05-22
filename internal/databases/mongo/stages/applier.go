@@ -62,6 +62,7 @@ type StorageApplier struct {
 	size         int
 	timeout      time.Duration
 	statsUpdater stats.OplogUploadStatsUpdater
+	resume       bool
 }
 
 // NewStorageApplier builds StorageApplier.
@@ -70,8 +71,10 @@ func NewStorageApplier(uploader archive.Uploader,
 	buf Buffer,
 	archiveAfterSize int,
 	archiveTimeout time.Duration,
-	statsUpdater stats.OplogUploadStatsUpdater) *StorageApplier {
-	return &StorageApplier{uploader, buf, archiveAfterSize, archiveTimeout, statsUpdater}
+	statsUpdater stats.OplogUploadStatsUpdater,
+	resume bool,
+) *StorageApplier {
+	return &StorageApplier{uploader, buf, archiveAfterSize, archiveTimeout, statsUpdater, resume}
 }
 
 // Apply runs working cycle that sends oplog records to storage.
@@ -99,6 +102,10 @@ func (sa *StorageApplier) Apply(ctx context.Context, oplogc chan *models.Oplog) 
 				if restartBatch {
 					batchStartTS = op.TS
 					restartBatch = false
+					if sa.resume {
+						sa.resume = false
+						continue
+					}
 				}
 				lastKnownTS = op.TS
 				if _, err := sa.buf.Write(op.Data); err != nil {

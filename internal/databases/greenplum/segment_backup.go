@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -9,7 +10,8 @@ import (
 type SegBackup struct {
 	postgres.Backup
 
-	AoFilesMetadataDto *AOFilesMetadataDTO
+	AoFilesMetadataDto  *AOFilesMetadataDTO
+	PaxFilesMetadataDto *pax.FilesMetadataDTO
 }
 
 func NewSegBackup(baseBackupFolder storage.Folder, name, storage string) (SegBackup, error) {
@@ -41,4 +43,19 @@ func (backup *SegBackup) LoadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
 
 	backup.AoFilesMetadataDto = &meta
 	return backup.AoFilesMetadataDto, nil
+}
+
+func (backup *SegBackup) LoadPaxFilesMetadata() (*pax.FilesMetadataDTO, error) {
+	if backup.PaxFilesMetadataDto != nil {
+		return backup.PaxFilesMetadataDto, nil
+	}
+
+	var meta pax.FilesMetadataDTO
+	err := internal.FetchDto(backup.Folder, &meta, pax.GetFilesMetadataPath(backup.Name))
+	if err != nil {
+		return nil, err
+	}
+
+	backup.PaxFilesMetadataDto = &meta
+	return backup.PaxFilesMetadataDto, nil
 }

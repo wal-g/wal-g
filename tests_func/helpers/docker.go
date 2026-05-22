@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -148,7 +149,7 @@ func RunAsyncCommand(ctx context.Context, container, cmd string) error {
 
 func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
 	for _, container := range containers {
-		if utils.StringInSlice(name, container.Names) {
+		if slices.Contains(container.Names, name) {
 			return &container, nil
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"io"
+	"slices"
 	"strings"
 )
 
@@ -80,7 +81,7 @@ type DBApplier struct {
 	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
 	lastOpTime            models.OpTime
-	reconfig              bool
+	catchUp               bool
 	initMongo             bool
 }
 
@@ -99,7 +100,7 @@ func NewDBApplier(m client.MongoDriver, args DBApplierArgs) *DBApplier {
 		txnBuffer:             txn.NewBuffer(),
 		preserveUUID:          args.PreserveUUID,
 		partial:               args.Partial,
-		reconfig:              args.Reconfig,
+		catchUp:               args.Reconfig,
 		applyIgnoreErrorCodes: args.IgnoreErrCodes,
 		initMongo:             args.InitMongo,
 	}
@@ -115,9 +116,11 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
-	if err := ap.shouldSkip(&op); err != nil {
-		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
-		return nil
+	if !ap.catchUp {
+		if err := ap.shouldSkip(&op); err != nil {
+			tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+			return nil
+		}
 	}
 
 	meta, err := txn.NewMeta(op)
@@ -144,7 +147,7 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {
-	if ap.reconfig {
+	if ap.catchUp {
 		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastOpTime); err != nil {
 			return err
 		}
@@ -203,12 +206,7 @@ func (ap *DBApplier) shouldIgnore(op string, err error) bool {
 		return false
 	}
 
-	for i := range ignoreErrorCodes {
-		if ce.Code == (ignoreErrorCodes[i]) {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ignoreErrorCodes, ce.Code)
 }
 
 var ConfigCollectionsToKeep = []string{
@@ -233,26 +231,13 @@ var selectedNSSupportedCommands = map[string]struct{}{
 	"commitIndexBuild": {},
 }
 
-func Index[S ~[]E, E comparable](s S, v E) int {
-	for i := range s {
-		if v == s[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-func Contains[S ~[]E, E comparable](s S, v E) bool {
-	return Index(s, v) >= 0
-}
-
 func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
 	coll, ok := strings.CutPrefix(oplog.Namespace, "config.")
 	if !ok {
 		return true // OK: not a "config" database. allow any ops
 	}
 
-	if Contains(ConfigCollectionsToKeep, coll) {
+	if slices.Contains(ConfigCollectionsToKeep, coll) {
 		return true // OK: create/update/delete a doc
 	}
 
@@ -267,7 +252,7 @@ func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
 		}
 		if _, ok := selectedNSSupportedCommands[op]; ok {
 			s, _ := oplog.Object[0].Value.(string)
-			return Contains(ConfigCollectionsToKeep, s)
+			return slices.Contains(ConfigCollectionsToKeep, s)
 		}
 	}
 

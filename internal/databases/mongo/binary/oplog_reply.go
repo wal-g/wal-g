@@ -2,6 +2,10 @@ package binary
 
 import (
 	"context"
+	"fmt"
+	"time"
+
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
@@ -9,6 +13,8 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"golang.org/x/sync/errgroup"
 )
+
+const inlineMongodShutdownTimeout = 30 * time.Second
 
 func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
 	// set up mongodb client and oplog applier
@@ -28,7 +34,26 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		if err != nil {
 			return err
 		}
-		defer mongodProcess.Close()
+		// Wait for inline mongod to actually exit before unwind: applier.Close
+		// issues graceful `shutdown` admin command on happy path (db.Close with
+		// initMongo=true), but Close() alone only SIGKILLs and races WiredTiger
+		// checkpoint, leaving mongod.lock that breaks subsequent restart (e.g.
+		// chown + supervisorctl in catch_up_stale_replica.feature). SIGKILL
+		// fallback covers early-error paths where shutdown is never sent.
+		defer func() {
+			done := make(chan struct{})
+			go func() {
+				_ = mongodProcess.Wait()
+				close(done)
+			}()
+			select {
+			case <-done:
+			case <-time.After(inlineMongodShutdownTimeout):
+				tracelog.WarningLogger.Printf("inline mongod did not exit gracefully within %s, killing", inlineMongodShutdownTimeout)
+				mongodProcess.Close()
+				<-done
+			}
+		}()
 		mongodbURL = mongodProcess.GetURI()
 	}
 
@@ -50,7 +75,10 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	}
 
 	dbApplier := oplog.NewDBApplier(mongoClient, oplog.DBApplierArgs{
-		PreserveUUID:   false,
+		// Catch-up replays onto an existing replica synced from master, so collection
+		// UUIDs already match. Preserving 'ui' keeps them aligned through replay so
+		// the replica can rejoin replSet without NamespaceNotFound on master's UUIDs
+		PreserveUUID:   replayArgs.WithCatchUpReconfig,
 		Partial:        replayArgs.Partial,
 		InitMongo:      initMongo,
 		Reconfig:       replayArgs.WithCatchUpReconfig,
@@ -63,12 +91,8 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	if err != nil {
 		return err
 	}
-	// discover archive sequence to replay
-	archives, err := downloader.ListOplogArchives()
-	if err != nil {
-		return err
-	}
-	path, err := archive.SequenceBetweenTS(archives, replayArgs.Since, replayArgs.Until)
+
+	path, err := resolveOplogReplaySequence(downloader, replayArgs.Since, replayArgs.Until)
 	if err != nil {
 		return err
 	}
@@ -78,6 +102,33 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 
 	// run worker cycle
 	return HandleOplogReplay(ctx, replayArgs.Since, replayArgs.Until, oplogFetcher, oplogApplier)
+}
+
+func resolveOplogReplaySequence(
+	downloader archive.Downloader,
+	since, until models.Timestamp,
+) (archive.Sequence, error) {
+	// because of oplog archives are write every 30 second intervals, we need to expand segment
+	sinceStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: since.TS - 300, Inc: 0}.String())
+	untilStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: until.TS + 30, Inc: until.Inc}.String())
+
+	archives, err := downloader.ListOplogArchivesSegment(&sinceStr, &untilStr)
+	if err != nil {
+		return nil, err
+	}
+	path, err := archive.SequenceBetweenTS(archives, since, until)
+	// if the start and end found in the archives, return the sequence
+	if err == nil {
+		return path, nil
+	}
+
+	// fallback to list all archives
+	tracelog.WarningLogger.Println("fallback to ListFolder to find the last record", err)
+	archives, err = downloader.ListOplogArchives()
+	if err != nil {
+		return nil, err
+	}
+	return archive.SequenceBetweenTS(archives, since, until)
 }
 
 // HandleOplogReplay starts oplog replay process: download from storage and apply to mongodb

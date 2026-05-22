@@ -85,31 +85,31 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 		}
 
 		var (
-			dataFilesCopied = int32(0)
+			dataFilesCopied atomic.Int32
 			sentinelDeleted = false
 		)
 
 		targetMock.PutObjectMock = func(_ context.Context, name string, content io.Reader) error {
 			if strings.HasSuffix(name, "_backup_stop_sentinel.json") {
-				if atomic.LoadInt32(&dataFilesCopied) < 99 {
+				if dataFilesCopied.Load() < 99 {
 					t.Fatalf("sentinel file must be copied to target storage only after all other files")
 				}
 				return targetMock.MemFolder.PutObject(name, content)
 			}
 			go func() {
 				time.Sleep(time.Millisecond)
-				atomic.AddInt32(&dataFilesCopied, 1)
+				dataFilesCopied.Add(1)
 				_ = targetMock.MemFolder.PutObject(name, content)
 			}()
 			return nil
 		}
-		sourceMock.DeleteObjectsMock = func(objectRelativePaths []string) error {
-			if strings.HasSuffix(objectRelativePaths[0], "_backup_stop_sentinel.json") {
+		sourceMock.DeleteObjectsMock = func(objectsWithRelativePath []storage.Object) error {
+			if strings.HasSuffix(objectsWithRelativePath[0].GetName(), "_backup_stop_sentinel.json") {
 				sentinelDeleted = true
 			} else if !sentinelDeleted {
 				t.Fatalf("sentinel file must be deleted from source storage before all other files")
 			}
-			return sourceMock.MemFolder.DeleteObjects(objectRelativePaths)
+			return sourceMock.MemFolder.DeleteObjects(objectsWithRelativePath)
 		}
 
 		err := h.Handle()
@@ -210,14 +210,14 @@ func TestTransferHandler_Handle(t *testing.T) {
 
 		delCalls := 0
 		dellCallsMux := new(sync.Mutex)
-		sourceMock.DeleteObjectsMock = func(paths []string) error {
+		sourceMock.DeleteObjectsMock = func(objects []storage.Object) error {
 			dellCallsMux.Lock()
 			defer dellCallsMux.Unlock()
 			delCalls++
 			if delCalls > 15 {
 				return fmt.Errorf("test")
 			}
-			return sourceMock.MemFolder.DeleteObjects(paths)
+			return sourceMock.MemFolder.DeleteObjects(objects)
 		}
 
 		h := defaultHandler()

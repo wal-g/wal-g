@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -35,16 +35,9 @@ type MongodService struct {
 }
 
 func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeout time.Duration) (*MongodService, error) {
-	var repeatOptions backoff.BackOff
-	repeatOptions = backoff.NewExponentialBackOff()
-	repeatOptions = backoff.WithMaxRetries(repeatOptions, mongoConnectRetries)
-	repeatOptions = backoff.WithContext(repeatOptions, ctx)
-
-	var mongoClient *mongo.Client
-	var err error
-	err = backoff.RetryNotify(
-		func() error {
-			mongoClient, err = mongo.Connect(ctx,
+	mongoClient, err := backoff.Retry(ctx,
+		func() (*mongo.Client, error) {
+			client, err := mongo.Connect(ctx,
 				options.Client().ApplyURI(mongodbURI).
 					SetServerSelectionTimeout(timeout).
 					SetConnectTimeout(timeout).
@@ -53,18 +46,17 @@ func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeou
 					SetDirect(true).
 					SetRetryReads(false))
 			if err != nil {
-				return errors.Wrap(err, "unable to connect to mongod")
+				return nil, errors.Wrap(err, "unable to connect to mongod")
 			}
-			err = mongoClient.Ping(ctx, nil)
-			if err != nil {
-				return errors.Wrap(err, "ping to mongod is failed")
+			if err := client.Ping(ctx, nil); err != nil {
+				return nil, errors.Wrap(err, "ping to mongod is failed")
 			}
-			return nil
+			return client, nil
 		},
-		repeatOptions,
-		func(err error, duration time.Duration) {
+		backoff.WithMaxTries(mongoConnectRetries+1),
+		backoff.WithNotify(func(err error, duration time.Duration) {
 			tracelog.InfoLogger.Printf("Unable to connect due '%+v', next retry: %v", err, duration)
-		},
+		}),
 	)
 	if err != nil {
 		return nil, err
@@ -77,16 +69,9 @@ func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeou
 }
 
 func CreateBackgroundMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
-	var repeatOptions backoff.BackOff
-	repeatOptions = backoff.NewExponentialBackOff()
-	repeatOptions = backoff.WithMaxRetries(repeatOptions, mongoConnectRetries)
-	repeatOptions = backoff.WithContext(repeatOptions, ctx)
-
-	var mongoClient *mongo.Client
-	var err error
-	err = backoff.RetryNotify(
-		func() error {
-			mongoClient, err = mongo.Connect(ctx,
+	mongoClient, err := backoff.Retry(ctx,
+		func() (*mongo.Client, error) {
+			client, err := mongo.Connect(ctx,
 				options.Client().ApplyURI(mongodbURI).
 					SetMaxPoolSize(1).
 					SetMinPoolSize(1).
@@ -97,18 +82,17 @@ func CreateBackgroundMongodService(ctx context.Context, appName, mongodbURI stri
 					SetDirect(true).
 					SetRetryReads(false))
 			if err != nil {
-				return errors.Wrap(err, "unable to connect to mongod")
+				return nil, errors.Wrap(err, "unable to connect to mongod")
 			}
-			err = mongoClient.Ping(ctx, nil)
-			if err != nil {
-				return errors.Wrap(err, "ping to mongod is failed")
+			if err := client.Ping(ctx, nil); err != nil {
+				return nil, errors.Wrap(err, "ping to mongod is failed")
 			}
-			return nil
+			return client, nil
 		},
-		repeatOptions,
-		func(err error, duration time.Duration) {
+		backoff.WithMaxTries(mongoConnectRetries+1),
+		backoff.WithNotify(func(err error, duration time.Duration) {
 			tracelog.InfoLogger.Printf("Unable to connect due '%+v', next retry: %v", err, duration)
-		},
+		}),
 	)
 	if err != nil {
 		return nil, err
@@ -373,56 +357,6 @@ func updateRsConfig(ctx context.Context, localDatabase *mongo.Database, rsConfig
 	}
 
 	return nil
-}
-
-func convertToFile(ident string) string {
-	return fmt.Sprintf("/%s.wt", ident)
-}
-
-type CatalogRecord struct {
-	Type       string            `bson:"type"`
-	Database   string            `bson:"db"`
-	Collection string            `bson:"name"`
-	Ident      string            `bson:"ident"`
-	IndexIdent map[string]string `bson:"idxIdent"`
-}
-
-func CreateBackupRoutesInfo(mongodService *MongodService) (*models.BackupRoutesInfo, error) {
-	routes := models.NewBackupRoutesInfo()
-
-	pipeline := mongo.Pipeline{{{Key: "$listCatalog", Value: bson.M{}}}}
-	cursor, err := mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, pipeline)
-	if err != nil {
-		return nil, err
-	}
-
-	for cursor.TryNext(mongodService.Context) {
-		var record CatalogRecord
-		if err = cursor.Decode(&record); err != nil {
-			return nil, err
-		}
-		if record.Type != "collection" {
-			continue
-		}
-
-		indexInfo := make(models.IndexInfo)
-		for index, uri := range record.IndexIdent {
-			indexInfo[index] = models.Paths{DBPath: convertToFile(uri)}
-		}
-
-		colInfo := models.CollectionInfo{
-			Paths:     models.Paths{DBPath: convertToFile(record.Ident)},
-			IndexInfo: indexInfo,
-		}
-
-		if _, ok := routes.Databases[record.Database]; !ok {
-			routes.Databases[record.Database] = make(models.DBInfo)
-		}
-
-		routes.Databases[record.Database][record.Collection] = colInfo
-	}
-
-	return &routes, nil
 }
 
 func replaceData(ctx context.Context, collection *mongo.Collection, drop bool, insertData bson.M) error {

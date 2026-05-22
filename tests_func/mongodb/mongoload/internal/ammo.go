@@ -6,13 +6,11 @@ import (
 	"io"
 	"math/rand"
 	"strings"
-	"time"
 )
 
 var letters = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func RandSeq(n int) string {
-	rand.Seed(time.Now().UTC().UnixNano())
 	b := make([]byte, n)
 	for i := range b {
 		b[i] = letters[rand.Intn(len(letters))]
@@ -228,8 +226,6 @@ func generateAmmo(config ammoConfig, w io.Writer) error {
 }
 
 func GenerateAmmo(r io.Reader, w io.Writer) error {
-	rand.Seed(time.Now().UnixNano())
-
 	decoder := json.NewDecoder(r)
 	var configs []ammoConfig
 	err := decoder.Decode(&configs)

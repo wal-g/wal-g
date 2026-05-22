@@ -112,7 +112,7 @@ func FindLastCommonPoint(target, source []*TimelineHistoryRecord) (LSN, uint32, 
 			currentLsn = tgtRecord.lsn
 			currentTimeline = tgtRecord.timeline
 		} else {
-			currentLsn = lsnMin(tgtRecord.lsn, source[i].lsn)
+			currentLsn = min(tgtRecord.lsn, source[i].lsn)
 			currentTimeline = tgtRecord.timeline
 			break
 		}

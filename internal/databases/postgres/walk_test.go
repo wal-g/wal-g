@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -354,7 +355,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	// Bundle and compress files to `compressed`.
 	bundle := postgres.NewBundle(data, nil, "", nil, nil, false, tarSizeThreshold)
 	compressed := filepath.Join(filepath.Dir(data), "compressed")
-	size := int64(0)
+	var size atomic.Int64
 	tarBallMaker := &testtools.FileTarBallMaker{
 		Out:  compressed,
 		Size: &size,

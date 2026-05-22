@@ -186,6 +186,7 @@ func TestHandleOplogPush_CancelLongUpload(t *testing.T) {
 		1,
 		time.Hour,
 		statsUpdater,
+		false,
 	)
 
 	err := HandleOplogPush(ctx, fetcher, applier)

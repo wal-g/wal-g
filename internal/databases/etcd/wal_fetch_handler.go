@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,8 +32,8 @@ func HandleWalFetch(folder storage.Folder, backupName string, dstDir string, bas
 	tracelog.ErrorLogger.FatalfOnError("Failed to list wal folder from storage: %v", err)
 	fmt.Println(walFiles)
 
-	sort.Slice(walFiles, func(i, j int) bool {
-		return walFiles[i].GetLastModified().Before(walFiles[j].GetLastModified())
+	slices.SortFunc(walFiles, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
 	})
 
 	for _, walFile := range walFiles {

@@ -217,6 +217,7 @@ To store backups on files system, WAL-G requires that these variables be set:
 (e.g. `/tmp/wal-g-test-data`)
 
 Please, keep in mind that by default storing backups on disk along with database is not safe. Do not use it as a disaster recovery plan.
+If this is used with nfs networked storage, the backend should provide standard file system semantics (no async).
 
 SSH
 -----------

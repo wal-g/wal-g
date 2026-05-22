@@ -14,7 +14,6 @@ import (
 
 func shuffledArchives(s []models.Archive) []models.Archive {
 	a := copyArchives(s)
-	rand.Seed(time.Now().UnixNano())
 	rand.Shuffle(len(a), func(i, j int) {
 		a[i], a[j] = a[j], a[i]
 	})

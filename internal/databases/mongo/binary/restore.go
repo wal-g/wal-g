@@ -2,7 +2,6 @@ package binary
 
 import (
 	"context"
-	"github.com/wal-g/wal-g/internal/databases/mongo/partial"
 	"time"
 
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -50,6 +49,7 @@ func (restoreService *RestoreService) DoRestore(
 	if err != nil {
 		return err
 	}
+	tracelog.InfoLogger.Printf("Sentinel %v", sentinel)
 
 	var onHostFilesFilter, tarFilesFilter map[string]struct{}
 
@@ -58,7 +58,7 @@ func (restoreService *RestoreService) DoRestore(
 		if err != nil {
 			return err
 		}
-		onHostFilesFilter, tarFilesFilter = partial.GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
+		onHostFilesFilter, tarFilesFilter = GetTarFilesFilter(metadata, args.Whitelist, args.Blacklist)
 	}
 
 	if !args.SkipChecks {

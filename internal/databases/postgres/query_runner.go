@@ -208,7 +208,16 @@ func (queryRunner *PgQueryRunner) getSystemIdentifier() (err error) {
 		return nil
 	}
 	conn := queryRunner.Connection
-	err = conn.QueryRow(context.TODO(), queryRunner.buildGetSystemIdentifier()).Scan(&queryRunner.SystemIdentifier)
+	var systemIdentifier int64
+	err = conn.QueryRow(context.TODO(), queryRunner.buildGetSystemIdentifier()).Scan(&systemIdentifier)
+	if err == nil {
+		// Intentionally scan into int64 and then convert to uint64 so negative
+		// int64 values are reinterpreted via two's-complement wraparound. This
+		// preserves the system identifier representation expected by PostgreSQL
+		// tooling; do not replace this with a direct uint64 scan.
+		converted := uint64(systemIdentifier)
+		queryRunner.SystemIdentifier = &converted
+	}
 	return errors.Wrap(err, "System Identifier: getting identifier of DB failed")
 }
 
@@ -571,11 +580,15 @@ func (queryRunner *PgQueryRunner) GetLockingPID() (int, error) {
 // Returns:
 // - string: SQL query
 // - error: An error if faces problems, otherwise nil.
-func (queryRunner *PgQueryRunner) BuildGetTablesQuery() (string, error) {
+func (queryRunner *PgQueryRunner) buildGetTablesQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
-		query := "SELECT c.relfilenode, c.oid, pg_relation_filepath(c.oid), c.relname, pg_namespace.nspname, " +
-			"c.relkind, parent.relname AS parent_name " +
+		// Only invoke pg_relation_filepath for mapped catalogs (relfilenode=0)
+		// Over millions of relations exhausts backend RELOID syscache, OOMing query
+		// Path only used by processTables when relfilenode=0
+		query := "SELECT c.relfilenode, c.oid, " +
+			"CASE WHEN c.relfilenode = 0 THEN pg_relation_filepath(c.oid) END, " +
+			"c.relname, pg_namespace.nspname, c.relkind, parent.relname AS parent_name " +
 			"FROM pg_class c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid " +
 			"LEFT JOIN pg_inherits i ON c.oid = i.inhrelid LEFT JOIN pg_class parent ON i.inhparent = parent.oid;"
 		return query, nil
@@ -593,7 +606,7 @@ func (queryRunner *PgQueryRunner) getTables() (map[string]TableInfo, error) {
 	tables := make(map[string]TableInfo, 0)
 	parentTables := make([]string, 0)
 
-	getTablesQuery, err := queryRunner.BuildGetTablesQuery()
+	getTablesQuery, err := queryRunner.buildGetTablesQuery()
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner GetTables: Building query failed")
 	}

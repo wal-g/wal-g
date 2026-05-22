@@ -2,10 +2,11 @@ package blob
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 
@@ -87,8 +88,8 @@ func (idx *Index) buildCache() {
 			idx.ocache = append(idx.ocache, b)
 		}
 	}
-	sort.Slice(idx.ocache, func(i, j int) bool {
-		return idx.ocache[i].Offset < idx.ocache[j].Offset
+	slices.SortFunc(idx.ocache, func(a, b *Block) int {
+		return cmp.Compare(a.Offset, b.Offset)
 	})
 }
 
@@ -229,8 +230,8 @@ func (idx *Index) GetBlockList(ltype string) *XBlockListOut {
 				})
 			}
 		}
-		sort.Slice(bl.UncommittedBlocks.Blocks, func(i, j int) bool {
-			return bl.UncommittedBlocks.Blocks[i].Name < bl.UncommittedBlocks.Blocks[j].Name
+		slices.SortFunc(bl.UncommittedBlocks.Blocks, func(a, b XBlockOut) int {
+			return cmp.Compare(a.Name, b.Name)
 		})
 	}
 	return &bl

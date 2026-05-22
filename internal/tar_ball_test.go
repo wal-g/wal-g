@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,7 +84,7 @@ func TestPackFileTo(t *testing.T) {
 		Typeflag: tar.TypeReg,
 	}
 	buffer := bytes.NewBuffer(make([]byte, 0))
-	size := int64(0)
+	var size atomic.Int64
 
 	tarBallMaker := testtools.BufferTarBallMaker{
 		BufferToWrite: buffer,
@@ -91,10 +92,10 @@ func TestPackFileTo(t *testing.T) {
 	}
 	tarBall := tarBallMaker.Make(false)
 	tarBall.SetUp(nil)
-	size, err := internal.PackFileTo(tarBall, mockHeader, strings.NewReader(mockData))
-	assert.Equal(t, int64(len(mockData)), size)
+	packed, err := internal.PackFileTo(tarBall, mockHeader, strings.NewReader(mockData))
+	assert.Equal(t, int64(len(mockData)), packed)
 	assert.NoError(t, err)
-	assert.Equal(t, tarBall.Size(), size)
+	assert.Equal(t, tarBall.Size(), packed)
 
 	reader := tar.NewReader(buffer)
 	interpreter := testtools.BufferTarInterpreter{}

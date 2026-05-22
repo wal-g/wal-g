@@ -1,5 +1,9 @@
 name: golangci-lint
-on: [ push, pull_request ]
+
+on:
+  push:
+    branches: master
+  pull_request:
 
 env:
   GO_VERSION: "1.25"

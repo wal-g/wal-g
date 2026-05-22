@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
@@ -460,13 +461,12 @@ func TestAoUpload_NotExistFile(t *testing.T) {
 
 	cfi := internal.NewComposeFileInfo(f.Name(), fInfo, false, false, header)
 
-	err = os.Remove(f.Name())
-	if err != nil {
-		t.Log(err)
-	}
+	assert.NoError(t, f.Close())
+	assert.NoError(t, os.Remove(f.Name()))
 
 	err = uploader.AddFile(cfi, meta, &location)
 	assert.NoError(t, err)
+	assert.Empty(t, uploader.GetFiles().Files)
 }
 
 func runSingleTest(t *testing.T, baseFiles greenplum.BackupAOFiles,

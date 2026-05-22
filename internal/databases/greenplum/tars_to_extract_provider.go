@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/tracelog"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
@@ -39,6 +40,27 @@ func (t FilesToExtractProviderImpl) Get(backup SegBackup, filesToUnwrap map[stri
 				continue
 			}
 			objPath := path.Join(AoStoragePath, meta.StoragePath)
+			readerMaker := internal.NewRegularFileStorageReaderMarker(backup.Folder, objPath, extractPath, meta.FileMode)
+			concurrentTarsToExtract = append(concurrentTarsToExtract, readerMaker)
+		}
+	}
+
+	// PAX files metadata only exists for Cloudberry backups that included PAX relations.
+	paxMeta, err := backup.LoadPaxFilesMetadata()
+	if err != nil {
+		if _, ok := err.(storage.ObjectNotFoundError); !ok {
+			return nil, nil,
+				fmt.Errorf("failed to fetch PAX files metadata for backup %s: %w", backup.Name, err)
+		}
+		tracelog.DebugLogger.Printf("PAX files metadata was not found. Skipping PAX file unpacking.")
+	} else {
+		tracelog.InfoLogger.Printf("PAX files metadata found. Will perform PAX file unpacking.")
+		for extractPath, meta := range paxMeta.Files {
+			if filesToUnwrap != nil && !filesToUnwrap[extractPath] {
+				tracelog.InfoLogger.Printf("Don't need to unwrap the %s PAX file, skipping it...", extractPath)
+				continue
+			}
+			objPath := path.Join(pax.StoragePath, meta.StoragePath)
 			readerMaker := internal.NewRegularFileStorageReaderMarker(backup.Folder, objPath, extractPath, meta.FileMode)
 			concurrentTarsToExtract = append(concurrentTarsToExtract, readerMaker)
 		}

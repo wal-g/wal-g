@@ -2,9 +2,10 @@ package postgres
 
 import (
 	"archive/tar"
+	"cmp"
 	"context"
 	"os"
-	"sort"
+	"slices"
 	"sync"
 
 	"github.com/wal-g/tracelog"
@@ -243,8 +244,8 @@ func (c *RatingTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
 }
 
 func (c *RatingTarBallComposer) sortFiles() {
-	sort.Slice(c.filesToCompose, func(i, j int) bool {
-		return c.filesToCompose[i].updateRating < c.filesToCompose[j].updateRating
+	slices.SortFunc(c.filesToCompose, func(a, b *RatedComposeFileInfo) int {
+		return cmp.Compare(a.updateRating, b.updateRating)
 	})
 }
 

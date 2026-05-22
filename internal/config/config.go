@@ -79,29 +79,30 @@ const (
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
 	DirectIO                      = "WALG_DIRECT_IO"
 
-	PgDataSetting                        = "PGDATA"
-	UserSetting                          = "USER" // TODO : do something with it
-	PgPortSetting                        = "PGPORT"
-	PgUserSetting                        = "PGUSER"
-	PgHostSetting                        = "PGHOST"
-	PgPasswordSetting                    = "PGPASSWORD"
-	PgPassfileSetting                    = "PGPASSFILE"
-	PgDatabaseSetting                    = "PGDATABASE"
-	PgSslModeSetting                     = "PGSSLMODE"
-	PgSslKey                             = "PGSSLKEY"
-	PgSslCert                            = "PGSSLCERT"
-	PgSslRootCert                        = "PGSSLROOTCERT"
-	PgAppName                            = "PGAPPNAME"
-	PgSlotName                           = "WALG_SLOTNAME"
-	PgWalSize                            = "WALG_PG_WAL_SIZE"
-	PgWalPageSize                        = "WALG_PG_WAL_PAGE_SIZE"
-	PgBlockSize                          = "WALG_PG_BLOCK_SIZE"
-	TotalBgUploadedLimit                 = "TOTAL_BG_UPLOADED_LIMIT"
-	NameStreamCreateCmd                  = "WALG_STREAM_CREATE_COMMAND"
-	NameStreamRestoreCmd                 = "WALG_STREAM_RESTORE_COMMAND"
-	MaxDelayedSegmentsCount              = "WALG_INTEGRITY_MAX_DELAYED_WALS"
-	PrefetchDir                          = "WALG_PREFETCH_DIR"
-	PgReadyRename                        = "PG_READY_RENAME"
+	PgDataSetting           = "PGDATA"
+	UserSetting             = "USER" // TODO : do something with it
+	PgPortSetting           = "PGPORT"
+	PgUserSetting           = "PGUSER"
+	PgHostSetting           = "PGHOST"
+	PgPasswordSetting       = "PGPASSWORD"
+	PgPassfileSetting       = "PGPASSFILE"
+	PgDatabaseSetting       = "PGDATABASE"
+	PgSslModeSetting        = "PGSSLMODE"
+	PgSslKey                = "PGSSLKEY"
+	PgSslCert               = "PGSSLCERT"
+	PgSslRootCert           = "PGSSLROOTCERT"
+	PgAppName               = "PGAPPNAME"
+	PgSlotName              = "WALG_SLOTNAME"
+	PgWalSize               = "WALG_PG_WAL_SIZE"
+	PgWalPageSize           = "WALG_PG_WAL_PAGE_SIZE"
+	PgBlockSize             = "WALG_PG_BLOCK_SIZE"
+	TotalBgUploadedLimit    = "TOTAL_BG_UPLOADED_LIMIT"
+	NameStreamCreateCmd     = "WALG_STREAM_CREATE_COMMAND"
+	NameStreamRestoreCmd    = "WALG_STREAM_RESTORE_COMMAND"
+	MaxDelayedSegmentsCount = "WALG_INTEGRITY_MAX_DELAYED_WALS"
+	PrefetchDir             = "WALG_PREFETCH_DIR"
+	PgReadyRename           = "PG_READY_RENAME"
+	// Deprecated: streaming JSON is the only mode; setting is retained to suppress unknown-setting warnings
 	SerializerTypeSetting                = "WALG_SERIALIZER_TYPE"
 	StreamSplitterPartitions             = "WALG_STREAM_SPLITTER_PARTITIONS"
 	StreamSplitterBlockSize              = "WALG_STREAM_SPLITTER_BLOCK_SIZE"
@@ -133,6 +134,7 @@ const (
 	MongoDBLastWriteUpdateInterval      = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	MongoDBExtendBackupCursor           = "MONGODB_EXTEND_BACKUP_CURSOR"
 	MongoDBDeletionProtectionWhitelist  = "MONGODB_DELETION_PROTECTION_WHITELIST"
+	MongoDBExtraInternalDatabases       = "MONGODB_EXTRA_INTERNAL_DATABASES"
 	OplogArchiveAfterSize               = "OPLOG_ARCHIVE_AFTER_SIZE"
 	OplogArchiveTimeoutInterval         = "OPLOG_ARCHIVE_TIMEOUT_INTERVAL"
 	OplogPITRDiscoveryInterval          = "OPLOG_PITR_DISCOVERY_INTERVAL"
@@ -187,6 +189,8 @@ const (
 	GPDeleteConcurrency          = "WALG_GP_DELETE_CONCURRENCY"
 	GPAoSegSizeThreshold         = "WALG_GP_AOSEG_SIZE_THRESHOLD"
 	GPAoDeduplicationAgeLimit    = "WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT"
+	GPPaxFileSizeThreshold       = "WALG_GP_PAXFILE_SIZE_THRESHOLD"
+	GPPaxDeduplicationAgeLimit   = "WALG_GP_PAXFILE_DEDUPLICATION_AGE_LIMIT"
 	GPRelativeRecoveryConfPath   = "WALG_GP_RELATIVE_RECOVERY_CONF_PATH"
 	GPRelativePostgresqlConfPath = "WALG_GP_RELATIVE_POSTGRESQL_CONF_PATH"
 	GPHome                       = "GPHOME"
@@ -275,7 +279,6 @@ var (
 		UseDatabaseComposerSetting:   "false",
 		WithoutFilesMetadataSetting:  "false",
 		MaxDelayedSegmentsCount:      "0",
-		SerializerTypeSetting:        "json_default",
 		LibsodiumKeyTransform:        "none",
 		FailoverStoragesCheckTimeout: "30s",
 		FailoverStorageCacheLifetime: "15m",
@@ -341,6 +344,8 @@ var (
 		GPDeleteConcurrency:          "1",
 		GPAoSegSizeThreshold:         "1048576", // (1 << 20)
 		GPAoDeduplicationAgeLimit:    "720h",    // 30 days
+		GPPaxFileSizeThreshold:       "1048576", // (1 << 20)
+		GPPaxDeduplicationAgeLimit:   "720h",    // 30 days
 		GPRelativeRecoveryConfPath:   "recovery.conf",
 		GPRelativePostgresqlConfPath: "postgresql.conf",
 		ForceWalDetal:                "false",
@@ -545,6 +550,7 @@ var (
 		MongoDBLastWriteUpdateInterval:     true,
 		MongoDBExtendBackupCursor:          true,
 		MongoDBDeletionProtectionWhitelist: true,
+		MongoDBExtraInternalDatabases:      true,
 		OplogArchiveTimeoutInterval:        true,
 		OplogArchiveAfterSize:              true,
 		OplogPushStatsEnabled:              true,
@@ -617,6 +623,8 @@ var (
 		GPDeleteConcurrency:                  true,
 		GPAoSegSizeThreshold:                 true,
 		GPAoDeduplicationAgeLimit:            true,
+		GPPaxFileSizeThreshold:               true,
+		GPPaxDeduplicationAgeLimit:           true,
 		GPRelativeRecoveryConfPath:           true,
 		GPRelativePostgresqlConfPath:         true,
 		FailoverStorages:                     true,
@@ -643,27 +651,28 @@ var (
 	Turbo bool
 
 	secretSettings = map[string]bool{
-		"WALE_" + GpgKeyIDSetting:    true,
-		"WALG_" + GpgKeyIDSetting:    true,
-		AwsAccessKeyID:               true,
-		AwsSecretAccessKey:           true,
-		AwsSessionToken:              true,
-		AzureStorageAccessKey:        true,
-		AzureStorageSasToken:         true,
-		GoogleApplicationCredentials: true,
-		AlicloudAccessKeyID:          true,
-		AlicloudAccessKeySecret:      true,
-		AlicloudSecurityToken:        true,
-		LibsodiumKeySetting:          true,
-		PgPasswordSetting:            true,
-		PgpKeyPassphraseSetting:      true,
-		PgpKeySetting:                true,
-		PgpEnvelopeKeySetting:        true,
-		RedisUsername:                true,
-		RedisPassword:                true,
-		SQLServerConnectionString:    true,
-		SSHPassword:                  true,
-		SwiftOsPassword:              true,
+		"WALE_" + GpgKeyIDSetting:     true,
+		"WALG_" + GpgKeyIDSetting:     true,
+		AwsAccessKeyID:                true,
+		AwsSecretAccessKey:            true,
+		AwsSessionToken:               true,
+		AzureStorageAccessKey:         true,
+		AzureStorageSasToken:          true,
+		GoogleApplicationCredentials:  true,
+		AlicloudAccessKeyID:           true,
+		AlicloudAccessKeySecret:       true,
+		AlicloudSecurityToken:         true,
+		LibsodiumKeySetting:           true,
+		PgPasswordSetting:             true,
+		PgpKeyPassphraseSetting:       true,
+		PgpKeySetting:                 true,
+		PgpEnvelopeKeySetting:         true,
+		RedisUsername:                 true,
+		RedisPassword:                 true,
+		SQLServerConnectionString:     true,
+		SSHPassword:                   true,
+		SwiftOsPassword:               true,
+		MongoDBExtraInternalDatabases: true,
 	}
 
 	complexSettings = map[string]bool{
@@ -671,6 +680,8 @@ var (
 		StatsdExtraTagsSetting: true,
 	}
 )
+
+const ConfigPathEnvVar = "WALG_CONFIG_PATH"
 
 const MinAllowedConcurrency = 1
 
@@ -871,8 +882,12 @@ func InitConfig() {
 	globalViper.AutomaticEnv() // read in environment variables that match
 	SetDefaultValues(globalViper)
 	SetGoMaxProcs(globalViper)
+	if CfgFile == "" {
+		CfgFile = os.Getenv(ConfigPathEnvVar)
+	}
 	ReadConfigFromFile(globalViper, CfgFile)
 	CheckAllowedSettings(globalViper)
+	WarnDeprecatedSettings(globalViper)
 
 	bindConfigToEnv(globalViper)
 }
@@ -914,6 +929,19 @@ func SetGoMaxProcs(config *viper.Viper) {
 	gomaxprocs := config.GetInt(GoMaxProcs)
 	if !Turbo && gomaxprocs > 0 {
 		runtime.GOMAXPROCS(gomaxprocs)
+	}
+}
+
+// WarnDeprecatedSettings warns when retired settings are present in user config or env
+func WarnDeprecatedSettings(config *viper.Viper) {
+	if config.IsSet(SerializerTypeSetting) {
+		v := config.GetString(SerializerTypeSetting)
+		tracelog.DebugLogger.Printf("%s is deprecated and no longer has effect; streaming JSON is always used",
+			SerializerTypeSetting)
+		if v != "" && v != "json_streamed" {
+			tracelog.WarningLogger.Printf("%s=%q selected non-streaming serialization, which is no longer available",
+				SerializerTypeSetting, v)
+		}
 	}
 }
 

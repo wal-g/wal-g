@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"sort"
+	"slices"
 	"time"
 )
 
@@ -28,9 +28,7 @@ func (desc *BackupFileDescription) SetCorruptBlocks(corruptBlockNumbers []uint32
 	if len(corruptBlockNumbers) == 0 {
 		return
 	}
-	sort.Slice(corruptBlockNumbers, func(i, j int) bool {
-		return corruptBlockNumbers[i] < corruptBlockNumbers[j]
-	})
+	slices.Sort(corruptBlockNumbers)
 
 	corruptBlocksCount := len(corruptBlockNumbers)
 	// write no more than MaxCorruptBlocksInFileDesc

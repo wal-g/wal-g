@@ -51,7 +51,12 @@ func Init(cmd *cobra.Command, dbName string) {
 	cmd.InitDefaultVersionFlag()
 	conf.AddConfigFlags(cmd, hiddenConfigFlagAnnotation)
 
-	cmd.PersistentFlags().StringVar(&conf.CfgFile, "config", "", "config file (default is $HOME/.walg.json)")
+	cmd.PersistentFlags().StringVar(
+		&conf.CfgFile,
+		"config",
+		"",
+		"config file (default is $HOME/.walg.json, can also be set via WALG_CONFIG_PATH env var)",
+	)
 
 	initHelp(cmd)
 

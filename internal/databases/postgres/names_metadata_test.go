@@ -3,7 +3,7 @@ package postgres_test
 import (
 	"bytes"
 	"encoding/json"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,7 +109,7 @@ func TestResolveRegexp_RestoreAllForDatabase(t *testing.T) {
 	assert.False(t, ok3)
 
 	assert.Equal(t, 3, len(db1))
-	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	slices.Sort(db1)
 	assert.Equal(t, uint32(40000), db1[0])
 	assert.Equal(t, uint32(40001), db1[1])
 	assert.Equal(t, uint32(40002), db1[2])
@@ -128,12 +128,12 @@ func TestResolveRegexp_RestoreSomeDatabase(t *testing.T) {
 	assert.False(t, ok3)
 
 	assert.Equal(t, 3, len(db1))
-	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	slices.Sort(db1)
 	assert.Equal(t, uint32(40000), db1[0])
 	assert.Equal(t, uint32(40001), db1[1])
 	assert.Equal(t, uint32(40002), db1[2])
 	assert.Equal(t, 4, len(db2))
-	sort.Slice(db2, func(i, j int) bool { return db2[i] < db2[j] })
+	slices.Sort(db2)
 	assert.Equal(t, uint32(40100), db2[0])
 	assert.Equal(t, uint32(40101), db2[1])
 	assert.Equal(t, uint32(40102), db2[2])
@@ -152,7 +152,7 @@ func TestResolveRegexp_RestoreAllForDatabaseRegexp(t *testing.T) {
 	assert.False(t, ok2)
 	assert.False(t, ok3)
 
-	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	slices.Sort(db1)
 	assert.Equal(t, 3, len(db1))
 	assert.Equal(t, uint32(40000), db1[0])
 	assert.Equal(t, uint32(40001), db1[1])
@@ -171,7 +171,7 @@ func TestResolveRegexp_RestoreSomeTablesInDatabase(t *testing.T) {
 	assert.False(t, ok2)
 	assert.False(t, ok3)
 
-	sort.Slice(db1, func(i, j int) bool { return db1[i] < db1[j] })
+	slices.Sort(db1)
 	assert.Equal(t, 2, len(db1))
 	assert.Equal(t, uint32(40000), db1[0])
 	assert.Equal(t, uint32(40001), db1[1])
@@ -205,7 +205,7 @@ func TestResolveRegexp_RestoreSomeNamespaces(t *testing.T) {
 	assert.True(t, ok2)
 	assert.False(t, ok3)
 
-	sort.Slice(db2, func(i, j int) bool { return db2[i] < db2[j] })
+	slices.Sort(db2)
 	assert.Equal(t, 2, len(db2))
 	assert.Equal(t, uint32(40100), db2[0])
 	assert.Equal(t, uint32(40101), db2[1])
@@ -223,7 +223,7 @@ func TestResolveRegexp_RestoreAllInNamespace(t *testing.T) {
 	assert.True(t, ok2)
 	assert.False(t, ok3)
 
-	sort.Slice(db2, func(i, j int) bool { return db2[i] < db2[j] })
+	slices.Sort(db2)
 	assert.Equal(t, 2, len(db2))
 	assert.Equal(t, uint32(40102), db2[0])
 	assert.Equal(t, uint32(40103), db2[1])
@@ -256,7 +256,7 @@ func TestFetchDtoWithFilesMetadata(t *testing.T) {
 	}
 
 	oldObjects := DatabaseObjectsInfoOld{Oid: 12, Tables: map[string]uint32{"t1": 1, "t2": 2}}
-	newObjects := postgres.DatabaseObjectsInfo{Oid: 12, Tables: map[string]postgres.TableInfo{"t1": postgres.TableInfo{Oid: 1, Relfilenode: 2}, "t2": postgres.TableInfo{Oid: 3, Relfilenode: 4}}}
+	newObjects := postgres.DatabaseObjectsInfo{Oid: 12, Tables: map[string]postgres.TableInfo{"t1": {Oid: 1, Relfilenode: 2}, "t2": {Oid: 3, Relfilenode: 4}}}
 
 	bytesOld, _ := json.Marshal(oldObjects)
 	bytesNew, _ := json.Marshal(newObjects)

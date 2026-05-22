@@ -1,6 +1,6 @@
 # MariaDB + WAL-G Docker Image
 
-Production-ready Docker image combining MariaDB with WAL-G for enterprise-grade backup and recovery.
+Production-ready Docker image combining MariaDB with WAL-G for automated backup and point-in-time recovery.
 
 ## Features
 
@@ -8,7 +8,7 @@ Production-ready Docker image combining MariaDB with WAL-G for enterprise-grade 
 - **Point-in-Time Recovery (PITR)**: Applies binlogs to specific timestamp
 - **Graceful Shutdown**: Proper signal handling with tini
 - **Permission Management**: Automatic ownership fixing
-- **Production Ready**: Mission-critical reliability
+- **Production Ready**: Tested and reliable for production use
 - **Docker & Kubernetes**: Works in both environments
 
 ## Quick Start
@@ -231,7 +231,7 @@ See `test-e2e.sh` for comprehensive end-to-end testing.
 
 - Check container logs: `docker logs -f mariadb`
 - Verify restore: Look for "Backup restored successfully"
-- Verify PITR: Look for "PITR completado"
+- Verify PITR: Look for "PITR completed"
 
 ## Troubleshooting
 

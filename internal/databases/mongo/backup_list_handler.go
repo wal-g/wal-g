@@ -3,7 +3,7 @@ package mongo
 import (
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -59,8 +59,8 @@ func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, j
 		backupDetails = append(backupDetails, backupDetail)
 	}
 
-	sort.Slice(backupDetails, func(i, j int) bool {
-		return backupDetails[i].FinishLocalTime.Before(backupDetails[j].FinishLocalTime)
+	slices.SortFunc(backupDetails, func(a, b *BackupDetail) int {
+		return a.FinishLocalTime.Compare(b.FinishLocalTime)
 	})
 
 	printableEntities := make([]printlist.Entity, len(backupDetails))

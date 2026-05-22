@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -358,8 +358,8 @@ func GetRestorePointsTimeSlices(restorePoints []storage.Object) []RestorePointTi
 			RestorePointTime{Name: StripRightmostRestorePointName(key), Time: time, StorageName: storageName})
 	}
 
-	sort.Slice(restorePointsTimes, func(i, j int) bool {
-		return restorePointsTimes[i].Time.Before(restorePointsTimes[j].Time)
+	slices.SortFunc(restorePointsTimes, func(a, b RestorePointTime) int {
+		return a.Time.Compare(b.Time)
 	})
 	return restorePointsTimes
 }

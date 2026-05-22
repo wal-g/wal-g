@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"sync/atomic"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/wal-g/internal/splitmerge"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -45,7 +48,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 				idx := 0
 				for {
 					fileReader := io.LimitReader(reader, int64(uploader.maxFileSize))
-					read := int64(0)
+					var read atomic.Int64
 					fileReader = utility.NewWithSizeReader(fileReader, &read)
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
@@ -54,8 +57,8 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 					if err != nil {
 						return err
 					}
-					if read == 0 {
-						err = uploader.Folder().DeleteObjects([]string{dstPath})
+					if read.Load() == 0 {
+						err = uploader.Folder().DeleteObjects([]storage.Object{storage.NewLocalObject(dstPath, time.Time{}, 0)})
 						return err
 					}
 					idx++

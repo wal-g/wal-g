@@ -13,7 +13,7 @@ type Folder struct {
 
 	GetPathMock       func() string
 	ListFolderMock    func() (objects []storage.Object, subFolders []storage.Folder, err error)
-	DeleteObjectsMock func(objectRelativePaths []string) error
+	DeleteObjectsMock func(objectRelativePaths []storage.Object) error
 	ExistsMock        func(objectRelativePath string) (bool, error)
 	GetSubFolderMock  func(subFolderRelativePath string) storage.Folder
 	ReadObjectMock    func(objectRelativePath string) (io.ReadCloser, error)
@@ -49,7 +49,7 @@ func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Fo
 	return f.MemFolder.ListFolder()
 }
 
-func (f *Folder) DeleteObjects(objectRelativePaths []string) error {
+func (f *Folder) DeleteObjects(objectRelativePaths []storage.Object) error {
 	if f.DeleteObjectsMock != nil {
 		return f.DeleteObjectsMock(objectRelativePaths)
 	}
@@ -100,3 +100,8 @@ func (f *Folder) Validate() error {
 
 // NOT IMPLEMENTED
 func (f *Folder) SetVersioningEnabled(enable bool) {}
+
+// NOT IMPLEMENTED
+func (f *Folder) GetVersioningEnabled() bool {
+	return false
+}

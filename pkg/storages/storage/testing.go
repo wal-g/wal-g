@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -92,11 +93,11 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	err = sub1.DeleteObjects([]string{"file1"})
+	err = sub1.DeleteObjects([]Object{NewLocalObject("file1", time.Time{}, 0)})
 	assert.NoError(t, err)
-	err = storageFolder.DeleteObjects([]string{"Sub1"})
+	err = storageFolder.DeleteObjects([]Object{NewLocalObject("Sub1", time.Time{}, 0)})
 	assert.NoError(t, err)
-	err = storageFolder.DeleteObjects([]string{"file0"})
+	err = storageFolder.DeleteObjects([]Object{NewLocalObject("file0", time.Time{}, 0)})
 	assert.NoError(t, err)
 
 	b, err = storageFolder.Exists("file0")

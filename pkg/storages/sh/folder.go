@@ -58,6 +58,10 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 			continue
 		}
 
+		if storage.HasTimestampRandomTmpSuffix(fileInfo.Name()) {
+			continue // Do not list objects that have not been written yet, like S3.
+		}
+
 		object := storage.NewLocalObject(
 			fileInfo.Name(),
 			fileInfo.ModTime(),
@@ -69,14 +73,14 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return objects, subFolders, err
 }
 
-func (folder *Folder) DeleteObjects(objectRelativePaths []string) error {
+func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
 	client, err := folder.sftpLazy.Client()
 	if err != nil {
 		return err
 	}
 
-	for _, relativePath := range objectRelativePaths {
-		objPath := client.Join(folder.path, relativePath)
+	for _, object := range objectsWithRelativePaths {
+		objPath := client.Join(folder.path, object.GetName())
 
 		stat, err := client.Stat(objPath)
 		if errors.Is(err, os.ErrNotExist) {
@@ -155,30 +159,41 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 		return err
 	}
 
-	absolutePath := filepath.Join(folder.path, name)
+	randomSuffix, err := storage.NewTimestampRandomTag()
+	if err != nil {
+		return fmt.Errorf("error generating random postfix: %w", err)
+	}
 
+	absolutePath := filepath.Join(folder.path, name)
 	dirPath := filepath.Dir(absolutePath)
+	tmpFilePath := absolutePath + randomSuffix
 	err = client.MkdirAll(dirPath)
 	if err != nil {
 		return fmt.Errorf("create directory %q via SFTP: %w", dirPath, err)
 	}
 
-	file, err := client.Create(absolutePath)
+	file, err := client.Create(tmpFilePath)
 	if err != nil {
-		return fmt.Errorf("create file %q via SFTP: %w", absolutePath, err)
+		return fmt.Errorf("create file %q via SFTP: %w", tmpFilePath, err)
 	}
 
 	_, err = io.Copy(file, content)
 	if err != nil {
 		closerErr := file.Close()
 		if closerErr != nil {
-			tracelog.InfoLogger.Println("Error during closing failed upload ", closerErr)
+			tracelog.InfoLogger.Println("error during closing failed upload ", closerErr)
 		}
-		return fmt.Errorf("write data to file %q via SFTP: %w", absolutePath, err)
+		return fmt.Errorf("write data to file %q via SFTP: %w", tmpFilePath, err)
 	}
+
 	err = file.Close()
 	if err != nil {
-		return fmt.Errorf("close file %q opened via SFTP: %w", absolutePath, err)
+		return fmt.Errorf("close file %q opened via SFTP: %w", tmpFilePath, err)
+	}
+
+	err = renameSFTP(client, tmpFilePath, absolutePath)
+	if err != nil {
+		return fmt.Errorf("unable to rename tmp file %q to %q: %w", tmpFilePath, absolutePath, err)
 	}
 	return nil
 }
@@ -212,3 +227,8 @@ func (folder *Folder) Validate() error {
 
 // NOT IMPLEMENTED
 func (folder *Folder) SetVersioningEnabled(enable bool) {}
+
+// NOT IMPLEMENTED
+func (folder *Folder) GetVersioningEnabled() bool {
+	return false
+}

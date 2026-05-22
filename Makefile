@@ -8,7 +8,7 @@ MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
-DOCKER_COMMON := golang ubuntu ubuntu_20_04 s3
+DOCKER_COMMON := golang ubuntu ubuntu_22_04 s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
@@ -67,24 +67,24 @@ pg_build_image:
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
 	docker compose build pg
-	docker compose build pg_build_docker_prefix
+	docker compose build pg_tests_template
 
 pg_save_image: install_and_build_pg pg_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE} | gzip -c > ${CACHE_FILE_DOCKER_PREFIX}
-	docker save wal-g/ubuntu:18.04 | gzip -c > ${CACHE_FILE_UBUNTU_18_04}
-	docker save wal-g/ubuntu:20.04 | gzip -c > ${CACHE_FILE_UBUNTU_20_04}
-	docker save ${IMAGE_GOLANG} | gzip -c > ${CACHE_FILE_GOLANG}
+	docker save ${IMAGE_PG_TESTS}  > ${CACHE_FILE_PG_TESTS}
+	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
+	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
+	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
-	@if [ "x" = "${CACHE_FILE_DOCKER_PREFIX}x" ]; then\
+	@if [ "x" = "${CACHE_FILE_PG_TESTS}x" ]; then\
 		echo "Rebuild";\
 		make install_and_build_pg;\
 		make pg_build_image;\
 	else\
-		docker load -i ${CACHE_FILE_DOCKER_PREFIX};\
+		docker load -i ${CACHE_FILE_PG_TESTS} && rm ${CACHE_FILE_PG_TESTS};\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
@@ -144,9 +144,9 @@ load_docker_common:
 		echo "Rebuild";\
 		docker compose build $(DOCKER_COMMON);\
 	else\
-		docker load -i ${CACHE_FILE_UBUNTU_18_04};\
-		docker load -i ${CACHE_FILE_UBUNTU_20_04};\
-		docker load -i ${CACHE_FILE_GOLANG};\
+		docker load -i ${CACHE_FILE_UBUNTU_18_04} && rm ${CACHE_FILE_UBUNTU_18_04};\
+		docker load -i ${CACHE_FILE_UBUNTU_22_04} && rm ${CACHE_FILE_UBUNTU_22_04};\
+		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
 	fi
 
 mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
@@ -183,7 +183,7 @@ mongo_install: mongo_build
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) MONGO_TEST_TYPE=$(MONGO_TEST_TYPE) go test -v -count=1 -timeout 45m  --tf.test=true --tf.debug=true --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) MONGO_TEST_TYPE=$(MONGO_TEST_TYPE) go test -v -count=1 -timeout 45m  --tf.test=true --tf.debug=true --tf.clean=false --tf.stop=false --tf.database=mongodb
 
 mongo_binary_features:
 	MONGO_TEST_TYPE="binary" $(MAKE) mongo_features

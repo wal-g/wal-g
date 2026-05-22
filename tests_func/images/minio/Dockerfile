@@ -1,4 +1,4 @@
-FROM minio/mc:RELEASE.2024-06-12T14-34-03Z as minio_client
+FROM minio/mc:RELEASE.2024-06-12T14-34-03Z AS minio_client
 FROM minio/minio:RELEASE.2024-06-13T22-53-53Z
 
 COPY --from=minio_client /usr/bin/mc /usr/bin/mc

@@ -17,11 +17,13 @@ const (
 
 	SkipMetadataFlag  = "skip-metadata"
 	CountJournalsFlag = "count-journals"
+	AddUserDataFlag   = "add-user-data"
 )
 
 var (
 	countJournals = false
 	skipMetadata  = false
+	userDataRaw   = ""
 )
 
 var binaryBackupPushCmd = &cobra.Command{
@@ -40,6 +42,7 @@ var binaryBackupPushCmd = &cobra.Command{
 			SkipMetadata:  skipMetadata,
 			AppName:       "wal-g-mongo " + binaryBackupPushCommandName,
 			CountJournals: countJournals,
+			UserDataRaw:   userDataRaw,
 		}
 		err := mongo.HandleBinaryBackupPush(ctx, pushArgs)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -51,5 +54,7 @@ func init() {
 	binaryBackupPushCmd.Flags().BoolVar(&skipMetadata, SkipMetadataFlag, false, "Skip metadata collecting for partial restore")
 	binaryBackupPushCmd.Flags().BoolVar(&countJournals, CountJournalsFlag, false,
 		"Count and store in S3 oplog sizes required to get replay data from a backup to the next one")
+	binaryBackupPushCmd.Flags().StringVar(&userDataRaw, AddUserDataFlag,
+		"", "Write the provided user data to the backup sentinel and metadata files.")
 	cmd.AddCommand(binaryBackupPushCmd)
 }

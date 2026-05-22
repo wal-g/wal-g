@@ -1,6 +1,9 @@
 package stats
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 var _ Collector = &nopCollector{}
 
@@ -22,10 +25,8 @@ func (nc *nopCollector) FirstAliveStorage() (*string, error) {
 }
 
 func (nc *nopCollector) SpecificStorage(name string) (bool, error) {
-	for _, s := range nc.storagesInOrder {
-		if s == name {
-			return true, nil
-		}
+	if slices.Contains(nc.storagesInOrder, name) {
+		return true, nil
 	}
 	return false, fmt.Errorf("unknown storage %q", name)
 }

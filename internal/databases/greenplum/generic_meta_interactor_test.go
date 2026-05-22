@@ -58,9 +58,7 @@ func TestFetch(t *testing.T) {
 	}
 
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	marshaller, _ := internal.NewDtoSerializer()
-	file, _ := marshaller.Marshal(testObject)
-	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
+	_ = internal.UploadDto(folder, testObject, internal.SentinelNameFromBackup(backupName))
 	actualResult, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
 
 	//check equality of time separately
@@ -96,9 +94,7 @@ func TestSetIsPermanent(t *testing.T) {
 	}
 
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	marshaller, _ := internal.NewDtoSerializer()
-	file, _ := marshaller.Marshal(testObject)
-	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
+	_ = internal.UploadDto(folder, testObject, internal.SentinelNameFromBackup(backupName))
 
 	_ = greenplum.NewGenericMetaSetter().SetIsPermanent(backupName, folder, true)
 	backup, err := greenplum.NewGenericMetaFetcher().Fetch(backupName, folder)
@@ -127,9 +123,7 @@ func TestSetUserData(t *testing.T) {
 	}
 
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	marshaller, _ := internal.NewDtoSerializer()
-	file, _ := marshaller.Marshal(testObject)
-	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
+	_ = internal.UploadDto(folder, testObject, internal.SentinelNameFromBackup(backupName))
 
 	_ = greenplum.NewGenericMetaSetter().SetUserData(backupName, folder, updatedData)
 

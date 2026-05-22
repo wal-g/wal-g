@@ -9,8 +9,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"time"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/statistics"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
@@ -53,6 +56,7 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 	preventWalOverwrite := viper.GetBool(conf.PreventWalOverwriteSetting) || strings.HasSuffix(walFilePath, ".history")
 	readyRename := viper.GetBool(conf.PgReadyRename)
 
+	uploadStart := time.Now()
 	bgUploader := NewBgUploader(ctx, walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
@@ -70,6 +74,7 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 	if err != nil {
 		return err
 	}
+	statistics.WriteS3UploadTimeMetric(time.Since(uploadStart))
 
 	if uploader.getUseWalDelta() {
 		uploader.FlushFiles(ctx)

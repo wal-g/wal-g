@@ -13,23 +13,23 @@ import (
 // ResolveStartingTS fetches last-known folder TS or initiates first run from last-known mongoClient TS
 func ResolveStartingTS(ctx context.Context,
 	downloader archive.Downloader,
-	mongoClient client.MongoDriver) (models.Timestamp, error) {
+	mongoClient client.MongoDriver) (models.Timestamp, bool, error) {
 	since, err := downloader.LastKnownArchiveTS()
 	if err != nil {
-		return models.Timestamp{}, fmt.Errorf("can not fetch last-known storage timestamp: %+v", err)
+		return models.Timestamp{}, false, fmt.Errorf("can not fetch last-known storage timestamp: %+v", err)
 	}
 	zeroTS := models.Timestamp{}
 	if since != zeroTS {
 		tracelog.InfoLogger.Printf("Newest timestamp at storage folder: %v", since)
-		return since, nil
+		return since, false, nil
 	}
 
 	tracelog.InfoLogger.Printf("Initiating archiving first run")
 	im, err := mongoClient.IsMaster(ctx)
 	if err != nil {
-		return models.Timestamp{}, fmt.Errorf("can not fetch LastWrite.MajorityOpTime: %+v", err)
+		return models.Timestamp{}, false, fmt.Errorf("can not fetch LastWrite.MajorityOpTime: %+v", err)
 	}
-	return im.LastWrite.MajorityOpTime.TS, nil
+	return im.LastWrite.MajorityOpTime.TS, true, nil
 }
 
 // BuildCursorFromTS finds point to resume archiving or _restarts_ procedure from newest oplog document

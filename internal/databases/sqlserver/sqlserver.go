@@ -1,6 +1,7 @@
 package sqlserver
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -249,8 +251,8 @@ func buildRestoreUrls(baseURL string, blobNames []string) string {
 }
 
 func buildPhysicalFileMove(files []DatabaseFile, dbname string, datadir string, logdir string) (string, error) {
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].FileID < files[j].FileID
+	slices.SortFunc(files, func(a, b DatabaseFile) int {
+		return cmp.Compare(a.FileID, b.FileID)
 	})
 	res := ""
 	dataFileCnt := 0
@@ -340,12 +342,9 @@ func doesLogBackupContainDB(folder storage.Folder, logBakupName string, dbname s
 	if err != nil {
 		return false, err
 	}
-	for _, dbDir := range dbDirs {
-		if dbname == path.Base(dbDir.GetPath()) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.ContainsFunc(dbDirs, func(d storage.Folder) bool {
+		return dbname == path.Base(d.GetPath())
+	}), nil
 }
 
 func listBackupBlobs(folder storage.Folder) ([]string, error) {

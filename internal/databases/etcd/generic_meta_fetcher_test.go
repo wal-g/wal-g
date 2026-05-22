@@ -36,9 +36,7 @@ func TestFetch(t *testing.T) {
 		UserData:    data,
 	}
 
-	marshaller, _ := internal.NewDtoSerializer()
-	file, _ := marshaller.Marshal(testObject)
-	_ = folder.PutObject(internal.SentinelNameFromBackup(backupName), file)
+	_ = internal.UploadDto(folder, testObject, internal.SentinelNameFromBackup(backupName))
 
 	actualResult, err := etcd.NewGenericMetaFetcher().Fetch(backupName, folder)
 	assert.NoError(t, err)

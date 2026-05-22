@@ -19,7 +19,7 @@ import (
 type FileTarBall struct {
 	out         string
 	number      int
-	partSize    *int64
+	partSize    *atomic.Int64
 	writeCloser io.WriteCloser
 	tarWriter   *tar.Writer
 }
@@ -73,8 +73,8 @@ func (tarBall *FileTarBall) CloseTar() error {
 	return tarBall.writeCloser.Close()
 }
 
-func (tarBall *FileTarBall) Size() int64            { return atomic.LoadInt64(tarBall.partSize) }
-func (tarBall *FileTarBall) AddSize(i int64)        { atomic.AddInt64(tarBall.partSize, i) }
+func (tarBall *FileTarBall) Size() int64            { return tarBall.partSize.Load() }
+func (tarBall *FileTarBall) AddSize(i int64)        { tarBall.partSize.Add(i) }
 func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
 func (tarBall *FileTarBall) AwaitUploads()          {}
 
@@ -82,7 +82,7 @@ func (tarBall *FileTarBall) AwaitUploads()          {}
 // written to buffer.
 type BufferTarBall struct {
 	number     int
-	partSize   *int64
+	partSize   *atomic.Int64
 	underlying *bytes.Buffer
 	tarWriter  *tar.Writer
 }
@@ -100,11 +100,11 @@ func (tarBall *BufferTarBall) CloseTar() error {
 }
 
 func (tarBall *BufferTarBall) Size() int64 {
-	return atomic.LoadInt64(tarBall.partSize)
+	return tarBall.partSize.Load()
 }
 
 func (tarBall *BufferTarBall) AddSize(add int64) {
-	atomic.AddInt64(tarBall.partSize, add)
+	tarBall.partSize.Add(add)
 }
 
 func (tarBall *BufferTarBall) TarWriter() *tar.Writer {

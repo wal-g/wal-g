@@ -70,3 +70,8 @@ test-mysql-walg
 main/mysql/wal-g-linux
 main/pg/wal-g-linux
 main/*/wal-g-*
+
+# AI tools files and directories
+.claude
+AGENTS.md
+.mcp.json

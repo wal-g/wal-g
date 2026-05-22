@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,10 +26,8 @@ type TimedBackup interface {
 }
 
 func SortTimedBackup(backups []TimedBackup) {
-	sort.Slice(backups, func(i, j int) bool {
-		b1 := backups[i]
-		b2 := backups[j]
-		return b1.StartTime().After(b2.StartTime())
+	slices.SortFunc(backups, func(a, b TimedBackup) int {
+		return b.StartTime().Compare(a.StartTime())
 	})
 }
 
@@ -147,8 +145,8 @@ func GetBackupTimeSlices(backupObjects []storage.Object) []BackupTime {
 }
 
 func SortBackupTimeSlices(backupTimes []BackupTime) {
-	sort.Slice(backupTimes, func(i, j int) bool {
-		return backupTimes[i].Time.Before(backupTimes[j].Time)
+	slices.SortFunc(backupTimes, func(a, b BackupTime) int {
+		return a.Time.Compare(b.Time)
 	})
 }
 
@@ -249,34 +247,40 @@ func SplitPurgingBackups(backups []TimedBackup,
 
 // DeleteGarbage purges given garbage keys
 func DeleteGarbage(folder storage.Folder, garbage []string) error {
-	var keys []string
+	var objects []storage.Object
 	for _, prefix := range garbage {
 		garbageObjects, err := storage.ListFolderRecursively(folder.GetSubFolder(prefix))
 		if err != nil {
 			return err
 		}
 		for _, obj := range garbageObjects {
-			keys = append(keys, path.Join(prefix, obj.GetName()))
+			objects = append(objects, storage.NewLocalObjectWithVersion(
+				path.Join(prefix, obj.GetName()),
+				obj.GetLastModified(),
+				obj.GetSize(),
+				obj.GetVersionID(),
+				obj.GetAdditionalInfo()),
+			)
 		}
 	}
-	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", keys)
-	return folder.DeleteObjects(keys)
+	tracelog.DebugLogger.Printf("Garbage keys will be deleted: %+v\n", objects)
+	return folder.DeleteObjects(objects)
 }
 
 // DeleteBackups purges given backups files
 // TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
 func DeleteBackups(folder storage.Folder, backups []string) error {
-	keys := make([]string, 0, len(backups)*2)
+	keys := make([]storage.Object, 0, len(backups)*2)
 	for i := range backups {
 		backupName := backups[i]
-		keys = append(keys, SentinelNameFromBackup(backupName))
+		keys = append(keys, storage.NewLocalObject(SentinelNameFromBackup(backupName), time.Time{}, 0))
 
 		dataObjects, err := storage.ListFolderRecursively(folder.GetSubFolder(backupName))
 		if err != nil {
 			return err
 		}
 		for _, obj := range dataObjects {
-			keys = append(keys, path.Join(backupName, obj.GetName()))
+			keys = append(keys, storage.NewLocalObject(path.Join(backupName, obj.GetName()), time.Time{}, 0))
 		}
 	}
 

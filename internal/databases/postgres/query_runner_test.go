@@ -81,3 +81,39 @@ func TestIsTablespaceMapExists(t *testing.T) {
 		})
 	}
 }
+
+func TestSystemIdentifierToUint64Y2K38(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    int64
+		expected uint64
+	}{
+		{
+			name:     "negative_from_pg_control_system_after_y2k38",
+			input:    -9223371710917873611,
+			expected: 9223372362791678005,
+		},
+		{
+			name:     "regular_positive_value",
+			input:    9223371710917873611,
+			expected: 9223371710917873611,
+		},
+		{
+			name:     "minus_one_becomes_max_uint64",
+			input:    -1,
+			expected: ^uint64(0),
+		},
+		{
+			name:     "min_int64_becomes_1_shift_63",
+			input:    -1 << 63,
+			expected: 1 << 63,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := uint64(tc.input)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}

@@ -172,7 +172,7 @@ func (b *BgUploader) scanAndProcessFiles() {
 //
 // This function should only be invoked once (in scanFiles)
 func (b *BgUploader) processFiles(fileChan <-chan string) {
-	var numUploaded int32
+	var numUploaded atomic.Int32
 	for {
 		name, ok := <-fileChan
 		if !ok {
@@ -192,7 +192,7 @@ func (b *BgUploader) processFiles(fileChan <-chan string) {
 				uploadedFile := b.upload(context.Background(), name)
 				b.workerCountSem.Release(1)
 				if uploadedFile {
-					if atomic.AddInt32(&numUploaded, 1) >= b.maxNumUploaded {
+					if numUploaded.Add(1) >= b.maxNumUploaded {
 						b.cancelFunc()
 					}
 				}

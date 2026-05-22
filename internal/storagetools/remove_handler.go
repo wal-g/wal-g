@@ -2,6 +2,7 @@ package storagetools
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -16,12 +17,7 @@ func HandleRemove(prefix string, folder storage.Folder) error {
 		return fmt.Errorf("object or folder %q does not exist", prefix)
 	}
 
-	paths := make([]string, len(objects))
-	for i, obj := range objects {
-		paths[i] = obj.GetName()
-	}
-
-	err = folder.DeleteObjects(paths)
+	err = folder.DeleteObjects(objects)
 	if err != nil {
 		return fmt.Errorf("delete objects by the prefix: %v", err)
 	}
@@ -45,6 +41,15 @@ func HandleRemoveWithGlobPattern(pattern string, folder storage.Folder) error {
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func HandleRemoveVersion(key string, versionID string, folder storage.Folder) error {
+	obj := storage.NewLocalObjectWithVersion(key, time.Time{}, 0, versionID, "")
+	err := folder.DeleteObjects([]storage.Object{obj})
+	if err != nil {
+		return fmt.Errorf("delete object %q version %q: %w", key, versionID, err)
 	}
 	return nil
 }

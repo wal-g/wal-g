@@ -563,6 +563,20 @@ Flags:
 - `-t, --to string` Storage config to where should copy backup
 - `-w, --with-history` If set - copy WALs older than backup finish_lsn. If not - copy only WALs from start_lsn to finish_lsn
 
+### Delete retention ordering and ``--use-sentinel-time``
+
+For PostgreSQL, ``wal-g delete retain`` and ``wal-g delete before`` sort backups using the **timeline** and WAL **segment number** parsed from the backup name (``base_<timeline>...``) unless you change that behavior.
+
+After a **major version upgrade** (for example ``pg_upgrade``) or a new data directory, the cluster timeline often **starts again at a low value** while backups from the old cluster remain in the same bucket or prefix. Then name-based order is **not** the same as real-world time: ``retain`` may keep old backups and delete **new** ones even when you meant to keep the latest *N* backups. See [issue #636](https://github.com/wal-g/wal-g/issues/636).
+
+Use the ``--use-sentinel-time`` flag on ``wal-g delete`` so WAL-G orders backups by **start time** from each backup's sentinel/metadata (when metadata is present for backups in storage). If metadata cannot be read for some backups, WAL-G **falls back** to timeline and segment ordering.
+
+**Mitigations:** prefer a **separate storage path or bucket** per major PostgreSQL version so pre- and post-upgrade backups are not mixed; always run without ``--confirm`` first to dry-run.
+
+```bash
+wal-g delete retain FULL 5 --use-sentinel-time --confirm
+```
+
 ### ``delete garbage``
 
 Deletes outdated WAL archives and backups leftover files from storage, e.g. unsuccessfully backups or partially deleted ones. Will remove all non-permanent objects before the earliest non-permanent backup. This command is useful when backups are being deleted by the `delete target` command.

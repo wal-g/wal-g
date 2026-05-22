@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -154,7 +154,7 @@ func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (Jour
 func (ji *JournalInfo) Delete(folder storage.Folder) error {
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
-		DeleteObjects([]string{ji.JournalName})
+		DeleteObjects([]storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
 	if err != nil {
 		return err
 	}
@@ -329,10 +329,8 @@ func filterJournalsInfoNewerThen(objects []storage.Object, timestamp time.Time) 
 }
 
 func sortJournalsInfo(objects []storage.Object) []storage.Object {
-	sort.Slice(objects, func(i, j int) bool {
-		ti := getJournalTimestamp(objects[i].GetName())
-		tj := getJournalTimestamp(objects[j].GetName())
-		return ti.Before(tj)
+	slices.SortFunc(objects, func(a, b storage.Object) int {
+		return getJournalTimestamp(a.GetName()).Compare(getJournalTimestamp(b.GetName()))
 	})
 	return objects
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 
-	"github.com/RoaringBitmap/roaring"
+	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 
@@ -72,7 +72,7 @@ type Bundle struct {
 	IncrementFromName  string
 	DeltaMap           PagedFileDeltaMap
 	TablespaceSpec     TablespaceSpec
-	DataCatalogSize    *int64
+	DataCatalogSize    atomic.Int64
 
 	forceIncremental bool
 
@@ -97,7 +97,6 @@ func NewBundle(
 		IncrementFromName:  incrementFromName,
 		TablespaceSpec:     NewTablespaceSpec(directory),
 		forceIncremental:   forceIncremental,
-		DataCatalogSize:    new(int64),
 	}
 }
 
@@ -193,7 +192,7 @@ func (bundle *Bundle) HandleWalkedFSObject(path string, info os.FileInfo, err er
 		return errors.Wrap(err, "HandleWalkedFSObject: walk failed")
 	}
 
-	atomic.AddInt64(bundle.DataCatalogSize, info.Size())
+	bundle.DataCatalogSize.Add(info.Size())
 
 	path, err = bundle.TablespaceSpec.makeTablespaceSymlinkPath(path)
 	if err != nil {

@@ -17,10 +17,10 @@ type TimelineCheckDetails struct {
 func (details TimelineCheckDetails) NewPlainTextReader() (io.Reader, error) {
 	var outputBuffer bytes.Buffer
 
-	outputBuffer.WriteString(fmt.Sprintf("Highest timeline found in storage: %d\n",
-		details.HighestStorageTimelineID))
-	outputBuffer.WriteString(fmt.Sprintf("Current cluster timeline: %d\n",
-		details.CurrentTimelineID))
+	fmt.Fprintf(&outputBuffer, "Highest timeline found in storage: %d\n",
+		details.HighestStorageTimelineID)
+	fmt.Fprintf(&outputBuffer, "Current cluster timeline: %d\n",
+		details.CurrentTimelineID)
 
 	return &outputBuffer, nil
 }
@@ -82,9 +82,7 @@ func tryFindHighestTimelineID(filenames []string) (highestTimelineID uint32) {
 			continue
 		}
 
-		if highestTimelineID < fileTimeline {
-			highestTimelineID = fileTimeline
-		}
+		highestTimelineID = max(highestTimelineID, fileTimeline)
 	}
 	return highestTimelineID
 }

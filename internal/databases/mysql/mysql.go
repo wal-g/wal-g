@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -123,8 +123,8 @@ func getLastUploadedBinlog(folder storage.Folder) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sort.Slice(logFiles, func(i, j int) bool {
-		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	slices.SortFunc(logFiles, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
 	})
 	if len(logFiles) == 0 {
 		return "", nil
@@ -143,8 +143,8 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 	if err != nil {
 		return "", err
 	}
-	sort.Slice(logFiles, func(i, j int) bool {
-		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	slices.SortFunc(logFiles, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
 	})
 	if len(logFiles) == 0 {
 		return "", nil
@@ -314,57 +314,6 @@ outer:
 	return nil
 }
 
-func provideLogs(folder storage.Folder, dstDir string, startTS, endTS time.Time, p *storage.ObjectProvider) {
-	defer p.Close()
-	_, err := os.Stat(dstDir)
-	if os.IsNotExist(err) {
-		err = os.MkdirAll(dstDir, 0777)
-		p.HandleError(err)
-		if err != nil {
-			return
-		}
-	}
-
-	logFolder := folder.GetSubFolder(BinlogPath)
-	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, utility.MaxTime)
-	p.HandleError(err)
-	if err != nil {
-		return
-	}
-
-	for _, logFile := range logsToFetch {
-		// download log files
-		binlogName := utility.TrimFileExtension(logFile.GetName())
-		binlogPath := path.Join(dstDir, binlogName)
-		tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-		if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
-			if os.IsExist(err) {
-				tracelog.WarningLogger.Printf("file %s exist skipping", binlogName)
-			} else {
-				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
-				p.HandleError(err)
-				return
-			}
-		}
-
-		// add file to provider
-		err = p.AddObject(logFile)
-		p.HandleError(err)
-		if err != nil {
-			return
-		}
-
-		timestamp, err := GetBinlogStartTimestamp(binlogPath, gomysql.MySQLFlavor)
-		p.HandleError(err)
-		if err != nil {
-			return
-		}
-		if timestamp.After(endTS) {
-			return
-		}
-	}
-}
-
 func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time, error) {
 	startTS := utility.MaxTime // far future
 	var streamSentinel StreamSentinelDto
@@ -409,8 +358,8 @@ func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStar
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(logFiles, func(i, j int) bool {
-		return logFiles[i].GetLastModified().Before(logFiles[j].GetLastModified())
+	slices.SortFunc(logFiles, func(a, b storage.Object) int {
+		return a.GetLastModified().Compare(b.GetLastModified())
 	})
 	var logsToFetch []storage.Object
 	for _, logFile := range logFiles {

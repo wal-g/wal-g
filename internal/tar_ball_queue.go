@@ -19,7 +19,7 @@ type TarBallQueue struct {
 	started          atomic.Bool
 
 	TarSizeThreshold   int64
-	AllTarballsSize    *int64
+	AllTarballsSize    atomic.Int64
 	TarBallMaker       TarBallMaker
 	LastCreatedTarball TarBall
 }
@@ -28,7 +28,6 @@ func NewTarBallQueue(tarSizeThreshold int64, tarBallMaker TarBallMaker) *TarBall
 	return &TarBallQueue{
 		TarSizeThreshold: tarSizeThreshold,
 		TarBallMaker:     tarBallMaker,
-		AllTarballsSize:  new(int64),
 		started:          atomic.Bool{},
 	}
 }
@@ -154,6 +153,6 @@ func (tarQueue *TarBallQueue) NewTarBall(dedicatedUploader bool) TarBall {
 }
 
 func (tarQueue *TarBallQueue) CloseTarball(tarBall TarBall) error {
-	atomic.AddInt64(tarQueue.AllTarballsSize, tarBall.Size())
+	tarQueue.AllTarballsSize.Add(tarBall.Size())
 	return tarBall.CloseTar()
 }

@@ -59,7 +59,7 @@ func tryReadXLogRecordData(alignedReader *AlignedReader) (data []byte, whole boo
 	if err != nil {
 		return nil, false, err
 	}
-	recordContent := make([]byte, minUint32(recordHeader.TotalRecordLength-XLogRecordHeaderSize, uint32(WalPageSize)))
+	recordContent := make([]byte, min(recordHeader.TotalRecordLength-XLogRecordHeaderSize, uint32(WalPageSize)))
 	readCount, err = alignedReader.Read(recordContent)
 	if err != nil && err != io.EOF {
 		return nil, false, errors.WithStack(err)

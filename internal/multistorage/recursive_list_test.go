@@ -2,11 +2,12 @@ package multistorage_test
 
 import (
 	"bytes"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/multistorage"
@@ -31,14 +32,9 @@ func TestListFolderRecursively(t *testing.T) {
 	fullPathObjects, err := multistorage.ListFolderRecursively(folder)
 	assert.NoError(t, err)
 	for _, relativePath := range paths {
-		found := false
-		for _, object := range fullPathObjects {
-			if object.GetName() == relativePath {
-				found = true
-				break
-			}
-		}
-		assert.True(t, found)
+		assert.True(t, slices.ContainsFunc(fullPathObjects, func(o storage.Object) bool {
+			return o.GetName() == relativePath
+		}))
 	}
 	for _, obj := range fullPathObjects {
 		assert.Equal(t, "test_storage", multistorage.GetStorage(obj))

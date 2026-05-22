@@ -1,8 +1,14 @@
 package storage
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"net/url"
+	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -48,4 +54,41 @@ func ParsePrefixAsURL(prefix string) (bucket, server string, err error) {
 	}
 
 	return storageURL.Host, storageURL.Path, nil
+}
+
+const (
+	tmpTagRandomBytes = 8 // 16 chars / 64 random bits
+	tmpTagTimeLayout  = "20060102T150405Z"
+)
+
+// NewTimestampRandomTag returns a timestamp-prefixed random tag.
+//
+// Example:
+//
+//	.tmp.20260428T113012Z-9f2c6a4b
+func NewTimestampRandomTag() (string, error) {
+	b := make([]byte, tmpTagRandomBytes)
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+
+	return ".tmp." + time.Now().UTC().Format(tmpTagTimeLayout) + "-" + hex.EncodeToString(b[:]), nil
+}
+
+var tmpSuffixRE = regexp.MustCompile(fmt.Sprintf(
+	`\.tmp\.`+
+		`\d{8}T\d{6}Z`+
+		`-`+
+		`[0-9a-f]{%d}`+
+		`$`,
+	tmpTagRandomBytes*2, // two hex chars per byte
+))
+
+// HasTimestampRandomTmpSuffix returns true iff path ends with:
+//
+//	.tmp.<UTC timestamp to seconds>-<8 lowercase hex chars>
+//
+// It checks only the path string suffix; it does not stat the file.
+func HasTimestampRandomTmpSuffix(path string) bool {
+	return tmpSuffixRE.MatchString(filepath.Base(path))
 }

@@ -2,6 +2,7 @@ package testtools
 
 import (
 	"bytes"
+	"sync/atomic"
 
 	"github.com/wal-g/wal-g/internal"
 )
@@ -11,7 +12,7 @@ import (
 // extracted to.
 type FileTarBallMaker struct {
 	number int
-	Size   *int64
+	Size   *atomic.Int64
 	Out    string
 }
 
@@ -27,7 +28,7 @@ func (tarBallMaker *FileTarBallMaker) Make(inheritState bool) internal.TarBall {
 
 type BufferTarBallMaker struct {
 	number        int
-	Size          *int64
+	Size          *atomic.Int64
 	BufferToWrite *bytes.Buffer
 }
 

@@ -11,7 +11,7 @@ Feature: MongoDB binary backups restores partially with PITR
   Scenario: Binary backups, and partial restores with pitr was done successfully
     # first load to backup
     And mongodb01 has been loaded with "partial1"
-    When we create binary mongo-backup on mongodb01
+    When we create binary mongo-backup on mongodb01 with metadata
     Then we got 1 backup entries of mongodb01
     And journal info count is #1
     # second load to pitr

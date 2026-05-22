@@ -24,7 +24,7 @@ import (
 
 	"github.com/gofrs/flock"
 	"github.com/google/uuid"
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -59,7 +59,7 @@ type Server struct {
 	decompressor compression.Decompressor
 	encryption   string
 	crypter      crypto.Crypter
-	readCache    *lru.Cache
+	readCache    *lru.Cache[string, []byte]
 }
 
 func NewServer(folder storage.Folder) (*Server, error) {
@@ -107,7 +107,7 @@ func NewServer(folder storage.Folder) (*Server, error) {
 	if bs.crypter != nil {
 		bs.encryption = bs.crypter.Name()
 	}
-	c, err := lru.NewWithEvict(BlockReadCacheSize, func(k, _ interface{}) {
+	c, err := lru.NewWithEvict[string, []byte](BlockReadCacheSize, func(k string, _ []byte) {
 		tracelog.DebugLogger.Printf("EVICT_CACHE: %s", k)
 	})
 	if err != nil {
@@ -699,7 +699,7 @@ func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 	}
 	bs.indexesMutex.Lock()
 	defer bs.indexesMutex.Unlock()
-	err := upperFolder.DeleteObjects([]string{blob})
+	err := upperFolder.DeleteObjects([]storage.Object{storage.NewLocalObject(blob, time.Time{}, 0)})
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -751,7 +751,12 @@ func (bs *Server) deleteGarbage(folder storage.Folder, garbage []string) {
 	if len(garbage) == 0 {
 		return
 	}
-	err := folder.DeleteObjects(garbage)
+
+	objects := make([]storage.Object, 0, len(garbage))
+	for _, item := range garbage {
+		objects = append(objects, storage.NewLocalObject(item, time.Time{}, 0))
+	}
+	err := folder.DeleteObjects(objects)
 	if err != nil {
 		tracelog.WarningLogger.Printf("proxy: failed to delete garbage objects: %v", err)
 	}
@@ -818,7 +823,7 @@ func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) 
 	var buf []byte
 	if b, ok := bs.readCache.Get(key); ok {
 		tracelog.DebugLogger.Printf("READ_CACHE: %s %d", key, s.BlockSize)
-		buf = b.([]byte)
+		buf = b
 	} else {
 		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
 		r, err := folder.ReadObject(s.Path)

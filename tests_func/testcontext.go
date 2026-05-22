@@ -19,7 +19,7 @@ const (
 	stagingDir = "staging"
 	envFile    = "env.file"
 
-	MAX_RETRIES_COUNT = 10
+	MAX_TRIES_COUNT = 10
 )
 
 func (tctx *TestContext) ContainerFQDN(name string) string {

@@ -90,7 +90,6 @@ func (err UnmarshallingError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-// TODO : unit tests
 func ConfigureLimiters() {
 	if conf.Turbo {
 		return
@@ -108,7 +107,6 @@ func ConfigureLimiters() {
 	}
 }
 
-// TODO : unit tests
 func ConfigureStorage() (storage.HashableStorage, error) {
 	var rootWraps []storage.WrapRootFolder
 	if limiters.NetworkLimiter != nil {
@@ -210,7 +208,6 @@ func GetRelativeArchiveDataFolderPath() string {
 	return filepath.Join(getRelativeWalFolderPath(""), "walg_data", "walg_archive_status")
 }
 
-// TODO : unit tests
 func ConfigureArchiveStatusManager() (fsutil.DataFolder, error) {
 	return fsutil.NewDiskDataFolder(getArchiveDataFolderPath())
 }
@@ -373,7 +370,6 @@ func configureEnvelopePgpCrypter(config *viper.Viper) (crypto.Crypter, error) {
 	return nil, errors.New("there is no any supported envelope gpg crypter configuration")
 }
 
-// TODO : unit tests
 func GetDeltaConfig() (maxDeltas int, fromFull bool) {
 	maxDeltas = viper.GetInt(conf.DeltaMaxStepsSetting)
 	if origin, hasOrigin := conf.GetSetting(conf.DeltaOriginSetting); hasOrigin {

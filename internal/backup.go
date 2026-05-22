@@ -1,7 +1,10 @@
 package internal
 
 import (
+	"encoding/json"
+	jsonv2 "encoding/json/v2"
 	"fmt"
+	"io"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -110,24 +113,16 @@ func FetchDto(folder storage.Folder, dto interface{}, path string) error {
 	if err != nil {
 		return err
 	}
-	unmarshaller, err := NewDtoSerializer()
-	if err != nil {
-		return err
-	}
 	defer utility.LoggedClose(reader, fmt.Sprintf("failed to close reader for %s", path))
-	return errors.Wrap(unmarshaller.Unmarshal(reader, dto), fmt.Sprintf("failed to fetch dto from %s", path))
+	return errors.Wrap(jsonv2.UnmarshalRead(reader, dto, json.DefaultOptionsV1()), fmt.Sprintf("failed to fetch dto from %s", path))
 }
 
 // UploadDto serializes given object to JSON and puts it to path
 func UploadDto(folder storage.Folder, dto interface{}, path string) error {
-	marshaller, err := NewDtoSerializer()
-	if err != nil {
-		return err
-	}
-	r, err := marshaller.Marshal(dto)
-	if err != nil {
-		return err
-	}
+	r, w := io.Pipe()
+	go func() {
+		_ = w.CloseWithError(jsonv2.MarshalWrite(w, dto, json.DefaultOptionsV1()))
+	}()
 	return folder.PutObject(path, r)
 }
 

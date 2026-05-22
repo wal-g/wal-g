@@ -15,6 +15,7 @@ type HandleBinaryBackupPushArgs struct {
 	CountJournals bool
 	Permanent     bool
 	SkipMetadata  bool
+	UserDataRaw   string
 }
 
 func HandleBinaryBackupPush(ctx context.Context, args HandleBinaryBackupPushArgs) error {
@@ -38,11 +39,23 @@ func HandleBinaryBackupPush(ctx context.Context, args HandleBinaryBackupPushArgs
 		return err
 	}
 
+	var userData interface{}
+	if args.UserDataRaw == "" {
+		if userData, err = internal.GetSentinelUserData(); err != nil {
+			return err
+		}
+	} else {
+		if userData, err = internal.UnmarshalSentinelUserData(args.UserDataRaw); err != nil {
+			return err
+		}
+	}
+
 	doBackupArgs := binary.DoBackupArgs{
 		BackupName:    binary.GenerateNewBackupName(),
 		CountJournals: args.CountJournals,
 		Permanent:     args.Permanent,
 		SkipMetadata:  args.SkipMetadata,
+		UserData:      userData,
 	}
 	return backupService.DoBackup(doBackupArgs)
 }

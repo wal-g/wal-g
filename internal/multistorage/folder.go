@@ -572,7 +572,7 @@ func (mf Folder) PutObjectOrUpdateAllFound(ctx context.Context, name string, con
 
 // DeleteObjects deletes the objects from multiple storages. A specific implementation is selected using
 // policies.Policies
-func (mf Folder) DeleteObjects(objectRelativePaths []string) error {
+func (mf Folder) DeleteObjects(objectRelativePaths []storage.Object) error {
 	switch mf.policies.Delete {
 	case policies.DeletePolicyFirst:
 		return mf.DeleteObjectsFromFirst(objectRelativePaths)
@@ -584,7 +584,7 @@ func (mf Folder) DeleteObjects(objectRelativePaths []string) error {
 }
 
 // DeleteObjectsFromFirst deletes the objects from the first storage.
-func (mf Folder) DeleteObjectsFromFirst(objectRelativePaths []string) error {
+func (mf Folder) DeleteObjectsFromFirst(objectRelativePaths []storage.Object) error {
 	if len(mf.usedFolders) == 0 {
 		return ErrNoUsedStorages
 	}
@@ -600,7 +600,7 @@ func (mf Folder) DeleteObjectsFromFirst(objectRelativePaths []string) error {
 }
 
 // DeleteObjectsFromAll deletes the objects from all used storages.
-func (mf Folder) DeleteObjectsFromAll(objectRelativePaths []string) error {
+func (mf Folder) DeleteObjectsFromAll(objectRelativePaths []storage.Object) error {
 	filesNum := len(objectRelativePaths)
 	for _, f := range mf.usedFolders {
 		err := f.DeleteObjects(objectRelativePaths)
@@ -680,7 +680,20 @@ func (mf Folder) Validate() error {
 	return nil
 }
 
+// TODO: not implemented
 func (mf Folder) SetVersioningEnabled(enable bool) {}
+
+// TODO: not implemented
+func (mf Folder) GetVersioningEnabled() bool {
+	return false
+}
+
+func (mf Folder) SetShowAllVersions(show bool) {
+	tracelog.DebugLogger.Printf("setting all versions %t", show)
+	for _, folder := range mf.configuredRootFolders {
+		storage.SetShowAllVersions(folder, show)
+	}
+}
 
 var (
 	ErrNoUsedStorages  = fmt.Errorf("no storages are used")
