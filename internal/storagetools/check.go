@@ -7,9 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 func HandleCheckRead(folder storage.Folder, filenames []string) error {

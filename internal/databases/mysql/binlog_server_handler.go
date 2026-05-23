@@ -18,7 +18,6 @@ import (
 	"github.com/go-mysql-org/go-mysql/server"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"

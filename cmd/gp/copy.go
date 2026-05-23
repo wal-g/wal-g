@@ -3,7 +3,6 @@ package gp
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"

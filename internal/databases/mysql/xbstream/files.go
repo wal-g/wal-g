@@ -7,7 +7,6 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/fsutil"
-
 	"github.com/wal-g/wal-g/utility"
 )
 

@@ -4,11 +4,10 @@ import (
 	"context"
 	"time"
 
-	conf "github.com/wal-g/wal-g/internal/config"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )

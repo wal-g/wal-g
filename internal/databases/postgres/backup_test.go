@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )

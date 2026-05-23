@@ -5,10 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 type SegmentRole string
