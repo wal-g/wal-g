@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/blang/semver"
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -216,7 +216,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 
-	semVer, err := semver.Make(fh.sentinel.GpVersion)
+	semVer, err := version.NewVersion(fh.sentinel.GpVersion)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to parse GP version: %s,  %s", fh.sentinel.GpVersion, err)
 	}

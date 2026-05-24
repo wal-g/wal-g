@@ -10,7 +10,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.13.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.1
 	github.com/aws/aws-sdk-go v1.55.7
-	github.com/blang/semver v3.5.1+incompatible
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cucumber/godog v0.15.1
 	github.com/cyberdelia/lzo v1.0.0
@@ -73,6 +72,7 @@ require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/alibabacloud-go/debug v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.24.2 // indirect
+	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
