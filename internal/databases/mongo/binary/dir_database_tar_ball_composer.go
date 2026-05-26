@@ -1,8 +1,9 @@
 package binary
 
 import (
-	"github.com/wal-g/wal-g/internal"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal"
 )
 
 const (

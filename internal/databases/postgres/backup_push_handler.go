@@ -14,16 +14,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
-
-	"github.com/pkg/errors"
-	"github.com/spf13/viper"
-	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -543,7 +540,7 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 	conn, err := pgconn.Connect(context.Background(), "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), conn)
+	baseBackup := NewStreamingBaseBackup(bh.PgInfo.PgDataDirectory, viper.GetInt64(conf.TarSizeThresholdSetting), bh.PgInfo.PgVersion, conn)
 	var bundleFiles internal.BundleFiles
 	if bh.Arguments.withoutFilesMetadata {
 		bundleFiles = &internal.NopBundleFiles{}

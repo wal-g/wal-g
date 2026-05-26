@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/wal-g/wal-g/internal/crypto/envelope/mocks"
 )

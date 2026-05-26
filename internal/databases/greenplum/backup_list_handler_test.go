@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
