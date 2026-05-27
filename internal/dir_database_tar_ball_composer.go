@@ -3,10 +3,11 @@ package internal
 import (
 	"archive/tar"
 	"context"
-	"github.com/wal-g/wal-g/internal/crypto"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
+
+	"github.com/wal-g/wal-g/internal/crypto"
+	"golang.org/x/sync/errgroup"
 )
 
 type PathFilter func(path string) bool

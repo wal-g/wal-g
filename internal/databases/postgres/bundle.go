@@ -11,14 +11,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
-
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/utility"
 )
 

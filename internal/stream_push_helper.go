@@ -9,11 +9,10 @@ import (
 	"time"
 
 	"github.com/wal-g/tracelog"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/wal-g/wal-g/internal/splitmerge"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 const (

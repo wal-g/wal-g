@@ -3,23 +3,20 @@ package greenplum
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"os"
 	"slices"
 	"strings"
 	"time"
 
-	"github.com/wal-g/wal-g/internal/multistorage"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-
-	"github.com/spf13/viper"
-
+	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/jackc/pgx/v5"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -183,7 +180,9 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 							pgOptions = "-c gp_role=utility"
 							switchFunction = "pg_switch_wal()"
 						}
-						return fmt.Sprintf("PGOPTIONS='%s' psql -p %d -d postgres -c 'select %s;'", pgOptions, seg[0].Port, switchFunction)
+						return fmt.Sprintf("PGOPTIONS='%s' psql -h %s -p %d -d postgres -c 'select %s;'",
+							pgOptions, seg[0].Hostname, seg[0].Port, switchFunction,
+						)
 					}
 					return ""
 				})

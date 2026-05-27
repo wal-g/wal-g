@@ -4,12 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-
-	"go.uber.org/mock/gomock"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-	"github.com/wal-g/wal-g/test/mocks"
-	mock_internal "github.com/wal-g/wal-g/testtools/mocks"
-
 	"path"
 	"strings"
 	"testing"
@@ -18,8 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/test/mocks"
 	"github.com/wal-g/wal-g/testtools"
+	mock_internal "github.com/wal-g/wal-g/testtools/mocks"
 	"github.com/wal-g/wal-g/utility"
+	"go.uber.org/mock/gomock"
 )
 
 func init() {

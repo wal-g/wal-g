@@ -1,3 +1,5 @@
+ARG PG_IMAGE=wal-g/pg10:latest
+
 FROM wal-g/golang:latest AS build
 ENV GOEXPERIMENT=jsonv2
 
@@ -27,7 +29,7 @@ RUN --mount=type=cache,target=/gocache cd cmd/daemonclient && GOCACHE=/gocache \
 RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache go test -v -c
 RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go test -v -c
 
-FROM wal-g/pg:latest
+FROM ${PG_IMAGE}
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y netcat-openbsd net-tools && apt-get clean
 

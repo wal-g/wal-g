@@ -10,12 +10,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/greenplum-db/gp-common-go-libs/cluster"
 	"github.com/greenplum-db/gp-common-go-libs/gplog"
 	"github.com/jackc/pgx/v5"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -522,7 +520,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
-	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(version)
+	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo()
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
