@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
@@ -15,13 +16,13 @@ func NewRestorePointBackupSelector(restorePoint string) *RestorePointBackupSelec
 	return &RestorePointBackupSelector{restorePoint: restorePoint}
 }
 
-func (s *RestorePointBackupSelector) Select(folder storage.Folder) (internal.Backup, error) {
-	restorePoint, err := FetchRestorePointMetadata(folder, s.restorePoint)
+func (s *RestorePointBackupSelector) Select(ctx context.Context, folder storage.Folder) (internal.Backup, error) {
+	restorePoint, err := FetchRestorePointMetadata(ctx, folder, s.restorePoint)
 	if err != nil {
 		return internal.Backup{}, err
 	}
 
-	backups, err := ListStorageBackups(folder)
+	backups, err := ListStorageBackups(ctx, folder)
 	if err != nil {
 		return internal.Backup{}, err
 	}

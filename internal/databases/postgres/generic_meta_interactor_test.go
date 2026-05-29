@@ -17,7 +17,7 @@ import (
 )
 
 func TestFetch(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder(t.Context())
 	backupName := "test"
 	data := "Data"
 	hostName := "TestHost"
@@ -43,15 +43,15 @@ func TestFetch(t *testing.T) {
 		StartTime:        date,
 		FinishTime:       date,
 		IsPermanent:      false,
-		IncrementDetails: postgres.NewIncrementDetailsFetcher(postgres.Backup{
+		IncrementDetails: postgres.NewIncrementDetailsFetcher(t.Context(), postgres.Backup{
 			Backup: internal.Backup{Name: backupName, Folder: folder},
 		}),
 		UserData: data,
 	}
 
-	_ = internal.UploadDto(folder, testObject, internal.MetadataNameFromBackup(backupName))
+	_ = internal.UploadDto(t.Context(), folder, testObject, internal.MetadataNameFromBackup(backupName))
 
-	actualResult, err := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
+	actualResult, err := postgres.NewGenericMetaFetcher().Fetch(t.Context(), backupName, folder)
 
 	assert.NoError(t, err)
 	isEqualTimeStart := expectedResult.StartTime.Equal(actualResult.StartTime)
@@ -69,16 +69,16 @@ func TestFetch(t *testing.T) {
 
 func TestFetchReturnErrorWhenNotFoundMetadata(t *testing.T) {
 	backupName := "test"
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder(t.Context())
 
-	_, err := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
+	_, err := postgres.NewGenericMetaFetcher().Fetch(t.Context(), backupName, folder)
 
 	assert.Error(t, err)
 	assert.IsType(t, storage.ObjectNotFoundError{}, err)
 }
 
 func TestSetUserData(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder(t.Context())
 	backupName := "test"
 	data := "Data"
 	hostName := "TestHost"
@@ -98,10 +98,10 @@ func TestSetUserData(t *testing.T) {
 
 	newUserData := "NewUserData"
 
-	_ = internal.UploadDto(folder, testObject, internal.MetadataNameFromBackup(backupName))
+	_ = internal.UploadDto(t.Context(), folder, testObject, internal.MetadataNameFromBackup(backupName))
 
-	setDataErr := postgres.NewGenericMetaSetter().SetUserData(backupName, folder, newUserData)
-	fetchResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
+	setDataErr := postgres.NewGenericMetaSetter().SetUserData(t.Context(), backupName, folder, newUserData)
+	fetchResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(t.Context(), backupName, folder)
 
 	assert.NoError(t, setDataErr)
 	assert.NoError(t, fetchErr)
@@ -110,10 +110,10 @@ func TestSetUserData(t *testing.T) {
 
 func TestSetUserDataReturnErrorWhenNotFoundMetadata(t *testing.T) {
 	backupName := "test"
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder(t.Context())
 	testObject := postgres.ExtendedMetadataDto{}
 
-	err := postgres.NewGenericMetaSetter().SetUserData(backupName, folder, testObject)
+	err := postgres.NewGenericMetaSetter().SetUserData(t.Context(), backupName, folder, testObject)
 
 	assert.Error(t, err)
 	assert.IsType(t, storage.ObjectNotFoundError{}, errors.Cause(err))
@@ -134,23 +134,23 @@ func TestSetUserDataReturnErrorWhenFolderIsMultiStorage(t *testing.T) {
 	folder := multistorage.NewFolder(memFolders, statsCollectorMock)
 	testObject := postgres.ExtendedMetadataDto{}
 
-	err := postgres.NewGenericMetaSetter().SetUserData(backupName, folder, testObject)
+	err := postgres.NewGenericMetaSetter().SetUserData(t.Context(), backupName, folder, testObject)
 
 	assert.Error(t, err)
 	assert.IsType(t, "failed to modify metadata", err.Error())
 }
 
 func TestSetIsPermanent(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder(t.Context())
 	backupName := "test"
 	testObject := postgres.ExtendedMetadataDto{
 		IsPermanent: false,
 	}
 
-	_ = internal.UploadDto(folder, testObject, internal.MetadataNameFromBackup(backupName))
+	_ = internal.UploadDto(t.Context(), folder, testObject, internal.MetadataNameFromBackup(backupName))
 
-	setErr := postgres.NewGenericMetaInteractor().SetIsPermanent(backupName, folder, true)
-	actualResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(backupName, folder)
+	setErr := postgres.NewGenericMetaInteractor().SetIsPermanent(t.Context(), backupName, folder, true)
+	actualResult, fetchErr := postgres.NewGenericMetaFetcher().Fetch(t.Context(), backupName, folder)
 
 	assert.NoError(t, setErr)
 	assert.NoError(t, fetchErr)

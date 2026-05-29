@@ -20,17 +20,15 @@ var (
 )
 
 type RestoreService struct {
-	Context      context.Context
 	LocalStorage *LocalStorage
 	Uploader     internal.Uploader
 
 	minimalConfigPath string
 }
 
-func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploader internal.Uploader,
+func CreateRestoreService(localStorage *LocalStorage, uploader internal.Uploader,
 	minimalConfigPath string) (*RestoreService, error) {
 	return &RestoreService{
-		Context:           ctx,
 		LocalStorage:      localStorage,
 		Uploader:          uploader,
 		minimalConfigPath: minimalConfigPath,
@@ -38,13 +36,14 @@ func CreateRestoreService(ctx context.Context, localStorage *LocalStorage, uploa
 }
 
 func (restoreService *RestoreService) DoRestore(
+	ctx context.Context,
 	rsConfig RsConfig,
 	shConfig ShConfig,
 	mongoCfgConfig MongoCfgConfig,
 	replyOplogConfig ReplyOplogConfig,
 	args RestoreArgs,
 ) error {
-	sentinel, err := common.DownloadSentinel(restoreService.Uploader.Folder(), args.BackupName)
+	sentinel, err := common.DownloadSentinel(ctx, restoreService.Uploader.Folder(), args.BackupName)
 	if err != nil {
 		return err
 	}
@@ -53,7 +52,7 @@ func (restoreService *RestoreService) DoRestore(
 	var onHostFilesFilter, tarFilesFilter map[string]struct{}
 
 	if args.IsPartial() {
-		metadata, err := common.DownloadMetadata(restoreService.Uploader.Folder(), args.BackupName)
+		metadata, err := common.DownloadMetadata(ctx, restoreService.Uploader.Folder(), args.BackupName)
 		if err != nil {
 			return err
 		}
@@ -70,7 +69,7 @@ func (restoreService *RestoreService) DoRestore(
 	}
 
 	if !args.SkipBackupDownload {
-		if err = restoreService.downloadBackup(args.BackupName, tarFilesFilter); err != nil {
+		if err = restoreService.downloadBackup(ctx, args.BackupName, tarFilesFilter); err != nil {
 			return err
 		}
 	} else {
@@ -85,7 +84,7 @@ func (restoreService *RestoreService) DoRestore(
 
 	if !args.SkipMongoReconfig {
 		if err = restoreService.reconfigMongo(
-			rsConfig, shConfig, replyOplogConfig,
+			ctx, rsConfig, shConfig, replyOplogConfig,
 			mongoCfgConfig, sentinel, args.IsPartial(),
 		); err != nil {
 			return err
@@ -96,14 +95,15 @@ func (restoreService *RestoreService) DoRestore(
 	return nil
 }
 
-func (restoreService *RestoreService) downloadBackup(backupName string, tarFilter map[string]struct{}) error {
+func (restoreService *RestoreService) downloadBackup(ctx context.Context,
+	backupName string, tarFilter map[string]struct{}) error {
 	err := restoreService.LocalStorage.CleanupMongodDBPath()
 	if err != nil {
 		return err
 	}
 
 	tracelog.InfoLogger.Println("Download backup files to dbPath")
-	return restoreService.downloadFromTarArchives(backupName, tarFilter)
+	return restoreService.downloadFromTarArchives(ctx, backupName, tarFilter)
 }
 
 func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion string) error {
@@ -116,31 +116,34 @@ func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion stri
 }
 
 func (restoreService *RestoreService) reconfigMongo(
+	ctx context.Context,
 	rsConfig RsConfig, shConfig ShConfig, replyOplogConfig ReplyOplogConfig,
 	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, partial bool,
 ) error {
-	if err := restoreService.fixSystemData(rsConfig, shConfig, mongoCfgConfig, partial); err != nil {
+	if err := restoreService.fixSystemData(ctx, rsConfig, shConfig, mongoCfgConfig, partial); err != nil {
 		return err
 	}
 
-	if err := restoreService.recoverFromOplogAsStandalone(sentinel, partial); err != nil {
+	if err := restoreService.recoverFromOplogAsStandalone(ctx, sentinel, partial); err != nil {
 		return err
 	}
 
 	if replyOplogConfig.HasPitr {
-		if err := restoreService.oplogReply(replyOplogConfig, partial); err != nil {
+		if err := restoreService.oplogReply(ctx, replyOplogConfig, partial); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (restoreService *RestoreService) downloadFromTarArchives(backupName string, filter map[string]struct{}) error {
+func (restoreService *RestoreService) downloadFromTarArchives(ctx context.Context,
+	backupName string, filter map[string]struct{}) error {
 	downloader := internal.CreateConcurrentDownloader(restoreService.Uploader, restoreService.LocalStorage.whitelist)
-	return downloader.Download(backupName, restoreService.LocalStorage.MongodDBPath, filter)
+	return downloader.Download(ctx, backupName, restoreService.LocalStorage.MongodDBPath, filter)
 }
 
 func (restoreService *RestoreService) fixSystemData(
+	ctx context.Context,
 	rsConfig RsConfig, shConfig ShConfig, mongocfgConfig MongoCfgConfig, partial bool,
 ) error {
 	mongodProcess := Mongod(restoreService.minimalConfigPath).
@@ -150,13 +153,13 @@ func (restoreService *RestoreService) fixSystemData(
 		mongodProcess.WithRestore()
 	}
 
-	if _, err := mongodProcess.Start(); err != nil {
+	if _, err := mongodProcess.Start(ctx); err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
 	defer mongodProcess.Close()
 
 	mongodService, err := CreateMongodService(
-		restoreService.Context,
+		ctx,
 		"wal-g restore",
 		mongodProcess.GetURI(),
 		10*time.Minute,
@@ -185,7 +188,7 @@ func (restoreService *RestoreService) fixSystemData(
 		return err
 	}
 
-	err = mongodService.Shutdown()
+	err = mongodService.Shutdown(ctx)
 	if err != nil {
 		return err
 	}
@@ -193,7 +196,8 @@ func (restoreService *RestoreService) fixSystemData(
 	return mongodProcess.Wait()
 }
 
-func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *models.Backup, partial bool) error {
+func (restoreService *RestoreService) recoverFromOplogAsStandalone(ctx context.Context,
+	sentinel *models.Backup, partial bool) error {
 	mongodProcess := Mongod(restoreService.minimalConfigPath).
 		WithParams(RecoverFromOplogAsStandalone, TakeUnstableCheckpointOnShutdown)
 
@@ -201,7 +205,7 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 		mongodProcess.WithRestore()
 	}
 
-	if _, err := mongodProcess.Start(); err != nil {
+	if _, err := mongodProcess.Start(ctx); err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
 
@@ -212,7 +216,7 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	}
 
 	mongodService, err := CreateMongodService(
-		restoreService.Context,
+		ctx,
 		"wal-g restore",
 		mongodProcess.GetURI(),
 		recoverTimeout,
@@ -221,7 +225,7 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	err = mongodService.Shutdown()
+	err = mongodService.Shutdown(ctx)
 	if err != nil {
 		return err
 	}
@@ -229,7 +233,8 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(sentinel *mod
 	return mongodProcess.Wait()
 }
 
-func (restoreService *RestoreService) oplogReply(replayOplogConfig ReplyOplogConfig, partial bool) error {
+func (restoreService *RestoreService) oplogReply(ctx context.Context,
+	replayOplogConfig ReplyOplogConfig, partial bool) error {
 	mongodProcess := Mongod(restoreService.minimalConfigPath).
 		WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
 
@@ -237,14 +242,14 @@ func (restoreService *RestoreService) oplogReply(replayOplogConfig ReplyOplogCon
 		mongodProcess.WithRestore()
 	}
 
-	if _, err := mongodProcess.Start(); err != nil {
+	if _, err := mongodProcess.Start(ctx); err != nil {
 		return errors.Wrap(err, "unable to start mongod in special mode")
 	}
 
 	defer mongodProcess.Close()
 
 	mongodService, err := CreateMongodService(
-		restoreService.Context,
+		ctx,
 		"wal-g restore",
 		mongodProcess.GetURI(),
 		10*time.Minute,
@@ -253,12 +258,12 @@ func (restoreService *RestoreService) oplogReply(replayOplogConfig ReplyOplogCon
 		return errors.Wrap(err, "unable to create mongod service")
 	}
 
-	err = RunOplogReplay(restoreService.Context, mongodProcess.GetURI(), replayOplogConfig)
+	err = RunOplogReplay(ctx, mongodProcess.GetURI(), replayOplogConfig)
 	if err != nil {
 		return err
 	}
 
-	err = mongodService.Shutdown()
+	err = mongodService.Shutdown(ctx)
 	if err != nil {
 		return err
 	}

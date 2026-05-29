@@ -1,6 +1,7 @@
 package gcs
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"time"
@@ -42,6 +43,7 @@ const (
 
 // TODO: Unit tests
 func ConfigureStorage(
+	ctx context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,
@@ -107,7 +109,7 @@ func ConfigureStorage(
 		},
 	}
 
-	st, err := NewStorage(config, rootWraps...)
+	st, err := NewStorage(ctx, config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create Google Cloud storage: %w", err)
 	}

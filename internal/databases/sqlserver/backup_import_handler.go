@@ -13,7 +13,8 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func prepareBackupImportSpec(externalStorage storage.Folder, d map[string]string) ([]string, map[string][]storage.Object, error) {
+func prepareBackupImportSpec(ctx context.Context,
+	externalStorage storage.Folder, d map[string]string) ([]string, map[string][]storage.Object, error) {
 	dbnames := make([]string, 0, len(d))
 	fileNames := make([]string, 0, len(d))
 	fileNameMapping := make(map[string][]string, len(d))
@@ -22,7 +23,7 @@ func prepareBackupImportSpec(externalStorage storage.Folder, d map[string]string
 		fileNameMapping[dbname] = strings.Split(v, ExternalBackupFilenameSeparator)
 		fileNames = append(fileNames, fileNameMapping[dbname]...)
 	}
-	objects, err := resolveExternalStorageFiles(externalStorage, fileNames)
+	objects, err := resolveExternalStorageFiles(ctx, externalStorage, fileNames)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -35,8 +36,9 @@ func prepareBackupImportSpec(externalStorage storage.Folder, d map[string]string
 	return dbnames, fileMapping, nil
 }
 
-func resolveExternalStorageFiles(externalFolder storage.Folder, fileNames []string) (map[string]storage.Object, error) {
-	objs, _, err := externalFolder.ListFolder()
+func resolveExternalStorageFiles(ctx context.Context,
+	externalFolder storage.Folder, fileNames []string) (map[string]storage.Object, error) {
+	objs, _, err := externalFolder.ListFolder(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to access external storage: %w", err)
 	}
@@ -63,15 +65,15 @@ func HandleBackupImport(ctx context.Context, externalConfig string, importDataba
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 	folder := st.RootFolder()
 
-	externalSt, err := internal.StorageFromConfig(externalConfig)
+	externalSt, err := internal.StorageFromConfig(ctx, externalConfig)
 	tracelog.ErrorLogger.FatalOnError(err)
 	externalFolder := externalSt.RootFolder()
 
-	dbnames, databaseFiles, err := prepareBackupImportSpec(externalFolder, importDatabases)
+	dbnames, databaseFiles, err := prepareBackupImportSpec(ctx, externalFolder, importDatabases)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
@@ -80,11 +82,11 @@ func HandleBackupImport(ctx context.Context, externalConfig string, importDataba
 
 	var backupName string
 	var sentinel *SentinelDto
-	backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
+	backup, err := internal.GetBackupByName(ctx, internal.LatestString, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
 	backupName = backup.Name
 	sentinel = new(SentinelDto)
-	err = backup.FetchSentinel(sentinel)
+	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = runParallel(func(i int) error {
@@ -95,7 +97,7 @@ func HandleBackupImport(ctx context.Context, externalConfig string, importDataba
 	sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	uploader := internal.NewRegularUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
-	err = internal.UploadSentinel(uploader, sentinel, backupName)
+	err = internal.UploadSentinel(ctx, uploader, sentinel, backupName)
 	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)
 
 	tracelog.InfoLogger.Printf("import finished")
@@ -172,7 +174,7 @@ func releaseLeasePrintError(ctx context.Context, client *http.Client, blobURL st
 }
 
 func importSingleDatabaseBlob(ctx context.Context, externalFolder storage.Folder, backupFile storage.Object, blobURL string) error {
-	rc, err := externalFolder.ReadObject(backupFile.GetName())
+	rc, err := externalFolder.ReadObject(ctx, backupFile.GetName())
 	if err != nil {
 		return err
 	}

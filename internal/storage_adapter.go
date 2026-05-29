@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"context"
+
 	"github.com/spf13/viper"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/azure"
@@ -20,6 +22,7 @@ type StorageAdapter struct {
 }
 
 type ConfigureStorageFunc func(
+	ctx context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,

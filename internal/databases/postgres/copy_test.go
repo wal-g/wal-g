@@ -17,20 +17,20 @@ import (
 
 func TestStartCopy_WhenThereAreNoObjectsToCopy(t *testing.T) {
 	var infos = make([]copy.InfoProvider, 0)
-	var err = copy.Infos(infos)
+	var err = copy.Infos(t.Context(), infos)
 	assert.NoError(t, err)
 }
 
 func TestStartCopy_WhenThereAreObjectsToCopy(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	infos, err := postgres.WildcardInfo(from, to)
+	infos, err := postgres.WildcardInfo(t.Context(), from, to)
 	assert.NoError(t, err)
-	err = copy.Infos(infos)
+	err = copy.Infos(t.Context(), infos)
 	assert.NoError(t, err)
 
 	for _, info := range infos {
-		var result, err = to.Exists(info.SrcObj.GetName())
+		var result, err = to.Exists(t.Context(), info.SrcObj.GetName())
 		assert.NoError(t, err)
 		if !result {
 			tracelog.InfoLogger.Println("Filename '" + info.SrcObj.GetName() + "' not found")
@@ -44,7 +44,7 @@ func TestGetBackupCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000002")
 	assert.NoError(t, err)
-	infos, err := postgres.BackupCopyingInfo(backup, from, to)
+	infos, err := postgres.BackupCopyingInfo(t.Context(), backup, from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
@@ -54,7 +54,7 @@ func TestGetBackupCopyingInfo_WhenFolderIsNotEmpty(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000002")
 	assert.NoError(t, err)
-	infos, err := postgres.BackupCopyingInfo(backup, from, to)
+	infos, err := postgres.BackupCopyingInfo(t.Context(), backup, from, to)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(infos))
 	assert.NotEmpty(t, infos)
@@ -65,44 +65,44 @@ func TestGetHistoryCopyingInfo_WhenFolderIsEmpty(t *testing.T) {
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000002")
 	assert.NoError(t, err)
-	infos, err := postgres.HistoryCopyingInfo(backup, from, to, true)
+	infos, err := postgres.HistoryCopyingInfo(t.Context(), backup, from, to, true)
 	assert.Error(t, err)
 	assert.Empty(t, infos)
 }
 
 func TestGetHistoryCopyingInfo_WhenThereIsNoHistoryObjects(t *testing.T) {
-	var from = testtools.CreateMockStorageFolder()
+	var from = testtools.CreateMockStorageFolder(t.Context())
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000002")
 	assert.NoError(t, err)
 	metadata := map[string]interface{}{"finish_lsn": postgres.WalSegmentSize * 4, "start_lsn": postgres.WalSegmentSize * 2}
 	bytesMetadata, err := json.Marshal(&metadata)
 	assert.NoError(t, err)
-	from.PutObject("base_000000010000000000000002/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
-	infos, err := postgres.HistoryCopyingInfo(backup, from, to, true)
+	from.PutObject(t.Context(), "base_000000010000000000000002/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+	infos, err := postgres.HistoryCopyingInfo(t.Context(), backup, from, to, true)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
 
 func TestGetHistoryCopyingInfo_WithAllHistory(t *testing.T) {
-	var from = testtools.CreateMockStorageFolder()
+	var from = testtools.CreateMockStorageFolder(t.Context())
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000004")
 	metadata := map[string]interface{}{"finish_lsn": postgres.WalSegmentSize * 4, "start_lsn": postgres.WalSegmentSize * 2}
 	bytesMetadata, err := json.Marshal(&metadata)
 	assert.NoError(t, err)
-	from.PutObject("base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+	from.PutObject(t.Context(), "base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
 	subFolderWals := from.GetSubFolder(utility.WalPath)
-	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{}) //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000000", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000001", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000002", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000003", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000004.00000028.br", &bytes.Buffer{}) //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000004", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000005", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000006", &bytes.Buffer{})             //nolint:errcheck
 	assert.NoError(t, err)
-	infos, err := postgres.HistoryCopyingInfo(backup, from, to, true)
+	infos, err := postgres.HistoryCopyingInfo(t.Context(), backup, from, to, true)
 	assert.NoError(t, err)
 	// from 1 to 6 (with walg backup info file)
 	assert.Equal(t, 7, len(infos))
@@ -110,24 +110,24 @@ func TestGetHistoryCopyingInfo_WithAllHistory(t *testing.T) {
 }
 
 func TestGetHistoryCopyingInfo_WithoutAllHistory(t *testing.T) {
-	var from = testtools.CreateMockStorageFolder()
+	var from = testtools.CreateMockStorageFolder(t.Context())
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 	var backup, err = postgres.NewBackup(from, "base_000000010000000000000004")
 	metadata := map[string]interface{}{"finish_lsn": postgres.WalSegmentSize * 4, "start_lsn": postgres.WalSegmentSize * 2}
 	bytesMetadata, err := json.Marshal(&metadata)
 	assert.NoError(t, err)
-	from.PutObject("base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+	from.PutObject(t.Context(), "base_000000010000000000000004/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
 	subFolderWals := from.GetSubFolder(utility.WalPath)
-	subFolderWals.PutObject("000000010000000000000000", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000001", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000002", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000003", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004.00000028.br", &bytes.Buffer{}) //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000004", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000005", &bytes.Buffer{})             //nolint:errcheck
-	subFolderWals.PutObject("000000010000000000000006", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000000", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000001", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000002", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000003", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000004.00000028.br", &bytes.Buffer{}) //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000004", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000005", &bytes.Buffer{})             //nolint:errcheck
+	subFolderWals.PutObject(t.Context(), "000000010000000000000006", &bytes.Buffer{})             //nolint:errcheck
 	assert.NoError(t, err)
-	infos, err := postgres.HistoryCopyingInfo(backup, from, to, false)
+	infos, err := postgres.HistoryCopyingInfo(t.Context(), backup, from, to, false)
 	assert.NoError(t, err)
 	// from 1 to 4 (with walg backup info file)
 	assert.Equal(t, 5, len(infos))
@@ -137,7 +137,7 @@ func TestGetHistoryCopyingInfo_WithoutAllHistory(t *testing.T) {
 func TestGetAllCopyingInfo_WhenFromFolderIsEmpty(t *testing.T) {
 	var from = testtools.MakeDefaultInMemoryStorageFolder()
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos, err = postgres.WildcardInfo(from, to)
+	var infos, err = postgres.WildcardInfo(t.Context(), from, to)
 	assert.NoError(t, err)
 	assert.Empty(t, infos)
 }
@@ -145,12 +145,12 @@ func TestGetAllCopyingInfo_WhenFromFolderIsEmpty(t *testing.T) {
 func TestGetAllCopyingInfo_WhenFromFolderIsNotEmpty(t *testing.T) {
 	var from = testtools.CreateMockStorageFolderWithPermanentBackups(t)
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	var infos, err = postgres.WildcardInfo(from, to)
+	var infos, err = postgres.WildcardInfo(t.Context(), from, to)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, infos)
 
 	for _, info := range infos {
-		var result, err = from.Exists(info.SrcObj.GetName())
+		var result, err = from.Exists(t.Context(), info.SrcObj.GetName())
 		assert.NoError(t, err)
 		assert.True(t, result)
 	}
@@ -172,9 +172,9 @@ func TestBuildCopyingInfos_WhenThereNoObjectsInFolder(t *testing.T) {
 }
 
 func TestBuildCopyingInfos_WhenConditionIsJustFalse(t *testing.T) {
-	var from = testtools.CreateMockStorageFolder()
+	var from = testtools.CreateMockStorageFolder(t.Context())
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
-	objects, err := storage.ListFolderRecursively(from)
+	objects, err := storage.ListFolderRecursively(t.Context(), from)
 	assert.NoError(t, err)
 	var infos = copy.BuildCopyingInfos(
 		from,
@@ -188,10 +188,10 @@ func TestBuildCopyingInfos_WhenConditionIsJustFalse(t *testing.T) {
 }
 
 func TestBuildCopyingInfos_WhenComplexCondition(t *testing.T) {
-	var from = testtools.CreateMockStorageFolder()
+	var from = testtools.CreateMockStorageFolder(t.Context())
 	var to = testtools.MakeDefaultInMemoryStorageFolder()
 
-	objects, err := storage.ListFolderRecursively(from)
+	objects, err := storage.ListFolderRecursively(t.Context(), from)
 	assert.NoError(t, err)
 	var condition = func(object storage.Object) bool { return strings.HasSuffix(object.GetName(), ".json") }
 	var expectedCount int

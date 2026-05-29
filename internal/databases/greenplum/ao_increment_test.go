@@ -29,10 +29,10 @@ func TestFailOnIncorrectOffset(t *testing.T) {
 		fmt.Print(err.Error())
 	}
 
-	_, err = greenplum.NewIncrementalPageReader(file, aoSegmentFileSizeBytes, aoSegmentFileSizeBytes)
+	_, err = greenplum.NewIncrementalPageReader(t.Context(), file, aoSegmentFileSizeBytes, aoSegmentFileSizeBytes)
 	assert.Error(t, err)
 
-	_, err = greenplum.NewIncrementalPageReader(file, 0, aoSegmentFileSizeBytes)
+	_, err = greenplum.NewIncrementalPageReader(t.Context(), file, 0, aoSegmentFileSizeBytes)
 	assert.Error(t, err)
 }
 
@@ -42,7 +42,7 @@ func gpReadIncrement(offset, eof int64, t *testing.T) {
 		fmt.Print(err.Error())
 	}
 
-	reader, err := greenplum.NewIncrementalPageReader(file, eof, offset)
+	reader, err := greenplum.NewIncrementalPageReader(t.Context(), file, eof, offset)
 	assert.NoError(t, err)
 
 	increment, err := io.ReadAll(reader)

@@ -27,7 +27,7 @@ type UploadBackupArgs struct {
 
 // UploadBackup compresses a stream and uploads it, and uploads meta info
 func (su *StorageUploader) UploadBackup(ctx context.Context, args UploadBackupArgs) error {
-	if err := args.MetaConstructor.Init(); err != nil {
+	if err := args.MetaConstructor.Init(ctx); err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
 
@@ -49,11 +49,11 @@ func (su *StorageUploader) UploadBackup(ctx context.Context, args UploadBackupAr
 		return err
 	}
 
-	return su.Finalize(args.MetaConstructor, dstPath)
+	return su.Finalize(ctx, args.MetaConstructor, dstPath)
 }
 
-func (su *StorageUploader) Finalize(metaConstructor internal.MetaConstructor, dstPath string) error {
-	if err := metaConstructor.Finalize(dstPath); err != nil {
+func (su *StorageUploader) Finalize(ctx context.Context, metaConstructor internal.MetaConstructor, dstPath string) error {
+	if err := metaConstructor.Finalize(ctx, dstPath); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
@@ -69,7 +69,7 @@ func (su *StorageUploader) Finalize(metaConstructor internal.MetaConstructor, ds
 	backup.BackupSize = uploadedSize
 	backup.BackupName = dstPath
 	backup.DataSize = rawSize
-	if err := internal.UploadSentinel(su, backupSentinelInfo, dstPath); err != nil {
+	if err := internal.UploadSentinel(ctx, su, backupSentinelInfo, dstPath); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}
 	return nil

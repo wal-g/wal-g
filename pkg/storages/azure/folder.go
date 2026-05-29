@@ -44,9 +44,8 @@ func (folder *Folder) GetPath() string {
 	return folder.path
 }
 
-func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
+func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
-	ctx := context.Background()
 	blobClient := folder.containerClient.NewBlockBlobClient(path)
 	_, err := blobClient.GetProperties(ctx, nil)
 	if err != nil && bloberror.HasCode(err, bloberror.BlobNotFound) {
@@ -58,13 +57,13 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	return true, nil
 }
 
-func (folder *Folder) ListFolder() ([]storage.Object, []storage.Folder, error) {
+func (folder *Folder) ListFolder(ctx context.Context) ([]storage.Object, []storage.Folder, error) {
 	var objects []storage.Object
 	var subFolders []storage.Folder
 
 	blobPager := folder.containerClient.NewListBlobsHierarchyPager("/", &container.ListBlobsHierarchyOptions{Prefix: &folder.path})
 	for blobPager.More() {
-		blobs, err := blobPager.NextPage(context.Background())
+		blobs, err := blobPager.NextPage(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("iterate through folder %q: %w", folder.path, err)
 		}
@@ -101,11 +100,11 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 		folder.timeout)
 }
 
-func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (folder *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	blobClient := folder.containerClient.NewBlockBlobClient(path)
 
-	get, err := blobClient.DownloadStream(context.Background(), nil)
+	get, err := blobClient.DownloadStream(ctx, nil)
 	if err != nil {
 		if bloberror.HasCode(err, bloberror.BlobNotFound) {
 			return nil, storage.NewObjectNotFoundError(path)
@@ -115,11 +114,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	return get.Body, nil
 }
 
-func (folder *Folder) PutObject(name string, content io.Reader) error {
-	return folder.PutObjectWithContext(context.Background(), name, content)
-}
-
-func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (folder *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	//Upload content to a block blob using full path
 	path := storage.JoinPath(folder.path, name)
@@ -133,10 +128,10 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 	return nil
 }
 
-func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
+func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
 	var exists bool
 	var err error
-	if exists, err = folder.Exists(srcPath); !exists {
+	if exists, err = folder.Exists(ctx, srcPath); !exists {
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
@@ -145,18 +140,18 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	srcClient := folder.containerClient.NewBlockBlobClient(srcPath)
 	dstClient := folder.containerClient.NewBlockBlobClient(dstPath)
 	hot := blob.AccessTierHot
-	_, err = dstClient.StartCopyFromURL(context.Background(), srcClient.URL(), &blob.StartCopyFromURLOptions{Tier: &hot})
+	_, err = dstClient.StartCopyFromURL(ctx, srcClient.URL(), &blob.StartCopyFromURLOptions{Tier: &hot})
 	return err
 }
 
-func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+func (folder *Folder) DeleteObjects(ctx context.Context, objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
 		//Delete blob using blobClient obtained from full path to blob
 		path := storage.JoinPath(folder.path, object.GetName())
 		blobClient := folder.containerClient.NewBlockBlobClient(path)
 		tracelog.DebugLogger.Printf("Delete %v\n", path)
 		deleteOption := blob.DeleteSnapshotsOptionTypeInclude
-		_, err := blobClient.Delete(context.Background(), &blob.DeleteOptions{DeleteSnapshots: &deleteOption})
+		_, err := blobClient.Delete(ctx, &blob.DeleteOptions{DeleteSnapshots: &deleteOption})
 		if err != nil && bloberror.HasCode(err, bloberror.BlobNotFound) {
 			continue
 		}
@@ -168,14 +163,14 @@ func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) e
 	return nil
 }
 
-func (folder *Folder) Validate() error {
+func (folder *Folder) Validate(ctx context.Context) error {
 	return nil
 }
 
 // NOT IMPLEMENTED
-func (folder *Folder) SetVersioningEnabled(using bool) {}
+func (folder *Folder) SetVersioningEnabled(_ context.Context, using bool) {}
 
 // NOT IMPLEMENTED
-func (folder *Folder) GetVersioningEnabled() bool {
+func (folder *Folder) GetVersioningEnabled(_ context.Context) bool {
 	return false
 }

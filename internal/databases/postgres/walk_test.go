@@ -181,7 +181,7 @@ func extract(t *testing.T, dir string) string {
 		t.Log(err)
 	}
 
-	err = internal.ExtractAll(ft, out)
+	err = internal.ExtractAll(t.Context(), ft, out)
 	if err != nil {
 		t.Log(err)
 	}
@@ -369,7 +369,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer, withoutFilesMetadata))
+	err = bundle.SetupComposer(t.Context(), setupTestTarBallComposerMaker(composer, withoutFilesMetadata))
 	if err != nil {
 		t.Log(err)
 	}
@@ -409,7 +409,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	sen := bundle.Sentinel.Info.Name()
 	assert.Equal(t, postgres.PgControl, sen)
 
-	err = bundle.UploadPgControl("lz4")
+	err = bundle.UploadPgControl(t.Context(), "lz4")
 	assert.NoError(t, err)
 
 	// err = bundle.UploadLabelFiles("backup", "table")

@@ -1,13 +1,15 @@
 package etcd
 
 import (
+	"context"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func NewEtcdDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error) {
-	backups, err := internal.GetBackupSentinelObjects(folder)
+func NewEtcdDeleteHandler(ctx context.Context, folder storage.Folder) (*internal.DeleteHandler, error) {
+	backups, err := internal.GetBackupSentinelObjects(ctx, folder)
 	if err != nil {
 		return nil, err
 	}
@@ -17,7 +19,7 @@ func NewEtcdDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error
 		backupObjects = append(backupObjects, internal.NewDefaultBackupObject(object))
 	}
 
-	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
+	permanentBackups := internal.GetPermanentBackups(ctx, folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
 
 	isPermanentFunc := func(object storage.Object) bool {
 		return internal.IsPermanent(object.GetName(), permanentBackups, internal.StreamBackupNameLength)

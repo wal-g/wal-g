@@ -1,6 +1,9 @@
 package internal
 
-import "io"
+import (
+	"context"
+	"io"
+)
 
 type FileType string
 
@@ -12,7 +15,7 @@ const (
 // ReaderMaker is the generic interface used by extract. It
 // allows for ease of handling different file formats.
 type ReaderMaker interface {
-	Reader() (io.ReadCloser, error)
+	Reader(ctx context.Context) (io.ReadCloser, error)
 	StoragePath() string
 	LocalPath() string
 	FileType() FileType

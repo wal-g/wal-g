@@ -100,7 +100,7 @@ type OplogPushReport struct {
 
 // OplogPushStats implements OplogPushUpdater
 type OplogPushStats struct {
-	ctx      context.Context
+	ctx      context.Context //nolint:containedctx // drives background stats refresh goroutine
 	uploader OplogArchivedStatsReporter
 	mc       client.MongoDriver
 	sync.Mutex

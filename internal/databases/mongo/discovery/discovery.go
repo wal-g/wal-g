@@ -14,7 +14,7 @@ import (
 func ResolveStartingTS(ctx context.Context,
 	downloader archive.Downloader,
 	mongoClient client.MongoDriver) (models.Timestamp, bool, error) {
-	since, err := downloader.LastKnownArchiveTS()
+	since, err := downloader.LastKnownArchiveTS(ctx)
 	if err != nil {
 		return models.Timestamp{}, false, fmt.Errorf("can not fetch last-known storage timestamp: %+v", err)
 	}

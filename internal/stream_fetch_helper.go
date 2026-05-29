@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"path"
@@ -37,11 +38,12 @@ func GetLogsDstSettings(operationLogsDstEnvVariable string) (dstFolder string, e
 
 // TODO : unit tests
 // downloadAndDecompressStream downloads, decompresses and writes stream to stdout
-func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) error {
+func DownloadAndDecompressStream(ctx context.Context, backup Backup, writeCloser io.WriteCloser) error {
 	defer utility.LoggedClose(writeCloser, "")
 
 	for _, decompressor := range compression.Decompressors {
-		archiveReader, exists, err := TryDownloadFile(NewFolderReader(backup.Folder), GetStreamName(backup.Name, decompressor.FileExtension()))
+		archiveReader, exists, err := TryDownloadFile(ctx, NewFolderReader(backup.Folder),
+			GetStreamName(backup.Name, decompressor.FileExtension()))
 		if err != nil {
 			return fmt.Errorf("failed to dowload file: %w", err)
 		}
@@ -68,14 +70,14 @@ func DownloadAndDecompressStream(backup Backup, writeCloser io.WriteCloser) erro
 
 // TODO : unit tests
 // DownloadAndDecompressSplittedStream downloads, decompresses and writes stream to stdout
-func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension string,
+func DownloadAndDecompressSplittedStream(ctx context.Context, backup Backup, blockSize int, extension string,
 	writeCloser io.WriteCloser, maxDownloadRetry int) error {
 	decompressor := compression.FindDecompressor(extension)
 	if decompressor == nil {
 		return fmt.Errorf("decompressor for file type '%s' not found", extension)
 	}
 
-	files, err := GetPartitionedBackupFileNames(backup, decompressor)
+	files, err := GetPartitionedBackupFileNames(ctx, backup, decompressor)
 	if err != nil {
 		return err
 	}
@@ -91,7 +93,7 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 		go func(files []string) {
 			defer close(errCh)
 			for _, fileName := range files {
-				err := downloadAndDecompressFile(backup, decompressor, fileName, writer, maxDownloadRetry)
+				err := downloadAndDecompressFile(ctx, backup, decompressor, fileName, writer, maxDownloadRetry)
 				if err != nil {
 					tracelog.ErrorLogger.PrintOnError(writer.Close())
 					errCh <- err
@@ -114,10 +116,10 @@ func DownloadAndDecompressSplittedStream(backup Backup, blockSize int, extension
 	return lastErr
 }
 
-func downloadAndDecompressFile(backup Backup, decompressor compression.Decompressor,
+func downloadAndDecompressFile(ctx context.Context, backup Backup, decompressor compression.Decompressor,
 	fileName string, writer io.WriteCloser, maxDownloadRetry int) error {
 	getArchiveReader := func() (io.ReadCloser, error) {
-		archiveReader, exists, err := TryDownloadFile(NewFolderReader(backup.Folder), fileName)
+		archiveReader, exists, err := TryDownloadFile(ctx, NewFolderReader(backup.Folder), fileName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to dowload file %v: %w", fileName, err)
 		} else if !exists {
@@ -149,9 +151,9 @@ func downloadAndDecompressFile(backup Backup, decompressor compression.Decompres
 	return nil
 }
 
-func GetPartitionedBackupFileNames(backup Backup, decompressor compression.Decompressor) ([][]string, error) {
+func GetPartitionedBackupFileNames(ctx context.Context, backup Backup, decompressor compression.Decompressor) ([][]string, error) {
 	// list all files in backup folder:
-	files, _, err := backup.Folder.GetSubFolder(backup.Name).ListFolder()
+	files, _, err := backup.Folder.GetSubFolder(backup.Name).ListFolder(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot list files in backup folder '%s' due to: %w", backup.Folder.GetPath(), err)
 	}

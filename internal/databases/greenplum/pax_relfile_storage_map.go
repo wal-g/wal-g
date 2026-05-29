@@ -16,9 +16,7 @@ import (
 //
 // PAX is a Cloudberry-only access method, so for plain Greenplum and unknown flavors
 // the function short-circuits to an empty map without contacting the catalog.
-func NewPaxRelFileStorageMap(queryRunner *GpQueryRunner) (pax.RelFileStorageMap, error) {
-	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
-	ctx := context.Background()
+func NewPaxRelFileStorageMap(ctx context.Context, queryRunner *GpQueryRunner) (pax.RelFileStorageMap, error) {
 	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query greenplum version")

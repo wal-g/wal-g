@@ -46,7 +46,7 @@ func buildOplogReplayRunArgs(
 	cmdargs []string, partial,
 	withCatchUpReconfig bool, minimalConfigPath string,
 ) (binary.ReplyOplogConfig, string, error) {
-	args, err := binary.NewReplyOplogConfig(cmdargs[0], cmdargs[1], partial, withCatchUpReconfig, minimalConfigPath)
+	args, err := binary.NewReplyOplogConfig(cmd.Context(), cmdargs[0], cmdargs[1], partial, withCatchUpReconfig, minimalConfigPath)
 	if err != nil {
 		return args, "", err
 	}

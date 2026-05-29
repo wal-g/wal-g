@@ -290,7 +290,7 @@ func (e *WalgExporter) Start(ctx context.Context) {
 	defer tickerWalVerify.Stop()
 
 	// Initial scrape
-	e.checkStorageAliveness()
+	e.checkStorageAliveness(ctx)
 	e.scrapeBackupMetrics()
 	e.scrapeWalMetrics()
 
@@ -301,7 +301,7 @@ func (e *WalgExporter) Start(ctx context.Context) {
 			e.logger.Info("Exporter context canceled, stopping metrics collection")
 			return
 		case <-tickerStorage.C:
-			e.checkStorageAliveness()
+			e.checkStorageAliveness(ctx)
 		case <-tickerBackup.C:
 			e.scrapeBackupMetrics()
 		case <-tickerWalVerify.C:
@@ -539,11 +539,11 @@ func (e *WalgExporter) updatePitrWindow(backups []BackupInfo) {
 }
 
 // checkStorageAliveness checks if the storage backend is accessible
-func (e *WalgExporter) checkStorageAliveness() {
+func (e *WalgExporter) checkStorageAliveness(ctx context.Context) {
 	start := time.Now()
 
 	// Set a reasonable timeout for storage check
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	// Try a simple WAL-G command to test storage connectivity

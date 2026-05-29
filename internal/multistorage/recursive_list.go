@@ -1,6 +1,7 @@
 package multistorage
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strings"
@@ -10,14 +11,15 @@ import (
 
 // ListFolderRecursively is like storage.ListFolderRecursively but it preserves the information about what storage each
 // object is stored in.
-func ListFolderRecursively(folder storage.Folder) (relativePathObjects []storage.Object, err error) {
+func ListFolderRecursively(ctx context.Context, folder storage.Folder) (relativePathObjects []storage.Object, err error) {
 	noFilter := func(string) bool { return true }
-	return ListFolderRecursivelyWithFilter(folder, noFilter)
+	return ListFolderRecursivelyWithFilter(ctx, folder, noFilter)
 }
 
 // ListFolderRecursivelyWithFilter is like storage.ListFolderRecursivelyWithFilter but it preserves the information
 // about what storage each object is stored in.
 func ListFolderRecursivelyWithFilter(
+	ctx context.Context,
 	folder storage.Folder,
 	folderSelector func(path string) bool,
 ) (relativePathObjects []storage.Object, err error) {
@@ -26,7 +28,7 @@ func ListFolderRecursivelyWithFilter(
 	for len(queue) > 0 {
 		subFolder := queue[0]
 		queue = queue[1:]
-		objects, subFolders, err := subFolder.ListFolder()
+		objects, subFolders, err := subFolder.ListFolder(ctx)
 		folderPrefix := strings.TrimPrefix(subFolder.GetPath(), folder.GetPath())
 		relativePathObjects = append(relativePathObjects, prependPaths(objects, folderPrefix)...)
 		if err != nil {
@@ -41,14 +43,18 @@ func ListFolderRecursivelyWithFilter(
 
 // ListFolderRecursivelyWithPrefix is like storage.ListFolderRecursivelyWithPrefix but it preserves the information
 // about what storage each object is stored in.
-func ListFolderRecursivelyWithPrefix(folder storage.Folder, prefix string) (relativePathObjects []storage.Object, err error) {
+func ListFolderRecursivelyWithPrefix(
+	ctx context.Context,
+	folder storage.Folder,
+	prefix string,
+) (relativePathObjects []storage.Object, err error) {
 	checkFile := len(prefix) > 0 && !strings.HasSuffix(prefix, "/")
 	prefix = strings.Trim(prefix, "/")
 
 	if checkFile {
 		dirName, fileName := path.Split(prefix)
 		parentFolder := folder.GetSubFolder(dirName)
-		objects, _, err := parentFolder.ListFolder()
+		objects, _, err := parentFolder.ListFolder(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("can't list folder %q: %w", dirName, err)
 		}
@@ -60,7 +66,7 @@ func ListFolderRecursivelyWithPrefix(folder storage.Folder, prefix string) (rela
 	}
 
 	parentFolder := folder.GetSubFolder(prefix)
-	objects, err := ListFolderRecursively(parentFolder)
+	objects, err := ListFolderRecursively(ctx, parentFolder)
 	if err != nil {
 		return nil, fmt.Errorf("can't list folder %q: %w", prefix, err)
 	}

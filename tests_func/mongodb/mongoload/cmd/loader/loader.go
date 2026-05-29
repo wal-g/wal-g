@@ -1,7 +1,6 @@
 package loader
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -19,9 +18,7 @@ var Cmd = &cobra.Command{
 	Short: "Load tool",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx := context.Background()
-
-		client, err := internal.NewMongoClient(ctx, "mongodb://localhost:27018") // TODO: get from environ
+		client, err := internal.NewMongoClient(cmd.Context(), "mongodb://localhost:27018") // TODO: get from environ
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		var input io.Reader
@@ -33,7 +30,7 @@ var Cmd = &cobra.Command{
 			defer func() { _ = file.Close() }()
 		}
 
-		stat, err := mongoload.HandleLoad(ctx, input, client, 1)
+		stat, err := mongoload.HandleLoad(cmd.Context(), input, client, 1)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		err = internal.PrintStat(stat, os.Stdout)

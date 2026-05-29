@@ -37,19 +37,19 @@ type Uploader interface {
 
 // Downloader defines interface to fetch mongodb oplog archives
 type Downloader interface {
-	BackupMeta(name string) (*models.Backup, error)
-	DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error
-	ListOplogArchives() ([]models.Archive, error)
-	ListOplogArchivesSegment(startAfter *string, endBefore *string) ([]models.Archive, error)
-	LoadBackups(names []string) ([]*models.Backup, error)
-	ListBackups() ([]internal.BackupTime, []string, error)
-	LastKnownArchiveTS() (models.Timestamp, error)
+	BackupMeta(ctx context.Context, name string) (*models.Backup, error)
+	DownloadOplogArchive(ctx context.Context, arch models.Archive, writeCloser io.WriteCloser) error
+	ListOplogArchives(ctx context.Context) ([]models.Archive, error)
+	ListOplogArchivesSegment(ctx context.Context, startAfter *string, endBefore *string) ([]models.Archive, error)
+	LoadBackups(ctx context.Context, names []string) ([]*models.Backup, error)
+	ListBackups(ctx context.Context) ([]internal.BackupTime, []string, error)
+	LastKnownArchiveTS(ctx context.Context) (models.Timestamp, error)
 }
 
 type Purger interface {
-	DeleteBackups(backups []*models.Backup) error
-	DeleteGarbage(garbage []string) error
-	DeleteOplogArchives(archives []models.Archive) error
+	DeleteBackups(ctx context.Context, backups []*models.Backup) error
+	DeleteGarbage(ctx context.Context, garbage []string) error
+	DeleteOplogArchives(ctx context.Context, archives []models.Archive) error
 }
 
 // StorageSettings defines storage relative paths
@@ -74,8 +74,8 @@ type StorageDownloader struct {
 }
 
 // NewStorageDownloader builds mongodb downloader.
-func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
-	st, err := internal.ConfigureStorage()
+func NewStorageDownloader(ctx context.Context, opts StorageSettings) (*StorageDownloader, error) {
+	st, err := internal.ConfigureStorage(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -87,15 +87,15 @@ func NewStorageDownloader(opts StorageSettings) (*StorageDownloader, error) {
 }
 
 // BackupMeta downloads sentinel contents.
-func (sd *StorageDownloader) BackupMeta(name string) (*models.Backup, error) {
-	return common.DownloadSentinel(sd.backupsFolder, name)
+func (sd *StorageDownloader) BackupMeta(ctx context.Context, name string) (*models.Backup, error) {
+	return common.DownloadSentinel(ctx, sd.backupsFolder, name)
 }
 
 // LoadBackups downloads backups metadata
-func (sd *StorageDownloader) LoadBackups(names []string) ([]*models.Backup, error) {
+func (sd *StorageDownloader) LoadBackups(ctx context.Context, names []string) ([]*models.Backup, error) {
 	backups := make([]*models.Backup, 0, len(names))
 	for _, name := range names {
-		backup, err := sd.BackupMeta(name)
+		backup, err := sd.BackupMeta(ctx, name)
 		if err != nil {
 			return nil, err
 		}
@@ -108,13 +108,13 @@ func (sd *StorageDownloader) LoadBackups(names []string) ([]*models.Backup, erro
 }
 
 // ListBackups lists backups in folder
-func (sd *StorageDownloader) ListBackups() ([]internal.BackupTime, []string, error) {
-	return internal.GetBackupsAndGarbage(sd.backupsFolder)
+func (sd *StorageDownloader) ListBackups(ctx context.Context) ([]internal.BackupTime, []string, error) {
+	return internal.GetBackupsAndGarbage(ctx, sd.backupsFolder)
 }
 
 // LastBackupName get last backup
-func (sd *StorageDownloader) LastBackupName() (string, error) {
-	backup, err := internal.GetLatestBackup(sd.backupsFolder)
+func (sd *StorageDownloader) LastBackupName(ctx context.Context) (string, error) {
+	backup, err := internal.GetLatestBackup(ctx, sd.backupsFolder)
 	if err != nil {
 		return "", err
 	}
@@ -122,17 +122,18 @@ func (sd *StorageDownloader) LastBackupName() (string, error) {
 }
 
 // DownloadOplogArchive downloads, decompresses and decrypts (if needed) oplog archive.
-func (sd *StorageDownloader) DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error {
-	return internal.DownloadFile(internal.NewFolderReader(sd.oplogsFolder), arch.Filename(), arch.Extension(), writeCloser)
+func (sd *StorageDownloader) DownloadOplogArchive(ctx context.Context, arch models.Archive, writeCloser io.WriteCloser) error {
+	return internal.DownloadFile(ctx, internal.NewFolderReader(sd.oplogsFolder), arch.Filename(), arch.Extension(), writeCloser)
 }
 
 // ListOplogArchives fetches all oplog archives existed in storage.
-func (sd *StorageDownloader) ListOplogArchives() ([]models.Archive, error) {
-	return sd.ListOplogArchivesSegment(nil, nil)
+func (sd *StorageDownloader) ListOplogArchives(ctx context.Context) ([]models.Archive, error) {
+	return sd.ListOplogArchivesSegment(ctx, nil, nil)
 }
 
 // ListOplogArchivesSegment fetches all oplog archives existed in storage after the given startAfter.
-func (sd *StorageDownloader) ListOplogArchivesSegment(startAfter *string, endBefore *string) ([]models.Archive, error) {
+func (sd *StorageDownloader) ListOplogArchivesSegment(ctx context.Context,
+	startAfter *string, endBefore *string) ([]models.Archive, error) {
 	tracelog.DebugLogger.Printf("Listing %s with startAfter `%s` and endBefore `%s`",
 		sd.oplogsFolder.GetPath(),
 		aws.StringValue(startAfter),
@@ -143,12 +144,12 @@ func (sd *StorageDownloader) ListOplogArchivesSegment(startAfter *string, endBef
 
 	if folder, ok := sd.oplogsFolder.(storage.FolderExt); !ok {
 		tracelog.WarningLogger.Printf("doesn't support ListFolderSegment %s fallback to ListFolder", sd.oplogsFolder.GetPath())
-		objects, _, err = sd.oplogsFolder.ListFolder()
+		objects, _, err = sd.oplogsFolder.ListFolder(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
 		}
 	} else {
-		objects, _, err = folder.ListFolderSegment(startAfter, endBefore)
+		objects, _, err = folder.ListFolderSegment(ctx, startAfter, endBefore)
 		if err != nil {
 			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
 		}
@@ -169,19 +170,19 @@ func (sd *StorageDownloader) ListOplogArchivesSegment(startAfter *string, endBef
 }
 
 // LastKnownArchiveTS returns the most recent existed timestamp in storage folder.
-func (sd *StorageDownloader) LastKnownArchiveTS() (models.Timestamp, error) {
+func (sd *StorageDownloader) LastKnownArchiveTS(ctx context.Context) (models.Timestamp, error) {
 	maxTS := models.Timestamp{}
 	var keys []storage.Object
 	var err error
 
 	if folder, ok := sd.oplogsFolder.(storage.FolderExt); !ok {
 		tracelog.WarningLogger.Printf("doesn't support ListFolderSegment %s fallback to ListFolder", sd.oplogsFolder.GetPath())
-		keys, _, err = sd.oplogsFolder.ListFolder()
+		keys, _, err = sd.oplogsFolder.ListFolder(ctx)
 		if err != nil {
 			return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
 		}
 	} else {
-		keys, err = findLastRecordsByStep(folder)
+		keys, err = findLastRecordsByStep(ctx, folder)
 		if err != nil {
 			return models.Timestamp{}, fmt.Errorf("can not fetch keys since storage folder: %w ", err)
 		}
@@ -198,14 +199,14 @@ func (sd *StorageDownloader) LastKnownArchiveTS() (models.Timestamp, error) {
 }
 
 // try to find the last record by steps in last 15minutes, 3hours, 1.1day, 10days to improve performance
-func findLastRecordsByStep(folder storage.FolderExt) ([]storage.Object, error) {
+func findLastRecordsByStep(ctx context.Context, folder storage.FolderExt) ([]storage.Object, error) {
 	keyPrefix := fmt.Sprintf("%s_%d", models.ArchiveTypeOplog, time.Now().Unix())
 	keyPrefix = keyPrefix[:len(keyPrefix)-3]
 	// make 4 steps to find the last record 1step~15minutes, 2step~3hour, 3step~1.1day, 4step~10day
 	// next step is 3 month so just fallback to list all archives
 	for i := 0; i < 4; i++ {
 		tracelog.DebugLogger.Printf("try oplog prefix to find the last record: %s", keyPrefix)
-		keys, _, err := folder.ListFolderSegment(&keyPrefix, nil)
+		keys, _, err := folder.ListFolderSegment(ctx, &keyPrefix, nil)
 		if err != nil {
 			return nil, fmt.Errorf("can not list oplog archives folder: %w", err)
 		}
@@ -215,7 +216,7 @@ func findLastRecordsByStep(folder storage.FolderExt) ([]storage.Object, error) {
 		keyPrefix = keyPrefix[:len(keyPrefix)-1]
 	}
 	tracelog.WarningLogger.Println("fallback to ListFolder to find the last record")
-	keys, _, err := folder.ListFolder()
+	keys, _, err := folder.ListFolder(ctx)
 	return keys, err
 }
 
@@ -307,7 +308,7 @@ func (su *StorageUploader) UploadGapArchive(ctx context.Context, archErr error, 
 // UploadBackup compresses a stream and uploads it.
 func (su *StorageUploader) UploadBackup(ctx context.Context, stream io.Reader, cmd internal.ErrWaiter,
 	metaConstructor internal.MetaConstructor) error {
-	err := metaConstructor.Init()
+	err := metaConstructor.Init(ctx)
 	if err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
@@ -316,7 +317,7 @@ func (su *StorageUploader) UploadBackup(ctx context.Context, stream io.Reader, c
 		return fmt.Errorf("can not push stream: %+v", err)
 	}
 
-	if err := metaConstructor.Finalize(backupName); err != nil {
+	if err := metaConstructor.Finalize(ctx, backupName); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
@@ -325,7 +326,7 @@ func (su *StorageUploader) UploadBackup(ctx context.Context, stream io.Reader, c
 	}
 
 	backupSentinel := metaConstructor.MetaInfo()
-	if err := internal.UploadSentinel(su.Uploader, backupSentinel, backupName); err != nil {
+	if err := internal.UploadSentinel(ctx, su.Uploader, backupSentinel, backupName); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}
 	return nil
@@ -338,8 +339,8 @@ type StoragePurger struct {
 }
 
 // NewStoragePurger builds mongodb StoragePurger.
-func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
-	st, err := internal.ConfigureStorage()
+func NewStoragePurger(ctx context.Context, opts StorageSettings) (*StoragePurger, error) {
+	st, err := internal.ConfigureStorage(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -350,22 +351,22 @@ func NewStoragePurger(opts StorageSettings) (*StoragePurger, error) {
 
 // DeleteBackups purges given backups files
 // TODO: extract BackupLayout abstraction and provide DataPath(), SentinelPath(), Exists() methods
-func (sp *StoragePurger) DeleteBackups(backups []*models.Backup) error {
+func (sp *StoragePurger) DeleteBackups(ctx context.Context, backups []*models.Backup) error {
 	backupNames := BackupNamesFromBackups(backups)
-	return internal.DeleteBackups(sp.backupsFolder, backupNames)
+	return internal.DeleteBackups(ctx, sp.backupsFolder, backupNames)
 }
 
 // DeleteGarbage purges given garbage keys
-func (sp *StoragePurger) DeleteGarbage(garbage []string) error {
-	return internal.DeleteGarbage(sp.backupsFolder, garbage)
+func (sp *StoragePurger) DeleteGarbage(ctx context.Context, garbage []string) error {
+	return internal.DeleteGarbage(ctx, sp.backupsFolder, garbage)
 }
 
 // DeleteOplogArchives purges given oplogs files
-func (sp *StoragePurger) DeleteOplogArchives(archives []models.Archive) error {
+func (sp *StoragePurger) DeleteOplogArchives(ctx context.Context, archives []models.Archive) error {
 	oplogKeys := make([]storage.Object, 0, len(archives))
 	for _, arch := range archives {
 		oplogKeys = append(oplogKeys, storage.NewLocalObject(arch.Filename(), time.Time{}, 0))
 	}
 	tracelog.DebugLogger.Printf("Oplog keys will be deleted: %+v\n", oplogKeys)
-	return sp.oplogsFolder.DeleteObjects(oplogKeys)
+	return sp.oplogsFolder.DeleteObjects(ctx, oplogKeys)
 }

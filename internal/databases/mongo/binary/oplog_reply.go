@@ -30,7 +30,7 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 
 	initMongo := replayArgs.MinimalConfigPath != ""
 	if initMongo {
-		mongodProcess, err := Mongod(replayArgs.MinimalConfigPath).Start()
+		mongodProcess, err := Mongod(replayArgs.MinimalConfigPath).Start(ctx)
 		if err != nil {
 			return err
 		}
@@ -87,12 +87,12 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	oplogApplier := stages.NewGenericApplier(dbApplier)
 
 	// set up storage downloader client
-	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
 	if err != nil {
 		return err
 	}
 
-	path, err := resolveOplogReplaySequence(downloader, replayArgs.Since, replayArgs.Until)
+	path, err := resolveOplogReplaySequence(ctx, downloader, replayArgs.Since, replayArgs.Until)
 	if err != nil {
 		return err
 	}
@@ -105,6 +105,7 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 }
 
 func resolveOplogReplaySequence(
+	ctx context.Context,
 	downloader archive.Downloader,
 	since, until models.Timestamp,
 ) (archive.Sequence, error) {
@@ -112,7 +113,7 @@ func resolveOplogReplaySequence(
 	sinceStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: since.TS - 300, Inc: 0}.String())
 	untilStr := fmt.Sprintf("%s_%s", models.ArchiveTypeOplog, models.Timestamp{TS: until.TS + 30, Inc: until.Inc}.String())
 
-	archives, err := downloader.ListOplogArchivesSegment(&sinceStr, &untilStr)
+	archives, err := downloader.ListOplogArchivesSegment(ctx, &sinceStr, &untilStr)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +125,7 @@ func resolveOplogReplaySequence(
 
 	// fallback to list all archives
 	tracelog.WarningLogger.Println("fallback to ListFolder to find the last record", err)
-	archives, err = downloader.ListOplogArchives()
+	archives, err = downloader.ListOplogArchives(ctx)
 	if err != nil {
 		return nil, err
 	}

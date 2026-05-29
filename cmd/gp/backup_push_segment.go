@@ -28,7 +28,7 @@ var (
 
 			greenplum.SetSegmentStoragePrefix(contentID)
 
-			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
+			rootFolder, err := getMultistorageRootFolder(cmd.Context(), true, policies.TakeFirstStorage)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
@@ -67,7 +67,7 @@ var (
 				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),
 				userData, viper.GetBool(conf.WithoutFilesMetadataSetting))
 
-			backupHandler, err := greenplum.NewSegBackupHandler(arguments)
+			backupHandler, err := greenplum.NewSegBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
 		},

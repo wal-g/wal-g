@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/tracelog"
@@ -9,7 +10,7 @@ import (
 )
 
 type FileLister interface {
-	ListFilesToMove(sourceStorage, targetStorage storage.Folder) (files []FilesGroup, num int, err error)
+	ListFilesToMove(ctx context.Context, sourceStorage, targetStorage storage.Folder) (files []FilesGroup, num int, err error)
 }
 
 // FilesGroup is an ordered set of files that must be transferred atomically
@@ -35,8 +36,8 @@ func NewRegularFileLister(prefix string, overwrite bool, maxFiles int) *RegularF
 	}
 }
 
-func (l *RegularFileLister) ListFilesToMove(source, target storage.Folder) (files []FilesGroup, num int, err error) {
-	missingFiles, err := listMissingFiles(source, target, l.Prefix, l.Overwrite)
+func (l *RegularFileLister) ListFilesToMove(ctx context.Context, source, target storage.Folder) (files []FilesGroup, num int, err error) {
+	missingFiles, err := listMissingFiles(ctx, source, target, l.Prefix, l.Overwrite)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -44,12 +45,14 @@ func (l *RegularFileLister) ListFilesToMove(source, target storage.Folder) (file
 	return limitedFiles, len(limitedFiles), nil
 }
 
-func listMissingFiles(source, target storage.Folder, prefix string, overwrite bool) (map[string]storage.Object, error) {
-	targetFiles, err := storage.ListFolderRecursivelyWithPrefix(target, prefix)
+func listMissingFiles(
+	ctx context.Context, source, target storage.Folder, prefix string, overwrite bool,
+) (map[string]storage.Object, error) {
+	targetFiles, err := storage.ListFolderRecursivelyWithPrefix(ctx, target, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("list files in the target storage: %w", err)
 	}
-	sourceFiles, err := storage.ListFolderRecursivelyWithPrefix(source, prefix)
+	sourceFiles, err := storage.ListFolderRecursivelyWithPrefix(ctx, source, prefix)
 	if err != nil {
 		return nil, fmt.Errorf("list files in the source storage: %w", err)
 	}

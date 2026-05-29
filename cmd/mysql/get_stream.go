@@ -46,13 +46,13 @@ var getStreamCmd = &cobra.Command{
 		backupSelector, err := internal.NewTargetBackupSelector("", backupName, mysql.NewGenericMetaFetcher())
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = exec.OnStorage(targetStorage, func(folder storage.Folder) error {
-			backup, err := backupSelector.Select(folder)
+		err = exec.OnStorage(cmd.Context(), targetStorage, func(folder storage.Folder) error {
+			backup, err := backupSelector.Select(cmd.Context(), folder)
 			tracelog.ErrorLogger.FatalOnError(err)
-			fetcher, err := internal.GetBackupStreamFetcher(backup)
+			fetcher, err := internal.GetBackupStreamFetcher(cmd.Context(), backup)
 			tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
 
-			return fetcher(backup, outStream)
+			return fetcher(cmd.Context(), backup, outStream)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

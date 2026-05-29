@@ -28,18 +28,18 @@ func TestHandleDefaultBackupList(t *testing.T) {
 	t.Run("print correct backups in correct order", func(t *testing.T) {
 		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
 		curTime = time.Unix(1690000000, 0)
-		_ = folder.PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "base_111_backup_stop_sentinel.json", &bytes.Buffer{})
 		curTime = curTime.Add(time.Second)
-		_ = folder.PutObject("base_222_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "base_222_backup_stop_sentinel.json", &bytes.Buffer{})
 		curTime = curTime.Add(time.Second)
-		_ = folder.PutObject("base_333_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "base_333_backup_stop_sentinel.json", &bytes.Buffer{})
 
 		rescueStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDefaultBackupList(folder, true, true)
+		HandleDefaultBackupList(t.Context(), folder, true, true)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -72,7 +72,7 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		t.Cleanup(mockCtrl.Finish)
 		collectorMock := stats.NewMockCollector(mockCtrl)
-		collectorMock.EXPECT().AllAliveStorages().Return([]string{"storage_1", "storage_2"}, nil)
+		collectorMock.EXPECT().AllAliveStorages(gomock.Any()).Return([]string{"storage_1", "storage_2"}, nil)
 		collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		memStorages := map[string]storage.Folder{
@@ -81,19 +81,19 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		}
 		multiFolder := multistorage.NewFolder(memStorages, collectorMock).(storage.Folder)
 		multiFolder = multistorage.SetPolicies(multiFolder, policies.UniteAllStorages)
-		multiFolder, err := multistorage.UseAllAliveStorages(multiFolder)
+		multiFolder, err := multistorage.UseAllAliveStorages(t.Context(), multiFolder)
 		require.NoError(t, err)
 
 		curTime = time.Unix(1690000000, 0)
-		_ = memStorages["storage_1"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = memStorages["storage_2"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memStorages["storage_1"].PutObject(t.Context(), "base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memStorages["storage_2"].PutObject(t.Context(), "base_111_backup_stop_sentinel.json", &bytes.Buffer{})
 
 		rescueStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDefaultBackupList(multiFolder, true, true)
+		HandleDefaultBackupList(t.Context(), multiFolder, true, true)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -129,7 +129,7 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDefaultBackupList(folder, true, false)
+		HandleDefaultBackupList(t.Context(), folder, true, false)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -151,7 +151,7 @@ func TestHandleDefaultBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDefaultBackupList(folder, true, true)
+		HandleDefaultBackupList(t.Context(), folder, true, true)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)

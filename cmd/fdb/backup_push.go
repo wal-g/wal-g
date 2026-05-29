@@ -18,11 +18,11 @@ var backupPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 		uploader.ChangeDirectory(utility.BaseBackupPath)
 
-		backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
+		backupCmd, err := internal.GetCommandSettingContext(cmd.Context(), conf.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 		fdb.HandleBackupPush(cmd.Context(), uploader, backupCmd)
 	},

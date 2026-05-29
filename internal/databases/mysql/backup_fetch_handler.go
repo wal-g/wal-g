@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
@@ -8,25 +9,25 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleBackupFetch(folder storage.Folder,
+func HandleBackupFetch(ctx context.Context, folder storage.Folder,
 	targetBackupSelector internal.BackupSelector,
 	restoreCmd *exec.Cmd,
 	prepareCmd *exec.Cmd,
 	useXbtoolExtract bool,
 	inplace bool,
 ) {
-	backup, err := targetBackupSelector.Select(folder)
+	backup, err := targetBackupSelector.Select(ctx, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get backup: %v", err)
 
 	var sentinel StreamSentinelDto
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch sentinel: %v", err)
 
 	// we should ba able to read & restore any backup we ever created:
 	if sentinel.Tool == WalgXtrabackupTool {
-		internal.HandleBackupFetch(folder, targetBackupSelector, GetXtrabackupFetcher(restoreCmd, prepareCmd, useXbtoolExtract, inplace))
+		internal.HandleBackupFetch(ctx, folder, targetBackupSelector, GetXtrabackupFetcher(restoreCmd, prepareCmd, useXbtoolExtract, inplace))
 	} else {
-		internal.HandleBackupFetch(folder, targetBackupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
+		internal.HandleBackupFetch(ctx, folder, targetBackupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 		if prepareCmd != nil {
 			err = prepareCmd.Run()
 			tracelog.ErrorLogger.FatalfOnError("failed to prepare fetched backup: %v", err)

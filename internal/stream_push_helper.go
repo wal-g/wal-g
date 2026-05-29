@@ -37,8 +37,8 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 
 	// Upload Stream:
-	errGroup, ctx := errgroup.WithContext(ctx)
-	var readers = splitmerge.SplitReader(ctx, stream, uploader.partitions, uploader.blockSize)
+	errGroup, egCtx := errgroup.WithContext(ctx)
+	var readers = splitmerge.SplitReader(egCtx, stream, uploader.partitions, uploader.blockSize)
 	for partNumber := 0; partNumber < uploader.partitions; partNumber++ {
 		reader := readers[partNumber]
 		if uploader.maxFileSize != 0 {
@@ -52,12 +52,12 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
 					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compression().FileExtension(), currentPartNumber, idx)
-					err := uploader.PushStreamToDestination(ctx, fileReader, dstPath)
+					err := uploader.PushStreamToDestination(egCtx, fileReader, dstPath)
 					if err != nil {
 						return err
 					}
 					if read.Load() == 0 {
-						err = uploader.Folder().DeleteObjects([]storage.Object{storage.NewLocalObject(dstPath, time.Time{}, 0)})
+						err = uploader.Folder().DeleteObjects(egCtx, []storage.Object{storage.NewLocalObject(dstPath, time.Time{}, 0)})
 						return err
 					}
 					idx++
@@ -66,7 +66,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 		} else {
 			dstPath := GetPartitionedStreamName(backupName, uploader.Compression().FileExtension(), partNumber)
 			errGroup.Go(func() error {
-				return uploader.PushStreamToDestination(ctx, reader, dstPath)
+				return uploader.PushStreamToDestination(egCtx, reader, dstPath)
 			})
 		}
 	}
@@ -86,7 +86,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 	}
 	uploaderClone := uploader.Clone()
 	uploaderClone.DisableSizeTracking() // don't count metadata.json in backup size
-	err := UploadBackupStreamMetadata(uploader, meta, backupName)
+	err := UploadBackupStreamMetadata(ctx, uploader, meta, backupName)
 
 	return backupName, err
 }

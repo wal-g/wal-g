@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -62,7 +63,7 @@ func createSession(config *Config) (*session.Session, error) {
 
 	if config.EndpointSource != "" {
 		sess.Handlers.Validate.PushBack(func(request *request.Request) {
-			endpoint := requestEndpointFromSource(config.EndpointSource, config.EndpointPort)
+			endpoint := requestEndpointFromSource(request.Context(), config.EndpointSource, config.EndpointPort)
 			if endpoint != nil {
 				tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
 				host := strings.TrimPrefix(*sess.Config.Endpoint, "https://")
@@ -220,14 +221,19 @@ func detectAWSRegionByBucket(bucket string, config *aws.Config) (string, error) 
 	return *output.LocationConstraint, nil
 }
 
-func requestEndpointFromSource(endpointSource, port string) *string {
+func requestEndpointFromSource(ctx context.Context, endpointSource, port string) *string {
 	t := http.DefaultTransport
 	c := http.DefaultClient
 	if tr, ok := t.(*http.Transport); ok {
 		tr.DisableKeepAlives = true
 		c = &http.Client{Transport: tr}
 	}
-	resp, err := c.Get(endpointSource)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointSource, nil)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Endpoint source request error: %v ", err)
+		return nil
+	}
+	resp, err := c.Do(req)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Endpoint source error: %v ", err)
 		return nil

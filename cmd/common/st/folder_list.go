@@ -26,15 +26,16 @@ var folderListCmd = &cobra.Command{
 			path = ""
 		}
 
-		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
+		ctx := cmd.Context()
+		err := exec.OnStorage(ctx, targetStorage, func(folder storage.Folder) error {
 			if showAllVersions {
 				storage.SetShowAllVersions(folder, true)
 			}
 			if glob {
-				return storagetools.HandleFolderListWithGlob(folder, path, recursive)
+				return storagetools.HandleFolderListWithGlob(ctx, folder, path, recursive)
 			}
 			subfolder := folder.GetSubFolder(path)
-			return storagetools.HandleFolderList(subfolder, recursive)
+			return storagetools.HandleFolderList(ctx, subfolder, recursive)
 		})
 		if err != nil {
 			tracelog.ErrorLogger.FatalOnError(err)

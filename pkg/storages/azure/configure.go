@@ -1,6 +1,7 @@
 package azure
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -45,6 +46,7 @@ const (
 
 // TODO: Unit tests
 func ConfigureStorage(
+	_ context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,

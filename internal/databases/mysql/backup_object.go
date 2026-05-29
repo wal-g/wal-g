@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"context"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -35,10 +37,10 @@ func (o BackupObject) GetIncrementFromName() string {
 	return o.incrementFromName
 }
 
-func MakeMySQLBackupObjects(folder storage.Folder, sentinelObjects []storage.Object) ([]internal.BackupObject, error) {
+func MakeMySQLBackupObjects(ctx context.Context, folder storage.Folder, sentinelObjects []storage.Object) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(sentinelObjects))
 	for _, object := range sentinelObjects {
-		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(folder.GetSubFolder(utility.BaseBackupPath), object)
+		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(ctx, folder.GetSubFolder(utility.BaseBackupPath), object)
 		if err != nil {
 			return nil, err
 		}
@@ -49,13 +51,13 @@ func MakeMySQLBackupObjects(folder storage.Folder, sentinelObjects []storage.Obj
 	return backupObjects, nil
 }
 
-func getIncrementInfo(folder storage.Folder, object storage.Object) (string, string, bool, error) {
+func getIncrementInfo(ctx context.Context, folder storage.Folder, object storage.Object) (string, string, bool, error) {
 	backup, err := internal.NewBackup(folder, utility.StripRightmostBackupName(object.GetName()))
 	if err != nil {
 		return "", "", true, err
 	}
 	var sentinel = StreamSentinelDto{}
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		return "", "", true, err
 	}

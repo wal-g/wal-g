@@ -20,18 +20,18 @@ var (
 
 func TestGetRestorePointTimeSlices_emptyList(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("restore_123312", &bytes.Buffer{})
-	objects, _, _ := folder.ListFolder()
+	_ = folder.PutObject(t.Context(), "restore_123312", &bytes.Buffer{})
+	objects, _, _ := folder.ListFolder(t.Context())
 	result := greenplum.GetRestorePointsTimeSlices(objects)
 	assert.Equalf(t, []greenplum.RestorePointTime{}, result, "GetRestorePointsTimeSlices returned not empty list: something wrong")
 }
 
 func TestGetRestorePointTimeSlices_List(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("restore_123312", &bytes.Buffer{})
-	_ = folder.PutObject(testStreamBackup.BackupName+greenplum.RestorePointSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "restore_123312", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+greenplum.RestorePointSuffix, &bytes.Buffer{})
 
-	objects, _, _ := folder.ListFolder()
+	objects, _, _ := folder.ListFolder(t.Context())
 
 	result := greenplum.GetRestorePointsTimeSlices(objects)
 
@@ -42,11 +42,11 @@ func TestGetRestorePointTimeSlices_List(t *testing.T) {
 
 func TestGetRestorePointTimeSlices_OrderCheck(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject(testStreamBackup.BackupName+".1"+greenplum.RestorePointSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+".1"+greenplum.RestorePointSuffix, &bytes.Buffer{})
 	time.Sleep(time.Second)
-	_ = folder.PutObject(testStreamBackup.BackupName+".2"+greenplum.RestorePointSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+".2"+greenplum.RestorePointSuffix, &bytes.Buffer{})
 
-	objects, _, _ := folder.ListFolder()
+	objects, _, _ := folder.ListFolder(t.Context())
 
 	result := greenplum.GetRestorePointsTimeSlices(objects)
 

@@ -10,6 +10,7 @@
 package stats
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -40,18 +41,18 @@ func (m *MockCollector) EXPECT() *MockCollectorMockRecorder {
 }
 
 // AllAliveStorages mocks base method.
-func (m *MockCollector) AllAliveStorages() ([]string, error) {
+func (m *MockCollector) AllAliveStorages(ctx context.Context) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AllAliveStorages")
+	ret := m.ctrl.Call(m, "AllAliveStorages", ctx)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // AllAliveStorages indicates an expected call of AllAliveStorages.
-func (mr *MockCollectorMockRecorder) AllAliveStorages() *gomock.Call {
+func (mr *MockCollectorMockRecorder) AllAliveStorages(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllAliveStorages", reflect.TypeOf((*MockCollector)(nil).AllAliveStorages))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AllAliveStorages", reflect.TypeOf((*MockCollector)(nil).AllAliveStorages), ctx)
 }
 
 // Close mocks base method.
@@ -69,18 +70,18 @@ func (mr *MockCollectorMockRecorder) Close() *gomock.Call {
 }
 
 // FirstAliveStorage mocks base method.
-func (m *MockCollector) FirstAliveStorage() (*string, error) {
+func (m *MockCollector) FirstAliveStorage(ctx context.Context) (*string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FirstAliveStorage")
+	ret := m.ctrl.Call(m, "FirstAliveStorage", ctx)
 	ret0, _ := ret[0].(*string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FirstAliveStorage indicates an expected call of FirstAliveStorage.
-func (mr *MockCollectorMockRecorder) FirstAliveStorage() *gomock.Call {
+func (mr *MockCollectorMockRecorder) FirstAliveStorage(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FirstAliveStorage", reflect.TypeOf((*MockCollector)(nil).FirstAliveStorage))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FirstAliveStorage", reflect.TypeOf((*MockCollector)(nil).FirstAliveStorage), ctx)
 }
 
 // ReportOperationResult mocks base method.
@@ -96,16 +97,16 @@ func (mr *MockCollectorMockRecorder) ReportOperationResult(storage, op, success 
 }
 
 // SpecificStorage mocks base method.
-func (m *MockCollector) SpecificStorage(name string) (bool, error) {
+func (m *MockCollector) SpecificStorage(ctx context.Context, name string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SpecificStorage", name)
+	ret := m.ctrl.Call(m, "SpecificStorage", ctx, name)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SpecificStorage indicates an expected call of SpecificStorage.
-func (mr *MockCollectorMockRecorder) SpecificStorage(name any) *gomock.Call {
+func (mr *MockCollectorMockRecorder) SpecificStorage(ctx, name any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SpecificStorage", reflect.TypeOf((*MockCollector)(nil).SpecificStorage), name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SpecificStorage", reflect.TypeOf((*MockCollector)(nil).SpecificStorage), ctx, name)
 }

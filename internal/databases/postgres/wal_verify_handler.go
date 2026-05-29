@@ -89,9 +89,7 @@ type BackupSearchParams struct {
 }
 
 // QueryCurrentWalSegment() gets start WAL segment from Postgres cluster
-func QueryCurrentWalSegment() WalSegmentDescription {
-	// No request ctx plumbed to this entry point yet; revisit when callers thread ctx.
-	ctx := context.Background()
+func QueryCurrentWalSegment(ctx context.Context) WalSegmentDescription {
 	conn, err := Connect(ctx)
 	tracelog.ErrorLogger.FatalfOnError("Failed to establish a connection to Postgres cluster %v", err)
 
@@ -114,6 +112,7 @@ func QueryCurrentWalSegment() WalSegmentDescription {
 }
 
 func BuildWalVerifyCheckRunner(
+	ctx context.Context,
 	checkType WalVerifyCheckType,
 	rootFolder storage.Folder,
 	walFolderFilenames []string,
@@ -126,7 +125,7 @@ func BuildWalVerifyCheckRunner(
 	case WalVerifyTimelineCheck:
 		checkRunner, err = NewTimelineCheckRunner(walFolderFilenames, currentWalSegment)
 	case WalVerifyIntegrityCheck:
-		checkRunner, err = NewIntegrityCheckRunner(rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
+		checkRunner, err = NewIntegrityCheckRunner(ctx, rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
 	default:
 		return nil, NewUnknownWalVerifyCheckError(checkType)
 	}
@@ -140,6 +139,7 @@ func BuildWalVerifyCheckRunner(
 // HandleWalVerify builds a check runner for each check type
 // and writes the check results to the provided output writer
 func HandleWalVerify(
+	ctx context.Context,
 	checkTypes []WalVerifyCheckType,
 	rootFolder storage.Folder,
 	currentWalSegment WalSegmentDescription,
@@ -149,12 +149,12 @@ func HandleWalVerify(
 	checkResults := make(map[WalVerifyCheckType]WalVerifyCheckResult, len(checkTypes))
 
 	// pre-fetch WAL folder filenames to reduce storage load
-	walFolderFilenames, err := getFolderFilenames(rootFolder.GetSubFolder(utility.WalPath))
+	walFolderFilenames, err := getFolderFilenames(ctx, rootFolder.GetSubFolder(utility.WalPath))
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch WAL folder filenames: %v", err)
 
 	for _, checkType := range checkTypes {
 		tracelog.InfoLogger.Printf("Building check runner: %s\n", checkType)
-		runner, err := BuildWalVerifyCheckRunner(checkType, rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
+		runner, err := BuildWalVerifyCheckRunner(ctx, checkType, rootFolder, walFolderFilenames, currentWalSegment, backupSearchParams)
 		tracelog.ErrorLogger.FatalfOnError(
 			fmt.Sprintf("Failed to build check runner %s:", checkType), err)
 

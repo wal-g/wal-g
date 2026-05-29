@@ -1,24 +1,26 @@
 package greenplum
 
 import (
+	"context"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
-func NewSegBackupHandler(arguments postgres.BackupArguments) (*postgres.BackupHandler, error) {
-	bh, err := postgres.NewBackupHandler(arguments)
+func NewSegBackupHandler(ctx context.Context, arguments postgres.BackupArguments) (*postgres.BackupHandler, error) {
+	bh, err := postgres.NewBackupHandler(ctx, arguments)
 	if err != nil {
 		return nil, err
 	}
 
-	composerInitFunc := func(handler *postgres.BackupHandler) error {
+	composerInitFunc := func(ctx context.Context, handler *postgres.BackupHandler) error {
 		queryRunner := ToGpQueryRunner(handler.Workers.QueryRunner)
-		relStorageMap, err := NewAoRelFileStorageMap(queryRunner)
+		relStorageMap, err := NewAoRelFileStorageMap(ctx, queryRunner)
 		if err != nil {
 			return err
 		}
 
-		paxRelStorageMap, err := NewPaxRelFileStorageMap(queryRunner)
+		paxRelStorageMap, err := NewPaxRelFileStorageMap(ctx, queryRunner)
 		if err != nil {
 			return err
 		}
@@ -28,7 +30,7 @@ func NewSegBackupHandler(arguments postgres.BackupArguments) (*postgres.BackupHa
 			return err
 		}
 
-		return bh.Workers.Bundle.SetupComposer(maker)
+		return bh.Workers.Bundle.SetupComposer(ctx, maker)
 	}
 
 	bh.SetComposerInitFunc(composerInitFunc)

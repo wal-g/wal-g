@@ -39,7 +39,7 @@ var backupPushCmd = &cobra.Command{
 		mongoClient, err := client.NewMongoClient(ctx, mongodbURL)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		uplProvider, err := internal.ConfigureSplitUploader()
+		uplProvider, err := internal.ConfigureSplitUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 		uplProvider.ChangeDirectory(utility.BaseBackupPath)
 
@@ -47,7 +47,7 @@ var backupPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		backupCmd.Stderr = os.Stderr
 		uploader := archive.NewStorageUploader(uplProvider)
-		metaConstructor := archive.NewBackupMongoMetaConstructor(ctx, mongoClient, uplProvider.Folder(), permanent)
+		metaConstructor := archive.NewBackupMongoMetaConstructor(mongoClient, uplProvider.Folder(), permanent)
 
 		err = mongo.HandleBackupPush(ctx, uploader, metaConstructor, backupCmd)
 		tracelog.ErrorLogger.FatalfOnError("Backup creation failed: %v", err)

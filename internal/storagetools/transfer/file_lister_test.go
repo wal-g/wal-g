@@ -22,11 +22,11 @@ func TestRegularFileLister_ListFilesToMove(t *testing.T) {
 		l, source, target := defaultLister()
 		l.Prefix = "1/"
 
-		_ = source.PutObject("1/a", &bytes.Buffer{})
-		_ = source.PutObject("1/b", &bytes.Buffer{})
-		_ = source.PutObject("2/a", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "1/a", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "1/b", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "2/a", &bytes.Buffer{})
 
-		groups, num, err := l.ListFilesToMove(source, target)
+		groups, num, err := l.ListFilesToMove(t.Context(), source, target)
 		assert.NoError(t, err)
 
 		require.Len(t, groups, 2)
@@ -39,12 +39,12 @@ func TestRegularFileLister_ListFilesToMove(t *testing.T) {
 	t.Run("exclude already existing files", func(t *testing.T) {
 		l, source, target := defaultLister()
 
-		_ = source.PutObject("1", &bytes.Buffer{})
-		_ = source.PutObject("2", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "1", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "2", &bytes.Buffer{})
 
-		_ = target.PutObject("1", &bytes.Buffer{})
+		_ = target.PutObject(t.Context(), "1", &bytes.Buffer{})
 
-		groups, _, err := l.ListFilesToMove(source, target)
+		groups, _, err := l.ListFilesToMove(t.Context(), source, target)
 		assert.NoError(t, err)
 
 		require.Len(t, groups, 1)
@@ -55,12 +55,12 @@ func TestRegularFileLister_ListFilesToMove(t *testing.T) {
 		l, source, target := defaultLister()
 		l.Overwrite = true
 
-		_ = source.PutObject("1", &bytes.Buffer{})
-		_ = source.PutObject("2", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "1", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "2", &bytes.Buffer{})
 
-		_ = target.PutObject("1", &bytes.Buffer{})
+		_ = target.PutObject(t.Context(), "1", &bytes.Buffer{})
 
-		groups, _, err := l.ListFilesToMove(source, target)
+		groups, _, err := l.ListFilesToMove(t.Context(), source, target)
 		assert.NoError(t, err)
 
 		require.Len(t, groups, 2)
@@ -70,11 +70,11 @@ func TestRegularFileLister_ListFilesToMove(t *testing.T) {
 		l, source, target := defaultLister()
 		l.Overwrite = true
 
-		_ = source.PutObject("2", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "2", &bytes.Buffer{})
 
-		_ = target.PutObject("1", &bytes.Buffer{})
+		_ = target.PutObject(t.Context(), "1", &bytes.Buffer{})
 
-		groups, _, err := l.ListFilesToMove(source, target)
+		groups, _, err := l.ListFilesToMove(t.Context(), source, target)
 		assert.NoError(t, err)
 
 		require.Len(t, groups, 1)
@@ -86,10 +86,10 @@ func TestRegularFileLister_ListFilesToMove(t *testing.T) {
 		l, source, target := defaultLister()
 		l.MaxFiles = 1
 
-		_ = source.PutObject("1", &bytes.Buffer{})
-		_ = source.PutObject("2", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "1", &bytes.Buffer{})
+		_ = source.PutObject(t.Context(), "2", &bytes.Buffer{})
 
-		groups, _, err := l.ListFilesToMove(source, target)
+		groups, _, err := l.ListFilesToMove(t.Context(), source, target)
 		assert.NoError(t, err)
 
 		require.Len(t, groups, 1)

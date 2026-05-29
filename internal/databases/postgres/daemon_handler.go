@@ -97,7 +97,7 @@ type WalFetchMessageHandler struct {
 	reader internal.StorageFolderReader
 }
 
-func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) error {
+func (h *WalFetchMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
 	args, err := daemon.BytesToArgs(messageBody)
 	if err != nil {
 		return err
@@ -113,7 +113,7 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 	}
 	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
 
-	err = HandleWALFetch(h.reader, walFileName, fullPath, DaemonPrefetcher{})
+	err = HandleWALFetch(ctx, h.reader, walFileName, fullPath, DaemonPrefetcher{})
 	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
 		_, err = h.fd.Write(daemon.ArchiveNonExistenceType.ToBytes())
@@ -134,6 +134,7 @@ func (h *WalFetchMessageHandler) Handle(_ context.Context, messageBody []byte) e
 }
 
 func NewMessageHandler(
+	ctx context.Context,
 	messageType daemon.SocketMessageType,
 	c net.Conn,
 	storage storage.Storage,
@@ -142,13 +143,13 @@ func NewMessageHandler(
 	case daemon.CheckType:
 		return &CheckMessageHandler{c}, nil
 	case daemon.WalPushType:
-		walUploader, err := PrepareMultiStorageWalUploader(storage.RootFolder(), "")
+		walUploader, err := PrepareMultiStorageWalUploader(ctx, storage.RootFolder(), "")
 		if err != nil {
 			return nil, err
 		}
 		return &ArchiveMessageHandler{c, walUploader}, nil
 	case daemon.WalFetchType:
-		folderReader, err := internal.PrepareMultiStorageFolderReader(storage.RootFolder(), "")
+		folderReader, err := internal.PrepareMultiStorageFolderReader(ctx, storage.RootFolder(), "")
 		if err != nil {
 			return nil, err
 		}
@@ -203,7 +204,7 @@ func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messa
 }
 
 // HandleDaemon is invoked to perform daemon mode
-func HandleDaemon(options DaemonOptions) {
+func HandleDaemon(ctx context.Context, options DaemonOptions) {
 	if _, err := os.Stat(options.SocketPath); err == nil {
 		err = os.Remove(options.SocketPath)
 		if err != nil {
@@ -221,7 +222,7 @@ func HandleDaemon(options DaemonOptions) {
 
 	SetupSignalListener()
 
-	multiSt, err := internal.ConfigureMultiStorage(true)
+	multiSt, err := internal.ConfigureMultiStorage(ctx, true)
 	defer utility.LoggedClose(multiSt, "close multi-storage")
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("configure multi-storage: %w", err)
@@ -233,7 +234,7 @@ func HandleDaemon(options DaemonOptions) {
 		if err != nil {
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go ProcessConnection(context.Background(), fd, multiSt)
+		go ProcessConnection(ctx, fd, multiSt)
 	}
 }
 
@@ -270,7 +271,7 @@ func handleMessage(
 	conn net.Conn,
 	multiSt *multistorage.Storage,
 ) error {
-	messageHandler, err := NewMessageHandler(messageType, conn, multiSt)
+	messageHandler, err := NewMessageHandler(ctx, messageType, conn, multiSt)
 	if err != nil {
 		return fmt.Errorf("init handler for message type %s: %v", string(messageType), err)
 	}

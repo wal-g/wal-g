@@ -21,7 +21,8 @@ var removeCmd = &cobra.Command{
 	Short: removeShortDescription,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
+		ctx := cmd.Context()
+		err := exec.OnStorage(ctx, targetStorage, func(folder storage.Folder) error {
 			if removeVersionID != "" && removeAllVersions {
 				return fmt.Errorf("--version-id cannot be used together with --all-versions ")
 			}
@@ -30,15 +31,15 @@ var removeCmd = &cobra.Command{
 			}
 
 			if removeVersionID != "" {
-				folder.SetVersioningEnabled(true)
-				return storagetools.HandleRemoveVersion(args[0], removeVersionID, folder)
+				folder.SetVersioningEnabled(ctx, true)
+				return storagetools.HandleRemoveVersion(ctx, args[0], removeVersionID, folder)
 			}
 
-			folder.SetVersioningEnabled(removeAllVersions)
+			folder.SetVersioningEnabled(ctx, removeAllVersions)
 			if glob {
-				return storagetools.HandleRemoveWithGlobPattern(args[0], folder)
+				return storagetools.HandleRemoveWithGlobPattern(ctx, args[0], folder)
 			}
-			return storagetools.HandleRemove(args[0], folder)
+			return storagetools.HandleRemove(ctx, args[0], folder)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

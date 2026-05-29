@@ -1,6 +1,7 @@
 package pgbackrest
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -11,8 +12,8 @@ import (
 )
 
 // TODO: unit tests
-func HandleBackupList(folder storage.Folder, stanza string, detailed bool, pretty bool, json bool) error {
-	backupTimes, err := GetBackupList(folder, stanza)
+func HandleBackupList(ctx context.Context, folder storage.Folder, stanza string, detailed bool, pretty bool, json bool) error {
+	backupTimes, err := GetBackupList(ctx, folder, stanza)
 
 	if len(backupTimes) == 0 {
 		tracelog.InfoLogger.Println("No backups found")
@@ -28,7 +29,7 @@ func HandleBackupList(folder storage.Folder, stanza string, detailed bool, prett
 	printableEntities := make([]printlist.Entity, len(backupTimes))
 	for i := range backupTimes {
 		if detailed {
-			details, err := GetBackupDetails(folder, stanza, backupTimes[i].BackupName)
+			details, err := GetBackupDetails(ctx, folder, stanza, backupTimes[i].BackupName)
 			if err != nil {
 				return fmt.Errorf("get backup details: %w", err)
 			}

@@ -55,17 +55,17 @@ func (f *Folder) GetPath() string {
 	return f.path
 }
 
-func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (f *Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	prefix := f.GetPath()
 	delimiter := "/"
 
-	if f.isVersioningEnabled() {
+	if f.isVersioningEnabled(ctx) {
 		return nil, nil, fmt.Errorf("versioning is not supported for oss")
 	}
 
 	var continuationToken *string
 	for {
-		result, err := f.ossAPI.ListObjectsV2(context.Background(), &oss.ListObjectsV2Request{
+		result, err := f.ossAPI.ListObjectsV2(ctx, &oss.ListObjectsV2Request{
 			Bucket:            oss.Ptr(f.bucket),
 			Prefix:            oss.Ptr(prefix),
 			Delimiter:         oss.Ptr(delimiter),
@@ -97,8 +97,8 @@ func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Fo
 	return objects, subFolders, nil
 }
 
-func (f *Folder) DeleteObjects(objectRelativePaths []storage.Object) error {
-	if f.isVersioningEnabled() {
+func (f *Folder) DeleteObjects(ctx context.Context, objectRelativePaths []storage.Object) error {
+	if f.isVersioningEnabled(ctx) {
 		return fmt.Errorf("versioning is not supported for oss")
 	}
 
@@ -110,7 +110,7 @@ func (f *Folder) DeleteObjects(objectRelativePaths []storage.Object) error {
 			objectsToDelete = append(objectsToDelete, oss.DeleteObject{Key: oss.Ptr(fullPath)})
 		}
 
-		_, err := f.ossAPI.DeleteMultipleObjects(context.Background(), &oss.DeleteMultipleObjectsRequest{
+		_, err := f.ossAPI.DeleteMultipleObjects(ctx, &oss.DeleteMultipleObjectsRequest{
 			Bucket:  oss.Ptr(f.bucket),
 			Objects: objectsToDelete,
 		})
@@ -140,9 +140,9 @@ func partitionObjects(keys []storage.Object, size int) [][]storage.Object {
 	return parts
 }
 
-func (f *Folder) Exists(objectRelativePath string) (bool, error) {
+func (f *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
 	objectPath := f.GetPath() + objectRelativePath
-	_, err := f.ossAPI.HeadObject(context.Background(), &oss.HeadObjectRequest{
+	_, err := f.ossAPI.HeadObject(ctx, &oss.HeadObjectRequest{
 		Bucket: oss.Ptr(f.bucket),
 		Key:    oss.Ptr(objectPath),
 	})
@@ -162,13 +162,13 @@ func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(f.ossAPI, f.bucket, storage.JoinPath(f.path, subFolderRelativePath), f.config)
 }
 
-func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (f *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	objectPath := f.GetPath() + objectRelativePath
 	req := &oss.GetObjectRequest{
 		Bucket: oss.Ptr(f.bucket),
 		Key:    oss.Ptr(objectPath),
 	}
-	result, err := f.ossAPI.GetObject(context.Background(), req)
+	result, err := f.ossAPI.GetObject(ctx, req)
 	if err != nil {
 		var serviceError *oss.ServiceError
 		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
@@ -180,11 +180,7 @@ func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
 	return result.Body, nil
 }
 
-func (f *Folder) PutObject(name string, content io.Reader) error {
-	return f.PutObjectWithContext(context.Background(), name, content)
-}
-
-func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (f *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	objectPath := f.GetPath() + name
 
 	_, err := f.uploader.UploadFrom(ctx, &oss.PutObjectRequest{
@@ -197,8 +193,8 @@ func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content 
 	return nil
 }
 
-func (f *Folder) CopyObject(srcPath string, dstPath string) error {
-	if exists, err := f.Exists(srcPath); !exists {
+func (f *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
+	if exists, err := f.Exists(ctx, srcPath); !exists {
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
@@ -207,7 +203,7 @@ func (f *Folder) CopyObject(srcPath string, dstPath string) error {
 	src := path.Join(f.GetPath(), srcPath)
 	dst := path.Join(f.GetPath(), dstPath)
 
-	_, err := f.copier.Copy(context.Background(), &oss.CopyObjectRequest{
+	_, err := f.copier.Copy(ctx, &oss.CopyObjectRequest{
 		Bucket:       oss.Ptr(f.bucket),
 		Key:          oss.Ptr(dst),
 		SourceBucket: oss.Ptr(f.bucket),
@@ -216,10 +212,10 @@ func (f *Folder) CopyObject(srcPath string, dstPath string) error {
 	return err
 }
 
-func (f *Folder) Validate() error {
+func (f *Folder) Validate(ctx context.Context) error {
 	prefix := f.GetPath()
 	delimiter := "/"
-	_, err := f.ossAPI.ListObjectsV2(context.Background(), &oss.ListObjectsV2Request{
+	_, err := f.ossAPI.ListObjectsV2(ctx, &oss.ListObjectsV2Request{
 		Bucket:    oss.Ptr(f.bucket),
 		Prefix:    oss.Ptr(prefix),
 		Delimiter: oss.Ptr(delimiter),
@@ -230,14 +226,14 @@ func (f *Folder) Validate() error {
 	return nil
 }
 
-func (f *Folder) isVersioningEnabled() bool {
+func (f *Folder) isVersioningEnabled(ctx context.Context) bool {
 	switch f.config.EnableVersioning {
 	case VersioningEnabled:
 		return true
 	case VersioningDisabled:
 		return false
 	case VersioningDefault:
-		result, err := f.ossAPI.GetBucketVersioning(context.Background(), &oss.GetBucketVersioningRequest{
+		result, err := f.ossAPI.GetBucketVersioning(ctx, &oss.GetBucketVersioningRequest{
 			Bucket: oss.Ptr(f.bucket),
 		})
 		if err != nil {
@@ -253,14 +249,14 @@ func (f *Folder) isVersioningEnabled() bool {
 	return false
 }
 
-func (f *Folder) SetVersioningEnabled(enable bool) {
-	if enable && f.isVersioningEnabled() {
+func (f *Folder) SetVersioningEnabled(ctx context.Context, enable bool) {
+	if enable && f.isVersioningEnabled(ctx) {
 		f.config.EnableVersioning = VersioningEnabled
 	} else {
 		f.config.EnableVersioning = VersioningDisabled
 	}
 }
 
-func (f *Folder) GetVersioningEnabled() bool {
-	return f.isVersioningEnabled()
+func (f *Folder) GetVersioningEnabled(ctx context.Context) bool {
+	return f.isVersioningEnabled(ctx)
 }

@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strings"
@@ -68,7 +69,7 @@ type FetchHandler struct {
 	sentinel            BackupSentinelDto
 }
 
-// nolint:gocritic
+//nolint:gocritic
 func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
@@ -303,14 +304,14 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 
 func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
 	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
-) func(folder storage.Folder, backup internal.Backup) {
-	return func(folder storage.Folder, backup internal.Backup) {
+) func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
+	return func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
 		if restorePoint != "" {
-			tracelog.ErrorLogger.FatalOnError(ValidateMatch(folder, backup.Name, restorePoint, backup.GetStorageName()))
+			tracelog.ErrorLogger.FatalOnError(ValidateMatch(ctx, folder, backup.Name, restorePoint, backup.GetStorageName()))
 		}
 		var sentinel BackupSentinelDto
-		err := backup.FetchSentinel(&sentinel)
+		err := backup.FetchSentinel(ctx, &sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)

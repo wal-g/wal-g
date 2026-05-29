@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strings"
@@ -22,7 +23,7 @@ const (
 )
 
 type SegDeleteHandler interface {
-	Delete(backup SegBackup) error
+	Delete(ctx context.Context, backup SegBackup) error
 }
 
 type SegDeleteBeforeHandler struct {
@@ -31,13 +32,13 @@ type SegDeleteBeforeHandler struct {
 	args      DeleteArgs
 }
 
-func NewSegDeleteHandler(rootFolder storage.Folder, contentID int, args DeleteArgs, delType SegDeleteType,
+func NewSegDeleteHandler(ctx context.Context, rootFolder storage.Folder, contentID int, args DeleteArgs, delType SegDeleteType,
 ) (SegDeleteHandler, error) {
 	segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 
-	permanentBackups, permanentWals := GetPermanentBackupsAndWals(rootFolder, contentID)
+	permanentBackups, permanentWals := GetPermanentBackupsAndWals(ctx, rootFolder, contentID)
 
-	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
+	segDeleteHandler, err := postgres.NewDeleteHandler(ctx, segFolder, permanentBackups, permanentWals, false)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func NewSegDeleteHandler(rootFolder storage.Folder, contentID int, args DeleteAr
 	}
 }
 
-func (h SegDeleteBeforeHandler) Delete(segBackup SegBackup) error {
+func (h SegDeleteBeforeHandler) Delete(ctx context.Context, segBackup SegBackup) error {
 	segTarget, err := h.FindTargetByName(segBackup.Name)
 	if err != nil {
 		return err
@@ -78,15 +79,15 @@ func (h SegDeleteBeforeHandler) Delete(segBackup SegBackup) error {
 		return !strings.HasPrefix(folderPath, aoSegFolderPrefix) &&
 			!strings.HasPrefix(folderPath, paxFolderPrefix)
 	}
-	err = h.DeleteBeforeTargetWhere(segTarget, h.args.Confirmed, filterFunc, folderFilter)
+	err = h.DeleteBeforeTargetWhere(ctx, segTarget, h.args.Confirmed, filterFunc, folderFilter)
 	if err != nil {
 		return err
 	}
 
-	if err := cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed); err != nil {
+	if err := cleanupAOSegments(ctx, segTarget, h.Folder, h.args.Confirmed); err != nil {
 		return err
 	}
-	return cleanupPaxFiles(segTarget, h.Folder, h.args.Confirmed)
+	return cleanupPaxFiles(ctx, segTarget, h.Folder, h.args.Confirmed)
 }
 
 type SegDeleteTargetHandler struct {
@@ -95,7 +96,7 @@ type SegDeleteTargetHandler struct {
 	args      DeleteArgs
 }
 
-func (h SegDeleteTargetHandler) Delete(segBackup SegBackup) error {
+func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup) error {
 	segTarget, err := h.FindTargetByName(segBackup.Name)
 	if err != nil {
 		return err
@@ -108,21 +109,21 @@ func (h SegDeleteTargetHandler) Delete(segBackup SegBackup) error {
 		return !strings.HasPrefix(folderPath, AoStoragePath) &&
 			!strings.HasPrefix(folderPath, pax.StoragePath)
 	}
-	err = h.DeleteTarget(segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
+	err = h.DeleteTarget(ctx, segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
 	if err != nil {
 		return err
 	}
 
-	if err := cleanupAOSegments(segTarget, h.Folder, h.args.Confirmed); err != nil {
+	if err := cleanupAOSegments(ctx, segTarget, h.Folder, h.args.Confirmed); err != nil {
 		return err
 	}
-	return cleanupPaxFiles(segTarget, h.Folder, h.args.Confirmed)
+	return cleanupPaxFiles(ctx, segTarget, h.Folder, h.args.Confirmed)
 }
 
 // TODO: unit tests
-func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
+func cleanupAOSegments(ctx context.Context, target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(AoStoragePath)
-	aoSegmentsToRetain, err := LoadStorageAoFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
+	aoSegmentsToRetain, err := LoadStorageAoFiles(ctx, segFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, c
 	}
 
 	tracelog.InfoLogger.Printf("Cleaning up the AO segment objects")
-	aoSegmentsToDelete, err := findAoSegmentsToDelete(target, aoSegmentsToRetain, aoSegFolder)
+	aoSegmentsToDelete, err := findAoSegmentsToDelete(ctx, target, aoSegmentsToRetain, aoSegFolder)
 	if err != nil {
 		return err
 	}
@@ -141,20 +142,20 @@ func cleanupAOSegments(target internal.BackupObject, segFolder storage.Folder, c
 		return nil
 	}
 
-	return aoSegFolder.DeleteObjects(aoSegmentsToDelete)
+	return aoSegFolder.DeleteObjects(ctx, aoSegmentsToDelete)
 }
 
-func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[postgres.PermanentObject]bool,
+func GetPermanentBackupsAndWals(ctx context.Context, rootFolder storage.Folder, contentID int) (map[postgres.PermanentObject]bool,
 	map[postgres.PermanentObject]bool) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
 	folder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
-	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
+	backupTimes, err := internal.GetBackups(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		tracelog.WarningLogger.Println("Error while fetching backups")
 		return map[postgres.PermanentObject]bool{}, map[postgres.PermanentObject]bool{}
 	}
 
-	restorePointMetas, err := FetchAllRestorePoints(rootFolder)
+	restorePointMetas, err := FetchAllRestorePoints(ctx, rootFolder)
 	if err != nil {
 		tracelog.WarningLogger.Println("Error while fetching restore points")
 		return map[postgres.PermanentObject]bool{}, map[postgres.PermanentObject]bool{}
@@ -165,13 +166,13 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 	permanentBackups := map[postgres.PermanentObject]bool{}
 	permanentWals := map[postgres.PermanentObject]bool{}
 	for _, backupTime := range backupTimes {
-		backup, err := postgres.NewBackupInStorage(backupsFolder, backupTime.BackupName, backupTime.StorageName)
+		backup, err := postgres.NewBackupInStorage(ctx, backupsFolder, backupTime.BackupName, backupTime.StorageName)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
 		}
 
-		meta, err := backup.FetchMeta()
+		meta, err := backup.FetchMeta(ctx)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
@@ -183,7 +184,7 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 			continue
 		}
 
-		restorePointMeta, err := FetchRestorePointMetadata(rootFolder, restorePoint)
+		restorePointMeta, err := FetchRestorePointMetadata(ctx, rootFolder, restorePoint)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
@@ -229,9 +230,9 @@ func GetPermanentBackupsAndWals(rootFolder storage.Folder, contentID int) (map[p
 }
 
 // TODO: unit tests
-func cleanupPaxFiles(target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
+func cleanupPaxFiles(ctx context.Context, target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
 	paxFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(pax.StoragePath)
-	paxFilesToRetain, err := pax.LoadStoragePaxFiles(segFolder.GetSubFolder(utility.BaseBackupPath))
+	paxFilesToRetain, err := pax.LoadStoragePaxFiles(ctx, segFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
@@ -241,7 +242,7 @@ func cleanupPaxFiles(target internal.BackupObject, segFolder storage.Folder, con
 	}
 
 	tracelog.InfoLogger.Printf("Cleaning up the PAX file objects")
-	paxFilesToDelete, err := findPaxFilesToDelete(target, paxFilesToRetain, paxFolder)
+	paxFilesToDelete, err := findPaxFilesToDelete(ctx, target, paxFilesToRetain, paxFolder)
 	if err != nil {
 		return err
 	}
@@ -250,13 +251,13 @@ func cleanupPaxFiles(target internal.BackupObject, segFolder storage.Folder, con
 		return nil
 	}
 
-	return paxFolder.DeleteObjects(paxFilesToDelete)
+	return paxFolder.DeleteObjects(ctx, paxFilesToDelete)
 }
 
 // TODO: unit tests
-func findPaxFilesToDelete(target internal.BackupObject,
+func findPaxFilesToDelete(ctx context.Context, target internal.BackupObject,
 	paxFilesToRetain map[string]struct{}, paxFolder storage.Folder) ([]storage.Object, error) {
-	paxObjects, _, err := paxFolder.ListFolder()
+	paxObjects, _, err := paxFolder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -282,9 +283,9 @@ func findPaxFilesToDelete(target internal.BackupObject,
 }
 
 // TODO: unit tests
-func findAoSegmentsToDelete(target internal.BackupObject,
+func findAoSegmentsToDelete(ctx context.Context, target internal.BackupObject,
 	aoSegmentsToRetain map[string]struct{}, aoSegFolder storage.Folder) ([]storage.Object, error) {
-	aoObjects, _, err := aoSegFolder.ListFolder()
+	aoObjects, _, err := aoSegFolder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}

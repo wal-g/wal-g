@@ -36,7 +36,7 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
-			mysql.HandleBinlogServer(BinlogBackupName, untilTS)
+			mysql.HandleBinlogServer(cmd.Context(), BinlogBackupName, untilTS)
 		},
 	}
 )

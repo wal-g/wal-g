@@ -57,9 +57,9 @@ func (tarQueue *TarBallQueue) StartQueue() error {
 	return nil
 }
 
-// DequeCtx returns a TarBall from the queue. If the context finishes before it
+// Deque returns a TarBall from the queue. If the context finishes before it
 // can do so, it returns the result of ctx.Err().
-func (tarQueue *TarBallQueue) DequeCtx(ctx context.Context) (TarBall, error) {
+func (tarQueue *TarBallQueue) Deque(ctx context.Context) (TarBall, error) {
 	if !tarQueue.started.Load() {
 		panic("Trying to deque from not started Queue")
 	}
@@ -69,13 +69,6 @@ func (tarQueue *TarBallQueue) DequeCtx(ctx context.Context) (TarBall, error) {
 	case tarball := <-tarQueue.tarsToFillQueue:
 		return tarball, nil
 	}
-}
-
-func (tarQueue *TarBallQueue) Deque() TarBall {
-	// The error can be ignored, since context.Background will never finish, so
-	// DequeCtx will never return an error.
-	tarball, _ := tarQueue.DequeCtx(context.Background())
-	return tarball
 }
 
 func (tarQueue *TarBallQueue) FinishQueue() error {

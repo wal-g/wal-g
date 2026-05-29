@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"os"
 	"slices"
 
@@ -11,12 +12,12 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
-	backups, err := internal.GetBackups(folder)
+func HandleDetailedBackupList(ctx context.Context, folder storage.Folder, pretty bool, json bool) {
+	backups, err := internal.GetBackups(ctx, folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	backupDetails, err := GetBackupDetails(folder, backups)
+	backupDetails, err := GetBackupDetails(ctx, folder, backups)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	printableEntities := make([]printlist.Entity, len(backupDetails))
@@ -27,10 +28,10 @@ func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
 	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
 }
 
-func GetBackupDetails(folder storage.Folder, backups []internal.BackupTime) ([]archive.Backup, error) {
+func GetBackupDetails(ctx context.Context, folder storage.Folder, backups []internal.BackupTime) ([]archive.Backup, error) {
 	backupDetails := make([]archive.Backup, 0, len(backups))
 	for i := len(backups) - 1; i >= 0; i-- {
-		details, err := archive.SentinelWithoutExistenceCheck(folder, backups[i].BackupName)
+		details, err := archive.SentinelWithoutExistenceCheck(ctx, folder, backups[i].BackupName)
 		if err != nil {
 			return nil, err
 		}

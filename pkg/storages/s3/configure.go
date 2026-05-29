@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -110,6 +111,7 @@ const (
 //
 //nolint:funlen,gocyclo
 func ConfigureStorage(
+	ctx context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,
@@ -227,7 +229,7 @@ func ConfigureStorage(
 		DeleteBatchSize:         deleteBatchSize,
 	}
 
-	st, err := NewStorage(config, rootWraps...)
+	st, err := NewStorage(ctx, config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}

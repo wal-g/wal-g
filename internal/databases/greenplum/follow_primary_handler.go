@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"slices"
@@ -24,8 +25,8 @@ type FollowPrimaryHandler struct {
 const LATEST = "LATEST"
 const WalFolder = utility.SegmentsPath + "/seg%d/" + utility.WalPath
 
-// nolint:gocritic
 func NewFollowPrimaryHandler(
+	ctx context.Context,
 	folder storage.Folder,
 	logsDir string,
 	restoreCfgPath, stopAtRestorePoint string,
@@ -45,7 +46,7 @@ func NewFollowPrimaryHandler(
 	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
 
 	if stopAtRestorePoint == LATEST {
-		restorePoints, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
+		restorePoints, err := GetRestorePoints(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
@@ -57,7 +58,7 @@ func NewFollowPrimaryHandler(
 		tracelog.InfoLogger.Printf("Selected latest restore point: %s", stopAtRestorePoint)
 	}
 
-	FatalIfWalLogMissing(stopAtRestorePoint, folder)
+	FatalIfWalLogMissing(ctx, stopAtRestorePoint, folder)
 
 	return &FollowPrimaryHandler{
 		cluster:            globalCluster,
@@ -66,8 +67,8 @@ func NewFollowPrimaryHandler(
 	}
 }
 
-func FatalIfWalLogMissing(restorePoint string, folder storage.Folder) {
-	metadata, err := FetchRestorePointMetadata(folder, restorePoint)
+func FatalIfWalLogMissing(ctx context.Context, restorePoint string, folder storage.Folder) {
+	metadata, err := FetchRestorePointMetadata(ctx, folder, restorePoint)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
@@ -82,7 +83,7 @@ outer:
 		walSegmentNo := postgres.NewWalSegmentNo(LSN)
 
 		subfolder := folder.GetSubFolder(fmt.Sprintf(WalFolder, seg))
-		folderObjects, _, err := subfolder.ListFolder()
+		folderObjects, _, err := subfolder.ListFolder(ctx)
 		if err != nil {
 			tracelog.ErrorLogger.FatalOnError(err)
 		}

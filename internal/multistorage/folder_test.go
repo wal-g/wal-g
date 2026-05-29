@@ -1,6 +1,7 @@
 package multistorage
 
 import (
+	"context"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -32,11 +33,11 @@ func TestSetPolicies(t *testing.T) {
 }
 
 func TestUseDifferentStorages(t *testing.T) {
-	useStorageFuncs := map[string]func(folder storage.Folder) (storage.Folder, error){
+	useStorageFuncs := map[string]func(ctx context.Context, folder storage.Folder) (storage.Folder, error){
 		"use_all_alive":   UseAllAliveStorages,
 		"use_first_alive": UseFirstAliveStorage,
-		"use_specific": func(folder storage.Folder) (storage.Folder, error) {
-			return UseSpecificStorage("s3", folder)
+		"use_specific": func(ctx context.Context, folder storage.Folder) (storage.Folder, error) {
+			return UseSpecificStorage(ctx, "s3", folder)
 		},
 	}
 
@@ -44,9 +45,9 @@ func TestUseDifferentStorages(t *testing.T) {
 		folder := newTestFolder(t, initialStorages...)
 		collectorMock := folder.statsCollector.(*stats.MockCollector)
 		newAliveStorage := "s3"
-		collectorMock.EXPECT().AllAliveStorages().Return([]string{newAliveStorage}, nil).AnyTimes()
-		collectorMock.EXPECT().FirstAliveStorage().Return(&newAliveStorage, nil).AnyTimes()
-		collectorMock.EXPECT().SpecificStorage(newAliveStorage).Return(true, nil).AnyTimes()
+		collectorMock.EXPECT().AllAliveStorages(gomock.Any()).Return([]string{newAliveStorage}, nil).AnyTimes()
+		collectorMock.EXPECT().FirstAliveStorage(gomock.Any()).Return(&newAliveStorage, nil).AnyTimes()
+		collectorMock.EXPECT().SpecificStorage(gomock.Any(), newAliveStorage).Return(true, nil).AnyTimes()
 		return folder
 	}
 
@@ -54,9 +55,9 @@ func TestUseDifferentStorages(t *testing.T) {
 		folder := newTestFolder(t, initialStorages...)
 		collectorMock := folder.statsCollector.(*stats.MockCollector)
 
-		collectorMock.EXPECT().AllAliveStorages().Return(nil, nil).AnyTimes()
-		collectorMock.EXPECT().FirstAliveStorage().Return(nil, nil).AnyTimes()
-		collectorMock.EXPECT().SpecificStorage("s3").Return(false, nil).AnyTimes()
+		collectorMock.EXPECT().AllAliveStorages(gomock.Any()).Return(nil, nil).AnyTimes()
+		collectorMock.EXPECT().FirstAliveStorage(gomock.Any()).Return(nil, nil).AnyTimes()
+		collectorMock.EXPECT().SpecificStorage(gomock.Any(), "s3").Return(false, nil).AnyTimes()
 
 		return folder
 	}
@@ -65,7 +66,7 @@ func TestUseDifferentStorages(t *testing.T) {
 		t.Run(funcName, func(t *testing.T) {
 			t.Run("do nothing if folder is not multistorage", func(t *testing.T) {
 				folder := memory.NewFolder("test/", memory.NewKVS())
-				newFolder, err := useStorageFunc(folder)
+				newFolder, err := useStorageFunc(t.Context(), folder)
 				require.NoError(t, err)
 				assert.Equal(t, folder, newFolder)
 			})
@@ -73,7 +74,7 @@ func TestUseDifferentStorages(t *testing.T) {
 			t.Run("changing storages does not affect source folder", func(t *testing.T) {
 				folder := newMockFolder(t, "s1", "s2")
 
-				newFolder, err := useStorageFunc(folder)
+				newFolder, err := useStorageFunc(t.Context(), folder)
 				require.NoError(t, err)
 
 				assert.Len(t, folder.usedFolders, 2)
@@ -87,7 +88,7 @@ func TestUseDifferentStorages(t *testing.T) {
 			t.Run("change directory in new storages", func(t *testing.T) {
 				folder := newMockFolder(t, "s1", "s2").GetSubFolder("a/b/c")
 
-				newFolder, err := useStorageFunc(folder)
+				newFolder, err := useStorageFunc(t.Context(), folder)
 				require.NoError(t, err)
 
 				newUsedFolders := newFolder.(Folder).usedFolders
@@ -103,7 +104,7 @@ func TestUseDifferentStorages(t *testing.T) {
 
 			t.Run("throw an error if no storages are alive", func(t *testing.T) {
 				folder := newMockFolderWithNoAlive(t, "s1", "s2", "s3")
-				_, err := useStorageFunc(folder)
+				_, err := useStorageFunc(t.Context(), folder)
 				require.ErrorIs(t, err, ErrNoAliveStorages)
 			})
 		})
@@ -114,9 +115,9 @@ func TestUseSpecificStorage(t *testing.T) {
 	t.Run("do nothing if this storage is already used", func(t *testing.T) {
 		folder := newTestFolder(t, "s2")
 		collectorMock := folder.statsCollector.(*stats.MockCollector)
-		collectorMock.EXPECT().SpecificStorage(gomock.Any()).Times(0)
+		collectorMock.EXPECT().SpecificStorage(gomock.Any(), gomock.Any()).Times(0)
 
-		newFolder, err := UseSpecificStorage("s2", folder)
+		newFolder, err := UseSpecificStorage(t.Context(), "s2", folder)
 		require.NoError(t, err, ErrNoAliveStorages)
 		assert.Equal(t, folder, newFolder)
 	})

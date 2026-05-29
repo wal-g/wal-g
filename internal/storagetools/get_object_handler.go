@@ -1,6 +1,7 @@
 package storagetools
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -14,7 +15,7 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleGetObject(objectPath, dstPath string, folder storage.Folder, decrypt, decompress bool) error {
+func HandleGetObject(ctx context.Context, objectPath, dstPath string, folder storage.Folder, decrypt, decompress bool) error {
 	fileName := path.Base(objectPath)
 	targetPath, err := getTargetFilePath(dstPath, fileName)
 	if err != nil {
@@ -26,7 +27,7 @@ func HandleGetObject(objectPath, dstPath string, folder storage.Folder, decrypt,
 		return fmt.Errorf("open the destination file: %v", err)
 	}
 
-	err = downloadObject(objectPath, folder, dstFile, decrypt, decompress)
+	err = downloadObject(ctx, objectPath, folder, dstFile, decrypt, decompress)
 	dstFile.Close()
 	if err != nil {
 		os.Remove(targetPath)
@@ -55,8 +56,8 @@ func getTargetFilePath(dstPath string, fileName string) (string, error) {
 	return dstPath, nil
 }
 
-func downloadObject(objectPath string, folder storage.Folder, fileWriter io.Writer, decrypt, decompress bool) error {
-	objReadCloser, err := folder.ReadObject(objectPath)
+func downloadObject(ctx context.Context, objectPath string, folder storage.Folder, fileWriter io.Writer, decrypt, decompress bool) error {
+	objReadCloser, err := folder.ReadObject(ctx, objectPath)
 	if err != nil {
 		return err
 	}

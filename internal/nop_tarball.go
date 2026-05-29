@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"io"
 	"sync/atomic"
 
@@ -19,8 +20,8 @@ func (tarBall *NOPTarBall) Name() string {
 	return "NOPTarBall"
 }
 
-func (tarBall *NOPTarBall) SetUp(crypter crypto.Crypter, params ...string) {}
-func (tarBall *NOPTarBall) CloseTar() error                                { return nil }
+func (tarBall *NOPTarBall) SetUp(_ context.Context, crypter crypto.Crypter, params ...string) {}
+func (tarBall *NOPTarBall) CloseTar() error                                                   { return nil }
 
 func (tarBall *NOPTarBall) Size() int64            { return tarBall.partSize.Load() }
 func (tarBall *NOPTarBall) AddSize(i int64)        { tarBall.partSize.Add(i) }

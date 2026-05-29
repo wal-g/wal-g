@@ -15,16 +15,16 @@ func HandleBackupRestore(ctx context.Context, backupName string, dbnames []strin
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	storage, err := internal.ConfigureStorage()
+	storage, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	folder := storage.RootFolder()
 
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = backup.FetchSentinel(sentinel)
+	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -64,7 +64,7 @@ func restoreSingleDatabase(ctx context.Context,
 	fromName string) error {
 	baseURL := getDatabaseBackupURL(backupName, fromName)
 	basePath := getDatabaseBackupPath(backupName, fromName)
-	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	blobs, err := listBackupBlobs(ctx, folder.GetSubFolder(basePath))
 	if err != nil {
 		return err
 	}

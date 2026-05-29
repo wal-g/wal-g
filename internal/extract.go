@@ -141,11 +141,11 @@ func DecryptAndDecompressTar(reader io.Reader, filePath string, crypter crypto.C
 // File type `.nop` is used for testing purposes. Each file is extracted
 // in its own goroutine and ExtractAll will wait for all goroutines to finish.
 // Retries unsuccessful attempts log2(MaxConcurrency) times, dividing concurrency by two each time.
-func ExtractAll(tarInterpreter TarInterpreter, files []ReaderMaker) error {
-	return ExtractAllWithSleeper(tarInterpreter, files, NewExponentialSleeper(MinExtractRetryWait, MaxExtractRetryWait))
+func ExtractAll(ctx context.Context, tarInterpreter TarInterpreter, files []ReaderMaker) error {
+	return ExtractAllWithSleeper(ctx, tarInterpreter, files, NewExponentialSleeper(MinExtractRetryWait, MaxExtractRetryWait))
 }
 
-func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, sleeper Sleeper) error {
+func ExtractAllWithSleeper(ctx context.Context, tarInterpreter TarInterpreter, files []ReaderMaker, sleeper Sleeper) error {
 	if len(files) == 0 {
 		return newNoFilesToExtractError()
 	}
@@ -158,7 +158,7 @@ func ExtractAllWithSleeper(tarInterpreter TarInterpreter, files []ReaderMaker, s
 	retries := conf.GetFetchRetries()
 
 	for currentRun := files; len(currentRun) > 0; {
-		failed := tryExtractFiles(currentRun, tarInterpreter, downloadingConcurrency)
+		failed := tryExtractFiles(ctx, currentRun, tarInterpreter, downloadingConcurrency)
 		if downloadingConcurrency > 1 {
 			downloadingConcurrency /= 2
 		} else if len(failed) == len(currentRun) && retries <= 0 {
@@ -198,10 +198,10 @@ func extractFile(tarInterpreter TarInterpreter, extractingReader io.Reader, file
 }
 
 // TODO : unit tests
-func tryExtractFiles(files []ReaderMaker,
+func tryExtractFiles(downloadingContext context.Context,
+	files []ReaderMaker,
 	tarInterpreter TarInterpreter,
 	downloadingConcurrency int) (failed []ReaderMaker) {
-	downloadingContext := context.TODO()
 	downloadingSemaphore := semaphore.NewWeighted(int64(downloadingConcurrency))
 	crypter := ConfigureCrypter()
 	isFailed := sync.Map{}
@@ -217,7 +217,7 @@ func tryExtractFiles(files []ReaderMaker,
 		go func() {
 			defer downloadingSemaphore.Release(1)
 
-			readCloser, err := fileClosure.Reader()
+			readCloser, err := fileClosure.Reader(downloadingContext)
 			if err == nil {
 				defer utility.LoggedClose(readCloser, "")
 

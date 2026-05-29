@@ -48,7 +48,7 @@ func TestS3DependentFunctions(t *testing.T) {
 
 	tarBallQueue.NewTarBall(false)
 	tarBall := tarBallQueue.LastCreatedTarball
-	tarBall.SetUp(nil)
+	tarBall.SetUp(t.Context(), nil)
 	tarWriter := tarBall.TarWriter()
 
 	mockData := []byte("a")
@@ -91,7 +91,7 @@ func TestPackFileTo(t *testing.T) {
 		Size:          &size,
 	}
 	tarBall := tarBallMaker.Make(false)
-	tarBall.SetUp(nil)
+	tarBall.SetUp(t.Context(), nil)
 	packed, err := internal.PackFileTo(tarBall, mockHeader, strings.NewReader(mockData))
 	assert.Equal(t, int64(len(mockData)), packed)
 	assert.NoError(t, err)

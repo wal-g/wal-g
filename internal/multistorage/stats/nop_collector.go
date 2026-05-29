@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"context"
 	"fmt"
 	"slices"
 )
@@ -16,15 +17,15 @@ func NewNopCollector(storagesInOrder []string) Collector {
 	return &nopCollector{storagesInOrder: storagesInOrder}
 }
 
-func (nc *nopCollector) AllAliveStorages() ([]string, error) {
+func (nc *nopCollector) AllAliveStorages(_ context.Context) ([]string, error) {
 	return nc.storagesInOrder, nil
 }
 
-func (nc *nopCollector) FirstAliveStorage() (*string, error) {
+func (nc *nopCollector) FirstAliveStorage(_ context.Context) (*string, error) {
 	return &nc.storagesInOrder[0], nil
 }
 
-func (nc *nopCollector) SpecificStorage(name string) (bool, error) {
+func (nc *nopCollector) SpecificStorage(_ context.Context, name string) (bool, error) {
 	if slices.Contains(nc.storagesInOrder, name) {
 		return true, nil
 	}

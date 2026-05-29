@@ -1,6 +1,7 @@
 package sh
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -26,6 +27,7 @@ const defaultPort = "22"
 
 // TODO: Unit tests
 func ConfigureStorage(
+	_ context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,

@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"errors"
 	"io"
 
@@ -22,9 +23,9 @@ type BackupStreamMetadata struct {
 	Compression string `json:"compression,omitempty"`
 }
 
-func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
+func GetBackupStreamFetcher(ctx context.Context, backup Backup) (StreamFetcher, error) {
 	var metadata BackupStreamMetadata
-	err := FetchDto(backup.Folder, &metadata, StreamMetadataNameFromBackup(backup.Name))
+	err := FetchDto(ctx, backup.Folder, &metadata, StreamMetadataNameFromBackup(backup.Name))
 	var test storage.ObjectNotFoundError
 	if errors.As(err, &test) {
 		return DownloadAndDecompressStream, nil
@@ -38,8 +39,8 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	case SplitMergeStreamBackup:
 		var blockSize = metadata.BlockSize
 		var compression = metadata.Compression
-		return func(backup Backup, writer io.WriteCloser) error {
-			return DownloadAndDecompressSplittedStream(backup, int(blockSize), compression, writer, maxDownloadRetry)
+		return func(ctx context.Context, backup Backup, writer io.WriteCloser) error {
+			return DownloadAndDecompressSplittedStream(ctx, backup, int(blockSize), compression, writer, maxDownloadRetry)
 		}, nil
 	case SingleStreamStreamBackup, "":
 		return DownloadAndDecompressStream, nil
@@ -48,7 +49,7 @@ func GetBackupStreamFetcher(backup Backup) (StreamFetcher, error) {
 	return nil, nil // unreachable
 }
 
-func UploadBackupStreamMetadata(uploader Uploader, metadata interface{}, backupName string) error {
+func UploadBackupStreamMetadata(ctx context.Context, uploader Uploader, metadata interface{}, backupName string) error {
 	sentinelName := StreamMetadataNameFromBackup(backupName)
-	return UploadDto(uploader.Folder(), metadata, sentinelName)
+	return UploadDto(ctx, uploader.Folder(), metadata, sentinelName)
 }

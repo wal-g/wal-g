@@ -21,9 +21,9 @@ var backupDeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		backupName := args[0]
 
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
-		err = redis.HandleBackupDelete(storage.RootFolder(), backupName, !confirmedBackupDelete)
+		err = redis.HandleBackupDelete(cmd.Context(), storage.RootFolder(), backupName, !confirmedBackupDelete)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

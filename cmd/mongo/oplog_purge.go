@@ -36,14 +36,14 @@ func pitrDiscoveryAfterTime() *time.Time {
 func runOplogPurge(cmd *cobra.Command, args []string) {
 	pitrAfterTime := pitrDiscoveryAfterTime()
 	// set up storage downloader client
-	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	downloader, err := archive.NewStorageDownloader(cmd.Context(), archive.NewDefaultStorageSettings())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// set up storage purger client
-	purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
+	purger, err := archive.NewStoragePurger(cmd.Context(), archive.NewDefaultStorageSettings())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = mongo.HandleOplogPurge(downloader, purger, pitrAfterTime, !confirmedOplogPurge)
+	err = mongo.HandleOplogPurge(cmd.Context(), downloader, purger, pitrAfterTime, !confirmedOplogPurge)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

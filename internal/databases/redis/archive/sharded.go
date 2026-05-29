@@ -25,8 +25,8 @@ import (
 
 const SlotsFileName = "slots.json"
 
-func GetSlotsCompressedFileName(backupName string) (string, error) {
-	upl, err := internal.ConfigureUploader()
+func GetSlotsCompressedFileName(ctx context.Context, backupName string) (string, error) {
+	upl, err := internal.ConfigureUploader(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -196,14 +196,14 @@ func GetSlotsMap(netImpl NetI) (map[string][][]string, error) {
 	return validateFqdns(fqdnToIDMap, idToSlots)
 }
 
-func FetchSlotsDataFromStorage(folder storage.Folder, backup *Backup) (string, error) {
+func FetchSlotsDataFromStorage(ctx context.Context, folder storage.Folder, backup *Backup) (string, error) {
 	tmpDir, err := os.MkdirTemp("/tmp", "slots_data")
 	if err != nil {
 		return "", err
 	}
 	defer os.RemoveAll(tmpDir)
 
-	compressedFileName, err := GetSlotsCompressedFileName(backup.BackupName)
+	compressedFileName, err := GetSlotsCompressedFileName(ctx, backup.BackupName)
 	if err != nil {
 		return "", err
 	}
@@ -214,7 +214,7 @@ func FetchSlotsDataFromStorage(folder storage.Folder, backup *Backup) (string, e
 	storageFolder := intBackup.Folder.GetSubFolder("")
 
 	pathToExtract := internal.NewRegularFileStorageReaderMarker(storageFolder, compressedFileName, fileName, 0644)
-	err = internal.ExtractAll(tarInterpreter, []internal.ReaderMaker{pathToExtract})
+	err = internal.ExtractAll(ctx, tarInterpreter, []internal.ReaderMaker{pathToExtract})
 	if err != nil {
 		return "", errors.Wrapf(err, "file %s in folder %s", compressedFileName, storageFolder.GetPath())
 	}
@@ -254,7 +254,7 @@ func FillSlotsForSharded(ctx context.Context, args FillSlotsForShardedArgs) erro
 	}
 	tracelog.InfoLogger.Printf("packing %s", string(jsonData))
 
-	fullPath, err := GetSlotsCompressedFileName(args.BackupName)
+	fullPath, err := GetSlotsCompressedFileName(ctx, args.BackupName)
 	if err != nil {
 		return err
 	}

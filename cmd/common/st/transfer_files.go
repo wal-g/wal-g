@@ -1,6 +1,8 @@
 package st
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/storagetools/transfer"
@@ -13,12 +15,12 @@ var filesCmd = &cobra.Command{
 	Use:   "files prefix --source='source_storage' [--target='target_storage']",
 	Short: filesShortDescription,
 	Args:  cobra.ExactArgs(1),
-	Run: func(_ *cobra.Command, args []string) {
-		transferFiles(args[0])
+	Run: func(cmd *cobra.Command, args []string) {
+		transferFiles(cmd.Context(), args[0])
 	},
 }
 
-func transferFiles(prefix string) {
+func transferFiles(ctx context.Context, prefix string) {
 	separateFileLister := transfer.NewRegularFileLister(prefix, transferOverwrite, int(transferMaxFiles))
 
 	cfg := &transfer.HandlerConfig{
@@ -29,10 +31,10 @@ func transferFiles(prefix string) {
 		AppearanceChecksInterval: transferAppearanceChecksInterval,
 	}
 
-	handler, err := transfer.NewHandler(transferSourceStorage, targetStorage, separateFileLister, cfg)
+	handler, err := transfer.NewHandler(ctx, transferSourceStorage, targetStorage, separateFileLister, cfg)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = handler.Handle()
+	err = handler.Handle(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

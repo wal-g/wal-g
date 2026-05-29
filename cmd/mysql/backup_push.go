@@ -33,11 +33,11 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
-			uploader, err := internal.ConfigureSplitUploader()
+			uploader, err := internal.ConfigureSplitUploader(cmd.Context())
 			tracelog.ErrorLogger.FatalOnError(err)
 			folder := uploader.Folder()
 			uploader.ChangeDirectory(utility.BaseBackupPath)
-			backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
+			backupCmd, err := internal.GetCommandSettingContext(cmd.Context(), conf.NameStreamCreateCmd)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			if userData == "" {

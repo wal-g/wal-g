@@ -1,6 +1,8 @@
 package greenplum
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -26,12 +28,13 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 
 // TODO: Unit tests
 func (mf GenericMetaFetcher) fetch(
+	ctx context.Context,
 	backupName string, backupFolder storage.Folder, specificStorage bool, storage string,
 ) (internal.GenericMetadata, error) {
 	var backup internal.Backup
 	var err error
 	if specificStorage {
-		backup, err = internal.NewBackupInStorage(backupFolder, backupName, storage)
+		backup, err = internal.NewBackupInStorage(ctx, backupFolder, backupName, storage)
 	} else {
 		backup, err = internal.NewBackup(backupFolder, backupName)
 	}
@@ -39,7 +42,7 @@ func (mf GenericMetaFetcher) fetch(
 		return internal.GenericMetadata{}, err
 	}
 	var sentinel BackupSentinelDto
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		return internal.GenericMetadata{}, err
 	}
@@ -57,13 +60,13 @@ func (mf GenericMetaFetcher) fetch(
 	}, nil
 }
 
-func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
-	return mf.fetch(backupName, backupFolder, false, "")
+func (mf GenericMetaFetcher) Fetch(ctx context.Context, backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
+	return mf.fetch(ctx, backupName, backupFolder, false, "")
 }
 
 func (mf GenericMetaFetcher) FetchFromStorage(
-	backupName string, backupFolder storage.Folder, storage string) (internal.GenericMetadata, error) {
-	return mf.fetch(backupName, backupFolder, true, storage)
+	ctx context.Context, backupName string, backupFolder storage.Folder, storage string) (internal.GenericMetadata, error) {
+	return mf.fetch(ctx, backupName, backupFolder, true, storage)
 }
 
 type GenericMetaSetter struct{}
@@ -73,35 +76,36 @@ func NewGenericMetaSetter() GenericMetaSetter {
 }
 
 // TODO: Unit tests
-func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
+func (ms GenericMetaSetter) SetUserData(ctx context.Context, backupName string, backupFolder storage.Folder, userData interface{}) error {
 	modifier := func(dto BackupSentinelDto) BackupSentinelDto {
 		dto.UserData = userData
 		return dto
 	}
-	return modifyBackupSentinel(backupName, backupFolder, modifier)
+	return modifyBackupSentinel(ctx, backupName, backupFolder, modifier)
 }
 
 // TODO: Unit tests
-func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error {
+func (ms GenericMetaSetter) SetIsPermanent(ctx context.Context, backupName string, backupFolder storage.Folder, isPermanent bool) error {
 	modifier := func(dto BackupSentinelDto) BackupSentinelDto {
 		dto.IsPermanent = isPermanent
 		return dto
 	}
-	return modifyBackupSentinel(backupName, backupFolder, modifier)
+	return modifyBackupSentinel(ctx, backupName, backupFolder, modifier)
 }
 
-func modifyBackupSentinel(backupName string, backupFolder storage.Folder, modifier func(BackupSentinelDto) BackupSentinelDto) error {
+func modifyBackupSentinel(ctx context.Context,
+	backupName string, backupFolder storage.Folder, modifier func(BackupSentinelDto) BackupSentinelDto) error {
 	backup, err := internal.NewBackup(backupFolder, backupName)
 	if err != nil {
 		return errors.Wrap(err, "failed to modify metadata")
 	}
 	var sentinel BackupSentinelDto
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch the existing backup metadata for modifying")
 	}
 	sentinel = modifier(sentinel)
-	err = backup.UploadSentinel(sentinel)
+	err = backup.UploadSentinel(ctx, sentinel)
 	if err != nil {
 		return errors.Wrap(err, "failed to upload the modified metadata to the storage")
 	}

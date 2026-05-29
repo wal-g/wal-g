@@ -36,8 +36,7 @@ type UploaderConfig struct {
 }
 
 // TODO: unit tests
-func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
-	ctx := context.Background()
+func NewStorage(ctx context.Context, config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	client, err := gcs.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create GCS client: %w", err)

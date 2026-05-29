@@ -29,7 +29,7 @@ const cursorCreateRetries = 10
 const mongoConnectRetries = 3
 
 type MongodService struct {
-	Context     context.Context
+	Context     context.Context //nolint:containedctx // long-lived mongod client connection service
 	MongoClient *mongo.Client
 }
 
@@ -405,8 +405,8 @@ func makeBsonRsMembers(rsConfig RsConfig) bson.A {
 	return bsonMembers
 }
 
-func (mongodService *MongodService) Shutdown() error {
-	err := mongodService.MongoClient.Database(adminDB).RunCommand(context.Background(),
+func (mongodService *MongodService) Shutdown(ctx context.Context) error {
+	err := mongodService.MongoClient.Database(adminDB).RunCommand(ctx,
 		bson.D{{Key: "shutdown", Value: 1}},
 	).Err()
 	if err != nil && !strings.Contains(err.Error(), "socket was unexpectedly closed") {
@@ -503,6 +503,7 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 }
 
 func NewReplyOplogConfig(
+	ctx context.Context,
 	sincePitrStr, untilPitrStr string, partial, withCatchUpReconfig bool, minimalConfigPath string,
 ) (ReplyOplogConfig, error) {
 	var roConfig ReplyOplogConfig
@@ -510,15 +511,15 @@ func NewReplyOplogConfig(
 	roConfig.HasPitr = true
 
 	// resolve archiving settings
-	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
 	if err != nil {
 		return roConfig, err
 	}
-	roConfig.Since, err = processTimestamp(sincePitrStr, downloader)
+	roConfig.Since, err = processTimestamp(ctx, sincePitrStr, downloader)
 	if err != nil {
 		return roConfig, err
 	}
-	roConfig.Until, err = processTimestamp(untilPitrStr, downloader)
+	roConfig.Until, err = processTimestamp(ctx, untilPitrStr, downloader)
 	if err != nil {
 		return roConfig, err
 	}
@@ -548,16 +549,16 @@ func NewReplyOplogConfig(
 	return roConfig, err
 }
 
-func processTimestamp(arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
+func processTimestamp(ctx context.Context, arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
 	switch arg {
 	case internal.LatestString:
-		return downloader.LastKnownArchiveTS()
+		return downloader.LastKnownArchiveTS(ctx)
 	case LatestBackupString:
-		lastBackupName, err := downloader.LastBackupName()
+		lastBackupName, err := downloader.LastBackupName(ctx)
 		if err != nil {
 			return models.Timestamp{}, err
 		}
-		backupMeta, err := downloader.BackupMeta(lastBackupName)
+		backupMeta, err := downloader.BackupMeta(ctx, lastBackupName)
 		if err != nil {
 			return models.Timestamp{}, err
 		}

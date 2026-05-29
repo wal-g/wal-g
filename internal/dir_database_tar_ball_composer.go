@@ -22,9 +22,11 @@ type DirDatabaseTarBallComposer struct {
 	//
 	pathFilter        PathFilter
 	fileDirCollection map[string][]*ComposeFileInfo
+	ctx               context.Context //nolint:containedctx // errgroup root feeds async addListToTar during filepath.Walk
 }
 
 func NewDirDatabaseTarBallComposer(
+	ctx context.Context,
 	files BundleFiles,
 	tarBallQueue *TarBallQueue,
 	tarBallFilePacker TarBallFilePacker,
@@ -40,6 +42,7 @@ func NewDirDatabaseTarBallComposer(
 		fileDirCollection: make(map[string][]*ComposeFileInfo),
 		crypter:           crypter,
 		pathFilter:        pathFilter,
+		ctx:               ctx,
 	}
 }
 
@@ -52,8 +55,11 @@ func (d DirDatabaseTarBallComposer) AddFile(info *ComposeFileInfo) {
 }
 
 func (d DirDatabaseTarBallComposer) AddHeader(header *tar.Header, fileInfo os.FileInfo) error {
-	tarBall := d.tarBallQueue.Deque()
-	tarBall.SetUp(d.crypter)
+	tarBall, err := d.tarBallQueue.Deque(d.ctx)
+	if err != nil {
+		return err
+	}
+	tarBall.SetUp(d.ctx, d.crypter)
 	defer d.tarBallQueue.EnqueueBack(tarBall)
 	d.tarFileSets.AddFile(tarBall.Name(), header.Name)
 	d.files.AddFile(header, fileInfo, false)
@@ -71,7 +77,7 @@ func (d DirDatabaseTarBallComposer) FinishComposing() (TarFileSets, error) {
 		return nil, err
 	}
 
-	eg, ctx := errgroup.WithContext(context.Background())
+	eg, ctx := errgroup.WithContext(d.ctx)
 	for _, fileInfos := range d.fileDirCollection {
 		thisInfos := fileInfos
 		eg.Go(func() error {
@@ -99,12 +105,15 @@ func (d DirDatabaseTarBallComposer) GetFiles() BundleFiles {
 }
 
 func (d DirDatabaseTarBallComposer) addListToTar(files []*ComposeFileInfo) error {
-	tarBall := d.tarBallQueue.Deque()
-	tarBall.SetUp(d.crypter)
+	tarBall, err := d.tarBallQueue.Deque(d.ctx)
+	if err != nil {
+		return err
+	}
+	tarBall.SetUp(d.ctx, d.crypter)
 
 	for _, file := range files {
 		d.tarFileSets.AddFile(tarBall.Name(), file.Header.Name)
-		err := d.tarBallFilePacker.PackFileIntoTar(file, tarBall)
+		err := d.tarBallFilePacker.PackFileIntoTar(d.ctx, file, tarBall)
 		if err != nil {
 			return err
 		}
@@ -114,8 +123,11 @@ func (d DirDatabaseTarBallComposer) addListToTar(files []*ComposeFileInfo) error
 			if err != nil {
 				return err
 			}
-			tarBall = d.tarBallQueue.Deque()
-			tarBall.SetUp(d.crypter)
+			tarBall, err = d.tarBallQueue.Deque(d.ctx)
+			if err != nil {
+				return err
+			}
+			tarBall.SetUp(d.ctx, d.crypter)
 		}
 	}
 	return d.tarBallQueue.FinishTarBall(tarBall)

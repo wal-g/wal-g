@@ -3,8 +3,6 @@ package transfer
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -34,15 +32,16 @@ type HandlerConfig struct {
 }
 
 func NewHandler(
+	ctx context.Context,
 	sourceStorage, targetStorage string,
 	fileLister FileLister,
 	cfg *HandlerConfig,
 ) (*Handler, error) {
-	source, err := exec.ConfigureStorage(sourceStorage)
+	source, err := exec.ConfigureStorage(ctx, sourceStorage)
 	if err != nil {
 		return nil, fmt.Errorf("configure source storage folder: %w", err)
 	}
-	target, err := exec.ConfigureStorage(targetStorage)
+	target, err := exec.ConfigureStorage(ctx, targetStorage)
 	if err != nil {
 		return nil, fmt.Errorf("configure target storage folder: %w", err)
 	}
@@ -57,14 +56,14 @@ func NewHandler(
 	}, nil
 }
 
-func (h *Handler) Handle() error {
-	files, filesNum, err := h.fileLister.ListFilesToMove(h.source, h.target)
+func (h *Handler) Handle(ctx context.Context) error {
+	files, filesNum, err := h.fileLister.ListFilesToMove(ctx, h.source, h.target)
 	if err != nil {
 		return err
 	}
 
 	workersNum := utility.Min(h.cfg.Concurrency, len(files))
-	return h.transferConcurrently(workersNum, files, filesNum)
+	return h.transferConcurrently(ctx, workersNum, files, filesNum)
 }
 
 type transferJob struct {
@@ -118,7 +117,7 @@ func (ts transferStatus) String() string {
 	}
 }
 
-func (h *Handler) transferConcurrently(workers int, files []FilesGroup, filesNum int) (finErr error) {
+func (h *Handler) transferConcurrently(ctx context.Context, workers int, files []FilesGroup, filesNum int) (finErr error) {
 	jobsQueue := make(chan transferJob, filesNum)
 	h.filesLeft.Add(int32(filesNum))
 	for _, group := range files {
@@ -136,8 +135,8 @@ func (h *Handler) transferConcurrently(workers int, files []FilesGroup, filesNum
 
 	errs := make(chan error, len(files))
 
-	workersCtx, cancelWorkers := context.WithCancel(context.Background())
-	cancelOnSignal(cancelWorkers)
+	// ctx already cancels on SIGINT/SIGTERM via the root command context
+	workersCtx, cancelWorkers := context.WithCancel(ctx)
 	workersWG := new(sync.WaitGroup)
 	workersWG.Add(workers)
 	for i := 0; i < workers; i++ {
@@ -194,15 +193,6 @@ func (h *Handler) saveRequirements(file FileToMove) {
 	}
 }
 
-func cancelOnSignal(cancel context.CancelFunc) {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, os.Interrupt)
-	go func() {
-		<-sigs
-		cancel()
-	}()
-}
-
 func (h *Handler) transferFilesWorker(
 	ctx context.Context,
 	jobsQueue chan transferJob,
@@ -235,11 +225,11 @@ func (h *Handler) transferFilesWorker(
 		if ok {
 			switch job.key.jobType {
 			case jobTypeCopy:
-				newJob, err = h.copyFile(job)
+				newJob, err = h.copyFile(ctx, job)
 			case jobTypeWait:
-				newJob, err = h.waitFile(job)
+				newJob, err = h.waitFile(ctx, job)
 			case jobTypeDelete:
-				err = h.deleteFile(job)
+				err = h.deleteFile(ctx, job)
 			}
 		} else {
 			// Repeat the same job if its requirements haven't yet satisfied
@@ -285,14 +275,14 @@ func (h *Handler) checkRequirements(job transferJob) (ok bool, err error) {
 	return true, nil
 }
 
-func (h *Handler) copyFile(job transferJob) (newJob *transferJob, err error) {
-	content, err := h.source.ReadObject(job.key.filePath)
+func (h *Handler) copyFile(ctx context.Context, job transferJob) (newJob *transferJob, err error) {
+	content, err := h.source.ReadObject(ctx, job.key.filePath)
 	if err != nil {
 		return nil, fmt.Errorf("read file from the source storage: %w", err)
 	}
 	defer utility.LoggedClose(content, "close object content read from the source storage")
 
-	err = h.target.PutObject(job.key.filePath, content)
+	err = h.target.PutObject(ctx, job.key.filePath, content)
 	if err != nil {
 		return nil, fmt.Errorf("write file to the target storage: %w", err)
 	}
@@ -304,14 +294,14 @@ func (h *Handler) copyFile(job transferJob) (newJob *transferJob, err error) {
 	return newJob, nil
 }
 
-func (h *Handler) waitFile(job transferJob) (newJob *transferJob, err error) {
+func (h *Handler) waitFile(ctx context.Context, job transferJob) (newJob *transferJob, err error) {
 	var appeared bool
 
 	skipCheck := h.cfg.AppearanceChecks == 0
 	if skipCheck {
 		appeared = true
 	} else {
-		appeared, err = h.checkForAppearance(job.prevCheck, job.key.filePath)
+		appeared, err = h.checkForAppearance(ctx, job.prevCheck, job.key.filePath)
 		if err != nil {
 			return nil, err
 		}
@@ -348,22 +338,22 @@ func (h *Handler) waitFile(job transferJob) (newJob *transferJob, err error) {
 	return newJob, nil
 }
 
-func (h *Handler) checkForAppearance(prevCheck time.Time, filePath string) (appeared bool, err error) {
+func (h *Handler) checkForAppearance(ctx context.Context, prevCheck time.Time, filePath string) (appeared bool, err error) {
 	nextCheck := prevCheck.Add(h.cfg.AppearanceChecksInterval)
 	waitTime := time.Until(nextCheck)
 	if waitTime > 0 {
 		time.Sleep(waitTime)
 	}
 
-	appeared, err = h.target.Exists(filePath)
+	appeared, err = h.target.Exists(ctx, filePath)
 	if err != nil {
 		return false, fmt.Errorf("check if file exists in the target storage: %w", err)
 	}
 	return appeared, nil
 }
 
-func (h *Handler) deleteFile(job transferJob) error {
-	err := h.source.DeleteObjects([]storage.Object{storage.NewLocalObject(job.key.filePath, time.Time{}, 0)})
+func (h *Handler) deleteFile(ctx context.Context, job transferJob) error {
+	err := h.source.DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(job.key.filePath, time.Time{}, 0)})
 	if err != nil {
 		return fmt.Errorf("delete file from the source storage: %w", err)
 	}

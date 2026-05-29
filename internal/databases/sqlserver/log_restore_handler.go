@@ -16,16 +16,16 @@ func HandleLogRestore(ctx context.Context, backupName string, untilTS string, db
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	folder := st.RootFolder()
 
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = backup.FetchSentinel(sentinel)
+	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()
@@ -41,7 +41,7 @@ func HandleLogRestore(ctx context.Context, backupName string, untilTS string, db
 	stopAt, err := utility.ParseUntilTS(untilTS)
 	tracelog.ErrorLogger.FatalfOnError("invalid util timestamp: %v", err)
 
-	logs, err := getLogsSinceBackup(folder, backup.Name, stopAt)
+	logs, err := getLogsSinceBackup(ctx, folder, backup.Name, stopAt)
 	tracelog.ErrorLogger.FatalfOnError("failed to list log backups: %v", err)
 
 	err = runParallel(func(i int) error {
@@ -50,7 +50,7 @@ func HandleLogRestore(ctx context.Context, backupName string, untilTS string, db
 		if err != nil {
 			return err
 		}
-		backupMetadata, err := GetBackupProperties(db, folder, false, backup.Name, fromname)
+		backupMetadata, err := GetBackupProperties(ctx, db, folder, false, backup.Name, fromname)
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func HandleLogRestore(ctx context.Context, backupName string, untilTS string, db
 		}
 		prevBackupFinishdate := dbBackupProperties.BackupFinishDate
 		for _, logBackupName := range logs {
-			ok, err := doesLogBackupContainDB(folder, logBackupName, fromname)
+			ok, err := doesLogBackupContainDB(ctx, folder, logBackupName, fromname)
 			if err != nil {
 				return err
 			}
@@ -111,13 +111,13 @@ func restoreSingleLog(ctx context.Context,
 ) (time.Time, error) {
 	baseURL := getLogBackupURL(logBackupName, fromname)
 	basePath := getLogBackupPath(logBackupName, fromname)
-	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	blobs, err := listBackupBlobs(ctx, folder.GetSubFolder(basePath))
 	if err != nil {
 		return prevBackupFinishDate, err
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 
-	logBackupFileProperties, err := GetBackupProperties(db, folder, true, logBackupName, fromname)
+	logBackupFileProperties, err := GetBackupProperties(ctx, db, folder, true, logBackupName, fromname)
 	if err != nil {
 		return prevBackupFinishDate, err
 	}

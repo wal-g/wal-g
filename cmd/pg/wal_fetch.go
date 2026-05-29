@@ -18,13 +18,13 @@ var walFetchCmd = &cobra.Command{
 	Short: WalFetchShortDescription, // TODO : improve description
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := internal.ConfigureMultiStorage(false)
+		storage, err := internal.ConfigureMultiStorage(cmd.Context(), false)
 		tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
-		folderReader, err := internal.PrepareMultiStorageFolderReader(storage.RootFolder(), targetStorage)
+		folderReader, err := internal.PrepareMultiStorageFolderReader(cmd.Context(), storage.RootFolder(), targetStorage)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = postgres.HandleWALFetch(folderReader, args[0], args[1], postgres.RegularPrefetcher{})
+		err = postgres.HandleWALFetch(cmd.Context(), folderReader, args[0], args[1], postgres.RegularPrefetcher{})
 		if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 			tracelog.ErrorLogger.Print(err.Error())
 			os.Exit(constants.ExIoError)

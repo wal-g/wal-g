@@ -43,10 +43,10 @@ var (
 		Args:  cobra.ExactArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
 			if all {
-				db.HandleCopyAll(fromConfigFile, toConfigFile)
+				db.HandleCopyAll(cmd.Context(), fromConfigFile, toConfigFile)
 				return
 			}
-			db.HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix)
+			db.HandleCopyBackup(cmd.Context(), fromConfigFile, toConfigFile, backupName, prefix)
 		},
 	}
 )

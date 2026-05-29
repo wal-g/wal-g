@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -55,25 +56,25 @@ func PurgeDryRun(dryRun bool) PurgeOption {
 }
 
 // HandlePurge delete backups and oplog archives according to settings
-func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters ...PurgeOption) error {
+func HandlePurge(ctx context.Context, downloader archive.Downloader, purger archive.Purger, setters ...PurgeOption) error {
 	opts := PurgeSettings{purgeOplog: false, dryRun: true}
 	for _, setter := range setters {
 		setter(&opts)
 	}
 
-	backupTimes, garbage, err := downloader.ListBackups()
+	backupTimes, garbage, err := downloader.ListBackups(ctx)
 	if err != nil {
 		return err
 	}
 
-	_, _, err = HandleBackupsPurge(backupTimes, downloader, purger, opts)
+	_, _, err = HandleBackupsPurge(ctx, backupTimes, downloader, purger, opts)
 	if err != nil {
 		return err
 	}
 
 	if opts.purgeOplog {
 		// TODO: fix error if retainBackups is empty
-		if err := HandleOplogPurge(downloader, purger, opts.retainAfter, opts.dryRun); err != nil {
+		if err := HandleOplogPurge(ctx, downloader, purger, opts.retainAfter, opts.dryRun); err != nil {
 			return err
 		}
 	}
@@ -81,7 +82,7 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 	if opts.purgeGarbage {
 		tracelog.InfoLogger.Printf("Garbage prefixes in backups folder: %v", garbage)
 		if !opts.dryRun {
-			if err := purger.DeleteGarbage(garbage); err != nil {
+			if err := purger.DeleteGarbage(ctx, garbage); err != nil {
 				return err
 			}
 		}
@@ -91,7 +92,7 @@ func HandlePurge(downloader archive.Downloader, purger archive.Purger, setters .
 }
 
 // HandleBackupsPurge delete backups according to settings
-func HandleBackupsPurge(backupTimes []internal.BackupTime,
+func HandleBackupsPurge(ctx context.Context, backupTimes []internal.BackupTime,
 	downloader archive.Downloader,
 	purger archive.Purger,
 	opts PurgeSettings) (purge, retain []*models.Backup, err error) {
@@ -100,7 +101,7 @@ func HandleBackupsPurge(backupTimes []internal.BackupTime,
 		return nil, nil, nil
 	}
 
-	backups, err := downloader.LoadBackups(archive.BackupNamesFromBackupTimes(backupTimes))
+	backups, err := downloader.LoadBackups(ctx, archive.BackupNamesFromBackupTimes(backupTimes))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -119,7 +120,7 @@ func HandleBackupsPurge(backupTimes []internal.BackupTime,
 	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", archive.BackupNamesFromBackups(retain))
 
 	if !opts.dryRun {
-		if err := purger.DeleteBackups(purge); err != nil {
+		if err := purger.DeleteBackups(ctx, purge); err != nil {
 			return nil, nil, err
 		}
 		tracelog.InfoLogger.Printf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain))

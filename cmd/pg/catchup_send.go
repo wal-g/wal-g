@@ -15,7 +15,7 @@ var (
 		Short: catchupSendShortDescription,
 		Args:  cobra.ExactArgs(2),
 		Run: func(cmd *cobra.Command, args []string) {
-			postgres.HandleCatchupSend(args[0], args[1])
+			postgres.HandleCatchupSend(cmd.Context(), args[0], args[1])
 		},
 		Annotations: map[string]string{"NoStorage": ""},
 	}

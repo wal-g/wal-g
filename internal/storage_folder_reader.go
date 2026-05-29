@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"io"
 
 	"github.com/wal-g/tracelog"
@@ -10,7 +11,7 @@ import (
 )
 
 type StorageFolderReader interface {
-	ReadObject(objectRelativePath string) (io.ReadCloser, error)
+	ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error)
 	SubFolder(subFolderRelativePath string) StorageFolderReader
 }
 
@@ -26,13 +27,13 @@ func (fsr *FolderReaderImpl) SubFolder(subFolderRelativePath string) StorageFold
 	return NewFolderReader(fsr.GetSubFolder(subFolderRelativePath))
 }
 
-func PrepareMultiStorageFolderReader(folder storage.Folder, targetStorage string) (StorageFolderReader, error) {
+func PrepareMultiStorageFolderReader(ctx context.Context, folder storage.Folder, targetStorage string) (StorageFolderReader, error) {
 	folder = multistorage.SetPolicies(folder, policies.MergeAllStorages)
 	var err error
 	if targetStorage == "" {
-		folder, err = multistorage.UseAllAliveStorages(folder)
+		folder, err = multistorage.UseAllAliveStorages(ctx, folder)
 	} else {
-		folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+		folder, err = multistorage.UseSpecificStorage(ctx, targetStorage, folder)
 	}
 	tracelog.DebugLogger.Printf("Files will be read from storages: %v", multistorage.UsedStorages(folder))
 	if err != nil {

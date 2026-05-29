@@ -11,8 +11,8 @@ var pgbackrestWalFetchCmd = &cobra.Command{
 	Short: WalFetchShortDescription,
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, stanza := configurePgbackrestSettings()
-		err := pgbackrest.HandleWalFetch(folder, stanza, args[0], args[1])
+		folder, stanza := configurePgbackrestSettings(cmd.Context())
+		err := pgbackrest.HandleWalFetch(cmd.Context(), folder, stanza, args[0], args[1])
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }
