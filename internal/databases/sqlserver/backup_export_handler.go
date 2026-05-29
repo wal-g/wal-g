@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"syscall"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -25,10 +23,9 @@ func prepareBackupExportSpec(d map[string]string) (dbnames []string, mapping map
 	return
 }
 
-func HandleBackupExport(externalConfig string, exportPrefixes map[string]string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
+func HandleBackupExport(ctx context.Context, externalConfig string, exportPrefixes map[string]string) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)

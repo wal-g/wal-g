@@ -14,7 +14,7 @@ var backupImportCmd = &cobra.Command{
 	Use:   "backup-import",
 	Short: backupImportShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
-		sqlserver.HandleBackupImport(externalConfigFileImport, importDatabases)
+		sqlserver.HandleBackupImport(cmd.Context(), externalConfigFileImport, importDatabases)
 	},
 }
 

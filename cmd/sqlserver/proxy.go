@@ -17,7 +17,7 @@ var proxyCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		storage, err := internal.ConfigureStorage()
 		tracelog.ErrorLogger.FatalOnError(err)
-		sqlserver.RunProxy(storage.RootFolder())
+		sqlserver.RunProxy(cmd.Context(), storage.RootFolder())
 	},
 }
 
