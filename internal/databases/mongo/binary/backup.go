@@ -172,7 +172,7 @@ func (backupService *BackupService) DoBackup(args DoBackupArgs) error {
 
 	var metadataCollector *StorageMetadataCollector
 	if !args.SkipMetadata {
-		bgCtx, cancel := context.WithCancel(context.Background())
+		bgCtx, cancel := context.WithCancel(backupService.Context)
 		defer cancel()
 		metadataCollector, err = backupService.BackgroundMetadata(bgCtx, args.SkipMetadata)
 		if err != nil {
