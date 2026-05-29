@@ -70,6 +70,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 						upl := archivemocks.Uploader{}
 						upl.On("UploadGapArchive",
 							mock.Anything,
+							mock.Anything,
 							reqTS,
 							newestTS).
 							Return(nil).Once()
@@ -244,6 +245,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 						upl := archivemocks.Uploader{}
 						upl.On("UploadGapArchive",
 							mock.Anything,
+							mock.Anything,
 							reqTS,
 							newestTS).
 							Return(fmt.Errorf("gap upload error")).Once()
@@ -285,6 +287,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 					uploader: func() *archivemocks.Uploader {
 						upl := archivemocks.Uploader{}
 						upl.On("UploadGapArchive",
+							mock.Anything,
 							mock.Anything,
 							reqTS,
 							newestTS).

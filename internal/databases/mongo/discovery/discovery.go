@@ -67,7 +67,7 @@ func BuildCursorFromTS(ctx context.Context,
 		return nil, models.Timestamp{}, fmt.Errorf("can not fetch LastWrite.MajorityOpTime: %+v", err)
 	}
 	newestTS := im.LastWrite.MajorityOpTime.TS
-	if err := uploader.UploadGapArchive(gapErr, since, newestTS); err != nil {
+	if err := uploader.UploadGapArchive(ctx, gapErr, since, newestTS); err != nil {
 		return nil, models.Timestamp{}, err
 	}
 

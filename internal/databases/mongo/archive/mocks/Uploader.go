@@ -18,13 +18,13 @@ type Uploader struct {
 	mock.Mock
 }
 
-// UploadBackup provides a mock function with given fields: stream, cmd, metaConstructor
-func (_m *Uploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
-	ret := _m.Called(stream, cmd, metaConstructor)
+// UploadBackup provides a mock function with given fields: ctx, stream, cmd, metaConstructor
+func (_m *Uploader) UploadBackup(ctx context.Context, stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+	ret := _m.Called(ctx, stream, cmd, metaConstructor)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(io.Reader, internal.ErrWaiter, internal.MetaConstructor) error); ok {
-		r0 = rf(stream, cmd, metaConstructor)
+	if rf, ok := ret.Get(0).(func(context.Context, io.Reader, internal.ErrWaiter, internal.MetaConstructor) error); ok {
+		r0 = rf(ctx, stream, cmd, metaConstructor)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -32,13 +32,13 @@ func (_m *Uploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaC
 	return r0
 }
 
-// UploadGapArchive provides a mock function with given fields: err, firstTS, lastTS
-func (_m *Uploader) UploadGapArchive(err error, firstTS models.Timestamp, lastTS models.Timestamp) error {
-	ret := _m.Called(err, firstTS, lastTS)
+// UploadGapArchive provides a mock function with given fields: ctx, err, firstTS, lastTS
+func (_m *Uploader) UploadGapArchive(ctx context.Context, err error, firstTS models.Timestamp, lastTS models.Timestamp) error {
+	ret := _m.Called(ctx, err, firstTS, lastTS)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(error, models.Timestamp, models.Timestamp) error); ok {
-		r0 = rf(err, firstTS, lastTS)
+	if rf, ok := ret.Get(0).(func(context.Context, error, models.Timestamp, models.Timestamp) error); ok {
+		r0 = rf(ctx, err, firstTS, lastTS)
 	} else {
 		r0 = ret.Error(0)
 	}
