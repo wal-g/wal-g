@@ -26,7 +26,7 @@ type LogsCache struct {
 
 //gocyclo:ignore
 //nolint:funlen
-func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs bool) {
+func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinlog string, checkGTIDs bool) {
 	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(BinlogPath)
 
@@ -119,7 +119,7 @@ func HandleBinlogPush(uploader internal.Uploader, untilBinlog string, checkGTIDs
 		}
 
 		// Upload binlogs:
-		err = archiveBinLog(uploader, binlogsFolder, binlog)
+		err = archiveBinLog(ctx, uploader, binlogsFolder, binlog)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		cache.LastArchivedBinlog = binlog
@@ -171,7 +171,7 @@ func getMySQLBinlogsFolder(db *sql.DB) (string, error) {
 	return path.Dir(logBinBasename), nil
 }
 
-func archiveBinLog(uploader internal.Uploader, dataDir string, binlog string) error {
+func archiveBinLog(ctx context.Context, uploader internal.Uploader, dataDir string, binlog string) error {
 	tracelog.InfoLogger.Printf("Archiving %v\n", binlog)
 
 	filename := path.Join(dataDir, binlog)
@@ -180,7 +180,7 @@ func archiveBinLog(uploader internal.Uploader, dataDir string, binlog string) er
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
 	}
 	defer utility.LoggedClose(walFile, "")
-	err = uploader.UploadFile(context.Background(), walFile)
+	err = uploader.UploadFile(ctx, walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
 	}
