@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -122,9 +123,9 @@ func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
 
 // TODO : unit tests
 // checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
-func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
+func (bundle *Bundle) checkTimelineChanged(ctx context.Context, queryRunner *PgQueryRunner) bool {
 	if bundle.Replica {
-		timeline, err := queryRunner.ReadTimeline()
+		timeline, err := queryRunner.ReadTimeline(ctx)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
@@ -146,10 +147,10 @@ func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
+func (bundle *Bundle) StartBackup(ctx context.Context, queryRunner *PgQueryRunner,
 	backup string) (backupName string, lsn LSN, err error) {
 	var name, lsnStr string
-	name, lsnStr, bundle.Replica, err = queryRunner.StartBackup(backup)
+	name, lsnStr, bundle.Replica, err = queryRunner.StartBackup(ctx, backup)
 
 	if err != nil {
 		return "", 0, err
@@ -160,12 +161,12 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 	}
 
 	if bundle.Replica {
-		name, bundle.Timeline, err = getWalFilename(lsn, queryRunner)
+		name, bundle.Timeline, err = getWalFilename(ctx, lsn, queryRunner)
 		if err != nil {
 			return "", 0, err
 		}
 	} else {
-		bundle.Timeline, err = queryRunner.ReadTimeline()
+		bundle.Timeline, err = queryRunner.ReadTimeline(ctx)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
@@ -353,8 +354,9 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // TODO : unit tests
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner, compressorFileExtension string) (string, []string, LSN, error) {
-	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
+func (bundle *Bundle) uploadLabelFiles(ctx context.Context,
+	queryRunner *PgQueryRunner, compressorFileExtension string) (string, []string, LSN, error) {
+	label, offsetMap, lsnStr, err := queryRunner.StopBackup(ctx)
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}

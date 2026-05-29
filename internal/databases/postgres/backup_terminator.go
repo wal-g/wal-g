@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"os"
 	"path"
 
@@ -24,7 +25,8 @@ func NewBackupTerminator(queryRunner *PgQueryRunner, pgVersion int, pgDataDir st
 }
 
 func (t *BackupTerminator) TerminateBackup() {
-	_, _, _, err := t.queryRunner.StopBackup()
+	// Signal-triggered cleanup with no request ctx; StopBackup detaches cancellation regardless.
+	_, _, _, err := t.queryRunner.StopBackup(context.Background())
 	if err == nil {
 		tracelog.InfoLogger.Printf("Successfully stopped the running backup")
 		return

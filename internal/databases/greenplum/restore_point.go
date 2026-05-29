@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -104,7 +105,7 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 		return nil, err
 	}
 
-	conn, err := postgres.Connect()
+	conn, err := postgres.Connect(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -148,18 +149,20 @@ func (rpc *RestorePointCreator) Create() {
 
 func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs map[int]string, timeLine uint32, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
-	queryRunner, err := NewGpQueryRunner(conn)
+	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
+	ctx := context.Background()
+	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	timeLine, err = queryRunner.ReadTimeline()
+	timeLine, err = queryRunner.ReadTimeline(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	for retries := 0; retries < RestorePointCreateRetries; retries++ {
-		restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(restorePointName)
+		restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(ctx, restorePointName)
 		if err == nil {
 			// After create restore point should archive related WAL log segments.
 			// This ensures the new cluster can retrieve complete WAL logs with the restore point for restoration.

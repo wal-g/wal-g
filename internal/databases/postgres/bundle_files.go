@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"os"
 	"sync"
 
@@ -74,8 +75,10 @@ func (relStat *RelFileStatistics) getFileUpdateCount(filePath string) uint64 {
 func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error) {
 	result := make(map[walparser.RelFileNode]PgRelationStat)
 
-	err := queryRunner.ForEachDatabase(func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
-		pgStatRows, err := currentRunner.getStatistics(db)
+	// No request ctx plumbed through the composer callback yet; revisit when it threads ctx.
+	ctx := context.Background()
+	err := queryRunner.ForEachDatabase(ctx, func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
+		pgStatRows, err := currentRunner.getStatistics(ctx, db)
 		if err != nil {
 			return err
 		}
