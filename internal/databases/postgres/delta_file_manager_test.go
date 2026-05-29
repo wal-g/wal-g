@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -15,7 +14,7 @@ import (
 func TestGetCanceledDeltaFiles_MidWalFile(t *testing.T) {
 	manager := postgres.NewDeltaFileManager(testtools.NewMockDataFolder())
 	manager.CancelRecording(WalFilename)
-	manager.FlushFiles(context.Background(), nil)
+	manager.FlushFiles(t.Context(), nil)
 
 	deltaFilename, err := postgres.GetDeltaFilenameFor(WalFilename)
 	assert.NoError(t, err)
@@ -25,7 +24,7 @@ func TestGetCanceledDeltaFiles_MidWalFile(t *testing.T) {
 func TestGetCanceledDeltaFiles_LastWalFile(t *testing.T) {
 	manager := postgres.NewDeltaFileManager(testtools.NewMockDataFolder())
 	manager.CancelRecording(LastWalFilename)
-	manager.FlushFiles(context.Background(), nil)
+	manager.FlushFiles(t.Context(), nil)
 
 	deltaFilename, err := postgres.GetDeltaFilenameFor(LastWalFilename)
 	assert.NoError(t, err)
@@ -193,7 +192,7 @@ func TestFlushDeltaFiles_CanceledFile(t *testing.T) {
 	assert.NoError(t, err)
 	manager.DeltaFileWriters.Store(DeltaFilename, postgres.NewDeltaFileChanWriter(deltaFile))
 	manager.CanceledDeltaFiles[DeltaFilename] = true
-	manager.FlushDeltaFiles(context.Background(), nil, map[string]bool{
+	manager.FlushDeltaFiles(t.Context(), nil, map[string]bool{
 		postgres.ToPartFilename(DeltaFilename): true,
 	})
 }
@@ -205,7 +204,7 @@ func TestFlushDeltaFiles_CompleteFile(t *testing.T) {
 	assert.NoError(t, err)
 	manager.DeltaFileWriters.Store(DeltaFilename, postgres.NewDeltaFileChanWriter(deltaFile))
 	storage := memory.NewKVS()
-	manager.FlushDeltaFiles(context.Background(), testtools.NewStoringMockUploader(storage), map[string]bool{
+	manager.FlushDeltaFiles(t.Context(), testtools.NewStoringMockUploader(storage), map[string]bool{
 		postgres.ToPartFilename(DeltaFilename): true,
 	})
 
@@ -224,7 +223,7 @@ func TestFlushDeltaFiles_PartialFile(t *testing.T) {
 	deltaFile.Locations = append(deltaFile.Locations, TestLocation)
 	assert.NoError(t, err)
 	manager.DeltaFileWriters.Store(DeltaFilename, postgres.NewDeltaFileChanWriter(deltaFile))
-	manager.FlushDeltaFiles(context.Background(), nil, make(map[string]bool))
+	manager.FlushDeltaFiles(t.Context(), nil, make(map[string]bool))
 
 	actualDeltaFileReader, err := dataFolder.OpenReadonlyFile(DeltaFilename)
 	assert.NoError(t, err)

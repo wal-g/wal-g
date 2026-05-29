@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -98,7 +97,7 @@ func TestBackgroundWALUpload(t *testing.T) {
 			tu := testtools.NewMockWalUploader(false, false)
 			fakeASM := asm.NewFakeASM()
 			tu.ArchiveStatusManager = fakeASM
-			bu := postgres.NewBgUploader(context.Background(), a, int32(tt.maxParallelism), int32(tt.maxNumFilesUploaded), tu, false, false)
+			bu := postgres.NewBgUploader(t.Context(), a, int32(tt.maxParallelism), int32(tt.maxNumFilesUploaded), tu, false, false)
 			// Run BgUploader and wait 1 second before stopping
 			bu.Start()
 			// KLUDGE If maxParallelism=0, we expect to do no work. Therefore, do not wait.

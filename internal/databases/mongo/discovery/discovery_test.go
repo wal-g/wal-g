@@ -63,7 +63,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				newestTS := models.Timestamp{TS: 1579005001, Inc: 1}
 
 				return args{
-					ctx:     context.TODO(),
+					ctx:     t.Context(),
 					since:   reqTS,
 					initial: true,
 					uploader: func() *archivemocks.Uploader {
@@ -115,7 +115,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 
 				return args{
-					ctx:     context.TODO(),
+					ctx:     t.Context(),
 					since:   reqTS,
 					initial: true,
 					uploader: func() *archivemocks.Uploader {
@@ -148,7 +148,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 			args: func() args {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 				return args{
-					ctx:     context.TODO(),
+					ctx:     t.Context(),
 					since:   reqTS,
 					initial: true,
 					uploader: func() *archivemocks.Uploader {
@@ -172,7 +172,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				reqTS := models.Timestamp{TS: 1579001001, Inc: 1}
 
 				return args{
-					ctx:     context.TODO(),
+					ctx:     t.Context(),
 					since:   reqTS,
 					initial: true,
 					uploader: func() *archivemocks.Uploader {
@@ -201,7 +201,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				oldestTS := models.Timestamp{TS: 1579003001, Inc: 1}
 
 				return args{
-					ctx:     context.TODO(),
+					ctx:     t.Context(),
 					since:   reqTS,
 					initial: true,
 					uploader: func() *archivemocks.Uploader {
@@ -238,7 +238,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				newestTS := models.Timestamp{TS: 1579005001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
+					ctx:   t.Context(),
 					since: reqTS,
 					uploader: func() *archivemocks.Uploader {
 						upl := archivemocks.Uploader{}
@@ -280,7 +280,7 @@ func TestBuildCursorFromFolderTS(t *testing.T) {
 				newestTS := models.Timestamp{TS: 1579005001, Inc: 1}
 
 				return args{
-					ctx:   context.TODO(),
+					ctx:   t.Context(),
 					since: reqTS,
 					uploader: func() *archivemocks.Uploader {
 						upl := archivemocks.Uploader{}
@@ -364,7 +364,7 @@ func TestResolveStartingTS(t *testing.T) {
 			name: "last_storage_ts_fetched,_no_error",
 			args: func() args {
 				return args{
-					ctx: context.TODO(),
+					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
 						dl.On("LastKnownArchiveTS").Return(models.Timestamp{TS: 1579002001, Inc: 1}, nil).Once()
@@ -379,7 +379,7 @@ func TestResolveStartingTS(t *testing.T) {
 			name: "last_storage_ts_fetch_error",
 			args: func() args {
 				return args{
-					ctx: context.TODO(),
+					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
 						dl.On("LastKnownArchiveTS").Return(models.Timestamp{}, fmt.Errorf("ts fetch failed")).Once()
@@ -394,7 +394,7 @@ func TestResolveStartingTS(t *testing.T) {
 			name: "initial_last_maj_ts_fetched,_no_error",
 			args: func() args {
 				return args{
-					ctx: context.TODO(),
+					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
 						dl.On("LastKnownArchiveTS").Return(models.Timestamp{}, nil).Once()
@@ -415,7 +415,7 @@ func TestResolveStartingTS(t *testing.T) {
 			name: "initial_last_maj_ts_fetch_error",
 			args: func() args {
 				return args{
-					ctx: context.TODO(),
+					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
 						dl.On("LastKnownArchiveTS").Return(models.Timestamp{}, nil).Once()

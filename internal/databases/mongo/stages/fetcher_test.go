@@ -149,7 +149,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			name:   "from_first_until_last,_one_archive",
 			fields: SetupDownloaderMocks(ops),
 			args: args{
-				ctx:   context.TODO(),
+				ctx:   t.Context(),
 				from:  ops[0].TS,
 				until: ops[len(ops)-1].TS,
 			},
@@ -160,7 +160,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			name:   "from_first_until_last,_three_archives",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{
-				ctx:   context.TODO(),
+				ctx:   t.Context(),
 				from:  ops[0].TS,
 				until: ops[len(ops)-1].TS,
 			},
@@ -171,7 +171,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			name:   "from_second_until_pre-last,_three_archives",
 			fields: SetupDownloaderMocks(ops[0:3], ops[3:4], ops[4:]),
 			args: args{
-				ctx:   context.TODO(),
+				ctx:   t.Context(),
 				from:  ops[1].TS,
 				until: ops[len(ops)-2].TS,
 			},
@@ -182,7 +182,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			name:   "error:_first_>_until",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{
-				ctx:   context.TODO(),
+				ctx:   t.Context(),
 				from:  ops[0].TS,
 				until: models.Timestamp{TS: 1579002000, Inc: 1},
 			},
@@ -193,7 +193,7 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			name:   "error:_until_is_not_reached",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{
-				ctx:   context.TODO(),
+				ctx:   t.Context(),
 				from:  ops[0].TS,
 				until: models.Timestamp{TS: 1579002099, Inc: 1},
 			},
@@ -316,7 +316,7 @@ func TestDBFetcher_Fetch(t *testing.T) {
 			name:     "from_first_until_last,_until_cursor_exhausted",
 			dbFields: SetupMongoDriverMocks(ops, nil, nil, false),
 			args: args{
-				ctx:  context.TODO(),
+				ctx:  t.Context(),
 				from: ops[0].TS,
 				wg:   &sync.WaitGroup{},
 			},
@@ -327,7 +327,7 @@ func TestDBFetcher_Fetch(t *testing.T) {
 			name:     "error:_cursor_error",
 			dbFields: SetupMongoDriverMocks(ops, nil, fmt.Errorf("cursor error"), false),
 			args: args{
-				ctx:  context.TODO(),
+				ctx:  t.Context(),
 				from: ops[0].TS,
 				wg:   &sync.WaitGroup{},
 			},
@@ -338,7 +338,7 @@ func TestDBFetcher_Fetch(t *testing.T) {
 			name:     "error:_primary_expected",
 			dbFields: SetupSecondaryMongoDriverMocks(ops[0]),
 			args: args{
-				ctx:  context.TODO(),
+				ctx:  t.Context(),
 				from: ops[0].TS,
 				wg:   &sync.WaitGroup{},
 			},
@@ -400,7 +400,7 @@ func TestDBFetcher_FetchBson(t *testing.T) {
 			name:      "10b_2kb_bson_oplog",
 			bsonFname: "../testdata/10_2048_oplog.bson",
 			args: args{
-				ctx:  context.TODO(),
+				ctx:  t.Context(),
 				from: models.Timestamp{TS: 1591288704, Inc: 73000},
 			},
 			wantOpsCount: 5041,

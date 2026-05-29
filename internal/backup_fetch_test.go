@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"path"
 	"strings"
@@ -203,7 +202,7 @@ func TestUploadSentinel(t *testing.T) {
 	uploaderProv.EXPECT().Folder().Return(folder)
 
 	sentinel := streamSentinelDto{StartLocalTime: utility.TimeNowCrossPlatformLocal()}
-	fileName, err := uploaderProv.PushStream(context.Background(), bytes.NewReader(getByteSampleArray(51)))
+	fileName, err := uploaderProv.PushStream(t.Context(), bytes.NewReader(getByteSampleArray(51)))
 	if err != nil {
 		t.Errorf("Error pushing stream: %v", err)
 	}

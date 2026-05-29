@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -102,7 +101,7 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, n
 	)
 
 	sample := getByteSampleArray(sampleSize)
-	backupName, err := uploader.PushStream(context.Background(), bytes.NewReader(sample))
+	backupName, err := uploader.PushStream(t.Context(), bytes.NewReader(sample))
 	if err != nil {
 		return
 	}
@@ -207,7 +206,7 @@ func checkSplitPush(t *testing.T, partitions, blockSize, maxFileSize, s3errorAft
 		blockSize,
 		maxFileSize,
 	)
-	splitUploader.PushStream(context.Background(), bytes.NewBuffer(getByteSampleArray(sampleSize)))
+	splitUploader.PushStream(t.Context(), bytes.NewBuffer(getByteSampleArray(sampleSize)))
 }
 
 func TestSplitPush_Synchronous_WithoutFiles(t *testing.T) {

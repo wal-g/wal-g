@@ -2,7 +2,6 @@ package splitmerge
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"math/rand"
@@ -49,7 +48,7 @@ func TestSplitMerge(t *testing.T) {
 	// in:
 	inputData := generateDataset(dataSize)
 	dataReader := bytes.NewReader(inputData)
-	readers := SplitReader(context.Background(), dataReader, partitions, blockSize)
+	readers := SplitReader(t.Context(), dataReader, partitions, blockSize)
 
 	// out:
 	var sink BufferCloser

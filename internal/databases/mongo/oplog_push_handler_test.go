@@ -51,9 +51,9 @@ func (tm *oplogPushMocks) AssertExpectations(t *testing.T) {
 	}
 }
 
-func buildTestArgs() oplogPushArgs {
+func buildTestArgs(t *testing.T) oplogPushArgs {
 	return oplogPushArgs{
-		ctx: context.TODO(),
+		ctx: t.Context(),
 
 		fetcherReturn: &fetcherReturn{make(chan *models.Oplog), make(chan error), nil},
 		applierReturn: &applierReturn{make(chan error), nil},
@@ -85,21 +85,21 @@ func TestHandleOplogPush(t *testing.T) {
 	}{
 		{
 			name:        "fetcher call returns error",
-			args:        buildTestArgs(),
+			args:        buildTestArgs(t),
 			mocks:       oplogPushMocks{&mocks.Fetcher{}, nil},
 			failErrRet:  func(args oplogPushArgs) { args.fetcherReturn.err = fmt.Errorf("fetcher ret err") },
 			expectedErr: fmt.Errorf("fetcher ret err"),
 		},
 		{
 			name:        "applier call returns error",
-			args:        buildTestArgs(),
+			args:        buildTestArgs(t),
 			mocks:       oplogPushMocks{&mocks.Fetcher{}, &mocks.Applier{}},
 			failErrRet:  func(args oplogPushArgs) { args.applierReturn.err = fmt.Errorf("applier ret err") },
 			expectedErr: fmt.Errorf("applier ret err"),
 		},
 		{
 			name:  "fetcher returns error via error channel",
-			args:  buildTestArgs(),
+			args:  buildTestArgs(t),
 			mocks: oplogPushMocks{&mocks.Fetcher{}, &mocks.Applier{}},
 			failErrChan: func(args oplogPushArgs) {
 				args.fetcherReturn.errChan <- fmt.Errorf("fetcher chan err")
@@ -110,7 +110,7 @@ func TestHandleOplogPush(t *testing.T) {
 		},
 		{
 			name:  "applier returns error via error channel",
-			args:  buildTestArgs(),
+			args:  buildTestArgs(t),
 			mocks: oplogPushMocks{&mocks.Fetcher{}, &mocks.Applier{}},
 			failErrChan: func(args oplogPushArgs) {
 				args.applierReturn.errChan <- fmt.Errorf("applier chan err")
@@ -145,7 +145,7 @@ func TestHandleOplogPush(t *testing.T) {
 }
 
 func TestHandleOplogPush_CancelLongUpload(t *testing.T) {
-	ctx, cancelCtx := context.WithCancel(context.Background())
+	ctx, cancelCtx := context.WithCancel(t.Context())
 	defer cancelCtx()
 
 	fetcher := &mocks.Fetcher{}
