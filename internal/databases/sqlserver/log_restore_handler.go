@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"syscall"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -14,10 +12,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromnames []string, noRecovery bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
+func HandleLogRestore(ctx context.Context, backupName string, untilTS string, dbnames []string, fromnames []string, noRecovery bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	st, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)

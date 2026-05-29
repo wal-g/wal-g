@@ -1,10 +1,7 @@
 package sqlserver
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"syscall"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -12,9 +9,6 @@ import (
 )
 
 func HandleDatabaseList(backupName string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
 	storage, err := internal.ConfigureStorage()
 	tracelog.ErrorLogger.FatalOnError(err)
 	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, storage.RootFolder())
