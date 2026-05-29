@@ -26,13 +26,12 @@ type UploadBackupArgs struct {
 }
 
 // UploadBackup compresses a stream and uploads it, and uploads meta info
-func (su *StorageUploader) UploadBackup(args UploadBackupArgs) error {
-	err := args.MetaConstructor.Init()
-	if err != nil {
+func (su *StorageUploader) UploadBackup(ctx context.Context, args UploadBackupArgs) error {
+	if err := args.MetaConstructor.Init(); err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
 
-	dstPath, err := su.PushStream(context.Background(), args.Stream)
+	dstPath, err := su.PushStream(ctx, args.Stream)
 	if err != nil {
 		return fmt.Errorf("can not upload backup: %+v", err)
 	}
@@ -46,8 +45,7 @@ func (su *StorageUploader) UploadBackup(args UploadBackupArgs) error {
 		Sharded:    args.Sharded,
 		Uploader:   su,
 	}
-	err = archive.FillSlotsForSharded(context.Background(), fillArgs)
-	if err != nil {
+	if err := archive.FillSlotsForSharded(ctx, fillArgs); err != nil {
 		return err
 	}
 

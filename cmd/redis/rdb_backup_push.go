@@ -60,7 +60,7 @@ var backupPushCmd = &cobra.Command{
 			Uploader:        uploader,
 			MetaConstructor: metaConstructor,
 		}
-		err = redis.HandleRDBBackupPush(pushArgs)
+		err = redis.HandleRDBBackupPush(ctx, pushArgs)
 		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
