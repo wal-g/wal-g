@@ -225,13 +225,19 @@ func getIncrementInfo(folder storage.Folder, object storage.Object, storageName 
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
-func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error {
+func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool, deleteWithoutBackups bool) error {
 	predicate := ExtractDeleteGarbagePredicate(args)
+	folderFilter := func(string) bool { return true }
 	backupSelector := internal.NewOldestNonPermanentSelector(NewGenericMetaFetcher())
 	oldestBackup, err := backupSelector.Select(dh.Folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
-			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage. Not doing anything.")
+			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage.")
+			if deleteWithoutBackups {
+				tracelog.InfoLogger.Println("Will delete garbage anyway.")
+				dh.DeleteWhere(confirm, predicate, folderFilter)
+			}
+			tracelog.InfoLogger.Println("Not doing anything.")
 			return nil
 		}
 		return err
@@ -242,7 +248,6 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool) error 
 		return err
 	}
 
-	folderFilter := func(string) bool { return true }
 	return dh.DeleteBeforeTargetWhere(target, confirm, predicate, folderFilter)
 }
 

@@ -19,6 +19,7 @@ const DeleteGarbageUse = "garbage [ARCHIVES|BACKUPS]"
 const afterFlag = "after"
 
 var confirmed = false
+var deleteWithoutBackups = false
 var useSentinelTime = false
 var deleteTargetUserData = ""
 
@@ -138,7 +139,7 @@ func runDeleteGarbage(cmd *cobra.Command, args []string) {
 	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, false)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = deleteHandler.HandleDeleteGarbage(args, confirmed)
+	err = deleteHandler.HandleDeleteGarbage(args, confirmed, deleteWithoutBackups)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -163,6 +164,8 @@ func init() {
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
 	deleteRetainCmd.Flags().StringP(afterFlag, "a", "", "Set the time after which retain backups")
+
+	deleteGarbageCmd.Flags().BoolVar(&deleteWithoutBackups, "without-backup-check", false, "skip check for existing non-permanent backups")
 
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
