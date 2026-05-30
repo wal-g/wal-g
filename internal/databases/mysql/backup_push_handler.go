@@ -16,6 +16,7 @@ import (
 
 //nolint:funlen
 func HandleBackupPush(
+	ctx context.Context,
 	folder storage.Folder,
 	uploader internal.Uploader,
 	backupCmd *exec.Cmd,
@@ -59,9 +60,9 @@ func HandleBackupPush(
 		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
 		tracelog.ErrorLogger.FatalfOnError("failed to get previous backup for delta backup: %v", err)
 
-		backupName, xtrabackupInfo, err = handleXtrabackupBackup(uploader, backupCmd, isFullBackup, &prevBackupInfo)
+		backupName, xtrabackupInfo, err = handleXtrabackupBackup(ctx, uploader, backupCmd, isFullBackup, &prevBackupInfo)
 	} else {
-		backupName, err = handleRegularBackup(uploader, backupCmd)
+		backupName, err = handleRegularBackup(ctx, uploader, backupCmd)
 	}
 	tracelog.ErrorLogger.FatalfOnError("backup create command failed: %v", err)
 
@@ -160,11 +161,11 @@ func HandleBackupPush(
 	tracelog.InfoLogger.Printf("uploaded journal info for %s", backupName)
 }
 
-func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backupName string, err error) {
+func handleRegularBackup(ctx context.Context, uploader internal.Uploader, backupCmd *exec.Cmd) (backupName string, err error) {
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
+	backupName, err = uploader.PushStream(ctx, limiters.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
@@ -175,6 +176,7 @@ func handleRegularBackup(uploader internal.Uploader, backupCmd *exec.Cmd) (backu
 }
 
 func handleXtrabackupBackup(
+	ctx context.Context,
 	uploader internal.Uploader,
 	backupCmd *exec.Cmd,
 	isFullBackup bool,
@@ -194,7 +196,7 @@ func handleXtrabackupBackup(
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	backupName, err = uploader.PushStream(context.Background(), limiters.NewDiskLimitReader(stdout))
+	backupName, err = uploader.PushStream(ctx, limiters.NewDiskLimitReader(stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	cmdErr := backupCmd.Wait()
