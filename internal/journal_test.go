@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -55,7 +54,7 @@ func generateAndUploadData(t *testing.T, mockUploader internal.Uploader) {
 		journalPath := fmt.Sprintf("%s/"+JournalFmt, DefaultJournalDirectory, i)
 
 		r := bytes.NewReader([]byte(record))
-		err := mockUploader.Upload(context.Background(), journalPath, r)
+		err := mockUploader.Upload(t.Context(), journalPath, r)
 		assert.NoError(t, err)
 
 		time.Sleep(time.Millisecond)

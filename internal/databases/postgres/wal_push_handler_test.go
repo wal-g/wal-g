@@ -1,7 +1,6 @@
 package postgres_test
 
 import (
-	"context"
 	"path"
 	"testing"
 
@@ -30,7 +29,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUplo
 	uploader := testtools.NewMockWalDirUploader(false, false)
 	fakeASM := asm.NewFakeASM()
 	uploader.ArchiveStatusManager = fakeASM
-	postgres.HandleWALPush(context.Background(), uploader, path.Join(dirName, testFileName))
+	postgres.HandleWALPush(t.Context(), uploader, path.Join(dirName, testFileName))
 	return *uploader, fakeASM, dir, testFileName
 }
 
