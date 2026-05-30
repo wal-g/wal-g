@@ -24,7 +24,7 @@ var checkAOTableLengthMasterCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 		handler, err := greenplum.NewAOLengthCheckHandler(logsDir, runBackupCheck, name, rootFolder)
 		tracelog.ErrorLogger.FatalOnError(err)
-		handler.CheckAOTableLength()
+		handler.CheckAOTableLength(cmd.Context())
 	},
 }
 

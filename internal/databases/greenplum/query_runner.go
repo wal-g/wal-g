@@ -29,8 +29,8 @@ type aoRelPgClassInfo struct {
 }
 
 // NewGpQueryRunner builds QueryRunner from available connection
-func NewGpQueryRunner(conn *pgx.Conn) (*GpQueryRunner, error) {
-	pgQueryRunner, err := postgres.NewPgQueryRunner(conn)
+func NewGpQueryRunner(ctx context.Context, conn *pgx.Conn) (*GpQueryRunner, error) {
+	pgQueryRunner, err := postgres.NewPgQueryRunner(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -48,9 +48,10 @@ func (queryRunner *GpQueryRunner) buildCreateGreenplumRestorePoint(restorePointN
 }
 
 // CreateGreenplumRestorePoint creates a restore point
-func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
+func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(ctx context.Context,
+	restorePointName string) (restoreLSNs map[int]string, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(context.TODO(), queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
+	rows, err := conn.Query(ctx, queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
 	if err != nil {
 		return nil, err
 	}
@@ -91,9 +92,9 @@ WHERE role = 'p'
 ORDER BY content, role DESC;`
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo() (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) (segments []cluster.SegConfig, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(context.TODO(), getGreenplumSegmentsInfoQuery)
+	rows, err := conn.Query(ctx, getGreenplumSegmentsInfoQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +128,9 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo() (segments []cluster
 }
 
 // GetGreenplumVersion returns version
-func (queryRunner *GpQueryRunner) GetGreenplumVersion() (version string, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumVersion(ctx context.Context) (version string, err error) {
 	conn := queryRunner.Connection
-	err = conn.QueryRow(context.TODO(), "SELECT pg_catalog.version()").Scan(&version)
+	err = conn.QueryRow(ctx, "SELECT pg_catalog.version()").Scan(&version)
 	if err != nil {
 		return "", err
 	}
@@ -146,10 +147,10 @@ SELECT pg_is_in_backup(), -1;
 }
 
 // TryGetLock tries to take advisory lock
-func (queryRunner *GpQueryRunner) TryGetLock() (err error) {
+func (queryRunner *GpQueryRunner) TryGetLock(ctx context.Context) (err error) {
 	conn := queryRunner.Connection
 	var lockFree bool
-	err = conn.QueryRow(context.TODO(), "SELECT pg_try_advisory_lock(hashtext('gp_backup'))").Scan(&lockFree)
+	err = conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(hashtext('gp_backup'))").Scan(&lockFree)
 	if err != nil {
 		return err
 	}
@@ -171,10 +172,10 @@ func (queryRunner *GpQueryRunner) buildAbortBackupMaster() string {
 }
 
 // IsInBackup check if there is backup running
-func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bool, err error) {
+func (queryRunner *GpQueryRunner) IsInBackup(ctx context.Context) (isInBackupByContentID map[int]bool, err error) {
 	conn := queryRunner.Connection
 
-	rows, err := conn.Query(context.TODO(), queryRunner.buildIsInBackup())
+	rows, err := conn.Query(ctx, queryRunner.buildIsInBackup())
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner IsInBackup: query failed")
 	}
@@ -198,23 +199,26 @@ func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bo
 }
 
 // AbortBackup stops the backup process on all segments
-func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
+func (queryRunner *GpQueryRunner) AbortBackup(ctx context.Context) (err error) {
 	tracelog.InfoLogger.Println("Calling pg_stop_backup() on all segments...")
 	conn := queryRunner.Connection
 
+	// Cleanup must not be cancellable: a signal must not strand segments mid-abort.
+	cleanupCtx := context.WithoutCancel(ctx)
+
 	errs := make([]error, 0)
-	_, err = conn.Exec(context.TODO(), "SET statement_timeout=0;")
+	_, err = conn.Exec(cleanupCtx, "SET statement_timeout=0;")
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner AbortBackup: failed setting statement timeout in transaction"))
 	}
 
-	_, err = conn.Exec(context.TODO(), queryRunner.buildAbortBackupSegments())
+	_, err = conn.Exec(cleanupCtx, queryRunner.buildAbortBackupSegments())
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: segment backups stop error"))
 	}
 	tracelog.DebugLogger.Println("Stopped backups on segments")
 
-	_, err = conn.Exec(context.TODO(), queryRunner.buildAbortBackupMaster())
+	_, err = conn.Exec(cleanupCtx, queryRunner.buildAbortBackupMaster())
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: master backup stop error"))
 	}
@@ -229,18 +233,19 @@ func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
 }
 
 // FetchAOStorageMetadata queries the storage metadata for AO & AOCS tables (GreenplumDB)
-func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatabaseInfo) (AoRelFileStorageMap, error) {
+func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(ctx context.Context,
+	dbInfo postgres.PgDatabaseInfo) (AoRelFileStorageMap, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
 	tracelog.InfoLogger.Printf("Querying pg_class for %s", dbInfo.Name)
-	getStatQuery, err := queryRunner.buildAORelPgClassQuery()
+	getStatQuery, err := queryRunner.buildAORelPgClassQuery(ctx)
 	conn := queryRunner.Connection
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build the pg_class query")
 	}
 
-	rows, err := conn.Query(context.TODO(), getStatQuery)
+	rows, err := conn.Query(ctx, getStatQuery)
 	if err != nil {
 		return nil, errors.Wrap(err, "pg_class query failed")
 	}
@@ -284,7 +289,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatab
 					return nil, err
 				}
 
-				return conn.Query(context.TODO(), query)
+				return conn.Query(ctx, query)
 			}
 		case ColumnOriented:
 			queryFunc = func() (pgx.Rows, error) {
@@ -293,7 +298,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatab
 					return nil, err
 				}
 
-				return conn.Query(context.TODO(), query, row.oid)
+				return conn.Query(ctx, query, row.oid)
 			}
 		default:
 			tracelog.WarningLogger.Printf("Unexpected relation storage type %c for relfilenode %d in database %s",
@@ -396,8 +401,8 @@ JOIN (
 	) seg ON aoseg_c.oid = seg.segrelid;
 `
 
-func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
-	versionStr, err := queryRunner.GetGreenplumVersion()
+func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (string, error) {
+	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return "", err
 	}

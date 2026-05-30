@@ -62,7 +62,9 @@ func (storageMap *AoRelFileStorageMap) getAOStorageMetadata(filePath string) (bo
 }
 
 func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, error) {
-	databases, err := queryRunner.GetDatabaseInfos()
+	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
+	ctx := context.Background()
+	databases, err := queryRunner.GetDatabaseInfos(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get database names")
 	}
@@ -76,17 +78,17 @@ func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, er
 			return nil
 		}
 
-		dbConn, err := postgres.Connect(databaseOption)
+		dbConn, err := postgres.Connect(ctx, databaseOption)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
 			continue
 		}
 
-		queryRunner, err := NewGpQueryRunner(dbConn)
+		queryRunner, err := NewGpQueryRunner(ctx, dbConn)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to build query runner.")
 		}
-		rows, err := queryRunner.FetchAOStorageMetadata(db)
+		rows, err := queryRunner.FetchAOStorageMetadata(ctx, db)
 		if err != nil {
 			tracelog.WarningLogger.Printf("failed to fetch storage types: %s\n'%v'\n", db.Name, err)
 			continue
@@ -95,7 +97,7 @@ func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, er
 		for relFileLoc, metadata := range rows {
 			result[relFileLoc] = metadata
 		}
-		err = dbConn.Close(context.TODO())
+		err = dbConn.Close(ctx)
 		tracelog.WarningLogger.PrintOnError(err)
 	}
 	return result, nil

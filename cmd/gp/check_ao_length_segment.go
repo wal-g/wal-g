@@ -24,9 +24,9 @@ var checkAOLengthSegmentCmd = &cobra.Command{
 		handler, err := greenplum.NewAOLengthCheckSegmentHandler(port, segnum, rootFolder)
 		tracelog.ErrorLogger.FatalOnError(err)
 		if checkBackup {
-			handler.CheckAOBackupLengthSegment(backupName)
+			handler.CheckAOBackupLengthSegment(cmd.Context(), backupName)
 		} else {
-			handler.CheckAOTableLengthSegment()
+			handler.CheckAOTableLengthSegment(cmd.Context())
 		}
 	},
 }

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -23,6 +24,8 @@ import (
 func HandleCatchupSend(pgDataDirectory string, destination string) {
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Sending %v to %v\n", pgDataDirectory, destination)
+	// No request ctx plumbed to this entry point yet; revisit when callers thread ctx.
+	ctx := context.Background()
 	info, runner, err := GetPgServerInfo(true)
 	if info.systemIdentifier == nil {
 		tracelog.ErrorLogger.Fatal("Our system lacks System Identifier, cannot proceed")
@@ -46,7 +49,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	err = decoder.Decode(&fileList)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Received file list of %v files", len(fileList))
-	_, lsnStr, _, err := runner.StartBackup("")
+	_, lsnStr, _, err := runner.StartBackup(ctx, "")
 	tracelog.ErrorLogger.FatalOnError(err)
 	lsn, err := ParseLSN(lsnStr)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -57,7 +60,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 
 	sendFileCommands(encoder, pgDataDirectory, fileList, control.Checkpoint)
 
-	label, offsetMap, _, err := runner.StopBackup()
+	label, offsetMap, _, err := runner.StopBackup(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = encoder.Encode(

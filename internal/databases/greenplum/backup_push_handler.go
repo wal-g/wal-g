@@ -390,19 +390,21 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 		return nil
 	}
 
-	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
+	// No request ctx plumbed through the gp handler yet; revisit when callers thread ctx.
+	ctx := context.Background()
+	queryRunner, err := NewGpQueryRunner(ctx, bh.workers.Conn)
 	if err != nil {
 		return err
 	}
 
 	tracelog.InfoLogger.Println("Trying to acquire lock")
-	err = queryRunner.TryGetLock()
+	err = queryRunner.TryGetLock(ctx)
 	if err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Println("Lock successfully acquired")
 
-	backupStatuses, err := queryRunner.IsInBackup()
+	backupStatuses, err := queryRunner.IsInBackup(ctx)
 	if err != nil {
 		return err
 	}
@@ -416,7 +418,7 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 
 	if len(isInBackupSegments) > 0 {
 		tracelog.InfoLogger.Printf("backup is already in progress on one or more segments: %v", isInBackupSegments)
-		err = queryRunner.AbortBackup()
+		err = queryRunner.AbortBackup(ctx)
 		if err != nil {
 			return fmt.Errorf("closing old backups failed: %v", err)
 		}
@@ -439,13 +441,13 @@ func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err erro
 // nolint:unused
 func (bh *BackupHandler) connect() (err error) {
 	tracelog.InfoLogger.Println("Connecting to Greenplum master.")
-	bh.workers.Conn, err = postgres.Connect()
+	bh.workers.Conn, err = postgres.Connect(context.Background())
 	return err
 }
 
 func (bh *BackupHandler) disconnect() {
 	tracelog.InfoLogger.Println("Disconnecting from the Greenplum master.")
-	err := bh.workers.Conn.Close(context.TODO())
+	err := bh.workers.Conn.Close(context.Background())
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to disconnect: %v", err)
 	}
@@ -453,12 +455,14 @@ func (bh *BackupHandler) disconnect() {
 
 // CheckArchiveCommand verifies the archive_mode and archive_command settings.
 func CheckArchiveCommand(conn *pgx.Conn) error {
-	queryRunner, err := NewGpQueryRunner(conn)
+	// No request ctx plumbed through the gp handler yet; revisit when callers thread ctx.
+	ctx := context.Background()
+	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
 		return err
 	}
 	// Check if the server is in recovery mode (standby)
-	standby, err := queryRunner.IsStandby()
+	standby, err := queryRunner.IsStandby(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to determine standby mode: %v", err)
 		return err
@@ -471,7 +475,7 @@ func CheckArchiveCommand(conn *pgx.Conn) error {
 	}
 
 	// Retrieve the current archive_mode setting
-	archiveMode, err := queryRunner.GetArchiveMode()
+	archiveMode, err := queryRunner.GetArchiveMode(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_mode: %v", err)
 		return err
@@ -484,7 +488,7 @@ func CheckArchiveCommand(conn *pgx.Conn) error {
 				"Please consider configuring WAL archiving.")
 	} else {
 		// Retrieve the current archive_command setting
-		archiveCommand, err := queryRunner.GetArchiveCommand()
+		archiveCommand, err := queryRunner.GetArchiveCommand(ctx)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_command: %v", err)
 			return err
@@ -504,12 +508,14 @@ func CheckArchiveCommand(conn *pgx.Conn) error {
 }
 
 func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version Version, systemIdentifier *uint64, err error) {
-	queryRunner, err := NewGpQueryRunner(conn)
+	// No request ctx plumbed through the gp handler yet; revisit when callers thread ctx.
+	ctx := context.Background()
+	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
 
-	versionStr, err := queryRunner.GetGreenplumVersion()
+	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
@@ -518,7 +524,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
-	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo()
+	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(ctx)
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
@@ -531,7 +537,7 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) {
 	uploader := arguments.Uploader
 
-	conn, err := postgres.Connect()
+	conn, err := postgres.Connect(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -664,11 +670,13 @@ func (bh *BackupHandler) terminateRunningBackups() error {
 	}
 
 	tracelog.InfoLogger.Println("Terminating the running exclusive backups...")
-	queryRunner, err := NewGpQueryRunner(bh.workers.Conn)
+	// Signal-triggered cleanup with no request ctx; AbortBackup detaches cancellation regardless.
+	ctx := context.Background()
+	queryRunner, err := NewGpQueryRunner(ctx, bh.workers.Conn)
 	if err != nil {
 		return err
 	}
-	return queryRunner.AbortBackup()
+	return queryRunner.AbortBackup(ctx)
 }
 
 func (bh *BackupHandler) terminateWalgProcesses() error {

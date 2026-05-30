@@ -34,13 +34,13 @@ func NewAOLengthCheckHandler(
 	}, nil
 }
 
-func (checker *AOLengthCheckHandler) CheckAOTableLength() {
-	conn, err := postgres.Connect()
+func (checker *AOLengthCheckHandler) CheckAOTableLength(ctx context.Context) {
+	conn, err := postgres.Connect(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
 	defer func() {
-		err := conn.Close(context.TODO())
+		err := conn.Close(ctx)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to close connection %v", err)
 		}
