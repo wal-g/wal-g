@@ -40,7 +40,8 @@ func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 		if len(names) > 0 {
 			tarBall.name = names[0]
 		} else {
-			tarBall.name = fmt.Sprintf("part_%0.3d.tar.%v", tarBall.partNumber, tarBall.uploader.Compression().FileExtension())
+			tarBall.name = utility.AddFileExtension(
+				fmt.Sprintf("part_%0.3d.tar", tarBall.partNumber), tarBall.uploader.Compression().FileExtension())
 		}
 		writeCloser := tarBall.startUpload(tarBall.name, crypter)
 

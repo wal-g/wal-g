@@ -176,6 +176,15 @@ func TrimFileExtension(filePath string) string {
 	return strings.TrimSuffix(filePath, "."+GetFileExtension(filePath))
 }
 
+// AddFileExtension appends ".ext" to name, omitting the separator when ext is
+// empty (e.g. "none" compression), to avoid a dangling trailing dot
+func AddFileExtension(name, ext string) string {
+	if ext == "" {
+		return name
+	}
+	return name + "." + ext
+}
+
 func GetSubdirectoryRelativePath(subdirectoryPath string, directoryPath string) string {
 	return NormalizePath(SanitizePath(strings.TrimPrefix(subdirectoryPath, directoryPath)))
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // The StreamingBaseBackup object represents a Postgres BASE_BACKUP, connecting to Postgres, and streaming backup data.
@@ -150,7 +151,7 @@ func (bb *StreamingBaseBackup) Upload(ctx context.Context, uploader internal.Upl
 		for {
 			tbsTar := ioextensions.NewNamedReaderImpl(streamer, bb.FileName())
 			compressedFile := internal.CompressAndEncrypt(tbsTar, uploader.Compression(), internal.ConfigureCrypter())
-			dstPath := fmt.Sprintf("%s.%s", bb.Path(), uploader.Compression().FileExtension())
+			dstPath := utility.AddFileExtension(bb.Path(), uploader.Compression().FileExtension())
 			if err := uploader.Upload(ctx, dstPath, compressedFile); err != nil {
 				return err
 			}
@@ -171,7 +172,7 @@ func (bb *StreamingBaseBackup) Upload(ctx context.Context, uploader internal.Upl
 	if teeStreamer != nil {
 		teeTar := ioextensions.NewNamedReaderImpl(teeStreamer.TeeIo, bb.FileName())
 		teeCompressedFile := internal.CompressAndEncrypt(teeTar, bb.uploader.Compression(), internal.ConfigureCrypter())
-		teeFileName := fmt.Sprintf("pg_control.tar.%s", bb.uploader.Compression().FileExtension())
+		teeFileName := utility.AddFileExtension("pg_control.tar", bb.uploader.Compression().FileExtension())
 		teeFilePath := storage.JoinPath(bb.BackupName(), internal.TarPartitionFolderName, teeFileName)
 		if err := bb.uploader.Upload(ctx, teeFilePath, teeCompressedFile); err != nil {
 			return err

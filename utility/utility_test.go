@@ -392,6 +392,15 @@ func TestTrimFileExtension_PathWithExtension(t *testing.T) {
 	assert.Equal(t, "/path/index", utility.TrimFileExtension("/path/index.js"))
 }
 
+func TestAddFileExtension_NonEmpty(t *testing.T) {
+	assert.Equal(t, "pg_control.tar.lz4", utility.AddFileExtension("pg_control.tar", "lz4"))
+}
+
+// "none" compression reports an empty extension: must not leave a trailing dot (issue #2227)
+func TestAddFileExtension_Empty(t *testing.T) {
+	assert.Equal(t, "pg_control.tar", utility.AddFileExtension("pg_control.tar", ""))
+}
+
 func TestGetSubdirectoryRelativePath_NormalizedDirectory(t *testing.T) {
 	assert.Equal(t, "ismirn0ff/documents", utility.GetSubdirectoryRelativePath("/home/ismirn0ff/documents", "/home"))
 }
