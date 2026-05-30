@@ -39,7 +39,7 @@ func HandlePutObject(
 }
 
 func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) error {
-	fullPath := dstPath + "." + uploader.Compression().FileExtension()
+	fullPath := utility.AddFileExtension(dstPath, uploader.Compression().FileExtension())
 	exists, err := uploader.Folder().Exists(fullPath)
 	if err != nil {
 		return fmt.Errorf("check object existence: %v", err)
@@ -77,7 +77,7 @@ func uploadFile(ctx context.Context, name string, content io.Reader, uploader in
 	var compressor compression.Compressor
 	if compress && uploader.Compression() != nil {
 		compressor = uploader.Compression()
-		name += "." + uploader.Compression().FileExtension()
+		name = utility.AddFileExtension(name, uploader.Compression().FileExtension())
 	}
 
 	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter)

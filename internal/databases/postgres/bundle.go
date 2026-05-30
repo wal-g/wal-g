@@ -310,7 +310,7 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 	path := bundle.Sentinel.Path
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, "pg_control.tar."+compressorFileExtension)
+	tarBall.SetUp(bundle.Crypter, utility.AddFileExtension("pg_control.tar", compressorFileExtension))
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -369,7 +369,7 @@ func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner, compressorFil
 	}
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, "backup_label.tar."+compressorFileExtension)
+	tarBall.SetUp(bundle.Crypter, utility.AddFileExtension("backup_label.tar", compressorFileExtension))
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,
