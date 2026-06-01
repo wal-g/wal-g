@@ -134,7 +134,7 @@ func runDeleteTrimWal(cmd *cobra.Command, args []string) {
 	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = deleteHandler.HandleDeleteTrimWal(args[0])
+	err = deleteHandler.HandleDeleteTrimWal(cmd.Context(), args[0])
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

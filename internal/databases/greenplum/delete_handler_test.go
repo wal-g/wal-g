@@ -2,6 +2,7 @@ package greenplum_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"path"
 	"testing"
@@ -112,7 +113,7 @@ func TestHandleDeleteTrimWal_DeletesWalAfterCutoff(t *testing.T) {
 	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName)
+	err = handler.HandleDeleteTrimWal(context.Background(), backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -143,7 +144,7 @@ func TestHandleDeleteTrimWal_WithoutConfirm_NothingDeleted(t *testing.T) {
 	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName)
+	err = handler.HandleDeleteTrimWal(context.Background(), backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -175,7 +176,7 @@ func TestHandleDeleteTrimWal_DeletesRestorePointsExceptTarget(t *testing.T) {
 	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName)
+	err = handler.HandleDeleteTrimWal(context.Background(), backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -207,7 +208,7 @@ func TestHandleDeleteTrimWal_NoRestorePoint(t *testing.T) {
 	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName)
+	err = handler.HandleDeleteTrimWal(context.Background(), backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -235,7 +236,7 @@ func TestHandleDeleteTrimWal_MultipleSegments(t *testing.T) {
 	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName)
+	err = handler.HandleDeleteTrimWal(context.Background(), backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -256,6 +257,6 @@ func TestHandleDeleteTrimWal_BackupNotFound(t *testing.T) {
 	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal("backup_nonexistent")
+	err = handler.HandleDeleteTrimWal(context.Background(), "backup_nonexistent")
 	assert.Error(t, err)
 }

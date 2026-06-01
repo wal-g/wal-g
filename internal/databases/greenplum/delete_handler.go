@@ -201,7 +201,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 }
 
 // HandleDeleteTrimWal deletes WAL files accumulated after each segment's RestorePointLSN.
-func (h *DeleteHandler) HandleDeleteTrimWal(backupName string) error {
+func (h *DeleteHandler) HandleDeleteTrimWal(ctx context.Context, backupName string) error {
 	baseBackupFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
 	backupName, err := internal.UnwrapLatestModifier(backupName, baseBackupFolder)
 	if err != nil {
@@ -231,7 +231,7 @@ func (h *DeleteHandler) HandleDeleteTrimWal(backupName string) error {
 		tracelog.WarningLogger.Printf("config error: %v", err)
 	}
 
-	errorGroup, _ := errgroup.WithContext(context.Background())
+	errorGroup, _ := errgroup.WithContext(ctx)
 	errorGroup.SetLimit(deleteConcurrency)
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
