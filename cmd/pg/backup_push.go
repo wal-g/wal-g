@@ -14,18 +14,17 @@ import (
 
 const (
 	backupPushShortDescription = "Makes backup and uploads it to storage"
-	// JSONFlag                   = "json"
-	permanentFlag             = "permanent"
-	fullBackupFlag            = "full"
-	verifyPagesFlag           = "verify"
-	storeAllCorruptBlocksFlag = "store-all-corrupt"
-	useRatingComposerFlag     = "rating-composer"
-	useCopyComposerFlag       = "copy-composer"
-	useDatabaseComposerFlag   = "database-composer"
-	deltaFromUserDataFlag     = "delta-from-user-data"
-	deltaFromNameFlag         = "delta-from-name"
-	addUserDataFlag           = "add-user-data"
-	withoutFilesMetadataFlag  = "without-files-metadata"
+	permanentFlag              = "permanent"
+	fullBackupFlag             = "full"
+	verifyPagesFlag            = "verify"
+	storeAllCorruptBlocksFlag  = "store-all-corrupt"
+	useRatingComposerFlag      = "rating-composer"
+	useCopyComposerFlag        = "copy-composer"
+	useDatabaseComposerFlag    = "database-composer"
+	deltaFromUserDataFlag      = "delta-from-user-data"
+	deltaFromNameFlag          = "delta-from-name"
+	addUserDataFlag            = "add-user-data"
+	withoutFilesMetadataFlag   = "without-files-metadata"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -126,9 +125,6 @@ var (
 	deltaFromUserData     = ""
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
-	// pretty                = false
-	// json                  = false
-	// detail                = false
 )
 
 func chooseTarBallComposer() postgres.TarBallComposerType {
