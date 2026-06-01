@@ -167,13 +167,13 @@ func (queryRunner *PgQueryRunner) buildGetSystemIdentifier() string {
 // buildGetParameter formats a query to get a postgresql.conf parameter
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetParameter() string {
-	return "select setting from pg_settings where name = $1"
+	return "select setting from pg_settings where name OPERATOR(pg_catalog.=) $1"
 }
 
 // buildGetPhysicalSlotInfo formats a query to get info on a Physical Replication Slot
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
-	return "select active, restart_lsn from pg_catalog.pg_replication_slots where slot_name = $1"
+	return "select active, restart_lsn from pg_catalog.pg_replication_slots where slot_name OPERATOR(pg_catalog.=) $1"
 }
 
 // Retrieve PostgreSQL numeric version
