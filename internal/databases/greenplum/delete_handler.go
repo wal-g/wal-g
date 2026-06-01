@@ -204,8 +204,8 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 
 // HandleDeleteTrimWal deletes WAL files accumulated after each segment's RestorePointLSN.
 func (h *DeleteHandler) HandleDeleteTrimWal(backupName string, confirm bool) error {
-	folder := h.Folder.GetSubFolder(utility.BaseBackupPath)
-	backupName, err := internal.UnwrapLatestModifier(backupName, folder)
+	baseBackupFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
+	backupName, err := internal.UnwrapLatestModifier(backupName, baseBackupFolder)
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,6 @@ func (h *DeleteHandler) HandleDeleteTrimWal(backupName string, confirm bool) err
 
 	errorGroup, _ := errgroup.WithContext(context.Background())
 	errorGroup.SetLimit(deleteConcurrency)
-
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
 		errorGroup.Go(func() error {
@@ -243,7 +242,33 @@ func (h *DeleteHandler) HandleDeleteTrimWal(backupName string, confirm bool) err
 		})
 	}
 
-	return errorGroup.Wait()
+	if err := errorGroup.Wait(); err != nil {
+		return err
+	}
+
+	if sentinel.RestorePoint != nil {
+		return h.deleteRestorePointsExcept(*sentinel.RestorePoint, confirm, baseBackupFolder)
+	}
+	return nil
+}
+
+func (h *DeleteHandler) deleteRestorePointsExcept(targetRestorePoint string, confirm bool, baseBackupFolder storage.Folder) error {
+	_, err := FetchAllRestorePoints(h.Folder)
+	if err != nil {
+		if _, ok := err.(NoRestorePointsFoundError); ok {
+			return nil
+		}
+		return err
+	}
+
+	folderFilter := func(string) bool { return true }
+	return internal.DeleteObjectsWhere(baseBackupFolder, confirm, func(object storage.Object) bool {
+		name := object.GetName()
+		if !strings.HasSuffix(name, RestorePointSuffix) {
+			return false
+		}
+		return StripRightmostRestorePointName(name) != targetRestorePoint
+	}, folderFilter)
 }
 
 func (h *DeleteHandler) trimSegmentWal(meta SegmentMetadata, confirm bool) error {
@@ -304,9 +329,4 @@ func (h *DeleteHandler) HandleDeleteGarbage(args []string) error {
 
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
 	return h.DeleteBeforeTargetWhere(target, h.args.Confirmed, predicate, folderFilter)
-}
-
-func(h *DeleteHandler) HandleDeleteTrimWal(backupName string, confirm bool) error {
-	backupName, err := internal.UnWrapLatestModifier(backupName, h.Folder.GetSubFolder(utility.BaseBackupPath))
-	if err != 
 }
