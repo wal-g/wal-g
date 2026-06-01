@@ -571,7 +571,8 @@ func (queryRunner *PgQueryRunner) GetLockingPID(ctx context.Context) (int, error
 
 	conn := queryRunner.Connection
 	var pid int
-	err := conn.QueryRow(ctx, "SELECT pid FROM pg_catalog.pg_locks WHERE locktype='advisory' AND objid OPERATOR(pg_catalog.=) pg_catalog.hashtext('pg_backup')").Scan(&pid)
+	err := conn.QueryRow(ctx, "SELECT pid FROM pg_catalog.pg_locks WHERE locktype='advisory' "+
+		"AND objid OPERATOR(pg_catalog.=) pg_catalog.hashtext('pg_backup')").Scan(&pid)
 	if err != nil {
 		return 0, err
 	}
@@ -594,7 +595,8 @@ func (queryRunner *PgQueryRunner) buildGetTablesQuery() (string, error) {
 			"CASE WHEN c.relfilenode OPERATOR(pg_catalog.=) 0 THEN pg_catalog.pg_relation_filepath(c.oid) END, " +
 			"c.relname, pg_namespace.nspname, c.relkind, parent.relname AS parent_name " +
 			"FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace ON c.relnamespace OPERATOR(pg_catalog.=) pg_namespace.oid " +
-			"LEFT JOIN pg_catalog.pg_inherits i ON c.oid OPERATOR(pg_catalog.=) i.inhrelid LEFT JOIN ppg_catalog.g_class parent ON i.inhparent OPERATOR(pg_catalog.=) parent.oid;"
+			"LEFT JOIN pg_catalog.pg_inherits i ON c.oid OPERATOR(pg_catalog.=) i.inhrelid " +
+			"LEFT JOIN ppg_catalog.pg_class parent ON i.inhparent OPERATOR(pg_catalog.=) parent.oid;"
 		return query, nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
