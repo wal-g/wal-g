@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/stretchr/testify/assert"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -16,7 +19,6 @@ import (
 	"github.com/wal-g/wal-g/testtools"
 	mock_internal "github.com/wal-g/wal-g/testtools/mocks"
 	"github.com/wal-g/wal-g/utility"
-	"go.uber.org/mock/gomock"
 )
 
 func init() {
@@ -190,6 +192,27 @@ func TestFetchMetadata(t *testing.T) {
 	assert.Equal(t, testBackup.FinishTime, empMeta.FinishTime)
 	assert.Equal(t, testBackup.UserData, empMeta.UserData)
 	assert.Equal(t, testBackup, empMeta)
+}
+
+func TestFetchSentinel(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_456"
+	expected := streamSentinelDto{StartLocalTime: time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)}
+	data, err := json.Marshal(expected)
+	assert.NoError(t, err)
+
+	sentinelPath := path.Join(utility.BaseBackupPath, backupName+utility.SentinelSuffix)
+	err = folder.PutObject(sentinelPath, bytes.NewReader(data))
+	assert.NoError(t, err)
+
+	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	assert.NoError(t, err)
+
+	var actual streamSentinelDto
+	err = backup.FetchSentinel(&actual)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actual)
 }
 
 func TestUploadSentinel(t *testing.T) {
