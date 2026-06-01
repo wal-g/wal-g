@@ -225,6 +225,20 @@ func TestFetchSentinel_backupFolderIsEmpty(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestFetchSentinel_invalidJSON(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	err := folder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader("not a json"))
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+	var actual streamSentinelDto
+	err = backup.FetchSentinel(&actual)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to fetch dto from")
+}
+
 func TestUploadSentinel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	folder := mocks.NewMockFolder(mockCtrl)
