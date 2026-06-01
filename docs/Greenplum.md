@@ -277,3 +277,14 @@ If you want to secect special backup for check, you can add it`s name:
 ```bash
 wal-g check-ao-aocs-length --check-backup --backup-name=backup_name
 ```
+
+### ``delete trim-wal``
+
+Deletes WAL files accumulated after the given backup's restore point LSN on every segment. This frees storage space when WAL files are no longer needed for point-in-time recovery from that backup.
+
+Also removes all `*_restore_point.json` metadata files except the one associated with the specified backup.
+
+Usage:
+```bash
+wal-g delete trim-wal BACKUP_NAME|LATEST [--confirm]
+```
