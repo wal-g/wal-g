@@ -596,7 +596,7 @@ func (queryRunner *PgQueryRunner) buildGetTablesQuery() (string, error) {
 			"c.relname, pg_namespace.nspname, c.relkind, parent.relname AS parent_name " +
 			"FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace ON c.relnamespace OPERATOR(pg_catalog.=) pg_namespace.oid " +
 			"LEFT JOIN pg_catalog.pg_inherits i ON c.oid OPERATOR(pg_catalog.=) i.inhrelid " +
-			"LEFT JOIN ppg_catalog.pg_class parent ON i.inhparent OPERATOR(pg_catalog.=) parent.oid;"
+			"LEFT JOIN pg_catalog.pg_class parent ON i.inhparent OPERATOR(pg_catalog.=) parent.oid;"
 		return query, nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
