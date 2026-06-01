@@ -3,6 +3,7 @@ package gp
 import (
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -130,10 +131,11 @@ func runDeleteTrimWal(cmd *cobra.Command, args []string) {
 	rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, greenplum.DeleteArgs{Confirmed: confirmed})
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = deleteHandler.HandleDeleteTrimWal(args[0], confirmed)
+	err = deleteHandler.HandleDeleteTrimWal(args[0])
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

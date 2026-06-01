@@ -203,7 +203,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 }
 
 // HandleDeleteTrimWal deletes WAL files accumulated after each segment's RestorePointLSN.
-func (h *DeleteHandler) HandleDeleteTrimWal(backupName string, confirm bool) error {
+func (h *DeleteHandler) HandleDeleteTrimWal(backupName string) error {
 	baseBackupFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
 	backupName, err := internal.UnwrapLatestModifier(backupName, baseBackupFolder)
 	if err != nil {
@@ -238,7 +238,7 @@ func (h *DeleteHandler) HandleDeleteTrimWal(backupName string, confirm bool) err
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
 		errorGroup.Go(func() error {
-			return h.trimSegmentWal(meta, confirm)
+			return h.trimSegmentWal(meta, h.args.Confirmed)
 		})
 	}
 
@@ -247,7 +247,7 @@ func (h *DeleteHandler) HandleDeleteTrimWal(backupName string, confirm bool) err
 	}
 
 	if sentinel.RestorePoint != nil {
-		return h.deleteRestorePointsExcept(*sentinel.RestorePoint, confirm, baseBackupFolder)
+		return h.deleteRestorePointsExcept(*sentinel.RestorePoint, h.args.Confirmed, baseBackupFolder)
 	}
 	return nil
 }

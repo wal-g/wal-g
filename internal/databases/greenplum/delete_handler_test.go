@@ -106,12 +106,14 @@ func TestHandleDeleteTrimWal_DeletesWalAfterCutoff(t *testing.T) {
 	walSegNosByContentID := map[int][]uint64{0: {1, 2, 3, 4}}
 	storedRestorePoints := []string{restorePoint}
 	folder := makeTrimWalFolder(
-		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints)
+		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
+	)
 
-	handler, err := greenplum.NewDeleteHandler(folder, greenplum.DeleteArgs{})
+	delArgs := greenplum.DeleteArgs{Confirmed: true}
+	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName, true)
+	err = handler.HandleDeleteTrimWal(backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -138,10 +140,11 @@ func TestHandleDeleteTrimWal_WithoutConfirm_NothingDeleted(t *testing.T) {
 		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
 	)
 
-	handler, err := greenplum.NewDeleteHandler(folder, greenplum.DeleteArgs{})
+	delArgs := greenplum.DeleteArgs{Confirmed: false}
+	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName, false)
+	err = handler.HandleDeleteTrimWal(backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -169,10 +172,11 @@ func TestHandleDeleteTrimWal_DeletesRestorePointsExceptTarget(t *testing.T) {
 		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
 	)
 
-	handler, err := greenplum.NewDeleteHandler(folder, greenplum.DeleteArgs{})
+	delArgs := greenplum.DeleteArgs{Confirmed: true}
+	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName, true)
+	err = handler.HandleDeleteTrimWal(backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -200,10 +204,11 @@ func TestHandleDeleteTrimWal_NoRestorePoint(t *testing.T) {
 		t, backupName, restorePoint, segments, walSegNosByContentID, nil,
 	)
 
-	handler, err := greenplum.NewDeleteHandler(folder, greenplum.DeleteArgs{})
+	delArgs := greenplum.DeleteArgs{Confirmed: true}
+	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName, true)
+	err = handler.HandleDeleteTrimWal(backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -227,10 +232,11 @@ func TestHandleDeleteTrimWal_MultipleSegments(t *testing.T) {
 		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
 	)
 
-	handler, err := greenplum.NewDeleteHandler(folder, greenplum.DeleteArgs{})
+	delArgs := greenplum.DeleteArgs{Confirmed: true}
+	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal(backupName, true)
+	err = handler.HandleDeleteTrimWal(backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
@@ -247,9 +253,10 @@ func TestHandleDeleteTrimWal_MultipleSegments(t *testing.T) {
 func TestHandleDeleteTrimWal_BackupNotFound(t *testing.T) {
 	folder := makeTrimWalFolder(t, "backup_20260101T000000Z", "", nil, nil, nil)
 
-	handler, err := greenplum.NewDeleteHandler(folder, greenplum.DeleteArgs{})
+	delArgs := greenplum.DeleteArgs{Confirmed: true}
+	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
 
-	err = handler.HandleDeleteTrimWal("backup_nonexistent", true)
+	err = handler.HandleDeleteTrimWal("backup_nonexistent")
 	assert.Error(t, err)
 }
