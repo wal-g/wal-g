@@ -215,6 +215,16 @@ func TestFetchSentinel(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFetchSentinel_backupFolderIsEmpty(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	backup := internal.Backup{Name: "base_000", Folder: folder}
+
+	var actual streamSentinelDto
+	err := backup.FetchSentinel(&actual)
+
+	assert.Error(t, err)
+}
+
 func TestUploadSentinel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	folder := mocks.NewMockFolder(mockCtrl)
