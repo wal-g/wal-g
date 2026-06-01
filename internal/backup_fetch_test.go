@@ -275,6 +275,27 @@ func TestFetchSentinel_extraFieldsInJSON(t *testing.T) {
 	assert.Equal(t, expected, actual)
 }
 
+func TestFetchSentinel_missingFieldsInJSON(t *testing.T) {
+	type partialSentinelDto struct {
+		StartTime time.Time
+		Size      int64
+	}
+
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	err := folder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(`{"StartTime":"2020-06-01T00:00:00Z"}`))
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+	var actual partialSentinelDto
+	err = backup.FetchSentinel(&actual)
+
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2020, 6, 1, 0, 0, 0, 0, time.UTC), actual.StartTime)
+	assert.Equal(t, int64(0), actual.Size)
+}
+
 func TestUploadSentinel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	folder := mocks.NewMockFolder(mockCtrl)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -89,7 +90,6 @@ func (backup *Backup) SentinelExists() (bool, error) {
 	return backup.Folder.Exists(backup.getStopSentinelPath())
 }
 
-// TODO : unit tests
 func (backup *Backup) FetchSentinel(sentinelDto interface{}) error {
 	return FetchDto(backup.Folder, sentinelDto, backup.getStopSentinelPath())
 }
