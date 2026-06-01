@@ -239,6 +239,21 @@ func TestFetchSentinel_invalidJSON(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to fetch dto from")
 }
 
+func TestFetchSentinel_emptyFile(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	err := folder.PutObject(backupName+utility.SentinelSuffix, &bytes.Buffer{})
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+	var actual streamSentinelDto
+	err = backup.FetchSentinel(&actual)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to fetch dto from")
+}
+
 func TestUploadSentinel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	folder := mocks.NewMockFolder(mockCtrl)
