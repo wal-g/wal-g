@@ -504,6 +504,16 @@ func DeleteObjectsWhere(
 	return nil
 }
 
+func (h *DeleteHandler) DeleteObjectsWhereWithPermanentCheck(
+	confirm bool,
+	objFilter func(object storage.Object) bool,
+	folderFilter func(name string) bool,
+) error {
+	return DeleteObjectsWhere(h.Folder, confirm, func(object storage.Object) bool {
+		return objFilter(object) && !h.isPermanent(object)
+	}, folderFilter)
+}
+
 func findTarget(objects []BackupObject,
 	compare func(object1, object2 storage.Object) bool,
 	isTarget func(object BackupObject) bool) (BackupObject, error) {
