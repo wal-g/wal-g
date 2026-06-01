@@ -3,7 +3,6 @@ package greenplum_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"path"
 	"testing"
 
@@ -11,24 +10,24 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
 
-const (
-	timeline         = uint32(1)
-	segmentsPerGroup = uint64(0x100)
-)
+const walTimeline = uint32(1)
 
 func walSegFilename(segNo uint64) string {
-	hi := segNo / segmentsPerGroup
-	lo := segNo % segmentsPerGroup
-	return fmt.Sprintf("%08X%08X%08X", timeline, hi, lo)
+	return postgres.WalSegmentNo(segNo).GetFilename(walTimeline)
 }
 
 func walObjectPath(contentID int, segNo uint64) string {
-	return path.Join(greenplum.FormatSegmentStoragePrefix(contentID), utility.WalPath, walSegFilename(segNo))
+	return path.Join(greenplum.FormatSegmentWalPath(contentID), walSegFilename(segNo))
+}
+
+func walCutoffLSN(cutoffSegNo uint64) string {
+	return postgres.LSN(cutoffSegNo * postgres.WalSegmentSize).String()
 }
 
 func makeTrimWalFolder(
@@ -100,7 +99,7 @@ func TestHandleDeleteTrimWal_DeletesWalAfterCutoff(t *testing.T) {
 	segments := []greenplum.SegmentMetadata{
 		{
 			ContentID:       0,
-			RestorePointLSN: "0/02000000",
+			RestorePointLSN: walCutoffLSN(2),
 		},
 	}
 	walSegNosByContentID := map[int][]uint64{0: {1, 2, 3, 4}}
@@ -129,7 +128,7 @@ func TestHandleDeleteTrimWal_WithoutConfirm_NothingDeleted(t *testing.T) {
 	segments := []greenplum.SegmentMetadata{
 		{
 			ContentID:       0,
-			RestorePointLSN: "0/02000000",
+			RestorePointLSN: walCutoffLSN(2),
 		},
 	}
 	walSegNos := []uint64{1, 2, 3, 4}
@@ -162,7 +161,7 @@ func TestHandleDeleteTrimWal_DeletesRestorePointsExceptTarget(t *testing.T) {
 	segments := []greenplum.SegmentMetadata{
 		{
 			ContentID:       0,
-			RestorePointLSN: "0/02000000",
+			RestorePointLSN: walCutoffLSN(2),
 		},
 	}
 	walSegNos := []uint64{1}
@@ -195,7 +194,7 @@ func TestHandleDeleteTrimWal_NoRestorePoint(t *testing.T) {
 	segments := []greenplum.SegmentMetadata{
 		{
 			ContentID:       0,
-			RestorePointLSN: "0/02000000",
+			RestorePointLSN: walCutoffLSN(2),
 		},
 	}
 	walSegNos := []uint64{1, 3}
@@ -220,8 +219,8 @@ func TestHandleDeleteTrimWal_MultipleSegments(t *testing.T) {
 	backupName := "backup_20260101T000000Z"
 	restorePoint := "test_restore_point"
 	segments := []greenplum.SegmentMetadata{
-		{ContentID: -1, RestorePointLSN: "0/01000000"},
-		{ContentID: 0, RestorePointLSN: "0/02000000"},
+		{ContentID: -1, RestorePointLSN: walCutoffLSN(1)},
+		{ContentID: 0, RestorePointLSN: walCutoffLSN(2)},
 	}
 	walSegNosByContentID := map[int][]uint64{
 		-1: {1, 2, 3},
