@@ -202,12 +202,10 @@ func TestFetchSentinel(t *testing.T) {
 	data, err := json.Marshal(expected)
 	assert.NoError(t, err)
 
-	sentinelPath := path.Join(utility.BaseBackupPath, backupName+utility.SentinelSuffix)
-	err = folder.PutObject(sentinelPath, bytes.NewReader(data))
+	err = folder.PutObject(backupName+utility.SentinelSuffix, bytes.NewReader(data))
 	assert.NoError(t, err)
 
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
-	assert.NoError(t, err)
+	backup := internal.Backup{Name: backupName, Folder: folder}
 
 	var actual streamSentinelDto
 	err = backup.FetchSentinel(&actual)
@@ -294,6 +292,22 @@ func TestFetchSentinel_missingFieldsInJSON(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, time.Date(2020, 6, 1, 0, 0, 0, 0, time.UTC), actual.StartTime)
 	assert.Equal(t, int64(0), actual.Size)
+}
+
+func TestFetchSentinel_sentinelNotFoundForWrongName(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	expected := streamSentinelDto{StartLocalTime: time.Date(2020, 6, 1, 0, 0, 0, 0, time.UTC)}
+	data, err := json.Marshal(expected)
+	assert.NoError(t, err)
+
+	err = folder.PutObject(backupName+utility.SentinelSuffix, bytes.NewReader(data))
+	assert.NoError(t, err)
+	wrongBackup := internal.Backup{Name: "base_000_wrong", Folder: folder}
+	var actual streamSentinelDto
+	err = wrongBackup.FetchSentinel(&actual)
+	assert.Error(t, err)
 }
 
 func TestUploadSentinel(t *testing.T) {
