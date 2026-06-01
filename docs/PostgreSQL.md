@@ -581,6 +581,8 @@ wal-g delete retain FULL 5 --use-sentinel-time --confirm
 
 Deletes outdated WAL archives and backups leftover files from storage, e.g. unsuccessfully backups or partially deleted ones. Will remove all non-permanent objects before the earliest non-permanent backup. This command is useful when backups are being deleted by the `delete target` command.
 
+If there are no non-permanent backup in storage, command won`t delete anything. To bypass this check, and delete garbage anyway, use ``--without-backup-check`` flag.
+
 Usage:
 ```bash
 wal-g delete garbage           # Deletes outdated WAL archives and leftover backups files from storage

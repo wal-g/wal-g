@@ -235,7 +235,7 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool, delete
 			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage.")
 			if deleteWithoutBackups {
 				tracelog.InfoLogger.Println("Will delete garbage anyway.")
-				dh.DeleteWhere(confirm, predicate, folderFilter)
+				return dh.DeleteWhere(confirm, predicate, folderFilter)
 			}
 			tracelog.InfoLogger.Println("Not doing anything.")
 			return nil
