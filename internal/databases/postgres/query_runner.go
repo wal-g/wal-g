@@ -79,15 +79,15 @@ func (queryRunner *PgQueryRunner) buildGetVersion() string {
 func (queryRunner *PgQueryRunner) buildGetCurrentLsn() string {
 	if queryRunner.Version >= 100000 {
 		return "SELECT CASE " +
-			"WHEN pg_is_in_recovery() " +
-			"THEN pg_last_wal_receive_lsn() " +
-			"ELSE pg_current_wal_lsn() " +
+			"WHEN pg_catalog.pg_is_in_recovery() " +
+			"THEN pg_catalog.pg_last_wal_receive_lsn() " +
+			"ELSE pg_catalog.pg_current_wal_lsn() " +
 			"END"
 	}
 	return "SELECT CASE " +
-		"WHEN pg_is_in_recovery() " +
-		"THEN pg_last_xlog_receive_location() " +
-		"ELSE pg_current_xlog_location() " +
+		"WHEN pg_catalog.pg_is_in_recovery() " +
+		"THEN pg_catalog.pg_last_xlog_receive_location() " +
+		"ELSE pg_catalog.pg_current_xlog_location() " +
 		"END"
 }
 
@@ -97,21 +97,21 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 	// where pg_start_backup() will fail on standby anyway
 	switch {
 	case queryRunner.Version >= 150000:
-		return "SELECT case when pg_is_in_recovery()" +
-			" then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
-			" FROM pg_backup_start($1, true) lsn", nil
+		return "SELECT case when pg_catalog.pg_is_in_recovery()" +
+			" then '' else (pg_catalog.pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery()" +
+			" FROM pg_catalog.pg_backup_start($1, true) lsn", nil
 	case queryRunner.Version >= 100000:
-		return "SELECT case when pg_is_in_recovery()" +
-			" then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
-			" FROM pg_start_backup($1, true, false) lsn", nil
+		return "SELECT case when pg_catalog.pg_is_in_recovery()" +
+			" then '' else (pg_catalog.pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery()" +
+			" FROM pg_catalog.pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90600:
-		return "SELECT case when pg_is_in_recovery() " +
-			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
-			" FROM pg_start_backup($1, true, false) lsn", nil
+		return "SELECT case when pg_catalog.pg_is_in_recovery() " +
+			"then '' else (pg_catalog.pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery()" +
+			" FROM pg_catalog.pg_start_backup($1, true, false) lsn", nil
 	case queryRunner.Version >= 90000:
-		return "SELECT case when pg_is_in_recovery() " +
-			"then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery()" +
-			" FROM pg_start_backup($1, true) lsn", nil
+		return "SELECT case when pg_catalog.pg_is_in_recovery() " +
+			"then '' else (pg_catalog.pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery()" +
+			" FROM pg_catalog.pg_start_backup($1, true) lsn", nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
 	default:
@@ -123,13 +123,13 @@ func (queryRunner *PgQueryRunner) BuildStartBackup() (string, error) {
 func (queryRunner *PgQueryRunner) BuildStopBackup() (string, error) {
 	switch {
 	case queryRunner.Version >= 150000:
-		return "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop()", nil
+		return "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_backup_stop()", nil
 	case queryRunner.Version >= 90600:
-		return "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", nil
+		return "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_stop_backup(false)", nil
 	case queryRunner.Version >= 90000:
-		return "SELECT (pg_xlogfile_name_offset(lsn)).file_name," +
-			" lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text " +
-			"FROM pg_stop_backup() lsn", nil
+		return "SELECT (pg_catalog.pg_xlogfile_name_offset(lsn)).file_name," +
+			" lpad((pg_catalog.pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text " +
+			"FROM pg_catalog.pg_stop_backup() lsn", nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
 	default:
@@ -167,13 +167,13 @@ func (queryRunner *PgQueryRunner) buildGetSystemIdentifier() string {
 // buildGetParameter formats a query to get a postgresql.conf parameter
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetParameter() string {
-	return "select setting from pg_settings where name = $1"
+	return "select setting from pg_settings where name OPERATOR(pg_catalog.=) $1"
 }
 
 // buildGetPhysicalSlotInfo formats a query to get info on a Physical Replication Slot
 // TODO: Unittest
 func (queryRunner *PgQueryRunner) buildGetPhysicalSlotInfo() string {
-	return "select active, restart_lsn from pg_replication_slots where slot_name = $1"
+	return "select active, restart_lsn from pg_catalog.pg_replication_slots where slot_name OPERATOR(pg_catalog.=) $1"
 }
 
 // Retrieve PostgreSQL numeric version
@@ -300,10 +300,10 @@ func (queryRunner *PgQueryRunner) BuildStatisticsQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
 		return "SELECT info.relfilenode, info.reltablespace, s.n_tup_ins, s.n_tup_upd, s.n_tup_del " +
-			"FROM pg_class info " +
-			"LEFT OUTER JOIN pg_stat_all_tables s " +
-			"ON info.Oid = s.relid " +
-			"WHERE relfilenode != 0 " +
+			"FROM pg_catalog.pg_class info " +
+			"LEFT OUTER JOIN pg_catalog.pg_stat_all_tables s " +
+			"ON info.Oid OPERATOR(pg_catalog.=) s.relid " +
+			"WHERE relfilenode OPERATOR(pg_catalog.!=) 0 " +
 			"AND n_tup_ins IS NOT NULL", nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
@@ -360,7 +360,7 @@ func (queryRunner *PgQueryRunner) getStatistics(ctx context.Context,
 func (queryRunner *PgQueryRunner) BuildGetDatabasesQuery() (string, error) {
 	switch {
 	case queryRunner.Version >= 90000:
-		return "SELECT Oid, datname, dattablespace FROM pg_database WHERE datallowconn", nil
+		return "SELECT Oid, datname, dattablespace FROM pg_catalog.pg_database WHERE datallowconn", nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
 	default:
@@ -481,13 +481,13 @@ func (queryRunner *PgQueryRunner) ReadTimeline(ctx context.Context) (timeline ui
 
 	if queryRunner.Version >= 90600 {
 		err = conn.QueryRow(ctx, "select timeline_id, bytes_per_wal_segment "+
-			"from pg_control_checkpoint(), pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
+			"from pg_catalog.pg_control_checkpoint(), pg_catalog.pg_control_init()").Scan(&timeline, &bytesPerWalSegment)
 		if err == nil && uint64(bytesPerWalSegment) != WalSegmentSize {
 			return 0, newBytesPerWalSegmentError()
 		}
 	} else {
 		var hex string
-		err = conn.QueryRow(ctx, "SELECT SUBSTR(pg_xlogfile_name(pg_current_xlog_insert_location()), "+
+		err = conn.QueryRow(ctx, "SELECT SUBSTR(pg_catalog.pg_xlogfile_name(pg_catalog.pg_current_xlog_insert_location()), "+
 			"1, 8) AS timeline").Scan(&hex)
 		if err != nil {
 			return
@@ -554,7 +554,7 @@ func (queryRunner *PgQueryRunner) TryGetLock(ctx context.Context) (err error) {
 
 	conn := queryRunner.Connection
 	var lockFree bool
-	err = conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(hashtext('pg_backup'))").Scan(&lockFree)
+	err = conn.QueryRow(ctx, "SELECT pg_catalog.pg_try_advisory_lock(pg_catalog.hashtext('pg_backup'))").Scan(&lockFree)
 	if err != nil {
 		return err
 	}
@@ -571,7 +571,8 @@ func (queryRunner *PgQueryRunner) GetLockingPID(ctx context.Context) (int, error
 
 	conn := queryRunner.Connection
 	var pid int
-	err := conn.QueryRow(ctx, "SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid = hashtext('pg_backup')").Scan(&pid)
+	err := conn.QueryRow(ctx, "SELECT pid FROM pg_catalog.pg_locks WHERE locktype='advisory' "+
+		"AND objid OPERATOR(pg_catalog.=) pg_catalog.hashtext('pg_backup')").Scan(&pid)
 	if err != nil {
 		return 0, err
 	}
@@ -591,10 +592,11 @@ func (queryRunner *PgQueryRunner) buildGetTablesQuery() (string, error) {
 		// Over millions of relations exhausts backend RELOID syscache, OOMing query
 		// Path only used by processTables when relfilenode=0
 		query := "SELECT c.relfilenode, c.oid, " +
-			"CASE WHEN c.relfilenode = 0 THEN pg_relation_filepath(c.oid) END, " +
+			"CASE WHEN c.relfilenode OPERATOR(pg_catalog.=) 0 THEN pg_catalog.pg_relation_filepath(c.oid) END, " +
 			"c.relname, pg_namespace.nspname, c.relkind, parent.relname AS parent_name " +
-			"FROM pg_class c JOIN pg_namespace ON c.relnamespace = pg_namespace.oid " +
-			"LEFT JOIN pg_inherits i ON c.oid = i.inhrelid LEFT JOIN pg_class parent ON i.inhparent = parent.oid;"
+			"FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace ON c.relnamespace OPERATOR(pg_catalog.=) pg_namespace.oid " +
+			"LEFT JOIN pg_catalog.pg_inherits i ON c.oid OPERATOR(pg_catalog.=) i.inhrelid " +
+			"LEFT JOIN pg_catalog.pg_class parent ON i.inhparent OPERATOR(pg_catalog.=) parent.oid;"
 		return query, nil
 	case queryRunner.Version == 0:
 		return "", NewNoPostgresVersionError()
@@ -776,7 +778,7 @@ func (queryRunner *PgQueryRunner) IsStandby(ctx context.Context) (bool, error) {
 	defer queryRunner.Mu.Unlock()
 
 	var standby bool
-	err := queryRunner.Connection.QueryRow(ctx, "SELECT pg_is_in_recovery()").Scan(&standby)
+	err := queryRunner.Connection.QueryRow(ctx, "SELECT pg_catalog.pg_is_in_recovery()").Scan(&standby)
 	if err != nil {
 		return false, errors.Wrap(err, "IsStandby: failed to determine recovery mode")
 	}
