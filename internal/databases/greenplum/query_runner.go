@@ -44,7 +44,7 @@ func ToGpQueryRunner(queryRunner *postgres.PgQueryRunner) *GpQueryRunner {
 
 // BuildCreateGreenplumRestorePoint formats a query to create a restore point
 func (queryRunner *GpQueryRunner) buildCreateGreenplumRestorePoint(restorePointName string) string {
-	return fmt.Sprintf("SELECT (public.gp_create_restore_point('%s'))::text", restorePointName)
+	return fmt.Sprintf("SELECT (gp_create_restore_point('%s'))::text", restorePointName)
 }
 
 // CreateGreenplumRestorePoint creates a restore point
