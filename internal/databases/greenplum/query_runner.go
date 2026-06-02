@@ -352,7 +352,8 @@ func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDa
 }
 
 const gpAoRelationPgClassQuery = `
-SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn), 'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
+SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn),
+	'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
 FROM pg_catalog.pg_class aoseg_c
 JOIN (
@@ -363,7 +364,8 @@ JOIN (
 	JOIN (
 		SELECT
 		    c.oid,
-		    pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname) AS aotablefqn, 
+		    pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname)
+			AS aotablefqn, 
 			c.relstorage,
 			c.relnatts,
 			c.relfilenode,
@@ -376,7 +378,8 @@ JOIN (
 `
 
 const cbAoRelationPgClassQuery = `
-SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn), 'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
+SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn),
+	'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
 FROM pg_catalog.pg_class aoseg_c
 JOIN (
@@ -387,8 +390,11 @@ JOIN (
 	JOIN (
             SELECT 
                 c.oid,
-                pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname) AS aotablefqn,
-                ASCII(CASE WHEN am.amname OPERATOR(pg_catalog.=) 'ao_row' THEN 'a' WHEN am.amname OPERATOR(pg_catalog.=) 'ao_column' THEN 'c' ELSE 'unknown' END) as relstorage,
+                pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname)
+				AS aotablefqn,
+                ASCII(CASE WHEN am.amname OPERATOR(pg_catalog.=) 'ao_row'
+				THEN 'a' WHEN am.amname OPERATOR(pg_catalog.=) 'ao_column'
+				THEN 'c' ELSE 'unknown' END) as relstorage,
                 c.relnatts,
                 c.relfilenode,
                 c.reltablespace

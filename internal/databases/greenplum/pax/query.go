@@ -15,7 +15,8 @@ import (
 const paxRelationsQuery = `
 SELECT
     c.oid                                                                  AS pax_oid,
-    pg_catalog.md5(pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname))           AS rel_md5,
+    pg_catalog.md5(pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname))
+	AS rel_md5,
     c.relfilenode,
     c.reltablespace,
     paxt.auxrelid::regclass::text                                          AS aux_table_fqn
