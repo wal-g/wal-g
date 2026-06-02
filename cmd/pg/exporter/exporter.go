@@ -138,7 +138,8 @@ func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
 
 	// Extract the part after "_D_" which contains the base backup identifier
 	expectedParent := "base_" + b.BackupName[deltaIndex+3:] // +3 to skip "_D_"
-	for _, candidate := range backups {
+	for i := range backups {
+		candidate := &backups[i]
 		if b.BackupName != candidate.BackupName && strings.HasPrefix(candidate.BackupName, expectedParent) {
 			return candidate.BackupName
 		}
@@ -148,7 +149,14 @@ func (b *BackupInfo) GetDeltaOriginName(backups []BackupInfo) string {
 }
 
 // NewWalgExporter creates a new WAL-G exporter
-func NewWalgExporter(logger *slog.Logger, walgPath string, backupScrapeInterval time.Duration, verifyScrapeInterval time.Duration, storageScrapeInterval time.Duration, walgConfigPath string) (*WalgExporter, error) {
+func NewWalgExporter(
+	logger *slog.Logger,
+	walgPath string,
+	backupScrapeInterval time.Duration,
+	verifyScrapeInterval time.Duration,
+	storageScrapeInterval time.Duration,
+	walgConfigPath string,
+) *WalgExporter {
 	return &WalgExporter{
 		logger:                logger,
 		walgPath:              walgPath,
@@ -157,120 +165,81 @@ func NewWalgExporter(logger *slog.Logger, walgPath string, backupScrapeInterval 
 		storageScrapeInterval: storageScrapeInterval,
 		walgConfigPath:        walgConfigPath,
 
-		pitrWindow: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "walg_pitr_window_seconds",
-				Help: "Point-in-time recovery window size in seconds",
-			},
-		),
+		pitrWindow: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "walg_pitr_window_seconds",
+			Help: "Point-in-time recovery window size in seconds",
+		}),
 
-		errors: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "walg_errors_total",
-				Help: "Total number of WAL-G errors",
-			},
-			[]string{"operation", "error_type"},
-		),
+		errors: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "walg_errors_total",
+			Help: "Total number of WAL-G errors",
+		}, []string{"operation", "error_type"}),
 
-		walVerifyCheck: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_wal_verify_status",
-				Help: "WAL verify status (1 = OK, 0 = FAILURE, 2 = WARNING, -1 = UNKNOWN)",
-			},
-			[]string{"operation"},
-		),
+		walVerifyCheck: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_wal_verify_status",
+			Help: "WAL verify status (1 = OK, 0 = FAILURE, 2 = WARNING, -1 = UNKNOWN)",
+		}, []string{"operation"}),
 
-		walIntegrity: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_wal_integrity_status",
-				Help: "WAL integrity status (1 = FOUND, 0 = MISSING)",
-			},
-			[]string{"timeline_id", "timeline_hex"},
-		),
+		walIntegrity: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_wal_integrity_status",
+			Help: "WAL integrity status (1 = FOUND, 0 = MISSING)",
+		}, []string{"timeline_id", "timeline_hex"}),
 
-		backupCount: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_backups",
-				Help: "Number of backups by type",
-			},
-			[]string{"backup_type"},
-		),
+		backupCount: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_backups",
+			Help: "Number of backups by type",
+		}, []string{"backup_type"}),
 
-		backupInfo: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_backup_info",
-				Help: "Information about stored backups. Value is always 1.",
-			},
-			[]string{"backup_name", "backup_type", "wal_file", "pg_version", "start_lsn", "finish_lsn", "is_permanent", "delta_origin"},
-		),
+		backupInfo: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_backup_info",
+			Help: "Information about stored backups. Value is always 1.",
+		}, []string{"backup_name", "backup_type", "wal_file", "pg_version", "start_lsn", "finish_lsn", "is_permanent", "delta_origin"}),
 
-		backupStartTimestamp: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_backup_start_timestamp",
-				Help: "Start time of the backup (Unix timestamp).",
-			},
-			[]string{"backup_name"},
-		),
+		backupStartTimestamp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_backup_start_timestamp",
+			Help: "Start time of the backup (Unix timestamp).",
+		}, []string{"backup_name"}),
 
-		backupFinishTimestamp: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_backup_finish_timestamp",
-				Help: "Finish time of the backup (Unix timestamp).",
-			},
-			[]string{"backup_name"},
-		),
+		backupFinishTimestamp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_backup_finish_timestamp",
+			Help: "Finish time of the backup (Unix timestamp).",
+		}, []string{"backup_name"}),
 
-		backupUncompressedSize: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_backup_uncompressed_size_bytes",
-				Help: "Uncompressed size of the backup in bytes.",
-			},
-			[]string{"backup_name"},
-		),
+		backupUncompressedSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_backup_uncompressed_size_bytes",
+			Help: "Uncompressed size of the backup in bytes.",
+		}, []string{"backup_name"}),
 
-		backupCompressedSize: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: "walg_backup_compressed_size_bytes",
-				Help: "Compressed size of the backup in bytes.",
-			},
-			[]string{"backup_name"},
-		),
+		backupCompressedSize: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "walg_backup_compressed_size_bytes",
+			Help: "Compressed size of the backup in bytes.",
+		}, []string{"backup_name"}),
 
-		backupScrapeDuration: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "walg_backup_list_duration_seconds",
-				Help: "Time taken to execute 'backup-list' during the last collector run.",
-			},
-		),
+		backupScrapeDuration: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "walg_backup_list_duration_seconds",
+			Help: "Time taken to execute 'backup-list' during the last collector run.",
+		}),
 
-		verifyScrapeDuration: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "walg_wal_verify_duration_seconds",
-				Help: "Time taken to execute 'wal-verify' during the last collector run.",
-			},
-		),
+		verifyScrapeDuration: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "walg_wal_verify_duration_seconds",
+			Help: "Time taken to execute 'wal-verify' during the last collector run.",
+		}),
 
-		scrapeErrors: prometheus.NewCounter(
-			prometheus.CounterOpts{
-				Name: "walg_scrape_errors_total",
-				Help: "Total number of scrape errors",
-			},
-		),
+		scrapeErrors: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "walg_scrape_errors_total",
+			Help: "Total number of scrape errors",
+		}),
 
-		storageAlive: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "walg_storage_up",
-				Help: "Storage connectivity status (1 = up, 0 = down)",
-			},
-		),
+		storageAlive: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "walg_storage_up",
+			Help: "Storage connectivity status (1 = up, 0 = down)",
+		}),
 
-		storageLatency: prometheus.NewGauge(
-			prometheus.GaugeOpts{
-				Name: "walg_storage_latency_seconds",
-				Help: "Storage operation latency in seconds",
-			},
-		),
-	}, nil
+		storageLatency: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "walg_storage_latency_seconds",
+			Help: "Storage operation latency in seconds",
+		}),
+	}
 }
 
 // Describe implements the Prometheus Collector interface
@@ -329,7 +298,7 @@ func (e *WalgExporter) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			e.logger.Info("Exporter context cancelled, stopping metrics collection")
+			e.logger.Info("Exporter context canceled, stopping metrics collection")
 			return
 		case <-tickerStorage.C:
 			e.checkStorageAliveness()
@@ -441,7 +410,8 @@ func (e *WalgExporter) updateBackupMetrics(backups []BackupInfo) {
 	fullCount, deltaCount := 0, 0
 
 	// Create detailed metrics for each backup
-	for _, backup := range backups {
+	for i := range backups {
+		backup := &backups[i]
 		backupType := backup.GetBackupType()
 		if backup.IsFullBackup() {
 			fullCount++

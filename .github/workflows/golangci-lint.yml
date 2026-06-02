@@ -26,4 +26,21 @@ jobs:
         uses: golangci/golangci-lint-action@v9.2.1
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v2.4
+          version: v2.12
+
+  golangci-exporter:
+    name: lint exporter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+        id: go
+      # pg/exporter is a separate module; lint it under the repo-root .golangci.yml
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9.2.1
+        with:
+          version: v2.12
+          working-directory: cmd/pg/exporter
