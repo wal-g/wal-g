@@ -20,7 +20,7 @@ SELECT
     c.relfilenode,
     c.reltablespace,
     paxt.auxrelid::regclass::text                                          AS aux_table_fqn
-FROM ppg_catalog.pg_class c
+FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_am am          ON c.relam OPERATOR(pg_catalog.=) am.oid
 JOIN pg_catalog.pg_namespace n    ON c.relnamespace OPERATOR(pg_catalog.=) n.oid
 JOIN pg_ext_aux.pg_pax_tables paxt ON paxt.relid OPERATOR(pg_catalog.=) c.oid
