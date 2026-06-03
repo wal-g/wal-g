@@ -41,7 +41,7 @@ var backupPushCmd = &cobra.Command{
 			userDataRaw = viper.GetString(conf.SentinelUserDataSetting)
 		}
 
-		etcd.HandleBackupPush(uploader, backupCmd, permanent, userDataRaw)
+		etcd.HandleBackupPush(cmd.Context(), uploader, backupCmd, permanent, userDataRaw)
 	},
 }
 

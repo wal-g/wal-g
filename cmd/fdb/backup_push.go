@@ -24,7 +24,7 @@ var backupPushCmd = &cobra.Command{
 
 		backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
-		fdb.HandleBackupPush(uploader, backupCmd)
+		fdb.HandleBackupPush(cmd.Context(), uploader, backupCmd)
 	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		conf.RequiredSettings[conf.NameStreamCreateCmd] = true

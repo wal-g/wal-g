@@ -187,7 +187,7 @@ func (f *Folder) PutObject(name string, content io.Reader) error {
 func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
 	objectPath := f.GetPath() + name
 
-	_, err := f.uploader.UploadFrom(context.Background(), &oss.PutObjectRequest{
+	_, err := f.uploader.UploadFrom(ctx, &oss.PutObjectRequest{
 		Bucket: oss.Ptr(f.bucket),
 		Key:    oss.Ptr(objectPath),
 	}, content)
