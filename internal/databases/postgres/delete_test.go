@@ -285,6 +285,65 @@ func TestDeleteBeforeTargetWithPermanentBackups(t *testing.T) {
 	verifyThatExistBackupsAndWals(t, expectBackupExistAfterDelete, expectWalExistAfterDelete, folder)
 }
 
+func TestDeleteTargetWithPermanentBackups(t *testing.T) {
+	folder := testtools.CreateMockStorageFolderWithPermanentBackups(t)
+
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+	isPermanent := makeTestPermanentFunc(permanentBackups, permanentWals)
+	deleteHandler := newTestDeleteHandler(folder, lessByTime, internal.IsPermanentFunc(isPermanent))
+
+	permanentFullBackup := "base_000000010000000000000002"
+	target := TestPostgresBackupObject{
+		storage.NewLocalObject(permanentFullBackup+utility.SentinelSuffix, utility.TimeNowCrossPlatformLocal(), 0),
+		"default",
+	}
+
+	err := deleteHandler.DeleteTarget(target, true, false, func(string) bool { return true })
+	assert.Error(t, err)
+	assert.IsType(t, utility.ForbiddenActionError{}, err)
+
+	expectBackupExistAfterDelete := map[string]bool{
+		"base_000000010000000000000002":                            true,
+		"base_000000010000000000000004_D_000000010000000000000002": true,
+		"base_000000010000000000000006_D_000000010000000000000004": true,
+	}
+	expectWalExistAfterDelete := map[string]bool{
+		"000000010000000000000001": true,
+		"000000010000000000000002": true,
+		"000000010000000000000003": true,
+	}
+	verifyThatExistBackupsAndWals(t, expectBackupExistAfterDelete, expectWalExistAfterDelete, folder)
+}
+
+func TestDeleteTargetDeletesNonPermanentBackup(t *testing.T) {
+	folder := testtools.CreateMockStorageFolderWithPermanentBackups(t)
+
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+	isPermanent := makeTestPermanentFunc(permanentBackups, permanentWals)
+	deleteHandler := newTestDeleteHandler(folder, lessByTime, internal.IsPermanentFunc(isPermanent))
+
+	nonPermanentBackup := "base_000000010000000000000006_D_000000010000000000000004"
+	target := TestPostgresBackupObject{
+		storage.NewLocalObject(nonPermanentBackup+utility.SentinelSuffix, utility.TimeNowCrossPlatformLocal(), 0),
+		"default",
+	}
+
+	err := deleteHandler.DeleteTarget(target, true, false, func(string) bool { return true })
+	assert.NoError(t, err)
+
+	expectBackupExistAfterDelete := map[string]bool{
+		"base_000000010000000000000002":                            true,
+		"base_000000010000000000000004_D_000000010000000000000002": true,
+		"base_000000010000000000000006_D_000000010000000000000004": false,
+	}
+	expectWalExistAfterDelete := map[string]bool{
+		"000000010000000000000001": true,
+		"000000010000000000000002": true,
+		"000000010000000000000003": true,
+	}
+	verifyThatExistBackupsAndWals(t, expectBackupExistAfterDelete, expectWalExistAfterDelete, folder)
+}
+
 func createMockFolderWithTime(t *testing.T, baseTime time.Time) *mocks.MockFolder {
 	baseNamePrefix := "base_"
 	deltaMark := "_D_"

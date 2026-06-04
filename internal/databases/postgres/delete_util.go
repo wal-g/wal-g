@@ -69,20 +69,51 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool
 }
 
 func IsPermanent(objectName, storageName string, permanentBackups, permanentWals map[PermanentObject]bool) bool {
-	if strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24 {
+	if walName, ok := walNameFromObjectPath(objectName); ok {
 		wal := PermanentObject{
-			Name:        objectName[len(utility.WalPath) : len(utility.WalPath)+24],
+			Name:        walName,
 			StorageName: storageName,
 		}
 		return permanentWals[wal]
 	}
-	if strings.HasPrefix(objectName, utility.BaseBackupPath) {
+	if backupName, ok := backupNameFromObjectPath(objectName); ok {
 		backup := PermanentObject{
-			Name:        utility.StripLeftmostBackupName(objectName[len(utility.BaseBackupPath):]),
+			Name:        backupName,
 			StorageName: storageName,
 		}
 		return permanentBackups[backup]
 	}
-	// should not reach here, default to false
 	return false
+}
+
+func backupNameFromObjectPath(objectName string) (string, bool) {
+	var relativePath string
+	switch {
+	case strings.HasPrefix(objectName, utility.BaseBackupPath):
+		relativePath = objectName[len(utility.BaseBackupPath):]
+	default:
+		// Objects listed from the base backup subfolder have paths relative to that folder.
+		relativePath = objectName
+	}
+	backupName := utility.StripLeftmostBackupName(relativePath)
+	if backupName == "" {
+		return "", false
+	}
+	return backupName, true
+}
+
+func walNameFromObjectPath(objectName string) (string, bool) {
+	switch {
+	case strings.HasPrefix(objectName, utility.WalPath) && len(objectName) >= len(utility.WalPath)+24:
+		return objectName[len(utility.WalPath) : len(utility.WalPath)+24], true
+	case strings.HasPrefix(objectName, utility.WalPath):
+		return "", false
+	default:
+		// WAL objects listed from the WAL subfolder have paths relative to that folder.
+		walName := utility.StripWalFileName(objectName)
+		if walName == strings.Repeat("Z", 24) {
+			return "", false
+		}
+		return walName, true
+	}
 }
