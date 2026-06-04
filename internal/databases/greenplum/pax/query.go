@@ -15,15 +15,16 @@ import (
 const paxRelationsQuery = `
 SELECT
     c.oid                                                                  AS pax_oid,
-    md5(quote_ident(n.nspname) || '.' || quote_ident(c.relname))           AS rel_md5,
+    pg_catalog.md5(pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname))
+	AS rel_md5,
     c.relfilenode,
     c.reltablespace,
     paxt.auxrelid::regclass::text                                          AS aux_table_fqn
-FROM pg_class c
-JOIN pg_am am          ON c.relam = am.oid
-JOIN pg_namespace n    ON c.relnamespace = n.oid
-JOIN pg_ext_aux.pg_pax_tables paxt ON paxt.relid = c.oid
-WHERE am.amname = 'pax' AND c.relpersistence = 'p';
+FROM pg_catalog.pg_class c
+JOIN pg_catalog.pg_am am          ON c.relam OPERATOR(pg_catalog.=) am.oid
+JOIN pg_catalog.pg_namespace n    ON c.relnamespace OPERATOR(pg_catalog.=) n.oid
+JOIN pg_ext_aux.pg_pax_tables paxt ON paxt.relid OPERATOR(pg_catalog.=) c.oid
+WHERE am.amname OPERATOR(pg_catalog.=) 'pax' AND c.relpersistence OPERATOR(pg_catalog.=) 'p';
 `
 
 type paxRelation struct {

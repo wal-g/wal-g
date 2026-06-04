@@ -382,6 +382,18 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(
 	}, folderFilter)
 }
 
+func (h *DeleteHandler) DeleteWhere(
+	confirmed bool,
+	objSelector func(object storage.Object) bool,
+	folderFilter func(name string) bool,
+) error {
+	tracelog.InfoLogger.Println("Start delete")
+
+	return DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
+		return objSelector(object) && !h.isPermanent(object)
+	}, folderFilter)
+}
+
 func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bool,
 	folderFilter func(name string) bool) error {
 	var backupsToDelete []BackupObject

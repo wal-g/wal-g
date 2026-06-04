@@ -243,7 +243,7 @@ func (bh *BackupHandler) startBackup(ctx context.Context) error {
 	}
 	bh.CurBackupInfo.startLSN = backupStartLSN
 	bh.CurBackupInfo.Name = backupName
-	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
+	tracelog.InfoLogger.Printf("Started backup with name %s at LSN %s", backupName, backupStartLSN)
 	bh.initBackupTerminator()
 	return nil
 }

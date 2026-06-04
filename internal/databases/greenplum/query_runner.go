@@ -87,8 +87,8 @@ const getGreenplumSegmentsInfoQuery = `SELECT
 	port,
 	hostname,
 	datadir
-FROM gp_segment_configuration
-WHERE role = 'p'
+FROM pg_catalog.gp_segment_configuration
+WHERE role OPERATOR(pg_catalog.=) 'p'
 ORDER BY content, role DESC;`
 
 // GetGreenplumSegmentsInfo returns the information about segments
@@ -140,9 +140,9 @@ func (queryRunner *GpQueryRunner) GetGreenplumVersion(ctx context.Context) (vers
 // BuildIsInBackup formats a query to retrieve information about running backups
 func (queryRunner *GpQueryRunner) buildIsInBackup() string {
 	return `
-SELECT pg_is_in_backup(), gp_segment_id FROM gp_dist_random('gp_id')
+SELECT pg_catalog.pg_is_in_backup(), gp_segment_id FROM gp_dist_random('gp_id')
 UNION ALL
-SELECT pg_is_in_backup(), -1;
+SELECT pg_catalog.pg_is_in_backup(), -1;
 `
 }
 
@@ -150,7 +150,7 @@ SELECT pg_is_in_backup(), -1;
 func (queryRunner *GpQueryRunner) TryGetLock(ctx context.Context) (err error) {
 	conn := queryRunner.Connection
 	var lockFree bool
-	err = conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(hashtext('gp_backup'))").Scan(&lockFree)
+	err = conn.QueryRow(ctx, "SELECT pg_catalog.pg_try_advisory_lock(pg_catalog.hashtext('gp_backup'))").Scan(&lockFree)
 	if err != nil {
 		return err
 	}
@@ -163,12 +163,12 @@ func (queryRunner *GpQueryRunner) TryGetLock(ctx context.Context) (err error) {
 
 // buildAbortBackupSegments aborts the running backup on the segments
 func (queryRunner *GpQueryRunner) buildAbortBackupSegments() string {
-	return `SELECT pg_stop_backup(), gp_segment_id FROM gp_dist_random('gp_id');`
+	return `SELECT pg_catalog.pg_stop_backup(), gp_segment_id FROM gp_dist_random('gp_id');`
 }
 
 // buildAbortBackupSegments aborts the running backup on the master instance
 func (queryRunner *GpQueryRunner) buildAbortBackupMaster() string {
-	return `SELECT pg_stop_backup();`
+	return `SELECT pg_catalog.pg_stop_backup();`
 }
 
 // IsInBackup check if there is backup running
@@ -352,53 +352,59 @@ func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDa
 }
 
 const gpAoRelationPgClassQuery = `
-SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
+SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn),
+	'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
-FROM pg_class aoseg_c
+FROM pg_catalog.pg_class aoseg_c
 JOIN (
 	SELECT pg_ao.relid AS aooid, pg_ao.segrelid, 
 			aotables.aotablefqn, aotables.relstorage, 
 			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
-	FROM pg_appendonly pg_ao
+	FROM pg_catalog.pg_appendonly pg_ao
 	JOIN (
 		SELECT
 		    c.oid,
-		    quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn, 
+		    pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname)
+			AS aotablefqn, 
 			c.relstorage,
 			c.relnatts,
 			c.relfilenode,
 			c.reltablespace 
-		FROM pg_class c
-		JOIN pg_namespace n ON c.relnamespace = n.oid
-		WHERE relstorage IN ( 'a', 'c' ) AND relpersistence='p'
-		) aotables ON pg_ao.relid = aotables.oid
-	) seg ON aoseg_c.oid = seg.segrelid;
+		FROM pg_catalog.pg_class c
+		JOIN pg_catalog.pg_namespace n ON c.relnamespace OPERATOR(pg_catalog.=) n.oid
+		WHERE relstorage IN ( 'a', 'c' ) AND relpersistence OPERATOR(pg_catalog.=) 'p'
+		) aotables ON pg_ao.relid OPERATOR(pg_catalog.=) aotables.oid
+	) seg ON aoseg_c.oid OPERATOR(pg_catalog.=) seg.segrelid;
 `
 
 const cbAoRelationPgClassQuery = `
-SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
+SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn),
+	'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
-FROM pg_class aoseg_c
+FROM pg_catalog.pg_class aoseg_c
 JOIN (
 	SELECT pg_ao.relid AS aooid, pg_ao.segrelid, 
 			aotables.aotablefqn, aotables.relstorage, 
 			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
-	FROM pg_appendonly pg_ao
+	FROM pg_catalog.pg_appendonly pg_ao
 	JOIN (
             SELECT 
                 c.oid,
-                quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn,
-                ASCII(CASE WHEN am.amname = 'ao_row' THEN 'a' WHEN am.amname = 'ao_column' THEN 'c' ELSE 'unknown' END) as relstorage,
+                pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname)
+				AS aotablefqn,
+                ASCII(CASE WHEN am.amname OPERATOR(pg_catalog.=) 'ao_row'
+				THEN 'a' WHEN am.amname OPERATOR(pg_catalog.=) 'ao_column'
+				THEN 'c' ELSE 'unknown' END) as relstorage,
                 c.relnatts,
                 c.relfilenode,
                 c.reltablespace
-            FROM pg_class c
-                JOIN pg_namespace n ON c.relnamespace = n.oid
-                JOIN pg_am am ON c.relam = am.oid
+            FROM pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n ON c.relnamespace OPERATOR(pg_catalog.=) n.oid
+                JOIN pg_catalog.pg_am am ON c.relam OPERATOR(pg_catalog.=) am.oid
             WHERE
-                am.amname in ('ao_row', 'ao_column') AND relpersistence='p'
-		) aotables ON pg_ao.relid = aotables.oid
-	) seg ON aoseg_c.oid = seg.segrelid;
+                am.amname in ('ao_row', 'ao_column') AND relpersistence OPERATOR(pg_catalog.=) 'p'
+		) aotables ON pg_ao.relid OPERATOR(pg_catalog.=) aotables.oid
+	) seg ON aoseg_c.oid OPERATOR(pg_catalog.=) seg.segrelid;
 `
 
 func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (string, error) {

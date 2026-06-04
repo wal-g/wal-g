@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/stretchr/testify/assert"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -16,7 +19,6 @@ import (
 	"github.com/wal-g/wal-g/testtools"
 	mock_internal "github.com/wal-g/wal-g/testtools/mocks"
 	"github.com/wal-g/wal-g/utility"
-	"go.uber.org/mock/gomock"
 )
 
 func init() {
@@ -190,6 +192,122 @@ func TestFetchMetadata(t *testing.T) {
 	assert.Equal(t, testBackup.FinishTime, empMeta.FinishTime)
 	assert.Equal(t, testBackup.UserData, empMeta.UserData)
 	assert.Equal(t, testBackup, empMeta)
+}
+
+func TestFetchSentinel(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_456"
+	expected := streamSentinelDto{StartLocalTime: time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)}
+	data, err := json.Marshal(expected)
+	assert.NoError(t, err)
+
+	err = folder.PutObject(backupName+utility.SentinelSuffix, bytes.NewReader(data))
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+
+	var actual streamSentinelDto
+	err = backup.FetchSentinel(&actual)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actual)
+}
+
+func TestFetchSentinel_backupFolderIsEmpty(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	backup := internal.Backup{Name: "base_000", Folder: folder}
+
+	var actual streamSentinelDto
+	err := backup.FetchSentinel(&actual)
+
+	assert.Error(t, err)
+}
+
+func TestFetchSentinel_invalidJSON(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	err := folder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader("not a json"))
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+	var actual streamSentinelDto
+	err = backup.FetchSentinel(&actual)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to fetch dto from")
+}
+
+func TestFetchSentinel_emptyFile(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	err := folder.PutObject(backupName+utility.SentinelSuffix, &bytes.Buffer{})
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+	var actual streamSentinelDto
+	err = backup.FetchSentinel(&actual)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to fetch dto from")
+}
+
+func TestFetchSentinel_extraFieldsInJSON(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	expected := streamSentinelDto{StartLocalTime: time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)}
+	raw := map[string]interface{}{
+		"StartLocalTime": expected.StartLocalTime,
+		"UnknownField":   "ignored",
+	}
+	data, err := json.Marshal(raw)
+	assert.NoError(t, err)
+	err = folder.PutObject(backupName+utility.SentinelSuffix, bytes.NewReader(data))
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+	var actual streamSentinelDto
+	err = backup.FetchSentinel(&actual)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, actual)
+}
+
+func TestFetchSentinel_missingFieldsInJSON(t *testing.T) {
+	type partialSentinelDto struct {
+		StartTime time.Time
+		Size      int64
+	}
+
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	err := folder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(`{"StartTime":"2020-06-01T00:00:00Z"}`))
+	assert.NoError(t, err)
+
+	backup := internal.Backup{Name: backupName, Folder: folder}
+	var actual partialSentinelDto
+	err = backup.FetchSentinel(&actual)
+
+	assert.NoError(t, err)
+	assert.Equal(t, time.Date(2020, 6, 1, 0, 0, 0, 0, time.UTC), actual.StartTime)
+	assert.Equal(t, int64(0), actual.Size)
+}
+
+func TestFetchSentinel_sentinelNotFoundForWrongName(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+
+	const backupName = "base_000"
+	expected := streamSentinelDto{StartLocalTime: time.Date(2020, 6, 1, 0, 0, 0, 0, time.UTC)}
+	data, err := json.Marshal(expected)
+	assert.NoError(t, err)
+
+	err = folder.PutObject(backupName+utility.SentinelSuffix, bytes.NewReader(data))
+	assert.NoError(t, err)
+	wrongBackup := internal.Backup{Name: "base_000_wrong", Folder: folder}
+	var actual streamSentinelDto
+	err = wrongBackup.FetchSentinel(&actual)
+	assert.Error(t, err)
 }
 
 func TestUploadSentinel(t *testing.T) {

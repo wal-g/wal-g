@@ -232,8 +232,19 @@ func TestTransferHandler_Handle(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "delete file")
 
-		assert.Equal(t, 100, countFiles(h.target, 100))
+		// 15 deletes succeed before the failing one; fail-fast then aborts,
+		// abandoning queued copies so the target count is racy. The invariant
+		// that must always hold is no file lost: a file leaves the source only
+		// after it lands in the target
 		assert.Equal(t, 85, countFiles(h.source, 100))
+		for i := 0; i < 100; i++ {
+			name := strconv.Itoa(i)
+			inSource, err := h.source.Exists(name)
+			assert.NoError(t, err)
+			inTarget, err := h.target.Exists(name)
+			assert.NoError(t, err)
+			assert.True(t, inSource || inTarget, "file %q lost from both storages", name)
+		}
 	})
 }
 
