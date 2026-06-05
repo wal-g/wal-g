@@ -195,11 +195,11 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 		bh.Workers.Bundle.IncrementFromChkpNum = bh.prevBackupInfo.sentinelDto.BackupStartChkpNum
 	}
 
-	err = bh.startBackup()
+	err = bh.startBackup(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bh.checkDataChecksums()
+	err = bh.checkDataChecksums(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = bh.CheckArchiveCommand()
+	err = bh.CheckArchiveCommand(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if orioledbEnabled {
@@ -208,8 +208,8 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 	err = bh.handleDeltaBackup(folder)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tarFileSets := bh.uploadBackup()
-	sentinelDto, filesMetaDto, err := bh.setupDTO(tarFileSets)
+	tarFileSets := bh.uploadBackup(ctx)
+	sentinelDto, filesMetaDto, err := bh.setupDTO(ctx, tarFileSets)
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.markBackups(folder, sentinelDto)
 	bh.uploadMetadata(ctx, sentinelDto, filesMetaDto)
@@ -229,26 +229,26 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 }
 
-func (bh *BackupHandler) startBackup() error {
+func (bh *BackupHandler) startBackup(ctx context.Context) error {
 	// Connect to postgres and start/finish a nonexclusive backup.
 	tracelog.DebugLogger.Println("Connecting to Postgres.")
-	conn, err := Connect()
+	conn, err := Connect(ctx)
 	if err != nil {
 		return err
 	}
-	bh.Workers.QueryRunner, err = NewPgQueryRunner(conn)
+	bh.Workers.QueryRunner, err = NewPgQueryRunner(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("failed to build query runner: %v", err)
 	}
 
 	// If preventConcurrentBackups is set to true, we need to ensure that no backups are in progress
 	if bh.Arguments.preventConcurrentBackups {
-		err = bh.Workers.QueryRunner.TryGetLock()
+		err = bh.Workers.QueryRunner.TryGetLock(ctx)
 		if err != nil {
 			tracelog.WarningLogger.Println("Failed to get advisory lock")
 			if strings.Contains(err.Error(), "Lock is already taken") {
 				tracelog.WarningLogger.Println("Another process holds backup lock")
-				pid, err1 := bh.Workers.QueryRunner.GetLockingPID()
+				pid, err1 := bh.Workers.QueryRunner.GetLockingPID(ctx)
 				if err1 != nil {
 					return fmt.Errorf("failed to acquire blocking process id: %v", err)
 				}
@@ -260,7 +260,7 @@ func (bh *BackupHandler) startBackup() error {
 				}
 				tracelog.InfoLogger.Printf("Successfully killed process with id %d\n", pid)
 
-				err1 = bh.Workers.QueryRunner.TryGetLock()
+				err1 = bh.Workers.QueryRunner.TryGetLock(ctx)
 				if err1 != nil {
 					return fmt.Errorf("failed to acquire lock: %v", err1)
 				}
@@ -273,13 +273,13 @@ func (bh *BackupHandler) startBackup() error {
 
 	tracelog.DebugLogger.Println("Running StartBackup.")
 	backupName, backupStartLSN, err := bh.Workers.Bundle.StartBackup(
-		bh.Workers.QueryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
+		ctx, bh.Workers.QueryRunner, utility.CeilTimeUpToMicroseconds(time.Now()).String())
 	if err != nil {
 		return err
 	}
 	bh.CurBackupInfo.startLSN = backupStartLSN
 	bh.CurBackupInfo.Name = backupName
-	tracelog.DebugLogger.Printf("Backup name: %s\nBackup start LSN: %s", backupName, backupStartLSN)
+	tracelog.InfoLogger.Printf("Started backup with name %s at LSN %s", backupName, backupStartLSN)
 	bh.initBackupTerminator()
 	return nil
 }
@@ -320,7 +320,7 @@ func (bh *BackupHandler) handleDeltaBackup(folder storage.Folder) error {
 	return nil
 }
 
-func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto,
+func (bh *BackupHandler) setupDTO(ctx context.Context, tarFileSets internal.TarFileSets) (sentinelDto BackupSentinelDto,
 	filesMeta FilesMetadataDto, err error) {
 	var tablespaceSpec *TablespaceSpec
 	if !bh.Workers.Bundle.TablespaceSpec.empty() {
@@ -330,7 +330,7 @@ func (bh *BackupHandler) setupDTO(tarFileSets internal.TarFileSets) (sentinelDto
 	filesMeta.setFiles(bh.Workers.Bundle.GetFiles())
 	filesMeta.TarFileSets = tarFileSets.Get()
 	if !(viper.GetBool(conf.DisablePartialRestore)) {
-		filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata()
+		filesMeta.DatabasesByNames, err = bh.collectDatabaseNamesMetadata(ctx)
 	}
 	return sentinelDto, filesMeta, err
 }
@@ -360,7 +360,7 @@ func configureTarBallComposer(bh *BackupHandler, tarBallComposerType TarBallComp
 	return bh.Workers.Bundle.SetupComposer(maker)
 }
 
-func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
+func (bh *BackupHandler) uploadBackup(ctx context.Context) internal.TarFileSets {
 	bundle := bh.Workers.Bundle
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
 	tracelog.InfoLogger.Println("Starting a new tar bundle")
@@ -389,7 +389,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	// Stops backup and write/upload postgres `backup_label` and `tablespace_map` Files
 	tracelog.DebugLogger.Println("Stop backup and upload backup_label and tablespace_map")
 	labelFilesTarBallName, labelFilesList, finishLsn, err := bundle.uploadLabelFiles(
-		bh.Workers.QueryRunner,
+		ctx, bh.Workers.QueryRunner,
 		bh.Arguments.Uploader.Compression().FileExtension())
 	tracelog.ErrorLogger.FatalOnError(err)
 	bh.CurBackupInfo.endLSN = finishLsn
@@ -398,7 +398,7 @@ func (bh *BackupHandler) uploadBackup() internal.TarFileSets {
 	bh.CurBackupInfo.dataCatalogSize = bundle.DataCatalogSize.Load()
 	tracelog.ErrorLogger.FatalOnError(err)
 	tarFileSets.AddFiles(labelFilesTarBallName, labelFilesList)
-	timelineChanged := bundle.checkTimelineChanged(bh.Workers.QueryRunner)
+	timelineChanged := bundle.checkTimelineChanged(ctx, bh.Workers.QueryRunner)
 	tracelog.DebugLogger.Printf("Labelfiles tarball name: %s", labelFilesTarBallName)
 	tracelog.DebugLogger.Printf("Number of label files: %d", len(labelFilesList))
 	tracelog.DebugLogger.Printf("Finish LSN: %s", bh.CurBackupInfo.endLSN)
@@ -523,14 +523,14 @@ func (bh *BackupHandler) uploadMetadata(ctx context.Context, sentinelDto BackupS
 	}
 }
 
-func (bh *BackupHandler) collectDatabaseNamesMetadata() (DatabasesByNames, error) {
+func (bh *BackupHandler) collectDatabaseNamesMetadata(ctx context.Context) (DatabasesByNames, error) {
 	databases := make(DatabasesByNames)
-	err := bh.Workers.QueryRunner.ForEachDatabase(
+	err := bh.Workers.QueryRunner.ForEachDatabase(ctx,
 		func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
 			var err error
 			info := NewDatabaseObjectsInfo(uint32(db.Oid))
 
-			info.Tables, err = currentRunner.getTables()
+			info.Tables, err = currentRunner.getTables(ctx)
 			if err != nil {
 				return err
 			}
@@ -605,38 +605,40 @@ func (bh *BackupHandler) runRemoteBackup(ctx context.Context) *StreamingBaseBack
 func GetPgServerInfo(keepRunner bool) (pgInfo BackupPgInfo, runner *PgQueryRunner, err error) {
 	// Creating a temporary connection to read slot info and wal_segment_size
 	tracelog.DebugLogger.Println("Initializing tmp connection to read Postgres info")
-	tmpConn, err := Connect()
+	// No request ctx plumbed to this entry point yet; revisit when callers thread ctx.
+	ctx := context.Background()
+	tmpConn, err := Connect(ctx)
 	if err != nil {
 		return pgInfo, nil, err
 	}
 
-	queryRunner, err := NewPgQueryRunner(tmpConn)
+	queryRunner, err := NewPgQueryRunner(ctx, tmpConn)
 	if err != nil {
 		return pgInfo, nil, err
 	}
 
-	pgInfo.PgDataDirectory, err = queryRunner.GetDataDir()
+	pgInfo.PgDataDirectory, err = queryRunner.GetDataDir(ctx)
 	if err != nil {
 		return pgInfo, nil, err
 	}
 	pgInfo.PgDataDirectory = utility.ResolveSymlink(pgInfo.PgDataDirectory)
 	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.PgDataDirectory)
 
-	err = queryRunner.getVersion()
+	err = queryRunner.getVersion(ctx)
 	if err != nil {
 		return pgInfo, nil, err
 	}
 	pgInfo.PgVersion = queryRunner.Version
 	tracelog.DebugLogger.Printf("Postgres version: %d", queryRunner.Version)
 
-	err = queryRunner.getSystemIdentifier()
+	err = queryRunner.getSystemIdentifier(ctx)
 	if err != nil {
 		return pgInfo, nil, err
 	}
 	pgInfo.systemIdentifier = queryRunner.SystemIdentifier
 	tracelog.DebugLogger.Printf("Postgres SystemIdentifier: %d", queryRunner.Version)
 
-	pgInfo.Timeline, err = queryRunner.ReadTimeline()
+	pgInfo.Timeline, err = queryRunner.ReadTimeline(ctx)
 	if err != nil {
 		return pgInfo, nil, err
 	}
@@ -695,11 +697,11 @@ func (bh *BackupHandler) initBackupTerminator() {
 	}()
 }
 
-func (bh *BackupHandler) checkDataChecksums() error {
+func (bh *BackupHandler) checkDataChecksums(ctx context.Context) error {
 	if bh.Arguments.verifyPageChecksums {
 		tracelog.DebugLogger.Println("checkDataChecksums: Checking data_checksums setting.")
 
-		dataChecksums, err := bh.Workers.QueryRunner.GetDataChecksums()
+		dataChecksums, err := bh.Workers.QueryRunner.GetDataChecksums(ctx)
 		if err != nil {
 			return err
 		}
@@ -723,9 +725,9 @@ func (bh *BackupHandler) checkDataChecksums() error {
 }
 
 // CheckArchiveCommand verifies the archive_mode and archive_command settings.
-func (bh *BackupHandler) CheckArchiveCommand() error {
+func (bh *BackupHandler) CheckArchiveCommand(ctx context.Context) error {
 	// Check if the server is in recovery mode (standby)
-	standby, err := bh.Workers.QueryRunner.IsStandby()
+	standby, err := bh.Workers.QueryRunner.IsStandby(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to determine standby mode: %v", err)
 		return err
@@ -738,7 +740,7 @@ func (bh *BackupHandler) CheckArchiveCommand() error {
 	}
 
 	// Retrieve the current archive_mode setting
-	archiveMode, err := bh.Workers.QueryRunner.GetArchiveMode()
+	archiveMode, err := bh.Workers.QueryRunner.GetArchiveMode(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_mode: %v", err)
 		return err
@@ -751,7 +753,7 @@ func (bh *BackupHandler) CheckArchiveCommand() error {
 				"Please consider configuring WAL archiving.")
 	} else {
 		// Retrieve the current archive_command setting
-		archiveCommand, err := bh.Workers.QueryRunner.GetArchiveCommand()
+		archiveCommand, err := bh.Workers.QueryRunner.GetArchiveCommand(ctx)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("CheckArchiveCommand: failed to get archive_command: %v", err)
 			return err

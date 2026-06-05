@@ -156,22 +156,24 @@ func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) 
 	slotName := internal.GetPgSlotName()
 
 	// Creating a temporary connection to read slot info and wal_segment_size
-	tmpConn, err := Connect()
+	// No request ctx plumbed to this entry point yet; revisit when callers thread ctx.
+	ctx := context.Background()
+	tmpConn, err := Connect(ctx)
 	if err != nil {
 		return
 	}
-	defer tmpConn.Close(context.TODO())
+	defer tmpConn.Close(ctx)
 
-	queryRunner, err := NewPgQueryRunner(tmpConn)
-	if err != nil {
-		return
-	}
-
-	slot, err = queryRunner.GetPhysicalSlotInfo(slotName)
+	queryRunner, err := NewPgQueryRunner(ctx, tmpConn)
 	if err != nil {
 		return
 	}
 
-	walSegmentBytes, err = queryRunner.GetWalSegmentBytes()
+	slot, err = queryRunner.GetPhysicalSlotInfo(ctx, slotName)
+	if err != nil {
+		return
+	}
+
+	walSegmentBytes, err = queryRunner.GetWalSegmentBytes(ctx)
 	return
 }

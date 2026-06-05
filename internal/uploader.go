@@ -160,7 +160,7 @@ func (uploader *RegularUploader) uploadFile(ctx context.Context, file ioextensio
 
 	dstPath := utility.SanitizePath(filename)
 	if !isExactPath {
-		dstPath = utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
+		dstPath = utility.SanitizePath(utility.AddFileExtension(filepath.Base(filename), uploader.Compressor.FileExtension()))
 	}
 
 	err := uploader.Upload(ctx, dstPath, compressedFile)

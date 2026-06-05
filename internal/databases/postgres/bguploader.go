@@ -109,8 +109,9 @@ func (b *BgUploader) Start() {
 func (b *BgUploader) Stop() error {
 	// Send signal to stop scanning for and uploading new files
 	b.cancelFunc()
-	// Wait for all running uploads
-	return b.workerCountSem.Acquire(context.TODO(), int64(b.maxParallelWorkers))
+	// Wait for all running uploads. b.ctx is canceled above, so drain with an
+	// uncanceled context else Acquire returns immediately instead of waiting.
+	return b.workerCountSem.Acquire(context.Background(), int64(b.maxParallelWorkers))
 }
 
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It

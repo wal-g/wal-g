@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -85,8 +86,8 @@ func SetWalSize(sizeMb uint64) {
 }
 
 // getWalFilename formats WAL file name using PostgreSQL connection. Essentially reads timeline of the server.
-func getWalFilename(lsn LSN, queryRunner *PgQueryRunner) (walFilename string, timeline uint32, err error) {
-	timeline, err = queryRunner.ReadTimeline()
+func getWalFilename(ctx context.Context, lsn LSN, queryRunner *PgQueryRunner) (walFilename string, timeline uint32, err error) {
+	timeline, err = queryRunner.ReadTimeline(ctx)
 	if err != nil {
 		return "", 0, err
 	}

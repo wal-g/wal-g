@@ -29,8 +29,8 @@ type aoRelPgClassInfo struct {
 }
 
 // NewGpQueryRunner builds QueryRunner from available connection
-func NewGpQueryRunner(conn *pgx.Conn) (*GpQueryRunner, error) {
-	pgQueryRunner, err := postgres.NewPgQueryRunner(conn)
+func NewGpQueryRunner(ctx context.Context, conn *pgx.Conn) (*GpQueryRunner, error) {
+	pgQueryRunner, err := postgres.NewPgQueryRunner(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -48,9 +48,10 @@ func (queryRunner *GpQueryRunner) buildCreateGreenplumRestorePoint(restorePointN
 }
 
 // CreateGreenplumRestorePoint creates a restore point
-func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(restorePointName string) (restoreLSNs map[int]string, err error) {
+func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(ctx context.Context,
+	restorePointName string) (restoreLSNs map[int]string, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(context.TODO(), queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
+	rows, err := conn.Query(ctx, queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
 	if err != nil {
 		return nil, err
 	}
@@ -86,14 +87,14 @@ const getGreenplumSegmentsInfoQuery = `SELECT
 	port,
 	hostname,
 	datadir
-FROM gp_segment_configuration
-WHERE role = 'p'
+FROM pg_catalog.gp_segment_configuration
+WHERE role OPERATOR(pg_catalog.=) 'p'
 ORDER BY content, role DESC;`
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo() (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) (segments []cluster.SegConfig, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(context.TODO(), getGreenplumSegmentsInfoQuery)
+	rows, err := conn.Query(ctx, getGreenplumSegmentsInfoQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -127,9 +128,9 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo() (segments []cluster
 }
 
 // GetGreenplumVersion returns version
-func (queryRunner *GpQueryRunner) GetGreenplumVersion() (version string, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumVersion(ctx context.Context) (version string, err error) {
 	conn := queryRunner.Connection
-	err = conn.QueryRow(context.TODO(), "SELECT pg_catalog.version()").Scan(&version)
+	err = conn.QueryRow(ctx, "SELECT pg_catalog.version()").Scan(&version)
 	if err != nil {
 		return "", err
 	}
@@ -139,17 +140,17 @@ func (queryRunner *GpQueryRunner) GetGreenplumVersion() (version string, err err
 // BuildIsInBackup formats a query to retrieve information about running backups
 func (queryRunner *GpQueryRunner) buildIsInBackup() string {
 	return `
-SELECT pg_is_in_backup(), gp_segment_id FROM gp_dist_random('gp_id')
+SELECT pg_catalog.pg_is_in_backup(), gp_segment_id FROM gp_dist_random('gp_id')
 UNION ALL
-SELECT pg_is_in_backup(), -1;
+SELECT pg_catalog.pg_is_in_backup(), -1;
 `
 }
 
 // TryGetLock tries to take advisory lock
-func (queryRunner *GpQueryRunner) TryGetLock() (err error) {
+func (queryRunner *GpQueryRunner) TryGetLock(ctx context.Context) (err error) {
 	conn := queryRunner.Connection
 	var lockFree bool
-	err = conn.QueryRow(context.TODO(), "SELECT pg_try_advisory_lock(hashtext('gp_backup'))").Scan(&lockFree)
+	err = conn.QueryRow(ctx, "SELECT pg_catalog.pg_try_advisory_lock(pg_catalog.hashtext('gp_backup'))").Scan(&lockFree)
 	if err != nil {
 		return err
 	}
@@ -162,19 +163,19 @@ func (queryRunner *GpQueryRunner) TryGetLock() (err error) {
 
 // buildAbortBackupSegments aborts the running backup on the segments
 func (queryRunner *GpQueryRunner) buildAbortBackupSegments() string {
-	return `SELECT pg_stop_backup(), gp_segment_id FROM gp_dist_random('gp_id');`
+	return `SELECT pg_catalog.pg_stop_backup(), gp_segment_id FROM gp_dist_random('gp_id');`
 }
 
 // buildAbortBackupSegments aborts the running backup on the master instance
 func (queryRunner *GpQueryRunner) buildAbortBackupMaster() string {
-	return `SELECT pg_stop_backup();`
+	return `SELECT pg_catalog.pg_stop_backup();`
 }
 
 // IsInBackup check if there is backup running
-func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bool, err error) {
+func (queryRunner *GpQueryRunner) IsInBackup(ctx context.Context) (isInBackupByContentID map[int]bool, err error) {
 	conn := queryRunner.Connection
 
-	rows, err := conn.Query(context.TODO(), queryRunner.buildIsInBackup())
+	rows, err := conn.Query(ctx, queryRunner.buildIsInBackup())
 	if err != nil {
 		return nil, errors.Wrap(err, "QueryRunner IsInBackup: query failed")
 	}
@@ -198,23 +199,26 @@ func (queryRunner *GpQueryRunner) IsInBackup() (isInBackupByContentID map[int]bo
 }
 
 // AbortBackup stops the backup process on all segments
-func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
+func (queryRunner *GpQueryRunner) AbortBackup(ctx context.Context) (err error) {
 	tracelog.InfoLogger.Println("Calling pg_stop_backup() on all segments...")
 	conn := queryRunner.Connection
 
+	// Cleanup must not be cancellable: a signal must not strand segments mid-abort.
+	cleanupCtx := context.WithoutCancel(ctx)
+
 	errs := make([]error, 0)
-	_, err = conn.Exec(context.TODO(), "SET statement_timeout=0;")
+	_, err = conn.Exec(cleanupCtx, "SET statement_timeout=0;")
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner AbortBackup: failed setting statement timeout in transaction"))
 	}
 
-	_, err = conn.Exec(context.TODO(), queryRunner.buildAbortBackupSegments())
+	_, err = conn.Exec(cleanupCtx, queryRunner.buildAbortBackupSegments())
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: segment backups stop error"))
 	}
 	tracelog.DebugLogger.Println("Stopped backups on segments")
 
-	_, err = conn.Exec(context.TODO(), queryRunner.buildAbortBackupMaster())
+	_, err = conn.Exec(cleanupCtx, queryRunner.buildAbortBackupMaster())
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "QueryRunner IsInBackup: master backup stop error"))
 	}
@@ -229,18 +233,19 @@ func (queryRunner *GpQueryRunner) AbortBackup() (err error) {
 }
 
 // FetchAOStorageMetadata queries the storage metadata for AO & AOCS tables (GreenplumDB)
-func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatabaseInfo) (AoRelFileStorageMap, error) {
+func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(ctx context.Context,
+	dbInfo postgres.PgDatabaseInfo) (AoRelFileStorageMap, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
 	tracelog.InfoLogger.Printf("Querying pg_class for %s", dbInfo.Name)
-	getStatQuery, err := queryRunner.buildAORelPgClassQuery()
+	getStatQuery, err := queryRunner.buildAORelPgClassQuery(ctx)
 	conn := queryRunner.Connection
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to build the pg_class query")
 	}
 
-	rows, err := conn.Query(context.TODO(), getStatQuery)
+	rows, err := conn.Query(ctx, getStatQuery)
 	if err != nil {
 		return nil, errors.Wrap(err, "pg_class query failed")
 	}
@@ -284,7 +289,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatab
 					return nil, err
 				}
 
-				return conn.Query(context.TODO(), query)
+				return conn.Query(ctx, query)
 			}
 		case ColumnOriented:
 			queryFunc = func() (pgx.Rows, error) {
@@ -293,7 +298,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(dbInfo postgres.PgDatab
 					return nil, err
 				}
 
-				return conn.Query(context.TODO(), query, row.oid)
+				return conn.Query(ctx, query, row.oid)
 			}
 		default:
 			tracelog.WarningLogger.Printf("Unexpected relation storage type %c for relfilenode %d in database %s",
@@ -347,57 +352,63 @@ func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDa
 }
 
 const gpAoRelationPgClassQuery = `
-SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
+SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn),
+	'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
-FROM pg_class aoseg_c
+FROM pg_catalog.pg_class aoseg_c
 JOIN (
 	SELECT pg_ao.relid AS aooid, pg_ao.segrelid, 
 			aotables.aotablefqn, aotables.relstorage, 
 			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
-	FROM pg_appendonly pg_ao
+	FROM pg_catalog.pg_appendonly pg_ao
 	JOIN (
 		SELECT
 		    c.oid,
-		    quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn, 
+		    pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname)
+			AS aotablefqn, 
 			c.relstorage,
 			c.relnatts,
 			c.relfilenode,
 			c.reltablespace 
-		FROM pg_class c
-		JOIN pg_namespace n ON c.relnamespace = n.oid
-		WHERE relstorage IN ( 'a', 'c' ) AND relpersistence='p'
-		) aotables ON pg_ao.relid = aotables.oid
-	) seg ON aoseg_c.oid = seg.segrelid;
+		FROM pg_catalog.pg_class c
+		JOIN pg_catalog.pg_namespace n ON c.relnamespace OPERATOR(pg_catalog.=) n.oid
+		WHERE relstorage IN ( 'a', 'c' ) AND relpersistence OPERATOR(pg_catalog.=) 'p'
+		) aotables ON pg_ao.relid OPERATOR(pg_catalog.=) aotables.oid
+	) seg ON aoseg_c.oid OPERATOR(pg_catalog.=) seg.segrelid;
 `
 
 const cbAoRelationPgClassQuery = `
-SELECT seg.aooid, md5(seg.aotablefqn), 'pg_aoseg.' || quote_ident(aoseg_c.relname) AS aosegtablefqn,
+SELECT seg.aooid, pg_catalog.md5(seg.aotablefqn),
+	'pg_aoseg.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(aoseg_c.relname) AS aosegtablefqn,
 	seg.relfilenode, seg.reltablespace, seg.relstorage, seg.relnatts 
-FROM pg_class aoseg_c
+FROM pg_catalog.pg_class aoseg_c
 JOIN (
 	SELECT pg_ao.relid AS aooid, pg_ao.segrelid, 
 			aotables.aotablefqn, aotables.relstorage, 
 			aotables.relnatts, aotables.relfilenode, aotables.reltablespace
-	FROM pg_appendonly pg_ao
+	FROM pg_catalog.pg_appendonly pg_ao
 	JOIN (
             SELECT 
                 c.oid,
-                quote_ident(n.nspname)|| '.' || quote_ident(c.relname) AS aotablefqn,
-                ASCII(CASE WHEN am.amname = 'ao_row' THEN 'a' WHEN am.amname = 'ao_column' THEN 'c' ELSE 'unknown' END) as relstorage,
+                pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(c.relname)
+				AS aotablefqn,
+                ASCII(CASE WHEN am.amname OPERATOR(pg_catalog.=) 'ao_row'
+				THEN 'a' WHEN am.amname OPERATOR(pg_catalog.=) 'ao_column'
+				THEN 'c' ELSE 'unknown' END) as relstorage,
                 c.relnatts,
                 c.relfilenode,
                 c.reltablespace
-            FROM pg_class c
-                JOIN pg_namespace n ON c.relnamespace = n.oid
-                JOIN pg_am am ON c.relam = am.oid
+            FROM pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n ON c.relnamespace OPERATOR(pg_catalog.=) n.oid
+                JOIN pg_catalog.pg_am am ON c.relam OPERATOR(pg_catalog.=) am.oid
             WHERE
-                am.amname in ('ao_row', 'ao_column') AND relpersistence='p'
-		) aotables ON pg_ao.relid = aotables.oid
-	) seg ON aoseg_c.oid = seg.segrelid;
+                am.amname in ('ao_row', 'ao_column') AND relpersistence OPERATOR(pg_catalog.=) 'p'
+		) aotables ON pg_ao.relid OPERATOR(pg_catalog.=) aotables.oid
+	) seg ON aoseg_c.oid OPERATOR(pg_catalog.=) seg.segrelid;
 `
 
-func (queryRunner *GpQueryRunner) buildAORelPgClassQuery() (string, error) {
-	versionStr, err := queryRunner.GetGreenplumVersion()
+func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (string, error) {
+	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return "", err
 	}

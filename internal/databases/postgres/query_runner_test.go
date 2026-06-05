@@ -20,19 +20,19 @@ func TestBuildStartBackup(t *testing.T) {
 
 	queryBuilder.Version = 90321
 	queryString, err := queryBuilder.BuildStartBackup()
-	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true) lsn", queryString)
+	assert.Equal(t, "SELECT case when pg_catalog.pg_is_in_recovery() then '' else (pg_catalog.pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery() FROM pg_catalog.pg_start_backup($1, true) lsn", queryString)
 
 	queryBuilder.Version = 90600
 	queryString, err = queryBuilder.BuildStartBackup()
-	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", queryString)
+	assert.Equal(t, "SELECT case when pg_catalog.pg_is_in_recovery() then '' else (pg_catalog.pg_xlogfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery() FROM pg_catalog.pg_start_backup($1, true, false) lsn", queryString)
 
 	queryBuilder.Version = 100000
 	queryString, err = queryBuilder.BuildStartBackup()
-	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_start_backup($1, true, false) lsn", queryString)
+	assert.Equal(t, "SELECT case when pg_catalog.pg_is_in_recovery() then '' else (pg_catalog.pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery() FROM pg_catalog.pg_start_backup($1, true, false) lsn", queryString)
 
 	queryBuilder.Version = 150000
 	queryString, err = queryBuilder.BuildStartBackup()
-	assert.Equal(t, "SELECT case when pg_is_in_recovery() then '' else (pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_is_in_recovery() FROM pg_backup_start($1, true) lsn", queryString)
+	assert.Equal(t, "SELECT case when pg_catalog.pg_is_in_recovery() then '' else (pg_catalog.pg_walfile_name_offset(lsn)).file_name end, lsn::text, pg_catalog.pg_is_in_recovery() FROM pg_catalog.pg_backup_start($1, true) lsn", queryString)
 }
 
 // Tests building stop backup query
@@ -47,19 +47,19 @@ func TestBuildStopBackup(t *testing.T) {
 
 	queryBuilder.Version = 90321
 	queryString, err := queryBuilder.BuildStopBackup()
-	assert.Equal(t, "SELECT (pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_stop_backup() lsn", queryString)
+	assert.Equal(t, "SELECT (pg_catalog.pg_xlogfile_name_offset(lsn)).file_name, lpad((pg_catalog.pg_xlogfile_name_offset(lsn)).file_offset::text, 8, '0') AS file_offset, lsn::text FROM pg_catalog.pg_stop_backup() lsn", queryString)
 
 	queryBuilder.Version = 90600
 	queryString, err = queryBuilder.BuildStopBackup()
-	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", queryString)
+	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_stop_backup(false)", queryString)
 
 	queryBuilder.Version = 100000
 	queryString, err = queryBuilder.BuildStopBackup()
-	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_stop_backup(false)", queryString)
+	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_stop_backup(false)", queryString)
 
 	queryBuilder.Version = 150000
 	queryString, err = queryBuilder.BuildStopBackup()
-	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_backup_stop()", queryString)
+	assert.Equal(t, "SELECT labelfile, spcmapfile, lsn FROM pg_catalog.pg_backup_stop()", queryString)
 }
 
 func TestIsTablespaceMapExists(t *testing.T) {

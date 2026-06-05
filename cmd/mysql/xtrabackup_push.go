@@ -58,6 +58,7 @@ var (
 			}
 
 			mysql.HandleBackupPush(
+				cmd.Context(),
 				folder,
 				uploader,
 				backupCmd,

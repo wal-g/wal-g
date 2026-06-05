@@ -46,7 +46,7 @@ func TestStorageUploader_UploadOplogArchive_ProperInterfaces(t *testing.T) {
 
 	firstTS := models.Timestamp{TS: 100, Inc: 1}
 	lastTS := models.Timestamp{TS: 120, Inc: 1}
-	if err := su.UploadOplogArchive(context.Background(), r, firstTS, lastTS); err != nil {
+	if err := su.UploadOplogArchive(t.Context(), r, firstTS, lastTS); err != nil {
 		t.Errorf("UploadOplogArchive() error = %v", err)
 	}
 }

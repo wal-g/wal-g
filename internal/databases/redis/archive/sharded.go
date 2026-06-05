@@ -31,7 +31,7 @@ func GetSlotsCompressedFileName(backupName string) (string, error) {
 		return "", err
 	}
 
-	fileName := fmt.Sprintf("%s.%s", SlotsFileName, upl.Compression().FileExtension())
+	fileName := utility.AddFileExtension(SlotsFileName, upl.Compression().FileExtension())
 	return filepath.Join(backupName, fileName), nil
 }
 

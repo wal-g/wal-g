@@ -19,13 +19,13 @@ type StreamSentinelDto struct {
 }
 
 // HandleBackupPush starts backup procedure.
-func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd, permanent bool, userDataRaw string) {
+func HandleBackupPush(ctx context.Context, uploader internal.Uploader, backupCmd *exec.Cmd, permanent bool, userDataRaw string) {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	fileName, err := uploader.PushStream(context.Background(), stdout)
+	fileName, err := uploader.PushStream(ctx, stdout)
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()

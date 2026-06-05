@@ -105,14 +105,15 @@ func (uploader *RegularUploader) PushStreamToDestination(ctx context.Context, st
 }
 
 func GetStreamName(backupName string, extension string) string {
-	return utility.SanitizePath(path.Join(backupName, "stream.")) + extension
+	return utility.AddFileExtension(utility.SanitizePath(path.Join(backupName, "stream")), extension)
 }
 
 func GetPartitionedStreamName(backupName string, extension string, partIdx int) string {
-	return fmt.Sprintf("%s_%04d.%s", utility.SanitizePath(path.Join(backupName, "part")), partIdx, extension)
+	return utility.AddFileExtension(
+		fmt.Sprintf("%s_%04d", utility.SanitizePath(path.Join(backupName, "part")), partIdx), extension)
 }
 
 func GetPartitionedSteamMultipartName(backupName string, extension string, partIdx int, fileNumber int) string {
-	return fmt.Sprintf("%s_%04d_%04d.%s", utility.SanitizePath(path.Join(backupName, "part")),
-		partIdx, fileNumber, extension)
+	return utility.AddFileExtension(
+		fmt.Sprintf("%s_%04d_%04d", utility.SanitizePath(path.Join(backupName, "part")), partIdx, fileNumber), extension)
 }

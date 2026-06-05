@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"strings"
 	"testing"
@@ -85,7 +84,7 @@ func TestUpload(t *testing.T) {
 
 	uploader := internal.NewRegularUploader(compressor, folder)
 
-	err := uploader.Upload(context.Background(), "", reader)
+	err := uploader.Upload(t.Context(), "", reader)
 
 	assert.NoError(t, err)
 
@@ -108,11 +107,11 @@ func TestUploadMock(t *testing.T) {
 	folder.EXPECT().PutObjectWithContext(gomock.Any(), "some/path", gomock.Any()).Return(nil)
 	folder.EXPECT().PutObjectWithContext(gomock.Any(), "path/to/incorrect/file", gomock.Any()).Return(errors.New("some error"))
 
-	uploadWithoutErr := uploader.Upload(context.Background(), "some/path", reader)
+	uploadWithoutErr := uploader.Upload(t.Context(), "some/path", reader)
 
 	assert.NoError(t, uploadWithoutErr)
 
-	uploadWithErr := uploader.Upload(context.Background(), "path/to/incorrect/file", reader)
+	uploadWithErr := uploader.Upload(t.Context(), "path/to/incorrect/file", reader)
 
 	assert.Error(t, uploadWithErr)
 }
