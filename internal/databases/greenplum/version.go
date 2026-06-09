@@ -33,7 +33,7 @@ func NewVersion(v *version.Version, flavor Flavor) Version {
 }
 
 func parseGreenplumVersion(versionStr string) (Version, error) {
-	pattern := regexp.MustCompile(`(Greenplum Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
+	pattern := regexp.MustCompile(`(Greenplum Database|Greengage Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
 	groups := pattern.FindStringSubmatch(versionStr)
 	if groups == nil {
 		return Version{}, fmt.Errorf("unknown flavor: %s", versionStr)
@@ -46,6 +46,8 @@ func parseGreenplumVersion(versionStr string) (Version, error) {
 	var flavor Flavor
 	switch groups[1] {
 	case "Greenplum Database":
+		flavor = Greenplum
+	case "Greengage Database":
 		flavor = Greenplum
 	case "Cloudberry Database":
 		flavor = Cloudberry
