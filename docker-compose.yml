@@ -39,6 +39,13 @@ services:
     image: wal-g/ubuntu:22.04
     container_name: wal-g_ubuntu_22_04
 
+  base:
+    build:
+      dockerfile: ./docker/base/Dockerfile
+      context: .
+    image: wal-g/base
+    container_name: wal-g_base
+
   swift:
     image: openstackswift/saio:py3
     container_name: wal-g_swift
