@@ -77,8 +77,7 @@ func parseInfoLine(line, name string) (i int64) {
 	return
 }
 
-func (m *ServerDataGetter) fillMemoryData(res *ServerData) {
-	ctx := context.Background()
+func (m *ServerDataGetter) fillMemoryData(ctx context.Context, res *ServerData) {
 	data, err := m.conn.Info(ctx, "memory").Result()
 	if err != nil {
 		tracelog.InfoLogger.Printf("memory info getting failed: %v", err)
@@ -110,8 +109,7 @@ func parseInfoLineNumberedName(line, name string) (i int64) {
 	return
 }
 
-func (m *ServerDataGetter) fillMaxDBNumData(res *ServerData) {
-	ctx := context.Background()
+func (m *ServerDataGetter) fillMaxDBNumData(ctx context.Context, res *ServerData) {
 	data, err := m.conn.Info(ctx, "keyspace").Result()
 	if err != nil {
 		tracelog.InfoLogger.Printf("keyspace info getting failed: %v", err)
@@ -126,9 +124,9 @@ func (m *ServerDataGetter) fillMaxDBNumData(res *ServerData) {
 	}
 }
 
-func (m *ServerDataGetter) Get() (res *ServerData) {
+func (m *ServerDataGetter) Get(ctx context.Context) (res *ServerData) {
 	res = &ServerData{}
-	m.fillMemoryData(res)
-	m.fillMaxDBNumData(res)
+	m.fillMemoryData(ctx, res)
+	m.fillMaxDBNumData(ctx, res)
 	return
 }

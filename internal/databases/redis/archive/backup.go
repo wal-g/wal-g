@@ -194,7 +194,7 @@ func (m *RedisMetaConstructor) Init() error {
 	if err != nil {
 		return err
 	}
-	serverData := m.serverDataGetter.Get()
+	serverData := m.serverDataGetter.Get(m.ctx)
 	m.meta = BackupMeta{
 		Permanent:     m.permanent,
 		User:          userData,

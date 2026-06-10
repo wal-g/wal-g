@@ -132,7 +132,7 @@ func (bs *BackupService) DoBackup(args DoBackupArgs) error {
 		Sharded:    args.Sharded,
 		Uploader:   bs.concurrentUploader,
 	}
-	err = archive.FillSlotsForSharded(context.Background(), fillArgs)
+	err = archive.FillSlotsForSharded(bs.Context, fillArgs)
 	if err != nil {
 		return err
 	}
