@@ -1,0 +1,30 @@
+#!/bin/sh
+# Oracle mysql debs for Debian ship systemd units only, no sysv script;
+# tests drive mysqld via service(8). --daemonize returns once server is ready
+
+PIDFILE=/var/run/mysqld/mysqld.pid
+
+case "$1" in
+    start)
+        install -d -o mysql -g mysql /var/run/mysqld
+        exec mysqld --daemonize --pid-file="$PIDFILE"
+        ;;
+    stop)
+        [ -f "$PIDFILE" ] || exit 0
+        pid=$(cat "$PIDFILE")
+        kill "$pid" 2>/dev/null || exit 0
+        for _ in $(seq 1 120); do
+            kill -0 "$pid" 2>/dev/null || exit 0
+            sleep 1
+        done
+        echo "mysqld pid $pid did not exit" >&2
+        exit 1
+        ;;
+    restart)
+        "$0" stop && exec "$0" start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}" >&2
+        exit 2
+        ;;
+esac

@@ -266,9 +266,7 @@ services:
       dockerfile: docker/pg/Dockerfile
       context: .
       args:
-        UBUNTU_TAG: "22.04"
         PG_MAJOR: "18"
-        USE_PGDG: "1"
         INSTALL_WALE: "0"
     image: wal-g/pg18
     container_name: wal-g_pg18
@@ -662,13 +660,6 @@ services:
     command: /tmp/run_integration_tests.sh
     <<: *s3_common_depends
 
-  mysql:
-    build:
-      dockerfile: docker/mysql/Dockerfile
-      context: .
-    image: wal-g/mysql
-    container_name: wal-g_mysql
-
   mysql8:
     build:
       dockerfile: docker/mysql/Dockerfile_v8
@@ -794,8 +785,6 @@ services:
       context: .
     image: wal-g/etcd
     container_name: wal-g_etcd
-    environment:
-      - ALLOW_NONE_AUTHENTICATION=yes
 
   etcd_tests:
     build:
@@ -803,8 +792,6 @@ services:
       context: .
     image: wal-g/etcd_tests
     container_name: wal-g_etcd_tests
-    depends_on:
-      - etcd
 
   gp:
     build:

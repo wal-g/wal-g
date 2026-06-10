@@ -1,4 +1,4 @@
-FROM wal-g/ubuntu:22.04
+FROM wal-g/base
 
 RUN apt-get update && \
     # required: \

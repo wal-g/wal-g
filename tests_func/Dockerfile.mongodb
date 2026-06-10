@@ -13,7 +13,7 @@ RUN make ENABLE_RACE_DETECTION=1 link_external_deps mongo_build
 
 ###
 
-FROM ubuntu:focal
+FROM ubuntu:jammy
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/mongo/wal-g /usr/bin/wal-g
 
@@ -32,8 +32,8 @@ ENV MONGO_MAJOR=${MONGO_VERSION%.*}
 RUN apt-get update -q && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
     supervisor ca-certificates libsasl2-modules-gssapi-mit snmp wget gnupg curl tzdata && \
-    echo "deb http://$MONGO_REPO/apt/ubuntu focal/${MONGO_PACKAGE}/${MONGO_MAJOR} multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
-    wget -qO - https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc | apt-key add - && \
+    wget -qO /usr/share/keyrings/mongodb-server-${MONGO_MAJOR}.asc https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc && \
+    echo "deb [signed-by=/usr/share/keyrings/mongodb-server-${MONGO_MAJOR}.asc] http://$MONGO_REPO/apt/ubuntu jammy/${MONGO_PACKAGE}/${MONGO_MAJOR} multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
     apt-get update -q && \
     apt-get download --allow-unauthenticated ${MONGO_PACKAGE}-server=$MONGO_VERSION && \
     dpkg --unpack ${MONGO_PACKAGE}-server*.deb && \

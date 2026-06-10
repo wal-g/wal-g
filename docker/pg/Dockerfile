@@ -1,8 +1,7 @@
-ARG UBUNTU_TAG=18.04
-FROM wal-g/ubuntu:${UBUNTU_TAG}
+FROM wal-g/base
 
 ARG PG_MAJOR=10
-ARG USE_PGDG=0
+ARG USE_PGDG=1
 ARG INSTALL_WALE=1
 
 ENV PG_MAJOR=${PG_MAJOR}
@@ -23,7 +22,6 @@ RUN apt-get update && \
     fi && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
     postgresql-${PG_MAJOR} \
-    postgresql-contrib-${PG_MAJOR} \
     time \
     bc \
     jq \
@@ -33,6 +31,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
+# wal-e deps from apt: gevent 26+ ships no py3.9 wheel, boto is AWS SDK v2 (wal-e[aws]); slim base has no toolchain to source-build
 RUN if [ "${INSTALL_WALE}" = "1" ]; then \
         apt-get update && \
         apt-get install --yes --no-install-recommends --no-install-suggests \

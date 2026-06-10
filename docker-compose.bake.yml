@@ -35,16 +35,16 @@ services:
   # additional_contexts wires FROM references to sibling bake targets. The
   # docker-container builder's content store is digest-addressed and does not
   # resolve image names like the local docker daemon does, so without this
-  # FROM wal-g/ubuntu:18.04 falls through to docker.io and fails authorization.
+  # FROM wal-g/base falls through to docker.io and fails authorization.
   # Keys must omit :latest, buildx strips the tag from FROM identifiers before
   # matching against the contexts map and a literal :latest key never hits
   pg10:
     build:
       additional_contexts:
-        wal-g/ubuntu:18.04: service:ubuntu
+        wal-g/base: service:base
       cache_from:
         - type=gha,scope=walg-pg10
-        - type=gha,scope=walg-ubuntu-bionic
+        - type=gha,scope=walg-base
       cache_to:
         - type=gha,mode=max,scope=walg-pg10
 
@@ -57,18 +57,17 @@ services:
         - type=gha,scope=walg-pg10-tests
         - type=gha,scope=walg-pg10
         - type=gha,scope=walg-golang
-        - type=gha,scope=walg-ubuntu-bionic
+        - type=gha,scope=walg-base
       cache_to:
         - type=gha,mode=max,scope=walg-pg10-tests
 
-  # pg18 builds on ubuntu 22.04, not bionic (UBUNTU_TAG=22.04, see docker-compose.yml)
   pg18:
     build:
       additional_contexts:
-        wal-g/ubuntu:22.04: service:ubuntu_22_04
+        wal-g/base: service:base
       cache_from:
         - type=gha,scope=walg-pg18
-        - type=gha,scope=walg-ubuntu-2204
+        - type=gha,scope=walg-base
       cache_to:
         - type=gha,mode=max,scope=walg-pg18
 
@@ -81,6 +80,6 @@ services:
         - type=gha,scope=walg-pg18-tests
         - type=gha,scope=walg-pg18
         - type=gha,scope=walg-golang
-        - type=gha,scope=walg-ubuntu-2204
+        - type=gha,scope=walg-base
       cache_to:
         - type=gha,mode=max,scope=walg-pg18-tests
