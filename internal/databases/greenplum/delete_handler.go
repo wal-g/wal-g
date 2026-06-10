@@ -6,15 +6,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"golang.org/x/sync/errgroup"
 )
 
 type DeleteArgs struct {
@@ -245,18 +248,36 @@ func (h *DeleteHandler) HandleDeleteTrimWal(ctx context.Context, backupName stri
 	}
 
 	if sentinel.RestorePoint != nil {
-		return h.deleteRestorePointsExcept(*sentinel.RestorePoint, h.args.Confirmed, baseBackupFolder)
+		return h.deleteRestorePointsAfter(*sentinel.RestorePoint, h.args.Confirmed, baseBackupFolder)
 	}
 	return nil
 }
 
-func (h *DeleteHandler) deleteRestorePointsExcept(targetRestorePoint string, confirm bool, baseBackupFolder storage.Folder) error {
-	_, err := FetchAllRestorePoints(h.Folder)
+func (h *DeleteHandler) deleteRestorePointsAfter(targetRestorePoint string, confirm bool, baseBackupFolder storage.Folder) error {
+	allRestorePoints, err := FetchAllRestorePoints(h.Folder)
 	if err != nil {
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			return nil
 		}
 		return err
+	}
+
+	var cutoffTime time.Time
+	for _, restorePoint := range allRestorePoints {
+		if restorePoint.Name == targetRestorePoint {
+			cutoffTime = restorePoint.FinishTime
+			break
+		}
+	}
+	if cutoffTime.IsZero() {
+		return nil
+	}
+
+	toDelete := make(map[string]struct{}, len(allRestorePoints))
+	for _, restorePoint := range allRestorePoints {
+		if restorePoint.FinishTime.After(cutoffTime) {
+			toDelete[restorePoint.Name] = struct{}{}
+		}
 	}
 
 	folderFilter := func(string) bool { return true }
@@ -265,7 +286,8 @@ func (h *DeleteHandler) deleteRestorePointsExcept(targetRestorePoint string, con
 		if !strings.HasSuffix(name, RestorePointSuffix) {
 			return false
 		}
-		return StripRightmostRestorePointName(name) != targetRestorePoint
+		_, ok := toDelete[StripRightmostRestorePointName(name)]
+		return ok
 	}, folderFilter)
 }
 
