@@ -8,7 +8,7 @@ MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
-DOCKER_COMMON := golang ubuntu ubuntu_22_04 s3
+DOCKER_COMMON := golang ubuntu ubuntu_22_04 base s3
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
@@ -90,6 +90,7 @@ pg_save_image: install_and_build_pg pg10_build_image pg18_build_image
 	docker save ${IMAGE_PG18_TESTS} > ${CACHE_FILE_PG18_TESTS}
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
+	docker save wal-g/base         > ${CACHE_FILE_BASE}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
@@ -168,6 +169,7 @@ load_docker_common:
 	else\
 		docker load -i ${CACHE_FILE_UBUNTU_18_04} && rm ${CACHE_FILE_UBUNTU_18_04};\
 		docker load -i ${CACHE_FILE_UBUNTU_22_04} && rm ${CACHE_FILE_UBUNTU_22_04};\
+		docker load -i ${CACHE_FILE_BASE} && rm ${CACHE_FILE_BASE};\
 		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
 	fi
 
