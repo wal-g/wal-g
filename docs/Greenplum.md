@@ -280,9 +280,9 @@ wal-g check-ao-aocs-length --check-backup --backup-name=backup_name
 
 ### ``delete trim-wal``
 
-Deletes WAL files accumulated after the given backup's restore point LSN on every segment. This frees storage space when WAL files are no longer needed for point-in-time recovery from that backup.
+Deletes WAL files accumulated after the given backup's restore point LSN on every segment, within the same timeline as the restore point. This frees storage space when WAL files are no longer needed for point-in-time recovery from that backup. WAL files from other timelines are not affected.
 
-Also removes all `*_restore_point.json` metadata files except the one associated with the specified backup.
+Also removes `*_restore_point.json` metadata files created after the specified backup's restore point, while retaining the target restore point and any older ones.
 
 Usage:
 ```bash
