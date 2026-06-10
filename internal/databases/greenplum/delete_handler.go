@@ -9,9 +9,7 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
-
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -272,9 +270,9 @@ func (h *DeleteHandler) deleteRestorePointsAfter(targetRestorePoint string, conf
 	}
 
 	var cutoffTime time.Time
-	for _, restorePoint := range allRestorePoints {
-		if restorePoint.Name == targetRestorePoint {
-			cutoffTime = restorePoint.FinishTime
+	for i := range allRestorePoints {
+		if allRestorePoints[i].Name == targetRestorePoint {
+			cutoffTime = allRestorePoints[i].FinishTime
 			break
 		}
 	}
@@ -283,9 +281,9 @@ func (h *DeleteHandler) deleteRestorePointsAfter(targetRestorePoint string, conf
 	}
 
 	toDelete := make(map[string]struct{}, len(allRestorePoints))
-	for _, restorePoint := range allRestorePoints {
-		if restorePoint.FinishTime.After(cutoffTime) {
-			toDelete[restorePoint.Name] = struct{}{}
+	for i := range allRestorePoints {
+		if allRestorePoints[i].FinishTime.After(cutoffTime) {
+			toDelete[allRestorePoints[i].Name] = struct{}{}
 		}
 	}
 
