@@ -56,7 +56,7 @@ require (
 	github.com/klauspost/compress v1.18.5
 	github.com/mongodb/mongo-tools v0.0.0-20240724183527-6d4f001be3fc
 	github.com/ncw/directio v1.0.5
-	github.com/ncw/swift/v2 v2.0.2
+	github.com/ncw/swift/v2 v2.0.5
 	github.com/pkg/profile v1.6.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.6.2
