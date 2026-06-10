@@ -229,6 +229,15 @@ func (h *DeleteHandler) HandleDeleteTrimWal(ctx context.Context, backupName stri
 		return err
 	}
 
+	var cutoffTimeline uint32
+	if sentinel.RestorePoint != nil {
+		rpMeta, err := FetchRestorePointMetadata(h.Folder, *sentinel.RestorePoint)
+		if err != nil {
+			return fmt.Errorf("failed to fetch restore point metadata: %w", err)
+		}
+		cutoffTimeline = rpMeta.TimeLine
+	}
+
 	deleteConcurrency, err := conf.GetMaxConcurrency(conf.GPDeleteConcurrency)
 	if err != nil {
 		tracelog.WarningLogger.Printf("config error: %v", err)
@@ -239,7 +248,7 @@ func (h *DeleteHandler) HandleDeleteTrimWal(ctx context.Context, backupName stri
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
 		errorGroup.Go(func() error {
-			return h.trimSegmentWal(meta, h.args.Confirmed)
+			return h.trimSegmentWal(meta, cutoffTimeline, h.args.Confirmed)
 		})
 	}
 
@@ -291,7 +300,7 @@ func (h *DeleteHandler) deleteRestorePointsAfter(targetRestorePoint string, conf
 	}, folderFilter)
 }
 
-func (h *DeleteHandler) trimSegmentWal(meta SegmentMetadata, confirm bool) error {
+func (h *DeleteHandler) trimSegmentWal(meta SegmentMetadata, cutoffTimeline uint32, confirm bool) error {
 	lsn, err := postgres.ParseLSN(meta.RestorePointLSN)
 	if err != nil {
 		return fmt.Errorf("failed to parse RestorePointLSN for segment %d: %w", meta.ContentID, err)
@@ -314,8 +323,11 @@ func (h *DeleteHandler) trimSegmentWal(meta SegmentMetadata, confirm bool) error
 		if !strings.HasPrefix(name, utility.WalPath) {
 			return false
 		}
-		_, segNo, ok := postgres.TryFetchTimelineAndLogSegNo(name)
+		timeline, segNo, ok := postgres.TryFetchTimelineAndLogSegNo(name)
 		if !ok {
+			return false
+		}
+		if cutoffTimeline != 0 && timeline != cutoffTimeline {
 			return false
 		}
 		return postgres.WalSegmentNo(segNo) > cutoffSegNo

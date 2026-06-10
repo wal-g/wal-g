@@ -21,18 +21,19 @@ import (
 type testRestorePoint struct {
 	name       string
 	finishTime time.Time
+	timeLine   uint32
 }
 
 var baseFinishTime = time.Date(2026, 1, 1, 0, 1, 0, 0, time.UTC)
 
-const walTimeline = uint32(1)
+const baseWalTimeLine = uint32(1)
 
-func walSegFilename(segNo uint64) string {
-	return postgres.WalSegmentNo(segNo).GetFilename(walTimeline)
+func walSegFilename(segNo uint64, walTimeLine uint32) string {
+	return postgres.WalSegmentNo(segNo).GetFilename(walTimeLine)
 }
 
-func walObjectPath(contentID int, segNo uint64) string {
-	return path.Join(greenplum.FormatSegmentWalPath(contentID), walSegFilename(segNo))
+func walObjectPath(contentID int, segNo uint64, walTimeLine uint32) string {
+	return path.Join(greenplum.FormatSegmentWalPath(contentID), walSegFilename(segNo, walTimeLine))
 }
 
 func walCutoffLSN(cutoffSegNo uint64) string {
@@ -71,7 +72,7 @@ func makeTrimWalFolder(
 	for contentID, segNos := range walSegNosByContentID {
 		segFolder := folder.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
 		for _, segNo := range segNos {
-			walFilePath := path.Join(utility.WalPath, walSegFilename(segNo))
+			walFilePath := path.Join(utility.WalPath, walSegFilename(segNo, baseWalTimeLine))
 			err = segFolder.PutObject(walFilePath, &bytes.Buffer{})
 			require.NoError(t, err)
 		}
@@ -82,6 +83,7 @@ func makeTrimWalFolder(
 			"name":        rp.name,
 			"start_time":  rp.finishTime.Add(-time.Second).Format(time.RFC3339),
 			"finish_time": rp.finishTime.Format(time.RFC3339),
+			"time_line":   rp.timeLine,
 		}
 		restorePointBytes, err := json.Marshal(restorePointData)
 		require.NoError(t, err)
@@ -106,13 +108,10 @@ func TestHandleDeleteTrimWal_DeletesWalAfterCutoff(t *testing.T) {
 	backupName := "backup_20260101T000000Z"
 	restorePoint := "test_restore_point"
 	segments := []greenplum.SegmentMetadata{
-		{
-			ContentID:       0,
-			RestorePointLSN: walCutoffLSN(2),
-		},
+		{ContentID: 0, RestorePointLSN: walCutoffLSN(2)},
 	}
 	walSegNosByContentID := map[int][]uint64{0: {1, 2, 3, 4}}
-	storedRestorePoints := []testRestorePoint{{restorePoint, baseFinishTime}}
+	storedRestorePoints := []testRestorePoint{{restorePoint, baseFinishTime, baseWalTimeLine}}
 	folder := makeTrimWalFolder(
 		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
 	)
@@ -125,26 +124,24 @@ func TestHandleDeleteTrimWal_DeletesWalAfterCutoff(t *testing.T) {
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
-	assert.Contains(t, objectPaths, walObjectPath(0, 1), "WAL at cutoff-1 must be retained")
-	assert.Contains(t, objectPaths, walObjectPath(0, 2), "WAL at cutoff must be retained")
-	assert.NotContains(t, objectPaths, walObjectPath(0, 3), "WAL past cutoff must be deleted")
-	assert.NotContains(t, objectPaths, walObjectPath(0, 4), "WAL past cutoff must be deleted")
+	assert.Contains(t, objectPaths, walObjectPath(0, 1, baseWalTimeLine), "WAL at cutoff-1 must be retained")
+	assert.Contains(t, objectPaths, walObjectPath(0, 2, baseWalTimeLine), "WAL at cutoff must be retained")
+	assert.NotContains(t, objectPaths, walObjectPath(0, 3, baseWalTimeLine), "WAL past cutoff must be deleted")
+	assert.NotContains(t, objectPaths, walObjectPath(0, 4, baseWalTimeLine), "WAL past cutoff must be deleted")
 }
 
 func TestHandleDeleteTrimWal_WithoutConfirm_NothingDeleted(t *testing.T) {
 	backupName := "backup_20260101T000000Z"
 	restorePoint := "test_restore_point"
+	laterRestorePoint := "later_restore_point"
 	segments := []greenplum.SegmentMetadata{
-		{
-			ContentID:       0,
-			RestorePointLSN: walCutoffLSN(2),
-		},
+		{ContentID: 0, RestorePointLSN: walCutoffLSN(2)},
 	}
 	walSegNos := []uint64{1, 2, 3, 4}
 	walSegNosByContentID := map[int][]uint64{0: walSegNos}
 	storedRestorePoints := []testRestorePoint{
-		{restorePoint, baseFinishTime},
-		{"later_restore_point", baseFinishTime.Add(time.Minute)},
+		{restorePoint, baseFinishTime, baseWalTimeLine},
+		{laterRestorePoint, baseFinishTime.Add(time.Minute), baseWalTimeLine},
 	}
 
 	folder := makeTrimWalFolder(
@@ -160,28 +157,27 @@ func TestHandleDeleteTrimWal_WithoutConfirm_NothingDeleted(t *testing.T) {
 
 	objectPaths := getStorageObjectsPaths(t, folder)
 	for _, segNo := range walSegNos {
-		assert.Contains(t, objectPaths, walObjectPath(0, segNo), "dry run must not delete WAL segNo %d", segNo)
+		assert.Contains(t, objectPaths, walObjectPath(0, segNo, baseWalTimeLine), "dry run must not delete WAL segNo %d", segNo)
 	}
 	// later_restore_point would be deleted in confirmed mode, but dry run must keep it
-	laterRestorePointFilePath := path.Join(utility.BaseBackupPath, "later_restore_point"+greenplum.RestorePointSuffix)
+	laterRestorePointFilePath := path.Join(utility.BaseBackupPath, laterRestorePoint+greenplum.RestorePointSuffix)
 	assert.Contains(t, objectPaths, laterRestorePointFilePath, "dry run must not delete restore point files")
 }
 
 func TestHandleDeleteTrimWal_DeletesRestorePointsAfterTarget(t *testing.T) {
 	backupName := "backup_20260101T000000Z"
 	restorePoint := "test_restore_point"
+	beforeRestorePoint := "before_restore_point"
+	afterRestorePoint := "after_restore_point"
 	segments := []greenplum.SegmentMetadata{
-		{
-			ContentID:       0,
-			RestorePointLSN: walCutoffLSN(2),
-		},
+		{ContentID: 0, RestorePointLSN: walCutoffLSN(2)},
 	}
 	walSegNos := []uint64{1}
 	walSegNosByContentID := map[int][]uint64{0: walSegNos}
 	storedRestorePoints := []testRestorePoint{
-		{restorePoint, baseFinishTime},
-		{"before_restore_point", baseFinishTime.Add(-time.Minute)},
-		{"after_restore_point", baseFinishTime.Add(time.Minute)},
+		{restorePoint, baseFinishTime, baseWalTimeLine},
+		{beforeRestorePoint, baseFinishTime.Add(-time.Minute), baseWalTimeLine},
+		{afterRestorePoint, baseFinishTime.Add(time.Minute), baseWalTimeLine},
 	}
 	folder := makeTrimWalFolder(
 		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
@@ -198,10 +194,10 @@ func TestHandleDeleteTrimWal_DeletesRestorePointsAfterTarget(t *testing.T) {
 	targetFile := path.Join(utility.BaseBackupPath, restorePoint+greenplum.RestorePointSuffix)
 	assert.Contains(t, objectPaths, targetFile, "target restore point must be kept")
 
-	beforeFile := path.Join(utility.BaseBackupPath, "before_restore_point"+greenplum.RestorePointSuffix)
+	beforeFile := path.Join(utility.BaseBackupPath, beforeRestorePoint+greenplum.RestorePointSuffix)
 	assert.Contains(t, objectPaths, beforeFile, "restore point before target must be kept")
 
-	afterFile := path.Join(utility.BaseBackupPath, "after_restore_point"+greenplum.RestorePointSuffix)
+	afterFile := path.Join(utility.BaseBackupPath, afterRestorePoint+greenplum.RestorePointSuffix)
 	assert.NotContains(t, objectPaths, afterFile, "restore point after target must be deleted")
 }
 
@@ -209,10 +205,7 @@ func TestHandleDeleteTrimWal_NoRestorePoint(t *testing.T) {
 	backupName := "backup_20260101T000000Z"
 	restorePoint := ""
 	segments := []greenplum.SegmentMetadata{
-		{
-			ContentID:       0,
-			RestorePointLSN: walCutoffLSN(2),
-		},
+		{ContentID: 0, RestorePointLSN: walCutoffLSN(2)},
 	}
 	walSegNos := []uint64{1, 3}
 	walSegNosByContentID := map[int][]uint64{0: walSegNos}
@@ -223,13 +216,12 @@ func TestHandleDeleteTrimWal_NoRestorePoint(t *testing.T) {
 	delArgs := greenplum.DeleteArgs{Confirmed: true}
 	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
 	require.NoError(t, err)
-
 	err = handler.HandleDeleteTrimWal(context.Background(), backupName)
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
-	assert.Contains(t, objectPaths, walObjectPath(0, 1), "WAL at or before cutoff must be kept")
-	assert.NotContains(t, objectPaths, walObjectPath(0, 3), "WAL past cutoff must be deleted")
+	assert.Contains(t, objectPaths, walObjectPath(0, 1, baseWalTimeLine), "WAL at or before cutoff must be kept")
+	assert.NotContains(t, objectPaths, walObjectPath(0, 3, baseWalTimeLine), "WAL past cutoff must be deleted")
 }
 
 func TestHandleDeleteTrimWal_MultipleSegments(t *testing.T) {
@@ -243,7 +235,9 @@ func TestHandleDeleteTrimWal_MultipleSegments(t *testing.T) {
 		-1: {1, 2, 3},
 		0:  {1, 2, 3},
 	}
-	storedRestorePoints := []testRestorePoint{{restorePoint, baseFinishTime}}
+	storedRestorePoints := []testRestorePoint{
+		{restorePoint, baseFinishTime, baseWalTimeLine},
+	}
 	folder := makeTrimWalFolder(
 		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
 	)
@@ -256,14 +250,49 @@ func TestHandleDeleteTrimWal_MultipleSegments(t *testing.T) {
 	require.NoError(t, err)
 
 	objectPaths := getStorageObjectsPaths(t, folder)
+	assert.Contains(t, objectPaths, walObjectPath(-1, 1, baseWalTimeLine))
+	assert.NotContains(t, objectPaths, walObjectPath(-1, 2, baseWalTimeLine))
+	assert.NotContains(t, objectPaths, walObjectPath(-1, 3, baseWalTimeLine))
 
-	assert.Contains(t, objectPaths, walObjectPath(-1, 1))
-	assert.NotContains(t, objectPaths, walObjectPath(-1, 2))
-	assert.NotContains(t, objectPaths, walObjectPath(-1, 3))
+	assert.Contains(t, objectPaths, walObjectPath(0, 1, baseWalTimeLine))
+	assert.Contains(t, objectPaths, walObjectPath(0, 2, baseWalTimeLine))
+	assert.NotContains(t, objectPaths, walObjectPath(0, 3, baseWalTimeLine))
+}
 
-	assert.Contains(t, objectPaths, walObjectPath(0, 1))
-	assert.Contains(t, objectPaths, walObjectPath(0, 2))
-	assert.NotContains(t, objectPaths, walObjectPath(0, 3))
+func TestHandleDeleteTrimWal_SkipsWalFromOtherTimeline(t *testing.T) {
+	backupName := "backup_20260101T000000Z"
+	restorePoint := "test_restore_point"
+	segments := []greenplum.SegmentMetadata{
+		{ContentID: 0, RestorePointLSN: walCutoffLSN(2)},
+	}
+	walSegNosByContentID := map[int][]uint64{0: {1, 2, 3, 4}}
+	storedRestorePoints := []testRestorePoint{
+		{restorePoint, baseFinishTime, baseWalTimeLine},
+	}
+	folder := makeTrimWalFolder(
+		t, backupName, restorePoint, segments, walSegNosByContentID, storedRestorePoints,
+	)
+
+	const otherTimeline = uint32(2)
+	segNosAfterCutoffOnOtherTimeline := []uint64{3, 4}
+	for _, segNo := range segNosAfterCutoffOnOtherTimeline {
+		err := folder.PutObject(walObjectPath(0, segNo, otherTimeline), &bytes.Buffer{})
+		require.NoError(t, err)
+	}
+
+	delArgs := greenplum.DeleteArgs{Confirmed: true}
+	handler, err := greenplum.NewDeleteHandler(folder, delArgs)
+	require.NoError(t, err)
+
+	err = handler.HandleDeleteTrimWal(context.Background(), backupName)
+	require.NoError(t, err)
+
+	objectPaths := getStorageObjectsPaths(t, folder)
+	assert.NotContains(t, objectPaths, walObjectPath(0, 3, baseWalTimeLine), "WAL on cutoff timeline past cutoff must be deleted")
+	assert.NotContains(t, objectPaths, walObjectPath(0, 4, baseWalTimeLine), "WAL on cutoff timeline past cutoff must be deleted")
+
+	assert.Contains(t, objectPaths, walObjectPath(0, 3, otherTimeline), "WAL on other timeline must be kept")
+	assert.Contains(t, objectPaths, walObjectPath(0, 4, otherTimeline), "WAL on other timeline must be kept")
 }
 
 func TestHandleDeleteTrimWal_BackupNotFound(t *testing.T) {
