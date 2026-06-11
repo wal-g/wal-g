@@ -1,0 +1,38 @@
+name: Mirror Docker Hub images to ghcr.io
+
+# buildimages refreshes the third-party image tar from this mirror
+# (ci_thirdparty_images.sh); anonymous Docker Hub pulls from shared GHA runner
+# IPs hit per-IP rate limits, manifesting as
+# "Client.Timeout exceeded while awaiting headers" flakes.
+# Mirrors live at ghcr.io/wal-g/dockerhub/<dockerhub path>:<tag>, private is
+# fine: workflow-pushed packages grant repo access & buildimages logs in.
+# Runs on merge when the image list changes (dispatch only works once on master),
+# until then buildimages falls back to Docker Hub
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - .github/workflows/mirror-dockerhub.yml
+      - ci_thirdparty_images.sh
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Copy images with skopeo
+        run: |
+          set -eu
+          echo "${{ secrets.GITHUB_TOKEN }}" | skopeo login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for image in $(./ci_thirdparty_images.sh list); do
+            skopeo copy --all --retry-times 3 \
+              "docker://docker.io/$image" \
+              "docker://ghcr.io/${{ github.repository_owner }}/dockerhub/$image"
+          done

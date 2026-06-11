@@ -9,16 +9,14 @@ on:
 
 env:
   CACHE_FOLDER: ~/docker-images-${{ github.sha }}
-  CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
-  CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
-  CACHE_FILE_BASE: ~/docker-images-${{ github.sha }}/wal-g_base.tar
-  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
   CACHE_FILE_PG10_TESTS: ~/docker-images-${{ github.sha }}/pg10_tests.tar
   CACHE_FILE_PG18_TESTS: ~/docker-images-${{ github.sha }}/pg18_tests.tar
+  COMMON_IMAGES_REPO: ghcr.io/${{ github.repository_owner }}/common
   IMAGE_PG10_TESTS: wal-g/pg10_tests
   IMAGE_PG18_TESTS: wal-g/pg18_tests
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
+  THIRDPARTY_CACHE_FILE: docker-thirdparty.tar
   GO_VERSION: "1.25"
 
 jobs:
@@ -34,10 +32,6 @@ jobs:
           path: |
             ${{ env.CACHE_FILE_PG10_TESTS }}
             ${{ env.CACHE_FILE_PG18_TESTS }}
-            ${{ env.CACHE_FILE_UBUNTU_18_04 }}
-            ${{ env.CACHE_FILE_UBUNTU_22_04 }}
-            ${{ env.CACHE_FILE_BASE }}
-            ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
       - name: Cleanup space on runner
@@ -55,10 +49,28 @@ jobs:
         run: sudo apt clean && sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
-        if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/checkout@v7
         with:
           submodules: true
+
+      # commit-invariant tar of third-party images for test jobs, refresh on miss;
+      # lookup-only: buildimages never consumes the tar itself
+      - name: Third-party images cache
+        id: cache-thirdparty
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.THIRDPARTY_CACHE_FILE }}
+          key: thirdparty-images-${{ hashFiles('ci_thirdparty_images.sh') }}
+          lookup-only: true
+
+      # login lets ghcr mirror stay private (packages pushed by workflows grant repo access)
+      - name: Log in to ghcr
+        if: steps.cache-thirdparty.outputs.cache-hit != 'true'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Save third-party images
+        if: steps.cache-thirdparty.outputs.cache-hit != 'true'
+        run: ./ci_thirdparty_images.sh save "$THIRDPARTY_CACHE_FILE"
 
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -75,6 +87,29 @@ jobs:
       - name: Build images
         if: steps.cache-images.outputs.cache-hit != 'true'
         run: make pg_save_image
+
+      - name: Compute common images tag
+        if: github.event_name == 'push' && steps.cache-images.outputs.cache-hit != 'true'
+        id: common
+        run: echo "tag=$(./ci_common_images_tag.sh)" >> "$GITHUB_OUTPUT"
+
+      # publish commit-invariant images, pull_request tokens are read-only so master pushes only
+      - name: Push common images to ghcr
+        if: github.event_name == 'push' && steps.cache-images.outputs.cache-hit != 'true'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          tag="${{ steps.common.outputs.tag }}"
+          push_if_absent() {
+            if docker manifest inspect "$2:$tag" >/dev/null 2>&1; then
+              echo "$2:$tag already published"
+            else
+              docker tag "$1" "$2:$tag" && docker push "$2:$tag"
+            fi
+          }
+          push_if_absent wal-g/golang       "$COMMON_IMAGES_REPO/golang"
+          push_if_absent wal-g/ubuntu:18.04 "$COMMON_IMAGES_REPO/ubuntu-18.04"
+          push_if_absent wal-g/ubuntu:22.04 "$COMMON_IMAGES_REPO/ubuntu-22.04"
+          push_if_absent wal-g/base         "$COMMON_IMAGES_REPO/base"
     env:
       USE_BROTLI: 1
       USE_LZO: 1
@@ -116,10 +151,6 @@ jobs:
           path: |
             ${{ env.CACHE_FILE_PG10_TESTS }}
             ${{ env.CACHE_FILE_PG18_TESTS }}
-            ${{ env.CACHE_FILE_UBUNTU_18_04 }}
-            ${{ env.CACHE_FILE_UBUNTU_22_04 }}
-            ${{ env.CACHE_FILE_BASE }}
-            ${{ env.CACHE_FILE_GOLANG }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
       - name: Fail if no cached images
@@ -127,6 +158,20 @@ jobs:
         run: |
           echo "Failed to fetch cached docker images. Will now exit..."
           exit 1
+
+      # consumed by Makefile load_docker_common to pull common images from ghcr
+      - name: Compute common images tag
+        run: echo "COMMON_IMAGES_TAG=$(./ci_common_images_tag.sh)" >> "$GITHUB_ENV"
+
+      # images land under canonical Docker Hub names, compose up finds them locally
+      - name: Third-party images cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.THIRDPARTY_CACHE_FILE }}
+          key: thirdparty-images-${{ hashFiles('ci_thirdparty_images.sh') }}
+
+      - name: Load third-party images
+        run: ./ci_thirdparty_images.sh load "$THIRDPARTY_CACHE_FILE"
 
       - name: Run test
         run: ${{ matrix.command }}
