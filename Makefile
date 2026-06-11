@@ -9,6 +9,8 @@ MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
 DOCKER_COMMON := golang ubuntu ubuntu_22_04 base s3
+# commit-invariant images published to ghcr by CI, see dockertests.yml
+COMMON_IMAGES_REPO ?= ghcr.io/wal-g/common
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
@@ -88,10 +90,6 @@ pg_save_image: install_and_build_pg pg10_build_image pg18_build_image
 	sudo rm -rf ${CACHE_FOLDER}/*
 	docker save ${IMAGE_PG10_TESTS} > ${CACHE_FILE_PG10_TESTS}
 	docker save ${IMAGE_PG18_TESTS} > ${CACHE_FILE_PG18_TESTS}
-	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
-	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
-	docker save wal-g/base         > ${CACHE_FILE_BASE}
-	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
@@ -162,16 +160,22 @@ mysql_build: $(CMD_FILES) $(PKG_FILES)
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
+# pull prebuilt commit-invariant images from ghcr when CI provides tag,
+# fall back to local build (fresh fork, tag not yet published, local dev)
 load_docker_common:
-	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
-		echo "Rebuild";\
-		docker compose build $(DOCKER_COMMON);\
-	else\
-		docker load -i ${CACHE_FILE_UBUNTU_18_04} && rm ${CACHE_FILE_UBUNTU_18_04};\
-		docker load -i ${CACHE_FILE_UBUNTU_22_04} && rm ${CACHE_FILE_UBUNTU_22_04};\
-		docker load -i ${CACHE_FILE_BASE} && rm ${CACHE_FILE_BASE};\
-		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
-	fi
+ifdef COMMON_IMAGES_TAG
+	docker pull ${COMMON_IMAGES_REPO}/golang:${COMMON_IMAGES_TAG} && \
+	docker pull ${COMMON_IMAGES_REPO}/ubuntu-18.04:${COMMON_IMAGES_TAG} && \
+	docker pull ${COMMON_IMAGES_REPO}/ubuntu-22.04:${COMMON_IMAGES_TAG} && \
+	docker pull ${COMMON_IMAGES_REPO}/base:${COMMON_IMAGES_TAG} && \
+	docker tag ${COMMON_IMAGES_REPO}/golang:${COMMON_IMAGES_TAG} wal-g/golang && \
+	docker tag ${COMMON_IMAGES_REPO}/ubuntu-18.04:${COMMON_IMAGES_TAG} wal-g/ubuntu:18.04 && \
+	docker tag ${COMMON_IMAGES_REPO}/ubuntu-22.04:${COMMON_IMAGES_TAG} wal-g/ubuntu:22.04 && \
+	docker tag ${COMMON_IMAGES_REPO}/base:${COMMON_IMAGES_TAG} wal-g/base || \
+	docker compose build $(DOCKER_COMMON)
+else
+	docker compose build $(DOCKER_COMMON)
+endif
 
 mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
 	./link_brotli.sh
@@ -204,10 +208,11 @@ mongo_build: $(CMD_FILES) $(PKG_FILES)
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
 
+# env -u: ambient COMPOSE_FILE (set by CI for root compose) would override compose file computed by tests_func
 mongo_features:
 	set -e
 	make go_deps
-	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) MONGO_TEST_TYPE=$(MONGO_TEST_TYPE) go test -v -count=1 -timeout 45m  --tf.test=true --tf.debug=true --tf.clean=false --tf.stop=false --tf.database=mongodb
+	cd tests_func/ && env -u COMPOSE_FILE MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) MONGO_TEST_TYPE=$(MONGO_TEST_TYPE) go test -v -count=1 -timeout 45m  --tf.test=true --tf.debug=true --tf.clean=false --tf.stop=false --tf.database=mongodb
 
 mongo_binary_features:
 	MONGO_TEST_TYPE="binary" $(MAKE) mongo_features
@@ -223,7 +228,7 @@ mongo_catch_up_features:
 
 clean_mongo_features:
 	set -e
-	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
+	cd tests_func/ && env -u COMPOSE_FILE MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w")
@@ -255,11 +260,11 @@ redis_install: redis_build
 redis_features:
 	set -e
 	make go_deps
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) IMAGE_TYPE=$(IMAGE_TYPE) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
+	cd tests_func/ && env -u COMPOSE_FILE REDIS_VERSION=$(REDIS_VERSION) IMAGE_TYPE=$(IMAGE_TYPE) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
 
 clean_redis_features:
 	set -e
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
+	cd tests_func/ && env -u COMPOSE_FILE REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
 
 etcd_test: deps etcd_build unlink_brotli etcd_integration_test
 
