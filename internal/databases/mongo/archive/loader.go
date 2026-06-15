@@ -31,8 +31,8 @@ var (
 //go:generate mockery --dir=./ --name=Uploader --filename=Uploader.go --output=mocks/ --outpkg=archivemocks
 type Uploader interface {
 	UploadOplogArchive(ctx context.Context, stream io.Reader, firstTS, lastTS models.Timestamp) error // TODO: rename firstTS
-	UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error
-	UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error
+	UploadGapArchive(ctx context.Context, err error, firstTS, lastTS models.Timestamp) error
+	UploadBackup(ctx context.Context, stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error
 }
 
 // Downloader defines interface to fetch mongodb oplog archives
@@ -245,12 +245,13 @@ func (d *DiscardUploader) UploadOplogArchive(_ context.Context, archReader io.Re
 }
 
 // UploadGapArchive returns nil error
-func (d *DiscardUploader) UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error {
+func (d *DiscardUploader) UploadGapArchive(_ context.Context, err error, firstTS, lastTS models.Timestamp) error {
 	return nil
 }
 
 // UploadBackup is not implemented yet
-func (d *DiscardUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+func (d *DiscardUploader) UploadBackup(_ context.Context, stream io.Reader, cmd internal.ErrWaiter,
+	metaConstructor internal.MetaConstructor) error {
 	panic("implement me")
 }
 
@@ -287,7 +288,7 @@ func (su *StorageUploader) UploadOplogArchive(ctx context.Context, stream io.Rea
 }
 
 // UploadGap uploads mark indicating archiving gap.
-func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS models.Timestamp) error {
+func (su *StorageUploader) UploadGapArchive(ctx context.Context, archErr error, firstTS, lastTS models.Timestamp) error {
 	if archErr == nil {
 		return fmt.Errorf("archErr must not be nil")
 	}
@@ -297,19 +298,20 @@ func (su *StorageUploader) UploadGapArchive(archErr error, firstTS, lastTS model
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	if err := su.PushStreamToDestination(context.Background(), strings.NewReader(archErr.Error()), arch.Filename()); err != nil {
+	if err := su.PushStreamToDestination(ctx, strings.NewReader(archErr.Error()), arch.Filename()); err != nil {
 		return fmt.Errorf("error while uploading stream: %w", err)
 	}
 	return nil
 }
 
 // UploadBackup compresses a stream and uploads it.
-func (su *StorageUploader) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+func (su *StorageUploader) UploadBackup(ctx context.Context, stream io.Reader, cmd internal.ErrWaiter,
+	metaConstructor internal.MetaConstructor) error {
 	err := metaConstructor.Init()
 	if err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
-	backupName, err := su.PushStream(context.Background(), stream)
+	backupName, err := su.PushStream(ctx, stream)
 	if err != nil {
 		return fmt.Errorf("can not push stream: %+v", err)
 	}

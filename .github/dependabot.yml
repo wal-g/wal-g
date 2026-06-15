@@ -8,6 +8,19 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    allow:
-      - dependency-name: "github.com/wal-g/tracelog"
-      - dependency-name: "github.com/wal-g/storages"
+    groups:
+      opentelemetry:
+        patterns:
+          - "go.opentelemetry.io/otel"
+          - "go.opentelemetry.io/otel/*"
+      azure-sdk:
+        patterns:
+          - "github.com/Azure/azure-sdk-for-go/*"
+      google-cloud-go:
+        patterns:
+          - "cloud.google.com/go"
+          - "cloud.google.com/go/*"
+  - package-ecosystem: "gomod"
+    directory: "/cmd/pg/exporter"
+    schedule:
+      interval: "weekly"
