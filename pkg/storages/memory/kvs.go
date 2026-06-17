@@ -9,6 +9,9 @@ import (
 
 // This function is needed for being cross-platform
 func CeilTimeUpToMicroseconds(timeToCeil time.Time) time.Time {
+	// drop monotonic reading: real storages report wall-clock LastModified, & ceiling shifts wall & monotonic
+	// by different deltas, inverting Compare ordering of same-microsecond stamps
+	timeToCeil = timeToCeil.Round(0)
 	if timeToCeil.Nanosecond()%1000 != 0 {
 		timeToCeil = timeToCeil.Add(time.Microsecond)
 		timeToCeil = timeToCeil.Add(-time.Duration(timeToCeil.Nanosecond() % 1000))
