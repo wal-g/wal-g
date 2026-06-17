@@ -75,3 +75,6 @@ main/*/wal-g-*
 .claude
 AGENTS.md
 .mcp.json
+
+# Internal documentation
+internal-docs/

@@ -38,3 +38,5 @@ Thumbs.db
 
 # Logs
 *.log
+internal-docs/
+exporter
