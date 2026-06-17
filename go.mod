@@ -58,7 +58,7 @@ require (
 	github.com/mongodb/mongo-tools v0.0.0-20240724183527-6d4f001be3fc
 	github.com/ncw/directio v1.0.5
 	github.com/ncw/swift/v2 v2.0.5
-	github.com/pkg/profile v1.6.0
+	github.com/pkg/profile v1.7.0
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.6.2
 	github.com/redis/go-redis/v9 v9.7.3
@@ -92,6 +92,7 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
+	github.com/felixge/fgprof v0.9.3 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -99,6 +100,7 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang-sql/sqlexp v0.1.0 // indirect
+	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.16 // indirect
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
