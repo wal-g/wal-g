@@ -194,6 +194,9 @@ func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messa
 	if err != nil {
 		return daemon.ErrorType, nil, fmt.Errorf("fail to read message len: %w", err)
 	}
+	if messageLength < 3 {
+		return daemon.ErrorType, nil, fmt.Errorf("message too short: %d", messageLength)
+	}
 	messageBody = make([]byte, messageLength-3)
 	_, err = io.ReadFull(r.c, messageBody)
 	if err != nil {
