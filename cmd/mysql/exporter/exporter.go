@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -13,479 +13,519 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// MySQLWalgExporter implements the Prometheus Collector interface for MySQL/MariaDB
-type MySQLWalgExporter struct {
+// Exporter implements the Prometheus Collector interface for MySQL/MariaDB WAL-G.
+type Exporter struct {
+	logger         *slog.Logger
 	walgPath       string
 	walgConfigPath string
-	scrapeInterval time.Duration
 
-	// Metrics
+	backupScrapeInterval  time.Duration
+	binlogScrapeInterval  time.Duration
+	storageScrapeInterval time.Duration
+
+	// last known values used for cross-scrape coverage computation
+	lastOldestBackupStart time.Time
+	lastLatestBinlogTime  time.Time
+
 	backupCount            *prometheus.GaugeVec
+	backupInfo             *prometheus.GaugeVec
 	backupStartTimestamp   *prometheus.GaugeVec
 	backupFinishTimestamp  *prometheus.GaugeVec
 	backupUncompressedSize *prometheus.GaugeVec
 	backupCompressedSize   *prometheus.GaugeVec
 	backupDuration         *prometheus.GaugeVec
+	backupScrapeDuration   prometheus.Gauge
+
 	binlogCount            prometheus.Gauge
 	binlogLatestTimestamp  prometheus.Gauge
 	binlogTotalSize        prometheus.Gauge
-	scrapeDuration         prometheus.Gauge
-	scrapeErrors           prometheus.Counter
-	errors                 *prometheus.CounterVec
+	binlogCoverage         prometheus.Gauge
+	binlogScrapeDuration   prometheus.Gauge
 
-	// Storage health metrics
-	storageAlive   prometheus.Gauge
-	storageLatency prometheus.Gauge
+	storageAlive         prometheus.Gauge
+	storageLatency       prometheus.Gauge
 
-	// Internal state
-	lastScrape time.Time
+	scrapeErrors prometheus.Counter
+	errors       *prometheus.CounterVec
 }
 
-// MySQLBackupInfo represents backup information from backup-list --detail --json
-type MySQLBackupInfo struct {
-	BackupName       string      `json:"backup_name"`
-	ModifyTime       time.Time   `json:"modify_time"`
-	BinLogStart      string      `json:"binlog_start"`
-	BinLogEnd        string      `json:"binlog_end"`
-	StartLocalTime   time.Time   `json:"start_local_time"`
-	StopLocalTime    time.Time   `json:"stop_local_time"`
-	UncompressedSize int64       `json:"uncompressed_size"`
-	CompressedSize   int64       `json:"compressed_size"`
-	Hostname         string      `json:"hostname"`
-	IsPermanent      bool        `json:"is_permanent"`
-	UserData         interface{} `json:"user_data,omitempty"`
+// BackupInfo represents an entry from wal-g backup-list --detail --json.
+type BackupInfo struct {
+	BackupName       string    `json:"backup_name"`
+	StartLocalTime   time.Time `json:"start_local_time"`
+	StopLocalTime    time.Time `json:"stop_local_time"`
+	BinLogStart      string    `json:"binlog_start"`
+	BinLogEnd        string    `json:"binlog_end"`
+	UncompressedSize int64     `json:"uncompressed_size"`
+	CompressedSize   int64     `json:"compressed_size"`
+	Hostname         string    `json:"hostname"`
+	IsPermanent      bool      `json:"is_permanent"`
 }
 
-// GetBackupType determines if backup is full or incremental
-func (b *MySQLBackupInfo) GetBackupType() string {
-	// Check if backup name contains increment indicators
-	// Incremental backups created by xtrabackup have specific naming patterns
+func (b *BackupInfo) backupType() string {
 	if strings.Contains(b.BackupName, "_increment") || strings.Contains(b.BackupName, "_incr") {
 		return "incremental"
 	}
 	return "full"
 }
 
-// GetBackupDuration calculates backup duration in seconds
-func (b *MySQLBackupInfo) GetBackupDuration() float64 {
+func (b *BackupInfo) duration() float64 {
 	if b.StopLocalTime.IsZero() || b.StartLocalTime.IsZero() {
 		return 0
 	}
 	return b.StopLocalTime.Sub(b.StartLocalTime).Seconds()
 }
 
-// MySQLBinlogInfo represents binlog information
-type MySQLBinlogInfo struct {
-	BinlogName   string    `json:"binlog_name"`
-	ModifiedTime time.Time `json:"modified_time"`
-	Size         int64     `json:"size"`
+// BinlogInfo represents an entry from wal-g binlog-list.
+type BinlogInfo struct {
+	Name         string
+	ModifiedTime time.Time
+	Size         int64
 }
 
-// NewMySQLWalgExporter creates a new WAL-G exporter for MySQL/MariaDB
-func NewMySQLWalgExporter(walgPath string, scrapeInterval time.Duration, walgConfigPath string) (*MySQLWalgExporter, error) {
-	return &MySQLWalgExporter{
-		walgPath:       walgPath,
-		scrapeInterval: scrapeInterval,
-		walgConfigPath: walgConfigPath,
+// NewExporter creates a new Exporter. The caller owns the logger.
+func NewExporter(
+	logger *slog.Logger,
+	walgPath string,
+	backupScrapeInterval time.Duration,
+	binlogScrapeInterval time.Duration,
+	storageScrapeInterval time.Duration,
+	walgConfigPath string,
+) (*Exporter, error) {
+	return &Exporter{
+		logger:                logger,
+		walgPath:              walgPath,
+		walgConfigPath:        walgConfigPath,
+		backupScrapeInterval:  backupScrapeInterval,
+		binlogScrapeInterval:  binlogScrapeInterval,
+		storageScrapeInterval: storageScrapeInterval,
 
 		backupCount: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
-				Name: "walg_mysql_backups",
-				Help: "Number of backups by type (full/incremental)",
+				Name: "walg_mysql_backups_total",
+				Help: "Number of backups by type.",
 			},
 			[]string{"backup_type"},
+		),
+
+		backupInfo: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "walg_mysql_backup_info",
+				Help: "Metadata for each stored backup. Value is always 1.",
+			},
+			[]string{"backup_name", "backup_type", "hostname", "is_permanent", "binlog_start", "binlog_end"},
 		),
 
 		backupStartTimestamp: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_backup_start_timestamp",
-				Help: "Start timestamp of backup in Unix time",
+				Help: "Start time of the backup (Unix timestamp).",
 			},
-			[]string{"backup_name", "backup_type", "hostname", "is_permanent", "binlog_start", "binlog_end"},
+			[]string{"backup_name"},
 		),
 
 		backupFinishTimestamp: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_backup_finish_timestamp",
-				Help: "Finish timestamp of backup in Unix time",
+				Help: "Finish time of the backup (Unix timestamp).",
 			},
-			[]string{"backup_name", "backup_type", "hostname", "is_permanent", "binlog_start", "binlog_end"},
+			[]string{"backup_name"},
 		),
 
 		backupUncompressedSize: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_backup_uncompressed_size_bytes",
-				Help: "Uncompressed size of the backup in bytes",
+				Help: "Uncompressed size of the backup in bytes.",
 			},
-			[]string{"backup_name", "backup_type", "hostname"},
+			[]string{"backup_name"},
 		),
 
 		backupCompressedSize: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_backup_compressed_size_bytes",
-				Help: "Compressed size of the backup in bytes",
+				Help: "Compressed size of the backup in bytes.",
 			},
-			[]string{"backup_name", "backup_type", "hostname"},
+			[]string{"backup_name"},
 		),
 
 		backupDuration: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_backup_duration_seconds",
-				Help: "Duration of backup operation in seconds",
+				Help: "Duration of the backup operation in seconds.",
 			},
-			[]string{"backup_name", "backup_type"},
+			[]string{"backup_name"},
+		),
+
+		backupScrapeDuration: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "walg_mysql_backup_list_duration_seconds",
+				Help: "Time taken to execute backup-list during the last collector run.",
+			},
 		),
 
 		binlogCount: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_binlog_count",
-				Help: "Number of binlogs in storage",
+				Help: "Number of binlogs in storage.",
 			},
 		),
 
 		binlogLatestTimestamp: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_binlog_latest_timestamp",
-				Help: "Timestamp of the latest binlog in Unix time",
+				Help: "Modification time of the most recent binlog (Unix timestamp).",
 			},
 		),
 
 		binlogTotalSize: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_binlog_total_size_bytes",
-				Help: "Total size of all binlogs in storage in bytes",
+				Help: "Total size of all binlogs in storage in bytes.",
 			},
 		),
 
-		scrapeDuration: prometheus.NewGauge(
+		binlogCoverage: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "walg_mysql_scrape_duration_seconds",
-				Help: "Duration of the last scrape in seconds",
+				Name: "walg_mysql_binlog_coverage_seconds",
+				Help: "Time span covered by stored binlogs in seconds (latest binlog time minus oldest backup start time).",
 			},
 		),
 
-		scrapeErrors: prometheus.NewCounter(
-			prometheus.CounterOpts{
-				Name: "walg_mysql_scrape_errors_total",
-				Help: "Total number of scrape errors",
+		binlogScrapeDuration: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "walg_mysql_binlog_list_duration_seconds",
+				Help: "Time taken to execute binlog-list during the last collector run.",
 			},
-		),
-
-		errors: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "walg_mysql_errors_total",
-				Help: "Total number of WAL-G errors by operation and error type",
-			},
-			[]string{"operation", "error_type"},
 		),
 
 		storageAlive: prometheus.NewGauge(
 			prometheus.GaugeOpts{
-				Name: "walg_mysql_storage_alive",
-				Help: "Storage connectivity status (1 = alive, 0 = dead)",
+				Name: "walg_mysql_storage_up",
+				Help: "Storage connectivity status (1 = up, 0 = down).",
 			},
 		),
 
 		storageLatency: prometheus.NewGauge(
 			prometheus.GaugeOpts{
 				Name: "walg_mysql_storage_latency_seconds",
-				Help: "Storage operation latency in seconds",
+				Help: "Storage operation latency in seconds.",
 			},
+		),
+
+		scrapeErrors: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "walg_mysql_scrape_errors_total",
+				Help: "Total number of scrape errors.",
+			},
+		),
+
+		errors: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "walg_mysql_errors_total",
+				Help: "Total number of WAL-G errors by operation and error type.",
+			},
+			[]string{"operation", "error_type"},
 		),
 	}, nil
 }
 
-// Describe implements the Prometheus Collector interface
-func (e *MySQLWalgExporter) Describe(ch chan<- *prometheus.Desc) {
+// Describe implements prometheus.Collector.
+func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	e.backupCount.Describe(ch)
+	e.backupInfo.Describe(ch)
 	e.backupStartTimestamp.Describe(ch)
 	e.backupFinishTimestamp.Describe(ch)
 	e.backupUncompressedSize.Describe(ch)
 	e.backupCompressedSize.Describe(ch)
 	e.backupDuration.Describe(ch)
+	e.backupScrapeDuration.Describe(ch)
 	e.binlogCount.Describe(ch)
 	e.binlogLatestTimestamp.Describe(ch)
 	e.binlogTotalSize.Describe(ch)
-	e.scrapeDuration.Describe(ch)
-	e.scrapeErrors.Describe(ch)
-	e.errors.Describe(ch)
+	e.binlogCoverage.Describe(ch)
+	e.binlogScrapeDuration.Describe(ch)
 	e.storageAlive.Describe(ch)
 	e.storageLatency.Describe(ch)
+	e.scrapeErrors.Describe(ch)
+	e.errors.Describe(ch)
 }
 
-// Collect implements the Prometheus Collector interface
-func (e *MySQLWalgExporter) Collect(ch chan<- prometheus.Metric) {
+// Collect implements prometheus.Collector.
+func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.backupCount.Collect(ch)
+	e.backupInfo.Collect(ch)
 	e.backupStartTimestamp.Collect(ch)
 	e.backupFinishTimestamp.Collect(ch)
 	e.backupUncompressedSize.Collect(ch)
 	e.backupCompressedSize.Collect(ch)
 	e.backupDuration.Collect(ch)
+	e.backupScrapeDuration.Collect(ch)
 	e.binlogCount.Collect(ch)
 	e.binlogLatestTimestamp.Collect(ch)
 	e.binlogTotalSize.Collect(ch)
-	e.scrapeDuration.Collect(ch)
-	e.scrapeErrors.Collect(ch)
-	e.errors.Collect(ch)
+	e.binlogCoverage.Collect(ch)
+	e.binlogScrapeDuration.Collect(ch)
 	e.storageAlive.Collect(ch)
 	e.storageLatency.Collect(ch)
+	e.scrapeErrors.Collect(ch)
+	e.errors.Collect(ch)
 }
 
-// Start begins the metrics collection loop
-func (e *MySQLWalgExporter) Start(ctx context.Context) {
-	ticker := time.NewTicker(e.scrapeInterval)
-	defer ticker.Stop()
+// Start runs the metric collection loop until ctx is cancelled.
+func (e *Exporter) Start(ctx context.Context) {
+	tickerBackup := time.NewTicker(e.backupScrapeInterval)
+	defer tickerBackup.Stop()
+	tickerBinlog := time.NewTicker(e.binlogScrapeInterval)
+	defer tickerBinlog.Stop()
+	tickerStorage := time.NewTicker(e.storageScrapeInterval)
+	defer tickerStorage.Stop()
 
-	// Initial scrape
-	e.scrapeMetrics()
+	e.checkStorage()
+	e.scrapeBackups()
+	e.scrapeBinlogs()
+
+	e.logger.Info("Initial scrape completed; starting periodic collection")
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Exporter context cancelled, stopping metrics collection")
+			e.logger.Info("Context cancelled, stopping collection")
 			return
-		case <-ticker.C:
-			e.scrapeMetrics()
+		case <-tickerBackup.C:
+			e.scrapeBackups()
+		case <-tickerBinlog.C:
+			e.scrapeBinlogs()
+		case <-tickerStorage.C:
+			e.checkStorage()
 		}
 	}
 }
 
-// scrapeMetrics collects all metrics from WAL-G
-func (e *MySQLWalgExporter) scrapeMetrics() {
+func (e *Exporter) scrapeBackups() {
 	start := time.Now()
-	defer func() {
-		e.scrapeDuration.Set(time.Since(start).Seconds())
-		e.lastScrape = time.Now()
-	}()
+	defer func() { e.backupScrapeDuration.Set(time.Since(start).Seconds()) }()
 
-	log.Printf("Scraping WAL-G MySQL metrics...")
-
-	// Check storage aliveness first
-	e.checkStorageAliveness()
-
-	// Get backup information
-	backups, err := e.getBackupList()
+	backups, err := e.fetchBackupList()
 	if err != nil {
-		log.Printf("Error getting backup list: %v", err)
+		e.logger.Error("backup-list failed", "error", err)
 		e.scrapeErrors.Inc()
 		e.errors.WithLabelValues("backup-list", "command_failed").Inc()
-		// Continue with other metrics even if backup-list fails
-	} else {
-		e.updateBackupMetrics(backups)
+		return
 	}
 
-	// Get binlog information
-	binlogs, err := e.getBinlogList()
-	if err != nil {
-		log.Printf("Error getting binlog list: %v", err)
-		e.scrapeErrors.Inc()
-		e.errors.WithLabelValues("binlog-list", "command_failed").Inc()
-		// Continue even if binlog-list fails
-	} else {
-		e.updateBinlogMetrics(binlogs)
-	}
-
-	log.Printf("Metrics scrape completed in %v", time.Since(start))
+	e.updateBackupMetrics(backups)
+	e.lastOldestBackupStart = oldestNonPermanentStart(backups)
+	e.updateBinlogCoverage()
+	e.logger.Info("backup-list scrape completed", "count", len(backups), "duration", time.Since(start))
 }
 
-// getBackupList executes wal-g backup-list --detail --json
-func (e *MySQLWalgExporter) getBackupList() ([]MySQLBackupInfo, error) {
-	var cmd *exec.Cmd
+func (e *Exporter) scrapeBinlogs() {
+	start := time.Now()
+	defer func() { e.binlogScrapeDuration.Set(time.Since(start).Seconds()) }()
 
-	if e.walgConfigPath != "" {
-		cmd = exec.Command(e.walgPath, "backup-list", "--detail", "--json", "--config", e.walgConfigPath)
-	} else {
-		cmd = exec.Command(e.walgPath, "backup-list", "--detail", "--json")
-	}
-
-	output, err := cmd.Output()
+	binlogs, err := e.fetchBinlogList()
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute backup-list: %w", err)
+		e.logger.Error("binlog-list failed", "error", err)
+		e.scrapeErrors.Inc()
+		e.errors.WithLabelValues("binlog-list", "command_failed").Inc()
+		return
 	}
 
-	var backups []MySQLBackupInfo
+	e.lastLatestBinlogTime = latestBinlogTime(binlogs)
+	e.updateBinlogMetrics(binlogs)
+	e.updateBinlogCoverage()
+	e.logger.Info("binlog-list scrape completed", "count", len(binlogs), "duration", time.Since(start))
+}
+
+func (e *Exporter) fetchBackupList() ([]BackupInfo, error) {
+	args := []string{"backup-list", "--detail", "--json"}
+	if e.walgConfigPath != "" {
+		args = append(args, "--config", e.walgConfigPath)
+	}
+
+	output, err := exec.Command(e.walgPath, args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("backup-list: %w", err)
+	}
+
+	var backups []BackupInfo
 	if err := json.Unmarshal(output, &backups); err != nil {
-		return nil, fmt.Errorf("failed to parse backup-list output: %w", err)
+		return nil, fmt.Errorf("parse backup-list output: %w", err)
 	}
 
 	return backups, nil
 }
 
-// getBinlogList executes wal-g binlog-list (if available)
-func (e *MySQLWalgExporter) getBinlogList() ([]MySQLBinlogInfo, error) {
-	var cmd *exec.Cmd
-
+func (e *Exporter) fetchBinlogList() ([]BinlogInfo, error) {
+	args := []string{"binlog-list"}
 	if e.walgConfigPath != "" {
-		cmd = exec.Command(e.walgPath, "binlog-list", "--config", e.walgConfigPath)
-	} else {
-		cmd = exec.Command(e.walgPath, "binlog-list")
+		args = append(args, "--config", e.walgConfigPath)
 	}
 
-	output, err := cmd.Output()
+	output, err := exec.Command(e.walgPath, args...).Output()
 	if err != nil {
-		// binlog-list might not be available or no binlogs exist
-		// This is not necessarily an error
-		return []MySQLBinlogInfo{}, nil
+		// binlog-list fails when no binlogs exist; treat as empty, not an error.
+		return nil, nil
 	}
 
-	// Parse binlog-list output (format: name, modified_time, size)
-	// Since binlog-list doesn't output JSON, we parse the text output
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	var binlogs []MySQLBinlogInfo
+	return parseBinlogList(string(output))
+}
+
+// parseBinlogList parses the text output of wal-g binlog-list.
+// Expected format per line: <name> <RFC3339-timestamp> <size-bytes>
+// The first line is skipped if it cannot be parsed as data (header row detection).
+func parseBinlogList(output string) ([]BinlogInfo, error) {
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	binlogs := make([]BinlogInfo, 0, len(lines))
 
 	for i, line := range lines {
-		if i == 0 || strings.TrimSpace(line) == "" {
-			// Skip header or empty lines
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
 
 		fields := strings.Fields(line)
 		if len(fields) < 3 {
-			log.Printf("Warning: binlog line has insufficient fields (expected 3, got %d): %s", len(fields), line)
-			continue
+			return nil, fmt.Errorf("line %d: expected at least 3 fields, got %d: %q", i+1, len(fields), line)
 		}
 
-		binlog := MySQLBinlogInfo{
-			BinlogName: fields[0],
+		modTime, err := time.Parse(time.RFC3339, fields[1])
+		if err != nil {
+			if i == 0 {
+				// First line with non-parseable timestamp is treated as a header.
+				continue
+			}
+			return nil, fmt.Errorf("line %d: parse timestamp %q: %w", i+1, fields[1], err)
 		}
 
-		// Try to parse timestamp (fields[1])
-		if t, err := time.Parse("2006-01-02T15:04:05Z", fields[1]); err == nil {
-			binlog.ModifiedTime = t
-		} else {
-			log.Printf("Warning: failed to parse binlog timestamp '%s': %v", fields[1], err)
+		size, err := strconv.ParseInt(fields[2], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("line %d: parse size %q: %w", i+1, fields[2], err)
 		}
 
-		// Try to parse size (fields[2])
-		if size, err := strconv.ParseInt(fields[2], 10, 64); err == nil {
-			binlog.Size = size
-		} else {
-			log.Printf("Warning: failed to parse binlog size '%s': %v", fields[2], err)
-		}
-
-		binlogs = append(binlogs, binlog)
+		binlogs = append(binlogs, BinlogInfo{
+			Name:         fields[0],
+			ModifiedTime: modTime,
+			Size:         size,
+		})
 	}
 
 	return binlogs, nil
 }
 
-// updateBackupMetrics updates backup-related metrics
-func (e *MySQLWalgExporter) updateBackupMetrics(backups []MySQLBackupInfo) {
-	// Reset metrics
+func (e *Exporter) updateBackupMetrics(backups []BackupInfo) {
 	e.backupCount.Reset()
+	e.backupInfo.Reset()
 	e.backupStartTimestamp.Reset()
 	e.backupFinishTimestamp.Reset()
 	e.backupUncompressedSize.Reset()
 	e.backupCompressedSize.Reset()
 	e.backupDuration.Reset()
 
-	fullCount, incrementalCount := 0, 0
+	counts := map[string]float64{"full": 0, "incremental": 0}
 
-	for _, backup := range backups {
-		backupType := backup.GetBackupType()
-		if backupType == "full" {
-			fullCount++
-		} else {
-			incrementalCount++
-		}
+	for _, b := range backups {
+		bt := b.backupType()
+		counts[bt]++
 
-		permanent := strconv.FormatBool(backup.IsPermanent)
+		e.backupInfo.WithLabelValues(
+			b.BackupName,
+			bt,
+			b.Hostname,
+			strconv.FormatBool(b.IsPermanent),
+			b.BinLogStart,
+			b.BinLogEnd,
+		).Set(1)
 
-		// Set timestamp metrics with reduced-cardinality labels
-		// Use "latest" constant instead of backup name to avoid creating a new time series per backup
-		labels := []string{
-			"latest",
-			backupType,
-			backup.Hostname,
-			permanent,
-			backup.BinLogStart,
-			backup.BinLogEnd,
-		}
-
-		e.backupStartTimestamp.WithLabelValues(labels...).Set(float64(backup.StartLocalTime.Unix()))
-		e.backupFinishTimestamp.WithLabelValues(labels...).Set(float64(backup.StopLocalTime.Unix()))
-
-		// Set size metrics with reduced-cardinality labels
-		sizeLabels := []string{
-			"latest",
-			backupType,
-			backup.Hostname,
-		}
-		e.backupUncompressedSize.WithLabelValues(sizeLabels...).Set(float64(backup.UncompressedSize))
-		e.backupCompressedSize.WithLabelValues(sizeLabels...).Set(float64(backup.CompressedSize))
-
-		// Set duration metric with reduced-cardinality labels
-		durationLabels := []string{
-			"latest",
-			backupType,
-		}
-		e.backupDuration.WithLabelValues(durationLabels...).Set(backup.GetBackupDuration())
+		e.backupStartTimestamp.WithLabelValues(b.BackupName).Set(float64(b.StartLocalTime.Unix()))
+		e.backupFinishTimestamp.WithLabelValues(b.BackupName).Set(float64(b.StopLocalTime.Unix()))
+		e.backupUncompressedSize.WithLabelValues(b.BackupName).Set(float64(b.UncompressedSize))
+		e.backupCompressedSize.WithLabelValues(b.BackupName).Set(float64(b.CompressedSize))
+		e.backupDuration.WithLabelValues(b.BackupName).Set(b.duration())
 	}
 
-	// Set backup counts by type
-	e.backupCount.WithLabelValues("full").Set(float64(fullCount))
-	e.backupCount.WithLabelValues("incremental").Set(float64(incrementalCount))
-
-	log.Printf("Updated metrics for %d backups (%d full, %d incremental)", len(backups), fullCount, incrementalCount)
+	for bt, count := range counts {
+		e.backupCount.WithLabelValues(bt).Set(count)
+	}
 }
 
-// updateBinlogMetrics updates binlog-related metrics
-func (e *MySQLWalgExporter) updateBinlogMetrics(binlogs []MySQLBinlogInfo) {
+func (e *Exporter) updateBinlogMetrics(binlogs []BinlogInfo) {
+	e.binlogCount.Set(float64(len(binlogs)))
+
 	if len(binlogs) == 0 {
-		e.binlogCount.Set(0)
 		e.binlogLatestTimestamp.Set(0)
 		e.binlogTotalSize.Set(0)
 		return
 	}
 
-	e.binlogCount.Set(float64(len(binlogs)))
-
-	// Find latest binlog and calculate total size
-	var latestTime time.Time
 	var totalSize int64
-
-	for _, binlog := range binlogs {
-		if binlog.ModifiedTime.After(latestTime) {
-			latestTime = binlog.ModifiedTime
-		}
-		totalSize += binlog.Size
+	for _, b := range binlogs {
+		totalSize += b.Size
 	}
 
-	if !latestTime.IsZero() {
-		e.binlogLatestTimestamp.Set(float64(latestTime.Unix()))
-	}
 	e.binlogTotalSize.Set(float64(totalSize))
-
-	log.Printf("Updated metrics for %d binlogs (total size: %d bytes)", len(binlogs), totalSize)
+	e.binlogLatestTimestamp.Set(float64(e.lastLatestBinlogTime.Unix()))
 }
 
-// checkStorageAliveness checks if the storage backend is accessible
-func (e *MySQLWalgExporter) checkStorageAliveness() {
+func (e *Exporter) updateBinlogCoverage() {
+	if e.lastLatestBinlogTime.IsZero() || e.lastOldestBackupStart.IsZero() {
+		e.binlogCoverage.Set(0)
+		return
+	}
+
+	coverage := e.lastLatestBinlogTime.Sub(e.lastOldestBackupStart).Seconds()
+	if coverage < 0 {
+		coverage = 0
+	}
+	e.binlogCoverage.Set(coverage)
+}
+
+func oldestNonPermanentStart(backups []BackupInfo) time.Time {
+	var t time.Time
+	for _, b := range backups {
+		if b.IsPermanent {
+			continue
+		}
+		if t.IsZero() || b.StartLocalTime.Before(t) {
+			t = b.StartLocalTime
+		}
+	}
+	return t
+}
+
+func latestBinlogTime(binlogs []BinlogInfo) time.Time {
+	var t time.Time
+	for _, b := range binlogs {
+		if b.ModifiedTime.After(t) {
+			t = b.ModifiedTime
+		}
+	}
+	return t
+}
+
+func (e *Exporter) checkStorage() {
 	start := time.Now()
 
-	// Set a reasonable timeout for storage check
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Try a simple WAL-G command to test storage connectivity
-	var cmd *exec.Cmd
+	args := []string{"st", "check", "read"}
 	if e.walgConfigPath != "" {
-		cmd = exec.CommandContext(ctx, e.walgPath, "st", "check", "read", "--config", e.walgConfigPath)
-	} else {
-		cmd = exec.CommandContext(ctx, e.walgPath, "st", "check", "read")
+		args = append(args, "--config", e.walgConfigPath)
 	}
 
-	err := cmd.Run()
+	err := exec.CommandContext(ctx, e.walgPath, args...).Run()
 	latency := time.Since(start).Seconds()
 
-	// Set latency regardless of success/failure
 	e.storageLatency.Set(latency)
 
 	if err != nil {
-		log.Printf("Storage aliveness check failed: %v", err)
+		e.logger.Error("Storage check failed", "error", err, "latency", latency)
 		e.storageAlive.Set(0)
 		e.errors.WithLabelValues("storage-check", "connectivity_failed").Inc()
-	} else {
-		e.storageAlive.Set(1)
+		return
 	}
+
+	e.storageAlive.Set(1)
+	e.logger.Info("Storage check completed", "latency", latency)
 }

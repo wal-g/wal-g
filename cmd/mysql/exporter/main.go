@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,96 +16,91 @@ import (
 )
 
 var (
-	listenAddr     = flag.String("web.listen-address", ":9352", "Address to listen on for web interface and telemetry.")
-	metricsPath    = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
-	walgPath       = flag.String("walg.path", "wal-g", "Path to the wal-g binary.")
-	scrapeInterval = flag.Duration("scrape.interval", 60*time.Second, "Interval between scrapes.")
-	walgConfigPath = flag.String("walg.config-path", "", "Path to the wal-g config file.")
+	listenAddr            = flag.String("web.listen-address", ":9352", "Address to listen on for web interface and telemetry.")
+	metricsPath           = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+	walgPath              = flag.String("walg.path", "wal-g", "Path to the wal-g binary.")
+	walgConfigPath        = flag.String("walg.config-path", "", "Path to the wal-g config file.")
+	backupScrapeInterval  = flag.Duration("backup-list.scrape-interval", 60*time.Second, "Interval between backup-list scrapes.")
+	binlogScrapeInterval  = flag.Duration("binlog-list.scrape-interval", 30*time.Second, "Interval between binlog-list scrapes.")
+	storageScrapeInterval = flag.Duration("storage-check.scrape-interval", 30*time.Second, "Interval between storage connectivity checks.")
 )
 
 func main() {
 	flag.Parse()
 
-	log.Printf("Starting WAL-G MySQL/MariaDB Prometheus Exporter")
-	log.Printf("Listen address: %s", *listenAddr)
-	log.Printf("Metrics path: %s", *metricsPath)
-	log.Printf("WAL-G path: %s", *walgPath)
-	log.Printf("Scrape interval: %v", *scrapeInterval)
-	if *walgConfigPath != "" {
-		log.Printf("WAL-G config path: %s", *walgConfigPath)
-	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	// Create context for graceful shutdown
+	logger.Info("Starting WAL-G MySQL/MariaDB Prometheus exporter",
+		"listen_address", *listenAddr,
+		"metrics_path", *metricsPath,
+		"walg_path", *walgPath,
+		"walg_config", *walgConfigPath,
+		slog.Group("intervals",
+			slog.Duration("backup", *backupScrapeInterval),
+			slog.Duration("binlog", *binlogScrapeInterval),
+			slog.Duration("storage", *storageScrapeInterval),
+		),
+	)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Create and register the exporter
-	exporter, err := NewMySQLWalgExporter(*walgPath, *scrapeInterval, *walgConfigPath)
+	exporter, err := NewExporter(
+		logger,
+		*walgPath,
+		*backupScrapeInterval,
+		*binlogScrapeInterval,
+		*storageScrapeInterval,
+		*walgConfigPath,
+	)
 	if err != nil {
-		log.Fatalf("Failed to create exporter: %v", err)
+		logger.Error("Failed to create exporter", "error", err)
+		os.Exit(1)
 	}
 
 	prometheus.MustRegister(exporter)
 
-	// Start the exporter in a goroutine
 	go exporter.Start(ctx)
 
-	// Set up HTTP server
 	mux := http.NewServeMux()
 	mux.Handle(*metricsPath, promhttp.Handler())
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `<html>
-<head><title>WAL-G MySQL/MariaDB Prometheus Exporter</title></head>
+<head><title>WAL-G MySQL/MariaDB Exporter</title></head>
 <body>
-<h1>WAL-G MySQL/MariaDB Prometheus Exporter</h1>
+<h1>WAL-G MySQL/MariaDB Exporter</h1>
 <p><a href="%s">Metrics</a></p>
-<h2>Status</h2>
-<ul>
-<li>Scrape interval: %v</li>
-<li>WAL-G path: %s</li>
-</ul>
 </body>
-</html>`, *metricsPath, *scrapeInterval, *walgPath)
-	})
-
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"healthy"}`)
+</html>`, *metricsPath)
 	})
 
 	server := &http.Server{
-		Addr:         *listenAddr,
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		Addr:    *listenAddr,
+		Handler: mux,
 	}
 
-	// Start HTTP server in a goroutine
 	go func() {
-		log.Printf("Starting HTTP server on %s", *listenAddr)
+		logger.Info("HTTP server listening", "addr", *listenAddr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("HTTP server failed: %v", err)
+			logger.Error("HTTP server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
-	// Wait for interrupt signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
+	sig := <-sigChan
 
-	log.Println("Received shutdown signal, shutting down gracefully...")
-
-	// Cancel context to stop exporter
+	logger.Info("Received shutdown signal", "signal", sig.String())
 	cancel()
 
-	// Shutdown HTTP server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		logger.Error("HTTP server shutdown error", "error", err)
 	}
 
-	log.Println("Exporter shutdown complete")
+	logger.Info("Exporter shutdown complete")
 }
