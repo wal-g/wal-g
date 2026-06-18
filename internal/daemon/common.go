@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	ErrCorruptedCorruptedMessageBody = fmt.Errorf("currepted message body")
+	ErrCorruptedMessageBody = fmt.Errorf("corrapted message body")
 )
 
 func (msg SocketMessageType) ToBytes() []byte {
@@ -50,23 +50,26 @@ func ArgsToBytes(args ...string) ([]byte, error) {
 }
 
 func BytesToArgs(body []byte) ([]string, error) {
+	if len(body) == 0 {
+		return nil, ErrCorruptedMessageBody
+	}
 	argsCount := int(body[0])
 	res := make([]string, 0, argsCount)
 	idx := 1
 	for i := 0; i < argsCount; i++ {
-		if idx+2 >= len(body) {
-			return nil, ErrCorruptedCorruptedMessageBody
+		if idx+2 > len(body) {
+			return nil, ErrCorruptedMessageBody
 		}
 		l := int(binary.BigEndian.Uint16(body[idx : idx+2]))
 		idx += 2
 		if idx+l > len(body) {
-			return nil, ErrCorruptedCorruptedMessageBody
+			return nil, ErrCorruptedMessageBody
 		}
 		res = append(res, string(body[idx:idx+l]))
 		idx += l
 	}
 	if len(body) != idx {
-		return nil, ErrCorruptedCorruptedMessageBody
+		return nil, ErrCorruptedMessageBody
 	}
 	return res, nil
 }

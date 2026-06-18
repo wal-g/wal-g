@@ -225,11 +225,11 @@ func HandleDaemon(options DaemonOptions) {
 	SetupSignalListener()
 
 	multiSt, err := internal.ConfigureMultiStorage(true)
-	defer utility.LoggedClose(multiSt, "close multi-storage")
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("configure multi-storage: %w", err)
 		return
 	}
+	defer utility.LoggedClose(multiSt, "close multi-storage")
 
 	for {
 		fd, err := l.Accept()
