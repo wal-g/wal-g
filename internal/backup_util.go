@@ -145,7 +145,7 @@ func GetBackupTimeSlices(backupObjects []storage.Object) []BackupTime {
 }
 
 func SortBackupTimeSlices(backupTimes []BackupTime) {
-	slices.SortFunc(backupTimes, func(a, b BackupTime) int {
+	slices.SortStableFunc(backupTimes, func(a, b BackupTime) int {
 		return a.Time.Compare(b.Time)
 	})
 }
