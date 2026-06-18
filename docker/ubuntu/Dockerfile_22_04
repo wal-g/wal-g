@@ -12,4 +12,4 @@ RUN apt-get update && \
         wget curl \
         git \
         ca-certificates && \
-  rm -rf /var/lib/apt/lists/*
+  rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
