@@ -194,6 +194,9 @@ func (r SocketMessageReader) Next() (messageType daemon.SocketMessageType, messa
 	if err != nil {
 		return daemon.ErrorType, nil, fmt.Errorf("fail to read message len: %w", err)
 	}
+	if messageLength < 3 {
+		return daemon.ErrorType, nil, fmt.Errorf("message too short: %d", messageLength)
+	}
 	messageBody = make([]byte, messageLength-3)
 	_, err = io.ReadFull(r.c, messageBody)
 	if err != nil {
@@ -222,11 +225,11 @@ func HandleDaemon(options DaemonOptions) {
 	SetupSignalListener()
 
 	multiSt, err := internal.ConfigureMultiStorage(true)
-	defer utility.LoggedClose(multiSt, "close multi-storage")
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("configure multi-storage: %w", err)
 		return
 	}
+	defer utility.LoggedClose(multiSt, "close multi-storage")
 
 	for {
 		fd, err := l.Accept()
