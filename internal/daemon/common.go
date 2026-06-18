@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	ErrCorruptedMessageBody = fmt.Errorf("corrapted message body")
+	ErrCorruptedMessageBody = fmt.Errorf("corrupted message body")
 )
 
 func (msg SocketMessageType) ToBytes() []byte {
