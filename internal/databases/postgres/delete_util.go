@@ -91,12 +91,14 @@ func backupNameFromObjectPath(objectName string) (string, bool) {
 	switch {
 	case strings.HasPrefix(objectName, utility.BaseBackupPath):
 		relativePath = objectName[len(utility.BaseBackupPath):]
-	default:
+	case strings.HasPrefix(objectName, utility.BackupNamePrefix):
 		// Objects listed from the base backup subfolder have paths relative to that folder.
 		relativePath = objectName
+	default:
+		return "", false
 	}
 	backupName := utility.StripLeftmostBackupName(relativePath)
-	if backupName == "" {
+	if backupName == "" || !strings.HasPrefix(backupName, utility.BackupNamePrefix) {
 		return "", false
 	}
 	return backupName, true
@@ -110,6 +112,10 @@ func walNameFromObjectPath(objectName string) (string, bool) {
 		return "", false
 	default:
 		// WAL objects listed from the WAL subfolder have paths relative to that folder.
+		if strings.HasPrefix(objectName, utility.BaseBackupPath) ||
+			strings.HasPrefix(objectName, utility.BackupNamePrefix) {
+			return "", false
+		}
 		walName := utility.StripWalFileName(objectName)
 		if walName == strings.Repeat("Z", 24) {
 			return "", false
