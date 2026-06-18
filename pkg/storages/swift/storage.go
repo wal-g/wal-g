@@ -28,7 +28,7 @@ type Config struct {
 }
 
 // TODO: Unit tests
-func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
+func NewStorage(ctx context.Context, config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	connection := new(swift.Connection)
 	for envKey, envValue := range config.EnvVariables {
 		err := os.Setenv(envKey, envValue)
@@ -43,7 +43,6 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 		}
 	}
 
-	ctx := context.Background()
 	err := connection.ApplyEnvironment()
 	if err != nil {
 		return nil, fmt.Errorf("apply env variables: %w", err)

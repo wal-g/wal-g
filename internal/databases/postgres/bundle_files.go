@@ -72,11 +72,9 @@ func (relStat *RelFileStatistics) getFileUpdateCount(filePath string) uint64 {
 	return fileStat.deletedTuplesCount + fileStat.updatedTuplesCount + fileStat.insertedTuplesCount
 }
 
-func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error) {
+func newRelFileStatistics(ctx context.Context, queryRunner *PgQueryRunner) (RelFileStatistics, error) {
 	result := make(map[walparser.RelFileNode]PgRelationStat)
 
-	// No request ctx plumbed through the composer callback yet; revisit when it threads ctx.
-	ctx := context.Background()
 	err := queryRunner.ForEachDatabase(ctx, func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
 		pgStatRows, err := currentRunner.getStatistics(ctx, db)
 		if err != nil {

@@ -196,7 +196,7 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
-	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
+	err := uploader.UploadingFolder.PutObject(ctx, path, content)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
 		uploader.failed.Store(true)

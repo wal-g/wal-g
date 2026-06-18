@@ -342,7 +342,7 @@ func TestConfigureLimiters_TurboSkipsLimiters(t *testing.T) {
 func TestConfigureStorage_NoStorageConfigured(t *testing.T) {
 	resetToDefaults()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.Error(t, err)
 	assert.IsType(t, internal.UnconfiguredStorageError{}, err)
@@ -354,7 +354,7 @@ func TestConfigureStorage_FileStorage(t *testing.T) {
 	viper.Set("WALG_FILE_PREFIX", dir)
 	defer resetToDefaults()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, st)
@@ -367,7 +367,7 @@ func TestConfigureStorage_FileStorageWithPrefix(t *testing.T) {
 	viper.Set(config.StoragePrefixSetting, "myprefix")
 	defer resetToDefaults()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, st)
@@ -383,7 +383,7 @@ func TestConfigureStorage_WithNetworkLimiter(t *testing.T) {
 		resetToDefaults()
 	}()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, st)

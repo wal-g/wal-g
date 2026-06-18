@@ -48,7 +48,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	postgres.HandleCopy(fromConfigFile, toConfigFile, backupName, withAllHistory)
+	postgres.HandleCopy(cmd.Context(), fromConfigFile, toConfigFile, backupName, withAllHistory)
 }
 
 func init() {

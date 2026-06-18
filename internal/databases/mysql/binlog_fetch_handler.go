@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"os"
 	"path"
 	"path/filepath"
@@ -42,17 +43,17 @@ func (ih *indexHandler) createIndexFile() error {
 	return nil
 }
 
-func HandleBinlogFetch(folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
+func HandleBinlogFetch(ctx context.Context, folder storage.Folder, backupName string, untilTS string, untilBinlogLastModifiedTS string) {
 	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	startTS, endTS, endBinlogTS, err := getTimestamps(folder, backupName, untilTS, untilBinlogLastModifiedTS)
+	startTS, endTS, endBinlogTS, err := getTimestamps(ctx, folder, backupName, untilTS, untilBinlogLastModifiedTS)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	handler := newIndexHandler(dstDir)
 
 	tracelog.InfoLogger.Printf("Fetching binlogs since %s until %s", startTS, endTS)
-	err = fetchLogs(folder, dstDir, startTS, endTS, endBinlogTS, handler)
+	err = fetchLogs(ctx, folder, dstDir, startTS, endTS, endBinlogTS, handler)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch binlogs: %v", err)
 
 	err = handler.createIndexFile()

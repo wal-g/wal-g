@@ -15,7 +15,6 @@ import (
 )
 
 type BackupService struct {
-	Context                 context.Context
 	DiskWatcher             *diskwatcher.DiskWatcher
 	concurrentUploader      *internal.ConcurrentUploader
 	metaConstructor         internal.MetaConstructor
@@ -62,11 +61,10 @@ func (p *FilesPinner) Unpin() {
 	}
 }
 
-func CreateBackupService(ctx context.Context, diskWatcher *diskwatcher.DiskWatcher, uploader *internal.ConcurrentUploader,
+func CreateBackupService(diskWatcher *diskwatcher.DiskWatcher, uploader *internal.ConcurrentUploader,
 	metaConstructor internal.MetaConstructor, backupFilesListProvider *BackupFilesListProvider, filesPinner *FilesPinner,
 ) (*BackupService, error) {
 	return &BackupService{
-		Context:                 ctx,
 		DiskWatcher:             diskWatcher,
 		concurrentUploader:      uploader,
 		backupFilesListProvider: backupFilesListProvider,
@@ -80,8 +78,8 @@ type DoBackupArgs struct {
 	Sharded    bool
 }
 
-func (bs *BackupService) DoBackup(args DoBackupArgs) error {
-	err := bs.metaConstructor.Init()
+func (bs *BackupService) DoBackup(ctx context.Context, args DoBackupArgs) error {
+	err := bs.metaConstructor.Init(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "can not init meta provider")
 	}
@@ -132,16 +130,16 @@ func (bs *BackupService) DoBackup(args DoBackupArgs) error {
 		Sharded:    args.Sharded,
 		Uploader:   bs.concurrentUploader,
 	}
-	err = archive.FillSlotsForSharded(bs.Context, fillArgs)
+	err = archive.FillSlotsForSharded(ctx, fillArgs)
 	if err != nil {
 		return err
 	}
 
-	return bs.Finalize(args.BackupName)
+	return bs.Finalize(ctx, args.BackupName)
 }
 
-func (bs *BackupService) Finalize(backupName string) error {
-	if err := bs.metaConstructor.Finalize(backupName); err != nil {
+func (bs *BackupService) Finalize(ctx context.Context, backupName string) error {
+	if err := bs.metaConstructor.Finalize(ctx, backupName); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
@@ -150,7 +148,7 @@ func (bs *BackupService) Finalize(backupName string) error {
 	backup.BackupName = backupName
 	backup.BackupSize = bs.concurrentUploader.CompressedSize
 	backup.DataSize = bs.concurrentUploader.UncompressedSize
-	if err := bs.concurrentUploader.UploadSentinel(backupSentinelInfo, backupName); err != nil {
+	if err := bs.concurrentUploader.UploadSentinel(ctx, backupSentinelInfo, backupName); err != nil {
 		return fmt.Errorf("can not upload sentinel: %+v", err)
 	}
 	return nil

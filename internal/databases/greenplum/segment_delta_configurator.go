@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/tracelog"
@@ -19,10 +20,10 @@ type SegDeltaBackupConfigurator struct {
 	deltaBaseSelector internal.BackupSelector
 }
 
-func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent bool,
+func (c SegDeltaBackupConfigurator) Configure(ctx context.Context, folder storage.Folder, isPermanent bool,
 ) (prevBackupInfo postgres.PrevBackupInfo, incrementCount int, err error) {
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	previousBackup, err := c.deltaBaseSelector.Select(folder)
+	previousBackup, err := c.deltaBaseSelector.Select(ctx, folder)
 	if err != nil {
 		return postgres.PrevBackupInfo{}, 0,
 			fmt.Errorf("couldn't find the requested base backup: %w", err)
@@ -31,9 +32,9 @@ func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent
 	if err != nil {
 		return postgres.PrevBackupInfo{}, 0, err
 	}
-	previousSegBackup, err := NewSegBackup(baseBackupFolder, previousBackup.Name, storage)
+	previousSegBackup, err := NewSegBackup(ctx, baseBackupFolder, previousBackup.Name, storage)
 	tracelog.ErrorLogger.FatalOnError(err)
-	prevBackupSentinelDto, err := previousSegBackup.GetSentinel()
+	prevBackupSentinelDto, err := previousSegBackup.GetSentinel(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
@@ -42,7 +43,7 @@ func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent
 		incrementCount = 1
 	}
 
-	previousBackupMeta, err := previousSegBackup.FetchMeta()
+	previousBackupMeta, err := previousSegBackup.FetchMeta(ctx)
 	if err != nil {
 		return postgres.PrevBackupInfo{}, 0,
 			fmt.Errorf("failed to get previous backup metadata: %w", err)
@@ -56,7 +57,7 @@ func (c SegDeltaBackupConfigurator) Configure(folder storage.Folder, isPermanent
 	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousSegBackup.Name,
 		*prevBackupSentinelDto.BackupStartLSN)
 
-	sentinelDto, filesMetadataDto, err := previousSegBackup.GetSentinelAndFilesMetadata()
+	sentinelDto, filesMetadataDto, err := previousSegBackup.GetSentinelAndFilesMetadata(ctx)
 	if err != nil {
 		return postgres.PrevBackupInfo{}, 0, err
 	}

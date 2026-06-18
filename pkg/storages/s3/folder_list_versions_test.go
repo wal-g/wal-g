@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,16 @@ func (m *mockS3ClientVersioning) ListObjectVersionsPages(
 	return nil
 }
 
-func (m *mockS3ClientVersioning) GetBucketVersioning(input *s3.GetBucketVersioningInput) (*s3.GetBucketVersioningOutput, error) {
+func (m *mockS3ClientVersioning) ListObjectVersionsPagesWithContext(
+	_ aws.Context,
+	input *s3.ListObjectVersionsInput,
+	fn func(*s3.ListObjectVersionsOutput, bool) bool,
+	_ ...request.Option,
+) error {
+	return m.ListObjectVersionsPages(input, fn)
+}
+
+func (m *mockS3ClientVersioning) GetBucketVersioningWithContext(_ aws.Context, input *s3.GetBucketVersioningInput, _ ...request.Option) (*s3.GetBucketVersioningOutput, error) {
 	return &s3.GetBucketVersioningOutput{
 		Status: aws.String(s3.BucketVersioningStatusEnabled),
 	}, nil
@@ -87,7 +97,7 @@ func TestListFolder_VersioningEnabled_ExcludesDeletedObjects(t *testing.T) {
 	}
 	folder := walgs3.NewFolder(mockClient, nil, "", config)
 
-	objects, subFolders, err := folder.ListFolder()
+	objects, subFolders, err := folder.ListFolder(t.Context())
 
 	require.NoError(t, err)
 	assert.Empty(t, subFolders)
@@ -137,7 +147,7 @@ func TestListFolder_VersioningEnabled_IncludesAllVersionsOfNonDeletedObjects(t *
 	}
 	folder := walgs3.NewFolder(mockClient, nil, "", config)
 
-	objects, _, err := folder.ListFolder()
+	objects, _, err := folder.ListFolder(t.Context())
 
 	require.NoError(t, err)
 
@@ -188,7 +198,7 @@ func TestListFolder_VersioningEnabled_ExcludesAllVersionsOfDeletedObject(t *test
 	}
 	folder := walgs3.NewFolder(mockClient, nil, "", config)
 
-	objects, _, err := folder.ListFolder()
+	objects, _, err := folder.ListFolder(t.Context())
 
 	require.NoError(t, err)
 
@@ -229,7 +239,7 @@ func TestListFolder_VersioningEnabled_HandlesOldDeleteMarkers(t *testing.T) {
 	}
 	folder := walgs3.NewFolder(mockClient, nil, "", config)
 
-	objects, _, err := folder.ListFolder()
+	objects, _, err := folder.ListFolder(t.Context())
 
 	require.NoError(t, err)
 
@@ -280,7 +290,7 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesDeleted(t *testing.
 	// Enable show all versions
 	folder.SetShowAllVersions(true)
 
-	objects, _, err := folder.ListFolder()
+	objects, _, err := folder.ListFolder(t.Context())
 
 	require.NoError(t, err)
 
@@ -343,14 +353,14 @@ func TestListFolder_VersioningEnabled_ShowAllVersionsPropagatesToSubfoldersFromL
 	root := walgs3.NewFolder(mockClient, nil, "", config)
 	root.SetShowAllVersions(true)
 
-	_, subFolders, err := root.ListFolder()
+	_, subFolders, err := root.ListFolder(t.Context())
 	require.NoError(t, err)
 	require.Len(t, subFolders, 1)
 
 	// This is the critical part: the subfolder was created by ListFolder() from CommonPrefixes,
 	// not via GetSubFolder(). It must still have showAllVersions enabled.
 	sub := subFolders[0]
-	objects, _, err := sub.ListFolder()
+	objects, _, err := sub.ListFolder(t.Context())
 	require.NoError(t, err)
 
 	// Expect:

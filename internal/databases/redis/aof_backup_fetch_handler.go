@@ -25,12 +25,12 @@ func HandleAofFetchPush(
 	processName, _ := conf.GetSetting(conf.RedisServerProcessName)
 	versionParser := archive.NewVersionParser(processName)
 
-	restoreService, err := aof.CreateRestoreService(ctx, sourceStorageFolder, targetDiskFolder, uploader, versionParser)
+	restoreService, err := aof.CreateRestoreService(sourceStorageFolder, targetDiskFolder, uploader, versionParser)
 	if err != nil {
 		return err
 	}
 
-	return restoreService.DoRestore(aof.RestoreArgs{
+	return restoreService.DoRestore(ctx, aof.RestoreArgs{
 		BackupName:     backupName,
 		RestoreVersion: restoreVersion,
 

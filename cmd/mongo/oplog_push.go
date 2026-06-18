@@ -49,7 +49,7 @@ func init() {
 func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplogPushStatsArgs) error {
 	// set up storage client
 	tracelog.DebugLogger.Printf("starting oplog archiving with arguments: %+v", pushArgs)
-	uplProvider, err := internal.ConfigureUploader()
+	uplProvider, err := internal.ConfigureUploader(ctx)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func runOplogPush(ctx context.Context, pushArgs oplogPushRunArgs, statsArgs oplo
 	}
 
 	// Lookup for last timestamp archived to storage (set up storage downloader client)
-	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
 	if err != nil {
 		return err
 	}

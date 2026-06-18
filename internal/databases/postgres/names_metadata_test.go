@@ -260,10 +260,10 @@ func TestFetchDtoWithFilesMetadata(t *testing.T) {
 	bytesOld, _ := json.Marshal(oldObjects)
 	bytesNew, _ := json.Marshal(newObjects)
 
-	folder.PutObject("files_metadata_old.json", bytes.NewReader(bytesOld))
-	folder.PutObject("files_metadata_new.json", bytes.NewReader(bytesNew))
+	folder.PutObject(t.Context(), "files_metadata_old.json", bytes.NewReader(bytesOld))
+	folder.PutObject(t.Context(), "files_metadata_new.json", bytes.NewReader(bytesNew))
 	ansV1 := postgres.DatabaseObjectsInfo{}
-	err := internal.FetchDto(folder, &ansV1, "files_metadata_old.json")
+	err := internal.FetchDto(t.Context(), folder, &ansV1, "files_metadata_old.json")
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(12), ansV1.Oid)
 	assert.Equal(t, uint32(0), ansV1.Tables["t1"].Oid)
@@ -272,7 +272,7 @@ func TestFetchDtoWithFilesMetadata(t *testing.T) {
 	assert.Equal(t, uint32(0), ansV1.Tables["t2"].Relfilenode)
 
 	ansV2 := postgres.DatabaseObjectsInfo{}
-	err = internal.FetchDto(folder, &ansV2, "files_metadata_new.json")
+	err = internal.FetchDto(t.Context(), folder, &ansV2, "files_metadata_new.json")
 	assert.NoError(t, err)
 	assert.Equal(t, uint32(12), ansV2.Oid)
 	assert.Equal(t, uint32(1), ansV2.Tables["t1"].Oid)

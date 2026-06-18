@@ -18,7 +18,7 @@ func init() {
 }
 
 func TestFetch(t *testing.T) {
-	folder := testtools.CreateMockStorageFolder()
+	folder := testtools.CreateMockStorageFolder(t.Context())
 	backupName := "test"
 	data := "Data"
 	date := time.Date(2002, 3, 21, 0, 0, 0, 0, time.UTC)
@@ -36,9 +36,9 @@ func TestFetch(t *testing.T) {
 		UserData:    data,
 	}
 
-	_ = internal.UploadDto(folder, testObject, internal.SentinelNameFromBackup(backupName))
+	_ = internal.UploadDto(t.Context(), folder, testObject, internal.SentinelNameFromBackup(backupName))
 
-	actualResult, err := etcd.NewGenericMetaFetcher().Fetch(backupName, folder)
+	actualResult, err := etcd.NewGenericMetaFetcher().Fetch(t.Context(), backupName, folder)
 	assert.NoError(t, err)
 
 	isEqualTimeStart := expectedResult.StartTime.Equal(actualResult.StartTime)

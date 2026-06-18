@@ -57,7 +57,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	greenplum.HandleCopy(fromConfigFile, toConfigFile, targetBackupName)
+	greenplum.HandleCopy(cmd.Context(), fromConfigFile, toConfigFile, targetBackupName)
 }
 
 func init() {

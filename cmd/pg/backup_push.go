@@ -45,14 +45,14 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
 
-			storage, err := internal.ConfigureMultiStorage(true)
+			storage, err := internal.ConfigureMultiStorage(cmd.Context(), true)
 			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
 			rootFolder := multistorage.SetPolicies(storage.RootFolder(), policies.TakeFirstStorage)
 			if targetStorage == "" {
-				rootFolder, err = multistorage.UseFirstAliveStorage(rootFolder)
+				rootFolder, err = multistorage.UseFirstAliveStorage(cmd.Context(), rootFolder)
 			} else {
-				rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
+				rootFolder, err = multistorage.UseSpecificStorage(cmd.Context(), targetStorage, rootFolder)
 			}
 			tracelog.ErrorLogger.FatalOnError(err)
 			tracelog.InfoLogger.Printf("Backup will be pushed to storage: %v", multistorage.UsedStorages(rootFolder)[0])
@@ -110,7 +110,7 @@ var (
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
 				userData, withoutFilesMetadata)
 
-			backupHandler, err := postgres.NewBackupHandler(arguments)
+			backupHandler, err := postgres.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
 		},

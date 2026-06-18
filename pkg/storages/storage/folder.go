@@ -18,53 +18,50 @@ type Folder interface {
 
 	// ListFolder lists the folder and provides nested objects and folders. Objects must be with relative paths.
 	// If the folder doesn't exist, empty objects and subFolders must be returned without any error.
-	ListFolder() (objects []Object, subFolders []Folder, err error)
+	ListFolder(ctx context.Context) (objects []Object, subFolders []Folder, err error)
 
 	// DeleteObjects deletes objects from the storage if they exist.
-	DeleteObjects(objects []Object) error
+	DeleteObjects(ctx context.Context, objects []Object) error
 
 	// Exists checks if an object exists in the folder.
-	Exists(objectRelativePath string) (bool, error)
+	Exists(ctx context.Context, objectRelativePath string) (bool, error)
 
 	// GetSubFolder returns a handle to the subfolder. Does not have to instantiate the subfolder in any material form.
 	GetSubFolder(subFolderRelativePath string) Folder
 
 	// ReadObject reads an object from the folder. Must return ObjectNotFoundError in case the object doesn't exist.
-	ReadObject(objectRelativePath string) (io.ReadCloser, error)
+	ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error)
 
 	// PutObject uploads a new object into the folder by a relative path. If an object with the same name already
-	// exists, it is overwritten. Please prefer using PutObjectWithContext.
-	PutObject(name string, content io.Reader) error
-
-	// PutObjectWithContext uploads a new object into the folder by a relative path. If an object with the same name
-	// already exists, it is overwritten. Operation can be terminated using Context.
-	PutObjectWithContext(ctx context.Context, name string, content io.Reader) error
+	// exists, it is overwritten. Operation can be terminated using ctx.
+	PutObject(ctx context.Context, name string, content io.Reader) error
 
 	// CopyObject copies an object from one place inside the folder to the other. Both paths must be relative. This is
 	// an error if the source object doesn't exist.
-	CopyObject(srcPath string, dstPath string) error
+	CopyObject(ctx context.Context, srcPath string, dstPath string) error
 
-	Validate() error
-
-	// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
-	// Default versioning is set according to server setting.
-	SetVersioningEnabled(enable bool)
+	Validate(ctx context.Context) error
 
 	// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
 	// Default versioning is set according to server setting.
-	GetVersioningEnabled() bool
+	SetVersioningEnabled(ctx context.Context, enable bool)
+
+	// Sets versioning setting. If versioning is disabled on server, sets it to disabled.
+	// Default versioning is set according to server setting.
+	GetVersioningEnabled(ctx context.Context) bool
 }
 
 type FolderExt interface {
 	Folder
-	ListFolderSegment(startAfter *string, endBefore *string) (objects []Object, subFolders []Folder, err error)
+	ListFolderSegment(ctx context.Context, startAfter *string, endBefore *string) (objects []Object, subFolders []Folder, err error)
 }
 
-func ListFolderRecursively(folder Folder) (relativePathObjects []Object, err error) {
-	return ListFolderRecursivelyWithFilter(folder, func(string) bool { return true })
+func ListFolderRecursively(ctx context.Context, folder Folder) (relativePathObjects []Object, err error) {
+	return ListFolderRecursivelyWithFilter(ctx, folder, func(string) bool { return true })
 }
 
 func ListFolderRecursivelyWithFilter(
+	ctx context.Context,
 	folder Folder,
 	folderSelector func(path string) bool,
 ) (relativePathObjects []Object, err error) {
@@ -73,7 +70,7 @@ func ListFolderRecursivelyWithFilter(
 	for len(queue) > 0 {
 		subFolder := queue[0]
 		queue = queue[1:]
-		objects, subFolders, err := subFolder.ListFolder()
+		objects, subFolders, err := subFolder.ListFolder(ctx)
 		folderPrefix := strings.TrimPrefix(subFolder.GetPath(), folder.GetPath())
 		relativePathObjects = append(relativePathObjects, prependPaths(objects, folderPrefix)...)
 		if err != nil {
@@ -109,14 +106,14 @@ func filterSubfolders(rootFolderPath string, folders []Folder, selector func(pat
 	return result
 }
 
-func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePathObjects []Object, err error) {
+func ListFolderRecursivelyWithPrefix(ctx context.Context, folder Folder, prefix string) (relativePathObjects []Object, err error) {
 	checkFile := len(prefix) > 0 && !strings.HasSuffix(prefix, "/")
 	prefix = strings.Trim(prefix, "/")
 
 	if checkFile {
 		dirName, fileName := path.Split(prefix)
 		parentFolder := folder.GetSubFolder(dirName)
-		objects, _, err := parentFolder.ListFolder()
+		objects, _, err := parentFolder.ListFolder(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("can't list folder %q: %w", dirName, err)
 		}
@@ -128,14 +125,14 @@ func ListFolderRecursivelyWithPrefix(folder Folder, prefix string) (relativePath
 	}
 
 	parentFolder := folder.GetSubFolder(prefix)
-	objects, err := ListFolderRecursively(parentFolder)
+	objects, err := ListFolderRecursively(ctx, parentFolder)
 	if err != nil {
 		return nil, fmt.Errorf("can't list folder %q: %w", prefix, err)
 	}
 	return prependPaths(objects, prefix), nil
 }
 
-func Glob(folder Folder, pattern string) (objectPaths []string, folderPaths []string, err error) {
+func Glob(ctx context.Context, folder Folder, pattern string) (objectPaths []string, folderPaths []string, err error) {
 	objectPaths = make([]string, 0)
 	folderPaths = make([]string, 0)
 
@@ -161,7 +158,7 @@ func Glob(folder Folder, pattern string) (objectPaths []string, folderPaths []st
 		isLast := len(patternParts) == 1 || (len(patternParts) == 2 && patternParts[1] == "")
 
 		folderPath := current.folder.GetPath()
-		objects, subfolders, err := current.folder.ListFolder()
+		objects, subfolders, err := current.folder.ListFolder(ctx)
 		if err != nil {
 			return nil, nil, err
 		}

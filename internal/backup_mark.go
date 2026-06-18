@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"slices"
 
 	"github.com/pkg/errors"
@@ -24,14 +25,14 @@ func NewBackupMarkHandler(metaInteractor GenericMetaInteractor, storageRootFolde
 }
 
 // MarkBackup marks a backup as permanent or impermanent
-func (h *BackupMarkHandler) MarkBackup(backupName string, toPermanent bool) {
+func (h *BackupMarkHandler) MarkBackup(ctx context.Context, backupName string, toPermanent bool) {
 	tracelog.InfoLogger.Printf("Retrieving previous related backups to be marked: toPermanent=%t", toPermanent)
-	backupsToMark, err := h.GetBackupsToMark(backupName, toPermanent)
+	backupsToMark, err := h.GetBackupsToMark(ctx, backupName, toPermanent)
 
 	tracelog.ErrorLogger.FatalfOnError("Failed to get previous backups: %v", err)
 	tracelog.InfoLogger.Printf("Retrieved backups to be marked, marking: %v", backupsToMark)
 	for _, backupName := range backupsToMark {
-		err = h.metaInteractor.SetIsPermanent(backupName, h.baseBackupFolder, toPermanent)
+		err = h.metaInteractor.SetIsPermanent(ctx, backupName, h.baseBackupFolder, toPermanent)
 		tracelog.ErrorLogger.FatalfOnError("Failed to mark backups: %v", err)
 	}
 }
@@ -43,8 +44,8 @@ func (h *BackupMarkHandler) MarkBackup(backupName string, toPermanent bool) {
 //
 // For example, when marking backups from impermanent to permanent, we retrieve
 // all currently impermanent backups and return them as a slice
-func (h *BackupMarkHandler) GetBackupsToMark(backupName string, toPermanent bool) ([]string, error) {
-	meta, err := h.metaInteractor.Fetch(backupName, h.baseBackupFolder)
+func (h *BackupMarkHandler) GetBackupsToMark(ctx context.Context, backupName string, toPermanent bool) ([]string, error) {
+	meta, err := h.metaInteractor.Fetch(ctx, backupName, h.baseBackupFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -59,14 +60,14 @@ func (h *BackupMarkHandler) GetBackupsToMark(backupName string, toPermanent bool
 	}
 
 	if toPermanent {
-		return h.getBackupsToMarkPermanent(backupName)
+		return h.getBackupsToMarkPermanent(ctx, backupName)
 	}
-	return h.getBackupsToMarkImpermanent(backupName)
+	return h.getBackupsToMarkImpermanent(ctx, backupName)
 }
 
-func (h *BackupMarkHandler) getBackupsToMarkPermanent(backupName string) ([]string, error) {
+func (h *BackupMarkHandler) getBackupsToMarkPermanent(ctx context.Context, backupName string) ([]string, error) {
 	var backupsToMark []string
-	meta, err := h.metaInteractor.Fetch(backupName, h.baseBackupFolder)
+	meta, err := h.metaInteractor.Fetch(ctx, backupName, h.baseBackupFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +87,7 @@ func (h *BackupMarkHandler) getBackupsToMarkPermanent(backupName string) ([]stri
 	}
 
 	// mark previous backup
-	previousImpermanentBackups, err := h.getBackupsToMarkPermanent(incrementDetails.IncrementFrom)
+	previousImpermanentBackups, err := h.getBackupsToMarkPermanent(ctx, incrementDetails.IncrementFrom)
 	if err != nil {
 		return nil, err
 	}
@@ -95,17 +96,17 @@ func (h *BackupMarkHandler) getBackupsToMarkPermanent(backupName string) ([]stri
 	return previousImpermanentBackups, nil
 }
 
-func (h *BackupMarkHandler) getBackupsToMarkImpermanent(backupName string) ([]string, error) {
-	meta, err := h.metaInteractor.Fetch(backupName, h.baseBackupFolder)
+func (h *BackupMarkHandler) getBackupsToMarkImpermanent(ctx context.Context, backupName string) ([]string, error) {
+	meta, err := h.metaInteractor.Fetch(ctx, backupName, h.baseBackupFolder)
 	if err != nil {
 		return nil, err
 	}
 
-	permanentBackups := GetPermanentBackups(h.baseBackupFolder, h.metaInteractor)
+	permanentBackups := GetPermanentBackups(ctx, h.baseBackupFolder, h.metaInteractor)
 	//  del current backup from
 	delete(permanentBackups, backupName)
 
-	reverseLinks, err := h.getGraphFromBaseToIncrement()
+	reverseLinks, err := h.getGraphFromBaseToIncrement(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -138,15 +139,15 @@ func backupHasPermanentInFuture(reverseLinks *map[string][]string,
 }
 
 // return graph where nodes - backup names, edges - links from base backups to increment backups
-func (h *BackupMarkHandler) getGraphFromBaseToIncrement() (map[string][]string, error) {
-	backups, err := GetBackups(h.baseBackupFolder)
+func (h *BackupMarkHandler) getGraphFromBaseToIncrement(ctx context.Context) (map[string][]string, error) {
+	backups, err := GetBackups(ctx, h.baseBackupFolder)
 	if err != nil {
 		return nil, err
 	}
 
 	reverseLinks := make(map[string][]string)
 	for _, b := range backups {
-		incrementFrom, isIncrement, err := h.getMetadataFromBackup(b.BackupName)
+		incrementFrom, isIncrement, err := h.getMetadataFromBackup(ctx, b.BackupName)
 		if err != nil {
 			return nil, err
 		}
@@ -159,8 +160,9 @@ func (h *BackupMarkHandler) getGraphFromBaseToIncrement() (map[string][]string, 
 	return reverseLinks, nil
 }
 
-func (h *BackupMarkHandler) getMetadataFromBackup(backupName string) (incrementFrom string, isIncrement bool, err error) {
-	meta, err := h.metaInteractor.Fetch(backupName, h.baseBackupFolder)
+func (h *BackupMarkHandler) getMetadataFromBackup(ctx context.Context,
+	backupName string) (incrementFrom string, isIncrement bool, err error) {
+	meta, err := h.metaInteractor.Fetch(ctx, backupName, h.baseBackupFolder)
 	if err != nil {
 		return "", false, err
 	}
@@ -186,17 +188,17 @@ func newBackupHasPermanentBackupInFutureError(backupName string) BackupHasPerman
 			backupName)}
 }
 
-func GetPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher) map[string]bool {
-	return getPermanentBackups(folder, metaFetcher, false)
+func GetPermanentBackups(ctx context.Context, folder storage.Folder, metaFetcher GenericMetaFetcher) map[string]bool {
+	return getPermanentBackups(ctx, folder, metaFetcher, false)
 }
 
-func GetPermanentBackupsFromStorage(folder storage.Folder, metaFetcher GenericMetaFetcher) map[string]bool {
-	return getPermanentBackups(folder, metaFetcher, true)
+func GetPermanentBackupsFromStorage(ctx context.Context, folder storage.Folder, metaFetcher GenericMetaFetcher) map[string]bool {
+	return getPermanentBackups(ctx, folder, metaFetcher, true)
 }
 
-func getPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher, fromStorage bool) map[string]bool {
+func getPermanentBackups(ctx context.Context, folder storage.Folder, metaFetcher GenericMetaFetcher, fromStorage bool) map[string]bool {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := GetBackups(folder)
+	backupTimes, err := GetBackups(ctx, folder)
 	if err != nil {
 		return map[string]bool{}
 	}
@@ -204,9 +206,9 @@ func getPermanentBackups(folder storage.Folder, metaFetcher GenericMetaFetcher, 
 	permanentBackups := map[string]bool{}
 	for _, backupTime := range backupTimes {
 		if fromStorage {
-			meta, err = metaFetcher.FetchFromStorage(backupTime.BackupName, folder, backupTime.StorageName)
+			meta, err = metaFetcher.FetchFromStorage(ctx, backupTime.BackupName, folder, backupTime.StorageName)
 		} else {
-			meta, err = metaFetcher.Fetch(backupTime.BackupName, folder)
+			meta, err = metaFetcher.Fetch(ctx, backupTime.BackupName, folder)
 		}
 		if err != nil {
 			FatalOnUnrecoverableMetadataError(backupTime, err)

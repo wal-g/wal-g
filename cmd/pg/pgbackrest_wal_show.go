@@ -15,13 +15,13 @@ var pgbackrestWalgShowCmd = &cobra.Command{
 	Long:  WalShowLongDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, stanza := configurePgbackrestSettings()
+		folder, stanza := configurePgbackrestSettings(cmd.Context())
 		outputType := postgres.TableOutput
 		if detailedJSONOutput {
 			outputType = postgres.JSONOutput
 		}
 		outputWriter := postgres.NewWalShowOutputWriter(outputType, os.Stdout, false)
-		err := pgbackrest.HandleWalShow(folder, stanza, outputWriter)
+		err := pgbackrest.HandleWalShow(cmd.Context(), folder, stanza, outputWriter)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

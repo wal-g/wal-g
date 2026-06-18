@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"path"
 	"strings"
 
@@ -12,24 +13,24 @@ import (
 )
 
 // HandleCopy copy specific or all backups from one storage to another
-func HandleCopy(fromConfigFile string, toConfigFile string, backupName string, withAllHistory bool) {
-	var from, fromError = internal.StorageFromConfig(fromConfigFile)
-	var to, toError = internal.StorageFromConfig(toConfigFile)
+func HandleCopy(ctx context.Context, fromConfigFile string, toConfigFile string, backupName string, withAllHistory bool) {
+	var from, fromError = internal.StorageFromConfig(ctx, fromConfigFile)
+	var to, toError = internal.StorageFromConfig(ctx, toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := getCopyingInfos(backupName, from.RootFolder(), to.RootFolder(), withAllHistory)
+	infos, err := getCopyingInfos(ctx, backupName, from.RootFolder(), to.RootFolder(), withAllHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = copy.Infos(infos)
+	err = copy.Infos(ctx, infos)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Success copy.")
 }
 
-func BackupCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+func BackupCopyingInfo(ctx context.Context, backup Backup, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Print("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 
-	var objects, err = storage.ListFolderRecursively(from)
+	var objects, err = storage.ListFolderRecursively(ctx, from)
 	if err != nil {
 		return nil, err
 	}
@@ -45,26 +46,26 @@ func BackupCopyingInfo(backup Backup, from storage.Folder, to storage.Folder) ([
 	), nil
 }
 
-func getCopyingInfos(backupName string,
+func getCopyingInfos(ctx context.Context, backupName string,
 	from storage.Folder,
 	to storage.Folder,
 	withAllHistory bool) ([]copy.InfoProvider, error) {
 	if backupName == "" {
 		tracelog.InfoLogger.Printf("Copy all backups and history.")
-		return WildcardInfo(from, to)
+		return WildcardInfo(ctx, from, to)
 	}
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, from)
 	if err != nil {
 		return nil, err
 	}
 
 	pgBackup := ToPgBackup(backup)
-	infos, err := BackupCopyingInfo(pgBackup, from, to)
+	infos, err := BackupCopyingInfo(ctx, pgBackup, from, to)
 	if err != nil {
 		return nil, err
 	}
-	history, err := HistoryCopyingInfo(pgBackup, from, to, withAllHistory)
+	history, err := HistoryCopyingInfo(ctx, pgBackup, from, to, withAllHistory)
 	if err != nil {
 		return nil, err
 	}
@@ -72,24 +73,25 @@ func getCopyingInfos(backupName string,
 	return infos, nil
 }
 
-func HistoryCopyingInfo(backup Backup, from storage.Folder, to storage.Folder, withAllHistory bool) ([]copy.InfoProvider, error) {
+func HistoryCopyingInfo(ctx context.Context, backup Backup, from storage.Folder, to storage.Folder, withAllHistory bool,
+) ([]copy.InfoProvider, error) {
 	tracelog.DebugLogger.Print("Collecting history files... ")
 
 	var fromWalFolder = from.GetSubFolder(utility.WalPath)
 
-	var lastWalFilename, err = GetLastWalFilename(backup)
+	var lastWalFilename, err = GetLastWalFilename(ctx, backup)
 	if err != nil {
 		return make([]copy.InfoProvider, 0), err
 	}
 
-	firstWalFilename, err := GetFirstWalFilename(backup)
+	firstWalFilename, err := GetFirstWalFilename(ctx, backup)
 	if err != nil {
 		return make([]copy.InfoProvider, 0), err
 	}
 
 	tracelog.DebugLogger.Print("getLastWalFilename not failed!")
 
-	objects, err := storage.ListFolderRecursively(fromWalFolder)
+	objects, err := storage.ListFolderRecursively(ctx, fromWalFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -115,8 +117,8 @@ func GetWalFileName(filename string) string {
 	return strings.Split(filename, ".")[0]
 }
 
-func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
-	objects, err := storage.ListFolderRecursively(from)
+func WildcardInfo(ctx context.Context, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+	objects, err := storage.ListFolderRecursively(ctx, from)
 	if err != nil {
 		return nil, err
 	}

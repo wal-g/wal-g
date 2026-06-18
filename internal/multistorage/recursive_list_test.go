@@ -26,10 +26,10 @@ func TestListFolderRecursively(t *testing.T) {
 		"subfolder2/d",
 	}
 	for _, relativePath := range paths {
-		err := folder.PutObject(relativePath, &bytes.Buffer{})
+		err := folder.PutObject(t.Context(), relativePath, &bytes.Buffer{})
 		assert.NoError(t, err)
 	}
-	fullPathObjects, err := multistorage.ListFolderRecursively(folder)
+	fullPathObjects, err := multistorage.ListFolderRecursively(t.Context(), folder)
 	assert.NoError(t, err)
 	for _, relativePath := range paths {
 		assert.True(t, slices.ContainsFunc(fullPathObjects, func(o storage.Object) bool {
@@ -55,7 +55,7 @@ func TestListFolderRecursivelyWithFilter(t *testing.T) {
 	}
 
 	for _, name := range includedObjNames {
-		_ = folder.PutObject(name, &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), name, &bytes.Buffer{})
 	}
 
 	excludedObjNames := []string{
@@ -66,14 +66,14 @@ func TestListFolderRecursivelyWithFilter(t *testing.T) {
 	}
 
 	for _, name := range excludedObjNames {
-		_ = folder.PutObject(name, &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), name, &bytes.Buffer{})
 	}
 
 	filterFunc := func(path string) bool {
 		return !strings.HasPrefix(path, "basebackups_005/base_456/tar_partitions")
 	}
 
-	filtered, err := multistorage.ListFolderRecursivelyWithFilter(folder, filterFunc)
+	filtered, err := multistorage.ListFolderRecursivelyWithFilter(t.Context(), folder, filterFunc)
 
 	filteredNames := make([]string, 0)
 
@@ -103,17 +103,17 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 
 	t.Run("list single file with prefix name if exists", func(t *testing.T) {
 		folder := newMultiStorageFolder(t)
-		_ = folder.PutObject("a/b/c/123", &bytes.Buffer{})
-		_ = folder.PutObject("a/b/c/123/waste1", &bytes.Buffer{})
-		_ = folder.PutObject("a/b/c/123/waste2/waste3", &bytes.Buffer{})
-		files, err := multistorage.ListFolderRecursivelyWithPrefix(folder, "a/b/c/123")
+		_ = folder.PutObject(t.Context(), "a/b/c/123", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/b/c/123/waste1", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/b/c/123/waste2/waste3", &bytes.Buffer{})
+		files, err := multistorage.ListFolderRecursivelyWithPrefix(t.Context(), folder, "a/b/c/123")
 		assert.NoError(t, err)
 		assertFiles(t, files, []string{"a/b/c/123"})
 
-		_ = folder.PutObject("a", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a", &bytes.Buffer{})
 
 		for _, prefix := range []string{"a", "/a"} {
-			files, err = multistorage.ListFolderRecursivelyWithPrefix(folder, prefix)
+			files, err = multistorage.ListFolderRecursivelyWithPrefix(t.Context(), folder, prefix)
 			assert.NoError(t, err)
 			assertFiles(t, files, []string{"a"})
 		}
@@ -121,14 +121,14 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 
 	t.Run("list all files in dir with prefix name", func(t *testing.T) {
 		folder := newMultiStorageFolder(t)
-		_ = folder.PutObject("waste1", &bytes.Buffer{})
-		_ = folder.PutObject("a/111", &bytes.Buffer{})
-		_ = folder.PutObject("a/b/222", &bytes.Buffer{})
-		_ = folder.PutObject("a/b/c/333", &bytes.Buffer{})
-		_ = folder.PutObject("b/waste2", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "waste1", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/111", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/b/222", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/b/c/333", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "b/waste2", &bytes.Buffer{})
 
 		for _, prefix := range []string{"a", "a/", "/a", "/a/"} {
-			files, err := multistorage.ListFolderRecursivelyWithPrefix(folder, prefix)
+			files, err := multistorage.ListFolderRecursivelyWithPrefix(t.Context(), folder, prefix)
 			assert.NoError(t, err)
 			assertFiles(t, files, []string{"a/111", "a/b/222", "a/b/c/333"})
 		}
@@ -136,13 +136,13 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 
 	t.Run("list all files for empty prefix", func(t *testing.T) {
 		folder := newMultiStorageFolder(t)
-		_ = folder.PutObject("000", &bytes.Buffer{})
-		_ = folder.PutObject("a/111", &bytes.Buffer{})
-		_ = folder.PutObject("a/b/222", &bytes.Buffer{})
-		_ = folder.PutObject("b/333", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "000", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/111", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/b/222", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "b/333", &bytes.Buffer{})
 
 		for _, prefix := range []string{"", "/"} {
-			files, err := multistorage.ListFolderRecursivelyWithPrefix(folder, prefix)
+			files, err := multistorage.ListFolderRecursivelyWithPrefix(t.Context(), folder, prefix)
 			assert.NoError(t, err)
 			assertFiles(t, files, []string{"000", "a/111", "a/b/222", "b/333"})
 		}
@@ -150,12 +150,12 @@ func TestListFolderRecursivelyWithPrefix(t *testing.T) {
 
 	t.Run("dont list files and dirs with names starting with prefix", func(t *testing.T) {
 		folder := newMultiStorageFolder(t)
-		_ = folder.PutObject("a_waste1", &bytes.Buffer{})
-		_ = folder.PutObject("a/111", &bytes.Buffer{})
-		_ = folder.PutObject("a/b/222", &bytes.Buffer{})
-		_ = folder.PutObject("a_waste2/333", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a_waste1", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/111", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a/b/222", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "a_waste2/333", &bytes.Buffer{})
 
-		files, err := multistorage.ListFolderRecursivelyWithPrefix(folder, "a")
+		files, err := multistorage.ListFolderRecursivelyWithPrefix(t.Context(), folder, "a")
 		assert.NoError(t, err)
 		assertFiles(t, files, []string{"a/111", "a/b/222"})
 	})
@@ -165,14 +165,14 @@ func newMultiStorageFolder(t *testing.T) storage.Folder {
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
 	collectorMock := stats.NewMockCollector(mockCtrl)
-	collectorMock.EXPECT().AllAliveStorages().Return([]string{"test_storage"}, nil)
+	collectorMock.EXPECT().AllAliveStorages(gomock.Any()).Return([]string{"test_storage"}, nil)
 	collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	memStorages := map[string]storage.Folder{
 		"test_storage": memory.NewFolder("", memory.NewKVS()),
 	}
 	folder := multistorage.NewFolder(memStorages, collectorMock)
-	folder, err := multistorage.UseAllAliveStorages(folder)
+	folder, err := multistorage.UseAllAliveStorages(t.Context(), folder)
 	require.NoError(t, err)
 	multistorage.SetPolicies(folder, policies.TakeFirstStorage)
 

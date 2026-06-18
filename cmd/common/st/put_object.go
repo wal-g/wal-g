@@ -53,7 +53,7 @@ var putObjectCmd = &cobra.Command{
 			reader = os.Stdin
 		}
 
-		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
+		err := exec.OnStorage(cmd.Context(), targetStorage, func(folder storage.Folder) error {
 			uploader, err := internal.ConfigureUploaderToFolder(folder)
 			if err != nil {
 				return err

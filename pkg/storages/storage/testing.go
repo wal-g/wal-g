@@ -11,18 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// nolint: funlen
+//nolint:funlen
 func RunFolderTest(storageFolder Folder, t *testing.T) {
+	ctx := t.Context()
 	sub1 := storageFolder.GetSubFolder("Sub1")
 
 	token := make([]byte, 1024*1024) //Send 1 Mb
 	_, err := rand.Read(token)
 	assert.NoError(t, err)
 
-	err = storageFolder.PutObject("file0", bytes.NewBuffer(token))
+	err = storageFolder.PutObject(ctx, "file0", bytes.NewBuffer(token))
 	assert.NoError(t, err)
 
-	readCloser, err := storageFolder.ReadObject("file0")
+	readCloser, err := storageFolder.ReadObject(ctx, "file0")
 	assert.NoError(t, err)
 	if err == nil {
 		all, err := io.ReadAll(readCloser)
@@ -31,33 +32,33 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 		assert.NoError(t, readCloser.Close())
 	}
 
-	err = sub1.PutObject("file1", strings.NewReader("data1"))
+	err = sub1.PutObject(ctx, "file1", strings.NewReader("data1"))
 	assert.NoError(t, err)
 
-	b, err := storageFolder.Exists("file0")
+	b, err := storageFolder.Exists(ctx, "file0")
 	assert.NoError(t, err)
 	assert.True(t, b)
-	b, err = sub1.Exists("file1")
+	b, err = sub1.Exists(ctx, "file1")
 	assert.NoError(t, err)
 	assert.True(t, b)
-	b, err = storageFolder.Exists("Sub1/file1")
+	b, err = storageFolder.Exists(ctx, "Sub1/file1")
 	assert.NoError(t, err)
 	assert.True(t, b)
 
-	objects, subFolders, err := storageFolder.ListFolder()
+	objects, subFolders, err := storageFolder.ListFolder(ctx)
 	assert.NoError(t, err)
 	t.Log(subFolders[0].GetPath())
 	assert.Equal(t, "file0", objects[0].GetName())
 	assert.True(t, strings.HasSuffix(subFolders[0].GetPath(), "Sub1/") ||
 		strings.HasSuffix(subFolders[0].GetPath(), "Sub1"))
 
-	sublist, subFolders, err := sub1.ListFolder()
+	sublist, subFolders, err := sub1.ListFolder(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(subFolders))
 	assert.Equal(t, 1, len(sublist))
 	assert.Equal(t, sublist[0].GetName(), "file1")
 
-	data, err := sub1.ReadObject("file1")
+	data, err := sub1.ReadObject(ctx, "file1")
 	assert.NoError(t, err)
 	if err == nil {
 		data0Str, err := io.ReadAll(data)
@@ -67,23 +68,23 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	err = storageFolder.CopyObject("Sub1/file1", "Sub2/file2")
+	err = storageFolder.CopyObject(ctx, "Sub1/file1", "Sub2/file2")
 	assert.NoError(t, err)
-	sublist, subFolders, err = storageFolder.ListFolder()
+	sublist, subFolders, err = storageFolder.ListFolder(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(subFolders))
 	assert.Equal(t, 1, len(sublist))
-	sublist, subFolders, err = sub1.ListFolder()
+	sublist, subFolders, err = sub1.ListFolder(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(subFolders))
 	assert.Equal(t, 1, len(sublist))
 	sub2 := storageFolder.GetSubFolder("Sub2")
-	sublist, subFolders, err = sub2.ListFolder()
+	sublist, subFolders, err = sub2.ListFolder(ctx)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(subFolders))
 	assert.Equal(t, 1, len(sublist))
 
-	data, err = sub2.ReadObject("file2")
+	data, err = sub2.ReadObject(ctx, "file2")
 	assert.NoError(t, err)
 	if err == nil {
 		data0Str, err := io.ReadAll(data)
@@ -93,20 +94,20 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	err = sub1.DeleteObjects([]Object{NewLocalObject("file1", time.Time{}, 0)})
+	err = sub1.DeleteObjects(ctx, []Object{NewLocalObject("file1", time.Time{}, 0)})
 	assert.NoError(t, err)
-	err = storageFolder.DeleteObjects([]Object{NewLocalObject("Sub1", time.Time{}, 0)})
+	err = storageFolder.DeleteObjects(ctx, []Object{NewLocalObject("Sub1", time.Time{}, 0)})
 	assert.NoError(t, err)
-	err = storageFolder.DeleteObjects([]Object{NewLocalObject("file0", time.Time{}, 0)})
+	err = storageFolder.DeleteObjects(ctx, []Object{NewLocalObject("file0", time.Time{}, 0)})
 	assert.NoError(t, err)
 
-	b, err = storageFolder.Exists("file0")
+	b, err = storageFolder.Exists(ctx, "file0")
 	assert.NoError(t, err)
 	assert.False(t, b)
-	b, err = sub1.Exists("file1")
+	b, err = sub1.Exists(ctx, "file1")
 	assert.NoError(t, err)
 	assert.False(t, b)
 
-	_, err = sub1.ReadObject("Tumba Yumba")
+	_, err = sub1.ReadObject(ctx, "Tumba Yumba")
 	assert.Error(t, err.(ObjectNotFoundError))
 }

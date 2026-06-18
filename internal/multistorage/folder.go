@@ -17,13 +17,13 @@ import (
 )
 
 // UseAllAliveStorages makes a copy of the Folder that uses all currently alive storages.
-func UseAllAliveStorages(folder storage.Folder) (storage.Folder, error) {
+func UseAllAliveStorages(ctx context.Context, folder storage.Folder) (storage.Folder, error) {
 	mf, ok := folder.(Folder)
 	if !ok {
 		return folder, nil
 	}
 
-	storageNames, err := mf.statsCollector.AllAliveStorages()
+	storageNames, err := mf.statsCollector.AllAliveStorages(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select all alive storages in multistorage folder: %w", err)
 	}
@@ -43,13 +43,13 @@ func UseAllAliveStorages(folder storage.Folder) (storage.Folder, error) {
 
 // UseFirstAliveStorage makes a copy of the Folder that uses a single storage, that is first alive in the list.
 // This is an error if all storages are dead.
-func UseFirstAliveStorage(folder storage.Folder) (storage.Folder, error) {
+func UseFirstAliveStorage(ctx context.Context, folder storage.Folder) (storage.Folder, error) {
 	mf, ok := folder.(Folder)
 	if !ok {
 		return folder, nil
 	}
 
-	firstStorage, err := mf.statsCollector.FirstAliveStorage()
+	firstStorage, err := mf.statsCollector.FirstAliveStorage(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("select first alive storage in multistorage folder: %w", err)
 	}
@@ -67,7 +67,7 @@ func UseFirstAliveStorage(folder storage.Folder) (storage.Folder, error) {
 
 // UseSpecificStorage makes a copy of the Folder that uses storage with the specified name.
 // This is an error if the storage is dead.
-func UseSpecificStorage(name string, folder storage.Folder) (storage.Folder, error) {
+func UseSpecificStorage(ctx context.Context, name string, folder storage.Folder) (storage.Folder, error) {
 	mf, ok := folder.(Folder)
 	if !ok {
 		return folder, nil
@@ -78,7 +78,7 @@ func UseSpecificStorage(name string, folder storage.Folder) (storage.Folder, err
 		return mf, nil
 	}
 
-	alive, err := mf.statsCollector.SpecificStorage(name)
+	alive, err := mf.statsCollector.SpecificStorage(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("select storage %q in multistorage folder: %w", name, err)
 	}
@@ -180,39 +180,39 @@ func (mf Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 
 // Exists checks if the object exists in multiple storages. A specific implementation is selected using
 // policies.Policies
-func (mf Folder) Exists(objectRelativePath string) (bool, error) {
-	exists, _, err := Exists(mf, objectRelativePath)
+func (mf Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
+	exists, _, err := Exists(ctx, mf, objectRelativePath)
 	return exists, err
 }
 
 // Exists is like storage.Folder.Exists, but it also provides the name of the storage where the file is found. If it's
 // not found, storage name is empty. If it's found in all storages, provides "all" as the storage name.
-func Exists(folder storage.Folder, objectRelativePath string) (found bool, storageName string, err error) {
+func Exists(ctx context.Context, folder storage.Folder, objectRelativePath string) (found bool, storageName string, err error) {
 	mf, ok := folder.(Folder)
 	if !ok {
-		exists, err := folder.Exists(objectRelativePath)
+		exists, err := folder.Exists(ctx, objectRelativePath)
 		return exists, consts.DefaultStorage, err
 	}
 
 	switch mf.policies.Exists {
 	case policies.ExistsPolicyFirst:
-		return mf.ExistsInFirst(objectRelativePath)
+		return mf.ExistsInFirst(ctx, objectRelativePath)
 	case policies.ExistsPolicyAny:
-		return mf.ExistsInAny(objectRelativePath)
+		return mf.ExistsInAny(ctx, objectRelativePath)
 	case policies.ExistsPolicyAll:
-		return mf.ExistsInAll(objectRelativePath)
+		return mf.ExistsInAll(ctx, objectRelativePath)
 	default:
 		panic(fmt.Sprintf("unknown exists policy %d", mf.policies.Exists))
 	}
 }
 
 // ExistsInFirst checks if the object exists in the first storage.
-func (mf Folder) ExistsInFirst(objectRelativePath string) (bool, string, error) {
+func (mf Folder) ExistsInFirst(ctx context.Context, objectRelativePath string) (bool, string, error) {
 	if len(mf.usedFolders) == 0 {
 		return false, "", ErrNoUsedStorages
 	}
 	first := mf.usedFolders[0]
-	exists, err := first.Exists(objectRelativePath)
+	exists, err := first.Exists(ctx, objectRelativePath)
 	mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationExists, err == nil)
 	if err != nil {
 		return false, first.StorageName, fmt.Errorf("check file for existence in %q: %w", first.StorageName, err)
@@ -221,9 +221,9 @@ func (mf Folder) ExistsInFirst(objectRelativePath string) (bool, string, error) 
 }
 
 // ExistsInAny checks if the object exists in any storage.
-func (mf Folder) ExistsInAny(objectRelativePath string) (bool, string, error) {
+func (mf Folder) ExistsInAny(ctx context.Context, objectRelativePath string) (bool, string, error) {
 	for _, f := range mf.usedFolders {
-		exists, err := f.Exists(objectRelativePath)
+		exists, err := f.Exists(ctx, objectRelativePath)
 		mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationExists, err == nil)
 		if err != nil {
 			return false, f.StorageName, fmt.Errorf("check file for existence in %q: %w", f.StorageName, err)
@@ -236,9 +236,9 @@ func (mf Folder) ExistsInAny(objectRelativePath string) (bool, string, error) {
 }
 
 // ExistsInAll checks if the object exists in all used storages.
-func (mf Folder) ExistsInAll(objectRelativePath string) (bool, string, error) {
+func (mf Folder) ExistsInAll(ctx context.Context, objectRelativePath string) (bool, string, error) {
 	for _, f := range mf.usedFolders {
-		exists, err := f.Exists(objectRelativePath)
+		exists, err := f.Exists(ctx, objectRelativePath)
 		mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationExists, err == nil)
 		if err != nil {
 			return false, f.StorageName, fmt.Errorf("check file for existence in %q: %w", f.StorageName, err)
@@ -251,36 +251,36 @@ func (mf Folder) ExistsInAll(objectRelativePath string) (bool, string, error) {
 }
 
 // ReadObject reads the object from multiple storages. A specific implementation is selected using policies.Policies.
-func (mf Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	file, _, err := ReadObject(mf, objectRelativePath)
+func (mf Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
+	file, _, err := ReadObject(ctx, mf, objectRelativePath)
 	return file, err
 }
 
 // ReadObject is like storage.Folder.ReadObject, but it also provides the name of storage where the file is read from.
-func ReadObject(folder storage.Folder, objectRelativePath string) (io.ReadCloser, string, error) {
+func ReadObject(ctx context.Context, folder storage.Folder, objectRelativePath string) (io.ReadCloser, string, error) {
 	mf, ok := folder.(Folder)
 	if !ok {
-		file, err := folder.ReadObject(objectRelativePath)
+		file, err := folder.ReadObject(ctx, objectRelativePath)
 		return file, consts.DefaultStorage, err
 	}
 
 	switch mf.policies.Read {
 	case policies.ReadPolicyFirst:
-		return mf.ReadObjectFromFirst(objectRelativePath)
+		return mf.ReadObjectFromFirst(ctx, objectRelativePath)
 	case policies.ReadPolicyFoundFirst:
-		return mf.ReadObjectFoundFirst(objectRelativePath)
+		return mf.ReadObjectFoundFirst(ctx, objectRelativePath)
 	default:
 		panic(fmt.Sprintf("unknown read object policy %d", mf.policies.Read))
 	}
 }
 
 // ReadObjectFromFirst reads the object from the first storage.
-func (mf Folder) ReadObjectFromFirst(objectRelativePath string) (io.ReadCloser, string, error) {
+func (mf Folder) ReadObjectFromFirst(ctx context.Context, objectRelativePath string) (io.ReadCloser, string, error) {
 	if len(mf.usedFolders) == 0 {
 		return nil, "", ErrNoUsedStorages
 	}
 	first := mf.usedFolders[0]
-	file, err := first.ReadObject(objectRelativePath)
+	file, err := first.ReadObject(ctx, objectRelativePath)
 	if err != nil {
 		if _, ok := err.(storage.ObjectNotFoundError); ok {
 			mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationRead(0), true)
@@ -294,15 +294,15 @@ func (mf Folder) ReadObjectFromFirst(objectRelativePath string) (io.ReadCloser, 
 }
 
 // ReadObjectFoundFirst reads the object from all used storages in order and returns the first one found.
-func (mf Folder) ReadObjectFoundFirst(objectRelativePath string) (io.ReadCloser, string, error) {
+func (mf Folder) ReadObjectFoundFirst(ctx context.Context, objectRelativePath string) (io.ReadCloser, string, error) {
 	for _, f := range mf.usedFolders {
-		exists, err := f.Exists(objectRelativePath)
+		exists, err := f.Exists(ctx, objectRelativePath)
 		if err != nil {
 			mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationExists, false)
 			return nil, f.StorageName, fmt.Errorf("check file for existence in %q: %w", f.StorageName, err)
 		}
 		if exists {
-			file, err := f.ReadObject(objectRelativePath)
+			file, err := f.ReadObject(ctx, objectRelativePath)
 			if err != nil {
 				if _, ok := err.(storage.ObjectNotFoundError); ok {
 					mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationRead(0), true)
@@ -319,35 +319,35 @@ func (mf Folder) ReadObjectFoundFirst(objectRelativePath string) (io.ReadCloser,
 }
 
 // ListFolder lists the folder in multiple storages. A specific implementation is selected using policies.Policies
-func (mf Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	switch mf.policies.List {
 	case policies.ListPolicyFirst:
-		return mf.ListFolderInFirst()
+		return mf.ListFolderInFirst(ctx)
 	case policies.ListPolicyFoundFirst:
-		return mf.ListFolderWhereFoundFirst()
+		return mf.ListFolderWhereFoundFirst(ctx)
 	case policies.ListPolicyAll:
-		return mf.ListFolderAll()
+		return mf.ListFolderAll(ctx)
 	default:
 		panic(fmt.Sprintf("unknown list policy %d", mf.policies.List))
 	}
 }
 
 // ListFolderInFirst lists the folder in the first storage.
-func (mf Folder) ListFolderInFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf Folder) ListFolderInFirst(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	if len(mf.usedFolders) == 0 {
 		return nil, nil, ErrNoUsedStorages
 	}
-	return mf.listSpecificFolder(mf.usedFolders[0])
+	return mf.listSpecificFolder(ctx, mf.usedFolders[0])
 }
 
 // ListFolderWhereFoundFirst lists the folder in all used storages and provides a result where each file is taken from
 // the first storage in which it was found.
-func (mf Folder) ListFolderWhereFoundFirst() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf Folder) ListFolderWhereFoundFirst(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	metObjects := map[string]bool{}
 	metSubFolders := map[string]bool{}
 
 	for _, f := range mf.usedFolders {
-		curObjects, curSubFolders, err := mf.listSpecificFolder(f)
+		curObjects, curSubFolders, err := mf.listSpecificFolder(ctx, f)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -373,11 +373,11 @@ func (mf Folder) ListFolderWhereFoundFirst() (objects []storage.Object, subFolde
 }
 
 // ListFolderAll lists every used storage and provides the union of all found files. Subfolders aren't listed twice.
-func (mf Folder) ListFolderAll() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (mf Folder) ListFolderAll(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	metSubFolders := map[string]bool{}
 
 	for _, f := range mf.usedFolders {
-		curObjects, curSubFolders, err := mf.listSpecificFolder(f)
+		curObjects, curSubFolders, err := mf.listSpecificFolder(ctx, f)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -395,8 +395,8 @@ func (mf Folder) ListFolderAll() (objects []storage.Object, subFolders []storage
 	return objects, subFolders, nil
 }
 
-func (mf Folder) listSpecificFolder(folder NamedFolder) ([]storage.Object, []storage.Folder, error) {
-	objects, subFolders, err := folder.ListFolder()
+func (mf Folder) listSpecificFolder(ctx context.Context, folder NamedFolder) ([]storage.Object, []storage.Folder, error) {
+	objects, subFolders, err := folder.ListFolder(ctx)
 	if err != nil {
 		mf.statsCollector.ReportOperationResult(folder.StorageName, stats.OperationList, false)
 		return nil, nil, fmt.Errorf("list folder in storage %q: %w", folder.StorageName, err)
@@ -431,13 +431,9 @@ func (mf Folder) listSpecificFolder(folder NamedFolder) ([]storage.Object, []sto
 	return objects, subFolders, nil
 }
 
-func (mf Folder) PutObject(name string, content io.Reader) error {
-	return mf.PutObjectWithContext(context.Background(), name, content)
-}
-
-// PutObjectWithContext puts the object to multiple storages.
+// PutObject puts the object to multiple storages.
 // A specific implementation is selected using policies.Policies
-func (mf Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (mf Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	switch mf.policies.Put {
 	case policies.PutPolicyFirst:
 		return mf.PutObjectToFirst(ctx, name, content)
@@ -457,7 +453,7 @@ func (mf Folder) PutObjectToFirst(ctx context.Context, name string, content io.R
 	if len(mf.usedFolders) == 0 {
 		return ErrNoUsedStorages
 	}
-	return mf.usedFolders[0].PutObjectWithContext(ctx, name, content)
+	return mf.usedFolders[0].PutObject(ctx, name, content)
 }
 
 // PutObjectOrUpdateFirstFound updates the object in the first storage where it is found. If it's not found anywhere,
@@ -468,13 +464,13 @@ func (mf Folder) PutObjectOrUpdateFirstFound(ctx context.Context, name string, c
 	}
 	countContent := newCountReader(content)
 	for _, f := range mf.usedFolders {
-		exists, err := f.Exists(name)
+		exists, err := f.Exists(ctx, name)
 		if err != nil {
 			mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationExists, false)
 			return fmt.Errorf("check file for existence in %q: %w", f.StorageName, err)
 		}
 		if exists {
-			err = f.PutObjectWithContext(ctx, name, countContent)
+			err = f.PutObject(ctx, name, countContent)
 			if err != nil {
 				mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationPut(countContent.ReadBytes()), false)
 				return fmt.Errorf("put object to %q: %w", f.StorageName, err)
@@ -484,7 +480,7 @@ func (mf Folder) PutObjectOrUpdateFirstFound(ctx context.Context, name string, c
 		}
 	}
 	first := mf.usedFolders[0]
-	err := first.PutObjectWithContext(ctx, name, countContent)
+	err := first.PutObject(ctx, name, countContent)
 	if err != nil {
 		mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationPut(countContent.ReadBytes()), false)
 		return fmt.Errorf("put object to %q: %w", first.StorageName, err)
@@ -507,7 +503,7 @@ func (mf Folder) PutObjectToAll(ctx context.Context, name string, content io.Rea
 			content = bytes.NewReader(buffer)
 		}
 		bufferSize := int64(len(buffer))
-		err := f.PutObjectWithContext(ctx, name, content)
+		err := f.PutObject(ctx, name, content)
 		if err != nil {
 			mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationPut(bufferSize), false)
 			return fmt.Errorf("put object to storage %q: %w", f.StorageName, err)
@@ -536,7 +532,7 @@ func (mf Folder) PutObjectOrUpdateAllFound(ctx context.Context, name string, con
 
 	var found bool
 	for _, f := range mf.usedFolders {
-		exists, err := f.Exists(name)
+		exists, err := f.Exists(ctx, name)
 		if err != nil {
 			return fmt.Errorf("check for existence: %w", err)
 		}
@@ -544,7 +540,7 @@ func (mf Folder) PutObjectOrUpdateAllFound(ctx context.Context, name string, con
 			if buffer != nil {
 				content = bytes.NewReader(buffer)
 			}
-			err = f.PutObjectWithContext(ctx, name, content)
+			err = f.PutObject(ctx, name, content)
 			if err != nil {
 				mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationPut(bufferSize), false)
 				return fmt.Errorf("put object to storage %q: %w", f.StorageName, err)
@@ -558,7 +554,7 @@ func (mf Folder) PutObjectOrUpdateAllFound(ctx context.Context, name string, con
 			content = bytes.NewReader(buffer)
 		}
 		first := mf.usedFolders[0]
-		err := first.PutObjectWithContext(ctx, name, content)
+		err := first.PutObject(ctx, name, content)
 		if err != nil {
 			mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationPut(bufferSize), false)
 			return fmt.Errorf("put object to storage %q: %w", first.StorageName, err)
@@ -572,25 +568,25 @@ func (mf Folder) PutObjectOrUpdateAllFound(ctx context.Context, name string, con
 
 // DeleteObjects deletes the objects from multiple storages. A specific implementation is selected using
 // policies.Policies
-func (mf Folder) DeleteObjects(objectRelativePaths []storage.Object) error {
+func (mf Folder) DeleteObjects(ctx context.Context, objectRelativePaths []storage.Object) error {
 	switch mf.policies.Delete {
 	case policies.DeletePolicyFirst:
-		return mf.DeleteObjectsFromFirst(objectRelativePaths)
+		return mf.DeleteObjectsFromFirst(ctx, objectRelativePaths)
 	case policies.DeletePolicyAll:
-		return mf.DeleteObjectsFromAll(objectRelativePaths)
+		return mf.DeleteObjectsFromAll(ctx, objectRelativePaths)
 	default:
 		panic(fmt.Sprintf("unknown delete policy %d", mf.policies.Delete))
 	}
 }
 
 // DeleteObjectsFromFirst deletes the objects from the first storage.
-func (mf Folder) DeleteObjectsFromFirst(objectRelativePaths []storage.Object) error {
+func (mf Folder) DeleteObjectsFromFirst(ctx context.Context, objectRelativePaths []storage.Object) error {
 	if len(mf.usedFolders) == 0 {
 		return ErrNoUsedStorages
 	}
 	first := mf.usedFolders[0]
 	filesNum := len(objectRelativePaths)
-	err := first.DeleteObjects(objectRelativePaths)
+	err := first.DeleteObjects(ctx, objectRelativePaths)
 	if err != nil {
 		mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationDelete(filesNum), false)
 		return fmt.Errorf("delete object from storage %q: %w", first.StorageName, err)
@@ -600,10 +596,10 @@ func (mf Folder) DeleteObjectsFromFirst(objectRelativePaths []storage.Object) er
 }
 
 // DeleteObjectsFromAll deletes the objects from all used storages.
-func (mf Folder) DeleteObjectsFromAll(objectRelativePaths []storage.Object) error {
+func (mf Folder) DeleteObjectsFromAll(ctx context.Context, objectRelativePaths []storage.Object) error {
 	filesNum := len(objectRelativePaths)
 	for _, f := range mf.usedFolders {
-		err := f.DeleteObjects(objectRelativePaths)
+		err := f.DeleteObjects(ctx, objectRelativePaths)
 		if err != nil {
 			mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationDelete(filesNum), false)
 			return fmt.Errorf("delete objects from storage %q: %w", f.StorageName, err)
@@ -614,24 +610,24 @@ func (mf Folder) DeleteObjectsFromAll(objectRelativePaths []storage.Object) erro
 }
 
 // CopyObject copies the object in multiple storages. A specific implementation is selected using policies.Policies
-func (mf Folder) CopyObject(srcPath string, dstPath string) error {
+func (mf Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
 	switch mf.policies.Copy {
 	case policies.CopyPolicyFirst:
-		return mf.CopyObjectInFirst(srcPath, dstPath)
+		return mf.CopyObjectInFirst(ctx, srcPath, dstPath)
 	case policies.CopyPolicyAll:
-		return mf.CopyObjectInAll(srcPath, dstPath)
+		return mf.CopyObjectInAll(ctx, srcPath, dstPath)
 	default:
 		panic(fmt.Sprintf("unknown copy policy %d", mf.policies.Copy))
 	}
 }
 
 // CopyObjectInFirst copies the object in the first storage.
-func (mf Folder) CopyObjectInFirst(srcPath string, dstPath string) error {
+func (mf Folder) CopyObjectInFirst(ctx context.Context, srcPath string, dstPath string) error {
 	if len(mf.usedFolders) == 0 {
 		return ErrNoUsedStorages
 	}
 	first := mf.usedFolders[0]
-	err := first.CopyObject(srcPath, dstPath)
+	err := first.CopyObject(ctx, srcPath, dstPath)
 	if err != nil {
 		_, notFound := err.(storage.ObjectNotFoundError)
 		if !notFound {
@@ -644,10 +640,10 @@ func (mf Folder) CopyObjectInFirst(srcPath string, dstPath string) error {
 }
 
 // CopyObjectInAll copies the object in all used storages. If no storages have the object, an error is returned.
-func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
+func (mf Folder) CopyObjectInAll(ctx context.Context, srcPath string, dstPath string) error {
 	found := false
 	for _, f := range mf.usedFolders {
-		err := f.CopyObject(srcPath, dstPath)
+		err := f.CopyObject(ctx, srcPath, dstPath)
 		if _, ok := err.(storage.ObjectNotFoundError); ok {
 			mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationCopy, true)
 			continue
@@ -665,10 +661,10 @@ func (mf Folder) CopyObjectInAll(srcPath string, dstPath string) error {
 	return nil
 }
 
-func (mf Folder) Validate() error {
+func (mf Folder) Validate(ctx context.Context) error {
 	errs := make([]error, 0)
 	for _, folder := range mf.usedFolders {
-		err := folder.Validate()
+		err := folder.Validate(ctx)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -681,10 +677,10 @@ func (mf Folder) Validate() error {
 }
 
 // TODO: not implemented
-func (mf Folder) SetVersioningEnabled(enable bool) {}
+func (mf Folder) SetVersioningEnabled(_ context.Context, enable bool) {}
 
 // TODO: not implemented
-func (mf Folder) GetVersioningEnabled() bool {
+func (mf Folder) GetVersioningEnabled(_ context.Context) bool {
 	return false
 }
 

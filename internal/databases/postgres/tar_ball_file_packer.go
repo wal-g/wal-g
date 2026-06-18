@@ -72,8 +72,8 @@ func (p *TarBallFilePackerImpl) UpdateDeltaMap(deltaMap PagedFileDeltaMap) {
 }
 
 // TODO : unit tests
-func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, tarBall internal.TarBall) error {
-	fileReadCloser, err := p.createFileReadCloser(cfi)
+func (p *TarBallFilePackerImpl) PackFileIntoTar(ctx context.Context, cfi *internal.ComposeFileInfo, tarBall internal.TarBall) error {
+	fileReadCloser, err := p.createFileReadCloser(ctx, cfi)
 	if err != nil {
 		switch err.(type) {
 		case SkippedFileError:
@@ -88,7 +88,7 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, t
 			return err
 		}
 	}
-	errorGroup, _ := errgroup.WithContext(context.Background())
+	errorGroup, _ := errgroup.WithContext(ctx)
 
 	if p.options.verifyPageChecksums {
 		var secondReadCloser io.ReadCloser
@@ -123,7 +123,7 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(cfi *internal.ComposeFileInfo, t
 	return errorGroup.Wait()
 }
 
-func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileInfo) (io.ReadCloser, error) {
+func (p *TarBallFilePackerImpl) createFileReadCloser(ctx context.Context, cfi *internal.ComposeFileInfo) (io.ReadCloser, error) {
 	var fileReadCloser io.ReadCloser
 	if cfi.IsIncremented {
 		bitmap, err := p.getDeltaBitmapFor(cfi.Path)
@@ -134,9 +134,9 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		}
 		if p.IncrementFromChkpNum != nil && orioledb.IsOrioledbDataFile(cfi.FileInfo, cfi.Path) {
 			fileReadCloser, cfi.Header.Size, err =
-				orioledb.ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.IncrementFromChkpNum, bitmap)
+				orioledb.ReadIncrementalFile(ctx, cfi.Path, cfi.FileInfo.Size(), *p.IncrementFromChkpNum, bitmap)
 		} else {
-			fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
+			fileReadCloser, cfi.Header.Size, err = ReadIncrementalFile(ctx, cfi.Path, cfi.FileInfo.Size(), *p.incrementFromLsn, bitmap)
 		}
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, internal.NewFileNotExistError(cfi.Path)
@@ -153,7 +153,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		case pg_errors.InvalidBlockError: // fallback to full file backup
 			tracelog.WarningLogger.Printf("failed to read file '%s' as incremented\n", cfi.Header.Name)
 			cfi.IsIncremented = false
-			fileReadCloser, err = internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
+			fileReadCloser, err = internal.StartReadingFile(ctx, cfi.Header, cfi.FileInfo, cfi.Path)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +162,7 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(cfi *internal.ComposeFileIn
 		}
 	} else {
 		var err error
-		fileReadCloser, err = internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
+		fileReadCloser, err = internal.StartReadingFile(ctx, cfi.Header, cfi.FileInfo, cfi.Path)
 		if err != nil {
 			return nil, err
 		}

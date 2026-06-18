@@ -2,6 +2,7 @@ package testtools
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -94,19 +95,19 @@ func NewMockWalDirUploader(apiMultiErr, apiErr bool) *postgres.WalUploader {
 }
 
 /*nolint:errcheck*/
-func CreateMockStorageFolder() storage.Folder {
+func CreateMockStorageFolder(ctx context.Context) storage.Folder {
 	var folder = MakeDefaultInMemoryStorageFolder()
 	subFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	subFolder.PutObject("base_123_backup_stop_sentinel.json", &bytes.Buffer{})         //nolint:errcheck
-	subFolder.PutObject("base_456_backup_stop_sentinel.json", strings.NewReader("{}")) //nolint:errcheck
-	subFolder.PutObject("base_000_backup_stop_sentinel.json", &bytes.Buffer{})         //nolint:errcheck// last put
+	subFolder.PutObject(ctx, "base_123_backup_stop_sentinel.json", &bytes.Buffer{})         //nolint:errcheck
+	subFolder.PutObject(ctx, "base_456_backup_stop_sentinel.json", strings.NewReader("{}")) //nolint:errcheck
+	subFolder.PutObject(ctx, "base_000_backup_stop_sentinel.json", &bytes.Buffer{})         //nolint:errcheck// last put
 	// not a sentinel
-	subFolder.PutObject("base_123312", &bytes.Buffer{})               //nolint:errcheck
-	subFolder.PutObject("base_321/nop", &bytes.Buffer{})              //nolint:errcheck
-	subFolder.PutObject("folder123/nop", &bytes.Buffer{})             //nolint:errcheck
-	subFolder.PutObject("base_456/tar_partitions/1", &bytes.Buffer{}) //nolint:errcheck
-	subFolder.PutObject("base_456/tar_partitions/2", &bytes.Buffer{}) //nolint:errcheck
-	subFolder.PutObject("base_456/tar_partitions/3", &bytes.Buffer{}) //nolint:errcheck
+	subFolder.PutObject(ctx, "base_123312", &bytes.Buffer{})               //nolint:errcheck
+	subFolder.PutObject(ctx, "base_321/nop", &bytes.Buffer{})              //nolint:errcheck
+	subFolder.PutObject(ctx, "folder123/nop", &bytes.Buffer{})             //nolint:errcheck
+	subFolder.PutObject(ctx, "base_456/tar_partitions/1", &bytes.Buffer{}) //nolint:errcheck
+	subFolder.PutObject(ctx, "base_456/tar_partitions/2", &bytes.Buffer{}) //nolint:errcheck
+	subFolder.PutObject(ctx, "base_456/tar_partitions/3", &bytes.Buffer{}) //nolint:errcheck
 	return folder
 }
 
@@ -161,12 +162,12 @@ func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling D
 			timeData = time.Date(creationTimeYears[i], time.January, 1, 1, 1, 1, 1, time.UTC)
 		}
 		bytesSentinel, err := json.Marshal(&objects[i])
-		folder.PutObject(backupsName[i]+utility.SentinelSuffix, strings.NewReader(string(bytesSentinel)))
+		folder.PutObject(t.Context(), backupsName[i]+utility.SentinelSuffix, strings.NewReader(string(bytesSentinel)))
 		assert.NoError(t, err)
 		metadata := map[string]interface{}{"start_time": timeData}
 		bytesMetadata, err := json.Marshal(&metadata)
 		assert.NoError(t, err)
-		folder.PutObject(backupsName[i]+"/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
+		folder.PutObject(t.Context(), backupsName[i]+"/"+utility.MetadataFileName, strings.NewReader(string(bytesMetadata)))
 	}
 
 	controller := gomock.NewController(t)
@@ -176,16 +177,18 @@ func CreatePostgresMockStorageFolderWithTimeMetadata(t *testing.T, dataFilling D
 
 	mockBaseBackupFolder.
 		EXPECT().
-		ListFolder().
+		ListFolder(gomock.Any()).
 		Return(objects, nil, nil).
 		AnyTimes()
 
 	for i := 0; i < backupsCount; i++ {
 		currentSentinelPath := backupsName[i] + utility.SentinelSuffix
-		mockBaseBackupFolder.EXPECT().Exists(currentSentinelPath).Return(true, nil).AnyTimes()
+		mockBaseBackupFolder.EXPECT().Exists(gomock.Any(), currentSentinelPath).Return(true, nil).AnyTimes()
 		currentMetadataPath := backupsName[i] + "/" + utility.MetadataFileName
-		mockBaseBackupFolder.EXPECT().ReadObject(currentMetadataPath).Return(folder.ReadObject(currentMetadataPath)).AnyTimes()
-		mockBaseBackupFolder.EXPECT().ReadObject(currentSentinelPath).Return(folder.ReadObject(currentSentinelPath)).AnyTimes()
+		mockBaseBackupFolder.EXPECT().ReadObject(gomock.Any(), currentMetadataPath).
+			Return(folder.ReadObject(t.Context(), currentMetadataPath)).AnyTimes()
+		mockBaseBackupFolder.EXPECT().ReadObject(gomock.Any(), currentSentinelPath).
+			Return(folder.ReadObject(t.Context(), currentSentinelPath)).AnyTimes()
 	}
 	return mockBaseBackupFolder
 }
@@ -209,7 +212,7 @@ func CreateMockStorageFolderWithDeltaBackups(t *testing.T) storage.Folder {
 		bytesSentinel, err := json.Marshal(backupNames[backupName])
 		assert.NoError(t, err)
 		sentinelString := string(bytesSentinel)
-		err = subFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+		err = subFolder.PutObject(t.Context(), backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
 		assert.NoError(t, err)
 	}
 	return folder
@@ -253,21 +256,21 @@ func CreateMockStorageFolderWithPermanentBackups(t *testing.T) storage.Folder {
 		empty, err := json.Marshal(&emptyData)
 		assert.NoError(t, err)
 		sentinelString := string(empty)
-		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
+		err = baseBackupFolder.PutObject(t.Context(), backupName+utility.SentinelSuffix, strings.NewReader(sentinelString))
 
 		// metadata
 		assert.NoError(t, err)
 		bytesMetadata, err := json.Marshal(backupNames[backupName])
 		assert.NoError(t, err)
 		metadataString := string(bytesMetadata)
-		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
+		err = baseBackupFolder.PutObject(t.Context(), backupName+"/"+utility.MetadataFileName, strings.NewReader(metadataString))
 		assert.NoError(t, err)
 	}
 	for walName := range walNames {
 		bytes, err := json.Marshal(walNames[walName])
 		assert.NoError(t, err)
 		walString := string(bytes)
-		err = walBackupFolder.PutObject(walName+".lz4", strings.NewReader(walString))
+		err = walBackupFolder.PutObject(t.Context(), walName+".lz4", strings.NewReader(walString))
 		assert.NoError(t, err)
 	}
 	return folder
@@ -318,26 +321,26 @@ func CreateMockStorageFolderWithPermanentGPBackups(t *testing.T) storage.Folder 
 		assert.NoError(t, err)
 		stringSegmentBackupMetadata := string(bytesSegmentBackupMetadata)
 
-		err = segmentsFolder.PutObject(
+		err = segmentsFolder.PutObject(t.Context(),
 			fmt.Sprintf("seg%d/%s%s/metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]),
 			strings.NewReader(stringSegmentBackupMetadata))
 		assert.NoError(t, err)
 
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s%s", backupId, utility.BaseBackupPath, meta["backup_name"], utility.SentinelSuffix), &bytes.Buffer{})        //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/ao_files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})           //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})              //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/tar_partitions/part_001.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})   //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s/tar_partitions/pg_control.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{}) //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s.00000028.backup.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})                         //nolint:errcheck
-		segmentsFolder.PutObject(fmt.Sprintf("seg%d/%s%s.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})                                         //nolint:errcheck
+		segmentsFolder.PutObject(t.Context(), fmt.Sprintf("seg%d/%s%s%s", backupId, utility.BaseBackupPath, meta["backup_name"], utility.SentinelSuffix), &bytes.Buffer{})        //nolint:errcheck
+		segmentsFolder.PutObject(t.Context(), fmt.Sprintf("seg%d/%s%s/ao_files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})           //nolint:errcheck
+		segmentsFolder.PutObject(t.Context(), fmt.Sprintf("seg%d/%s%s/files_metadata.json", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})              //nolint:errcheck
+		segmentsFolder.PutObject(t.Context(), fmt.Sprintf("seg%d/%s%s/tar_partitions/part_001.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{})   //nolint:errcheck
+		segmentsFolder.PutObject(t.Context(), fmt.Sprintf("seg%d/%s%s/tar_partitions/pg_control.tar.br", backupId, utility.BaseBackupPath, meta["backup_name"]), &bytes.Buffer{}) //nolint:errcheck
+		segmentsFolder.PutObject(t.Context(), fmt.Sprintf("seg%d/%s%s.00000028.backup.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})                         //nolint:errcheck
+		segmentsFolder.PutObject(t.Context(), fmt.Sprintf("seg%d/%s%s.br", backupId, utility.WalPath, meta["wal_name"]), &bytes.Buffer{})                                         //nolint:errcheck
 	}
 
 	bytesBackupSentinelData, err := json.Marshal(backupSentinelData)
 	assert.NoError(t, err)
 	stringBackupSentinelData := string(bytesBackupSentinelData)
-	err = baseBackupFolder.PutObject(fmt.Sprintf("%s%s", backupName, utility.SentinelSuffix), strings.NewReader(stringBackupSentinelData))
+	err = baseBackupFolder.PutObject(t.Context(), fmt.Sprintf("%s%s", backupName, utility.SentinelSuffix), strings.NewReader(stringBackupSentinelData))
 	assert.NoError(t, err)
-	err = baseBackupFolder.PutObject(fmt.Sprintf("%s_restore_point.json", backupName), &bytes.Buffer{})
+	err = baseBackupFolder.PutObject(t.Context(), fmt.Sprintf("%s_restore_point.json", backupName), &bytes.Buffer{})
 	assert.NoError(t, err)
 
 	return folder

@@ -72,7 +72,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 
 			assert.NoError(
 				t,
-				folder.PutObject(b.BackupName+utility.SentinelSuffix, bytes.NewReader(serialized)),
+				folder.PutObject(t.Context(), b.BackupName+utility.SentinelSuffix, bytes.NewReader(serialized)),
 				"couldn't put sentinel in the folder",
 			)
 		}
@@ -82,7 +82,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		redis.HandleDetailedBackupList(folder, true, true)
+		redis.HandleDetailedBackupList(t.Context(), folder, true, true)
 
 		_ = w.Close()
 		got, _ := io.ReadAll(r)
@@ -110,7 +110,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		redis.HandleDetailedBackupList(folder, true, false)
+		redis.HandleDetailedBackupList(t.Context(), folder, true, false)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)

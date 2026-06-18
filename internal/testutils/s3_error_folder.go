@@ -28,11 +28,7 @@ type S3TestFolder struct {
 	mutex sync.Mutex
 }
 
-func (tf *S3TestFolder) PutObject(name string, content io.Reader) error {
-	return tf.PutObjectWithContext(context.Background(), name, content)
-}
-
-func (tf *S3TestFolder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (tf *S3TestFolder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	buf := &bytes.Buffer{}
 	count, err := io.Copy(buf, content)
 	if err != nil {
@@ -48,7 +44,7 @@ func (tf *S3TestFolder) PutObjectWithContext(ctx context.Context, name string, c
 	tf.wasSkippedBlock = false
 	tf.bytesLeft -= count
 
-	err = tf.Folder.PutObjectWithContext(ctx, name, content)
+	err = tf.Folder.PutObject(ctx, name, content)
 
 	return err
 }

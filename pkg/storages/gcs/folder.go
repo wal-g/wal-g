@@ -55,9 +55,9 @@ func (folder *Folder) BuildObjectHandle(path string) *gcs.ObjectHandle {
 	return objectHandle
 }
 
-func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	prefix := storage.AddDelimiterToPath(folder.path)
-	ctx, cancel := folder.createTimeoutContext(context.Background())
+	ctx, cancel := folder.createTimeoutContext(ctx)
 	defer cancel()
 	iter := folder.bucket.Objects(ctx, &gcs.Query{Delimiter: "/", Prefix: prefix})
 	for {
@@ -94,13 +94,13 @@ func (folder *Folder) createTimeoutContext(ctx context.Context) (context.Context
 	return context.WithTimeout(ctx, folder.config.ContextTimeout)
 }
 
-func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+func (folder *Folder) DeleteObjects(ctx context.Context, objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
 		objPath := folder.joinPath(folder.path, object.GetName())
 		object := folder.BuildObjectHandle(objPath)
 		tracelog.DebugLogger.Printf("Delete %v\n", objPath)
-		ctx, ctxCancel := folder.createTimeoutContext(context.Background())
-		err := object.Delete(ctx)
+		opCtx, ctxCancel := folder.createTimeoutContext(ctx)
+		err := object.Delete(opCtx)
 		if err != nil && err != gcs.ErrObjectNotExist {
 			ctxCancel()
 			return fmt.Errorf("delete GCS object %q: %w", objPath, err)
@@ -110,10 +110,10 @@ func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) e
 	return nil
 }
 
-func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
+func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
 	objPath := folder.joinPath(folder.path, objectRelativePath)
 	object := folder.BuildObjectHandle(objPath)
-	ctx, cancel := folder.createTimeoutContext(context.Background())
+	ctx, cancel := folder.createTimeoutContext(ctx)
 	defer cancel()
 	_, err := object.Attrs(ctx)
 	if err == gcs.ErrObjectNotExist {
@@ -134,24 +134,17 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 	)
 }
 
-func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (folder *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	objPath := folder.joinPath(folder.path, objectRelativePath)
 	object := folder.BuildObjectHandle(objPath)
-	reader, err := object.NewReader(context.Background())
+	reader, err := object.NewReader(ctx)
 	if err == gcs.ErrObjectNotExist {
 		return nil, storage.NewObjectNotFoundError(objPath)
 	}
 	return io.NopCloser(reader), err
 }
 
-func (folder *Folder) PutObject(name string, content io.Reader) error {
-	ctx, cancel := folder.createTimeoutContext(context.Background())
-	defer cancel()
-
-	return folder.PutObjectWithContext(ctx, name, content)
-}
-
-func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (folder *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	objectPath := folder.joinPath(folder.path, name)
 	object := folder.BuildObjectHandle(objectPath)
@@ -223,8 +216,8 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 	return nil
 }
 
-func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
-	if exists, err := folder.Exists(srcPath); !exists {
+func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(ctx, srcPath); !exists {
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
@@ -233,7 +226,6 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	source := path.Join(folder.path, srcPath)
 	dst := path.Join(folder.path, dstPath)
 
-	ctx := context.Background()
 	_, err := folder.bucket.Object(dst).CopierFrom(folder.bucket.Object(source)).Run(ctx)
 	if err != nil {
 		return fmt.Errorf("copy GCS object %q to %q: %w", srcPath, dstPath, err)
@@ -285,14 +277,14 @@ func fillBuffer(r io.Reader, b []byte) (int, error) {
 	return offset, err
 }
 
-func (folder *Folder) Validate() error {
+func (folder *Folder) Validate(ctx context.Context) error {
 	return nil
 }
 
 // NOT IMPLEMENTED
-func (folder *Folder) SetVersioningEnabled(enable bool) {}
+func (folder *Folder) SetVersioningEnabled(_ context.Context, enable bool) {}
 
 // NOT IMPLEMENTED
-func (folder *Folder) GetVersioningEnabled() bool {
+func (folder *Folder) GetVersioningEnabled(_ context.Context) bool {
 	return false
 }

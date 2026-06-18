@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -22,9 +23,9 @@ func CreateConcurrentDownloader(uploader Uploader, whitelist *regexp.Regexp) *Co
 	}
 }
 
-func (downloader *ConcurrentDownloader) Download(backupName, localDirectory string, filter map[string]struct{}) error {
+func (downloader *ConcurrentDownloader) Download(ctx context.Context, backupName, localDirectory string, filter map[string]struct{}) error {
 	tarsFolder := downloader.folder.GetSubFolder(strings.Trim(backupName+TarPartitionFolderName, "/"))
-	tarsToExtract, err := downloader.getTarsToExtract(tarsFolder, filter)
+	tarsToExtract, err := downloader.getTarsToExtract(ctx, tarsFolder, filter)
 	if err != nil {
 		return err
 	}
@@ -38,11 +39,12 @@ func (downloader *ConcurrentDownloader) Download(backupName, localDirectory stri
 	}
 
 	tarInterpreter := NewFileTarInterpreter(localDirectory)
-	return ExtractAll(tarInterpreter, tarsToExtract)
+	return ExtractAll(ctx, tarInterpreter, tarsToExtract)
 }
 
-func (downloader *ConcurrentDownloader) getTarsToExtract(tarsFolder storage.Folder, filter map[string]struct{}) ([]ReaderMaker, error) {
-	tarObjects, subFolders, err := tarsFolder.ListFolder()
+func (downloader *ConcurrentDownloader) getTarsToExtract(ctx context.Context,
+	tarsFolder storage.Folder, filter map[string]struct{}) ([]ReaderMaker, error) {
+	tarObjects, subFolders, err := tarsFolder.ListFolder(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to list '%s'", tarsFolder.GetPath())
 	}

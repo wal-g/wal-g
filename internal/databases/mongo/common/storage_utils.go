@@ -1,6 +1,8 @@
 package common
 
 import (
+	"context"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -10,26 +12,26 @@ import (
 const LogicalBackupType = "logical"
 const BinaryBackupType = "binary"
 
-func DownloadMetadata(folder storage.Folder, backupName string) (*models.BackupRoutesInfo, error) {
+func DownloadMetadata(ctx context.Context, folder storage.Folder, backupName string) (*models.BackupRoutesInfo, error) {
 	var metadata models.BackupRoutesInfo
-	backup, err := internal.GetBackupByName(backupName, "", folder)
+	backup, err := internal.GetBackupByName(ctx, backupName, "", folder)
 	if err != nil {
 		return nil, err
 	}
-	if err := backup.FetchMetadata(&metadata); err != nil {
+	if err := backup.FetchMetadata(ctx, &metadata); err != nil {
 		return nil, err
 	}
 
 	return &metadata, nil
 }
 
-func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup, error) {
+func DownloadSentinel(ctx context.Context, folder storage.Folder, backupName string) (*models.Backup, error) {
 	var sentinel models.Backup
-	backup, err := internal.GetBackupByName(backupName, "", folder)
+	backup, err := internal.GetBackupByName(ctx, backupName, "", folder)
 	if err != nil {
 		return nil, err
 	}
-	if err := backup.FetchSentinel(&sentinel); err != nil {
+	if err := backup.FetchSentinel(ctx, &sentinel); err != nil {
 		return nil, err
 	}
 	if sentinel.BackupName == "" {
@@ -41,8 +43,8 @@ func DownloadSentinel(folder storage.Folder, backupName string) (*models.Backup,
 	return &sentinel, nil
 }
 
-func GetBackupFolder() (backupFolder storage.Folder, err error) {
-	st, err := internal.ConfigureStorage()
+func GetBackupFolder(ctx context.Context) (backupFolder storage.Folder, err error) {
+	st, err := internal.ConfigureStorage(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -49,9 +49,9 @@ func RestorePointMetadataFileName(pointName string) string {
 	return pointName + RestorePointSuffix
 }
 
-func FetchRestorePointMetadata(folder storage.Folder, pointName string) (RestorePointMetadata, error) {
+func FetchRestorePointMetadata(ctx context.Context, folder storage.Folder, pointName string) (RestorePointMetadata, error) {
 	var restorePoint RestorePointMetadata
-	err := internal.FetchDto(folder.GetSubFolder(utility.BaseBackupPath),
+	err := internal.FetchDto(ctx, folder.GetSubFolder(utility.BaseBackupPath),
 		&restorePoint, RestorePointMetadataFileName(pointName))
 	if err != nil {
 		return RestorePointMetadata{}, fmt.Errorf("failed to fetch metadata for restore point %s: %w", pointName, err)
@@ -61,17 +61,17 @@ func FetchRestorePointMetadata(folder storage.Folder, pointName string) (Restore
 }
 
 // ValidateMatch checks that restore point is reachable from the provided backup
-func ValidateMatch(folder storage.Folder, backupName, restorePoint, storage string) error {
-	backup, err := NewBackupInStorage(folder, backupName, storage)
+func ValidateMatch(ctx context.Context, folder storage.Folder, backupName, restorePoint, storage string) error {
+	backup, err := NewBackupInStorage(ctx, folder, backupName, storage)
 	if err != nil {
 		return err
 	}
-	bSentinel, err := backup.GetSentinel()
+	bSentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch %s sentinel: %w", backupName, err)
 	}
 
-	rpMeta, err := FetchRestorePointMetadata(folder, restorePoint)
+	rpMeta, err := FetchRestorePointMetadata(ctx, folder, restorePoint)
 	if err != nil {
 		tracelog.WarningLogger.Printf(
 			"failed to fetch restore point %s metadata, will skip the validation check: %v", restorePoint, err)
@@ -99,18 +99,18 @@ type RestorePointCreator struct {
 }
 
 // NewRestorePointCreator returns a restore point creator
-func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err error) {
-	uploader, err := internal.ConfigureUploader()
+func NewRestorePointCreator(ctx context.Context, pointName string) (rpc *RestorePointCreator, err error) {
+	uploader, err := internal.ConfigureUploader(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := postgres.Connect(context.Background())
+	conn, err := postgres.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	_, version, systemIdentifier, err := getGpClusterInfo(conn)
+	_, version, systemIdentifier, err := getGpClusterInfo(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -129,17 +129,17 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 }
 
 // Create creates cluster-wide consistent restore point
-func (rpc *RestorePointCreator) Create() {
+func (rpc *RestorePointCreator) Create(ctx context.Context) {
 	rpc.startTime = utility.TimeNowCrossPlatformUTC()
 	initGpLog(rpc.logsDir)
 
-	err := rpc.checkExists()
+	err := rpc.checkExists(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	restoreLSNs, timeLine, err := createRestorePoint(rpc.Conn, rpc.pointName)
+	restoreLSNs, timeLine, err := createRestorePoint(ctx, rpc.Conn, rpc.pointName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = rpc.uploadMetadata(restoreLSNs, timeLine)
+	err = rpc.uploadMetadata(ctx, restoreLSNs, timeLine)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for restore point %s", rpc.pointName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -147,10 +147,9 @@ func (rpc *RestorePointCreator) Create() {
 	tracelog.InfoLogger.Printf("Restore point %s successfully created", rpc.pointName)
 }
 
-func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs map[int]string, timeLine uint32, err error) {
+func createRestorePoint(ctx context.Context, conn *pgx.Conn, restorePointName string) (
+	restoreLSNs map[int]string, timeLine uint32, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
-	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
-	ctx := context.Background()
 	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
 		return nil, 0, err
@@ -166,7 +165,7 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 		if err == nil {
 			// After create restore point should archive related WAL log segments.
 			// This ensures the new cluster can retrieve complete WAL logs with the restore point for restoration.
-			globalCluster, gpVersion, _, err := getGpClusterInfo(conn)
+			globalCluster, gpVersion, _, err := getGpClusterInfo(ctx, conn)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -198,8 +197,8 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 	return nil, 0, err
 }
 
-func (rpc *RestorePointCreator) checkExists() error {
-	exists, err := rpc.Uploader.Folder().Exists(RestorePointMetadataFileName(rpc.pointName))
+func (rpc *RestorePointCreator) checkExists(ctx context.Context) error {
+	exists, err := rpc.Uploader.Folder().Exists(ctx, RestorePointMetadataFileName(rpc.pointName))
 	if err != nil {
 		return fmt.Errorf("failed to check restore point existence: %v", err)
 	}
@@ -209,7 +208,7 @@ func (rpc *RestorePointCreator) checkExists() error {
 	return nil
 }
 
-func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string, timeLine uint32) (err error) {
+func (rpc *RestorePointCreator) uploadMetadata(ctx context.Context, restoreLSNs map[int]string, timeLine uint32) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
@@ -231,7 +230,7 @@ func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string, timeL
 	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
 	tracelog.InfoLogger.Println(meta.String())
 
-	return internal.UploadDto(rpc.Uploader.Folder(), meta, metaFileName)
+	return internal.UploadDto(ctx, rpc.Uploader.Folder(), meta, metaFileName)
 }
 
 type RestorePointTime struct {
@@ -248,16 +247,16 @@ func NewNoRestorePointsFoundError() NoRestorePointsFoundError {
 	return NoRestorePointsFoundError{fmt.Errorf("no restore points found")}
 }
 
-func FetchAllRestorePoints(folder storage.Folder) ([]RestorePointMetadata, error) {
+func FetchAllRestorePoints(ctx context.Context, folder storage.Folder) ([]RestorePointMetadata, error) {
 	restorePointMetas := make([]RestorePointMetadata, 0)
 
-	restorePointTimes, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
+	restorePointTimes, err := GetRestorePoints(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return restorePointMetas, err
 	}
 
 	for _, rp := range restorePointTimes {
-		meta, err := FetchRestorePointMetadata(folder, rp.Name)
+		meta, err := FetchRestorePointMetadata(ctx, folder, rp.Name)
 		if err != nil {
 			return restorePointMetas, fmt.Errorf("fetch restore point %s metadata: %v", rp.Name, err)
 		}
@@ -332,8 +331,8 @@ func FindRestorePointWithTS(timestampStr string, restorePointMetas []RestorePoin
 }
 
 // GetRestorePoints receives restore points descriptions and sorts them by time
-func GetRestorePoints(folder storage.Folder) (restorePoints []RestorePointTime, err error) {
-	restorePointsObjects, _, err := folder.ListFolder()
+func GetRestorePoints(ctx context.Context, folder storage.Folder) (restorePoints []RestorePointTime, err error) {
+	restorePointsObjects, _, err := folder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}

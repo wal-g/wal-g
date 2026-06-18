@@ -27,6 +27,7 @@ type CreateConcurrentUploaderArgs struct {
 }
 
 func CreateConcurrentUploader(
+	ctx context.Context,
 	args CreateConcurrentUploaderArgs,
 ) (*ConcurrentUploader, error) {
 	crypter := ConfigureCrypter()
@@ -44,7 +45,7 @@ func CreateConcurrentUploader(
 		args.TarBallComposerMaker = NewRegularTarBallComposerMaker(&RegularBundleFiles{}, NewRegularTarFileSets(), args.SkipFileNotExists)
 	}
 
-	err = bundle.SetupComposer(args.TarBallComposerMaker)
+	err = bundle.SetupComposer(ctx, args.TarBallComposerMaker)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +93,6 @@ func (concurrentUploader *ConcurrentUploader) Finalize() (TarFileSets, error) {
 	return tarFileSets, err
 }
 
-func (concurrentUploader *ConcurrentUploader) UploadSentinel(sentinelDto interface{}, backupName string) error {
-	return UploadSentinel(concurrentUploader.uploader, sentinelDto, backupName)
+func (concurrentUploader *ConcurrentUploader) UploadSentinel(ctx context.Context, sentinelDto interface{}, backupName string) error {
+	return UploadSentinel(ctx, concurrentUploader.uploader, sentinelDto, backupName)
 }

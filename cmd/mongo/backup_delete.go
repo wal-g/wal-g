@@ -23,14 +23,14 @@ var backupDeleteCmd = &cobra.Command{
 		backupName := args[0]
 
 		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+		downloader, err := archive.NewStorageDownloader(cmd.Context(), archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// set up storage downloader client
-		purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
+		purger, err := archive.NewStoragePurger(cmd.Context(), archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = mongo.HandleBackupDelete(backupName, downloader, purger, !confirmedBackupDelete)
+		err = mongo.HandleBackupDelete(cmd.Context(), backupName, downloader, purger, !confirmedBackupDelete)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

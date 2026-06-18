@@ -1,6 +1,7 @@
 package internal_test
 
 import (
+	"context"
 	"bufio"
 	"bytes"
 	"fmt"
@@ -28,13 +29,13 @@ const (
 
 func TestExtractAll_noFilesProvided(t *testing.T) {
 	buf := &testtools.NOPTarInterpreter{}
-	err := internal.ExtractAllWithSleeper(buf, []internal.ReaderMaker{}, NOPSleeper{})
+	err := internal.ExtractAllWithSleeper(t.Context(), buf, []internal.ReaderMaker{}, NOPSleeper{})
 	assert.IsType(t, err, internal.NoFilesToExtractError{})
 }
 
 func TestExtractAll_fileDoesntExist(t *testing.T) {
 	readerMaker := &testtools.FileReaderMaker{Key: "testdata/booba.tar"}
-	err := internal.ExtractAllWithSleeper(&testtools.NOPTarInterpreter{}, []internal.ReaderMaker{readerMaker}, NOPSleeper{})
+	err := internal.ExtractAllWithSleeper(t.Context(), &testtools.NOPTarInterpreter{}, []internal.ReaderMaker{readerMaker}, NOPSleeper{})
 	assert.Error(t, err)
 }
 
@@ -124,7 +125,7 @@ func TestExtractAll_simpleTar(t *testing.T) {
 	buf := &testtools.BufferTarInterpreter{}
 	files := []internal.ReaderMaker{&brm}
 
-	err := internal.ExtractAllWithSleeper(buf, files, NOPSleeper{})
+	err := internal.ExtractAllWithSleeper(t.Context(), buf, files, NOPSleeper{})
 	if err != nil {
 		t.Log(err)
 	}
@@ -156,7 +157,7 @@ func TestRetryExtractWithSleeper(t *testing.T) {
 	// set warnings output to buffer
 	tracelog.SetWarningOutput(writer)
 
-	err = internal.ExtractAllWithSleeper(buf, files, NOPSleeper{})
+	err = internal.ExtractAllWithSleeper(t.Context(), buf, files, NOPSleeper{})
 
 	// return logger output back to std
 	tracelog.SetWarningOutput(os.Stderr)
@@ -196,7 +197,7 @@ func TestExtractAll_multipleTars(t *testing.T) {
 
 	buf := testtools.NewConcurrentConcatBufferTarInterpreter()
 
-	err := internal.ExtractAllWithSleeper(buf, brms, NOPSleeper{})
+	err := internal.ExtractAllWithSleeper(t.Context(), buf, brms, NOPSleeper{})
 	if err != nil {
 		t.Log(err)
 	}
@@ -222,7 +223,7 @@ func TestExtractAll_multipleConcurrentTars(t *testing.T) {
 
 	buf := testtools.NewConcurrentConcatBufferTarInterpreter()
 
-	err := internal.ExtractAllWithSleeper(buf, brms, NOPSleeper{})
+	err := internal.ExtractAllWithSleeper(t.Context(), buf, brms, NOPSleeper{})
 	if err != nil {
 		t.Log(err)
 	}
@@ -375,7 +376,7 @@ type BufferReaderMaker struct {
 	Key string
 }
 
-func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return io.NopCloser(b.Buf), nil }
+func (b *BufferReaderMaker) Reader(_ context.Context) (io.ReadCloser, error) { return io.NopCloser(b.Buf), nil }
 func (b *BufferReaderMaker) StoragePath() string            { return b.Key }
 func (b *BufferReaderMaker) LocalPath() string              { return b.Key }
 func (b *BufferReaderMaker) FileType() internal.FileType    { return internal.TarFileType }

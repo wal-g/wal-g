@@ -334,9 +334,9 @@ func getLogBackupURL(logBackupName, dbname string) string {
 	return fmt.Sprintf("https://%s/%s", hostname, getLogBackupPath(logBackupName, dbname))
 }
 
-func doesLogBackupContainDB(folder storage.Folder, logBakupName string, dbname string) (bool, error) {
+func doesLogBackupContainDB(ctx context.Context, folder storage.Folder, logBakupName string, dbname string) (bool, error) {
 	f := folder.GetSubFolder(utility.WalPath).GetSubFolder(logBakupName)
-	_, dbDirs, err := f.ListFolder()
+	_, dbDirs, err := f.ListFolder(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -345,8 +345,8 @@ func doesLogBackupContainDB(folder storage.Folder, logBakupName string, dbname s
 	}), nil
 }
 
-func listBackupBlobs(folder storage.Folder) ([]string, error) {
-	ok, err := folder.Exists(blob.IndexFileName)
+func listBackupBlobs(ctx context.Context, folder storage.Folder) ([]string, error) {
+	ok, err := folder.Exists(ctx, blob.IndexFileName)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func listBackupBlobs(folder storage.Folder) ([]string, error) {
 		// old-style single blob backup
 		return nil, nil
 	}
-	_, blobDirs, err := folder.ListFolder()
+	_, blobDirs, err := folder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -369,13 +369,13 @@ func listBackupBlobs(folder storage.Folder) ([]string, error) {
 	return blobs, nil
 }
 
-func getLogsSinceBackup(folder storage.Folder, backupName string, stopAt time.Time) ([]string, error) {
+func getLogsSinceBackup(ctx context.Context, folder storage.Folder, backupName string, stopAt time.Time) ([]string, error) {
 	if !strings.HasPrefix(backupName, utility.BackupNamePrefix) {
 		return nil, fmt.Errorf("unexpected backup name: %s", backupName)
 	}
 	startTS := backupName[len(utility.BackupNamePrefix):]
 	endTS := stopAt.Format(utility.BackupTimeFormat)
-	_, logBackups, err := folder.GetSubFolder(utility.WalPath).ListFolder()
+	_, logBackups, err := folder.GetSubFolder(utility.WalPath).ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +479,8 @@ type BackupProperties struct {
 	BackupFile        string
 }
 
-func GetBackupProperties(db *sql.DB,
+func GetBackupProperties(ctx context.Context,
+	db *sql.DB,
 	folder storage.Folder,
 	logBackup bool,
 	backupName string,
@@ -495,7 +496,7 @@ func GetBackupProperties(db *sql.DB,
 		baseURL = getDatabaseBackupURL(backupName, databaseName)
 		basePath = getDatabaseBackupPath(backupName, databaseName)
 	}
-	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	blobs, err := listBackupBlobs(ctx, folder.GetSubFolder(basePath))
 	if err != nil {
 		return res, err
 	}

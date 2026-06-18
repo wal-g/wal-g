@@ -3,6 +3,7 @@ package postgres
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"fmt"
 	"io"
 	"slices"
@@ -49,6 +50,7 @@ type IntegrityCheckRunner struct {
 }
 
 func NewIntegrityCheckRunner(
+	ctx context.Context,
 	rootFolder storage.Folder,
 	walFolderFilenames []string,
 	currentWalSegment WalSegmentDescription,
@@ -56,7 +58,7 @@ func NewIntegrityCheckRunner(
 ) (IntegrityCheckRunner, error) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 
-	timelineSwitchMap, err := createTimelineSwitchMap(currentWalSegment.Timeline, walFolder)
+	timelineSwitchMap, err := createTimelineSwitchMap(ctx, currentWalSegment.Timeline, walFolder)
 	if err != nil {
 		return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to initialize timeline history map")
 	}
@@ -65,7 +67,7 @@ func NewIntegrityCheckRunner(
 
 	var stopWalSegmentNo WalSegmentNo
 	if backupSearchParams.FindEarliestBackup {
-		stopWalSegmentNo, err = getEarliestBackupStartSegmentNo(timelineSwitchMap, currentWalSegment.Timeline, rootFolder)
+		stopWalSegmentNo, err = getEarliestBackupStartSegmentNo(ctx, timelineSwitchMap, currentWalSegment.Timeline, rootFolder)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to detect earliest backup WAL segment no: '%v',"+
 				"will scan until the 0000000X0000000000000001 segment.\n", err)
@@ -73,7 +75,8 @@ func NewIntegrityCheckRunner(
 			noBackupsFound = true
 		}
 	} else {
-		stopWalSegmentNo, err = getSpecifiedBackupStartSegmentNo(timelineSwitchMap, currentWalSegment.Timeline, backupSearchParams, rootFolder)
+		stopWalSegmentNo, err = getSpecifiedBackupStartSegmentNo(ctx, timelineSwitchMap,
+			currentWalSegment.Timeline, backupSearchParams, rootFolder)
 		if err != nil {
 			return IntegrityCheckRunner{}, errors.Wrap(err, "Failed to find specified backup start segment")
 		}
@@ -241,15 +244,15 @@ func collapseSegmentsByStatusAndTimeline(scannedSegments []ScannedSegmentDescrip
 }
 
 // getEarliestBackupStartSegmentNo returns the starting segmentNo of the earliest available correct backup
-func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
+func getEarliestBackupStartSegmentNo(ctx context.Context, timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
 	currentTimeline uint32,
 	rootFolder storage.Folder) (WalSegmentNo, error) {
-	backups, err := internal.GetBackups(rootFolder.GetSubFolder(utility.BaseBackupPath))
+	backups, err := internal.GetBackups(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return 0, err
 	}
 
-	backupDetails, err := GetBackupsDetails(rootFolder.GetSubFolder(utility.BaseBackupPath), backups)
+	backupDetails, err := GetBackupsDetails(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath), backups)
 	if err != nil {
 		return 0, err
 	}
@@ -272,12 +275,13 @@ func getEarliestBackupStartSegmentNo(timelineSwitchMap map[WalSegmentNo]*Timelin
 
 // getSpecifiedBackupStartSegmentNo returns the starting segmentNo of the available correct backup with specified name
 func getSpecifiedBackupStartSegmentNo(
+	ctx context.Context,
 	timelineSwitchMap map[WalSegmentNo]*TimelineHistoryRecord,
 	currentTimeline uint32,
 	backupSearchParams BackupSearchParams,
 	rootFolder storage.Folder,
 ) (WalSegmentNo, error) {
-	backups, err := internal.GetBackups(rootFolder.GetSubFolder(utility.BaseBackupPath))
+	backups, err := internal.GetBackups(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return 0, err
 	}
@@ -285,7 +289,7 @@ func getSpecifiedBackupStartSegmentNo(
 	if err != nil {
 		return 0, err
 	}
-	backupDetails, err := GetBackupDetails(rootFolder.GetSubFolder(utility.BaseBackupPath), backup)
+	backupDetails, err := GetBackupDetails(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath), backup)
 	if err != nil {
 		return 0, err
 	}

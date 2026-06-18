@@ -41,11 +41,13 @@ const MaxCacheBlockSize = 16 * 1024 * 1024 // 16M
 const InternalPingURL = "/__walg_g_ping__"
 
 type Server struct {
-	folder       storage.Folder
-	certFile     string
-	keyFile      string
-	endpoint     string
-	server       http.Server
+	folder   storage.Folder
+	certFile string
+	keyFile  string
+	endpoint string
+	server   http.Server
+	// ctx outlives any request, set in Run, handed to index saver goroutines
+	ctx          context.Context //nolint:containedctx // process-lifetime ctx for background index savers
 	indexes      map[string]*Index
 	indexesMutex sync.Mutex
 	leases       map[string]Lease
@@ -123,6 +125,7 @@ func NewServer(folder storage.Folder) (*Server, error) {
 }
 
 func (bs *Server) Run(ctx context.Context) error {
+	bs.ctx = ctx
 	errs := make(chan error)
 	go func() {
 		tracelog.InfoLogger.Printf("running proxy at %s", bs.endpoint)
@@ -130,7 +133,7 @@ func (bs *Server) Run(ctx context.Context) error {
 	}()
 	select {
 	case <-ctx.Done():
-		return bs.Shutdown()
+		return bs.Shutdown(context.Background())
 	case err := <-errs:
 		return err
 	}
@@ -158,7 +161,11 @@ func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
 	for {
 		select {
 		case <-t.C:
-			resp, _ := c.Head(url)
+			req, err := http.NewRequestWithContext(sctx, http.MethodHead, url, nil)
+			if err != nil {
+				return err
+			}
+			resp, _ := c.Do(req)
 			if resp != nil {
 				return resp.Body.Close()
 			}
@@ -168,9 +175,9 @@ func (bs *Server) WaitReady(ctx context.Context, timeout time.Duration) error {
 	}
 }
 
-func (bs *Server) Shutdown() error {
+func (bs *Server) Shutdown(ctx context.Context) error {
 	tracelog.InfoLogger.Printf("stopping proxy")
-	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	sctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	err := bs.server.Shutdown(sctx)
 	if err != nil {
@@ -179,7 +186,7 @@ func (bs *Server) Shutdown() error {
 	bs.indexesMutex.Lock()
 	defer bs.indexesMutex.Unlock()
 	for _, idx := range bs.indexes {
-		err2 := idx.Save()
+		err2 := idx.Save(ctx)
 		if err2 != nil {
 			tracelog.ErrorLogger.Printf("proxy shutdown index save error: %v", err2)
 			err = err2
@@ -414,7 +421,7 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	folder := bs.getBlobFolder(req.URL.Path)
-	idx, err := bs.loadBlobIndex(folder)
+	idx, err := bs.loadBlobIndex(req.Context(), folder)
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -435,7 +442,7 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 	}
 	filename := idx.PutBlock(blockID, blockSize)
 	bs.uploadSem <- struct{}{}
-	err = folder.PutObject(filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter))
+	err = folder.PutObject(req.Context(), filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter))
 	<-bs.uploadSem
 	req.Body.Close()
 	if err != nil {
@@ -460,7 +467,7 @@ func (bs *Server) HandleBlockList(w http.ResponseWriter, req *http.Request) {
 
 func (bs *Server) HandleBlockListPut(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
-	idx, err := bs.loadBlobIndex(folder)
+	idx, err := bs.loadBlobIndex(req.Context(), folder)
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -487,18 +494,18 @@ func (bs *Server) HandleBlockListPut(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = idx.Save()
+	err = idx.Save(req.Context())
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
 	}
-	bs.deleteGarbage(folder, garbage)
+	bs.deleteGarbage(req.Context(), folder, garbage)
 	w.WriteHeader(http.StatusCreated)
 }
 
 func (bs *Server) HandleBlockListGet(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
-	idx, err := bs.loadBlobIndex(folder)
+	idx, err := bs.loadBlobIndex(req.Context(), folder)
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -536,7 +543,7 @@ func (bs *Server) HandleBlob(w http.ResponseWriter, req *http.Request) {
 
 func (bs *Server) HandleBlobHead(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
-	idx, err := bs.loadBlobIndex(folder)
+	idx, err := bs.loadBlobIndex(req.Context(), folder)
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -548,7 +555,7 @@ func (bs *Server) HandleBlobHead(w http.ResponseWriter, req *http.Request) {
 
 func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
-	idx, err := bs.loadBlobIndex(folder)
+	idx, err := bs.loadBlobIndex(req.Context(), folder)
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -591,7 +598,7 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	sections := idx.GetSections(rangeMin, rangeMax)
 	for _, s := range sections {
 		bs.downloadSem <- struct{}{}
-		r, err := bs.getCachedReader(idx, s)
+		r, err := bs.getCachedReader(req.Context(), idx, s)
 		defer utility.LoggedClose(r, "failed to close section reader")
 		<-bs.downloadSem
 		if err != nil {
@@ -607,7 +614,7 @@ func (bs *Server) HandleBlobGet(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (bs *Server) blobPut(r io.Reader, idx *Index) ([]string, error) {
+func (bs *Server) blobPut(ctx context.Context, r io.Reader, idx *Index) ([]string, error) {
 	const blockSize = 4 * 1024 * 1024
 	buf := make([]byte, blockSize)
 	xblocklist := &XBlockListIn{Blocks: []XBlockIn{}}
@@ -626,7 +633,7 @@ func (bs *Server) blobPut(r io.Reader, idx *Index) ([]string, error) {
 		id := fmt.Sprintf("data_%05d", i)
 		name := idx.PutBlock(id, uint64(n))
 		encryptedReader := internal.CompressAndEncrypt(bytes.NewReader(buf[:n]), bs.compressor, bs.crypter)
-		err = idx.folder.PutObject(name, encryptedReader)
+		err = idx.folder.PutObject(ctx, name, encryptedReader)
 		if err != nil {
 			return nil, err
 		}
@@ -637,9 +644,9 @@ func (bs *Server) blobPut(r io.Reader, idx *Index) ([]string, error) {
 
 func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 	folder := bs.getBlobFolder(req.URL.Path)
-	idx, err := bs.loadBlobIndex(folder)
+	idx, err := bs.loadBlobIndex(req.Context(), folder)
 	if err == ErrNotFound {
-		idx = NewIndex(folder)
+		idx = NewIndex(bs.ctx, folder)
 		idx.Compression = bs.compression
 		idx.Encryption = bs.encryption
 	} else if err != nil {
@@ -664,22 +671,21 @@ func (bs *Server) HandleBlobPut(w http.ResponseWriter, req *http.Request) {
 		garbage = idx.Clear()
 	} else {
 		defer req.Body.Close()
-		garbage, err = bs.blobPut(req.Body, idx)
+		garbage, err = bs.blobPut(req.Context(), req.Body, idx)
 		if err != nil {
 			bs.returnError(w, req, err)
 			return
 		}
 	}
 	bs.indexesMutex.Lock()
-	err = idx.Save()
-	if err != nil {
+	if err := idx.Save(req.Context()); err != nil {
 		bs.indexesMutex.Unlock()
 		bs.returnError(w, req, err)
 		return
 	}
 	bs.indexes[folder.GetPath()] = idx
 	bs.indexesMutex.Unlock()
-	bs.deleteGarbage(folder, garbage)
+	bs.deleteGarbage(req.Context(), folder, garbage)
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -697,7 +703,7 @@ func (bs *Server) HandleBlobDelete(w http.ResponseWriter, req *http.Request) {
 	}
 	bs.indexesMutex.Lock()
 	defer bs.indexesMutex.Unlock()
-	err := upperFolder.DeleteObjects([]storage.Object{storage.NewLocalObject(blob, time.Time{}, 0)})
+	err := upperFolder.DeleteObjects(req.Context(), []storage.Object{storage.NewLocalObject(blob, time.Time{}, 0)})
 	if err != nil {
 		bs.returnError(w, req, err)
 		return
@@ -729,15 +735,15 @@ func (bs *Server) getBlobFolder(path string) storage.Folder {
 	return f
 }
 
-func (bs *Server) loadBlobIndex(folder storage.Folder) (*Index, error) {
+func (bs *Server) loadBlobIndex(ctx context.Context, folder storage.Folder) (*Index, error) {
 	bs.indexesMutex.Lock()
 	defer bs.indexesMutex.Unlock()
 	path := folder.GetPath()
 	if idx, ok := bs.indexes[path]; ok {
 		return idx, nil
 	}
-	idx := NewIndex(folder)
-	err := idx.Load()
+	idx := NewIndex(bs.ctx, folder)
+	err := idx.Load(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -745,7 +751,7 @@ func (bs *Server) loadBlobIndex(folder storage.Folder) (*Index, error) {
 	return idx, nil
 }
 
-func (bs *Server) deleteGarbage(folder storage.Folder, garbage []string) {
+func (bs *Server) deleteGarbage(ctx context.Context, folder storage.Folder, garbage []string) {
 	if len(garbage) == 0 {
 		return
 	}
@@ -754,7 +760,7 @@ func (bs *Server) deleteGarbage(folder storage.Folder, garbage []string) {
 	for _, item := range garbage {
 		objects = append(objects, storage.NewLocalObject(item, time.Time{}, 0))
 	}
-	err := folder.DeleteObjects(objects)
+	err := folder.DeleteObjects(ctx, objects)
 	if err != nil {
 		tracelog.WarningLogger.Printf("proxy: failed to delete garbage objects: %v", err)
 	}
@@ -807,12 +813,12 @@ func (bs *Server) validateBlobCompressionEncryption(idx *Index) error {
 	return nil
 }
 
-func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) {
+func (bs *Server) getCachedReader(ctx context.Context, idx *Index, s Section) (io.ReadCloser, error) {
 	folder := idx.folder
 	key := folder.GetPath() + s.Path
 	if s.BlockSize > MaxCacheBlockSize {
 		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
-		r, err := folder.ReadObject(s.Path)
+		r, err := folder.ReadObject(ctx, s.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -824,7 +830,7 @@ func (bs *Server) getCachedReader(idx *Index, s Section) (io.ReadCloser, error) 
 		buf = b
 	} else {
 		tracelog.DebugLogger.Printf("READ_OBJ: %s %d", key, s.BlockSize)
-		r, err := folder.ReadObject(s.Path)
+		r, err := folder.ReadObject(ctx, s.Path)
 		if err != nil {
 			return nil, err
 		}

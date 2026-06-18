@@ -31,7 +31,7 @@ var aofBackupPushCmd = &cobra.Command{
 		internal.ConfigureLimiters()
 		ctx := cmd.Context()
 
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
@@ -42,7 +42,6 @@ var aofBackupPushCmd = &cobra.Command{
 		versionParser := archive.NewVersionParser(processName)
 
 		metaConstructor := archive.NewBackupRedisMetaConstructor(
-			ctx,
 			uploader.Folder(),
 			permanent,
 			archive.AOFBackupType,

@@ -48,7 +48,7 @@ func HandleBackupPush(
 	gtidStart, err := getMySQLGTIDExecuted(db, flavor)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	binlogStart, err := getLastUploadedBinlogBeforeGTID(folder, gtidStart, flavor)
+	binlogStart, err := getLastUploadedBinlogBeforeGTID(ctx, folder, gtidStart, flavor)
 	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog: %v", err)
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
@@ -57,7 +57,7 @@ func HandleBackupPush(
 	var incrementCount int
 	var xtrabackupInfo XtrabackupExtInfo
 	if isXtrabackup(backupCmd) {
-		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(isFullBackup, hostname, serverUUID, version)
+		prevBackupInfo, incrementCount, err = deltaBackupConfigurator.Configure(ctx, isFullBackup, hostname, serverUUID, version)
 		tracelog.ErrorLogger.FatalfOnError("failed to get previous backup for delta backup: %v", err)
 
 		backupName, xtrabackupInfo, err = handleXtrabackupBackup(ctx, uploader, backupCmd, isFullBackup, &prevBackupInfo)
@@ -66,7 +66,7 @@ func HandleBackupPush(
 	}
 	tracelog.ErrorLogger.FatalfOnError("backup create command failed: %v", err)
 
-	binlogEnd, err := getLastUploadedBinlog(folder)
+	binlogEnd, err := getLastUploadedBinlog(ctx, folder)
 	tracelog.ErrorLogger.FatalfOnError("failed to get last uploaded binlog (after): %v", err)
 	timeStop := utility.TimeNowCrossPlatformLocal()
 
@@ -117,7 +117,7 @@ func HandleBackupPush(
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", sentinel.String())
 
-	err = internal.UploadSentinel(uploader, &sentinel, backupName)
+	err = internal.UploadSentinel(ctx, uploader, &sentinel, backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if !countJournals {
@@ -132,6 +132,7 @@ func HandleBackupPush(
 	}
 
 	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(
+		ctx,
 		folder,
 		BinlogPath,
 	)
@@ -146,13 +147,13 @@ func HandleBackupPush(
 		BinlogPath,
 	)
 
-	err = journalInfo.Upload(folder)
+	err = journalInfo.Upload(ctx, folder)
 	if err != nil {
 		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
 		return
 	}
 
-	err = journalInfo.UpdateIntervalSize(folder, &internal.JournalFiles{})
+	err = journalInfo.UpdateIntervalSize(ctx, folder, &internal.JournalFiles{})
 	if err != nil {
 		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
 		return
@@ -165,7 +166,7 @@ func handleRegularBackup(ctx context.Context, uploader internal.Uploader, backup
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	backupName, err = uploader.PushStream(ctx, limiters.NewDiskLimitReader(stdout))
+	backupName, err = uploader.PushStream(ctx, limiters.NewDiskLimitReader(ctx, stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
@@ -196,7 +197,7 @@ func handleXtrabackupBackup(
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	backupName, err = uploader.PushStream(ctx, limiters.NewDiskLimitReader(stdout))
+	backupName, err = uploader.PushStream(ctx, limiters.NewDiskLimitReader(ctx, stdout))
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	cmdErr := backupCmd.Wait()

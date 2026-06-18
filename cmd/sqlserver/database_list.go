@@ -11,7 +11,7 @@ var databaseListCmd = &cobra.Command{
 	Use:   "database-list",
 	Short: databaseListShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
-		sqlserver.HandleDatabaseList(args[0])
+		sqlserver.HandleDatabaseList(cmd.Context(), args[0])
 	},
 }
 

@@ -46,7 +46,7 @@ func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinl
 	}
 
 	var binlogSentinelDto BinlogSentinelDto
-	err = FetchBinlogSentinel(rootFolder, &binlogSentinelDto)
+	err = FetchBinlogSentinel(ctx, rootFolder, &binlogSentinelDto)
 	if err == nil && binlogSentinelDto.GTIDArchived != "" {
 		tracelog.InfoLogger.Printf("fetched binlog archived GTID SET: %s\n", binlogSentinelDto.GTIDArchived)
 	}
@@ -129,7 +129,7 @@ func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinl
 		if checkGTIDs && filter.isValid() {
 			binlogSentinelDto.GTIDArchived = filter.gtidArchived.String()
 			tracelog.InfoLogger.Printf("Uploading binlog sentinel: %s", binlogSentinelDto)
-			err := UploadBinlogSentinel(rootFolder, &binlogSentinelDto)
+			err := UploadBinlogSentinel(ctx, rootFolder, &binlogSentinelDto)
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 	}

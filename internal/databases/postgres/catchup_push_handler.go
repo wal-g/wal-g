@@ -17,7 +17,7 @@ func extendExcludedFiles() {
 
 // HandleCatchupPush is invoked to perform a wal-g catchup-push
 func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN) {
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureUploader(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
@@ -40,7 +40,7 @@ func HandleCatchupPush(ctx context.Context, pgDataDirectory string, fromLSN LSN)
 		tracelog.InfoLogger.Printf("Catchup incremental backup is not implemented for orioledb. Full backup will be performed.")
 	}
 
-	backupConfig, err := NewBackupHandler(backupArguments)
+	backupConfig, err := NewBackupHandler(ctx, backupArguments)
 	tracelog.ErrorLogger.FatalOnError(err)
 	backupConfig.HandleBackupPush(ctx)
 }

@@ -169,15 +169,15 @@ func (bh *BackupHandler) addSegmentDeltaBaseArg(contentID int, args []string) []
 }
 
 // HandleBackupPush handles the backup being read from filesystem and being pushed to the repository
-func (bh *BackupHandler) HandleBackupPush() {
+func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 	bh.currBackupInfo.backupName = BackupNamePrefix + time.Now().Format(utility.BackupTimeFormat)
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 	initGpLog(bh.arguments.logsDir)
 
-	err := bh.checkPrerequisites()
+	err := bh.checkPrerequisites(ctx)
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
 
-	err = bh.configureDeltaBackup()
+	err = bh.configureDeltaBackup(ctx)
 	tracelog.ErrorLogger.FatalfOnError("Failed to configure delta backup: %v\n", err)
 
 	tracelog.InfoLogger.Println("Running wal-g on segments")
@@ -200,40 +200,40 @@ func (bh *BackupHandler) HandleBackupPush() {
 	// this is a non-critical error since backup PIDs are only useful if backup is aborted
 	tracelog.ErrorLogger.PrintOnError(err)
 	if remoteOutput.NumErrors > 0 {
-		bh.abortBackup()
+		bh.abortBackup(ctx)
 	}
 
 	// wait for segments to complete their backups
 	waitBackupsErr := bh.waitSegmentBackups()
 	if waitBackupsErr != nil {
 		tracelog.ErrorLogger.Printf("Segment backups wait error: %v", waitBackupsErr)
-		bh.abortBackup()
+		bh.abortBackup(ctx)
 	}
 
-	restoreLSNs, _, err := createRestorePoint(bh.workers.Conn, bh.currBackupInfo.backupName)
+	restoreLSNs, _, err := createRestorePoint(ctx, bh.workers.Conn, bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata()
+	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bh.currBackupInfo.finishTime = utility.TimeNowCrossPlatformUTC()
 
 	sentinelDto := NewBackupSentinelDto(&bh.currBackupInfo, &bh.prevBackupInfo,
 		restoreLSNs, bh.arguments.userData, bh.arguments.isPermanent)
-	err = bh.uploadSentinel(sentinelDto)
+	err = bh.uploadSentinel(ctx, sentinelDto)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload sentinel file for backup: %s", bh.currBackupInfo.backupName)
 		tracelog.ErrorLogger.FatalError(err)
 	}
 
-	err = bh.uploadRestorePointMetadata(restoreLSNs)
+	err = bh.uploadRestorePointMetadata(ctx, restoreLSNs)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
-	bh.disconnect()
+	bh.disconnect(ctx)
 }
 
-func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) (err error) {
+func (bh *BackupHandler) uploadRestorePointMetadata(ctx context.Context, restoreLSNs map[int]string) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
@@ -254,7 +254,7 @@ func (bh *BackupHandler) uploadRestorePointMetadata(restoreLSNs map[int]string) 
 	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
 	tracelog.InfoLogger.Println(meta.String())
 
-	if err := internal.UploadDto(bh.workers.Uploader.Folder(), meta, metaFileName); err != nil {
+	if err := internal.UploadDto(ctx, bh.workers.Uploader.Folder(), meta, metaFileName); err != nil {
 		return fmt.Errorf("upload metadata file for restore point %s: %w", meta.Name, err)
 	}
 	return nil
@@ -379,7 +379,7 @@ func (bh *BackupHandler) pollSegmentStates() (map[int]SegCmdState, error) {
 	return segmentStates, nil
 }
 
-func (bh *BackupHandler) checkPrerequisites() (err error) {
+func (bh *BackupHandler) checkPrerequisites(ctx context.Context) (err error) {
 	tracelog.InfoLogger.Println("Checking backup prerequisites")
 
 	version := bh.currBackupInfo.gpVersion
@@ -390,8 +390,6 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 		return nil
 	}
 
-	// No request ctx plumbed through the gp handler yet; revisit when callers thread ctx.
-	ctx := context.Background()
 	queryRunner, err := NewGpQueryRunner(ctx, bh.workers.Conn)
 	if err != nil {
 		return err
@@ -428,35 +426,33 @@ func (bh *BackupHandler) checkPrerequisites() (err error) {
 	return nil
 }
 
-// nolint:gocritic
-func (bh *BackupHandler) uploadSentinel(sentinelDto BackupSentinelDto) (err error) {
+//nolint:gocritic
+func (bh *BackupHandler) uploadSentinel(ctx context.Context, sentinelDto BackupSentinelDto) (err error) {
 	tracelog.InfoLogger.Println("Uploading sentinel file")
 	tracelog.InfoLogger.Println(sentinelDto.String())
 
 	sentinelUploader := bh.workers.Uploader
 	sentinelUploader.ChangeDirectory(utility.BaseBackupPath)
-	return internal.UploadSentinel(sentinelUploader, sentinelDto, bh.currBackupInfo.backupName)
+	return internal.UploadSentinel(ctx, sentinelUploader, sentinelDto, bh.currBackupInfo.backupName)
 }
 
-// nolint:unused
-func (bh *BackupHandler) connect() (err error) {
+//nolint:unused
+func (bh *BackupHandler) connect(ctx context.Context) (err error) {
 	tracelog.InfoLogger.Println("Connecting to Greenplum master.")
-	bh.workers.Conn, err = postgres.Connect(context.Background())
+	bh.workers.Conn, err = postgres.Connect(ctx)
 	return err
 }
 
-func (bh *BackupHandler) disconnect() {
+func (bh *BackupHandler) disconnect(ctx context.Context) {
 	tracelog.InfoLogger.Println("Disconnecting from the Greenplum master.")
-	err := bh.workers.Conn.Close(context.Background())
+	err := bh.workers.Conn.Close(ctx)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to disconnect: %v", err)
 	}
 }
 
 // CheckArchiveCommand verifies the archive_mode and archive_command settings.
-func CheckArchiveCommand(conn *pgx.Conn) error {
-	// No request ctx plumbed through the gp handler yet; revisit when callers thread ctx.
-	ctx := context.Background()
+func CheckArchiveCommand(ctx context.Context, conn *pgx.Conn) error {
 	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
 		return err
@@ -507,9 +503,8 @@ func CheckArchiveCommand(conn *pgx.Conn) error {
 	return nil
 }
 
-func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version Version, systemIdentifier *uint64, err error) {
-	// No request ctx plumbed through the gp handler yet; revisit when callers thread ctx.
-	ctx := context.Background()
+func getGpClusterInfo(ctx context.Context, conn *pgx.Conn) (
+	globalCluster *cluster.Cluster, version Version, systemIdentifier *uint64, err error) {
 	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
 		return globalCluster, Version{}, nil, err
@@ -534,20 +529,20 @@ func getGpClusterInfo(conn *pgx.Conn) (globalCluster *cluster.Cluster, version V
 }
 
 // NewBackupHandler returns a backup handler object, which can handle the backup
-func NewBackupHandler(arguments BackupArguments) (bh *BackupHandler, err error) {
+func NewBackupHandler(ctx context.Context, arguments BackupArguments) (bh *BackupHandler, err error) {
 	uploader := arguments.Uploader
 
-	conn, err := postgres.Connect(context.Background())
+	conn, err := postgres.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	globalCluster, version, systemIdentifier, err := getGpClusterInfo(conn)
+	globalCluster, version, systemIdentifier, err := getGpClusterInfo(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
 
-	err = CheckArchiveCommand(conn)
+	err = CheckArchiveCommand(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -584,7 +579,7 @@ func NewBackupArguments(uploader internal.Uploader, isPermanent, isFull bool, us
 	}
 }
 
-func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentSentinelDto, error) {
+func (bh *BackupHandler) fetchSegmentBackupsMetadata(ctx context.Context) (map[string]PgSegmentSentinelDto, error) {
 	metadata := make(map[string]PgSegmentSentinelDto)
 
 	backupIDs := make([]string, 0)
@@ -600,7 +595,7 @@ func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentSent
 	maxRetryCount := 5
 
 	for i < len(backupIDs) {
-		meta, err := bh.fetchSingleMetadata(backupIDs[i], bh.currBackupInfo.segmentBackups[backupIDs[i]])
+		meta, err := bh.fetchSingleMetadata(ctx, backupIDs[i], bh.currBackupInfo.segmentBackups[backupIDs[i]])
 		if err != nil {
 			// Due to the potentially large number of segments, a large number of ListObjects() requests can be produced instantly.
 			// Instead of failing immediately, sleep and retry a couple of times.
@@ -621,14 +616,15 @@ func (bh *BackupHandler) fetchSegmentBackupsMetadata() (map[string]PgSegmentSent
 	return metadata, nil
 }
 
-func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.SegConfig) (*PgSegmentSentinelDto, error) {
+func (bh *BackupHandler) fetchSingleMetadata(ctx context.Context, backupID string,
+	segCfg *cluster.SegConfig) (*PgSegmentSentinelDto, error) {
 	// Actually, this is not a real completed backup. It is only used to fetch the segment metadata
 	currentBackup, err := NewBackup(bh.workers.Uploader.Folder(), bh.currBackupInfo.backupName)
 	if err != nil {
 		return nil, err
 	}
 
-	pgBackup, err := currentBackup.GetSegmentBackup(backupID, segCfg.ContentID)
+	pgBackup, err := currentBackup.GetSegmentBackup(ctx, backupID, segCfg.ContentID)
 	if err != nil {
 		return nil, err
 	}
@@ -637,7 +633,7 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 		BackupName: pgBackup.Name,
 	}
 
-	meta.BackupSentinelDto, err = pgBackup.GetSentinel()
+	meta.BackupSentinelDto, err = pgBackup.GetSentinel(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -645,8 +641,8 @@ func (bh *BackupHandler) fetchSingleMetadata(backupID string, segCfg *cluster.Se
 	return &meta, nil
 }
 
-func (bh *BackupHandler) abortBackup() {
-	err := bh.terminateRunningBackups()
+func (bh *BackupHandler) abortBackup(ctx context.Context) {
+	err := bh.terminateRunningBackups(ctx)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to stop running backups: %v", err)
 	}
@@ -660,7 +656,7 @@ func (bh *BackupHandler) abortBackup() {
 		gplog.GetLogFilePath())
 }
 
-func (bh *BackupHandler) terminateRunningBackups() error {
+func (bh *BackupHandler) terminateRunningBackups(ctx context.Context) error {
 	// Abort the non-finished exclusive backups on the segments.
 	// WAL-G in CB&GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
 	version := bh.currBackupInfo.gpVersion
@@ -671,7 +667,6 @@ func (bh *BackupHandler) terminateRunningBackups() error {
 
 	tracelog.InfoLogger.Println("Terminating the running exclusive backups...")
 	// Signal-triggered cleanup with no request ctx; AbortBackup detaches cancellation regardless.
-	ctx := context.Background()
 	queryRunner, err := NewGpQueryRunner(ctx, bh.workers.Conn)
 	if err != nil {
 		return err
@@ -716,7 +711,7 @@ func (bh *BackupHandler) terminateWalgProcesses() error {
 	return nil
 }
 
-func (bh *BackupHandler) configureDeltaBackup() (err error) {
+func (bh *BackupHandler) configureDeltaBackup(ctx context.Context) (err error) {
 	if bh.arguments.isFull {
 		tracelog.InfoLogger.Println("Full backup flag is set to true. Doing full backup.")
 		return nil
@@ -728,7 +723,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 	}
 
 	folder := bh.workers.Uploader.Folder()
-	previousBackup, err := bh.arguments.deltaBaseSelector.Select(folder)
+	previousBackup, err := bh.arguments.deltaBaseSelector.Select(ctx, folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -739,7 +734,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 
 	previousGpBackup, err := NewBackup(folder, previousBackup.Name)
 	tracelog.ErrorLogger.FatalOnError(err)
-	prevBackupSentinelDto, err := previousGpBackup.GetSentinel()
+	prevBackupSentinelDto, err := previousGpBackup.GetSentinel(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bh.currBackupInfo.incrementCount = 1
@@ -767,7 +762,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 
 		previousGpBackup, err = NewBackup(folder, prevName)
 		tracelog.ErrorLogger.FatalOnError(err)
-		prevBackupSentinelDto, err = previousGpBackup.GetSentinel()
+		prevBackupSentinelDto, err = previousGpBackup.GetSentinel(ctx)
 		if err != nil {
 			return err
 		}
@@ -775,7 +770,7 @@ func (bh *BackupHandler) configureDeltaBackup() (err error) {
 
 	tracelog.InfoLogger.Printf("Delta backup from %v.\n", previousGpBackup.Name)
 	bh.prevBackupInfo.name = previousGpBackup.Name
-	bh.prevBackupInfo.sentinelDto, err = previousGpBackup.GetSentinel()
+	bh.prevBackupInfo.sentinelDto, err = previousGpBackup.GetSentinel(ctx)
 	if err != nil {
 		return err
 	}

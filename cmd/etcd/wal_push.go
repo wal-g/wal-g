@@ -22,7 +22,7 @@ var walPushCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		dataDir, err := conf.GetRequiredSetting(conf.ETCDMemberDataDirectory)

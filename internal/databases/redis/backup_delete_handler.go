@@ -1,15 +1,17 @@
 package redis
 
 import (
+	"context"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleBackupDelete(folder storage.Folder, backupName string, dryRun bool) error {
+func HandleBackupDelete(ctx context.Context, folder storage.Folder, backupName string, dryRun bool) error {
 	// processing possible LATEST backupName, that's why existence check
-	backup, err := archive.SentinelWithExistenceCheck(folder, backupName)
+	backup, err := archive.SentinelWithExistenceCheck(ctx, folder, backupName)
 	if err != nil {
 		tracelog.InfoLogger.Printf("Backup %s does not exist, nothing done: %+v", backupName, err)
 		return nil
@@ -21,7 +23,7 @@ func HandleBackupDelete(folder storage.Folder, backupName string, dryRun bool) e
 	}
 
 	internalFolder := backup.ToInternal(folder).Folder
-	if err := internal.DeleteBackups(internalFolder, []string{backup.Name()}); err != nil {
+	if err := internal.DeleteBackups(ctx, internalFolder, []string{backup.Name()}); err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Printf("Backup was deleted: %+v", backup)

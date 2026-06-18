@@ -26,7 +26,7 @@ import (
 )
 
 type writer struct {
-	ctx context.Context
+	ctx context.Context //nolint:containedctx // ctx-aware io wrapper; Read/Write/Close carry no ctx
 	w   io.Writer
 }
 
@@ -58,7 +58,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 }
 
 type reader struct {
-	ctx context.Context
+	ctx context.Context //nolint:containedctx // ctx-aware io wrapper; Read/Write/Close carry no ctx
 	r   io.Reader
 }
 
@@ -107,7 +107,7 @@ func NewCloser(ctx context.Context, c io.Closer) io.Closer {
 }
 
 type closer struct {
-	ctx context.Context
+	ctx context.Context //nolint:containedctx // ctx-aware io wrapper; Read/Write/Close carry no ctx
 	c   io.Closer
 }
 

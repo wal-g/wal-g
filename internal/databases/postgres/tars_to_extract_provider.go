@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"regexp"
 
 	"github.com/wal-g/tracelog"
@@ -8,21 +9,21 @@ import (
 )
 
 type FilesToExtractProvider interface {
-	Get(backup Backup, filesToUnwrap map[string]bool, skipRedundantTars bool) (
+	Get(ctx context.Context, backup Backup, filesToUnwrap map[string]bool, skipRedundantTars bool) (
 		tarsToExtract []internal.ReaderMaker, pgControlKey string, err error)
 }
 
 type FilesToExtractProviderImpl struct {
 }
 
-func (t FilesToExtractProviderImpl) Get(backup Backup, filesToUnwrap map[string]bool, skipRedundantTars bool) (
+func (t FilesToExtractProviderImpl) Get(ctx context.Context, backup Backup, filesToUnwrap map[string]bool, skipRedundantTars bool) (
 	concurrentTarsToExtract []internal.ReaderMaker, sequentialTarsToExtract []internal.ReaderMaker, err error) {
-	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	tarNames, err := backup.GetTarNames()
+	tarNames, err := backup.GetTarNames(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

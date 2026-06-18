@@ -51,7 +51,7 @@ var copyObjectCmd = &cobra.Command{
 	Short: copyObjectShortDescription,
 	Args:  cobra.ExactArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		storagetools.HandleCopyObjects(fromConfigFile, toConfigFile, prefix, decryptSource, encryptTarget)
+		storagetools.HandleCopyObjects(cmd.Context(), fromConfigFile, toConfigFile, prefix, decryptSource, encryptTarget)
 	},
 	PersistentPreRun: func(*cobra.Command, []string) {
 		// do not check for any configured settings because wal-g copy uses the different

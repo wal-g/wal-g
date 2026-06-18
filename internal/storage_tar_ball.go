@@ -35,7 +35,7 @@ func (tarBall *StorageTarBall) Name() string {
 // Upload will block until the tar file is finished writing.
 // If a name for the file is not given, default name is of
 // the form `part_....tar.[Compressor file extension]`.
-func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
+func (tarBall *StorageTarBall) SetUp(ctx context.Context, crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
 		if len(names) > 0 {
 			tarBall.name = names[0]
@@ -43,7 +43,7 @@ func (tarBall *StorageTarBall) SetUp(crypter crypto.Crypter, names ...string) {
 			tarBall.name = utility.AddFileExtension(
 				fmt.Sprintf("part_%0.3d.tar", tarBall.partNumber), tarBall.uploader.Compression().FileExtension())
 		}
-		writeCloser := tarBall.startUpload(tarBall.name, crypter)
+		writeCloser := tarBall.startUpload(ctx, tarBall.name, crypter)
 
 		tarBall.writeCloser = writeCloser
 		tarBall.tarWriter = tar.NewWriter(writeCloser)
@@ -80,7 +80,7 @@ func GetBackupTarPath(backupName, fileName string) string {
 // TODO : unit tests
 // startUpload creates a compressing writer and runs upload in the background once
 // a compressed tar member is finished writing.
-func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) io.WriteCloser {
+func (tarBall *StorageTarBall) startUpload(ctx context.Context, name string, crypter crypto.Crypter) io.WriteCloser {
 	pipeReader, pipeWriter := io.Pipe()
 	uploader := tarBall.uploader
 
@@ -89,7 +89,7 @@ func (tarBall *StorageTarBall) startUpload(name string, crypter crypto.Crypter) 
 	tracelog.InfoLogger.Printf("Starting part %d of backup %s ...\n", tarBall.partNumber, tarBall.backupName)
 
 	go func() {
-		err := uploader.Upload(context.Background(), path, pipeReader)
+		err := uploader.Upload(ctx, path, pipeReader)
 		if compressingError, ok := err.(CompressAndEncryptError); ok {
 			tracelog.ErrorLogger.Printf("could not upload '%s' due to compression error\n%+v\n", path, compressingError)
 		}

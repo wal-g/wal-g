@@ -28,13 +28,13 @@ func HandleBinaryBackupPush(ctx context.Context, args HandleBinaryBackupPushArgs
 		return err
 	}
 
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureUploader(ctx)
 	if err != nil {
 		return err
 	}
 	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
-	backupService, err := binary.CreateBackupService(ctx, mongodService, uploader)
+	backupService, err := binary.CreateBackupService(mongodService, uploader)
 	if err != nil {
 		return err
 	}
@@ -57,5 +57,5 @@ func HandleBinaryBackupPush(ctx context.Context, args HandleBinaryBackupPushArgs
 		SkipMetadata:  args.SkipMetadata,
 		UserData:      userData,
 	}
-	return backupService.DoBackup(doBackupArgs)
+	return backupService.DoBackup(ctx, doBackupArgs)
 }

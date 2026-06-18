@@ -18,7 +18,7 @@ func TestS3FolderValidate_S3ReturnsErr(t *testing.T) {
 	}
 	s3Client := testtools.NewMockS3Client(true, false)
 	folder := s3.NewFolder(s3Client, nil, config.RootPath, config)
-	err := folder.Validate()
+	err := folder.Validate(t.Context())
 	assert.Contains(t, err.Error(), "bad credentials")
 }
 
@@ -32,6 +32,6 @@ func TestS3FolderValidate_S3DoesNotReturnErr(t *testing.T) {
 	}
 	s3Client := testtools.NewMockS3Client(false, false)
 	folder := s3.NewFolder(s3Client, nil, config.RootPath, config)
-	err := folder.Validate()
+	err := folder.Validate(t.Context())
 	assert.NoError(t, err)
 }

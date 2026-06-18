@@ -28,9 +28,9 @@ func (folder *Folder) GetPath() string {
 	return folder.path
 }
 
-func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
+func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
-	_, _, err := folder.connection.Object(context.Background(), folder.container.Name, path)
+	_, _, err := folder.connection.Object(ctx, folder.container.Name, path)
 	if err == swift.ObjectNotFound {
 		return false, nil
 	}
@@ -40,10 +40,10 @@ func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
 	return true, nil
 }
 
-func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	//Iterate
 	err = folder.connection.ObjectsWalk(
-		context.Background(),
+		ctx,
 		folder.container.Name,
 		&swift.ObjectsOpts{Delimiter: int32('/'), Prefix: folder.path},
 		func(ctx context.Context, opts *swift.ObjectsOpts) (interface{}, error) {
@@ -86,10 +86,10 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 	return NewFolder(folder.connection, folder.container, storage.AddDelimiterToPath(storage.JoinPath(folder.path, subFolderRelativePath)))
 }
 
-func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (folder *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	path := storage.JoinPath(folder.path, objectRelativePath)
 	//get the object from the cloud using full path
-	readContents, _, err := folder.connection.ObjectOpen(context.Background(), folder.container.Name, path, true, nil)
+	readContents, _, err := folder.connection.ObjectOpen(ctx, folder.container.Name, path, true, nil)
 	if err == swift.ObjectNotFound {
 		return nil, storage.NewObjectNotFoundError(path)
 	}
@@ -100,11 +100,7 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	return io.NopCloser(readContents), nil
 }
 
-func (folder *Folder) PutObject(name string, content io.Reader) error {
-	return folder.PutObjectWithContext(context.Background(), name, content)
-}
-
-func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (folder *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.path)
 	path := storage.JoinPath(folder.path, name)
 	//put the object in the cloud using full path
@@ -116,8 +112,8 @@ func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, con
 	return nil
 }
 
-func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
-	if exists, err := folder.Exists(srcPath); !exists {
+func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(ctx, srcPath); !exists {
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
@@ -125,18 +121,18 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	}
 	srcPath = storage.JoinPath(folder.path, srcPath)
 	dstPath = storage.JoinPath(folder.path, dstPath)
-	_, err := folder.connection.ObjectCopy(context.Background(), folder.container.Name, srcPath, folder.container.Name, dstPath, nil)
+	_, err := folder.connection.ObjectCopy(ctx, folder.container.Name, srcPath, folder.container.Name, dstPath, nil)
 	if err != nil {
 		return fmt.Errorf("copy Swift object %q -> %q: %w", srcPath, dstPath, err)
 	}
 	return nil
 }
 
-func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+func (folder *Folder) DeleteObjects(ctx context.Context, objectsWithRelativePaths []storage.Object) error {
 	for _, object := range objectsWithRelativePaths {
 		path := storage.JoinPath(folder.path, object.GetName())
 		tracelog.DebugLogger.Printf("Delete object %v\n", path)
-		err := folder.connection.ObjectDelete(context.Background(), folder.container.Name, path)
+		err := folder.connection.ObjectDelete(ctx, folder.container.Name, path)
 		if err == swift.ObjectNotFound {
 			continue
 		}
@@ -147,14 +143,14 @@ func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) e
 	return nil
 }
 
-func (folder *Folder) Validate() error {
+func (folder *Folder) Validate(ctx context.Context) error {
 	return nil
 }
 
 // NOT IMPLEMENTED
-func (folder *Folder) SetVersioningEnabled(enable bool) {}
+func (folder *Folder) SetVersioningEnabled(_ context.Context, enable bool) {}
 
 // NOT IMPLEMENTED
-func (folder *Folder) GetVersioningEnabled() bool {
+func (folder *Folder) GetVersioningEnabled(_ context.Context) bool {
 	return false
 }

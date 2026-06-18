@@ -1,6 +1,7 @@
 package storagetools
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -67,16 +68,16 @@ func (ld *ListDirectory) Type() ListElementType {
 	return Directory
 }
 
-func HandleFolderList(folder storage.Folder, recursive bool) error {
+func HandleFolderList(ctx context.Context, folder storage.Folder, recursive bool) error {
 	var list []ListElement
 	var folderObjects []storage.Object
 	var err error
 
 	if recursive {
-		folderObjects, err = storage.ListFolderRecursively(folder)
+		folderObjects, err = storage.ListFolderRecursively(ctx, folder)
 	} else {
 		var subFolders []storage.Folder
-		folderObjects, subFolders, err = folder.ListFolder()
+		folderObjects, subFolders, err = folder.ListFolder(ctx)
 		for i := range subFolders {
 			list = append(list, NewListDirectory(subFolders[i], folder))
 		}
@@ -120,15 +121,15 @@ func WriteObjectsList(objects []ListElement, output io.Writer) error {
 	return nil
 }
 
-func HandleFolderListWithGlob(folder storage.Folder, pattern string, recursive bool) error {
-	_, folderPaths, err := storage.Glob(folder, pattern)
+func HandleFolderListWithGlob(ctx context.Context, folder storage.Folder, pattern string, recursive bool) error {
+	_, folderPaths, err := storage.Glob(ctx, folder, pattern)
 	if err != nil {
 		return err
 	}
 	for _, folderPath := range folderPaths {
 		subfolder := folder.GetSubFolder(folderPath)
 		fmt.Println(subfolder.GetPath() + ":")
-		err := HandleFolderList(subfolder, recursive)
+		err := HandleFolderList(ctx, subfolder, recursive)
 		if err != nil {
 			return err
 		}

@@ -22,9 +22,9 @@ var (
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			logsDir := viper.GetString(conf.GPLogsDirectory)
-			rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
+			rootFolder, err := getMultistorageRootFolder(cmd.Context(), true, policies.UniteAllStorages)
 			tracelog.ErrorLogger.FatalOnError(err)
-			follower := greenplum.NewFollowPrimaryHandler(rootFolder,
+			follower := greenplum.NewFollowPrimaryHandler(cmd.Context(), rootFolder,
 				logsDir, restoreConfigPath, args[0], timeout)
 			follower.Follow()
 		},

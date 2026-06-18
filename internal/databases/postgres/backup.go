@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,17 +54,17 @@ func NewBackup(baseBackupFolder storage.Folder, name string) (Backup, error) {
 	return Backup{Backup: backup}, nil
 }
 
-func NewBackupInStorage(baseBackupFolder storage.Folder, name, storage string) (Backup, error) {
-	backup, err := internal.NewBackupInStorage(baseBackupFolder, name, storage)
+func NewBackupInStorage(ctx context.Context, baseBackupFolder storage.Folder, name, storage string) (Backup, error) {
+	backup, err := internal.NewBackupInStorage(ctx, baseBackupFolder, name, storage)
 	if err != nil {
 		return Backup{}, err
 	}
 	return Backup{Backup: backup}, nil
 }
 
-func (backup *Backup) GetTarNames() ([]string, error) {
+func (backup *Backup) GetTarNames(ctx context.Context) ([]string, error) {
 	tarPartitionFolder := backup.GetTarPartitionFolder()
-	objects, _, err := tarPartitionFolder.ListFolder()
+	objects, _, err := tarPartitionFolder.ListFolder(ctx)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to list backup '%s' for deletion", backup.Name)
 	}
@@ -74,7 +75,7 @@ func (backup *Backup) GetTarNames() ([]string, error) {
 	return result, nil
 }
 
-func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
+func (backup *Backup) GetSentinel(ctx context.Context) (BackupSentinelDto, error) {
 	if backup.SentinelDto != nil {
 		return *backup.SentinelDto, nil
 	}
@@ -86,7 +87,7 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 		DeprecatedSentinelFields
 	}{}
 
-	err := backup.FetchSentinel(&s)
+	err := backup.FetchSentinel(ctx, &s)
 	if err != nil {
 		return BackupSentinelDto{}, err
 	}
@@ -120,8 +121,8 @@ func (backup *Backup) readDeprecatedFields(fields DeprecatedSentinelFields) erro
 	return nil
 }
 
-func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMetadataDto, error) {
-	sentinel, err := backup.GetSentinel()
+func (backup *Backup) GetSentinelAndFilesMetadata(ctx context.Context) (BackupSentinelDto, FilesMetadataDto, error) {
+	sentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return BackupSentinelDto{}, FilesMetadataDto{}, err
 	}
@@ -140,10 +141,10 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 		return sentinel, filesMetadata, nil
 	}
 
-	err = internal.FetchDto(backup.Folder, &filesMetadata, getFilesMetadataPath(backup.Name))
+	err = internal.FetchDto(ctx, backup.Folder, &filesMetadata, getFilesMetadataPath(backup.Name))
 	if err != nil {
 		// double-check that this is not V2 backup
-		sentinelV2, err2 := backup.getSentinelV2()
+		sentinelV2, err2 := backup.getSentinelV2(ctx)
 		// there should be no error since old sentinel can be read as V2
 		if err2 != nil {
 			return BackupSentinelDto{}, FilesMetadataDto{}, fmt.Errorf("failed to fetch backup sentinel for version-check: %v, "+
@@ -164,10 +165,10 @@ func (backup *Backup) GetSentinelAndFilesMetadata() (BackupSentinelDto, FilesMet
 	return sentinel, filesMetadata, nil
 }
 
-func (backup *Backup) getSentinelV2() (BackupSentinelDtoV2, error) {
+func (backup *Backup) getSentinelV2(ctx context.Context) (BackupSentinelDtoV2, error) {
 	var sentinel BackupSentinelDtoV2
 
-	err := backup.FetchSentinel(&sentinel)
+	err := backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		return BackupSentinelDtoV2{}, err
 	}
@@ -175,9 +176,9 @@ func (backup *Backup) getSentinelV2() (BackupSentinelDtoV2, error) {
 	return sentinel, nil
 }
 
-func (backup *Backup) FetchMeta() (ExtendedMetadataDto, error) {
+func (backup *Backup) FetchMeta(ctx context.Context) (ExtendedMetadataDto, error) {
 	extendedMetadataDto := ExtendedMetadataDto{}
-	err := backup.FetchMetadata(&extendedMetadataDto)
+	err := backup.FetchMetadata(ctx, &extendedMetadataDto)
 	if err != nil {
 		return ExtendedMetadataDto{}, err
 	}
@@ -250,6 +251,7 @@ func setTablespacePaths(spec TablespaceSpec) error {
 
 // check that directory is empty before unwrap
 func (backup *Backup) unwrapToEmptyDirectory(
+	ctx context.Context,
 	dbDataDirectory string, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 	extractProv ExtractProvider,
 ) error {
@@ -258,17 +260,18 @@ func (backup *Backup) unwrapToEmptyDirectory(
 		return err
 	}
 
-	return backup.unwrapOld(dbDataDirectory, filesToUnwrap, createIncrementalFiles, extractProv)
+	return backup.unwrapOld(ctx, dbDataDirectory, filesToUnwrap, createIncrementalFiles, extractProv)
 }
 
 // TODO : unit tests
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapOld(
+	ctx context.Context,
 	dbDataDirectory string, filesToUnwrap map[string]bool, createIncrementalFiles bool,
 	extractProv ExtractProvider,
 ) error {
 	tarInterpreter, concurrentTarsToExtract, sequentialTarsToExtract, err := extractProv.Get(
-		*backup, filesToUnwrap, false, dbDataDirectory, createIncrementalFiles)
+		ctx, *backup, filesToUnwrap, false, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
 		return err
 	}
@@ -280,13 +283,13 @@ func (backup *Backup) unwrapOld(
 		return newPgControlNotFoundError()
 	}
 
-	err = internal.ExtractAll(tarInterpreter, concurrentTarsToExtract)
+	err = internal.ExtractAll(ctx, tarInterpreter, concurrentTarsToExtract)
 	if err != nil {
 		return err
 	}
 
 	if needPgControl {
-		err = internal.ExtractAll(tarInterpreter, sequentialTarsToExtract)
+		err = internal.ExtractAll(ctx, tarInterpreter, sequentialTarsToExtract)
 		if err != nil {
 			return errors.Wrap(err, "failed to extract pg_control")
 		}
@@ -303,8 +306,8 @@ func IsPgControlRequired(backup Backup) bool {
 	return needPgControl
 }
 
-func (backup *Backup) GetFilesToUnwrap(fileMask string) (map[string]bool, error) {
-	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
+func (backup *Backup) GetFilesToUnwrap(ctx context.Context, fileMask string) (map[string]bool, error) {
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -339,8 +342,8 @@ func shouldUnwrapTar(tarName string, filesMeta FilesMetadataDto, filesToUnwrap m
 	return false
 }
 
-func GetLastWalFilename(backup Backup) (string, error) {
-	meta, err := backup.FetchMeta()
+func GetLastWalFilename(ctx context.Context, backup Backup) (string, error) {
+	meta, err := backup.FetchMeta(ctx)
 	if err != nil {
 		tracelog.InfoLogger.Print("No meta found.")
 		return "", err
@@ -354,8 +357,8 @@ func GetLastWalFilename(backup Backup) (string, error) {
 	return endWalSegmentNo.GetFilename(timelineID), nil
 }
 
-func GetFirstWalFilename(backup Backup) (string, error) {
-	meta, err := backup.FetchMeta()
+func GetFirstWalFilename(ctx context.Context, backup Backup) (string, error) {
+	meta, err := backup.FetchMeta(ctx)
 	if err != nil {
 		tracelog.InfoLogger.Print("No meta found.")
 		return "", err

@@ -1,6 +1,7 @@
 package pgbackrest
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path"
@@ -12,27 +13,27 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandlePgbackrestBackupFetch(folder storage.Folder, stanza string, destinationDirectory string,
+func HandlePgbackrestBackupFetch(ctx context.Context, folder storage.Folder, stanza string, destinationDirectory string,
 	backupSelector internal.BackupSelector) error {
-	backup, err := backupSelector.Select(folder)
+	backup, err := backupSelector.Select(ctx, folder)
 	if err != nil {
 		return err
 	}
 
-	backupDetails, err := GetBackupDetails(folder, stanza, backup.Name)
+	backupDetails, err := GetBackupDetails(ctx, folder, stanza, backup.Name)
 	if err != nil {
 		return err
 	}
 
 	switch backupDetails.Type {
 	case "full":
-		return fullBackupFetch(folder, stanza, backup.Name, destinationDirectory, backupDetails)
+		return fullBackupFetch(ctx, folder, stanza, backup.Name, destinationDirectory, backupDetails)
 	default:
 		return errors.New("Unsupported backup type: " + backupDetails.Type)
 	}
 }
 
-func fullBackupFetch(folder storage.Folder, stanza string, backupName string,
+func fullBackupFetch(ctx context.Context, folder storage.Folder, stanza string, backupName string,
 	destinationDirectory string, backupDetails *BackupDetails) error {
 	backupFilesFolder := folder.GetSubFolder(BackupFolderName).GetSubFolder(stanza).GetSubFolder(backupName).GetSubFolder(BackupDataDirectory)
 	err := createDirectories(backupDetails, destinationDirectory)
@@ -40,14 +41,14 @@ func fullBackupFetch(folder storage.Folder, stanza string, backupName string,
 		return err
 	}
 
-	files, err := getFilesRecursively(backupFilesFolder, backupFilesFolder, backupDetails.DefaultFileMode)
+	files, err := getFilesRecursively(ctx, backupFilesFolder, backupFilesFolder, backupDetails.DefaultFileMode)
 	if err != nil {
 		return err
 	}
 
 	fileInterpreter := postgres.NewFileTarInterpreter(destinationDirectory, postgres.BackupSentinelDto{},
 		postgres.FilesMetadataDto{}, getFilesToUnwrap(files), false)
-	return internal.ExtractAll(fileInterpreter, files)
+	return internal.ExtractAll(ctx, fileInterpreter, files)
 }
 
 func getFilesToUnwrap(files []internal.ReaderMaker) map[string]bool {
@@ -72,8 +73,9 @@ func createDirectories(backupDetails *BackupDetails, dbDataDirectory string) err
 	return nil
 }
 
-func getFilesRecursively(folder storage.Folder, backupFilesFolder storage.Folder, fileMode int) (files []internal.ReaderMaker, err error) {
-	objects, subfolders, err := folder.ListFolder()
+func getFilesRecursively(ctx context.Context,
+	folder storage.Folder, backupFilesFolder storage.Folder, fileMode int) (files []internal.ReaderMaker, err error) {
+	objects, subfolders, err := folder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +91,7 @@ func getFilesRecursively(folder storage.Folder, backupFilesFolder storage.Folder
 	}
 
 	for _, subfolder := range subfolders {
-		subfolderFiles, err := getFilesRecursively(subfolder, backupFilesFolder, fileMode)
+		subfolderFiles, err := getFilesRecursively(ctx, subfolder, backupFilesFolder, fileMode)
 		if err != nil {
 			return nil, err
 		}

@@ -189,7 +189,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 		for _, arch := range path {
 			tracelog.DebugLogger.Printf("Fetching archive %s", arch.Filename())
 
-			if err := sf.downloader.DownloadOplogArchive(arch, cpw); err != nil {
+			if err := sf.downloader.DownloadOplogArchive(ctx, arch, cpw); err != nil {
 				cpw.CloseWithError(fmt.Errorf("failed to download archive %s: %w", arch.Filename(), err))
 				return
 			}

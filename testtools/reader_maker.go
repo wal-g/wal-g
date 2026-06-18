@@ -1,6 +1,7 @@
 package testtools
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -18,7 +19,7 @@ func (f *FileReaderMaker) StoragePath() string { return f.Key }
 func (f *FileReaderMaker) LocalPath() string { return f.Key }
 
 // Reader creates a new reader from the passed in file.
-func (f *FileReaderMaker) Reader() (io.ReadCloser, error) {
+func (f *FileReaderMaker) Reader(_ context.Context) (io.ReadCloser, error) {
 	r, err := os.Open(f.Key)
 	if err != nil {
 		return nil, err

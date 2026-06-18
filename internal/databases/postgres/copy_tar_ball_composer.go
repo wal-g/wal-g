@@ -40,7 +40,8 @@ type CopyTarBallComposer struct {
 	tarFilePacker *TarBallFilePackerImpl
 	crypter       crypto.Crypter
 	files         *internal.RegularBundleFiles
-	ctx           context.Context
+	ctx           context.Context //nolint:containedctx // errgroup root feeds async copy during filepath.Walk
+	reqCtx        context.Context //nolint:containedctx // request ctx; outlives errorGroup ctx for background part uploads
 	errorGroup    *errgroup.Group
 
 	copyCount              int
@@ -66,6 +67,7 @@ func NewCopyTarBallComposerMaker(previousBackup Backup, newBackupName string,
 }
 
 func NewCopyTarBallComposer(
+	ctx context.Context,
 	tarBallQueue *internal.TarBallQueue,
 	tarBallFilePacker *TarBallFilePackerImpl,
 	files *internal.RegularBundleFiles,
@@ -76,8 +78,8 @@ func NewCopyTarBallComposer(
 	prevFileTar map[string]string,
 	prevTarFileSets internal.TarFileSets,
 ) (*CopyTarBallComposer, error) {
-	errorGroup, ctx := errgroup.WithContext(context.Background())
-	_, _, err := prevBackup.GetSentinelAndFilesMetadata()
+	errorGroup, egCtx := errgroup.WithContext(ctx)
+	_, _, err := prevBackup.GetSentinelAndFilesMetadata(egCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +88,8 @@ func NewCopyTarBallComposer(
 		tarFilePacker:          tarBallFilePacker,
 		crypter:                crypter,
 		files:                  files,
-		ctx:                    ctx,
+		ctx:                    egCtx,
+		reqCtx:                 ctx,
 		errorGroup:             errorGroup,
 		copyCount:              0,
 		prevBackup:             prevBackup,
@@ -100,7 +103,7 @@ func NewCopyTarBallComposer(
 	}, nil
 }
 
-func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
+func (maker *CopyTarBallComposerMaker) Make(ctx context.Context, bundle *Bundle) (internal.TarBallComposer, error) {
 	prevFileTar := make(map[string]string)
 	prevTarFileSets := internal.NewRegularTarFileSets()
 	tarUnchangedFilesCount := make(map[string]int)
@@ -118,7 +121,7 @@ func (maker *CopyTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallCom
 	files := &internal.RegularBundleFiles{}
 	tarBallFilePacker := NewTarBallFilePacker(bundle.DeltaMap,
 		bundle.IncrementFromLsn, files, maker.filePackerOptions)
-	return NewCopyTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, files,
+	return NewCopyTarBallComposer(ctx, bundle.TarBallQueue, tarBallFilePacker, files,
 		bundle.Crypter, maker.previousBackup, maker.newBackupName, tarUnchangedFilesCount,
 		prevFileTar, prevTarFileSets)
 }
@@ -172,7 +175,7 @@ func (c *CopyTarBallComposer) copyTar(tarName string) error {
 	c.copyCount++
 	srcPath := path.Join(c.prevBackup.Name, internal.TarPartitionFolderName, tarName)
 	dstPath := path.Join(c.newBackupName, internal.TarPartitionFolderName, newTarName)
-	err := c.prevBackup.Folder.CopyObject(srcPath, dstPath)
+	err := c.prevBackup.Folder.CopyObject(c.ctx, srcPath, dstPath)
 	if err != nil {
 		return err
 	}
@@ -190,10 +193,13 @@ func (c *CopyTarBallComposer) copyTar(tarName string) error {
 	return nil
 }
 
-func (c *CopyTarBallComposer) getTarBall() internal.TarBall {
-	tarBall := c.tarBallQueue.Deque()
-	tarBall.SetUp(c.crypter)
-	return tarBall
+func (c *CopyTarBallComposer) getTarBall() (internal.TarBall, error) {
+	tarBall, err := c.tarBallQueue.Deque(c.ctx)
+	if err != nil {
+		return nil, err
+	}
+	tarBall.SetUp(c.reqCtx, c.crypter)
+	return tarBall, nil
 }
 
 func (c *CopyTarBallComposer) copyUnchangedTars() error {
@@ -238,7 +244,9 @@ func (c *CopyTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	for fileName := range c.fileInfo {
 		file := c.fileInfo[fileName]
 		if file.status == doNotCopy || file.status == fromNew {
-			c.addFileToTarBall(fileName)
+			if err := c.addFileToTarBall(fileName); err != nil {
+				return nil, err
+			}
 			file.status = processed
 		}
 	}
@@ -247,8 +255,11 @@ func (c *CopyTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	for headerName := range c.headerInfos {
 		header := c.headerInfos[headerName]
 		if header.status == doNotCopy || header.status == fromNew {
-			tarBall = c.getTarBall()
-			err := tarBall.TarWriter().WriteHeader(header.fileInfoHeader)
+			tarBall, err = c.getTarBall()
+			if err != nil {
+				return nil, err
+			}
+			err = tarBall.TarWriter().WriteHeader(header.fileInfoHeader)
 			if err != nil {
 				return nil, err
 			}
@@ -265,17 +276,21 @@ func (c *CopyTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 	return c.tarFileSets, nil
 }
 
-func (c *CopyTarBallComposer) addFileToTarBall(fileName string) {
+func (c *CopyTarBallComposer) addFileToTarBall(fileName string) error {
 	file := c.fileInfo[fileName]
-	tarBall := c.getTarBall()
+	tarBall, err := c.getTarBall()
+	if err != nil {
+		return err
+	}
 	c.errorGroup.Go(func() error {
-		err := c.tarFilePacker.PackFileIntoTar(file.info, tarBall)
+		err := c.tarFilePacker.PackFileIntoTar(c.ctx, file.info, tarBall)
 		if err != nil {
 			return err
 		}
 		return c.tarBallQueue.CheckSizeAndEnqueueBack(tarBall)
 	})
 	c.tarFileSets.AddFile(tarBall.Name(), fileName)
+	return nil
 }
 
 func (c *CopyTarBallComposer) GetFiles() internal.BundleFiles {

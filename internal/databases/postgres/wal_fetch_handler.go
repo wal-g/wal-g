@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -27,11 +28,12 @@ func (err InvalidWalFileMagicError) Error() string {
 
 // TODO : unit tests
 // HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string, location string, prefetcher WalPrefetcher) error {
+func HandleWALFetch(ctx context.Context,
+	baseReader internal.StorageFolderReader, walFileName string, location string, prefetcher WalPrefetcher) error {
 	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s)\n", walFileName, location)
 	reader := baseReader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
-	defer prefetcher.Prefetch(baseReader, walFileName, location)
+	defer prefetcher.Prefetch(ctx, baseReader, walFileName, location)
 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
 	tracelog.DebugLogger.Printf("Going to check prefetch in %s", prefetched)
@@ -89,7 +91,7 @@ func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string,
 		time.Sleep(2 * time.Millisecond)
 	}
 
-	return internal.DownloadFileTo(reader, walFileName, location)
+	return internal.DownloadFileTo(ctx, reader, walFileName, location)
 }
 
 // TODO : unit tests

@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
@@ -48,13 +49,13 @@ func getMySQLVersion(db *sql.DB) (string, error) {
 	return fetchMySQLVariable(db, "version")
 }
 
-// nolint:unused
+//nolint:unused
 func getMySQLArchitecture(db *sql.DB) (string, error) {
 	// e.g 'x86_64' / 'aarch64' / 'arm64'
 	return fetchMySQLVariable(db, "version_compile_machine")
 }
 
-// nolint:unused
+//nolint:unused
 func getMySQLOS(db *sql.DB) (string, error) {
 	// e.g. 'Linux' / 'macos14.2'
 	return fetchMySQLVariable(db, "version_compile_os")
@@ -116,8 +117,8 @@ func getServerUUID(db *sql.DB, flavor string) (string, error) {
 	return uuid, nil
 }
 
-func getLastUploadedBinlog(folder storage.Folder) (string, error) {
-	logFiles, _, err := folder.GetSubFolder(BinlogPath).ListFolder()
+func getLastUploadedBinlog(ctx context.Context, folder storage.Folder) (string, error) {
+	logFiles, _, err := folder.GetSubFolder(BinlogPath).ListFolder(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -135,9 +136,9 @@ func getLastUploadedBinlog(folder storage.Folder) (string, error) {
 	return name, nil
 }
 
-func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet, flavor string) (string, error) {
+func getLastUploadedBinlogBeforeGTID(ctx context.Context, folder storage.Folder, gtid gomysql.GTIDSet, flavor string) (string, error) {
 	folder = folder.GetSubFolder(BinlogPath)
-	logFiles, _, err := folder.ListFolder()
+	logFiles, _, err := folder.ListFolder(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -148,7 +149,7 @@ func getLastUploadedBinlogBeforeGTID(folder storage.Folder, gtid gomysql.GTIDSet
 		return "", nil
 	}
 	for i := len(logFiles) - 1; i > 0; i-- {
-		prevGtid, err := GetBinlogPreviousGTIDsRemote(folder, logFiles[i].GetName(), flavor)
+		prevGtid, err := GetBinlogPreviousGTIDsRemote(ctx, folder, logFiles[i].GetName(), flavor)
 		if err != nil {
 			return "", err
 		}
@@ -274,12 +275,13 @@ type binlogHandler interface {
 	handleBinlog(binlogPath string) error
 }
 
-func fetchLogs(folder storage.Folder, dstDir string, startTS, endTS, endBinlogTS time.Time, handler binlogHandler) error {
+func fetchLogs(ctx context.Context,
+	folder storage.Folder, dstDir string, startTS, endTS, endBinlogTS time.Time, handler binlogHandler) error {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	includeStart := true
 outer:
 	for {
-		logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, includeStart, endBinlogTS)
+		logsToFetch, err := getLogsCoveringInterval(ctx, logFolder, startTS, includeStart, endBinlogTS)
 		includeStart = false
 		if err != nil {
 			return err
@@ -289,7 +291,7 @@ outer:
 			binlogName := utility.TrimFileExtension(logFile.GetName())
 			binlogPath := path.Join(dstDir, binlogName)
 			tracelog.InfoLogger.Printf("downloading %s into %s", binlogName, binlogPath)
-			if err = internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
+			if err = internal.DownloadFileTo(ctx, internal.NewFolderReader(logFolder), binlogName, binlogPath); err != nil {
 				tracelog.ErrorLogger.Printf("failed to download %s: %v", binlogName, err)
 				return err
 			}
@@ -312,17 +314,17 @@ outer:
 	return nil
 }
 
-func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time, error) {
+func getBinlogSinceTS(ctx context.Context, folder storage.Folder, backup internal.Backup) (time.Time, error) {
 	startTS := utility.MaxTime // far future
 	var streamSentinel StreamSentinelDto
-	err := backup.FetchSentinel(&streamSentinel)
+	err := backup.FetchSentinel(ctx, &streamSentinel)
 	if err != nil {
 		return time.Time{}, err
 	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel.String())
 
 	// case when backup was uploaded before first binlog
-	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	sentinels, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -335,7 +337,7 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 		}
 	}
 	// case when binlog was uploaded before backup
-	binlogs, _, err := folder.GetSubFolder(BinlogPath).ListFolder()
+	binlogs, _, err := folder.GetSubFolder(BinlogPath).ListFolder(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -351,8 +353,9 @@ func getBinlogSinceTS(folder storage.Folder, backup internal.Backup) (time.Time,
 }
 
 // getLogsCoveringInterval lists the operation logs that cover the interval
-func getLogsCoveringInterval(folder storage.Folder, start time.Time, includeStart bool, endBinlogTS time.Time) ([]storage.Object, error) {
-	logFiles, _, err := folder.ListFolder()
+func getLogsCoveringInterval(ctx context.Context, folder storage.Folder,
+	start time.Time, includeStart bool, endBinlogTS time.Time) ([]storage.Object, error) {
+	logFiles, _, err := folder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}

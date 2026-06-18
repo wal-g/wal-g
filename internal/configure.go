@@ -106,7 +106,7 @@ func ConfigureLimiters() {
 	}
 }
 
-func ConfigureStorage() (storage.HashableStorage, error) {
+func ConfigureStorage(ctx context.Context) (storage.HashableStorage, error) {
 	var rootWraps []storage.WrapRootFolder
 	if limiters.NetworkLimiter != nil {
 		rootWraps = append(rootWraps, func(prevFolder storage.Folder) (newFolder storage.Folder) {
@@ -115,7 +115,7 @@ func ConfigureStorage() (storage.HashableStorage, error) {
 	}
 	rootWraps = append(rootWraps, ConfigureStoragePrefix)
 
-	st, err := ConfigureStorageForSpecificConfig(viper.GetViper(), rootWraps...)
+	st, err := ConfigureStorageForSpecificConfig(ctx, viper.GetViper(), rootWraps...)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +136,7 @@ func ConfigureStoragePrefix(folder storage.Folder) storage.Folder {
 // this function will always return only one concrete 'storage'.
 // Chosen folder depends only on 'StorageAdapters' order
 func ConfigureStorageForSpecificConfig(
+	ctx context.Context,
 	config *viper.Viper,
 	rootWraps ...storage.WrapRootFolder,
 ) (storage.HashableStorage, error) {
@@ -148,7 +149,7 @@ func ConfigureStorageForSpecificConfig(
 		}
 
 		settings := adapter.loadSettings(config)
-		st, err := adapter.configure(prefix, settings, rootWraps...)
+		st, err := adapter.configure(ctx, prefix, settings, rootWraps...)
 		if err != nil {
 			return nil, fmt.Errorf("configure storage with prefix %q: %w", prefix, err)
 		}
@@ -216,8 +217,8 @@ func ConfigurePGArchiveStatusManager() (fsutil.DataFolder, error) {
 }
 
 // ConfigureUploader is like ConfigureUploaderToFolder, but configures the default storage.
-func ConfigureUploader() (*RegularUploader, error) {
-	st, err := ConfigureStorage()
+func ConfigureUploader(ctx context.Context) (*RegularUploader, error) {
+	st, err := ConfigureStorage(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure storage")
 	}
@@ -238,8 +239,8 @@ func ConfigureUploaderToFolder(folder storage.Folder) (uploader *RegularUploader
 	return uploader, err
 }
 
-func ConfigureUploaderWithoutCompressor() (Uploader, error) {
-	st, err := ConfigureStorage()
+func ConfigureUploaderWithoutCompressor(ctx context.Context) (Uploader, error) {
+	st, err := ConfigureStorage(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to configure storage")
 	}
@@ -248,8 +249,8 @@ func ConfigureUploaderWithoutCompressor() (Uploader, error) {
 	return uploader, err
 }
 
-func ConfigureSplitUploader() (Uploader, error) {
-	uploader, err := ConfigureUploader()
+func ConfigureSplitUploader(ctx context.Context) (Uploader, error) {
+	uploader, err := ConfigureUploader(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -427,10 +428,6 @@ func GetCommandSettingContext(ctx context.Context, variableName string, args ...
 	return cmd, nil
 }
 
-func GetCommandSetting(variableName string) (*exec.Cmd, error) {
-	return GetCommandSettingContext(context.Background(), variableName)
-}
-
 func GetOplogArchiveAfterSize() (int, error) {
 	oplogArchiveAfterSizeStr, _ := conf.GetSetting(conf.OplogArchiveAfterSize)
 	oplogArchiveAfterSize, err := strconv.Atoi(oplogArchiveAfterSizeStr)
@@ -442,7 +439,7 @@ func GetOplogArchiveAfterSize() (int, error) {
 	return oplogArchiveAfterSize, nil
 }
 
-// nolint: gocyclo
+//nolint:gocyclo
 func ConfigureSettings(currentType string) {
 	if len(conf.DefaultConfigValues) == 0 {
 		conf.DefaultConfigValues = conf.CommonDefaultConfigValues
@@ -502,13 +499,13 @@ func ConfigureSettings(currentType string) {
 }
 
 // StorageFromConfig prefers the config parameters instead of the current environment variables
-func StorageFromConfig(configFile string) (storage.Storage, error) {
+func StorageFromConfig(ctx context.Context, configFile string) (storage.Storage, error) {
 	var config = viper.New()
 	conf.SetDefaultValues(config)
 	conf.ReadConfigFromFile(config, configFile)
 	conf.CheckAllowedSettings(config)
 
-	folder, err := ConfigureStorageForSpecificConfig(config)
+	folder, err := ConfigureStorageForSpecificConfig(ctx, config)
 
 	if err != nil {
 		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
@@ -517,7 +514,7 @@ func StorageFromConfig(configFile string) (storage.Storage, error) {
 	return folder, err
 }
 
-func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, err error) {
+func ConfigureFailoverStorages(ctx context.Context) (failovers map[string]storage.HashableStorage, err error) {
 	storageConfigs := viper.GetStringMap(conf.FailoverStorages)
 
 	if len(storageConfigs) == 0 {
@@ -551,7 +548,7 @@ func ConfigureFailoverStorages() (failovers map[string]storage.HashableStorage, 
 		}
 		rootWraps = append(rootWraps, ConfigureStoragePrefix)
 
-		st, err := ConfigureStorageForSpecificConfig(cfg, rootWraps...)
+		st, err := ConfigureStorageForSpecificConfig(ctx, cfg, rootWraps...)
 		if err != nil {
 			return nil, fmt.Errorf("failover storage %s: %v", name, err)
 		}
@@ -600,7 +597,7 @@ func isAnyStorageSet() bool {
 //   - The function does not set any specific policies for the root folder of the multi-storage. Initially, the policies.Default are used.
 //   - If operations involve writing to the storage, the `checkWrite` parameter should be set to `true`.
 //     This determines whether the health check is read-only (R/O) or read-write (R/W).
-func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error) {
+func ConfigureMultiStorage(ctx context.Context, checkWrite bool) (ms *multistorage.Storage, err error) {
 	// errClosers are needed to close already configured storages if a fatal error happens before they are delegated to multi-storage.
 	var errClosers []io.Closer
 	defer func() {
@@ -612,13 +609,13 @@ func ConfigureMultiStorage(checkWrite bool) (ms *multistorage.Storage, err error
 		}
 	}()
 
-	primary, err := ConfigureStorage()
+	primary, err := ConfigureStorage(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("configure primary storage: %w", err)
 	}
 	errClosers = append(errClosers, primary)
 
-	failovers, err := ConfigureFailoverStorages()
+	failovers, err := ConfigureFailoverStorages(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("configure failover storages: %w", err)
 	}

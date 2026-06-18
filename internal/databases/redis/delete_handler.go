@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"slices"
 	"time"
 
@@ -48,18 +49,18 @@ func PurgeDryRun(dryRun bool) PurgeOption {
 }
 
 // HandlePurge delete backups and oplog archives according to settings
-func HandlePurge(backupFolder storage.Folder, setters ...PurgeOption) error {
+func HandlePurge(ctx context.Context, backupFolder storage.Folder, setters ...PurgeOption) error {
 	opts := PurgeSettings{dryRun: true}
 	for _, setter := range setters {
 		setter(&opts)
 	}
 
-	backupTimes, garbage, err := internal.GetBackupsAndGarbage(backupFolder)
+	backupTimes, garbage, err := internal.GetBackupsAndGarbage(ctx, backupFolder)
 	if err != nil {
 		return err
 	}
 
-	_, _, err = HandleBackupsDelete(backupTimes, backupFolder, opts)
+	_, _, err = HandleBackupsDelete(ctx, backupTimes, backupFolder, opts)
 	if err != nil {
 		return err
 	}
@@ -67,7 +68,7 @@ func HandlePurge(backupFolder storage.Folder, setters ...PurgeOption) error {
 	if opts.purgeGarbage {
 		tracelog.InfoLogger.Printf("Garbage prefixes in backups folder: %v", garbage)
 		if !opts.dryRun {
-			if err := internal.DeleteGarbage(backupFolder, garbage); err != nil {
+			if err := internal.DeleteGarbage(ctx, backupFolder, garbage); err != nil {
 				return err
 			}
 		}
@@ -77,7 +78,7 @@ func HandlePurge(backupFolder storage.Folder, setters ...PurgeOption) error {
 }
 
 // HandleBackupsDelete delete backups according to settings
-func HandleBackupsDelete(backupTimes []internal.BackupTime,
+func HandleBackupsDelete(ctx context.Context, backupTimes []internal.BackupTime,
 	folder storage.Folder,
 	opts PurgeSettings) (purge, retain []archive.Backup, err error) {
 	if len(backupTimes) == 0 {
@@ -85,7 +86,7 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 		return []archive.Backup{}, []archive.Backup{}, nil
 	}
 
-	backups, err := LoadBackups(folder, BackupNamesFromBackupTimes(backupTimes))
+	backups, err := LoadBackups(ctx, folder, BackupNamesFromBackupTimes(backupTimes))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -106,7 +107,7 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 	tracelog.InfoLogger.Printf("Backups selected to be retained: %v", BackupNamesFromBackups(retain))
 
 	if !opts.dryRun {
-		if err := internal.DeleteBackups(folder, purgeFiles); err != nil {
+		if err := internal.DeleteBackups(ctx, folder, purgeFiles); err != nil {
 			return nil, nil, err
 		}
 		tracelog.InfoLogger.Printf("Backups were purged: deleted: %d, retained: %v", len(purge), len(retain))
@@ -115,10 +116,10 @@ func HandleBackupsDelete(backupTimes []internal.BackupTime,
 }
 
 // LoadBackups downloads backups metadata
-func LoadBackups(folder storage.Folder, names []string) ([]archive.Backup, error) {
+func LoadBackups(ctx context.Context, folder storage.Folder, names []string) ([]archive.Backup, error) {
 	backups := make([]archive.Backup, 0, len(names))
 	for _, name := range names {
-		backup, err := archive.SentinelWithoutExistenceCheck(folder, name)
+		backup, err := archive.SentinelWithoutExistenceCheck(ctx, folder, name)
 		if err != nil {
 			return nil, err
 		}

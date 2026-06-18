@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"slices"
@@ -42,8 +43,8 @@ func NewBackupDetail(backupTime internal.BackupTime, sentinel *models.Backup) *B
 }
 
 // TODO: unit tests
-func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, json bool) error {
-	backupTimes, err := internal.GetBackups(folder)
+func HandleDetailedBackupList(ctx context.Context, folder storage.Folder, output io.Writer, pretty, json bool) error {
+	backupTimes, err := internal.GetBackups(ctx, folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)
 	if err != nil {
 		return err
@@ -51,7 +52,7 @@ func HandleDetailedBackupList(folder storage.Folder, output io.Writer, pretty, j
 
 	backupDetails := make([]*BackupDetail, 0, len(backupTimes))
 	for _, backupTime := range backupTimes {
-		sentinel, err := common.DownloadSentinel(folder, backupTime.BackupName)
+		sentinel, err := common.DownloadSentinel(ctx, folder, backupTime.BackupName)
 		if err != nil {
 			return errors.Wrapf(err, "Unable to load sentinel of backup %v", backupTime.BackupName)
 		}

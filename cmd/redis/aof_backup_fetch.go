@@ -28,7 +28,7 @@ var aofBackupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		sourceStorageFolder := uploader.Folder()

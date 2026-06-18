@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -23,6 +24,7 @@ const (
 var DebugLogBufferCounter = 0
 
 type RangeReader struct {
+	ctx           context.Context //nolint:containedctx // ctx-aware io.Reader; Read carries no ctx, reused for range re-reads
 	lastBody      io.ReadCloser
 	folder        *Folder
 	maxRetries    int
@@ -43,7 +45,7 @@ func (reader *RangeReader) getObjectRange(from, to int64) (*s3.GetObjectOutput, 
 		Range:  aws.String(bytesRange),
 	}
 	reader.debugLog("GetObject with range %s", bytesRange)
-	return reader.folder.s3API.GetObject(input)
+	return reader.folder.s3API.GetObjectWithContext(reader.ctx, input)
 }
 
 func (reader *RangeReader) Read(p []byte) (n int, err error) {
@@ -134,9 +136,10 @@ func (reader *RangeReader) Close() (err error) {
 	return reader.lastBody.Close()
 }
 
-func NewRangeReader(body io.ReadCloser, objectPath string, retriesCount int, folder *Folder) *RangeReader {
+func NewRangeReader(ctx context.Context, body io.ReadCloser, objectPath string, retriesCount int, folder *Folder) *RangeReader {
 	DebugLogBufferCounter++
 	reader := &RangeReader{
+		ctx:        ctx,
 		lastBody:   body,
 		objectPath: objectPath,
 		maxRetries: retriesCount,

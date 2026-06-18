@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"strings"
 
 	"github.com/wal-g/tracelog"
@@ -44,18 +45,19 @@ func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec
 }
 
 func (p ExtractProviderDBSpec) Get(
+	ctx context.Context,
 	backup postgres.Backup,
 	filesToUnwrap map[string]bool,
 	skipRedundantTars bool,
 	dbDataDir string,
 	createNewIncrementalFiles bool,
 ) (postgres.IncrementalTarInterpreter, []internal.ReaderMaker, []internal.ReaderMaker, error) {
-	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	desc, err := p.restoreDescMaker.Make(p.restoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
-	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
+	return ExtractProviderImpl{}.Get(ctx, backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }

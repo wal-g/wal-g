@@ -48,7 +48,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment(ctx contex
 
 	for _, db := range DBNames {
 		tracelog.DebugLogger.Println(db.DBName)
-		conn, err := checker.connect(db.DBName)
+		conn, err := checker.connect(ctx, db.DBName)
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 		}
@@ -104,12 +104,12 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(ctx conte
 		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
 	}
 
-	s3Files, err := checker.getAOBackupFilesData()
+	s3Files, err := checker.getAOBackupFilesData(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get files data from s3 %v", err)
 	}
 
-	backupFilesMetadata, err := checker.getAOMetadata(backupName)
+	backupFilesMetadata, err := checker.getAOMetadata(ctx, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
 	}
@@ -165,9 +165,8 @@ func (checker *AOLengthCheckSegmentHandler) checkFileSizes(AOTablesSize map[stri
 	return errors
 }
 
-func (checker *AOLengthCheckSegmentHandler) connect(db string) (*pgx.Conn, error) {
-	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
-	return postgres.Connect(context.Background(), func(config *pgx.ConnConfig) error {
+func (checker *AOLengthCheckSegmentHandler) connect(ctx context.Context, db string) (*pgx.Conn, error) {
+	return postgres.Connect(ctx, func(config *pgx.ConnConfig) error {
 		a, err := strconv.Atoi(checker.port)
 		if err != nil {
 			return err
@@ -212,7 +211,7 @@ func (checker *AOLengthCheckSegmentHandler) getTablesSizes(ctx context.Context, 
 }
 
 func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo(ctx context.Context) ([]dbInfo, error) {
-	conn, err := checker.connect("")
+	conn, err := checker.connect(ctx, "")
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
@@ -265,12 +264,12 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(ctx context.Cont
 	return metaEOF, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (BackupAOFiles, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOMetadata(ctx context.Context, backupName string) (BackupAOFiles, error) {
 	rootFolder := checker.rootFolder
 
 	var backup internal.Backup
 
-	backup, err := internal.GetBackupByName(backupName,
+	backup, err := internal.GetBackupByName(ctx, backupName,
 		fmt.Sprintf("%s/seg%s/%s", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath), rootFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get backup with name: %s", backupName)
@@ -280,7 +279,7 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 	tracelog.DebugLogger.Printf("backup %s", backup.Name)
 	files := NewAOFilesMetadataDTO()
 
-	err = internal.FetchDto(backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
+	err = internal.FetchDto(ctx, backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to fetch file data")
 		return nil, err
@@ -291,11 +290,11 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 	return files.Files, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData() (map[string]int64, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData(ctx context.Context) (map[string]int64, error) {
 	rootFolder := checker.rootFolder
 	aoFolder := rootFolder.GetSubFolder(fmt.Sprintf("%s/seg%s/%s/aosegments/", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath))
 
-	files, _, err := aoFolder.ListFolder()
+	files, _, err := aoFolder.ListFolder(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to list s3 objects: %v", err)
 		return nil, err

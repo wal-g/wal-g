@@ -72,13 +72,13 @@ func (walUploader *WalUploader) FlushFiles(ctx context.Context) {
 	walUploader.DeltaFileManager.FlushFiles(ctx, walUploader)
 }
 
-func PrepareMultiStorageWalUploader(folder storage.Folder, targetStorage string) (*WalUploader, error) {
+func PrepareMultiStorageWalUploader(ctx context.Context, folder storage.Folder, targetStorage string) (*WalUploader, error) {
 	folder = multistorage.SetPolicies(folder, policies.TakeFirstStorage)
 	var err error
 	if targetStorage == "" {
-		folder, err = multistorage.UseFirstAliveStorage(folder)
+		folder, err = multistorage.UseFirstAliveStorage(ctx, folder)
 	} else {
-		folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+		folder, err = multistorage.UseSpecificStorage(ctx, targetStorage, folder)
 	}
 	if err != nil {
 		return nil, err

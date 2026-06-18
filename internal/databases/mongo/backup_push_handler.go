@@ -15,7 +15,7 @@ func HandleBackupPush(ctx context.Context,
 	uploader archive.Uploader,
 	metaConstructor internal.MetaConstructor,
 	backupCmd *exec.Cmd) error {
-	if err := metaConstructor.Init(); err != nil {
+	if err := metaConstructor.Init(ctx); err != nil {
 		return fmt.Errorf("can not initiate meta provider: %+v", err)
 	}
 

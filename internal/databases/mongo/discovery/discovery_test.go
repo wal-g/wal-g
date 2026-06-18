@@ -370,7 +370,7 @@ func TestResolveStartingTS(t *testing.T) {
 					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
-						dl.On("LastKnownArchiveTS").Return(models.Timestamp{TS: 1579002001, Inc: 1}, nil).Once()
+						dl.On("LastKnownArchiveTS", mock.Anything).Return(models.Timestamp{TS: 1579002001, Inc: 1}, nil).Once()
 						return dl
 					}(),
 					mongoClient: &mocks.MongoDriver{},
@@ -385,7 +385,7 @@ func TestResolveStartingTS(t *testing.T) {
 					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
-						dl.On("LastKnownArchiveTS").Return(models.Timestamp{}, fmt.Errorf("ts fetch failed")).Once()
+						dl.On("LastKnownArchiveTS", mock.Anything).Return(models.Timestamp{}, fmt.Errorf("ts fetch failed")).Once()
 						return dl
 					}(),
 					mongoClient: &mocks.MongoDriver{},
@@ -400,7 +400,7 @@ func TestResolveStartingTS(t *testing.T) {
 					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
-						dl.On("LastKnownArchiveTS").Return(models.Timestamp{}, nil).Once()
+						dl.On("LastKnownArchiveTS", mock.Anything).Return(models.Timestamp{}, nil).Once()
 						return dl
 					}(),
 					mongoClient: func() *mocks.MongoDriver {
@@ -421,7 +421,7 @@ func TestResolveStartingTS(t *testing.T) {
 					ctx: t.Context(),
 					downloader: func() *archivemocks.Downloader {
 						dl := &archivemocks.Downloader{}
-						dl.On("LastKnownArchiveTS").Return(models.Timestamp{}, nil).Once()
+						dl.On("LastKnownArchiveTS", mock.Anything).Return(models.Timestamp{}, nil).Once()
 						return dl
 					}(),
 					mongoClient: func() *mocks.MongoDriver {

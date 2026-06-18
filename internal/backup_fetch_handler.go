@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os/exec"
@@ -15,7 +16,7 @@ type BackupNonExistenceError struct {
 	error
 }
 
-type StreamFetcher = func(backup Backup, writeCloser io.WriteCloser) error
+type StreamFetcher = func(ctx context.Context, backup Backup, writeCloser io.WriteCloser) error
 
 func NewBackupNonExistenceError(backupName string) BackupNonExistenceError {
 	return BackupNonExistenceError{errors.Errorf("Backup '%s' does not exist.", backupName)}
@@ -26,8 +27,8 @@ func (err BackupNonExistenceError) Error() string {
 }
 
 // GetBackupToCommandFetcher returns function that copies all bytes from backup to cmd's stdin
-func GetBackupToCommandFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup Backup) {
-	return func(folder storage.Folder, backup Backup) {
+func GetBackupToCommandFetcher(cmd *exec.Cmd) func(ctx context.Context, folder storage.Folder, backup Backup) {
+	return func(ctx context.Context, folder storage.Folder, backup Backup) {
 		stdin, err := cmd.StdinPipe()
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 		stderr := &bytes.Buffer{}
@@ -35,10 +36,10 @@ func GetBackupToCommandFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup
 		err = cmd.Start()
 		tracelog.ErrorLogger.FatalfOnError("Failed to start restore command: %v\n", err)
 
-		fetcher, err := GetBackupStreamFetcher(backup)
+		fetcher, err := GetBackupStreamFetcher(ctx, backup)
 		tracelog.ErrorLogger.FatalfOnError("Failed to detect backup format: %v\n", err)
 
-		err = fetcher(backup, stdin)
+		err = fetcher(ctx, backup, stdin)
 
 		cmdErr := cmd.Wait()
 		if err != nil || cmdErr != nil {
@@ -55,7 +56,7 @@ func GetBackupToCommandFetcher(cmd *exec.Cmd) func(folder storage.Folder, backup
 }
 
 // StreamBackupToCommandStdin downloads and decompresses backup stream to cmd stdin.
-func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
+func StreamBackupToCommandStdin(ctx context.Context, cmd *exec.Cmd, backup Backup) error {
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return fmt.Errorf("failed to fetch backup: %v", err)
@@ -65,7 +66,7 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	if err != nil {
 		return fmt.Errorf("failed to start command: %v", err)
 	}
-	err = DownloadAndDecompressStream(backup, stdin)
+	err = DownloadAndDecompressStream(ctx, backup, stdin)
 	if err != nil {
 		return errors.Wrap(err, "failed to download and decompress stream")
 	}
@@ -79,14 +80,14 @@ func StreamBackupToCommandStdin(cmd *exec.Cmd, backup Backup) error {
 	return nil
 }
 
-type Fetcher func(rootFolder storage.Folder, backup Backup)
+type Fetcher func(ctx context.Context, rootFolder storage.Folder, backup Backup)
 
 // TODO : unit tests
 // HandleBackupFetch is invoked to perform wal-g backup-fetch
-func HandleBackupFetch(folder storage.Folder, targetBackupSelector BackupSelector, fetcher Fetcher) {
-	backup, err := targetBackupSelector.Select(folder)
+func HandleBackupFetch(ctx context.Context, folder storage.Folder, targetBackupSelector BackupSelector, fetcher Fetcher) {
+	backup, err := targetBackupSelector.Select(ctx, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to select backup: %v\n", err)
 	tracelog.DebugLogger.Printf("HandleBackupFetch(%s)\n", backup.Name)
 
-	fetcher(folder, backup)
+	fetcher(ctx, folder, backup)
 }

@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,13 +41,13 @@ func (b BinlogInfo) PrintableFields() []printlist.TableField {
 	}
 }
 
-func HandleBinlogList(folder storage.Folder, since, until string, pretty, json bool) {
+func HandleBinlogList(ctx context.Context, folder storage.Folder, since, until string, pretty, json bool) {
 	binlogFolder := folder.GetSubFolder(BinlogPath)
 
-	startTime, endTime, err := parseTimeRange(folder, since, until)
+	startTime, endTime, err := parseTimeRange(ctx, folder, since, until)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	logFiles, err := getLogsCoveringInterval(binlogFolder, startTime, true, endTime)
+	logFiles, err := getLogsCoveringInterval(ctx, binlogFolder, startTime, true, endTime)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(fmt.Errorf("failed to list binlog files: %w", err))
 	}
@@ -75,19 +76,19 @@ func HandleBinlogList(folder storage.Folder, since, until string, pretty, json b
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func parseTimeRange(folder storage.Folder, since, until string) (time.Time, time.Time, error) {
+func parseTimeRange(ctx context.Context, folder storage.Folder, since, until string) (time.Time, time.Time, error) {
 	var startTime, endTime time.Time
 	var err error
 
 	if strings.TrimSpace(since) != "" {
-		startTime, err = parseTimeFilter(folder, since)
+		startTime, err = parseTimeFilter(ctx, folder, since)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("failed to parse --since time '%s': %w", since, err)
 		}
 	}
 
 	if strings.TrimSpace(until) != "" {
-		endTime, err = parseTimeFilter(folder, until)
+		endTime, err = parseTimeFilter(ctx, folder, until)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("failed to parse --until time '%s': %w", until, err)
 		}
@@ -103,14 +104,14 @@ func parseTimeRange(folder storage.Folder, since, until string) (time.Time, time
 	return startTime, endTime, nil
 }
 
-func parseTimeFilter(folder storage.Folder, timeStr string) (time.Time, error) {
+func parseTimeFilter(ctx context.Context, folder storage.Folder, timeStr string) (time.Time, error) {
 	timeStr = strings.TrimSpace(timeStr)
 	if timeStr == "" {
 		return time.Time{}, nil
 	}
 
 	if strings.ToUpper(timeStr) == internal.LatestString {
-		startTS, _, _, err := getTimestamps(folder, internal.LatestString, "", "")
+		startTS, _, _, err := getTimestamps(ctx, folder, internal.LatestString, "", "")
 		if err != nil {
 			return time.Time{}, fmt.Errorf("failed to get latest backup timestamp: %w", err)
 		}

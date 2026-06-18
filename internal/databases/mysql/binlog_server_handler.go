@@ -31,7 +31,7 @@ var (
 
 type Handler struct {
 	server.EmptyReplicationHandler
-	ctx           context.Context
+	ctx           context.Context //nolint:containedctx // detached binlog replication server outlives any request
 	cancel        context.CancelFunc
 	replicaSource string
 	rootFolder    storage.Folder
@@ -46,8 +46,8 @@ type Handler struct {
 	skipCurrentTxn bool
 }
 
-func newHandler(replicaSource string, root storage.Folder, dst string) *Handler {
-	ctx, cancel := context.WithCancel(context.Background())
+func newHandler(ctx context.Context, replicaSource string, root storage.Folder, dst string) *Handler {
+	ctx, cancel := context.WithCancel(ctx)
 	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
 	return &Handler{
 		ctx:           ctx,
@@ -163,7 +163,7 @@ func (h *Handler) downloadBinlog(logFolder storage.Folder, logFile storage.Objec
 	os.Remove(binlogPath)
 
 	tracelog.InfoLogger.Printf("Downloading %s to disk...", binlogName)
-	err := internal.DownloadFileTo(internal.NewFolderReader(logFolder), binlogName, binlogPath)
+	err := internal.DownloadFileTo(h.ctx, internal.NewFolderReader(logFolder), binlogName, binlogPath)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to download %s: %w", binlogName, err)
 	}
@@ -255,7 +255,7 @@ func (h *Handler) streamBinlogFiles(startPos mysql.Position, s *replication.Binl
 	}
 
 	logFolder := h.rootFolder.GetSubFolder(BinlogPath)
-	logsToFetch, err := getLogsCoveringInterval(logFolder, startTS, true, utility.MaxTime)
+	logsToFetch, err := getLogsCoveringInterval(h.ctx, logFolder, startTS, true, utility.MaxTime)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to get logs list from storage: %v", err)
 		return
@@ -343,11 +343,11 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 }
 
-func HandleBinlogServer(since string, until string) {
+func HandleBinlogServer(ctx context.Context, since string, until string) {
 	// get necessary settings
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
-	startTS, untilTS, _, err = getTimestamps(st.RootFolder(), since, until, "")
+	startTS, untilTS, _, err = getTimestamps(ctx, st.RootFolder(), since, until, "")
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// validate WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE
@@ -392,11 +392,12 @@ func HandleBinlogServer(since string, until string) {
 			continue
 		}
 
-		go handleBinlogConnection(c, srv, replicaSource, st.RootFolder(), dstDir, user, password)
+		go handleBinlogConnection(ctx, c, srv, replicaSource, st.RootFolder(), dstDir, user, password)
 	}
 }
 
 func handleBinlogConnection(
+	ctx context.Context,
 	c net.Conn,
 	srv *server.Server,
 	replicaSource string,
@@ -405,7 +406,7 @@ func handleBinlogConnection(
 	user string,
 	password string,
 ) {
-	h := newHandler(replicaSource, folder, dstDir)
+	h := newHandler(ctx, replicaSource, folder, dstDir)
 	defer func() {
 		h.cancel()
 		c.Close()

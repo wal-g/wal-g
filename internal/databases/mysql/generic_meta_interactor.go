@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -24,13 +26,13 @@ func NewGenericMetaFetcher() GenericMetaFetcher {
 	return GenericMetaFetcher{}
 }
 
-func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
+func (mf GenericMetaFetcher) Fetch(ctx context.Context, backupName string, backupFolder storage.Folder) (internal.GenericMetadata, error) {
 	backup, err := internal.NewBackup(backupFolder, backupName)
 	if err != nil {
 		return internal.GenericMetadata{}, err
 	}
 	var sentinel StreamSentinelDto
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		return internal.GenericMetadata{}, err
 	}
@@ -50,9 +52,9 @@ func (mf GenericMetaFetcher) Fetch(backupName string, backupFolder storage.Folde
 
 // TODO implement fetch from storage in mysql
 func (mf GenericMetaFetcher) FetchFromStorage(
-	backupName string, backupFolder storage.Folder, storage string,
+	ctx context.Context, backupName string, backupFolder storage.Folder, storage string,
 ) (internal.GenericMetadata, error) {
-	return mf.Fetch(backupName, backupFolder)
+	return mf.Fetch(ctx, backupName, backupFolder)
 }
 
 type GenericMetaSetter struct{}
@@ -61,35 +63,36 @@ func NewGenericMetaSetter() GenericMetaSetter {
 	return GenericMetaSetter{}
 }
 
-func (ms GenericMetaSetter) SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error {
+func (ms GenericMetaSetter) SetUserData(ctx context.Context, backupName string, backupFolder storage.Folder, userData interface{}) error {
 	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
 		dto.UserData = userData
 		return dto
 	}
-	return modifyBackupSentinel(backupName, backupFolder, modifier)
+	return modifyBackupSentinel(ctx, backupName, backupFolder, modifier)
 }
 
 // TODO: Unit tests
-func (ms GenericMetaSetter) SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error {
+func (ms GenericMetaSetter) SetIsPermanent(ctx context.Context, backupName string, backupFolder storage.Folder, isPermanent bool) error {
 	modifier := func(dto StreamSentinelDto) StreamSentinelDto {
 		dto.IsPermanent = isPermanent
 		return dto
 	}
-	return modifyBackupSentinel(backupName, backupFolder, modifier)
+	return modifyBackupSentinel(ctx, backupName, backupFolder, modifier)
 }
 
-func modifyBackupSentinel(backupName string, backupFolder storage.Folder, modifier func(StreamSentinelDto) StreamSentinelDto) error {
+func modifyBackupSentinel(ctx context.Context,
+	backupName string, backupFolder storage.Folder, modifier func(StreamSentinelDto) StreamSentinelDto) error {
 	backup, err := internal.NewBackup(backupFolder, backupName)
 	if err != nil {
 		return err
 	}
 	var sentinel StreamSentinelDto
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch the existing backup metadata for modifying")
 	}
 	sentinel = modifier(sentinel)
-	err = backup.UploadSentinel(sentinel)
+	err = backup.UploadSentinel(ctx, sentinel)
 	if err != nil {
 		return errors.Wrap(err, "failed to upload the modified metadata to the storage")
 	}

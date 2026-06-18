@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Already-cancelled ctx must abort before any upload, proving ctx reaches the OSS SDK
-// rather than being dropped for context.Background().
 func TestPutObjectWithContextHonorsCancellation(t *testing.T) {
 	config := &Config{
 		Region:          "test",
@@ -25,9 +23,9 @@ func TestPutObjectWithContextHonorsCancellation(t *testing.T) {
 
 	folder := NewFolder(client, config.Bucket, "test-path/", config)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	err = folder.PutObjectWithContext(ctx, "obj", strings.NewReader("data"))
+	err = folder.PutObject(ctx, "obj", strings.NewReader("data"))
 	require.ErrorIs(t, err, context.Canceled)
 }

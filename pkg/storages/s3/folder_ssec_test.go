@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/stretchr/testify/assert"
@@ -37,6 +39,18 @@ func (m *MockS3ClientSSEC) CopyObject(input *s3.CopyObjectInput) (*s3.CopyObject
 	return &s3.CopyObjectOutput{}, nil
 }
 
+func (m *MockS3ClientSSEC) GetObjectWithContext(_ aws.Context, input *s3.GetObjectInput, _ ...request.Option) (*s3.GetObjectOutput, error) {
+	return m.GetObject(input)
+}
+
+func (m *MockS3ClientSSEC) HeadObjectWithContext(_ aws.Context, input *s3.HeadObjectInput, _ ...request.Option) (*s3.HeadObjectOutput, error) {
+	return m.HeadObject(input)
+}
+
+func (m *MockS3ClientSSEC) CopyObjectWithContext(_ aws.Context, input *s3.CopyObjectInput, _ ...request.Option) (*s3.CopyObjectOutput, error) {
+	return m.CopyObject(input)
+}
+
 func createSSECUploader(sseAlgorithm, sseKey string) *walgs3.Uploader {
 	return walgs3.NewUploader(nil, sseAlgorithm, sseKey, "", "STANDARD", "GOVERNANCE", 0)
 }
@@ -51,7 +65,7 @@ func TestReadObject_WithSSEC_AddsCorrectHeaders(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	reader, err := folder.ReadObject("test-file.txt")
+	reader, err := folder.ReadObject(t.Context(), "test-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, reader)
@@ -72,7 +86,7 @@ func TestReadObject_WithoutSSEC_NoHeadersAdded(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	reader, err := folder.ReadObject("test-file.txt")
+	reader, err := folder.ReadObject(t.Context(), "test-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, reader)
@@ -94,7 +108,7 @@ func TestExists_WithSSEC_AddsCorrectHeaders(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	exists, err := folder.Exists("test-file.txt")
+	exists, err := folder.Exists(t.Context(), "test-file.txt")
 
 	require.NoError(t, err)
 	assert.True(t, exists)
@@ -114,7 +128,7 @@ func TestExists_WithoutSSEC_NoHeadersAdded(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	exists, err := folder.Exists("test-file.txt")
+	exists, err := folder.Exists(t.Context(), "test-file.txt")
 
 	require.NoError(t, err)
 	assert.True(t, exists)
@@ -135,7 +149,7 @@ func TestCopyObject_WithSSEC_AddsCorrectHeadersForSourceAndDestination(t *testin
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	err := folder.CopyObject("source-file.txt", "dest-file.txt")
+	err := folder.CopyObject(t.Context(), "source-file.txt", "dest-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, mockClient.LastCopyObjectInput)
@@ -161,7 +175,7 @@ func TestCopyObject_WithoutSSEC_NoHeadersAdded(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	err := folder.CopyObject("source-file.txt", "dest-file.txt")
+	err := folder.CopyObject(t.Context(), "source-file.txt", "dest-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, mockClient.LastCopyObjectInput)
@@ -180,7 +194,7 @@ func TestReadObject_WithSSECButNoAlgorithm_NoHeadersAdded(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	reader, err := folder.ReadObject("test-file.txt")
+	reader, err := folder.ReadObject(t.Context(), "test-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, reader)
@@ -198,7 +212,7 @@ func TestReadObject_WithSSECButNoKey_NoHeadersAdded(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	reader, err := folder.ReadObject("test-file.txt")
+	reader, err := folder.ReadObject(t.Context(), "test-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, reader)
@@ -216,7 +230,7 @@ func TestReadObject_WithSSEC_CorrectObjectPath(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "base/path/", config)
 
-	_, err := folder.ReadObject("subfolder/file.txt")
+	_, err := folder.ReadObject(t.Context(), "subfolder/file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, mockClient.LastGetObjectInput)
@@ -233,7 +247,7 @@ func TestCopyObject_WithSSEKMS_AddsCorrectHeadersForKMS(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	err := folder.CopyObject("source-file.txt", "dest-file.txt")
+	err := folder.CopyObject(t.Context(), "source-file.txt", "dest-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, mockClient.LastCopyObjectInput)
@@ -260,7 +274,7 @@ func TestCopyObject_WithSSES3_AddsCorrectHeadersForS3(t *testing.T) {
 	config := &walgs3.Config{Bucket: "test-bucket"}
 	folder := walgs3.NewFolder(mockClient, uploader, "test-path/", config)
 
-	err := folder.CopyObject("source-file.txt", "dest-file.txt")
+	err := folder.CopyObject(t.Context(), "source-file.txt", "dest-file.txt")
 
 	require.NoError(t, err)
 	require.NotNil(t, mockClient.LastCopyObjectInput)

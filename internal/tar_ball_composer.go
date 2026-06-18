@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"os"
 )
 
@@ -15,7 +16,7 @@ type TarBallComposer interface {
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
 type TarBallComposerMaker interface {
-	Make(bundle *Bundle) (TarBallComposer, error)
+	Make(ctx context.Context, bundle *Bundle) (TarBallComposer, error)
 }
 
 type ComposeFileInfo struct {

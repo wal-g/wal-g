@@ -1,6 +1,7 @@
 package pgbackrest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -114,9 +115,9 @@ type DefaultPathSection struct {
 	User  string `ini:"user"`
 }
 
-func GetArchiveName(folder storage.Folder, stanza string) (*string, error) {
+func GetArchiveName(ctx context.Context, folder storage.Folder, stanza string) (*string, error) {
 	archiveFolder := folder.GetSubFolder(WalArchivePath).GetSubFolder(stanza)
-	ioReader, err := archiveFolder.ReadObject(ArchiveInfo)
+	ioReader, err := archiveFolder.ReadObject(ctx, ArchiveInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +141,9 @@ func GetArchiveName(folder storage.Folder, stanza string) (*string, error) {
 	return &archiveName, nil
 }
 
-func LoadBackupsSettings(folder storage.Folder, stanza string) ([]BackupSettings, error) {
+func LoadBackupsSettings(ctx context.Context, folder storage.Folder, stanza string) ([]BackupSettings, error) {
 	backupFolder := folder.GetSubFolder(BackupPath).GetSubFolder(stanza)
-	ioReader, err := backupFolder.ReadObject(BackupInfoIni)
+	ioReader, err := backupFolder.ReadObject(ctx, BackupInfoIni)
 	if err != nil {
 		return nil, err
 	}
@@ -172,9 +173,9 @@ func LoadBackupsSettings(folder storage.Folder, stanza string) ([]BackupSettings
 	return backupsSettings, nil
 }
 
-func LoadManifest(folder storage.Folder, stanza string, backupName string) (*ManifestSettings, error) {
+func LoadManifest(ctx context.Context, folder storage.Folder, stanza string, backupName string) (*ManifestSettings, error) {
 	backupFolder := folder.GetSubFolder(BackupPath).GetSubFolder(stanza).GetSubFolder(backupName)
-	ioReader, err := backupFolder.ReadObject(BackupManifestIni)
+	ioReader, err := backupFolder.ReadObject(ctx, BackupManifestIni)
 	if err != nil {
 		return nil, err
 	}

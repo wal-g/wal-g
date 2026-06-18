@@ -29,7 +29,7 @@ var backupFetchCmd = &cobra.Command{
 		internal.ConfigureLimiters()
 		ctx := cmd.Context()
 
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		var cmdArgs []string

@@ -14,7 +14,7 @@ func HandleLogPush(ctx context.Context, dbnames []string, norecovery bool) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	folder, err := internal.ConfigureStorage()
+	folder, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	db, err := getSQLServerConnection()

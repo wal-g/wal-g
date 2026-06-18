@@ -26,9 +26,9 @@ var binlogFetchCmd = &cobra.Command{
 	Short: "Fetch binlog from storage and save it to the disk",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogFetch(storage.RootFolder(), fetchBackupName, fetchUntilTS, fetchUntilBinlogLastModifiedTS)
+		mysql.HandleBinlogFetch(cmd.Context(), storage.RootFolder(), fetchBackupName, fetchUntilTS, fetchUntilBinlogLastModifiedTS)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
 		conf.RequiredSettings[conf.MysqlBinlogDstSetting] = true

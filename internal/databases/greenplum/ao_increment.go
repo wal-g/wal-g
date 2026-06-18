@@ -2,6 +2,7 @@ package greenplum
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -132,7 +133,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, fsync bool) error 
 	return nil
 }
 
-func NewIncrementalPageReader(file io.ReadSeekCloser, eof, offset int64) (io.ReadCloser, error) {
+func NewIncrementalPageReader(ctx context.Context, file io.ReadSeekCloser, eof, offset int64) (io.ReadCloser, error) {
 	if eof <= offset {
 		return nil, fmt.Errorf("file eof %d is less or equal than offset %d", eof, offset)
 	}
@@ -148,7 +149,7 @@ func NewIncrementalPageReader(file io.ReadSeekCloser, eof, offset int64) (io.Rea
 
 	return &ioextensions.ReadCascadeCloser{
 		Reader: &io.LimitedReader{
-			R: io.MultiReader(&headerBuffer, limiters.NewDiskLimitReader(file)),
+			R: io.MultiReader(&headerBuffer, limiters.NewDiskLimitReader(ctx, file)),
 			N: int64(headerBuffer.Len()) + eof - offset,
 		},
 		Closer: file,

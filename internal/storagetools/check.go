@@ -2,6 +2,7 @@ package storagetools
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -11,14 +12,14 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleCheckRead(folder storage.Folder, filenames []string) error {
-	_, _, err := folder.ListFolder()
+func HandleCheckRead(ctx context.Context, folder storage.Folder, filenames []string) error {
+	_, _, err := folder.ListFolder(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list the storage: %v", err)
 	}
 	missing := make([]string, 0)
 	for _, name := range filenames {
-		ok, err := folder.Exists(name)
+		ok, err := folder.Exists(ctx, name)
 		if err != nil || !ok {
 			missing = append(missing, name)
 		}
@@ -37,11 +38,11 @@ func randomName(length int) string {
 	return fmt.Sprintf("%x", b)[:length]
 }
 
-func HandleCheckWrite(folder storage.Folder) error {
+func HandleCheckWrite(ctx context.Context, folder storage.Folder) error {
 	var filename string
 	for {
 		filename = randomName(32)
-		ok, err := folder.Exists(filename)
+		ok, err := folder.Exists(ctx, filename)
 		if err != nil {
 			return fmt.Errorf("failed to read from the storage: %v", err)
 		}
@@ -49,8 +50,8 @@ func HandleCheckWrite(folder storage.Folder) error {
 			break
 		}
 	}
-	err := folder.PutObject(filename, bytes.NewBufferString("test"))
-	if folder.DeleteObjects([]storage.Object{storage.NewLocalObject(filename, time.Time{}, 0)}) != nil {
+	err := folder.PutObject(ctx, filename, bytes.NewBufferString("test"))
+	if folder.DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(filename, time.Time{}, 0)}) != nil {
 		tracelog.WarningLogger.Printf("failed to clean temp files, %s left in storage", filename)
 	}
 	if err != nil {

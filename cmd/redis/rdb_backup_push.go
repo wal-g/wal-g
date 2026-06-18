@@ -33,7 +33,7 @@ var backupPushCmd = &cobra.Command{
 		internal.ConfigureLimiters()
 		ctx := cmd.Context()
 
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// Configure folder
@@ -50,7 +50,7 @@ var backupPushCmd = &cobra.Command{
 
 		memoryDataGetter := client.NewServerDataGetter()
 
-		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
+		metaConstructor := archive.NewBackupRedisMetaConstructor(uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
 
 		backupCmd.Stderr = os.Stderr
 

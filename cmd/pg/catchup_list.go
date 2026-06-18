@@ -19,12 +19,12 @@ var (
 		Short: catchupListShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			storage, err := internal.ConfigureStorage()
+			storage, err := internal.ConfigureStorage(cmd.Context())
 			tracelog.ErrorLogger.FatalOnError(err)
 			if detail {
-				postgres.HandleDetailedBackupList(storage.RootFolder().GetSubFolder(utility.CatchupPath), pretty, json)
+				postgres.HandleDetailedBackupList(cmd.Context(), storage.RootFolder().GetSubFolder(utility.CatchupPath), pretty, json)
 			} else {
-				internal.HandleDefaultBackupList(storage.RootFolder().GetSubFolder(utility.CatchupPath), pretty, json)
+				internal.HandleDefaultBackupList(cmd.Context(), storage.RootFolder().GetSubFolder(utility.CatchupPath), pretty, json)
 			}
 		},
 	}

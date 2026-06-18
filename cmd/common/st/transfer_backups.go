@@ -15,7 +15,7 @@ var backupsCmd = &cobra.Command{
 	Use:   "backups [backup_name] --source='source_storage' [--target='target_storage']",
 	Short: backupsShortDescription,
 	Args:  cobra.RangeArgs(0, 1),
-	Run: func(_ *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
 		var fileLister transfer.FileLister
 		if len(args) == 0 {
 			fileLister = transfer.NewAllBackupsFileLister(transferOverwrite, int(transferMaxFiles), int(transferMaxBackups))
@@ -31,10 +31,10 @@ var backupsCmd = &cobra.Command{
 			AppearanceChecksInterval: transferAppearanceChecksInterval,
 		}
 
-		handler, err := transfer.NewHandler(transferSourceStorage, targetStorage, fileLister, cfg)
+		handler, err := transfer.NewHandler(cmd.Context(), transferSourceStorage, targetStorage, fileLister, cfg)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = handler.Handle()
+		err = handler.Handle(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

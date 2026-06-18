@@ -1,6 +1,8 @@
 package fdb
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -31,9 +33,9 @@ var deleteRetainCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		afterValue, _ := cmd.Flags().GetString("after")
 		if afterValue == "" {
-			runDeleteRetain(args)
+			runDeleteRetain(cmd.Context(), args)
 		} else {
-			runDeleteRetainAfter(append(args, afterValue))
+			runDeleteRetainAfter(cmd.Context(), append(args, afterValue))
 		}
 	},
 }
@@ -47,43 +49,43 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
+	deleteHandler, err := newFdbDeleteHandler(cmd.Context(), st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.DeleteEverything(confirmed)
+	deleteHandler.DeleteEverything(cmd.Context(), confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
+	deleteHandler, err := newFdbDeleteHandler(cmd.Context(), st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteBefore(args, confirmed)
+	deleteHandler.HandleDeleteBefore(cmd.Context(), args, confirmed)
 }
 
-func runDeleteRetain(args []string) {
-	st, err := internal.ConfigureStorage()
+func runDeleteRetain(ctx context.Context, args []string) {
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
+	deleteHandler, err := newFdbDeleteHandler(ctx, st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteRetain(args, confirmed)
+	deleteHandler.HandleDeleteRetain(ctx, args, confirmed)
 }
 
-func runDeleteRetainAfter(args []string) {
-	st, err := internal.ConfigureStorage()
+func runDeleteRetainAfter(ctx context.Context, args []string) {
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := newFdbDeleteHandler(st.RootFolder())
+	deleteHandler, err := newFdbDeleteHandler(ctx, st.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteRetainAfter(args, confirmed)
+	deleteHandler.HandleDeleteRetainAfter(ctx, args, confirmed)
 }
 
 func init() {
@@ -93,8 +95,8 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func newFdbDeleteHandler(folder storage.Folder) (*internal.DeleteHandler, error) {
-	backups, err := internal.GetBackupSentinelObjects(folder)
+func newFdbDeleteHandler(ctx context.Context, folder storage.Folder) (*internal.DeleteHandler, error) {
+	backups, err := internal.GetBackupSentinelObjects(ctx, folder)
 	if err != nil {
 		return nil, err
 	}

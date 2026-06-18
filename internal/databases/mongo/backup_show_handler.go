@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 
@@ -9,8 +10,8 @@ import (
 )
 
 // HandleBackupShow prints sentinel contents.
-func HandleBackupShow(backupFolder storage.Folder, backupName string, output io.Writer, pretty bool) (err error) {
-	sentinel, err := common.DownloadSentinel(backupFolder, backupName)
+func HandleBackupShow(ctx context.Context, backupFolder storage.Folder, backupName string, output io.Writer, pretty bool) (err error) {
+	sentinel, err := common.DownloadSentinel(ctx, backupFolder, backupName)
 	if err != nil {
 		return err
 	}

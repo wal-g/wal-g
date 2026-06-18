@@ -502,11 +502,10 @@ func (queryRunner *PgQueryRunner) ReadTimeline(ctx context.Context) (timeline ui
 	return
 }
 
-func (queryRunner *PgQueryRunner) Ping() error {
+func (queryRunner *PgQueryRunner) Ping(ctx context.Context) error {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
-	ctx := context.Background()
 	return queryRunner.Connection.Ping(ctx)
 }
 
@@ -538,7 +537,7 @@ func (queryRunner *PgQueryRunner) executeForDatabase(ctx context.Context,
 		tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
 		return nil
 	}
-	defer utility.LoggedCloseContext(dbConn, "")
+	defer utility.LoggedCloseContext(ctx, dbConn, "")
 
 	runner, err := NewPgQueryRunner(ctx, dbConn)
 	if err != nil {

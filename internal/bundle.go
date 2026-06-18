@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,8 +54,8 @@ func (bundle *Bundle) StartQueue(tarBallMaker TarBallMaker) error {
 	return bundle.TarBallQueue.StartQueue()
 }
 
-func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
-	tarBallComposer, err := composerMaker.Make(bundle)
+func (bundle *Bundle) SetupComposer(ctx context.Context, composerMaker TarBallComposerMaker) (err error) {
+	tarBallComposer, err := composerMaker.Make(ctx, bundle)
 	if err != nil {
 		return err
 	}

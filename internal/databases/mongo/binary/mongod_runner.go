@@ -45,8 +45,8 @@ func (mongodProcess *MongodProcess) WithParams(params ...string) *MongodProcess 
 	return mongodProcess
 }
 
-func (mongodProcess *MongodProcess) Start() (*MongodProcess, error) {
-	return mongodProcess, mongodProcess.start()
+func (mongodProcess *MongodProcess) Start(ctx context.Context) (*MongodProcess, error) {
+	return mongodProcess, mongodProcess.start(ctx)
 }
 
 func (mongodProcess *MongodProcess) GetHostWithPort() string {
@@ -72,7 +72,7 @@ func (mongodProcess *MongodProcess) Close() {
 	mongodProcess.cancel()
 }
 
-func (mongodProcess *MongodProcess) start() (err error) {
+func (mongodProcess *MongodProcess) start(ctx context.Context) (err error) {
 	mongodProcess.port, err = randomUnusedPort()
 	if err != nil {
 		return err
@@ -96,8 +96,8 @@ func (mongodProcess *MongodProcess) start() (err error) {
 		cliArgs = append(cliArgs, "--repair")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	mongodProcess.cmd = exec.CommandContext(ctx, "mongod", cliArgs...)
+	errCtx, cancel := context.WithCancel(ctx)
+	mongodProcess.cmd = exec.CommandContext(errCtx, "mongod", cliArgs...)
 
 	tracelog.InfoLogger.Printf("Starting mongod by command: %v", mongodProcess.cmd)
 	err = mongodProcess.cmd.Start()

@@ -16,7 +16,6 @@ type ActionHandler struct {
 
 const actionCmd = "sed -i '/^recovery_target_action = /d' %s && echo 'recovery_target_action = %s' >> %s"
 
-// nolint:gocritic
 func NewActionHandler(logsDir string, restoreCfgPath string) *ActionHandler {
 	restoreCfg, err := readRestoreConfig(restoreCfgPath)
 	tracelog.ErrorLogger.FatalOnError(err)

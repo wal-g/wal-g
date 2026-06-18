@@ -22,9 +22,9 @@ var (
 
 func TestGetBackups_emptyFolder(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("base_123312", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "base_123312", &bytes.Buffer{})
 
-	backups, err := internal.GetBackups(folder)
+	backups, err := internal.GetBackups(t.Context(), folder)
 
 	assert.Empty(t, backups)
 	assert.Error(t, err, internal.NoBackupsFoundError{})
@@ -32,10 +32,10 @@ func TestGetBackups_emptyFolder(t *testing.T) {
 
 func TestGetBackups(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("base_123312", &bytes.Buffer{})
-	_ = folder.PutObject(testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "base_123312", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
 
-	backups, _ := internal.GetBackups(folder)
+	backups, _ := internal.GetBackups(t.Context(), folder)
 
 	assert.Equal(t, 1, len(backups))
 	assert.Equal(t, testStreamBackup.BackupName, backups[0].BackupName)
@@ -43,9 +43,9 @@ func TestGetBackups(t *testing.T) {
 
 func TestGetBackupsAndGarbage_emptyList(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("base_123312", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "base_123312", &bytes.Buffer{})
 
-	backups, garbage, _ := internal.GetBackupsAndGarbage(folder)
+	backups, garbage, _ := internal.GetBackupsAndGarbage(t.Context(), folder)
 
 	assert.Empty(t, backups)
 	assert.Empty(t, garbage)
@@ -53,11 +53,11 @@ func TestGetBackupsAndGarbage_emptyList(t *testing.T) {
 
 func TestGetBackupsAndGarbage(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("base_123312", &bytes.Buffer{})
-	_ = folder.PutObject("base_321/nop", &bytes.Buffer{})
-	_ = folder.PutObject(testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "base_123312", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "base_321/nop", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
 
-	backups, garbage, _ := internal.GetBackupsAndGarbage(folder)
+	backups, garbage, _ := internal.GetBackupsAndGarbage(t.Context(), folder)
 
 	assert.Equal(t, 1, len(backups))
 	assert.Equal(t, 1, len(garbage))
@@ -67,18 +67,18 @@ func TestGetBackupsAndGarbage(t *testing.T) {
 
 func TestGetBackupTimeSlices_emptyList(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("base_123312", &bytes.Buffer{})
-	objects, _, _ := folder.ListFolder()
+	_ = folder.PutObject(t.Context(), "base_123312", &bytes.Buffer{})
+	objects, _, _ := folder.ListFolder(t.Context())
 	result := internal.GetBackupTimeSlices(objects)
 	assert.Equalf(t, []internal.BackupTime{}, result, "GetBackupTimeSlices returned not empty list: something wrong")
 }
 
 func TestGetBackupTimeSlices_List(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("base_123312", &bytes.Buffer{})
-	_ = folder.PutObject(testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "base_123312", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+utility.SentinelSuffix, &bytes.Buffer{})
 
-	objects, _, _ := folder.ListFolder()
+	objects, _, _ := folder.ListFolder(t.Context())
 
 	result := internal.GetBackupTimeSlices(objects)
 
@@ -90,10 +90,10 @@ func TestGetBackupTimeSlices_List(t *testing.T) {
 
 func TestGetBackupTimeSlices_OrderCheck(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject(testStreamBackup.BackupName+".1"+utility.SentinelSuffix, &bytes.Buffer{})
-	_ = folder.PutObject(testStreamBackup.BackupName+".2"+utility.SentinelSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+".1"+utility.SentinelSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), testStreamBackup.BackupName+".2"+utility.SentinelSuffix, &bytes.Buffer{})
 
-	objects, _, _ := folder.ListFolder()
+	objects, _, _ := folder.ListFolder(t.Context())
 
 	result := internal.GetBackupTimeSlices(objects)
 	internal.SortBackupTimeSlices(result)
@@ -108,14 +108,14 @@ func TestGetLastBackupName(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 	b1 := testStreamBackup.BackupName + ".1" + utility.SentinelSuffix
 	b2 := testStreamBackup.BackupName + ".2" + utility.SentinelSuffix
-	_, _ = folder.PutObject(b1, &bytes.Buffer{}), folder.PutObject(b2, &bytes.Buffer{})
-	lastB, _ := internal.GetLatestBackup(folder)
+	_, _ = folder.PutObject(t.Context(), b1, &bytes.Buffer{}), folder.PutObject(t.Context(), b2, &bytes.Buffer{})
+	lastB, _ := internal.GetLatestBackup(t.Context(), folder)
 	assert.Equalf(t, lastB.Name+utility.SentinelSuffix, b2, "Last Backup is not b2")
 }
 
 func TestGetLatestBackupName_EmptyWhenNoBackups(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	lastB, _ := internal.GetLatestBackup(folder)
+	lastB, _ := internal.GetLatestBackup(t.Context(), folder)
 	assert.Equal(t, "", lastB.Name)
 }
 
@@ -157,31 +157,31 @@ func TestDeleteGarbage_emptyFolder(t *testing.T) {
 
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
 
-	objects, folders, _ := folder.ListFolder()
+	objects, folders, _ := folder.ListFolder(t.Context())
 	assert.Equal(t, 0, len(objects))
 	assert.Equal(t, 0, len(folders))
 
-	err := internal.DeleteGarbage(folder, []string{"backup1", "backup2", "backup3"})
+	err := internal.DeleteGarbage(t.Context(), folder, []string{"backup1", "backup2", "backup3"})
 	assert.Equal(t, nil, err)
 
-	objects, folders, _ = folder.ListFolder()
+	objects, folders, _ = folder.ListFolder(t.Context())
 	assert.Equal(t, 0, len(objects))
 	assert.Equal(t, 0, len(folders))
 }
 
 func TestDeleteGarbage_nonRecursive(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("backup1/file.json", &bytes.Buffer{})
-	_ = folder.PutObject("backup2/file.json", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "backup1/file.json", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "backup2/file.json", &bytes.Buffer{})
 
-	objects, folders, _ := folder.ListFolder()
+	objects, folders, _ := folder.ListFolder(t.Context())
 	assert.Equal(t, 0, len(objects))
 	assert.Equal(t, 2, len(folders))
 
-	err := internal.DeleteGarbage(folder, []string{"backup1"})
+	err := internal.DeleteGarbage(t.Context(), folder, []string{"backup1"})
 	assert.Equal(t, nil, err)
 
-	objects, folders, _ = folder.ListFolder()
+	objects, folders, _ = folder.ListFolder(t.Context())
 	assert.Equal(t, 0, len(objects))
 	assert.Equal(t, 1, len(folders))
 	assert.Equal(t, folders[0].GetPath(), "in_memory/backup2/")
@@ -189,25 +189,25 @@ func TestDeleteGarbage_nonRecursive(t *testing.T) {
 
 func TestDeleteGarbage_recursive(t *testing.T) {
 	folder := testtools.MakeDefaultInMemoryStorageFolder()
-	_ = folder.PutObject("backup1/folder1/obj1.tar", &bytes.Buffer{})
-	_ = folder.PutObject("backup1/folder2/obj2.zip", &bytes.Buffer{})
-	_ = folder.PutObject("backup1/meta.json", &bytes.Buffer{})
-	_ = folder.PutObject("backup2/meta_b2.json", &bytes.Buffer{})
-	_ = folder.PutObject("backup2/folder1/obj1.tar", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "backup1/folder1/obj1.tar", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "backup1/folder2/obj2.zip", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "backup1/meta.json", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "backup2/meta_b2.json", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), "backup2/folder1/obj1.tar", &bytes.Buffer{})
 
-	objects, folders, _ := folder.ListFolder()
+	objects, folders, _ := folder.ListFolder(t.Context())
 	assert.Equal(t, 0, len(objects))
 	assert.Equal(t, 2, len(folders))
 
-	err := internal.DeleteGarbage(folder, []string{"backup1"})
+	err := internal.DeleteGarbage(t.Context(), folder, []string{"backup1"})
 	assert.Equal(t, nil, err)
 
-	objects, folders, _ = folder.ListFolder()
+	objects, folders, _ = folder.ListFolder(t.Context())
 	assert.Equal(t, 0, len(objects))
 	assert.Equal(t, 1, len(folders))
 	backup2 := folders[0]
 	assert.Equal(t, backup2.GetPath(), "in_memory/backup2/")
-	objects, folders, _ = backup2.ListFolder()
+	objects, folders, _ = backup2.ListFolder(t.Context())
 	assert.Equal(t, 1, len(objects))
 	assert.Equal(t, 1, len(folders))
 	assert.Equal(t, objects[0].GetName(), "meta_b2.json")

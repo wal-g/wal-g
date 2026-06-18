@@ -20,9 +20,9 @@ var walRestoreCmd = &cobra.Command{
 	Long:  WalRestoreLongDescription,
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalfOnError("Error on configure external folder %v\n", err)
-		postgres.HandleWALRestore(args[0], args[1], storage.RootFolder())
+		postgres.HandleWALRestore(cmd.Context(), args[0], args[1], storage.RootFolder())
 	},
 }
 

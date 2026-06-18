@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,8 +35,8 @@ func (dto *BinlogSentinelDto) String() string {
 	return string(result)
 }
 
-func FetchBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
-	reader, err := folder.ReadObject(BinlogSentinelPath)
+func FetchBinlogSentinel(ctx context.Context, folder storage.Folder, sentinelDto interface{}) error {
+	reader, err := folder.ReadObject(ctx, BinlogSentinelPath)
 	if err != nil {
 		return err
 	}
@@ -51,14 +52,14 @@ func FetchBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
 	return nil
 }
 
-func UploadBinlogSentinel(folder storage.Folder, sentinelDto interface{}) error {
+func UploadBinlogSentinel(ctx context.Context, folder storage.Folder, sentinelDto interface{}) error {
 	sentinelName := BinlogSentinelPath
 	dtoBody, err := json.Marshal(sentinelDto)
 	if err != nil {
 		return internal.NewSentinelMarshallingError(sentinelName, err)
 	}
 
-	return folder.PutObject(sentinelName, bytes.NewReader(dtoBody))
+	return folder.PutObject(ctx, sentinelName, bytes.NewReader(dtoBody))
 }
 
 func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, error) {
@@ -110,9 +111,9 @@ func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, erro
 	return result, nil
 }
 
-func GetBinlogPreviousGTIDsRemote(folder storage.Folder, filename string, flavor string) (mysql.GTIDSet, error) {
+func GetBinlogPreviousGTIDsRemote(ctx context.Context, folder storage.Folder, filename string, flavor string) (mysql.GTIDSet, error) {
 	binlogName := utility.TrimFileExtension(filename)
-	fh, err := internal.DownloadAndDecompressStorageFile(internal.NewFolderReader(folder), binlogName)
+	fh, err := internal.DownloadAndDecompressStorageFile(ctx, internal.NewFolderReader(folder), binlogName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read binlog %s: %w", binlogName, err)
 	}
@@ -150,9 +151,9 @@ func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) 
 	return time.Unix(int64(ts), 0), nil
 }
 
-func GetBinlogTS(folder storage.Folder, binlogName string) (time.Time, error) {
+func GetBinlogTS(ctx context.Context, folder storage.Folder, binlogName string) (time.Time, error) {
 	logFolder := folder.GetSubFolder(BinlogPath)
-	logFiles, _, err := logFolder.ListFolder()
+	logFiles, _, err := logFolder.ListFolder(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}

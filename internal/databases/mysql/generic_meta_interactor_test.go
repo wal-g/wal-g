@@ -50,10 +50,10 @@ func TestGenericMetaFetcher_Fetch_Success(t *testing.T) {
 		IncrementCount:    &incCount,
 	}
 
-	require.NoError(t, backup.UploadSentinel(sentinel))
+	require.NoError(t, backup.UploadSentinel(t.Context(), sentinel))
 
 	mf := NewGenericMetaFetcher()
-	meta, err := mf.Fetch(backupName, folder)
+	meta, err := mf.Fetch(t.Context(), backupName, folder)
 	require.NoError(t, err)
 
 	require.Equal(t, backupName, meta.BackupName)
@@ -81,7 +81,7 @@ func TestGenericMetaFetcher_Fetch_NoSentinel_ReturnsError(t *testing.T) {
 	folder := st.RootFolder()
 
 	mf := NewGenericMetaFetcher()
-	_, err := mf.Fetch("nonexistent_backup", folder)
+	_, err := mf.Fetch(t.Context(), "nonexistent_backup", folder)
 	require.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 }
 
@@ -110,10 +110,10 @@ func TestGenericMetaFetcher_Fetch_NonIncremental(t *testing.T) {
 		IsIncremental:    false,
 	}
 
-	require.NoError(t, backup.UploadSentinel(sentinel))
+	require.NoError(t, backup.UploadSentinel(t.Context(), sentinel))
 
 	mf := NewGenericMetaFetcher()
-	meta, err := mf.Fetch(backupName, folder)
+	meta, err := mf.Fetch(t.Context(), backupName, folder)
 	require.NoError(t, err)
 
 	require.Equal(t, backupName, meta.BackupName)
@@ -156,15 +156,15 @@ func TestGenericMetaSetter_SetUserData_Success(t *testing.T) {
 		IsIncremental:    false,
 	}
 
-	require.NoError(t, backup.UploadSentinel(sentinel))
+	require.NoError(t, backup.UploadSentinel(t.Context(), sentinel))
 
 	ms := NewGenericMetaSetter()
 
 	newUserData := map[string]string{"key": "value"}
-	require.NoError(t, ms.SetUserData(backupName, folder, newUserData))
+	require.NoError(t, ms.SetUserData(t.Context(), backupName, folder, newUserData))
 
 	var updated StreamSentinelDto
-	require.NoError(t, backup.FetchSentinel(&updated))
+	require.NoError(t, backup.FetchSentinel(t.Context(), &updated))
 	require.Equal(t, map[string]interface{}{"key": "value"}, updated.UserData)
 	require.Equal(t, sentinel.Hostname, updated.Hostname)
 	require.Equal(t, sentinel.UncompressedSize, updated.UncompressedSize)
@@ -182,7 +182,7 @@ func TestGenericMetaSetter_SetUserData_BackupNotFound(t *testing.T) {
 
 	ms := NewGenericMetaSetter()
 
-	err := ms.SetUserData("nonexistent_backup", folder, "data")
+	err := ms.SetUserData(t.Context(), "nonexistent_backup", folder, "data")
 	require.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 }
 
@@ -194,9 +194,9 @@ func TestGenericMetaSetter_SetUserData_InvalidSentinel(t *testing.T) {
 	folder := st.RootFolder()
 
 	backupName := "base_000000010000000000000011"
-	require.NoError(t, folder.PutObject(backupName+"_backup_stop_sentinel.json", bytes.NewReader([]byte("invalid json"))))
+	require.NoError(t, folder.PutObject(t.Context(), backupName+"_backup_stop_sentinel.json", bytes.NewReader([]byte("invalid json"))))
 
 	ms := NewGenericMetaSetter()
-	err := ms.SetUserData(backupName, folder, "newdata")
+	err := ms.SetUserData(t.Context(), backupName, folder, "newdata")
 	require.Error(t, err)
 }

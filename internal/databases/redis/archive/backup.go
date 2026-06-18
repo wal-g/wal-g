@@ -179,7 +179,6 @@ type BackupMeta struct {
 }
 
 type RedisMetaConstructor struct {
-	ctx              context.Context
 	folder           storage.Folder
 	meta             BackupMeta
 	permanent        bool
@@ -189,12 +188,12 @@ type RedisMetaConstructor struct {
 }
 
 // Init - required for internal.MetaConstructor
-func (m *RedisMetaConstructor) Init() error {
+func (m *RedisMetaConstructor) Init(ctx context.Context) error {
 	userData, err := internal.GetSentinelUserData()
 	if err != nil {
 		return err
 	}
-	serverData := m.serverDataGetter.Get(m.ctx)
+	serverData := m.serverDataGetter.Get(ctx)
 	m.meta = BackupMeta{
 		Permanent:     m.permanent,
 		User:          userData,
@@ -228,15 +227,15 @@ func (m *RedisMetaConstructor) MetaInfo() interface{} {
 	}
 }
 
-func (m *RedisMetaConstructor) Finalize(backupName string) error {
+func (m *RedisMetaConstructor) Finalize(_ context.Context, _ string) error {
 	m.meta.FinishTime = utility.TimeNowCrossPlatformLocal()
 	return nil
 }
 
-func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, permanent bool, backupType string,
+func NewBackupRedisMetaConstructor(folder storage.Folder, permanent bool, backupType string,
 	versionParser *VersionParser, memoryDataGetter client.ServerDataGetter) internal.MetaConstructor {
 	return &RedisMetaConstructor{
-		ctx: ctx, folder: folder,
+		folder:           folder,
 		permanent:        permanent,
 		backupType:       backupType,
 		versionParser:    versionParser,
@@ -244,27 +243,27 @@ func NewBackupRedisMetaConstructor(ctx context.Context, folder storage.Folder, p
 	}
 }
 
-func SentinelWithExistenceCheck(folder storage.Folder, backupName string) (Backup, error) {
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+func SentinelWithExistenceCheck(ctx context.Context, folder storage.Folder, backupName string) (Backup, error) {
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return Backup{}, err
 	}
 
-	return fetchSentinel(backup, backupName)
+	return fetchSentinel(ctx, backup, backupName)
 }
 
-func SentinelWithoutExistenceCheck(folder storage.Folder, backupName string) (Backup, error) {
+func SentinelWithoutExistenceCheck(ctx context.Context, folder storage.Folder, backupName string) (Backup, error) {
 	backup, err := internal.NewBackup(folder, backupName)
 	if err != nil {
 		return Backup{}, err
 	}
 
-	return fetchSentinel(backup, backupName)
+	return fetchSentinel(ctx, backup, backupName)
 }
 
-func fetchSentinel(backup internal.Backup, backupName string) (Backup, error) {
+func fetchSentinel(ctx context.Context, backup internal.Backup, backupName string) (Backup, error) {
 	var sentinel Backup
-	if err := backup.FetchSentinel(&sentinel); err != nil {
+	if err := backup.FetchSentinel(ctx, &sentinel); err != nil {
 		return Backup{}, err
 	}
 	if sentinel.BackupName == "" {

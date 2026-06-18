@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"os"
 
 	"github.com/wal-g/tracelog"
@@ -8,8 +9,8 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleDefaultBackupList(folder storage.Folder, pretty, json bool) {
-	backupTimes, err := GetBackups(folder)
+func HandleDefaultBackupList(ctx context.Context, folder storage.Folder, pretty, json bool) {
+	backupTimes, err := GetBackups(ctx, folder)
 	err = FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
 

@@ -1,13 +1,15 @@
 package mysql
 
 import (
+	"context"
+
 	gomysql "github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBinlogFind(folder storage.Folder, gtid string) {
+func HandleBinlogFind(ctx context.Context, folder storage.Folder, gtid string) {
 	db, err := getMySQLConnection()
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer utility.LoggedClose(db, "")
@@ -21,7 +23,7 @@ func HandleBinlogFind(folder storage.Folder, gtid string) {
 		gtidSet, err = gomysql.ParseGTIDSet(flavor, gtid)
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
-	name, err := getLastUploadedBinlogBeforeGTID(folder, gtidSet, flavor)
+	name, err := getLastUploadedBinlogBeforeGTID(ctx, folder, gtidSet, flavor)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println(name)
 }
