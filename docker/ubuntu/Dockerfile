@@ -10,4 +10,4 @@ RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https:
     apt-get install --yes --no-install-recommends --no-install-suggests \
     git ca-certificates \
     liblzo2-2 && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
