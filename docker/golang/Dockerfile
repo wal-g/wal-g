@@ -1,3 +1,25 @@
+FROM ubuntu:bionic AS brotli-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Build and install Brotli in a dedicated stage to avoid keeping sources in the final image.
+RUN apt-get update && \
+    apt-get -y install \
+        build-essential \
+        wget
+
+RUN ARCH="$(uname -m)" && \
+    wget "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
+    tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
+    rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
+
+COPY submodules/ /tmp/
+
+RUN cd /tmp/brotli && \
+    mkdir out && cd out && \
+    cmake .. && \
+    make && make install
+
 FROM ubuntu:bionic
 
 # custom golang image with CMake and Brotli support (compatible with ubuntu 18.04..22.04)
@@ -35,9 +57,4 @@ RUN ARCH="$(uname -m)" && \
     tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
     rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
 
-COPY submodules/ tmp/
-
-RUN cd tmp/brotli && \
-    mkdir out && cd out && \
-    cmake .. && \
-    make && make install
+COPY --from=brotli-builder /usr/local/ /usr/local/
