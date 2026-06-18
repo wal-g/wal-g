@@ -17,6 +17,7 @@ env:
   IMAGE_PG10_TESTS: wal-g/pg10_tests
   IMAGE_PG18_TESTS: wal-g/pg18_tests
   IMAGE_GOLANG: wal-g/golang
+  IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.25"
   LIBSODIUM_VERSION: "1.0.20"
 
@@ -25,49 +26,54 @@ jobs:
     name: Build images
     runs-on: ubuntu-latest
     steps:
+      #  use cache to pass docker images to the test jobs
+      - name: Docker images caching
+        id: cache-images
+        uses: actions/cache@v5
+        with:
+          path: |
+            ${{ env.CACHE_FILE_PG10_TESTS }}
+            ${{ env.CACHE_FILE_PG18_TESTS }}
+            ${{ env.CACHE_FILE_UBUNTU_18_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_22_04 }}
+            ${{ env.CACHE_FILE_GOLANG }}
+          key: ${{ env.IMAGES_CACHE_KEY }}
+
       - name: Cleanup space on runner
         run: |
           swapon --show=NAME --noheadings | while read swap_device; do
             sudo swapoff $swap_device
           done
-
+  
           if [ -e /swapfile ]; then
             sudo rm /swapfile
           fi
 
       - name: Install deps
+        if: steps.cache-images.outputs.cache-hit != 'true'
         run: sudo apt clean && sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
+        if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/checkout@v6
         with:
           submodules: true
 
       - name: Set up Go 1.x
+        if: steps.cache-images.outputs.cache-hit != 'true'
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
       - name: Set up Docker Buildx
+        if: steps.cache-images.outputs.cache-hit != 'true'
         uses: docker/setup-buildx-action@v4
 
       # build images
       - name: Build images
+        if: steps.cache-images.outputs.cache-hit != 'true'
         run: make pg_save_image
-
-      # pass images to the test jobs via artifact: strongly consistent within a run, unlike cache
-      - name: Resolve images dir
-        id: imagesdir
-        run: echo "dir=$HOME/docker-images-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload docker images
-        uses: actions/upload-artifact@v7
-        with:
-          name: docker-images
-          path: ${{ steps.imagesdir.outputs.dir }}/*.tar
-          retention-days: 1
-          if-no-files-found: error
     env:
       USE_BROTLI: 1
       USE_LZO: 1
@@ -101,16 +107,24 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
-      # load docker images built by the buildimages job
-      - name: Resolve images dir
-        id: imagesdir
-        run: echo "dir=$HOME/docker-images-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-
-      - name: Download docker images
-        uses: actions/download-artifact@v8
+      # load docker images
+      - name: Load docker images
+        id: cache-images
+        uses: actions/cache@v5
         with:
-          name: docker-images
-          path: ${{ steps.imagesdir.outputs.dir }}
+          path: |
+            ${{ env.CACHE_FILE_PG10_TESTS }}
+            ${{ env.CACHE_FILE_PG18_TESTS }}
+            ${{ env.CACHE_FILE_UBUNTU_18_04 }}
+            ${{ env.CACHE_FILE_UBUNTU_22_04 }}
+            ${{ env.CACHE_FILE_GOLANG }}
+          key: ${{ env.IMAGES_CACHE_KEY }}
+
+      - name: Fail if no cached images
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        run: |
+          echo "Failed to fetch cached docker images. Will now exit..."
+          exit 1
 
       - name: Run test
         run: ${{ matrix.command }}
