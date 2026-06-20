@@ -81,26 +81,7 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(ctx context.Contex
 	return restoreLSNs, nil
 }
 
-// BuildGetGreenplumSegmentsInfo formats a query to retrieve information about segments
-func (queryRunner *GpQueryRunner) buildGetGreenplumSegmentsInfo(version dbconn.GPDBVersion) string {
-	validRange := version.StringToSemVerRange("<6")
-	if version.IsGPDB() && validRange(version.SemVer) {
-		return `
-SELECT
-	s.dbid,
-	s.content,
-	s.role::text,
-	s.port,
-	s.hostname,
-	e.fselocation
-FROM gp_segment_configuration s
-JOIN pg_filespace_entry e ON s.dbid OPERATOR(pg_catalog.=) e.fsedbid
-JOIN pg_filespace f ON e.fsefsoid OPERATOR(pg_catalog.=) f.oid
-WHERE s.role OPERATOR(pg_catalog.=) 'p' AND f.fsname OPERATOR(pg_catalog.=) 'pg_system'
-ORDER BY s.content, s.role DESC;`
-	}
-	return `
-SELECT
+const getGreenplumSegmentsInfoQuery = `SELECT
 	dbid,
 	content,
 	role::text,
@@ -110,12 +91,11 @@ SELECT
 FROM pg_catalog.gp_segment_configuration
 WHERE role OPERATOR(pg_catalog.=) 'p'
 ORDER BY content, role DESC;`
-}
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context, version dbconn.GPDBVersion) ([]cluster.SegConfig, error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) ([]cluster.SegConfig, error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(ctx, queryRunner.buildGetGreenplumSegmentsInfo(version))
+	rows, err := conn.Query(ctx, getGreenplumSegmentsInfoQuery)
 	if err != nil {
 		return nil, err
 	}

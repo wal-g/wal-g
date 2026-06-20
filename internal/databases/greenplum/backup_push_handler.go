@@ -518,7 +518,7 @@ func getGpClusterInfo(ctx context.Context, conn *pgx.Conn) (
 	tracelog.InfoLogger.Printf("Greenplum version: %s", versionStr)
 	version = ParseVersionInfo(versionStr)
 
-	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(ctx, version)
+	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(ctx)
 	if err != nil {
 		return globalCluster, dbconn.GPDBVersion{}, nil, err
 	}
