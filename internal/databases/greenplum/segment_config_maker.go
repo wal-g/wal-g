@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/apache/cloudberry-go-libs/cluster"
-
 	"github.com/wal-g/wal-g/utility"
 )
 

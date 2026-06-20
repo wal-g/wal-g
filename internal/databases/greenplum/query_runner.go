@@ -113,14 +113,14 @@ ORDER BY content, role DESC;`
 }
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context, version dbconn.GPDBVersion) (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context, version dbconn.GPDBVersion) ([]cluster.SegConfig, error) {
 	conn := queryRunner.Connection
 	rows, err := conn.Query(ctx, queryRunner.buildGetGreenplumSegmentsInfo(version))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	segments = make([]cluster.SegConfig, 0)
+	segments := make([]cluster.SegConfig, 0)
 	for rows.Next() {
 		var dbID int
 		var contentID int
@@ -142,10 +142,7 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context, 
 		segments = append(segments, segment)
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-	return segments, nil
+	return segments, rows.Err()
 }
 
 // GetGreenplumVersion returns version
