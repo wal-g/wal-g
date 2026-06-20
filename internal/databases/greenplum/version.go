@@ -1,63 +1,66 @@
 package greenplum
 
 import (
+	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/apache/cloudberry-go-libs/dbconn"
+	"github.com/hashicorp/go-version"
 )
-
-// dbconn parser matches only "Greenplum Database" & "Apache Cloudberry".
-// Remap those product strings so dbconn fills SemVer & Type
-var productRemap = strings.NewReplacer(
-	"Greengage Database", "Greenplum Database",
-	"Cloudberry Database", "Apache Cloudberry",
-)
-
-// ParseVersionInfo augments dbconn parser with Greengage & legacy "Cloudberry Database" product strings
-func ParseVersionInfo(versionString string) dbconn.GPDBVersion {
-	var v dbconn.GPDBVersion
-	v.ParseVersionInfo(versionString)
-	if v.Type == dbconn.Unknown {
-		v.ParseVersionInfo(productRemap.Replace(versionString))
-		v.VersionString = versionString
-	}
-	return v
-}
 
 type Flavor string
-
-func NewFlavor(t dbconn.DBType) Flavor {
-	switch t {
-	case dbconn.GPDB:
-		return Greenplum
-	case dbconn.CBDB:
-		return Cloudberry
-	default:
-		return Unknown
-	}
-}
 
 func (f Flavor) String() string {
 	return string(f)
 }
 
-func (f Flavor) ToDBType() dbconn.DBType {
-	switch f {
-	case Greenplum:
-		return dbconn.GPDB
-	case Cloudberry:
-		return dbconn.CBDB
-	default:
-		return dbconn.Unknown
-	}
-}
-
 const (
 	Greenplum  Flavor = "greenplum"
 	Cloudberry Flavor = "cloudberry"
-	Unknown    Flavor = "unknown"
 )
+
+type Version struct {
+	*version.Version
+	Major  int
+	Flavor Flavor // Note: can be '' for old backups
+}
+
+func NewVersion(v *version.Version, flavor Flavor) Version {
+	return Version{
+		Version: v,
+		Major:   v.Segments()[0],
+		Flavor:  flavor,
+	}
+}
+
+func parseGreenplumVersion(versionStr string) (Version, error) {
+	pattern := regexp.MustCompile(`(Greenplum Database|Greengage Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
+	groups := pattern.FindStringSubmatch(versionStr)
+	if groups == nil {
+		return Version{}, fmt.Errorf("unknown flavor: %s", versionStr)
+	}
+	semVer, err := version.NewVersion(groups[2])
+	if err != nil {
+		return Version{}, err
+	}
+
+	var flavor Flavor
+	switch groups[1] {
+	case "Greenplum Database":
+		flavor = Greenplum
+	case "Greengage Database":
+		flavor = Greenplum
+	case "Cloudberry Database":
+		flavor = Cloudberry
+	case "Apache Cloudberry":
+		flavor = Cloudberry
+	default:
+		return Version{}, fmt.Errorf("unknown flavor: %s", groups[1])
+	}
+
+	return NewVersion(semVer, flavor), nil
+}
 
 func EstimatePostgreSQLVersion(flavor Flavor, gpVersion string) int {
 	if flavor == Cloudberry {

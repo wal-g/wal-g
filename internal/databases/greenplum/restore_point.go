@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/apache/cloudberry-go-libs/cluster"
-	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -31,7 +30,7 @@ type RestorePointMetadata struct {
 	FinishTime       time.Time      `json:"finish_time"`
 	Hostname         string         `json:"hostname"`
 	GpVersion        string         `json:"gp_version"`
-	GpFlavor         Flavor         `json:"gp_flavor"`
+	GpFlavor         string         `json:"gp_flavor"`
 	SystemIdentifier *uint64        `json:"system_identifier"`
 	LsnBySegment     map[int]string `json:"lsn_by_segment"`
 	StorageName      string         `json:"storage_name"`
@@ -91,7 +90,7 @@ type RestorePointCreator struct {
 	pointName        string
 	startTime        time.Time
 	systemIdentifier *uint64
-	gpVersion        dbconn.GPDBVersion
+	gpVersion        Version
 
 	Uploader internal.Uploader
 	Conn     *pgx.Conn
@@ -176,7 +175,7 @@ func createRestorePoint(ctx context.Context, conn *pgx.Conn, restorePointName st
 					seg, ok := globalCluster.ByContent[contentID]
 					if ok {
 						var pgOptions, switchFunction string
-						if gpVersion.IsGPDB() && gpVersion.SemVer.Major == 6 {
+						if gpVersion.Flavor == Greenplum && gpVersion.Major == 6 {
 							pgOptions = "-c gp_session_role=utility"
 							switchFunction = "pg_switch_xlog()"
 						} else {
@@ -220,8 +219,8 @@ func (rpc *RestorePointCreator) uploadMetadata(ctx context.Context, restoreLSNs 
 		StartTime:        rpc.startTime,
 		FinishTime:       utility.TimeNowCrossPlatformUTC(),
 		Hostname:         hostname,
-		GpVersion:        rpc.gpVersion.SemVer.String(),
-		GpFlavor:         NewFlavor(rpc.gpVersion.Type),
+		GpVersion:        rpc.gpVersion.String(),
+		GpFlavor:         rpc.gpVersion.Flavor.String(),
 		SystemIdentifier: rpc.systemIdentifier,
 		LsnBySegment:     restoreLSNs,
 		TimeLine:         timeLine,

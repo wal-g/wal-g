@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/apache/cloudberry-go-libs/cluster"
-	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/apache/cloudberry-go-libs/gplog"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -89,7 +88,7 @@ type CurrBackupInfo struct {
 	startTime            time.Time
 	finishTime           time.Time
 	systemIdentifier     *uint64
-	gpVersion            dbconn.GPDBVersion
+	gpVersion            Version
 	segmentsMetadata     map[string]PgSegmentSentinelDto
 	backupPidByContentID map[int]int
 	incrementCount       int
@@ -245,8 +244,8 @@ func (bh *BackupHandler) uploadRestorePointMetadata(ctx context.Context, restore
 		StartTime:        bh.currBackupInfo.startTime,
 		FinishTime:       bh.currBackupInfo.finishTime,
 		Hostname:         hostname,
-		GpVersion:        bh.currBackupInfo.gpVersion.SemVer.String(),
-		GpFlavor:         NewFlavor(bh.currBackupInfo.gpVersion.Type),
+		GpVersion:        bh.currBackupInfo.gpVersion.String(),
+		GpFlavor:         bh.currBackupInfo.gpVersion.Flavor.String(),
 		SystemIdentifier: bh.currBackupInfo.systemIdentifier,
 		LsnBySegment:     restoreLSNs,
 	}
@@ -384,8 +383,8 @@ func (bh *BackupHandler) checkPrerequisites(ctx context.Context) (err error) {
 	tracelog.InfoLogger.Println("Checking backup prerequisites")
 
 	version := bh.currBackupInfo.gpVersion
-	if version.Type == dbconn.CBDB ||
-		(version.Type == dbconn.GPDB && version.SemVer.Major >= 7) {
+	if version.Flavor == Cloudberry ||
+		(version.Flavor == Greenplum && version.Major >= 7) {
 		// CB & GP7+ allows the non-exclusive backups
 		tracelog.InfoLogger.Println("Checking backup prerequisites: SKIP - non-exclusive backups used")
 		return nil
@@ -505,22 +504,25 @@ func CheckArchiveCommand(ctx context.Context, conn *pgx.Conn) error {
 }
 
 func getGpClusterInfo(ctx context.Context, conn *pgx.Conn) (
-	globalCluster *cluster.Cluster, version dbconn.GPDBVersion, systemIdentifier *uint64, err error) {
+	globalCluster *cluster.Cluster, version Version, systemIdentifier *uint64, err error) {
 	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
-		return globalCluster, dbconn.GPDBVersion{}, nil, err
+		return globalCluster, Version{}, nil, err
 	}
 
 	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
-		return globalCluster, dbconn.GPDBVersion{}, nil, err
+		return globalCluster, Version{}, nil, err
 	}
 	tracelog.InfoLogger.Printf("Greenplum version: %s", versionStr)
-	version = ParseVersionInfo(versionStr)
+	version, err = parseGreenplumVersion(versionStr)
+	if err != nil {
+		return globalCluster, Version{}, nil, err
+	}
 
 	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(ctx)
 	if err != nil {
-		return globalCluster, dbconn.GPDBVersion{}, nil, err
+		return globalCluster, Version{}, nil, err
 	}
 	globalCluster = cluster.NewCluster(segConfigs)
 
@@ -659,8 +661,8 @@ func (bh *BackupHandler) terminateRunningBackups(ctx context.Context) error {
 	// Abort the non-finished exclusive backups on the segments.
 	// WAL-G in CB&GP7+ uses the non-exclusive backups, that are terminated on connection close, so this is unnecessary.
 	version := bh.currBackupInfo.gpVersion
-	if version.Type == dbconn.CBDB ||
-		(version.Type == dbconn.GPDB && version.SemVer.Major >= 7) {
+	if version.Flavor == Cloudberry ||
+		(version.Flavor == Greenplum && version.Major >= 7) {
 		return nil
 	}
 

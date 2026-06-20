@@ -21,9 +21,12 @@ func NewPaxRelFileStorageMap(ctx context.Context, queryRunner *GpQueryRunner) (p
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query greenplum version")
 	}
-	version := ParseVersionInfo(versionStr)
-	if !version.IsCBDB() {
-		tracelog.DebugLogger.Printf("Skipping PAX storage map: flavor=%s does not support PAX", NewFlavor(version.Type))
+	version, err := parseGreenplumVersion(versionStr)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse greenplum version")
+	}
+	if version.Flavor != Cloudberry {
+		tracelog.DebugLogger.Printf("Skipping PAX storage map: flavor=%s does not support PAX", version.Flavor)
 		return pax.RelFileStorageMap{}, nil
 	}
 

@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/apache/cloudberry-go-libs/cluster"
-	"github.com/apache/cloudberry-go-libs/dbconn"
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -410,10 +409,13 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (s
 	if err != nil {
 		return "", err
 	}
-	version := ParseVersionInfo(versionStr)
+	version, err := parseGreenplumVersion(versionStr)
+	if err != nil {
+		return "", err
+	}
 
-	switch version.Type {
-	case dbconn.GPDB:
+	switch version.Flavor {
+	case Greenplum:
 		{
 			switch {
 			case queryRunner.Version >= 120000:
@@ -426,10 +428,10 @@ func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (s
 				return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
 			}
 		}
-	case dbconn.CBDB:
+	case Cloudberry:
 		return cbAoRelationPgClassQuery, nil
 	default:
-		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.VersionString)
+		return "", fmt.Errorf("unsupported greenplum flavor: %s", version.Flavor.String())
 	}
 }
 

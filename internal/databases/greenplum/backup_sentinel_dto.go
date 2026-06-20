@@ -111,8 +111,8 @@ func NewBackupSentinelDto(currBackupInfo *CurrBackupInfo, prevBackupInfo *PrevBa
 		FinishTime:       currBackupInfo.finishTime,
 		DatetimeFormat:   MetadataDatetimeFormat,
 		Hostname:         hostname,
-		GpVersion:        currBackupInfo.gpVersion.SemVer.String(),
-		GpFlavor:         NewFlavor(currBackupInfo.gpVersion.Type),
+		GpVersion:        currBackupInfo.gpVersion.String(),
+		GpFlavor:         currBackupInfo.gpVersion.Flavor,
 		IsPermanent:      isPermanent,
 		SystemIdentifier: currBackupInfo.systemIdentifier,
 	}
