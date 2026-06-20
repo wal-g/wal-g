@@ -29,14 +29,19 @@ RUN apt-get update && \
     jq \
     s3cmd \
     lzop \
-    pv
+    pv && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
 RUN if [ "${INSTALL_WALE}" = "1" ]; then \
+        apt-get update && \
         apt-get install --yes --no-install-recommends --no-install-suggests \
             python3.7 python3-setuptools python3-pip && \
-        python3.7 -m pip install --upgrade pip && \
-        python3.7 -m pip install git+https://github.com/wal-e/wal-e.git && \
-        python3.7 -m pip install boto; \
+        python3.7 -m pip install --no-cache-dir --upgrade pip && \
+        python3.7 -m pip install --no-cache-dir git+https://github.com/wal-e/wal-e.git && \
+        python3.7 -m pip install --no-cache-dir boto && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/* /var/cache/debconf/* /root/.cache/pip; \
     fi
 
 COPY docker/pg/PGP_KEY /tmp/PGP_KEY
