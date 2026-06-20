@@ -31,11 +31,13 @@ ENV TERM=xterm-256color
 RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
         > /etc/apt/apt.conf.d/80-retries && \
     apt-get update && \
-    apt-get -y install \
-        build-essential cmake \
+    apt-get install --yes --no-install-recommends --no-install-suggests \
+        build-essential \
+        ca-certificates \
         iputils-ping \
         net-tools dnsutils \
-        wget
+        wget && \
+    rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
 RUN ARCH="$(uname -m)" && \
     case "$ARCH" in \
