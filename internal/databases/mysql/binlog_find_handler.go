@@ -10,14 +10,14 @@ import (
 )
 
 func HandleBinlogFind(ctx context.Context, folder storage.Folder, gtid string) {
-	db, err := getMySQLConnection()
+	conn, err := getMySQLConnection(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(db, "")
-	flavor, err := getMySQLFlavor(db)
+	defer utility.LoggedClose(conn, "")
+	flavor, err := getMySQLFlavor(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 	var gtidSet gomysql.GTIDSet
 	if gtid == "" {
-		gtidSet, err = getMySQLGTIDExecuted(db, flavor)
+		gtidSet, err = getMySQLGTIDExecuted(conn, flavor)
 		tracelog.ErrorLogger.FatalOnError(err)
 	} else {
 		gtidSet, err = gomysql.ParseGTIDSet(flavor, gtid)

@@ -14,7 +14,6 @@ require (
 	github.com/cucumber/godog v0.15.1
 	github.com/cyberdelia/lzo v1.0.0
 	github.com/go-mysql-org/go-mysql v1.14.1-0.20260227075927-498f8104b8ff
-	github.com/go-sql-driver/mysql v1.10.0
 	github.com/gofrs/flock v0.13.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7

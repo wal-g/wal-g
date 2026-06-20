@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
@@ -13,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/go-mysql-org/go-mysql/server"
-	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -128,11 +127,17 @@ func (h *Handler) waitReplicationIsDoneSafe() {
 
 	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", h.sentGTIDs.String())
 
-	db, err := sql.Open("mysql", h.replicaSource)
+	dsn, err := parseMySQLDatasource(h.replicaSource)
 	if err != nil {
-		tracelog.ErrorLogger.Fatalf("Failed to connect to replica SQL port: %v", err)
+		tracelog.ErrorLogger.Fatalf("Failed to parse replica datasource: %v", err)
 	}
-	defer db.Close()
+	var conn *client.Conn
+	connCount := 0
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
 
 	for {
 		if h.ctx.Err() != nil {
@@ -140,16 +145,31 @@ func (h *Handler) waitReplicationIsDoneSafe() {
 			return
 		}
 
-		var executedStr string
-		err := db.QueryRowContext(h.ctx, "SELECT @@global.gtid_executed").Scan(&executedStr)
-		if err == nil {
-			replicaSet, _ := mysql.ParseGTIDSet("mysql", executedStr)
-			if replicaSet != nil && replicaSet.Contain(h.sentGTIDs) {
-				tracelog.InfoLogger.Println("Replica has successfully caught up! We are safely done.")
-				os.Exit(0)
+		if conn == nil {
+			if conn, err = connectMySQL(h.ctx, dsn, ""); err != nil {
+				connCount++
+				tracelog.WarningLogger.Printf("Failed to connect to replica SQL (times: %d) port: %v", connCount, err)
+				time.Sleep(1 * time.Second)
+				continue
 			}
-		} else {
+			connCount = 0
+		}
+
+		r, err := conn.Execute("SELECT @@global.gtid_executed")
+		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to query replica GTID state: %v", err)
+			conn.Close()
+			conn = nil
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		executedStr, _ := r.GetString(0, 0)
+		r.Close()
+
+		replicaSet, _ := mysql.ParseGTIDSet("mysql", executedStr)
+		if replicaSet != nil && replicaSet.Contain(h.sentGTIDs) {
+			tracelog.InfoLogger.Println("Replica has successfully caught up! We are safely done.")
+			os.Exit(0)
 		}
 
 		time.Sleep(1 * time.Second)
@@ -353,7 +373,7 @@ func HandleBinlogServer(ctx context.Context, since string, until string) {
 	// validate WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE
 	replicaSource, err := conf.GetRequiredSetting(conf.MysqlBinlogServerReplicaSource)
 	tracelog.ErrorLogger.FatalOnError(err)
-	_, err = mysqldriver.ParseDSN(replicaSource)
+	_, err = parseMySQLDatasource(replicaSource)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	dstDir, err := internal.GetLogsDstSettings(conf.MysqlBinlogDstSetting)
