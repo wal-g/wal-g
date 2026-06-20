@@ -70,7 +70,7 @@ type DatabaseFile struct {
 	FileID       int
 }
 
-func getSQLServerConnection() (*sql.DB, error) {
+func getSQLServerConnection(ctx context.Context) (*sql.DB, error) {
 	connString, err := conf.GetRequiredSetting(conf.SQLServerConnectionString)
 	if err != nil {
 		return nil, err
@@ -79,15 +79,15 @@ func getSQLServerConnection() (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.Ping()
+	err = db.PingContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return db, nil
 }
 
-func getDatabasesToBackup(db *sql.DB, dbnames []string) ([]string, error) {
-	allDbnames, err := listDatabases(db)
+func getDatabasesToBackup(ctx context.Context, db *sql.DB, dbnames []string) ([]string, error) {
+	allDbnames, err := listDatabases(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +134,8 @@ func getDatabasesToRestore(sentinel *SentinelDto, dbnames []string, fromnames []
 	return dbnames, fromnames, nil
 }
 
-func listDatabases(db *sql.DB) ([]string, error) {
-	rows, err := db.Query("SELECT name FROM sys.databases WHERE name != 'tempdb'")
+func listDatabases(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, "SELECT name FROM sys.databases WHERE name != 'tempdb'")
 	if err != nil {
 		return nil, err
 	}
@@ -152,9 +152,9 @@ func listDatabases(db *sql.DB) ([]string, error) {
 	return names, nil
 }
 
-func estimateSize(db *sql.DB, query string, args ...interface{}) (int64, int, error) {
+func estimateSize(ctx context.Context, db *sql.DB, query string, args ...interface{}) (int64, int, error) {
 	var size int64
-	row := db.QueryRow(query, args...)
+	row := db.QueryRowContext(ctx, query, args...)
 	err := row.Scan(&size)
 	if err != nil {
 		return 0, 0, err
@@ -163,29 +163,29 @@ func estimateSize(db *sql.DB, query string, args ...interface{}) (int64, int, er
 	return size, blobCount, nil
 }
 
-func estimateDBSize(db *sql.DB, dbname string) (int64, int, error) {
+func estimateDBSize(ctx context.Context, db *sql.DB, dbname string) (int64, int, error) {
 	query := fmt.Sprintf(`
 		USE %s; 
 		SELECT (SELECT SUM(used_log_space_in_bytes) FROM sys.dm_db_log_space_usage) 
 			 + (SELECT SUM(allocated_extent_page_count)*8*1024 FROM sys.dm_db_file_space_usage)
 		USE master;
 	`, quoteName(dbname))
-	return estimateSize(db, query)
+	return estimateSize(ctx, db, query)
 }
 
-func estimateLogSize(db *sql.DB, dbname string) (int64, int, error) {
+func estimateLogSize(ctx context.Context, db *sql.DB, dbname string) (int64, int, error) {
 	query := fmt.Sprintf(`
 		USE %s; 
 		SELECT SUM(log_space_in_bytes_since_last_backup) FROM sys.dm_db_log_space_usage; 
 		USE master;
 	`, quoteName(dbname))
-	return estimateSize(db, query)
+	return estimateSize(ctx, db, query)
 }
 
-func listDatabaseFiles(db *sql.DB, urls string) ([]DatabaseFile, error) {
+func listDatabaseFiles(ctx context.Context, db *sql.DB, urls string) ([]DatabaseFile, error) {
 	var res []DatabaseFile
 	query := fmt.Sprintf("RESTORE FILELISTONLY FROM %s", urls)
-	rows, err := db.Query(query)
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +502,7 @@ func GetBackupProperties(ctx context.Context,
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 	query := fmt.Sprintf("RESTORE HEADERONLY FROM %s", urls)
-	rows, err := db.Query(query)
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return res, err
 	}
@@ -573,19 +573,19 @@ func RunOrReuseProxy(ctx context.Context, cancel context.CancelFunc, folder stor
 	return &LockWrapper{lock}, nil
 }
 
-func GetDBRestoreLSN(db *sql.DB, databaseName string) (string, error) {
+func GetDBRestoreLSN(ctx context.Context, db *sql.DB, databaseName string) (string, error) {
 	query := `SELECT MAX(redo_start_lsn) 
         FROM sys.master_files
         WHERE database_id=DB_ID(@dbname) `
 	var res string
-	if err := db.QueryRow(query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
+	if err := db.QueryRowContext(ctx, query, sql.Named("dbname", databaseName)).Scan(&res); err != nil {
 		return "0", err
 	}
 	return res, nil
 }
 
-func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFileProperties *BackupProperties) (bool, error) {
-	dbRestoreLSN, err := GetDBRestoreLSN(db, databaseName)
+func IsLogAlreadyApplied(ctx context.Context, db *sql.DB, databaseName string, logBackupFileProperties *BackupProperties) (bool, error) {
+	dbRestoreLSN, err := GetDBRestoreLSN(ctx, db, databaseName)
 	if err != nil {
 		return false, err
 	}
@@ -605,9 +605,9 @@ func IsLogAlreadyApplied(db *sql.DB, databaseName string, logBackupFilePropertie
 	return true, nil
 }
 
-func GetDefaultDataLogDirs(db *sql.DB) (string, string, error) {
+func GetDefaultDataLogDirs(ctx context.Context, db *sql.DB) (string, string, error) {
 	var datadir, logdir string
 	query := `SELECT serverproperty('InstanceDefaultDataPath'), serverproperty('InstanceDefaultLogPath')`
-	err := db.QueryRow(query).Scan(&datadir, &logdir)
+	err := db.QueryRowContext(ctx, query).Scan(&datadir, &logdir)
 	return strings.TrimSpace(datadir), strings.TrimSpace(logdir), err
 }

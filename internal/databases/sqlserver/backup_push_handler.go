@@ -19,10 +19,10 @@ func HandleBackupPush(ctx context.Context, dbnames []string, updateLatest bool) 
 	storage, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	db, err := getSQLServerConnection()
+	db, err := getSQLServerConnection(ctx)
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
-	dbnames, err = getDatabasesToBackup(db, dbnames)
+	dbnames, err = getDatabasesToBackup(ctx, db, dbnames)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
@@ -70,7 +70,7 @@ func HandleBackupPush(ctx context.Context, dbnames []string, updateLatest bool) 
 
 func backupSingleDatabase(ctx context.Context, db *sql.DB, backupName string, dbname string, builtinCompression bool) error {
 	baseURL := getDatabaseBackupURL(backupName, dbname)
-	size, blobCount, err := estimateDBSize(db, dbname)
+	size, blobCount, err := estimateDBSize(ctx, db, dbname)
 	if err != nil {
 		return err
 	}
