@@ -1,9 +1,16 @@
-FROM wal-g/ubuntu:22.04
+FROM wal-g/base
 
 # install mysql
 ENV MYSQLDATA=/var/lib/mysql
 
-RUN apt-get update && \
+# debian ships MariaDB as default-mysql; Oracle's apt repo carries real MySQL 8.0 for bullseye
+# -2025 key file = same key as -2023 (fp BCA43417C3B485DD128EC6D4B7B3B788A8D3785C) with expiry renewed to 2027-10;
+# -2023 file still serves stale copy expired 2025-10, fails apt with EXPKEYSIG
+RUN install -d /etc/apt/keyrings && \
+    curl -fsSL https://repo.mysql.com/RPM-GPG-KEY-mysql-2025 -o /etc/apt/keyrings/mysql.asc && \
+    echo "deb [signed-by=/etc/apt/keyrings/mysql.asc] https://repo.mysql.com/apt/debian bullseye mysql-8.0" \
+        > /etc/apt/sources.list.d/mysql.list && \
+    apt-get update && \
     apt-get install --yes \
         mysql-server \
         mysql-client \
@@ -23,6 +30,7 @@ RUN  wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb &&
 RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && apt -y install sysbench
 RUN rm -rf $MYSQLDATA
 
+COPY docker/mysql/mysql.init /etc/init.d/mysql
 COPY docker/mysql/client.cnf /root/.my.cnf
 COPY docker/mysql/client.cnf /etc/mysql/debian.cnf
 COPY docker/mysql/init.sql /etc/mysql/init.sql

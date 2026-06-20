@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 as build
+FROM debian:bullseye-slim as build
 
 RUN apt-get update && apt-get install -y wget
 

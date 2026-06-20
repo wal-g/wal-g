@@ -76,7 +76,7 @@ setup_gpadmin_user() {
       user_add_cmd="/usr/sbin/useradd -G supergroup,tty gpadmin"
       create_gpadmin_if_not_existing ${user_add_cmd}
       ;;
-    ubuntu*)
+    ubuntu*|debian*)
       user_add_cmd="/usr/sbin/useradd -G supergroup,tty gpadmin -s /bin/bash"
       create_gpadmin_if_not_existing ${user_add_cmd}
       ;;
@@ -107,7 +107,7 @@ setup_sshd() {
 
   setup_ssh_for_user root
 
-  if [[ "$TEST_OS" == *"ubuntu"* ]]; then
+  if [[ "$TEST_OS" == *"ubuntu"* || "$TEST_OS" == *"debian"* ]]; then
     mkdir -p /var/run/sshd
     chmod 0755 /var/run/sshd
   fi
@@ -126,8 +126,8 @@ determine_os() {
   elif [ -f /etc/SuSE-release ]; then
     name="sles"
     version=$(awk -F " *= *" '$1 == "VERSION" { print $2 }' /etc/SuSE-release)
-  elif grep -q ubuntu /etc/os-release ; then
-    name="ubuntu"
+  elif grep -qE '^ID=(ubuntu|debian)' /etc/os-release ; then
+    name=$(awk -F " *= *" '$1 == "ID" { print $2 }' /etc/os-release)
     version=$(awk -F " *= *" '$1 == "VERSION_ID" { print $2 }' /etc/os-release | tr -d \")
   elif [ -f /etc/kylin-release ]; then
     name="kylin"

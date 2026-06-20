@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+# common images pulled from ghcr need only read; publishing happens on master push
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   sequential:
     if: ${{ github.repository_owner == 'wal-g' || github.event_name == 'workflow_dispatch' }}
