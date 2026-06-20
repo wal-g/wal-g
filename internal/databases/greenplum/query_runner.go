@@ -94,9 +94,9 @@ SELECT
 	s.hostname,
 	e.fselocation
 FROM gp_segment_configuration s
-JOIN pg_filespace_entry e ON s.dbid = e.fsedbid
-JOIN pg_filespace f ON e.fsefsoid = f.oid
-WHERE s.role = 'p' AND f.fsname = 'pg_system'
+JOIN pg_filespace_entry e ON s.dbid OPERATOR(pg_catalog.=) e.fsedbid
+JOIN pg_filespace f ON e.fsefsoid OPERATOR(pg_catalog.=) f.oid
+WHERE s.role OPERATOR(pg_catalog.=) 'p' AND f.fsname OPERATOR(pg_catalog.=) 'pg_system'
 ORDER BY s.content, s.role DESC;`
 	}
 	return `
