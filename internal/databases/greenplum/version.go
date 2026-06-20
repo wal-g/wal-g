@@ -1,36 +1,26 @@
 package greenplum
 
 import (
-	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/apache/cloudberry-go-libs/dbconn"
-	"github.com/blang/semver"
 )
 
-// cloudberry-go-libs dbconn matches only "Greenplum Database" & "Apache Cloudberry".
-// Greengage is Greenplum-compatible (wal-g PR #2324); legacy releases report "Cloudberry Database X.Y.Z"
-var (
-	greengagePattern  = regexp.MustCompile(`\(Greengage Database ([0-9]+\.[0-9]+\.[0-9]+)[^)]*\)`)
-	cbdbLegacyPattern = regexp.MustCompile(`\(Cloudberry Database ([0-9]+\.[0-9]+\.[0-9]+)[^)]*\)`)
+// dbconn parser matches only "Greenplum Database" & "Apache Cloudberry".
+// Remap those product strings so dbconn fills SemVer & Type
+var productRemap = strings.NewReplacer(
+	"Greengage Database", "Greenplum Database",
+	"Cloudberry Database", "Apache Cloudberry",
 )
 
 // ParseVersionInfo augments dbconn parser with Greengage & legacy "Cloudberry Database" product strings
 func ParseVersionInfo(versionString string) dbconn.GPDBVersion {
 	var v dbconn.GPDBVersion
 	v.ParseVersionInfo(versionString)
-	if v.Type != dbconn.Unknown {
-		return v
-	}
-	if m := greengagePattern.FindStringSubmatch(versionString); m != nil {
-		if ver, err := semver.Make(m[1]); err == nil {
-			v.Type = dbconn.GPDB
-			v.SemVer = ver
-		}
-	} else if m := cbdbLegacyPattern.FindStringSubmatch(versionString); m != nil {
-		if ver, err := semver.Make(m[1]); err == nil {
-			v.Type = dbconn.CBDB
-			v.SemVer = ver
-		}
+	if v.Type == dbconn.Unknown {
+		v.ParseVersionInfo(productRemap.Replace(versionString))
+		v.VersionString = versionString
 	}
 	return v
 }
@@ -69,14 +59,16 @@ const (
 	Unknown    Flavor = "unknown"
 )
 
-func EstimatePostgreSQLVersion(v dbconn.GPDBVersion) int {
-	if v.IsCBDB() {
+func EstimatePostgreSQLVersion(flavor Flavor, gpVersion string) int {
+	if flavor == Cloudberry {
 		return 140000
 	}
-	if v.SemVer.Major == 7 {
+	majorStr, _, _ := strings.Cut(gpVersion, ".")
+	major, _ := strconv.Atoi(majorStr)
+	switch major {
+	case 7:
 		return 120000
-	}
-	if v.SemVer.Major == 6 {
+	case 6:
 		return 90400
 	}
 	return 0

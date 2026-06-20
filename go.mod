@@ -52,7 +52,6 @@ require (
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.3
 	github.com/aliyun/credentials-go v1.4.5
 	github.com/apache/cloudberry-go-libs v1.0.12-0.20250910014224-fc376e8a1056
-	github.com/blang/semver v3.5.1+incompatible
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v1.1.0
 	github.com/klauspost/compress v1.18.5
@@ -83,6 +82,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
 	github.com/alibabacloud-go/debug v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.24.2 // indirect
+	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
