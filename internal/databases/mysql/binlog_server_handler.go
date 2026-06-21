@@ -148,7 +148,13 @@ func (h *Handler) waitReplicationIsDoneSafe() {
 		if conn == nil {
 			if conn, err = connectMySQL(h.ctx, dsn, ""); err != nil {
 				connCount++
-				tracelog.WarningLogger.Printf("Failed to connect to replica SQL (times: %d) port: %v", connCount, err)
+				if connCount >= 10 {
+					tracelog.ErrorLogger.Fatalf("Failed to connect to replica SQL 10 times, giving up: %v", err)
+				} else if connCount > 1 {
+					tracelog.WarningLogger.Printf("Failed to connect to replica SQL (times: %d): %v", connCount, err)
+				} else {
+					tracelog.WarningLogger.Printf("Failed to connect to replica SQL: %v", err)
+				}
 				time.Sleep(1 * time.Second)
 				continue
 			}
