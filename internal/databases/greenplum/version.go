@@ -3,6 +3,8 @@ package greenplum
 import (
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 )
@@ -60,14 +62,16 @@ func parseGreenplumVersion(versionStr string) (Version, error) {
 	return NewVersion(semVer, flavor), nil
 }
 
-func (v Version) EstimatePostgreSQLVersion() int {
-	if v.Flavor == Cloudberry {
+func EstimatePostgreSQLVersion(flavor Flavor, gpVersion string) int {
+	if flavor == Cloudberry {
 		return 140000
 	}
-	if v.Major == 7 {
+	majorStr, _, _ := strings.Cut(gpVersion, ".")
+	major, _ := strconv.Atoi(majorStr)
+	switch major {
+	case 7:
 		return 120000
-	}
-	if v.Major == 6 {
+	case 6:
 		return 90400
 	}
 	return 0

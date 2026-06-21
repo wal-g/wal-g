@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -92,14 +92,14 @@ WHERE role OPERATOR(pg_catalog.=) 'p'
 ORDER BY content, role DESC;`
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) ([]cluster.SegConfig, error) {
 	conn := queryRunner.Connection
 	rows, err := conn.Query(ctx, getGreenplumSegmentsInfoQuery)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	segments = make([]cluster.SegConfig, 0)
+	segments := make([]cluster.SegConfig, 0)
 	for rows.Next() {
 		var dbID int
 		var contentID int
@@ -121,10 +121,7 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) 
 		segments = append(segments, segment)
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-	return segments, nil
+	return segments, rows.Err()
 }
 
 // GetGreenplumVersion returns version
