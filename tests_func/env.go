@@ -90,10 +90,10 @@ func DynConf(env map[string]string, osEnviron map[string]string) (map[string]str
 		"NETWORK_NAME":     netName,
 	}
 
-	if imageType, ok := osEnviron["FEATURE"]; ok {
-		if imageType == "aof_backup" {
+	if feature, ok := osEnviron["FEATURE"]; ok {
+		if feature == "aof_backup" {
 			res["REDIS_CONF_FILE"] = "redis-aof.conf"
-		} else if imageType == "rdb" {
+		} else if feature == "rdb_backup" {
 			res["REDIS_CONF_FILE"] = "redis-rdb.conf"
 		} else {
 			return nil, fmt.Errorf("unknown FEATURE env value")
