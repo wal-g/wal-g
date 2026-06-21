@@ -23,7 +23,6 @@ MONGO_REPO ?= "repo.mongodb.org"
 MONGO_TEST_TYPE ?= "all"
 GOLANGCI_LINT_VERSION ?= "v2.0"
 REDIS_VERSION ?= "6.2.4"
-IMAGE_TYPE ?= "rdb"
 MOCKS_DESTINATION := ./testtools/mocks
 FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
 WALG_VERSION ?= `git tag -l --points-at HEAD | tail -1`
@@ -253,7 +252,7 @@ redis_install: redis_build
 redis_features:
 	set -e
 	make go_deps
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) IMAGE_TYPE=$(IMAGE_TYPE) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
 
 clean_redis_features:
 	set -e
