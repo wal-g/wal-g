@@ -32,20 +32,20 @@ func HandleBackupPush(
 		tracelog.WarningLogger.Printf("Failed to obtain the OS hostname")
 	}
 
-	db, err := getMySQLConnection()
+	conn, err := getMySQLConnection(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
-	defer utility.LoggedClose(db, "")
+	defer utility.LoggedClose(conn, "")
 
-	version, err := getMySQLVersion(db)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	flavor, err := getMySQLFlavor(db)
+	version, err := getMySQLVersion(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	serverUUID, err := getServerUUID(db, flavor)
+	flavor, err := getMySQLFlavor(conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	gtidStart, err := getMySQLGTIDExecuted(db, flavor)
+	serverUUID, err := getServerUUID(conn, flavor)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	gtidStart, err := getMySQLGTIDExecuted(conn, flavor)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	binlogStart, err := getLastUploadedBinlogBeforeGTID(ctx, folder, gtidStart, flavor)
