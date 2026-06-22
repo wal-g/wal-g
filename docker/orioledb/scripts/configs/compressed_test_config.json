@@ -1,2 +1,2 @@
-"WALE_S3_PREFIX": "s3://orioledb_compressed",
+"WALE_S3_PREFIX": "s3://orioledb-compressed",
 "WALG_DELTA_MAX_STEPS": "6"

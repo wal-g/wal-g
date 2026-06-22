@@ -63,7 +63,7 @@ services:
       - "3000:3000"
 
   s3:
-    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
+    image: ghcr.io/wal-g/minio:RELEASE.2024-06-13T22-53-53Z
     container_name: wal-g_s3
     hostname: s3
     ports:
@@ -129,21 +129,21 @@ services:
       &&  mkdir -p /export/mysqlmarknoerrorbucket
       &&  mkdir -p /export/mysqlmarkincrementalbucket
       &&  mkdir -p /export/mysqlbinlogreplaybucket
-      &&  mkdir -p /export/mysql_pitr_binlogserver_bucket
-      &&  mkdir -p /export/mysql_pitr_binlogserver_reconnection_bucket
+      &&  mkdir -p /export/mysql-pitr-binlogserver-bucket
+      &&  mkdir -p /export/mysql-pitr-binlogserver-reconnection-bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay
       &&  mkdir -p /export/mysqlpermanentbackupbucket
-      &&  mkdir -p /export/mysql_journal_test_bucket
-      &&  mkdir -p /export/mysql8_xbtool_bucket
-      &&  mkdir -p /export/mysql8_xbtool_incremental_bucket
-      &&  mkdir -p /export/mysql8_xbtool_inplace_bucket
-      &&  mkdir -p /export/mariadb_binlog_push_fetch
-      &&  mkdir -p /export/mariadb_binlog_push_with_gtids_check
-      &&  mkdir -p /export/mariadb_full_mysqldump
-      &&  mkdir -p /export/mariadb_full_maria_backup
-      &&  mkdir -p /export/mariadb_pitr_xtrabackup
+      &&  mkdir -p /export/mysql-journal-test-bucket
+      &&  mkdir -p /export/mysql8-xbtool-bucket
+      &&  mkdir -p /export/mysql8-xbtool-incremental-bucket
+      &&  mkdir -p /export/mysql8-xbtool-inplace-bucket
+      &&  mkdir -p /export/mariadb-binlog-push-fetch
+      &&  mkdir -p /export/mariadb-binlog-push-with-gtids-check
+      &&  mkdir -p /export/mariadb-full-mysqldump
+      &&  mkdir -p /export/mariadb-full-maria-backup
+      &&  mkdir -p /export/mariadb-pitr-xtrabackup
       &&  mkdir -p /export/mongostreampushbucket
       &&  mkdir -p /export/mongooplogpushbucket
       &&  mkdir -p /export/mongodeletebeforebucket
@@ -179,7 +179,7 @@ services:
       &&  mkdir -p /export/cloudberry-partial-table-bucket
       &&  mkdir -p /export/createrestorepointbucket
       &&  mkdir -p /export/storagetoolsbucket
-      &&  mkdir -p /export/storagetoolsbucket_target
+      &&  mkdir -p /export/storagetoolsbucket-target
       &&  mkdir -p /export/sttransferfilesbucket
       &&  mkdir -p /export/sttransferfilesfailoverbucket
       &&  mkdir -p /export/transferbackupbucket
@@ -194,13 +194,13 @@ services:
       &&  mkdir -p /export/receivewalbucket
       &&  mkdir -p /export/severaldeltabackupsbucket
       &&  mkdir -p /export/walperftestbucket
-      &&  mkdir -p /export/orioledb_compatibility
-      &&  mkdir -p /export/orioledb_simple
-      &&  mkdir -p /export/orioledb_compressed
+      &&  mkdir -p /export/orioledb-compatibility
+      &&  mkdir -p /export/orioledb-simple
+      &&  mkdir -p /export/orioledb-compressed
       &&  /usr/bin/minio server /export'
 
   s3-another:
-    image: minio/minio:RELEASE.2021-06-07T21-40-51Z
+    image: ghcr.io/wal-g/minio:RELEASE.2024-06-13T22-53-53Z
     container_name: wal-g_s32
     ports:
       - "9001:9001"
@@ -213,7 +213,7 @@ services:
       &&  /usr/bin/minio server /export'
 
   s3-for-throttling:
-    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    image: ghcr.io/wal-g/minio:RELEASE.2024-06-13T22-53-53Z
     container_name: wal-g_s3_3
     hostname: s3
     ports:
