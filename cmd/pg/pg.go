@@ -51,7 +51,6 @@ var (
 
 			err := conf.ConfigureAndRunDefaultWebServer()
 			tracelog.ErrorLogger.FatalOnError(err)
-
 		},
 	}
 
