@@ -11,6 +11,4 @@ ENTRYPOINT ["/usr/bin/docker-entrypoint.sh"]
 HEALTHCHECK --interval=30s --timeout=5s \
     CMD /usr/bin/healthcheck.sh
 
-EXPOSE $S3_PORT
-
 CMD ["server", "/export"]
