@@ -49,7 +49,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.3.0
 	github.com/RoaringBitmap/roaring/v2 v2.18.2
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.3
-	github.com/aliyun/credentials-go v1.4.5
+	github.com/aliyun/credentials-go v1.4.12
 	github.com/apache/cloudberry-go-libs v1.0.12-0.20260624080114-3de23e29a87a
 	github.com/cactus/go-statsd-client/v5 v5.0.0
 	github.com/google/brotli/go/cbrotli v1.1.0
