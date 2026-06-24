@@ -29,7 +29,7 @@ jobs:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.CACHE_FILE_PG10_TESTS }}
@@ -110,7 +110,7 @@ jobs:
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ${{ env.CACHE_FILE_PG10_TESTS }}
