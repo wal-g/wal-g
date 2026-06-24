@@ -47,7 +47,7 @@ require (
 
 require (
 	github.com/ProtonMail/go-crypto v1.3.0
-	github.com/RoaringBitmap/roaring/v2 v2.18.0
+	github.com/RoaringBitmap/roaring/v2 v2.18.2
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.2.3
 	github.com/aliyun/credentials-go v1.4.5
 	github.com/apache/cloudberry-go-libs v1.0.12-0.20250910014224-fc376e8a1056
