@@ -180,7 +180,7 @@ func (checker *AOLengthCheckSegmentHandler) connect(ctx context.Context, db stri
 }
 
 func (checker *AOLengthCheckSegmentHandler) getTablesSizes(ctx context.Context, conn *pgx.Conn, dbOID uint32) (map[string]relNames, error) {
-	rows, err := conn.Query(ctx, `SELECT a.relfilenode file, n.nspname || '.' || a.relname tname, b.relname segname
+	rows, err := conn.Query(ctx, `SELECT a.relfilenode file, pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pgcatalog.||) pg_catalog.quote_ident(a.relname) tname, b.relname segname
 	FROM (SELECT relname, relid, segrelid, relpersistence, relfilenode, relnamespace FROM pg_class JOIN pg_appendonly ON oid = relid) a,
 	(SELECT relname, segrelid FROM pg_class JOIN pg_appendonly ON oid = segrelid) b,
 	pg_namespace n
