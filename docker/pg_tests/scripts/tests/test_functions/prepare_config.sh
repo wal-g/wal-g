@@ -11,6 +11,4 @@ prepare_config() {
   TMP_CONFIG="/tmp/configs/tmp_config.json"
 
   jq -s '.[0] * .[1]' "${COMMON_CONFIG}" "${CONFIG_FILE}" > "${TMP_CONFIG}"
-
-  /tmp/scripts/wrap_config_file.sh "${TMP_CONFIG}"
 }
