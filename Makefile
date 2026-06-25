@@ -59,7 +59,7 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 
 install_and_build_pg: deps pg_build
 
-pg10_build_image:
+pg10_build_image: go_deps
 ifeq ($(COMPOSE_BAKE),true)
 	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
 	docker compose build $(DOCKER_COMMON) pg10 pg10_tests_template
@@ -72,7 +72,7 @@ else
 	docker compose build pg10_tests_template
 endif
 
-pg18_build_image:
+pg18_build_image: go_deps
 ifeq ($(COMPOSE_BAKE),true)
 	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
 	docker compose build $(DOCKER_COMMON) pg18 pg18_tests_template
