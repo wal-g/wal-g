@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -198,6 +199,137 @@ func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.B
 	}
 
 	return errorGroup.Wait()
+}
+
+// HandleDeleteTrimWal deletes WAL files accumulated after each segment's RestorePointLSN.
+func (h *DeleteHandler) HandleDeleteTrimWal(ctx context.Context, backupName string) error {
+	baseBackupFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
+	backupName, err := internal.UnwrapLatestModifier(backupName, baseBackupFolder)
+	if err != nil {
+		return err
+	}
+
+	target, err := h.FindTargetByName(backupName)
+	if err != nil {
+		return err
+	}
+	if target == nil {
+		return fmt.Errorf("backup '%s' not found", backupName)
+	}
+
+	backup, err := NewBackupInStorage(h.Folder, target.GetBackupName(), multistorage.GetStorage(target))
+	if err != nil {
+		return err
+	}
+
+	sentinel, err := backup.GetSentinel()
+	if err != nil {
+		return err
+	}
+
+	var cutoffTimeline uint32
+	if sentinel.RestorePoint != nil {
+		rpMeta, err := FetchRestorePointMetadata(h.Folder, *sentinel.RestorePoint)
+		if err != nil {
+			return fmt.Errorf("failed to fetch restore point metadata: %w", err)
+		}
+		cutoffTimeline = rpMeta.TimeLine
+	}
+
+	deleteConcurrency, err := conf.GetMaxConcurrency(conf.GPDeleteConcurrency)
+	if err != nil {
+		tracelog.WarningLogger.Printf("config error: %v", err)
+	}
+
+	errorGroup, _ := errgroup.WithContext(ctx)
+	errorGroup.SetLimit(deleteConcurrency)
+	for i := range sentinel.Segments {
+		meta := sentinel.Segments[i]
+		errorGroup.Go(func() error {
+			return h.trimSegmentWal(meta, cutoffTimeline, h.args.Confirmed)
+		})
+	}
+
+	if err := errorGroup.Wait(); err != nil {
+		return err
+	}
+
+	if sentinel.RestorePoint != nil {
+		return h.deleteRestorePointsAfter(*sentinel.RestorePoint, h.args.Confirmed, baseBackupFolder)
+	}
+	return nil
+}
+
+func (h *DeleteHandler) deleteRestorePointsAfter(targetRestorePoint string, confirm bool, baseBackupFolder storage.Folder) error {
+	allRestorePoints, err := FetchAllRestorePoints(h.Folder)
+	if err != nil {
+		if _, ok := err.(NoRestorePointsFoundError); ok {
+			return nil
+		}
+		return err
+	}
+
+	var cutoffTime time.Time
+	for i := range allRestorePoints {
+		if allRestorePoints[i].Name == targetRestorePoint {
+			cutoffTime = allRestorePoints[i].FinishTime
+			break
+		}
+	}
+	if cutoffTime.IsZero() {
+		return nil
+	}
+
+	toDelete := make(map[string]struct{}, len(allRestorePoints))
+	for i := range allRestorePoints {
+		if allRestorePoints[i].FinishTime.After(cutoffTime) {
+			toDelete[allRestorePoints[i].Name] = struct{}{}
+		}
+	}
+
+	folderFilter := func(string) bool { return true }
+	return internal.DeleteObjectsWhere(baseBackupFolder, confirm, func(object storage.Object) bool {
+		name := object.GetName()
+		if !strings.HasSuffix(name, RestorePointSuffix) {
+			return false
+		}
+		_, ok := toDelete[StripRightmostRestorePointName(name)]
+		return ok
+	}, folderFilter)
+}
+
+func (h *DeleteHandler) trimSegmentWal(meta SegmentMetadata, cutoffTimeline uint32, confirm bool) error {
+	lsn, err := postgres.ParseLSN(meta.RestorePointLSN)
+	if err != nil {
+		return fmt.Errorf("failed to parse RestorePointLSN for segment %d: %w", meta.ContentID, err)
+	}
+
+	cutoffSegNo := postgres.NewWalSegmentNo(lsn)
+	segFolder := h.Folder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
+	permanentBackups, permanentWals := GetPermanentBackupsAndWals(h.Folder, meta.ContentID)
+
+	segDeleteHandler, err := postgres.NewDeleteHandler(segFolder, permanentBackups, permanentWals, false)
+	if err != nil {
+		return err
+	}
+
+	tracelog.InfoLogger.Printf("Trimming WAL for segment %d (cutoff segment: %d)", meta.ContentID, cutoffSegNo)
+
+	folderFilter := func(string) bool { return true }
+	return segDeleteHandler.DeleteObjectsWhereWithPermanentCheck(confirm, func(object storage.Object) bool {
+		name := object.GetName()
+		if !strings.HasPrefix(name, utility.WalPath) {
+			return false
+		}
+		timeline, segNo, ok := postgres.TryFetchTimelineAndLogSegNo(name)
+		if !ok {
+			return false
+		}
+		if cutoffTimeline != 0 && timeline != cutoffTimeline {
+			return false
+		}
+		return postgres.WalSegmentNo(segNo) > cutoffSegNo
+	}, folderFilter)
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
