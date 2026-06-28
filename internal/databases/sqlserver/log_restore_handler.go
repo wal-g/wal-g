@@ -28,7 +28,7 @@ func HandleLogRestore(ctx context.Context, backupName string, untilTS string, db
 	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	db, err := getSQLServerConnection()
+	db, err := getSQLServerConnection(ctx)
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
@@ -121,7 +121,7 @@ func restoreSingleLog(ctx context.Context,
 	if err != nil {
 		return prevBackupFinishDate, err
 	}
-	applied, err := IsLogAlreadyApplied(db, dbname, logBackupFileProperties[0])
+	applied, err := IsLogAlreadyApplied(ctx, db, dbname, logBackupFileProperties[0])
 	if err != nil {
 		return prevBackupFinishDate, err
 	}
