@@ -40,6 +40,8 @@ type BackupArguments struct {
 	segPollRetries  int
 
 	deltaBaseSelector internal.BackupSelector
+	json              bool
+	pretty            bool
 }
 
 type SegmentUserData struct {
@@ -577,6 +579,8 @@ func NewBackupArguments(uploader internal.Uploader, isPermanent, isFull bool, us
 		segPollInterval:   segPollInterval,
 		segPollRetries:    segPollRetries,
 		deltaBaseSelector: deltaBaseSelector,
+		pretty:            false,
+		json:              false,
 	}
 }
 
