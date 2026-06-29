@@ -64,19 +64,42 @@ func UploadBinlogSentinel(ctx context.Context, folder storage.Folder, sentinelDt
 
 func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, error) {
 	var result mysql.GTIDSet
+	fh, err := os.Open(filename)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open binlog file '%s'", filename)
+	}
+	defer utility.LoggedClose(fh, "failed to close binlog")
 
+	err = parseBinlogPreviousGTIDs(fh, flavor, &result)
+	if err != nil && result == nil {
+		return nil, errors.Wrapf(err, "could not find GTIDs in binlog file '%s' \n", filename)
+	}
+
+	return result, nil
+}
+
+func parseBinlogPreviousGTIDs(reader io.Reader, flavor string, result *mysql.GTIDSet) error {
 	parser := replication.NewBinlogParser()
 	parser.SetFlavor(flavor)
 	parser.SetVerifyChecksum(false) // the faster, the better
 	parser.SetRawMode(true)         // choose events to parse manually
-	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+
+	header := make([]byte, len(replication.BinLogFileHeader))
+	if _, err := io.ReadFull(reader, header); err != nil {
+		return err
+	}
+	if !bytes.Equal(header, replication.BinLogFileHeader) {
+		return fmt.Errorf("not a valid binlog file, head 4 bytes must fe'bin'")
+	}
+
+	return parser.ParseReader(reader, func(event *replication.BinlogEvent) error {
 		if event.Header.EventType == replication.PREVIOUS_GTIDS_EVENT && flavor == mysql.MySQLFlavor {
 			previousGTID := &replication.PreviousGTIDsEvent{}
 			err := previousGTID.Decode(event.RawData[replication.EventHeaderSize:])
 			if err != nil {
 				return err
 			}
-			result, err = mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
+			*result, err = mysql.ParseMysqlGTIDSet(previousGTID.GTIDSets)
 			if err != nil {
 				return err
 			}
@@ -98,41 +121,26 @@ func GetBinlogPreviousGTIDs(filename string, flavor string) (mysql.GTIDSet, erro
 					return err
 				}
 			}
-			result = resultSet
+			*result = resultSet
 			return fmt.Errorf("shallow file read finished")
 		}
 		return nil
 	})
-
-	if err != nil && result == nil {
-		return nil, errors.Wrapf(err, "could not find GTIDs in binlog file '%s' \n", filename)
-	}
-
-	return result, nil
 }
 
 func GetBinlogPreviousGTIDsRemote(ctx context.Context, folder storage.Folder, filename string, flavor string) (mysql.GTIDSet, error) {
+	var result mysql.GTIDSet
 	binlogName := utility.TrimFileExtension(filename)
 	fh, err := internal.DownloadAndDecompressStorageFile(ctx, internal.NewFolderReader(folder), binlogName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read binlog %s: %w", binlogName, err)
 	}
 	defer utility.LoggedClose(fh, "failed to close binlog")
-	tmp, err := os.CreateTemp("", binlogName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file: %w", err)
-	}
-	defer utility.LoggedClose(tmp, "failed to close temp file")
-	defer os.Remove(tmp.Name())
-	_, err = io.CopyN(tmp, fh, BinlogReadHeaderSize)
-	if err != nil && err != io.EOF {
-		return nil, fmt.Errorf("failed to read binlog beginning")
-	}
-	prevGtid, err := GetBinlogPreviousGTIDs(tmp.Name(), flavor)
-	if err != nil {
+	err = parseBinlogPreviousGTIDs(io.LimitReader(fh, BinlogReadHeaderSize), flavor, &result)
+	if err != nil && result == nil {
 		return nil, fmt.Errorf("failed to parse %s binlog %s: %w", flavor, binlogName, err)
 	}
-	return prevGtid, nil
+	return result, nil
 }
 
 func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) {
