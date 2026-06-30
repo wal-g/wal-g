@@ -1,6 +1,6 @@
 # WAL-G storage configuration
 
-WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, remote host (via SSH) or local file system. 
+WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, OCI Object Storage, Swift, remote host (via SSH) or local file system.
 
 S3
 -----------
@@ -199,6 +199,44 @@ Size of the part to upload when uploading large files to OSS. Alicloud OSS defau
 * `OSS_COPY_PART_SIZE`
 
 Size of the part to copy when copying large files within OSS. Default OSS is 67,108,864 bytes (64 MiB).
+
+OCI Object Storage
+-----------
+
+To connect to OCI Object Storage, WAL-G requires that this variable be set:
+
+* `WALG_OCI_PREFIX`
+  (e.g. `oci://bucket/path/to/folder`)
+
+WAL-G can authenticate either with a security token and private key pair, or with a standard OCI config file.
+
+**Security token authentication**
+
+Set these variables:
+
+* `OCI_REGION`
+* `OCI_TENANCY_OCID`
+* `OCI_SECURITY_TOKEN_FILE`
+* `OCI_PRIVATE_KEY_FILE`
+
+**OCI config file authentication**
+
+Set these variables:
+
+* `OCI_CONFIG_FILE`
+* `OCI_PROFILE`
+
+If `OCI_PROFILE` is omitted, WAL-G uses the `DEFAULT` profile.
+
+**Optional variables**
+
+* `WALG_OCI_CA_CERT_FILE`
+
+Path to a custom CA certificate file used for OCI Object Storage TLS connections.
+
+* `OCI_CONNECT_TIMEOUT`
+
+Connection timeout in seconds. Default is 30.
 
 Swift
 -----------
