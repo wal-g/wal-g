@@ -232,9 +232,22 @@ func HandleDaemon(ctx context.Context, options DaemonOptions) {
 	}
 	defer utility.LoggedClose(multiSt, "close multi-storage")
 
+	serve(ctx, l, multiSt)
+}
+
+func serve(ctx context.Context, l net.Listener, multiSt *multistorage.Storage) {
+	go func() {
+		<-ctx.Done()
+		utility.LoggedClose(l, "close daemon listener")
+	}()
+
 	for {
 		fd, err := l.Accept()
 		if err != nil {
+			if ctx.Err() != nil {
+				tracelog.InfoLogger.Println("daemon shutting down")
+				return
+			}
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
 		go ProcessConnection(ctx, fd, multiSt)
