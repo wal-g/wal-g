@@ -32,6 +32,7 @@ jobs:
         "make TEST=\"pg18_remote_backup_test\" pg_integration_test",
         "make TEST=\"pg18_remote_backup_without_files_metadata_test\" pg_integration_test",
         "make TEST=\"pg18_full_backup_test\" pg_integration_test",
+        "make TEST=\"pg18_delta_backup_wal_summaries_test\" pg_integration_test",
         "make TEST=\"pg10_ssh_backup_test\" pg_integration_test",
         "make TEST=\"pg10_transfer_backup_test\" pg_integration_test",
         "make TEST=\"pg10_receive_wal_test\" pg_integration_test",

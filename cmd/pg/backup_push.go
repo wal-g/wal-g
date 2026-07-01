@@ -24,6 +24,7 @@ const (
 	useDatabaseComposerFlag   = "database-composer"
 	deltaFromUserDataFlag     = "delta-from-user-data"
 	deltaFromNameFlag         = "delta-from-name"
+	deltaFromWalSummariesFlag = "delta-from-wal-summaries"
 	addUserDataFlag           = "add-user-data"
 	withoutFilesMetadataFlag  = "without-files-metadata"
 
@@ -104,11 +105,16 @@ var (
 			userData, err := internal.UnmarshalSentinelUserData(userDataRaw)
 			tracelog.ErrorLogger.FatalfOnError("Failed to unmarshal the provided UserData: %s", err)
 
+			if deltaFromWalSummaries && fullBackup {
+				tracelog.ErrorLogger.Fatalf("%s cannot be combined with %s",
+					deltaFromWalSummariesFlag, fullBackupFlag)
+			}
+
 			arguments := postgres.NewBackupArguments(uploader, dataDirectory, utility.BaseBackupPath,
 				permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
-				userData, withoutFilesMetadata)
+				userData, withoutFilesMetadata, deltaFromWalSummaries)
 
 			backupHandler, err := postgres.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -124,6 +130,7 @@ var (
 	useCopyComposer       = false
 	deltaFromName         = ""
 	deltaFromUserData     = ""
+	deltaFromWalSummaries = false
 	userDataRaw           = ""
 	withoutFilesMetadata  = false
 )
@@ -171,6 +178,8 @@ func init() {
 		"", "Select the backup specified by name as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,
 		"", "Select the backup specified by UserData as the target for the delta backup")
+	backupPushCmd.Flags().BoolVar(&deltaFromWalSummaries, deltaFromWalSummariesFlag,
+		false, "Build the delta map from pg_wal/summaries (PostgreSQL 17+, requires summarize_wal=on)")
 	backupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().BoolVar(&withoutFilesMetadata, withoutFilesMetadataFlag,
