@@ -54,6 +54,7 @@ func TestGetBinlogPreviousGTIDsRemoteDoesNotRequireTempDir(t *testing.T) {
 	ctx := context.Background()
 	binlogData, err := os.ReadFile(testFilenameSmall)
 	require.NoError(t, err)
+	require.Less(t, len(binlogData), BinlogReadHeaderSize)
 
 	folder := memory.NewFolder("", memory.NewKVS())
 	binlogName := filepath.Base(testFilenameSmall)
