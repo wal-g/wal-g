@@ -7,11 +7,10 @@ import (
 
 	"github.com/minio/sio"
 	"github.com/wal-g/tracelog"
-	ycsdk "github.com/yandex-cloud/go-sdk/v2"
-	"github.com/yandex-cloud/go-sdk/v2/pkg/options"
-
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	ycsdk "github.com/yandex-cloud/go-sdk/v2"
+	"github.com/yandex-cloud/go-sdk/v2/pkg/options"
 )
 
 type YcCrypter struct {

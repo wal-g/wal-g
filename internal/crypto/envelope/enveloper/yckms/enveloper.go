@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/kms/v1"
 	kmsservice "github.com/yandex-cloud/go-sdk/services/kms/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk/v2"
@@ -14,8 +15,6 @@ import (
 	"github.com/yandex-cloud/go-sdk/v2/pkg/endpoints"
 	"github.com/yandex-cloud/go-sdk/v2/pkg/iamkey"
 	"github.com/yandex-cloud/go-sdk/v2/pkg/options"
-
-	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 
 const (
