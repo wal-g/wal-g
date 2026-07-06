@@ -7,10 +7,15 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal/crypto/envelope"
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/kms/v1"
-	ycsdk "github.com/yandex-cloud/go-sdk"
-	"github.com/yandex-cloud/go-sdk/iamkey"
+	kmsservice "github.com/yandex-cloud/go-sdk/services/kms/v1"
+	ycsdk "github.com/yandex-cloud/go-sdk/v2"
+	"github.com/yandex-cloud/go-sdk/v2/credentials"
+	"github.com/yandex-cloud/go-sdk/v2/pkg/endpoints"
+	"github.com/yandex-cloud/go-sdk/v2/pkg/iamkey"
+	"github.com/yandex-cloud/go-sdk/v2/pkg/options"
+
+	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 
 const (
@@ -34,7 +39,7 @@ func (enveloper *Enveloper) ReadEncryptedKey(r io.Reader) (*envelope.EncryptedKe
 
 func (enveloper *Enveloper) DecryptKey(encryptedKey *envelope.EncryptedKey) ([]byte, error) {
 	ctx := context.Background()
-	rsp, err := enveloper.sdk.KMSCrypto().SymmetricCrypto().Decrypt(ctx, &kms.SymmetricDecryptRequest{
+	rsp, err := kmsservice.NewSymmetricCryptoClient(enveloper.sdk).Decrypt(ctx, &kms.SymmetricDecryptRequest{
 		KeyId:      enveloper.keyID,
 		Ciphertext: encryptedKey.Data,
 		AadContext: nil,
@@ -123,21 +128,20 @@ func readEncryptedKey(r io.Reader) (*envelope.EncryptedKey, error) {
 	return envelope.NewEncryptedKey(keyID, encryptedKey), nil
 }
 
-func getCredentials(saFilePath string) (ycsdk.Credentials, error) {
-	var credentials ycsdk.Credentials
-	credentials = ycsdk.InstanceServiceAccount()
+func getCredentials(saFilePath string) (credentials.Credentials, error) {
+	var creds credentials.Credentials = credentials.InstanceServiceAccount()
 	if len(saFilePath) > 0 {
 		var authorizedKey, keyErr = iamkey.ReadFromJSONFile(saFilePath)
 		if keyErr != nil {
 			return nil, errors.Wrap(keyErr, "Can't initialize yc sdk")
 		}
-		var accountCredentials, credErr = ycsdk.ServiceAccountKey(authorizedKey)
+		var accountCredentials, credErr = credentials.ServiceAccountKey(authorizedKey)
 		if credErr != nil {
 			return nil, errors.Wrap(credErr, "Can't initialize yc sdk")
 		}
-		credentials = accountCredentials
+		creds = accountCredentials
 	}
-	return credentials, nil
+	return creds, nil
 }
 
 func EnveloperFromKeyIDAndCredential(keyID, saFilePath, endpoint string) (envelope.Enveloper, error) {
@@ -146,10 +150,11 @@ func EnveloperFromKeyIDAndCredential(keyID, saFilePath, endpoint string) (envelo
 		return nil, errors.Wrap(credErr, "Can't initialize yc sdk")
 	}
 
-	var sdk, sdkErr = ycsdk.Build(context.Background(), ycsdk.Config{
-		Credentials: credentials,
-		Endpoint:    endpoint,
-	})
+	var sdk, sdkErr = ycsdk.Build(
+		context.Background(),
+		options.WithCredentials(credentials),
+		options.WithEndpointsResolver(endpoints.NewSingleEndpointResolver(endpoint)),
+	)
 	if sdkErr != nil {
 		return nil, errors.Wrap(sdkErr, "Can't initialize yc sdk")
 	}
