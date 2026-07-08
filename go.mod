@@ -21,7 +21,7 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/microsoft/go-mssqldb v1.10.0
-	github.com/minio/sio v0.2.0
+	github.com/minio/sio v0.5.1
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.0
 	github.com/pierrec/lz4/v4 v4.1.27

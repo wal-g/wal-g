@@ -35,7 +35,7 @@ func (crypter *YcCrypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 	}
 
 	encryptedWriter, err := sio.EncryptWriter(bufferedWriter,
-		sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_256_GCM}})
+		sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_GCM}})
 
 	if err != nil {
 		tracelog.ErrorLogger.Printf("YC KMS can't create encrypted writer: %v", err)
@@ -52,7 +52,7 @@ func (crypter *YcCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	err = crypter.symmetricKey.Decrypt()
 	tracelog.ErrorLogger.FatalfOnError("Can't decrypt data encryption key from archive file header: %v", err)
 
-	return sio.DecryptReader(reader, sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_256_GCM}})
+	return sio.DecryptReader(reader, sio.Config{Key: crypter.symmetricKey.GetKey(), CipherSuites: []byte{sio.AES_GCM}})
 }
 
 func YcCrypterFromKeyIDAndCredential(keyID string, saFilePath string) crypto.Crypter {
