@@ -295,11 +295,7 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 	}
 
 	currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)
-	err = currentBinlogGTIDSet.Minus(*u.lastGtidSeen)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Cannot subtract GTIDs: %v (gtid check)\n", err)
-		return true // math is broken. upload binlog
-	}
+	gtidSetMinus(currentBinlogGTIDSet, u.lastGtidSeen)
 
 	// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
 	if u.gtidArchived.Contain(currentBinlogGTIDSet) {
@@ -308,7 +304,7 @@ func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 		return false
 	}
 
-	err = u.gtidArchived.Add(*currentBinlogGTIDSet)
+	err = u.gtidArchived.Update(currentBinlogGTIDSet.String())
 	if err != nil {
 		tracelog.WarningLogger.Printf("Cannot merge GTIDs: %v (gtid check)\n", err)
 		return true // math is broken. upload binlog
@@ -323,4 +319,53 @@ func lastOrDefault(data []string, defaultValue string) string {
 		return data[len(data)-1]
 	}
 	return defaultValue
+}
+
+// gtidSetMinus subtracts sub from s in place (set difference s\sub).
+func gtidSetMinus(s, sub *mysql.MysqlGTIDSet) {
+	for sid, subTags := range *sub {
+		sTags, ok := (*s)[sid]
+		if !ok {
+			continue
+		}
+		for tag, subIntervals := range subTags {
+			intervals, ok := sTags[tag]
+			if !ok {
+				continue
+			}
+			if diff := subtractIntervals(intervals, subIntervals); len(diff) > 0 {
+				sTags[tag] = diff
+			} else {
+				delete(sTags, tag)
+			}
+		}
+		if len(sTags) == 0 {
+			delete(*s, sid)
+		}
+	}
+}
+
+// subtractIntervals returns a\b for half-open [Start, Stop) GTID interval slices
+func subtractIntervals(a, b mysql.IntervalSlice) mysql.IntervalSlice {
+	a = a.Normalize()
+	b = b.Normalize()
+	var result mysql.IntervalSlice
+	for _, cur := range a {
+		for _, sub := range b {
+			if sub.Stop <= cur.Start || sub.Start >= cur.Stop {
+				continue // disjoint
+			}
+			if sub.Start > cur.Start {
+				result = append(result, mysql.Interval{Start: cur.Start, Stop: sub.Start})
+			}
+			cur.Start = sub.Stop
+			if cur.Start >= cur.Stop {
+				break // fully consumed by b
+			}
+		}
+		if cur.Start < cur.Stop {
+			result = append(result, cur)
+		}
+	}
+	return result
 }
