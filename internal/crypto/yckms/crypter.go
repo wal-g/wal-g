@@ -9,7 +9,8 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/ioextensions"
-	ycsdk "github.com/yandex-cloud/go-sdk"
+	ycsdk "github.com/yandex-cloud/go-sdk/v2"
+	"github.com/yandex-cloud/go-sdk/v2/pkg/options"
 )
 
 type YcCrypter struct {
@@ -57,9 +58,10 @@ func (crypter *YcCrypter) Decrypt(reader io.Reader) (io.Reader, error) {
 
 func YcCrypterFromKeyIDAndCredential(keyID string, saFilePath string) crypto.Crypter {
 	credentials := resolveCredentials(saFilePath)
-	sdk, err := ycsdk.Build(context.Background(), ycsdk.Config{
-		Credentials: credentials,
-	})
+	sdk, err := ycsdk.Build(
+		context.Background(),
+		options.WithCredentials(credentials),
+	)
 	tracelog.ErrorLogger.FatalfOnError("Can't initialize yc sdk: %v", err)
 
 	return &YcCrypter{symmetricKey: YcSymmetricKeyFromKeyIDAndSdk(keyID, sdk)}
