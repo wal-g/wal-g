@@ -34,8 +34,8 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/ulikunitz/xz v0.5.15
 	github.com/wal-g/tracelog v0.1.1
-	github.com/yandex-cloud/go-genproto v0.0.0-20230918115514-93a99045c9de
-	github.com/yandex-cloud/go-sdk v0.0.0-20230918120620-9e95f0816d79
+	github.com/yandex-cloud/go-genproto v0.93.0
+	github.com/yandex-cloud/go-sdk v0.32.0
 	go.mongodb.org/mongo-driver v1.17.7
 	golang.org/x/crypto v0.53.0
 	golang.org/x/sync v0.21.0
@@ -153,7 +153,7 @@ require (
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-memdb v1.3.4 // indirect
-	github.com/hashicorp/go-multierror v1.0.0 // indirect
+	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
