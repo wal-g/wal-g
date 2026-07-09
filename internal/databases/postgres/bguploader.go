@@ -139,6 +139,8 @@ func (b *BgUploader) scanAndProcessFiles() {
 		}
 	}
 
+	go b.cleanStatusFiles()
+
 	for {
 		files, err := os.ReadDir(filepath.Join(b.dir, archiveStatusDir))
 		if err != nil {
@@ -230,4 +232,42 @@ func (b *BgUploader) upload(ctx context.Context, walStatusFilename string) bool 
 	}
 
 	return true
+}
+
+// cleanStatusFiles scans wal-g archive status directory to remove obsolete
+// status files left between runs. A status file is obsolete when the
+// corresponding WAL segment no longer has a .ready or .done entry in
+// PostgreSQL's archive_status directory. The number of files processed is
+// limited to avoid slowing down wal-push on clusters with a large backlog of
+// stale marker files.
+func (b *BgUploader) cleanStatusFiles() {
+	limit := int((b.maxNumUploaded + b.maxParallelWorkers) * 2)
+	files, err := b.uploader.ArchiveStatusManager.ListUploaded(limit)
+	if err != nil {
+		tracelog.ErrorLogger.Print("Failed to list walg archive status files: ", err)
+		return
+	}
+
+	for _, walName := range files {
+		select {
+		case <-b.ctx.Done():
+			return
+		default:
+		}
+
+		readyPath := filepath.Join(b.dir, archiveStatusDir, walName+readySuffix)
+		donePath := filepath.Join(b.dir, archiveStatusDir, walName+".done")
+
+		_, readyErr := os.Stat(readyPath)
+		_, doneErr := os.Stat(donePath)
+
+		if os.IsNotExist(readyErr) && os.IsNotExist(doneErr) {
+			err := b.uploader.ArchiveStatusManager.UnmarkWalFile(walName)
+			if err != nil {
+				tracelog.ErrorLogger.Printf("Failed to remove obsolete walg archive status file %s: %v", walName, err)
+			} else {
+				tracelog.InfoLogger.Printf("Removed obsolete walg archive status file: %s", walName)
+			}
+		}
+	}
 }

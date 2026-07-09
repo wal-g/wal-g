@@ -71,3 +71,20 @@ func (folder *DiskDataFolder) RenameFile(oldFileName string, newFileName string)
 	newPath := filepath.Join(folder.Path, newFileName)
 	return os.Rename(oldPath, newPath)
 }
+
+func (folder *DiskDataFolder) ListFiles(limit int) ([]string, error) {
+	entries, err := os.ReadDir(folder.Path)
+	if err != nil {
+		return nil, err
+	}
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.Type().IsDir() {
+			files = append(files, entry.Name())
+			if limit > 0 && len(files) >= limit {
+				break
+			}
+		}
+	}
+	return files, nil
+}

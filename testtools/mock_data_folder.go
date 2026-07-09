@@ -54,3 +54,14 @@ func (folder *MockDataFolder) OpenWriteOnlyFile(filename string) (io.WriteCloser
 func (folder *MockDataFolder) RenameFile(oldFilename string, newFilename string) error {
 	return nil
 }
+
+func (folder *MockDataFolder) ListFiles(limit int) ([]string, error) {
+	files := make([]string, 0, len(*folder))
+	for name := range *folder {
+		files = append(files, name)
+		if limit > 0 && len(files) >= limit {
+			break
+		}
+	}
+	return files, nil
+}

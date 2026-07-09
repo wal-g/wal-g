@@ -21,3 +21,7 @@ func (asm NopASM) UnmarkWalFile(walFilePath string) error {
 func (asm NopASM) RenameReady(walFilePath string) error {
 	return nil
 }
+
+func (asm NopASM) ListUploaded(limit int) ([]string, error) {
+	return nil, nil
+}
