@@ -21,9 +21,35 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/printlist"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
+
+type BackupInfo struct {
+	Name    string
+	Storage string
+}
+
+func (b BackupInfo) PrintableFields() []printlist.TableField {
+	return []printlist.TableField{
+		{
+			Name:       "name",
+			PrettyName: "Name of backup",
+			Value:      b.Name,
+		},
+		{
+			Name:       "storage",
+			PrettyName: "Name of storage",
+			Value:      b.Storage,
+		},
+	}
+}
 
 type backupFromFuture struct {
 	error
@@ -64,6 +90,8 @@ type BackupArguments struct {
 	withoutFilesMetadata     bool
 	composerInitFunc         func(ctx context.Context, handler *BackupHandler) error
 	preventConcurrentBackups bool
+	json                     bool
+	pretty                   bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -120,7 +148,7 @@ type BackupHandler struct {
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
 	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
-	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool) BackupArguments {
+	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool, json bool, pretty bool) BackupArguments {
 	return BackupArguments{
 		Uploader:              uploader,
 		pgDataDirectory:       pgDataDirectory,
@@ -136,6 +164,8 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 			return configureTarBallComposer(ctx, handler, tarBallComposerType)
 		},
 		preventConcurrentBackups: false,
+		json:                     json,
+		pretty:                   pretty,
 	}
 }
 
@@ -190,7 +220,13 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 
 	// logging backup set Name
-	tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
+	createdBackup := BackupInfo{Name: bh.CurBackupInfo.Name, Storage: storageNames[0]}
+	if bh.Arguments.json {
+		err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
+	} else {
+		tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
+	}
+
 }
 
 func (bh *BackupHandler) startBackup(ctx context.Context) error {

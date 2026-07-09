@@ -32,6 +32,25 @@ func List(entitiesInOrder []Entity, output io.Writer, pretty, json bool) error {
 	return listInTabbedTable(entitiesInOrder, output)
 }
 
+func OneElement(entity Entity, output io.Writer, pretty, json bool) error {
+	if json {
+		return oneElementInJSON(entity, output, pretty)
+	}
+	return nil
+}
+
+func oneElementInJSON(entity Entity, output io.Writer, pretty bool) error {
+	encoder := json.NewEncoder(output)
+	if pretty {
+		encoder.SetIndent("", "    ")
+	}
+	err := encoder.Encode(entity)
+	if err != nil {
+		return fmt.Errorf("encode to JSON: %w", err)
+	}
+	return nil
+}
+
 // listInJSON prints entities in JSON format. All fields that aren't hidden by json tags are printed, not just ones
 // returned from Entity.PrintableFields. If pretty flag is set, JSONs are indented.
 func listInJSON(entities []Entity, output io.Writer, pretty bool) error {
