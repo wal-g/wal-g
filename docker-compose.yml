@@ -74,6 +74,7 @@ services:
     entrypoint: sh
     command: >
       -c 'mkdir -p /export/fullbucket
+      &&  mkdir -p /export/fullbucket-compression-none-encryption
       &&  mkdir -p /export/fullratingcomposerbucket
       &&  mkdir -p /export/fulldatabasecomposerbucket
       &&  mkdir -p /export/fullcopycomposerbucket
@@ -393,6 +394,11 @@ services:
     <<: *pg10_test_common
     container_name: wal-g_pg10_full_backup_test
     command: /tmp/tests/full_backup_test.sh
+
+  pg10_full_backup_test_compression_none_encryption_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_full_backup_test_compression_none_encryption_test
+    command: /tmp/tests/full_backup_test_compression_none_encryption.sh
 
   pg10_full_backup_failover_storage_test:
     <<: *pg10_test_common
