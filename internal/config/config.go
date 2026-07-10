@@ -77,6 +77,7 @@ const (
 	PgpEnvelopeYcEndpointSetting  = "WALG_ENVELOPE_PGP_YC_ENDPOINT"
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
 	DirectIO                      = "WALG_DIRECT_IO"
+	DirectIOBlockCountSetting     = "WALG_DIRECT_IO_BLOCK_COUNT"
 
 	PgDataSetting           = "PGDATA"
 	UserSetting             = "USER" // TODO : do something with it
@@ -283,6 +284,7 @@ var (
 		FailoverStorageCacheLifetime: "15m",
 		PgpEnvelopeCacheExpiration:   "0",
 		DirectIO:                     "false",
+		DirectIOBlockCountSetting:    "32",
 		LogLevelSetting:              "NORMAL",
 	}
 
@@ -386,6 +388,7 @@ var (
 		PgpEnvelopeYcSaKeyFileSetting: true,
 		PgpEnvelopeYcEndpointSetting:  true,
 		DirectIO:                      false,
+		DirectIOBlockCountSetting:     false,
 		LibsodiumKeySetting:           true,
 		LibsodiumKeyPathSetting:       true,
 		LibsodiumKeyTransform:         true,
