@@ -30,7 +30,7 @@ An experimental feature that allows you to perform direct_io reads during a ```b
 * `WALG_DIRECT_IO_BLOCK_COUNT`
 
 Set number of disk blocks read and processed in a single batch with direct_io during a ```backup-push```. Default 32 blocks is 32 * 4kb = 128kb
-single read. Larger reads up to 1024 blocks reduce syscall CPU costs and improve throughput at the expense of higher memory consumption.
+single read. Larger reads reduce syscall CPU costs and improve throughput at the expense of higher memory consumption.
 
 * `WALG_PREFETCH_DIR`
 
