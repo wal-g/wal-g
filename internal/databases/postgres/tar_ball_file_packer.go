@@ -1,15 +1,19 @@
 package postgres
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/ncw/directio"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
 	pg_errors "github.com/wal-g/wal-g/internal/databases/postgres/errors"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -94,7 +98,11 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(ctx context.Context, cfi *intern
 		var secondReadCloser io.ReadCloser
 		// newTeeReadCloser is used to provide the fileReadCloser to two consumers:
 		// fileReadCloser is needed for PackFileTo, secondReadCloser is for the page verification
-		fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
+		if viper.GetBool(conf.DirectIO) {
+			fileReadCloser, secondReadCloser = newTeeReadCloserDirectIO(fileReadCloser)
+		} else {
+			fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
+		}
 		errorGroup.Go(func() (err error) {
 			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented)
 			if err != nil {
@@ -197,7 +205,8 @@ func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncre
 	return VerifyPagedFileBase(path, fileInfo, fileReader)
 }
 
-// TeeReadCloser creates two io.ReadClosers from one
+// newTeeReadCloser creates two io.ReadClosers from one. Writes to the second consumer
+// (page verification) are streamed directly through an unbuffered pipe.
 func newTeeReadCloser(readCloser io.ReadCloser) (io.ReadCloser, io.ReadCloser) {
 	pipeReader, pipeWriter := io.Pipe()
 
@@ -207,3 +216,32 @@ func newTeeReadCloser(readCloser io.ReadCloser) (io.ReadCloser, io.ReadCloser) {
 	closer := ioextensions.NewMultiCloser([]io.Closer{readCloser, pipeWriter})
 	return &ioextensions.ReadCascadeCloser{Reader: teeReader, Closer: closer}, pipeReader
 }
+
+// newTeeReadCloserDirectIO is newTeeReadCloser for the DIRECT_IO read path: it buffers writes to
+// the second consumer (page verification) into WALG_DIRECT_IO_BLOCK_COUNT-sized blocks so the
+// verifier is woken once per O_DIRECT block instead of once per io.Copy chunk.
+func newTeeReadCloserDirectIO(readCloser io.ReadCloser) (io.ReadCloser, io.ReadCloser) {
+	pipeReader, pipeWriter := io.Pipe()
+
+	blockSize := viper.GetInt(conf.DirectIOBlockCountSetting) * directio.BlockSize
+	bufferedWriter := bufio.NewWriterSize(pipeWriter, blockSize)
+	teeReader := io.TeeReader(readCloser, bufferedWriter)
+
+	// Flush the bufferedWriter before the pipe writer is closed so the final
+	// partial block reaches the verifier.
+	closer := ioextensions.NewMultiCloser([]io.Closer{
+		readCloser,
+		closerFunc(func() error {
+			if err := bufferedWriter.Flush(); err != nil {
+				return err
+			}
+			return pipeWriter.Close()
+		}),
+	})
+	return &ioextensions.ReadCascadeCloser{Reader: teeReader, Closer: closer}, pipeReader
+}
+
+// closerFunc adapts a function to io.Closer.
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }

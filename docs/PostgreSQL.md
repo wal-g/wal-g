@@ -27,6 +27,11 @@ To configure how many times failed file will be retried during ```backup-fetch``
 
 An experimental feature that allows you to perform direct_io reads during a ```backup-push``` without flushing the disk cache. To activate it, set the value of the environment variable to `true`.
 
+* `WALG_DIRECT_IO_BLOCK_COUNT`
+
+Set number of disk blocks read and processed in a single batch with direct_io during a ```backup-push```. Default 32 blocks is 32 * 4kb = 128kb
+single read. Larger reads reduce syscall CPU costs and improve throughput at the expense of higher memory consumption.
+
 * `WALG_PREFETCH_DIR`
 
 By default WAL prefetch is storing prefetched data in pg_wal directory. This ensures that WAL can be easily moved from prefetch location to actual WAL consumption directory. But it may have negative consequences if you use it with pg_rewind in PostgreSQL 13.
