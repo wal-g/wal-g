@@ -1,5 +1,4 @@
 FROM wal-g/golang:latest AS build
-ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 RUN apt-get update && \
@@ -13,7 +12,6 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
-ENV USE_BROTLI=1
 
 RUN wget https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-x86_64.tar.gz && \
     tar xf cmake-3.31.0-linux-x86_64.tar.gz -C /usr --strip-components=1
@@ -25,10 +23,7 @@ RUN cd tmp/brotli && \
     cmake .. && \
     make && make install
 
-RUN cd main/etcd && \
-    go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
-
-RUN make etcd_build
+RUN USE_BROTLI=1 make etcd_build
 
 FROM wal-g/etcd:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/etcd/wal-g /usr/bin
