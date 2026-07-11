@@ -93,7 +93,7 @@ func HandleWALFetch(ctx context.Context,
 		time.Sleep(2 * time.Millisecond)
 	}
 
-	tracelog.DebugLogger.Printf("Statring external storage downlaod for file %s at %v", walFileName, time.Now())
+	tracelog.DebugLogger.Printf("Statring external storage download for file %s at %v", walFileName, time.Now())
 	return internal.DownloadFileTo(ctx, reader, walFileName, location)
 }
 
