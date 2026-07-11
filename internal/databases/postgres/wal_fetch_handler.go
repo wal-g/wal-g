@@ -27,10 +27,10 @@ func (err InvalidWalFileMagicError) Error() string {
 }
 
 // TODO : unit tests
-// HandleWALFetch is invoked to performa wal-g wal-fetch
+// HandleWALFetch is invoked to perform wal-g wal-fetch
 func HandleWALFetch(ctx context.Context,
 	baseReader internal.StorageFolderReader, walFileName string, location string, prefetcher WalPrefetcher) error {
-	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s)\n", walFileName, location)
+	tracelog.DebugLogger.Printf("HandleWALFetch in folder with walFileName=%s, location=%s)\n", walFileName, location)
 	reader := baseReader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
 	defer prefetcher.Prefetch(ctx, baseReader, walFileName, location)
@@ -86,11 +86,14 @@ func HandleWALFetch(ctx context.Context,
 		} else if os.IsNotExist(err) {
 			break // Normal startup path
 		} else {
-			break // Abnormal path. Permission denied etc. Yes, I know that previous 'else' can be eliminated.
+			// Abnormal path. Permission denied etc.
+			tracelog.ErrorLogger.Printf("Prefetch file %s attempt erroneous: %v", location, err)
+			break
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
 
+	tracelog.DebugLogger.Printf("Statring external storage downlaod for file %s at %v", walFileName, time.Now())
 	return internal.DownloadFileTo(ctx, reader, walFileName, location)
 }
 
