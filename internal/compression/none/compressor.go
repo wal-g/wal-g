@@ -42,9 +42,5 @@ func (w *Writer) Close() error {
 		return nil
 	}
 	w.isClosed = true
-
-	if closer, ok := w.writer.(io.Closer); ok {
-		return closer.Close()
-	}
 	return nil
 }
