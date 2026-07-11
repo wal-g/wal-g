@@ -1,5 +1,4 @@
 FROM wal-g/golang:latest AS build
-ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 COPY go.mod go.mod
@@ -9,9 +8,9 @@ COPY pkg/ pkg/
 COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
+COPY Makefile Makefile
 
-RUN cd main/mysql && \
-    go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+RUN make mysql_build
 
 FROM wal-g/mariadb:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
