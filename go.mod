@@ -35,7 +35,7 @@ require (
 	github.com/yandex-cloud/go-genproto v0.93.0
 	github.com/yandex-cloud/go-sdk/services/kms v0.0.75
 	github.com/yandex-cloud/go-sdk/v2 v2.132.0
-	go.mongodb.org/mongo-driver v1.17.7
+	go.mongodb.org/mongo-driver v1.17.9
 	golang.org/x/crypto v0.53.0
 	golang.org/x/sync v0.21.0
 	golang.org/x/time v0.15.0
