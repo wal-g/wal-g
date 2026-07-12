@@ -3,9 +3,11 @@
 set -e
 
 readonly CWD=$PWD
+readonly SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 readonly OS=$(uname)
 readonly ARCH=$(uname -m)
-readonly LIBSODIUM_VERSION=${LIBSODIUM_VERSION:-1.0.21}
+readonly LIBSODIUM_DEFAULT_VERSION=$(tr -d '\r\n' < "${SCRIPT_DIR}/.github/versions/libsodium-version")
+readonly LIBSODIUM_VERSION=${LIBSODIUM_VERSION:-${LIBSODIUM_DEFAULT_VERSION}}
 
 test -d tmp/libsodium || mkdir -p tmp/libsodium
 

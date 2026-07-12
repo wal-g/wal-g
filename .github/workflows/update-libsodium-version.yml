@@ -1,0 +1,57 @@
+name: Update libsodium version
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-libsodium-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Resolve latest libsodium release
+        id: libsodium
+        run: |
+          latest_tag=$(curl --retry 5 --retry-delay 0 -fsSL https://api.github.com/repos/jedisct1/libsodium/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')
+
+          case "$latest_tag" in
+            *-RELEASE) latest_version=${latest_tag%-RELEASE} ;;
+            *)
+              echo "Unexpected libsodium release tag: $latest_tag" >&2
+              exit 1
+              ;;
+          esac
+
+          current_version=$(tr -d '\r\n' < .github/versions/libsodium-version)
+
+          echo "current=$current_version" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest_version" >> "$GITHUB_OUTPUT"
+
+          if [ "$current_version" = "$latest_version" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf '%s\n' "$latest_version" > .github/versions/libsodium-version
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create pull request
+        if: steps.libsodium.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/update-libsodium-${{ steps.libsodium.outputs.latest }}
+          delete-branch: true
+          commit-message: "chore: bump libsodium to ${{ steps.libsodium.outputs.latest }}"
+          title: "chore: bump libsodium to ${{ steps.libsodium.outputs.latest }}"
+          body: |
+            Updates the shared libsodium version used by CI and build scripts.
+
+            Current version: `${{ steps.libsodium.outputs.current }}`
+            Latest version: `${{ steps.libsodium.outputs.latest }}`
