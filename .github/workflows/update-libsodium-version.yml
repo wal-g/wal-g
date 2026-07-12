@@ -12,6 +12,7 @@ permissions:
 jobs:
   update-libsodium-version:
     runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'wal-g' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Check out code
         uses: actions/checkout@v7
