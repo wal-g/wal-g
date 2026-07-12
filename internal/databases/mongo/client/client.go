@@ -11,10 +11,9 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/utility"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 var (
@@ -53,8 +52,8 @@ type CmdResponse struct {
 
 // Optime ...
 type OpTime struct {
-	TS   primitive.Timestamp `bson:"ts" json:"ts"`
-	Term int64               `bson:"t" json:"t"`
+	TS   bson.Timestamp `bson:"ts" json:"ts"`
+	Term int64          `bson:"t" json:"t"`
 }
 
 // IsMasterLastWrite ...
@@ -133,14 +132,14 @@ func (m *MongoOplogCursor) Next(ctx context.Context) bool {
 
 // ApplyOplog is used to replay oplog entry.
 type ApplyOplog struct {
-	Operation  string            `bson:"op"`
-	Namespace  string            `bson:"ns"`
-	Object     bson.D            `bson:"o"`
-	Query      bson.D            `bson:"o2,omitempty"`
-	UI         *primitive.Binary `bson:"ui,omitempty"`
-	LSID       bson.Raw          `bson:"lsid,omitempty"`
-	TxnNumber  *int64            `bson:"txnNumber,omitempty"`
-	PrevOpTime bson.Raw          `bson:"prevOpTime,omitempty"`
+	Operation  string       `bson:"op"`
+	Namespace  string       `bson:"ns"`
+	Object     bson.D       `bson:"o"`
+	Query      bson.D       `bson:"o2,omitempty"`
+	UI         *bson.Binary `bson:"ui,omitempty"`
+	LSID       bson.Raw     `bson:"lsid,omitempty"`
+	TxnNumber  *int64       `bson:"txnNumber,omitempty"`
+	PrevOpTime bson.Raw     `bson:"prevOpTime,omitempty"`
 }
 
 // MongoClient implements MongoDriver
@@ -193,7 +192,7 @@ func NewMongoClient(ctx context.Context, uri string, setters ...Option) (*MongoC
 		applyOpsCmd = append(applyOpsCmd, bson.E{Key: "alwaysUpsert", Value: *args.OplogAlwaysUpsert})
 	}
 
-	client, err := mongo.Connect(ctx,
+	client, err := mongo.Connect(
 		options.Client().ApplyURI(uri).
 			SetAppName(driverAppName).
 			SetDirect(true).
@@ -494,9 +493,9 @@ func (mc *MongoClient) ChangeOplogLastTimestamp(ctx context.Context, opTime mode
 func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, opTime models.OpTime) error {
 	minValidCol := mc.c.Database(oplogDatabaseName).Collection("replset.minvalid")
 	var minValue = struct {
-		ID primitive.ObjectID  `bson:"_id,omitempty"`
-		TS primitive.Timestamp `bson:"ts"`
-		T  int64               `bson:"t"`
+		ID bson.ObjectID  `bson:"_id,omitempty"`
+		TS bson.Timestamp `bson:"ts"`
+		T  int64          `bson:"t"`
 	}{}
 
 	if err := minValidCol.FindOne(ctx, bson.M{}).Decode(&minValue); err != nil {
@@ -521,8 +520,8 @@ func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, opTime model
 func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Context) error {
 	otapCol := mc.c.Database(oplogDatabaseName).Collection("replset.oplogTruncateAfterPoint")
 	var otap = struct {
-		ID string              `bson:"_id,omitempty"`
-		TS primitive.Timestamp `bson:"oplogTruncateAfterPoint"`
+		ID string         `bson:"_id,omitempty"`
+		TS bson.Timestamp `bson:"oplogTruncateAfterPoint"`
 	}{}
 
 	if err := otapCol.FindOne(ctx, bson.M{}).Decode(&otap); err != nil {
@@ -530,7 +529,7 @@ func (mc *MongoClient) changeOplogTruncateAfterPointTimestamp(ctx context.Contex
 	}
 	result, err := otapCol.UpdateOne(ctx, bson.M{"_id": otap.ID}, bson.M{
 		"$set": bson.M{
-			"oplogTruncateAfterPoint": primitive.Timestamp{},
+			"oplogTruncateAfterPoint": bson.Timestamp{},
 		},
 	})
 
@@ -560,7 +559,7 @@ func (mc *MongoClient) addNoopToOplog(ctx context.Context, opTime models.OpTime)
 		{Key: "v", Value: 2},
 		{Key: "op", Value: "n"},
 		{Key: "ns", Value: ""},
-		{Key: "wall", Value: primitive.NewDateTimeFromTime(time.Now())},
+		{Key: "wall", Value: bson.NewDateTimeFromTime(time.Now())},
 		{Key: "o", Value: bson.D{
 			{Key: "msg", Value: "manually inserted oplog position"},
 		}},

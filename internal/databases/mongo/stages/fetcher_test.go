@@ -17,8 +17,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
 	mongoMocks "github.com/wal-g/wal-g/internal/databases/mongo/client/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const (
@@ -42,7 +41,7 @@ func TestMain(m *testing.M) {
 }
 
 type oplogMeta struct {
-	TS primitive.Timestamp `bson:"ts"`
+	TS bson.Timestamp `bson:"ts"`
 }
 
 func fillOpsRawData() {
