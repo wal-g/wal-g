@@ -36,8 +36,8 @@ require (
 	github.com/yandex-cloud/go-sdk/services/kms v0.0.75
 	github.com/yandex-cloud/go-sdk/v2 v2.132.0
 	go.mongodb.org/mongo-driver v1.17.9
-	golang.org/x/crypto v0.53.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/crypto v0.54.0
+	golang.org/x/sync v0.22.0
 	golang.org/x/time v0.15.0
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da
 	google.golang.org/api v0.285.0
@@ -61,8 +61,8 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/redis/go-redis/v9 v9.20.1
 	go.uber.org/mock v0.6.0
-	golang.org/x/mod v0.36.0
-	golang.org/x/net v0.56.0
+	golang.org/x/mod v0.37.0
+	golang.org/x/net v0.57.0
 	golang.org/x/sys v0.47.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -188,8 +188,8 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/term v0.44.0 // indirect
-	golang.org/x/text v0.38.0
+	golang.org/x/term v0.45.0 // indirect
+	golang.org/x/text v0.40.0
 	google.golang.org/genproto v0.0.0-20260519071638-aa98bba5eb94 // indirect
 	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
