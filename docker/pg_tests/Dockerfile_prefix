@@ -11,7 +11,7 @@ RUN apt-get update && \
     liblzo2-dev \
     curl
 
-COPY .github/ .github/
+COPY .github/versions/libsodium-version .github/versions/libsodium-version
 COPY go.mod go.mod
 COPY vendor/ vendor/
 COPY internal/ internal/
