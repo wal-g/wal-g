@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type CommandOp struct {
@@ -100,8 +99,8 @@ func NewTxnExec(client *mongo.Client, op *TxnOp) ExecFunc {
 			return NewOpInfo("transaction", op.ID, tm, time.Now(), err)
 		}
 		defer session.EndSession(context.Background())
-		tres, err := session.WithTransaction(ctx, func(sessCtx mongo.SessionContext) (interface{}, error) {
-			return op.callback(sessCtx, client)
+		tres, err := session.WithTransaction(ctx, func(ctx context.Context) (interface{}, error) {
+			return op.callback(ctx, client)
 		})
 
 		info := NewOpInfo("transaction", op.ID, tm, time.Now(), err)
@@ -142,9 +141,9 @@ func NewSleepExec(client *mongo.Client, op *SleepOp) ExecFunc {
 				var result bson.M
 				tm := time.Now()
 				doc := bson.D{
-					primitive.E{Key: "find", Value: "sleep_temp"},
-					primitive.E{Key: "filter", Value: bson.D{
-						primitive.E{Key: "$where", Value: fmt.Sprintf("sleep(%f)", op.Duration)}}},
+					bson.E{Key: "find", Value: "sleep_temp"},
+					bson.E{Key: "filter", Value: bson.D{
+						bson.E{Key: "$where", Value: fmt.Sprintf("sleep(%f)", op.Duration)}}},
 				}
 				err := db.RunCommand(ctx, doc).Decode(&result)
 				info := NewOpInfo(doc[0].Key, op.ID, tm, time.Now(), err)
@@ -170,12 +169,12 @@ func NewAbortOp(cd RawMongoOp) (*AbortOp, error) {
 func NewAbortExec(_ *mongo.Client, op *AbortOp) ExecFunc {
 	return func(ctx context.Context) OpInfo {
 		t := time.Time{}
-		sessCtx, ok := ctx.(mongo.SessionContext)
-		if !ok {
-			return OpInfo{err: fmt.Errorf("expected sessioinContext instance")}
+		session := mongo.SessionFromContext(ctx)
+		if session == nil {
+			return OpInfo{err: fmt.Errorf("expected session context")}
 		}
 
-		err := sessCtx.AbortTransaction(sessCtx)
+		err := session.AbortTransaction(ctx)
 		return NewOpInfo("abort", op.ID, t, time.Time{}, err)
 	}
 }

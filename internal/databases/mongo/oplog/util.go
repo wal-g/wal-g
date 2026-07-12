@@ -5,7 +5,7 @@ import (
 	"slices"
 
 	"github.com/mongodb/mongo-tools/common/db"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // filterUUIDs recursively removes 'ui' entries from ops, including nested applyOps ops.

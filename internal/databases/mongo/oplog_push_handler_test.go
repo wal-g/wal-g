@@ -16,7 +16,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	mocks "github.com/wal-g/wal-g/internal/databases/mongo/stages/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stats"
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type fetcherReturn struct {

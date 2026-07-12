@@ -6,8 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const (
@@ -22,8 +21,8 @@ type Timestamp struct {
 	Inc uint32 `json:"Inc"`
 }
 
-func (ots Timestamp) ToBsonTS() primitive.Timestamp {
-	return primitive.Timestamp{
+func (ots Timestamp) ToBsonTS() bson.Timestamp {
+	return bson.Timestamp{
 		T: ots.TS,
 		I: ots.Inc,
 	}
@@ -78,13 +77,13 @@ func Equal(ots1, ots2 Timestamp) bool {
 }
 
 // TimestampFromBson builds Timestamp from BSON primitive
-func TimestampFromBson(bts primitive.Timestamp) Timestamp {
+func TimestampFromBson(bts bson.Timestamp) Timestamp {
 	return Timestamp{TS: bts.T, Inc: bts.I}
 }
 
 // BsonTimestampFromOplogTS builds BSON primitive from Timestamp
-func BsonTimestampFromOplogTS(ots Timestamp) primitive.Timestamp {
-	return primitive.Timestamp{T: ots.TS, I: ots.Inc}
+func BsonTimestampFromOplogTS(ots Timestamp) bson.Timestamp {
+	return bson.Timestamp{T: ots.TS, I: ots.Inc}
 }
 
 // Oplog represents oplog raw and parsed metadata.
