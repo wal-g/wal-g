@@ -1,4 +1,9 @@
 version: 2
+
+# External release archives such as libsodium are updated by
+# .github/workflows/update-libsodium-version.yml because Dependabot only
+# supports manifest-backed ecosystems and GitHub Actions references.
+
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
