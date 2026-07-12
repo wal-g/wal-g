@@ -44,7 +44,7 @@ jobs:
 
       - name: Create pull request
         if: steps.libsodium.outputs.updated == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/update-libsodium-${{ steps.libsodium.outputs.latest }}
           delete-branch: true
