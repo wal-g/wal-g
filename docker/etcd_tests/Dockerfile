@@ -23,7 +23,7 @@ RUN cd tmp/brotli && \
     cmake .. && \
     make && make install
 
-RUN USE_BROTLI=1 make etcd_build
+RUN USE_BROTLI=1 make ENABLE_RACE_DETECTION=1 etcd_build
 
 FROM wal-g/etcd:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/etcd/wal-g /usr/bin

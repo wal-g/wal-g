@@ -11,7 +11,7 @@ COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
 
-RUN USE_BROTLI=1 make fdb_build
+RUN USE_BROTLI=1 make ENABLE_RACE_DETECTION=1 fdb_build
 
 FROM foundationdb/foundationdb:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/fdb/wal-g /usr/bin
