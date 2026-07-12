@@ -11,7 +11,7 @@ COPY utility/ utility/
 COPY Makefile Makefile
 
 # we test wal-g logic, not our deps. So, no brotli in these tests.
-RUN make gp_build
+RUN make ENABLE_RACE_DETECTION=1 gp_build
 
 FROM wal-g/gp:latest
 
