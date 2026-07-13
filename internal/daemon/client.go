@@ -63,15 +63,16 @@ func SendCommand(opts *RunOptions) (SocketMessageType, error) {
 		return ErrorType, fmt.Errorf("unix socket write error: %w", err)
 	}
 
-	// The daemon always sends exactly one response byte (OkType, ErrorType, or
-	// ArchiveNonExistenceType). Reading a fixed 512-byte buffer risks silently
-	// misclassifying a multi-byte error payload if its first byte collides with a
-	// known type constant. Read exactly one byte instead.
 	resp := make([]byte, 1)
-	_, err = socketConnection.Read(resp)
+	n, err := socketConnection.Read(resp)
 	if err != nil {
 		return ErrorType, fmt.Errorf("unix socket read error: %w", err)
 	}
+
+	if n < 1 {
+		return ErrorType, fmt.Errorf("daemon response error [message type: %v, args: %v]", string(opts.MessageType), opts.MessageArgs)
+	}
+
 	if !OkType.IsEqual(resp[0]) {
 		return SocketMessageType(resp[0]), fmt.Errorf("daemon command run error [message type: %v, args: %v, daemon response: %v]",
 			string(opts.MessageType), opts.MessageArgs, string(resp[0]))
