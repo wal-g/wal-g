@@ -132,6 +132,7 @@ services:
       &&  mkdir -p /export/mysqlbinlogreplaybucket
       &&  mkdir -p /export/mysql-pitr-binlogserver-bucket
       &&  mkdir -p /export/mysql-pitr-binlogserver-reconnection-bucket
+      &&  mkdir -p /export/mysql-pitr-binlogserver-until-lmt-bucket
       &&  mkdir -p /export/mysqlpitrxtrabackupbucket
       &&  mkdir -p /export/mysqlpitrmysqldumpbucket
       &&  mkdir -p /export/mysqllivereplay
