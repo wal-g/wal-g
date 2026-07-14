@@ -75,12 +75,17 @@ func parseArgs(args []string) (*commandOpts, *flag.FlagSet, error) {
 	opts.SocketName = args[0]
 
 	command := strings.ToLower(args[1])
-	cmd, ok := commands[command]
+	template, ok := commands[command]
 	if !ok {
 		return nil, fs, fmt.Errorf("unsupported command %v", command)
 	}
 
-	cmd.name = command
+	cmd := &commandOpts{
+		name:    command,
+		msgType: template.msgType,
+		args:    template.args,
+	}
+
 	if len(args) < 2+len(cmd.args) {
 		return cmd, fs, errCommandArguments
 	}
