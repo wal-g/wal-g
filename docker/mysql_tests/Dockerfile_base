@@ -16,8 +16,6 @@ RUN cd main/mysql && \
 FROM wal-g/mysql:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
 
-RUN mkdir /root/testtools
-
 COPY docker/mysql_tests/scripts/ /tmp
 
 CMD /tmp/run_integration_tests.sh  -p /tmp/base_tests
