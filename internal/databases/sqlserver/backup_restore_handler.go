@@ -27,7 +27,7 @@ func HandleBackupRestore(ctx context.Context, backupName string, dbnames []strin
 	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	db, err := getSQLServerConnection()
+	db, err := getSQLServerConnection(ctx)
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
@@ -70,11 +70,11 @@ func restoreSingleDatabase(ctx context.Context,
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 	sql := fmt.Sprintf("RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY", quoteName(dbname), urls)
-	files, err := listDatabaseFiles(db, urls)
+	files, err := listDatabaseFiles(ctx, db, urls)
 	if err != nil {
 		return err
 	}
-	datadir, logdir, err := GetDefaultDataLogDirs(db)
+	datadir, logdir, err := GetDefaultDataLogDirs(ctx, db)
 	if err != nil {
 		return err
 	}

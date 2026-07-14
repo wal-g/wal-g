@@ -23,8 +23,8 @@
 /internal/databases/mysql/ @mialinx @ostinru @teem0n @noname0443
 /cmd/mysql/ @mialinx @ostinru @teem0n @noname0443
 
-/internal/databases/sqlserver/ @mialinx @ostinru @teem0n
-/cmd/sqlserver/ @mialinx @ostinru @teem0n
+/internal/databases/sqlserver/ @mialinx @ostinru @teem0n @chipitsine
+/cmd/sqlserver/ @mialinx @ostinru @teem0n @chipitsine
 
 /internal/databases/mongo/ @perekalov @VGoshev @Apelsin234 @kronwerk @NotAmigo
 /cmd/mongo/ @perekalov @VGoshev @Apelsin234 @kronwerk @NotAmigo
