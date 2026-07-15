@@ -45,7 +45,7 @@ require (
 )
 
 require (
-	github.com/ProtonMail/go-crypto v1.3.0
+	github.com/ProtonMail/go-crypto v1.4.1
 	github.com/RoaringBitmap/roaring/v2 v2.18.2
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.5.2
 	github.com/aliyun/credentials-go v1.4.12
