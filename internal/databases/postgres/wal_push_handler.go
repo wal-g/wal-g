@@ -34,7 +34,7 @@ func (err CantOverwriteWalFileError) Error() string {
 
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath string) error {
+func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath string) (retErr error) {
 	if uploader.ArchiveStatusManager.IsWalAlreadyUploaded(walFilePath) {
 		if err := uploader.ArchiveStatusManager.UnmarkWalFile(walFilePath); err != nil {
 			tracelog.ErrorLogger.Printf("unmark wal-g status for %s file failed due following error %+v", walFilePath, err)
@@ -56,14 +56,16 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 	bgUploader := NewBgUploader(ctx, walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
+	defer func() {
+		if err := bgUploader.Stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
 	if err := uploadWALFile(ctx, uploader, walFilePath, preventWalOverwrite); err != nil {
 		return err
 	}
 	if err := uploadLocalWalMetadata(ctx, walFilePath, uploader.Uploader); err != nil {
-		return err
-	}
-	if err := bgUploader.Stop(); err != nil {
 		return err
 	}
 	statistics.WriteS3UploadTimeMetric(time.Since(uploadStart))
