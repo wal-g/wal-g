@@ -177,10 +177,10 @@ func createRestorePoint(ctx context.Context, conn *pgx.Conn, restorePointName st
 						var pgOptions, switchFunction string
 						if gpVersion.Flavor == Greenplum && gpVersion.Major == 6 {
 							pgOptions = "-c gp_session_role=utility"
-							switchFunction = "pg_switch_xlog()"
+							switchFunction = "pg_catalog.pg_switch_xlog()"
 						} else {
 							pgOptions = "-c gp_role=utility"
-							switchFunction = "pg_switch_wal()"
+							switchFunction = "pg_catalog.pg_switch_wal()"
 						}
 						return fmt.Sprintf("PGOPTIONS='%s' psql -h %s -p %d -d postgres -c 'select %s;'",
 							pgOptions, seg[0].Hostname, seg[0].Port, switchFunction,
