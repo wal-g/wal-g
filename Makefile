@@ -231,7 +231,12 @@ fdb_integration_test: load_docker_common
 	docker compose build fdb_tests
 	docker compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
 
-redis_test: deps redis_build unlink_brotli redis_integration_test
+# Redis integration tests build a Brotli-enabled test image. Keep the Brotli
+# sources and static libraries linked until that image build finishes.
+redis_test:
+	@set -e; \
+	$(MAKE) USE_BROTLI=1 deps redis_build redis_integration_test; \
+	$(MAKE) USE_BROTLI=1 unlink_brotli
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")

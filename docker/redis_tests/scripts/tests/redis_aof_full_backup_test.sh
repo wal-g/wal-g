@@ -12,7 +12,7 @@ sleep $REDIS_TIMEOUT # Wait for aof files
 expected_output=$(redis-cli get key)
 
 mkdir $WALG_FILE_PREFIX
-wal-g aof-backup-push
+wal-g backup-push --type aof
 
 ensure aof $(wal-g backup-info --tag BackupType LATEST)
 
@@ -22,7 +22,7 @@ touch /var/lib/redis/fake.aof
 touch /var/lib/redis/fake.rdb
 mkdir /var/lib/redis/appendonlydir
 touch /var/lib/redis/appendonlydir/fake.tmp
-wal-g aof-backup-fetch LATEST 7.2.5
+wal-g backup-fetch LATEST --type aof --redis-version 7.2.5
 ensure no $(test -e /var/lib/redis/fake.aof && echo "yes" || echo "no")
 ensure no $(test -e /var/lib/redis/fake.rdb && echo "yes" || echo "no")
 ensure no $(test -e /var/lib/redis/appendonlydir/fake.tmp && echo "yes" || echo "no")

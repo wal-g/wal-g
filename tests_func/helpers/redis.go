@@ -87,8 +87,7 @@ func (rc *RedisCtl) WriteTestData(mark string, docsCount int) error {
 }
 
 func (rc *RedisCtl) PushBackup(backupType string) (string, error) {
-	cmd := fmt.Sprintf("%s-backup-push", backupType)
-	exec, err := rc.runCmd([]string{cmd})
+	exec, err := rc.runCmd([]string{"backup-push", "--type", backupType})
 	if err != nil {
 		return "", err
 	}

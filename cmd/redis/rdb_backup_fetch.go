@@ -1,64 +1,98 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/databases/redis"
+	redisdb "github.com/wal-g/wal-g/internal/databases/redis"
 )
 
 const (
-	backupFetchShortDescription = "Fetches desired rdb backup from storage"
-	SkipCleanFlag               = "skip-clean"
-	SkipCleanShorthand          = "s"
+	backupFetchShortDescription   = "Fetches a Redis backup from storage"
+	SkipCleanFlag                 = "skip-clean"
+	SkipCleanShorthand            = "s"
+	SkipBackupDownloadFlag        = "skip-backup-download"
+	SkipBackupDownloadDescription = "Skip backup download"
+	SkipChecksFlag                = "skip-checks"
+	SkipChecksDescription         = "Skip checking Redis version compatibility with the backup"
+	redisVersionFlag              = "redis-version"
 )
 
 var (
-	skipClean bool
+	skipClean              bool
+	skipBackupDownloadFlag bool
+	skipCheckFlag          bool
+	redisVersion           string
 )
 
 var backupFetchCmd = &cobra.Command{
-	Use:   "backup-fetch backup-name",
-	Short: backupFetchShortDescription,
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		internal.ConfigureLimiters()
-		ctx := cmd.Context()
+	Use:     "backup-fetch backup-name",
+	Short:   backupFetchShortDescription,
+	Args:    cobra.ExactArgs(1),
+	PreRunE: validateBackupFetch,
+	RunE:    runBackupFetch,
+}
 
-		storage, err := internal.ConfigureStorage(cmd.Context())
-		tracelog.ErrorLogger.FatalOnError(err)
+func validateBackupFetch(cmd *cobra.Command, args []string) error {
+	if err := validateBackupType(cmd, args); err != nil {
+		return err
+	}
+	if (backupType == aofBackupType || backupType == aofTSBackupType) && redisVersion == "" {
+		return fmt.Errorf("--%s is required for backup type %q", redisVersionFlag, backupType)
+	}
+	if backupType == rdbBackupType || backupType == rdbTSBackupType {
+		conf.RequiredSettings[conf.NameStreamRestoreCmd] = true
+		return internal.AssertRequiredSettingsSet()
+	}
+	return nil
+}
 
-		var cmdArgs []string
-		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd, cmdArgs...)
-		tracelog.ErrorLogger.FatalOnError(err)
-		tracelog.InfoLogger.Print(restoreCmd.String())
+func runBackupFetch(cmd *cobra.Command, args []string) error {
+	internal.ConfigureLimiters()
 
-		redisPassword, ok := conf.GetSetting(conf.RedisPassword)
-		if ok && redisPassword != "" { // special hack for redis-cli
-			restoreCmd.Env = append(restoreCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
-		}
+	switch backupType {
+	case rdbBackupType:
+		return runRDBBackupFetch(cmd.Context(), args[0])
+	case aofBackupType:
+		return runAOFBackupFetch(cmd.Context(), args[0])
+	case rdbTSBackupType, aofTSBackupType, tsBackupType:
+		return fmt.Errorf("redis backup type %q is not available until tiered-storage support is enabled", backupType)
+	default:
+		return fmt.Errorf("unsupported redis backup type %q", backupType)
+	}
+}
 
-		restoreCmd.Stdout = os.Stdout
-		restoreCmd.Stderr = os.Stderr
+func runRDBBackupFetch(ctx context.Context, backupName string) error {
+	storage, err := internal.ConfigureStorage(ctx)
+	if err != nil {
+		return err
+	}
 
-		err = redis.HandleBackupFetch(ctx, storage.RootFolder(), args[0], restoreCmd, skipClean)
-		tracelog.ErrorLogger.FatalOnError(err)
-	},
+	restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)
+	if err != nil {
+		return err
+	}
+
+	redisPassword, ok := conf.GetSetting(conf.RedisPassword)
+	if ok && redisPassword != "" {
+		restoreCmd.Env = append(restoreCmd.Env, fmt.Sprintf("REDISCLI_AUTH=%s", redisPassword))
+	}
+	restoreCmd.Stdout = os.Stdout
+	restoreCmd.Stderr = os.Stderr
+
+	return redisdb.HandleBackupFetch(ctx, storage.RootFolder(), backupName, restoreCmd, skipClean)
 }
 
 func init() {
+	backupFetchCmd.Flags().BoolVarP(&skipClean, SkipCleanFlag, SkipCleanShorthand, false, "Skip data folder clean check")
+	backupFetchCmd.Flags().BoolVar(&skipBackupDownloadFlag, SkipBackupDownloadFlag, false, SkipBackupDownloadDescription)
+	backupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
+	backupFetchCmd.Flags().StringVar(&redisVersion, redisVersionFlag, "", "Redis version for AOF backup compatibility checks")
+	backupFetchCmd.Flags().StringVarP(&backupType, typeFlag, typeShorthand, rdbBackupType,
+		"Backup type: rdb, aof, rdb_ts, aof_ts, or ts")
 	cmd.AddCommand(backupFetchCmd)
-
-	rdbBackupFetchCmd := &cobra.Command{
-		Use:   "rdb-backup-fetch backup-name",
-		Short: backupFetchCmd.Short,
-		Args:  backupFetchCmd.Args,
-		Run:   backupFetchCmd.Run,
-	}
-	rdbBackupFetchCmd.Flags().BoolVarP(&skipClean, SkipCleanFlag, SkipCleanShorthand, false, "Skip data folder clean check")
-	cmd.AddCommand(rdbBackupFetchCmd)
 }

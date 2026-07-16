@@ -31,13 +31,18 @@ WAL-G redis extension currently supports these commands:
 
 ### ``backup-push``
 
-Creates new backup and send it to storage.
+Creates and uploads a Redis backup. The `--type` (`-t`) flag selects its payload:
 
-Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
+- `rdb` (default): an RDB stream produced by `WALG_STREAM_CREATE_COMMAND`.
+- `aof`: Redis AOF files.
+- `rdb_ts`, `aof_ts`, and `ts`: reserved for Valkey tiered-storage backups and are unavailable until tiered-storage support is enabled.
 
 ```bash
-wal-g backup-push
+wal-g redis backup-push --type rdb
+wal-g redis backup-push --type aof
 ```
+
+The legacy `rdb-backup-push` and `aof-backup-push` commands have been removed.
 
 ### `backup-list`
 
@@ -49,13 +54,16 @@ wal-g backup-list
 
 ### `backup-fetch`
 
-Fetches backup from storage and restores passes data to `WALG_STREAM_RESTORE_COMMAND` to restore backup.
-
-User should specify the name of the backup to fetch.
+Fetches a backup by name. Use `--type rdb` (the default) to restore through
+`WALG_STREAM_RESTORE_COMMAND`; use `--type aof --redis-version <version>` for
+an AOF restore. `--redis-version` is required for AOF compatibility checks.
 
 ```bash
-wal-g backup-fetch example_backup
+wal-g redis backup-fetch example_backup --type rdb
+wal-g redis backup-fetch example_backup --type aof --redis-version 7.2
 ```
+
+The legacy `rdb-backup-fetch` and `aof-backup-fetch` commands have been removed.
 
 ### `delete`
 

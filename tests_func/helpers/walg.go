@@ -172,7 +172,7 @@ func (w *WalgUtil) FetchAofBackupByNum(backupNum int, version string) error {
 	if err != nil {
 		return err
 	}
-	_, err = w.runCmd("aof-backup-fetch", backup, version)
+	_, err = w.runCmd("backup-fetch", backup, "--type", "aof", "--redis-version", version)
 	if err != nil {
 		return err
 	}

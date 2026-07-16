@@ -23,6 +23,7 @@ func HandleRDBBackupPush(ctx context.Context, args RDBBackupPushArgs) error {
 
 	redisUploader := rdb.NewRedisStorageUploader(args.Uploader)
 	uploadArgs := rdb.UploadBackupArgs{
+		BackupName:      rdb.GenerateNewBackupName(),
 		Cmd:             args.BackupCmd,
 		MetaConstructor: args.MetaConstructor,
 		Sharded:         args.Sharded,
