@@ -194,18 +194,18 @@ FROM
       relfilenode, 
       relnamespace 
     FROM 
-      pg_class 
-      JOIN pg_appendonly ON oid OPERATOR(pg_catalog.=) relid
+      pg_catalog.pg_class
+      JOIN pg_catalog.pg_appendonly ON oid OPERATOR(pg_catalog.=) relid
   ) a, 
   (
     SELECT 
       relname, 
       segrelid 
     FROM 
-      pg_class 
-      JOIN pg_appendonly ON oid OPERATOR(pg_catalog.=) segrelid
+      pg_catalog.pg_class 
+      JOIN pg_catalog.pg_appendonly ON oid OPERATOR(pg_catalog.=) segrelid
   ) b, 
-  pg_namespace n 
+  pg_catalog.pg_namespace n 
 WHERE 
   a.relpersistence OPERATOR(pg_catalog.=) 'p' 
   AND a.segrelid OPERATOR(pg_catalog.=) b.segrelid 
@@ -247,7 +247,7 @@ func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo(ctx context.Context
 		}
 	}()
 
-	rows, err := conn.Query(ctx, "SELECT datname, oid FROM pg_database WHERE datallowconn")
+	rows, err := conn.Query(ctx, "SELECT datname, oid FROM pg_catalog.pg_database WHERE datallowconn")
 	if err != nil {
 		return nil, err
 	}

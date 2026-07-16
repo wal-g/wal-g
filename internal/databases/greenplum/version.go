@@ -26,6 +26,10 @@ type Version struct {
 	Flavor Flavor // Note: can be '' for old backups
 }
 
+func (v Version) String() string {
+	return fmt.Sprintf("%s (%s)", v.Flavor.String(), v.Version.String())
+}
+
 func NewVersion(v *version.Version, flavor Flavor) Version {
 	return Version{
 		Version: v,
