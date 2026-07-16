@@ -17,7 +17,22 @@ import (
 const (
 	RDBBackupType = "rdb"
 	AOFBackupType = "aof"
+	TSBackupType  = "ts"
 )
+
+const tsDataDirectory = "ts_data"
+
+func AttachedTSDataPrefix(backupName string) string {
+	return backupName + "/" + tsDataDirectory
+}
+
+func AttachedTSSentinelName(backupName string) string {
+	return backupName + "/" + tsDataDirectory + "_backup_stop_sentinel.json"
+}
+
+func GenerateNewTSBackupName() string {
+	return "ts_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+}
 
 // Backup represents backup sentinel data
 type Backup struct {
@@ -33,6 +48,12 @@ type Backup struct {
 	UsedMemory      int64       `json:"UsedMemory,omitempty"`
 	UsedMemoryRss   int64       `json:"UsedMemoryRss,omitempty"`
 	MaxDBNumber     int64       `json:"MaxDBNumber"`
+	TSBackupID      string      `json:"TSBackupID,omitempty"`
+	TSBackupPath    string      `json:"TSBackupPath,omitempty"`
+	TSDataSize      int64       `json:"TSDataSize,omitempty"`
+	TSFileCount     int64       `json:"TSFileCount,omitempty"`
+	TSStartTime     time.Time   `json:"TSStartTime,omitempty"`
+	TSFinishTime    time.Time   `json:"TSFinishTime,omitempty"`
 }
 
 func (b Backup) Name() string {
@@ -119,6 +140,26 @@ func (b Backup) PrintableFields() []printlist.TableField {
 			Name:       "used_memory_rss",
 			PrettyName: "Used memory (as seen by OS))",
 			Value:      strconv.FormatInt(b.UsedMemoryRss, 10),
+		},
+		{
+			Name:       "ts_backup_id",
+			PrettyName: "TS backup ID",
+			Value:      b.TSBackupID,
+		},
+		{
+			Name:       "ts_backup_path",
+			PrettyName: "TS backup path",
+			Value:      b.TSBackupPath,
+		},
+		{
+			Name:       "ts_data_size",
+			PrettyName: "TS data size",
+			Value:      strconv.FormatInt(b.TSDataSize, 10),
+		},
+		{
+			Name:       "ts_file_count",
+			PrettyName: "TS file count",
+			Value:      strconv.FormatInt(b.TSFileCount, 10),
 		},
 	}
 }

@@ -27,6 +27,7 @@ var (
 	skipBackupDownloadFlag bool
 	skipCheckFlag          bool
 	redisVersion           string
+	tsFetchBackup          string
 )
 
 var backupFetchCmd = &cobra.Command{
@@ -44,9 +45,26 @@ func validateBackupFetch(cmd *cobra.Command, args []string) error {
 	if (backupType == aofBackupType || backupType == aofTSBackupType) && redisVersion == "" {
 		return fmt.Errorf("--%s is required for backup type %q", redisVersionFlag, backupType)
 	}
+	if err := validateTSBackupFetchInput(); err != nil {
+		return err
+	}
 	if backupType == rdbBackupType || backupType == rdbTSBackupType {
 		conf.RequiredSettings[conf.NameStreamRestoreCmd] = true
 		return internal.AssertRequiredSettingsSet()
+	}
+	return nil
+}
+
+func validateTSBackupFetchInput() error {
+	switch backupType {
+	case rdbBackupType, aofBackupType:
+		if tsFetchBackup != "" {
+			return fmt.Errorf("--%s is only valid for tiered-storage backup types", tsBackupFlag)
+		}
+	case rdbTSBackupType, aofTSBackupType, tsBackupType:
+		if tsFetchBackup == "" {
+			return fmt.Errorf("--%s is required for backup type %q", tsBackupFlag, backupType)
+		}
 	}
 	return nil
 }
@@ -92,6 +110,7 @@ func init() {
 	backupFetchCmd.Flags().BoolVar(&skipBackupDownloadFlag, SkipBackupDownloadFlag, false, SkipBackupDownloadDescription)
 	backupFetchCmd.Flags().BoolVar(&skipCheckFlag, SkipChecksFlag, false, SkipChecksDescription)
 	backupFetchCmd.Flags().StringVar(&redisVersion, redisVersionFlag, "", "Redis version for AOF backup compatibility checks")
+	backupFetchCmd.Flags().StringVar(&tsFetchBackup, tsBackupFlag, "", "Tiered-storage restore directory")
 	backupFetchCmd.Flags().StringVarP(&backupType, typeFlag, typeShorthand, rdbBackupType,
 		"Backup type: rdb, aof, rdb_ts, aof_ts, or ts")
 	cmd.AddCommand(backupFetchCmd)

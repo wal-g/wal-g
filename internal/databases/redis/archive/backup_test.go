@@ -19,6 +19,10 @@ func TestBackup_PrintableFields(t *testing.T) {
 		UserData:        []string{"a", "b", "c"},
 		Version:         "4.5.4",
 		BackupType:      "rdb",
+		TSBackupID:      "ts-id",
+		TSBackupPath:    "/var/lib/redis/ext/ts-id",
+		TSDataSize:      300000,
+		TSFileCount:     17,
 	}
 	got := b.PrintableFields()
 	prettyStartTime := "Wednesday, 23-Aug-23 17:18:31 UTC"
@@ -88,6 +92,30 @@ func TestBackup_PrintableFields(t *testing.T) {
 			Name:        "used_memory_rss",
 			PrettyName:  "Used memory (as seen by OS))",
 			Value:       "0",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "ts_backup_id",
+			PrettyName:  "TS backup ID",
+			Value:       "ts-id",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "ts_backup_path",
+			PrettyName:  "TS backup path",
+			Value:       "/var/lib/redis/ext/ts-id",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "ts_data_size",
+			PrettyName:  "TS data size",
+			Value:       "300000",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "ts_file_count",
+			PrettyName:  "TS file count",
+			Value:       "17",
 			PrettyValue: nil,
 		},
 	}

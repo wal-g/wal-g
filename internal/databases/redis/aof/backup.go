@@ -3,13 +3,11 @@ package aof
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	"github.com/wal-g/wal-g/internal/databases/redis/pin"
 	"github.com/wal-g/wal-g/internal/diskwatcher"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -26,39 +24,10 @@ func GenerateNewBackupName() string {
 	return "aof_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
 }
 
-type FilesPinner struct {
-	pinFolder   string
-	pinnedPaths []string
-}
+type FilesPinner = pin.FilesPinner
 
 func NewFilesPinner(path string) *FilesPinner {
-	return &FilesPinner{
-		pinFolder: path,
-	}
-}
-
-func (p *FilesPinner) Pin(paths []string) ([]string, error) {
-	for _, path := range paths {
-		filename := filepath.Base(path)
-		pinnedPath := filepath.Join(p.pinFolder, filename)
-		if path != pinnedPath {
-			err := os.Link(path, pinnedPath)
-			if err != nil {
-				return nil, errors.Wrapf(err, "failed to pin file %s", path)
-			}
-		}
-		p.pinnedPaths = append(p.pinnedPaths, pinnedPath)
-	}
-	return p.pinnedPaths, nil
-}
-
-func (p *FilesPinner) Unpin() {
-	for _, path := range p.pinnedPaths {
-		err := os.Remove(path)
-		if err != nil {
-			tracelog.ErrorLogger.Printf("failed to remove pinned file %s: %v", path, err)
-		}
-	}
+	return pin.NewFilesPinner(path)
 }
 
 func CreateBackupService(diskWatcher *diskwatcher.DiskWatcher, uploader *internal.ConcurrentUploader,
