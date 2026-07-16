@@ -510,15 +510,11 @@ func getGpClusterInfo(ctx context.Context, conn *pgx.Conn) (
 		return globalCluster, Version{}, nil, err
 	}
 
-	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
+	version, err = queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return globalCluster, Version{}, nil, err
 	}
-	tracelog.InfoLogger.Printf("Greenplum version: %s", versionStr)
-	version, err = parseGreenplumVersion(versionStr)
-	if err != nil {
-		return globalCluster, Version{}, nil, err
-	}
+	tracelog.InfoLogger.Printf("Greenplum version: %s", version)
 
 	segConfigs, err := queryRunner.GetGreenplumSegmentsInfo(ctx)
 	if err != nil {

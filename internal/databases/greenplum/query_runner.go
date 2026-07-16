@@ -67,13 +67,9 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(
 	restorePointName string,
 ) (restoreLSNs map[int]string, err error) {
 	conn := queryRunner.Connection
-	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
+	version, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting version: %w", err)
-	}
-	version, err := parseGreenplumVersion(versionStr)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing version: %w", err)
 	}
 
 	createRestorePointQuery, err := queryRunner.buildCreateGreenplumRestorePoint(restorePointName, version)
@@ -155,12 +151,19 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) 
 }
 
 // GetGreenplumVersion returns version
-func (queryRunner *GpQueryRunner) GetGreenplumVersion(ctx context.Context) (version string, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumVersion(ctx context.Context) (Version, error) {
 	conn := queryRunner.Connection
-	err = conn.QueryRow(ctx, "SELECT pg_catalog.version()").Scan(&version)
-	if err != nil {
-		return "", err
+
+	var versionStr string
+	if err := conn.QueryRow(ctx, "SELECT pg_catalog.version()").Scan(&versionStr); err != nil {
+		return Version{}, err
 	}
+
+	version, err := parseGreenplumVersion(versionStr)
+	if err != nil {
+		return Version{}, fmt.Errorf("error parsing version: %w", err)
+	}
+
 	return version, nil
 }
 
@@ -435,11 +438,7 @@ JOIN (
 `
 
 func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (string, error) {
-	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
-	if err != nil {
-		return "", err
-	}
-	version, err := parseGreenplumVersion(versionStr)
+	version, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return "", err
 	}

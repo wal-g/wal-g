@@ -17,14 +17,11 @@ import (
 // PAX is a Cloudberry-only access method, so for plain Greenplum and unknown flavors
 // the function short-circuits to an empty map without contacting the catalog.
 func NewPaxRelFileStorageMap(ctx context.Context, queryRunner *GpQueryRunner) (pax.RelFileStorageMap, error) {
-	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
+	version, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query greenplum version")
 	}
-	version, err := parseGreenplumVersion(versionStr)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse greenplum version")
-	}
+
 	if version.Flavor != Cloudberry {
 		tracelog.DebugLogger.Printf("Skipping PAX storage map: flavor=%s does not support PAX", version.Flavor)
 		return pax.RelFileStorageMap{}, nil
