@@ -35,7 +35,7 @@ func (r ConnResetRetryer) ShouldRetry(req *request.Request) bool {
 	}
 
 	// Some S3-compatible servers (e.g. MinIO) return HTTP 499 with error code
-	// "ClientDisconnected" when the request context is cancelled server-side
+	// "ClientDisconnected" when the request context is canceled server-side
 	// (including on the server's own shutdown), not necessarily because the
 	// client actually disconnected. Treat it as a transient failure worth
 	// retrying rather than aborting the whole backup on a single occurrence.
