@@ -25,6 +25,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//nolint:gocyclo
 func createSession(config *Config) (*session.Session, error) {
 	sessOpts := session.Options{}
 	if config.CACertFile != "" {
@@ -241,7 +242,7 @@ func detectAWSRegionByBucket(bucket string, config *aws.Config) (string, error) 
 }
 
 // endpointSchemeAndHost splits the configured endpoint into a connection scheme and a host.
-// A scheme-less endpoint defaults to https, matching the AWS SDK behaviour.
+// A scheme-less endpoint defaults to https, matching the AWS SDK behavior.
 func endpointSchemeAndHost(endpoint string) (scheme, host string) {
 	switch {
 	case strings.HasPrefix(endpoint, "https://"):
