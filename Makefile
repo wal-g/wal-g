@@ -370,7 +370,7 @@ unlink_libsodium:
 
 build_client:
 	cd cmd/daemonclient && \
-	go build -o ../../bin/walg-daemon-client -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=$(GIT_REVISION) -X main.version=$(WALG_VERSION)"
+	go build -o ../../bin/walg-daemon-client $(if $(ENABLE_RACE_DETECTION),-race) -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=$(GIT_REVISION) -X main.version=$(WALG_VERSION)"
 
 .PHONY: mocks
 # put the files with interfaces you'd like to mock in prerequisites
