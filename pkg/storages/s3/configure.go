@@ -35,6 +35,7 @@ const (
 	maxPartSizeSetting              = "S3_MAX_PART_SIZE"
 	endpointSourceSetting           = "S3_ENDPOINT_SOURCE"
 	endpointPortSetting             = "S3_ENDPOINT_PORT"
+	endpointProtocolSetting         = "S3_ENDPOINT_PROTOCOL"
 	logLevelSetting                 = "S3_LOG_LEVEL"
 	useListObjectsV1Setting         = "S3_USE_LIST_OBJECTS_V1"
 	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
@@ -55,6 +56,7 @@ var SettingList = []string{
 	endpointPortSetting,
 	endpointSetting,
 	endpointSourceSetting,
+	endpointProtocolSetting,
 	regionSetting,
 	forcePathStyleSetting,
 	accessKeyIDSetting,
@@ -195,6 +197,7 @@ func ConfigureStorage(
 		Endpoint:                 settings[endpointSetting],
 		EndpointSource:           settings[endpointSourceSetting],
 		EndpointPort:             port,
+		EndpointProtocol:         settings[endpointProtocolSetting],
 		Bucket:                   bucket,
 		RootPath:                 rootPath,
 		AccessKey:                strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),

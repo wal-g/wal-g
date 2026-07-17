@@ -68,6 +68,11 @@ func createSession(config *Config) (*session.Session, error) {
 		// name in the Host header. The connection scheme follows the configured endpoint
 		// instead of being hardcoded to plain HTTP.
 		scheme, host := endpointSchemeAndHost(config.Endpoint)
+
+		if config.EndpointProtocol != "" {
+			scheme = config.EndpointProtocol
+		}
+
 		if scheme == "https" {
 			// The TCP connection goes straight to the node address, so TLS SNI and
 			// certificate verification must be pinned to the real endpoint name rather

@@ -32,6 +32,18 @@ WAL-G can automatically determine the S3 bucket's region using `s3:GetBucketLoca
 
 Overrides the default hostname to connect to an S3-compatible service. i.e, `http://s3-like-service:9000`
 
+* `S3_ENDPOINT_SOURCE`
+
+Use to bypass balancer and connect directly to host. In the balancer-bypass mode we replace the request host with the address of a specific node returned by the endpoint source.
+
+* `S3_ENDPOINT_PORT`
+
+Sets port to use for s3 connection. By default 443 is used.
+
+* `S3_ENDPOINT_PROTOCOL`
+
+When `S3_ENDPOINT_SOURCE` is set, use this option to specify protocol (http, https). By default will use protocol from  `AWS_ENDPOINT`
+
 * `AWS_S3_FORCE_PATH_STYLE`
 
 To enable path-style addressing (i.e., `http://s3.amazonaws.com/BUCKET/KEY`) when connecting to an S3-compatible service that lack of support for sub-domain style bucket URLs (i.e., `http://BUCKET.s3.amazonaws.com/KEY`). Defaults to `false`.
