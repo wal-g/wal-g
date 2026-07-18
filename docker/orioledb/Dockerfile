@@ -3,7 +3,7 @@ WORKDIR /go/src/github.com/wal-g/wal-g
 
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    liblzo2-dev
+    liblzo2-dev git
 
 COPY .git .git
 COPY .gitmodules .gitmodules
