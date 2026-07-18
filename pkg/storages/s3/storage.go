@@ -22,6 +22,7 @@ type Config struct {
 	Endpoint                 string
 	EndpointSource           string
 	EndpointPort             string
+	EndpointProtocol         string
 	Bucket                   string
 	RootPath                 string
 	AccessKey                string
