@@ -9,15 +9,13 @@ COPY staging/wal-g ${WALG_REPO}/
 
 WORKDIR ${WALG_REPO}
 
-RUN make link_external_deps && \
-    make BUILD_ARGS=-race mongo_build && \
-    cp main/mongo/wal-g /usr/bin/wal-g
+RUN make ENABLE_RACE_DETECTION=1 link_external_deps mongo_build
 
 ###
 
 FROM ubuntu:focal
 
-COPY --from=build /usr/bin/wal-g /usr/bin/wal-g
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/mongo/wal-g /usr/bin/wal-g
 
 ENV DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
 
