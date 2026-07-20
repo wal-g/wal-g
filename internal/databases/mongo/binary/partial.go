@@ -1,7 +1,6 @@
 package binary
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/mongodb/mongo-tools/common/util"
@@ -141,11 +140,15 @@ func GetTarFilesFilter(
 }
 
 func convertToFile(ident string) string {
-	return fmt.Sprintf("/%s.wt", ident)
+	builder := strings.Builder{}
+	builder.WriteRune('/')
+	builder.WriteString(ident)
+	builder.WriteString(".wt")
+	return builder.String()
 }
 
 func localPathFromURI(uri string) string {
-	tracelog.InfoLogger.Printf("URI: %s", uri)
+	//tracelog.DebugLogger.Printf("URI: %s", uri) removed due to efficiency
 	return strings.SplitN(uri, ":", 3)[2]
 }
 
