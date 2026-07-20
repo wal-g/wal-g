@@ -87,7 +87,7 @@ func runUpload(t *testing.T, base pax.BackupFiles, bundleFiles *internal.Regular
 
 	for _, tf := range files {
 		cfi := tf.ComposeFileInfo
-		err := uploader.AddFile(&cfi, tf.RelFileMetadata, tf.FileKey)
+		err := uploader.AddFile(t.Context(), &cfi, tf.RelFileMetadata, tf.FileKey)
 		assert.NoError(t, err)
 	}
 
@@ -260,7 +260,7 @@ func TestUpload_FileDeletedBetweenWalkAndOpen(t *testing.T) {
 	assert.NoError(t, f.Close())
 	assert.NoError(t, os.Remove(f.Name()))
 
-	err = uploader.AddFile(cfi, pax.RelFileMetadata{}, pax.FileKey{})
+	err = uploader.AddFile(t.Context(), cfi, pax.RelFileMetadata{}, pax.FileKey{})
 	assert.NoError(t, err)
 	assert.Empty(t, uploader.GetFiles().Files)
 }

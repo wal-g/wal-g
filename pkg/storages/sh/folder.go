@@ -32,7 +32,7 @@ func (folder *Folder) GetPath() string {
 	return folder.path
 }
 
-func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (folder *Folder) ListFolder(_ context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	client, err := folder.sftpLazy.Client()
 	if err != nil {
 		return nil, nil, err
@@ -73,7 +73,7 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return objects, subFolders, err
 }
 
-func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+func (folder *Folder) DeleteObjects(_ context.Context, objectsWithRelativePaths []storage.Object) error {
 	client, err := folder.sftpLazy.Client()
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) e
 	return nil
 }
 
-func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
+func (folder *Folder) Exists(_ context.Context, objectRelativePath string) (bool, error) {
 	client, err := folder.sftpLazy.Client()
 	if err != nil {
 		return false, err
@@ -135,7 +135,7 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 
 const defaultBufferSize = 64 * 1024 * 1024
 
-func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (folder *Folder) ReadObject(_ context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	client, err := folder.sftpLazy.Client()
 	if err != nil {
 		return nil, err
@@ -153,11 +153,12 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	}{bufio.NewReaderSize(file, defaultBufferSize), file}, nil
 }
 
-func (folder *Folder) PutObject(name string, content io.Reader) error {
+func (folder *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	client, err := folder.sftpLazy.Client()
 	if err != nil {
 		return err
 	}
+	content = contextio.NewReader(ctx, content)
 
 	randomSuffix, err := storage.NewTimestampRandomTag()
 	if err != nil {
@@ -198,37 +199,32 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
-func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	ctxReader := contextio.NewReader(ctx, content)
-	return folder.PutObject(name, ctxReader)
-}
-
-func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
-	if exists, err := folder.Exists(srcPath); !exists {
+func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
+	if exists, err := folder.Exists(ctx, srcPath); !exists {
 		if err == nil {
 			return storage.NewObjectNotFoundError(srcPath)
 		}
 		return fmt.Errorf("copy via SFTP: check if source file %q exists: %w", srcPath, err)
 	}
-	file, err := folder.ReadObject(srcPath)
+	file, err := folder.ReadObject(ctx, srcPath)
 	if err != nil {
 		return fmt.Errorf("copy via SFTP: read source file %q: %w", srcPath, err)
 	}
-	err = folder.PutObject(dstPath, file)
+	err = folder.PutObject(ctx, dstPath, file)
 	if err != nil {
 		return fmt.Errorf("copy via SFTP: write destination file %q: %w", dstPath, err)
 	}
 	return nil
 }
 
-func (folder *Folder) Validate() error {
+func (folder *Folder) Validate(ctx context.Context) error {
 	return nil
 }
 
 // NOT IMPLEMENTED
-func (folder *Folder) SetVersioningEnabled(enable bool) {}
+func (folder *Folder) SetVersioningEnabled(_ context.Context, enable bool) {}
 
 // NOT IMPLEMENTED
-func (folder *Folder) GetVersioningEnabled() bool {
+func (folder *Folder) GetVersioningEnabled(_ context.Context) bool {
 	return false
 }

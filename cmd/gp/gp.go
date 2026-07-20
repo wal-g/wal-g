@@ -1,14 +1,12 @@
 package gp
 
 import (
-	"fmt"
-	"os"
+	"context"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/cmd/common"
 	"github.com/wal-g/wal-g/cmd/pg"
 	"github.com/wal-g/wal-g/internal"
@@ -60,10 +58,7 @@ var (
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main().
 func Execute() {
-	if err := cmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	common.ExecuteContext(cmd)
 }
 
 func GetCmd() *cobra.Command {
@@ -102,8 +97,8 @@ func init() {
 	cmd.AddCommand(pg.WalPrefetchCmd)
 }
 
-func getMultistorageRootFolder(checkWrite bool, policy policies.Policies) (storage.Folder, error) {
-	storage, err := internal.ConfigureMultiStorage(checkWrite)
+func getMultistorageRootFolder(ctx context.Context, checkWrite bool, policy policies.Policies) (storage.Folder, error) {
+	storage, err := internal.ConfigureMultiStorage(ctx, checkWrite)
 	if err != nil {
 		return nil, err
 	}
@@ -111,13 +106,13 @@ func getMultistorageRootFolder(checkWrite bool, policy policies.Policies) (stora
 	rootFolder := multistorage.SetPolicies(storage.RootFolder(), policy)
 
 	if targetStorage != "" {
-		rootFolder, err = multistorage.UseSpecificStorage(targetStorage, rootFolder)
+		rootFolder, err = multistorage.UseSpecificStorage(ctx, targetStorage, rootFolder)
 		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder)[0])
 	} else if policy == policies.TakeFirstStorage {
-		rootFolder, err = multistorage.UseFirstAliveStorage(rootFolder)
+		rootFolder, err = multistorage.UseFirstAliveStorage(ctx, rootFolder)
 		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder)[0])
 	} else if policy == policies.UniteAllStorages {
-		rootFolder, err = multistorage.UseAllAliveStorages(rootFolder)
+		rootFolder, err = multistorage.UseAllAliveStorages(ctx, rootFolder)
 		tracelog.InfoLogger.Printf("Using storages: %v", multistorage.UsedStorages(rootFolder))
 	}
 	if err != nil {

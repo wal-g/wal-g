@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -51,13 +52,13 @@ type GenericMetaInteractor interface {
 }
 
 type GenericMetaFetcher interface {
-	Fetch(backupName string, backupFolder storage.Folder) (GenericMetadata, error)
-	FetchFromStorage(backupName string, backupFolder storage.Folder, storage string) (GenericMetadata, error)
+	Fetch(ctx context.Context, backupName string, backupFolder storage.Folder) (GenericMetadata, error)
+	FetchFromStorage(ctx context.Context, backupName string, backupFolder storage.Folder, storage string) (GenericMetadata, error)
 }
 
 type GenericMetaSetter interface {
-	SetUserData(backupName string, backupFolder storage.Folder, userData interface{}) error
-	SetIsPermanent(backupName string, backupFolder storage.Folder, isPermanent bool) error
+	SetUserData(ctx context.Context, backupName string, backupFolder storage.Folder, userData interface{}) error
+	SetIsPermanent(ctx context.Context, backupName string, backupFolder storage.Folder, isPermanent bool) error
 }
 
 // NopIncrementDetailsFetcher is useful for databases without incremental backup support

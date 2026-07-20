@@ -47,45 +47,45 @@ var deleteTargetCmd = &cobra.Command{
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	storage, err := internal.ConfigureStorage()
+	storage, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(cmd.Context(), storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteBefore(args, confirmed)
+	deleteHandler.HandleDeleteBefore(cmd.Context(), args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	storage, err := internal.ConfigureStorage()
+	storage, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(cmd.Context(), storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteRetain(args, confirmed)
+	deleteHandler.HandleDeleteRetain(cmd.Context(), args, confirmed)
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	storage, err := internal.ConfigureStorage()
+	storage, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(cmd.Context(), storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.DeleteEverything(confirmed)
+	deleteHandler.DeleteEverything(cmd.Context(), confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	storage, err := internal.ConfigureStorage()
+	storage, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler, err := etcd.NewEtcdDeleteHandler(storage.RootFolder())
+	deleteHandler, err := etcd.NewEtcdDeleteHandler(cmd.Context(), storage.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, etcd.NewGenericMetaFetcher())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteTarget(targetBackupSelector, confirmed, false)
+	deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, false)
 }
 
 func init() {

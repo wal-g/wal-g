@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"strings"
 	"testing"
@@ -12,9 +11,8 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
-
-	"go.uber.org/mock/gomock"
 	"github.com/wal-g/wal-g/test/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 func TestConfigure(t *testing.T) {
@@ -44,7 +42,7 @@ func TestConfigureDeepBucket(t *testing.T) {
 func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer string) {
 	// Test empty environment variables
 	os.Unsetenv("WALE_S3_PREFIX")
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureUploader(t.Context())
 	if _, ok := (errors.Cause(err)).(internal.UnconfiguredStorageError); !ok {
 		t.Errorf("upload: Expected error 'UnconfiguredStorageError' but got %s", err)
 	}
@@ -59,20 +57,20 @@ func doConfigureWithBucketPath(t *testing.T, bucketPath string, expectedServer s
 	os.Setenv("AWS_ENDPOINT", "http://127.0.0.1:9000")
 	os.Setenv("AWS_REGION", "")
 	os.Setenv("S3_SKIP_VALIDATION", "true")
-	_, err = internal.ConfigureUploader()
+	_, err = internal.ConfigureUploader(t.Context())
 	assert.NoError(t, err)
 	os.Setenv("WALE_S3_PREFIX", "test_fail:")
-	_, err = internal.ConfigureUploader()
+	_, err = internal.ConfigureUploader(t.Context())
 	assert.Error(t, err)
 	os.Setenv("WALE_S3_PREFIX", bucketPath)
-	uploader, err = internal.ConfigureUploader()
+	uploader, err = internal.ConfigureUploader(t.Context())
 	assert.NoError(t, err)
 	assert.Equal(t, expectedServer, strings.TrimSuffix(uploader.Folder().GetPath(), "/"))
 	assert.NotNil(t, uploader)
 	assert.NoError(t, err)
 	// Test STANDARD_IA storage class
 	os.Setenv("WALG_S3_STORAGE_CLASS", "STANDARD_IA")
-	_, err = internal.ConfigureUploader()
+	_, err = internal.ConfigureUploader(t.Context())
 	assert.NoError(t, err)
 }
 
@@ -86,11 +84,11 @@ func TestUpload(t *testing.T) {
 
 	uploader := internal.NewRegularUploader(compressor, folder)
 
-	err := uploader.Upload(context.Background(), "", reader)
+	err := uploader.Upload(t.Context(), "", reader)
 
 	assert.NoError(t, err)
 
-	_, objErr := uploader.UploadingFolder.ReadObject("")
+	_, objErr := uploader.UploadingFolder.ReadObject(t.Context(), "")
 
 	assert.NoError(t, objErr)
 }
@@ -106,14 +104,14 @@ func TestUploadMock(t *testing.T) {
 
 	reader := bytes.NewReader([]byte("some text"))
 
-	folder.EXPECT().PutObjectWithContext(gomock.Any(), "some/path", gomock.Any()).Return(nil)
-	folder.EXPECT().PutObjectWithContext(gomock.Any(), "path/to/incorrect/file", gomock.Any()).Return(errors.New("some error"))
+	folder.EXPECT().PutObject(gomock.Any(), "some/path", gomock.Any()).Return(nil)
+	folder.EXPECT().PutObject(gomock.Any(), "path/to/incorrect/file", gomock.Any()).Return(errors.New("some error"))
 
-	uploadWithoutErr := uploader.Upload(context.Background(), "some/path", reader)
+	uploadWithoutErr := uploader.Upload(t.Context(), "some/path", reader)
 
 	assert.NoError(t, uploadWithoutErr)
 
-	uploadWithErr := uploader.Upload(context.Background(), "path/to/incorrect/file", reader)
+	uploadWithErr := uploader.Upload(t.Context(), "path/to/incorrect/file", reader)
 
 	assert.Error(t, uploadWithErr)
 }

@@ -1,16 +1,11 @@
 package fdb
 
 import (
-	"context"
-	"os"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/fdb"
-	"github.com/wal-g/wal-g/utility"
 )
 
 const backupFetchShortDescription = "Fetches desired backup from storage"
@@ -22,12 +17,9 @@ var backupFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
+		ctx := cmd.Context()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		restoreCmd, err := internal.GetCommandSettingContext(ctx, conf.NameStreamRestoreCmd)

@@ -2,18 +2,17 @@ package binary
 
 import (
 	"container/heap"
-	"context"
 	"fmt"
-	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
 func TestNewStorageMetadataCollector_Initialization(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
+	svc := &MongodService{Context: t.Context()}
 	onComplete := func(routes *models.BackupRoutesInfo) error { return nil }
 
 	collector := NewStorageMetadataCollector(svc, onComplete)
@@ -29,7 +28,7 @@ func TestNewStorageMetadataCollector_Initialization(t *testing.T) {
 }
 
 func TestHandleTop100Info_SystemDBsSkipped(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
+	svc := &MongodService{Context: t.Context()}
 	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
 		return nil
 	})
@@ -45,7 +44,7 @@ func TestHandleTop100Info_SystemDBsSkipped(t *testing.T) {
 }
 
 func TestHandleTop100Info_FillHeapUnderTopK(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
+	svc := &MongodService{Context: t.Context()}
 	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
 		return nil
 	})
@@ -61,7 +60,7 @@ func TestHandleTop100Info_FillHeapUnderTopK(t *testing.T) {
 }
 
 func TestHandleTop100Info_FillHeapExactlyTopK(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
+	svc := &MongodService{Context: t.Context()}
 	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
 		return nil
 	})
@@ -77,7 +76,7 @@ func TestHandleTop100Info_FillHeapExactlyTopK(t *testing.T) {
 }
 
 func TestHandleTop100Info_ReplaceSmallestWhenFull(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
+	svc := &MongodService{Context: t.Context()}
 	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
 		return nil
 	})
@@ -101,7 +100,7 @@ func TestHandleTop100Info_ReplaceSmallestWhenFull(t *testing.T) {
 }
 
 func TestHandleTop100Info_SmallElementNotReplaced(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
+	svc := &MongodService{Context: t.Context()}
 	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
 		return nil
 	})
@@ -127,7 +126,7 @@ func TestHandleTop100Info_SmallElementNotReplaced(t *testing.T) {
 }
 
 func TestHandleTop100Info_EqualToMinNotReplaced(t *testing.T) {
-	svc := &MongodService{Context: context.Background()}
+	svc := &MongodService{Context: t.Context()}
 	collector := NewStorageMetadataCollector(svc, func(routes *models.BackupRoutesInfo) error {
 		return nil
 	})

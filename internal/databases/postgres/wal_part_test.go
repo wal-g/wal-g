@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 func TestSaveLoadWalPart(t *testing.T) {

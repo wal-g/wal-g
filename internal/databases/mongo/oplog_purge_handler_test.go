@@ -58,16 +58,16 @@ func TestHandleOplogPurge(t *testing.T) {
 			args: args{
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("ListOplogArchives").Return(Archives, nil).Once().
-						On("ListBackups").Return(make([]internal.BackupTime, 4), []string{}, nil).Once().
-						On("LoadBackups",
+					dl.On("ListOplogArchives", mock.Anything).Return(Archives, nil).Once().
+						On("ListBackups", mock.Anything).Return(make([]internal.BackupTime, 4), []string{}, nil).Once().
+						On("LoadBackups", mock.Anything,
 							mock.MatchedBy(func(backupNames []string) bool { return len(backupNames) == 4 })).
 						Return(Backups, nil).Once()
 					return dl
 				}(),
 				purger: func() *mocks.Purger {
 					pr := &mocks.Purger{}
-					pr.On("DeleteOplogArchives", mock.MatchedBy(func(archives []models.Archive) bool {
+					pr.On("DeleteOplogArchives", mock.Anything, mock.MatchedBy(func(archives []models.Archive) bool {
 						return reflect.DeepEqual(archives,
 							[]models.Archive{
 								{Start: models.Timestamp{TS: 100}, End: models.Timestamp{TS: 200}},
@@ -85,9 +85,9 @@ func TestHandleOplogPurge(t *testing.T) {
 			args: args{
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("ListOplogArchives").Return(Archives, nil).Once().
-						On("ListBackups").Return(make([]internal.BackupTime, 4), []string{}, nil).Once().
-						On("LoadBackups",
+					dl.On("ListOplogArchives", mock.Anything).Return(Archives, nil).Once().
+						On("ListBackups", mock.Anything).Return(make([]internal.BackupTime, 4), []string{}, nil).Once().
+						On("LoadBackups", mock.Anything,
 							mock.MatchedBy(func(backupNames []string) bool { return len(backupNames) == 4 })).
 						Return(Backups, nil).Once()
 					return dl
@@ -103,7 +103,7 @@ func TestHandleOplogPurge(t *testing.T) {
 			args: args{
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("ListOplogArchives").Return(nil, fmt.Errorf("listing error")).Once()
+					dl.On("ListOplogArchives", mock.Anything).Return(nil, fmt.Errorf("listing error")).Once()
 					return dl
 				}(),
 				purger:      &mocks.Purger{},
@@ -117,8 +117,8 @@ func TestHandleOplogPurge(t *testing.T) {
 			args: args{
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("ListOplogArchives").Return(Archives, nil).Once().
-						On("ListBackups").Return(nil, []string{}, fmt.Errorf("listing backup times failed")).Once()
+					dl.On("ListOplogArchives", mock.Anything).Return(Archives, nil).Once().
+						On("ListBackups", mock.Anything).Return(nil, []string{}, fmt.Errorf("listing backup times failed")).Once()
 					return dl
 				}(),
 				purger:      &mocks.Purger{},
@@ -132,9 +132,9 @@ func TestHandleOplogPurge(t *testing.T) {
 			args: args{
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("ListOplogArchives").Return(Archives, nil).Once().
-						On("ListBackups").Return(make([]internal.BackupTime, 4), []string{}, nil).Once().
-						On("LoadBackups",
+					dl.On("ListOplogArchives", mock.Anything).Return(Archives, nil).Once().
+						On("ListBackups", mock.Anything).Return(make([]internal.BackupTime, 4), []string{}, nil).Once().
+						On("LoadBackups", mock.Anything,
 							mock.MatchedBy(func(backupNames []string) bool { return len(backupNames) == 4 })).
 						Return(nil, fmt.Errorf("backup loading failed")).Once()
 					return dl
@@ -150,9 +150,9 @@ func TestHandleOplogPurge(t *testing.T) {
 			args: args{
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("ListOplogArchives").Return(Archives, nil).Once().
-						On("ListBackups").Return([]internal.BackupTime{}, []string{}, nil).Once().
-						On("LoadBackups",
+					dl.On("ListOplogArchives", mock.Anything).Return(Archives, nil).Once().
+						On("ListBackups", mock.Anything).Return([]internal.BackupTime{}, []string{}, nil).Once().
+						On("LoadBackups", mock.Anything,
 							mock.MatchedBy(func(backupNames []string) bool { return len(backupNames) == 0 })).
 						Return([]models.Backup{}, nil).Once()
 					return dl
@@ -166,7 +166,7 @@ func TestHandleOplogPurge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := HandleOplogPurge(tt.args.downloader, tt.args.purger, tt.args.retainAfter, tt.args.dryRun)
+			err := HandleOplogPurge(t.Context(), tt.args.downloader, tt.args.purger, tt.args.retainAfter, tt.args.dryRun)
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 				return

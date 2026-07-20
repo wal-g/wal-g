@@ -52,7 +52,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 				timeout: time.Second * 50,
 			},
 			args: args{
-				ctx:    context.TODO(),
+				ctx:    t.Context(),
 				oplogc: make(chan *models.Oplog),
 			},
 			ops: []*models.Oplog{
@@ -104,7 +104,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 				timeout: 1024000000,
 			},
 			args: args{
-				ctx:    context.TODO(),
+				ctx:    t.Context(),
 				oplogc: make(chan *models.Oplog),
 			},
 			ops: []*models.Oplog{
@@ -145,7 +145,7 @@ func TestStorageApplier_Apply(t *testing.T) {
 				timeout: 1024000000,
 			},
 			args: args{
-				ctx:    context.TODO(),
+				ctx:    t.Context(),
 				oplogc: make(chan *models.Oplog),
 			},
 			ops: []*models.Oplog{

@@ -10,10 +10,15 @@ type AlignedReader struct {
 	innerReader io.Reader
 	alignment   int
 	alreadyRead int
+	padBuf      []byte
 }
 
 func NewAlignedReader(source io.Reader, alignment int) *AlignedReader {
-	return &AlignedReader{source, alignment, 0}
+	return &AlignedReader{
+		innerReader: source,
+		alignment:   alignment,
+		padBuf:      make([]byte, alignment),
+	}
 }
 
 func (reader *AlignedReader) Read(p []byte) (n int, err error) {
@@ -27,7 +32,6 @@ func (reader *AlignedReader) ReadToAlignment() error {
 	if paddingLength == reader.alignment {
 		return nil
 	}
-	padding := make([]byte, paddingLength)
-	_, err := reader.Read(padding)
+	_, err := reader.Read(reader.padBuf[:paddingLength])
 	return errors.WithStack(err)
 }

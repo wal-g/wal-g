@@ -29,14 +29,14 @@ var backupListCmd = &cobra.Command{
 	Short: backupListShortDescription, // TODO : improve description
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		backupFolder, err := common.GetBackupFolder()
+		backupFolder, err := common.GetBackupFolder(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if detail {
-			err := mongo.HandleDetailedBackupList(backupFolder, os.Stdout, prettyPrint, jsonFormat)
+			err := mongo.HandleDetailedBackupList(cmd.Context(), backupFolder, os.Stdout, prettyPrint, jsonFormat)
 			tracelog.ErrorLogger.FatalOnError(err)
 		} else {
-			internal.HandleDefaultBackupList(backupFolder, prettyPrint, jsonFormat)
+			internal.HandleDefaultBackupList(cmd.Context(), backupFolder, prettyPrint, jsonFormat)
 		}
 	},
 }

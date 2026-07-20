@@ -1,13 +1,13 @@
 package testutils
 
 import (
+	"context"
 	"io"
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func NewUnexpectedEOFLimitReader(readCloser io.ReadCloser, maxRead int64) io.ReadCloser {
@@ -58,8 +58,8 @@ type TestFolder struct {
 	mutex        sync.Mutex
 }
 
-func (tf *TestFolder) ReadObject(path string) (io.ReadCloser, error) {
-	reader, err := tf.Folder.ReadObject(path)
+func (tf *TestFolder) ReadObject(ctx context.Context, path string) (io.ReadCloser, error) {
+	reader, err := tf.Folder.ReadObject(ctx, path)
 	if tf.maxReadSize != 0 {
 		tf.mutex.Lock()
 		defer tf.mutex.Unlock()

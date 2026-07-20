@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"os"
 	"sync"
 
 	"github.com/wal-g/wal-g/internal"
-
 	"github.com/wal-g/wal-g/internal/walparser"
 )
 
@@ -72,11 +72,11 @@ func (relStat *RelFileStatistics) getFileUpdateCount(filePath string) uint64 {
 	return fileStat.deletedTuplesCount + fileStat.updatedTuplesCount + fileStat.insertedTuplesCount
 }
 
-func newRelFileStatistics(queryRunner *PgQueryRunner) (RelFileStatistics, error) {
+func newRelFileStatistics(ctx context.Context, queryRunner *PgQueryRunner) (RelFileStatistics, error) {
 	result := make(map[walparser.RelFileNode]PgRelationStat)
 
-	err := queryRunner.ForEachDatabase(func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
-		pgStatRows, err := currentRunner.getStatistics(db)
+	err := queryRunner.ForEachDatabase(ctx, func(currentRunner *PgQueryRunner, db PgDatabaseInfo) error {
+		pgStatRows, err := currentRunner.getStatistics(ctx, db)
 		if err != nil {
 			return err
 		}

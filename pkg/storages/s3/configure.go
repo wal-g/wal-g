@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ const (
 	maxPartSizeSetting              = "S3_MAX_PART_SIZE"
 	endpointSourceSetting           = "S3_ENDPOINT_SOURCE"
 	endpointPortSetting             = "S3_ENDPOINT_PORT"
+	endpointProtocolSetting         = "S3_ENDPOINT_PROTOCOL"
 	logLevelSetting                 = "S3_LOG_LEVEL"
 	useListObjectsV1Setting         = "S3_USE_LIST_OBJECTS_V1"
 	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
@@ -54,6 +56,7 @@ var SettingList = []string{
 	endpointPortSetting,
 	endpointSetting,
 	endpointSourceSetting,
+	endpointProtocolSetting,
 	regionSetting,
 	forcePathStyleSetting,
 	accessKeyIDSetting,
@@ -110,6 +113,7 @@ const (
 //
 //nolint:funlen,gocyclo
 func ConfigureStorage(
+	ctx context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,
@@ -193,6 +197,7 @@ func ConfigureStorage(
 		Endpoint:                 settings[endpointSetting],
 		EndpointSource:           settings[endpointSourceSetting],
 		EndpointPort:             port,
+		EndpointProtocol:         settings[endpointProtocolSetting],
 		Bucket:                   bucket,
 		RootPath:                 rootPath,
 		AccessKey:                strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
@@ -227,7 +232,7 @@ func ConfigureStorage(
 		DeleteBatchSize:         deleteBatchSize,
 	}
 
-	st, err := NewStorage(config, rootWraps...)
+	st, err := NewStorage(ctx, config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}

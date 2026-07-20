@@ -1,10 +1,6 @@
 package redis
 
 import (
-	"context"
-	"os"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -33,12 +29,9 @@ var aofBackupPushCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
+		ctx := cmd.Context()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		uploader.ChangeDirectory(utility.BaseBackupPath + "/")
@@ -49,7 +42,6 @@ var aofBackupPushCmd = &cobra.Command{
 		versionParser := archive.NewVersionParser(processName)
 
 		metaConstructor := archive.NewBackupRedisMetaConstructor(
-			ctx,
 			uploader.Folder(),
 			permanent,
 			archive.AOFBackupType,

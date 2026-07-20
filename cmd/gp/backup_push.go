@@ -3,13 +3,12 @@ package gp
 import (
 	"strconv"
 
-	"github.com/wal-g/wal-g/internal/databases/greenplum"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 )
 
@@ -58,7 +57,7 @@ var (
 
 			segPollRetries := viper.GetInt(conf.GPSegmentsPollRetries)
 
-			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
+			rootFolder, err := getMultistorageRootFolder(cmd.Context(), true, policies.TakeFirstStorage)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
@@ -66,9 +65,9 @@ var (
 
 			arguments := greenplum.NewBackupArguments(uploader, permanent, fullBackup, userData, prepareSegmentFwdArgs(), logsDir,
 				segPollInterval, segPollRetries, deltaBaseSelector)
-			backupHandler, err := greenplum.NewBackupHandler(arguments)
+			backupHandler, err := greenplum.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
-			backupHandler.HandleBackupPush()
+			backupHandler.HandleBackupPush(cmd.Context())
 		},
 	}
 	permanent   = false

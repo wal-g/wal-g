@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +8,7 @@ import (
 )
 
 func TestMongoOplogCursor_NextPush(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	m := NewMongoOplogCursor(&mongo.Cursor{})
 	assert.Nil(t, m.Push([]byte{'t'}))
 	assert.EqualError(t, m.Push([]byte{'e'}), "cursor already has one unread pushed document")
@@ -23,7 +22,7 @@ func TestMongoOplogCursor_NextPush(t *testing.T) {
 }
 
 func TestBsonCursor_NextPush(t *testing.T) {
-	ctx := context.TODO()
+	ctx := t.Context()
 	m := NewBsonCursor(nil)
 
 	assert.Nil(t, m.Push([]byte{'t'}))

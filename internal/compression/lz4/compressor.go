@@ -3,9 +3,8 @@ package lz4
 import (
 	"io"
 
-	"github.com/wal-g/wal-g/internal/ioextensions"
-
 	"github.com/pierrec/lz4/v4"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 )
 
 const (

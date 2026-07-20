@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"context"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -8,7 +10,7 @@ import (
 )
 
 type DeltaBackupConfigurator interface {
-	Configure(folder storage.Folder, isPermanent bool) (PrevBackupInfo, int, error)
+	Configure(ctx context.Context, folder storage.Folder, isPermanent bool) (PrevBackupInfo, int, error)
 }
 
 type RegularDeltaBackupConfigurator struct {
@@ -20,6 +22,7 @@ func NewRegularDeltaBackupConfigurator(deltaBaseSelector internal.BackupSelector
 }
 
 func (c RegularDeltaBackupConfigurator) Configure(
+	ctx context.Context,
 	folder storage.Folder, isPermanent bool,
 ) (prevBackupInfo PrevBackupInfo, incrementCount int, err error) {
 	maxDeltas, fromFull := internal.GetDeltaConfig()
@@ -28,7 +31,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	}
 
 	baseBackupFolder := folder.GetSubFolder(utility.BaseBackupPath)
-	previousBackup, err := c.deltaBaseSelector.Select(folder)
+	previousBackup, err := c.deltaBaseSelector.Select(ctx, folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -38,7 +41,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	}
 
 	previousPgBackup := ToPgBackup(previousBackup)
-	prevBackupSentinelDto, err := previousPgBackup.GetSentinel()
+	prevBackupSentinelDto, err := previousPgBackup.GetSentinel(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
@@ -58,7 +61,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 		return PrevBackupInfo{}, 0, nil
 	}
 
-	previousBackupMeta, err := previousPgBackup.FetchMeta()
+	previousBackupMeta, err := previousPgBackup.FetchMeta(ctx)
 	if err != nil {
 		tracelog.InfoLogger.Printf(
 			"Failed to get previous backup metadata: %s. Doing full backup.\n", err.Error())
@@ -82,7 +85,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 		if err != nil {
 			return PrevBackupInfo{}, 0, err
 		}
-		prevBackupSentinelDto, err = previousPgBackup.GetSentinel()
+		prevBackupSentinelDto, err = previousPgBackup.GetSentinel(ctx)
 		if err != nil {
 			return PrevBackupInfo{}, 0, err
 		}
@@ -90,7 +93,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	tracelog.InfoLogger.Printf("Delta backup from %v with LSN %s.\n", previousPgBackup.Name,
 		*prevBackupSentinelDto.BackupStartLSN)
 	prevBackupInfo.name = previousPgBackup.Name
-	prevBackupInfo.sentinelDto, prevBackupInfo.filesMetadataDto, err = previousPgBackup.GetSentinelAndFilesMetadata()
+	prevBackupInfo.sentinelDto, prevBackupInfo.filesMetadataDto, err = previousPgBackup.GetSentinelAndFilesMetadata(ctx)
 	return prevBackupInfo, incrementCount, err
 }
 
@@ -104,7 +107,8 @@ func NewCatchupDeltaBackupConfigurator(fakePreviousBackupSentinelDto BackupSenti
 	}
 }
 
-func (c CatchupDeltaBackupConfigurator) Configure(storage.Folder, bool) (prevBackupInfo PrevBackupInfo, incrementCount int, err error) {
+func (c CatchupDeltaBackupConfigurator) Configure(context.Context, storage.Folder, bool) (
+	prevBackupInfo PrevBackupInfo, incrementCount int, err error) {
 	prevBackupInfo.sentinelDto = c.fakePrevSentinel
 	prevBackupInfo.filesMetadataDto = FilesMetadataDto{}
 	return prevBackupInfo, 1, nil

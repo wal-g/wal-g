@@ -4,21 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/sync/errgroup"
-
 	"io"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/wal-g/internal/statistics"
-
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/ioextensions"
+	"github.com/wal-g/wal-g/internal/statistics"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 var ErrorSizeTrackingDisabled = fmt.Errorf("size tracking disabled by DisableSizeTracking method")
@@ -163,7 +160,7 @@ func (uploader *RegularUploader) uploadFile(ctx context.Context, file ioextensio
 
 	dstPath := utility.SanitizePath(filename)
 	if !isExactPath {
-		dstPath = utility.SanitizePath(filepath.Base(filename) + "." + uploader.Compressor.FileExtension())
+		dstPath = utility.SanitizePath(utility.AddFileExtension(filepath.Base(filename), uploader.Compressor.FileExtension()))
 	}
 
 	err := uploader.Upload(ctx, dstPath, compressedFile)
@@ -199,7 +196,7 @@ func (uploader *RegularUploader) Upload(ctx context.Context, path string, conten
 	if uploader.tarSize != nil {
 		content = utility.NewWithSizeReader(content, uploader.tarSize)
 	}
-	err := uploader.UploadingFolder.PutObjectWithContext(ctx, path, content)
+	err := uploader.UploadingFolder.PutObject(ctx, path, content)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
 		uploader.failed.Store(true)

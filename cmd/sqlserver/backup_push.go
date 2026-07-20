@@ -16,7 +16,7 @@ var backupPushCmd = &cobra.Command{
 	Short: backupPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
-		sqlserver.HandleBackupPush(backupPushDatabases, backupUpdateLatest)
+		sqlserver.HandleBackupPush(cmd.Context(), backupPushDatabases, backupUpdateLatest)
 	},
 }
 

@@ -15,13 +15,13 @@ type streamSentinelDto struct {
 	StartLocalTime time.Time
 }
 
-func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
+func HandleBackupPush(ctx context.Context, uploader internal.Uploader, backupCmd *exec.Cmd) {
 	timeStart := utility.TimeNowCrossPlatformLocal()
 
 	stdout, stderr, err := utility.StartCommandWithStdoutStderr(backupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
-	fileName, err := uploader.PushStream(context.Background(), stdout)
+	fileName, err := uploader.PushStream(ctx, stdout)
 	tracelog.ErrorLogger.FatalfOnError("failed to push backup: %v", err)
 
 	err = backupCmd.Wait()
@@ -32,6 +32,6 @@ func HandleBackupPush(uploader internal.Uploader, backupCmd *exec.Cmd) {
 
 	sentinel := streamSentinelDto{StartLocalTime: timeStart}
 
-	err = internal.UploadSentinel(uploader, &sentinel, fileName)
+	err = internal.UploadSentinel(ctx, uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)
 }

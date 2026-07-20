@@ -7,9 +7,11 @@ linters:
   enable:
     - asciicheck
     - bodyclose
+    - containedctx
     - copyloopvar
     - dupl
     - errcheck
+    - fatcontext
     - funlen
     - gocritic
     - gocyclo
@@ -19,11 +21,13 @@ linters:
     - makezero
     - misspell
     - nakedret
+    - nolintlint
     - revive
     - staticcheck
     - unconvert
     - unparam
     - unused
+    - usetesting
     - whitespace
   settings:
     dupl:
@@ -98,7 +102,9 @@ severity:
       severity: info
 formatters:
   enable:
+    - gci
     - gofmt
+    - goimports
   exclusions:
     generated: lax
     paths:

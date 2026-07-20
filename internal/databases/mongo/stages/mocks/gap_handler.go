@@ -3,6 +3,8 @@
 package stagesmocks
 
 import (
+	context "context"
+
 	mock "github.com/stretchr/testify/mock"
 	models "github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -12,13 +14,13 @@ type GapHandler struct {
 	mock.Mock
 }
 
-// HandleGap provides a mock function with given fields: from, until, err
-func (_m *GapHandler) HandleGap(from models.Timestamp, until models.Timestamp, err error) error {
-	ret := _m.Called(from, until, err)
+// HandleGap provides a mock function with given fields: ctx, from, until, err
+func (_m *GapHandler) HandleGap(ctx context.Context, from models.Timestamp, until models.Timestamp, err error) error {
+	ret := _m.Called(ctx, from, until, err)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.Timestamp, models.Timestamp, error) error); ok {
-		r0 = rf(from, until, err)
+	if rf, ok := ret.Get(0).(func(context.Context, models.Timestamp, models.Timestamp, error) error); ok {
+		r0 = rf(ctx, from, until, err)
 	} else {
 		r0 = ret.Error(0)
 	}

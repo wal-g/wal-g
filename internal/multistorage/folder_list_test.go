@@ -5,6 +5,7 @@ import (
 	"path"
 	"testing"
 
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
@@ -18,7 +19,7 @@ func TestListFolder(t *testing.T) {
 		folder := newTestFolder(t)
 		folder.policies.List = policies.ListPolicyFirst
 
-		_, _, err := folder.ListFolder()
+		_, _, err := folder.ListFolder(t.Context())
 		assert.ErrorIs(t, err, ErrNoUsedStorages)
 	})
 
@@ -55,13 +56,13 @@ func TestListFolder(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.List = policies.ListPolicyFirst
 
-		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("aaa/123", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("ccc/123", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("ddd", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa/123", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "ccc/123", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "ddd", &bytes.Buffer{})
 
-		objects, subFolders, err := folder.ListFolder()
+		objects, subFolders, err := folder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"aaa", "s1"}: true,
@@ -77,22 +78,22 @@ func TestListFolder(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.List = policies.ListPolicyFoundFirst
 
-		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("aaa/123", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa/123", &bytes.Buffer{})
 
-		_ = folder.usedFolders[1].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("aaa/123", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("bbb/123", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "aaa/123", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb/123", &bytes.Buffer{})
 
-		_ = folder.usedFolders[2].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("ccc", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("aaa/123", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("bbb/123", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("ccc/123", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "aaa/123", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "bbb/123", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "ccc/123", &bytes.Buffer{})
 
-		objects, subFolders, err := folder.ListFolder()
+		objects, subFolders, err := folder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"aaa", "s1"}: true,
@@ -110,22 +111,22 @@ func TestListFolder(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.List = policies.ListPolicyAll
 
-		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("aaa/123", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa/123", &bytes.Buffer{})
 
-		_ = folder.usedFolders[1].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("aaa/123", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("bbb/123", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "aaa/123", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb/123", &bytes.Buffer{})
 
-		_ = folder.usedFolders[2].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("ccc", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("aaa/123", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("bbb/123", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("ccc/123", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "aaa/123", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "bbb/123", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "ccc/123", &bytes.Buffer{})
 
-		objects, subFolders, err := folder.ListFolder()
+		objects, subFolders, err := folder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"aaa", "s1"}: true,
@@ -146,15 +147,15 @@ func TestListFolder(t *testing.T) {
 		folder := newTestFolder(t, "s1")
 		folder.policies.List = policies.ListPolicyFirst
 
-		_ = folder.usedFolders[0].PutObject("sub/aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("sub/sub2/bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("sub/sub2/ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "sub/aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "sub/sub2/bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "sub/sub2/ccc", &bytes.Buffer{})
 
-		_, subFolders, err := folder.ListFolder()
+		_, subFolders, err := folder.ListFolder(t.Context())
 		require.NoError(t, err)
 		require.Len(t, subFolders, 1)
 		subFolder := subFolders[0]
-		objects, subFolders, err := subFolder.ListFolder()
+		objects, subFolders, err := subFolder.ListFolder(t.Context())
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"aaa", "s1"}: true,
 		})
@@ -177,18 +178,18 @@ func TestListFolder(t *testing.T) {
 		rootFolder := newTestFolder(t, "s1", "s2", "s3")
 		rootFolder.policies.List = policies.ListPolicyAll
 
-		_ = rootFolder.usedFolders[0].PutObject("a/b/c/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[0].PutObject("a/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[0].PutObject("a1/file1", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "a/b/c/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "a/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "a1/file1", &bytes.Buffer{})
 
-		_ = rootFolder.usedFolders[1].PutObject("a/b/c/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("a/b/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("a/b2/file2", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "a/b/c/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "a/b/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "a/b2/file2", &bytes.Buffer{})
 
-		_ = rootFolder.usedFolders[2].PutObject("a/b/c/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[2].PutObject("a/b/c3/file3", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[2].PutObject(t.Context(), "a/b/c/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[2].PutObject(t.Context(), "a/b/c3/file3", &bytes.Buffer{})
 
-		objects, subFolders, err := rootFolder.ListFolder()
+		objects, subFolders, err := rootFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{})
 		assertListedSubFolders(t, rootFolder, subFolders, map[string]bool{
@@ -197,7 +198,7 @@ func TestListFolder(t *testing.T) {
 		})
 		aSubFolder := getSubFolder(t, subFolders, "a/")
 
-		objects, subFolders, err = aSubFolder.ListFolder()
+		objects, subFolders, err = aSubFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file", "s1"}: true,
@@ -208,7 +209,7 @@ func TestListFolder(t *testing.T) {
 		})
 		bSubFolder := getSubFolder(t, subFolders, "a/b/")
 
-		objects, subFolders, err = bSubFolder.ListFolder()
+		objects, subFolders, err = bSubFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file", "s2"}: true,
@@ -219,7 +220,7 @@ func TestListFolder(t *testing.T) {
 		})
 		cSubFolder := getSubFolder(t, subFolders, "a/b/c/")
 
-		objects, subFolders, err = cSubFolder.ListFolder()
+		objects, subFolders, err = cSubFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file", "s1"}: true,
@@ -233,14 +234,14 @@ func TestListFolder(t *testing.T) {
 		rootFolder := newTestFolder(t, "s1", "s2")
 		rootFolder.policies.List = policies.ListPolicyAll
 
-		_ = rootFolder.usedFolders[0].PutObject("file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[0].PutObject("a/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[0].PutObject("a/b/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("a/file", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("a/b/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "a/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "a/b/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "a/file", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "a/b/file", &bytes.Buffer{})
 
-		objects, subFolders, err := rootFolder.ListFolder()
+		objects, subFolders, err := rootFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file", "s1"}: true,
@@ -250,7 +251,7 @@ func TestListFolder(t *testing.T) {
 
 		aSubFolder = SetPolicies(aSubFolder, policies.MergeAllStorages)
 
-		objects, subFolders, err = aSubFolder.ListFolder()
+		objects, subFolders, err = aSubFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file", "s1"}: true,
@@ -259,7 +260,7 @@ func TestListFolder(t *testing.T) {
 
 		bSubFolder = SetPolicies(bSubFolder, policies.UniteAllStorages)
 
-		objects, subFolders, err = bSubFolder.ListFolder()
+		objects, subFolders, err = bSubFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file", "s1"}: true,
@@ -272,14 +273,14 @@ func TestListFolder(t *testing.T) {
 		rootFolder.policies.List = policies.ListPolicyAll
 		collectorMock := rootFolder.statsCollector.(*stats.MockCollector)
 
-		_ = rootFolder.usedFolders[0].PutObject("file1", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[0].PutObject("a/file2", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[0].PutObject("a/b/file3", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("file1", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("a/file2", &bytes.Buffer{})
-		_ = rootFolder.usedFolders[1].PutObject("a/b/file3", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "file1", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "a/file2", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[0].PutObject(t.Context(), "a/b/file3", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "file1", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "a/file2", &bytes.Buffer{})
+		_ = rootFolder.usedFolders[1].PutObject(t.Context(), "a/b/file3", &bytes.Buffer{})
 
-		objects, subFolders, err := rootFolder.ListFolder()
+		objects, subFolders, err := rootFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file1", "s1"}: true,
@@ -287,24 +288,24 @@ func TestListFolder(t *testing.T) {
 		})
 		aSubFolder := getSubFolder(t, subFolders, "a/")
 
-		collectorMock.EXPECT().SpecificStorage("s1").Return(true, nil)
-		aSubFolder, err = UseSpecificStorage("s1", aSubFolder)
+		collectorMock.EXPECT().SpecificStorage(gomock.Any(), "s1").Return(true, nil)
+		aSubFolder, err = UseSpecificStorage(t.Context(), "s1", aSubFolder)
 		require.NoError(t, err)
 
-		objects, subFolders, err = aSubFolder.ListFolder()
+		objects, subFolders, err = aSubFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file2", "s1"}: true,
 		})
 		bSubFolder := getSubFolder(t, subFolders, "a/b/")
 
-		collectorMock.EXPECT().AllAliveStorages().Return([]string{"s1", "s2", "s3"}, nil)
-		bSubFolder, err = UseAllAliveStorages(bSubFolder)
+		collectorMock.EXPECT().AllAliveStorages(gomock.Any()).Return([]string{"s1", "s2", "s3"}, nil)
+		bSubFolder, err = UseAllAliveStorages(t.Context(), bSubFolder)
 
 		require.NoError(t, err)
 		bSubFolder = SetPolicies(bSubFolder, policies.UniteAllStorages)
 
-		objects, subFolders, err = bSubFolder.ListFolder()
+		objects, subFolders, err = bSubFolder.ListFolder(t.Context())
 		require.NoError(t, err)
 		assertListedObjects(t, objects, map[listedObj]bool{
 			{"file3", "s1"}: true,

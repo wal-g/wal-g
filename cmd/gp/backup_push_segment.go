@@ -1,17 +1,15 @@
 package gp
 
 import (
-	"github.com/wal-g/wal-g/internal/databases/greenplum"
-	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -30,7 +28,7 @@ var (
 
 			greenplum.SetSegmentStoragePrefix(contentID)
 
-			rootFolder, err := getMultistorageRootFolder(true, policies.TakeFirstStorage)
+			rootFolder, err := getMultistorageRootFolder(cmd.Context(), true, policies.TakeFirstStorage)
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			uploader, err := internal.ConfigureUploaderToFolder(rootFolder)
@@ -69,7 +67,7 @@ var (
 				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),
 				userData, viper.GetBool(conf.WithoutFilesMetadataSetting))
 
-			backupHandler, err := greenplum.NewSegBackupHandler(arguments)
+			backupHandler, err := greenplum.NewSegBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
 		},

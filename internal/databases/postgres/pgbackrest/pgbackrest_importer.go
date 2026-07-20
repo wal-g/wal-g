@@ -1,13 +1,13 @@
 package pgbackrest
 
 import (
+	"context"
 	"strconv"
 	"time"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/printlist"
-
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -84,8 +84,8 @@ func (bd *BackupDetails) PrintableFields() []printlist.TableField {
 	}
 }
 
-func GetBackupList(backupsFolder storage.Folder, stanza string) ([]internal.BackupTime, error) {
-	backupsSettings, err := LoadBackupsSettings(backupsFolder, stanza)
+func GetBackupList(ctx context.Context, backupsFolder storage.Folder, stanza string) ([]internal.BackupTime, error) {
+	backupsSettings, err := LoadBackupsSettings(ctx, backupsFolder, stanza)
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +101,8 @@ func GetBackupList(backupsFolder storage.Folder, stanza string) ([]internal.Back
 	return backupTimes, nil
 }
 
-func GetBackupDetails(backupsFolder storage.Folder, stanza string, backupName string) (*BackupDetails, error) {
-	manifest, err := LoadManifest(backupsFolder, stanza, backupName)
+func GetBackupDetails(ctx context.Context, backupsFolder storage.Folder, stanza string, backupName string) (*BackupDetails, error) {
+	manifest, err := LoadManifest(ctx, backupsFolder, stanza, backupName)
 	if err != nil {
 		return nil, err
 	}

@@ -9,11 +9,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 )
@@ -69,7 +68,7 @@ func (u *WalMetadataUploader) UploadWalMetadata(
 		return errors.Wrapf(err, "Unable to marshal walmetadata")
 	}
 	if u.useBulkMetadataUpload {
-		err = u.walMetadataFolder.PutObject(walMetadataName, bytes.NewReader(dtoBody))
+		err = u.walMetadataFolder.PutObject(ctx, walMetadataName, bytes.NewReader(dtoBody))
 		if err != nil {
 			return errors.Wrapf(err, "upload: could not Upload metadata'%s'\n", walFileName)
 		}

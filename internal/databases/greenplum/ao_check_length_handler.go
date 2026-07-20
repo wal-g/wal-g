@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -34,26 +34,26 @@ func NewAOLengthCheckHandler(
 	}, nil
 }
 
-func (checker *AOLengthCheckHandler) CheckAOTableLength() {
-	conn, err := postgres.Connect()
+func (checker *AOLengthCheckHandler) CheckAOTableLength(ctx context.Context) {
+	conn, err := postgres.Connect(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
 	defer func() {
-		err := conn.Close(context.TODO())
+		err := conn.Close(ctx)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("failed to close connection %v", err)
 		}
 	}()
 
-	globalCluster, _, _, err := getGpClusterInfo(conn)
+	globalCluster, _, _, err := getGpClusterInfo(ctx, conn)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("could not get cluster info %v", err)
 	}
 
 	segmentsBackups := make(map[int]string)
 	if checker.checkBackup {
-		segmentsBackups, err = getSegmentBackupNames(checker.backupName, checker.rootFolder)
+		segmentsBackups, err = getSegmentBackupNames(ctx, checker.backupName, checker.rootFolder)
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("could not get segment`s backups %v", err)
 		}
@@ -109,14 +109,14 @@ func (checker *AOLengthCheckHandler) buildCheckAOLengthCmd(contentID int, backup
 	return cmdLine
 }
 
-func getSegmentBackupNames(name string, rootFolder storage.Folder) (map[int]string, error) {
-	backup, err := internal.GetBackupByName(name, utility.BaseBackupPath, rootFolder)
+func getSegmentBackupNames(ctx context.Context, name string, rootFolder storage.Folder) (map[int]string, error) {
+	backup, err := internal.GetBackupByName(ctx, name, utility.BaseBackupPath, rootFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get latest backup")
 		return nil, err
 	}
 	var sentinel BackupSentinelDto
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get latest backup")
 		return nil, err

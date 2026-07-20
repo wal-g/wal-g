@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -253,15 +252,15 @@ func testGetBackupMetadataToUpload(
 	for backupName, backupData := range backups {
 		sentinelBytes, err := json.Marshal(backupData.sentinel)
 		assert.NoError(t, err)
-		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, bytes.NewReader(sentinelBytes))
+		err = baseBackupFolder.PutObject(t.Context(), backupName+utility.SentinelSuffix, bytes.NewReader(sentinelBytes))
 		assert.NoError(t, err)
 		metaBytes, err := json.Marshal(backupData.meta)
 		assert.NoError(t, err)
-		err = baseBackupFolder.PutObject(backupName+"/"+utility.MetadataFileName, bytes.NewReader(metaBytes))
+		err = baseBackupFolder.PutObject(t.Context(), backupName+"/"+utility.MetadataFileName, bytes.NewReader(metaBytes))
 		assert.NoError(t, err)
 	}
 	markHandler := internal.NewBackupMarkHandler(postgres.NewGenericMetaInteractor(), folder)
-	backupsToMark, err := markHandler.GetBackupsToMark(toMark, toPermanent)
+	backupsToMark, err := markHandler.GetBackupsToMark(t.Context(), toMark, toPermanent)
 
 	if !isErrorExpect {
 		assert.NoError(t, err)

@@ -2,12 +2,13 @@ package binary
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"strings"
 )
 
 type SetMap map[string]map[string]struct{}

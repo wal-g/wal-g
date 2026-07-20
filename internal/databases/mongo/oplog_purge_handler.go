@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,27 +11,28 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
-func LoadBackups(downloader archive.Downloader) ([]*models.Backup, error) {
-	backupTimes, _, err := downloader.ListBackups()
+func LoadBackups(ctx context.Context, downloader archive.Downloader) ([]*models.Backup, error) {
+	backupTimes, _, err := downloader.ListBackups(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if len(backupTimes) == 0 {
 		return []*models.Backup{}, nil
 	}
-	return downloader.LoadBackups(archive.BackupNamesFromBackupTimes(backupTimes))
+	return downloader.LoadBackups(ctx, archive.BackupNamesFromBackupTimes(backupTimes))
 }
 
 // HandleOplogPurge delete oplog archives according to settings
-func HandleOplogPurge(downloader archive.Downloader, purger archive.Purger, retainAfter *time.Time, dryRun bool) error {
-	archives, err := downloader.ListOplogArchives()
+func HandleOplogPurge(ctx context.Context,
+	downloader archive.Downloader, purger archive.Purger, retainAfter *time.Time, dryRun bool) error {
+	archives, err := downloader.ListOplogArchives(ctx)
 	if err != nil {
 		return fmt.Errorf("can not load oplog archives: %+v", err)
 	}
 	if len(archives) == 0 {
 		return nil
 	}
-	backups, err := LoadBackups(downloader)
+	backups, err := LoadBackups(ctx, downloader)
 	if err != nil {
 		return fmt.Errorf("can not load backups: %+v", err)
 	}
@@ -55,7 +57,7 @@ func HandleOplogPurge(downloader archive.Downloader, purger archive.Purger, reta
 	purgeArchives := archive.SelectPurgingOplogArchives(archives, backups, &retainArchivesAfterTS, additionalInterval)
 	tracelog.DebugLogger.Printf("Oplog archives selected to be deleted: %v", purgeArchives)
 	if !dryRun {
-		if err := purger.DeleteOplogArchives(purgeArchives); err != nil {
+		if err := purger.DeleteOplogArchives(ctx, purgeArchives); err != nil {
 			return fmt.Errorf("can not purge oplog archives: %+v", err)
 		}
 		tracelog.InfoLogger.Printf("Oplog archives were purged: %d", len(purgeArchives))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"net"
 	"time"
 )
@@ -22,6 +23,9 @@ func getMessage(messageType SocketMessageType, messageArgs []string) ([]byte, er
 	case 0:
 		return binary.BigEndian.AppendUint16(messageType.ToBytes(), uint16(3)), nil
 	case 1:
+		if len(messageArgs[0])+3 > math.MaxUint16 {
+			return nil, fmt.Errorf("unsupported arg size: message length %d exceeds uint16 max", len(messageArgs[0])+3)
+		}
 		res := binary.BigEndian.AppendUint16(messageType.ToBytes(), uint16(len(messageArgs[0])+3))
 		return append(res, []byte(messageArgs[0])...), nil
 	}
@@ -59,14 +63,16 @@ func SendCommand(opts *RunOptions) (SocketMessageType, error) {
 		return ErrorType, fmt.Errorf("unix socket write error: %w", err)
 	}
 
-	resp := make([]byte, 512)
+	resp := make([]byte, 1)
 	n, err := socketConnection.Read(resp)
 	if err != nil {
 		return ErrorType, fmt.Errorf("unix socket read error: %w", err)
 	}
+
 	if n < 1 {
 		return ErrorType, fmt.Errorf("daemon response error [message type: %v, args: %v]", string(opts.MessageType), opts.MessageArgs)
 	}
+
 	if !OkType.IsEqual(resp[0]) {
 		return SocketMessageType(resp[0]), fmt.Errorf("daemon command run error [message type: %v, args: %v, daemon response: %v]",
 			string(opts.MessageType), opts.MessageArgs, string(resp[0]))

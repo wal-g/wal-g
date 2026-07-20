@@ -5,10 +5,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"strings"
 
 	"golang.org/x/net/html/charset"
-
-	"strings"
 )
 
 const (

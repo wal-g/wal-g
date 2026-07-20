@@ -24,24 +24,20 @@ func (lf *LimitedFolder) GetSubFolder(subFolderRelativePath string) storage.Fold
 	return NewLimitedFolder(folder, lf.limiter)
 }
 
-func (lf *LimitedFolder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	readCloser, err := lf.Folder.ReadObject(objectRelativePath)
+func (lf *LimitedFolder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
+	readCloser, err := lf.Folder.ReadObject(ctx, objectRelativePath)
 	if err != nil {
 		return nil, err
 	}
 	return ioextensions.ReadCascadeCloser{
-		Reader: limiters.NewReader(context.Background(), readCloser, lf.limiter),
+		Reader: limiters.NewReader(ctx, readCloser, lf.limiter),
 		Closer: readCloser,
 	}, nil
 }
 
-func (lf *LimitedFolder) PutObject(name string, content io.Reader) error {
-	return lf.PutObjectWithContext(context.Background(), name, content)
-}
-
-func (lf *LimitedFolder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (lf *LimitedFolder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	limitedReader := limiters.NewReader(ctx, content, lf.limiter)
-	return lf.Folder.PutObjectWithContext(ctx, name, limitedReader)
+	return lf.Folder.PutObject(ctx, name, limitedReader)
 }
 
 // SetShowAllVersions delegates the "show all versions" toggle to the underlying folder (if supported).

@@ -1,12 +1,10 @@
 package postgres_test
 
 import (
-	"context"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
 )
 
@@ -19,7 +17,7 @@ func TestSavePreviousWalTail(t *testing.T) {
 	previousWalTail := []byte{1, 2, 3, 4, 5}
 	err = walPartRecorder.SavePreviousWalTail(previousWalTail)
 	assert.NoError(t, err)
-	manager.FlushFiles(context.Background(), nil)
+	manager.FlushFiles(t.Context(), nil)
 
 	deltaFilename, err := postgres.GetDeltaFilenameFor(WalFilename)
 	assert.NoError(t, err)
@@ -38,7 +36,7 @@ func TestSaveNextWalHead_MiddleWalFile(t *testing.T) {
 	nextWalHead := []byte{1, 2, 3, 4, 5}
 	err = walPartRecorder.SaveNextWalHead(nextWalHead)
 	assert.NoError(t, err)
-	manager.FlushFiles(context.Background(), nil)
+	manager.FlushFiles(t.Context(), nil)
 
 	deltaFilename, err := postgres.GetDeltaFilenameFor(WalFilename)
 	assert.NoError(t, err)
@@ -57,7 +55,7 @@ func TestSaveNextWalHead_LastWalFile(t *testing.T) {
 	nextWalHead := []byte{1, 2, 3, 4, 5}
 	err = walPartRecorder.SaveNextWalHead(nextWalHead)
 	assert.NoError(t, err)
-	manager.FlushFiles(context.Background(), nil)
+	manager.FlushFiles(t.Context(), nil)
 
 	deltaFilename, err := postgres.GetDeltaFilenameFor(LastWalFilename)
 	assert.NoError(t, err)

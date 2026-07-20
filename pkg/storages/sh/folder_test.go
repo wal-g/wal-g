@@ -18,6 +18,7 @@ func TestSHFolder(t *testing.T) {
 	}
 
 	st, err := ConfigureStorage(
+		t.Context(),
 		// Configuration source docker/pg_tests/scripts/configs/ssh_backup_test_config.json
 		fmt.Sprintf("ssh://wal-g_ssh/tmp/sh-folder-test-%x", rand.Int63()),
 		map[string]string{

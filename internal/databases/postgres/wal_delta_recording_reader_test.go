@@ -2,15 +2,13 @@ package postgres_test
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"os"
 	"path"
 	"testing"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
@@ -79,7 +77,7 @@ func TestRead_CorrectRecording(t *testing.T) {
 
 	_, err = io.ReadAll(recordingReader)
 	assert.NoError(t, err)
-	manager.FlushFiles(context.Background(), nil)
+	manager.FlushFiles(t.Context(), nil)
 
 	locations, err := walparser.ReadLocationsFrom((*dataFolder)[DeltaFilename])
 	assert.NoError(t, err)
@@ -100,7 +98,7 @@ func TestRead_RecordingFail(t *testing.T) {
 
 	actualData, err := io.ReadAll(recordingReader)
 	assert.NoError(t, err)
-	manager.FlushFiles(context.Background(), nil)
+	manager.FlushFiles(t.Context(), nil)
 
 	assert.Equal(t, walData, actualData)
 	assert.True(t, dataFolder.IsEmpty())

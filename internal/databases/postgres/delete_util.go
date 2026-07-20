@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"strings"
 
 	"github.com/wal-g/tracelog"
@@ -14,9 +15,9 @@ type PermanentObject struct {
 	StorageName string
 }
 
-func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool, map[PermanentObject]bool) {
+func GetPermanentBackupsAndWals(ctx context.Context, folder storage.Folder) (map[PermanentObject]bool, map[PermanentObject]bool) {
 	tracelog.InfoLogger.Println("retrieving permanent objects")
-	backupTimes, err := internal.GetBackups(folder.GetSubFolder(utility.BaseBackupPath))
+	backupTimes, err := internal.GetBackups(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return map[PermanentObject]bool{}, map[PermanentObject]bool{}
 	}
@@ -26,12 +27,12 @@ func GetPermanentBackupsAndWals(folder storage.Folder) (map[PermanentObject]bool
 	permanentBackups := map[PermanentObject]bool{}
 	permanentWals := map[PermanentObject]bool{}
 	for _, backupTime := range backupTimes {
-		backup, err := NewBackupInStorage(backupsFolder, backupTime.BackupName, backupTime.StorageName)
+		backup, err := NewBackupInStorage(ctx, backupsFolder, backupTime.BackupName, backupTime.StorageName)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue
 		}
-		meta, err := backup.FetchMeta()
+		meta, err := backup.FetchMeta(ctx)
 		if err != nil {
 			internal.FatalOnUnrecoverableMetadataError(backupTime, err)
 			continue

@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"fmt"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/utility"
@@ -25,7 +26,7 @@ func HandleBinaryFetchPush(
 	}
 
 	localStorage := binary.CreateLocalStorage(config.GetDBPath())
-	uploader, err := internal.ConfigureUploader()
+	uploader, err := internal.ConfigureUploader(ctx)
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func HandleBinaryFetchPush(
 		}
 	}
 
-	restoreService, err := binary.CreateRestoreService(ctx, localStorage, uploader, minimalConfigPath)
+	restoreService, err := binary.CreateRestoreService(localStorage, uploader, minimalConfigPath)
 	if err != nil {
 		return err
 	}
@@ -59,20 +60,21 @@ func HandleBinaryFetchPush(
 	}
 
 	// check backup existence and resolve flag LATEST
-	backup, err := internal.GetBackupByName(backupName, "", uploader.Folder())
+	backup, err := internal.GetBackupByName(ctx, backupName, "", uploader.Folder())
 	if err != nil {
 		return err
 	}
 
 	var replyOplogConfig binary.ReplyOplogConfig
 	if pitrSince != "" && pitrUntil != "" {
-		replyOplogConfig, err = binary.NewReplyOplogConfig(pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "")
+		replyOplogConfig, err = binary.NewReplyOplogConfig(ctx, pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "")
 		if err != nil {
 			return err
 		}
 	}
 
 	return restoreService.DoRestore(
+		ctx,
 		rsConfig,
 		shConfig,
 		mongocfgConfig,

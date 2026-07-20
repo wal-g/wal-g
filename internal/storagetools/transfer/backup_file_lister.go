@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"path"
 	"strings"
 
@@ -36,8 +37,8 @@ func NewAllBackupsFileLister(overwrite bool, maxFiles, maxBackups int) *BackupFi
 	}
 }
 
-func (l *BackupFileLister) ListFilesToMove(source, target storage.Folder) (files []FilesGroup, num int, err error) {
-	missingFiles, err := listMissingFiles(source, target, prefix, l.Overwrite)
+func (l *BackupFileLister) ListFilesToMove(ctx context.Context, source, target storage.Folder) (files []FilesGroup, num int, err error) {
+	missingFiles, err := listMissingFiles(ctx, source, target, prefix, l.Overwrite)
 	if err != nil {
 		return nil, 0, err
 	}

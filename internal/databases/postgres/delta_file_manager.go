@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/wal-g/wal-g/internal"
-
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/walparser"

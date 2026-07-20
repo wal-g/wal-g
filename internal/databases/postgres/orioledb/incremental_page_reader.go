@@ -2,6 +2,7 @@ package orioledb
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"io"
 	"os"
@@ -289,7 +290,8 @@ func (pageReader *incrementalPageReader) SelectNewValidPage(pageBytes []byte, bl
 	return
 }
 
-func ReadIncrementalFile(filePath string,
+func ReadIncrementalFile(ctx context.Context,
+	filePath string,
 	fileSize int64,
 	chkpNum uint32,
 	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
@@ -299,7 +301,7 @@ func ReadIncrementalFile(filePath string,
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
-		Reader: limiters.NewDiskLimitReader(file),
+		Reader: limiters.NewDiskLimitReader(ctx, file),
 		Seeker: file,
 		Closer: file,
 	}

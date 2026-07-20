@@ -47,7 +47,7 @@ func TestMain(m *testing.M) {
 }
 
 func runExporter(t *testing.T, mockWalgPath string) func() {
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(t.Context())
 
 	args := []string{
 		"-web.listen-address", listenAddress,

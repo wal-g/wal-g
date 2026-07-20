@@ -4,12 +4,11 @@ import (
 	"context"
 	"path/filepath"
 
+	"github.com/spf13/viper"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/redis/aof"
 	"github.com/wal-g/wal-g/internal/diskwatcher"
-
-	"github.com/spf13/viper"
 )
 
 type AOFBackupPushArgs struct {
@@ -27,6 +26,7 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	aofPath := filepath.Join(dataFolder, aofFolder)
 	tmpPath, _ := conf.GetSetting(conf.RedisAppendonlyTmpFolder)
 	concurrentUploader, err := internal.CreateConcurrentUploader(
+		ctx,
 		internal.CreateConcurrentUploaderArgs{
 			Uploader:   args.Uploader,
 			BackupName: backupName,
@@ -48,7 +48,6 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	filesPinner := aof.NewFilesPinner(tmpPath)
 
 	backupService, err := aof.CreateBackupService(
-		ctx,
 		diskWatcher,
 		concurrentUploader,
 		args.MetaConstructor,
@@ -64,5 +63,5 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 		Sharded:    args.Sharded,
 	}
 
-	return backupService.DoBackup(doBackupArgs)
+	return backupService.DoBackup(ctx, doBackupArgs)
 }

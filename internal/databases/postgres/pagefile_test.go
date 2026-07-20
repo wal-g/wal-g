@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -148,7 +149,7 @@ func postgresReadIncrementTest(localLSN LSN, t *testing.T) {
 	if err != nil {
 		fmt.Print(err.Error())
 	}
-	reader, size, err := ReadIncrementalFile(pagedFileName, fileInfo.Size(), localLSN, nil)
+	reader, size, err := ReadIncrementalFile(t.Context(), pagedFileName, fileInfo.Size(), localLSN, nil)
 	if err != nil {
 		fmt.Print(err.Error())
 	}
@@ -424,7 +425,7 @@ func checkAllWrittenBlocksCorrect(mockFile *MockReadWriterAt, sourceFile io.Read
 
 func readIncrementToBuffer(localLSN LSN) []byte {
 	fileInfo, _ := os.Stat(pagedFileName)
-	reader, _, _ := ReadIncrementalFile(pagedFileName, fileInfo.Size(), localLSN, nil)
+	reader, _, _ := ReadIncrementalFile(context.Background(), pagedFileName, fileInfo.Size(), localLSN, nil)
 	buf, _ := io.ReadAll(reader)
 	return buf
 }

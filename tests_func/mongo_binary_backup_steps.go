@@ -2,6 +2,7 @@ package functests
 
 import (
 	"fmt"
+
 	"github.com/cucumber/godog"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"

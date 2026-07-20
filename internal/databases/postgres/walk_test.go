@@ -2,7 +2,6 @@ package postgres_test
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -182,7 +181,7 @@ func extract(t *testing.T, dir string) string {
 		t.Log(err)
 	}
 
-	err = internal.ExtractAll(ft, out)
+	err = internal.ExtractAll(t.Context(), ft, out)
 	if err != nil {
 		t.Log(err)
 	}
@@ -370,7 +369,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 		t.Log(err)
 	}
 
-	err = bundle.SetupComposer(setupTestTarBallComposerMaker(composer, withoutFilesMetadata))
+	err = bundle.SetupComposer(t.Context(), setupTestTarBallComposerMaker(composer, withoutFilesMetadata))
 	if err != nil {
 		t.Log(err)
 	}
@@ -410,7 +409,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	sen := bundle.Sentinel.Info.Name()
 	assert.Equal(t, postgres.PgControl, sen)
 
-	err = bundle.UploadPgControl("lz4")
+	err = bundle.UploadPgControl(t.Context(), "lz4")
 	assert.NoError(t, err)
 
 	// err = bundle.UploadLabelFiles("backup", "table")
@@ -434,7 +433,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 	walFileName := filepath.Join(data, "1")
 	walFile, err := os.Open(walFileName)
 	assert.NoError(t, err)
-	err = uploader.UploadFile(context.Background(), walFile)
+	err = uploader.UploadFile(t.Context(), walFile)
 
 	if err != nil {
 		// t.Errorf("upload: expected no error to occur but got %+v", err)

@@ -12,12 +12,13 @@ env:
   CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
-  CACHE_FILE_PG_TESTS: ~/docker-images-${{ github.sha }}/pg_tests.tar
-  IMAGE_PG_TESTS: wal-g/pg_tests
+  CACHE_FILE_PG10_TESTS: ~/docker-images-${{ github.sha }}/pg10_tests.tar
+  CACHE_FILE_PG18_TESTS: ~/docker-images-${{ github.sha }}/pg18_tests.tar
+  IMAGE_PG10_TESTS: wal-g/pg10_tests
+  IMAGE_PG18_TESTS: wal-g/pg18_tests
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
   GO_VERSION: "1.25"
-  LIBSODIUM_VERSION: "1.0.20"
 
 jobs:
   buildimages:
@@ -27,10 +28,11 @@ jobs:
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
-            ${{ env.CACHE_FILE_PG_TESTS }}
+            ${{ env.CACHE_FILE_PG10_TESTS }}
+            ${{ env.CACHE_FILE_PG18_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
@@ -52,7 +54,9 @@ jobs:
 
       - name: Check out code into the Go module directory
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
@@ -61,10 +65,9 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
-      - name: Get dependencies
+      - name: Set up Docker Buildx
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: |
-          go get -v -t ./...
+        uses: docker/setup-buildx-action@v4
 
       # build images
       - name: Build images
@@ -73,6 +76,9 @@ jobs:
     env:
       USE_BROTLI: 1
       USE_LZO: 1
+      # route docker compose build through buildx bake so per-service cache_from / cache_to in docker-compose.bake.yml take effect
+      COMPOSE_BAKE: "true"
+      COMPOSE_FILE: docker-compose.yml:docker-compose.bake.yml
 
   test:
     name: test
@@ -90,7 +96,9 @@ jobs:
         run: sudo apt-get install liblzo2-dev
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v6
@@ -98,17 +106,14 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
         id: go
 
-      - name: Get dependencies
-        run: |
-          go get -v -t -d ./...
-
       # load docker images
       - name: Load docker images
         id: cache-images
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
-            ${{ env.CACHE_FILE_PG_TESTS }}
+            ${{ env.CACHE_FILE_PG10_TESTS }}
+            ${{ env.CACHE_FILE_PG18_TESTS }}
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}

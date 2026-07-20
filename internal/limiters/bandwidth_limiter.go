@@ -8,20 +8,14 @@ import (
 )
 
 var DiskLimiter *rate.Limiter
+
+// NetworkLimiter throttles storage traffic via LimitedFolder, see internal.NewLimitedFolder
 var NetworkLimiter *rate.Limiter
 
-// NewNetworkLimitReader returns a reader that is rate limited by network limiter
-func NewNetworkLimitReader(r io.Reader) io.Reader {
-	if NetworkLimiter == nil {
-		return r
-	}
-	return NewReader(context.Background(), r, NetworkLimiter)
-}
-
 // NewDiskLimitReader returns a reader that is rate limited by disk limiter
-func NewDiskLimitReader(r io.Reader) io.Reader {
+func NewDiskLimitReader(ctx context.Context, r io.Reader) io.Reader {
 	if DiskLimiter == nil {
 		return r
 	}
-	return NewReader(context.Background(), r, DiskLimiter)
+	return NewReader(ctx, r, DiskLimiter)
 }

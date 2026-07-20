@@ -7,12 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
-
 	"github.com/wal-g/wal-g/utility"
-
-	"github.com/wal-g/wal-g/internal"
 )
 
 func HandlePutObject(
@@ -22,7 +20,7 @@ func HandlePutObject(
 	uploader internal.Uploader,
 	overwrite, encrypt, compress bool,
 ) error {
-	err := checkOverwrite(dstPath, uploader, overwrite)
+	err := checkOverwrite(ctx, dstPath, uploader, overwrite)
 	if err != nil {
 		return fmt.Errorf("check file overwrite: %v", err)
 	}
@@ -40,9 +38,9 @@ func HandlePutObject(
 	return nil
 }
 
-func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) error {
-	fullPath := dstPath + "." + uploader.Compression().FileExtension()
-	exists, err := uploader.Folder().Exists(fullPath)
+func checkOverwrite(ctx context.Context, dstPath string, uploader internal.Uploader, overwrite bool) error {
+	fullPath := utility.AddFileExtension(dstPath, uploader.Compression().FileExtension())
+	exists, err := uploader.Folder().Exists(ctx, fullPath)
 	if err != nil {
 		return fmt.Errorf("check object existence: %v", err)
 	}
@@ -79,7 +77,7 @@ func uploadFile(ctx context.Context, name string, content io.Reader, uploader in
 	var compressor compression.Compressor
 	if compress && uploader.Compression() != nil {
 		compressor = uploader.Compression()
-		name += "." + uploader.Compression().FileExtension()
+		name = utility.AddFileExtension(name, uploader.Compression().FileExtension())
 	}
 
 	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter)

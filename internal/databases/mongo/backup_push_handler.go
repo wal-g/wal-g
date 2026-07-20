@@ -1,6 +1,7 @@
 package mongo
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 
@@ -10,10 +11,11 @@ import (
 )
 
 // HandleBackupPush starts backup procedure.
-func HandleBackupPush(uploader archive.Uploader,
+func HandleBackupPush(ctx context.Context,
+	uploader archive.Uploader,
 	metaConstructor internal.MetaConstructor,
 	backupCmd *exec.Cmd) error {
-	if err := metaConstructor.Init(); err != nil {
+	if err := metaConstructor.Init(ctx); err != nil {
 		return fmt.Errorf("can not initiate meta provider: %+v", err)
 	}
 
@@ -22,5 +24,5 @@ func HandleBackupPush(uploader archive.Uploader,
 		return fmt.Errorf("can not start backup command: %+v", err)
 	}
 
-	return uploader.UploadBackup(stdout, backupCmd, metaConstructor)
+	return uploader.UploadBackup(ctx, stdout, backupCmd, metaConstructor)
 }

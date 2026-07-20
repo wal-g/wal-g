@@ -1,10 +1,6 @@
 package etcd
 
 import (
-	"context"
-	"os"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -34,22 +30,18 @@ var backupPushCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 		uploader.ChangeDirectory(utility.BaseBackupPath)
 
-		backupCmd, err := internal.GetCommandSetting(conf.NameStreamCreateCmd)
+		backupCmd, err := internal.GetCommandSettingContext(cmd.Context(), conf.NameStreamCreateCmd)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if userDataRaw == "" {
 			userDataRaw = viper.GetString(conf.SentinelUserDataSetting)
 		}
 
-		etcd.HandleBackupPush(uploader, backupCmd, permanent, userDataRaw)
+		etcd.HandleBackupPush(cmd.Context(), uploader, backupCmd, permanent, userDataRaw)
 	},
 }
 

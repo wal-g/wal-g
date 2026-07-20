@@ -16,13 +16,13 @@ type Folder struct {
 	mock.Mock
 }
 
-// CopyObject provides a mock function with given fields: srcPath, dstPath
-func (_m *Folder) CopyObject(srcPath string, dstPath string) error {
-	ret := _m.Called(srcPath, dstPath)
+// CopyObject provides a mock function with given fields: ctx, srcPath, dstPath
+func (_m *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
+	ret := _m.Called(ctx, srcPath, dstPath)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(srcPath, dstPath)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, srcPath, dstPath)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -30,13 +30,13 @@ func (_m *Folder) CopyObject(srcPath string, dstPath string) error {
 	return r0
 }
 
-// DeleteObjects provides a mock function with given fields: objectRelativePaths
-func (_m *Folder) DeleteObjects(objectRelativePaths []string) error {
-	ret := _m.Called(objectRelativePaths)
+// DeleteObjects provides a mock function with given fields: ctx, objects
+func (_m *Folder) DeleteObjects(ctx context.Context, objects []storage.Object) error {
+	ret := _m.Called(ctx, objects)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]string) error); ok {
-		r0 = rf(objectRelativePaths)
+	if rf, ok := ret.Get(0).(func(context.Context, []storage.Object) error); ok {
+		r0 = rf(ctx, objects)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -44,23 +44,23 @@ func (_m *Folder) DeleteObjects(objectRelativePaths []string) error {
 	return r0
 }
 
-// Exists provides a mock function with given fields: objectRelativePath
-func (_m *Folder) Exists(objectRelativePath string) (bool, error) {
-	ret := _m.Called(objectRelativePath)
+// Exists provides a mock function with given fields: ctx, objectRelativePath
+func (_m *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
+	ret := _m.Called(ctx, objectRelativePath)
 
 	var r0 bool
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (bool, error)); ok {
-		return rf(objectRelativePath)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (bool, error)); ok {
+		return rf(ctx, objectRelativePath)
 	}
-	if rf, ok := ret.Get(0).(func(string) bool); ok {
-		r0 = rf(objectRelativePath)
+	if rf, ok := ret.Get(0).(func(context.Context, string) bool); ok {
+		r0 = rf(ctx, objectRelativePath)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(objectRelativePath)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectRelativePath)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -98,34 +98,34 @@ func (_m *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return r0
 }
 
-// ListFolder provides a mock function with given fields:
-func (_m *Folder) ListFolder() ([]storage.Object, []storage.Folder, error) {
-	ret := _m.Called()
+// ListFolder provides a mock function with given fields: ctx
+func (_m *Folder) ListFolder(ctx context.Context) ([]storage.Object, []storage.Folder, error) {
+	ret := _m.Called(ctx)
 
 	var r0 []storage.Object
 	var r1 []storage.Folder
 	var r2 error
-	if rf, ok := ret.Get(0).(func() ([]storage.Object, []storage.Folder, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) ([]storage.Object, []storage.Folder, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() []storage.Object); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) []storage.Object); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]storage.Object)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() []storage.Folder); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) []storage.Folder); ok {
+		r1 = rf(ctx)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]storage.Folder)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func() error); ok {
-		r2 = rf()
+	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = rf(ctx)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -133,22 +133,8 @@ func (_m *Folder) ListFolder() ([]storage.Object, []storage.Folder, error) {
 	return r0, r1, r2
 }
 
-// PutObject provides a mock function with given fields: name, content
-func (_m *Folder) PutObject(name string, content io.Reader) error {
-	ret := _m.Called(name, content)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, io.Reader) error); ok {
-		r0 = rf(name, content)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// PutObjectWithContext provides a mock function with given fields: ctx, name, content
-func (_m *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+// PutObject provides a mock function with given fields: ctx, name, content
+func (_m *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	ret := _m.Called(ctx, name, content)
 
 	var r0 error
@@ -161,25 +147,25 @@ func (_m *Folder) PutObjectWithContext(ctx context.Context, name string, content
 	return r0
 }
 
-// ReadObject provides a mock function with given fields: objectRelativePath
-func (_m *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
-	ret := _m.Called(objectRelativePath)
+// ReadObject provides a mock function with given fields: ctx, objectRelativePath
+func (_m *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
+	ret := _m.Called(ctx, objectRelativePath)
 
 	var r0 io.ReadCloser
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (io.ReadCloser, error)); ok {
-		return rf(objectRelativePath)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (io.ReadCloser, error)); ok {
+		return rf(ctx, objectRelativePath)
 	}
-	if rf, ok := ret.Get(0).(func(string) io.ReadCloser); ok {
-		r0 = rf(objectRelativePath)
+	if rf, ok := ret.Get(0).(func(context.Context, string) io.ReadCloser); ok {
+		r0 = rf(ctx, objectRelativePath)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(io.ReadCloser)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(objectRelativePath)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectRelativePath)
 	} else {
 		r1 = ret.Error(1)
 	}

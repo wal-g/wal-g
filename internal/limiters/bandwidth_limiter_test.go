@@ -27,16 +27,14 @@ func (r *fakeCloser) Close() error {
 
 func TestLimiter(t *testing.T) {
 	limiters.DiskLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
-	limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(10000), int(1024))
 	defer func() {
 		limiters.DiskLimiter = nil
-		limiters.NetworkLimiter = nil
 	}()
 	buffer := bytes.NewReader(make([]byte, 2000))
 	r := &fakeCloser{buffer}
 	start := utility.TimeNowCrossPlatformLocal()
 
-	reader := limiters.NewDiskLimitReader(limiters.NewNetworkLimitReader(r))
+	reader := limiters.NewDiskLimitReader(t.Context(), r)
 	_, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 	end := utility.TimeNowCrossPlatformLocal()

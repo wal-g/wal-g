@@ -9,11 +9,10 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/asm"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
-
-	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -73,13 +72,13 @@ func (walUploader *WalUploader) FlushFiles(ctx context.Context) {
 	walUploader.DeltaFileManager.FlushFiles(ctx, walUploader)
 }
 
-func PrepareMultiStorageWalUploader(folder storage.Folder, targetStorage string) (*WalUploader, error) {
+func PrepareMultiStorageWalUploader(ctx context.Context, folder storage.Folder, targetStorage string) (*WalUploader, error) {
 	folder = multistorage.SetPolicies(folder, policies.TakeFirstStorage)
 	var err error
 	if targetStorage == "" {
-		folder, err = multistorage.UseFirstAliveStorage(folder)
+		folder, err = multistorage.UseFirstAliveStorage(ctx, folder)
 	} else {
-		folder, err = multistorage.UseSpecificStorage(targetStorage, folder)
+		folder, err = multistorage.UseSpecificStorage(ctx, targetStorage, folder)
 	}
 	if err != nil {
 		return nil, err

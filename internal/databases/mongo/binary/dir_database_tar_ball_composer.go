@@ -1,8 +1,10 @@
 package binary
 
 import (
-	"github.com/wal-g/wal-g/internal"
+	"context"
 	"strings"
+
+	"github.com/wal-g/wal-g/internal"
 )
 
 const (
@@ -22,9 +24,10 @@ func NewDirDatabaseTarBallComposerMaker() *DirDatabaseTarBallComposerMaker {
 	}
 }
 
-func (maker *DirDatabaseTarBallComposerMaker) Make(bundle *internal.Bundle) (internal.TarBallComposer, error) {
+func (maker *DirDatabaseTarBallComposerMaker) Make(ctx context.Context, bundle *internal.Bundle) (internal.TarBallComposer, error) {
 	packer := internal.NewRegularTarBallFilePacker(maker.files, false)
 	return internal.NewDirDatabaseTarBallComposer(
+		ctx,
 		maker.files,
 		bundle.TarBallQueue,
 		packer,

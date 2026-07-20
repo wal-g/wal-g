@@ -1,10 +1,9 @@
 package gp
 
 import (
-	"github.com/wal-g/wal-g/internal/databases/greenplum"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/greenplum"
 )
 
 const (
@@ -20,10 +19,10 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			restorePointCreator, err := greenplum.NewRestorePointCreator(name)
+			restorePointCreator, err := greenplum.NewRestorePointCreator(cmd.Context(), name)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			restorePointCreator.Create()
+			restorePointCreator.Create(cmd.Context())
 		},
 	}
 )

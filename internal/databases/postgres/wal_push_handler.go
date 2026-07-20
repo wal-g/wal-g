@@ -8,16 +8,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
 	"time"
-
-	"github.com/wal-g/wal-g/internal"
-	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/statistics"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/statistics"
 )
 
 type CantOverwriteWalFileError struct {
@@ -36,11 +34,9 @@ func (err CantOverwriteWalFileError) Error() string {
 
 // TODO : unit tests
 // HandleWALPush is invoked to perform wal-g wal-push
-func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath string) error {
+func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath string) (retErr error) {
 	if uploader.ArchiveStatusManager.IsWalAlreadyUploaded(walFilePath) {
-		err := uploader.ArchiveStatusManager.UnmarkWalFile(walFilePath)
-
-		if err != nil {
+		if err := uploader.ArchiveStatusManager.UnmarkWalFile(walFilePath); err != nil {
 			tracelog.ErrorLogger.Printf("unmark wal-g status for %s file failed due following error %+v", walFilePath, err)
 		}
 		return uploadLocalWalMetadata(ctx, walFilePath, uploader)
@@ -60,18 +56,16 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 	bgUploader := NewBgUploader(ctx, walFilePath, int32(concurrency-1), totalBgUploadedLimit-1, uploader, preventWalOverwrite, readyRename)
 	// Look for new WALs while doing main upload
 	bgUploader.Start()
+	defer func() {
+		if err := bgUploader.Stop(); err != nil && retErr == nil {
+			retErr = err
+		}
+	}()
 
-	err = uploadWALFile(ctx, uploader, walFilePath, preventWalOverwrite)
-	if err != nil {
+	if err := uploadWALFile(ctx, uploader, walFilePath, preventWalOverwrite); err != nil {
 		return err
 	}
-	err = uploadLocalWalMetadata(ctx, walFilePath, uploader.Uploader)
-	if err != nil {
-		return err
-	}
-
-	err = bgUploader.Stop()
-	if err != nil {
+	if err := uploadLocalWalMetadata(ctx, walFilePath, uploader.Uploader); err != nil {
 		return err
 	}
 	statistics.WriteS3UploadTimeMetric(time.Since(uploadStart))
@@ -86,7 +80,7 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 // uploadWALFile from FS to the cloud
 func uploadWALFile(ctx context.Context, uploader *WalUploader, walFilePath string, preventWalOverwrite bool) error {
 	if preventWalOverwrite {
-		overwriteAttempt, err := checkWALOverwrite(uploader, walFilePath)
+		overwriteAttempt, err := checkWALOverwrite(ctx, uploader, walFilePath)
 		if overwriteAttempt {
 			return err
 		} else if err != nil {
@@ -105,8 +99,9 @@ func uploadWALFile(ctx context.Context, uploader *WalUploader, walFilePath strin
 }
 
 // TODO : unit tests
-func checkWALOverwrite(uploader *WalUploader, walFilePath string) (overwriteAttempt bool, err error) {
-	walFileReader, err := internal.DownloadAndDecompressStorageFile(internal.NewFolderReader(uploader.Folder()), filepath.Base(walFilePath))
+func checkWALOverwrite(ctx context.Context, uploader *WalUploader, walFilePath string) (overwriteAttempt bool, err error) {
+	walFileReader, err := internal.DownloadAndDecompressStorageFile(ctx,
+		internal.NewFolderReader(uploader.Folder()), filepath.Base(walFilePath))
 	if err != nil {
 		if _, ok := err.(internal.ArchiveNonExistenceError); ok {
 			err = nil

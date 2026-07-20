@@ -1,13 +1,13 @@
 package postgres
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strconv"
 	"strings"
 
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
 )
 
@@ -76,7 +76,7 @@ func (desc RestoreDesc) FilterFilesToUnwrap(filesToUnwrap map[string]bool) {
 }
 
 func TryGetOidPair(file string) (bool, uint32, uint32) {
-	// nolint : staticcheck
+	//nolint:staticcheck
 	if !(strings.HasPrefix(file, defaultTbspPrefix) || strings.HasPrefix(file, customTbspPrefix)) {
 		return false, 0, 0
 	}
@@ -153,18 +153,19 @@ func NewExtractProviderDBSpec(restoreParameters []string) *ExtractProviderDBSpec
 }
 
 func (p ExtractProviderDBSpec) Get(
+	ctx context.Context,
 	backup Backup,
 	filesToUnwrap map[string]bool,
 	skipRedundantTars bool,
 	dbDataDir string,
 	createNewIncrementalFiles bool,
 ) (IncrementalTarInterpreter, []internal.ReaderMaker, []internal.ReaderMaker, error) {
-	_, filesMeta, err := backup.GetSentinelAndFilesMetadata()
+	_, filesMeta, err := backup.GetSentinelAndFilesMetadata(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	desc, err := p.restoreDescMaker.Make(p.RestoreParameters, filesMeta.DatabasesByNames)
 	tracelog.ErrorLogger.FatalOnError(err)
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
-	return ExtractProviderImpl{}.Get(backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
+	return ExtractProviderImpl{}.Get(ctx, backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }

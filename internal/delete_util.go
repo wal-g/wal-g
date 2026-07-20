@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -32,8 +33,8 @@ func IsPermanent(objectName string, permanentBackups map[string]bool, backupName
 	return false
 }
 
-func FindBackupObjects(folder storage.Folder) ([]BackupObject, error) {
-	backups, err := GetBackupSentinelObjects(folder)
+func FindBackupObjects(ctx context.Context, folder storage.Folder) ([]BackupObject, error) {
+	backups, err := GetBackupSentinelObjects(ctx, folder)
 	if err != nil {
 		return nil, err
 	}

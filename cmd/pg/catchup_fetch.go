@@ -22,9 +22,9 @@ var catchupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
-		postgres.HandleCatchupFetch(storage.RootFolder(), args[0], args[1], useNewUnwrap)
+		postgres.HandleCatchupFetch(cmd.Context(), storage.RootFolder(), args[0], args[1], useNewUnwrap)
 	},
 }
 

@@ -11,6 +11,7 @@
 package postgres
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -23,7 +24,6 @@ import (
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -138,7 +138,8 @@ func isChecksumValidatableFile(info os.FileInfo, filePath string) bool {
 		pagedFilenameRegexp.MatchString(path.Base(filePath))
 }
 
-func ReadIncrementalFile(filePath string,
+func ReadIncrementalFile(ctx context.Context,
+	filePath string,
 	fileSize int64,
 	lsn LSN,
 	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
@@ -148,7 +149,7 @@ func ReadIncrementalFile(filePath string,
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
-		Reader: limiters.NewDiskLimitReader(file),
+		Reader: limiters.NewDiskLimitReader(ctx, file),
 		Seeker: file,
 		Closer: file,
 	}
@@ -162,14 +163,14 @@ func ReadIncrementalFile(filePath string,
 	return pageReader, incrementSize, nil
 }
 
-func ReadIncrementLocations(filePath string, fileSize int64, lsn LSN) ([]walparser.BlockLocation, error) {
+func ReadIncrementLocations(ctx context.Context, filePath string, fileSize int64, lsn LSN) ([]walparser.BlockLocation, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
-		Reader: limiters.NewDiskLimitReader(file),
+		Reader: limiters.NewDiskLimitReader(ctx, file),
 		Seeker: file,
 		Closer: file,
 	}

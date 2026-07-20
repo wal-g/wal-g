@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -18,17 +19,17 @@ type SentinelDto struct {
 	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
 }
 
-func HandleWalFetch(folder storage.Folder, backupName string, dstDir string, baseReader internal.StorageFolderReader) {
+func HandleWalFetch(ctx context.Context, folder storage.Folder, backupName string, dstDir string, baseReader internal.StorageFolderReader) {
 	reader := baseReader.SubFolder(utility.WalPath)
 
-	backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
+	backup, err := internal.GetBackupByName(ctx, internal.LatestString, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get mentioned backup: %v", err)
 
 	var lastBackupSentinel SentinelDto
-	err = backup.FetchSentinel(&lastBackupSentinel)
+	err = backup.FetchSentinel(ctx, &lastBackupSentinel)
 	tracelog.ErrorLogger.FatalfOnError("Failed to unmarshall backup sentinel: %v", err)
 
-	walFiles, _, err := folder.GetSubFolder(utility.WalPath).ListFolder()
+	walFiles, _, err := folder.GetSubFolder(utility.WalPath).ListFolder(ctx)
 	tracelog.ErrorLogger.FatalfOnError("Failed to list wal folder from storage: %v", err)
 	fmt.Println(walFiles)
 
@@ -41,7 +42,7 @@ func HandleWalFetch(folder storage.Folder, backupName string, dstDir string, bas
 			walName := strings.TrimSuffix(walFile.GetName(), filepath.Ext(walFile.GetName()))
 			walPath := path.Join(dstDir, walName)
 			tracelog.InfoLogger.Printf("fetching %s into %s", walName, walPath)
-			err = internal.DownloadFileTo(reader, walName, walPath)
+			err = internal.DownloadFileTo(ctx, reader, walName, walPath)
 			tracelog.ErrorLogger.FatalfOnError("Failed to download wal file: %v", err)
 		}
 	}

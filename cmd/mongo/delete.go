@@ -50,14 +50,14 @@ func runPurge(cmd *cobra.Command, args []string) {
 	}
 
 	// set up storage downloader client
-	downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+	downloader, err := archive.NewStorageDownloader(cmd.Context(), archive.NewDefaultStorageSettings())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// set up storage downloader client
-	purger, err := archive.NewStoragePurger(archive.NewDefaultStorageSettings())
+	purger, err := archive.NewStoragePurger(cmd.Context(), archive.NewDefaultStorageSettings())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = mongo.HandlePurge(downloader, purger, opts...)
+	err = mongo.HandlePurge(cmd.Context(), downloader, purger, opts...)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

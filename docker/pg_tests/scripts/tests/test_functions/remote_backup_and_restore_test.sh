@@ -82,6 +82,8 @@ remote_backup_and_restore_test() {
   pg_ctl stop
 
   echo Comparing source and destination
+  # PG18 pg_dump emits \restrict/\unrestrict with per-invocation random keys
+  sed -i '/^\\restrict /d; /^\\unrestrict /d' "${TMPDIR}"/srcdump.sql "${TMPDIR}"/dstdump.sql
   if diff "${TMPDIR}"/*dump.sql; then
     /tmp/scripts/drop_pg.sh
     rm ${TMP_CONFIG}

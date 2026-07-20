@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"context"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -14,7 +16,7 @@ type PrevBackupInfo struct {
 }
 
 type DeltaBackupConfigurator interface {
-	Configure(isFullBackup bool, hostname string, serverUUID string, serverVersion string) (PrevBackupInfo, int, error)
+	Configure(ctx context.Context, isFullBackup bool, hostname string, serverUUID string, serverVersion string) (PrevBackupInfo, int, error)
 }
 
 type NoDeltaBackupConfigurator struct{}
@@ -23,7 +25,7 @@ func NewNoDeltaBackupConfigurator() NoDeltaBackupConfigurator {
 	return NoDeltaBackupConfigurator{}
 }
 
-func (c NoDeltaBackupConfigurator) Configure(_ bool, _ string, _ string, _ string) (PrevBackupInfo, int, error) {
+func (c NoDeltaBackupConfigurator) Configure(_ context.Context, _ bool, _ string, _ string, _ string) (PrevBackupInfo, int, error) {
 	return PrevBackupInfo{}, 0, nil
 }
 
@@ -40,6 +42,7 @@ func NewRegularDeltaBackupConfigurator(folder storage.Folder, deltaBaseSelector 
 //
 //nolint:funlen,gocyclo
 func (c RegularDeltaBackupConfigurator) Configure(
+	ctx context.Context,
 	isFullBackup bool,
 	hostname string,
 	serverUUID string,
@@ -55,7 +58,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	}
 
 	baseBackupFolder := c.folder.GetSubFolder(utility.BaseBackupPath)
-	previousBackup, err := c.deltaBaseSelector.Select(c.folder)
+	previousBackup, err := c.deltaBaseSelector.Select(ctx, c.folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find previous backup. Doing full backup.")
@@ -65,7 +68,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 	}
 
 	var prevBackupSentinelDto = StreamSentinelDto{}
-	err = previousBackup.FetchSentinel(&prevBackupSentinelDto)
+	err = previousBackup.FetchSentinel(ctx, &prevBackupSentinelDto)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if prevBackupSentinelDto.IncrementCount != nil {
@@ -100,7 +103,7 @@ func (c RegularDeltaBackupConfigurator) Configure(
 		if err != nil {
 			return PrevBackupInfo{}, 0, err
 		}
-		err = previousBackup.FetchSentinel(&prevBackupSentinelDto)
+		err = previousBackup.FetchSentinel(ctx, &prevBackupSentinelDto)
 		if err != nil {
 			return PrevBackupInfo{}, 0, err
 		}

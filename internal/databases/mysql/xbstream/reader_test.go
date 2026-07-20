@@ -2,10 +2,11 @@ package xbstream
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/testutils"
 	"io"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/testutils"
 )
 
 func TestXBStreamReader(t *testing.T) {

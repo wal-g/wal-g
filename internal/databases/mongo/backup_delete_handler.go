@@ -1,20 +1,23 @@
 package mongo
 
 import (
+	"context"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
-func purgeJournalInfo(backupName string, dryRun bool) {
-	storage, err := internal.ConfigureStorage()
+func purgeJournalInfo(ctx context.Context, backupName string, dryRun bool) {
+	storage, err := internal.ConfigureStorage(ctx)
 	if err != nil {
 		tracelog.WarningLogger.Printf("Can't configure storage: %+v", err)
 		return
 	}
 
 	journalInfo, err := internal.NewJournalInfo(
+		ctx,
 		backupName,
 		storage.RootFolder(),
 		models.OplogArchBasePath,
@@ -30,7 +33,7 @@ func purgeJournalInfo(backupName string, dryRun bool) {
 		return
 	}
 
-	err = journalInfo.Delete(storage.RootFolder())
+	err = journalInfo.Delete(ctx, storage.RootFolder())
 	if err != nil {
 		tracelog.ErrorLogger.Print(err)
 	} else {
@@ -39,8 +42,8 @@ func purgeJournalInfo(backupName string, dryRun bool) {
 }
 
 // HandleBackupDelete deletes backup.
-func HandleBackupDelete(backupName string, downloader archive.Downloader, purger archive.Purger, dryRun bool) error {
-	backup, err := downloader.BackupMeta(backupName)
+func HandleBackupDelete(ctx context.Context, backupName string, downloader archive.Downloader, purger archive.Purger, dryRun bool) error {
+	backup, err := downloader.BackupMeta(ctx, backupName)
 	if err != nil {
 		return err
 	}
@@ -50,10 +53,10 @@ func HandleBackupDelete(backupName string, downloader archive.Downloader, purger
 		return nil
 	}
 
-	if err := purger.DeleteBackups([]*models.Backup{backup}); err != nil {
+	if err := purger.DeleteBackups(ctx, []*models.Backup{backup}); err != nil {
 		return err
 	}
 	tracelog.InfoLogger.Printf("Backup was deleted: %+v", backup)
-	purgeJournalInfo(backupName, dryRun)
+	purgeJournalInfo(ctx, backupName, dryRun)
 	return nil
 }

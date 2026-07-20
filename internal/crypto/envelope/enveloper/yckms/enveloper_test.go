@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	"github.com/wal-g/wal-g/internal/crypto/envelope"
 )
 

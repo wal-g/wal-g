@@ -1,10 +1,8 @@
 package redis
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
@@ -33,12 +31,9 @@ var backupPushCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
+		ctx := cmd.Context()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// Configure folder
@@ -55,7 +50,7 @@ var backupPushCmd = &cobra.Command{
 
 		memoryDataGetter := client.NewServerDataGetter()
 
-		metaConstructor := archive.NewBackupRedisMetaConstructor(ctx, uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
+		metaConstructor := archive.NewBackupRedisMetaConstructor(uploader.Folder(), permanent, archive.RDBBackupType, nil, memoryDataGetter)
 
 		backupCmd.Stderr = os.Stderr
 
@@ -65,7 +60,7 @@ var backupPushCmd = &cobra.Command{
 			Uploader:        uploader,
 			MetaConstructor: metaConstructor,
 		}
-		err = redis.HandleRDBBackupPush(pushArgs)
+		err = redis.HandleRDBBackupPush(ctx, pushArgs)
 		tracelog.ErrorLogger.FatalfOnError("Redis backup creation failed: %v", err)
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {

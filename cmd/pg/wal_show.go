@@ -3,11 +3,10 @@ package pg
 import (
 	"os"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (
@@ -31,14 +30,14 @@ var (
 		Long:  WalShowLongDescription,
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			storage, err := internal.ConfigureStorage()
+			storage, err := internal.ConfigureStorage(cmd.Context())
 			tracelog.ErrorLogger.FatalOnError(err)
 			outputType := postgres.TableOutput
 			if detailedJSONOutput {
 				outputType = postgres.JSONOutput
 			}
 			outputWriter := postgres.NewWalShowOutputWriter(outputType, os.Stdout, !disableBackupsLookup)
-			postgres.HandleWalShow(storage.RootFolder(), !disableBackupsLookup, outputWriter)
+			postgres.HandleWalShow(cmd.Context(), storage.RootFolder(), !disableBackupsLookup, outputWriter)
 		},
 	}
 	detailedJSONOutput   bool

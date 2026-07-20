@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"io"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -27,8 +28,8 @@ func (readerMaker *StorageReaderMaker) StoragePath() string { return readerMaker
 
 func (readerMaker *StorageReaderMaker) LocalPath() string { return readerMaker.localPath }
 
-func (readerMaker *StorageReaderMaker) Reader() (io.ReadCloser, error) {
-	return readerMaker.Folder.ReadObject(readerMaker.storagePath)
+func (readerMaker *StorageReaderMaker) Reader(ctx context.Context) (io.ReadCloser, error) {
+	return readerMaker.Folder.ReadObject(ctx, readerMaker.storagePath)
 }
 
 func (readerMaker *StorageReaderMaker) FileType() FileType { return readerMaker.StorageFileType }

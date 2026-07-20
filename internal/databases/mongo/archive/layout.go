@@ -2,9 +2,9 @@ package archive
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"

@@ -11,8 +11,8 @@ var pgbackrestBackupListCmd = &cobra.Command{
 	Short: backupListShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		folder, stanza := configurePgbackrestSettings()
-		err := pgbackrest.HandleBackupList(folder, stanza, detail, pretty, json)
+		folder, stanza := configurePgbackrestSettings(cmd.Context())
+		err := pgbackrest.HandleBackupList(cmd.Context(), folder, stanza, detail, pretty, json)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

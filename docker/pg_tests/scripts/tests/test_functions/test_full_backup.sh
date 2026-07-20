@@ -101,6 +101,8 @@ test_full_backup()
   /tmp/scripts/wait_while_pg_not_ready.sh
   pg_dumpall -f /tmp/dump2
 
+  # PG18 pg_dumpall emits \restrict/\unrestrict with per-invocation random keys
+  sed -i '/^\\restrict /d; /^\\unrestrict /d' /tmp/dump1 /tmp/dump2
   diff /tmp/dump1 /tmp/dump2
 
   psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres

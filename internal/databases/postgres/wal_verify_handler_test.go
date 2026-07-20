@@ -2,17 +2,17 @@ package postgres_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
-	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -757,6 +757,7 @@ func testWalVerify(t *testing.T, setup WalVerifyTestSetup, backupSearchParams po
 	}
 
 	result, outputCallsCount := executeWalVerify(
+		t.Context(),
 		setup.storageSegments,
 		setup.storageFiles,
 		setup.currentWalSegment,
@@ -770,6 +771,7 @@ func testWalVerify(t *testing.T, setup WalVerifyTestSetup, backupSearchParams po
 // executeWalShow invokes the HandleWalVerify() with fake storage filled with
 // provided wal segments and other storage folder files
 func executeWalVerify(
+	ctx context.Context,
 	walFilenames []string,
 	storageFiles map[string]*bytes.Buffer,
 	currentWalSegment postgres.WalSegmentDescription,
@@ -778,15 +780,15 @@ func executeWalVerify(
 	rootFolder := setupTestStorageFolder()
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
 	for name, content := range storageFiles {
-		_ = rootFolder.PutObject(name, content)
+		_ = rootFolder.PutObject(ctx, name, content)
 	}
-	putWalSegments(walFilenames, walFolder)
+	putWalSegments(ctx, walFilenames, walFolder)
 
 	mockOutputWriter := &MockWalVerifyOutputWriter{}
 	checkTypes := []postgres.WalVerifyCheckType{
 		postgres.WalVerifyTimelineCheck, postgres.WalVerifyIntegrityCheck}
 
-	postgres.HandleWalVerify(checkTypes, rootFolder, currentWalSegment, backupSearchParams, mockOutputWriter)
+	postgres.HandleWalVerify(ctx, checkTypes, rootFolder, currentWalSegment, backupSearchParams, mockOutputWriter)
 
 	return mockOutputWriter.lastResult, mockOutputWriter.writeCallsCount
 }

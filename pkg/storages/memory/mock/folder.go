@@ -12,13 +12,13 @@ type Folder struct {
 	MemFolder *memory.Folder
 
 	GetPathMock       func() string
-	ListFolderMock    func() (objects []storage.Object, subFolders []storage.Folder, err error)
-	DeleteObjectsMock func(objectRelativePaths []storage.Object) error
-	ExistsMock        func(objectRelativePath string) (bool, error)
+	ListFolderMock    func(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error)
+	DeleteObjectsMock func(ctx context.Context, objectRelativePaths []storage.Object) error
+	ExistsMock        func(ctx context.Context, objectRelativePath string) (bool, error)
 	GetSubFolderMock  func(subFolderRelativePath string) storage.Folder
-	ReadObjectMock    func(objectRelativePath string) (io.ReadCloser, error)
+	ReadObjectMock    func(ctx context.Context, objectRelativePath string) (io.ReadCloser, error)
 	PutObjectMock     func(ctx context.Context, name string, content io.Reader) error
-	CopyObjectMock    func(srcPath string, dstPath string) error
+	CopyObjectMock    func(ctx context.Context, srcPath string, dstPath string) error
 	ValidateMock      func() error
 }
 
@@ -28,11 +28,11 @@ func NewFolder(memFolder *memory.Folder) *Folder {
 	}
 }
 
-func (f *Folder) Exists(objectRelativePath string) (bool, error) {
+func (f *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
 	if f.ExistsMock != nil {
-		return f.ExistsMock(objectRelativePath)
+		return f.ExistsMock(ctx, objectRelativePath)
 	}
-	return f.MemFolder.Exists(objectRelativePath)
+	return f.MemFolder.Exists(ctx, objectRelativePath)
 }
 
 func (f *Folder) GetPath() string {
@@ -42,18 +42,18 @@ func (f *Folder) GetPath() string {
 	return f.MemFolder.GetPath()
 }
 
-func (f *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (f *Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	if f.ListFolderMock != nil {
-		return f.ListFolderMock()
+		return f.ListFolderMock(ctx)
 	}
-	return f.MemFolder.ListFolder()
+	return f.MemFolder.ListFolder(ctx)
 }
 
-func (f *Folder) DeleteObjects(objectRelativePaths []storage.Object) error {
+func (f *Folder) DeleteObjects(ctx context.Context, objectRelativePaths []storage.Object) error {
 	if f.DeleteObjectsMock != nil {
-		return f.DeleteObjectsMock(objectRelativePaths)
+		return f.DeleteObjectsMock(ctx, objectRelativePaths)
 	}
-	return f.MemFolder.DeleteObjects(objectRelativePaths)
+	return f.MemFolder.DeleteObjects(ctx, objectRelativePaths)
 }
 
 func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
@@ -63,45 +63,38 @@ func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return f.MemFolder.GetSubFolder(subFolderRelativePath)
 }
 
-func (f *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (f *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	if f.ReadObjectMock != nil {
-		return f.ReadObjectMock(objectRelativePath)
+		return f.ReadObjectMock(ctx, objectRelativePath)
 	}
-	return f.MemFolder.ReadObject(objectRelativePath)
+	return f.MemFolder.ReadObject(ctx, objectRelativePath)
 }
 
-func (f *Folder) PutObject(name string, content io.Reader) error {
-	if f.PutObjectMock != nil {
-		return f.PutObjectMock(context.Background(), name, content)
-	}
-	return f.MemFolder.PutObject(name, content)
-}
-
-func (f *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
+func (f *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	if f.PutObjectMock != nil {
 		return f.PutObjectMock(ctx, name, content)
 	}
-	return f.MemFolder.PutObjectWithContext(ctx, name, content)
+	return f.MemFolder.PutObject(ctx, name, content)
 }
 
-func (f *Folder) CopyObject(srcPath string, dstPath string) error {
+func (f *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
 	if f.CopyObjectMock != nil {
-		return f.CopyObjectMock(srcPath, dstPath)
+		return f.CopyObjectMock(ctx, srcPath, dstPath)
 	}
-	return f.MemFolder.CopyObject(srcPath, dstPath)
+	return f.MemFolder.CopyObject(ctx, srcPath, dstPath)
 }
 
-func (f *Folder) Validate() error {
+func (f *Folder) Validate(ctx context.Context) error {
 	if f.ValidateMock != nil {
 		return f.ValidateMock()
 	}
-	return f.MemFolder.Validate()
+	return f.MemFolder.Validate(ctx)
 }
 
 // NOT IMPLEMENTED
-func (f *Folder) SetVersioningEnabled(enable bool) {}
+func (f *Folder) SetVersioningEnabled(_ context.Context, enable bool) {}
 
 // NOT IMPLEMENTED
-func (f *Folder) GetVersioningEnabled() bool {
+func (f *Folder) GetVersioningEnabled(_ context.Context) bool {
 	return false
 }

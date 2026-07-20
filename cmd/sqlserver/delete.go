@@ -1,6 +1,8 @@
 package sqlserver
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -40,24 +42,24 @@ var deleteEverythingCmd = &cobra.Command{
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSQLServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.DeleteEverything(confirmed)
+	deleteHandler.DeleteEverything(cmd.Context(), confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSQLServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteBefore(args, confirmed)
+	deleteHandler.HandleDeleteBefore(cmd.Context(), args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	deleteHandler, err := newSQLServerDeleteHandler()
+	deleteHandler, err := newSQLServerDeleteHandler(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteRetain(args, confirmed)
+	deleteHandler.HandleDeleteRetain(cmd.Context(), args, confirmed)
 }
 
 func init() {
@@ -66,13 +68,13 @@ func init() {
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 }
 
-func newSQLServerDeleteHandler() (*internal.DeleteHandler, error) {
-	st, err := internal.ConfigureStorage()
+func newSQLServerDeleteHandler(ctx context.Context) (*internal.DeleteHandler, error) {
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	folder := st.RootFolder()
 
-	backups, err := internal.GetBackupSentinelObjects(folder)
+	backups, err := internal.GetBackupSentinelObjects(ctx, folder)
 	if err != nil {
 		return nil, err
 	}

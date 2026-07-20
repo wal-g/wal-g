@@ -27,21 +27,21 @@ func TestHandleDetailedBackupList(t *testing.T) {
 	t.Run("print correct backup details in correct order", func(t *testing.T) {
 		folder := memory.NewFolder("", memory.NewKVS(memory.WithCustomTime(curTimeFunc)))
 		curTime = time.Unix(1690000000, 0)
-		_ = folder.PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = folder.PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
+		_ = folder.PutObject(t.Context(), "base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "base_111/metadata.json", bytes.NewBufferString("{}"))
 		curTime = curTime.Add(time.Second)
-		_ = folder.PutObject("base_222_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = folder.PutObject("base_222/metadata.json", bytes.NewBufferString("{}"))
+		_ = folder.PutObject(t.Context(), "base_222_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "base_222/metadata.json", bytes.NewBufferString("{}"))
 		curTime = curTime.Add(time.Second)
-		_ = folder.PutObject("base_333_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = folder.PutObject("base_333/metadata.json", bytes.NewBufferString("{}"))
+		_ = folder.PutObject(t.Context(), "base_333_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = folder.PutObject(t.Context(), "base_333/metadata.json", bytes.NewBufferString("{}"))
 
 		rescueStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDetailedBackupList(folder, true, true)
+		HandleDetailedBackupList(t.Context(), folder, true, true)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -110,9 +110,9 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		t.Cleanup(mockCtrl.Finish)
 		collectorMock := stats.NewMockCollector(mockCtrl)
-		collectorMock.EXPECT().AllAliveStorages().Return([]string{"storage_1", "storage_2"}, nil)
-		collectorMock.EXPECT().SpecificStorage("storage_1").Return(true, nil)
-		collectorMock.EXPECT().SpecificStorage("storage_2").Return(true, nil)
+		collectorMock.EXPECT().AllAliveStorages(gomock.Any()).Return([]string{"storage_1", "storage_2"}, nil)
+		collectorMock.EXPECT().SpecificStorage(gomock.Any(), "storage_1").Return(true, nil)
+		collectorMock.EXPECT().SpecificStorage(gomock.Any(), "storage_2").Return(true, nil)
 		collectorMock.EXPECT().ReportOperationResult(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 		memFolders := map[string]storage.Folder{
@@ -121,22 +121,22 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		}
 		multiFolder := multistorage.NewFolder(memFolders, collectorMock).(storage.Folder)
 		multiFolder = multistorage.SetPolicies(multiFolder, policies.UniteAllStorages)
-		multiFolder, err := multistorage.UseAllAliveStorages(multiFolder)
+		multiFolder, err := multistorage.UseAllAliveStorages(t.Context(), multiFolder)
 		require.NoError(t, err)
 
 		curTime = time.Unix(1690000000, 0)
-		_ = memFolders["storage_1"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = memFolders["storage_1"].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
+		_ = memFolders["storage_1"].PutObject(t.Context(), "base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memFolders["storage_1"].PutObject(t.Context(), "base_111/metadata.json", bytes.NewBufferString("{}"))
 		curTime = curTime.Add(time.Second)
-		_ = memFolders["storage_2"].PutObject("base_111_backup_stop_sentinel.json", &bytes.Buffer{})
-		_ = memFolders["storage_2"].PutObject("base_111/metadata.json", bytes.NewBufferString("{}"))
+		_ = memFolders["storage_2"].PutObject(t.Context(), "base_111_backup_stop_sentinel.json", &bytes.Buffer{})
+		_ = memFolders["storage_2"].PutObject(t.Context(), "base_111/metadata.json", bytes.NewBufferString("{}"))
 
 		rescueStdout := os.Stdout
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDetailedBackupList(multiFolder, true, true)
+		HandleDetailedBackupList(t.Context(), multiFolder, true, true)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -196,7 +196,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		HandleDetailedBackupList(folder, true, false)
+		HandleDetailedBackupList(t.Context(), folder, true, false)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)

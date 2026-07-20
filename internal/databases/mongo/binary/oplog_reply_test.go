@@ -26,6 +26,7 @@ func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 	var actualUntil *string
 	downloader.On(
 		"ListOplogArchivesSegment",
+		testifymock.Anything,
 		testifymock.MatchedBy(func(value *string) bool {
 			actualSince = value
 			return value != nil && *value == expectedSince
@@ -35,9 +36,9 @@ func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
 			return value != nil && *value == expectedUntil
 		}),
 	).Return([]models.Archive{firstArch}, nil).Once()
-	downloader.On("ListOplogArchives").Return([]models.Archive{firstArch, lastArch}, nil).Once()
+	downloader.On("ListOplogArchives", testifymock.Anything).Return([]models.Archive{firstArch, lastArch}, nil).Once()
 
-	got, err := resolveOplogReplaySequence(downloader, since, until)
+	got, err := resolveOplogReplaySequence(t.Context(), downloader, since, until)
 	require.NoError(t, err)
 	assert.Equal(t, archivepkg.Sequence{firstArch, lastArch}, got)
 	require.NotNil(t, actualSince)

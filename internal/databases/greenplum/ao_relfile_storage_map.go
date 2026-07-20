@@ -6,7 +6,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
@@ -62,8 +61,8 @@ func (storageMap *AoRelFileStorageMap) getAOStorageMetadata(filePath string) (bo
 	return true, storageInfo, location
 }
 
-func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, error) {
-	databases, err := queryRunner.GetDatabaseInfos()
+func NewAoRelFileStorageMap(ctx context.Context, queryRunner *GpQueryRunner) (AoRelFileStorageMap, error) {
+	databases, err := queryRunner.GetDatabaseInfos(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get database names")
 	}
@@ -77,17 +76,17 @@ func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, er
 			return nil
 		}
 
-		dbConn, err := postgres.Connect(databaseOption)
+		dbConn, err := postgres.Connect(ctx, databaseOption)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to connect to database: %s\n'%v'\n", db.Name, err)
 			continue
 		}
 
-		queryRunner, err := NewGpQueryRunner(dbConn)
+		queryRunner, err := NewGpQueryRunner(ctx, dbConn)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to build query runner.")
 		}
-		rows, err := queryRunner.FetchAOStorageMetadata(db)
+		rows, err := queryRunner.FetchAOStorageMetadata(ctx, db)
 		if err != nil {
 			tracelog.WarningLogger.Printf("failed to fetch storage types: %s\n'%v'\n", db.Name, err)
 			continue
@@ -96,7 +95,7 @@ func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, er
 		for relFileLoc, metadata := range rows {
 			result[relFileLoc] = metadata
 		}
-		err = dbConn.Close(context.TODO())
+		err = dbConn.Close(ctx)
 		tracelog.WarningLogger.PrintOnError(err)
 	}
 	return result, nil

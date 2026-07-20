@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"reflect"
@@ -11,12 +12,12 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleBackupInfo(folder storage.Folder, backupName string, output io.Writer, tag string) {
-	backupDetails, err := archive.SentinelWithExistenceCheck(folder, backupName)
+func HandleBackupInfo(ctx context.Context, folder storage.Folder, backupName string, output io.Writer, tag string) {
+	backupDetails, err := archive.SentinelWithExistenceCheck(ctx, folder, backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if tag != "" {
-		v, err := getField(folder, &backupDetails, tag)
+		v, err := getField(ctx, folder, &backupDetails, tag)
 		tracelog.ErrorLogger.FatalOnError(err)
 		_, err = fmt.Fprintln(output, v)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -29,9 +30,9 @@ func HandleBackupInfo(folder storage.Folder, backupName string, output io.Writer
 	tracelog.ErrorLogger.FatalfOnError("Print backup info: %v", err)
 }
 
-func getField(folder storage.Folder, v *archive.Backup, field string) (string, error) {
+func getField(ctx context.Context, folder storage.Folder, v *archive.Backup, field string) (string, error) {
 	if field == "Slots" {
-		return archive.FetchSlotsDataFromStorage(folder, v)
+		return archive.FetchSlotsDataFromStorage(ctx, folder, v)
 	}
 
 	r := reflect.ValueOf(v)

@@ -10,12 +10,10 @@ import (
 	"strings"
 
 	"github.com/wal-g/tracelog"
-
-	"github.com/wal-g/wal-g/utility"
-
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/databases/mysql/innodb"
 	"github.com/wal-g/wal-g/internal/splitmerge"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type diffFileSink struct {
@@ -216,7 +214,7 @@ func (sink *diffFileSink) getHandlingStrategy(chunk *Chunk) (diffFileStrategy, e
 	}, nil
 }
 
-// nolint: funlen,gocyclo
+//nolint:gocyclo
 func (sink *diffFileSink) applyDiff() error {
 	miniDeltaWritten := false
 

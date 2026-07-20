@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/printlist"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -20,7 +19,7 @@ import (
 
 func TestBackupListFlagsFindsBackups(t *testing.T) {
 	folder := CreateMockStorageFolder(t)
-	backups, err := greenplum.ListStorageBackups(folder)
+	backups, err := greenplum.ListStorageBackups(t.Context(), folder)
 
 	assert.NoError(t, err)
 	assert.True(t, len(backups) > 0)
@@ -29,7 +28,7 @@ func TestBackupListFlagsFindsBackups(t *testing.T) {
 func TestBackupListCorrectDetailedJsonOutput(t *testing.T) {
 	folder := CreateMockStorageFolder(t)
 
-	backups, err := greenplum.ListStorageBackups(folder)
+	backups, err := greenplum.ListStorageBackups(t.Context(), folder)
 	assert.NoError(t, err)
 
 	details := greenplum.MakeBackupDetails(backups)
@@ -93,7 +92,7 @@ func TestBackupListCorrectPrettyJsonOutput(t *testing.T) {
 
 	folder := CreateMockStorageFolder(t)
 
-	backups, err := greenplum.ListStorageBackups(folder)
+	backups, err := greenplum.ListStorageBackups(t.Context(), folder)
 	assert.NoError(t, err)
 
 	details := greenplum.MakeBackupDetails(backups)
@@ -160,7 +159,7 @@ backup_20221213T011727Z_D_20221212T151258Z backup_20221213T011727Z_D_20221212T15
 			require.NoError(t, err)
 			os.Stdout = w
 
-			greenplum.HandleDetailedBackupList(folder, tc.pretty, false)
+			greenplum.HandleDetailedBackupList(t.Context(), folder, tc.pretty, false)
 			w.Close()
 
 			out, err := io.ReadAll(r)
@@ -242,13 +241,13 @@ func TestHandleDetailedBackupListTableOutput_JSON(t *testing.T) {
 			require.NoError(t, err)
 			os.Stdout = w
 
-			greenplum.HandleDetailedBackupList(folder, tc.pretty, true)
+			greenplum.HandleDetailedBackupList(t.Context(), folder, tc.pretty, true)
 			w.Close()
 
 			out, err := io.ReadAll(r)
 			require.NoError(t, err)
 
-			backups, err := greenplum.ListStorageBackups(folder)
+			backups, err := greenplum.ListStorageBackups(t.Context(), folder)
 			require.NoError(t, err)
 			details := greenplum.MakeBackupDetails(backups)
 
@@ -331,7 +330,7 @@ func CreateMockStorageFolder(t *testing.T) storage.Folder {
 		bytesMetadata, err := json.Marshal(backupNames[backupName])
 		assert.NoError(t, err)
 		metadataString := string(bytesMetadata)
-		err = baseBackupFolder.PutObject(backupName+utility.SentinelSuffix, strings.NewReader(metadataString))
+		err = baseBackupFolder.PutObject(t.Context(), backupName+utility.SentinelSuffix, strings.NewReader(metadataString))
 		assert.NoError(t, err)
 	}
 
@@ -339,7 +338,7 @@ func CreateMockStorageFolder(t *testing.T) storage.Folder {
 		bytesMetadata, err := json.Marshal(restorePoints[pointName])
 		assert.NoError(t, err)
 		metadataString := string(bytesMetadata)
-		err = baseBackupFolder.PutObject(pointName+greenplum.RestorePointSuffix, strings.NewReader(metadataString))
+		err = baseBackupFolder.PutObject(t.Context(), pointName+greenplum.RestorePointSuffix, strings.NewReader(metadataString))
 		assert.NoError(t, err)
 	}
 	return folder

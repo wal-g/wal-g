@@ -1,15 +1,12 @@
 package redis
 
 import (
-	"context"
 	"os"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis"
-	"github.com/wal-g/wal-g/utility"
 )
 
 var tag string
@@ -21,15 +18,11 @@ var backupInfoCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		backupName := args[0]
-		redis.HandleBackupInfo(storage.RootFolder(), backupName, os.Stdout, tag)
+		redis.HandleBackupInfo(cmd.Context(), storage.RootFolder(), backupName, os.Stdout, tag)
 	},
 }
 

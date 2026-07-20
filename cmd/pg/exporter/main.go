@@ -61,11 +61,7 @@ func main() {
 	}
 
 	// Create and register the exporter
-	exporter, err := NewWalgExporter(logger, *walgPath, *backupScrapeInterval, *verifyScrapeInterval, *storageScrapeInterval, *walgConfigPath)
-	if err != nil {
-		logger.Error("Failed to create exporter", "error", err)
-		os.Exit(1)
-	}
+	exporter := NewWalgExporter(logger, *walgPath, *backupScrapeInterval, *verifyScrapeInterval, *storageScrapeInterval, *walgConfigPath)
 
 	prometheus.MustRegister(exporter)
 

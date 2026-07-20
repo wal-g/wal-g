@@ -1,15 +1,10 @@
 package mongo
 
 import (
-	"context"
-	"os"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
-	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -71,14 +66,11 @@ var binaryBackupFetchCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
 
 		backupName := args[0]
 		mongodConfigPath := args[1]
 		mongodVersion := args[2]
-		err := mongo.HandleBinaryFetchPush(ctx, mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
+		err := mongo.HandleBinaryFetchPush(cmd.Context(), mongodConfigPath, minimalConfigPath, backupName, mongodVersion,
 			rsName, rsMembers, rsMemberIDs, shardName, mongocfgConnectionString, shardConnectionStrings,
 			skipBackupDownloadFlag, skipMongoReconfigFlag, skipCheckFlag, pitrSince, pitrUntil, whitelist, blacklist)
 		tracelog.ErrorLogger.FatalOnError(err)

@@ -1,17 +1,15 @@
 package postgres_test
 
 import (
-	"context"
 	"path"
 	"testing"
-
-	conf "github.com/wal-g/wal-g/internal/config"
-	"github.com/wal-g/wal-g/internal/databases/postgres"
 
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/asm"
+	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/testtools"
 )
 
@@ -31,7 +29,7 @@ func generateAndUploadWalFile(t *testing.T, fileFormat string) (postgres.WalUplo
 	uploader := testtools.NewMockWalDirUploader(false, false)
 	fakeASM := asm.NewFakeASM()
 	uploader.ArchiveStatusManager = fakeASM
-	postgres.HandleWALPush(context.Background(), uploader, path.Join(dirName, testFileName))
+	postgres.HandleWALPush(t.Context(), uploader, path.Join(dirName, testFileName))
 	return *uploader, fakeASM, dir, testFileName
 }
 
@@ -39,7 +37,7 @@ func TestWalPush_HandleWALPush(t *testing.T) {
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer testtools.Cleanup(t, dir)
 	// ".mock" suffix is the MockCompressor file extension
-	_, err := uploader.Folder().ReadObject(testFileName + ".mock")
+	_, err := uploader.Folder().ReadObject(t.Context(), testFileName+".mock")
 	assert.NoError(t, err)
 }
 
@@ -47,7 +45,7 @@ func TestWalPush_IndividualMetadataUploader(t *testing.T) {
 	viper.Set(conf.UploadWalMetadata, postgres.WalIndividualMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer testtools.Cleanup(t, dir)
-	_, err := uploader.Folder().ReadObject(testFileName + ".json")
+	_, err := uploader.Folder().ReadObject(t.Context(), testFileName+".json")
 	assert.NoError(t, err)
 }
 
@@ -55,7 +53,7 @@ func TestWalPush_BulkMetadataUploader(t *testing.T) {
 	viper.Set(conf.UploadWalMetadata, postgres.WalBulkMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer testtools.Cleanup(t, dir)
-	_, err := uploader.Folder().ReadObject(testFileName[0:len(testFileName)-1] + ".json")
+	_, err := uploader.Folder().ReadObject(t.Context(), testFileName[0:len(testFileName)-1]+".json")
 	assert.NoError(t, err)
 }
 
@@ -63,7 +61,7 @@ func TestWalPush_NoMetataNoUploader(t *testing.T) {
 	viper.Set(conf.UploadWalMetadata, postgres.WalNoMetadataLevel)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "1")
 	defer testtools.Cleanup(t, dir)
-	_, err := uploader.Folder().ReadObject(testFileName + ".json")
+	_, err := uploader.Folder().ReadObject(t.Context(), testFileName+".json")
 	assert.Error(t, err)
 }
 
@@ -72,6 +70,6 @@ func TestWalPush_BulkMetadataUploaderWithUploadConcurrency(t *testing.T) {
 	viper.Set(conf.UploadConcurrencySetting, 4)
 	uploader, _, dir, testFileName := generateAndUploadWalFile(t, "F")
 	defer testtools.Cleanup(t, dir)
-	_, err := uploader.Folder().ReadObject(testFileName[0:len(testFileName)-1] + ".json")
+	_, err := uploader.Folder().ReadObject(t.Context(), testFileName[0:len(testFileName)-1]+".json")
 	assert.NoError(t, err)
 }

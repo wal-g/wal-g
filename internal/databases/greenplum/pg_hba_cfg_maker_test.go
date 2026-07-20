@@ -3,8 +3,9 @@ package greenplum_test
 import (
 	"testing"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/stretchr/testify/assert"
+
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 )
 

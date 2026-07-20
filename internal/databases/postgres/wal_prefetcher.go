@@ -1,32 +1,32 @@
 package postgres
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/spf13/viper"
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
-
-	"github.com/wal-g/tracelog"
 )
 
 type WalPrefetcher interface {
-	Prefetch(reader internal.StorageFolderReader, walFileName string, location string)
+	Prefetch(ctx context.Context, reader internal.StorageFolderReader, walFileName string, location string)
 }
 
 type NopPrefetcher struct {
 }
 
-func (p NopPrefetcher) Prefetch(reader internal.StorageFolderReader, walFileName string, location string) {
+func (p NopPrefetcher) Prefetch(_ context.Context, reader internal.StorageFolderReader, walFileName string, location string) {
 
 }
 
 type RegularPrefetcher struct {
 }
 
-func (p RegularPrefetcher) Prefetch(_ internal.StorageFolderReader, walFileName string, location string) {
+func (p RegularPrefetcher) Prefetch(_ context.Context, _ internal.StorageFolderReader, walFileName string, location string) {
 	if !checkPrefetchPossible(walFileName) {
 		return
 	}
@@ -52,14 +52,14 @@ func (p RegularPrefetcher) Prefetch(_ internal.StorageFolderReader, walFileName 
 type DaemonPrefetcher struct {
 }
 
-func (p DaemonPrefetcher) Prefetch(reader internal.StorageFolderReader, walFileName string, location string) {
+func (p DaemonPrefetcher) Prefetch(ctx context.Context, reader internal.StorageFolderReader, walFileName string, location string) {
 	if !checkPrefetchPossible(walFileName) {
 		return
 	}
 
 	go func() {
 		tracelog.DebugLogger.Printf("Invoking daemon WAL-prefetch (%s)", walFileName)
-		err := HandleWALPrefetch(reader, walFileName, location)
+		err := HandleWALPrefetch(ctx, reader, walFileName, location)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("WAL-prefetch (%s): %v", walFileName, err)
 		}

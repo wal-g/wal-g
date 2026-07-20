@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -11,14 +12,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
-
 	"github.com/RoaringBitmap/roaring/v2"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -100,8 +99,8 @@ func NewBundle(
 	}
 }
 
-func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
-	tarBallComposer, err := composerMaker.Make(bundle)
+func (bundle *Bundle) SetupComposer(ctx context.Context, composerMaker TarBallComposerMaker) (err error) {
+	tarBallComposer, err := composerMaker.Make(ctx, bundle)
 	if err != nil {
 		return err
 	}
@@ -124,9 +123,9 @@ func (bundle *Bundle) getIncrementBaseFiles() internal.BackupFileList {
 
 // TODO : unit tests
 // checkTimelineChanged compares timelines of pg_backup_start() and pg_backup_stop()
-func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
+func (bundle *Bundle) checkTimelineChanged(ctx context.Context, queryRunner *PgQueryRunner) bool {
 	if bundle.Replica {
-		timeline, err := queryRunner.ReadTimeline()
+		timeline, err := queryRunner.ReadTimeline(ctx)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("Unable to check timeline change. Sentinel for the backup will not be uploaded.")
 			return true
@@ -148,10 +147,10 @@ func (bundle *Bundle) checkTimelineChanged(queryRunner *PgQueryRunner) bool {
 // `backup_label` and `tablespace_map` contents are not immediately written to
 // a file but returned instead. Returns empty string and an error if backup
 // fails.
-func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
+func (bundle *Bundle) StartBackup(ctx context.Context, queryRunner *PgQueryRunner,
 	backup string) (backupName string, lsn LSN, err error) {
 	var name, lsnStr string
-	name, lsnStr, bundle.Replica, err = queryRunner.StartBackup(backup)
+	name, lsnStr, bundle.Replica, err = queryRunner.StartBackup(ctx, backup)
 
 	if err != nil {
 		return "", 0, err
@@ -162,12 +161,12 @@ func (bundle *Bundle) StartBackup(queryRunner *PgQueryRunner,
 	}
 
 	if bundle.Replica {
-		name, bundle.Timeline, err = getWalFilename(lsn, queryRunner)
+		name, bundle.Timeline, err = getWalFilename(ctx, lsn, queryRunner)
 		if err != nil {
 			return "", 0, err
 		}
 	} else {
-		bundle.Timeline, err = queryRunner.ReadTimeline()
+		bundle.Timeline, err = queryRunner.ReadTimeline(ctx)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Couldn't get current timeline because of error: '%v'\n", err)
 		}
@@ -306,13 +305,13 @@ func (bundle *Bundle) isIncremented(path string, wasInBase bool, info fs.FileInf
 // TODO : unit tests
 // UploadPgControl should only be called
 // after the rest of the backup is successfully uploaded to S3.
-func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
+func (bundle *Bundle) UploadPgControl(ctx context.Context, compressorFileExtension string) error {
 	fileName := bundle.Sentinel.Info.Name()
 	info := bundle.Sentinel.Info
 	path := bundle.Sentinel.Path
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, "pg_control.tar."+compressorFileExtension)
+	tarBall.SetUp(ctx, bundle.Crypter, utility.AddFileExtension("pg_control.tar", compressorFileExtension))
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -355,8 +354,9 @@ func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
 // TODO : unit tests
 // UploadLabelFiles creates the `backup_label` and `tablespace_map` files by stopping the backup
 // and uploads them to S3.
-func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner, compressorFileExtension string) (string, []string, LSN, error) {
-	label, offsetMap, lsnStr, err := queryRunner.StopBackup()
+func (bundle *Bundle) uploadLabelFiles(ctx context.Context,
+	queryRunner *PgQueryRunner, compressorFileExtension string) (string, []string, LSN, error) {
+	label, offsetMap, lsnStr, err := queryRunner.StopBackup(ctx)
 	if err != nil {
 		return "", nil, 0, errors.Wrap(err, "UploadLabelFiles: failed to stop backup")
 	}
@@ -371,7 +371,7 @@ func (bundle *Bundle) uploadLabelFiles(queryRunner *PgQueryRunner, compressorFil
 	}
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, "backup_label.tar."+compressorFileExtension)
+	tarBall.SetUp(ctx, bundle.Crypter, utility.AddFileExtension("backup_label.tar", compressorFileExtension))
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,
@@ -414,8 +414,8 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(reader internal.StorageFolderReader, backupStartLSN LSN) error {
-	deltaMap, err := getDeltaMap(reader, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
+func (bundle *Bundle) DownloadDeltaMap(ctx context.Context, reader internal.StorageFolderReader, backupStartLSN LSN) error {
+	deltaMap, err := getDeltaMap(ctx, reader, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
 	if err != nil {
 		return err
 	}

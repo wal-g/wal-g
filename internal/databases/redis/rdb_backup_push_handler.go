@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"os/exec"
 
 	"github.com/wal-g/tracelog"
@@ -16,7 +17,7 @@ type RDBBackupPushArgs struct {
 	MetaConstructor internal.MetaConstructor
 }
 
-func HandleRDBBackupPush(args RDBBackupPushArgs) error {
+func HandleRDBBackupPush(ctx context.Context, args RDBBackupPushArgs) error {
 	stdout, err := utility.StartCommandWithStdoutPipe(args.BackupCmd)
 	tracelog.ErrorLogger.FatalfOnError("failed to start backup create command: %v", err)
 
@@ -28,5 +29,5 @@ func HandleRDBBackupPush(args RDBBackupPushArgs) error {
 		Stream:          stdout,
 	}
 
-	return redisUploader.UploadBackup(uploadArgs)
+	return redisUploader.UploadBackup(ctx, uploadArgs)
 }

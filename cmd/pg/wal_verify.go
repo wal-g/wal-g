@@ -5,12 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/wal-g/wal-g/internal/databases/postgres"
-
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 const (
@@ -46,7 +45,7 @@ var (
 		Long:  WalVerifyLongDescription,
 		Args:  checkArgs,
 		Run: func(cmd *cobra.Command, checks []string) {
-			storage, err := internal.ConfigureStorage()
+			storage, err := internal.ConfigureStorage(cmd.Context())
 			tracelog.ErrorLogger.FatalOnError(err)
 			outputType := postgres.WalVerifyTableOutput
 			if useJSONOutput {
@@ -57,7 +56,7 @@ var (
 
 			walSegmentDescription := getWalSegmentDescription(cmd, lsnStr, timeline)
 			backupSearchParams := getBackupSearchParams(cmd, backupNameStr)
-			postgres.HandleWalVerify(checkTypes, storage.RootFolder(), walSegmentDescription, backupSearchParams, outputWriter)
+			postgres.HandleWalVerify(cmd.Context(), checkTypes, storage.RootFolder(), walSegmentDescription, backupSearchParams, outputWriter)
 		},
 	}
 	useJSONOutput bool
@@ -68,7 +67,7 @@ var (
 
 func getWalSegmentDescription(cmd *cobra.Command, lsnStr string, timeline uint32) postgres.WalSegmentDescription {
 	if !cmd.Flags().Changed(useSpecifiedLsnFlag) {
-		return postgres.QueryCurrentWalSegment()
+		return postgres.QueryCurrentWalSegment(cmd.Context())
 	}
 	lsn, err := postgres.ParseLSN(lsnStr)
 	tracelog.ErrorLogger.FatalOnError(err)

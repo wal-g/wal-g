@@ -1,15 +1,15 @@
 package storagetools
 
 import (
+	"context"
 	"io"
 	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/copy"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -49,22 +49,23 @@ func Encrypt(source io.Reader, crypter crypto.Crypter) (io.Reader, error) {
 }
 
 func collectCopyingInfo(
+	ctx context.Context,
 	prefix string,
 	fromConfigFile string,
 	toConfigFile string,
 	decryptSource bool,
 	encryptTarget bool) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Printf("Collecting files with prefix %s.", prefix)
-	from, err := internal.StorageFromConfig(fromConfigFile)
+	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
 	if err != nil {
 		return nil, err
 	}
-	to, err := internal.StorageFromConfig(toConfigFile)
+	to, err := internal.StorageFromConfig(ctx, toConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
-	objects, err := storage.ListFolderRecursively(from.RootFolder())
+	objects, err := storage.ListFolderRecursively(ctx, from.RootFolder())
 	if err != nil {
 		return nil, err
 	}
@@ -101,9 +102,10 @@ func collectCopyingInfo(
 
 // HandleCopyBackup copy specific backups from one storage to another
 func HandleCopyObjects(
+	ctx context.Context,
 	fromConfigFile, toConfigFile, prefix string,
 	decryptSource, encryptTarget bool) {
-	infos, err := collectCopyingInfo(prefix, fromConfigFile, toConfigFile, decryptSource,
+	infos, err := collectCopyingInfo(ctx, prefix, fromConfigFile, toConfigFile, decryptSource,
 		encryptTarget)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -117,7 +119,7 @@ func HandleCopyObjects(
 		return ret
 	}(), ","))
 
-	tracelog.ErrorLogger.FatalOnError(copy.Infos(infos))
+	tracelog.ErrorLogger.FatalOnError(copy.Infos(ctx, infos))
 
 	tracelog.InfoLogger.Printf("Successfully copied %d objects", len(infos))
 }

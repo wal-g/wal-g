@@ -1,6 +1,8 @@
 package pg
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -19,6 +21,7 @@ const DeleteGarbageUse = "garbage [ARCHIVES|BACKUPS]"
 const afterFlag = "after"
 
 var confirmed = false
+var deleteWithoutBackups = false
 var useSentinelTime = false
 var deleteTargetUserData = ""
 
@@ -66,38 +69,38 @@ var deleteGarbageCmd = &cobra.Command{
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
-	folder := configureFolder()
+	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
 
-	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, useSentinelTime)
+	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteBefore(args, confirmed)
+	deleteHandler.HandleDeleteBefore(cmd.Context(), args, confirmed)
 }
 
 func runDeleteRetain(cmd *cobra.Command, args []string) {
-	folder := configureFolder()
+	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
 
-	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, useSentinelTime)
+	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	afterValue, _ := cmd.Flags().GetString(afterFlag)
 	if afterValue == "" {
-		deleteHandler.HandleDeleteRetain(args, confirmed)
+		deleteHandler.HandleDeleteRetain(cmd.Context(), args, confirmed)
 	} else {
-		deleteHandler.HandleDeleteRetainAfter(append(args, afterValue), confirmed)
+		deleteHandler.HandleDeleteRetainAfter(cmd.Context(), append(args, afterValue), confirmed)
 	}
 }
 
 func runDeleteEverything(cmd *cobra.Command, args []string) {
-	folder := configureFolder()
+	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
 
-	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, useSentinelTime)
+	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	permanentBackupNames := make([]string, 0, len(permanentBackups))
@@ -106,13 +109,13 @@ func runDeleteEverything(cmd *cobra.Command, args []string) {
 			permanentBackupNames = append(permanentBackupNames, backup.Name)
 		}
 	}
-	deleteHandler.HandleDeleteEverything(args, permanentBackupNames, confirmed)
+	deleteHandler.HandleDeleteEverything(cmd.Context(), args, permanentBackupNames, confirmed)
 }
 
 func runDeleteTarget(cmd *cobra.Command, args []string) {
-	folder := configureFolder()
+	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
 
 	findFullBackup := false
 	modifier := internal.ExtractDeleteTargetModifierFromArgs(args)
@@ -122,31 +125,31 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 		args = args[1:]
 	}
 
-	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, useSentinelTime)
+	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, useSentinelTime)
 	tracelog.ErrorLogger.FatalOnError(err)
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, postgres.NewGenericMetaFetcher())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteTarget(targetBackupSelector, confirmed, findFullBackup)
+	deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, findFullBackup)
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
-	folder := configureFolder()
+	folder := configureFolder(cmd.Context())
 
-	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(folder)
+	permanentBackups, permanentWals := postgres.GetPermanentBackupsAndWals(cmd.Context(), folder)
 
-	deleteHandler, err := postgres.NewDeleteHandler(folder, permanentBackups, permanentWals, false)
+	deleteHandler, err := postgres.NewDeleteHandler(cmd.Context(), folder, permanentBackups, permanentWals, false)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = deleteHandler.HandleDeleteGarbage(args, confirmed)
+	err = deleteHandler.HandleDeleteGarbage(cmd.Context(), args, confirmed, deleteWithoutBackups)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func configureFolder() storage.Folder {
-	multiSt, err := internal.ConfigureMultiStorage(true)
+func configureFolder(ctx context.Context) storage.Folder {
+	multiSt, err := internal.ConfigureMultiStorage(ctx, true)
 	tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)
 
-	rootFolder, err := multistorage.UseAllAliveStorages(multiSt.RootFolder())
+	rootFolder, err := multistorage.UseAllAliveStorages(ctx, multiSt.RootFolder())
 	tracelog.InfoLogger.Printf("Backup to delete will be searched in storages: %v", multistorage.UsedStorages(rootFolder))
 	tracelog.ErrorLogger.FatalOnError(err)
 	return multistorage.SetPolicies(rootFolder, policies.UniteAllStorages)
@@ -163,6 +166,8 @@ func init() {
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
 	deleteRetainCmd.Flags().StringP(afterFlag, "a", "", "Set the time after which retain backups")
+
+	deleteGarbageCmd.Flags().BoolVar(&deleteWithoutBackups, "without-backup-check", false, "skip check for existing non-permanent backups")
 
 	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")

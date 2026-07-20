@@ -2,7 +2,6 @@ package internal_test
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
-
 	. "github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	functests "github.com/wal-g/wal-g/internal/testutils"
@@ -103,7 +101,7 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, n
 	)
 
 	sample := getByteSampleArray(sampleSize)
-	backupName, err := uploader.PushStream(context.Background(), bytes.NewReader(sample))
+	backupName, err := uploader.PushStream(t.Context(), bytes.NewReader(sample))
 	if err != nil {
 		return
 	}
@@ -114,7 +112,7 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, n
 		Folder: storageFolder,
 	}
 
-	err = DownloadAndDecompressSplittedStream(backup, blockSize, compression.Decompressors[0].FileExtension(), writer, retryAttempts)
+	err = DownloadAndDecompressSplittedStream(t.Context(), backup, blockSize, compression.Decompressors[0].FileExtension(), writer, retryAttempts)
 	assert.NoError(t, err)
 	<-writer.CloseNotify
 
@@ -208,7 +206,7 @@ func checkSplitPush(t *testing.T, partitions, blockSize, maxFileSize, s3errorAft
 		blockSize,
 		maxFileSize,
 	)
-	splitUploader.PushStream(context.Background(), bytes.NewBuffer(getByteSampleArray(sampleSize)))
+	splitUploader.PushStream(t.Context(), bytes.NewBuffer(getByteSampleArray(sampleSize)))
 }
 
 func TestSplitPush_Synchronous_WithoutFiles(t *testing.T) {

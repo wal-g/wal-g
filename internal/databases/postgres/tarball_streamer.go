@@ -75,6 +75,16 @@ type TarballStreamer struct {
 	Remaps TarballStreamerRemaps
 	// list of processed files
 	Files internal.BundleFiles
+	// set when inputTar.Next() returns io.EOF, distinguishing natural archive
+	// end from errTarStreamerOutputEOF part rotation
+	inputExhausted bool
+}
+
+// ArchiveDone reports whether the input tar archive has been fully consumed
+// (inputTar.Next() returned io.EOF). Distinct from errTarStreamerOutputEOF
+// which signals part rotation within an ongoing archive.
+func (streamer *TarballStreamer) ArchiveDone() bool {
+	return streamer.inputExhausted
 }
 
 func NewTarballStreamer(input io.Reader, maxTarSize int64, bundleFiles internal.BundleFiles) (streamer *TarballStreamer) {
@@ -108,6 +118,9 @@ func (streamer *TarballStreamer) NextInputFile() (err error) {
 	tracelog.DebugLogger.Printf("Next file")
 	streamer.curHeader, err = streamer.inputTar.Next()
 	if err != nil {
+		if err == io.EOF {
+			streamer.inputExhausted = true
+		}
 		return err
 	}
 	streamer.fileReadIndex = 0

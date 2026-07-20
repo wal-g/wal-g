@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	walgs3 "github.com/wal-g/wal-g/pkg/storages/s3"
@@ -43,6 +44,11 @@ func (client *MockS3Client) ListObjectsV2Pages(input *s3.ListObjectsV2Input,
 	return nil
 }
 
+func (client *MockS3Client) ListObjectsV2PagesWithContext(_ aws.Context, input *s3.ListObjectsV2Input,
+	callback func(*s3.ListObjectsV2Output, bool) bool, _ ...request.Option) error {
+	return client.ListObjectsV2Pages(input, callback)
+}
+
 func (client *MockS3Client) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
 	if client.err {
 		return nil, awserr.New("MockListObjects", "mock ListObjects errors", nil)
@@ -57,6 +63,11 @@ func (client *MockS3Client) ListObjects(input *s3.ListObjectsInput) (*s3.ListObj
 	return output, nil
 }
 
+func (client *MockS3Client) ListObjectsWithContext(_ aws.Context, input *s3.ListObjectsInput,
+	_ ...request.Option) (*s3.ListObjectsOutput, error) {
+	return client.ListObjects(input)
+}
+
 func (client *MockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error) {
 	if client.err {
 		return nil, awserr.New("MockGetObject", "mock GetObject error", nil)
@@ -69,6 +80,11 @@ func (client *MockS3Client) GetObject(input *s3.GetObjectInput) (*s3.GetObjectOu
 	return output, nil
 }
 
+func (client *MockS3Client) GetObjectWithContext(_ aws.Context, input *s3.GetObjectInput,
+	_ ...request.Option) (*s3.GetObjectOutput, error) {
+	return client.GetObject(input)
+}
+
 func (client *MockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error) {
 	if client.err {
 		return nil, awserr.New("MockHeadObject", "mock HeadObject error", nil)
@@ -77,6 +93,11 @@ func (client *MockS3Client) HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjec
 	}
 
 	return &s3.HeadObjectOutput{}, nil
+}
+
+func (client *MockS3Client) HeadObjectWithContext(_ aws.Context, input *s3.HeadObjectInput,
+	_ ...request.Option) (*s3.HeadObjectOutput, error) {
+	return client.HeadObject(input)
 }
 
 // Creates 5 fake S3 objects with Key and LastModified field.

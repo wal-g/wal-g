@@ -1,10 +1,6 @@
 package redis
 
 import (
-	"context"
-	"os"
-	"syscall"
-
 	"github.com/spf13/cobra"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -32,11 +28,7 @@ var aofBackupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		ctx, cancel := context.WithCancel(context.Background())
-		signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-		defer func() { _ = signalHandler.Close() }()
-
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		sourceStorageFolder := uploader.Folder()
@@ -45,7 +37,8 @@ var aofBackupFetchCmd = &cobra.Command{
 		backupName := args[0]
 		redisVersion := args[1]
 
-		err = redis.HandleAofFetchPush(ctx, sourceStorageFolder, uploader, backupName, redisVersion, skipBackupDownloadFlag, skipCheckFlag)
+		err = redis.HandleAofFetchPush(cmd.Context(), sourceStorageFolder, uploader, backupName, redisVersion, skipBackupDownloadFlag,
+			skipCheckFlag)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

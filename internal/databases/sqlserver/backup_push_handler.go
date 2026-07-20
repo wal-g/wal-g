@@ -5,27 +5,24 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"syscall"
-
-	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupPush(dbnames []string, updateLatest bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
+func HandleBackupPush(ctx context.Context, dbnames []string, updateLatest bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	storage, err := internal.ConfigureStorage()
+	storage, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	db, err := getSQLServerConnection()
+	db, err := getSQLServerConnection(ctx)
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
-	dbnames, err = getDatabasesToBackup(db, dbnames)
+	dbnames, err = getDatabasesToBackup(ctx, db, dbnames)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
@@ -39,11 +36,11 @@ func HandleBackupPush(dbnames []string, updateLatest bool) {
 	var backupName string
 	var sentinel *SentinelDto
 	if updateLatest {
-		backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, storage.RootFolder())
+		backup, err := internal.GetBackupByName(ctx, internal.LatestString, utility.BaseBackupPath, storage.RootFolder())
 		tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
 		backupName = backup.Name
 		sentinel = new(SentinelDto)
-		err = backup.FetchSentinel(sentinel)
+		err = backup.FetchSentinel(ctx, sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 		sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	} else {
@@ -65,7 +62,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool) {
 	}
 	uploader := internal.NewRegularUploader(nil, storage.RootFolder().GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
-	err = internal.UploadSentinel(uploader, sentinel, backupName)
+	err = internal.UploadSentinel(ctx, uploader, sentinel, backupName)
 	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)
 
 	tracelog.InfoLogger.Printf("backup finished")
@@ -73,7 +70,7 @@ func HandleBackupPush(dbnames []string, updateLatest bool) {
 
 func backupSingleDatabase(ctx context.Context, db *sql.DB, backupName string, dbname string, builtinCompression bool) error {
 	baseURL := getDatabaseBackupURL(backupName, dbname)
-	size, blobCount, err := estimateDBSize(db, dbname)
+	size, blobCount, err := estimateDBSize(ctx, db, dbname)
 	if err != nil {
 		return err
 	}

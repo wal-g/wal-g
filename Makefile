@@ -14,7 +14,7 @@ PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go intern
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
-TEST := "pg_tests"
+TEST := "pg10_tests"
 MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
 MONGO_VERSION ?= "8.0.3"
@@ -23,8 +23,6 @@ MONGO_REPO ?= "repo.mongodb.org"
 MONGO_TEST_TYPE ?= "all"
 GOLANGCI_LINT_VERSION ?= "v2.0"
 REDIS_VERSION ?= "6.2.4"
-IMAGE_TYPE ?= "rdb"
-TOOLS_MOD_DIR := ./internal/tools
 MOCKS_DESTINATION := ./testtools/mocks
 FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
 WALG_VERSION ?= `git tag -l --points-at HEAD | tail -1`
@@ -50,59 +48,82 @@ ifdef ENABLE_DEBUG
 	BUILD_GCFLAGS:=$(BUILD_GCFLAGS) all=-N -l
 endif
 
-.PHONY: unittest fmt lint clean install_tools
+.PHONY: unittest fmt lint clean
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
 
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_PG_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
 
 install_and_build_pg: deps pg_build
 
-pg_build_image:
+pg10_build_image: go_deps
+ifeq ($(COMPOSE_BAKE),true)
+	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
+	docker compose build $(DOCKER_COMMON) pg10 pg10_tests_template
+else
 	# There are dependencies between container images.
 	# Running in one command leads to using outdated images and fails on clean system.
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
-	docker compose build pg
-	docker compose build pg_tests_template
+	docker compose build pg10
+	docker compose build pg10_tests_template
+endif
 
-pg_save_image: install_and_build_pg pg_build_image
+pg18_build_image: go_deps
+ifeq ($(COMPOSE_BAKE),true)
+	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
+	docker compose build $(DOCKER_COMMON) pg18 pg18_tests_template
+else
+	docker compose build $(DOCKER_COMMON)
+	docker compose build pg18
+	docker compose build pg18_tests_template
+endif
+
+pg_save_image: install_and_build_pg pg10_build_image pg18_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE_PG_TESTS}  > ${CACHE_FILE_PG_TESTS}
+	docker save ${IMAGE_PG10_TESTS} > ${CACHE_FILE_PG10_TESTS}
+	docker save ${IMAGE_PG18_TESTS} > ${CACHE_FILE_PG18_TESTS}
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
-	@if [ "x" = "${CACHE_FILE_PG_TESTS}x" ]; then\
+	@if [ "x" = "${CACHE_FILE_PG10_TESTS}x" ]; then\
 		echo "Rebuild";\
 		make install_and_build_pg;\
-		make pg_build_image;\
+		make pg10_build_image;\
 	else\
-		docker load -i ${CACHE_FILE_PG_TESTS} && rm ${CACHE_FILE_PG_TESTS};\
+		docker load -i ${CACHE_FILE_PG10_TESTS} && rm ${CACHE_FILE_PG10_TESTS};\
+	fi
+	@if echo "$(TEST)" | grep -Fqe "pg18"; then\
+		if [ -f ${CACHE_FILE_PG18_TESTS} ]; then\
+			docker load -i ${CACHE_FILE_PG18_TESTS} && rm ${CACHE_FILE_PG18_TESTS};\
+		else\
+			make pg18_build_image;\
+		fi;\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
-		docker compose build pg_pgbackrest;\
+		docker compose build pg10_pgbackrest;\
 	fi
-	@if echo "$(TEST)" | grep -Fq -e "pg_ssh_" -e "pg_storage_ssh_"; then\
+	@if echo "$(TEST)" | grep -Fq -e "pg10_ssh_" -e "pg10_storage_ssh_"; then\
 		docker compose build ssh;\
 	fi
 
 	docker compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
-	@if [ "$(TEST)" = "pg_tests" ]; then\
-		docker compose build pg_pgbackrest ssh swift pg_wal_perftest_with_throttling &&\
-		docker compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
-		docker compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
-		docker compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
-		docker compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
+	@if [ "$(TEST)" = "pg10_tests" ]; then\
+		docker compose build pg10_pgbackrest ssh swift pg10_wal_perftest_with_throttling &&\
+		docker compose up --exit-code-from pg10_ssh_backup_test pg10_ssh_backup_test &&\
+		docker compose up --exit-code-from pg10_storage_swift_test pg10_storage_swift_test &&\
+		docker compose up --exit-code-from pg10_storage_ssh_test pg10_storage_ssh_test &&\
+		docker compose up --exit-code-from pg10_pgbackrest_backup_fetch_test pg10_pgbackrest_backup_fetch_test &&\
 		docker compose down &&\
-		docker compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
+		docker compose up --exit-code-from pg10_wal_perftest_with_throttling pg10_wal_perftest_with_throttling ;\
 	fi
 	make clean_compose
 
@@ -120,8 +141,8 @@ all_unittests: deps unittest
 
 # todo Should we remove this target as a duplicate of pg_integration_test?
 pg_int_tests_only:
-	docker compose build pg_tests
-	docker compose up --exit-code-from pg_tests pg_tests
+	docker compose build pg10_tests
+	docker compose up --exit-code-from pg10_tests pg10_tests
 
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)
@@ -134,10 +155,10 @@ mysql_base: deps mysql_build unlink_brotli
 mysql_test: deps mysql_build unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
 
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_SQLSERVER_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
@@ -172,10 +193,8 @@ mariadb_integration_test: unlink_brotli load_docker_common
 	docker compose build mariadb && docker compose build mariadb_tests
 	docker compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
 
-mongo_test: deps mongo_build unlink_brotli
-
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build $(BUILD_ARGS) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MONGO_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
 
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
@@ -202,7 +221,7 @@ clean_mongo_features:
 	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_FDB_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w")
+	(cd $(MAIN_FDB_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w")
 
 fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
@@ -215,7 +234,7 @@ fdb_integration_test: load_docker_common
 redis_test: deps redis_build unlink_brotli redis_integration_test
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
 
 redis_integration_test: load_docker_common
 	docker compose build redis && docker compose build redis_tests
@@ -231,7 +250,7 @@ redis_install: redis_build
 redis_features:
 	set -e
 	make go_deps
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) IMAGE_TYPE=$(IMAGE_TYPE) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
+	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
 
 clean_redis_features:
 	set -e
@@ -240,7 +259,7 @@ clean_redis_features:
 etcd_test: deps etcd_build unlink_brotli etcd_integration_test
 
 etcd_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_ETCD_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_ETCD_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=$(WALG_VERSION)")
 
 etcd_install: etcd_build
 	mv $(MAIN_ETCD_PATH)/wal-g $(GOBIN)/wal-g
@@ -256,7 +275,7 @@ etcd_integration_test: load_docker_common
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_GP_PATH) && go build -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_GP_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
 
 gp_clean:
 	(cd $(MAIN_GP_PATH) && go clean)
@@ -301,20 +320,11 @@ coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
 	go tool cover -html=$(COVERAGE_FILE)
 
-install_tools:
-	cd $(TOOLS_MOD_DIR) && go install golang.org/x/tools/cmd/goimports
-	$(warning Please run make docker_lint for lint. It is unreliable to use self-compiled golangci-lint. \
-		https://golangci-lint.run/usage/install/#install-from-source)
-	cd $(TOOLS_MOD_DIR) && go install github.com/golangci/golangci-lint/cmd/golangci-lint
-
 fmt: $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 	go fmt ./...
 	gofmt -s -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
 
-goimports: install_tools $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
-	goimports -w $(CMD_FILES) $(PKG_FILES) $(TEST_FILES)
-
-lint: install_tools
+lint:
 	golangci-lint run --allow-parallel-runners ./...
 
 docker_lint:
@@ -360,7 +370,7 @@ unlink_libsodium:
 
 build_client:
 	cd cmd/daemonclient && \
-	go build -o ../../bin/walg-daemon-client -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=$(GIT_REVISION) -X main.version=$(WALG_VERSION)"
+	go build -o ../../bin/walg-daemon-client $(if $(ENABLE_RACE_DETECTION),-race) -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X main.gitRevision=$(GIT_REVISION) -X main.version=$(WALG_VERSION)"
 
 .PHONY: mocks
 # put the files with interfaces you'd like to mock in prerequisites

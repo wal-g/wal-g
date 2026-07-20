@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
@@ -28,8 +29,8 @@ func NewBackup(rootFolder storage.Folder, name string) (Backup, error) {
 	}, nil
 }
 
-func NewBackupInStorage(rootFolder storage.Folder, name, storage string) (Backup, error) {
-	backup, err := internal.NewBackupInStorage(rootFolder.GetSubFolder(utility.BaseBackupPath), name, storage)
+func NewBackupInStorage(ctx context.Context, rootFolder storage.Folder, name, storage string) (Backup, error) {
+	backup, err := internal.NewBackupInStorage(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath), name, storage)
 	if err != nil {
 		return Backup{}, err
 	}
@@ -39,12 +40,12 @@ func NewBackupInStorage(rootFolder storage.Folder, name, storage string) (Backup
 	}, nil
 }
 
-func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
+func (backup *Backup) GetSentinel(ctx context.Context) (BackupSentinelDto, error) {
 	if backup.SentinelDto != nil {
 		return *backup.SentinelDto, nil
 	}
 	sentinelDto := BackupSentinelDto{}
-	err := backup.FetchSentinel(&sentinelDto)
+	err := backup.FetchSentinel(ctx, &sentinelDto)
 	if err != nil {
 		return sentinelDto, err
 	}
@@ -53,21 +54,21 @@ func (backup *Backup) GetSentinel() (BackupSentinelDto, error) {
 	return sentinelDto, nil
 }
 
-func (backup *Backup) GetSegmentBackup(backupID string, contentID int) (SegBackup, error) {
+func (backup *Backup) GetSegmentBackup(ctx context.Context, backupID string, contentID int) (SegBackup, error) {
 	selector, err := internal.NewUserDataBackupSelector(NewSegmentUserDataFromID(backupID).String(), postgres.NewGenericMetaFetcher())
 	if err != nil {
 		return SegBackup{}, err
 	}
 	segBackupsFolder := backup.rootFolder.GetSubFolder(FormatSegmentStoragePrefix(contentID))
 
-	segBackup, err := selector.Select(segBackupsFolder)
+	segBackup, err := selector.Select(ctx, segBackupsFolder)
 	if err != nil {
 		return SegBackup{}, fmt.Errorf(
 			"failed to select matching backup for id %s from subfolder %s: %w",
 			backupID, segBackupsFolder.GetPath(), err)
 	}
 
-	pgBackup, err := postgres.NewBackupInStorage(
+	pgBackup, err := postgres.NewBackupInStorage(ctx,
 		segBackupsFolder.GetSubFolder(utility.BaseBackupPath), segBackup.Name, segBackup.GetStorageName())
 	if err != nil {
 		return SegBackup{}, err

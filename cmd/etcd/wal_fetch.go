@@ -16,10 +16,10 @@ var WalFetchCmd = &cobra.Command{
 	Short: "Fetch wal from storage and save it to the specified dir",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 		folderReader := internal.NewFolderReader(storage.RootFolder())
-		etcd.HandleWalFetch(storage.RootFolder(), fetchBackupName, args[0], folderReader)
+		etcd.HandleWalFetch(cmd.Context(), storage.RootFolder(), fetchBackupName, args[0], folderReader)
 	},
 }
 

@@ -1,11 +1,14 @@
 package postgres
 
 import (
+	"context"
+
 	"github.com/wal-g/wal-g/internal"
 )
 
 type ExtractProvider interface {
-	Get(backup Backup, filesToUnwrap map[string]bool, skipRedundantTars bool, dbDataDir string, createNewIncrementalFiles bool) (
+	Get(ctx context.Context, backup Backup, filesToUnwrap map[string]bool, skipRedundantTars bool,
+		dbDataDir string, createNewIncrementalFiles bool) (
 		interpreter IncrementalTarInterpreter,
 		concurrentTarsToExtract []internal.ReaderMaker,
 		sequentialTarsToExtract []internal.ReaderMaker,
@@ -17,6 +20,7 @@ type ExtractProviderImpl struct {
 }
 
 func (t ExtractProviderImpl) Get(
+	ctx context.Context,
 	backup Backup,
 	filesToUnwrap map[string]bool,
 	skipRedundantTars bool,
@@ -24,7 +28,7 @@ func (t ExtractProviderImpl) Get(
 	createNewIncrementalFiles bool,
 ) (IncrementalTarInterpreter, []internal.ReaderMaker, []internal.ReaderMaker, error) {
 	interpreter := t.getTarInterpreter(dbDataDir, backup, filesToUnwrap, createNewIncrementalFiles)
-	concurrentTarsToExtract, sequentialTarsToExtract, err := t.FilesToExtractProviderImpl.Get(backup, filesToUnwrap, skipRedundantTars)
+	concurrentTarsToExtract, sequentialTarsToExtract, err := t.FilesToExtractProviderImpl.Get(ctx, backup, filesToUnwrap, skipRedundantTars)
 	return interpreter, concurrentTarsToExtract, sequentialTarsToExtract, err
 }
 

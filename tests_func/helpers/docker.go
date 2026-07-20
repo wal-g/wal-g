@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"net/netip"
 	"os"
 	"os/exec"
 	"slices"
@@ -12,12 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	containertypes "github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	networktypes "github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/utils"
 )
@@ -86,19 +85,19 @@ func RunCommandStrict(ctx context.Context, container string, command []string) (
 func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult, error) {
 	args := &RunOptions{}
 
-	execConfig := containertypes.ExecOptions{
+	execConfig := client.ExecCreateOptions{
 		AttachStdout: true,
 		AttachStderr: true,
 		User:         args.user,
 		Cmd:          cmd,
 	}
 
-	containerExec, err := Docker.ContainerExecCreate(ctx, container, execConfig)
+	containerExec, err := Docker.ExecCreate(ctx, container, execConfig)
 	if err != nil {
 		return ExecResult{}, err
 	}
 
-	attach, err := Docker.ContainerExecAttach(ctx, containerExec.ID, containertypes.ExecAttachOptions{})
+	attach, err := Docker.ExecAttach(ctx, containerExec.ID, client.ExecAttachOptions{})
 	if err != nil {
 		return ExecResult{}, err
 	}
@@ -124,7 +123,7 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 		return ExecResult{}, ctx.Err()
 	}
 
-	execInspect, err := Docker.ContainerExecInspect(ctx, containerExec.ID)
+	execInspect, err := Docker.ExecInspect(ctx, containerExec.ID, client.ExecInspectOptions{})
 	if err != nil {
 		return ExecResult{}, err
 	}
@@ -136,39 +135,39 @@ func RunCommand(ctx context.Context, container string, cmd []string) (ExecResult
 }
 
 func RunAsyncCommand(ctx context.Context, container, cmd string) error {
-	execCfg := containertypes.ExecOptions{
-		Detach: true,
-		Cmd:    []string{shell, "-c", cmd},
+	execCfg := client.ExecCreateOptions{
+		Cmd: []string{shell, "-c", cmd},
 	}
-	execResp, err := Docker.ContainerExecCreate(ctx, container, execCfg)
+	execResp, err := Docker.ExecCreate(ctx, container, execCfg)
 	if err != nil {
 		return err
 	}
-	return Docker.ContainerExecStart(ctx, execResp.ID, containertypes.ExecStartOptions{})
+	_, err = Docker.ExecStart(ctx, execResp.ID, client.ExecStartOptions{Detach: true})
+	return err
 }
 
-func ContainerWithPrefix(containers []types.Container, name string) (*types.Container, error) {
-	for _, container := range containers {
-		if slices.Contains(container.Names, name) {
-			return &container, nil
+func ContainerWithPrefix(containers []container.Summary, name string) (*container.Summary, error) {
+	for _, c := range containers {
+		if slices.Contains(c.Names, name) {
+			return &c, nil
 		}
 	}
 	return nil, fmt.Errorf("cannot find container with name %s", name)
 }
 
-func DockerContainer(ctx context.Context, prefix string) (*types.Container, error) {
-	containers, err := Docker.ContainerList(ctx, containertypes.ListOptions{})
+func DockerContainer(ctx context.Context, prefix string) (*container.Summary, error) {
+	containers, err := Docker.ContainerList(ctx, client.ContainerListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error in getting docker container: %v", err)
 	}
-	containerWithPrefixPointer, err := ContainerWithPrefix(containers, fmt.Sprintf("/%s", prefix))
+	containerWithPrefixPointer, err := ContainerWithPrefix(containers.Items, fmt.Sprintf("/%s", prefix))
 	if err != nil {
 		return nil, fmt.Errorf("error in getting docker container: %v", err)
 	}
 	return containerWithPrefixPointer, nil
 }
 
-func ExposedPort(container types.Container, port int) (string, int, error) {
+func ExposedPort(c container.Summary, port int) (string, int, error) {
 	machineName, hasMachineName := os.LookupEnv(envDockerMachineName)
 	host := "localhost"
 	if hasMachineName {
@@ -179,7 +178,7 @@ func ExposedPort(container types.Container, port int) (string, int, error) {
 		host = string(hostBytes)
 	}
 
-	bindings := container.Ports
+	bindings := c.Ports
 	for _, value := range bindings {
 		if value.Type != "tcp" {
 			continue
@@ -191,19 +190,16 @@ func ExposedPort(container types.Container, port int) (string, int, error) {
 	return "", 0, fmt.Errorf("error in getting exposed port")
 }
 
-func ListNets(ctx context.Context, name string) ([]networktypes.Summary, error) {
-	networkFilters := filters.NewArgs()
-	networkResources, err := Docker.NetworkList(ctx, networktypes.ListOptions{
-		Filters: networkFilters,
-	})
-	var result []networktypes.Summary
-	for _, value := range networkResources {
+func ListNets(ctx context.Context, name string) ([]network.Summary, error) {
+	networkResources, err := Docker.NetworkList(ctx, client.NetworkListOptions{})
+	var result []network.Summary
+	for _, value := range networkResources.Items {
 		if value.Name == name {
 			result = append(result, value)
 		}
 	}
 	if err != nil {
-		return []networktypes.Summary{}, fmt.Errorf("error in getting network list with name: %v", err)
+		return []network.Summary{}, fmt.Errorf("error in getting network list with name: %v", err)
 	}
 	return result, nil
 }
@@ -217,15 +213,15 @@ func CreateNet(ctx context.Context, netName string) error {
 		tracelog.DebugLogger.Printf("Found networks: %+v", networkList)
 		return nil
 	}
-	ipam := &networktypes.IPAM{
-		Config: []networktypes.IPAMConfig{{Subnet: fmt.Sprintf("10.0.%d.0/24", rand.Intn(255))}},
+	ipam := &network.IPAM{
+		Config: []network.IPAMConfig{{Subnet: netip.MustParsePrefix(fmt.Sprintf("10.0.%d.0/24", rand.Intn(255)))}},
 	}
 	netOpts := map[string]string{
 		"com.docker.network.bridge.enable_ip_masquerade": "true",
 		"com.docker.network.bridge.enable_icc":           "true",
 		"com.docker.network.bridge.netName":              netName,
 	}
-	config := networktypes.CreateOptions{
+	config := client.NetworkCreateOptions{
 		IPAM:    ipam,
 		Options: netOpts,
 	}
@@ -313,7 +309,7 @@ func (inf *Infra) Shutdown() error {
 		return fmt.Errorf("can not shutdown containers: %v", err)
 	}
 
-	if err := Docker.NetworkRemove(inf.ctx, inf.net); err != nil {
+	if _, err := Docker.NetworkRemove(inf.ctx, inf.net, client.NetworkRemoveOptions{}); err != nil {
 		return fmt.Errorf("error in shutting down network: %v", err)
 	}
 	return nil

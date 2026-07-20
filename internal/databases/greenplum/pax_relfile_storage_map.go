@@ -6,7 +6,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
@@ -17,21 +16,18 @@ import (
 //
 // PAX is a Cloudberry-only access method, so for plain Greenplum and unknown flavors
 // the function short-circuits to an empty map without contacting the catalog.
-func NewPaxRelFileStorageMap(queryRunner *GpQueryRunner) (pax.RelFileStorageMap, error) {
-	versionStr, err := queryRunner.GetGreenplumVersion()
+func NewPaxRelFileStorageMap(ctx context.Context, queryRunner *GpQueryRunner) (pax.RelFileStorageMap, error) {
+	version, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to query greenplum version")
 	}
-	version, err := parseGreenplumVersion(versionStr)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse greenplum version")
-	}
+
 	if version.Flavor != Cloudberry {
 		tracelog.DebugLogger.Printf("Skipping PAX storage map: flavor=%s does not support PAX", version.Flavor)
 		return pax.RelFileStorageMap{}, nil
 	}
 
-	databases, err := queryRunner.GetDatabaseInfos()
+	databases, err := queryRunner.GetDatabaseInfos(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get database names")
 	}
@@ -43,16 +39,16 @@ func NewPaxRelFileStorageMap(queryRunner *GpQueryRunner) (pax.RelFileStorageMap,
 			c.Database = dbName
 			return nil
 		}
-		dbConn, err := postgres.Connect(databaseOption)
+		dbConn, err := postgres.Connect(ctx, databaseOption)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to connect to database %s: %v", dbName, err)
 			continue
 		}
 
-		entries, err := pax.FetchStorageMetadata(context.TODO(), dbConn, db)
+		entries, err := pax.FetchStorageMetadata(ctx, dbConn, db)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to fetch PAX storage metadata for %s: %v", dbName, err)
-			closeErr := dbConn.Close(context.TODO())
+			closeErr := dbConn.Close(ctx)
 			tracelog.WarningLogger.PrintOnError(closeErr)
 			continue
 		}
@@ -62,7 +58,7 @@ func NewPaxRelFileStorageMap(queryRunner *GpQueryRunner) (pax.RelFileStorageMap,
 			result[k] = v
 		}
 
-		closeErr := dbConn.Close(context.TODO())
+		closeErr := dbConn.Close(ctx)
 		tracelog.WarningLogger.PrintOnError(closeErr)
 	}
 	return result, nil

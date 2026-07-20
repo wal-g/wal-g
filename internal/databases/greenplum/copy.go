@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/tracelog"
@@ -12,30 +13,30 @@ import (
 )
 
 // HandleCopy copy specific or all backups from one storage to another
-func HandleCopy(fromConfigFile string, toConfigFile string, backupName string) {
-	var from, fromError = internal.StorageFromConfig(fromConfigFile)
-	var to, toError = internal.StorageFromConfig(toConfigFile)
+func HandleCopy(ctx context.Context, fromConfigFile string, toConfigFile string, backupName string) {
+	var from, fromError = internal.StorageFromConfig(ctx, fromConfigFile)
+	var to, toError = internal.StorageFromConfig(ctx, toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := GetCopyingInfos(backupName, from.RootFolder(), to.RootFolder())
+	infos, err := GetCopyingInfos(ctx, backupName, from.RootFolder(), to.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = copy.Infos(infos)
+	err = copy.Infos(ctx, infos)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Println("Success copy.")
 }
 
-func GetCopyingInfos(backupName string,
+func GetCopyingInfos(ctx context.Context, backupName string,
 	from storage.Folder,
 	to storage.Folder) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, from)
 	if err != nil {
 		return nil, err
 	}
 
 	pgBackup := postgres.ToPgBackup(backup)
-	backupInfo, err := postgres.BackupCopyingInfo(pgBackup, from, to)
+	backupInfo, err := postgres.BackupCopyingInfo(ctx, pgBackup, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func GetCopyingInfos(backupName string,
 	infos = append(infos, backupInfo...)
 
 	var sentinel BackupSentinelDto
-	err = backup.FetchSentinel(&sentinel)
+	err = backup.FetchSentinel(ctx, &sentinel)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to get backup %s", backupName)
 		return nil, err
@@ -52,19 +53,19 @@ func GetCopyingInfos(backupName string,
 	for _, meta := range sentinel.Segments {
 		fromSubfolder := from.GetSubFolder(fmt.Sprintf("%s/seg%d/", utility.SegmentsPath, meta.ContentID))
 		toSubfolder := to.GetSubFolder(fmt.Sprintf("%s/seg%d/", utility.SegmentsPath, meta.ContentID))
-		backup, err := internal.GetBackupByName(meta.BackupName,
+		backup, err := internal.GetBackupByName(ctx, meta.BackupName,
 			fmt.Sprintf("%s/seg%d/%s", utility.SegmentsPath, meta.ContentID, utility.BaseBackupPath), from)
 		if err != nil {
 			return nil, err
 		}
 		pgBackup := postgres.ToPgBackup(backup)
 
-		backupInfo, err := postgres.BackupCopyingInfo(pgBackup, fromSubfolder, toSubfolder)
+		backupInfo, err := postgres.BackupCopyingInfo(ctx, pgBackup, fromSubfolder, toSubfolder)
 		if err != nil {
 			return nil, err
 		}
 		infos = append(infos, backupInfo...)
-		historyInfo, err := postgres.HistoryCopyingInfo(pgBackup, fromSubfolder, toSubfolder, false)
+		historyInfo, err := postgres.HistoryCopyingInfo(ctx, pgBackup, fromSubfolder, toSubfolder, false)
 		if err != nil {
 			return nil, err
 		}

@@ -12,7 +12,7 @@ import (
 func TestHandleRemove(t *testing.T) {
 	t.Run("throw err when there is no files at prefix", func(t *testing.T) {
 		emptyFolder := memory.NewFolder("test/", memory.NewKVS())
-		err := HandleRemove("a/b/c/nonexistent", emptyFolder)
+		err := HandleRemove(t.Context(), "a/b/c/nonexistent", emptyFolder)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not exist")
 	})
@@ -27,19 +27,19 @@ func TestHandleRemove(t *testing.T) {
 			"a/b/c/target/1/2/3",
 		}
 		for _, f := range append(targetFolder, targetFile) {
-			err := folder.PutObject(f, bytes.NewBufferString("123"))
+			err := folder.PutObject(t.Context(), f, bytes.NewBufferString("123"))
 			require.NoError(t, err)
 		}
 
-		err := HandleRemove("a/b/c/target", folder)
+		err := HandleRemove(t.Context(), "a/b/c/target", folder)
 		require.NoError(t, err)
 
-		exists, err := folder.Exists(targetFile)
+		exists, err := folder.Exists(t.Context(), targetFile)
 		require.NoError(t, err)
 		assert.False(t, exists)
 
 		for _, f := range targetFolder {
-			exists, err = folder.Exists(f)
+			exists, err = folder.Exists(t.Context(), f)
 			require.NoError(t, err)
 			assert.True(t, exists)
 		}
@@ -55,19 +55,19 @@ func TestHandleRemove(t *testing.T) {
 			"a/b/c/target/1/2/3",
 		}
 		for _, f := range append(targetFolder, targetFile) {
-			err := folder.PutObject(f, bytes.NewBufferString("123"))
+			err := folder.PutObject(t.Context(), f, bytes.NewBufferString("123"))
 			require.NoError(t, err)
 		}
 
-		err := HandleRemove("a/b/c/target/", folder)
+		err := HandleRemove(t.Context(), "a/b/c/target/", folder)
 		require.NoError(t, err)
 
-		exists, err := folder.Exists(targetFile)
+		exists, err := folder.Exists(t.Context(), targetFile)
 		require.NoError(t, err)
 		assert.True(t, exists)
 
 		for _, f := range targetFolder {
-			exists, err = folder.Exists(f)
+			exists, err = folder.Exists(t.Context(), f)
 			require.NoError(t, err)
 			assert.False(t, exists)
 		}
@@ -87,21 +87,21 @@ func TestHandleRemove(t *testing.T) {
 			"a/b/c/target/3b/5/6",
 		}
 		for _, f := range append(targetFolder, targetFiles...) {
-			err := folder.PutObject(f, bytes.NewBufferString("123"))
+			err := folder.PutObject(t.Context(), f, bytes.NewBufferString("123"))
 			require.NoError(t, err)
 		}
 
-		err := HandleRemoveWithGlobPattern("a/b/c/target/3*", folder)
+		err := HandleRemoveWithGlobPattern(t.Context(), "a/b/c/target/3*", folder)
 		require.NoError(t, err)
 
 		for _, f := range targetFiles {
-			exists, err := folder.Exists(f)
+			exists, err := folder.Exists(t.Context(), f)
 			require.NoError(t, err)
 			assert.True(t, exists)
 		}
 
 		for _, f := range targetFolder {
-			exists, err := folder.Exists(f)
+			exists, err := folder.Exists(t.Context(), f)
 			require.NoError(t, err)
 			assert.False(t, exists)
 		}

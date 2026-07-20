@@ -4,19 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/user"
 	"path"
 	"path/filepath"
-	"strings"
-
-	"os"
 	"sort"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
-
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -69,7 +67,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 		tracelog.DebugLogger.Printf("Testing... %v\n", wal)
 
 		// Upload wals:
-		err = archiveWal(uploader, walDir, wal)
+		err = archiveWal(ctx, uploader, walDir, wal)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		cache.LastArchivedWal = wal
@@ -81,7 +79,7 @@ func HandleWALPush(ctx context.Context, uploader internal.Uploader, dataDir stri
 	return nil
 }
 
-func archiveWal(uploader internal.Uploader, dataDir string, wal string) error {
+func archiveWal(ctx context.Context, uploader internal.Uploader, dataDir string, wal string) error {
 	tracelog.InfoLogger.Printf("Archiving %v\n", wal)
 
 	filename := path.Join(dataDir, wal)
@@ -90,7 +88,7 @@ func archiveWal(uploader internal.Uploader, dataDir string, wal string) error {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", filename)
 	}
 	defer utility.LoggedClose(walFile, "")
-	err = uploader.UploadFile(context.Background(), walFile)
+	err = uploader.UploadFile(ctx, walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not upload '%s'\n", filename)
 	}

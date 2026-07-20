@@ -1,7 +1,6 @@
 package mongo
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -76,7 +75,7 @@ func BenchmarkHandleOplogPush(b *testing.B) {
 				membuf := stages.NewMemoryBuffer()
 				applier := stages.NewStorageApplier(uploader, membuf, tc.archiveAfterSize, tc.archiveAfterTime, nil, false)
 
-				err := HandleOplogPush(context.TODO(), fetcher, applier)
+				err := HandleOplogPush(b.Context(), fetcher, applier)
 
 				assert.Nil(b, fileCloser.Close())
 				assert.Nil(b, membuf.Close())

@@ -16,7 +16,7 @@ var daemonCmd = &cobra.Command{
 		daemonOpts := postgres.DaemonOptions{
 			SocketPath: args[0],
 		}
-		postgres.HandleDaemon(daemonOpts)
+		postgres.HandleDaemon(cmd.Context(), daemonOpts)
 	},
 }
 

@@ -35,7 +35,7 @@ func (folder *Folder) GetPath() string {
 	return folder.subPath
 }
 
-func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []storage.Folder, err error) {
+func (folder *Folder) ListFolder(_ context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	dirPath := path.Join(folder.rootPath, folder.subPath)
 	files, err := os.ReadDir(dirPath)
 	if err != nil {
@@ -59,20 +59,38 @@ func (folder *Folder) ListFolder() (objects []storage.Object, subFolders []stora
 	return
 }
 
-func (folder *Folder) DeleteObjects(objectsWithRelativePaths []storage.Object) error {
+func (folder *Folder) DeleteObjects(_ context.Context, objectsWithRelativePaths []storage.Object) error {
+	baseDir := path.Join(folder.rootPath, folder.subPath)
 	for _, object := range objectsWithRelativePaths {
-		err := os.RemoveAll(folder.GetFilePath(object.GetName()))
+		filePath := folder.GetFilePath(object.GetName())
+		err := os.RemoveAll(filePath)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
 			return fmt.Errorf("unable to delete file %q: %w", object.GetName(), err)
 		}
+		removeEmptyParentDirs(path.Dir(filePath), baseDir)
 	}
 	return nil
 }
 
-func (folder *Folder) Exists(objectRelativePath string) (bool, error) {
+// removeEmptyParentDirs removes empty parent directories up to (but not including) stopDir.
+// os.Remove only succeeds on empty directories, so non-empty dirs are left untouched.
+func removeEmptyParentDirs(dir, stopDir string) {
+	for dir != stopDir {
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+		parent := path.Dir(dir)
+		if parent == dir {
+			return
+		}
+		dir = parent
+	}
+}
+
+func (folder *Folder) Exists(_ context.Context, objectRelativePath string) (bool, error) {
 	_, err := os.Stat(folder.GetFilePath(objectRelativePath))
 	if os.IsNotExist(err) {
 		return false, nil
@@ -93,7 +111,7 @@ func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder 
 	return sf
 }
 
-func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, error) {
+func (folder *Folder) ReadObject(_ context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	filePath := folder.GetFilePath(objectRelativePath)
 	file, err := os.Open(filePath)
 	if os.IsNotExist(err) {
@@ -105,8 +123,9 @@ func (folder *Folder) ReadObject(objectRelativePath string) (io.ReadCloser, erro
 	return file, nil
 }
 
-func (folder *Folder) PutObject(name string, content io.Reader) error {
+func (folder *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {
 	tracelog.DebugLogger.Printf("Put %v into %v\n", name, folder.subPath)
+	content = contextio.NewReader(ctx, content)
 	filePath := folder.GetFilePath(name)
 	randomSuffix, err := storage.NewTimestampRandomTag()
 	if err != nil {
@@ -153,12 +172,7 @@ func (folder *Folder) PutObject(name string, content io.Reader) error {
 	return nil
 }
 
-func (folder *Folder) PutObjectWithContext(ctx context.Context, name string, content io.Reader) error {
-	ctxReader := contextio.NewReader(ctx, content)
-	return folder.PutObject(name, ctxReader)
-}
-
-func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
+func (folder *Folder) CopyObject(ctx context.Context, srcPath string, dstPath string) error {
 	src := path.Join(folder.rootPath, srcPath)
 	srcStat, err := os.Stat(src)
 	if errors.Is(err, os.ErrNotExist) {
@@ -174,7 +188,7 @@ func (folder *Folder) CopyObject(srcPath string, dstPath string) error {
 	if err != nil {
 		return fmt.Errorf("unable to open file to copy %q: %w", srcPath, err)
 	}
-	err = folder.PutObject(dstPath, file)
+	err = folder.PutObject(ctx, dstPath, file)
 	if err != nil {
 		return fmt.Errorf("unable to copy: %w", err)
 	}
@@ -214,14 +228,14 @@ func (folder *Folder) EnsureExists() error {
 	return nil
 }
 
-func (folder *Folder) Validate() error {
+func (folder *Folder) Validate(ctx context.Context) error {
 	return nil
 }
 
 // NOT IMPLEMENTED
-func (folder *Folder) SetVersioningEnabled(enable bool) {}
+func (folder *Folder) SetVersioningEnabled(_ context.Context, enable bool) {}
 
 // NOT IMPLEMENTED
-func (folder *Folder) GetVersioningEnabled() bool {
+func (folder *Folder) GetVersioningEnabled(_ context.Context) bool {
 	return false
 }

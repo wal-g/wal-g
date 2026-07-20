@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -20,10 +21,10 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleCatchupSend(pgDataDirectory string, destination string) {
+func HandleCatchupSend(ctx context.Context, pgDataDirectory string, destination string) {
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Sending %v to %v\n", pgDataDirectory, destination)
-	info, runner, err := GetPgServerInfo(true)
+	info, runner, err := GetPgServerInfo(ctx, true)
 	if info.systemIdentifier == nil {
 		tracelog.ErrorLogger.Fatal("Our system lacks System Identifier, cannot proceed")
 	}
@@ -46,7 +47,7 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 	err = decoder.Decode(&fileList)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Received file list of %v files", len(fileList))
-	_, lsnStr, _, err := runner.StartBackup("")
+	_, lsnStr, _, err := runner.StartBackup(ctx, "")
 	tracelog.ErrorLogger.FatalOnError(err)
 	lsn, err := ParseLSN(lsnStr)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -55,9 +56,9 @@ func HandleCatchupSend(pgDataDirectory string, destination string) {
 			lsn, control.Checkpoint)
 	}
 
-	sendFileCommands(encoder, pgDataDirectory, fileList, control.Checkpoint)
+	sendFileCommands(ctx, encoder, pgDataDirectory, fileList, control.Checkpoint)
 
-	label, offsetMap, _, err := runner.StopBackup()
+	label, offsetMap, _, err := runner.StopBackup(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = encoder.Encode(
@@ -119,7 +120,7 @@ func chooseCompression() (compression.Compressor, compression.Decompressor) {
 	return c, d
 }
 
-func sendFileCommands(encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
+func sendFileCommands(ctx context.Context, encoder *gob.Encoder, directory string, list internal.BackupFileList, checkpoint LSN) {
 	extendExcludedFiles()
 	seenFiles := make(map[string]bool)
 	err := filepath.Walk(directory, func(path string, info fs.FileInfo, err error) error {
@@ -157,7 +158,7 @@ func sendFileCommands(encoder *gob.Encoder, directory string, list internal.Back
 			wasInBase = true
 		}
 
-		sendOneFile(path, info, wasInBase, checkpoint, encoder, fullFileName)
+		sendOneFile(ctx, path, info, wasInBase, checkpoint, encoder, fullFileName)
 
 		return nil
 	})
@@ -186,7 +187,7 @@ func sendDeletedFiles(encoder *gob.Encoder, list internal.BackupFileList, seenFi
 	}
 }
 
-func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
+func sendOneFile(ctx context.Context, path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
 	encoder *gob.Encoder, fullFileName string) {
 	increment := isPagedFile(info, path) && wasInBase
 	var err error
@@ -201,7 +202,7 @@ func sendOneFile(path string, info fs.FileInfo, wasInBase bool, checkpoint LSN,
 		tracelog.ErrorLogger.FatalOnError(err)
 		size = info.Size()
 	} else {
-		fd, size, err = ReadIncrementalFile(path, info.Size(), checkpoint, nil)
+		fd, size, err = ReadIncrementalFile(ctx, path, info.Size(), checkpoint, nil)
 
 		if _, ok := err.(*errors.InvalidBlockError); ok {
 			fd, err = os.Open(path)

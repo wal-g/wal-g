@@ -3,6 +3,10 @@ package oplog
 import (
 	"context"
 	"fmt"
+	"io"
+	"slices"
+	"strings"
+
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/txn"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -11,9 +15,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"io"
-	"slices"
-	"strings"
 )
 
 const NamespaceNotFoundError int32 = 26

@@ -1,10 +1,8 @@
 package universal
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/cmd/common"
 	"github.com/wal-g/wal-g/cmd/etcd"
 	"github.com/wal-g/wal-g/cmd/fdb"
 	"github.com/wal-g/wal-g/cmd/mongo"
@@ -22,10 +20,7 @@ var (
 )
 
 func Execute() {
-	if err := universalCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	common.ExecuteContext(universalCmd)
 }
 
 func init() {

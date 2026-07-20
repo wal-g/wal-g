@@ -6,9 +6,8 @@ import (
 	"sync"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
-
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 type SourceTransformerFunc func(r io.Reader) (io.Reader, error)
@@ -24,7 +23,7 @@ type InfoProvider struct {
 	targetName string
 }
 
-func Infos(chs []InfoProvider) error {
+func Infos(ctx context.Context, chs []InfoProvider) error {
 	maxParallelJobsCount := 8
 
 	tickets := make(chan interface{}, maxParallelJobsCount)
@@ -50,7 +49,7 @@ func Infos(chs []InfoProvider) error {
 
 		go func(handler InfoProvider) {
 			defer wg.Done()
-			err := handler.copyObject()
+			err := handler.copyObject(ctx)
 			tracelog.DebugLogger.PrintOnError(err)
 			tickets <- nil
 			errors <- err
@@ -68,8 +67,8 @@ func Infos(chs []InfoProvider) error {
 	return nil
 }
 
-func (ch *InfoProvider) copyObject() error {
-	objReadCloser, err := ch.From.ReadObject(ch.SrcObj.GetName())
+func (ch *InfoProvider) copyObject(ctx context.Context) error {
+	objReadCloser, err := ch.From.ReadObject(ctx, ch.SrcObj.GetName())
 	if err != nil {
 		return err
 	}
@@ -93,7 +92,7 @@ func (ch *InfoProvider) copyObject() error {
 		return err
 	}
 
-	if err := uploader.Upload(context.Background(), ch.targetName, r); err != nil {
+	if err := uploader.Upload(ctx, ch.targetName, r); err != nil {
 		return err
 	}
 

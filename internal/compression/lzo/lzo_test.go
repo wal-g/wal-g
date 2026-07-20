@@ -6,6 +6,7 @@ package lzo_test
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"testing"
@@ -65,7 +66,7 @@ func testLzopRoundTrip(t *testing.T, stride, nBytes int) {
 	brm := &BufferReaderMaker{tarContents, "/usr/local.lzo"}
 	buf := &testtools.BufferTarInterpreter{}
 	files := []internal.ReaderMaker{brm}
-	err = internal.ExtractAll(buf, files)
+	err = internal.ExtractAll(t.Context(), buf, files)
 	if err != nil {
 		t.Log(err)
 	}
@@ -127,7 +128,7 @@ func BenchmarkExtractAll(b *testing.B) {
 	// extract.ExtractAll(np, out)
 
 	buf := &testtools.BufferTarInterpreter{}
-	err := internal.ExtractAll(buf, out)
+	err := internal.ExtractAll(b.Context(), buf, out)
 	if err != nil {
 		b.Log(err)
 	}
@@ -140,7 +141,7 @@ type BufferReaderMaker struct {
 	Key string
 }
 
-func (b *BufferReaderMaker) Reader() (io.ReadCloser, error) { return io.NopCloser(b.Buf), nil }
+func (b *BufferReaderMaker) Reader(context.Context) (io.ReadCloser, error) { return io.NopCloser(b.Buf), nil }
 func (b *BufferReaderMaker) StoragePath() string            { return b.Key }
 func (b *BufferReaderMaker) LocalPath() string              { return b.Key }
 func (b *BufferReaderMaker) FileType() internal.FileType    { return internal.TarFileType }

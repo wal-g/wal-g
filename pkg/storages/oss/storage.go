@@ -1,6 +1,7 @@
 package oss
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -31,7 +32,7 @@ type Config struct {
 	CopyPartSize     int64
 }
 
-func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
+func NewStorage(ctx context.Context, config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, error) {
 	client, err := configureClient(config)
 	if err != nil {
 		return nil, fmt.Errorf("configure client: %w", err)
@@ -44,7 +45,7 @@ func NewStorage(config *Config, rootWraps ...storage.WrapRootFolder) (*Storage, 
 	}
 
 	if !config.SkipValidation {
-		err = folder.Validate()
+		err = folder.Validate(ctx)
 		if err != nil {
 			return nil, err
 		}

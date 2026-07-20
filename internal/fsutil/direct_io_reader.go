@@ -13,14 +13,13 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 )
 
-const directIOBlockCount = 32
-
 type reader struct {
-	mu           *sync.Mutex
-	fd           *os.File
-	buff         []byte
-	buffOffset   int
-	alignedBlock []byte
+	mu               *sync.Mutex
+	fd               *os.File
+	buff             []byte
+	buffOffset       int
+	alignedBlockSize int
+	alignedBlock     []byte
 }
 
 // OpenReadOnlyMayBeDirectIO returns read-only io.ReadSeekCloser.
@@ -33,15 +32,21 @@ func OpenReadOnlyMayBeDirectIO(path string) (io.ReadSeekCloser, error) {
 
 // NewDirectIOReadSeekCloser returns io.ReadSeekCloser.
 func NewDirectIOReadSeekCloser(path string, flag int, perm os.FileMode) (io.ReadSeekCloser, error) {
+	blockCount := viper.GetInt(conf.DirectIOBlockCountSetting)
+	if blockCount <= 0 {
+		return nil, fmt.Errorf("%s is expected to be positive but is: %d", conf.DirectIOBlockCountSetting, blockCount)
+	}
 	in, errOpen := directio.OpenFile(path, flag, perm)
 	if errOpen != nil {
 		return nil, errOpen
 	}
+	alignedBlockSize := blockCount * directio.BlockSize
 	return &reader{
-		mu:           &sync.Mutex{},
-		fd:           in,
-		buff:         nil,
-		alignedBlock: directio.AlignedBlock(directIOBlockCount * directio.BlockSize),
+		mu:               &sync.Mutex{},
+		fd:               in,
+		buff:             nil,
+		alignedBlockSize: alignedBlockSize,
+		alignedBlock:     directio.AlignedBlock(alignedBlockSize),
 	}, nil
 }
 
@@ -73,7 +78,7 @@ func (r *reader) Seek(offset int64, whence int) (int64, error) {
 	defer r.mu.Unlock()
 	r.buffOffset = 0
 	r.buff = nil
-	r.alignedBlock = directio.AlignedBlock(directIOBlockCount * directio.BlockSize)
+	r.alignedBlock = directio.AlignedBlock(r.alignedBlockSize)
 	if whence != io.SeekStart {
 		panic(fmt.Errorf("this is programm bug, seek with whence %d currently is not supported by DirectIOReadSeekCloser",
 			whence))

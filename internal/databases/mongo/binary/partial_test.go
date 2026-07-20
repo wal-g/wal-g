@@ -1,10 +1,11 @@
 package binary
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
 func TestGetFilters(t *testing.T) {

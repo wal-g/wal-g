@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/wal-g/tracelog"
@@ -9,7 +10,7 @@ import (
 )
 
 type DirectoryUploader interface {
-	Upload(path string) TarFileSets
+	Upload(ctx context.Context, path string) TarFileSets
 }
 
 type CommonDirectoryUploader struct {
@@ -40,7 +41,7 @@ func NewCommonDirectoryUploader(
 	}
 }
 
-func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
+func (u *CommonDirectoryUploader) Upload(ctx context.Context, path string) TarFileSets {
 	bundle := NewBundle(path, u.crypter, u.tarSizeThreshold, u.excludedFiles)
 
 	// Start a new tar bundle, walk the pgDataDirectory and upload everything there.
@@ -48,7 +49,7 @@ func (u *CommonDirectoryUploader) Upload(path string) TarFileSets {
 	err := bundle.StartQueue(NewStorageTarBallMaker(u.backupName, u.uploader))
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = bundle.SetupComposer(u.tarBallComposerMaker)
+	err = bundle.SetupComposer(ctx, u.tarBallComposerMaker)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Walking ...")

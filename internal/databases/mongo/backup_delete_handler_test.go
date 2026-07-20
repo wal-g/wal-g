@@ -28,13 +28,13 @@ func TestHandleBackupDelete(t *testing.T) {
 				backupName: "first",
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
+					dl.On("BackupMeta", mock.Anything, mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
 						Return(&models.Backup{BackupName: "first"}, nil).Once()
 					return dl
 				}(),
 				purger: func() *mocks.Purger {
 					pr := &mocks.Purger{}
-					pr.On("DeleteBackups", mock.MatchedBy(func(backups []*models.Backup) bool { return len(backups) == 1 && backups[0].BackupName == "first" })).
+					pr.On("DeleteBackups", mock.Anything, mock.MatchedBy(func(backups []*models.Backup) bool { return len(backups) == 1 && backups[0].BackupName == "first" })).
 						Return(nil).Once()
 					return pr
 				}(),
@@ -48,7 +48,7 @@ func TestHandleBackupDelete(t *testing.T) {
 				backupName: "first",
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
+					dl.On("BackupMeta", mock.Anything, mock.MatchedBy(func(backupName string) bool { return backupName == "first" })).
 						Return(&models.Backup{BackupName: "first"}, nil).Once()
 					return dl
 				}(),
@@ -63,7 +63,7 @@ func TestHandleBackupDelete(t *testing.T) {
 				backupName: "nonexistent",
 				downloader: func() *mocks.Downloader {
 					dl := &mocks.Downloader{}
-					dl.On("BackupMeta", mock.MatchedBy(func(backupName string) bool { return backupName == "nonexistent" })).
+					dl.On("BackupMeta", mock.Anything, mock.MatchedBy(func(backupName string) bool { return backupName == "nonexistent" })).
 						Return(nil, fmt.Errorf("can not fetch stream sentinel: test")).Once()
 					return dl
 				}(),
@@ -75,7 +75,7 @@ func TestHandleBackupDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := HandleBackupDelete(tt.args.backupName, tt.args.downloader, tt.args.purger, tt.args.dryRun)
+			err := HandleBackupDelete(t.Context(), tt.args.backupName, tt.args.downloader, tt.args.purger, tt.args.dryRun)
 			if tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 				return

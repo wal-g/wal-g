@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"path"
 	"strings"
 
@@ -12,13 +13,13 @@ import (
 )
 
 // HandleCopyBackup copy specific backups from one storage to another
-func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
-	var from, fromError = internal.StorageFromConfig(fromConfigFile)
-	var to, toError = internal.StorageFromConfig(toConfigFile)
+func HandleCopyBackup(ctx context.Context, fromConfigFile, toConfigFile, backupName, prefix string) {
+	var from, fromError = internal.StorageFromConfig(ctx, fromConfigFile)
+	var to, toError = internal.StorageFromConfig(ctx, toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := backupCopyingInfo(backupName, prefix, from.RootFolder(), to.RootFolder())
+	infos, err := backupCopyingInfo(ctx, backupName, prefix, from.RootFolder(), to.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.DebugLogger.Printf("copying files %s\n", strings.Join(func() []string {
@@ -30,35 +31,36 @@ func HandleCopyBackup(fromConfigFile, toConfigFile, backupName, prefix string) {
 		return ret
 	}(), ","))
 
-	tracelog.ErrorLogger.FatalOnError(copy.Infos(infos))
+	tracelog.ErrorLogger.FatalOnError(copy.Infos(ctx, infos))
 
 	tracelog.InfoLogger.Printf("Success copyed backup %s.\n", backupName)
 }
 
 // HandleCopyBackup copy  all backups from one storage to another
-func HandleCopyAll(fromConfigFile string, toConfigFile string) {
-	var from, fromError = internal.StorageFromConfig(fromConfigFile)
-	var to, toError = internal.StorageFromConfig(toConfigFile)
+func HandleCopyAll(ctx context.Context, fromConfigFile string, toConfigFile string) {
+	var from, fromError = internal.StorageFromConfig(ctx, fromConfigFile)
+	var to, toError = internal.StorageFromConfig(ctx, toConfigFile)
 	if fromError != nil || toError != nil {
 		return
 	}
-	infos, err := WildcardInfo(from.RootFolder(), to.RootFolder())
+	infos, err := WildcardInfo(ctx, from.RootFolder(), to.RootFolder())
 	tracelog.ErrorLogger.FatalOnError(err)
-	err = copy.Infos(infos)
+	err = copy.Infos(ctx, infos)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Success copyed all backups\n")
 }
 
-func backupCopyingInfo(backupName, prefix string, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+func backupCopyingInfo(ctx context.Context, backupName, prefix string, from storage.Folder, to storage.Folder,
+) ([]copy.InfoProvider, error) {
 	tracelog.InfoLogger.Printf("Handle backupname '%s'.", backupName)
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, from)
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, from)
 	if err != nil {
 		return nil, err
 	}
 	tracelog.InfoLogger.Print("Collecting backup files...")
 	var backupPrefix = path.Join(utility.BaseBackupPath, backup.Name)
 
-	objects, err := storage.ListFolderRecursively(from)
+	objects, err := storage.ListFolderRecursively(ctx, from)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +78,8 @@ func backupCopyingInfo(backupName, prefix string, from storage.Folder, to storag
 	), nil
 }
 
-func WildcardInfo(from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
-	objects, err := storage.ListFolderRecursively(from)
+func WildcardInfo(ctx context.Context, from storage.Folder, to storage.Folder) ([]copy.InfoProvider, error) {
+	objects, err := storage.ListFolderRecursively(ctx, from)
 	if err != nil {
 		return nil, err
 	}

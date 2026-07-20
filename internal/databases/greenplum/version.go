@@ -3,8 +3,10 @@ package greenplum
 import (
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 
-	"github.com/blang/semver"
+	"github.com/hashicorp/go-version"
 )
 
 type Flavor string
@@ -19,24 +21,30 @@ const (
 )
 
 type Version struct {
-	semver.Version
+	*version.Version
+	Major  int
 	Flavor Flavor // Note: can be '' for old backups
 }
 
-func NewVersion(version semver.Version, flavor Flavor) Version {
+func (v Version) String() string {
+	return fmt.Sprintf("%s (%s)", v.Flavor.String(), v.Version.String())
+}
+
+func NewVersion(v *version.Version, flavor Flavor) Version {
 	return Version{
-		Version: version,
+		Version: v,
+		Major:   v.Segments()[0],
 		Flavor:  flavor,
 	}
 }
 
-func parseGreenplumVersion(version string) (Version, error) {
-	pattern := regexp.MustCompile(`(Greenplum Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
-	groups := pattern.FindStringSubmatch(version)
+func parseGreenplumVersion(versionStr string) (Version, error) {
+	pattern := regexp.MustCompile(`(Greenplum Database|Greengage Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
+	groups := pattern.FindStringSubmatch(versionStr)
 	if groups == nil {
-		return Version{}, fmt.Errorf("unknown flavor: %s", version)
+		return Version{}, fmt.Errorf("unknown flavor: %s", versionStr)
 	}
-	semVer, err := semver.Make(groups[2])
+	semVer, err := version.NewVersion(groups[2])
 	if err != nil {
 		return Version{}, err
 	}
@@ -44,6 +52,8 @@ func parseGreenplumVersion(version string) (Version, error) {
 	var flavor Flavor
 	switch groups[1] {
 	case "Greenplum Database":
+		flavor = Greenplum
+	case "Greengage Database":
 		flavor = Greenplum
 	case "Cloudberry Database":
 		flavor = Cloudberry
@@ -56,14 +66,16 @@ func parseGreenplumVersion(version string) (Version, error) {
 	return NewVersion(semVer, flavor), nil
 }
 
-func (v Version) EstimatePostgreSQLVersion() int {
-	if v.Flavor == Cloudberry {
+func EstimatePostgreSQLVersion(flavor Flavor, gpVersion string) int {
+	if flavor == Cloudberry {
 		return 140000
 	}
-	if v.Major == 7 {
+	majorStr, _, _ := strings.Cut(gpVersion, ".")
+	major, _ := strconv.Atoi(majorStr)
+	switch major {
+	case 7:
 		return 120000
-	}
-	if v.Major == 6 {
+	case 6:
 		return 90400
 	}
 	return 0

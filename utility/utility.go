@@ -34,8 +34,8 @@ type ContextCloser interface {
 	Close(ctx context.Context) error
 }
 
-func LoggedCloseContext(c ContextCloser, errmsg string) {
-	err := c.Close(context.TODO())
+func LoggedCloseContext(ctx context.Context, c ContextCloser, errmsg string) {
+	err := c.Close(ctx)
 	if errmsg == "" {
 		errmsg = "Problem with closing object"
 	}
@@ -174,6 +174,15 @@ func GetFileExtension(filePath string) string {
 
 func TrimFileExtension(filePath string) string {
 	return strings.TrimSuffix(filePath, "."+GetFileExtension(filePath))
+}
+
+// AddFileExtension appends ".ext" to name, omitting the separator when ext is
+// empty (e.g. "none" compression), to avoid a dangling trailing dot
+func AddFileExtension(name, ext string) string {
+	if ext == "" {
+		return name
+	}
+	return name + "." + ext
 }
 
 func GetSubdirectoryRelativePath(subdirectoryPath string, directoryPath string) string {
@@ -341,7 +350,7 @@ func ResetTimer(t *time.Timer, d time.Duration) {
 
 // SignalHandler defines signal handler setup & shutdown representation
 type SignalHandler struct {
-	ctx    context.Context
+	ctx    context.Context //nolint:containedctx // ctx drives the signal-handling goroutine lifetime
 	ch     chan os.Signal
 	cancel func()
 }
