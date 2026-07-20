@@ -40,7 +40,6 @@ jobs:
 
       - name: Build dependencies
         run: |
-          go get -v -t ./...
           curl --retry 5 --retry-delay 0 -sL "https://github.com/jedisct1/libsodium/releases/download/$env:LIBSODIUM_VERSION-RELEASE/libsodium-$env:LIBSODIUM_VERSION-mingw.tar.gz" -o "libsodium-$env:LIBSODIUM_VERSION-mingw.tar.gz"
           tar -xf .\libsodium-$env:LIBSODIUM_VERSION-mingw.tar.gz
           mkdir tmp

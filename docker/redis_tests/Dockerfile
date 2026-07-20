@@ -20,7 +20,7 @@ COPY link_brotli.sh link_brotli.sh
 COPY CMakeLists-brotli.txt CMakeLists-brotli.txt
 COPY Makefile Makefile
 
-RUN go get -v -t ./... && USE_BROTLI=1 make ENABLE_RACE_DETECTION=1 deps redis_build
+RUN USE_BROTLI=1 make ENABLE_RACE_DETECTION=1 deps redis_build
 
 FROM wal-g/redis:latest
 
