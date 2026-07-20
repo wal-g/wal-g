@@ -44,3 +44,18 @@ func (asm *FakeASM) UnmarkWalFile(walFilePath string) error {
 func (asm *FakeASM) RenameReady(walFilePath string) error {
 	return nil
 }
+
+func (asm *FakeASM) ListUploaded(limit int) ([]string, error) {
+	asm.mutex.Lock()
+	defer asm.mutex.Unlock()
+	files := make([]string, 0, len(asm.uploaded))
+	for name, uploaded := range asm.uploaded {
+		if uploaded {
+			files = append(files, name)
+			if limit > 0 && len(files) >= limit {
+				break
+			}
+		}
+	}
+	return files, nil
+}
