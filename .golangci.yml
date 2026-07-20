@@ -75,8 +75,8 @@ linters:
         - name: redefines-builtin-id
     staticcheck:
       checks:
-        - -SA1019
         - all
+        - -SA1019
   exclusions:
     generated: lax
     presets:
