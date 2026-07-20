@@ -22,7 +22,7 @@ COPY CMakeLists-brotli.txt CMakeLists-brotli.txt
 COPY Makefile Makefile
 
 RUN --mount=type=cache,target=/gocache GOCACHE=/gocache \
-    go get -v -t ./... && USE_BROTLI=1 USE_LZO=1 make ENABLE_RACE_DETECTION=1 deps pg_build build_client
+    USE_BROTLI=1 USE_LZO=1 make ENABLE_RACE_DETECTION=1 deps pg_build build_client
 
 RUN --mount=type=cache,target=/gocache cd pkg/storages/swift && GOCACHE=/gocache go test -v -c
 RUN --mount=type=cache,target=/gocache cd pkg/storages/sh && GOCACHE=/gocache go test -v -c
