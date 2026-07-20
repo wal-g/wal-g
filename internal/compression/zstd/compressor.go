@@ -25,7 +25,6 @@ func (compressor Compressor) NewWriter(writer io.Writer) ioextensions.WriteFlush
 	}
 	zw, err := zstd.NewWriter(writer,
 		zstd.WithEncoderLevel(level),
-		zstd.WithConcurrentBlocks(true),
 	)
 	if err != nil {
 		panic(err)
