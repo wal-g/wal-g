@@ -92,6 +92,20 @@ func (err UnknownZstdLevelError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type ZstdLevelWithoutZstdMethodError struct {
+	error
+}
+
+func newZstdLevelWithoutZstdMethodError(method string) ZstdLevelWithoutZstdMethodError {
+	return ZstdLevelWithoutZstdMethodError{
+		errors.Errorf("WALG_ZSTD_LEVEL is set but the compression method is '%s', not 'zstd'",
+			method)}
+}
+
+func (err ZstdLevelWithoutZstdMethodError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 type UnmarshallingError struct {
 	error
 }
@@ -209,14 +223,15 @@ func ConfigureCompressor() (compression.Compressor, error) {
 	if !ok {
 		return nil, newUnknownCompressionMethodError(compressionMethod)
 	}
-	if compressionMethod == zstdcompression.AlgorithmName {
-		if levelName := viper.GetString(conf.ZstdLevelSetting); levelName != "" {
-			level, levelOK := zstdcompression.EncoderLevelFromName(levelName)
-			if !levelOK {
-				return nil, newUnknownZstdLevelError(levelName)
-			}
-			compressor = zstdcompression.Compressor{Level: level}
+	if levelName := viper.GetString(conf.ZstdLevelSetting); levelName != "" {
+		if compressionMethod != zstdcompression.AlgorithmName {
+			return nil, newZstdLevelWithoutZstdMethodError(compressionMethod)
 		}
+		level, levelOK := zstdcompression.EncoderLevelFromName(levelName)
+		if !levelOK {
+			return nil, newUnknownZstdLevelError(levelName)
+		}
+		compressor = zstdcompression.Compressor{Level: level}
 	}
 	return compressor, nil
 }

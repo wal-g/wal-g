@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/compression/lzma"
+	walgzstd "github.com/wal-g/wal-g/internal/compression/zstd"
 	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/testtools"
@@ -176,6 +178,30 @@ func TestConfigureCompressor_ErrorWhenViperClear(t *testing.T) {
 
 func TestConfigureCompressor_FailsOnInvalidCompressorString(t *testing.T) {
 	viper.Set(config.CompressionMethodSetting, "kek123kek")
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
+	resetToDefaults()
+}
+func TestConfigureCompressor_ZstdMethodWithLevel(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "zstd")
+	viper.Set(config.ZstdLevelSetting, "best")
+	compressor, err := internal.ConfigureCompressor()
+	assert.NoError(t, err)
+	assert.Equal(t, compressor, walgzstd.Compressor{Level: zstd.SpeedBestCompression})
+	resetToDefaults()
+}
+func TestConfigureCompressor_FailsOnInvalidZstdLevel(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "zstd")
+	viper.Set(config.ZstdLevelSetting, "kek123kek")
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
+	resetToDefaults()
+}
+func TestConfigureCompressor_FailsOnZstdLevelWithoutZstdMethod(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "lz4")
+	viper.Set(config.ZstdLevelSetting, "fastest")
 	compressor, err := internal.ConfigureCompressor()
 	assert.Error(t, err)
 	assert.Equal(t, compressor, nil)
