@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
+	zstdcompression "github.com/wal-g/wal-g/internal/compression/zstd"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/crypto/awskms"
@@ -74,6 +75,34 @@ func newUnknownCompressionMethodError(method string) UnknownCompressionMethodErr
 }
 
 func (err UnknownCompressionMethodError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type UnknownZstdLevelError struct {
+	error
+}
+
+func newUnknownZstdLevelError(level string) UnknownZstdLevelError {
+	return UnknownZstdLevelError{
+		errors.Errorf("Unknown zstd level: '%s', supported levels are: fastest, default, better, best",
+			level)}
+}
+
+func (err UnknownZstdLevelError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
+type ZstdLevelWithoutZstdMethodError struct {
+	error
+}
+
+func newZstdLevelWithoutZstdMethodError(method string) ZstdLevelWithoutZstdMethodError {
+	return ZstdLevelWithoutZstdMethodError{
+		errors.Errorf("WALG_ZSTD_LEVEL is set but the compression method is '%s', not 'zstd'",
+			method)}
+}
+
+func (err ZstdLevelWithoutZstdMethodError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
@@ -190,10 +219,21 @@ func GetPgSlotName() (pgSlotName string) {
 
 func ConfigureCompressor() (compression.Compressor, error) {
 	compressionMethod := viper.GetString(conf.CompressionMethodSetting)
-	if _, ok := compression.Compressors[compressionMethod]; !ok {
+	compressor, ok := compression.Compressors[compressionMethod]
+	if !ok {
 		return nil, newUnknownCompressionMethodError(compressionMethod)
 	}
-	return compression.Compressors[compressionMethod], nil
+	if levelName := viper.GetString(conf.ZstdLevelSetting); levelName != "" {
+		if compressionMethod != zstdcompression.AlgorithmName {
+			return nil, newZstdLevelWithoutZstdMethodError(compressionMethod)
+		}
+		level, levelOK := zstdcompression.EncoderLevelFromName(levelName)
+		if !levelOK {
+			return nil, newUnknownZstdLevelError(levelName)
+		}
+		compressor = zstdcompression.Compressor{Level: level}
+	}
+	return compressor, nil
 }
 
 func getPGArchiveStatusFolderPath() string {
