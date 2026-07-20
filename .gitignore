@@ -51,3 +51,6 @@ tags
 .claude
 AGENTS.md
 .mcp.json
+
+# Internal documentation
+internal-docs/
