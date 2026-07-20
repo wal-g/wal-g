@@ -42,6 +42,7 @@ const (
 	DeltaMaxStepsSetting          = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting            = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting      = "WALG_COMPRESSION_METHOD"
+	ZstdLevelSetting              = "WALG_ZSTD_LEVEL"
 	StoragePrefixSetting          = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting          = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting       = "WALG_NETWORK_RATE_LIMIT"
@@ -368,6 +369,7 @@ var (
 		DeltaMaxStepsSetting:          true,
 		DeltaOriginSetting:            true,
 		CompressionMethodSetting:      true,
+		ZstdLevelSetting:              true,
 		StoragePrefixSetting:          true,
 		DiskRateLimitSetting:          true,
 		NetworkRateLimitSetting:       true,

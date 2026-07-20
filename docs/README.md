@@ -72,6 +72,10 @@ To configure where WAL-G stores backups, please consult the [Storages](STORAGES.
 To configure the compression method used for backups. Possible options are: `lz4`, `lzma`, `zstd`, `brotli`, `none`. The default method is `lz4`. LZ4 is the fastest method, but the compression ratio is bad.
 LZMA is way much slower. However, it compresses backups about 6 times better than LZ4. Brotli and zstd are a good trade-off between speed and compression ratio, which is about 3 times better than LZ4. None compression method disables compression.
 
+* `WALG_ZSTD_LEVEL`
+
+To configure the zstd compression level when `WALG_COMPRESSION_METHOD` is `zstd`. Possible options are: `fastest`, `default`, `better`, `best`. When unset, `default` is used. Higher levels compress better at the cost of more CPU time.
+
 ### Encryption
 
 * `YC_CSE_KMS_KEY_ID`
