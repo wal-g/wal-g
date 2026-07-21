@@ -90,10 +90,15 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
 
-		if aoMeta.eof == remoteFile.EOF {
-			tracelog.WarningLogger.Printf(
-				"%s: equal EOF %d, but local modcount %d is different from the remote %d, will perform a regular upload",
+		if aoMeta.eof <= remoteFile.EOF {
+			tracelog.InfoLogger.Printf(
+				"%s: less or equal EOF %d, but local modcount %d is different from the remote %d, will perform a regular upload",
 				cfi.Header.Name, aoMeta.eof, aoMeta.modCount, remoteFile.ModCount)
+			return u.regularAoUpload(ctx, cfi, aoMeta, location)
+		}
+
+		if aoMeta.checksum != remoteFile.Checksum {
+			tracelog.InfoLogger.Printf("%s: remote file has different checksum from local, will perform a regular upload", cfi.Header.Name)
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
 

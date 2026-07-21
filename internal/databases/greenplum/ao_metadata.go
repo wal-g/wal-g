@@ -22,6 +22,7 @@ type BackupAOFileDesc struct {
 	Compressor      string         `json:"Compressor,omitempty"`
 	FileMode        int64          `json:"FileMode"`
 	InitialUploadTS time.Time      `json:"InitialUploadTS,omitempty"`
+	Checksum        string         `json:"Checksum,omitempty"`
 }
 
 type AOFilesMetadataDTO struct {
