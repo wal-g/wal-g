@@ -633,4 +633,3 @@ func (mc *MongoCtl) ChangeReplSet(rs string) error {
 	}
 	return mc.StartMongod()
 }
-

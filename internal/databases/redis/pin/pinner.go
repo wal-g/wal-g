@@ -111,7 +111,10 @@ func ValidateSameFilesystem(sourceDir, pinFolder string) error {
 		return fmt.Errorf("cannot determine filesystem for ts source %s and pin folder %s", sourceDir, pinFolder)
 	}
 	if sourceStat.Dev != pinStat.Dev {
-		return fmt.Errorf("ts source %s and pin folder %s are on different filesystems; configure WALG_REDIS_TS_PIN_FOLDER on the source filesystem", sourceDir, pinFolder)
+		return fmt.Errorf(
+			"ts source %s and pin folder %s are on different filesystems; configure WALG_REDIS_TS_PIN_FOLDER on the source filesystem",
+			sourceDir, pinFolder,
+		)
 	}
 	return nil
 }

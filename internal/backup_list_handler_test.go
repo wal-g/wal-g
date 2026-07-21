@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/tracelog"
@@ -17,6 +16,7 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage/stats"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"go.uber.org/mock/gomock"
 )
 
 func TestHandleDefaultBackupList(t *testing.T) {

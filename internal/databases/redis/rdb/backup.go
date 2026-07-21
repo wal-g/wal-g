@@ -74,7 +74,9 @@ func (su *StorageUploader) UploadBackup(ctx context.Context, args UploadBackupAr
 	return su.Finalize(ctx, args.MetaConstructor, dstPath, args.DeferSentinel)
 }
 
-func (su *StorageUploader) Finalize(ctx context.Context, metaConstructor internal.MetaConstructor, dstPath string, deferSentinel bool) error {
+func (su *StorageUploader) Finalize(
+	ctx context.Context, metaConstructor internal.MetaConstructor, dstPath string, deferSentinel bool,
+) error {
 	if err := metaConstructor.Finalize(ctx, dstPath); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}

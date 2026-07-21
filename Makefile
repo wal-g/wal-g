@@ -21,7 +21,7 @@ MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
 MONGO_TEST_TYPE ?= "all"
-GOLANGCI_LINT_VERSION ?= "v2.0"
+GOLANGCI_LINT_VERSION ?= "v2.4.0"
 REDIS_VERSION ?= "6.2.4"
 MOCKS_DESTINATION := ./testtools/mocks
 FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
@@ -336,7 +336,7 @@ docker_lint:
 	docker build -t wal-g/lint --build-arg TAG=$(GOLANGCI_LINT_VERSION) - < docker/lint/Dockerfile
 	docker run --rm -v `pwd`:/app \
 		-v wal-g_lint_cache:/cache -e GOLANGCI_LINT_CACHE=/cache/lint \
-		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod \
+		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod -e GOEXPERIMENT="$(GOEXPERIMENT)" \
 		wal-g/lint golangci-lint run -v
 
 deps: go_deps link_external_deps

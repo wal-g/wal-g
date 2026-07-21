@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	redisdb "github.com/wal-g/wal-g/internal/databases/redis"
@@ -16,6 +14,7 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/redis/rdb"
 	"github.com/wal-g/wal-g/internal/databases/redis/ts"
 	"github.com/wal-g/wal-g/utility"
+	"golang.org/x/sync/errgroup"
 )
 
 func runTieredStorageBackupPush(ctx context.Context) error {

@@ -16,6 +16,9 @@ func TestFilesPinnerPinTreePreservesRelativePathsAndKeepsFilesReadable(t *testin
 	require.NoError(t, os.WriteFile(filepath.Join(sourceDir, "root.rdb"), []byte("root"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(sourceDir, "nested", "part.dat"), []byte("part"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(sourceDir, "nested", "ignore.tmp"), []byte("tmp"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDir, "nested", "ignore.lock"), []byte("lock"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDir, "nested", "ignore.pid"), []byte("pid"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(sourceDir, "nested", "ignore.part"), []byte("part"), 0o600))
 
 	pinner := NewFilesPinner(pinDir)
 	pinnedPaths, err := pinner.PinTree(sourceDir)
@@ -28,6 +31,9 @@ func TestFilesPinnerPinTreePreservesRelativePathsAndKeepsFilesReadable(t *testin
 	assert.FileExists(t, rootPinned)
 	assert.FileExists(t, nestedPinned)
 	assert.NoFileExists(t, filepath.Join(pinDir, "nested", "ignore.tmp"))
+	assert.NoFileExists(t, filepath.Join(pinDir, "nested", "ignore.lock"))
+	assert.NoFileExists(t, filepath.Join(pinDir, "nested", "ignore.pid"))
+	assert.NoFileExists(t, filepath.Join(pinDir, "nested", "ignore.part"))
 
 	require.NoError(t, os.RemoveAll(sourceDir))
 	contents, err := os.ReadFile(nestedPinned)

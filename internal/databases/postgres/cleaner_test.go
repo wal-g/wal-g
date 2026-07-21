@@ -3,11 +3,11 @@ package postgres_test
 import (
 	"testing"
 
-	"go.uber.org/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 var (
