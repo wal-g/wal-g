@@ -27,7 +27,7 @@ func HandleBackupInfo(ctx context.Context, folder storage.Folder, backupName str
 
 	pretty := false
 	json := true
-	err = printlist.List([]printlist.Entity{backupDetails}, output, pretty, json)
+	err = printlist.List([]printlist.Entity{&backupDetails}, output, pretty, json)
 	tracelog.ErrorLogger.FatalfOnError("Print backup info: %v", err)
 }
 

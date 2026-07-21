@@ -57,31 +57,31 @@ type Backup struct {
 	TSFinishTime    time.Time   `json:"TSFinishTime,omitempty"`
 }
 
-func (b Backup) Name() string {
+func (b *Backup) Name() string {
 	return b.BackupName
 }
 
-func (b Backup) StartTime() time.Time {
+func (b *Backup) StartTime() time.Time {
 	return b.StartLocalTime
 }
 
-func (b Backup) IsPermanent() bool {
+func (b *Backup) IsPermanent() bool {
 	return b.Permanent
 }
 
-func (b Backup) IsAOF() bool {
+func (b *Backup) IsAOF() bool {
 	return b.BackupType == AOFBackupType
 }
 
-func (b Backup) IsRDB() bool {
+func (b *Backup) IsRDB() bool {
 	return b.BackupType == RDBBackupType
 }
 
-func (b Backup) VersionStr() string {
+func (b *Backup) VersionStr() string {
 	return b.Version
 }
 
-func (b Backup) PrintableFields() []printlist.TableField {
+func (b *Backup) PrintableFields() []printlist.TableField {
 	prettyStartTime := internal.PrettyFormatTime(b.StartLocalTime)
 	prettyFinishTime := internal.PrettyFormatTime(b.FinishLocalTime)
 	return []printlist.TableField{
@@ -170,7 +170,7 @@ func (b Backup) PrintableFields() []printlist.TableField {
 	}
 }
 
-func (b Backup) ToInternal(folder storage.Folder) internal.Backup {
+func (b *Backup) ToInternal(folder storage.Folder) internal.Backup {
 	return internal.Backup{
 		Folder: folder.GetSubFolder(utility.BaseBackupPath),
 		Name:   b.BackupName,
@@ -205,7 +205,7 @@ func RedisModelToTimedBackup(backups []Backup) []internal.TimedBackup {
 	}
 	result := make([]internal.TimedBackup, len(backups))
 	for i := range backups {
-		result[i] = backups[i]
+		result[i] = &backups[i]
 	}
 	return result
 }

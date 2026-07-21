@@ -22,7 +22,7 @@ func HandleDetailedBackupList(ctx context.Context, folder storage.Folder, pretty
 
 	printableEntities := make([]printlist.Entity, len(backupDetails))
 	for i := range backupDetails {
-		printableEntities[i] = backupDetails[i]
+		printableEntities[i] = &backupDetails[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
 	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)

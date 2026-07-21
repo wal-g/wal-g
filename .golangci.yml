@@ -45,7 +45,7 @@ linters:
         - style
       settings:
         hugeParam:
-          sizeThreshold: 270
+          sizeThreshold: 170
     gocyclo:
       min-complexity: 15
     lll:
