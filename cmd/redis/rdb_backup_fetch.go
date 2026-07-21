@@ -9,6 +9,8 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	redisdb "github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/internal/databases/redis/ts"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const (
@@ -77,8 +79,18 @@ func runBackupFetch(cmd *cobra.Command, args []string) error {
 		return runRDBBackupFetch(cmd.Context(), args[0])
 	case aofBackupType:
 		return runAOFBackupFetch(cmd.Context(), args[0])
-	case rdbTSBackupType, aofTSBackupType, tsBackupType:
-		return fmt.Errorf("redis backup type %q is not available until tiered-storage support is enabled", backupType)
+	case rdbTSBackupType:
+		if err := runRDBBackupFetch(cmd.Context(), args[0]); err != nil {
+			return err
+		}
+		return runTSBackupFetch(cmd.Context(), args[0])
+	case aofTSBackupType:
+		if err := runAOFBackupFetch(cmd.Context(), args[0]); err != nil {
+			return err
+		}
+		return runTSBackupFetch(cmd.Context(), args[0])
+	case tsBackupType:
+		return runTSBackupFetch(cmd.Context(), args[0])
 	default:
 		return fmt.Errorf("unsupported redis backup type %q", backupType)
 	}
@@ -103,6 +115,23 @@ func runRDBBackupFetch(ctx context.Context, backupName string) error {
 	restoreCmd.Stderr = os.Stderr
 
 	return redisdb.HandleBackupFetch(ctx, storage.RootFolder(), backupName, restoreCmd, skipClean)
+}
+
+func runTSBackupFetch(ctx context.Context, backupName string) error {
+	storage, err := internal.ConfigureStorage(ctx)
+	if err != nil {
+		return err
+	}
+	dataPrefix := backupName
+	if backupType != tsBackupType {
+		dataPrefix = ts.AttachedDataPrefix(backupName)
+	}
+	return ts.Fetch(ctx, ts.FetchArgs{
+		Folder:     storage.RootFolder().GetSubFolder(utility.BaseBackupPath),
+		DataPrefix: dataPrefix,
+		TargetDir:  tsFetchBackup,
+		SkipClean:  skipClean,
+	})
 }
 
 func init() {

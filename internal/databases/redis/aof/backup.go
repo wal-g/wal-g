@@ -43,8 +43,9 @@ func CreateBackupService(diskWatcher *diskwatcher.DiskWatcher, uploader *interna
 }
 
 type DoBackupArgs struct {
-	BackupName string
-	Sharded    bool
+	BackupName    string
+	Sharded       bool
+	DeferSentinel bool
 }
 
 func (bs *BackupService) DoBackup(ctx context.Context, args DoBackupArgs) error {
@@ -104,10 +105,10 @@ func (bs *BackupService) DoBackup(ctx context.Context, args DoBackupArgs) error 
 		return err
 	}
 
-	return bs.Finalize(ctx, args.BackupName)
+	return bs.Finalize(ctx, args.BackupName, args.DeferSentinel)
 }
 
-func (bs *BackupService) Finalize(ctx context.Context, backupName string) error {
+func (bs *BackupService) Finalize(ctx context.Context, backupName string, deferSentinel bool) error {
 	if err := bs.metaConstructor.Finalize(ctx, backupName); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
@@ -117,8 +118,10 @@ func (bs *BackupService) Finalize(ctx context.Context, backupName string) error 
 	backup.BackupName = backupName
 	backup.BackupSize = bs.concurrentUploader.CompressedSize
 	backup.DataSize = bs.concurrentUploader.UncompressedSize
-	if err := bs.concurrentUploader.UploadSentinel(ctx, backupSentinelInfo, backupName); err != nil {
-		return fmt.Errorf("can not upload sentinel: %+v", err)
+	if !deferSentinel {
+		if err := bs.concurrentUploader.UploadSentinel(ctx, backupSentinelInfo, backupName); err != nil {
+			return fmt.Errorf("can not upload sentinel: %+v", err)
+		}
 	}
 	return nil
 }

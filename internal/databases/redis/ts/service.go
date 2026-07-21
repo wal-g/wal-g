@@ -13,13 +13,14 @@ import (
 )
 
 type PushArgs struct {
-	Uploader   internal.Uploader
-	SourceDir  string
-	PinFolder  string
-	DataPrefix string
-	BackupID   string
-	BackupPath string
-	Permanent  bool
+	Uploader      internal.Uploader
+	SourceDir     string
+	PinFolder     string
+	DataPrefix    string
+	BackupID      string
+	BackupPath    string
+	Permanent     bool
+	DeferSentinel bool
 }
 
 // Push uploads a recursively pinned tiered-storage tree and writes its sentinel.
@@ -84,8 +85,10 @@ func Push(ctx context.Context, args PushArgs) (*archive.Backup, error) {
 		TSStartTime:     now,
 		TSFinishTime:    now,
 	}
-	if err = concurrentUploader.UploadSentinel(ctx, backup, args.DataPrefix); err != nil {
-		return nil, fmt.Errorf("upload ts sentinel: %w", err)
+	if !args.DeferSentinel {
+		if err = concurrentUploader.UploadSentinel(ctx, backup, args.DataPrefix); err != nil {
+			return nil, fmt.Errorf("upload ts sentinel: %w", err)
+		}
 	}
 	return backup, nil
 }

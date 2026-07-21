@@ -114,7 +114,7 @@ func runBackupPush(cmd *cobra.Command, _ []string) error {
 	case aofBackupType:
 		return runAOFBackupPush(ctx)
 	case rdbTSBackupType, aofTSBackupType, tsBackupType:
-		return fmt.Errorf("redis backup type %q is not available until tiered-storage support is enabled", backupType)
+		return runTieredStorageBackupPush(ctx)
 	default:
 		return fmt.Errorf("unsupported redis backup type %q", backupType)
 	}
