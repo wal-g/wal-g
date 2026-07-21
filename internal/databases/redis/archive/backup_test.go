@@ -19,6 +19,7 @@ func TestBackup_PrintableFields(t *testing.T) {
 		UserData:        []string{"a", "b", "c"},
 		Version:         "4.5.4",
 		BackupType:      "rdb",
+		HasTS:           true,
 		TSBackupID:      "ts-id",
 		TSBackupPath:    "/var/lib/redis/ext/ts-id",
 		TSDataSize:      300000,
@@ -92,6 +93,12 @@ func TestBackup_PrintableFields(t *testing.T) {
 			Name:        "used_memory_rss",
 			PrettyName:  "Used memory (as seen by OS))",
 			Value:       "0",
+			PrettyValue: nil,
+		},
+		{
+			Name:        "has_ts",
+			PrettyName:  "Has TS",
+			Value:       "true",
 			PrettyValue: nil,
 		},
 		{

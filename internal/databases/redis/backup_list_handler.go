@@ -35,6 +35,9 @@ func GetBackupDetails(ctx context.Context, folder storage.Folder, backups []inte
 		if err != nil {
 			return nil, err
 		}
+		if err = archive.EnrichWithAttachedTS(ctx, folder, &details); err != nil {
+			return nil, err
+		}
 		backupDetails = append(backupDetails, details)
 	}
 

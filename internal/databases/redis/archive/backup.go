@@ -48,6 +48,7 @@ type Backup struct {
 	UsedMemory      int64       `json:"UsedMemory,omitempty"`
 	UsedMemoryRss   int64       `json:"UsedMemoryRss,omitempty"`
 	MaxDBNumber     int64       `json:"MaxDBNumber"`
+	HasTS           bool        `json:"HasTS,omitempty"`
 	TSBackupID      string      `json:"TSBackupID,omitempty"`
 	TSBackupPath    string      `json:"TSBackupPath,omitempty"`
 	TSDataSize      int64       `json:"TSDataSize,omitempty"`
@@ -140,6 +141,11 @@ func (b Backup) PrintableFields() []printlist.TableField {
 			Name:       "used_memory_rss",
 			PrettyName: "Used memory (as seen by OS))",
 			Value:      strconv.FormatInt(b.UsedMemoryRss, 10),
+		},
+		{
+			Name:       "has_ts",
+			PrettyName: "Has TS",
+			Value:      fmt.Sprintf("%v", b.HasTS),
 		},
 		{
 			Name:       "ts_backup_id",
