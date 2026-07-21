@@ -2,15 +2,21 @@ package greenplum
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"io"
+	"os"
 	"path"
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -97,7 +103,8 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
 
-		if aoMeta.checksum != remoteFile.Checksum {
+		checksum, err := getCheckSum(ctx, cfi.Path, aoMeta.eof)
+		if checksum != remoteFile.Checksum {
 			tracelog.InfoLogger.Printf("%s: remote file has different checksum from local, will perform a regular upload", cfi.Header.Name)
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
@@ -106,7 +113,7 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 			"%s: EOF (local %d, remote %d), ModCount (local %d, remote %d), will perform an incremental upload",
 			cfi.Header.Name, aoMeta.eof, remoteFile.EOF, aoMeta.modCount, remoteFile.ModCount)
 
-		err := u.incrementalAoUpload(ctx, remoteFile.StoragePath, cfi, aoMeta, remoteFile.EOF, remoteFile.InitialUploadTS)
+		err = u.incrementalAoUpload(ctx, remoteFile.StoragePath, cfi, aoMeta, remoteFile.EOF, remoteFile.InitialUploadTS, checksum)
 		if err == nil {
 			return nil
 		}
@@ -126,15 +133,15 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 	tracelog.DebugLogger.Printf(
 		"%s: ModCount %d, EOF %d matches the remote file %s, will skip this file",
 		cfi.Header.Name, remoteFile.ModCount, remoteFile.EOF, remoteFile.StoragePath)
-	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS, remoteFile.IsIncremented)
+	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS, remoteFile.IsIncremented, remoteFile.Checksum)
 }
 
 func (u *AoStorageUploader) addAoFileMetadata(
 	cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped, isIncremented bool,
-	initialUplTS time.Time) {
+	initialUplTS time.Time, checksum string) {
 	u.metaMutex.Lock()
 	u.meta.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(),
-		initialUplTS, aoMeta, cfi.Header.Mode, isSkipped, isIncremented)
+		initialUplTS, aoMeta, cfi.Header.Mode, isSkipped, isIncremented, checksum)
 	u.metaMutex.Unlock()
 }
 
@@ -143,11 +150,30 @@ func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
 }
 
 func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string,
-	initialUploadTS time.Time, isIncremented bool) error {
-	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, isIncremented, initialUploadTS)
+	initialUploadTS time.Time, isIncremented bool, checksum string) error {
+	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, isIncremented, initialUploadTS, checksum)
 	u.bundleFiles.AddSkippedFile(cfi.Header, cfi.FileInfo)
 	tracelog.DebugLogger.Printf("Skipping %s AO relfile (already exists in storage as %s)", cfi.Path, storageKey)
 	return nil
+}
+
+func getCheckSum(ctx context.Context, filePath string, eof int64) (string, error) {
+	file, err := fsutil.OpenReadOnlyMayBeDirectIO(filePath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", internal.NewFileNotExistError(filePath)
+		}
+		return "", errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", filePath)
+	}
+	diskLimitedFileReader := limiters.NewDiskLimitReader(ctx, file)
+
+	hasher := sha512.New()
+	if _, err = io.CopyN(hasher, diskLimitedFileReader, eof); err != nil {
+		return "", err
+	}
+	checksum := hex.EncodeToString(hasher.Sum(nil)) // 128 hex chars = 64 raw bytes
+	return checksum, nil
+
 }
 
 func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
@@ -161,25 +187,32 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 
 	defer fileReadCloser.Close()
 
+	// Compute SHA-512 checksum while streaming the file to storage — zero extra I/O.
+	// The hash is fed by a TeeReader that sits between the file reader and the
+	// compressor/encryptor, so every byte is hashed exactly once as it is read.
+	hasher := sha512.New()
+	hashingReader := io.TeeReader(fileReadCloser, hasher)
+
 	// do not compress AO/AOCS segment files since they are already compressed in most cases
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
 	var compressor compression.Compressor
 
-	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
+	uploadContents := internal.CompressAndEncrypt(hashingReader, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
 	err = u.uploader.Upload(ctx, uploadPath, uploadContents)
 	if err != nil {
 		return err
 	}
 
-	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, false, time.Now())
+	checksum := hex.EncodeToString(hasher.Sum(nil)) // 128 hex chars = 64 raw bytes
+	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, false, time.Now(), checksum)
 	u.bundleFiles.AddFile(cfi.Header, cfi.FileInfo, false)
 	return nil
 }
 
 func (u *AoStorageUploader) incrementalAoUpload(ctx context.Context,
 	baseFileStorageKey string,
-	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, baseFileEOF int64, initialUploadTS time.Time) error {
+	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, baseFileEOF int64, initialUploadTS time.Time, checksum string) error {
 	storageKey := makeDeltaAoFileStorageKey(baseFileStorageKey, aoMeta.modCount)
 	tracelog.DebugLogger.Printf("Uploading %s AO relfile delta to %s", cfi.Path, storageKey)
 
@@ -199,7 +232,7 @@ func (u *AoStorageUploader) incrementalAoUpload(ctx context.Context,
 		return err
 	}
 
-	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, true, initialUploadTS)
+	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, true, initialUploadTS, checksum)
 	u.bundleFiles.AddFile(cfi.Header, cfi.FileInfo, true)
 	return nil
 }
