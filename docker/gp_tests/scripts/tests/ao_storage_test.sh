@@ -35,14 +35,16 @@ stop_and_delete_cluster_dir
 
 wal-g backup-fetch LATEST --in-place --config=${TMP_CONFIG}
 start_cluster
+sleep 5
+psql -p 6000 -d test -c "SELECT COUNT(*) FROM ao;"
 
-psql -p 6000 -d test -c "SELECT COUNT(*) FROM ao;" | grep 10000000 && EXIT_STATUS=$? || EXIT_STATUS=$?
+psql -p 6000 -d test -c "SELECT COUNT(*) FROM ao;" | grep 10000001 && EXIT_STATUS=$? || EXIT_STATUS=$?
 if [ "$EXIT_STATUS" -ne 0 ] ; then
     echo "Error: Failed to read from ao table after restore"
     exit 1
 fi
 
-psql -p 6000 -d test -c "SELECT COUNT(*) FROM co;" | grep 10000000 && EXIT_STATUS=$? || EXIT_STATUS=$?
+psql -p 6000 -d test -c "SELECT COUNT(*) FROM co;" | grep 10000001 && EXIT_STATUS=$? || EXIT_STATUS=$?
 if [ "$EXIT_STATUS" -ne 0 ] ; then
     echo "Error: Failed to read from co table after restore"
     exit 1

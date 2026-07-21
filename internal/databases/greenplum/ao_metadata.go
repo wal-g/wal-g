@@ -36,7 +36,7 @@ func NewAOFilesMetadataDTO() *AOFilesMetadataDTO {
 }
 
 func (m *AOFilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplTS time.Time, aoMeta AoRelFileMetadata,
-	fileMode int64, isSkipped, isIncremented bool) {
+	fileMode int64, isSkipped, isIncremented bool, checksum string) {
 	m.Files[key] = BackupAOFileDesc{
 		StoragePath:     storagePath,
 		IsSkipped:       isSkipped,
@@ -47,5 +47,6 @@ func (m *AOFilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplT
 		FileMode:        fileMode,
 		ModCount:        aoMeta.modCount,
 		InitialUploadTS: initialUplTS,
+		Checksum:        checksum,
 	}
 }
