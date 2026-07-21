@@ -1,5 +1,4 @@
 FROM wal-g/golang:latest AS build
-ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 COPY go.mod go.mod
@@ -14,9 +13,7 @@ COPY Makefile Makefile
 # we test wal-g logic, not our deps. So, no brotli in these tests.
 # Note: `-race` fails on ARM64 when ubuntu:bionic used: race runtime needs outline-atomics
 # helpers from libgcc 10+, which the bionic-based wal-g/golang base doesn't have.
-RUN cd main/gp && \
-    if [ "$(uname -m)" = "x86_64" ]; then RACE="-race"; else RACE=""; fi && \
-    go build -mod vendor $RACE -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+RUN make $( [ "$(uname -m)" = "x86_64" ] && echo ENABLE_RACE_DETECTION=1 ) gp_build
 
 FROM wal-g/cloudberry:latest
 
