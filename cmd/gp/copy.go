@@ -12,9 +12,8 @@ import (
 
 const (
 	backupCopyUsage            = "copy"
-	backupCopyShortDescription = "copy specific backup"
-	backupCopyLongDescription  = "Copy backup from one storage to another according to configs " +
-		"(with history by default)"
+	backupCopyShortDescription = "copy specific or all backups"
+	backupCopyLongDescription  = "Copy Greenplum backup(s) without transforming payloads"
 
 	backupNameFlag        = "backup-name"
 	backupNameShorthand   = "b"
@@ -27,12 +26,17 @@ const (
 	toFlag        = "to"
 	toShorthand   = "t"
 	toDescription = "Storage config to where should copy backup"
+
+	withHistoryFlag        = "with-history"
+	withHistoryShorthand   = "w"
+	withHistoryDescription = "Synchronize every segment WAL stream through the latest cluster restore point"
 )
 
 var (
 	targetBackupName string
 	fromConfigFile   string
 	toConfigFile     string
+	withHistory      bool
 
 	backupCopyCmd = &cobra.Command{
 		Use:   backupCopyUsage,
@@ -57,7 +61,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	greenplum.HandleCopy(cmd.Context(), fromConfigFile, toConfigFile, targetBackupName)
+	greenplum.HandleCopyWithHistory(cmd.Context(), fromConfigFile, toConfigFile, targetBackupName, withHistory)
 }
 
 func init() {
@@ -66,8 +70,8 @@ func init() {
 	backupCopyCmd.Flags().StringVarP(&targetBackupName, backupNameFlag, backupNameShorthand, "", backupNameDescription)
 	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	backupCopyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
+	backupCopyCmd.Flags().BoolVarP(&withHistory, withHistoryFlag, withHistoryShorthand, false, withHistoryDescription)
 
-	_ = backupCopyCmd.MarkFlagRequired(backupNameFlag)
 	_ = backupCopyCmd.MarkFlagRequired(toFlag)
 	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
 }

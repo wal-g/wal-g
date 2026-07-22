@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	db "github.com/wal-g/wal-g/internal/databases/mysql"
 )
@@ -41,13 +43,21 @@ var (
 		Use:   copyName,
 		Short: copyShortDescription,
 		Args:  cobra.ExactArgs(0),
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if all == (backupName != "") {
+				return fmt.Errorf("exactly one of --all or --backup must be specified")
+			}
 			if all {
+				if prefix != "" {
+					return fmt.Errorf("--add-prefix cannot be used with --all")
+				}
 				db.HandleCopyAll(cmd.Context(), fromConfigFile, toConfigFile)
-				return
+				return nil
 			}
 			db.HandleCopyBackup(cmd.Context(), fromConfigFile, toConfigFile, backupName, prefix)
+			return nil
 		},
+		PersistentPreRun: func(*cobra.Command, []string) {},
 	}
 )
 
@@ -57,6 +67,8 @@ func init() {
 	copyCmd.Flags().StringVarP(&backupName, backupNameFlag, backupShorthand, "", backupShortDescription)
 	copyCmd.Flags().StringVarP(&prefix, prefixFlag, prefixShorthand, "", prefixDescription)
 	copyCmd.Flags().BoolVarP(&all, copyAllFlag, allShorthand, false, copyAllSDescription)
+	_ = copyCmd.MarkFlagRequired(fromFlag)
+	_ = copyCmd.MarkFlagRequired(toFlag)
 
 	cmd.AddCommand(copyCmd)
 }

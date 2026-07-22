@@ -25,16 +25,17 @@ const RestorePointSuffix = "_restore_point.json"
 const RestorePointCreateRetries = 5
 
 type RestorePointMetadata struct {
-	Name             string         `json:"name"`
-	StartTime        time.Time      `json:"start_time"`
-	FinishTime       time.Time      `json:"finish_time"`
-	Hostname         string         `json:"hostname"`
-	GpVersion        string         `json:"gp_version"`
-	GpFlavor         string         `json:"gp_flavor"`
-	SystemIdentifier *uint64        `json:"system_identifier"`
-	LsnBySegment     map[int]string `json:"lsn_by_segment"`
-	StorageName      string         `json:"storage_name"`
-	TimeLine         uint32         `json:"time_line"`
+	Name              string         `json:"name"`
+	StartTime         time.Time      `json:"start_time"`
+	FinishTime        time.Time      `json:"finish_time"`
+	Hostname          string         `json:"hostname"`
+	GpVersion         string         `json:"gp_version"`
+	GpFlavor          string         `json:"gp_flavor"`
+	SystemIdentifier  *uint64        `json:"system_identifier"`
+	LsnBySegment      map[int]string `json:"lsn_by_segment"`
+	StorageName       string         `json:"storage_name"`
+	TimeLine          uint32         `json:"time_line"`
+	TimelineBySegment map[int]uint32 `json:"timeline_by_segment,omitempty"`
 }
 
 func (s *RestorePointMetadata) String() string {
@@ -136,10 +137,10 @@ func (rpc *RestorePointCreator) Create(ctx context.Context) {
 	err := rpc.checkExists(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	restoreLSNs, timeLine, err := createRestorePoint(ctx, rpc.Conn, rpc.pointName)
+	restoreLSNs, timelineBySegment, err := createRestorePoint(ctx, rpc.Conn, rpc.pointName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = rpc.uploadMetadata(ctx, restoreLSNs, timeLine)
+	err = rpc.uploadMetadata(ctx, restoreLSNs, timelineBySegment)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for restore point %s", rpc.pointName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -148,26 +149,33 @@ func (rpc *RestorePointCreator) Create(ctx context.Context) {
 }
 
 func createRestorePoint(ctx context.Context, conn *pgx.Conn, restorePointName string) (
-	restoreLSNs map[int]string, timeLine uint32, err error) {
+	restoreLSNs map[int]string, timelineBySegment map[int]uint32, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
 	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
 
-	timeLine, err = queryRunner.ReadTimeline(ctx)
+	_, err = queryRunner.ReadTimeline(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
 
 	for retries := 0; retries < RestorePointCreateRetries; retries++ {
 		restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(ctx, restorePointName)
 		if err == nil {
+			timelineBySegment, err = queryRunner.ReadTimelineBySegment(ctx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("read Greenplum timelines after restore point creation: %w", err)
+			}
+			if err := validateRestorePointTimelines(restoreLSNs, timelineBySegment); err != nil {
+				return nil, nil, err
+			}
 			// After create restore point should archive related WAL log segments.
 			// This ensures the new cluster can retrieve complete WAL logs with the restore point for restoration.
 			globalCluster, gpVersion, _, err := getGpClusterInfo(ctx, conn)
 			if err != nil {
-				return nil, 0, err
+				return nil, nil, err
 			}
 			tracelog.InfoLogger.Println("Switch xlog on cluster")
 			remoteOutput := globalCluster.GenerateAndExecuteCommand("Running wal-g", cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
@@ -191,10 +199,23 @@ func createRestorePoint(ctx context.Context, conn *pgx.Conn, restorePointName st
 			globalCluster.CheckClusterError(remoteOutput, "Unable to switch xlog on cluster", func(contentID int) string {
 				return "Unable to switch xlog on cluster"
 			}, true)
-			return restoreLSNs, timeLine, nil
+			return restoreLSNs, timelineBySegment, nil
 		}
 	}
-	return nil, 0, err
+	return nil, nil, err
+}
+
+func validateRestorePointTimelines(restoreLSNs map[int]string, timelines map[int]uint32) error {
+	if len(restoreLSNs) != len(timelines) {
+		return fmt.Errorf("greenplum restore point timeline topology does not match its LSN topology")
+	}
+	for contentID := range restoreLSNs {
+		timeline, ok := timelines[contentID]
+		if !ok || timeline == 0 {
+			return fmt.Errorf("greenplum restore point has no timeline for segment %d", contentID)
+		}
+	}
+	return nil
 }
 
 func (rpc *RestorePointCreator) checkExists(ctx context.Context) error {
@@ -208,22 +229,27 @@ func (rpc *RestorePointCreator) checkExists(ctx context.Context) error {
 	return nil
 }
 
-func (rpc *RestorePointCreator) uploadMetadata(ctx context.Context, restoreLSNs map[int]string, timeLine uint32) (err error) {
+func (rpc *RestorePointCreator) uploadMetadata(
+	ctx context.Context,
+	restoreLSNs map[int]string,
+	timelineBySegment map[int]uint32,
+) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
 	}
 
 	meta := RestorePointMetadata{
-		Name:             rpc.pointName,
-		StartTime:        rpc.startTime,
-		FinishTime:       utility.TimeNowCrossPlatformUTC(),
-		Hostname:         hostname,
-		GpVersion:        rpc.gpVersion.String(),
-		GpFlavor:         rpc.gpVersion.Flavor.String(),
-		SystemIdentifier: rpc.systemIdentifier,
-		LsnBySegment:     restoreLSNs,
-		TimeLine:         timeLine,
+		Name:              rpc.pointName,
+		StartTime:         rpc.startTime,
+		FinishTime:        utility.TimeNowCrossPlatformUTC(),
+		Hostname:          hostname,
+		GpVersion:         rpc.gpVersion.String(),
+		GpFlavor:          rpc.gpVersion.Flavor.String(),
+		SystemIdentifier:  rpc.systemIdentifier,
+		LsnBySegment:      restoreLSNs,
+		TimeLine:          timelineBySegment[-1],
+		TimelineBySegment: timelineBySegment,
 	}
 
 	metaFileName := RestorePointMetadataFileName(rpc.pointName)

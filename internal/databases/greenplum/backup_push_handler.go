@@ -210,7 +210,7 @@ func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 		bh.abortBackup(ctx)
 	}
 
-	restoreLSNs, _, err := createRestorePoint(ctx, bh.workers.Conn, bh.currBackupInfo.backupName)
+	restoreLSNs, timelineBySegment, err := createRestorePoint(ctx, bh.workers.Conn, bh.currBackupInfo.backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	bh.currBackupInfo.segmentsMetadata, err = bh.fetchSegmentBackupsMetadata(ctx)
@@ -226,28 +226,34 @@ func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 		tracelog.ErrorLogger.FatalError(err)
 	}
 
-	err = bh.uploadRestorePointMetadata(ctx, restoreLSNs)
+	err = bh.uploadRestorePointMetadata(ctx, restoreLSNs, timelineBySegment)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 	bh.disconnect(ctx)
 }
 
-func (bh *BackupHandler) uploadRestorePointMetadata(ctx context.Context, restoreLSNs map[int]string) (err error) {
+func (bh *BackupHandler) uploadRestorePointMetadata(
+	ctx context.Context,
+	restoreLSNs map[int]string,
+	timelineBySegment map[int]uint32,
+) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
 	}
 
 	meta := RestorePointMetadata{
-		Name:             bh.currBackupInfo.backupName,
-		StartTime:        bh.currBackupInfo.startTime,
-		FinishTime:       bh.currBackupInfo.finishTime,
-		Hostname:         hostname,
-		GpVersion:        bh.currBackupInfo.gpVersion.String(),
-		GpFlavor:         bh.currBackupInfo.gpVersion.Flavor.String(),
-		SystemIdentifier: bh.currBackupInfo.systemIdentifier,
-		LsnBySegment:     restoreLSNs,
+		Name:              bh.currBackupInfo.backupName,
+		StartTime:         bh.currBackupInfo.startTime,
+		FinishTime:        bh.currBackupInfo.finishTime,
+		Hostname:          hostname,
+		GpVersion:         bh.currBackupInfo.gpVersion.String(),
+		GpFlavor:          bh.currBackupInfo.gpVersion.Flavor.String(),
+		SystemIdentifier:  bh.currBackupInfo.systemIdentifier,
+		LsnBySegment:      restoreLSNs,
+		TimeLine:          timelineBySegment[-1],
+		TimelineBySegment: timelineBySegment,
 	}
 
 	metaFileName := RestorePointMetadataFileName(meta.Name)

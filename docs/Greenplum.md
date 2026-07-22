@@ -113,6 +113,16 @@ WAL-G can also fetch the latest backup:
 wal-g backup-fetch LATEST --restore-config=/path/to/restore_cfg.json --config=/path/to/config.yaml
 ```
 
+### ``copy``
+
+Copies a cluster backup, every coordinator/segment backup chain, and the WAL required for its cluster restore point without transforming payload objects:
+
+```bash
+wal-g copy --from=config_from.yaml --to=config_to.yaml --backup-name=LATEST
+```
+
+`--with-history` extends every coordinator/segment WAL stream through the LSN recorded by the newest cluster-wide restore point. WAL-G publishes restore-point metadata only after all referenced streams are present. Repeating the command later adds newly archived WAL and restore points while skipping immutable objects already present at the destination.
+
 Cluster restore configuration declares destination host, directory, and port for each segment.  Sample restore configuration:
 ```json
 {

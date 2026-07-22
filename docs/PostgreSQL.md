@@ -559,14 +559,16 @@ wal-g catchup-send ${PGDATA_PRIMARY} hostname:1337
 
 ### ``copy``
 
-This command will help to change the storage and move the set of backups there or write the backups on magnetic tape. For example, `wal-g copy --from=config_from.json --to=config_to.json` will copy all backups.
+This command copies restorable backup closures between storages without decrypting, decompressing, recompressing, or re-encrypting their payload objects. Existing destination objects with the same path and size are skipped. For example, `wal-g copy --from=config_from.json --to=config_to.json` copies all backups and their exact-restore WAL.
+
+`--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.
 
 Flags:
 
 - `-b, --backup-name string` Copy specific backup
 - `-f, --from string` Storage config from where should copy backup
 - `-t, --to string` Storage config to where should copy backup
-- `-w, --with-history` If set - copy WALs older than backup finish_lsn. If not - copy only WALs from start_lsn to finish_lsn
+- `-w, --with-history` Synchronize WAL through the latest continuous archive
 
 ### Delete retention ordering and ``--use-sentinel-time``
 
