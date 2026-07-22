@@ -102,11 +102,17 @@ type FetchArgs struct {
 
 // Fetch restores a tiered-storage tree from the data prefix into TargetDir.
 func Fetch(ctx context.Context, args FetchArgs) error {
-	if args.SkipClean {
-		return fmt.Errorf("--%s is not supported for tiered-storage restores", "skip-clean")
+	if !args.SkipClean {
+		if err := os.RemoveAll(args.TargetDir); err != nil {
+			return fmt.Errorf("clean ts restore directory %s: %w", args.TargetDir, err)
+		}
+		if err := os.MkdirAll(args.TargetDir, 0o700); err != nil {
+			return fmt.Errorf("create ts restore directory %s: %w", args.TargetDir, err)
+		}
 	}
+
 	downloader := internal.NewCommonDirectoryDownloader(args.Folder, args.DataPrefix)
-	if err := downloader.DownloadDirectory(ctx, args.TargetDir); err != nil {
+	if err := downloader.DownloadDirectory(ctx, args.TargetDir, args.SkipClean); err != nil {
 		return fmt.Errorf("download ts backup %s: %w", args.DataPrefix, err)
 	}
 	return nil

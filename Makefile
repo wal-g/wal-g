@@ -255,11 +255,11 @@ redis_install: redis_build
 redis_features:
 	set -e
 	make go_deps
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
+	cd tests_func/ && FEATURE=$(FEATURE) REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
 
 clean_redis_features:
 	set -e
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
+	cd tests_func/ && FEATURE=$(FEATURE) REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
 
 etcd_test: deps etcd_build unlink_brotli etcd_integration_test
 
