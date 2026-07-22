@@ -2,7 +2,6 @@ package greenplum
 
 import (
 	"context"
-	"crypto/sha512"
 	"encoding/hex"
 	"io"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
+	"github.com/zeebo/xxh3"
 )
 
 type AoStorageUploader struct {
@@ -103,9 +103,9 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
 
-		checksum, err := getCheckSum(ctx, cfi.Path, aoMeta.eof)
-		if checksum != remoteFile.Checksum {
-			tracelog.InfoLogger.Printf("%s: remote file has different checksum from local, will perform a regular upload", cfi.Header.Name)
+		err, checksum, shouldIncrement := hueMoe(ctx, cfi.Path, remoteFile.EOF, aoMeta.eof, remoteFile.Checksum)
+		if err != nil || !shouldIncrement {
+			tracelog.InfoLogger.Println("After checksum check will perform regular upload")
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
 
@@ -136,6 +136,27 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS, remoteFile.IsIncremented, remoteFile.Checksum)
 }
 
+// TODO rename
+// TODO unittest
+func hueMoe(ctx context.Context, path string, oldEof int64, curEof int64, previousChecksum string) (error, string, bool) {
+	checksum, err := getCheckSum(ctx, path, oldEof)
+	if err != nil {
+		tracelog.InfoLogger.Printf("failed to count checksum for file %s with error: %v", path, err)
+		return err, "", false
+	}
+	if checksum != previousChecksum || previousChecksum == "" {
+		tracelog.InfoLogger.Printf("%s: remote file has different checksum from local", path)
+		return nil, "", false
+	}
+
+	newChecksum, err := getCheckSum(ctx, path, curEof)
+	if err != nil {
+		tracelog.InfoLogger.Printf("failed to count new checksum for file %s with error: %v", path, err)
+		return err, "", false
+	}
+	return nil, newChecksum, true
+}
+
 func (u *AoStorageUploader) addAoFileMetadata(
 	cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped, isIncremented bool,
 	initialUplTS time.Time, checksum string) {
@@ -157,21 +178,22 @@ func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta A
 	return nil
 }
 
+// TODO unittests
 func getCheckSum(ctx context.Context, filePath string, eof int64) (string, error) {
 	file, err := fsutil.OpenReadOnlyMayBeDirectIO(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", internal.NewFileNotExistError(filePath)
 		}
-		return "", errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", filePath)
+		return "", errors.Wrapf(err, "failed to open file '%s'\n", filePath)
 	}
 	diskLimitedFileReader := limiters.NewDiskLimitReader(ctx, file)
 
-	hasher := sha512.New()
+	hasher := xxh3.New128()
 	if _, err = io.CopyN(hasher, diskLimitedFileReader, eof); err != nil {
 		return "", err
 	}
-	checksum := hex.EncodeToString(hasher.Sum(nil)) // 128 hex chars = 64 raw bytes
+	checksum := hex.EncodeToString(hasher.Sum(nil))
 	return checksum, nil
 
 }
@@ -187,10 +209,11 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 
 	defer fileReadCloser.Close()
 
-	// Compute SHA-512 checksum while streaming the file to storage — zero extra I/O.
+	// Compute checksum while streaming the file to storage — zero extra I/O.
 	// The hash is fed by a TeeReader that sits between the file reader and the
 	// compressor/encryptor, so every byte is hashed exactly once as it is read.
-	hasher := sha512.New()
+	hasher := xxh3.New128()
+	//TODO check only eof
 	hashingReader := io.TeeReader(fileReadCloser, hasher)
 
 	// do not compress AO/AOCS segment files since they are already compressed in most cases
