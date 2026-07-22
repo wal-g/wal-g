@@ -32,9 +32,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/ulikunitz/xz v0.5.16
 	github.com/wal-g/tracelog v0.1.1
-	github.com/yandex-cloud/go-genproto v0.95.0
-	github.com/yandex-cloud/go-sdk/services/kms v0.0.75
-	github.com/yandex-cloud/go-sdk/v2 v2.132.0
+	github.com/yandex-cloud/go-genproto v0.97.0
+	github.com/yandex-cloud/go-sdk/services/kms v0.0.79
+	github.com/yandex-cloud/go-sdk/v2 v2.138.0
 	go.mongodb.org/mongo-driver v1.17.9
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sync v0.22.0
