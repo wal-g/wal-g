@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/wal-g/tracelog"
 )
@@ -105,12 +104,7 @@ func ValidateSameFilesystem(sourceDir, pinFolder string) error {
 	if err != nil {
 		return fmt.Errorf("stat ts pin folder %s: %w", pinFolder, err)
 	}
-	sourceStat, sourceOK := sourceInfo.Sys().(*syscall.Stat_t)
-	pinStat, pinOK := pinInfo.Sys().(*syscall.Stat_t)
-	if !sourceOK || !pinOK {
-		return fmt.Errorf("cannot determine filesystem for ts source %s and pin folder %s", sourceDir, pinFolder)
-	}
-	if sourceStat.Dev != pinStat.Dev {
+	if !sameFilesystem(sourceDir, pinFolder, sourceInfo, pinInfo) {
 		return fmt.Errorf(
 			"ts source %s and pin folder %s are on different filesystems; configure WALG_REDIS_TS_PIN_FOLDER on the source filesystem",
 			sourceDir, pinFolder,
