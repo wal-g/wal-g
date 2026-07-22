@@ -18,4 +18,7 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
 
 COPY docker/mysql_tests/scripts/ /tmp
 
-CMD /tmp/run_integration_tests.sh
+ARG TEST_ARG=""
+ENV TEST_ARG=${TEST_ARG}
+
+CMD /tmp/run_integration_tests.sh ${TEST_ARG}
