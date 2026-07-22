@@ -671,8 +671,10 @@ services:
 
   mysql_base_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile_base
+      dockerfile: docker/mysql_tests/Dockerfile
       context: .
+      args:
+        TEST_ARG: "-p /tmp/base_tests"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql_tests
@@ -683,8 +685,10 @@ services:
 
   mysql_delete_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile_delete
+      dockerfile: docker/mysql_tests/Dockerfile
       context: .
+      args:
+        TEST_ARG: "-p /tmp/delete_tests"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql_tests
@@ -695,8 +699,10 @@ services:
 
   mysql_copy_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile_copy
+      dockerfile: docker/mysql_tests/Dockerfile
       context: .
+      args:
+        TEST_ARG: "-p /tmp/copy_tests"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql_tests
