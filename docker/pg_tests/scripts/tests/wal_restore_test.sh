@@ -151,7 +151,7 @@ if ! check_archiving_status ${ALPHA_PORT} 8 10; then
     exit 1
 fi
 
-pg_ctl -D ${PGDATA_ALPHA} -m fast -W stop
+pg_ctl -D ${PGDATA_ALPHA} -m fast -w stop
 
 # for more info to log
 ls "${PGDATA_BETA}/pg_wal"
