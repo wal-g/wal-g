@@ -106,6 +106,55 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(
 	return restoreLSNs, nil
 }
 
+func (queryRunner *GpQueryRunner) buildReadTimelineBySegment() (string, error) {
+	var timelineExpression string
+	switch {
+	case queryRunner.Version >= 100000:
+		timelineExpression = "SUBSTR(pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_insert_lsn()), 1, 8)"
+	case queryRunner.Version >= 90000:
+		timelineExpression = "SUBSTR(pg_catalog.pg_xlogfile_name(pg_catalog.pg_current_xlog_insert_location()), 1, 8)"
+	default:
+		return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+
+	return fmt.Sprintf(`SELECT gp_segment_id, %s
+FROM gp_dist_random('gp_id')
+UNION ALL
+SELECT -1, %s;`, timelineExpression, timelineExpression), nil
+}
+
+// ReadTimelineBySegment returns the current WAL timeline for every primary
+// segment and the coordinator (content ID -1).
+func (queryRunner *GpQueryRunner) ReadTimelineBySegment(ctx context.Context) (map[int]uint32, error) {
+	query, err := queryRunner.buildReadTimelineBySegment()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := queryRunner.Connection.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	timelines := make(map[int]uint32)
+	for rows.Next() {
+		var contentID int
+		var hexTimeline string
+		if err := rows.Scan(&contentID, &hexTimeline); err != nil {
+			return nil, err
+		}
+		value, err := strconv.ParseUint(hexTimeline, 16, 32)
+		if err != nil {
+			return nil, fmt.Errorf("parse timeline for Greenplum segment %d: %w", contentID, err)
+		}
+		timelines[contentID] = uint32(value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return timelines, nil
+}
+
 const getGreenplumSegmentsInfoQuery = `SELECT
 	dbid,
 	content,

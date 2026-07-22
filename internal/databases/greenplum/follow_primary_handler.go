@@ -88,8 +88,17 @@ outer:
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 
+		walObjects := make([]string, 0, len(folderObjects))
+		for _, object := range folderObjects {
+			walObjects = append(walObjects, object.GetName())
+		}
+		timeline, err := resolveGreenplumTimeline(metadata, seg, walSegmentNo, walObjects)
+		if err != nil {
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+
 		// WAL file example: "000000010000000000000003.lz4" -> base name is "000000010000000000000003"
-		walName := walSegmentNo.GetFilename(metadata.TimeLine)
+		walName := walSegmentNo.GetFilename(timeline)
 		for _, obj := range folderObjects {
 			if strings.HasPrefix(obj.GetName(), walName) {
 				foundCnt++

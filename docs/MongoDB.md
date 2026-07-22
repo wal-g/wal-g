@@ -78,6 +78,16 @@ Usage
 
 WAL-G mongodb extension currently supports these commands:
 
+### ``copy``
+
+Copies one backup or all backups between storage configurations without transforming payload objects:
+
+```bash
+wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
+```
+
+Add `--with-history` to synchronize a continuous oplog sequence from the selected backup through the latest archived entry. Repeating the command adds newly archived oplog objects and skips immutable objects already present at the destination.
+
 ### ``backup-push``
 
 Creates new logical backup and send it to storage.
