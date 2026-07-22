@@ -1,8 +1,8 @@
-# WAL-G for Redis
+# WAL-G for Redis and Valkey
 
 **Interface of Redis features is currently unstable**
 
-You can use wal-g as a tool for making encrypted, compressed Redis backups and push/fetch them to/from storage without saving it on your filesystem.
+You can use wal-g as a tool for making encrypted, compressed Redis or Valkey backups and push/fetch them to/from storage without saving it on your filesystem. Valkey uses the Redis-compatible WAL-G command surface.
 
 Configuration
 -------------
@@ -28,6 +28,16 @@ Usage
 -----
 
 WAL-G redis extension currently supports these commands:
+
+### ``copy``
+
+Copies one backup or all backups between storage configurations without transforming payload objects:
+
+```bash
+wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
+```
+
+Redis/Valkey backups are standalone, so this command does not copy unrelated archive history. Repeating it skips immutable objects already present at the destination.
 
 ### ``backup-push``
 

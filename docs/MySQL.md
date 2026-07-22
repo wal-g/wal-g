@@ -135,6 +135,16 @@ WAL-G can also fetch the latest backup using:
 wal-g backup-fetch  LATEST
 ```
 
+### ``copy``
+
+Copies one backup, its incremental ancestors, or all backups between storage configurations without transforming payload objects:
+
+```bash
+wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
+```
+
+Add `--with-history` to synchronize binlogs from the selected backup recovery point through the latest continuous archived binlog. Repeating the command later copies only missing immutable objects and refreshes the binlog sentinel when one is present. The older `backup-copy` command remains available as a compatibility alias, including `--add-prefix`.
+
 ### ``get-stream``
 Download the specified backup as single stream (when backup is stream-based backup). This command will:
 * decrypt backup
