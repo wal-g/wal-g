@@ -3,7 +3,6 @@ package greenplum
 import (
 	"context"
 	"encoding/hex"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -91,23 +90,6 @@ func TestValidateFileChecksum_EmptyPreviousChecksum_NoIncrement(t *testing.T) {
 	assert.Empty(t, checksum)
 }
 
-// TestValidateFileChecksum_FileNotExist_ReturnsError verifies that a missing file leads to an
-// error being returned (from the first getCheckSum call), no incremental upload,
-// and an empty checksum.
-func TestValidateFileChecksum_FileNotExist_ReturnsError(t *testing.T) {
-	const oldEof = int64(60)
-	const curEof = int64(100)
-
-	dir := t.TempDir()
-	missingPath := filepath.Join(dir, "does_not_exist.1")
-
-	err, checksum, shouldIncrement := validateFileChecksum(context.Background(), missingPath, oldEof, curEof, "somechecksum")
-
-	assert.Error(t, err, "a missing file must produce an error")
-	assert.False(t, shouldIncrement)
-	assert.Empty(t, checksum)
-}
-
 // TestValidateFileChecksum_OldEofBeyondFileSize_ReturnsError verifies that when the requested
 // base EOF exceeds the actual file size, the checksum computation fails (short
 // read) and ValidateFileChecksum propagates the error without allowing an incremental upload.
@@ -165,103 +147,41 @@ func TestValidateFileChecksum_EqualEof_ShouldIncrement(t *testing.T) {
 	assert.Equal(t, previousChecksum, checksum, "checksum over identical EOFs must be identical")
 }
 
-func hashViaTeeLimited(t *testing.T, data []byte, eof int64) (string, int) {
-	t.Helper()
-
-	hasher := xxh3.New128()
-	tee := io.TeeReader(byteReader(data), newLimitedWriter(hasher, eof))
-
-	streamed, err := io.Copy(io.Discard, tee)
-	require.NoError(t, err)
-
-	return hex.EncodeToString(hasher.Sum(nil)), int(streamed)
-}
-
-func byteReader(data []byte) io.Reader {
-	return &sliceReader{data: data}
-}
-
-type sliceReader struct {
-	data []byte
-	off  int
-}
-
-func (r *sliceReader) Read(p []byte) (int, error) {
-	if r.off >= len(r.data) {
-		return 0, io.EOF
-	}
-	n := copy(p, r.data[r.off:])
-	r.off += n
-	return n, nil
-}
-
-// TestRegularUploadChecksum_StopsAtEOF verifies that the streaming checksum only
-// covers the first `eof` bytes even when the file has extra trailing bytes, and
-// that it exactly matches checksumOfPrefix (the same thing getCheckSum computes).
-func TestRegularUploadChecksum_StopsAtEOF(t *testing.T) {
-	const eof = int64(100)
-	// File is larger than EOF: the tail simulates garbage from aborted txns.
-	data := makeMockData(160)
-
-	got, streamed := hashViaTeeLimited(t, data, eof)
-
-	assert.Equal(t, len(data), streamed, "the whole file must still be streamed to storage")
-	assert.Equal(t, checksumOfPrefix(data, eof), got,
-		"streaming checksum must cover only the first eof bytes, matching getCheckSum")
-	assert.NotEqual(t, checksumOfPrefix(data, int64(len(data))), got,
-		"streaming checksum must NOT depend on bytes past eof")
-}
-
-// TestRegularUploadChecksum_ExactEOF verifies the boundary case where the file
-// size equals EOF: hashing the whole file and hashing up to EOF are identical.
-func TestRegularUploadChecksum_ExactEOF(t *testing.T) {
-	const eof = int64(128)
+func TestGetChecksum_IntendedUsage(t *testing.T) {
+	eof := int64(60)
 	data := makeMockData(int(eof))
+	path := writeMockAoFile(t, "1663.1", data)
+	expectedChecksum := checksumOfPrefix(data, eof)
 
-	got, streamed := hashViaTeeLimited(t, data, eof)
+	err, checksum := getCheckSum(t.Context(), path, eof)
 
-	assert.Equal(t, len(data), streamed)
-	assert.Equal(t, checksumOfPrefix(data, eof), got)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedChecksum, checksum, "returned checksum must be computed over the current EOF")
 }
 
-// TestLimitedWriter_ReportsFullLengthAndCapsHashing verifies the limitedWriter
-// contract directly: it forwards at most `limit` bytes to the underlying writer
-// but always reports the full input length so an io.TeeReader never sees a short
-// write.
-func TestLimitedWriter_ReportsFullLengthAndCapsHashing(t *testing.T) {
-	hasher := xxh3.New128()
-	lw := newLimitedWriter(hasher, 5)
+func TestGetChecksum_FileIsLonger(t *testing.T) {
+	eof := int64(60)
+	data := makeMockData(int(eof + 30))
+	path := writeMockAoFile(t, "1663.1", data)
+	expectedChecksum := checksumOfPrefix(data, eof)
 
-	// First write is within the limit.
-	n, err := lw.Write([]byte("hello"))
-	require.NoError(t, err)
-	assert.Equal(t, 5, n)
+	err, checksum := getCheckSum(t.Context(), path, eof)
 
-	// Second write is entirely past the limit; it must be reported as fully
-	// consumed but must not reach the hasher.
-	n, err = lw.Write([]byte("world"))
-	require.NoError(t, err)
-	assert.Equal(t, 5, n, "writer must report full length even when discarding")
-
-	expected := xxh3.New128()
-	expected.Write([]byte("hello"))
-	assert.Equal(t, hex.EncodeToString(expected.Sum(nil)), hex.EncodeToString(hasher.Sum(nil)),
-		"only the first `limit` bytes must be hashed")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedChecksum, checksum, "returned checksum must be computed over the current EOF")
 }
 
-// TestLimitedWriter_PartialWriteAcrossLimit verifies the case where a single
-// Write straddles the limit: part of it is hashed, the rest discarded, and the
-// full length is reported.
-func TestLimitedWriter_PartialWriteAcrossLimit(t *testing.T) {
-	hasher := xxh3.New128()
-	lw := newLimitedWriter(hasher, 3)
+func TestGetChecksum_FileNotExist(t *testing.T) {
+	err, _ := getCheckSum(t.Context(), "random_path", 64)
+	assert.Error(t, err)
+}
 
-	n, err := lw.Write([]byte("abcdef"))
-	require.NoError(t, err)
-	assert.Equal(t, 6, n, "full input length must be reported")
+func TestGetChecksum_EofLongerThanFile(t *testing.T) {
+	eof := int64(60)
+	data := makeMockData(int(eof))
+	path := writeMockAoFile(t, "1663.1", data)
 
-	expected := xxh3.New128()
-	expected.Write([]byte("abc"))
-	assert.Equal(t, hex.EncodeToString(expected.Sum(nil)), hex.EncodeToString(hasher.Sum(nil)),
-		"only bytes up to the limit must be hashed")
+	err, _ := getCheckSum(t.Context(), path, eof+30)
+
+	assert.Error(t, err)
 }

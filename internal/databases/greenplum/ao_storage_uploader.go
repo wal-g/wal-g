@@ -15,6 +15,7 @@ import (
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/fsutil"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/walparser"
 	"github.com/wal-g/wal-g/utility"
@@ -137,7 +138,7 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 }
 
 func validateFileChecksum(ctx context.Context, path string, oldEof int64, curEof int64, previousChecksum string) (error, string, bool) {
-	checksum, err := getCheckSum(ctx, path, oldEof)
+	err, checksum := getCheckSum(ctx, path, oldEof)
 	if err != nil {
 		tracelog.InfoLogger.Printf("failed to count checksum for file %s with error: %v", path, err)
 		return err, "", false
@@ -147,7 +148,7 @@ func validateFileChecksum(ctx context.Context, path string, oldEof int64, curEof
 		return nil, "", false
 	}
 
-	newChecksum, err := getCheckSum(ctx, path, curEof)
+	err, newChecksum := getCheckSum(ctx, path, curEof)
 	if err != nil {
 		tracelog.InfoLogger.Printf("failed to count new checksum for file %s with error: %v", path, err)
 		return err, "", false
@@ -176,22 +177,22 @@ func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta A
 	return nil
 }
 
-func getCheckSum(ctx context.Context, filePath string, eof int64) (string, error) {
+func getCheckSum(ctx context.Context, filePath string, eof int64) (error, string) {
 	file, err := fsutil.OpenReadOnlyMayBeDirectIO(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return "", internal.NewFileNotExistError(filePath)
+			return internal.NewFileNotExistError(filePath), ""
 		}
-		return "", errors.Wrapf(err, "failed to open file '%s'\n", filePath)
+		return errors.Wrapf(err, "failed to open file '%s'\n", filePath), ""
 	}
 	diskLimitedFileReader := limiters.NewDiskLimitReader(ctx, file)
 
 	hasher := xxh3.New128()
 	if _, err = io.CopyN(hasher, diskLimitedFileReader, eof); err != nil {
-		return "", err
+		return err, ""
 	}
 	checksum := hex.EncodeToString(hasher.Sum(nil))
-	return checksum, nil
+	return nil, checksum
 
 }
 
@@ -210,7 +211,7 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 	// The hash is fed by a TeeReader that sits between the file reader and the
 	// compressor/encryptor, so every byte is hashed exactly once as it is read.
 	hasher := xxh3.New128()
-	hashingReader := io.TeeReader(fileReadCloser, newLimitedWriter(hasher, aoMeta.eof))
+	hashingReader := io.TeeReader(fileReadCloser, ioextensions.NewLimitedWriter(hasher, aoMeta.eof))
 
 	// do not compress AO/AOCS segment files since they are already compressed in most cases
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
@@ -264,40 +265,4 @@ func (u *AoStorageUploader) upload(ctx context.Context, reader io.Reader, storag
 	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
 	return u.uploader.Upload(ctx, uploadPath, uploadContents)
-}
-
-type limitedWriter struct {
-	w         io.Writer
-	remaining int64
-}
-
-func newLimitedWriter(w io.Writer, limit int64) *limitedWriter {
-	return &limitedWriter{w: w, remaining: limit}
-}
-
-func (lw *limitedWriter) Write(p []byte) (int, error) {
-	if lw.remaining <= 0 {
-		// Nothing left to hash; pretend we consumed everything so the
-		// TeeReader keeps streaming the rest of the file to storage.
-		return len(p), nil
-	}
-
-	toWrite := p
-	truncated := false
-	if int64(len(p)) > lw.remaining {
-		toWrite = p[:lw.remaining]
-		truncated = true
-	}
-
-	n, err := lw.w.Write(toWrite)
-	lw.remaining -= int64(n)
-	if err != nil {
-		return n, err
-	}
-	if truncated {
-		// Report the full length so the TeeReader does not treat the
-		// discarded tail as a short write.
-		return len(p), nil
-	}
-	return n, nil
 }

@@ -9,7 +9,6 @@ for i in tests/*.sh; do
   echo "===== RUNNING $i ====="
   set -x
 
-  if [ "$i" != "tests/ao_storage_vacuum_test.sh" ]; then continue ;fi
   ./"$i";
 
   set +x
