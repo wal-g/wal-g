@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/wal-g/tracelog"
-	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -87,12 +86,11 @@ func (ch *InfoProvider) copyObject(ctx context.Context) error {
 
 	tracelog.DebugLogger.Printf("fetched object %s reader\n", ch.SrcObj.GetName())
 
-	uploader, err := internal.ConfigureUploaderToFolder(ch.To)
-	if err != nil {
-		return err
-	}
-
-	if err := uploader.Upload(ctx, ch.targetName, r); err != nil {
+	// Put the stream directly into the target folder. Database-aware copy uses
+	// a nil/no-op transformer, so compressed and client-side encrypted payloads
+	// pass through WAL-G byte-for-byte without constructing an uploader,
+	// compressor, or crypter.
+	if err := ch.To.PutObject(ctx, ch.targetName, r); err != nil {
 		return err
 	}
 

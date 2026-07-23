@@ -29,6 +29,16 @@ Usage
 
 WAL-G etcd extension currently supports these commands:
 
+### ``copy``
+
+Copies one snapshot backup or all snapshot backups between storage configurations without transforming payload objects:
+
+```bash
+wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
+```
+
+Snapshot restore does not consume the separately archived etcd WAL directory, so `copy` includes only the selected backup closure. Repeating it skips immutable objects already present at the destination.
+
 ### ``backup-push``
 
 Creates new backup and send it to storage.
