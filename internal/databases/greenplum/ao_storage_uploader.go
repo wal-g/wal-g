@@ -103,7 +103,7 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
 
-		err, checksum, shouldIncrement := hueMoe(ctx, cfi.Path, remoteFile.EOF, aoMeta.eof, remoteFile.Checksum)
+		err, checksum, shouldIncrement := validateFileChecksum(ctx, cfi.Path, remoteFile.EOF, aoMeta.eof, remoteFile.Checksum)
 		if err != nil || !shouldIncrement {
 			tracelog.InfoLogger.Println("After checksum check will perform regular upload")
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
@@ -136,16 +136,14 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS, remoteFile.IsIncremented, remoteFile.Checksum)
 }
 
-// TODO rename
-// TODO unittest
-func hueMoe(ctx context.Context, path string, oldEof int64, curEof int64, previousChecksum string) (error, string, bool) {
+func validateFileChecksum(ctx context.Context, path string, oldEof int64, curEof int64, previousChecksum string) (error, string, bool) {
 	checksum, err := getCheckSum(ctx, path, oldEof)
 	if err != nil {
 		tracelog.InfoLogger.Printf("failed to count checksum for file %s with error: %v", path, err)
 		return err, "", false
 	}
 	if checksum != previousChecksum || previousChecksum == "" {
-		tracelog.InfoLogger.Printf("%s: remote file has different checksum from local", path)
+		tracelog.InfoLogger.Printf("%s: remote file has different checksum from local. Previous: %s Local: %s", path, previousChecksum, checksum)
 		return nil, "", false
 	}
 
@@ -178,7 +176,6 @@ func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta A
 	return nil
 }
 
-// TODO unittests
 func getCheckSum(ctx context.Context, filePath string, eof int64) (string, error) {
 	file, err := fsutil.OpenReadOnlyMayBeDirectIO(filePath)
 	if err != nil {
@@ -213,8 +210,7 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 	// The hash is fed by a TeeReader that sits between the file reader and the
 	// compressor/encryptor, so every byte is hashed exactly once as it is read.
 	hasher := xxh3.New128()
-	//TODO check only eof
-	hashingReader := io.TeeReader(fileReadCloser, hasher)
+	hashingReader := io.TeeReader(fileReadCloser, newLimitedWriter(hasher, aoMeta.eof))
 
 	// do not compress AO/AOCS segment files since they are already compressed in most cases
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
@@ -268,4 +264,40 @@ func (u *AoStorageUploader) upload(ctx context.Context, reader io.Reader, storag
 	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
 	return u.uploader.Upload(ctx, uploadPath, uploadContents)
+}
+
+type limitedWriter struct {
+	w         io.Writer
+	remaining int64
+}
+
+func newLimitedWriter(w io.Writer, limit int64) *limitedWriter {
+	return &limitedWriter{w: w, remaining: limit}
+}
+
+func (lw *limitedWriter) Write(p []byte) (int, error) {
+	if lw.remaining <= 0 {
+		// Nothing left to hash; pretend we consumed everything so the
+		// TeeReader keeps streaming the rest of the file to storage.
+		return len(p), nil
+	}
+
+	toWrite := p
+	truncated := false
+	if int64(len(p)) > lw.remaining {
+		toWrite = p[:lw.remaining]
+		truncated = true
+	}
+
+	n, err := lw.w.Write(toWrite)
+	lw.remaining -= int64(n)
+	if err != nil {
+		return n, err
+	}
+	if truncated {
+		// Report the full length so the TeeReader does not treat the
+		// discarded tail as a short write.
+		return len(p), nil
+	}
+	return n, nil
 }
