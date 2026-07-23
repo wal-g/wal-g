@@ -29,7 +29,7 @@ type AOFilesMetadataDTO struct {
 	Files BackupAOFiles
 }
 
-type BackupAOFiles map[string]BackupAOFileDesc
+type BackupAOFiles map[string]*BackupAOFileDesc
 
 func NewAOFilesMetadataDTO() *AOFilesMetadataDTO {
 	return &AOFilesMetadataDTO{Files: make(BackupAOFiles)}
@@ -37,7 +37,7 @@ func NewAOFilesMetadataDTO() *AOFilesMetadataDTO {
 
 func (m *AOFilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplTS time.Time, aoMeta AoRelFileMetadata,
 	fileMode int64, isSkipped, isIncremented bool, checksum string) {
-	m.Files[key] = BackupAOFileDesc{
+	m.Files[key] = &BackupAOFileDesc{
 		StoragePath:     storagePath,
 		IsSkipped:       isSkipped,
 		IsIncremented:   isIncremented,
