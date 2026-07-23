@@ -266,7 +266,7 @@ func TestIncrementalAoUpload(t *testing.T) {
 	runSingleTest(t, baseFiles, bundleFiles, testFiles, expectedResults, deduplicationAgeLimit, true)
 }
 
-func TestIncrementalAoUpload_EqualEof_DifferentModCount(t *testing.T) {
+func TestIncrementalAoUpload_EqualEOF_DifferentModCount(t *testing.T) {
 	baseFiles := greenplum.BackupAOFiles{
 		"1663.1": {
 			StoragePath:     "1009_13_md5summock_1663_1_4_test_aoseg",
@@ -308,7 +308,7 @@ func TestIncrementalAoUpload_EqualEof_DifferentModCount(t *testing.T) {
 	runSingleTest(t, baseFiles, bundleFiles, testFiles, expectedResults, deduplicationAgeLimit, true)
 }
 
-func TestIncrementalAoUpload_DifferentEof_EqualModCount(t *testing.T) {
+func TestIncrementalAoUpload_DifferentEOF_EqualModCount(t *testing.T) {
 	baseFiles := greenplum.BackupAOFiles{
 		"1663.1": {
 			StoragePath:     "1009_13_md5summock_1663_1_4_test_aoseg",

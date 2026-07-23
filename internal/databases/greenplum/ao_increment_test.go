@@ -52,15 +52,15 @@ func gpReadIncrement(offset, eof int64, t *testing.T) {
 	err = greenplum.ReadIncrementFileHeader(incrementBuf)
 	assert.NoError(t, err)
 
-	var parsedEof uint64
+	var parsedEOF uint64
 	var parsedOffset uint64
 	err = parsingutil.ParseMultipleFieldsFromReader([]parsingutil.FieldToParse{
-		{Field: &parsedEof, Name: "eof"},
+		{Field: &parsedEOF, Name: "eof"},
 		{Field: &parsedOffset, Name: "offset"},
 	}, incrementBuf)
 
 	assert.Equal(t, parsedOffset, uint64(offset))
-	assert.Equal(t, parsedEof, uint64(eof))
+	assert.Equal(t, parsedEOF, uint64(eof))
 
 	_, _ = file.Seek(offset, io.SeekStart)
 
