@@ -423,6 +423,19 @@ func (bundle *Bundle) DownloadDeltaMap(ctx context.Context, reader internal.Stor
 	return nil
 }
 
+// LoadDeltaMapFromWalSummaries populates DeltaMap by parsing PostgreSQL WAL
+// summary files under $PGDATA/pg_wal/summaries (PG17+, summarize_wal=on).
+// Increment files themselves are still emitted in wal-g's wi1 format.
+func (bundle *Bundle) LoadDeltaMapFromWalSummaries(pgDataDir string, backupStartLSN LSN) error {
+	deltaMap, err := ReadWalSummariesForRange(pgDataDir, bundle.Timeline,
+		*bundle.IncrementFromLsn, backupStartLSN)
+	if err != nil {
+		return err
+	}
+	bundle.DeltaMap = deltaMap
+	return nil
+}
+
 func (bundle *Bundle) FinishTarComposer() (internal.TarFileSets, error) {
 	return bundle.TarBallComposer.FinishComposing()
 }
