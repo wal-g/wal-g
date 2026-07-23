@@ -39,15 +39,15 @@ func makeMockData(size int) []byte {
 // ValidateFileChecksum signals that an incremental upload is possible and returns the checksum
 // computed over the current (grown) EOF.
 func TestValidateFileChecksum_ChecksumMatches_ShouldIncrement(t *testing.T) {
-	const oldEof = int64(60)
-	const curEof = int64(100)
-	data := makeMockData(int(curEof))
+	const oldEOF = int64(60)
+	const curEOF = int64(100)
+	data := makeMockData(int(curEOF))
 	path := writeMockAoFile(t, "1663.1", data)
 
-	previousChecksum := checksumOfPrefix(data, oldEof)
-	expectedNewChecksum := checksumOfPrefix(data, curEof)
+	previousChecksum := checksumOfPrefix(data, oldEOF)
+	expectedNewChecksum := checksumOfPrefix(data, curEOF)
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEof, curEof, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.NoError(t, err)
 	assert.True(t, shouldIncrement, "expected incremental upload to be allowed when base checksums match")
@@ -59,15 +59,15 @@ func TestValidateFileChecksum_ChecksumMatches_ShouldIncrement(t *testing.T) {
 // EOF, ValidateFileChecksum reports that no incremental upload should happen (a regular upload
 // is required) and returns an empty checksum without an error.
 func TestValidateFileChecksum_ChecksumDiffers_NoIncrement(t *testing.T) {
-	const oldEof = int64(60)
-	const curEof = int64(100)
-	data := makeMockData(int(curEof))
+	const oldEOF = int64(60)
+	const curEOF = int64(100)
+	data := makeMockData(int(curEOF))
 	path := writeMockAoFile(t, "1663.1", data)
 
 	// A checksum that will not match the actual prefix checksum.
 	previousChecksum := "deadbeefdeadbeefdeadbeefdeadbeef"
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEof, curEof, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.NoError(t, err)
 	assert.False(t, shouldIncrement, "incremental upload must not happen when base checksums differ")
@@ -78,12 +78,12 @@ func TestValidateFileChecksum_ChecksumDiffers_NoIncrement(t *testing.T) {
 // checksum is empty (e.g. it was never stored for the remote base file), ValidateFileChecksum
 // falls back to a regular upload even if the prefix would otherwise match.
 func TestValidateFileChecksum_EmptyPreviousChecksum_NoIncrement(t *testing.T) {
-	const oldEof = int64(60)
-	const curEof = int64(100)
-	data := makeMockData(int(curEof))
+	const oldEOF = int64(60)
+	const curEOF = int64(100)
+	data := makeMockData(int(curEOF))
 	path := writeMockAoFile(t, "1663.1", data)
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEof, curEof, "")
+	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, "")
 
 	assert.NoError(t, err)
 	assert.False(t, shouldIncrement, "empty previous checksum must force a regular upload")
@@ -93,17 +93,17 @@ func TestValidateFileChecksum_EmptyPreviousChecksum_NoIncrement(t *testing.T) {
 // TestValidateFileChecksum_OldEofBeyondFileSize_ReturnsError verifies that when the requested
 // base EOF exceeds the actual file size, the checksum computation fails (short
 // read) and ValidateFileChecksum propagates the error without allowing an incremental upload.
-func TestValidateFileChecksum_OldEofBeyondFileSize_ReturnsError(t *testing.T) {
+func TestValidateFileChecksum_OldEOFBeyondFileSize_ReturnsError(t *testing.T) {
 	data := makeMockData(50)
 	path := writeMockAoFile(t, "1663.1", data)
 
-	// oldEof is larger than the file, so io.CopyN inside getCheckSum fails.
-	const oldEof = int64(100)
-	const curEof = int64(120)
+	// oldEOF is larger than the file, so io.CopyN inside getCheckSum fails.
+	const oldEOF = int64(100)
+	const curEOF = int64(120)
 
 	previousChecksum := checksumOfPrefix(data, int64(len(data)))
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEof, curEof, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.Error(t, err, "reading beyond the file size must produce an error")
 	assert.False(t, shouldIncrement)
@@ -113,17 +113,17 @@ func TestValidateFileChecksum_OldEofBeyondFileSize_ReturnsError(t *testing.T) {
 // TestValidateFileChecksum_CurEofBeyondFileSize_ReturnsError verifies that when the base
 // checksum matches but the current EOF exceeds the file size, the second
 // getCheckSum call fails and ValidateFileChecksum propagates the error.
-func TestValidateFileChecksum_CurEofBeyondFileSize_ReturnsError(t *testing.T) {
-	const oldEof = int64(60)
+func TestValidateFileChecksum_CurEOFBeyondFileSize_ReturnsError(t *testing.T) {
+	const oldEOF = int64(60)
 	data := makeMockData(80)
 	path := writeMockAoFile(t, "1663.1", data)
 
-	previousChecksum := checksumOfPrefix(data, oldEof)
+	previousChecksum := checksumOfPrefix(data, oldEOF)
 
-	// curEof exceeds the file size, so the second getCheckSum call fails.
-	const curEof = int64(200)
+	// curEOF exceeds the file size, so the second getCheckSum call fails.
+	const curEOF = int64(200)
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEof, curEof, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.Error(t, err, "reading current EOF beyond the file size must produce an error")
 	assert.False(t, shouldIncrement)
@@ -133,7 +133,7 @@ func TestValidateFileChecksum_CurEofBeyondFileSize_ReturnsError(t *testing.T) {
 // TestValidateFileChecksum_EqualEof_ShouldIncrement verifies the boundary case where the base
 // EOF equals the current EOF (no growth). Since the checksums match, ValidateFileChecksum
 // still allows the (degenerate) incremental upload and returns the same checksum.
-func TestValidateFileChecksum_EqualEof_ShouldIncrement(t *testing.T) {
+func TestValidateFileChecksum_EqualEOF_ShouldIncrement(t *testing.T) {
 	const eof = int64(100)
 	data := makeMockData(int(eof))
 	path := writeMockAoFile(t, "1663.1", data)
@@ -176,7 +176,7 @@ func TestGetChecksum_FileNotExist(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGetChecksum_EofLongerThanFile(t *testing.T) {
+func TestGetChecksum_EOFLongerThanFile(t *testing.T) {
 	eof := int64(60)
 	data := makeMockData(int(eof))
 	path := writeMockAoFile(t, "1663.1", data)
