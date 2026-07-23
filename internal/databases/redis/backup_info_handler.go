@@ -15,6 +15,7 @@ import (
 func HandleBackupInfo(ctx context.Context, folder storage.Folder, backupName string, output io.Writer, tag string) {
 	backupDetails, err := archive.SentinelWithExistenceCheck(ctx, folder, backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
+	tracelog.ErrorLogger.FatalOnError(archive.EnrichWithAttachedTS(ctx, folder, &backupDetails))
 
 	if tag != "" {
 		v, err := getField(ctx, folder, &backupDetails, tag)
@@ -26,7 +27,7 @@ func HandleBackupInfo(ctx context.Context, folder storage.Folder, backupName str
 
 	pretty := false
 	json := true
-	err = printlist.List([]printlist.Entity{backupDetails}, output, pretty, json)
+	err = printlist.List([]printlist.Entity{&backupDetails}, output, pretty, json)
 	tracelog.ErrorLogger.FatalfOnError("Print backup info: %v", err)
 }
 

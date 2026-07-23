@@ -175,6 +175,7 @@ const (
 	RedisAppendonlyFolder    = "WALG_REDIS_APPENDONLY_PATH"
 	RedisAppendonlyManifest  = "WALG_REDIS_APPENDONLY_MANIFEST"
 	RedisAppendonlyTmpFolder = "WALG_REDIS_APPENDONLY_TEMP_MANIFEST"
+	RedisTSPinFolder         = "WALG_REDIS_TS_PIN_FOLDER"
 	RedisDataThreshold       = "WALG_REDIS_DATA_THRESHOLD"
 	RedisDataTimeout         = "WALG_REDIS_DATA_TIMEOUT"
 	RedisServerProcessName   = "WALG_REDIS_SERVER_PROCESS_NAME"
@@ -305,6 +306,7 @@ var (
 		RedisAppendonlyFolder:    "appendonlydir",
 		RedisAppendonlyManifest:  "appendonly.aof.manifest",
 		RedisAppendonlyTmpFolder: "/var/lib/redis/wal-g/",
+		RedisTSPinFolder:         "/var/lib/redis/ext/wal-g-pin/",
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
 		RedisServerProcessName:   "redis-server",
@@ -610,6 +612,7 @@ var (
 		RedisAppendonlyFolder:    true,
 		RedisAppendonlyManifest:  true,
 		RedisAppendonlyTmpFolder: true,
+		RedisTSPinFolder:         true,
 		RedisDataThreshold:       true,
 		RedisDataTimeout:         true,
 		RedisServerProcessName:   true,

@@ -34,17 +34,17 @@ func Test_nopCollector(t *testing.T) {
 	})
 
 	t.Run("SpecificStorage returns true if storage is known", func(t *testing.T) {
-		got, err := c.SpecificStorage(t.Context(),"default")
+		got, err := c.SpecificStorage(t.Context(), "default")
 		assert.NoError(t, err)
 		assert.Equal(t, true, got)
 
-		got, err = c.SpecificStorage(t.Context(),"failover_2")
+		got, err = c.SpecificStorage(t.Context(), "failover_2")
 		assert.NoError(t, err)
 		assert.Equal(t, true, got)
 	})
 
 	t.Run("SpecificStorage returns false and error if storage is unknown", func(t *testing.T) {
-		got, err := c.SpecificStorage(t.Context(),"failover_4")
+		got, err := c.SpecificStorage(t.Context(), "failover_4")
 		assert.Error(t, err)
 		assert.Equal(t, false, got)
 	})

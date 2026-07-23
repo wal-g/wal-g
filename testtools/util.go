@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3manager/s3manageriface"
-	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -26,6 +25,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/test/mocks"
 	"github.com/wal-g/wal-g/utility"
+	"go.uber.org/mock/gomock"
 )
 
 type DataFilling int

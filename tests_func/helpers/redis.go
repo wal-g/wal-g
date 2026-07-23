@@ -87,8 +87,7 @@ func (rc *RedisCtl) WriteTestData(mark string, docsCount int) error {
 }
 
 func (rc *RedisCtl) PushBackup(backupType string) (string, error) {
-	cmd := fmt.Sprintf("%s-backup-push", backupType)
-	exec, err := rc.runCmd([]string{cmd})
+	exec, err := rc.runCmd([]string{"backup-push", "--type", backupType})
 	if err != nil {
 		return "", err
 	}
@@ -98,12 +97,43 @@ func (rc *RedisCtl) PushBackup(backupType string) (string, error) {
 	return "", nil
 }
 
+func (rc *RedisCtl) PushTSBackup(backupType, sourceDir, backupID string) error {
+	args := []string{"backup-push", "--type", backupType, "--ts-backup", sourceDir}
+	if backupID != "" {
+		args = append(args, "--ts-backup-id", backupID)
+	}
+	_, err := rc.runCmd(args)
+	return err
+}
+
+func (rc *RedisCtl) FetchTSBackup(backupName, backupType, targetDir, redisVersion string) error {
+	args := []string{"backup-fetch", backupName, "--type", backupType, "--ts-backup", targetDir}
+	if redisVersion != "" {
+		args = append(args, "--redis-version", redisVersion)
+	}
+	_, err := rc.runCmd(args)
+	return err
+}
+
+func (rc *RedisCtl) Backups() ([]string, error) {
+	exec, err := rc.runCmd([]string{"backup-list"})
+	if err != nil {
+		return nil, err
+	}
+	return BackupNamesFromListing(exec.Combined()), nil
+}
+
 func (rc *RedisCtl) runCmd(run []string) (ExecResult, error) {
 	command := []string{rc.binPath, "--config", rc.confPath}
 	command = append(command, run...)
 
 	exc, err := RunCommandStrict(rc.ctx, rc.host, command)
 	return exc, err
+}
+
+func (rc *RedisCtl) DeleteBackup(backupName string) error {
+	_, err := rc.runCmd([]string{"backup-delete", backupName, "--confirm"})
+	return err
 }
 
 func (rc *RedisCtl) PurgeRetain(keepNumber int) error {

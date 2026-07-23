@@ -22,7 +22,7 @@ func HandleDetailedBackupList(ctx context.Context, folder storage.Folder, pretty
 
 	printableEntities := make([]printlist.Entity, len(backupDetails))
 	for i := range backupDetails {
-		printableEntities[i] = backupDetails[i]
+		printableEntities[i] = &backupDetails[i]
 	}
 	err = printlist.List(printableEntities, os.Stdout, pretty, json)
 	tracelog.ErrorLogger.FatalfOnError("Print backups: %v", err)
@@ -33,6 +33,9 @@ func GetBackupDetails(ctx context.Context, folder storage.Folder, backups []inte
 	for i := len(backups) - 1; i >= 0; i-- {
 		details, err := archive.SentinelWithoutExistenceCheck(ctx, folder, backups[i].BackupName)
 		if err != nil {
+			return nil, err
+		}
+		if err = archive.EnrichWithAttachedTS(ctx, folder, &details); err != nil {
 			return nil, err
 		}
 		backupDetails = append(backupDetails, details)
