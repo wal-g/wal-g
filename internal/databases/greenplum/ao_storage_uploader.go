@@ -104,7 +104,7 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
 		}
 
-		err, checksum, shouldIncrement := validateFileChecksum(ctx, cfi.Path, remoteFile.EOF, aoMeta.eof, remoteFile.Checksum)
+		checksum, shouldIncrement, err := validateFileChecksum(ctx, cfi.Path, remoteFile.EOF, aoMeta.eof, remoteFile.Checksum)
 		if err != nil || !shouldIncrement {
 			tracelog.InfoLogger.Println("After checksum check will perform regular upload")
 			return u.regularAoUpload(ctx, cfi, aoMeta, location)
@@ -137,23 +137,23 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS, remoteFile.IsIncremented, remoteFile.Checksum)
 }
 
-func validateFileChecksum(ctx context.Context, path string, oldEof int64, curEof int64, previousChecksum string) (error, string, bool) {
-	err, checksum := getCheckSum(ctx, path, oldEof)
+func validateFileChecksum(ctx context.Context, path string, oldEof int64, curEof int64, previousChecksum string) (string, bool, error) {
+	checksum, err := getCheckSum(ctx, path, oldEof)
 	if err != nil {
 		tracelog.InfoLogger.Printf("failed to count checksum for file %s with error: %v", path, err)
-		return err, "", false
+		return "", false, err
 	}
 	if checksum != previousChecksum || previousChecksum == "" {
 		tracelog.InfoLogger.Printf("%s: remote file has different checksum from local. Previous: %s Local: %s", path, previousChecksum, checksum)
-		return nil, "", false
+		return "", false, nil
 	}
 
-	err, newChecksum := getCheckSum(ctx, path, curEof)
+	newChecksum, err := getCheckSum(ctx, path, curEof)
 	if err != nil {
 		tracelog.InfoLogger.Printf("failed to count new checksum for file %s with error: %v", path, err)
-		return err, "", false
+		return "", false, err
 	}
-	return nil, newChecksum, true
+	return newChecksum, true, nil
 }
 
 func (u *AoStorageUploader) addAoFileMetadata(
@@ -177,23 +177,22 @@ func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta A
 	return nil
 }
 
-func getCheckSum(ctx context.Context, filePath string, eof int64) (error, string) {
+func getCheckSum(ctx context.Context, filePath string, eof int64) (string, error) {
 	file, err := fsutil.OpenReadOnlyMayBeDirectIO(filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return internal.NewFileNotExistError(filePath), ""
+			return "", internal.NewFileNotExistError(filePath)
 		}
-		return errors.Wrapf(err, "failed to open file '%s'\n", filePath), ""
+		return "", errors.Wrapf(err, "failed to open file '%s'\n", filePath)
 	}
 	diskLimitedFileReader := limiters.NewDiskLimitReader(ctx, file)
 
 	hasher := xxh3.New128()
 	if _, err = io.CopyN(hasher, diskLimitedFileReader, eof); err != nil {
-		return err, ""
+		return "", err
 	}
 	checksum := hex.EncodeToString(hasher.Sum(nil))
-	return nil, checksum
-
+	return checksum, nil
 }
 
 func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
