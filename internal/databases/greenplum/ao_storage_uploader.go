@@ -137,8 +137,8 @@ func (u *AoStorageUploader) addFile(ctx context.Context,
 	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS, remoteFile.IsIncremented, remoteFile.Checksum)
 }
 
-func validateFileChecksum(ctx context.Context, path string, oldEof int64, curEof int64, previousChecksum string) (string, bool, error) {
-	checksum, err := getCheckSum(ctx, path, oldEof)
+func validateFileChecksum(ctx context.Context, path string, oldEOF int64, curEof int64, previousChecksum string) (string, bool, error) {
+	checksum, err := getCheckSum(ctx, path, oldEOF)
 	if err != nil {
 		tracelog.InfoLogger.Printf("failed to count checksum for file %s with error: %v", path, err)
 		return "", false, err
@@ -185,6 +185,7 @@ func getCheckSum(ctx context.Context, filePath string, eof int64) (string, error
 		}
 		return "", errors.Wrapf(err, "failed to open file '%s'\n", filePath)
 	}
+	defer file.Close()
 	diskLimitedFileReader := limiters.NewDiskLimitReader(ctx, file)
 
 	hasher := xxh3.New128()
