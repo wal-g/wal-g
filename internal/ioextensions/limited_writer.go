@@ -13,8 +13,6 @@ func NewLimitedWriter(w io.Writer, limit int64) *LimitedWriter {
 
 func (lw *LimitedWriter) Write(p []byte) (int, error) {
 	if lw.remaining <= 0 {
-		// Nothing left to hash; pretend we consumed everything so the
-		// TeeReader keeps streaming the rest of the file to storage.
 		return len(p), nil
 	}
 
@@ -31,8 +29,7 @@ func (lw *LimitedWriter) Write(p []byte) (int, error) {
 		return n, err
 	}
 	if truncated {
-		// Report the full length so the TeeReader does not treat the
-		// discarded tail as a short write.
+		// Report the full length to avoid a short write error.
 		return len(p), nil
 	}
 	return n, nil

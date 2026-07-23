@@ -31,7 +31,6 @@ type AoRelFileMetadata struct {
 	storageType RelStorageType
 	eof         int64
 	modCount    int64
-	checksum    string
 }
 
 // AoRelFileStorageMap indicates the storage type for the relfile

@@ -224,7 +224,7 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 		return err
 	}
 
-	checksum := hex.EncodeToString(hasher.Sum(nil)) // 128 hex chars = 64 raw bytes
+	checksum := hex.EncodeToString(hasher.Sum(nil))
 	u.addAoFileMetadata(cfi, storageKey, aoMeta, false, false, time.Now(), checksum)
 	u.bundleFiles.AddFile(cfi.Header, cfi.FileInfo, false)
 	return nil
