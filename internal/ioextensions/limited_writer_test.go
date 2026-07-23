@@ -12,8 +12,7 @@ import (
 
 // TestLimitedWriter_ReportsFullLengthAndCapsHashing verifies the limitedWriter
 // contract directly: it forwards at most `limit` bytes to the underlying writer
-// but always reports the full input length so an io.TeeReader never sees a short
-// write.
+// but always reports the full input length to avoid a short write.
 func TestLimitedWriter_ReportsFullLengthAndCapsHashing(t *testing.T) {
 	hasher := xxh3.New128()
 	lw := ioextensions.NewLimitedWriter(hasher, 5)
