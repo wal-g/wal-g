@@ -12,6 +12,7 @@ env:
   CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
+  CACHE_FILE_BASE: ~/docker-images-${{ github.sha }}/wal-g_base.tar
   CACHE_FILE_PG10_TESTS: ~/docker-images-${{ github.sha }}/pg10_tests.tar
   CACHE_FILE_PG18_TESTS: ~/docker-images-${{ github.sha }}/pg18_tests.tar
   IMAGE_PG10_TESTS: wal-g/pg10_tests
@@ -36,6 +37,7 @@ jobs:
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
+            ${{ env.CACHE_FILE_BASE }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
       - name: Cleanup space on runner
@@ -117,6 +119,7 @@ jobs:
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
+            ${{ env.CACHE_FILE_BASE }}
           key: ${{ env.IMAGES_CACHE_KEY }}
 
       - name: Fail if no cached images

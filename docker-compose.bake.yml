@@ -25,6 +25,13 @@ services:
       cache_to:
         - type=gha,mode=max,scope=walg-ubuntu-2204
 
+  base:
+    build:
+      cache_from:
+        - type=gha,scope=walg-base
+      cache_to:
+        - type=gha,mode=max,scope=walg-base
+
   # additional_contexts wires FROM references to sibling bake targets. The
   # docker-container builder's content store is digest-addressed and does not
   # resolve image names like the local docker daemon does, so without this
