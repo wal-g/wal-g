@@ -13,7 +13,7 @@ RUN make ENABLE_RACE_DETECTION=1 link_external_deps redis_build
 
 ###
 
-FROM ubuntu:focal
+FROM debian:bullseye-slim
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/redis/wal-g /usr/bin/wal-g
 
@@ -29,13 +29,14 @@ ENV GROUP=redis
 ENV USERGROUP=$USER:$GROUP
 ENV HOME=/home/$USER
 
+# procps (pkill) used by redis_steps.go to stop redis-benchmark, absent from -slim
 RUN groupadd -r -g 999 $USER && useradd -r -g $GROUP -u 999 $USER && \
     apt-get update -q && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    supervisor ca-certificates wget build-essential && \
+    supervisor ca-certificates curl build-essential procps && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf && \
     apt-get clean && \
-    wget https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz && \
+    curl -fsSLO https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz && \
     tar xzf "${REDIS_VERSION}.tar.gz" && \
     cd "redis-${REDIS_VERSION}" && \
     make install

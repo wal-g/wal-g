@@ -1,11 +1,14 @@
-FROM bitnamilegacy/etcd:3.5.21
-# in 3.6 which is latest "etcdctl snapshot restore" -> "etcdutl snapshot restore" 
+FROM wal-g/base
 
-# FROM wal-g/ubuntu:latest
+ARG ETCD_VERSION=v3.5.31
+# stay on 3.5: in 3.6 "etcdctl snapshot restore" -> "etcdutl snapshot restore"
 
-
-# RUN apt-get update && \
-#     apt-get install --yes --no-install-recommends --no-install-suggests \
-#     etcd
+# official upstream binaries: etcd, etcdctl, etcdutl
+RUN ARCH="$(dpkg --print-architecture)" && \
+    curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-${ARCH}.tar.gz" \
+      | tar xz --strip-components=1 -C /usr/local/bin \
+          "etcd-${ETCD_VERSION}-linux-${ARCH}/etcd" \
+          "etcd-${ETCD_VERSION}-linux-${ARCH}/etcdctl" \
+          "etcd-${ETCD_VERSION}-linux-${ARCH}/etcdutl"
 
 COPY docker/etcd/export_common.sh /usr/local/export_common.sh

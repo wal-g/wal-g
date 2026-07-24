@@ -8,7 +8,7 @@ RUN apt-get update && \
     time \
     bc \
     jq \
-    wget
+    curl
 
 ADD docker/gp/run_greenplum.sh /home/gpadmin/run_greenplum.sh
 
@@ -20,7 +20,7 @@ WORKDIR /usr/local/gpdb_src
 RUN locale-gen en_US.utf8 \
  && sed -i 's/apt-get install/DEBIAN_FRONTEND=noninteractive apt-get install/g' README.ubuntu.bash \
  && ./README.ubuntu.bash \
- && wget -c https://archive.apache.org/dist/xerces/c/3/sources/xerces-c-3.1.1.tar.gz -O - | tar -xz \
+ && curl -fsSL https://archive.apache.org/dist/xerces/c/3/sources/xerces-c-3.1.1.tar.gz | tar -xz \
  && cd xerces-c-3.1.1 && ./configure && make -j$(nproc) > /dev/null && make -j$(nproc) install && cd .. \
  && ./configure --with-perl --with-python --with-libxml --with-gssapi --prefix=/usr/local/gpdb_src > /dev/null \
  && make -j$(nproc) > /dev/null \

@@ -1,8 +1,7 @@
-ARG UBUNTU_TAG=18.04
-FROM wal-g/ubuntu:${UBUNTU_TAG}
+FROM wal-g/base
 
 ARG PG_MAJOR=10
-ARG USE_PGDG=0
+ARG USE_PGDG=1
 ARG INSTALL_WALE=1
 
 ENV PG_MAJOR=${PG_MAJOR}
@@ -23,7 +22,6 @@ RUN apt-get update && \
     fi && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
     postgresql-${PG_MAJOR} \
-    postgresql-contrib-${PG_MAJOR} \
     time \
     bc \
     jq \
@@ -33,13 +31,13 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
+# wal-e pins gevent>=1.1.1 unbounded; cap <26 for a prebuilt py3.9 wheel, slim base can't build gevent 26+ from source
 RUN if [ "${INSTALL_WALE}" = "1" ]; then \
         apt-get update && \
         apt-get install --yes --no-install-recommends --no-install-suggests \
-            python3.7 python3-setuptools python3-pip && \
-        python3.7 -m pip install --no-cache-dir --upgrade pip && \
-        python3.7 -m pip install --no-cache-dir git+https://github.com/wal-e/wal-e.git && \
-        python3.7 -m pip install --no-cache-dir boto && \
+            python3 python3-setuptools python3-pip && \
+        python3 -m pip install --no-cache-dir --upgrade pip && \
+        python3 -m pip install --no-cache-dir "gevent<26" git+https://github.com/wal-e/wal-e.git boto && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/* /var/cache/debconf/* /root/.cache/pip; \
     fi

@@ -1,4 +1,4 @@
-FROM wal-g/ubuntu:22.04
+FROM wal-g/base
 
 RUN apt-get update && \
     # required: \
@@ -21,8 +21,7 @@ RUN apt-get update && \
     pinentry-qt \
     time \
     bc \
-    jq \
-    wget
+    jq
 
 # https://github.com/yezzey-gp/ygp/blob/YGP_6.27_STABLE/README.ubuntu.bash (kind of)
 RUN apt-get install --yes --no-install-recommends --no-install-suggests \

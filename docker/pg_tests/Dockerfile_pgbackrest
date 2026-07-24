@@ -1,10 +1,10 @@
-FROM ubuntu:18.04 as build
+FROM debian:bullseye-slim as build
 
-RUN apt-get update && apt-get install -y wget
+RUN apt-get update && apt-get install -y curl
 
 RUN mkdir -p /build
 
-RUN wget -q -O - https://github.com/pgbackrest/pgbackrest/archive/release/2.36.tar.gz | tar zx -C /build
+RUN curl -fsSL https://github.com/pgbackrest/pgbackrest/archive/release/2.36.tar.gz | tar zx -C /build
 RUN apt-get install -y make gcc libpq-dev libssl-dev libxml2-dev pkg-config liblz4-dev libzstd-dev libbz2-dev libz-dev libyaml-dev
 
 RUN cd /build/pgbackrest-release-2.36/src && ./configure && make
