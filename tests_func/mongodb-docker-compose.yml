@@ -22,7 +22,6 @@ services:
             args:
                 - MONGO_VERSION=${MONGO_VERSION}
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
-                - MONGO_REPO=${MONGO_REPO}
         depends_on:
           - minio01
         container_name: mongodb01.test_net_${TEST_ID}
@@ -45,7 +44,6 @@ services:
             args:
                 - MONGO_VERSION=${MONGO_VERSION}
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
-                - MONGO_REPO=${MONGO_REPO}
         depends_on:
           - minio01
         container_name: mongodb02.test_net_${TEST_ID}
