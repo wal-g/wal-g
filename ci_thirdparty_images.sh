@@ -5,9 +5,7 @@
 # buildimages from ghcr mirror (mirror-dockerhub.yml) with Docker Hub fallback;
 # anonymous Hub pulls from shared GHA runner IPs hit per-IP rate limits
 set -eu
-IMAGES='minio/minio:RELEASE.2021-06-07T21-40-51Z
-minio/minio:RELEASE.2024-01-18T22-51-28Z
-openstackswift/saio:py3'
+IMAGES='openstackswift/saio:py3'
 
 case "${1-}" in
 list)
