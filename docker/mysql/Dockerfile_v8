@@ -20,7 +20,7 @@ RUN install -d /etc/apt/keyrings && \
         bsdmainutils \
         gnupg2
 
-RUN  wget https://repo.percona.com/apt/percona-release_latest.generic_all.deb && \
+RUN  curl -fsSLO https://repo.percona.com/apt/percona-release_latest.generic_all.deb && \
         dpkg -i percona-release_latest.generic_all.deb && \
         percona-release enable pxb-80 release && \
         percona-release enable tools release && \

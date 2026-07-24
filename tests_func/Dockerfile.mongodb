@@ -31,8 +31,8 @@ ENV MONGO_MAJOR=${MONGO_VERSION%.*}
 
 RUN apt-get update -q && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    supervisor ca-certificates libsasl2-modules-gssapi-mit snmp wget gnupg curl tzdata && \
-    wget -qO /usr/share/keyrings/mongodb-server-${MONGO_MAJOR}.asc https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc && \
+    supervisor ca-certificates libsasl2-modules-gssapi-mit snmp gnupg curl tzdata && \
+    curl -fsSL -o /usr/share/keyrings/mongodb-server-${MONGO_MAJOR}.asc https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc && \
     echo "deb [signed-by=/usr/share/keyrings/mongodb-server-${MONGO_MAJOR}.asc] http://$MONGO_REPO/apt/ubuntu jammy/${MONGO_PACKAGE}/${MONGO_MAJOR} multiverse" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
     apt-get update -q && \
     apt-get download --allow-unauthenticated ${MONGO_PACKAGE}-server=$MONGO_VERSION && \

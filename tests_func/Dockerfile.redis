@@ -33,10 +33,10 @@ ENV HOME=/home/$USER
 RUN groupadd -r -g 999 $USER && useradd -r -g $GROUP -u 999 $USER && \
     apt-get update -q && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    supervisor ca-certificates wget build-essential procps && \
+    supervisor ca-certificates curl build-essential procps && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf && \
     apt-get clean && \
-    wget https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz && \
+    curl -fsSLO https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz && \
     tar xzf "${REDIS_VERSION}.tar.gz" && \
     cd "redis-${REDIS_VERSION}" && \
     make install

@@ -34,7 +34,6 @@ ENV PGDATA=/var/lib/postgresql/16/main
 
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends --no-install-suggests \
-		wget \
 		curl
 
 RUN mkdir -p /usr/src/postgresql/contrib/orioledb && chmod 777 /usr/src/postgresql/contrib/orioledb
@@ -86,8 +85,7 @@ RUN set -eux; \
 		libzstd-dev \
 		make \
 		pkg-config \
-		uuid-dev \
-		wget
+		uuid-dev
 
 WORKDIR /usr/src/postgresql
 ENV PATH="$PATH:/usr/local/bin"

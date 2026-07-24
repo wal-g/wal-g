@@ -5,7 +5,7 @@ ARG ETCD_VERSION=v3.5.31
 
 # official upstream binaries: etcd, etcdctl, etcdutl
 RUN ARCH="$(dpkg --print-architecture)" && \
-    wget -qO- "https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-${ARCH}.tar.gz" \
+    curl -fsSL "https://github.com/etcd-io/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-${ARCH}.tar.gz" \
       | tar xz --strip-components=1 -C /usr/local/bin \
           "etcd-${ETCD_VERSION}-linux-${ARCH}/etcd" \
           "etcd-${ETCD_VERSION}-linux-${ARCH}/etcdctl" \
