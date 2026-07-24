@@ -115,6 +115,10 @@ By default, WAL-G checks whether versioning is enabled on the bucket. When the u
 
 Sets batch size for object deletion. By default is set to 1000.
 
+* `S3_REQUEST_TIMEOUT`
+
+Sets the maximum number of seconds WAL-G will wait for the S3 server to send response headers for any request. Once headers arrive, body transfer is not constrained -- multi-GB uploads and downloads still complete. This protects against unresponsive endpoints (wrong host, network black hole, dead Minio, etc.) where commands would otherwise hang indefinitely. The default is `0`, which disables the timeout and preserves prior behavior.
+
 GCS
 -----------
 To store backups in Google Cloud Storage, WAL-G requires that this variable be set:
