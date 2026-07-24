@@ -342,7 +342,7 @@ docker_lint:
 deps: go_deps link_external_deps
 
 go_deps:
-	git submodule update --init
+	if [ ! -f submodules/brotli/CMakeLists.txt ]; then git submodule update --init; fi
 	cp CMakeLists-brotli.txt submodules/brotli/CMakeLists.txt
 	go mod vendor
 ifdef USE_LZO
