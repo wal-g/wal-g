@@ -2,7 +2,6 @@
 set -e -x
 
 . /usr/local/export_common.sh
-unset ETCD_DATA_DIR
 
 for i in /tmp/tests/*.sh; do
   echo
