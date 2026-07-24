@@ -31,14 +31,13 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
-# wal-e deps from apt: gevent 26+ ships no py3.9 wheel, boto is AWS SDK v2 (wal-e[aws]); slim base has no toolchain to source-build
+# wal-e pins gevent>=1.1.1 unbounded; cap <26 for a prebuilt py3.9 wheel, slim base can't build gevent 26+ from source
 RUN if [ "${INSTALL_WALE}" = "1" ]; then \
         apt-get update && \
         apt-get install --yes --no-install-recommends --no-install-suggests \
-            python3.7 python3-setuptools python3-pip && \
-        python3.7 -m pip install --no-cache-dir --upgrade pip && \
-        python3.7 -m pip install --no-cache-dir git+https://github.com/wal-e/wal-e.git && \
-        python3.7 -m pip install --no-cache-dir boto && \
+            python3 python3-setuptools python3-pip && \
+        python3 -m pip install --no-cache-dir --upgrade pip && \
+        python3 -m pip install --no-cache-dir "gevent<26" git+https://github.com/wal-e/wal-e.git boto && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/* /var/cache/debconf/* /root/.cache/pip; \
     fi
