@@ -23,7 +23,7 @@ COPY Makefile Makefile
 
 RUN USE_BROTLI=1 USE_LZO=1 make ENABLE_RACE_DETECTION=1 deps pg_build
 
-FROM wal-g/ubuntu:18.04
+FROM wal-g/base
 
 RUN apt-get update && apt-get install --yes --no-install-recommends --no-install-suggests brotli
 
