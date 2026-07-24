@@ -34,7 +34,7 @@ func makeDeltaAoFileStorageKey(baseKey string, modCount int64) string {
 func LoadStorageAoFiles(ctx context.Context, baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
 	aoSegments := make(map[string]struct{}, 0)
 
-	iterateFunc := func(_ string, desc BackupAOFileDesc) {
+	iterateFunc := func(_ string, desc *BackupAOFileDesc) {
 		aoSegments[desc.StoragePath] = struct{}{}
 	}
 	err := iterateStorageAoFilesWithFunc(ctx, baseBackupsFolder, iterateFunc)
@@ -46,7 +46,7 @@ func LoadStorageAoFiles(ctx context.Context, baseBackupsFolder storage.Folder) (
 }
 
 func iterateStorageAoFilesWithFunc(ctx context.Context,
-	baseBackupsFolder storage.Folder, iterateFunc func(string, BackupAOFileDesc)) error {
+	baseBackupsFolder storage.Folder, iterateFunc func(string, *BackupAOFileDesc)) error {
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {
 		return err

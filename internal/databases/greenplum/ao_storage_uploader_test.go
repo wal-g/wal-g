@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
@@ -181,6 +182,10 @@ func TestAoUpload_MaxAge(t *testing.T) {
 }
 
 func TestIncrementalAoUpload(t *testing.T) {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "1337.120")
+	require.NoError(t, os.WriteFile(path, []byte{1, 2, 3, 4, 5, 6, 7}, 0o600))
 	baseFiles := greenplum.BackupAOFiles{
 		"1337.120": {
 			StoragePath:     "0_13_md5summock_1337_120_4_test_aoseg",
@@ -193,6 +198,7 @@ func TestIncrementalAoUpload(t *testing.T) {
 			Compressor:      "",
 			FileMode:        420,
 			InitialUploadTS: time.Now(),
+			Checksum:        "cdeda69d6c5295db2e37947983fcbc0f",
 		},
 	}
 	bundleFiles := &internal.RegularBundleFiles{}
@@ -260,7 +266,7 @@ func TestIncrementalAoUpload(t *testing.T) {
 	runSingleTest(t, baseFiles, bundleFiles, testFiles, expectedResults, deduplicationAgeLimit, true)
 }
 
-func TestIncrementalAoUpload_EqualEof_DifferentModCount(t *testing.T) {
+func TestIncrementalAoUpload_EqualEOF_DifferentModCount(t *testing.T) {
 	baseFiles := greenplum.BackupAOFiles{
 		"1663.1": {
 			StoragePath:     "1009_13_md5summock_1663_1_4_test_aoseg",
@@ -302,7 +308,7 @@ func TestIncrementalAoUpload_EqualEof_DifferentModCount(t *testing.T) {
 	runSingleTest(t, baseFiles, bundleFiles, testFiles, expectedResults, deduplicationAgeLimit, true)
 }
 
-func TestIncrementalAoUpload_DifferentEof_EqualModCount(t *testing.T) {
+func TestIncrementalAoUpload_DifferentEOF_EqualModCount(t *testing.T) {
 	baseFiles := greenplum.BackupAOFiles{
 		"1663.1": {
 			StoragePath:     "1009_13_md5summock_1663_1_4_test_aoseg",

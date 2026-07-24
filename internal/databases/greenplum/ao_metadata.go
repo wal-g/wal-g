@@ -22,21 +22,22 @@ type BackupAOFileDesc struct {
 	Compressor      string         `json:"Compressor,omitempty"`
 	FileMode        int64          `json:"FileMode"`
 	InitialUploadTS time.Time      `json:"InitialUploadTS,omitempty"`
+	Checksum        string         `json:"Checksum,omitempty"`
 }
 
 type AOFilesMetadataDTO struct {
 	Files BackupAOFiles
 }
 
-type BackupAOFiles map[string]BackupAOFileDesc
+type BackupAOFiles map[string]*BackupAOFileDesc
 
 func NewAOFilesMetadataDTO() *AOFilesMetadataDTO {
 	return &AOFilesMetadataDTO{Files: make(BackupAOFiles)}
 }
 
 func (m *AOFilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplTS time.Time, aoMeta AoRelFileMetadata,
-	fileMode int64, isSkipped, isIncremented bool) {
-	m.Files[key] = BackupAOFileDesc{
+	fileMode int64, isSkipped, isIncremented bool, checksum string) {
+	m.Files[key] = &BackupAOFileDesc{
 		StoragePath:     storagePath,
 		IsSkipped:       isSkipped,
 		IsIncremented:   isIncremented,
@@ -46,5 +47,6 @@ func (m *AOFilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplT
 		FileMode:        fileMode,
 		ModCount:        aoMeta.modCount,
 		InitialUploadTS: initialUplTS,
+		Checksum:        checksum,
 	}
 }
