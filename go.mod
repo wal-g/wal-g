@@ -56,6 +56,7 @@ require (
 	github.com/mongodb/mongo-tools v0.0.0-20240724183527-6d4f001be3fc
 	github.com/ncw/directio v1.0.5
 	github.com/ncw/swift/v2 v2.0.5
+	github.com/oracle/oci-go-sdk/v65 v65.112.0
 	github.com/pkg/profile v1.7.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
@@ -114,6 +115,7 @@ require (
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20260504140133-511dba1dbe17 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/sony/gobreaker v0.5.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.43.0 // indirect
