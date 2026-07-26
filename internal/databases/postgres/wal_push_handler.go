@@ -68,6 +68,10 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 	if err := uploadLocalWalMetadata(ctx, walFilePath, uploader.Uploader); err != nil {
 		return err
 	}
+	// bg uploads record into DeltaFileManager, drain them before flushing it
+	if err := bgUploader.Stop(); err != nil {
+		return err
+	}
 	statistics.WriteS3UploadTimeMetric(time.Since(uploadStart))
 
 	if uploader.getUseWalDelta() {
