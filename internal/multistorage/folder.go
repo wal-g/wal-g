@@ -250,6 +250,68 @@ func (mf Folder) ExistsInAll(ctx context.Context, objectRelativePath string) (bo
 	return true, consts.AllStorages, nil
 }
 
+// StatObject fetches the object's metadata from multiple storages. A specific implementation is selected using
+// policies.Policies.
+func (mf Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	object, _, err := StatObject(ctx, mf, objectRelativePath)
+	return object, err
+}
+
+// StatObject is like storage.Folder.StatObject, but it also provides the name of the storage where the object is found.
+func StatObject(ctx context.Context, folder storage.Folder, objectRelativePath string) (storage.Object, string, error) {
+	mf, ok := folder.(Folder)
+	if !ok {
+		object, err := folder.StatObject(ctx, objectRelativePath)
+		return object, consts.DefaultStorage, err
+	}
+
+	switch mf.policies.Read {
+	case policies.ReadPolicyFirst:
+		return mf.StatObjectInFirst(ctx, objectRelativePath)
+	case policies.ReadPolicyFoundFirst:
+		return mf.StatObjectFoundFirst(ctx, objectRelativePath)
+	default:
+		panic(fmt.Sprintf("unknown read object policy %d", mf.policies.Read))
+	}
+}
+
+// StatObjectInFirst fetches the object's metadata from the first storage.
+func (mf Folder) StatObjectInFirst(ctx context.Context, objectRelativePath string) (storage.Object, string, error) {
+	if len(mf.usedFolders) == 0 {
+		return nil, "", ErrNoUsedStorages
+	}
+	first := mf.usedFolders[0]
+	object, err := first.StatObject(ctx, objectRelativePath)
+	if err != nil {
+		if _, ok := err.(storage.ObjectNotFoundError); ok {
+			mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationExists, true)
+			return nil, first.StorageName, err
+		}
+		mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationExists, false)
+		return nil, first.StorageName, fmt.Errorf("stat object in %q: %w", first.StorageName, err)
+	}
+	mf.statsCollector.ReportOperationResult(first.StorageName, stats.OperationExists, true)
+	return object, first.StorageName, nil
+}
+
+// StatObjectFoundFirst fetches the object's metadata from all used storages in order and returns the first one found.
+func (mf Folder) StatObjectFoundFirst(ctx context.Context, objectRelativePath string) (storage.Object, string, error) {
+	for _, f := range mf.usedFolders {
+		object, err := f.StatObject(ctx, objectRelativePath)
+		if err != nil {
+			if _, ok := err.(storage.ObjectNotFoundError); ok {
+				mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationExists, true)
+				continue
+			}
+			mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationExists, false)
+			return nil, f.StorageName, fmt.Errorf("stat object in %q: %w", f.StorageName, err)
+		}
+		mf.statsCollector.ReportOperationResult(f.StorageName, stats.OperationExists, true)
+		return object, f.StorageName, nil
+	}
+	return nil, consts.AllStorages, storage.NewObjectNotFoundError(objectRelativePath)
+}
+
 // ReadObject reads the object from multiple storages. A specific implementation is selected using policies.Policies.
 func (mf Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	file, _, err := ReadObject(ctx, mf, objectRelativePath)

@@ -101,6 +101,21 @@ func (folder *Folder) Exists(_ context.Context, objectRelativePath string) (bool
 	return true, nil
 }
 
+func (folder *Folder) StatObject(_ context.Context, objectRelativePath string) (storage.Object, error) {
+	filePath := folder.GetFilePath(objectRelativePath)
+	info, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		return nil, storage.NewObjectNotFoundError(filePath)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unable to get file stats %v: %w", objectRelativePath, err)
+	}
+	if info.IsDir() {
+		return nil, storage.NewObjectNotFoundError(filePath)
+	}
+	return storage.NewLocalObject(objectRelativePath, info.ModTime(), info.Size()), nil
+}
+
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	sf := NewFolder(folder.rootPath, path.Join(folder.subPath, subFolderRelativePath))
 	_ = sf.EnsureExists()

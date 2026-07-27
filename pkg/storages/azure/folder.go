@@ -57,6 +57,33 @@ func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bo
 	return true, nil
 }
 
+func (folder *Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	path := storage.JoinPath(folder.path, objectRelativePath)
+	blobClient := folder.containerClient.NewBlockBlobClient(path)
+	props, err := blobClient.GetProperties(ctx, nil)
+	if err != nil && bloberror.HasCode(err, bloberror.BlobNotFound) {
+		return nil, storage.NewObjectNotFoundError(path)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get Azure object stats %q: %w", path, err)
+	}
+
+	var size int64
+	if props.ContentLength != nil {
+		size = *props.ContentLength
+	}
+	var lastModified time.Time
+	if props.LastModified != nil {
+		lastModified = *props.LastModified
+	}
+	var versionID string
+	if props.VersionID != nil {
+		versionID = *props.VersionID
+	}
+
+	return storage.NewLocalObjectWithVersion(objectRelativePath, lastModified, size, versionID, ""), nil
+}
+
 func (folder *Folder) ListFolder(ctx context.Context) ([]storage.Object, []storage.Folder, error) {
 	var objects []storage.Object
 	var subFolders []storage.Folder

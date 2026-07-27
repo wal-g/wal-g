@@ -7,6 +7,7 @@ import (
 	"io"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 	"github.com/wal-g/tracelog"
@@ -140,9 +141,10 @@ func partitionObjects(keys []storage.Object, size int) [][]storage.Object {
 	return parts
 }
 
-func (f *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
+// headObject performs a HEAD request for a single object. Returns a nil result if the object doesn't exist.
+func (f *Folder) headObject(ctx context.Context, objectRelativePath string) (*oss.HeadObjectResult, error) {
 	objectPath := f.GetPath() + objectRelativePath
-	_, err := f.ossAPI.HeadObject(ctx, &oss.HeadObjectRequest{
+	result, err := f.ossAPI.HeadObject(ctx, &oss.HeadObjectRequest{
 		Bucket: oss.Ptr(f.bucket),
 		Key:    oss.Ptr(objectPath),
 	})
@@ -150,12 +152,46 @@ func (f *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, e
 	if err != nil {
 		var serviceError *oss.ServiceError
 		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
-			return false, nil
+			return nil, nil
 		}
-		return false, fmt.Errorf("failed to check oss object '%s' existence: %w", objectPath, err)
+		return nil, fmt.Errorf("failed to head oss object '%s': %w", objectPath, err)
 	}
 
-	return true, nil
+	return result, nil
+}
+
+func (f *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
+	result, err := f.headObject(ctx, objectRelativePath)
+	if err != nil {
+		return false, err
+	}
+	return result != nil, nil
+}
+
+func (f *Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	result, err := f.headObject(ctx, objectRelativePath)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, storage.NewObjectNotFoundError(f.GetPath() + objectRelativePath)
+	}
+
+	// ContentLength is -1 when the Content-Length header is absent.
+	size := result.ContentLength
+	if size < 0 {
+		size = 0
+	}
+	var lastModified time.Time
+	if result.LastModified != nil {
+		lastModified = *result.LastModified
+	}
+	var versionID string
+	if result.VersionId != nil {
+		versionID = *result.VersionId
+	}
+
+	return storage.NewLocalObjectWithVersion(objectRelativePath, lastModified, size, versionID, ""), nil
 }
 
 func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {

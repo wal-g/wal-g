@@ -184,6 +184,21 @@ func (mr *MockFolderMockRecorder) SetVersioningEnabled(ctx, enable any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVersioningEnabled", reflect.TypeOf((*MockFolder)(nil).SetVersioningEnabled), ctx, enable)
 }
 
+// StatObject mocks base method.
+func (m *MockFolder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StatObject", ctx, objectRelativePath)
+	ret0, _ := ret[0].(storage.Object)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// StatObject indicates an expected call of StatObject.
+func (mr *MockFolderMockRecorder) StatObject(ctx, objectRelativePath any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StatObject", reflect.TypeOf((*MockFolder)(nil).StatObject), ctx, objectRelativePath)
+}
+
 // Validate mocks base method.
 func (m *MockFolder) Validate(ctx context.Context) error {
 	m.ctrl.T.Helper()
