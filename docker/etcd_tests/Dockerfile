@@ -25,7 +25,7 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0
 
 RUN USE_BROTLI=1 make ENABLE_RACE_DETECTION=1 deps etcd_build
 
-FROM wal-g/base
+FROM wal-g/ubuntu:22.04
 
 ARG ETCD_VERSION=v3.5.33
 # stay on 3.5: in 3.6 "etcdctl snapshot restore" -> "etcdutl snapshot restore"
