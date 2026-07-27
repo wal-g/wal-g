@@ -15,6 +15,7 @@ type Folder struct {
 	ListFolderMock    func(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error)
 	DeleteObjectsMock func(ctx context.Context, objectRelativePaths []storage.Object) error
 	ExistsMock        func(ctx context.Context, objectRelativePath string) (bool, error)
+	StatObjectMock    func(ctx context.Context, objectRelativePath string) (storage.Object, error)
 	GetSubFolderMock  func(subFolderRelativePath string) storage.Folder
 	ReadObjectMock    func(ctx context.Context, objectRelativePath string) (io.ReadCloser, error)
 	PutObjectMock     func(ctx context.Context, name string, content io.Reader) error
@@ -33,6 +34,13 @@ func (f *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, e
 		return f.ExistsMock(ctx, objectRelativePath)
 	}
 	return f.MemFolder.Exists(ctx, objectRelativePath)
+}
+
+func (f *Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	if f.StatObjectMock != nil {
+		return f.StatObjectMock(ctx, objectRelativePath)
+	}
+	return f.MemFolder.StatObject(ctx, objectRelativePath)
 }
 
 func (f *Folder) GetPath() string {

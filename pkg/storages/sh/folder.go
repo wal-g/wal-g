@@ -129,6 +129,28 @@ func (folder *Folder) Exists(_ context.Context, objectRelativePath string) (bool
 	return true, nil
 }
 
+func (folder *Folder) StatObject(_ context.Context, objectRelativePath string) (storage.Object, error) {
+	client, err := folder.sftpLazy.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	objPath := filepath.Join(folder.path, objectRelativePath)
+	info, err := client.Stat(objPath)
+
+	if os.IsNotExist(err) {
+		return nil, storage.NewObjectNotFoundError(objPath)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get stats of object %q via SFTP: %w", objPath, err)
+	}
+	if info.IsDir() {
+		return nil, storage.NewObjectNotFoundError(objPath)
+	}
+
+	return storage.NewLocalObject(objectRelativePath, info.ModTime(), info.Size()), nil
+}
+
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(folder.sftpLazy, path.Join(folder.path, subFolderRelativePath))
 }

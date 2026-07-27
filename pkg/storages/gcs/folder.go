@@ -125,6 +125,21 @@ func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bo
 	return true, nil
 }
 
+func (folder *Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	objPath := folder.joinPath(folder.path, objectRelativePath)
+	object := folder.BuildObjectHandle(objPath)
+	ctx, cancel := folder.createTimeoutContext(ctx)
+	defer cancel()
+	attrs, err := object.Attrs(ctx)
+	if err == gcs.ErrObjectNotExist {
+		return nil, storage.NewObjectNotFoundError(objPath)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get GCS object stats %q: %w", objPath, err)
+	}
+	return storage.NewLocalObject(objectRelativePath, attrs.Updated, attrs.Size), nil
+}
+
 func (folder *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
 		folder.bucket,

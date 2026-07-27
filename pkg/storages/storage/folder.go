@@ -26,6 +26,10 @@ type Folder interface {
 	// Exists checks if an object exists in the folder.
 	Exists(ctx context.Context, objectRelativePath string) (bool, error)
 
+	// StatObject fetches metadata of a single object without listing the folder. Implementations must use a cheap
+	// point lookup (HEAD/stat) instead of a listing. Must return ObjectNotFoundError if the object doesn't exist.
+	StatObject(ctx context.Context, objectRelativePath string) (Object, error)
+
 	// GetSubFolder returns a handle to the subfolder. Does not have to instantiate the subfolder in any material form.
 	GetSubFolder(subFolderRelativePath string) Folder
 

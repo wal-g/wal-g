@@ -45,6 +45,26 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, b)
 
+	statObject, err := storageFolder.StatObject(ctx, "file0")
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, "file0", statObject.GetName())
+		assert.Equal(t, int64(len(token)), statObject.GetSize())
+	}
+	statObject, err = sub1.StatObject(ctx, "file1")
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, int64(len("data1")), statObject.GetSize())
+	}
+	statObject, err = storageFolder.StatObject(ctx, "Sub1/file1")
+	assert.NoError(t, err)
+	if err == nil {
+		assert.Equal(t, int64(len("data1")), statObject.GetSize())
+	}
+	_, err = storageFolder.StatObject(ctx, "Tumba Yumba")
+	assert.Error(t, err)
+	assert.IsType(t, ObjectNotFoundError{}, err)
+
 	objects, subFolders, err := storageFolder.ListFolder(ctx)
 	assert.NoError(t, err)
 	t.Log(subFolders[0].GetPath())
@@ -107,6 +127,9 @@ func RunFolderTest(storageFolder Folder, t *testing.T) {
 	b, err = sub1.Exists(ctx, "file1")
 	assert.NoError(t, err)
 	assert.False(t, b)
+
+	_, err = storageFolder.StatObject(ctx, "file0")
+	assert.IsType(t, ObjectNotFoundError{}, err)
 
 	_, err = sub1.ReadObject(ctx, "Tumba Yumba")
 	assert.Error(t, err.(ObjectNotFoundError))
