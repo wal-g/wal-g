@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM debian:bullseye-slim
 
 RUN apt-get update && apt-get install -y openssh-server
 RUN mkdir /var/run/sshd
