@@ -19,27 +19,11 @@ func TestOneElement(t *testing.T) {
 		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
-			name:       "print plain json",
-			entity:     entity,
-			pretty:     false,
-			json:       true,
-			wantOutput: fmt.Sprintf("%s\n", shortEntityPlainJSONLocal),
-			wantErr:    assert.NoError,
-		},
-		{
-			name:       "print indented json",
-			entity:     entity,
-			pretty:     true,
-			json:       true,
-			wantOutput: fmt.Sprintf("%s\n", shortEntityIndentedJSONLocal),
-			wantErr:    assert.NoError,
-		},
-		{
 			name:       "not json format",
 			entity:     entity,
 			pretty:     false,
 			json:       false,
-			wantOutput: "",
+			wantOutput: fmt.Sprintf("%v\n", entity),
 			wantErr:    assert.NoError,
 		},
 	}
@@ -56,6 +40,9 @@ func TestOneElement(t *testing.T) {
 	}
 }
 
+// TestOneElementInJSON is a dedicated test for the JSON code path of OneElement
+// (the oneElementInJSON helper). JSON output is verified separately from the
+// non-JSON (fmt.Fprintln) path covered by TestOneElement.
 func TestOneElementInJSON(t *testing.T) {
 	entity := shortEntity
 
@@ -70,14 +57,14 @@ func TestOneElementInJSON(t *testing.T) {
 			name:       "plain json",
 			entity:     entity,
 			pretty:     false,
-			wantOutput: fmt.Sprintf("%s\n", shortEntityPlainJSONLocal),
+			wantOutput: fmt.Sprintf("%s\n", shortEntityPlainJSON),
 			wantErr:    assert.NoError,
 		},
 		{
 			name:       "indented json",
 			entity:     entity,
 			pretty:     true,
-			wantOutput: fmt.Sprintf("%s\n", shortEntityIndentedJSONLocal),
+			wantOutput: fmt.Sprintf("%s\n", shortEntityOneElementIndentedJSON),
 			wantErr:    assert.NoError,
 		},
 	}
@@ -93,15 +80,3 @@ func TestOneElementInJSON(t *testing.T) {
 		})
 	}
 }
-
-// These variables are defined in entities_test.go but we need them here too
-// Using different names to avoid conflicts
-var (
-	shortEntityPlainJSONLocal = `{"a":"1692753495","b":"123","c":"kek"}`
-
-	shortEntityIndentedJSONLocal = `{
-    "a": "1692753495",
-    "b": "123",
-    "c": "kek"
-}`
-)

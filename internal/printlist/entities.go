@@ -36,6 +36,10 @@ func OneElement(entity Entity, output io.Writer, pretty, json bool) error {
 	if json {
 		return oneElementInJSON(entity, output, pretty)
 	}
+	_, err := fmt.Fprintln(output, entity)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

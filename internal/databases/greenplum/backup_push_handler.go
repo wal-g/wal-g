@@ -572,7 +572,7 @@ func NewBackupHandler(ctx context.Context, arguments BackupArguments) (bh *Backu
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(uploader internal.Uploader, isPermanent, isFull bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
-	segPollInterval time.Duration, segPollRetries int, deltaBaseSelector internal.BackupSelector) BackupArguments {
+	segPollInterval time.Duration, segPollRetries int, deltaBaseSelector internal.BackupSelector, pretty bool, json bool) BackupArguments {
 	return BackupArguments{
 		Uploader:          uploader,
 		isPermanent:       isPermanent,

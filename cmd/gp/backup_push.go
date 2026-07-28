@@ -64,7 +64,7 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			arguments := greenplum.NewBackupArguments(uploader, permanent, fullBackup, userData, prepareSegmentFwdArgs(), logsDir,
-				segPollInterval, segPollRetries, deltaBaseSelector)
+				segPollInterval, segPollRetries, deltaBaseSelector, json, pretty)
 			backupHandler, err := greenplum.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
@@ -88,6 +88,10 @@ func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
 func init() {
 	cmd.AddCommand(backupPushCmd)
 
+	backupPushCmd.Flags().BoolVar(&pretty, PrettyFlag, false,
+		"Prints more readable output in table format")
+	backupPushCmd.Flags().BoolVar(&json, JSONFlag, false,
+		"Prints output in JSON format, multiline and indented if combined with --pretty flag")
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,

@@ -36,21 +36,6 @@ type BackupInfo struct {
 	Storage string
 }
 
-func (b BackupInfo) PrintableFields() []printlist.TableField {
-	return []printlist.TableField{
-		{
-			Name:       "name",
-			PrettyName: "Name of backup",
-			Value:      b.Name,
-		},
-		{
-			Name:       "storage",
-			PrettyName: "Name of storage",
-			Value:      b.Storage,
-		},
-	}
-}
-
 type backupFromFuture struct {
 	error
 }
@@ -221,11 +206,9 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 	// logging backup set Name
 	createdBackup := BackupInfo{Name: bh.CurBackupInfo.Name, Storage: storageNames[0]}
-	if bh.Arguments.json {
-		err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
-	} else {
-		tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
-	}
+
+	err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
+	tracelog.ErrorLogger.FatalOnError(err)
 
 }
 
