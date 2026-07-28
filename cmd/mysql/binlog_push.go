@@ -18,7 +18,7 @@ var binlogPushCmd = &cobra.Command{
 	Short: binlogPushShortDescription,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		uploader, err := internal.ConfigureUploader()
+		uploader, err := internal.ConfigureUploader(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 		checkGTIDs, _ := conf.GetBoolSettingDefault(conf.MysqlCheckGTIDs, false)
 		mysql.HandleBinlogPush(cmd.Context(), uploader, untilBinlog, checkGTIDs)

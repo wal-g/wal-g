@@ -1,6 +1,7 @@
 package oss
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -49,6 +50,7 @@ const (
 )
 
 func ConfigureStorage(
+	ctx context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,
@@ -100,7 +102,7 @@ func ConfigureStorage(
 		CopyPartSize:    copyPartSize,
 	}
 
-	st, err := NewStorage(config, rootWraps...)
+	st, err := NewStorage(ctx, config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create storage: %w", err)
 	}

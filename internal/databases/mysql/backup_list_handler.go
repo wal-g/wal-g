@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -113,8 +114,8 @@ func NewBackupDetail(backupTime internal.BackupTime, sentinel StreamSentinelDto)
 }
 
 // TODO: unit tests
-func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
-	backupTimes, err := internal.GetBackups(folder)
+func HandleDetailedBackupList(ctx context.Context, folder storage.Folder, pretty, json bool) {
+	backupTimes, err := internal.GetBackups(ctx, folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalfOnError("Failed to fetch list of backups in storage: %s", err)
 
@@ -124,7 +125,7 @@ func HandleDetailedBackupList(folder storage.Folder, pretty, json bool) {
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		var sentinel StreamSentinelDto
-		err = backup.FetchSentinel(&sentinel)
+		err = backup.FetchSentinel(ctx, &sentinel)
 		tracelog.ErrorLogger.FatalfOnError("Failed to load sentinel for backup %s", err)
 
 		backupDetails = append(backupDetails, NewBackupDetail(backupTime, sentinel))

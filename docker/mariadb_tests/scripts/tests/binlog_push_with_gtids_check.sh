@@ -3,7 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-export WALE_S3_PREFIX=s3://mariadb_binlog_push_with_gtids_check
+export WALE_S3_PREFIX=s3://mariadb-binlog-push-with-gtids-check
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 export WALG_MYSQL_CHECK_GTIDS=True
 

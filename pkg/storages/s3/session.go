@@ -1,6 +1,8 @@
 package s3
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -23,6 +25,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//nolint:gocyclo
 func createSession(config *Config) (*session.Session, error) {
 	sessOpts := session.Options{}
 	if config.CACertFile != "" {
@@ -61,16 +64,34 @@ func createSession(config *Config) (*session.Session, error) {
 	}
 
 	if config.EndpointSource != "" {
+		// In the balancer-bypass mode we replace the request host with the address of a
+		// concrete node returned by the endpoint source, while keeping the original endpoint
+		// name in the Host header. The connection scheme follows the configured endpoint
+		// instead of being hardcoded to plain HTTP.
+		scheme, host := endpointSchemeAndHost(config.Endpoint)
+
+		if config.EndpointProtocol != "" {
+			scheme = config.EndpointProtocol
+		}
+
+		if scheme == "https" {
+			// The TCP connection goes straight to the node address, so TLS SNI and
+			// certificate verification must be pinned to the real endpoint name rather
+			// than the node address we dial.
+			if err := setTLSServerName(sess.Config, tlsServerName(host)); err != nil {
+				return nil, fmt.Errorf("configure TLS server name for S3 endpoint source: %w", err)
+			}
+		}
+
 		sess.Handlers.Validate.PushBack(func(request *request.Request) {
-			endpoint := requestEndpointFromSource(config.EndpointSource, config.EndpointPort)
+			endpoint := requestEndpointFromSource(request.Context(), config.EndpointSource, config.EndpointPort)
 			if endpoint != nil {
 				tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
-				host := strings.TrimPrefix(*sess.Config.Endpoint, "https://")
 				request.HTTPRequest.Host = host
 				request.HTTPRequest.URL.Host = *endpoint
-				request.HTTPRequest.URL.Scheme = "http"
+				request.HTTPRequest.URL.Scheme = scheme
 			} else {
-				tracelog.DebugLogger.Printf("using S3 endpoint %s", *sess.Config.Endpoint)
+				tracelog.DebugLogger.Printf("using S3 endpoint %s", config.Endpoint)
 			}
 		})
 	}
@@ -220,14 +241,63 @@ func detectAWSRegionByBucket(bucket string, config *aws.Config) (string, error) 
 	return *output.LocationConstraint, nil
 }
 
-func requestEndpointFromSource(endpointSource, port string) *string {
+// endpointSchemeAndHost splits the configured endpoint into a connection scheme and a host.
+// A scheme-less endpoint defaults to https, matching the AWS SDK behavior.
+func endpointSchemeAndHost(endpoint string) (scheme, host string) {
+	switch {
+	case strings.HasPrefix(endpoint, "https://"):
+		return "https", strings.TrimPrefix(endpoint, "https://")
+	case strings.HasPrefix(endpoint, "http://"):
+		return "http", strings.TrimPrefix(endpoint, "http://")
+	default:
+		return "https", endpoint
+	}
+}
+
+// tlsServerName strips an optional port from the host so it can be used as a TLS SNI value.
+func tlsServerName(host string) string {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	return host
+}
+
+// setTLSServerName pins the TLS SNI/certificate verification name on the session transport.
+// The underlying transport is cloned so a shared (e.g. http.DefaultTransport) instance is
+// never mutated.
+func setTLSServerName(cfg *aws.Config, serverName string) error {
+	lt, ok := cfg.HTTPClient.Transport.(*loggingTransport)
+	if !ok {
+		return fmt.Errorf("unexpected transport type %T", cfg.HTTPClient.Transport)
+	}
+
+	base, ok := lt.underlying.(*http.Transport)
+	if !ok {
+		return fmt.Errorf("unexpected underlying transport type %T", lt.underlying)
+	}
+
+	cloned := base.Clone()
+	if cloned.TLSClientConfig == nil {
+		cloned.TLSClientConfig = &tls.Config{}
+	}
+	cloned.TLSClientConfig.ServerName = serverName
+	lt.underlying = cloned
+	return nil
+}
+
+func requestEndpointFromSource(ctx context.Context, endpointSource, port string) *string {
 	t := http.DefaultTransport
 	c := http.DefaultClient
 	if tr, ok := t.(*http.Transport); ok {
 		tr.DisableKeepAlives = true
 		c = &http.Client{Transport: tr}
 	}
-	resp, err := c.Get(endpointSource)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointSource, nil)
+	if err != nil {
+		tracelog.ErrorLogger.Printf("Endpoint source request error: %v ", err)
+		return nil
+	}
+	resp, err := c.Do(req)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Endpoint source error: %v ", err)
 		return nil

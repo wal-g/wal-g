@@ -19,5 +19,6 @@
 
   "WALG_REDIS_USERNAME": "acl-test",
   "WALG_REDIS_PASSWORD": "1234",
-  "WALG_REDIS_DATA_PATH": "/data"
+  "WALG_REDIS_DATA_PATH": "/data",
+  "WALG_REDIS_TS_PIN_FOLDER": "/data/wal-g-ts-pin"
 }

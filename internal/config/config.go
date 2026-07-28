@@ -42,6 +42,7 @@ const (
 	DeltaMaxStepsSetting          = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting            = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting      = "WALG_COMPRESSION_METHOD"
+	ZstdLevelSetting              = "WALG_ZSTD_LEVEL"
 	StoragePrefixSetting          = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting          = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting       = "WALG_NETWORK_RATE_LIMIT"
@@ -77,6 +78,7 @@ const (
 	PgpEnvelopeYcEndpointSetting  = "WALG_ENVELOPE_PGP_YC_ENDPOINT"
 	PgpEnvelopeCacheExpiration    = "WALG_ENVELOPE_CACHE_EXPIRATION"
 	DirectIO                      = "WALG_DIRECT_IO"
+	DirectIOBlockCountSetting     = "WALG_DIRECT_IO_BLOCK_COUNT"
 
 	PgDataSetting           = "PGDATA"
 	UserSetting             = "USER" // TODO : do something with it
@@ -173,6 +175,7 @@ const (
 	RedisAppendonlyFolder    = "WALG_REDIS_APPENDONLY_PATH"
 	RedisAppendonlyManifest  = "WALG_REDIS_APPENDONLY_MANIFEST"
 	RedisAppendonlyTmpFolder = "WALG_REDIS_APPENDONLY_TEMP_MANIFEST"
+	RedisTSPinFolder         = "WALG_REDIS_TS_PIN_FOLDER"
 	RedisDataThreshold       = "WALG_REDIS_DATA_THRESHOLD"
 	RedisDataTimeout         = "WALG_REDIS_DATA_TIMEOUT"
 	RedisServerProcessName   = "WALG_REDIS_SERVER_PROCESS_NAME"
@@ -283,6 +286,7 @@ var (
 		FailoverStorageCacheLifetime: "15m",
 		PgpEnvelopeCacheExpiration:   "0",
 		DirectIO:                     "false",
+		DirectIOBlockCountSetting:    "32",
 		LogLevelSetting:              "NORMAL",
 	}
 
@@ -302,6 +306,7 @@ var (
 		RedisAppendonlyFolder:    "appendonlydir",
 		RedisAppendonlyManifest:  "appendonly.aof.manifest",
 		RedisAppendonlyTmpFolder: "/var/lib/redis/wal-g/",
+		RedisTSPinFolder:         "/var/lib/redis/ext/wal-g-pin/",
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
 		RedisServerProcessName:   "redis-server",
@@ -366,6 +371,7 @@ var (
 		DeltaMaxStepsSetting:          true,
 		DeltaOriginSetting:            true,
 		CompressionMethodSetting:      true,
+		ZstdLevelSetting:              true,
 		StoragePrefixSetting:          true,
 		DiskRateLimitSetting:          true,
 		NetworkRateLimitSetting:       true,
@@ -386,6 +392,7 @@ var (
 		PgpEnvelopeYcSaKeyFileSetting: true,
 		PgpEnvelopeYcEndpointSetting:  true,
 		DirectIO:                      false,
+		DirectIOBlockCountSetting:     false,
 		LibsodiumKeySetting:           true,
 		LibsodiumKeyPathSetting:       true,
 		LibsodiumKeyTransform:         true,
@@ -605,6 +612,7 @@ var (
 		RedisAppendonlyFolder:    true,
 		RedisAppendonlyManifest:  true,
 		RedisAppendonlyTmpFolder: true,
+		RedisTSPinFolder:         true,
 		RedisDataThreshold:       true,
 		RedisDataTimeout:         true,
 		RedisServerProcessName:   true,

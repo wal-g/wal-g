@@ -53,20 +53,20 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 
 		for i := 1; i <= 4; i++ {
 			for _, f := range genBackupFiles(i, i*100) {
-				_ = h.source.PutObject(f, bytes.NewBufferString("abc"))
+				_ = h.source.PutObject(t.Context(), f, bytes.NewBufferString("abc"))
 			}
 		}
 
-		err := h.Handle()
+		err := h.Handle(t.Context())
 		require.NoError(t, err)
 
 		for i := 1; i <= 4; i++ {
 			for _, f := range genBackupFiles(i, i*100) {
-				exists, err := h.source.Exists(f)
+				exists, err := h.source.Exists(t.Context(), f)
 				require.NoError(t, err)
 				require.False(t, exists)
 
-				exists, err = h.target.Exists(f)
+				exists, err = h.target.Exists(t.Context(), f)
 				require.NoError(t, err)
 				require.True(t, exists)
 			}
@@ -81,7 +81,7 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 		h.target = targetMock
 
 		for _, f := range genBackupFiles(1, 100) {
-			_ = h.source.PutObject(f, bytes.NewBufferString("abc"))
+			_ = h.source.PutObject(t.Context(), f, bytes.NewBufferString("abc"))
 		}
 
 		var (
@@ -94,33 +94,33 @@ func TestTransferHandler_Handle_Backup(t *testing.T) {
 				if dataFilesCopied.Load() < 99 {
 					t.Fatalf("sentinel file must be copied to target storage only after all other files")
 				}
-				return targetMock.MemFolder.PutObject(name, content)
+				return targetMock.MemFolder.PutObject(t.Context(), name, content)
 			}
 			go func() {
 				time.Sleep(time.Millisecond)
 				dataFilesCopied.Add(1)
-				_ = targetMock.MemFolder.PutObject(name, content)
+				_ = targetMock.MemFolder.PutObject(t.Context(), name, content)
 			}()
 			return nil
 		}
-		sourceMock.DeleteObjectsMock = func(objectsWithRelativePath []storage.Object) error {
+		sourceMock.DeleteObjectsMock = func(_ context.Context, objectsWithRelativePath []storage.Object) error {
 			if strings.HasSuffix(objectsWithRelativePath[0].GetName(), "_backup_stop_sentinel.json") {
 				sentinelDeleted = true
 			} else if !sentinelDeleted {
 				t.Fatalf("sentinel file must be deleted from source storage before all other files")
 			}
-			return sourceMock.MemFolder.DeleteObjects(objectsWithRelativePath)
+			return sourceMock.MemFolder.DeleteObjects(t.Context(), objectsWithRelativePath)
 		}
 
-		err := h.Handle()
+		err := h.Handle(t.Context())
 		require.NoError(t, err)
 
 		for _, f := range genBackupFiles(1, 100) {
-			exists, err := h.source.Exists(f)
+			exists, err := h.source.Exists(t.Context(), f)
 			require.NoError(t, err)
 			require.False(t, exists)
 
-			exists, err = h.target.Exists(f)
+			exists, err = h.target.Exists(t.Context(), f)
 			require.NoError(t, err)
 			require.True(t, exists)
 		}
@@ -147,7 +147,7 @@ func TestTransferHandler_Handle(t *testing.T) {
 	countFiles := func(folder storage.Folder, max int) int {
 		found := 0
 		for i := 0; i < max; i++ {
-			exists, err := folder.Exists(strconv.Itoa(i))
+			exists, err := folder.Exists(t.Context(), strconv.Itoa(i))
 			assert.NoError(t, err)
 			if exists {
 				found++
@@ -161,14 +161,14 @@ func TestTransferHandler_Handle(t *testing.T) {
 		h.fileLister.(*RegularFileLister).MaxFiles = 80
 
 		for i := 0; i < 100; i++ {
-			_ = h.source.PutObject(strconv.Itoa(i), &bytes.Buffer{})
+			_ = h.source.PutObject(t.Context(), strconv.Itoa(i), &bytes.Buffer{})
 		}
 
 		for i := 0; i < 10; i++ {
-			_ = h.target.PutObject(strconv.Itoa(i), &bytes.Buffer{})
+			_ = h.target.PutObject(t.Context(), strconv.Itoa(i), &bytes.Buffer{})
 		}
 
-		err := h.Handle()
+		err := h.Handle(t.Context())
 		assert.NoError(t, err)
 
 		assert.Equal(t, 90, countFiles(h.target, 100))
@@ -187,17 +187,17 @@ func TestTransferHandler_Handle(t *testing.T) {
 			if putCalls%5 == 0 {
 				return fmt.Errorf("test")
 			}
-			return targetMock.MemFolder.PutObject(name, content)
+			return targetMock.MemFolder.PutObject(t.Context(), name, content)
 		}
 
 		h := defaultHandler()
 		h.target = targetMock
 
 		for i := 0; i < 100; i++ {
-			_ = h.source.PutObject(strconv.Itoa(i), &bytes.Buffer{})
+			_ = h.source.PutObject(t.Context(), strconv.Itoa(i), &bytes.Buffer{})
 		}
 
-		err := h.Handle()
+		err := h.Handle(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "finished with 20 errors")
 
@@ -210,14 +210,14 @@ func TestTransferHandler_Handle(t *testing.T) {
 
 		delCalls := 0
 		dellCallsMux := new(sync.Mutex)
-		sourceMock.DeleteObjectsMock = func(objects []storage.Object) error {
+		sourceMock.DeleteObjectsMock = func(_ context.Context, objects []storage.Object) error {
 			dellCallsMux.Lock()
 			defer dellCallsMux.Unlock()
 			delCalls++
 			if delCalls > 15 {
 				return fmt.Errorf("test")
 			}
-			return sourceMock.MemFolder.DeleteObjects(objects)
+			return sourceMock.MemFolder.DeleteObjects(t.Context(), objects)
 		}
 
 		h := defaultHandler()
@@ -225,10 +225,10 @@ func TestTransferHandler_Handle(t *testing.T) {
 		h.cfg.FailOnFirstErr = true
 
 		for i := 0; i < 100; i++ {
-			_ = h.source.PutObject(strconv.Itoa(i), &bytes.Buffer{})
+			_ = h.source.PutObject(t.Context(), strconv.Itoa(i), &bytes.Buffer{})
 		}
 
-		err := h.Handle()
+		err := h.Handle(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "delete file")
 
@@ -239,9 +239,9 @@ func TestTransferHandler_Handle(t *testing.T) {
 		assert.Equal(t, 85, countFiles(h.source, 100))
 		for i := 0; i < 100; i++ {
 			name := strconv.Itoa(i)
-			inSource, err := h.source.Exists(name)
+			inSource, err := h.source.Exists(t.Context(), name)
 			assert.NoError(t, err)
-			inTarget, err := h.target.Exists(name)
+			inTarget, err := h.target.Exists(t.Context(), name)
 			assert.NoError(t, err)
 			assert.True(t, inSource || inTarget, "file %q lost from both storages", name)
 		}
@@ -369,7 +369,7 @@ func TestTransferHandler_copyFile(t *testing.T) {
 	t.Run("write new file", func(t *testing.T) {
 		h := defaultHandler()
 
-		_ = h.source.PutObject("1", bytes.NewBufferString("source"))
+		_ = h.source.PutObject(t.Context(), "1", bytes.NewBufferString("source"))
 
 		job := transferJob{
 			key: jobKey{
@@ -378,10 +378,10 @@ func TestTransferHandler_copyFile(t *testing.T) {
 			},
 		}
 
-		_, err := h.copyFile(job)
+		_, err := h.copyFile(t.Context(), job)
 		require.NoError(t, err)
 
-		file, err := h.target.ReadObject("1")
+		file, err := h.target.ReadObject(t.Context(), "1")
 		assert.NoError(t, err)
 		content, _ := io.ReadAll(file)
 		assert.Equal(t, "source", string(content))
@@ -390,8 +390,8 @@ func TestTransferHandler_copyFile(t *testing.T) {
 	t.Run("overwrite existing file", func(t *testing.T) {
 		h := defaultHandler()
 
-		_ = h.source.PutObject("1", bytes.NewBufferString("source"))
-		_ = h.target.PutObject("1", bytes.NewBufferString("target"))
+		_ = h.source.PutObject(t.Context(), "1", bytes.NewBufferString("source"))
+		_ = h.target.PutObject(t.Context(), "1", bytes.NewBufferString("target"))
 
 		job := transferJob{
 			key: jobKey{
@@ -400,10 +400,10 @@ func TestTransferHandler_copyFile(t *testing.T) {
 			},
 		}
 
-		_, err := h.copyFile(job)
+		_, err := h.copyFile(t.Context(), job)
 		require.NoError(t, err)
 
-		file, err := h.target.ReadObject("1")
+		file, err := h.target.ReadObject(t.Context(), "1")
 		assert.NoError(t, err)
 		content, _ := io.ReadAll(file)
 		assert.Equal(t, "source", string(content))
@@ -412,7 +412,7 @@ func TestTransferHandler_copyFile(t *testing.T) {
 	t.Run("provide new wait job and update status", func(t *testing.T) {
 		h := defaultHandler()
 
-		_ = h.source.PutObject("1", bytes.NewBufferString("source"))
+		_ = h.source.PutObject(t.Context(), "1", bytes.NewBufferString("source"))
 
 		job := transferJob{
 			key: jobKey{
@@ -421,7 +421,7 @@ func TestTransferHandler_copyFile(t *testing.T) {
 			},
 		}
 
-		newJob, err := h.copyFile(job)
+		newJob, err := h.copyFile(t.Context(), job)
 		require.NoError(t, err)
 
 		wantJob := &transferJob{
@@ -447,7 +447,7 @@ func TestTransferHandler_copyFile(t *testing.T) {
 			},
 		}
 
-		_, err := h.copyFile(job)
+		_, err := h.copyFile(t.Context(), job)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "read file")
 	})
@@ -478,7 +478,7 @@ func TestTransferHandler_aitFile(t *testing.T) {
 			performedChecks: 0,
 		}
 
-		newJob, err := h.waitFile(job)
+		newJob, err := h.waitFile(t.Context(), job)
 		assert.NoError(t, err)
 		assert.NotNil(t, newJob)
 		assert.Equal(t, "1", newJob.key.filePath)
@@ -492,7 +492,7 @@ func TestTransferHandler_aitFile(t *testing.T) {
 	t.Run("provide delete job if file has appeared", func(t *testing.T) {
 		h := defaultHandler()
 
-		_ = h.target.PutObject("1", &bytes.Buffer{})
+		_ = h.target.PutObject(t.Context(), "1", &bytes.Buffer{})
 
 		job := transferJob{
 			key: jobKey{
@@ -503,7 +503,7 @@ func TestTransferHandler_aitFile(t *testing.T) {
 			performedChecks: 0,
 		}
 
-		newJob, err := h.waitFile(job)
+		newJob, err := h.waitFile(t.Context(), job)
 		assert.NoError(t, err)
 		assert.NotNil(t, newJob)
 		assert.Equal(t, "1", newJob.key.filePath)
@@ -526,7 +526,7 @@ func TestTransferHandler_aitFile(t *testing.T) {
 			performedChecks: 0,
 		}
 
-		newJob, err := h.waitFile(job)
+		newJob, err := h.waitFile(t.Context(), job)
 		assert.NoError(t, err)
 		assert.NotNil(t, newJob)
 		assert.Equal(t, "1", newJob.key.filePath)
@@ -546,13 +546,13 @@ func TestTransferHandler_aitFile(t *testing.T) {
 		}
 
 		for i := 0; i < 2; i++ {
-			newJob, err := h.waitFile(job)
+			newJob, err := h.waitFile(t.Context(), job)
 			assert.NoError(t, err)
 			require.NotNil(t, newJob)
 			assert.Equal(t, uint(i+1), newJob.performedChecks)
 			job = *newJob
 		}
-		_, err := h.waitFile(job)
+		_, err := h.waitFile(t.Context(), job)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "couldn't wait for the file to appear")
 	})
@@ -565,7 +565,7 @@ func TestTransferHandler_deleteFile(t *testing.T) {
 		fileStatuses: new(sync.Map),
 	}
 
-	_ = h.source.PutObject("1", &bytes.Buffer{})
+	_ = h.source.PutObject(t.Context(), "1", &bytes.Buffer{})
 
 	job := transferJob{
 		key: jobKey{
@@ -574,10 +574,10 @@ func TestTransferHandler_deleteFile(t *testing.T) {
 		},
 	}
 
-	err := h.deleteFile(job)
+	err := h.deleteFile(t.Context(), job)
 	require.NoError(t, err)
 
-	exists, err := h.source.Exists("1")
+	exists, err := h.source.Exists(t.Context(), "1")
 	require.NoError(t, err)
 	assert.False(t, exists)
 
@@ -595,12 +595,12 @@ func TestTransferHandler_checkForAppearance(t *testing.T) {
 			},
 		}
 
-		_ = h.target.PutObject("1", &bytes.Buffer{})
+		_ = h.target.PutObject(t.Context(), "1", &bytes.Buffer{})
 
 		thisCheckTime := time.Now()
 		prevCheckTime := thisCheckTime.Add(-50 * time.Millisecond)
 
-		appeared, err := h.checkForAppearance(prevCheckTime, "1")
+		appeared, err := h.checkForAppearance(t.Context(), prevCheckTime, "1")
 		assert.GreaterOrEqual(t, time.Now(), thisCheckTime.Add(50*time.Millisecond))
 		assert.NoError(t, err)
 		assert.True(t, appeared)
@@ -614,11 +614,11 @@ func TestTransferHandler_checkForAppearance(t *testing.T) {
 			},
 		}
 
-		_ = h.target.PutObject("1", &bytes.Buffer{})
+		_ = h.target.PutObject(t.Context(), "1", &bytes.Buffer{})
 
 		prevCheckTime := time.Now().Add(-time.Hour)
 
-		appeared, err := h.checkForAppearance(prevCheckTime, "1")
+		appeared, err := h.checkForAppearance(t.Context(), prevCheckTime, "1")
 		assert.NoError(t, err)
 		assert.True(t, appeared)
 	})

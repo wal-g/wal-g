@@ -20,7 +20,7 @@ func HandlePutObject(
 	uploader internal.Uploader,
 	overwrite, encrypt, compress bool,
 ) error {
-	err := checkOverwrite(dstPath, uploader, overwrite)
+	err := checkOverwrite(ctx, dstPath, uploader, overwrite)
 	if err != nil {
 		return fmt.Errorf("check file overwrite: %v", err)
 	}
@@ -38,9 +38,9 @@ func HandlePutObject(
 	return nil
 }
 
-func checkOverwrite(dstPath string, uploader internal.Uploader, overwrite bool) error {
+func checkOverwrite(ctx context.Context, dstPath string, uploader internal.Uploader, overwrite bool) error {
 	fullPath := utility.AddFileExtension(dstPath, uploader.Compression().FileExtension())
-	exists, err := uploader.Folder().Exists(fullPath)
+	exists, err := uploader.Folder().Exists(ctx, fullPath)
 	if err != nil {
 		return fmt.Errorf("check object existence: %v", err)
 	}

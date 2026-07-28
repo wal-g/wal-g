@@ -48,6 +48,9 @@ var (
 			if targetStorage == "" {
 				targetStorage = viper.GetString(conf.PgTargetStorage)
 			}
+
+			err := conf.ConfigureAndRunDefaultWebServer()
+			tracelog.ErrorLogger.FatalOnError(err)
 		},
 	}
 

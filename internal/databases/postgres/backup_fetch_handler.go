@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -62,9 +63,9 @@ func chooseTablespaceSpecification(sentinelDtoSpec, spec *TablespaceSpec) *Table
 
 // TODO : unit tests
 // deltaFetchRecursion function composes Backup object and recursively searches for necessary base backup
-func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDirectory string,
+func deltaFetchRecursionOld(ctx context.Context, backup Backup, rootFolder storage.Folder, dbDataDirectory string,
 	tablespaceSpec *TablespaceSpec, filesToUnwrap map[string]bool, extractProv ExtractProvider) error {
-	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata()
+	sentinelDto, filesMetaDto, err := backup.GetSentinelAndFilesMetadata(ctx)
 	if err != nil {
 		return err
 	}
@@ -83,6 +84,7 @@ func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDire
 			return err
 		}
 		incrementFrom, err := NewBackupInStorage(
+			ctx,
 			rootFolder.GetSubFolder(utility.BaseBackupPath),
 			*sentinelDto.IncrementFrom,
 			backup.GetStorageName(),
@@ -90,7 +92,7 @@ func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDire
 		if err != nil {
 			return err
 		}
-		err = deltaFetchRecursionOld(incrementFrom, rootFolder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap, extractProv)
+		err = deltaFetchRecursionOld(ctx, incrementFrom, rootFolder, dbDataDirectory, tablespaceSpec, baseFilesToUnwrap, extractProv)
 		if err != nil {
 			return err
 		}
@@ -100,13 +102,13 @@ func deltaFetchRecursionOld(backup Backup, rootFolder storage.Folder, dbDataDire
 			*(sentinelDto.BackupStartLSN))
 	}
 
-	return backup.unwrapToEmptyDirectory(dbDataDirectory, filesToUnwrap, false, extractProv)
+	return backup.unwrapToEmptyDirectory(ctx, dbDataDirectory, filesToUnwrap, false, extractProv)
 }
 
 func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractProv ExtractProvider) internal.Fetcher {
-	return func(rootFolder storage.Folder, backup internal.Backup) {
+	return func(ctx context.Context, rootFolder storage.Folder, backup internal.Backup) {
 		pgBackup := ToPgBackup(backup)
-		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(fileMask)
+		filesToUnwrap, err := pgBackup.GetFilesToUnwrap(ctx, fileMask)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 
 		var spec *TablespaceSpec
@@ -118,7 +120,7 @@ func GetFetcherOld(dbDataDirectory, fileMask, restoreSpecPath string, extractPro
 			tracelog.ErrorLogger.FatalfOnError(errMessage, err)
 		}
 
-		err = deltaFetchRecursionOld(pgBackup, rootFolder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap, extractProv)
+		err = deltaFetchRecursionOld(ctx, pgBackup, rootFolder, utility.ResolveSymlink(dbDataDirectory), spec, filesToUnwrap, extractProv)
 		tracelog.ErrorLogger.FatalfOnError("Failed to fetch backup: %v\n", err)
 	}
 }

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"cmp"
+	"context"
 	"slices"
 
 	"github.com/wal-g/tracelog"
@@ -113,9 +114,9 @@ func (seq *WalSegmentsSequence) FindMissingSegments() ([]WalSegmentDescription, 
 
 // HandleWalShow gets the list of files inside WAL folder, detects the available WAL segments,
 // groups WAL segments by the timeline and shows detailed info about each timeline stored in storage
-func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter WalShowOutputWriter) {
+func HandleWalShow(ctx context.Context, rootFolder storage.Folder, showBackups bool, outputWriter WalShowOutputWriter) {
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
-	filenames, err := getFolderFilenames(walFolder)
+	filenames, err := getFolderFilenames(ctx, walFolder)
 	tracelog.ErrorLogger.FatalfOnError("Failed to get the WAL folder filenames %v\n", err)
 
 	walSegments := getSegmentsFromFiles(filenames)
@@ -123,7 +124,7 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 
 	timelineInfos := make([]*TimelineInfo, 0, len(segmentsByTimelines))
 	for _, segmentsSequence := range segmentsByTimelines {
-		historyRecords, err := GetTimeLineHistoryRecords(segmentsSequence.TimelineID, walFolder)
+		historyRecords, err := GetTimeLineHistoryRecords(ctx, segmentsSequence.TimelineID, walFolder)
 		if err != nil {
 			if _, ok := err.(HistoryFileNotFoundError); !ok {
 				tracelog.ErrorLogger.Fatalf("Error while loading .history file %v\n", err)
@@ -136,7 +137,7 @@ func HandleWalShow(rootFolder storage.Folder, showBackups bool, outputWriter Wal
 	}
 
 	if showBackups {
-		timelineInfos, err = addBackupsInfo(timelineInfos, rootFolder)
+		timelineInfos, err = addBackupsInfo(ctx, timelineInfos, rootFolder)
 		tracelog.ErrorLogger.FatalfOnError("Failed to add backups info: %v\n", err)
 	}
 
@@ -162,8 +163,8 @@ func groupSegmentsByTimelines(segments map[WalSegmentDescription]bool) map[uint3
 }
 
 // addBackupsInfo adds info about available backups for each timeline
-func addBackupsInfo(timelineInfos []*TimelineInfo, rootFolder storage.Folder) ([]*TimelineInfo, error) {
-	backups, err := internal.GetBackups(rootFolder.GetSubFolder(utility.BaseBackupPath))
+func addBackupsInfo(ctx context.Context, timelineInfos []*TimelineInfo, rootFolder storage.Folder) ([]*TimelineInfo, error) {
+	backups, err := internal.GetBackups(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("No backups found in storage.")
@@ -171,7 +172,7 @@ func addBackupsInfo(timelineInfos []*TimelineInfo, rootFolder storage.Folder) ([
 		}
 		return nil, err
 	}
-	backupDetails, err := GetBackupsDetails(rootFolder.GetSubFolder(utility.BaseBackupPath), backups)
+	backupDetails, err := GetBackupsDetails(ctx, rootFolder.GetSubFolder(utility.BaseBackupPath), backups)
 	if err != nil {
 		return nil, err
 	}

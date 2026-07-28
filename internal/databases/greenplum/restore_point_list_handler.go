@@ -1,6 +1,7 @@
 package greenplum
 
 import (
+	"context"
 	"os"
 
 	"github.com/wal-g/tracelog"
@@ -11,8 +12,8 @@ import (
 )
 
 // TODO: unit tests
-func HandleRestorePointList(folder storage.Folder, pretty, json bool) {
-	restorePoints, err := GetRestorePoints(folder)
+func HandleRestorePointList(ctx context.Context, folder storage.Folder, pretty, json bool) {
+	restorePoints, err := GetRestorePoints(ctx, folder)
 	if _, ok := err.(NoRestorePointsFoundError); ok {
 		err = nil
 	}

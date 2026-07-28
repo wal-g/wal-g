@@ -48,8 +48,9 @@ func (u *StorageUploader) GetFiles() *FilesMetadataDTO {
 	return u.meta
 }
 
-func (u *StorageUploader) AddFile(cfi *internal.ComposeFileInfo, meta RelFileMetadata, fileKey FileKey) error {
-	err := u.addFile(cfi, meta, fileKey)
+func (u *StorageUploader) AddFile(ctx context.Context,
+	cfi *internal.ComposeFileInfo, meta RelFileMetadata, fileKey FileKey) error {
+	err := u.addFile(ctx, cfi, meta, fileKey)
 	if _, ok := err.(internal.FileNotExistError); ok {
 		// File was deleted between walk and open. Treat as "did not exist".
 		tracelog.WarningLogger.Println(err)
@@ -58,17 +59,18 @@ func (u *StorageUploader) AddFile(cfi *internal.ComposeFileInfo, meta RelFileMet
 	return err
 }
 
-func (u *StorageUploader) addFile(cfi *internal.ComposeFileInfo, meta RelFileMetadata, fileKey FileKey) error {
+func (u *StorageUploader) addFile(ctx context.Context,
+	cfi *internal.ComposeFileInfo, meta RelFileMetadata, fileKey FileKey) error {
 	remoteFile, ok := u.baseFiles[cfi.Header.Name]
 	if !ok {
 		tracelog.DebugLogger.Printf("%s: no base PAX file in storage, will upload", cfi.Header.Name)
-		return u.regularUpload(cfi, meta, fileKey)
+		return u.regularUpload(ctx, cfi, meta, fileKey)
 	}
 
 	if remoteFile.InitialUploadTS.Before(u.deduplicationMinAge) {
 		tracelog.DebugLogger.Printf("%s: PAX dedup age limit passed (initial upload %s), will re-upload",
 			cfi.Header.Name, remoteFile.InitialUploadTS)
-		return u.regularUpload(cfi, meta, fileKey)
+		return u.regularUpload(ctx, cfi, meta, fileKey)
 	}
 
 	// if dedup check failed -> upload new file
@@ -78,7 +80,7 @@ func (u *StorageUploader) addFile(cfi *internal.ComposeFileInfo, meta RelFileMet
 			cfi.Header.Name,
 			remoteFile.RelNameMd5, remoteFile.BlockID, remoteFile.Kind,
 			meta.RelNameMd5, meta.BlockID, meta.Kind)
-		return u.regularUpload(cfi, meta, fileKey)
+		return u.regularUpload(ctx, cfi, meta, fileKey)
 	}
 
 	tracelog.DebugLogger.Printf("%s: PAX file already in storage as %s, will skip",
@@ -94,11 +96,12 @@ func (u *StorageUploader) skipUpload(cfi *internal.ComposeFileInfo, meta RelFile
 	return nil
 }
 
-func (u *StorageUploader) regularUpload(cfi *internal.ComposeFileInfo, meta RelFileMetadata, fileKey FileKey) error {
+func (u *StorageUploader) regularUpload(ctx context.Context,
+	cfi *internal.ComposeFileInfo, meta RelFileMetadata, fileKey FileKey) error {
 	storageKey := MakeFileStorageKey(meta.RelNameMd5, fileKey, u.newPaxFilesID)
 	tracelog.DebugLogger.Printf("Uploading %s PAX file to %s", cfi.Path, storageKey)
 
-	fileReadCloser, err := internal.StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
+	fileReadCloser, err := internal.StartReadingFile(ctx, cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
 		return err
 	}
@@ -109,7 +112,7 @@ func (u *StorageUploader) regularUpload(cfi *internal.ComposeFileInfo, meta RelF
 
 	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
 	uploadPath := path.Join(StoragePath, storageKey)
-	if err := u.uploader.Upload(context.Background(), uploadPath, uploadContents); err != nil {
+	if err := u.uploader.Upload(ctx, uploadPath, uploadContents); err != nil {
 		return err
 	}
 

@@ -1,12 +1,13 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"slices"
 	"strings"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -24,8 +25,8 @@ type FollowPrimaryHandler struct {
 const LATEST = "LATEST"
 const WalFolder = utility.SegmentsPath + "/seg%d/" + utility.WalPath
 
-// nolint:gocritic
 func NewFollowPrimaryHandler(
+	ctx context.Context,
 	folder storage.Folder,
 	logsDir string,
 	restoreCfgPath, stopAtRestorePoint string,
@@ -45,7 +46,7 @@ func NewFollowPrimaryHandler(
 	tracelog.DebugLogger.Printf("cluster %v\n", globalCluster)
 
 	if stopAtRestorePoint == LATEST {
-		restorePoints, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
+		restorePoints, err := GetRestorePoints(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 		if _, ok := err.(NoRestorePointsFoundError); ok {
 			err = nil
 		}
@@ -57,7 +58,7 @@ func NewFollowPrimaryHandler(
 		tracelog.InfoLogger.Printf("Selected latest restore point: %s", stopAtRestorePoint)
 	}
 
-	FatalIfWalLogMissing(stopAtRestorePoint, folder)
+	FatalIfWalLogMissing(ctx, stopAtRestorePoint, folder)
 
 	return &FollowPrimaryHandler{
 		cluster:            globalCluster,
@@ -66,8 +67,8 @@ func NewFollowPrimaryHandler(
 	}
 }
 
-func FatalIfWalLogMissing(restorePoint string, folder storage.Folder) {
-	metadata, err := FetchRestorePointMetadata(folder, restorePoint)
+func FatalIfWalLogMissing(ctx context.Context, restorePoint string, folder storage.Folder) {
+	metadata, err := FetchRestorePointMetadata(ctx, folder, restorePoint)
 	if err != nil {
 		tracelog.ErrorLogger.FatalOnError(err)
 	}
@@ -82,13 +83,22 @@ outer:
 		walSegmentNo := postgres.NewWalSegmentNo(LSN)
 
 		subfolder := folder.GetSubFolder(fmt.Sprintf(WalFolder, seg))
-		folderObjects, _, err := subfolder.ListFolder()
+		folderObjects, _, err := subfolder.ListFolder(ctx)
+		if err != nil {
+			tracelog.ErrorLogger.FatalOnError(err)
+		}
+
+		walObjects := make([]string, 0, len(folderObjects))
+		for _, object := range folderObjects {
+			walObjects = append(walObjects, object.GetName())
+		}
+		timeline, err := resolveGreenplumTimeline(metadata, seg, walSegmentNo, walObjects)
 		if err != nil {
 			tracelog.ErrorLogger.FatalOnError(err)
 		}
 
 		// WAL file example: "000000010000000000000003.lz4" -> base name is "000000010000000000000003"
-		walName := walSegmentNo.GetFilename(metadata.TimeLine)
+		walName := walSegmentNo.GetFilename(timeline)
 		for _, obj := range folderObjects {
 			if strings.HasPrefix(obj.GetName(), walName) {
 				foundCnt++

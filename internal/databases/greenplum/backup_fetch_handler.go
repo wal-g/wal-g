@@ -1,12 +1,12 @@
 package greenplum
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strings"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
-	"github.com/hashicorp/go-version"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -68,7 +68,7 @@ type FetchHandler struct {
 	sentinel            BackupSentinelDto
 }
 
-// nolint:gocritic
+//nolint:gocritic
 func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
@@ -216,11 +216,7 @@ func (fh *FetchHandler) createRecoveryConfigs() error {
 	pathToRecoveryConf := viper.GetString(conf.GPRelativeRecoveryConfPath)
 	pathToPostgresqlConf := viper.GetString(conf.GPRelativePostgresqlConfPath)
 
-	semVer, err := version.NewVersion(fh.sentinel.GpVersion)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("failed to parse GP version: %s,  %s", fh.sentinel.GpVersion, err)
-	}
-	pgVersion := NewVersion(semVer, fh.sentinel.GpFlavor).EstimatePostgreSQLVersion()
+	pgVersion := EstimatePostgreSQLVersion(fh.sentinel.GpFlavor, fh.sentinel.GpVersion)
 	if pgVersion > 120000 && pathToRecoveryConf == "recovery.conf" {
 		// Starting from PostgreSQL 12.0 - the server will not start if a recovery.conf exists.
 		tracelog.ErrorLogger.Print(
@@ -303,14 +299,14 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 
 func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
 	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
-) func(folder storage.Folder, backup internal.Backup) {
-	return func(folder storage.Folder, backup internal.Backup) {
+) func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
+	return func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
 		if restorePoint != "" {
-			tracelog.ErrorLogger.FatalOnError(ValidateMatch(folder, backup.Name, restorePoint, backup.GetStorageName()))
+			tracelog.ErrorLogger.FatalOnError(ValidateMatch(ctx, folder, backup.Name, restorePoint, backup.GetStorageName()))
 		}
 		var sentinel BackupSentinelDto
-		err := backup.FetchSentinel(&sentinel)
+		err := backup.FetchSentinel(ctx, &sentinel)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)

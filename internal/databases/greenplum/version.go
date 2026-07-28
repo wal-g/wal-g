@@ -3,6 +3,8 @@ package greenplum
 import (
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/go-version"
 )
@@ -24,6 +26,10 @@ type Version struct {
 	Flavor Flavor // Note: can be '' for old backups
 }
 
+func (v Version) String() string {
+	return fmt.Sprintf("%s (%s)", v.Flavor.String(), v.Version.String())
+}
+
 func NewVersion(v *version.Version, flavor Flavor) Version {
 	return Version{
 		Version: v,
@@ -33,7 +39,7 @@ func NewVersion(v *version.Version, flavor Flavor) Version {
 }
 
 func parseGreenplumVersion(versionStr string) (Version, error) {
-	pattern := regexp.MustCompile(`(Greenplum Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
+	pattern := regexp.MustCompile(`(Greenplum Database|Greengage Database|Cloudberry Database|Apache Cloudberry) (\d+\.\d+\.\d+)`)
 	groups := pattern.FindStringSubmatch(versionStr)
 	if groups == nil {
 		return Version{}, fmt.Errorf("unknown flavor: %s", versionStr)
@@ -47,6 +53,8 @@ func parseGreenplumVersion(versionStr string) (Version, error) {
 	switch groups[1] {
 	case "Greenplum Database":
 		flavor = Greenplum
+	case "Greengage Database":
+		flavor = Greenplum
 	case "Cloudberry Database":
 		flavor = Cloudberry
 	case "Apache Cloudberry":
@@ -58,14 +66,16 @@ func parseGreenplumVersion(versionStr string) (Version, error) {
 	return NewVersion(semVer, flavor), nil
 }
 
-func (v Version) EstimatePostgreSQLVersion() int {
-	if v.Flavor == Cloudberry {
+func EstimatePostgreSQLVersion(flavor Flavor, gpVersion string) int {
+	if flavor == Cloudberry {
 		return 140000
 	}
-	if v.Major == 7 {
+	majorStr, _, _ := strings.Cut(gpVersion, ".")
+	major, _ := strconv.Atoi(majorStr)
+	switch major {
+	case 7:
 		return 120000
-	}
-	if v.Major == 6 {
+	case 6:
 		return 90400
 	}
 	return 0

@@ -464,7 +464,7 @@ func TestAoUpload_NotExistFile(t *testing.T) {
 	assert.NoError(t, f.Close())
 	assert.NoError(t, os.Remove(f.Name()))
 
-	err = uploader.AddFile(cfi, meta, &location)
+	err = uploader.AddFile(t.Context(), cfi, meta, &location)
 	assert.NoError(t, err)
 	assert.Empty(t, uploader.GetFiles().Files)
 }
@@ -480,7 +480,7 @@ func runSingleTest(t *testing.T, baseFiles greenplum.BackupAOFiles,
 		cfi := testFile.ComposeFileInfo
 		aoMeta := testFile.AoRelFileMetadata
 		location := testFile.BlockLocation
-		err := uploader.AddFile(&cfi, aoMeta, &location)
+		err := uploader.AddFile(t.Context(), &cfi, aoMeta, &location)
 		assert.NoError(t, err)
 	}
 

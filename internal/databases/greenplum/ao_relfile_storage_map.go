@@ -61,9 +61,7 @@ func (storageMap *AoRelFileStorageMap) getAOStorageMetadata(filePath string) (bo
 	return true, storageInfo, location
 }
 
-func NewAoRelFileStorageMap(queryRunner *GpQueryRunner) (AoRelFileStorageMap, error) {
-	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
-	ctx := context.Background()
+func NewAoRelFileStorageMap(ctx context.Context, queryRunner *GpQueryRunner) (AoRelFileStorageMap, error) {
 	databases, err := queryRunner.GetDatabaseInfos(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get database names")

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -28,7 +29,7 @@ func NewTimelineWithSegmentNoBy(record *TimelineHistoryRecord) *TimelineWithSegm
 }
 
 // HandleWALRestore is invoked to perform wal-g wal-restore
-func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder) {
+func HandleWALRestore(ctx context.Context, targetPath, sourcePath string, cloudFolder storage.Folder) {
 	cloudFolder = cloudFolder.GetSubFolder(utility.WalPath)
 
 	targetPgData, err := ExtractPgControl(targetPath)
@@ -77,7 +78,7 @@ func HandleWALRestore(targetPath, sourcePath string, cloudFolder storage.Folder)
 	tracelog.InfoLogger.Printf("WAL files to restore: %v", filenamesToRestore)
 	for _, walFilename := range filenamesToRestore {
 		location := utility.ResolveSymlink(path.Join(sourceWalDir, walFilename))
-		if err = internal.DownloadFileTo(internal.NewFolderReader(cloudFolder), walFilename, location); err != nil {
+		if err = internal.DownloadFileTo(ctx, internal.NewFolderReader(cloudFolder), walFilename, location); err != nil {
 			tracelog.ErrorLogger.Printf("Failed to download WAL file %v: %v\n", walFilename, err)
 		} else {
 			tracelog.InfoLogger.Printf("Successfully download WAL file %v\n", walFilename)

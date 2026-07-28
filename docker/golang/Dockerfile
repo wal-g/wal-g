@@ -1,3 +1,25 @@
+FROM ubuntu:bionic AS brotli-builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Build and install Brotli in a dedicated stage to avoid keeping sources in the final image.
+RUN apt-get update && \
+    apt-get -y install \
+        build-essential \
+        wget
+
+RUN ARCH="$(uname -m)" && \
+    wget "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
+    tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
+    rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
+
+COPY submodules/ /tmp/
+
+RUN cd /tmp/brotli && \
+    mkdir out && cd out && \
+    cmake .. && \
+    make && make install
+
 FROM ubuntu:bionic
 
 # custom golang image with CMake and Brotli support (compatible with ubuntu 18.04..22.04)
@@ -5,12 +27,17 @@ FROM ubuntu:bionic
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=xterm-256color
 
-RUN apt-get update && \
-    apt-get -y install \
-        build-essential cmake \
+# bionic is EOL, archive.ubuntu.com mirrors are flaky; retry & lengthen timeouts
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+        > /etc/apt/apt.conf.d/80-retries && \
+    apt-get update && \
+    apt-get install --yes --no-install-recommends --no-install-suggests \
+        build-essential \
+        ca-certificates \
         iputils-ping \
         net-tools dnsutils \
-        wget
+        wget && \
+    rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
 RUN ARCH="$(uname -m)" && \
     case "$ARCH" in \
@@ -18,7 +45,7 @@ RUN ARCH="$(uname -m)" && \
         aarch64) GO_ARCH="arm64" ;; \
         *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
     esac && \
-    wget -O - "https://go.dev/dl/go1.25.9.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
+    wget -O - "https://go.dev/dl/go1.25.11.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
     export PATH="/usr/local/go/bin:$PATH" && \
     go version
 
@@ -32,9 +59,4 @@ RUN ARCH="$(uname -m)" && \
     tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
     rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
 
-COPY submodules/ tmp/
-
-RUN cd tmp/brotli && \
-    mkdir out && cd out && \
-    cmake .. && \
-    make && make install
+COPY --from=brotli-builder /usr/local/ /usr/local/

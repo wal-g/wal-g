@@ -32,6 +32,6 @@ func HandleBackupPush(ctx context.Context, uploader internal.Uploader, backupCmd
 
 	sentinel := streamSentinelDto{StartLocalTime: timeStart}
 
-	err = internal.UploadSentinel(uploader, &sentinel, fileName)
+	err = internal.UploadSentinel(ctx, uploader, &sentinel, fileName)
 	tracelog.ErrorLogger.FatalOnError(err)
 }

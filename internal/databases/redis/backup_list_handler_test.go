@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/config"
@@ -72,7 +73,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 
 			assert.NoError(
 				t,
-				folder.PutObject(b.BackupName+utility.SentinelSuffix, bytes.NewReader(serialized)),
+				folder.PutObject(t.Context(), b.BackupName+utility.SentinelSuffix, bytes.NewReader(serialized)),
 				"couldn't put sentinel in the folder",
 			)
 		}
@@ -82,7 +83,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		redis.HandleDetailedBackupList(folder, true, true)
+		redis.HandleDetailedBackupList(t.Context(), folder, true, true)
 
 		_ = w.Close()
 		got, _ := io.ReadAll(r)
@@ -110,7 +111,7 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		os.Stdout = w
 		defer func() { os.Stdout = rescueStdout }()
 
-		redis.HandleDetailedBackupList(folder, true, false)
+		redis.HandleDetailedBackupList(t.Context(), folder, true, false)
 
 		_ = w.Close()
 		captured, _ := io.ReadAll(r)
@@ -118,4 +119,50 @@ func TestHandleDetailedBackupList(t *testing.T) {
 		assert.Empty(t, string(captured))
 		assert.Contains(t, infoOutput.String(), "No backups found")
 	})
+}
+
+func TestGetBackupDetailsEnrichesAttachedTSWithoutCreatingSecondRow(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	mainName := "stream_20260721T120000Z"
+	standaloneName := "ts_20260721T120001Z"
+	mainBackup := archive.Backup{BackupName: mainName, BackupType: archive.RDBBackupType}
+	tsBackup := archive.Backup{
+		BackupName:  archive.AttachedTSDataPrefix(mainName),
+		BackupType:  archive.TSBackupType,
+		TSBackupID:  "attached-ts",
+		TSDataSize:  42,
+		TSFileCount: 3,
+	}
+	standaloneBackup := archive.Backup{BackupName: standaloneName, BackupType: archive.TSBackupType, TSBackupID: "standalone-ts"}
+
+	for objectName, backup := range map[string]archive.Backup{
+		mainName + utility.SentinelSuffix:       mainBackup,
+		standaloneName + utility.SentinelSuffix: standaloneBackup,
+	} {
+		serialized, err := json.Marshal(backup)
+		require.NoError(t, err)
+		require.NoError(t, folder.PutObject(t.Context(), objectName, bytes.NewReader(serialized)))
+	}
+	serializedTS, err := json.Marshal(tsBackup)
+	require.NoError(t, err)
+	require.NoError(t, folder.GetSubFolder(utility.BaseBackupPath).PutObject(
+		t.Context(), archive.AttachedTSSentinelName(mainName), bytes.NewReader(serializedTS),
+	))
+
+	details, err := redis.GetBackupDetails(t.Context(), folder, []internal.BackupTime{
+		{BackupName: mainName},
+		{BackupName: standaloneName},
+	})
+	require.NoError(t, err)
+	require.Len(t, details, 2)
+
+	byName := make(map[string]archive.Backup, len(details))
+	for _, detail := range details {
+		byName[detail.BackupName] = detail
+	}
+	assert.True(t, byName[mainName].HasTS)
+	assert.Equal(t, "attached-ts", byName[mainName].TSBackupID)
+	assert.Equal(t, int64(42), byName[mainName].TSDataSize)
+	assert.True(t, byName[standaloneName].HasTS)
+	assert.Equal(t, "standalone-ts", byName[standaloneName].TSBackupID)
 }

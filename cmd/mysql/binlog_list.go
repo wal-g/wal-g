@@ -23,9 +23,9 @@ var binlogListCmd = &cobra.Command{
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
-		mysql.HandleBinlogList(storage.RootFolder(), listSince, listUntil, prettyOutput, jsonOutput)
+		mysql.HandleBinlogList(cmd.Context(), storage.RootFolder(), listSince, listUntil, prettyOutput, jsonOutput)
 	},
 }
 

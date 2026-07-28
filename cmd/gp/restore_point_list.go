@@ -19,9 +19,9 @@ var (
 		Short: restorePointListShortDescription, // TODO : improve description
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
+			rootFolder, err := getMultistorageRootFolder(cmd.Context(), true, policies.UniteAllStorages)
 			tracelog.ErrorLogger.FatalOnError(err)
-			greenplum.HandleRestorePointList(rootFolder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
+			greenplum.HandleRestorePointList(cmd.Context(), rootFolder.GetSubFolder(utility.BaseBackupPath), pretty, jsonOutput)
 		},
 	}
 )

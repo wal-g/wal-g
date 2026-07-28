@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"slices"
@@ -111,7 +112,7 @@ type DeleteHandler struct {
 	isPermanent func(object storage.Object) bool
 }
 
-func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteBefore(ctx context.Context, args []string, confirmed bool) {
 	modifier, beforeStr := ExtractDeleteModifierFromArgs(args)
 
 	target, err := h.FindTargetBefore(beforeStr, modifier)
@@ -121,11 +122,11 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string, confirmed bool) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target, confirmed)
+	err = h.DeleteBeforeTarget(ctx, target, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteRetain(ctx context.Context, args []string, confirmed bool) {
 	modifier, retentionStr := ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -136,11 +137,11 @@ func (h *DeleteHandler) HandleDeleteRetain(args []string, confirmed bool) {
 		tracelog.InfoLogger.Printf("No backup found for deletion")
 		os.Exit(0)
 	}
-	err = h.DeleteBeforeTarget(target, confirmed)
+	err = h.DeleteBeforeTarget(ctx, target, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteRetainAfter(ctx context.Context, args []string, confirmed bool) {
 	modifier, retentionSir, afterStr := ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -153,12 +154,12 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string, confirmed bool) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target, confirmed)
+	err = h.DeleteBeforeTarget(ctx, target, confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confirmed, findFull bool) {
-	target, err := h.FindTargetBySelector(targetSelector)
+func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector BackupSelector, confirmed, findFull bool) {
+	target, err := h.FindTargetBySelector(ctx, targetSelector)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if target == nil {
@@ -168,11 +169,11 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector BackupSelector, confir
 	}
 
 	folderFilter := func(name string) bool { return true }
-	err = h.DeleteTarget(target, confirmed, findFull, folderFilter)
+	err = h.DeleteTarget(ctx, target, confirmed, findFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups []string, confirmed bool) {
+func (h *DeleteHandler) HandleDeleteEverything(ctx context.Context, args []string, permanentBackups []string, confirmed bool) {
 	forceModifier := false
 	modifier := ExtractDeleteEverythingModifierFromArgs(args)
 	if modifier == ForceDeleteModifier {
@@ -185,7 +186,7 @@ func (h *DeleteHandler) HandleDeleteEverything(args []string, permanentBackups [
 		}
 		tracelog.InfoLogger.Printf("Found permanent backups=%v\n", permanentBackups)
 	}
-	h.DeleteEverything(confirmed)
+	h.DeleteEverything(ctx, confirmed)
 }
 
 // TODO: unit tests
@@ -242,8 +243,8 @@ func (h *DeleteHandler) FindTargetByName(bname string) (BackupObject, error) {
 }
 
 // TODO: unit tests
-func (h *DeleteHandler) FindTargetBySelector(targetSelector BackupSelector) (BackupObject, error) {
-	targetBackup, err := targetSelector.Select(h.Folder)
+func (h *DeleteHandler) FindTargetBySelector(ctx context.Context, targetSelector BackupSelector) (BackupObject, error) {
+	targetBackup, err := targetSelector.Select(ctx, h.Folder)
 	if err != nil {
 		if _, ok := err.(NoBackupsFoundError); ok {
 			// it is OK to have no backups found for the provided selector,
@@ -351,21 +352,22 @@ func (h *DeleteHandler) FindTargetRetainAfterTime(retentionCount int, timeLine t
 	return target2, nil
 }
 
-func (h *DeleteHandler) DeleteEverything(confirmed bool) {
+func (h *DeleteHandler) DeleteEverything(ctx context.Context, confirmed bool) {
 	filter := func(object storage.Object) bool { return true }
 	folderFilter := func(path string) bool { return true }
-	err := DeleteObjectsWhere(h.Folder, confirmed, filter, folderFilter)
+	err := DeleteObjectsWhere(ctx, h.Folder, confirmed, filter, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) DeleteBeforeTarget(target BackupObject, confirmed bool) error {
+func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target BackupObject, confirmed bool) error {
 	objFilter := func(storage.Object) bool { return true }
 	folderFilter := func(string) bool { return true }
 
-	return h.DeleteBeforeTargetWhere(target, confirmed, objFilter, folderFilter)
+	return h.DeleteBeforeTargetWhere(ctx, target, confirmed, objFilter, folderFilter)
 }
 
 func (h *DeleteHandler) DeleteBeforeTargetWhere(
+	ctx context.Context,
 	target BackupObject,
 	confirmed bool,
 	objSelector func(object storage.Object) bool,
@@ -377,24 +379,25 @@ func (h *DeleteHandler) DeleteBeforeTargetWhere(
 	}
 	tracelog.InfoLogger.Println("Start delete")
 
-	return DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
+	return DeleteObjectsWhere(ctx, h.Folder, confirmed, func(object storage.Object) bool {
 		return objSelector(object) && h.less(object, target) && !h.isPermanent(object)
 	}, folderFilter)
 }
 
 func (h *DeleteHandler) DeleteWhere(
+	ctx context.Context,
 	confirmed bool,
 	objSelector func(object storage.Object) bool,
 	folderFilter func(name string) bool,
 ) error {
 	tracelog.InfoLogger.Println("Start delete")
 
-	return DeleteObjectsWhere(h.Folder, confirmed, func(object storage.Object) bool {
+	return DeleteObjectsWhere(ctx, h.Folder, confirmed, func(object storage.Object) bool {
 		return objSelector(object) && !h.isPermanent(object)
 	}, folderFilter)
 }
 
-func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bool,
+func (h *DeleteHandler) DeleteTarget(ctx context.Context, target BackupObject, confirmed, findFull bool,
 	folderFilter func(name string) bool) error {
 	var backupsToDelete []BackupObject
 	if findFull {
@@ -414,7 +417,7 @@ func (h *DeleteHandler) DeleteTarget(target BackupObject, confirmed, findFull bo
 		backupNamesToDelete[bTarget.GetBackupName()] = true
 	}
 
-	return DeleteObjectsWhere(h.Folder.GetSubFolder(utility.BaseBackupPath),
+	return DeleteObjectsWhere(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath),
 		confirmed, func(object storage.Object) bool {
 			return backupNamesToDelete[utility.StripLeftmostBackupName(object.GetName())] && !h.isPermanent(object)
 		}, folderFilter)
@@ -479,6 +482,7 @@ func (h *DeleteHandler) findDependantBackups(target BackupObject) []BackupObject
 }
 
 func DeleteObjectsWhere(
+	ctx context.Context,
 	folder storage.Folder,
 	confirm bool,
 	objFilter func(object1 storage.Object) bool,
@@ -486,7 +490,7 @@ func DeleteObjectsWhere(
 ) error {
 	// if folder has uncurrent versions we need to clean them as well
 	storage.SetShowAllVersions(folder, true)
-	relativePathObjects, err := multistorage.ListFolderRecursivelyWithFilter(folder, folderFilter)
+	relativePathObjects, err := multistorage.ListFolderRecursivelyWithFilter(ctx, folder, folderFilter)
 	if err != nil {
 		return err
 	}
@@ -506,7 +510,7 @@ func DeleteObjectsWhere(
 		return nil
 	}
 	if confirm {
-		err := folder.DeleteObjects(markedForDeletion)
+		err := folder.DeleteObjects(ctx, markedForDeletion)
 		if err == nil {
 			tracelog.InfoLogger.Printf("Objects deleted successfully: count=%d\n", deletionCount)
 		}

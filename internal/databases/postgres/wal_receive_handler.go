@@ -55,22 +55,22 @@ func HandleWALReceive(ctx context.Context, uploader *WalUploader) {
 
 	uploader.ChangeDirectory(utility.WalPath)
 
-	slot, walSegmentBytes, err := getCurrentWalInfo()
+	slot, walSegmentBytes, err := getCurrentWalInfo(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Printf("WAL segment bytes: %d", walSegmentBytes)
 
-	conn, err := pgconn.Connect(context.Background(), "replication=yes")
+	conn, err := pgconn.Connect(ctx, "replication=yes")
 	tracelog.ErrorLogger.FatalOnError(err)
 	defer conn.Close(context.Background())
 
-	sysident, err := pglogrepl.IdentifySystem(context.Background(), conn)
+	sysident, err := pglogrepl.IdentifySystem(ctx, conn)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if slot.Exists {
 		XLogPos = slot.RestartLSN
 	} else {
 		tracelog.InfoLogger.Println("Trying to create the replication slot")
-		_, err = pglogrepl.CreateReplicationSlot(context.Background(), conn, slot.Name, "",
+		_, err = pglogrepl.CreateReplicationSlot(ctx, conn, slot.Name, "",
 			pglogrepl.CreateReplicationSlotOptions{Mode: pglogrepl.PhysicalReplication})
 		tracelog.ErrorLogger.FatalOnError(err)
 		XLogPos = sysident.XLogPos
@@ -81,9 +81,9 @@ func HandleWALReceive(ctx context.Context, uploader *WalUploader) {
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
-	startReplication(conn, segment, slot.Name)
+	startReplication(ctx, conn, segment, slot.Name)
 	for {
-		streamResult, err := segment.Stream(conn, StandbyMessageTimeout)
+		streamResult, err := segment.Stream(ctx, conn, StandbyMessageTimeout)
 		tracelog.ErrorLogger.FatalOnError(err)
 		tracelog.DebugLogger.Printf("Successfully received wal segment %s: ", segment.Name())
 
@@ -104,7 +104,7 @@ func HandleWALReceive(ctx context.Context, uploader *WalUploader) {
 			err = uploadRemoteWalMetadata(ctx, segment.Name(), uploader.Uploader)
 			tracelog.ErrorLogger.FatalOnError(err)
 			timeline++
-			timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, int32(timeline))
+			timelinehistfile, err := pglogrepl.TimelineHistory(ctx, conn, int32(timeline))
 			tracelog.ErrorLogger.FatalOnError(err)
 			tlh, err := NewTimeLineHistFile(timeline, timelinehistfile.FileName, timelinehistfile.Content)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -113,7 +113,7 @@ func HandleWALReceive(ctx context.Context, uploader *WalUploader) {
 			err = uploadRemoteWalMetadata(ctx, tlh.Name(), uploader.Uploader)
 			tracelog.ErrorLogger.FatalOnError(err)
 			segment = NewWalSegment(timeline, XLogPos, walSegmentBytes)
-			startReplication(conn, segment, slot.Name)
+			startReplication(ctx, conn, segment, slot.Name)
 		default:
 			tracelog.ErrorLogger.FatalOnError(errors.Errorf("Unexpected result from WalSegment.Stream() %v", streamResult))
 		}
@@ -128,7 +128,7 @@ func getStartTimeline(ctx context.Context,
 	if systemTimeline < 2 {
 		return 1, nil
 	}
-	timelinehistfile, err := pglogrepl.TimelineHistory(context.Background(), conn, int32(systemTimeline))
+	timelinehistfile, err := pglogrepl.TimelineHistory(ctx, conn, int32(systemTimeline))
 	if err == nil {
 		tlh, err := NewTimeLineHistFile(systemTimeline, timelinehistfile.FileName, timelinehistfile.Content)
 		tracelog.ErrorLogger.FatalOnError(err)
@@ -144,25 +144,23 @@ func getStartTimeline(ctx context.Context,
 	return 0, nil
 }
 
-func startReplication(conn *pgconn.PgConn, segment *WalSegment, slotName string) {
+func startReplication(ctx context.Context, conn *pgconn.PgConn, segment *WalSegment, slotName string) {
 	tracelog.DebugLogger.Printf("Starting replication from %s: ", segment.StartLSN)
-	err := pglogrepl.StartReplication(context.Background(), conn, slotName, segment.StartLSN,
+	err := pglogrepl.StartReplication(ctx, conn, slotName, segment.StartLSN,
 		pglogrepl.StartReplicationOptions{Timeline: int32(segment.TimeLine), Mode: pglogrepl.PhysicalReplication})
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.DebugLogger.Println("Started replication")
 }
 
-func getCurrentWalInfo() (slot PhysicalSlot, walSegmentBytes uint64, err error) {
+func getCurrentWalInfo(ctx context.Context) (slot PhysicalSlot, walSegmentBytes uint64, err error) {
 	slotName := internal.GetPgSlotName()
 
 	// Creating a temporary connection to read slot info and wal_segment_size
-	// No request ctx plumbed to this entry point yet; revisit when callers thread ctx.
-	ctx := context.Background()
 	tmpConn, err := Connect(ctx)
 	if err != nil {
 		return
 	}
-	defer tmpConn.Close(ctx)
+	defer tmpConn.Close(context.Background())
 
 	queryRunner, err := NewPgQueryRunner(ctx, tmpConn)
 	if err != nil {

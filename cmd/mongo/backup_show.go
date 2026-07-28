@@ -19,10 +19,10 @@ var backupShowCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		backupName := args[0]
 
-		backupFolder, err := common.GetBackupFolder()
+		backupFolder, err := common.GetBackupFolder(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		err = mongo.HandleBackupShow(backupFolder, backupName, os.Stdout, true)
+		err = mongo.HandleBackupShow(cmd.Context(), backupFolder, backupName, os.Stdout, true)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

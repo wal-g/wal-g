@@ -15,7 +15,6 @@ import (
 )
 
 type MongoMetaConstructor struct {
-	ctx       context.Context
 	client    client.MongoDriver
 	folder    storage.Folder
 	meta      models.BackupMeta
@@ -37,15 +36,14 @@ func (m *MongoMetaConstructor) MetaInfo() interface{} {
 	return backupSentinel
 }
 
-func NewBackupMongoMetaConstructor(ctx context.Context,
-	mc client.MongoDriver,
+func NewBackupMongoMetaConstructor(mc client.MongoDriver,
 	folder storage.Folder,
 	permanent bool) internal.MetaConstructor {
-	return &MongoMetaConstructor{ctx: ctx, client: mc, folder: folder, permanent: permanent}
+	return &MongoMetaConstructor{client: mc, folder: folder, permanent: permanent}
 }
 
-func (m *MongoMetaConstructor) Init() error {
-	lastTS, lastMajTS, err := m.client.LastWriteTS(m.ctx)
+func (m *MongoMetaConstructor) Init(ctx context.Context) error {
+	lastTS, lastMajTS, err := m.client.LastWriteTS(ctx)
 	if err != nil {
 		return fmt.Errorf("can not initialize backup mongo")
 	}
@@ -75,13 +73,13 @@ func (m *MongoMetaConstructor) Init() error {
 	return nil
 }
 
-func (m *MongoMetaConstructor) Finalize(backupName string) error {
-	dataSize, err := internal.FolderSize(m.folder, backupName)
+func (m *MongoMetaConstructor) Finalize(ctx context.Context, backupName string) error {
+	dataSize, err := internal.FolderSize(ctx, m.folder, backupName)
 	if err != nil {
 		return fmt.Errorf("can not get backup size: %+v", err)
 	}
 
-	lastTS, lastMajTS, err := m.client.LastWriteTS(m.ctx)
+	lastTS, lastMajTS, err := m.client.LastWriteTS(ctx)
 	if err != nil {
 		return fmt.Errorf("can not finalize backup mongo")
 	}

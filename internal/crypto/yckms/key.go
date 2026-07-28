@@ -7,7 +7,8 @@ import (
 	"io"
 
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/kms/v1"
-	ycsdk "github.com/yandex-cloud/go-sdk"
+	kmsservice "github.com/yandex-cloud/go-sdk/services/kms/v1"
+	ycsdk "github.com/yandex-cloud/go-sdk/v2"
 )
 
 const (
@@ -91,7 +92,7 @@ func (key *ycSymmetricKey) GetKey() []byte {
 
 func (key *ycSymmetricKey) Decrypt() error {
 	ctx := context.Background()
-	rsp, err := key.sdk.KMSCrypto().SymmetricCrypto().Decrypt(ctx, &kms.SymmetricDecryptRequest{
+	rsp, err := kmsservice.NewSymmetricCryptoClient(key.sdk).Decrypt(ctx, &kms.SymmetricDecryptRequest{
 		KeyId:      key.keyID,
 		AadContext: nil,
 		Ciphertext: key.encryptedKey,
@@ -122,7 +123,7 @@ func (key *ycSymmetricKey) ReadEncryptedKey(r io.Reader) error {
 
 func (key *ycSymmetricKey) CreateKey() error {
 	ctx := context.Background()
-	dataKeyResponse, err := key.sdk.KMSCrypto().SymmetricCrypto().GenerateDataKey(ctx, &kms.GenerateDataKeyRequest{
+	dataKeyResponse, err := kmsservice.NewSymmetricCryptoClient(key.sdk).GenerateDataKey(ctx, &kms.GenerateDataKeyRequest{
 		KeyId:         key.keyID,
 		DataKeySpec:   kms.SymmetricAlgorithm_AES_256,
 		SkipPlaintext: false,

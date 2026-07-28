@@ -9,7 +9,7 @@ import (
 
 func TestS3FolderCreatesWithoutAdditionalHeaders(t *testing.T) {
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	_, err := ConfigureStorage(waleS3Prefix,
+	_, err := ConfigureStorage(t.Context(), waleS3Prefix,
 		map[string]string{
 			endpointSetting:          "HTTP://s3.kek.lol.net/",
 			skipValidationSetting:    "true",
@@ -21,7 +21,7 @@ func TestS3FolderCreatesWithoutAdditionalHeaders(t *testing.T) {
 
 func TestS3FolderCreatesWithAdditionalHeadersJSON(t *testing.T) {
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	_, err := ConfigureStorage(waleS3Prefix,
+	_, err := ConfigureStorage(t.Context(), waleS3Prefix,
 		map[string]string{
 			endpointSetting:                 "HTTP://s3.kek.lol.net/",
 			skipValidationSetting:           "true",
@@ -34,7 +34,7 @@ func TestS3FolderCreatesWithAdditionalHeadersJSON(t *testing.T) {
 
 func TestS3FolderCreatesWithAdditionalHeadersYAML(t *testing.T) {
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	_, err := ConfigureStorage(waleS3Prefix,
+	_, err := ConfigureStorage(t.Context(), waleS3Prefix,
 		map[string]string{
 			endpointSetting:          "HTTP://s3.kek.lol.net/",
 			skipValidationSetting:    "true",
@@ -51,7 +51,7 @@ func TestS3Folder(t *testing.T) {
 	t.Skip("Credentials needed to run S3 tests")
 
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	st, err := ConfigureStorage(waleS3Prefix,
+	st, err := ConfigureStorage(t.Context(), waleS3Prefix,
 		map[string]string{
 			endpointSetting: "HTTP://s3.kek.lol.net/",
 		})
@@ -63,7 +63,7 @@ func TestS3FolderEndpointSource(t *testing.T) {
 	t.Skip("Credentials needed to run S3 tests")
 
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
-	st, err := ConfigureStorage(waleS3Prefix,
+	st, err := ConfigureStorage(t.Context(), waleS3Prefix,
 		map[string]string{
 			endpointSetting:          "HTTP://s3.kek.lol.net/",
 			endpointSourceSetting:    "HTTP://localhost:80/",

@@ -28,8 +28,9 @@ var getObjectCmd = &cobra.Command{
 			tracelog.ErrorLogger.Fatalf("'all' target is not supported for st get command")
 		}
 
-		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
-			return storagetools.HandleGetObject(objectPath, dstPath, folder, !noDecrypt, !noDecompress)
+		ctx := cmd.Context()
+		err := exec.OnStorage(ctx, targetStorage, func(folder storage.Folder) error {
+			return storagetools.HandleGetObject(ctx, objectPath, dstPath, folder, !noDecrypt, !noDecompress)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

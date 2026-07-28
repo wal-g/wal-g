@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/compression/lzma"
+	walgzstd "github.com/wal-g/wal-g/internal/compression/zstd"
 	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/testtools"
@@ -181,6 +183,30 @@ func TestConfigureCompressor_FailsOnInvalidCompressorString(t *testing.T) {
 	assert.Equal(t, compressor, nil)
 	resetToDefaults()
 }
+func TestConfigureCompressor_ZstdMethodWithLevel(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "zstd")
+	viper.Set(config.ZstdLevelSetting, "best")
+	compressor, err := internal.ConfigureCompressor()
+	assert.NoError(t, err)
+	assert.Equal(t, compressor, walgzstd.Compressor{Level: zstd.SpeedBestCompression})
+	resetToDefaults()
+}
+func TestConfigureCompressor_FailsOnInvalidZstdLevel(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "zstd")
+	viper.Set(config.ZstdLevelSetting, "kek123kek")
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
+	resetToDefaults()
+}
+func TestConfigureCompressor_FailsOnZstdLevelWithoutZstdMethod(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "lz4")
+	viper.Set(config.ZstdLevelSetting, "fastest")
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
+	resetToDefaults()
+}
 
 func prepareDataFolder(t *testing.T, name string) string {
 	cwd, err := filepath.Abs("./")
@@ -342,7 +368,7 @@ func TestConfigureLimiters_TurboSkipsLimiters(t *testing.T) {
 func TestConfigureStorage_NoStorageConfigured(t *testing.T) {
 	resetToDefaults()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.Error(t, err)
 	assert.IsType(t, internal.UnconfiguredStorageError{}, err)
@@ -354,7 +380,7 @@ func TestConfigureStorage_FileStorage(t *testing.T) {
 	viper.Set("WALG_FILE_PREFIX", dir)
 	defer resetToDefaults()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, st)
@@ -367,7 +393,7 @@ func TestConfigureStorage_FileStorageWithPrefix(t *testing.T) {
 	viper.Set(config.StoragePrefixSetting, "myprefix")
 	defer resetToDefaults()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, st)
@@ -383,7 +409,7 @@ func TestConfigureStorage_WithNetworkLimiter(t *testing.T) {
 		resetToDefaults()
 	}()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(t.Context())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, st)

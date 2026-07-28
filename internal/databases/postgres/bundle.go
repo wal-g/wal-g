@@ -99,8 +99,8 @@ func NewBundle(
 	}
 }
 
-func (bundle *Bundle) SetupComposer(composerMaker TarBallComposerMaker) (err error) {
-	tarBallComposer, err := composerMaker.Make(bundle)
+func (bundle *Bundle) SetupComposer(ctx context.Context, composerMaker TarBallComposerMaker) (err error) {
+	tarBallComposer, err := composerMaker.Make(ctx, bundle)
 	if err != nil {
 		return err
 	}
@@ -305,13 +305,13 @@ func (bundle *Bundle) isIncremented(path string, wasInBase bool, info fs.FileInf
 // TODO : unit tests
 // UploadPgControl should only be called
 // after the rest of the backup is successfully uploaded to S3.
-func (bundle *Bundle) UploadPgControl(compressorFileExtension string) error {
+func (bundle *Bundle) UploadPgControl(ctx context.Context, compressorFileExtension string) error {
 	fileName := bundle.Sentinel.Info.Name()
 	info := bundle.Sentinel.Info
 	path := bundle.Sentinel.Path
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, utility.AddFileExtension("pg_control.tar", compressorFileExtension))
+	tarBall.SetUp(ctx, bundle.Crypter, utility.AddFileExtension("pg_control.tar", compressorFileExtension))
 	tarWriter := tarBall.TarWriter()
 
 	fileInfoHeader, err := tar.FileInfoHeader(info, fileName)
@@ -371,7 +371,7 @@ func (bundle *Bundle) uploadLabelFiles(ctx context.Context,
 	}
 
 	tarBall := bundle.NewTarBall(false)
-	tarBall.SetUp(bundle.Crypter, utility.AddFileExtension("backup_label.tar", compressorFileExtension))
+	tarBall.SetUp(ctx, bundle.Crypter, utility.AddFileExtension("backup_label.tar", compressorFileExtension))
 
 	labelHeader := &tar.Header{
 		Name:     BackupLabelFilename,
@@ -414,8 +414,8 @@ func (bundle *Bundle) getDeltaBitmapFor(filePath string) (*roaring.Bitmap, error
 	return bundle.DeltaMap.GetDeltaBitmapFor(filePath)
 }
 
-func (bundle *Bundle) DownloadDeltaMap(reader internal.StorageFolderReader, backupStartLSN LSN) error {
-	deltaMap, err := getDeltaMap(reader, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
+func (bundle *Bundle) DownloadDeltaMap(ctx context.Context, reader internal.StorageFolderReader, backupStartLSN LSN) error {
+	deltaMap, err := getDeltaMap(ctx, reader, bundle.Timeline, *bundle.IncrementFromLsn, backupStartLSN)
 	if err != nil {
 		return err
 	}

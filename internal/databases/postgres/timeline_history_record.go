@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"regexp"
@@ -64,10 +65,10 @@ func newHistoryRecordFromString(row string) (*TimelineHistoryRecord, error) {
 // createTimelineSwitchMap creates a map to lookup the TimelineHistoryRecords of .history file
 // by WalSegmentNo. So we can use this map to do a fast lookup
 // and check if there was a timeline switch on the provided segment number.
-func createTimelineSwitchMap(startTimeline uint32,
+func createTimelineSwitchMap(ctx context.Context, startTimeline uint32,
 	walFolder storage.Folder) (map[WalSegmentNo]*TimelineHistoryRecord, error) {
 	timeLineHistoryMap := make(map[WalSegmentNo]*TimelineHistoryRecord)
-	historyRecords, err := GetTimeLineHistoryRecords(startTimeline, walFolder)
+	historyRecords, err := GetTimeLineHistoryRecords(ctx, startTimeline, walFolder)
 	if _, ok := err.(HistoryFileNotFoundError); ok {
 		// return empty map if not found any history
 		return timeLineHistoryMap, nil
@@ -83,8 +84,8 @@ func createTimelineSwitchMap(startTimeline uint32,
 	return timeLineHistoryMap, nil
 }
 
-func GetTimeLineHistoryRecords(startTimeline uint32, walFolder storage.Folder) ([]*TimelineHistoryRecord, error) {
-	historyReadCloser, err := getHistoryFileFromStorage(startTimeline, walFolder)
+func GetTimeLineHistoryRecords(ctx context.Context, startTimeline uint32, walFolder storage.Folder) ([]*TimelineHistoryRecord, error) {
+	historyReadCloser, err := getHistoryFileFromStorage(ctx, startTimeline, walFolder)
 	if err != nil {
 		return nil, err
 	}
@@ -121,9 +122,9 @@ func parseHistoryFile(historyReader io.Reader) ([]*TimelineHistoryRecord, error)
 	return historyRecords, nil
 }
 
-func getHistoryFileFromStorage(timeline uint32, walFolder storage.Folder) (io.ReadCloser, error) {
+func getHistoryFileFromStorage(ctx context.Context, timeline uint32, walFolder storage.Folder) (io.ReadCloser, error) {
 	historyFileName := fmt.Sprintf(walHistoryFileFormat, timeline)
-	reader, err := internal.DownloadAndDecompressStorageFile(internal.NewFolderReader(walFolder), historyFileName)
+	reader, err := internal.DownloadAndDecompressStorageFile(ctx, internal.NewFolderReader(walFolder), historyFileName)
 	if _, ok := err.(internal.ArchiveNonExistenceError); ok {
 		return nil, newHistoryFileNotFoundError(historyFileName)
 	}

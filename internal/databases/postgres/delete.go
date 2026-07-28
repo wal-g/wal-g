@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -21,10 +22,10 @@ const (
 	DeleteGarbageBackupsModifier  = "BACKUPS"
 )
 
-func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map[PermanentObject]bool,
+func NewDeleteHandler(ctx context.Context, folder storage.Folder, permanentBackups, permanentWals map[PermanentObject]bool,
 	useSentinelTime bool,
 ) (*DeleteHandler, error) {
-	backupSentinels, err := internal.GetBackupSentinelObjects(folder)
+	backupSentinels, err := internal.GetBackupSentinelObjects(ctx, folder)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +36,7 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 		// If all backups in storage have metadata, we will use backup start time from sentinel.
 		// Otherwise, for example in case when we are dealing with some ancient backup without
 		// metadata included, fall back to the default timeline and segment number comparator.
-		startTimeByBackupName, err = getBackupStartTimeMap(folder, backupSentinels)
+		startTimeByBackupName, err = getBackupStartTimeMap(ctx, folder, backupSentinels)
 		if err != nil {
 			tracelog.WarningLogger.Printf("Failed to get sentinel backup start times: %v,"+
 				" will fall back to timeline and segment number for ordering...\n", err)
@@ -43,7 +44,7 @@ func NewDeleteHandler(folder storage.Folder, permanentBackups, permanentWals map
 			lessFunc = makeLessFunc(startTimeByBackupName)
 		}
 	}
-	postgresBackups, err := makeBackupObjects(folder, backupSentinels, startTimeByBackupName)
+	postgresBackups, err := makeBackupObjects(ctx, folder, backupSentinels, startTimeByBackupName)
 	if err != nil {
 		return nil, err
 	}
@@ -116,12 +117,13 @@ func (o BackupObject) GetStorage() string {
 }
 
 func makeBackupObjects(
+	ctx context.Context,
 	folder storage.Folder, objects []storage.Object, startTimeByBackupName map[string]time.Time,
 ) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
 		storageName := multistorage.GetStorage(object)
-		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(folder, object, storageName)
+		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(ctx, folder, object, storageName)
 		if err != nil {
 			return nil, err
 		}
@@ -169,12 +171,12 @@ func makeLessFunc(startTimeByBackupName map[string]time.Time) func(storage.Objec
 }
 
 // getBackupStartTimeMap returns a map for a fast lookup of the backup start time by the backup name
-func getBackupStartTimeMap(folder storage.Folder, backups []storage.Object) (map[string]time.Time, error) {
+func getBackupStartTimeMap(ctx context.Context, folder storage.Folder, backups []storage.Object) (map[string]time.Time, error) {
 	backupTimes := internal.GetBackupTimeSlices(backups)
 	startTimeByBackupName := make(map[string]time.Time, len(backups))
 
 	for _, backupTime := range backupTimes {
-		backupDetails, err := GetBackupDetails(folder.GetSubFolder(utility.BaseBackupPath), backupTime)
+		backupDetails, err := GetBackupDetails(ctx, folder.GetSubFolder(utility.BaseBackupPath), backupTime)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to get metadata of backup %s",
 				backupTime.BackupName)
@@ -208,12 +210,12 @@ func timelineAndSegmentNoLess(object1 storage.Object, object2 storage.Object) bo
 	return tl1 < tl2 || tl1 == tl2 && segNo1 < segNo2
 }
 
-func getIncrementInfo(folder storage.Folder, object storage.Object, storageName string) (string, string, bool, error) {
-	backup, err := NewBackupInStorage(folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object), storageName)
+func getIncrementInfo(ctx context.Context, folder storage.Folder, object storage.Object, storageName string) (string, string, bool, error) {
+	backup, err := NewBackupInStorage(ctx, folder.GetSubFolder(utility.BaseBackupPath), DeduceBackupName(object), storageName)
 	if err != nil {
 		return "", "", true, err
 	}
-	sentinel, err := backup.GetSentinel()
+	sentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return "", "", true, err
 	}
@@ -225,17 +227,17 @@ func getIncrementInfo(folder storage.Folder, object storage.Object, storageName 
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
-func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool, deleteWithoutBackups bool) error {
+func (dh *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string, confirm bool, deleteWithoutBackups bool) error {
 	predicate := ExtractDeleteGarbagePredicate(args)
 	folderFilter := func(string) bool { return true }
 	backupSelector := internal.NewOldestNonPermanentSelector(NewGenericMetaFetcher())
-	oldestBackup, err := backupSelector.Select(dh.Folder)
+	oldestBackup, err := backupSelector.Select(ctx, dh.Folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage.")
 			if deleteWithoutBackups {
 				tracelog.InfoLogger.Println("Will delete garbage anyway.")
-				return dh.DeleteWhere(confirm, predicate, folderFilter)
+				return dh.DeleteWhere(ctx, confirm, predicate, folderFilter)
 			}
 			tracelog.InfoLogger.Println("Not doing anything.")
 			return nil
@@ -248,7 +250,7 @@ func (dh *DeleteHandler) HandleDeleteGarbage(args []string, confirm bool, delete
 		return err
 	}
 
-	return dh.DeleteBeforeTargetWhere(target, confirm, predicate, folderFilter)
+	return dh.DeleteBeforeTargetWhere(ctx, target, confirm, predicate, folderFilter)
 }
 
 // ExtractDeleteGarbagePredicate extracts delete modifier the "delete garbage" command

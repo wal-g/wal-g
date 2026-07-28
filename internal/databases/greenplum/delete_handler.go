@@ -29,13 +29,13 @@ type DeleteHandler struct {
 	args             DeleteArgs
 }
 
-func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, error) {
-	backupSentinelObjects, err := internal.GetBackupSentinelObjects(folder)
+func NewDeleteHandler(ctx context.Context, folder storage.Folder, args DeleteArgs) (*DeleteHandler, error) {
+	backupSentinelObjects, err := internal.GetBackupSentinelObjects(ctx, folder)
 	if err != nil {
 		return nil, err
 	}
 
-	backupObjects, err := makeBackupObjects(folder, backupSentinelObjects)
+	backupObjects, err := makeBackupObjects(ctx, folder, backupSentinelObjects)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 		return obj1.GetLastModified().Before(obj2.GetLastModified())
 	}
 
-	permanentBackups := internal.GetPermanentBackupsFromStorage(folder.GetSubFolder(utility.BaseBackupPath),
+	permanentBackups := internal.GetPermanentBackupsFromStorage(ctx, folder.GetSubFolder(utility.BaseBackupPath),
 		NewGenericMetaFetcher())
 	permanentBackupNames := make([]string, 0, len(permanentBackups))
 	for name := range permanentBackups {
@@ -67,7 +67,7 @@ func NewDeleteHandler(folder storage.Folder, args DeleteArgs) (*DeleteHandler, e
 	}, nil
 }
 
-func (h *DeleteHandler) HandleDeleteBefore(args []string) {
+func (h *DeleteHandler) HandleDeleteBefore(ctx context.Context, args []string) {
 	modifier, beforeStr := internal.ExtractDeleteModifierFromArgs(args)
 
 	target, err := h.FindTargetBefore(beforeStr, modifier)
@@ -77,11 +77,11 @@ func (h *DeleteHandler) HandleDeleteBefore(args []string) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target)
+	err = h.DeleteBeforeTarget(ctx, target)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteRetain(args []string) {
+func (h *DeleteHandler) HandleDeleteRetain(ctx context.Context, args []string) {
 	modifier, retentionStr := internal.ExtractDeleteModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionStr)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -93,11 +93,11 @@ func (h *DeleteHandler) HandleDeleteRetain(args []string) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target)
+	err = h.DeleteBeforeTarget(ctx, target)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteRetainAfter(args []string) {
+func (h *DeleteHandler) HandleDeleteRetainAfter(ctx context.Context, args []string) {
 	modifier, retentionSir, afterStr := internal.ExtractDeleteRetainAfterModifierFromArgs(args)
 	retentionCount, err := strconv.Atoi(retentionSir)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -110,17 +110,17 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(args []string) {
 		os.Exit(0)
 	}
 
-	err = h.DeleteBeforeTarget(target)
+	err = h.DeleteBeforeTarget(ctx, target)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteEverything(args []string) {
-	h.DeleteHandler.HandleDeleteEverything(args, h.permanentBackups, h.args.Confirmed)
+func (h *DeleteHandler) HandleDeleteEverything(ctx context.Context, args []string) {
+	h.DeleteHandler.HandleDeleteEverything(ctx, args, h.permanentBackups, h.args.Confirmed)
 }
 
-func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
+func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target internal.BackupObject) error {
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
-	err := h.dispatchDeleteCmd(target, SegDeleteBefore)
+	err := h.dispatchDeleteCmd(ctx, target, SegDeleteBefore)
 	if err != nil {
 		return fmt.Errorf("failed to delete the segments backups: %w", err)
 	}
@@ -128,11 +128,11 @@ func (h *DeleteHandler) DeleteBeforeTarget(target internal.BackupObject) error {
 
 	objFilter := func(object storage.Object) bool { return true }
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteBeforeTargetWhere(target, h.args.Confirmed, objFilter, folderFilter)
+	return h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, objFilter, folderFilter)
 }
 
-func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelector) {
-	target, err := h.FindTargetBySelector(targetSelector)
+func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector internal.BackupSelector) {
+	target, err := h.FindTargetBySelector(ctx, targetSelector)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	if target == nil {
@@ -142,23 +142,23 @@ func (h *DeleteHandler) HandleDeleteTarget(targetSelector internal.BackupSelecto
 	}
 
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
-	err = h.dispatchDeleteCmd(target, SegDeleteTarget)
+	err = h.dispatchDeleteCmd(ctx, target, SegDeleteTarget)
 	if err != nil {
 		tracelog.ErrorLogger.Fatalf("Failed to delete the segments backups: %v", err)
 	}
 	tracelog.InfoLogger.Printf("Finished deleting the segments backups")
 
 	folderFilter := func(name string) bool { return true }
-	err = h.DeleteTarget(target, h.args.Confirmed, h.args.FindFull, folderFilter)
+	err = h.DeleteTarget(ctx, target, h.args.Confirmed, h.args.FindFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType SegDeleteType) error {
-	backup, err := NewBackupInStorage(h.Folder, target.GetBackupName(), multistorage.GetStorage(target))
+func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.BackupObject, delType SegDeleteType) error {
+	backup, err := NewBackupInStorage(ctx, h.Folder, target.GetBackupName(), multistorage.GetStorage(target))
 	if err != nil {
 		return err
 	}
-	sentinel, err := backup.GetSentinel()
+	sentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to load backup %s sentinel: %v", backup.Name, err)
 	}
@@ -168,7 +168,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 		tracelog.WarningLogger.Printf("config error: %v", err)
 	}
 
-	errorGroup, _ := errgroup.WithContext(context.Background())
+	errorGroup, _ := errgroup.WithContext(ctx)
 	errorGroup.SetLimit(deleteConcurrency)
 
 	// clean the segments
@@ -177,11 +177,11 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 		tracelog.InfoLogger.Printf("Processing segment %d (backupId=%s)", meta.ContentID, meta.BackupID)
 
 		errorGroup.Go(func() error {
-			segHandler, err := NewSegDeleteHandler(h.Folder, meta.ContentID, h.args, delType)
+			segHandler, err := NewSegDeleteHandler(ctx, h.Folder, meta.ContentID, h.args, delType)
 			if err != nil {
 				return err
 			}
-			segBackup, err := backup.GetSegmentBackup(meta.BackupID, meta.ContentID)
+			segBackup, err := backup.GetSegmentBackup(ctx, meta.BackupID, meta.ContentID)
 			if err != nil {
 				if h.args.Force {
 					tracelog.ErrorLogger.Printf("Processing segment %d (backupId=%s): %v", meta.ContentID, meta.BackupID, err)
@@ -189,7 +189,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 				}
 				return err
 			}
-			deleteErr := segHandler.Delete(segBackup)
+			deleteErr := segHandler.Delete(ctx, segBackup)
 			if deleteErr != nil {
 				return deleteErr
 			}
@@ -201,10 +201,10 @@ func (h *DeleteHandler) dispatchDeleteCmd(target internal.BackupObject, delType 
 }
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
-func (h *DeleteHandler) HandleDeleteGarbage(args []string) error {
+func (h *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string) error {
 	predicate := postgres.ExtractDeleteGarbagePredicate(args)
 	backupSelector := internal.NewOldestNonPermanentSelector(NewGenericMetaFetcher())
-	oldestBackup, err := backupSelector.Select(h.Folder)
+	oldestBackup, err := backupSelector.Select(ctx, h.Folder)
 	if err != nil {
 		if _, ok := err.(internal.NoBackupsFoundError); ok {
 			tracelog.InfoLogger.Println("Couldn't find any non-permanent backups in storage. Not doing anything.")
@@ -219,12 +219,12 @@ func (h *DeleteHandler) HandleDeleteGarbage(args []string) error {
 	}
 
 	tracelog.InfoLogger.Println("Processing the segments...")
-	err = h.dispatchDeleteCmd(target, SegDeleteBefore)
+	err = h.dispatchDeleteCmd(ctx, target, SegDeleteBefore)
 	if err != nil {
 		return fmt.Errorf("failed to delete: %w", err)
 	}
 	tracelog.InfoLogger.Printf("Finished processing the segments backups")
 
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteBeforeTargetWhere(target, h.args.Confirmed, predicate, folderFilter)
+	return h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, predicate, folderFilter)
 }

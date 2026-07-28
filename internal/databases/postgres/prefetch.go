@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -22,7 +23,7 @@ import (
 
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
-func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName string, location string) error {
+func HandleWALPrefetch(ctx context.Context, folderReader internal.StorageFolderReader, walFileName string, location string) error {
 	var fileName = walFileName
 	location = path.Dir(location)
 	waitGroup := &sync.WaitGroup{}
@@ -37,7 +38,7 @@ func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName st
 			return fmt.Errorf("get next filename: %v", err)
 		}
 		waitGroup.Add(1)
-		go prefetchFile(location, folderReader.SubFolder(utility.WalPath), fileName, waitGroup)
+		go prefetchFile(ctx, location, folderReader.SubFolder(utility.WalPath), fileName, waitGroup)
 
 		prefaultStartLsn, shouldPrefault, timelineID, err := shouldPrefault(fileName)
 		if err != nil {
@@ -45,7 +46,7 @@ func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName st
 		}
 		if shouldPrefault {
 			waitGroup.Add(1)
-			go prefaultData(prefaultStartLsn, timelineID, waitGroup, folderReader)
+			go prefaultData(ctx, prefaultStartLsn, timelineID, waitGroup, folderReader)
 		}
 
 		time.Sleep(10 * time.Millisecond) // ramp up in order
@@ -58,7 +59,8 @@ func HandleWALPrefetch(folderReader internal.StorageFolderReader, walFileName st
 }
 
 // TODO : unit tests
-func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitGroup, folderReader internal.StorageFolderReader) {
+func prefaultData(ctx context.Context, prefaultStartLsn LSN, timelineID uint32,
+	waitGroup *sync.WaitGroup, folderReader internal.StorageFolderReader) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("Prefault unsuccessful ", prefaultStartLsn)
@@ -79,7 +81,7 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 		false, viper.GetInt64(conf.TarSizeThresholdSetting))
 	bundle.Timeline = timelineID
 	startLsn := prefaultStartLsn + LSN(WalSegmentSize*WalFileInDelta)
-	err = bundle.DownloadDeltaMap(folderReader.SubFolder(utility.WalPath), startLsn)
+	err = bundle.DownloadDeltaMap(ctx, folderReader.SubFolder(utility.WalPath), startLsn)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Error during loading delta map: '%+v'.", err)
 		return
@@ -91,14 +93,16 @@ func prefaultData(prefaultStartLsn LSN, timelineID uint32, waitGroup *sync.WaitG
 		return
 	}
 	tracelog.InfoLogger.Println("Walking for prefault...")
-	err = filepath.Walk(archiveDirectory, bundle.prefaultWalkedFSObject)
+	err = filepath.Walk(archiveDirectory, func(path string, info os.FileInfo, err error) error {
+		return bundle.prefaultWalkedFSObject(ctx, path, info, err)
+	})
 	tracelog.ErrorLogger.FatalOnError(err)
 	err = bundle.FinishQueue()
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 // TODO : unit tests
-func (bundle *Bundle) prefaultWalkedFSObject(path string, info os.FileInfo, err error) error {
+func (bundle *Bundle) prefaultWalkedFSObject(ctx context.Context, path string, info os.FileInfo, err error) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			tracelog.WarningLogger.Println(path, " deleted during filepath walk")
@@ -108,7 +112,7 @@ func (bundle *Bundle) prefaultWalkedFSObject(path string, info os.FileInfo, err 
 	}
 
 	if info.Name() != PgControl {
-		err = bundle.prefaultHandleTar(path, info)
+		err = bundle.prefaultHandleTar(ctx, path, info)
 		if err != nil {
 			if err == filepath.SkipDir {
 				return err
@@ -120,7 +124,7 @@ func (bundle *Bundle) prefaultWalkedFSObject(path string, info os.FileInfo, err 
 }
 
 // TODO : unit tests
-func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
+func (bundle *Bundle) prefaultHandleTar(ctx context.Context, path string, info os.FileInfo) error {
 	fileName := info.Name()
 	_, excluded := ExcludedFilenames[fileName]
 	isDir := info.IsDir()
@@ -137,10 +141,13 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 	fileInfoHeader.Name = bundle.GetFileRelPath(path)
 
 	if !excluded && info.Mode().IsRegular() {
-		tarBall := bundle.TarBallQueue.Deque()
-		tarBall.SetUp(nil)
+		tarBall, err := bundle.TarBallQueue.Deque(ctx)
+		if err != nil {
+			return err
+		}
+		tarBall.SetUp(ctx, nil)
 		go func() {
-			err := bundle.prefaultFile(path, info, fileInfoHeader)
+			err := bundle.prefaultFile(ctx, path, info, fileInfoHeader)
 			if err != nil {
 				panic(err)
 			}
@@ -159,7 +166,7 @@ func (bundle *Bundle) prefaultHandleTar(path string, info os.FileInfo) error {
 }
 
 // TODO : unit tests
-func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader *tar.Header) error {
+func (bundle *Bundle) prefaultFile(ctx context.Context, path string, info os.FileInfo, fileInfoHeader *tar.Header) error {
 	incrementBaseLsn := bundle.getIncrementBaseLsn()
 	isIncremented := isPagedFile(info, path)
 	var fileReader io.ReadCloser
@@ -170,7 +177,7 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 				return errors.Wrapf(err, "packFileIntoTar: failed to find corresponding bitmap '%s'\n", path)
 			}
 			tracelog.InfoLogger.Println("Prefaulting ", path)
-			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(path, info.Size(), *incrementBaseLsn, bitmap)
+			fileReader, fileInfoHeader.Size, err = ReadIncrementalFile(ctx, path, info.Size(), *incrementBaseLsn, bitmap)
 			if _, ok := err.(pg_errors.InvalidBlockError); ok {
 				return nil
 			} else if err != nil {
@@ -190,7 +197,8 @@ func (bundle *Bundle) prefaultFile(path string, info os.FileInfo, fileInfoHeader
 }
 
 // TODO : unit tests
-func prefetchFile(location string, reader internal.StorageFolderReader, walFileName string, waitGroup *sync.WaitGroup) {
+func prefetchFile(ctx context.Context, location string,
+	reader internal.StorageFolderReader, walFileName string, waitGroup *sync.WaitGroup) {
 	defer func() {
 		if r := recover(); r != nil {
 			tracelog.ErrorLogger.Println("WAL-prefetch unsuccessful ", walFileName, r)
@@ -213,7 +221,7 @@ func prefetchFile(location string, reader internal.StorageFolderReader, walFileN
 	}
 
 	tracelog.DebugLogger.Printf("File prefetched to %s", oldPath)
-	err = internal.DownloadFileTo(reader, walFileName, oldPath)
+	err = internal.DownloadFileTo(ctx, reader, walFileName, oldPath)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("WAL-prefetch %s, download: %v", walFileName, err)
 	} else {

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
@@ -43,15 +43,41 @@ func ToGpQueryRunner(queryRunner *postgres.PgQueryRunner) *GpQueryRunner {
 }
 
 // BuildCreateGreenplumRestorePoint formats a query to create a restore point
-func (queryRunner *GpQueryRunner) buildCreateGreenplumRestorePoint(restorePointName string) string {
-	return fmt.Sprintf("SELECT (gp_create_restore_point('%s'))::text", restorePointName)
+func (queryRunner *GpQueryRunner) buildCreateGreenplumRestorePoint(
+	restorePointName string,
+	version Version,
+) (string, error) {
+	var queryTemplate string
+
+	switch version.Flavor {
+	case Greenplum:
+		queryTemplate = "SELECT (public.gp_create_restore_point('%s'))::text"
+	case Cloudberry:
+		queryTemplate = "SELECT (pg_catalog.gp_create_restore_point('%s'))::text"
+	default:
+		return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+
+	return fmt.Sprintf(queryTemplate, restorePointName), nil
 }
 
 // CreateGreenplumRestorePoint creates a restore point
-func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(ctx context.Context,
-	restorePointName string) (restoreLSNs map[int]string, err error) {
+func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(
+	ctx context.Context,
+	restorePointName string,
+) (restoreLSNs map[int]string, err error) {
 	conn := queryRunner.Connection
-	rows, err := conn.Query(ctx, queryRunner.buildCreateGreenplumRestorePoint(restorePointName))
+	version, err := queryRunner.GetGreenplumVersion(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting version: %w", err)
+	}
+
+	createRestorePointQuery, err := queryRunner.buildCreateGreenplumRestorePoint(restorePointName, version)
+	if err != nil {
+		return nil, fmt.Errorf("error building create restore point query: %w", err)
+	}
+
+	rows, err := conn.Query(ctx, createRestorePointQuery)
 	if err != nil {
 		return nil, err
 	}
@@ -80,6 +106,55 @@ func (queryRunner *GpQueryRunner) CreateGreenplumRestorePoint(ctx context.Contex
 	return restoreLSNs, nil
 }
 
+func (queryRunner *GpQueryRunner) buildReadTimelineBySegment() (string, error) {
+	var timelineExpression string
+	switch {
+	case queryRunner.Version >= 100000:
+		timelineExpression = "SUBSTR(pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_insert_lsn()), 1, 8)"
+	case queryRunner.Version >= 90000:
+		timelineExpression = "SUBSTR(pg_catalog.pg_xlogfile_name(pg_catalog.pg_current_xlog_insert_location()), 1, 8)"
+	default:
+		return "", postgres.NewUnsupportedPostgresVersionError(queryRunner.Version)
+	}
+
+	return fmt.Sprintf(`SELECT gp_segment_id, %s
+FROM gp_dist_random('gp_id')
+UNION ALL
+SELECT -1, %s;`, timelineExpression, timelineExpression), nil
+}
+
+// ReadTimelineBySegment returns the current WAL timeline for every primary
+// segment and the coordinator (content ID -1).
+func (queryRunner *GpQueryRunner) ReadTimelineBySegment(ctx context.Context) (map[int]uint32, error) {
+	query, err := queryRunner.buildReadTimelineBySegment()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := queryRunner.Connection.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	timelines := make(map[int]uint32)
+	for rows.Next() {
+		var contentID int
+		var hexTimeline string
+		if err := rows.Scan(&contentID, &hexTimeline); err != nil {
+			return nil, err
+		}
+		value, err := strconv.ParseUint(hexTimeline, 16, 32)
+		if err != nil {
+			return nil, fmt.Errorf("parse timeline for Greenplum segment %d: %w", contentID, err)
+		}
+		timelines[contentID] = uint32(value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return timelines, nil
+}
+
 const getGreenplumSegmentsInfoQuery = `SELECT
 	dbid,
 	content,
@@ -92,14 +167,14 @@ WHERE role OPERATOR(pg_catalog.=) 'p'
 ORDER BY content, role DESC;`
 
 // GetGreenplumSegmentsInfo returns the information about segments
-func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) (segments []cluster.SegConfig, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) ([]cluster.SegConfig, error) {
 	conn := queryRunner.Connection
 	rows, err := conn.Query(ctx, getGreenplumSegmentsInfoQuery)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	segments = make([]cluster.SegConfig, 0)
+	segments := make([]cluster.SegConfig, 0)
 	for rows.Next() {
 		var dbID int
 		var contentID int
@@ -121,19 +196,23 @@ func (queryRunner *GpQueryRunner) GetGreenplumSegmentsInfo(ctx context.Context) 
 		segments = append(segments, segment)
 	}
 
-	if rows.Err() != nil {
-		return nil, rows.Err()
-	}
-	return segments, nil
+	return segments, rows.Err()
 }
 
 // GetGreenplumVersion returns version
-func (queryRunner *GpQueryRunner) GetGreenplumVersion(ctx context.Context) (version string, err error) {
+func (queryRunner *GpQueryRunner) GetGreenplumVersion(ctx context.Context) (Version, error) {
 	conn := queryRunner.Connection
-	err = conn.QueryRow(ctx, "SELECT pg_catalog.version()").Scan(&version)
-	if err != nil {
-		return "", err
+
+	var versionStr string
+	if err := conn.QueryRow(ctx, "SELECT pg_catalog.version()").Scan(&versionStr); err != nil {
+		return Version{}, err
 	}
+
+	version, err := parseGreenplumVersion(versionStr)
+	if err != nil {
+		return Version{}, fmt.Errorf("error parsing version: %w", err)
+	}
+
 	return version, nil
 }
 
@@ -408,11 +487,7 @@ JOIN (
 `
 
 func (queryRunner *GpQueryRunner) buildAORelPgClassQuery(ctx context.Context) (string, error) {
-	versionStr, err := queryRunner.GetGreenplumVersion(ctx)
-	if err != nil {
-		return "", err
-	}
-	version, err := parseGreenplumVersion(versionStr)
+	version, err := queryRunner.GetGreenplumVersion(ctx)
 	if err != nil {
 		return "", err
 	}

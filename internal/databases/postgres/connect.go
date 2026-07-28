@@ -48,7 +48,6 @@ func Connect(ctx context.Context, configOptions ...func(config *pgx.ConnConfig) 
 	return conn, nil
 }
 
-// nolint:gocritic
 func tryConnectToGpSegment(ctx context.Context, config *pgx.ConnConfig) (*pgx.Conn, error) {
 	config.RuntimeParams["gp_role"] = "utility"
 	conn, err := pgx.ConnectConfig(ctx, config)

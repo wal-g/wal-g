@@ -86,11 +86,11 @@ type DownloaderFields struct {
 func SetupDownloaderMocks(ops ...[]*models.Oplog) DownloaderFields {
 	dl := archiveMocks.Downloader{}
 	archives, raws := ArchRawMocks(ops...)
-	dl.On("DownloadOplogArchive", mock.Anything, mock.Anything).
+	dl.On("DownloadOplogArchive", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			writer := args.Get(1).(io.WriteCloser)
-			arch := args.Get(0).(models.Archive)
+			writer := args.Get(2).(io.WriteCloser)
+			arch := args.Get(1).(models.Archive)
 			for i, a := range archives {
 				if a == arch {
 					if _, err := writer.Write(raws[i]); err != nil {

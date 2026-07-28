@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"syscall"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -25,21 +23,20 @@ func prepareBackupExportSpec(d map[string]string) (dbnames []string, mapping map
 	return
 }
 
-func HandleBackupExport(externalConfig string, exportPrefixes map[string]string) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
+func HandleBackupExport(ctx context.Context, externalConfig string, exportPrefixes map[string]string) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 	folder := st.RootFolder()
 
-	externalStorage, err := internal.StorageFromConfig(externalConfig)
+	externalStorage, err := internal.StorageFromConfig(ctx, externalConfig)
 	tracelog.ErrorLogger.FatalOnError(err)
 	externalFolder := externalStorage.RootFolder()
 
 	dbnames, exportPrefixes := prepareBackupExportSpec(exportPrefixes)
-	_, err = resolveExternalStorageFiles(externalFolder, nil)
+	_, err = resolveExternalStorageFiles(ctx, externalFolder, nil)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	lock, err := RunOrReuseProxy(ctx, cancel, folder)
@@ -48,11 +45,11 @@ func HandleBackupExport(externalConfig string, exportPrefixes map[string]string)
 
 	var backupName string
 	var sentinel *SentinelDto
-	backup, err := internal.GetBackupByName(internal.LatestString, utility.BaseBackupPath, folder)
+	backup, err := internal.GetBackupByName(ctx, internal.LatestString, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalfOnError("can't find latest backup: %v", err)
 	backupName = backup.Name
 	sentinel = new(SentinelDto)
-	err = backup.FetchSentinel(sentinel)
+	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	err = runParallel(func(i int) error {
@@ -63,7 +60,7 @@ func HandleBackupExport(externalConfig string, exportPrefixes map[string]string)
 	sentinel.Databases = uniq(append(sentinel.Databases, dbnames...))
 	uploader := internal.NewRegularUploader(nil, folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.InfoLogger.Printf("uploading sentinel: %s", sentinel)
-	err = internal.UploadSentinel(uploader, sentinel, backupName)
+	err = internal.UploadSentinel(ctx, uploader, sentinel, backupName)
 	tracelog.ErrorLogger.FatalfOnError("failed to save sentinel: %v", err)
 
 	tracelog.InfoLogger.Printf("export finished")
@@ -73,7 +70,7 @@ func exportSingleDatabaseBackup(ctx context.Context, folder storage.Folder, back
 	dbname string, externalFolder storage.Folder, prefix string) error {
 	baseURL := getDatabaseBackupURL(backupName, dbname)
 	basePath := getDatabaseBackupPath(backupName, dbname)
-	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	blobs, err := listBackupBlobs(ctx, folder.GetSubFolder(basePath))
 	if err != nil {
 		tracelog.ErrorLogger.Printf("database %v doesn't exist in backup %v", dbname, backupName)
 		return err
@@ -113,5 +110,5 @@ func exportSingleDatabaseBlob(ctx context.Context, blobURL string, externalFolde
 		return fmt.Errorf("unexpected proxy GET response: %d %s", resp.StatusCode, resp.Status)
 	}
 	defer resp.Body.Close()
-	return externalFolder.PutObject(backupFile, resp.Body)
+	return externalFolder.PutObject(ctx, backupFile, resp.Body)
 }

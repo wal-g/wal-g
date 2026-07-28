@@ -19,7 +19,7 @@ var checkAOLengthSegmentCmd = &cobra.Command{
 	Use:   "check-ao-aocs-length-segment",
 	Short: "Checks ao and aocs tables` EOF on disk is no less than in metadata for current segment",
 	Run: func(cmd *cobra.Command, args []string) {
-		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
+		rootFolder, err := getMultistorageRootFolder(cmd.Context(), false, policies.UniteAllStorages)
 		tracelog.ErrorLogger.FatalOnError(err)
 		handler, err := greenplum.NewAOLengthCheckSegmentHandler(port, segnum, rootFolder)
 		tracelog.ErrorLogger.FatalOnError(err)

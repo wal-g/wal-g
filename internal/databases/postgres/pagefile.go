@@ -11,6 +11,7 @@
 package postgres
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -137,7 +138,8 @@ func isChecksumValidatableFile(info os.FileInfo, filePath string) bool {
 		pagedFilenameRegexp.MatchString(path.Base(filePath))
 }
 
-func ReadIncrementalFile(filePath string,
+func ReadIncrementalFile(ctx context.Context,
+	filePath string,
 	fileSize int64,
 	lsn LSN,
 	deltaBitmap *roaring.Bitmap) (fileReader io.ReadCloser, size int64, err error) {
@@ -147,7 +149,7 @@ func ReadIncrementalFile(filePath string,
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
-		Reader: limiters.NewDiskLimitReader(file),
+		Reader: limiters.NewDiskLimitReader(ctx, file),
 		Seeker: file,
 		Closer: file,
 	}
@@ -161,14 +163,14 @@ func ReadIncrementalFile(filePath string,
 	return pageReader, incrementSize, nil
 }
 
-func ReadIncrementLocations(filePath string, fileSize int64, lsn LSN) ([]walparser.BlockLocation, error) {
+func ReadIncrementLocations(ctx context.Context, filePath string, fileSize int64, lsn LSN) ([]walparser.BlockLocation, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 
 	fileReadSeekCloser := &ioextensions.ReadSeekCloserImpl{
-		Reader: limiters.NewDiskLimitReader(file),
+		Reader: limiters.NewDiskLimitReader(ctx, file),
 		Seeker: file,
 		Closer: file,
 	}

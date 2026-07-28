@@ -16,15 +16,15 @@ import (
 func TestReadObject(t *testing.T) {
 	t.Run("check folder implementation and provide default name if it is not multistorage", func(t *testing.T) {
 		singleStorageFolder := memory.NewFolder("/test", memory.NewKVS())
-		_ = singleStorageFolder.PutObject("a/b/c", bytes.NewBufferString("abc"))
+		_ = singleStorageFolder.PutObject(t.Context(), "a/b/c", bytes.NewBufferString("abc"))
 
-		reader, storageName, err := ReadObject(singleStorageFolder, "a/b/c")
+		reader, storageName, err := ReadObject(t.Context(), singleStorageFolder, "a/b/c")
 		require.NoError(t, err)
 		assert.Equal(t, "default", storageName)
 		content, _ := io.ReadAll(reader)
 		assert.Equal(t, "abc", string(content))
 
-		reader, storageName, err = ReadObject(singleStorageFolder, "1/2/3")
+		reader, storageName, err = ReadObject(t.Context(), singleStorageFolder, "1/2/3")
 		require.Error(t, err)
 		assert.Equal(t, "default", storageName)
 	})
@@ -33,7 +33,7 @@ func TestReadObject(t *testing.T) {
 		folder := newTestFolder(t)
 		folder.policies.Read = policies.ReadPolicyFirst
 
-		_, _, err := ReadObject(folder, "kek")
+		_, _, err := ReadObject(t.Context(), folder, "kek")
 		assert.ErrorIs(t, err, ErrNoUsedStorages)
 	})
 
@@ -41,17 +41,17 @@ func TestReadObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.Read = policies.ReadPolicyFirst
 
-		_ = folder.usedFolders[0].PutObject("aaa", bytes.NewBufferString("abc"))
-		_ = folder.usedFolders[1].PutObject("aaa", bytes.NewBufferString("abc"))
-		_ = folder.usedFolders[1].PutObject("bbb", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[1].PutObject(t.Context(), "aaa", bytes.NewBufferString("abc"))
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb", bytes.NewBufferString("abc"))
 
-		reader, storageName, err := ReadObject(folder, "aaa")
+		reader, storageName, err := ReadObject(t.Context(), folder, "aaa")
 		require.NoError(t, err)
 		assert.Equal(t, "s1", storageName)
 		content, _ := io.ReadAll(reader)
 		assert.Equal(t, "abc", string(content))
 
-		reader, storageName, err = ReadObject(folder, "bbb")
+		reader, storageName, err = ReadObject(t.Context(), folder, "bbb")
 		require.Error(t, err)
 		assert.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 		assert.Equal(t, "s1", storageName)
@@ -61,34 +61,34 @@ func TestReadObject(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Read = policies.ReadPolicyFoundFirst
 
-		_ = folder.usedFolders[0].PutObject("aaa", bytes.NewBufferString("1"))
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", bytes.NewBufferString("1"))
 
-		_ = folder.usedFolders[1].PutObject("aaa", bytes.NewBufferString("2"))
-		_ = folder.usedFolders[1].PutObject("bbb", bytes.NewBufferString("2"))
+		_ = folder.usedFolders[1].PutObject(t.Context(), "aaa", bytes.NewBufferString("2"))
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb", bytes.NewBufferString("2"))
 
-		_ = folder.usedFolders[2].PutObject("aaa", bytes.NewBufferString("3"))
-		_ = folder.usedFolders[2].PutObject("bbb", bytes.NewBufferString("3"))
-		_ = folder.usedFolders[2].PutObject("ccc", bytes.NewBufferString("3"))
+		_ = folder.usedFolders[2].PutObject(t.Context(), "aaa", bytes.NewBufferString("3"))
+		_ = folder.usedFolders[2].PutObject(t.Context(), "bbb", bytes.NewBufferString("3"))
+		_ = folder.usedFolders[2].PutObject(t.Context(), "ccc", bytes.NewBufferString("3"))
 
-		reader, storageName, err := ReadObject(folder, "aaa")
+		reader, storageName, err := ReadObject(t.Context(), folder, "aaa")
 		require.NoError(t, err)
 		assert.Equal(t, "s1", storageName)
 		content, _ := io.ReadAll(reader)
 		assert.Equal(t, "1", string(content))
 
-		reader, storageName, err = ReadObject(folder, "bbb")
+		reader, storageName, err = ReadObject(t.Context(), folder, "bbb")
 		require.NoError(t, err)
 		assert.Equal(t, "s2", storageName)
 		content, _ = io.ReadAll(reader)
 		assert.Equal(t, "2", string(content))
 
-		reader, storageName, err = ReadObject(folder, "ccc")
+		reader, storageName, err = ReadObject(t.Context(), folder, "ccc")
 		require.NoError(t, err)
 		assert.Equal(t, "s3", storageName)
 		content, _ = io.ReadAll(reader)
 		assert.Equal(t, "3", string(content))
 
-		reader, storageName, err = ReadObject(folder, "ddd")
+		reader, storageName, err = ReadObject(t.Context(), folder, "ddd")
 		require.Error(t, err)
 		assert.ErrorAs(t, err, &storage.ObjectNotFoundError{})
 		assert.Equal(t, "all", storageName)

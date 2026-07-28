@@ -7,6 +7,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/redis/archive"
+	"github.com/wal-g/wal-g/utility"
 )
 
 type StorageUploader struct {
@@ -18,21 +19,41 @@ func NewRedisStorageUploader(upl internal.Uploader) *StorageUploader {
 	return &StorageUploader{upl}
 }
 
+// GenerateNewBackupName returns a Redis RDB backup name before the stream upload starts.
+func GenerateNewBackupName() string {
+	return internal.StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+}
+
 type UploadBackupArgs struct {
+	BackupName      string
 	Cmd             internal.ErrWaiter
 	MetaConstructor internal.MetaConstructor
 	Sharded         bool
 	Stream          io.Reader
+	DeferSentinel   bool
+}
+
+type namedStreamUploader interface {
+	PushStreamWithName(ctx context.Context, stream io.Reader, backupName string) (string, error)
 }
 
 // UploadBackup compresses a stream and uploads it, and uploads meta info
-func (su *StorageUploader) UploadBackup(args UploadBackupArgs) error {
-	err := args.MetaConstructor.Init()
-	if err != nil {
+func (su *StorageUploader) UploadBackup(ctx context.Context, args UploadBackupArgs) error {
+	if err := args.MetaConstructor.Init(ctx); err != nil {
 		return fmt.Errorf("can not init meta provider: %+v", err)
 	}
 
-	dstPath, err := su.PushStream(context.Background(), args.Stream)
+	var dstPath string
+	var err error
+	if args.BackupName == "" {
+		dstPath, err = su.PushStream(ctx, args.Stream)
+	} else {
+		namedUploader, ok := su.Uploader.(namedStreamUploader)
+		if !ok {
+			return fmt.Errorf("uploader does not support a pre-generated stream backup name")
+		}
+		dstPath, err = namedUploader.PushStreamWithName(ctx, args.Stream, args.BackupName)
+	}
 	if err != nil {
 		return fmt.Errorf("can not upload backup: %+v", err)
 	}
@@ -46,16 +67,17 @@ func (su *StorageUploader) UploadBackup(args UploadBackupArgs) error {
 		Sharded:    args.Sharded,
 		Uploader:   su,
 	}
-	err = archive.FillSlotsForSharded(context.Background(), fillArgs)
-	if err != nil {
+	if err := archive.FillSlotsForSharded(ctx, fillArgs); err != nil {
 		return err
 	}
 
-	return su.Finalize(args.MetaConstructor, dstPath)
+	return su.Finalize(ctx, args.MetaConstructor, dstPath, args.DeferSentinel)
 }
 
-func (su *StorageUploader) Finalize(metaConstructor internal.MetaConstructor, dstPath string) error {
-	if err := metaConstructor.Finalize(dstPath); err != nil {
+func (su *StorageUploader) Finalize(
+	ctx context.Context, metaConstructor internal.MetaConstructor, dstPath string, deferSentinel bool,
+) error {
+	if err := metaConstructor.Finalize(ctx, dstPath); err != nil {
 		return fmt.Errorf("can not finalize meta provider: %+v", err)
 	}
 
@@ -71,8 +93,10 @@ func (su *StorageUploader) Finalize(metaConstructor internal.MetaConstructor, ds
 	backup.BackupSize = uploadedSize
 	backup.BackupName = dstPath
 	backup.DataSize = rawSize
-	if err := internal.UploadSentinel(su, backupSentinelInfo, dstPath); err != nil {
-		return fmt.Errorf("can not upload sentinel: %+v", err)
+	if !deferSentinel {
+		if err := internal.UploadSentinel(ctx, su, backupSentinelInfo, dstPath); err != nil {
+			return fmt.Errorf("can not upload sentinel: %+v", err)
+		}
 	}
 	return nil
 }

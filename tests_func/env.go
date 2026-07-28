@@ -90,13 +90,14 @@ func DynConf(env map[string]string, osEnviron map[string]string) (map[string]str
 		"NETWORK_NAME":     netName,
 	}
 
-	if imageType, ok := osEnviron["IMAGE_TYPE"]; ok {
-		if imageType == "aof" {
+	if feature, ok := osEnviron["FEATURE"]; ok {
+		switch feature {
+		case "aof_backup", "aof_ts_backup":
 			res["REDIS_CONF_FILE"] = "redis-aof.conf"
-		} else if imageType == "rdb" {
+		case "rdb_backup", "rdb_ts_backup", "ts_backup":
 			res["REDIS_CONF_FILE"] = "redis-rdb.conf"
-		} else {
-			return nil, fmt.Errorf("unknown IMAGE_TYPE env value")
+		default:
+			return nil, fmt.Errorf("unknown FEATURE env value")
 		}
 	}
 

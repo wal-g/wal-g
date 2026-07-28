@@ -75,20 +75,20 @@ func queueTest(t *testing.T) {
 
 	bundle.StartQueue(tarBallMaker)
 
-	a := bundle.TarBallQueue.Deque()
+	a, _ := bundle.TarBallQueue.Deque(t.Context())
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		time.Sleep(10 * time.Millisecond)
 		bundle.TarBallQueue.EnqueueBack(a)
 	}()
 
-	c := bundle.TarBallQueue.Deque()
+	c, _ := bundle.TarBallQueue.Deque(t.Context())
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		bundle.TarBallQueue.CheckSizeAndEnqueueBack(c)
 	}()
 
-	b := bundle.TarBallQueue.Deque()
+	b, _ := bundle.TarBallQueue.Deque(t.Context())
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		bundle.TarBallQueue.EnqueueBack(b)
@@ -210,7 +210,7 @@ func TestLoadDeltaMap_AllDeltas(t *testing.T) {
 	_, curLogSegNo, _ := postgres.ParseWALFilename(backupNextWalFilename)
 
 	backupStartLsn := postgres.LSN(curLogSegNo*postgres.WalSegmentSize + 1)
-	err = bundle.DownloadDeltaMap(internal.NewFolderReader(folder), backupStartLsn)
+	err = bundle.DownloadDeltaMap(t.Context(), internal.NewFolderReader(folder), backupStartLsn)
 	deltaMap := bundle.DeltaMap
 	assert.NoError(t, err)
 	assert.NotNil(t, deltaMap)
@@ -227,7 +227,7 @@ func TestLoadDeltaMap_MissingDelta(t *testing.T) {
 	backupNextWalFilename := "0000000100000000000000B0"
 	_, curLogSegNo, _ := postgres.ParseWALFilename(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(internal.NewFolderReader(folder), postgres.LSN(curLogSegNo*postgres.WalSegmentSize))
+	err = bundle.DownloadDeltaMap(t.Context(), internal.NewFolderReader(folder), postgres.LSN(curLogSegNo*postgres.WalSegmentSize))
 	assert.Error(t, err)
 	assert.Nil(t, bundle.DeltaMap)
 }
@@ -239,7 +239,7 @@ func TestLoadDeltaMap_WalTail(t *testing.T) {
 	backupNextWalFilename := "000000010000000000000091"
 	_, curLogSegNo, _ := postgres.ParseWALFilename(backupNextWalFilename)
 
-	err = bundle.DownloadDeltaMap(internal.NewFolderReader(folder), postgres.LSN(curLogSegNo*postgres.WalSegmentSize))
+	err = bundle.DownloadDeltaMap(t.Context(), internal.NewFolderReader(folder), postgres.LSN(curLogSegNo*postgres.WalSegmentSize))
 	assert.NoError(t, err)
 	assert.NotNil(t, bundle.DeltaMap)
 	assert.Equal(t, []uint32{4, 9}, bundle.DeltaMap[BundleTestLocations[0].RelationFileNode].ToArray())

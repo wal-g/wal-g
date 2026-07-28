@@ -28,6 +28,7 @@ func TestSwiftFolderUsingEnvVariables(t *testing.T) {
 	t.Logf("Swift created test container: '%s'", container)
 
 	stWithEnv, err := ConfigureStorage(
+		t.Context(),
 		fmt.Sprintf("swift://%s/test-folder/sub0", container),
 		nil,
 	)

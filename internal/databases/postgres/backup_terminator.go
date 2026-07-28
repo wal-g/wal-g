@@ -24,9 +24,9 @@ func NewBackupTerminator(queryRunner *PgQueryRunner, pgVersion int, pgDataDir st
 	return &BackupTerminator{queryRunner: queryRunner, removeBackupLabel: removeBackupLabel, pgDataDir: pgDataDir}
 }
 
-func (t *BackupTerminator) TerminateBackup() {
+func (t *BackupTerminator) TerminateBackup(ctx context.Context) {
 	// Signal-triggered cleanup with no request ctx; StopBackup detaches cancellation regardless.
-	_, _, _, err := t.queryRunner.StopBackup(context.Background())
+	_, _, _, err := t.queryRunner.StopBackup(ctx)
 	if err == nil {
 		tracelog.InfoLogger.Printf("Successfully stopped the running backup")
 		return

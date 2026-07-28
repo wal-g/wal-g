@@ -214,12 +214,13 @@ func (u *uploaderMock) UploadOplogArchive(ctx context.Context, stream io.Reader,
 	return nil
 }
 
-func (u *uploaderMock) UploadGapArchive(err error, firstTS, lastTS models.Timestamp) error {
+func (u *uploaderMock) UploadGapArchive(_ context.Context, err error, firstTS, lastTS models.Timestamp) error {
 	u.t.Fatal("unexpected call")
 	return nil
 }
 
-func (u *uploaderMock) UploadBackup(stream io.Reader, cmd internal.ErrWaiter, metaConstructor internal.MetaConstructor) error {
+func (u *uploaderMock) UploadBackup(_ context.Context, stream io.Reader, cmd internal.ErrWaiter,
+	metaConstructor internal.MetaConstructor) error {
 	u.t.Fatal("unexpected call")
 	return nil
 }

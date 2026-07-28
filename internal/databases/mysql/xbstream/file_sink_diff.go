@@ -214,7 +214,7 @@ func (sink *diffFileSink) getHandlingStrategy(chunk *Chunk) (diffFileStrategy, e
 	}, nil
 }
 
-// nolint: funlen,gocyclo
+//nolint:gocyclo
 func (sink *diffFileSink) applyDiff() error {
 	miniDeltaWritten := false
 

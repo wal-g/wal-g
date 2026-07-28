@@ -1,5 +1,4 @@
 FROM wal-g/golang:latest AS build
-ENV GOEXPERIMENT=jsonv2
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 COPY go.mod go.mod
@@ -12,8 +11,7 @@ COPY utility/ utility/
 COPY Makefile Makefile
 
 # we test wal-g logic, not our deps. So, no brotli in these tests.
-RUN cd main/gp && \
-    go build -mod vendor -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
+RUN make ENABLE_RACE_DETECTION=1 gp_build
 
 FROM wal-g/gp:latest
 

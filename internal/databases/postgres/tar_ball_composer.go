@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"errors"
 
 	"github.com/wal-g/tracelog"
@@ -18,11 +19,11 @@ const (
 
 // TarBallComposerMaker is used to make an instance of TarBallComposer
 type TarBallComposerMaker interface {
-	Make(bundle *Bundle) (internal.TarBallComposer, error)
+	Make(ctx context.Context, bundle *Bundle) (internal.TarBallComposer, error)
 }
 
-func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQueryRunner, uploader internal.Uploader,
-	newBackupName string, filePackOptions TarBallFilePackerOptions,
+func NewTarBallComposerMaker(ctx context.Context, composerType TarBallComposerType, queryRunner *PgQueryRunner,
+	uploader internal.Uploader, newBackupName string, filePackOptions TarBallFilePackerOptions,
 	withoutFilesMetadata bool) (TarBallComposerMaker, error) {
 	folder := uploader.Folder()
 
@@ -37,13 +38,13 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 	case RegularComposer:
 		return NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets()), nil
 	case RatingComposer:
-		relFileStats, err := newRelFileStatistics(queryRunner)
+		relFileStats, err := newRelFileStatistics(ctx, queryRunner)
 		if err != nil {
 			return nil, err
 		}
 		return NewRatingTarBallComposerMaker(relFileStats, filePackOptions)
 	case CopyComposer:
-		previousBackup, err := internal.GetLatestBackup(folder)
+		previousBackup, err := internal.GetLatestBackup(ctx, folder)
 		if err != nil {
 			tracelog.InfoLogger.Printf(
 				"Failed to init the CopyComposer, will use the RegularComposer instead:"+
@@ -51,7 +52,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 			return NewRegularTarBallComposerMaker(filePackOptions, &internal.RegularBundleFiles{}, internal.NewRegularTarFileSets()), nil
 		}
 		previousPGBackup := ToPgBackup(previousBackup)
-		prevBackupSentinelDto, _, err := previousPGBackup.GetSentinelAndFilesMetadata()
+		prevBackupSentinelDto, _, err := previousPGBackup.GetSentinelAndFilesMetadata(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +62,7 @@ func NewTarBallComposerMaker(composerType TarBallComposerType, queryRunner *PgQu
 			if err != nil {
 				return nil, err
 			}
-			_, _, err = previousPGBackup.GetSentinelAndFilesMetadata()
+			_, _, err = previousPGBackup.GetSentinelAndFilesMetadata(ctx)
 			if err != nil {
 				return nil, err
 			}

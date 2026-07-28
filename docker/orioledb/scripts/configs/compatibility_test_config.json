@@ -1,2 +1,2 @@
-"WALE_S3_PREFIX": "s3://orioledb_compatibility",
+"WALE_S3_PREFIX": "s3://orioledb-compatibility",
 "WALG_DELTA_MAX_STEPS": "6"

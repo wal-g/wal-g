@@ -22,7 +22,7 @@ var (
 )
 
 type GapHandler interface {
-	HandleGap(from, until models.Timestamp, err error) error
+	HandleGap(ctx context.Context, from, until models.Timestamp, err error) error
 }
 
 type StorageGapHandler struct {
@@ -33,8 +33,8 @@ func NewStorageGapHandler(uploader archive.Uploader) *StorageGapHandler {
 	return &StorageGapHandler{uploader}
 }
 
-func (sgh *StorageGapHandler) HandleGap(from, until models.Timestamp, gapErr error) error {
-	if err := sgh.uploader.UploadGapArchive(gapErr, from, until); err != nil {
+func (sgh *StorageGapHandler) HandleGap(ctx context.Context, from, until models.Timestamp, gapErr error) error {
+	if err := sgh.uploader.UploadGapArchive(ctx, gapErr, from, until); err != nil {
 		return fmt.Errorf("can not upload gap archive: %w", err)
 	}
 	return nil
@@ -189,7 +189,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 		for _, arch := range path {
 			tracelog.DebugLogger.Printf("Fetching archive %s", arch.Filename())
 
-			if err := sf.downloader.DownloadOplogArchive(arch, cpw); err != nil {
+			if err := sf.downloader.DownloadOplogArchive(ctx, arch, cpw); err != nil {
 				cpw.CloseWithError(fmt.Errorf("failed to download archive %s: %w", arch.Filename(), err))
 				return
 			}

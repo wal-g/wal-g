@@ -19,7 +19,7 @@ var backupFetchCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		restoreCmd, err := internal.GetCommandSettingContext(cmd.Context(), conf.NameStreamRestoreCmd)
@@ -30,7 +30,7 @@ var backupFetchCmd = &cobra.Command{
 		backupSelector, err := internal.NewBackupNameSelector(args[0], true)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		internal.HandleBackupFetch(storage.RootFolder(), backupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
+		internal.HandleBackupFetch(cmd.Context(), storage.RootFolder(), backupSelector, internal.GetBackupToCommandFetcher(restoreCmd))
 	},
 }
 

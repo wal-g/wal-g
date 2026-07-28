@@ -1,14 +1,15 @@
 package storagetools
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleRemove(prefix string, folder storage.Folder) error {
-	objects, err := storage.ListFolderRecursivelyWithPrefix(folder, prefix)
+func HandleRemove(ctx context.Context, prefix string, folder storage.Folder) error {
+	objects, err := storage.ListFolderRecursivelyWithPrefix(ctx, folder, prefix)
 	if err != nil {
 		return fmt.Errorf("list files by prefix: %w", err)
 	}
@@ -17,27 +18,27 @@ func HandleRemove(prefix string, folder storage.Folder) error {
 		return fmt.Errorf("object or folder %q does not exist", prefix)
 	}
 
-	err = folder.DeleteObjects(objects)
+	err = folder.DeleteObjects(ctx, objects)
 	if err != nil {
 		return fmt.Errorf("delete objects by the prefix: %v", err)
 	}
 	return nil
 }
 
-func HandleRemoveWithGlobPattern(pattern string, folder storage.Folder) error {
-	objectPaths, folderPaths, err := storage.Glob(folder, pattern)
+func HandleRemoveWithGlobPattern(ctx context.Context, pattern string, folder storage.Folder) error {
+	objectPaths, folderPaths, err := storage.Glob(ctx, folder, pattern)
 	if err != nil {
 		return err
 	}
 	for _, objectPath := range objectPaths {
-		err := HandleRemove(objectPath, folder)
+		err := HandleRemove(ctx, objectPath, folder)
 		if err != nil {
 			return err
 		}
 	}
 
 	for _, folderPath := range folderPaths {
-		err := HandleRemove(folderPath, folder)
+		err := HandleRemove(ctx, folderPath, folder)
 		if err != nil {
 			return err
 		}
@@ -45,9 +46,9 @@ func HandleRemoveWithGlobPattern(pattern string, folder storage.Folder) error {
 	return nil
 }
 
-func HandleRemoveVersion(key string, versionID string, folder storage.Folder) error {
+func HandleRemoveVersion(ctx context.Context, key string, versionID string, folder storage.Folder) error {
 	obj := storage.NewLocalObjectWithVersion(key, time.Time{}, 0, versionID, "")
-	err := folder.DeleteObjects([]storage.Object{obj})
+	err := folder.DeleteObjects(ctx, []storage.Object{obj})
 	if err != nil {
 		return fmt.Errorf("delete object %q version %q: %w", key, versionID, err)
 	}

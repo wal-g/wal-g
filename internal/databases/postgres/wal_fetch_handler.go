@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"os"
@@ -26,12 +27,13 @@ func (err InvalidWalFileMagicError) Error() string {
 }
 
 // TODO : unit tests
-// HandleWALFetch is invoked to performa wal-g wal-fetch
-func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string, location string, prefetcher WalPrefetcher) error {
-	tracelog.DebugLogger.Printf("HandleWALFetch(folder, %s, %s)\n", walFileName, location)
+// HandleWALFetch is invoked to perform wal-g wal-fetch
+func HandleWALFetch(ctx context.Context,
+	baseReader internal.StorageFolderReader, walFileName string, location string, prefetcher WalPrefetcher) error {
+	tracelog.DebugLogger.Printf("HandleWALFetch in folder with walFileName=%s, location=%s)\n", walFileName, location)
 	reader := baseReader.SubFolder(utility.WalPath)
 	location = utility.ResolveSymlink(location)
-	defer prefetcher.Prefetch(baseReader, walFileName, location)
+	defer prefetcher.Prefetch(ctx, baseReader, walFileName, location)
 
 	_, _, running, prefetched := getPrefetchLocations(path.Dir(location), walFileName)
 	tracelog.DebugLogger.Printf("Going to check prefetch in %s", prefetched)
@@ -84,12 +86,15 @@ func HandleWALFetch(baseReader internal.StorageFolderReader, walFileName string,
 		} else if os.IsNotExist(err) {
 			break // Normal startup path
 		} else {
-			break // Abnormal path. Permission denied etc. Yes, I know that previous 'else' can be eliminated.
+			// Abnormal path. Permission denied etc.
+			tracelog.ErrorLogger.Printf("Prefetch file %s attempt erroneous: %v", location, err)
+			break
 		}
 		time.Sleep(2 * time.Millisecond)
 	}
 
-	return internal.DownloadFileTo(reader, walFileName, location)
+	tracelog.DebugLogger.Printf("Statring external storage download for file %s at %v", walFileName, time.Now())
+	return internal.DownloadFileTo(ctx, reader, walFileName, location)
 }
 
 // TODO : unit tests

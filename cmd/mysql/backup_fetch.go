@@ -24,18 +24,18 @@ var (
 		Args:  cobra.RangeArgs(0, 1),
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
-			storage, err := internal.ConfigureStorage()
+			storage, err := internal.ConfigureStorage(cmd.Context())
 			tracelog.ErrorLogger.FatalOnError(err)
-			restoreCmd, err := internal.GetCommandSetting(conf.NameStreamRestoreCmd)
+			restoreCmd, err := internal.GetCommandSettingContext(cmd.Context(), conf.NameStreamRestoreCmd)
 			if !useXbtoolExtract {
 				tracelog.ErrorLogger.FatalOnError(err)
 			}
-			prepareCmd, _ := internal.GetCommandSetting(conf.MysqlBackupPrepareCmd)
+			prepareCmd, _ := internal.GetCommandSettingContext(cmd.Context(), conf.MysqlBackupPrepareCmd)
 
 			targetBackupSelector, err := createTargetBackupSelector(args, fetchTargetUserData)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			mysql.HandleBackupFetch(storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd, useXbtoolExtract, inplace)
+			mysql.HandleBackupFetch(cmd.Context(), storage.RootFolder(), targetBackupSelector, restoreCmd, prepareCmd, useXbtoolExtract, inplace)
 		},
 	}
 	fetchTargetUserData string

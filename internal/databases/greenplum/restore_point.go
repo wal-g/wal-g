@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/greenplum-db/gp-common-go-libs/cluster"
+	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/jackc/pgx/v5"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -25,16 +25,17 @@ const RestorePointSuffix = "_restore_point.json"
 const RestorePointCreateRetries = 5
 
 type RestorePointMetadata struct {
-	Name             string         `json:"name"`
-	StartTime        time.Time      `json:"start_time"`
-	FinishTime       time.Time      `json:"finish_time"`
-	Hostname         string         `json:"hostname"`
-	GpVersion        string         `json:"gp_version"`
-	GpFlavor         string         `json:"gp_flavor"`
-	SystemIdentifier *uint64        `json:"system_identifier"`
-	LsnBySegment     map[int]string `json:"lsn_by_segment"`
-	StorageName      string         `json:"storage_name"`
-	TimeLine         uint32         `json:"time_line"`
+	Name              string         `json:"name"`
+	StartTime         time.Time      `json:"start_time"`
+	FinishTime        time.Time      `json:"finish_time"`
+	Hostname          string         `json:"hostname"`
+	GpVersion         string         `json:"gp_version"`
+	GpFlavor          string         `json:"gp_flavor"`
+	SystemIdentifier  *uint64        `json:"system_identifier"`
+	LsnBySegment      map[int]string `json:"lsn_by_segment"`
+	StorageName       string         `json:"storage_name"`
+	TimeLine          uint32         `json:"time_line"`
+	TimelineBySegment map[int]uint32 `json:"timeline_by_segment,omitempty"`
 }
 
 func (s *RestorePointMetadata) String() string {
@@ -49,9 +50,9 @@ func RestorePointMetadataFileName(pointName string) string {
 	return pointName + RestorePointSuffix
 }
 
-func FetchRestorePointMetadata(folder storage.Folder, pointName string) (RestorePointMetadata, error) {
+func FetchRestorePointMetadata(ctx context.Context, folder storage.Folder, pointName string) (RestorePointMetadata, error) {
 	var restorePoint RestorePointMetadata
-	err := internal.FetchDto(folder.GetSubFolder(utility.BaseBackupPath),
+	err := internal.FetchDto(ctx, folder.GetSubFolder(utility.BaseBackupPath),
 		&restorePoint, RestorePointMetadataFileName(pointName))
 	if err != nil {
 		return RestorePointMetadata{}, fmt.Errorf("failed to fetch metadata for restore point %s: %w", pointName, err)
@@ -61,17 +62,17 @@ func FetchRestorePointMetadata(folder storage.Folder, pointName string) (Restore
 }
 
 // ValidateMatch checks that restore point is reachable from the provided backup
-func ValidateMatch(folder storage.Folder, backupName, restorePoint, storage string) error {
-	backup, err := NewBackupInStorage(folder, backupName, storage)
+func ValidateMatch(ctx context.Context, folder storage.Folder, backupName, restorePoint, storage string) error {
+	backup, err := NewBackupInStorage(ctx, folder, backupName, storage)
 	if err != nil {
 		return err
 	}
-	bSentinel, err := backup.GetSentinel()
+	bSentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch %s sentinel: %w", backupName, err)
 	}
 
-	rpMeta, err := FetchRestorePointMetadata(folder, restorePoint)
+	rpMeta, err := FetchRestorePointMetadata(ctx, folder, restorePoint)
 	if err != nil {
 		tracelog.WarningLogger.Printf(
 			"failed to fetch restore point %s metadata, will skip the validation check: %v", restorePoint, err)
@@ -99,18 +100,18 @@ type RestorePointCreator struct {
 }
 
 // NewRestorePointCreator returns a restore point creator
-func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err error) {
-	uploader, err := internal.ConfigureUploader()
+func NewRestorePointCreator(ctx context.Context, pointName string) (rpc *RestorePointCreator, err error) {
+	uploader, err := internal.ConfigureUploader(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := postgres.Connect(context.Background())
+	conn, err := postgres.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	_, version, systemIdentifier, err := getGpClusterInfo(conn)
+	_, version, systemIdentifier, err := getGpClusterInfo(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -129,17 +130,17 @@ func NewRestorePointCreator(pointName string) (rpc *RestorePointCreator, err err
 }
 
 // Create creates cluster-wide consistent restore point
-func (rpc *RestorePointCreator) Create() {
+func (rpc *RestorePointCreator) Create(ctx context.Context) {
 	rpc.startTime = utility.TimeNowCrossPlatformUTC()
 	initGpLog(rpc.logsDir)
 
-	err := rpc.checkExists()
+	err := rpc.checkExists(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	restoreLSNs, timeLine, err := createRestorePoint(rpc.Conn, rpc.pointName)
+	restoreLSNs, timeLine, timelineBySegment, err := createRestorePoint(ctx, rpc.Conn, rpc.pointName)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	err = rpc.uploadMetadata(restoreLSNs, timeLine)
+	err = rpc.uploadMetadata(ctx, restoreLSNs, timeLine, timelineBySegment)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("Failed to upload metadata file for restore point %s", rpc.pointName)
 		tracelog.ErrorLogger.FatalError(err)
@@ -147,28 +148,29 @@ func (rpc *RestorePointCreator) Create() {
 	tracelog.InfoLogger.Printf("Restore point %s successfully created", rpc.pointName)
 }
 
-func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs map[int]string, timeLine uint32, err error) {
+func createRestorePoint(ctx context.Context, conn *pgx.Conn, restorePointName string) (
+	restoreLSNs map[int]string, timeLine uint32, timelineBySegment map[int]uint32, err error) {
 	tracelog.InfoLogger.Printf("Creating restore point with name %s", restorePointName)
-	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
-	ctx := context.Background()
 	queryRunner, err := NewGpQueryRunner(ctx, conn)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
 	timeLine, err = queryRunner.ReadTimeline(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
 	for retries := 0; retries < RestorePointCreateRetries; retries++ {
 		restoreLSNs, err = queryRunner.CreateGreenplumRestorePoint(ctx, restorePointName)
 		if err == nil {
+			timelineBySegment = readTimelineBySegmentBestEffort(
+				ctx, restoreLSNs, queryRunner.ReadTimelineBySegment)
 			// After create restore point should archive related WAL log segments.
 			// This ensures the new cluster can retrieve complete WAL logs with the restore point for restoration.
-			globalCluster, gpVersion, _, err := getGpClusterInfo(conn)
+			globalCluster, gpVersion, _, err := getGpClusterInfo(ctx, conn)
 			if err != nil {
-				return nil, 0, err
+				return nil, 0, nil, err
 			}
 			tracelog.InfoLogger.Println("Switch xlog on cluster")
 			remoteOutput := globalCluster.GenerateAndExecuteCommand("Running wal-g", cluster.ON_SEGMENTS|cluster.INCLUDE_MASTER,
@@ -178,10 +180,10 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 						var pgOptions, switchFunction string
 						if gpVersion.Flavor == Greenplum && gpVersion.Major == 6 {
 							pgOptions = "-c gp_session_role=utility"
-							switchFunction = "pg_switch_xlog()"
+							switchFunction = "pg_catalog.pg_switch_xlog()"
 						} else {
 							pgOptions = "-c gp_role=utility"
-							switchFunction = "pg_switch_wal()"
+							switchFunction = "pg_catalog.pg_switch_wal()"
 						}
 						return fmt.Sprintf("PGOPTIONS='%s' psql -h %s -p %d -d postgres -c 'select %s;'",
 							pgOptions, seg[0].Hostname, seg[0].Port, switchFunction,
@@ -192,14 +194,46 @@ func createRestorePoint(conn *pgx.Conn, restorePointName string) (restoreLSNs ma
 			globalCluster.CheckClusterError(remoteOutput, "Unable to switch xlog on cluster", func(contentID int) string {
 				return "Unable to switch xlog on cluster"
 			}, true)
-			return restoreLSNs, timeLine, nil
+			return restoreLSNs, timeLine, timelineBySegment, nil
 		}
 	}
-	return nil, 0, err
+	return nil, 0, nil, err
 }
 
-func (rpc *RestorePointCreator) checkExists() error {
-	exists, err := rpc.Uploader.Folder().Exists(RestorePointMetadataFileName(rpc.pointName))
+func readTimelineBySegmentBestEffort(
+	ctx context.Context,
+	restoreLSNs map[int]string,
+	read func(context.Context) (map[int]uint32, error),
+) map[int]uint32 {
+	timelines, err := read(ctx)
+	if err != nil {
+		tracelog.WarningLogger.Printf(
+			"Failed to read Greenplum per-segment timelines, continuing with the coordinator timeline: %v", err)
+		return nil
+	}
+	if err := validateRestorePointTimelines(restoreLSNs, timelines); err != nil {
+		tracelog.WarningLogger.Printf(
+			"Invalid Greenplum per-segment timelines, continuing with the coordinator timeline: %v", err)
+		return nil
+	}
+	return timelines
+}
+
+func validateRestorePointTimelines(restoreLSNs map[int]string, timelines map[int]uint32) error {
+	if len(restoreLSNs) != len(timelines) {
+		return fmt.Errorf("greenplum restore point timeline topology does not match its LSN topology")
+	}
+	for contentID := range restoreLSNs {
+		timeline, ok := timelines[contentID]
+		if !ok || timeline == 0 {
+			return fmt.Errorf("greenplum restore point has no timeline for segment %d", contentID)
+		}
+	}
+	return nil
+}
+
+func (rpc *RestorePointCreator) checkExists(ctx context.Context) error {
+	exists, err := rpc.Uploader.Folder().Exists(ctx, RestorePointMetadataFileName(rpc.pointName))
 	if err != nil {
 		return fmt.Errorf("failed to check restore point existence: %v", err)
 	}
@@ -209,29 +243,35 @@ func (rpc *RestorePointCreator) checkExists() error {
 	return nil
 }
 
-func (rpc *RestorePointCreator) uploadMetadata(restoreLSNs map[int]string, timeLine uint32) (err error) {
+func (rpc *RestorePointCreator) uploadMetadata(
+	ctx context.Context,
+	restoreLSNs map[int]string,
+	timeLine uint32,
+	timelineBySegment map[int]uint32,
+) (err error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		tracelog.WarningLogger.Printf("Failed to fetch the hostname for metadata, leaving empty: %v", err)
 	}
 
 	meta := RestorePointMetadata{
-		Name:             rpc.pointName,
-		StartTime:        rpc.startTime,
-		FinishTime:       utility.TimeNowCrossPlatformUTC(),
-		Hostname:         hostname,
-		GpVersion:        rpc.gpVersion.String(),
-		GpFlavor:         rpc.gpVersion.Flavor.String(),
-		SystemIdentifier: rpc.systemIdentifier,
-		LsnBySegment:     restoreLSNs,
-		TimeLine:         timeLine,
+		Name:              rpc.pointName,
+		StartTime:         rpc.startTime,
+		FinishTime:        utility.TimeNowCrossPlatformUTC(),
+		Hostname:          hostname,
+		GpVersion:         rpc.gpVersion.String(),
+		GpFlavor:          rpc.gpVersion.Flavor.String(),
+		SystemIdentifier:  rpc.systemIdentifier,
+		LsnBySegment:      restoreLSNs,
+		TimeLine:          timeLine,
+		TimelineBySegment: timelineBySegment,
 	}
 
 	metaFileName := RestorePointMetadataFileName(rpc.pointName)
 	tracelog.InfoLogger.Printf("Uploading restore point metadata file %s", metaFileName)
 	tracelog.InfoLogger.Println(meta.String())
 
-	return internal.UploadDto(rpc.Uploader.Folder(), meta, metaFileName)
+	return internal.UploadDto(ctx, rpc.Uploader.Folder(), meta, metaFileName)
 }
 
 type RestorePointTime struct {
@@ -248,16 +288,16 @@ func NewNoRestorePointsFoundError() NoRestorePointsFoundError {
 	return NoRestorePointsFoundError{fmt.Errorf("no restore points found")}
 }
 
-func FetchAllRestorePoints(folder storage.Folder) ([]RestorePointMetadata, error) {
+func FetchAllRestorePoints(ctx context.Context, folder storage.Folder) ([]RestorePointMetadata, error) {
 	restorePointMetas := make([]RestorePointMetadata, 0)
 
-	restorePointTimes, err := GetRestorePoints(folder.GetSubFolder(utility.BaseBackupPath))
+	restorePointTimes, err := GetRestorePoints(ctx, folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return restorePointMetas, err
 	}
 
 	for _, rp := range restorePointTimes {
-		meta, err := FetchRestorePointMetadata(folder, rp.Name)
+		meta, err := FetchRestorePointMetadata(ctx, folder, rp.Name)
 		if err != nil {
 			return restorePointMetas, fmt.Errorf("fetch restore point %s metadata: %v", rp.Name, err)
 		}
@@ -332,8 +372,8 @@ func FindRestorePointWithTS(timestampStr string, restorePointMetas []RestorePoin
 }
 
 // GetRestorePoints receives restore points descriptions and sorts them by time
-func GetRestorePoints(folder storage.Folder) (restorePoints []RestorePointTime, err error) {
-	restorePointsObjects, _, err := folder.ListFolder()
+func GetRestorePoints(ctx context.Context, folder storage.Folder) (restorePoints []RestorePointTime, err error) {
+	restorePointsObjects, _, err := folder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
 	}

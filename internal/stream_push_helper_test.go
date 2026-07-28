@@ -112,7 +112,7 @@ func checkPushAndFetchBackup(t *testing.T, partitions, blockSize, maxFileSize, n
 		Folder: storageFolder,
 	}
 
-	err = DownloadAndDecompressSplittedStream(backup, blockSize, compression.Decompressors[0].FileExtension(), writer, retryAttempts)
+	err = DownloadAndDecompressSplittedStream(t.Context(), backup, blockSize, compression.Decompressors[0].FileExtension(), writer, retryAttempts)
 	assert.NoError(t, err)
 	<-writer.CloseNotify
 

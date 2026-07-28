@@ -49,12 +49,12 @@ func runPurge(cmd *cobra.Command, args []string) {
 		opts = append(opts, redis.PurgeRetainCount(int(retainCount)))
 	}
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(cmd.Context())
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	backupFolder := st.RootFolder().GetSubFolder(utility.BaseBackupPath)
 
-	err = redis.HandlePurge(backupFolder, opts...)
+	err = redis.HandlePurge(cmd.Context(), backupFolder, opts...)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 

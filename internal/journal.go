@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -59,6 +60,7 @@ func NewEmptyJournalInfo(
 
 // NewJournalInfo creates instance of JournalInfo and reads its content from S3
 func NewJournalInfo(
+	ctx context.Context,
 	backupName string,
 	folder storage.Folder,
 	journalDir string,
@@ -68,7 +70,7 @@ func NewJournalInfo(
 		JournalDirectoryName: journalDir,
 	}
 
-	err := ji.Read(folder)
+	err := ji.Read(ctx, folder)
 	if err != nil {
 		return JournalInfo{}, err
 	}
@@ -77,9 +79,9 @@ func NewJournalInfo(
 }
 
 // Read syncs JournalInfo by reading the file on S3
-func (ji *JournalInfo) Read(folder storage.Folder) error {
+func (ji *JournalInfo) Read(ctx context.Context, folder storage.Folder) error {
 	folder = folder.GetSubFolder(utility.BaseBackupPath)
-	journalInfoReader, err := folder.ReadObject(ji.JournalName)
+	journalInfoReader, err := folder.ReadObject(ctx, ji.JournalName)
 	if err != nil {
 		return err
 	}
@@ -93,19 +95,19 @@ func (ji *JournalInfo) Read(folder storage.Folder) error {
 }
 
 // Upload syncs JournalInfo by uploading the structure as a file on S3
-func (ji *JournalInfo) Upload(folder storage.Folder) error {
+func (ji *JournalInfo) Upload(ctx context.Context, folder storage.Folder) error {
 	folder = folder.GetSubFolder(utility.BaseBackupPath)
 	rawJournalInfo, err := json.Marshal(ji)
 	if err != nil {
 		return err
 	}
 
-	return folder.PutObject(ji.JournalName, bytes.NewBuffer(rawJournalInfo))
+	return folder.PutObject(ctx, ji.JournalName, bytes.NewBuffer(rawJournalInfo))
 }
 
 // GetNext retrieves the JournalInfo that is immediately older/newer than the current one from S3
-func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (JournalInfo, error) {
-	objs, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+func (ji *JournalInfo) GetNext(ctx context.Context, folder storage.Folder, direction direction) (JournalInfo, error) {
+	objs, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder(ctx)
 	if err != nil {
 		return JournalInfo{}, err
 	}
@@ -137,6 +139,7 @@ func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (Jour
 		JournalPrefix,
 	)
 	newerJournalInfo, err := NewJournalInfo(
+		ctx,
 		backupName,
 		folder,
 		ji.JournalDirectoryName,
@@ -150,15 +153,15 @@ func (ji *JournalInfo) GetNext(folder storage.Folder, direction direction) (Jour
 // Delete deletes the current JournalInfo from S3,
 // updates the PriorBackupEnd of a newer JournalInfo with the PriorBackupEnd of the current one,
 // updates the older one journal size.
-func (ji *JournalInfo) Delete(folder storage.Folder) error {
+func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder) error {
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
-		DeleteObjects([]storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
+		DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
 	if err != nil {
 		return err
 	}
 
-	newerJi, err := ji.GetNext(folder, newer)
+	newerJi, err := ji.GetNext(ctx, folder, newer)
 	if err != nil {
 		if err.Error() != cantFindJournal {
 			return err
@@ -167,7 +170,7 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 		// SizeToNextBackup is the sum in bytes of binlogs between two backups.
 		// If the current backup was the newest one, the older one will be the newest then,
 		// and the SizeToNextBackup of it should be equal to zero.
-		olderJi, err := ji.GetNext(folder, older)
+		olderJi, err := ji.GetNext(ctx, folder, older)
 		if err != nil {
 			if err.Error() != cantFindJournal {
 				return err
@@ -176,16 +179,16 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 		}
 
 		olderJi.SizeToNextBackup = 0
-		return olderJi.Upload(folder)
+		return olderJi.Upload(ctx, folder)
 	}
 
 	newerJi.PriorBackupEnd = ji.PriorBackupEnd
-	err = newerJi.Upload(folder)
+	err = newerJi.Upload(ctx, folder)
 	if err != nil {
 		return err
 	}
 
-	err = newerJi.UpdateIntervalSize(folder, &JournalFiles{})
+	err = newerJi.UpdateIntervalSize(ctx, folder, &JournalFiles{})
 	if err != nil {
 		return err
 	}
@@ -195,10 +198,11 @@ func (ji *JournalInfo) Delete(folder storage.Folder) error {
 
 // GetMostRecentJournalInfo receives the most recently created JournalInfo on S3
 func GetMostRecentJournalInfo(
+	ctx context.Context,
 	folder storage.Folder,
 	journalDir string,
 ) (JournalInfo, error) {
-	objs, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder()
+	objs, _, err := folder.GetSubFolder(utility.BaseBackupPath).ListFolder(ctx)
 	if err != nil {
 		return JournalInfo{}, err
 	}
@@ -215,6 +219,7 @@ func GetMostRecentJournalInfo(
 	theMostRecentJournalObject := objs[len(objs)-1]
 	theMostRecentBackupName := strings.TrimPrefix(theMostRecentJournalObject.GetName(), JournalPrefix)
 	backupInfo, err := NewJournalInfo(
+		ctx,
 		theMostRecentBackupName,
 		folder,
 		journalDir,
@@ -233,11 +238,11 @@ type JournalFiles struct {
 
 // UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
 // using journal files on JournalDirectoryName and save it for the previous JournalInfo
-func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder, journalFilesObj *JournalFiles) error {
+func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Folder, journalFilesObj *JournalFiles) error {
 	var err error
 	if !journalFilesObj.initialized {
 		// doing this 1 time for reusing it in next runs during single calculation
-		journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder()
+		journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder(ctx)
 		if err != nil {
 			return err
 		}
@@ -263,7 +268,7 @@ func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder, journalFilesObj
 		}
 	}
 
-	prevJi, err := ji.GetNext(folder, older)
+	prevJi, err := ji.GetNext(ctx, folder, older)
 	if err != nil {
 		// There can only be one backup on S3 or we can delete the oldest one
 		if err.Error() == cantFindJournal {
@@ -273,7 +278,7 @@ func (ji *JournalInfo) UpdateIntervalSize(folder storage.Folder, journalFilesObj
 	}
 	prevJi.SizeToNextBackup = sum
 
-	err = prevJi.Upload(folder)
+	err = prevJi.Upload(ctx, folder)
 	if err != nil {
 		return err
 	}

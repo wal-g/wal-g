@@ -16,9 +16,9 @@ var pgbackrestBackupFetchCmd = &cobra.Command{
 
 		destinationDirectory := args[0]
 		backupName := args[1]
-		folder, stanza := configurePgbackrestSettings()
+		folder, stanza := configurePgbackrestSettings(cmd.Context())
 		backupSelector := pgbackrest.NewBackupSelector(backupName, stanza)
-		err := pgbackrest.HandlePgbackrestBackupFetch(folder, stanza, destinationDirectory, backupSelector)
+		err := pgbackrest.HandlePgbackrestBackupFetch(cmd.Context(), folder, stanza, destinationDirectory, backupSelector)
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
 }

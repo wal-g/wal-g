@@ -18,8 +18,8 @@ var checkReadCmd = &cobra.Command{
 	Short: "check read access to the storage",
 	Args:  cobra.MinimumNArgs(0),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
-			return storagetools.HandleCheckRead(folder, args)
+		err := exec.OnStorage(cmd.Context(), targetStorage, func(folder storage.Folder) error {
+			return storagetools.HandleCheckRead(cmd.Context(), folder, args)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},
@@ -30,8 +30,8 @@ var checkWriteCmd = &cobra.Command{
 	Short: "check write access to the storage",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		err := exec.OnStorage(targetStorage, func(folder storage.Folder) error {
-			return storagetools.HandleCheckWrite(folder)
+		err := exec.OnStorage(cmd.Context(), targetStorage, func(folder storage.Folder) error {
+			return storagetools.HandleCheckWrite(cmd.Context(), folder)
 		})
 		tracelog.ErrorLogger.FatalOnError(err)
 	},

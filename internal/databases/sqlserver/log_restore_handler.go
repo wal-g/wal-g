@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"syscall"
 	"time"
 
 	"github.com/wal-g/tracelog"
@@ -14,24 +12,23 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromnames []string, noRecovery bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
+func HandleLogRestore(ctx context.Context, backupName string, untilTS string, dbnames []string, fromnames []string, noRecovery bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	st, err := internal.ConfigureStorage()
+	st, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	folder := st.RootFolder()
 
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = backup.FetchSentinel(sentinel)
+	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	db, err := getSQLServerConnection()
+	db, err := getSQLServerConnection(ctx)
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
@@ -44,7 +41,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 	stopAt, err := utility.ParseUntilTS(untilTS)
 	tracelog.ErrorLogger.FatalfOnError("invalid util timestamp: %v", err)
 
-	logs, err := getLogsSinceBackup(folder, backup.Name, stopAt)
+	logs, err := getLogsSinceBackup(ctx, folder, backup.Name, stopAt)
 	tracelog.ErrorLogger.FatalfOnError("failed to list log backups: %v", err)
 
 	err = runParallel(func(i int) error {
@@ -53,7 +50,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 		if err != nil {
 			return err
 		}
-		backupMetadata, err := GetBackupProperties(db, folder, false, backup.Name, fromname)
+		backupMetadata, err := GetBackupProperties(ctx, db, folder, false, backup.Name, fromname)
 		if err != nil {
 			return err
 		}
@@ -65,7 +62,7 @@ func HandleLogRestore(backupName string, untilTS string, dbnames []string, fromn
 		}
 		prevBackupFinishdate := dbBackupProperties.BackupFinishDate
 		for _, logBackupName := range logs {
-			ok, err := doesLogBackupContainDB(folder, logBackupName, fromname)
+			ok, err := doesLogBackupContainDB(ctx, folder, logBackupName, fromname)
 			if err != nil {
 				return err
 			}
@@ -114,17 +111,17 @@ func restoreSingleLog(ctx context.Context,
 ) (time.Time, error) {
 	baseURL := getLogBackupURL(logBackupName, fromname)
 	basePath := getLogBackupPath(logBackupName, fromname)
-	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	blobs, err := listBackupBlobs(ctx, folder.GetSubFolder(basePath))
 	if err != nil {
 		return prevBackupFinishDate, err
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 
-	logBackupFileProperties, err := GetBackupProperties(db, folder, true, logBackupName, fromname)
+	logBackupFileProperties, err := GetBackupProperties(ctx, db, folder, true, logBackupName, fromname)
 	if err != nil {
 		return prevBackupFinishDate, err
 	}
-	applied, err := IsLogAlreadyApplied(db, dbname, logBackupFileProperties[0])
+	applied, err := IsLogAlreadyApplied(ctx, db, dbname, logBackupFileProperties[0])
 	if err != nil {
 		return prevBackupFinishDate, err
 	}

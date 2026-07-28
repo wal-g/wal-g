@@ -3,6 +3,7 @@ package postgres_test
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -68,7 +69,7 @@ func newTimelineHistoryFile(contents string, timelineId uint32) (string, *bytes.
 // TestWalShow test series is used to test the HandleWalShow() functionality
 
 func TestWalShow_NoSegmentsInStorage(t *testing.T) {
-	timelineInfos := executeWalShow([]string{}, make(map[string]*bytes.Buffer))
+	timelineInfos := executeWalShow(t.Context(), []string{}, make(map[string]*bytes.Buffer))
 	assert.Empty(t, timelineInfos)
 }
 
@@ -244,7 +245,7 @@ func TestWalShow_MultipleTimelines(t *testing.T) {
 
 // testSingleTimeline is used to test wal-show with only one timeline in WAL storage
 func testSingleTimeline(t *testing.T, setup *TestTimelineSetup, walFolderFiles map[string]*bytes.Buffer) {
-	timelines := executeWalShow(setup.GetWalFilenames(), walFolderFiles)
+	timelines := executeWalShow(t.Context(), setup.GetWalFilenames(), walFolderFiles)
 	assert.Len(t, timelines, 1)
 
 	verifySingleTimeline(t, setup, timelines[0])
@@ -253,7 +254,7 @@ func testSingleTimeline(t *testing.T, setup *TestTimelineSetup, walFolderFiles m
 // testMultipleTimelines is used to test wal-show in case of multiple timelines in WAL storage
 func testMultipleTimelines(t *testing.T, timelineSetups []*TestTimelineSetup, walFolderFiles map[string]*bytes.Buffer) {
 	walFilenames := concatWalFilenames(timelineSetups)
-	timelineInfos := executeWalShow(walFilenames, walFolderFiles)
+	timelineInfos := executeWalShow(t.Context(), walFilenames, walFolderFiles)
 
 	slices.SortFunc(timelineInfos, func(a, b *postgres.TimelineInfo) int {
 		return cmp.Compare(a.ID, b.ID)
@@ -301,25 +302,25 @@ func verifySingleTimeline(t *testing.T, setup *TestTimelineSetup, timelineInfo *
 
 // executeWalShow invokes the HandleWalShow() with fake storage filled with
 // provided wal segments and other folder files
-func executeWalShow(walFilenames []string, walFolderFiles map[string]*bytes.Buffer) []*postgres.TimelineInfo {
+func executeWalShow(ctx context.Context, walFilenames []string, walFolderFiles map[string]*bytes.Buffer) []*postgres.TimelineInfo {
 	rootFolder := setupTestStorageFolder()
 	walFolder := rootFolder.GetSubFolder(utility.WalPath)
-	putWalSegments(walFilenames, walFolder)
+	putWalSegments(ctx, walFilenames, walFolder)
 
 	for name, content := range walFolderFiles {
-		_ = walFolder.PutObject(name, content)
+		_ = walFolder.PutObject(ctx, name, content)
 	}
 
 	mockOutputWriter := &MockWalShowOutputWriter{}
-	postgres.HandleWalShow(rootFolder, false, mockOutputWriter)
+	postgres.HandleWalShow(ctx, rootFolder, false, mockOutputWriter)
 
 	return mockOutputWriter.timelineInfos
 }
 
-func putWalSegments(walFilenames []string, walFolder storage.Folder) {
+func putWalSegments(ctx context.Context, walFilenames []string, walFolder storage.Folder) {
 	for _, name := range walFilenames {
 		// we don't use the WAL file contents so let it be it empty inside
-		_ = walFolder.PutObject(name, new(bytes.Buffer))
+		_ = walFolder.PutObject(ctx, name, new(bytes.Buffer))
 	}
 }
 

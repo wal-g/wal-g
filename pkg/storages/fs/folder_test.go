@@ -16,7 +16,7 @@ func TestFSFolder(t *testing.T) {
 
 	defer os.RemoveAll(tmpDir)
 
-	st, err := ConfigureStorage(tmpDir, nil)
+	st, err := ConfigureStorage(t.Context(), tmpDir, nil)
 	assert.NoError(t, err)
 
 	storage.RunFolderTest(st.RootFolder(), t)
@@ -26,7 +26,7 @@ func TestDeleteObjectsRemovesEmptyDirs(t *testing.T) {
 	tmpDir := setupTmpDir(t)
 	defer os.RemoveAll(tmpDir)
 
-	st, err := ConfigureStorage(tmpDir, nil)
+	st, err := ConfigureStorage(t.Context(), tmpDir, nil)
 	assert.NoError(t, err)
 	root := st.RootFolder()
 
@@ -34,15 +34,15 @@ func TestDeleteObjectsRemovesEmptyDirs(t *testing.T) {
 	//   backup_001.json.lz4          — sentinel at root level
 	//   backup_001/pg_data/global/pg_control
 	//   backup_001/pg_data/base/1/1259
-	err = root.PutObject("backup_001.json.lz4", strings.NewReader("{}"))
+	err = root.PutObject(t.Context(), "backup_001.json.lz4", strings.NewReader("{}"))
 	assert.NoError(t, err)
-	err = root.PutObject("backup_001/pg_data/global/pg_control", strings.NewReader("data"))
+	err = root.PutObject(t.Context(), "backup_001/pg_data/global/pg_control", strings.NewReader("data"))
 	assert.NoError(t, err)
-	err = root.PutObject("backup_001/pg_data/base/1/1259", strings.NewReader("data"))
+	err = root.PutObject(t.Context(), "backup_001/pg_data/base/1/1259", strings.NewReader("data"))
 	assert.NoError(t, err)
 
 	// Delete sentinel + all data files, same as DeleteBackups does.
-	err = root.DeleteObjects([]storage.Object{
+	err = root.DeleteObjects(t.Context(), []storage.Object{
 		storage.NewLocalObject("backup_001.json.lz4", time.Time{}, 0),
 		storage.NewLocalObject("backup_001/pg_data/global/pg_control", time.Time{}, 0),
 		storage.NewLocalObject("backup_001/pg_data/base/1/1259", time.Time{}, 0),
@@ -66,18 +66,18 @@ func TestDeleteObjectsKeepsNonEmptyDirs(t *testing.T) {
 	tmpDir := setupTmpDir(t)
 	defer os.RemoveAll(tmpDir)
 
-	st, err := ConfigureStorage(tmpDir, nil)
+	st, err := ConfigureStorage(t.Context(), tmpDir, nil)
 	assert.NoError(t, err)
 	root := st.RootFolder()
 
 	// Two backups share a common parent layout but are independent.
-	err = root.PutObject("backup_001/pg_data/file_a", strings.NewReader("data"))
+	err = root.PutObject(t.Context(), "backup_001/pg_data/file_a", strings.NewReader("data"))
 	assert.NoError(t, err)
-	err = root.PutObject("backup_002/pg_data/file_b", strings.NewReader("data"))
+	err = root.PutObject(t.Context(), "backup_002/pg_data/file_b", strings.NewReader("data"))
 	assert.NoError(t, err)
 
 	// Delete only backup_001's file.
-	err = root.DeleteObjects([]storage.Object{
+	err = root.DeleteObjects(t.Context(), []storage.Object{
 		storage.NewLocalObject("backup_001/pg_data/file_a", time.Time{}, 0),
 	})
 	assert.NoError(t, err)

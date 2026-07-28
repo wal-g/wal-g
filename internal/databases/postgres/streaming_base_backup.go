@@ -57,7 +57,7 @@ func NewStreamingBaseBackup(pgDataDir string, maxTarSize int64, pgVersion int, p
 }
 
 // Start will start a base_backup read the backup info, and prepare for uploading tar files
-func (bb *StreamingBaseBackup) Start(verifyChecksum bool, diskLimit int32) (err error) {
+func (bb *StreamingBaseBackup) Start(ctx context.Context, verifyChecksum bool, diskLimit int32) (err error) {
 	options := pglogrepl.BaseBackupOptions{
 		// Following implementation for local backup.
 		Fast:              true,
@@ -66,7 +66,7 @@ func (bb *StreamingBaseBackup) Start(verifyChecksum bool, diskLimit int32) (err 
 		NoVerifyChecksums: !verifyChecksum,
 		MaxRate:           diskLimit,
 	}
-	result, err := pglogrepl.StartBaseBackup(context.Background(), bb.pgConn, options)
+	result, err := pglogrepl.StartBaseBackup(ctx, bb.pgConn, options)
 	if err != nil {
 		return
 	}
@@ -78,8 +78,8 @@ func (bb *StreamingBaseBackup) Start(verifyChecksum bool, diskLimit int32) (err 
 }
 
 // Finish will wrap up a backup after finalizing upload.
-func (bb *StreamingBaseBackup) Finish() (err error) {
-	result, err := pglogrepl.FinishBaseBackup(context.Background(), bb.pgConn)
+func (bb *StreamingBaseBackup) Finish(ctx context.Context) (err error) {
+	result, err := pglogrepl.FinishBaseBackup(ctx, bb.pgConn)
 	if err != nil {
 		return
 	}
@@ -262,7 +262,7 @@ func (bb *StreamingBaseBackup) compatArchiveForIdx(idx int) *archive {
 // compatReader yields raw CopyData payloads for one tablespace until CopyDone.
 type compatReader struct {
 	bb       *StreamingBaseBackup
-	ctx      context.Context
+	ctx      context.Context //nolint:containedctx // ctx-aware io.Reader; Read carries no ctx
 	chunk    []byte
 	chunkPos int
 	done     bool
@@ -354,7 +354,7 @@ func (bb *StreamingBaseBackup) streamArchives(ctx context.Context) iter.Seq2[*ar
 // yield, then exits before the main goroutine resumes the drain loop).
 type streamPump struct {
 	bb         *StreamingBaseBackup
-	ctx        context.Context
+	ctx        context.Context //nolint:containedctx // drives the streaming pump goroutine; iter.Seq yield carries no ctx
 	yield      func(*archive, error) bool
 	chunk      []byte // current 'd' payload (after stripping tag)
 	chunkPos   int

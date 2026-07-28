@@ -19,6 +19,6 @@ func replaceCommandArgument(cmd *exec.Cmd, replace, argument string) {
 	cmd.Args[len(cmd.Args)-1] = strings.Replace(cmd.Args[len(cmd.Args)-1], replace, argument, 1)
 }
 
-func cloneCommand(cmd *exec.Cmd) *exec.Cmd {
-	return exec.CommandContext(context.Background(), cmd.Args[0], cmd.Args[1:]...)
+func cloneCommand(ctx context.Context, cmd *exec.Cmd) *exec.Cmd {
+	return exec.CommandContext(ctx, cmd.Args[0], cmd.Args[1:]...)
 }

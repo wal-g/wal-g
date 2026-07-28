@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/tracelog"
@@ -10,13 +11,13 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func OnAllStorages(fn func(folder storage.Folder) error) error {
-	failover, err := internal.ConfigureFailoverStorages()
+func OnAllStorages(ctx context.Context, fn func(folder storage.Folder) error) error {
+	failover, err := internal.ConfigureFailoverStorages(ctx)
 	if err != nil {
 		return err
 	}
 
-	primary, err := internal.ConfigureStorage()
+	primary, err := internal.ConfigureStorage(ctx)
 	if err != nil {
 		return err
 	}
@@ -39,12 +40,12 @@ func OnAllStorages(fn func(folder storage.Folder) error) error {
 	return nil
 }
 
-func OnStorage(name string, fn func(folder storage.Folder) error) error {
+func OnStorage(ctx context.Context, name string, fn func(folder storage.Folder) error) error {
 	if name == consts.AllStorages {
-		return OnAllStorages(fn)
+		return OnAllStorages(ctx, fn)
 	}
 
-	st, err := ConfigureStorage(name)
+	st, err := ConfigureStorage(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to init folder for storage %q: %w", name, err)
 	}
@@ -52,14 +53,14 @@ func OnStorage(name string, fn func(folder storage.Folder) error) error {
 	return fn(st.RootFolder())
 }
 
-func ConfigureStorage(name string) (storage.Storage, error) {
+func ConfigureStorage(ctx context.Context, name string) (storage.Storage, error) {
 	switch name {
 	case consts.AllStorages:
 		return nil, fmt.Errorf("a specific storage name was expected instead of 'all'")
 	case consts.DefaultStorage:
-		return internal.ConfigureStorage()
+		return internal.ConfigureStorage(ctx)
 	default:
-		failover, err := internal.ConfigureFailoverStorages()
+		failover, err := internal.ConfigureFailoverStorages(ctx)
 		if err != nil {
 			return nil, err
 		}

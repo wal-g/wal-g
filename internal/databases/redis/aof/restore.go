@@ -11,7 +11,6 @@ import (
 )
 
 type RestoreService struct {
-	Context             context.Context
 	SourceStorageFolder storage.Folder
 	TargetDiskFolder    *archive.AofFolderInfo
 	Uploader            internal.Uploader
@@ -26,10 +25,9 @@ type RestoreArgs struct {
 	SkipBackupDownload bool
 }
 
-func CreateRestoreService(ctx context.Context, sourceStorageFolder storage.Folder, targetDiskFolder *archive.AofFolderInfo,
+func CreateRestoreService(sourceStorageFolder storage.Folder, targetDiskFolder *archive.AofFolderInfo,
 	uploader internal.Uploader, versionParser *archive.VersionParser) (*RestoreService, error) {
 	return &RestoreService{
-		Context:             ctx,
 		SourceStorageFolder: sourceStorageFolder,
 		TargetDiskFolder:    targetDiskFolder,
 		Uploader:            uploader,
@@ -37,8 +35,8 @@ func CreateRestoreService(ctx context.Context, sourceStorageFolder storage.Folde
 	}, nil
 }
 
-func (r *RestoreService) DoRestore(args RestoreArgs) error {
-	sentinel, err := SentinelWithExistenceCheck(r.SourceStorageFolder, args.BackupName)
+func (r *RestoreService) DoRestore(ctx context.Context, args RestoreArgs) error {
+	sentinel, err := SentinelWithExistenceCheck(ctx, r.SourceStorageFolder, args.BackupName)
 	if err != nil {
 		return err
 	}
@@ -67,7 +65,7 @@ func (r *RestoreService) DoRestore(args RestoreArgs) error {
 		}
 
 		tracelog.InfoLogger.Printf("Download backup files to %s\n", r.TargetDiskFolder.Path)
-		err = r.downloadFromTarArchives(sentinel.Name())
+		err = r.downloadFromTarArchives(ctx, sentinel.Name())
 		if err != nil {
 			return err
 		}
@@ -78,7 +76,7 @@ func (r *RestoreService) DoRestore(args RestoreArgs) error {
 	return nil
 }
 
-func (r *RestoreService) downloadFromTarArchives(backupName string) error {
+func (r *RestoreService) downloadFromTarArchives(ctx context.Context, backupName string) error {
 	downloader := internal.CreateConcurrentDownloader(r.Uploader, nil)
-	return downloader.Download(backupName, r.TargetDiskFolder.Path, nil)
+	return downloader.Download(ctx, backupName, r.TargetDiskFolder.Path, nil)
 }

@@ -10,7 +10,7 @@ import (
 func TestAzureFolder(t *testing.T) {
 	t.Skip("Credentials needed to run Azure Storage tests")
 
-	st, err := ConfigureStorage("azure://test-container/test-folder/Sub0", make(map[string]string))
+	st, err := ConfigureStorage(t.Context(), "azure://test-container/test-folder/Sub0", make(map[string]string))
 	assert.NoError(t, err)
 
 	storage.RunFolderTest(st.RootFolder(), t)
@@ -20,7 +20,7 @@ func TestConfigureStorage_WithoutAccountNameSetting(t *testing.T) {
 	settings := map[string]string{}
 	prefix := "azure://test-container/test-folder/Sub0"
 
-	_, err := ConfigureStorage(prefix, settings)
+	_, err := ConfigureStorage(t.Context(), prefix, settings)
 
 	assert.Error(t, err)
 }
@@ -31,7 +31,7 @@ func TestConfigureStorage_WithValidInput(t *testing.T) {
 	}
 	prefix := "azure://test-container/test-folder/Sub0"
 
-	storage, err := ConfigureStorage(prefix, settings)
+	storage, err := ConfigureStorage(t.Context(), prefix, settings)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, storage)

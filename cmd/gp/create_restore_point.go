@@ -19,10 +19,10 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
 
-			restorePointCreator, err := greenplum.NewRestorePointCreator(name)
+			restorePointCreator, err := greenplum.NewRestorePointCreator(cmd.Context(), name)
 			tracelog.ErrorLogger.FatalOnError(err)
 
-			restorePointCreator.Create()
+			restorePointCreator.Create(cmd.Context())
 		},
 	}
 )

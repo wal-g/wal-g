@@ -1,6 +1,8 @@
 package greenplum
 
 import (
+	"context"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -44,11 +46,11 @@ func (o BackupObject) GetStorage() string {
 	return o.storageName
 }
 
-func makeBackupObjects(folder storage.Folder, objects []storage.Object) ([]internal.BackupObject, error) {
+func makeBackupObjects(ctx context.Context, folder storage.Folder, objects []storage.Object) ([]internal.BackupObject, error) {
 	backupObjects := make([]internal.BackupObject, 0, len(objects))
 	for _, object := range objects {
 		storageName := multistorage.GetStorage(object)
-		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(folder, object, storageName)
+		incrementBase, incrementFrom, isFullBackup, err := getIncrementInfo(ctx, folder, object, storageName)
 		if err != nil {
 			return nil, err
 		}
@@ -59,12 +61,12 @@ func makeBackupObjects(folder storage.Folder, objects []storage.Object) ([]inter
 	return backupObjects, nil
 }
 
-func getIncrementInfo(folder storage.Folder, object storage.Object, storageName string) (string, string, bool, error) {
-	backup, err := NewBackupInStorage(folder, utility.StripRightmostBackupName(object.GetName()), storageName)
+func getIncrementInfo(ctx context.Context, folder storage.Folder, object storage.Object, storageName string) (string, string, bool, error) {
+	backup, err := NewBackupInStorage(ctx, folder, utility.StripRightmostBackupName(object.GetName()), storageName)
 	if err != nil {
 		return "", "", true, err
 	}
-	sentinel, err := backup.GetSentinel()
+	sentinel, err := backup.GetSentinel(ctx)
 	if err != nil {
 		return "", "", true, err
 	}

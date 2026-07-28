@@ -8,8 +8,7 @@ import (
 const (
 	backupCopyUsage            = "copy"
 	backupCopyShortDescription = "copy specific or all backups"
-	backupCopyLongDescription  = "Copy backup(s) from one storage to another according to configs " +
-		"(with history by default)"
+	backupCopyLongDescription  = "Copy backup(s) from one storage to another without transforming payloads"
 
 	backupNameFlag        = "backup-name"
 	backupNameShorthand   = "b"
@@ -25,7 +24,7 @@ const (
 
 	withAllHistoryFlag        = "with-history"
 	withAllHistoryShorthand   = "w"
-	withAllHistoryDescription = "If set - copy WALs older than backup finish_lsn. If not - copy only WALs from start_lsn to finish_lsn"
+	withAllHistoryDescription = "Synchronize WAL from the backup recovery point through the latest continuous archive"
 )
 
 var (
@@ -48,7 +47,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	postgres.HandleCopy(fromConfigFile, toConfigFile, backupName, withAllHistory)
+	postgres.HandleCopy(cmd.Context(), fromConfigFile, toConfigFile, backupName, withAllHistory)
 }
 
 func init() {

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"os"
 
 	"github.com/wal-g/tracelog"
@@ -9,12 +10,12 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-func HandleDetailedBackupList(folder storage.Folder, pretty bool, json bool) {
-	backups, err := internal.GetBackups(folder)
+func HandleDetailedBackupList(ctx context.Context, folder storage.Folder, pretty bool, json bool) {
+	backups, err := internal.GetBackups(ctx, folder)
 	err = internal.FilterOutNoBackupFoundError(err, json)
 	tracelog.ErrorLogger.FatalfOnError("Get backups from folder: %v", err)
 
-	backupDetails, err := GetBackupsDetails(folder, backups)
+	backupDetails, err := GetBackupsDetails(ctx, folder, backups)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	SortBackupDetails(backupDetails)

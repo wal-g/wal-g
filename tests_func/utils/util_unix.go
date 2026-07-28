@@ -10,6 +10,10 @@ import (
 )
 
 func setOwner(fileInfo os.FileInfo, sourcePath string, destPath string) error {
+	if os.Geteuid() != 0 {
+		return nil
+	}
+
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if !ok {
 		return fmt.Errorf("failed to get raw syscall.Stat_t data for '%s'", sourcePath)

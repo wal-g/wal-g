@@ -159,7 +159,7 @@ func (seg *WalSegment) processMessage(message pgproto3.BackendMessage) (ProcessM
 }
 
 // Stream is a helper function to retrieve messages from Postgres and have them processed by processMessage().
-func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Duration) (ProcessMessageResult, error) {
+func (seg *WalSegment) Stream(ctx context.Context, conn *pgconn.PgConn, standbyMessageTimeout time.Duration) (ProcessMessageResult, error) {
 	// Inspired by https://github.com/jackc/pglogrepl/blob/master/example/pglogrepl_demo/main.go
 	// And https://www.postgresql.org/docs/12/protocol-replication.html
 
@@ -168,7 +168,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 	nextStandbyMessageDeadline := time.Now()
 	for {
 		if time.Now().After(nextStandbyMessageDeadline) {
-			err = pglogrepl.SendStandbyStatusUpdate(context.Background(),
+			err = pglogrepl.SendStandbyStatusUpdate(ctx,
 				conn,
 				pglogrepl.StandbyStatusUpdate{WALWritePosition: seg.StartLSN})
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -176,8 +176,8 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
 		}
 
-		ctx, cancel := context.WithDeadline(context.Background(), nextStandbyMessageDeadline)
-		msg, err = conn.ReceiveMessage(ctx)
+		deadlineCtx, cancel := context.WithDeadline(ctx, nextStandbyMessageDeadline)
+		msg, err = conn.ReceiveMessage(deadlineCtx)
 		cancel()
 		if pgconn.Timeout(err) {
 			continue
@@ -193,7 +193,7 @@ func (seg *WalSegment) Stream(conn *pgconn.PgConn, standbyMessageTimeout time.Du
 		case ProcessMessageUnknown:
 			return result, err
 		case ProcessMessageCopyDone:
-			cdr, err := pglogrepl.SendStandbyCopyDone(context.Background(), conn)
+			cdr, err := pglogrepl.SendStandbyCopyDone(ctx, conn)
 			tracelog.ErrorLogger.FatalOnError(err)
 			tracelog.DebugLogger.Printf("CopyDoneResult => %v", cdr)
 			return result, nil

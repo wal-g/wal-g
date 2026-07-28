@@ -13,7 +13,7 @@ import (
 func TestGSFolder(t *testing.T) {
 	t.Skip("Credentials needed to run GCP tests")
 
-	st, err := ConfigureStorage("gs://x4m-test/walg-bucket", nil)
+	st, err := ConfigureStorage(t.Context(), "gs://x4m-test/walg-bucket", nil)
 	assert.NoError(t, err)
 
 	storage.RunFolderTest(st.RootFolder(), t)
@@ -25,7 +25,7 @@ func TestGSExactFolder(t *testing.T) {
 	//os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "/Users/x4mmm/Downloads/mdb-tests-d0uble-0b98813b622b.json")
 	//os.Setenv("GCS_CONTEXT_TIMEOUT", "1024000000")
 
-	st, err := ConfigureStorage("gs://x4m-test//walg-bucket////strange_folder",
+	st, err := ConfigureStorage(t.Context(), "gs://x4m-test//walg-bucket////strange_folder",
 		map[string]string{
 			normalizePrefixSetting: "false",
 		})
@@ -37,7 +37,7 @@ func TestGSExactFolder(t *testing.T) {
 func TestGSFolderWithEncryptionKey(t *testing.T) {
 	t.Skip("Credentials needed to run GCP tests")
 
-	st, err := ConfigureStorage("gs://x4m-test/walg-bucket",
+	st, err := ConfigureStorage(t.Context(), "gs://x4m-test/walg-bucket",
 		map[string]string{
 			encryptionKeySetting: "F2F90NxJ2LrC/ujDQVGFfHetdDgjIMyrDkkN1VqGNnw=",
 		})
@@ -64,7 +64,7 @@ func TestUploadingReaderFails(t *testing.T) {
 		},
 	}
 
-	err := folder.PutObject("name", fakeReader{})
+	err := folder.PutObject(t.Context(), "name", fakeReader{})
 	assert.EqualError(t, err, `read a chunk of object "path/name" to upload to GCS: failed to fake read`)
 }
 

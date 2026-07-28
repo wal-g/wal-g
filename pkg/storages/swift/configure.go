@@ -1,6 +1,7 @@
 package swift
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -24,6 +25,7 @@ var SettingList = []string{
 
 // TODO: Unit tests
 func ConfigureStorage(
+	ctx context.Context,
 	prefix string,
 	settings map[string]string,
 	rootWraps ...storage.WrapRootFolder,
@@ -48,7 +50,7 @@ func ConfigureStorage(
 		SecretEnvVariables: secretEnv,
 	}
 
-	st, err := NewStorage(config, rootWraps...)
+	st, err := NewStorage(ctx, config, rootWraps...)
 	if err != nil {
 		return nil, fmt.Errorf("create Swift storage: %w", err)
 	}

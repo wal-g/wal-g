@@ -1,9 +1,6 @@
 FROM wal-g/golang:latest AS build
-ENV GOEXPERIMENT=jsonv2
-WORKDIR /go/src/github.com/wal-g/wal-g
 
-RUN apt-get update && \
-    apt-get install --yes --no-install-recommends --no-install-suggests
+WORKDIR /go/src/github.com/wal-g/wal-g
 
 COPY go.mod go.mod
 COPY vendor/ vendor/
@@ -13,14 +10,8 @@ COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
-ENV USE_BROTLI=1
 
-RUN sed -i 's|#cgo LDFLAGS: -lbrotli.*|&-static -lbrotlicommon-static -lm|' \
-        vendor/github.com/google/brotli/go/cbrotli/cgo.go && \
-    cd main/fdb && \
-    go build -mod vendor -tags brotli -race -o wal-g -ldflags "-s -w -X main.buildDate=`date -u +%Y.%m.%d_%H:%M:%S`"
-    
-RUN make fdb_build
+RUN USE_BROTLI=1 make ENABLE_RACE_DETECTION=1 fdb_build
 
 FROM foundationdb/foundationdb:latest
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/fdb/wal-g /usr/bin

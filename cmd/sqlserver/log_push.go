@@ -14,7 +14,7 @@ var logPushCmd = &cobra.Command{
 	Use:   "log-push",
 	Short: logPushShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
-		sqlserver.HandleLogPush(logPushDatabases, logNoRecovery)
+		sqlserver.HandleLogPush(cmd.Context(), logPushDatabases, logNoRecovery)
 	},
 }
 

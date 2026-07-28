@@ -51,7 +51,7 @@ var backupFetchCmd = &cobra.Command{
 			fetchTargetUserData = viper.GetString(conf.FetchTargetUserDataSetting)
 		}
 
-		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
+		rootFolder, err := getMultistorageRootFolder(cmd.Context(), false, policies.UniteAllStorages)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		if restorePoint != "" && restorePointTS != "" {
@@ -59,7 +59,7 @@ var backupFetchCmd = &cobra.Command{
 		}
 
 		if restorePointTS != "" {
-			restorePoints, err := greenplum.FetchAllRestorePoints(rootFolder)
+			restorePoints, err := greenplum.FetchAllRestorePoints(cmd.Context(), rootFolder)
 			tracelog.ErrorLogger.FatalOnError(err)
 			restorePoint, err = greenplum.FindRestorePointBeforeTS(restorePointTS, restorePoints)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -77,7 +77,7 @@ var backupFetchCmd = &cobra.Command{
 		fetchMode, err := greenplum.NewBackupFetchMode(fetchModeStr)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		internal.HandleBackupFetch(rootFolder, targetBackupSelector,
+		internal.HandleBackupFetch(cmd.Context(), rootFolder, targetBackupSelector,
 			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIDs, fetchMode, restorePoint,
 				partialRestoreArgs))
 	},

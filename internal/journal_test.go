@@ -60,7 +60,7 @@ func generateAndUploadData(t *testing.T, mockUploader internal.Uploader) {
 		time.Sleep(time.Millisecond)
 	}
 
-	objs, _, err := mockUploader.Folder().GetSubFolder(DefaultJournalDirectory).ListFolder()
+	objs, _, err := mockUploader.Folder().GetSubFolder(DefaultJournalDirectory).ListFolder(t.Context())
 	assert.NoError(t, err)
 	for _, obj := range objs {
 		value, err := strconv.Atoi(obj.GetName())
@@ -86,7 +86,7 @@ func CreateThreeJournals(
 		MinimalJournalNumber, MinimalJournalNumber,
 		DefaultJournalDirectory,
 	)
-	assert.NoError(t, ji1.Upload(folder))
+	assert.NoError(t, ji1.Upload(t.Context(), folder))
 
 	ji2 := internal.NewEmptyJournalInfo(
 		fmt.Sprintf(
@@ -101,9 +101,9 @@ func CreateThreeJournals(
 		DefaultJournalDirectory,
 	)
 
-	assert.NoError(t, ji2.Upload(folder))
-	assert.NoError(t, ji2.UpdateIntervalSize(folder, &internal.JournalFiles{}))
-	assert.NoError(t, ji1.Read(folder))
+	assert.NoError(t, ji2.Upload(t.Context(), folder))
+	assert.NoError(t, ji2.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
+	assert.NoError(t, ji1.Read(t.Context(), folder))
 
 	ji3 := internal.NewEmptyJournalInfo(
 		fmt.Sprintf(
@@ -118,10 +118,10 @@ func CreateThreeJournals(
 		DefaultJournalDirectory,
 	)
 
-	assert.NoError(t, ji3.Upload(folder))
-	assert.NoError(t, ji3.UpdateIntervalSize(folder, &internal.JournalFiles{}))
-	assert.NoError(t, ji2.Read(folder))
-	assert.NoError(t, ji1.Read(folder))
+	assert.NoError(t, ji3.Upload(t.Context(), folder))
+	assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
+	assert.NoError(t, ji2.Read(t.Context(), folder))
+	assert.NoError(t, ji1.Read(t.Context(), folder))
 
 	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
 	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
@@ -143,9 +143,9 @@ func TestDeleteJournalInMiddle(t *testing.T) {
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
 
-	assert.NoError(t, ji2.Delete(folder))
-	assert.NoError(t, ji1.Read(folder))
-	assert.NoError(t, ji3.Read(folder))
+	assert.NoError(t, ji2.Delete(t.Context(), folder))
+	assert.NoError(t, ji1.Read(t.Context(), folder))
+	assert.NoError(t, ji3.Read(t.Context(), folder))
 	assert.Equal(t, int64(66), ji1.SizeToNextBackup)
 	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }
@@ -156,9 +156,9 @@ func TestDeleteJournalInBegin(t *testing.T) {
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
 
-	assert.NoError(t, ji1.Delete(folder))
-	assert.NoError(t, ji2.Read(folder))
-	assert.NoError(t, ji3.Read(folder))
+	assert.NoError(t, ji1.Delete(t.Context(), folder))
+	assert.NoError(t, ji2.Read(t.Context(), folder))
+	assert.NoError(t, ji3.Read(t.Context(), folder))
 	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
 	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
 }
@@ -169,9 +169,9 @@ func TestDeleteJournalInEnd(t *testing.T) {
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
 
-	assert.NoError(t, ji3.Delete(folder))
-	assert.NoError(t, ji1.Read(folder))
-	assert.NoError(t, ji2.Read(folder))
+	assert.NoError(t, ji3.Delete(t.Context(), folder))
+	assert.NoError(t, ji1.Read(t.Context(), folder))
+	assert.NoError(t, ji2.Read(t.Context(), folder))
 	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
 	assert.Equal(t, int64(0), ji2.SizeToNextBackup)
 	fmt.Println(ji1.JournalName, ji2.JournalName, ji3.JournalName)
@@ -185,15 +185,15 @@ func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
 
 	// There are random method calls
 	for i := 0; i < 10; i++ {
-		assert.NoError(t, ji1.UpdateIntervalSize(folder, &internal.JournalFiles{}))
-		assert.NoError(t, ji1.Upload(folder))
-		assert.NoError(t, ji3.Read(folder))
-		assert.NoError(t, ji2.Upload(folder))
-		assert.NoError(t, ji2.UpdateIntervalSize(folder, &internal.JournalFiles{}))
-		assert.NoError(t, ji3.Upload(folder))
-		assert.NoError(t, ji3.UpdateIntervalSize(folder, &internal.JournalFiles{}))
-		assert.NoError(t, ji2.Read(folder))
-		assert.NoError(t, ji1.Read(folder))
+		assert.NoError(t, ji1.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
+		assert.NoError(t, ji1.Upload(t.Context(), folder))
+		assert.NoError(t, ji3.Read(t.Context(), folder))
+		assert.NoError(t, ji2.Upload(t.Context(), folder))
+		assert.NoError(t, ji2.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
+		assert.NoError(t, ji3.Upload(t.Context(), folder))
+		assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
+		assert.NoError(t, ji2.Read(t.Context(), folder))
+		assert.NoError(t, ji1.Read(t.Context(), folder))
 	}
 
 	assert.Equal(t, int64(33), ji1.SizeToNextBackup)

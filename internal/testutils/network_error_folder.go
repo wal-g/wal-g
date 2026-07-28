@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"context"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -57,8 +58,8 @@ type TestFolder struct {
 	mutex        sync.Mutex
 }
 
-func (tf *TestFolder) ReadObject(path string) (io.ReadCloser, error) {
-	reader, err := tf.Folder.ReadObject(path)
+func (tf *TestFolder) ReadObject(ctx context.Context, path string) (io.ReadCloser, error) {
+	reader, err := tf.Folder.ReadObject(ctx, path)
 	if tf.maxReadSize != 0 {
 		tf.mutex.Lock()
 		defer tf.mutex.Unlock()

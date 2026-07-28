@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   parallel:
     uses: ./.github/workflows/dockertests.yml
@@ -21,6 +25,7 @@ jobs:
         "make TEST=\"pg10_copy_backup_test\" pg_integration_test",
         "make TEST=\"pg10_delta_backup_wal_delta_test\" pg_integration_test",
         "make TEST=\"pg10_full_backup_test\" pg_integration_test",
+        "make TEST=\"pg10_full_backup_test_compression_none_encryption_test\" pg_integration_test",
         "make TEST=\"pg10_full_backup_streamed_test\" pg_integration_test",
         "make TEST=\"pg10_partial_restore_test\" pg_integration_test",
         "make TEST=\"pg10_remote_backup_test\" pg_integration_test",
@@ -64,7 +69,6 @@ jobs:
         "make TEST=\"pg10_daemon_backup_and_restore_test\" pg_integration_test",
         "make TEST=\"pg10_daemon_client_test\" pg_integration_test",
         "make TEST=\"pg10_prefetch_test\" pg_integration_test",
-        "make mongo_test",
         "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
         "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
         "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
@@ -76,11 +80,14 @@ jobs:
         "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_logical_features",
         "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_partial_features",
         "make redis_test",
-        "make FEATURE=\"aof_backup\" IMAGE_TYPE=\"aof\" REDIS_VERSION=\"7.0.15\" redis_features",
-        "make FEATURE=\"aof_backup\" IMAGE_TYPE=\"aof\" REDIS_VERSION=\"7.2.4\" redis_features",
-        "make FEATURE=\"rdb_backup\" IMAGE_TYPE=\"rdb\" REDIS_VERSION=\"6.2.4\" redis_features",
-        "make FEATURE=\"rdb_backup\" IMAGE_TYPE=\"rdb\" REDIS_VERSION=\"7.0.15\" redis_features",
-        "make FEATURE=\"rdb_backup\" IMAGE_TYPE=\"rdb\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"rdb_ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"aof_ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"aof_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
+        "make FEATURE=\"aof_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"6.2.4\" redis_features",
+        "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
+        "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
         "make TEST=\"pg10_wale_tablespace_compatibility_test\" pg_integration_test",
         "make TEST=\"pg10_tablespace_support_test\" pg_integration_test",
         "make TEST=\"pg10_walg_tablespace_restore_spec_test\" pg_integration_test",

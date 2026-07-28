@@ -27,6 +27,11 @@ To configure how many times failed file will be retried during ```backup-fetch``
 
 An experimental feature that allows you to perform direct_io reads during a ```backup-push``` without flushing the disk cache. To activate it, set the value of the environment variable to `true`.
 
+* `WALG_DIRECT_IO_BLOCK_COUNT`
+
+Set number of disk blocks read and processed in a single batch with direct_io during a ```backup-push```. Default 32 blocks is 32 * 4kb = 128kb
+single read. Larger reads reduce syscall CPU costs and improve throughput at the expense of higher memory consumption.
+
 * `WALG_PREFETCH_DIR`
 
 By default WAL prefetch is storing prefetched data in pg_wal directory. This ensures that WAL can be easily moved from prefetch location to actual WAL consumption directory. But it may have negative consequences if you use it with pg_rewind in PostgreSQL 13.
@@ -554,14 +559,16 @@ wal-g catchup-send ${PGDATA_PRIMARY} hostname:1337
 
 ### ``copy``
 
-This command will help to change the storage and move the set of backups there or write the backups on magnetic tape. For example, `wal-g copy --from=config_from.json --to=config_to.json` will copy all backups.
+This command copies restorable backup closures between storages without decrypting, decompressing, recompressing, or re-encrypting their payload objects. Existing destination objects with the same path and size are skipped. For example, `wal-g copy --from=config_from.json --to=config_to.json` copies all backups and their exact-restore WAL.
+
+`--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.
 
 Flags:
 
 - `-b, --backup-name string` Copy specific backup
 - `-f, --from string` Storage config from where should copy backup
 - `-t, --to string` Storage config to where should copy backup
-- `-w, --with-history` If set - copy WALs older than backup finish_lsn. If not - copy only WALs from start_lsn to finish_lsn
+- `-w, --with-history` Synchronize WAL through the latest continuous archive
 
 ### Delete retention ordering and ``--use-sentinel-time``
 

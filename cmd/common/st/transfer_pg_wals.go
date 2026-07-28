@@ -12,8 +12,8 @@ var pgWALsCmd = &cobra.Command{
 	Use:   "pg-wals --source='source_storage' [--target='target_storage']",
 	Short: pgWALsShortDescription,
 	Args:  cobra.NoArgs,
-	Run: func(_ *cobra.Command, _ []string) {
-		transferFiles(utility.WalPath)
+	Run: func(cmd *cobra.Command, _ []string) {
+		transferFiles(cmd.Context(), utility.WalPath)
 	},
 }
 

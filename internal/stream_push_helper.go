@@ -23,7 +23,11 @@ const (
 // TODO : unit tests
 // PushStream compresses a stream and push it
 func (uploader *RegularUploader) PushStream(ctx context.Context, stream io.Reader) (string, error) {
-	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+	return uploader.PushStreamWithName(ctx, stream, StreamPrefix+utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat))
+}
+
+// PushStreamWithName compresses a stream and uploads it under the supplied backup name.
+func (uploader *RegularUploader) PushStreamWithName(ctx context.Context, stream io.Reader, backupName string) (string, error) {
 	dstPath := GetStreamName(backupName, uploader.Compressor.FileExtension())
 	err := uploader.PushStreamToDestination(ctx, stream, dstPath)
 
@@ -34,11 +38,14 @@ func (uploader *RegularUploader) PushStream(ctx context.Context, stream io.Reade
 // returns backup_prefix
 // (Note: individual parition names are built by adding '_0000.br' or '_0000_0000.br' suffix)
 func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.Reader) (string, error) {
-	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+	return uploader.PushStreamWithName(ctx, stream, StreamPrefix+utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat))
+}
 
+// PushStreamWithName splits, compresses, and uploads a stream under the supplied backup name.
+func (uploader *SplitStreamUploader) PushStreamWithName(ctx context.Context, stream io.Reader, backupName string) (string, error) {
 	// Upload Stream:
-	errGroup, ctx := errgroup.WithContext(ctx)
-	var readers = splitmerge.SplitReader(ctx, stream, uploader.partitions, uploader.blockSize)
+	errGroup, egCtx := errgroup.WithContext(ctx)
+	var readers = splitmerge.SplitReader(egCtx, stream, uploader.partitions, uploader.blockSize)
 	for partNumber := 0; partNumber < uploader.partitions; partNumber++ {
 		reader := readers[partNumber]
 		if uploader.maxFileSize != 0 {
@@ -52,12 +59,12 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 
 					tracelog.DebugLogger.Printf("Get file reader %d of part %d\n", idx, currentPartNumber)
 					dstPath := GetPartitionedSteamMultipartName(backupName, uploader.Compression().FileExtension(), currentPartNumber, idx)
-					err := uploader.PushStreamToDestination(ctx, fileReader, dstPath)
+					err := uploader.PushStreamToDestination(egCtx, fileReader, dstPath)
 					if err != nil {
 						return err
 					}
 					if read.Load() == 0 {
-						err = uploader.Folder().DeleteObjects([]storage.Object{storage.NewLocalObject(dstPath, time.Time{}, 0)})
+						err = uploader.Folder().DeleteObjects(egCtx, []storage.Object{storage.NewLocalObject(dstPath, time.Time{}, 0)})
 						return err
 					}
 					idx++
@@ -66,7 +73,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 		} else {
 			dstPath := GetPartitionedStreamName(backupName, uploader.Compression().FileExtension(), partNumber)
 			errGroup.Go(func() error {
-				return uploader.PushStreamToDestination(ctx, reader, dstPath)
+				return uploader.PushStreamToDestination(egCtx, reader, dstPath)
 			})
 		}
 	}
@@ -86,7 +93,7 @@ func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.R
 	}
 	uploaderClone := uploader.Clone()
 	uploaderClone.DisableSizeTracking() // don't count metadata.json in backup size
-	err := UploadBackupStreamMetadata(uploader, meta, backupName)
+	err := UploadBackupStreamMetadata(ctx, uploader, meta, backupName)
 
 	return backupName, err
 }

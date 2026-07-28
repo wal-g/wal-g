@@ -26,7 +26,7 @@ func NewReader(reader io.Reader, withChecksum bool) *Reader {
 	return result
 }
 
-// nolint: funlen,gocyclo
+//nolint:funlen,gocyclo
 func (xbs *Reader) Next() (*Chunk, error) {
 	var chunk = &Chunk{}
 
@@ -57,7 +57,7 @@ func (xbs *Reader) Next() (*Chunk, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 	chunk.Type = validateChunkType(chunk.Type)
-	// nolint : staticcheck
+	//nolint:staticcheck
 	if chunk.Type == ChunkTypeUnknown && !(chunk.Flags&StreamFlagIgnorable == 1) {
 		return nil, errors.New("unknown chunk type")
 	}

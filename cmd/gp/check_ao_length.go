@@ -20,7 +20,7 @@ var checkAOTableLengthMasterCmd = &cobra.Command{
 	Use:   "check-ao-aocs-length",
 	Short: "Runs on master and checks ao and aocs tables` EOF on disk is no less than in metadata for all segments",
 	Run: func(cmd *cobra.Command, args []string) {
-		rootFolder, err := getMultistorageRootFolder(false, policies.UniteAllStorages)
+		rootFolder, err := getMultistorageRootFolder(cmd.Context(), false, policies.UniteAllStorages)
 		tracelog.ErrorLogger.FatalOnError(err)
 		handler, err := greenplum.NewAOLengthCheckHandler(logsDir, runBackupCheck, name, rootFolder)
 		tracelog.ErrorLogger.FatalOnError(err)

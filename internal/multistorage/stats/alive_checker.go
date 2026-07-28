@@ -40,8 +40,8 @@ type AliveChecker struct {
 	checks  []storageCheck
 }
 
-func (ac *AliveChecker) CheckForAlive(storageNames ...string) map[string]bool {
-	ctx, cancel := context.WithTimeout(context.Background(), ac.timeout)
+func (ac *AliveChecker) CheckForAlive(ctx context.Context, storageNames ...string) map[string]bool {
+	ctx, cancel := context.WithTimeout(ctx, ac.timeout)
 	defer cancel()
 
 	resCh := make(chan checkRes, len(storageNames))
@@ -113,11 +113,8 @@ type storageCheck interface {
 
 type readCheck struct{}
 
-func (rc *readCheck) Check(_ context.Context, folder storage.Folder) error {
-	// We have to ignore the context.Context here as storages package
-	// can not provide a ListFolderWithContext. WAL-G might block here
-	// indefinitely (which is still quite unlikely).
-	_, _, err := folder.ListFolder()
+func (rc *readCheck) Check(ctx context.Context, folder storage.Folder) error {
+	_, _, err := folder.ListFolder(ctx)
 	if err != nil {
 		return fmt.Errorf("read check: list folder %q: %w", folder.GetPath(), err)
 	}
@@ -131,12 +128,12 @@ type writeCheck struct {
 func (wc *writeCheck) Check(ctx context.Context, folder storage.Folder) error {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	lr := io.LimitReader(r, int64(wc.writeSize))
-	err := folder.PutObjectWithContext(ctx, checkObjectName, lr)
+	err := folder.PutObject(ctx, checkObjectName, lr)
 	objPath := path.Join(folder.GetPath(), checkObjectName)
 	if err != nil {
 		return fmt.Errorf("write check: put object %q: %w", objPath, err)
 	}
-	err = folder.DeleteObjects([]storage.Object{storage.NewLocalObject(checkObjectName, time.Time{}, 0)})
+	err = folder.DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(checkObjectName, time.Time{}, 0)})
 	if err != nil {
 		return fmt.Errorf("write check: delete object %q: %w", objPath, err)
 	}

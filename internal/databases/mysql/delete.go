@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"context"
+
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -26,16 +28,16 @@ func makeLessFunc(folder storage.Folder) func(object1, object2 storage.Object) b
 	}
 }
 
-func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
-	backupSentinels, err := internal.GetBackupSentinelObjects(folder)
+func NewDeleteHandler(ctx context.Context, folder storage.Folder) (*DeleteHandler, error) {
+	backupSentinels, err := internal.GetBackupSentinelObjects(ctx, folder)
 	if err != nil {
 		return nil, err
 	}
 
-	backupObjects, err := MakeMySQLBackupObjects(folder, backupSentinels)
+	backupObjects, err := MakeMySQLBackupObjects(ctx, folder, backupSentinels)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	permanentBackups := internal.GetPermanentBackups(folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
+	permanentBackups := internal.GetPermanentBackups(ctx, folder.GetSubFolder(utility.BaseBackupPath), NewGenericMetaFetcher())
 	permanentBackupNames := make([]string, 0, len(permanentBackups))
 	for name := range permanentBackups {
 		permanentBackupNames = append(permanentBackupNames, name)
@@ -55,6 +57,6 @@ func NewDeleteHandler(folder storage.Folder) (*DeleteHandler, error) {
 	}, nil
 }
 
-func (h *DeleteHandler) HandleDeleteEverything(args []string, confirmed bool) {
-	h.DeleteHandler.HandleDeleteEverything(args, h.permanentBackups, confirmed)
+func (h *DeleteHandler) HandleDeleteEverything(ctx context.Context, args []string, confirmed bool) {
+	h.DeleteHandler.HandleDeleteEverything(ctx, args, h.permanentBackups, confirmed)
 }

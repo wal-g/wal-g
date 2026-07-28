@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"syscall"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -13,24 +11,23 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleBackupRestore(backupName string, dbnames []string, fromnames []string, noRecovery bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
+func HandleBackupRestore(ctx context.Context, backupName string, dbnames []string, fromnames []string, noRecovery bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	storage, err := internal.ConfigureStorage()
+	storage, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	folder := storage.RootFolder()
 
-	backup, err := internal.GetBackupByName(backupName, utility.BaseBackupPath, folder)
+	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, folder)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	sentinel := new(SentinelDto)
-	err = backup.FetchSentinel(sentinel)
+	err = backup.FetchSentinel(ctx, sentinel)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	db, err := getSQLServerConnection()
+	db, err := getSQLServerConnection(ctx)
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
 	dbnames, fromnames, err = getDatabasesToRestore(sentinel, dbnames, fromnames)
@@ -67,17 +64,17 @@ func restoreSingleDatabase(ctx context.Context,
 	fromName string) error {
 	baseURL := getDatabaseBackupURL(backupName, fromName)
 	basePath := getDatabaseBackupPath(backupName, fromName)
-	blobs, err := listBackupBlobs(folder.GetSubFolder(basePath))
+	blobs, err := listBackupBlobs(ctx, folder.GetSubFolder(basePath))
 	if err != nil {
 		return err
 	}
 	urls := buildRestoreUrls(baseURL, blobs)
 	sql := fmt.Sprintf("RESTORE DATABASE %s FROM %s WITH REPLACE, NORECOVERY", quoteName(dbname), urls)
-	files, err := listDatabaseFiles(db, urls)
+	files, err := listDatabaseFiles(ctx, db, urls)
 	if err != nil {
 		return err
 	}
-	datadir, logdir, err := GetDefaultDataLogDirs(db)
+	datadir, logdir, err := GetDefaultDataLogDirs(ctx, db)
 	if err != nil {
 		return err
 	}

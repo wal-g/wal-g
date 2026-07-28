@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
@@ -67,6 +68,7 @@ func checkDBDirectoryForUnwrapNew(dbDataDirectory string, sentinelDto BackupSent
 // TODO : unit tests
 // Do the job of unpacking Backup object
 func (backup *Backup) unwrapNew(
+	ctx context.Context,
 	dbDataDirectory string, filesToUnwrap map[string]bool,
 	createIncrementalFiles, skipRedundantTars bool, extractProv ExtractProvider) (*UnwrapResult, error) {
 	useNewUnwrapImplementation = true
@@ -76,7 +78,7 @@ func (backup *Backup) unwrapNew(
 	}
 
 	tarInterpreter, concurrentTarsToExtract, sequentialTarsToExtract, err := extractProv.Get(
-		*backup, filesToUnwrap, skipRedundantTars, dbDataDirectory, createIncrementalFiles)
+		ctx, *backup, filesToUnwrap, skipRedundantTars, dbDataDirectory, createIncrementalFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +90,7 @@ func (backup *Backup) unwrapNew(
 		return nil, newPgControlNotFoundError()
 	}
 
-	err = internal.ExtractAll(tarInterpreter, concurrentTarsToExtract)
+	err = internal.ExtractAll(ctx, tarInterpreter, concurrentTarsToExtract)
 	if _, ok := err.(internal.NoFilesToExtractError); ok {
 		// in case of no tars to extract, just ignore this backup and proceed to the next
 		tracelog.InfoLogger.Println("Skipping backup: no useful files found.")
@@ -99,7 +101,7 @@ func (backup *Backup) unwrapNew(
 	}
 
 	if needPgControl {
-		err = internal.ExtractAll(tarInterpreter, sequentialTarsToExtract)
+		err = internal.ExtractAll(ctx, tarInterpreter, sequentialTarsToExtract)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to extract pg_control")
 		}

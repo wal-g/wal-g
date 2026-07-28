@@ -14,7 +14,7 @@ var backupExportCmd = &cobra.Command{
 	Use:   "backup-export",
 	Short: backupExportShortDescription,
 	Run: func(cmd *cobra.Command, args []string) {
-		sqlserver.HandleBackupExport(externalConfigFileExport, exportDatabases)
+		sqlserver.HandleBackupExport(cmd.Context(), externalConfigFileExport, exportDatabases)
 	},
 }
 

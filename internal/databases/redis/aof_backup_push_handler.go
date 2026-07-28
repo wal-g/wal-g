@@ -12,20 +12,26 @@ import (
 )
 
 type AOFBackupPushArgs struct {
+	BackupName      string
 	Sharded         bool
 	Uploader        internal.Uploader
 	MetaConstructor internal.MetaConstructor
+	DeferSentinel   bool
 }
 
 // permanent bool, uploader internal.Uploader, metaConstructor internal.MetaConstructor
 func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
-	backupName := aof.GenerateNewBackupName()
+	backupName := args.BackupName
+	if backupName == "" {
+		backupName = aof.GenerateNewBackupName()
+	}
 
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
 	aofPath := filepath.Join(dataFolder, aofFolder)
 	tmpPath, _ := conf.GetSetting(conf.RedisAppendonlyTmpFolder)
 	concurrentUploader, err := internal.CreateConcurrentUploader(
+		ctx,
 		internal.CreateConcurrentUploaderArgs{
 			Uploader:   args.Uploader,
 			BackupName: backupName,
@@ -47,7 +53,6 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	filesPinner := aof.NewFilesPinner(tmpPath)
 
 	backupService, err := aof.CreateBackupService(
-		ctx,
 		diskWatcher,
 		concurrentUploader,
 		args.MetaConstructor,
@@ -59,9 +64,10 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	}
 
 	doBackupArgs := aof.DoBackupArgs{
-		BackupName: backupName,
-		Sharded:    args.Sharded,
+		BackupName:    backupName,
+		Sharded:       args.Sharded,
+		DeferSentinel: args.DeferSentinel,
 	}
 
-	return backupService.DoBackup(doBackupArgs)
+	return backupService.DoBackup(ctx, doBackupArgs)
 }

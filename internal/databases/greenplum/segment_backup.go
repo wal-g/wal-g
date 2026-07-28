@@ -1,6 +1,8 @@
 package greenplum
 
 import (
+	"context"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -14,8 +16,8 @@ type SegBackup struct {
 	PaxFilesMetadataDto *pax.FilesMetadataDTO
 }
 
-func NewSegBackup(baseBackupFolder storage.Folder, name, storage string) (SegBackup, error) {
-	pgBackup, err := postgres.NewBackupInStorage(baseBackupFolder, name, storage)
+func NewSegBackup(ctx context.Context, baseBackupFolder storage.Folder, name, storage string) (SegBackup, error) {
+	pgBackup, err := postgres.NewBackupInStorage(ctx, baseBackupFolder, name, storage)
 	if err != nil {
 		return SegBackup{}, err
 	}
@@ -30,13 +32,13 @@ func ToGpSegBackup(source postgres.Backup) (output SegBackup) {
 	}
 }
 
-func (backup *SegBackup) LoadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
+func (backup *SegBackup) LoadAoFilesMetadata(ctx context.Context) (*AOFilesMetadataDTO, error) {
 	if backup.AoFilesMetadataDto != nil {
 		return backup.AoFilesMetadataDto, nil
 	}
 
 	var meta AOFilesMetadataDTO
-	err := internal.FetchDto(backup.Folder, &meta, getAOFilesMetadataPath(backup.Name))
+	err := internal.FetchDto(ctx, backup.Folder, &meta, getAOFilesMetadataPath(backup.Name))
 	if err != nil {
 		return nil, err
 	}
@@ -45,13 +47,13 @@ func (backup *SegBackup) LoadAoFilesMetadata() (*AOFilesMetadataDTO, error) {
 	return backup.AoFilesMetadataDto, nil
 }
 
-func (backup *SegBackup) LoadPaxFilesMetadata() (*pax.FilesMetadataDTO, error) {
+func (backup *SegBackup) LoadPaxFilesMetadata(ctx context.Context) (*pax.FilesMetadataDTO, error) {
 	if backup.PaxFilesMetadataDto != nil {
 		return backup.PaxFilesMetadataDto, nil
 	}
 
 	var meta pax.FilesMetadataDTO
-	err := internal.FetchDto(backup.Folder, &meta, pax.GetFilesMetadataPath(backup.Name))
+	err := internal.FetchDto(ctx, backup.Folder, &meta, pax.GetFilesMetadataPath(backup.Name))
 	if err != nil {
 		return nil, err
 	}

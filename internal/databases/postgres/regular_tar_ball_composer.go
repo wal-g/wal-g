@@ -17,17 +17,19 @@ type RegularTarBallComposer struct {
 	files         internal.BundleFiles
 	tarFileSets   internal.TarFileSets
 	errorGroup    *errgroup.Group
-	ctx           context.Context
+	ctx           context.Context //nolint:containedctx // errgroup root feeds async AddFile during filepath.Walk
+	reqCtx        context.Context //nolint:containedctx // request ctx; outlives errorGroup ctx for background part uploads
 }
 
 func NewRegularTarBallComposer(
+	ctx context.Context,
 	tarBallQueue *internal.TarBallQueue,
 	tarBallFilePacker *TarBallFilePackerImpl,
 	files internal.BundleFiles,
 	tarFileSets internal.TarFileSets,
 	crypter crypto.Crypter,
 ) *RegularTarBallComposer {
-	errorGroup, ctx := errgroup.WithContext(context.Background())
+	errorGroup, egCtx := errgroup.WithContext(ctx)
 	return &RegularTarBallComposer{
 		tarBallQueue:  tarBallQueue,
 		tarFilePacker: tarBallFilePacker,
@@ -35,7 +37,8 @@ func NewRegularTarBallComposer(
 		files:         files,
 		tarFileSets:   tarFileSets,
 		errorGroup:    errorGroup,
-		ctx:           ctx,
+		ctx:           egCtx,
+		reqCtx:        ctx,
 	}
 }
 
@@ -55,7 +58,7 @@ func NewRegularTarBallComposerMaker(
 	}
 }
 
-func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBallComposer, error) {
+func (maker *RegularTarBallComposerMaker) Make(ctx context.Context, bundle *Bundle) (internal.TarBallComposer, error) {
 	bundleFiles := maker.files
 	tarFileSets := maker.tarFileSets
 	tarBallFilePacker := NewTarBallFilePacker(bundle.DeltaMap,
@@ -63,18 +66,18 @@ func (maker *RegularTarBallComposerMaker) Make(bundle *Bundle) (internal.TarBall
 	if bundle.IncrementFromChkpNum != nil {
 		tarBallFilePacker.IncrementFromChkpNum = bundle.IncrementFromChkpNum
 	}
-	return NewRegularTarBallComposer(bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
+	return NewRegularTarBallComposer(ctx, bundle.TarBallQueue, tarBallFilePacker, bundleFiles, tarFileSets, bundle.Crypter), nil
 }
 
 func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
-	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
+	tarBall, err := c.tarBallQueue.Deque(c.ctx)
 	if err != nil {
 		return
 	}
-	tarBall.SetUp(c.crypter)
+	tarBall.SetUp(c.reqCtx, c.crypter)
 	c.tarFileSets.AddFile(tarBall.Name(), info.Header.Name)
 	c.errorGroup.Go(func() error {
-		err := c.tarFilePacker.PackFileIntoTar(info, tarBall)
+		err := c.tarFilePacker.PackFileIntoTar(c.ctx, info, tarBall)
 		if err != nil {
 			return err
 		}
@@ -83,11 +86,11 @@ func (c *RegularTarBallComposer) AddFile(info *internal.ComposeFileInfo) {
 }
 
 func (c *RegularTarBallComposer) AddHeader(fileInfoHeader *tar.Header, info os.FileInfo) error {
-	tarBall, err := c.tarBallQueue.DequeCtx(c.ctx)
+	tarBall, err := c.tarBallQueue.Deque(c.ctx)
 	if err != nil {
 		return c.errorGroup.Wait()
 	}
-	tarBall.SetUp(c.crypter)
+	tarBall.SetUp(c.reqCtx, c.crypter)
 	defer c.tarBallQueue.EnqueueBack(tarBall)
 	c.tarFileSets.AddFile(tarBall.Name(), fileInfoHeader.Name)
 	c.files.AddFile(fileInfoHeader, info, false)

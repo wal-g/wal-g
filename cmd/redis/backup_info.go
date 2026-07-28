@@ -18,11 +18,11 @@ var backupInfoCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
 
-		storage, err := internal.ConfigureStorage()
+		storage, err := internal.ConfigureStorage(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		backupName := args[0]
-		redis.HandleBackupInfo(storage.RootFolder(), backupName, os.Stdout, tag)
+		redis.HandleBackupInfo(cmd.Context(), storage.RootFolder(), backupName, os.Stdout, tag)
 	},
 }
 

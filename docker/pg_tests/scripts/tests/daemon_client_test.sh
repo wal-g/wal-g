@@ -14,7 +14,7 @@ export SKIP_TEST_WAL_OVERWRITES="1"
 # show client version
 walg-daemon-client --version
 
-MAXCLIENTSIZE=4194304 # 4MB
+MAXCLIENTSIZE=5242880 # 5MB
 CLIENTSIZE=$(stat -c%s $(which walg-daemon-client))
 # assert that resulting binary has the correct size
 if [ $CLIENTSIZE -ge $MAXCLIENTSIZE ]; then

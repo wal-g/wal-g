@@ -30,14 +30,14 @@ var (
 		Long:  WalShowLongDescription,
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			storage, err := internal.ConfigureStorage()
+			storage, err := internal.ConfigureStorage(cmd.Context())
 			tracelog.ErrorLogger.FatalOnError(err)
 			outputType := postgres.TableOutput
 			if detailedJSONOutput {
 				outputType = postgres.JSONOutput
 			}
 			outputWriter := postgres.NewWalShowOutputWriter(outputType, os.Stdout, !disableBackupsLookup)
-			postgres.HandleWalShow(storage.RootFolder(), !disableBackupsLookup, outputWriter)
+			postgres.HandleWalShow(cmd.Context(), storage.RootFolder(), !disableBackupsLookup, outputWriter)
 		},
 	}
 	detailedJSONOutput   bool

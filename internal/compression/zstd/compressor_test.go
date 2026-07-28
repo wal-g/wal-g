@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,4 +71,43 @@ func TestCompressDecompress(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCompressDecompressLevels(t *testing.T) {
+	levels := []zstd.EncoderLevel{
+		zstd.SpeedFastest,
+		zstd.SpeedDefault,
+		zstd.SpeedBetterCompression,
+		zstd.SpeedBestCompression,
+	}
+
+	buff := make([]byte, 1<<16)
+	rand.New(rand.NewSource(0x1337c0deb357beef)).Read(buff)
+
+	for _, level := range levels {
+		var comp bytes.Buffer
+		wc := Compressor{Level: level}.NewWriter(&comp)
+		_, err := wc.Write(buff)
+		require.NoError(t, err, level.String())
+		require.NoError(t, wc.Close(), level.String())
+
+		rdr, err := Decompressor{}.Decompress(&comp)
+		require.NoError(t, err, level.String())
+
+		var decomp bytes.Buffer
+		_, err = io.Copy(&decomp, rdr)
+		require.NoError(t, err, level.String())
+		require.NoError(t, rdr.Close(), level.String())
+
+		assert.True(t, bytes.Equal(buff, decomp.Bytes()), "roundtrip mismatch at level %s", level.String())
+	}
+}
+
+func TestEncoderLevelFromName(t *testing.T) {
+	level, ok := EncoderLevelFromName("best")
+	require.True(t, ok)
+	assert.Equal(t, zstd.SpeedBestCompression, level)
+
+	_, ok = EncoderLevelFromName("nonsense")
+	assert.False(t, ok)
 }

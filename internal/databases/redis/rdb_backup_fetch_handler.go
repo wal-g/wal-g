@@ -12,7 +12,7 @@ import (
 )
 
 func HandleBackupFetch(ctx context.Context, folder storage.Folder, backupName string, restoreCmd *exec.Cmd, skipClean bool) error {
-	backup, err := archive.SentinelWithExistenceCheck(folder, backupName)
+	backup, err := archive.SentinelWithExistenceCheck(ctx, folder, backupName)
 	if err != nil {
 		return err
 	}
@@ -29,5 +29,5 @@ func HandleBackupFetch(ctx context.Context, folder storage.Folder, backupName st
 		}
 	}
 
-	return internal.StreamBackupToCommandStdin(restoreCmd, backup.ToInternal(folder))
+	return internal.StreamBackupToCommandStdin(ctx, restoreCmd, backup.ToInternal(folder))
 }

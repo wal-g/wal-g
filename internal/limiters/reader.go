@@ -13,7 +13,7 @@ import (
 type Reader struct {
 	reader  io.Reader
 	limiter *rate.Limiter
-	ctx     context.Context
+	ctx     context.Context //nolint:containedctx // ctx-aware io.Reader; Read carries no ctx
 }
 
 func NewReader(ctx context.Context, reader io.Reader, limiter *rate.Limiter) *Reader {

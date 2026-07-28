@@ -3,6 +3,7 @@ package testtools
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -30,7 +31,7 @@ func (tarBall *FileTarBall) Name() string {
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
-func (tarBall *FileTarBall) SetUp(crypter crypto.Crypter, names ...string) {
+func (tarBall *FileTarBall) SetUp(_ context.Context, crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
 		name := filepath.Join(tarBall.out, tarBall.Name())
 		file, err := os.Create(name)
@@ -91,7 +92,7 @@ func (tarBall *BufferTarBall) Name() string {
 	return "BufferTarBall"
 }
 
-func (tarBall *BufferTarBall) SetUp(crypter crypto.Crypter, args ...string) {
+func (tarBall *BufferTarBall) SetUp(_ context.Context, crypter crypto.Crypter, args ...string) {
 	tarBall.tarWriter = tar.NewWriter(tarBall.underlying)
 }
 

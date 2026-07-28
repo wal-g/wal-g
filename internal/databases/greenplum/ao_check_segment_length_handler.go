@@ -48,7 +48,7 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOTableLengthSegment(ctx contex
 
 	for _, db := range DBNames {
 		tracelog.DebugLogger.Println(db.DBName)
-		conn, err := checker.connect(db.DBName)
+		conn, err := checker.connect(ctx, db.DBName)
 		if err != nil {
 			tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 		}
@@ -104,12 +104,12 @@ func (checker *AOLengthCheckSegmentHandler) CheckAOBackupLengthSegment(ctx conte
 		tracelog.ErrorLogger.FatalfOnError("unable to list databases %v", err)
 	}
 
-	s3Files, err := checker.getAOBackupFilesData()
+	s3Files, err := checker.getAOBackupFilesData(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get files data from s3 %v", err)
 	}
 
-	backupFilesMetadata, err := checker.getAOMetadata(backupName)
+	backupFilesMetadata, err := checker.getAOMetadata(ctx, backupName)
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get backup data %v", err)
 	}
@@ -165,9 +165,8 @@ func (checker *AOLengthCheckSegmentHandler) checkFileSizes(AOTablesSize map[stri
 	return errors
 }
 
-func (checker *AOLengthCheckSegmentHandler) connect(db string) (*pgx.Conn, error) {
-	// No request ctx plumbed through this entry point yet; revisit when callers thread ctx.
-	return postgres.Connect(context.Background(), func(config *pgx.ConnConfig) error {
+func (checker *AOLengthCheckSegmentHandler) connect(ctx context.Context, db string) (*pgx.Conn, error) {
+	return postgres.Connect(ctx, func(config *pgx.ConnConfig) error {
 		a, err := strconv.Atoi(checker.port)
 		if err != nil {
 			return err
@@ -181,10 +180,36 @@ func (checker *AOLengthCheckSegmentHandler) connect(db string) (*pgx.Conn, error
 }
 
 func (checker *AOLengthCheckSegmentHandler) getTablesSizes(ctx context.Context, conn *pgx.Conn, dbOID uint32) (map[string]relNames, error) {
-	rows, err := conn.Query(ctx, `SELECT a.relfilenode file, a.relname tname, b.relname segname 
-	FROM (SELECT relname, relid, segrelid, relpersistence, relfilenode FROM pg_class JOIN pg_appendonly ON oid = relid) a,
-	(SELECT relname, segrelid FROM pg_class JOIN pg_appendonly ON oid = segrelid) b
-	WHERE a.relpersistence = 'p' AND a.segrelid = b.segrelid;`)
+	rows, err := conn.Query(ctx, `SELECT 
+  a.relfilenode file, 
+  pg_catalog.quote_ident(n.nspname) OPERATOR(pg_catalog.||) '.' OPERATOR(pg_catalog.||) pg_catalog.quote_ident(a.relname) tname, 
+  b.relname segname 
+FROM 
+  (
+    SELECT 
+      relname, 
+      relid, 
+      segrelid, 
+      relpersistence, 
+      relfilenode, 
+      relnamespace 
+    FROM 
+      pg_catalog.pg_class
+      JOIN pg_catalog.pg_appendonly ON oid OPERATOR(pg_catalog.=) relid
+  ) a, 
+  (
+    SELECT 
+      relname, 
+      segrelid 
+    FROM 
+      pg_catalog.pg_class 
+      JOIN pg_catalog.pg_appendonly ON oid OPERATOR(pg_catalog.=) segrelid
+  ) b, 
+  pg_catalog.pg_namespace n 
+WHERE 
+  a.relpersistence OPERATOR(pg_catalog.=) 'p' 
+  AND a.segrelid OPERATOR(pg_catalog.=) b.segrelid 
+  AND a.relnamespace OPERATOR(pg_catalog.=) n.oid;`)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get ao/aocs tables %v", err)
 	}
@@ -212,7 +237,7 @@ func (checker *AOLengthCheckSegmentHandler) getTablesSizes(ctx context.Context, 
 }
 
 func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo(ctx context.Context) ([]dbInfo, error) {
-	conn, err := checker.connect("")
+	conn, err := checker.connect(ctx, "")
 	if err != nil {
 		tracelog.ErrorLogger.FatalfOnError("unable to get connection %v", err)
 	}
@@ -222,7 +247,7 @@ func (checker *AOLengthCheckSegmentHandler) getDatabasesInfo(ctx context.Context
 		}
 	}()
 
-	rows, err := conn.Query(ctx, "SELECT datname, oid FROM pg_database WHERE datallowconn")
+	rows, err := conn.Query(ctx, "SELECT datname, oid FROM pg_catalog.pg_database WHERE datallowconn")
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +272,7 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(ctx context.Cont
 	if !strings.Contains(row.SegRelName, "aocs") {
 		query = fmt.Sprintf("SELECT sum(eof) FROM pg_aoseg.%s", row.SegRelName)
 	} else {
-		query = fmt.Sprintf("SELECT sum(eof) FROM gp_toolkit.__gp_aocsseg('\"%s\"')", row.TableName)
+		query = fmt.Sprintf("SELECT sum(eof) FROM gp_toolkit.__gp_aocsseg('%s')", row.TableName)
 	}
 
 	size, err := conn.Query(ctx, query)
@@ -265,12 +290,12 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(ctx context.Cont
 	return metaEOF, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (BackupAOFiles, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOMetadata(ctx context.Context, backupName string) (BackupAOFiles, error) {
 	rootFolder := checker.rootFolder
 
 	var backup internal.Backup
 
-	backup, err := internal.GetBackupByName(backupName,
+	backup, err := internal.GetBackupByName(ctx, backupName,
 		fmt.Sprintf("%s/seg%s/%s", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath), rootFolder)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to get backup with name: %s", backupName)
@@ -280,7 +305,7 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 	tracelog.DebugLogger.Printf("backup %s", backup.Name)
 	files := NewAOFilesMetadataDTO()
 
-	err = internal.FetchDto(backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
+	err = internal.FetchDto(ctx, backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to fetch file data")
 		return nil, err
@@ -291,11 +316,11 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(backupName string) (Ba
 	return files.Files, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData() (map[string]int64, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOBackupFilesData(ctx context.Context) (map[string]int64, error) {
 	rootFolder := checker.rootFolder
 	aoFolder := rootFolder.GetSubFolder(fmt.Sprintf("%s/seg%s/%s/aosegments/", utility.SegmentsPath, checker.segnum, utility.BaseBackupPath))
 
-	files, _, err := aoFolder.ListFolder()
+	files, _, err := aoFolder.ListFolder(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to list s3 objects: %v", err)
 		return nil, err

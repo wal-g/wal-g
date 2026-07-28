@@ -34,8 +34,8 @@ type ContextCloser interface {
 	Close(ctx context.Context) error
 }
 
-func LoggedCloseContext(c ContextCloser, errmsg string) {
-	err := c.Close(context.TODO())
+func LoggedCloseContext(ctx context.Context, c ContextCloser, errmsg string) {
+	err := c.Close(ctx)
 	if errmsg == "" {
 		errmsg = "Problem with closing object"
 	}
@@ -350,7 +350,7 @@ func ResetTimer(t *time.Timer, d time.Duration) {
 
 // SignalHandler defines signal handler setup & shutdown representation
 type SignalHandler struct {
-	ctx    context.Context
+	ctx    context.Context //nolint:containedctx // ctx drives the signal-handling goroutine lifetime
 	ch     chan os.Signal
 	cancel func()
 }

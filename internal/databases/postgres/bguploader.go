@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -37,10 +38,17 @@ type BgUploader struct {
 	preventWalOverwrite bool
 	readyRename         bool
 
-	// ctx signals internals to keep/stop enqueueing more uploads
-	ctx context.Context
+	// uploadCtx drives in-flight uploads, canceled only externally (eg Ctrl-C), not by Stop
+	uploadCtx context.Context //nolint:containedctx // parent ctx for background WAL upload goroutines
+	// ctx gates enqueueing of new uploads, canceled by Stop to halt scanning while in-flight uploads drain
+	ctx context.Context //nolint:containedctx // gates background WAL upload enqueueing
 	// cancelFunc signals internals to stop enqueuing more uploads
 	cancelFunc context.CancelFunc
+
+	// stopOnce guards Stop, which drains workerCountSem without releasing it,
+	// so a second Acquire would block forever
+	stopOnce sync.Once
+	stopErr  error
 
 	// workerCountSem tracks number of concurrent uploaders. Limited to
 	// maxParallelWorkers.
@@ -77,6 +85,7 @@ func NewBgUploader(ctx context.Context, walFilePath string,
 	started := make(map[string]struct{})
 	firstWalName := filepath.Base(walFilePath)
 	started[firstWalName+readySuffix] = struct{}{}
+	uploadCtx := ctx
 	ctx, cancelFunc := context.WithCancel(ctx)
 	return &BgUploader{
 		dir:                 filepath.Dir(walFilePath),
@@ -84,6 +93,7 @@ func NewBgUploader(ctx context.Context, walFilePath string,
 		preventWalOverwrite: preventWalOverwrite,
 		readyRename:         readyRename,
 
+		uploadCtx:          uploadCtx,
 		ctx:                ctx,
 		cancelFunc:         cancelFunc,
 		workerCountSem:     semaphore.NewWeighted(int64(maxParallelWorkers)),
@@ -107,11 +117,15 @@ func (b *BgUploader) Start() {
 
 // Stop pipeline. Stop can be safely called concurrently and repeatedly.
 func (b *BgUploader) Stop() error {
-	// Send signal to stop scanning for and uploading new files
-	b.cancelFunc()
-	// Wait for all running uploads. b.ctx is canceled above, so drain with an
-	// uncanceled context else Acquire returns immediately instead of waiting.
-	return b.workerCountSem.Acquire(context.Background(), int64(b.maxParallelWorkers))
+	b.stopOnce.Do(func() {
+		// Stop scanning for and enqueueing new uploads. In-flight uploads run on
+		// uploadCtx, not b.ctx, so they keep going and drain below.
+		b.cancelFunc()
+		// Wait for all running uploads. b.ctx is canceled above, so drain with an
+		// uncanceled context else Acquire returns immediately instead of waiting.
+		b.stopErr = b.workerCountSem.Acquire(context.Background(), int64(b.maxParallelWorkers))
+	})
+	return b.stopErr
 }
 
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
@@ -190,7 +204,7 @@ func (b *BgUploader) processFiles(fileChan <-chan string) {
 		b.started[name] = struct{}{}
 		if err := b.workerCountSem.Acquire(b.ctx, 1); err == nil {
 			go func() {
-				uploadedFile := b.upload(context.Background(), name)
+				uploadedFile := b.upload(b.uploadCtx, name)
 				b.workerCountSem.Release(1)
 				if uploadedFile {
 					if numUploaded.Add(1) >= b.maxNumUploaded {

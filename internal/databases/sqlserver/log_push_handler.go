@@ -4,27 +4,23 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"syscall"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/sqlserver/blob"
-	"github.com/wal-g/wal-g/utility"
 )
 
-func HandleLogPush(dbnames []string, norecovery bool) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalHandler := utility.NewSignalHandler(ctx, cancel, []os.Signal{syscall.SIGINT, syscall.SIGTERM})
-	defer func() { _ = signalHandler.Close() }()
+func HandleLogPush(ctx context.Context, dbnames []string, norecovery bool) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	folder, err := internal.ConfigureStorage()
+	folder, err := internal.ConfigureStorage(ctx)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	db, err := getSQLServerConnection()
+	db, err := getSQLServerConnection(ctx)
 	tracelog.ErrorLogger.FatalfOnError("failed to connect to SQLServer: %v", err)
 
-	dbnames, err = getDatabasesToBackup(db, dbnames)
+	dbnames, err = getDatabasesToBackup(ctx, db, dbnames)
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.ErrorLogger.FatalfOnError("failed to list databases to backup: %v", err)
@@ -45,7 +41,7 @@ func HandleLogPush(dbnames []string, norecovery bool) {
 
 func backupSingleLog(ctx context.Context, db *sql.DB, backupName string, dbname string, builtinCompression bool, noRecovery bool) error {
 	baseURL := getLogBackupURL(backupName, dbname)
-	size, blobCount, err := estimateLogSize(db, dbname)
+	size, blobCount, err := estimateLogSize(ctx, db, dbname)
 	if err != nil {
 		return err
 	}

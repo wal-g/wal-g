@@ -2,6 +2,7 @@ package internal
 
 import (
 	"archive/tar"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -28,7 +29,7 @@ func (err FileNotExistError) Error() string {
 }
 
 type TarBallFilePacker interface {
-	PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error
+	PackFileIntoTar(ctx context.Context, cfi *ComposeFileInfo, tarBall TarBall) error
 }
 
 type RegularTarBallFilePacker struct {
@@ -43,8 +44,8 @@ func NewRegularTarBallFilePacker(files BundleFiles, skipFileNotExists bool) *Reg
 	}
 }
 
-func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall TarBall) error {
-	fileReadCloser, err := StartReadingFile(cfi.Header, cfi.FileInfo, cfi.Path)
+func (p *RegularTarBallFilePacker) PackFileIntoTar(ctx context.Context, cfi *ComposeFileInfo, tarBall TarBall) error {
+	fileReadCloser, err := StartReadingFile(ctx, cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
 		if !p.skipFileNotExists {
 			return err
@@ -75,7 +76,7 @@ func (p *RegularTarBallFilePacker) PackFileIntoTar(cfi *ComposeFileInfo, tarBall
 }
 
 // TODO : unit tests
-func StartReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadSeekCloser, error) {
+func StartReadingFile(ctx context.Context, fileInfoHeader *tar.Header, info os.FileInfo, path string) (io.ReadSeekCloser, error) {
 	fileInfoHeader.Size = info.Size()
 	file, err := fsutil.OpenReadOnlyMayBeDirectIO(path)
 	if err != nil {
@@ -84,7 +85,7 @@ func StartReadingFile(fileInfoHeader *tar.Header, info os.FileInfo, path string)
 		}
 		return nil, errors.Wrapf(err, "startReadingFile: failed to open file '%s'\n", path)
 	}
-	diskLimitedFileReader := limiters.NewDiskLimitReader(file)
+	diskLimitedFileReader := limiters.NewDiskLimitReader(ctx, file)
 	fileReader := &ioextensions.ReadSeekCloserImpl{
 		Reader: &io.LimitedReader{
 			R: io.MultiReader(diskLimitedFileReader, &ioextensions.ZeroReader{}),

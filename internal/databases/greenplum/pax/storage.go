@@ -1,6 +1,7 @@
 package pax
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -50,9 +51,9 @@ func MakeFileStorageKey(relNameMd5 string, key FileKey, paxFilesID string) strin
 // LoadStoragePaxFiles loads the set of PAX file storage keys referenced by every
 // existing backup in baseBackupsFolder. The returned set is what the uploader uses
 // to decide whether a file may be skipped (already in storage) or must be uploaded.
-func LoadStoragePaxFiles(baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
+func LoadStoragePaxFiles(ctx context.Context, baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
 	known := make(map[string]struct{})
-	err := iterateStoragePaxFilesWithFunc(baseBackupsFolder, func(_ string, desc BackupFileDesc) {
+	err := iterateStoragePaxFilesWithFunc(ctx, baseBackupsFolder, func(_ string, desc BackupFileDesc) {
 		known[desc.StoragePath] = struct{}{}
 	})
 	if err != nil {
@@ -64,14 +65,14 @@ func LoadStoragePaxFiles(baseBackupsFolder storage.Folder) (map[string]struct{},
 // iterateStoragePaxFilesWithFunc visits every PAX file referenced by any backup that
 // has a `pax_files_metadata.json` next to its sentinel. Backups without the metadata
 // (older format, or non-PAX clusters) are silently skipped.
-func iterateStoragePaxFilesWithFunc(baseBackupsFolder storage.Folder, fn func(string, BackupFileDesc)) error {
-	backupObjects, _, err := baseBackupsFolder.ListFolder()
+func iterateStoragePaxFilesWithFunc(ctx context.Context, baseBackupsFolder storage.Folder, fn func(string, BackupFileDesc)) error {
+	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {
 		return err
 	}
 	for _, b := range internal.GetBackupTimeSlices(backupObjects) {
 		var meta FilesMetadataDTO
-		err := internal.FetchDto(baseBackupsFolder, &meta, GetFilesMetadataPath(b.BackupName))
+		err := internal.FetchDto(ctx, baseBackupsFolder, &meta, GetFilesMetadataPath(b.BackupName))
 		if err != nil {
 			if _, ok := err.(storage.ObjectNotFoundError); ok {
 				tracelog.DebugLogger.Printf("No PAX files metadata for backup %s in folder %s, skipping",

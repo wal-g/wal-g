@@ -33,11 +33,11 @@ var oplogFetchCmd = &cobra.Command{
 		oplogApplier := stages.NewGenericApplier(formatApplier)
 
 		// set up storage downloader client
-		downloader, err := archive.NewStorageDownloader(archive.NewDefaultStorageSettings())
+		downloader, err := archive.NewStorageDownloader(cmd.Context(), archive.NewDefaultStorageSettings())
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		// discover archive sequence to replay
-		archives, err := downloader.ListOplogArchives()
+		archives, err := downloader.ListOplogArchives(cmd.Context())
 		tracelog.ErrorLogger.FatalOnError(err)
 		path, err := archive.SequenceBetweenTS(archives, since, until)
 		tracelog.ErrorLogger.FatalOnError(err)

@@ -3,12 +3,11 @@
 package archivemocks
 
 import (
+	context "context"
 	io "io"
 
-	internal "github.com/wal-g/wal-g/internal"
-
 	mock "github.com/stretchr/testify/mock"
-
+	internal "github.com/wal-g/wal-g/internal"
 	models "github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
 
@@ -17,9 +16,9 @@ type Downloader struct {
 	mock.Mock
 }
 
-// BackupMeta provides a mock function with given fields: name
-func (_m *Downloader) BackupMeta(name string) (*models.Backup, error) {
-	ret := _m.Called(name)
+// BackupMeta provides a mock function with given fields: ctx, name
+func (_m *Downloader) BackupMeta(ctx context.Context, name string) (*models.Backup, error) {
+	ret := _m.Called(ctx, name)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BackupMeta")
@@ -27,19 +26,19 @@ func (_m *Downloader) BackupMeta(name string) (*models.Backup, error) {
 
 	var r0 *models.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (*models.Backup, error)); ok {
-		return rf(name)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*models.Backup, error)); ok {
+		return rf(ctx, name)
 	}
-	if rf, ok := ret.Get(0).(func(string) *models.Backup); ok {
-		r0 = rf(name)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *models.Backup); ok {
+		r0 = rf(ctx, name)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Backup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, name)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -47,17 +46,17 @@ func (_m *Downloader) BackupMeta(name string) (*models.Backup, error) {
 	return r0, r1
 }
 
-// DownloadOplogArchive provides a mock function with given fields: arch, writeCloser
-func (_m *Downloader) DownloadOplogArchive(arch models.Archive, writeCloser io.WriteCloser) error {
-	ret := _m.Called(arch, writeCloser)
+// DownloadOplogArchive provides a mock function with given fields: ctx, arch, writeCloser
+func (_m *Downloader) DownloadOplogArchive(ctx context.Context, arch models.Archive, writeCloser io.WriteCloser) error {
+	ret := _m.Called(ctx, arch, writeCloser)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DownloadOplogArchive")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.Archive, io.WriteCloser) error); ok {
-		r0 = rf(arch, writeCloser)
+	if rf, ok := ret.Get(0).(func(context.Context, models.Archive, io.WriteCloser) error); ok {
+		r0 = rf(ctx, arch, writeCloser)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -65,9 +64,9 @@ func (_m *Downloader) DownloadOplogArchive(arch models.Archive, writeCloser io.W
 	return r0
 }
 
-// LastKnownArchiveTS provides a mock function with no fields
-func (_m *Downloader) LastKnownArchiveTS() (models.Timestamp, error) {
-	ret := _m.Called()
+// LastKnownArchiveTS provides a mock function with given fields: ctx
+func (_m *Downloader) LastKnownArchiveTS(ctx context.Context) (models.Timestamp, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for LastKnownArchiveTS")
@@ -75,17 +74,17 @@ func (_m *Downloader) LastKnownArchiveTS() (models.Timestamp, error) {
 
 	var r0 models.Timestamp
 	var r1 error
-	if rf, ok := ret.Get(0).(func() (models.Timestamp, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) (models.Timestamp, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() models.Timestamp); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) models.Timestamp); ok {
+		r0 = rf(ctx)
 	} else {
 		r0 = ret.Get(0).(models.Timestamp)
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -93,9 +92,9 @@ func (_m *Downloader) LastKnownArchiveTS() (models.Timestamp, error) {
 	return r0, r1
 }
 
-// ListBackups provides a mock function with no fields
-func (_m *Downloader) ListBackups() ([]internal.BackupTime, []string, error) {
-	ret := _m.Called()
+// ListBackups provides a mock function with given fields: ctx
+func (_m *Downloader) ListBackups(ctx context.Context) ([]internal.BackupTime, []string, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListBackups")
@@ -104,27 +103,27 @@ func (_m *Downloader) ListBackups() ([]internal.BackupTime, []string, error) {
 	var r0 []internal.BackupTime
 	var r1 []string
 	var r2 error
-	if rf, ok := ret.Get(0).(func() ([]internal.BackupTime, []string, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) ([]internal.BackupTime, []string, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() []internal.BackupTime); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) []internal.BackupTime); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]internal.BackupTime)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() []string); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) []string); ok {
+		r1 = rf(ctx)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).([]string)
 		}
 	}
 
-	if rf, ok := ret.Get(2).(func() error); ok {
-		r2 = rf()
+	if rf, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = rf(ctx)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -132,9 +131,9 @@ func (_m *Downloader) ListBackups() ([]internal.BackupTime, []string, error) {
 	return r0, r1, r2
 }
 
-// ListOplogArchives provides a mock function with no fields
-func (_m *Downloader) ListOplogArchives() ([]models.Archive, error) {
-	ret := _m.Called()
+// ListOplogArchives provides a mock function with given fields: ctx
+func (_m *Downloader) ListOplogArchives(ctx context.Context) ([]models.Archive, error) {
+	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListOplogArchives")
@@ -142,19 +141,19 @@ func (_m *Downloader) ListOplogArchives() ([]models.Archive, error) {
 
 	var r0 []models.Archive
 	var r1 error
-	if rf, ok := ret.Get(0).(func() ([]models.Archive, error)); ok {
-		return rf()
+	if rf, ok := ret.Get(0).(func(context.Context) ([]models.Archive, error)); ok {
+		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func() []models.Archive); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context) []models.Archive); ok {
+		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.Archive)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -162,9 +161,9 @@ func (_m *Downloader) ListOplogArchives() ([]models.Archive, error) {
 	return r0, r1
 }
 
-// ListOplogArchivesSegment provides a mock function with given fields: startAfter, endBefore
-func (_m *Downloader) ListOplogArchivesSegment(startAfter *string, endBefore *string) ([]models.Archive, error) {
-	ret := _m.Called(startAfter, endBefore)
+// ListOplogArchivesSegment provides a mock function with given fields: ctx, startAfter, endBefore
+func (_m *Downloader) ListOplogArchivesSegment(ctx context.Context, startAfter *string, endBefore *string) ([]models.Archive, error) {
+	ret := _m.Called(ctx, startAfter, endBefore)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListOplogArchivesSegment")
@@ -172,19 +171,19 @@ func (_m *Downloader) ListOplogArchivesSegment(startAfter *string, endBefore *st
 
 	var r0 []models.Archive
 	var r1 error
-	if rf, ok := ret.Get(0).(func(*string, *string) ([]models.Archive, error)); ok {
-		return rf(startAfter, endBefore)
+	if rf, ok := ret.Get(0).(func(context.Context, *string, *string) ([]models.Archive, error)); ok {
+		return rf(ctx, startAfter, endBefore)
 	}
-	if rf, ok := ret.Get(0).(func(*string, *string) []models.Archive); ok {
-		r0 = rf(startAfter, endBefore)
+	if rf, ok := ret.Get(0).(func(context.Context, *string, *string) []models.Archive); ok {
+		r0 = rf(ctx, startAfter, endBefore)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]models.Archive)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*string, *string) error); ok {
-		r1 = rf(startAfter, endBefore)
+	if rf, ok := ret.Get(1).(func(context.Context, *string, *string) error); ok {
+		r1 = rf(ctx, startAfter, endBefore)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -192,9 +191,9 @@ func (_m *Downloader) ListOplogArchivesSegment(startAfter *string, endBefore *st
 	return r0, r1
 }
 
-// LoadBackups provides a mock function with given fields: names
-func (_m *Downloader) LoadBackups(names []string) ([]*models.Backup, error) {
-	ret := _m.Called(names)
+// LoadBackups provides a mock function with given fields: ctx, names
+func (_m *Downloader) LoadBackups(ctx context.Context, names []string) ([]*models.Backup, error) {
+	ret := _m.Called(ctx, names)
 
 	if len(ret) == 0 {
 		panic("no return value specified for LoadBackups")
@@ -202,19 +201,19 @@ func (_m *Downloader) LoadBackups(names []string) ([]*models.Backup, error) {
 
 	var r0 []*models.Backup
 	var r1 error
-	if rf, ok := ret.Get(0).(func([]string) ([]*models.Backup, error)); ok {
-		return rf(names)
+	if rf, ok := ret.Get(0).(func(context.Context, []string) ([]*models.Backup, error)); ok {
+		return rf(ctx, names)
 	}
-	if rf, ok := ret.Get(0).(func([]string) []*models.Backup); ok {
-		r0 = rf(names)
+	if rf, ok := ret.Get(0).(func(context.Context, []string) []*models.Backup); ok {
+		r0 = rf(ctx, names)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*models.Backup)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func([]string) error); ok {
-		r1 = rf(names)
+	if rf, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = rf(ctx, names)
 	} else {
 		r1 = ret.Error(1)
 	}

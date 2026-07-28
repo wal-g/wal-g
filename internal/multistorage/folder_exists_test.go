@@ -14,14 +14,14 @@ import (
 func TestExists(t *testing.T) {
 	t.Run("check folder implementation and provide default name if it is not multistorage", func(t *testing.T) {
 		singleStorageFolder := memory.NewFolder("/test", memory.NewKVS())
-		_ = singleStorageFolder.PutObject("a/b/c", &bytes.Buffer{})
+		_ = singleStorageFolder.PutObject(t.Context(), "a/b/c", &bytes.Buffer{})
 
-		exists, storage, err := Exists(singleStorageFolder, "a/b/c")
+		exists, storage, err := Exists(t.Context(), singleStorageFolder, "a/b/c")
 		require.NoError(t, err)
 		assert.Equal(t, "default", storage)
 		assert.True(t, exists)
 
-		exists, storage, err = Exists(singleStorageFolder, "1/2/3")
+		exists, storage, err = Exists(t.Context(), singleStorageFolder, "1/2/3")
 		require.NoError(t, err)
 		assert.Equal(t, "default", storage)
 		assert.False(t, exists)
@@ -31,7 +31,7 @@ func TestExists(t *testing.T) {
 		folder := newTestFolder(t)
 		folder.policies.Exists = policies.ExistsPolicyFirst
 
-		_, _, err := Exists(folder, "kek")
+		_, _, err := Exists(t.Context(), folder, "kek")
 		assert.ErrorIs(t, err, ErrNoUsedStorages)
 	})
 
@@ -39,16 +39,16 @@ func TestExists(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2")
 		folder.policies.Exists = policies.ExistsPolicyFirst
 
-		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb", &bytes.Buffer{})
 
-		exists, storage, err := Exists(folder, "aaa")
+		exists, storage, err := Exists(t.Context(), folder, "aaa")
 		require.NoError(t, err)
 		assert.Equal(t, "s1", storage)
 		assert.True(t, exists)
 
-		exists, storage, err = Exists(folder, "bbb")
+		exists, storage, err = Exists(t.Context(), folder, "bbb")
 		require.NoError(t, err)
 		assert.Equal(t, "s1", storage)
 		assert.False(t, exists)
@@ -58,22 +58,22 @@ func TestExists(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Exists = policies.ExistsPolicyAny
 
-		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("ccc", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "ccc", &bytes.Buffer{})
 
-		exists, storage, err := Exists(folder, "aaa")
+		exists, storage, err := Exists(t.Context(), folder, "aaa")
 		require.NoError(t, err)
 		assert.Equal(t, "s1", storage)
 		assert.True(t, exists)
 
-		exists, storage, err = Exists(folder, "bbb")
+		exists, storage, err = Exists(t.Context(), folder, "bbb")
 		require.NoError(t, err)
 		assert.Equal(t, "s2", storage)
 		assert.True(t, exists)
 
-		exists, storage, err = Exists(folder, "ccc")
+		exists, storage, err = Exists(t.Context(), folder, "ccc")
 		require.NoError(t, err)
 		assert.Equal(t, "s2", storage)
 		assert.True(t, exists)
@@ -83,26 +83,26 @@ func TestExists(t *testing.T) {
 		folder := newTestFolder(t, "s1", "s2", "s3")
 		folder.policies.Exists = policies.ExistsPolicyAll
 
-		_ = folder.usedFolders[0].PutObject("aaa", &bytes.Buffer{})
-		_ = folder.usedFolders[0].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "aaa", &bytes.Buffer{})
+		_ = folder.usedFolders[0].PutObject(t.Context(), "ccc", &bytes.Buffer{})
 
-		_ = folder.usedFolders[1].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[1].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[1].PutObject(t.Context(), "ccc", &bytes.Buffer{})
 
-		_ = folder.usedFolders[2].PutObject("bbb", &bytes.Buffer{})
-		_ = folder.usedFolders[2].PutObject("ccc", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "bbb", &bytes.Buffer{})
+		_ = folder.usedFolders[2].PutObject(t.Context(), "ccc", &bytes.Buffer{})
 
-		exists, storage, err := Exists(folder, "aaa")
+		exists, storage, err := Exists(t.Context(), folder, "aaa")
 		require.NoError(t, err)
 		assert.Equal(t, "s2", storage)
 		assert.False(t, exists)
 
-		exists, storage, err = Exists(folder, "bbb")
+		exists, storage, err = Exists(t.Context(), folder, "bbb")
 		require.NoError(t, err)
 		assert.Equal(t, "s1", storage)
 		assert.False(t, exists)
 
-		exists, storage, err = Exists(folder, "ccc")
+		exists, storage, err = Exists(t.Context(), folder, "ccc")
 		require.NoError(t, err)
 		assert.Equal(t, "all", storage)
 		assert.True(t, exists)

@@ -13,7 +13,7 @@ redis-cli set key test_value
 expected_output=$(redis-cli get key)
 
 mkdir $WALG_FILE_PREFIX
-wal-g rdb-backup-push
+wal-g backup-push --type rdb
 
 ensure rdb $(wal-g backup-info --tag BackupType LATEST)
 
@@ -23,7 +23,7 @@ touch /var/lib/redis/fake.aof
 touch /var/lib/redis/fake.rdb
 mkdir /var/lib/redis/appendonlydir
 touch /var/lib/redis/appendonlydir/fake.tmp
-wal-g rdb-backup-fetch LATEST
+wal-g backup-fetch LATEST --type rdb
 ensure no $(test -e /var/lib/redis/fake.aof && echo "yes" || echo "no")
 ensure no $(test -e /var/lib/redis/fake.rdb && echo "yes" || echo "no")
 ensure no $(test -e /var/lib/redis/appendonlydir/fake.tmp && echo "yes" || echo "no")

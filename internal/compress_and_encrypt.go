@@ -63,7 +63,7 @@ func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, cry
 			_ = dstWriter.CloseWithError(e)
 			return
 		}
-		if crypter != nil {
+		if crypter != nil && compressor != nil {
 			if err := writeCloser.Close(); err != nil {
 				e := newCompressingPipeWriterError("CompressAndEncrypt: encryption failed", err)
 				_ = dstWriter.CloseWithError(e)
