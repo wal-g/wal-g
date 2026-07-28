@@ -887,13 +887,17 @@ func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 func InitConfig() {
 	var globalViper = viper.GetViper()
 	globalViper.AutomaticEnv() // read in environment variables that match
-	SetDefaultValues(globalViper)
-	SetGoMaxProcs(globalViper)
 	if CfgFile == "" {
 		CfgFile = os.Getenv(ConfigPathEnvVar)
 	}
 	ReadConfigFromFile(globalViper, CfgFile)
+	// Validate the values supplied in the config file before adding defaults.
+	// viper.AllSettings includes defaults, so validating afterwards can report
+	// a database-independent default as unknown for a database that does not
+	// support that setting.
 	CheckAllowedSettings(globalViper)
+	SetDefaultValues(globalViper)
+	SetGoMaxProcs(globalViper)
 	WarnDeprecatedSettings(globalViper)
 
 	bindConfigToEnv(globalViper)

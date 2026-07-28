@@ -541,9 +541,9 @@ func ConfigureSettings(currentType string) {
 // StorageFromConfig prefers the config parameters instead of the current environment variables
 func StorageFromConfig(ctx context.Context, configFile string) (storage.Storage, error) {
 	var config = viper.New()
-	conf.SetDefaultValues(config)
 	conf.ReadConfigFromFile(config, configFile)
 	conf.CheckAllowedSettings(config)
+	conf.SetDefaultValues(config)
 
 	folder, err := ConfigureStorageForSpecificConfig(ctx, config)
 
