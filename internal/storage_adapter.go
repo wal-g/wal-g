@@ -9,6 +9,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/fs"
 	"github.com/wal-g/wal-g/pkg/storages/gcs"
 	"github.com/wal-g/wal-g/pkg/storages/oss"
+	"github.com/wal-g/wal-g/pkg/storages/rclone"
 	"github.com/wal-g/wal-g/pkg/storages/s3"
 	"github.com/wal-g/wal-g/pkg/storages/sh"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -62,4 +63,5 @@ var StorageAdapters = []StorageAdapter{
 	{"AZ", azure.SettingList, azure.ConfigureStorage},
 	{"SWIFT", swift.SettingList, swift.ConfigureStorage},
 	{"SSH", sh.SettingList, sh.ConfigureStorage},
+	{"RCLONE", rclone.SettingList, rclone.ConfigureStorage},
 }

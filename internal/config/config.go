@@ -507,6 +507,20 @@ var (
 		SSHUsername:       true,
 		SSHPrivateKeyPath: true,
 
+		// Rclone
+		"WALG_RCLONE_PREFIX":              true,
+		"RCLONE_REMOTE":                   true,
+		"RCLONE_CONFIG_PATH":              true,
+		"RCLONE_BINARY_PATH":              true,
+		"RCLONE_EXTRA_ARGS":               true,
+		"RCLONE_TRANSFERS":                true,
+		"RCLONE_BUFFER_SIZE":              true,
+		"RCLONE_TIMEOUT":                  true,
+		"RCLONE_RETRIES":                  true,
+		"RCLONE_LOW_LEVEL_RETRIES":        true,
+		"RCLONE_S3_CHUNK_SIZE":            true,
+		"RCLONE_UPLOAD_CONCURRENCY":       true,
+
 		//File
 		"WALG_FILE_PREFIX": true,
 
