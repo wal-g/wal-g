@@ -275,7 +275,6 @@ etcd_clean:
 
 # refactor
 etcd_integration_test: load_docker_common
-	docker compose build etcd
 	docker compose build etcd_tests
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
