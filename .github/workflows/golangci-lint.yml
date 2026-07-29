@@ -39,7 +39,7 @@ jobs:
       - name: Set up Go 1.x
         uses: actions/setup-go@v7
         with:
-          go-version-file: 'go.mod'
+          go-version-file: 'cmd/pg/exporter/go.mod'
         id: go
       # pg/exporter is a separate module; lint it under the repo-root .golangci.yml
       - name: golangci-lint
