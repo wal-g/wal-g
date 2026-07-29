@@ -2,10 +2,12 @@ package internal_test
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
@@ -320,3 +322,98 @@ func TestSplitPush_Synchronous_With_Error_2(t *testing.T) {
 func TestSplitPush_MaxFileSize_Equal_BlockSize(t *testing.T) {
 	checkSplitPush(t, 3, 7919, 7919, 0, 1000*1000)
 }
+
+func TestRegularUploader_UploadsStreamMetadata(t *testing.T) {
+	ctx := context.Background()
+	storageFolder, clear, err := GetFolder(0)
+	assert.NoError(t, err)
+	defer clear()
+
+	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	uploader := NewRegularUploader(compressor, storageFolder)
+
+	sample := getByteSampleArray(1000)
+	backupName, err := uploader.PushStream(ctx, bytes.NewReader(sample))
+	assert.NoError(t, err)
+
+	metadataPath := StreamMetadataNameFromBackup(backupName)
+	exists, err := storageFolder.Exists(ctx, metadataPath)
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	var metadata BackupStreamMetadata
+	err = FetchDto(ctx, storageFolder, &metadata, metadataPath)
+	assert.NoError(t, err)
+	assert.Equal(t, SingleStreamStreamBackup, metadata.Type)
+	assert.Equal(t, compressor.FileExtension(), metadata.Compression)
+}
+
+func TestSplitStreamUploader_UploadsStreamMetadata(t *testing.T) {
+	ctx := context.Background()
+	storageFolder, clear, err := GetFolder(0)
+	assert.NoError(t, err)
+	defer clear()
+
+	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	partitions := 3
+	blockSize := 1000
+	uploader := NewSplitStreamUploader(
+		NewRegularUploader(compressor, storageFolder),
+		partitions,
+		blockSize,
+		0,
+	)
+
+	sample := getByteSampleArray(5000)
+	backupName, err := uploader.PushStream(ctx, bytes.NewReader(sample))
+	assert.NoError(t, err)
+
+	metadataPath := StreamMetadataNameFromBackup(backupName)
+	exists, err := storageFolder.Exists(ctx, metadataPath)
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	var metadata BackupStreamMetadata
+	err = FetchDto(ctx, storageFolder, &metadata, metadataPath)
+	assert.NoError(t, err)
+	assert.Equal(t, SplitMergeStreamBackup, metadata.Type)
+	assert.Equal(t, uint(partitions), metadata.Partitions)
+	assert.Equal(t, uint(blockSize), metadata.BlockSize)
+	assert.Equal(t, compressor.FileExtension(), metadata.Compression)
+}
+
+func TestBackupFetch_WithoutMetadata(t *testing.T) {
+	ctx := context.Background()
+	storageFolder, clear, err := GetFolder(0)
+	assert.NoError(t, err)
+	defer clear()
+
+	compressor := compression.Compressors[compression.CompressingAlgorithms[0]]
+	uploader := NewRegularUploader(compressor, storageFolder)
+
+	sample := getByteSampleArray(1000)
+	backupName, err := uploader.PushStream(ctx, bytes.NewReader(sample))
+	assert.NoError(t, err)
+
+	metadataPath := StreamMetadataNameFromBackup(backupName)
+	err = storageFolder.DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(metadataPath, time.Time{}, 0)})
+	assert.NoError(t, err)
+
+	backup := Backup{
+		Name:   backupName,
+		Folder: storageFolder,
+	}
+	fetcher, err := GetBackupStreamFetcher(ctx, backup)
+	assert.NoError(t, err)
+	assert.NotNil(t, fetcher)
+
+	writer := newTestWriter()
+	err = fetcher(ctx, backup, writer)
+	assert.NoError(t, err)
+	<-writer.CloseNotify
+
+	result := writer.Result
+	assert.Equal(t, len(sample), len(result))
+	assert.Equal(t, sample, result)
+}
+

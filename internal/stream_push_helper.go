@@ -30,6 +30,18 @@ func (uploader *RegularUploader) PushStream(ctx context.Context, stream io.Reade
 func (uploader *RegularUploader) PushStreamWithName(ctx context.Context, stream io.Reader, backupName string) (string, error) {
 	dstPath := GetStreamName(backupName, uploader.Compressor.FileExtension())
 	err := uploader.PushStreamToDestination(ctx, stream, dstPath)
+	if err != nil {
+		return backupName, err
+	}
+
+	// Upload StreamMetadata
+	meta := BackupStreamMetadata{
+		Type:        SingleStreamStreamBackup,
+		Compression: uploader.Compressor.FileExtension(),
+	}
+	uploaderClone := uploader.Clone()
+	uploaderClone.DisableSizeTracking() // don't count metadata.json in backup size
+	err = UploadBackupStreamMetadata(ctx, uploaderClone, meta, backupName)
 
 	return backupName, err
 }
