@@ -38,8 +38,8 @@ func getField(ctx context.Context, folder storage.Folder, v *archive.Backup, fie
 
 	r := reflect.ValueOf(v)
 	f := reflect.Indirect(r).FieldByName(field)
-	if f.IsValid() {
-		return f.String(), nil
+	if f.IsValid() && f.CanInterface() {
+		return fmt.Sprint(f.Interface()), nil
 	}
 	return "", fmt.Errorf("no %s field in struct %v", field, &v)
 }
