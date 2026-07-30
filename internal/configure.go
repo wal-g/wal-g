@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -573,12 +574,19 @@ func ConfigureFailoverStorages(ctx context.Context) (failovers map[string]storag
 	}()
 
 	storages := make(map[string]storage.HashableStorage, len(storageConfigs))
-	for name := range storageConfigs {
+	for name, storageConfig := range storageConfigs {
 		if name == "default" {
 			return nil, fmt.Errorf("'%s' storage name is reserved", name)
 		}
 
-		cfg := viper.Sub(conf.FailoverStorages + "." + name)
+		settings, err := cast.ToStringMapE(storageConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failover storage %s: %v", name, err)
+		}
+		cfg := viper.New()
+		if err := cfg.MergeConfigMap(settings); err != nil {
+			return nil, fmt.Errorf("failover storage %s: %v", name, err)
+		}
 
 		var rootWraps []storage.WrapRootFolder
 		if limiters.NetworkLimiter != nil {
