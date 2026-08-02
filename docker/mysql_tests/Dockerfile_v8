@@ -8,6 +8,7 @@ COPY pkg/ pkg/
 COPY cmd/ cmd/
 COPY main/ main/
 COPY utility/ utility/
+COPY Makefile Makefile
 
 # we test wal-g logic, not our deps. So, no brotli in these tests.
 # Note: `-race` fails on ARM64 when ubuntu:bionic used: race runtime needs outline-atomics
