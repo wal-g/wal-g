@@ -151,6 +151,11 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(ctx, target, h.args.Confirmed, h.args.FindFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	// Runs after dispatchDeleteCmd on purpose: the cluster-wide size is recalculated from the
+	// segment journals, which the segment handlers above have just re-merged.
+	internal.DeleteJournalInfo(ctx, h.Folder, target.GetBackupName(), ClusterJournalDir,
+		SegmentsSizeCalculator{}, h.args.Confirmed)
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.BackupObject, delType SegDeleteType) error {

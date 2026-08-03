@@ -65,7 +65,7 @@ var (
 				permanent, verifyPageChecksums,
 				fullBackup, storeAllCorruptBlocks,
 				tarBallComposerType, greenplum.NewSegDeltaBackupConfigurator(deltaBaseSelector),
-				userData, viper.GetBool(conf.WithoutFilesMetadataSetting))
+				userData, viper.GetBool(conf.WithoutFilesMetadataSetting), countJournals)
 
 			backupHandler, err := greenplum.NewSegBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -87,6 +87,8 @@ func init() {
 		"", "Select the backup specified by UserData as the target for the delta backup")
 	segBackupPushCmd.Flags().StringVar(&userDataRaw, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
+	segBackupPushCmd.Flags().BoolVar(&countJournals, countJournalsFlag,
+		false, "Maintain the 'journal_<backup>' object tracking the WAL volume archived by this segment")
 	segBackupPushCmd.PersistentFlags().IntVar(&contentID, "content-id", 0, "segment content ID")
 	_ = segBackupPushCmd.MarkFlagRequired("content-id")
 	cmd.AddCommand(segBackupPushCmd)

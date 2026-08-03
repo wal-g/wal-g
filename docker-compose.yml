@@ -115,6 +115,7 @@ services:
       &&  mkdir -p /export/delete-garbage-multist-fo-bucket
       &&  mkdir -p /export/gpdeletetargetbucket
       &&  mkdir -p /export/gpdeletegarbagebucket
+      &&  mkdir -p /export/gp-journal-test-bucket
       &&  mkdir -p /export/cloudberry-delete-target-bucket
       &&  mkdir -p /export/cloudberry-delete-garbage-bucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
@@ -177,6 +178,7 @@ services:
       &&  mkdir -p /export/cloudberry-delete-before-time-bucket
       &&  mkdir -p /export/cloudberry-aostorage-test-bucket
       &&  mkdir -p /export/cloudberry-paxstorage-test-bucket
+      &&  mkdir -p /export/cloudberry-journal-test-bucket
       &&  mkdir -p /export/cloudberry-delta-backup-test-bucket
       &&  mkdir -p /export/cloudberry-partial-table-bucket
       &&  mkdir -p /export/createrestorepointbucket
@@ -196,6 +198,7 @@ services:
       &&  mkdir -p /export/receivewalbucket
       &&  mkdir -p /export/severaldeltabackupsbucket
       &&  mkdir -p /export/walperftestbucket
+      &&  mkdir -p /export/pg-journal-test-bucket
       &&  mkdir -p /export/orioledb-compatibility
       &&  mkdir -p /export/orioledb-simple
       &&  mkdir -p /export/orioledb-compressed
@@ -520,6 +523,11 @@ services:
     <<: *pg10_test_common
     container_name: wal-g_pg10_delete_target_delta_find_full_test
     command: /tmp/tests/delete_target_delta_find_full_test.sh
+
+  pg10_journals_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_journals_test
+    command: /tmp/tests/journals_test.sh
 
   pg10_ghost_table_test:
     <<: *pg10_test_common
