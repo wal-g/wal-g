@@ -77,7 +77,7 @@ func (tarBall *FileTarBall) CloseTar() error {
 func (tarBall *FileTarBall) Size() int64            { return tarBall.partSize.Load() }
 func (tarBall *FileTarBall) AddSize(i int64)        { tarBall.partSize.Add(i) }
 func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-func (tarBall *FileTarBall) AwaitUploads()          {}
+func (tarBall *FileTarBall) AwaitUploads() error    { return nil }
 
 // BufferTarBall represents a tarball that is
 // written to buffer.
@@ -112,4 +112,4 @@ func (tarBall *BufferTarBall) TarWriter() *tar.Writer {
 	return tarBall.tarWriter
 }
 
-func (tarBall *BufferTarBall) AwaitUploads() {}
+func (tarBall *BufferTarBall) AwaitUploads() error { return nil }
