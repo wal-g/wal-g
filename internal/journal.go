@@ -17,10 +17,9 @@ import (
 )
 
 const (
-	JournalPrefix           = "journal_"
-	JournalTimeLayout       = "20060102T150405Z"
-	cantFindJournal         = "can not find appropriate journal on S3"
-	fullJournalPrefixLength = len(JournalPrefix) + len(StreamPrefix)
+	JournalPrefix     = "journal_"
+	JournalTimeLayout = "20060102T150405Z"
+	cantFindJournal   = "can not find appropriate journal on S3"
 )
 
 type direction = int
@@ -111,27 +110,30 @@ func (ji *JournalInfo) GetNext(ctx context.Context, folder storage.Folder, direc
 	if err != nil {
 		return JournalInfo{}, err
 	}
-	currentJournalTimestamp := getJournalTimestamp(ji.JournalName)
 
-	objs = filterJournalsInfoFiles(objs)
+	candidates, err := loadJournalCandidates(ctx, folder, filterJournalsInfoFiles(objs))
+	if err != nil {
+		return JournalInfo{}, err
+	}
+
 	switch direction {
 	case older:
-		objs = filterJournalsInfoOlderThen(objs, currentJournalTimestamp)
+		candidates = filterCandidatesOlderThen(candidates, ji.CurrentBackupEnd)
 	case newer:
-		objs = filterJournalsInfoNewerThen(objs, currentJournalTimestamp)
+		candidates = filterCandidatesNewerThen(candidates, ji.CurrentBackupEnd)
 	}
-	objs = sortJournalsInfo(objs)
+	sortCandidates(candidates)
 
-	if len(objs) == 0 {
+	if len(candidates) == 0 {
 		return JournalInfo{}, xerrors.New(cantFindJournal)
 	}
 
 	var journalName string
 	switch direction {
 	case older:
-		journalName = objs[len(objs)-1].GetName()
+		journalName = candidates[len(candidates)-1].obj.GetName()
 	case newer:
-		journalName = objs[0].GetName()
+		journalName = candidates[0].obj.GetName()
 	}
 
 	backupName := strings.TrimPrefix(
@@ -211,12 +213,17 @@ func GetMostRecentJournalInfo(
 	}
 
 	objs = filterJournalsInfoFiles(objs)
-	objs = sortJournalsInfo(objs)
 	if len(objs) == 0 {
 		return JournalInfo{}, JournalsNotFound
 	}
 
-	theMostRecentJournalObject := objs[len(objs)-1]
+	candidates, err := loadJournalCandidates(ctx, folder, objs)
+	if err != nil {
+		return JournalInfo{}, err
+	}
+	sortCandidates(candidates)
+
+	theMostRecentJournalObject := candidates[len(candidates)-1].obj
 	theMostRecentBackupName := strings.TrimPrefix(theMostRecentJournalObject.GetName(), JournalPrefix)
 	backupInfo, err := NewJournalInfo(
 		ctx,
@@ -286,20 +293,6 @@ func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Fo
 	return nil
 }
 
-func getJournalTimestamp(journal string) time.Time {
-	if journal == "" {
-		return time.Time{}
-	}
-
-	timestampStr := journal[fullJournalPrefixLength:]
-	timestamp, err := time.Parse(JournalTimeLayout, timestampStr)
-	if err != nil {
-		tracelog.WarningLogger.Printf("Error during parsing timestamp '%s': %s", journal, err)
-	}
-
-	return timestamp
-}
-
 func filterJournalsInfoFiles(objects []storage.Object) []storage.Object {
 	newObjects := make([]storage.Object, 0, len(objects))
 	for _, obj := range objects {
@@ -310,31 +303,51 @@ func filterJournalsInfoFiles(objects []storage.Object) []storage.Object {
 	return newObjects
 }
 
-func filterJournalsInfoOlderThen(objects []storage.Object, timestamp time.Time) []storage.Object {
-	newObjects := make([]storage.Object, 0, len(objects))
-	for _, obj := range objects {
-		objTimestamp := getJournalTimestamp(obj.GetName())
-		if objTimestamp.Before(timestamp) {
-			newObjects = append(newObjects, obj)
-		}
-	}
-	return newObjects
+// journalCandidate pairs a journal's storage object with its CurrentBackupEnd, i.e. the
+// completion time of the backup it belongs to.
+type journalCandidate struct {
+	obj       storage.Object
+	timestamp time.Time
 }
 
-func filterJournalsInfoNewerThen(objects []storage.Object, timestamp time.Time) []storage.Object {
-	newObjects := make([]storage.Object, 0, len(objects))
+// loadJournalCandidates reads each journal's CurrentBackupEnd from its content instead of
+// deriving a timestamp from the associated backup's name, since backup naming conventions
+// differ across databases (e.g. MySQL's "stream_<timestamp>" vs Postgres' "base_<timeline><segno>").
+func loadJournalCandidates(ctx context.Context, folder storage.Folder, objects []storage.Object) ([]journalCandidate, error) {
+	candidates := make([]journalCandidate, 0, len(objects))
 	for _, obj := range objects {
-		objTimestamp := getJournalTimestamp(obj.GetName())
-		if objTimestamp.After(timestamp) {
-			newObjects = append(newObjects, obj)
+		backupName := strings.TrimPrefix(obj.GetName(), JournalPrefix)
+		ji, err := NewJournalInfo(ctx, backupName, folder, "")
+		if err != nil {
+			return nil, err
 		}
+		candidates = append(candidates, journalCandidate{obj: obj, timestamp: ji.CurrentBackupEnd})
 	}
-	return newObjects
+	return candidates, nil
 }
 
-func sortJournalsInfo(objects []storage.Object) []storage.Object {
-	slices.SortFunc(objects, func(a, b storage.Object) int {
-		return getJournalTimestamp(a.GetName()).Compare(getJournalTimestamp(b.GetName()))
+func filterCandidatesOlderThen(candidates []journalCandidate, timestamp time.Time) []journalCandidate {
+	newCandidates := make([]journalCandidate, 0, len(candidates))
+	for _, c := range candidates {
+		if c.timestamp.Before(timestamp) {
+			newCandidates = append(newCandidates, c)
+		}
+	}
+	return newCandidates
+}
+
+func filterCandidatesNewerThen(candidates []journalCandidate, timestamp time.Time) []journalCandidate {
+	newCandidates := make([]journalCandidate, 0, len(candidates))
+	for _, c := range candidates {
+		if c.timestamp.After(timestamp) {
+			newCandidates = append(newCandidates, c)
+		}
+	}
+	return newCandidates
+}
+
+func sortCandidates(candidates []journalCandidate) {
+	slices.SortFunc(candidates, func(a, b journalCandidate) int {
+		return a.timestamp.Compare(b.timestamp)
 	})
-	return objects
 }

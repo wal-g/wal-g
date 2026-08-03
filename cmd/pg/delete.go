@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const UseSentinelTimeFlag = "use-sentinel-time"
@@ -130,7 +131,29 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, postgres.NewGenericMetaFetcher())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, findFullBackup)
+	target := deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, findFullBackup)
+
+	deleteJournalInfo(cmd.Context(), folder, target.GetBackupName(), confirmed)
+}
+
+func deleteJournalInfo(ctx context.Context, folder storage.Folder, backupName string, confirmed bool) {
+	journalInfo, err := internal.NewJournalInfo(ctx, backupName, folder, utility.WalPath)
+	if err != nil {
+		// Backup could have been created without journal counting enabled.
+		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
+		return
+	}
+
+	if !confirmed {
+		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+		return
+	}
+
+	if err := journalInfo.Delete(ctx, folder); err != nil {
+		tracelog.ErrorLogger.Print(err)
+	} else {
+		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+	}
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
