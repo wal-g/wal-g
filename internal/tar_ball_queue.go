@@ -88,14 +88,18 @@ func (tarQueue *TarBallQueue) FinishQueue() error {
 		if err != nil {
 			return errors.Wrap(err, "HandleWalkedFSObject: failed to close tarball")
 		}
-		tarBall.AwaitUploads()
+		if err := tarBall.AwaitUploads(); err != nil {
+			return err
+		}
 	}
 
 	// At this point no new tarballs should be put into uploadQueue
 	for len(tarQueue.uploadQueue) > 0 {
 		select {
 		case otb := <-tarQueue.uploadQueue:
-			otb.AwaitUploads()
+			if err := otb.AwaitUploads(); err != nil {
+				return err
+			}
 		default:
 		}
 	}
@@ -120,7 +124,9 @@ func (tarQueue *TarBallQueue) FinishTarBall(tarBall TarBall) error {
 	for len(tarQueue.uploadQueue) > tarQueue.maxUploadQueue {
 		select {
 		case otb := <-tarQueue.uploadQueue:
-			otb.AwaitUploads()
+			if err := otb.AwaitUploads(); err != nil {
+				return err
+			}
 		default:
 		}
 	}
