@@ -8,7 +8,7 @@ import (
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/printlist"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // Backup represents backup sentinel data
@@ -126,7 +126,7 @@ type MongoMeta struct {
 
 	Version string `json:"Version,omitempty"`
 
-	BackupLastTS primitive.Timestamp `json:"BackupLastTS,omitempty"`
+	BackupLastTS bson.Timestamp `json:"BackupLastTS,omitempty"`
 }
 
 // BackupMeta includes mongodb and storage metadata
