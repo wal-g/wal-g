@@ -42,7 +42,7 @@ require (
 
 require (
 	github.com/ProtonMail/go-crypto v1.4.1
-	github.com/RoaringBitmap/roaring/v2 v2.18.2
+	github.com/RoaringBitmap/roaring/v2 v2.24.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.5.3
 	github.com/aliyun/credentials-go v1.4.12
 	github.com/apache/cloudberry-go-libs v1.0.12-0.20260624080114-3de23e29a87a
@@ -77,7 +77,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.57.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.57.0 // indirect
 	github.com/alibabacloud-go/debug v1.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.24.2 // indirect
+	github.com/bits-and-blooms/bitset v1.24.4 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/ccoveille/go-safecast/v2 v2.0.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
