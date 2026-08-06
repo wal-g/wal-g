@@ -196,6 +196,7 @@ services:
       &&  mkdir -p /export/receivewalbucket
       &&  mkdir -p /export/severaldeltabackupsbucket
       &&  mkdir -p /export/walperftestbucket
+      &&  mkdir -p /export/journals-test-bucket
       &&  mkdir -p /export/orioledb-compatibility
       &&  mkdir -p /export/orioledb-simple
       &&  mkdir -p /export/orioledb-compressed
