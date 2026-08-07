@@ -82,6 +82,7 @@ type MongoDriver interface {
 	Close(ctx context.Context, shutdown bool) error
 	ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error
 	LastOplogTS(ctx context.Context) (lastTS models.Timestamp, err error)
+	CatchUpStartTS(ctx context.Context) (models.Timestamp, error)
 }
 
 // OplogCursor defines methods to work with mongodb cursor.
@@ -301,6 +302,38 @@ func (mc *MongoClient) LastOplogTS(ctx context.Context) (lastTS models.Timestamp
 		return models.Timestamp{}, err
 	}
 	return models.TimestampFromBson(op.Timestamp), nil
+}
+
+// CatchUpStartTS returns the last point known to be applied to the data files.
+func (mc *MongoClient) CatchUpStartTS(ctx context.Context) (models.Timestamp, error) {
+	lastOplogTS, err := mc.LastOplogTS(ctx)
+	if err != nil {
+		return models.Timestamp{}, err
+	}
+
+	var minValid struct {
+		AppliedThrough *struct {
+			TS bson.Timestamp `bson:"ts"`
+		} `bson:"appliedThrough"`
+	}
+	err = mc.c.Database(oplogDatabaseName).
+		Collection("replset.minvalid").
+		FindOne(ctx, bson.M{}).
+		Decode(&minValid)
+	if err != nil {
+		return models.Timestamp{}, fmt.Errorf("failed to get appliedThrough: %w", err)
+	}
+	if minValid.AppliedThrough == nil || minValid.AppliedThrough.TS == (bson.Timestamp{}) {
+		return lastOplogTS, nil
+	}
+
+	appliedThroughTS := models.TimestampFromBson(minValid.AppliedThrough.TS)
+	if models.LessTS(lastOplogTS, appliedThroughTS) {
+		return models.Timestamp{}, fmt.Errorf(
+			"appliedThrough %s is ahead of the last oplog entry %s",
+			appliedThroughTS.String(), lastOplogTS.String())
+	}
+	return appliedThroughTS, nil
 }
 
 // Close disconnects from mongodb
