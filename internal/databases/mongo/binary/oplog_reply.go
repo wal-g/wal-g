@@ -64,7 +64,11 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 
 	var emptyTS models.Timestamp
 	if replayArgs.Since == emptyTS {
-		replayArgs.Since, err = mongoClient.LastOplogTS(ctx)
+		if replayArgs.WithCatchUpReconfig {
+			replayArgs.Since, err = mongoClient.CatchUpStartTS(ctx)
+		} else {
+			replayArgs.Since, err = mongoClient.LastOplogTS(ctx)
+		}
 		if err != nil {
 			return err
 		}
