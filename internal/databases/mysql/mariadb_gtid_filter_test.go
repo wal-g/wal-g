@@ -17,32 +17,32 @@ func TestMariaDBGTIDFilter_IsValid(t *testing.T) {
 		{
 			name: "Valid MariaDB filter",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        mysql.MariaDBFlavor,
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        mysql.MariaDBFlavor,
 			},
 			want: true,
 		},
 		{
 			name: "Invalid - MySQL flavor should not be valid for MariaDB filter",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        mysql.MySQLFlavor,
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        mysql.MySQLFlavor,
 			},
 			want: false,
 		},
 		{
 			name: "Invalid - empty flavor",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        "",
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        "",
 			},
 			want: false,
 		},
 		{
 			name: "Invalid - unknown flavor",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        "PostgreSQL",
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        "PostgreSQL",
 			},
 			want: false,
 		},
@@ -302,8 +302,8 @@ func TestMariaDBGTIDContainAfterUpdate(t *testing.T) {
 // TestMariaDBGTIDFilter_ShouldUpload_FirstRun tests the first binlog upload scenario
 func TestMariaDBGTIDFilter_ShouldUpload_FirstRun(t *testing.T) {
 	filter := mariadbGtidFilter{
-		BinlogsFolder: "/var/lib/mysql",
-		Flavor:        mysql.MariaDBFlavor,
+		binlogsFolder: "/var/lib/mysql",
+		flavor:        mysql.MariaDBFlavor,
 		gtidArchived:  nil, // First run - no archived GTIDs
 	}
 
@@ -311,4 +311,3 @@ func TestMariaDBGTIDFilter_ShouldUpload_FirstRun(t *testing.T) {
 	result := filter.shouldUpload("mysql-bin.000001", "")
 	assert.False(t, result, "Should return false when there's no next binlog")
 }
-

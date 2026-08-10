@@ -17,8 +17,8 @@ import (
 // This filter uses GTID checkpoints (end-state markers) to determine whether a binlog
 // has already been archived, avoiding unnecessary uploads.
 type mariadbGtidFilter struct {
-	BinlogsFolder string
-	Flavor        string
+	binlogsFolder string
+	flavor        string
 	gtidArchived  *mysql.MariadbGTIDSet // GTID checkpoint of archived binlogs
 }
 
@@ -31,11 +31,11 @@ func (f *mariadbGtidFilter) isValid() bool {
 	if f == nil {
 		return false
 	}
-	if f.Flavor == "" {
+	if f.flavor == "" {
 		return false
 	}
 	// Only valid for MariaDB flavor
-	if f.Flavor != mysql.MariaDBFlavor {
+	if f.flavor != mysql.MariaDBFlavor {
 		return false
 	}
 	return true
@@ -69,7 +69,7 @@ func (f *mariadbGtidFilter) shouldUpload(binlog, nextBinlog string) bool {
 
 	// Get end-state checkpoint: GTIDs at the end of current binlog
 	// Read from MARIADB_GTID_LIST_EVENT in the next binlog
-	endStateCheckpoint, err := GetBinlogPreviousGTIDs(path.Join(f.BinlogsFolder, nextBinlog), f.Flavor)
+	endStateCheckpoint, err := GetBinlogPreviousGTIDs(path.Join(f.binlogsFolder, nextBinlog), f.flavor)
 	if err != nil {
 		tracelog.InfoLogger.Printf(
 			"Cannot extract end-state checkpoint from next binlog %s (caused by %v). Upload %s to be safe. (mariadb gtid check)\n",
