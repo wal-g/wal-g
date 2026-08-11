@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mysql"
@@ -72,5 +73,5 @@ func init() {
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().BoolVar(&countJournals, countJournalsFlag,
-		false, "Create 'backups.json' file in the bucket and maintain the binlog sizes required to get from one backup to the next one")
+		false, "Create 'journal_<backup>' file in the bucket and maintain the binlog sizes required to get from one backup to the next one")
 }
