@@ -35,11 +35,20 @@ var JournalsNotFound = xerrors.New("there are no journals on the S3")
 // JournalInfo is a projection of the S3 journal info object.
 // When a JournalInfo instance was changed, it should be synced with S3 using the upload/read method.
 type JournalInfo struct {
-	JournalDirectoryName string    `json:"-"`
-	JournalName          string    `json:"-"`
-	PriorBackupEnd       time.Time `json:"PriorBackupEnd"`
-	CurrentBackupEnd     time.Time `json:"CurrentBackupEnd"`
-	SizeToNextBackup     int64     `json:"SizeToNextBackup"`
+	JournalDirectoryName string `json:"-"`
+	JournalName          string `json:"-"`
+	// PriorBackupEnd is the completion time of the previous backup before this journal's backup.
+	// Together with CurrentBackupEnd it defines the previous-to-current backup interval
+	// (PriorBackupEnd; CurrentBackupEnd], which is used to recalculate the previous
+	// journal's SizeToNextBackup when this backup is created or when a backup is deleted.
+	PriorBackupEnd time.Time `json:"PriorBackupEnd"`
+	// CurrentBackupEnd is the completion time of the backup this journal belongs to.
+	// It is also used to order journal_<backup> objects chronologically.
+	CurrentBackupEnd time.Time `json:"CurrentBackupEnd"`
+	// SizeToNextBackup belongs to a different interval than PriorBackupEnd/CurrentBackupEnd:
+	// it is the size, in bytes, of archived journal files needed to get from this backup
+	// to the next one. It is zero for the newest backup.
+	SizeToNextBackup int64 `json:"SizeToNextBackup"`
 }
 
 // NewEmptyJournalInfo creates instance of JournalInfo without sync with S3

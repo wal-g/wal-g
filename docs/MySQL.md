@@ -98,6 +98,18 @@ Creates new backup and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to 
 wal-g backup-push
 ```
 
+#### Journal (binlog) size accounting
+
+Run ``backup-push`` with the ``--count-journals`` flag to maintain a ``journal_<backup>`` object per backup in storage, tracking the volume of binlog accumulated between that backup and the next one. The size is computed from the actual storage object sizes of the archived binlog segments, so it correctly reflects compression.
+
+```bash
+wal-g backup-push --count-journals
+```
+
+Journal accounting is skipped for permanent backups (marked with ``--permanent``), since they are not expected to be removed and don't take part in WAL retention planning.
+
+Currently, only ``delete target`` cleans up and re-merges the corresponding journal entry when a backup is removed this way.
+
 ### ``xtrabackup-push``
 
 Creates new backup with `xtrabackup` tool and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
