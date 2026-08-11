@@ -35,8 +35,8 @@ var JournalsNotFound = xerrors.New("there are no journals on the S3")
 // JournalInfo is a projection of the S3 journal info object.
 // When a JournalInfo instance was changed, it should be synced with S3 using the upload/read method.
 type JournalInfo struct {
-	JournalDirectoryName string    `json:"-"`
-	JournalName          string    `json:"-"`
+	JournalDirectoryName string `json:"-"`
+	JournalName          string `json:"-"`
 	// PriorBackupEnd is the completion time of the previous backup before this journal's backup.
 	// Together with CurrentBackupEnd it defines the previous-to-current backup interval
 	// (PriorBackupEnd; CurrentBackupEnd], which is used to recalculate the previous
