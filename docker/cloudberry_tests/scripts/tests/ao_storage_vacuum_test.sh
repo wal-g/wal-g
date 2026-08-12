@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e -x
-CONFIG_FILE="/tmp/configs/ao_storage_test_config.json"
+CONFIG_FILE="/tmp/configs/delta_backup_test_config.json"
 
 COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
