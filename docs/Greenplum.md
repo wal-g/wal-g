@@ -122,7 +122,7 @@ wal-g st cat basebackups_005/journal_backup_20260721T120000Z --config=/path/to/c
 
 ``SizeToNextBackup`` is zero for the newest backup and is filled in once the following backup is created.
 
-A few things worth knowing about the cluster-wide number:
+A few things worth knowing about the cluster-wide WAL number:
 
 * It is the sum of the intervals the segments measured for themselves, not the WAL archived cluster-wide between two backup finish times. A segment finishes its backup-push before the coordinator creates the restore point, so WAL archived in between is counted in that segment's next interval. Nothing is lost or double counted along the chain, but the number will not match a naive sum over a calendar window.
 * If the journal of even one segment is unavailable, the cluster-wide size is left unset rather than written as a partial sum, and a warning naming the segments is logged. A silently understated number would be indistinguishable from a genuinely small one.
@@ -130,6 +130,21 @@ A few things worth knowing about the cluster-wide number:
 Journal accounting is skipped for permanent backups (marked with ``--permanent``), since they are not expected to be removed and don't take part in WAL retention planning.
 
 Currently, only ``delete target`` cleans up and re-merges the corresponding journal entries when a backup is removed; other ``delete`` modes (``before``, ``retain``, ``everything``, ``garbage``) leave existing journals untouched.
+
+##### Shared storage (AO/AOCS/PAX) accounting
+
+The same journal objects carry a second figure, ``SharedSize``, alongside ``SizeToNextBackup``:
+
+```bash
+wal-g st cat basebackups_005/journal_backup_20260721T120000Z --config=/path/to/config.yaml | jq '.SharedSize'
+```
+
+AO/AOCS and PAX files live in storage shared between backups (``aosegments/`` and ``paxfiles/`` under each segment), where an unchanged file is uploaded once and then reused by later backups through deduplication. ``SharedSize`` is the volume a backup *added* to that shared storage: each segment's uploader counts the bytes it actually pushed, skipping everything deduplicated, and the coordinator sums the segments. Unlike ``SizeToNextBackup``, it describes the backup itself and is therefore known immediately, not filled in later.
+
+Because every shared object is attributed to the backup that uploaded it, adding ``SharedSize`` over all backups approximates the total size of the shared storage. Two things make it an approximation rather than an identity:
+
+* When a backup is deleted, its ``SharedSize`` disappears with it, even if some of the files it uploaded are still being reused by newer backups. Those bytes then belong to no backup and the total drifts below the real size. This stays bounded as long as ``WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT`` and ``WALG_GP_PAXFILE_DEDUPLICATION_AGE_LIMIT`` are comparable to how long backups are retained, since a file is then re-uploaded before its owning backup is deleted. Setting the age limits much higher than the retention period will make the totals drift low.
+* Objects no longer referenced by any backup are not counted either. ``delete garbage`` exists to remove them.
 
 ### ``backup-fetch``
 

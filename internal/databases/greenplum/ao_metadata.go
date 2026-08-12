@@ -27,6 +27,10 @@ type BackupAOFileDesc struct {
 
 type AOFilesMetadataDTO struct {
 	Files BackupAOFiles
+	// UploadedSize is the volume this backup pushed to the shared aosegments/ storage.
+	// Files reused from an older backup via deduplication are not counted, so summing this field
+	// over all backups approximates the total size of the shared storage.
+	UploadedSize int64 `json:",omitempty"`
 }
 
 type BackupAOFiles map[string]*BackupAOFileDesc

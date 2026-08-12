@@ -264,6 +264,17 @@ func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder stora
 	journalInfo := internal.NewEmptyJournalInfo(bh.currBackupInfo.backupName,
 		mostRecentJournalInfo.CurrentBackupEnd, bh.currBackupInfo.finishTime, ClusterJournalDir)
 
+	// Unlike SizeToNextBackup, which is filled in once the following backup shows up, the shared
+	// volume is already known: the segments recorded theirs while pushing.
+	sharedSize, ok, err := SumSegmentJournals(ctx, rootFolder, bh.currBackupInfo.backupName,
+		func(ji internal.JournalInfo) int64 { return ji.SharedSize })
+	switch {
+	case err != nil:
+		tracelog.WarningLogger.Printf("can not calculate the shared storage size: %s", err.Error())
+	case ok:
+		journalInfo.SharedSize = sharedSize
+	}
+
 	if err := journalInfo.Upload(ctx, rootFolder); err != nil {
 		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
 		return

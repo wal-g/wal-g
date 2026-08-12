@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -34,6 +35,8 @@ type AoStorageUploader struct {
 	deduplicationMinAge time.Time
 	// unique identifier of the new AO/AOCS segments created by this uploader
 	newAoSegFilesID string
+	// bytes this backup actually pushed to the shared AO/AOCS storage, excluding deduplicated files
+	uploadedSize atomic.Int64
 }
 
 func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
@@ -166,6 +169,7 @@ func (u *AoStorageUploader) addAoFileMetadata(
 }
 
 func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
+	u.meta.UploadedSize = u.uploadedSize.Load()
 	return u.meta
 }
 
@@ -213,14 +217,7 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 	hasher := xxh3.New128()
 	hashingReader := io.TeeReader(fileReadCloser, ioextensions.NewLimitedWriter(hasher, aoMeta.eof))
 
-	// do not compress AO/AOCS segment files since they are already compressed in most cases
-	// TODO: lookup the compression details for each relation and compress it when compression is turned off
-	var compressor compression.Compressor
-
-	uploadContents := internal.CompressAndEncrypt(hashingReader, compressor, u.crypter)
-	uploadPath := path.Join(AoStoragePath, storageKey)
-	err = u.uploader.Upload(ctx, uploadPath, uploadContents)
-	if err != nil {
+	if err = u.upload(ctx, hashingReader, storageKey); err != nil {
 		return err
 	}
 
@@ -262,7 +259,13 @@ func (u *AoStorageUploader) upload(ctx context.Context, reader io.Reader, storag
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
 	var compressor compression.Compressor
 
-	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
+	// Counted after compression and encryption, so this is what the object actually takes in storage.
+	uploadContents := ioextensions.NewCountingReader(internal.CompressAndEncrypt(reader, compressor, u.crypter))
 	uploadPath := path.Join(AoStoragePath, storageKey)
-	return u.uploader.Upload(ctx, uploadPath, uploadContents)
+	if err := u.uploader.Upload(ctx, uploadPath, uploadContents); err != nil {
+		return err
+	}
+
+	u.uploadedSize.Add(uploadContents.BytesRead())
+	return nil
 }

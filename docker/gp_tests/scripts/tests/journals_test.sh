@@ -25,16 +25,23 @@ get_backup_name() {
     echo ${JOURNAL_NAME#"journal_"}
 }
 
-# get_cluster_journal_size <n> - SizeToNextBackup recorded for the n-th oldest backup
-get_cluster_journal_size() {
+# get_cluster_journal_field <n> <field> - journal field recorded for the n-th oldest backup.
+# Absent fields (SharedSize is omitempty) read as 0.
+get_cluster_journal_field() {
     JOURNAL_NAME=$(get_cluster_journals | awk "FNR == $1 {print}")
-    wal-g --config=${TMP_CONFIG} st cat basebackups_005/$JOURNAL_NAME | jq '.SizeToNextBackup'
+    wal-g --config=${TMP_CONFIG} st cat basebackups_005/$JOURNAL_NAME | jq ".$2 // 0"
 }
 
-# get_segments_journal_sum <n> - sum of SizeToNextBackup over the segment journals of the
+# get_cluster_journal_size <n> - SizeToNextBackup recorded for the n-th oldest backup
+get_cluster_journal_size() {
+    get_cluster_journal_field $1 SizeToNextBackup
+}
+
+# get_segments_journal_sum <n> <field> - sum of the field over the segment journals of the
 # n-th oldest backup, i.e. what the cluster-wide journal is supposed to hold
 get_segments_journal_sum() {
     BACKUP_NAME=$(get_backup_name $1)
+    FIELD=${2:-SizeToNextBackup}
     SENTINEL=$(wal-g --config=${TMP_CONFIG} st cat basebackups_005/${BACKUP_NAME}_backup_stop_sentinel.json)
 
     SUM=0
@@ -42,7 +49,7 @@ get_segments_journal_sum() {
         CONTENT_ID=${SEGMENT%%:*}
         SEG_BACKUP=${SEGMENT#*:}
         SEG_SIZE=$(wal-g --config=${TMP_CONFIG} st cat \
-            segments_005/seg${CONTENT_ID}/basebackups_005/journal_${SEG_BACKUP} | jq '.SizeToNextBackup')
+            segments_005/seg${CONTENT_ID}/basebackups_005/journal_${SEG_BACKUP} | jq ".$FIELD // 0")
         SUM=$((SUM + SEG_SIZE))
     done
     echo $SUM
@@ -81,8 +88,17 @@ test "0" -ne $SECOND_SIZE
 test "0" -eq $(get_cluster_journal_size 3)
 
 # The cluster-wide size is exactly the sum over the segments
-test $FIRST_SIZE -eq $(get_segments_journal_sum 1)
-test $SECOND_SIZE -eq $(get_segments_journal_sum 2)
+test $FIRST_SIZE -eq $(get_segments_journal_sum 1 SizeToNextBackup)
+test $SECOND_SIZE -eq $(get_segments_journal_sum 2 SizeToNextBackup)
+
+# insert_data creates AO and CO tables, so every backup pushed some AO/AOCS files to the shared
+# storage, and the cluster-wide figure is again the sum over the segments.
+for N in 1 2 3
+do
+    SHARED_SIZE=$(get_cluster_journal_field $N SharedSize)
+    test "0" -ne $SHARED_SIZE
+    test $SHARED_SIZE -eq $(get_segments_journal_sum $N SharedSize)
+done
 
 # Deleting a backup in the middle merges its interval into the previous one
 wal-g --config=${TMP_CONFIG} delete target $(get_backup_name 2) --confirm
