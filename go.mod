@@ -49,7 +49,7 @@ require (
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/google/brotli/go/cbrotli v1.1.0
 	github.com/jedib0t/go-pretty/v6 v6.8.2
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.19.2
 	github.com/mongodb/mongo-tools v0.0.0-20260508170159-0b142f65e139
 	github.com/ncw/directio v1.0.5
 	github.com/ncw/swift/v2 v2.0.5
