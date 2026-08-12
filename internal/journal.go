@@ -53,15 +53,15 @@ type JournalInfo struct {
 // NewEmptyJournalInfo creates instance of JournalInfo without sync with S3
 func NewEmptyJournalInfo(
 	backupName string,
-	currentBackupEnd time.Time,
 	priorBackupEnd time.Time,
+	currentBackupEnd time.Time,
 	journalDir string,
 ) JournalInfo {
 	return JournalInfo{
 		JournalName:          fmt.Sprintf("%s%s", JournalPrefix, backupName),
 		JournalDirectoryName: journalDir,
-		PriorBackupEnd:       currentBackupEnd,
-		CurrentBackupEnd:     priorBackupEnd,
+		PriorBackupEnd:       priorBackupEnd,
+		CurrentBackupEnd:     currentBackupEnd,
 		SizeToNextBackup:     0,
 	}
 }
@@ -164,7 +164,7 @@ func (ji *JournalInfo) GetNext(ctx context.Context, folder storage.Folder, direc
 // Delete deletes the current JournalInfo from S3,
 // updates the PriorBackupEnd of a newer JournalInfo with the PriorBackupEnd of the current one,
 // updates the older one journal size.
-func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder) error {
+func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder, calc IntervalSizeCalculator) error {
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
 		DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
@@ -199,12 +199,42 @@ func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder) error 
 		return err
 	}
 
-	err = newerJi.UpdateIntervalSize(ctx, folder, &JournalFiles{})
+	err = newerJi.UpdateIntervalSize(ctx, folder, calc)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// DeleteJournalInfo removes the journal of the given backup and re-links the neighbouring journals,
+// so that the journal volume of the deleted interval is accounted for by the previous backup.
+// A backup pushed without journal counting has no journal at all, which is not an error.
+func DeleteJournalInfo(
+	ctx context.Context,
+	folder storage.Folder,
+	backupName string,
+	journalDir string,
+	calc IntervalSizeCalculator,
+	confirmed bool,
+) {
+	journalInfo, err := NewJournalInfo(ctx, backupName, folder, journalDir)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
+		return
+	}
+
+	if !confirmed {
+		tracelog.InfoLogger.Printf("Journal info to delete: %+v", journalInfo)
+		return
+	}
+
+	if err := journalInfo.Delete(ctx, folder, calc); err != nil {
+		tracelog.ErrorLogger.Print(err)
+		return
+	}
+
+	tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
 }
 
 // GetMostRecentJournalInfo receives the most recently created JournalInfo on S3
@@ -247,32 +277,48 @@ func GetMostRecentJournalInfo(
 	return backupInfo, nil
 }
 
-type JournalFiles struct {
+// IntervalSizeCalculator computes the volume of journal data accumulated in the semi-interval
+// (ji.PriorBackupEnd; ji.CurrentBackupEnd], which is stored as prevJi.SizeToNextBackup.
+type IntervalSizeCalculator interface {
+	// Calculate returns ok == false when the size can not be determined. In that case the caller
+	// must leave prevJi.SizeToNextBackup as it is instead of resetting it to zero, since a missing
+	// measurement is indistinguishable from a genuine zero once it has been written to storage.
+	Calculate(ctx context.Context, folder storage.Folder, ji, prevJi JournalInfo) (size int64, ok bool, err error)
+}
+
+// JournalDirSizeCalculator sums the storage sizes of the journal files archived within the
+// interval, taken from a listing of ji.JournalDirectoryName. The listing is cached, so a single
+// instance is meant to be reused across the calls belonging to one recalculation, and only across
+// journals that share a directory.
+type JournalDirSizeCalculator struct {
 	files       []storage.Object
 	initialized bool
 }
 
-// UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
-// using journal files on JournalDirectoryName and save it for the previous JournalInfo
-func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Folder, journalFilesObj *JournalFiles) error {
-	var err error
-	if !journalFilesObj.initialized {
-		// doing this 1 time for reusing it in next runs during single calculation
+func NewJournalDirSizeCalculator() *JournalDirSizeCalculator {
+	return &JournalDirSizeCalculator{}
+}
+
+func (c *JournalDirSizeCalculator) Calculate(
+	ctx context.Context,
+	folder storage.Folder,
+	ji, _ JournalInfo,
+) (int64, bool, error) {
+	if !c.initialized {
 		journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder(ctx)
 		if err != nil {
-			return err
+			return 0, false, err
 		}
-		journalFilesObj.files = journalFiles
-		journalFilesObj.initialized = true
+		c.files = journalFiles
+		c.initialized = true
 	}
 
-	journalFiles := journalFilesObj.files
-	if len(journalFiles) == 0 {
-		return nil
+	if len(c.files) == 0 {
+		return 0, false, nil
 	}
 
 	sum := int64(0)
-	for _, journal := range journalFiles {
+	for _, journal := range c.files {
 		timestamp := journal.GetLastModified()
 
 		isInInterval := timestamp.After(ji.PriorBackupEnd) && timestamp.Before(ji.CurrentBackupEnd)
@@ -284,6 +330,12 @@ func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Fo
 		}
 	}
 
+	return sum, true, nil
+}
+
+// UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
+// and saves it for the previous JournalInfo
+func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Folder, calc IntervalSizeCalculator) error {
 	prevJi, err := ji.GetNext(ctx, folder, older)
 	if err != nil {
 		// There can only be one backup on S3 or we can delete the oldest one
@@ -292,14 +344,20 @@ func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Fo
 		}
 		return err
 	}
-	prevJi.SizeToNextBackup = sum
 
-	err = prevJi.Upload(ctx, folder)
+	sum, ok, err := calc.Calculate(ctx, folder, *ji, prevJi)
 	if err != nil {
 		return err
 	}
+	if !ok {
+		tracelog.WarningLogger.Printf("Can not determine the journal size for %s, leaving SizeToNextBackup of %s intact",
+			ji.JournalName, prevJi.JournalName)
+		return nil
+	}
 
-	return nil
+	prevJi.SizeToNextBackup = sum
+
+	return prevJi.Upload(ctx, folder)
 }
 
 func filterJournalsInfoFiles(objects []storage.Object) []storage.Object {

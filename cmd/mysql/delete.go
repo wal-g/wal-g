@@ -76,29 +76,8 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 
 	deleteHandler.HandleDeleteTarget(cmd.Context(), backupSelector, confirmed, findFullBackup)
 
-	journalInfo, err := internal.NewJournalInfo(
-		cmd.Context(),
-		backupName,
-		storage.RootFolder(),
-		mysql.BinlogPath,
-	)
-	// Backup could be created without journal
-	if err != nil {
-		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
-		return
-	}
-
-	if !confirmed {
-		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
-		return
-	}
-
-	err = journalInfo.Delete(cmd.Context(), storage.RootFolder())
-	if err != nil {
-		tracelog.ErrorLogger.Print(err)
-	} else {
-		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
-	}
+	internal.DeleteJournalInfo(cmd.Context(), storage.RootFolder(), backupName, mysql.BinlogPath,
+		internal.NewJournalDirSizeCalculator(), confirmed)
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {

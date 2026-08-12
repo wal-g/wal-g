@@ -427,7 +427,7 @@ func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder stora
 		return
 	}
 
-	if err := journalInfo.UpdateIntervalSize(ctx, rootFolder, &internal.JournalFiles{}); err != nil {
+	if err := journalInfo.UpdateIntervalSize(ctx, rootFolder, internal.NewJournalDirSizeCalculator()); err != nil {
 		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
 		return
 	}
