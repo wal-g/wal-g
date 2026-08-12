@@ -29,9 +29,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/ulikunitz/xz v0.5.16
 	github.com/wal-g/tracelog v0.1.1
-	github.com/yandex-cloud/go-genproto v0.100.0
-	github.com/yandex-cloud/go-sdk/services/kms v0.0.82
-	github.com/yandex-cloud/go-sdk/v2 v2.144.0
+	github.com/yandex-cloud/go-genproto v0.102.0
+	github.com/yandex-cloud/go-sdk/services/kms v0.0.84
+	github.com/yandex-cloud/go-sdk/v2 v2.148.0
 	golang.org/x/crypto v0.54.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/time v0.15.0
