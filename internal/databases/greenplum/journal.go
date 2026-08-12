@@ -40,6 +40,23 @@ func (SegmentsSizeCalculator) Calculate(
 ) (int64, bool, error) {
 	backupName := strings.TrimPrefix(prevJi.JournalName, internal.JournalPrefix)
 
+	return SumSegmentJournals(ctx, rootFolder, backupName, func(ji internal.JournalInfo) int64 {
+		return ji.SizeToNextBackup
+	})
+}
+
+// SumSegmentJournals adds up one field of the segment journals belonging to backupName, which the
+// segment WAL-G instances maintain in their own segments_005/seg<N>/ folders.
+//
+// A partial sum would silently understate the real volume and be indistinguishable from a genuinely
+// small one, so a single unreadable segment journal makes the whole aggregate unavailable
+// (ok=false) rather than wrong.
+func SumSegmentJournals(
+	ctx context.Context,
+	rootFolder storage.Folder,
+	backupName string,
+	field func(internal.JournalInfo) int64,
+) (int64, bool, error) {
 	backup, err := NewBackup(rootFolder, backupName)
 	if err != nil {
 		return 0, false, err
@@ -59,13 +76,13 @@ func (SegmentsSizeCalculator) Calculate(
 	for i := range sentinel.Segments {
 		meta := sentinel.Segments[i]
 
-		size, ok := segmentJournalSize(ctx, rootFolder, meta)
+		ji, ok := readSegmentJournal(ctx, rootFolder, meta)
 		if !ok {
 			missing = append(missing, meta.ContentID)
 			continue
 		}
 
-		sum += size
+		sum += field(ji)
 	}
 
 	if len(missing) > 0 {
@@ -74,17 +91,17 @@ func (SegmentsSizeCalculator) Calculate(
 		return 0, false, nil
 	}
 
-	tracelog.DebugLogger.Printf("Cluster-wide journal size of backup %s is %d bytes over %d segments",
+	tracelog.DebugLogger.Printf("Cluster-wide journal sum of backup %s is %d bytes over %d segments",
 		backupName, sum, len(sentinel.Segments))
 
 	return sum, true, nil
 }
 
-func segmentJournalSize(ctx context.Context, rootFolder storage.Folder, meta SegmentMetadata) (int64, bool) {
+func readSegmentJournal(ctx context.Context, rootFolder storage.Folder, meta SegmentMetadata) (internal.JournalInfo, bool) {
 	if meta.BackupName == "" {
 		// Written by a WAL-G old enough not to record the segment backup name in the sentinel.
 		tracelog.WarningLogger.Printf("Sentinel does not name the backup of segment %d", meta.ContentID)
-		return 0, false
+		return internal.JournalInfo{}, false
 	}
 
 	segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
@@ -94,8 +111,8 @@ func segmentJournalSize(ctx context.Context, rootFolder storage.Folder, meta Seg
 		// The segment backup was pushed without journal counting, or its journal is already gone.
 		tracelog.WarningLogger.Printf("Can not read the journal of segment %d backup %s: %v",
 			meta.ContentID, meta.BackupName, err)
-		return 0, false
+		return internal.JournalInfo{}, false
 	}
 
-	return ji.SizeToNextBackup, true
+	return ji, true
 }

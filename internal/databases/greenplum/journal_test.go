@@ -22,9 +22,26 @@ const (
 // pushing segBackupName and then measuring the WAL it archived until the next backup.
 func putSegmentJournal(t *testing.T, root storage.Folder, contentID int, segBackupName string, size int64) {
 	t.Helper()
+	putSegmentJournalInfo(t, root, contentID, segBackupName, func(ji *internal.JournalInfo) {
+		ji.SizeToNextBackup = size
+	})
+}
+
+// putSegmentSharedJournal writes the journal of a segment that reported how much it added to the
+// shared AO/AOCS and PAX storage while pushing segBackupName.
+func putSegmentSharedJournal(t *testing.T, root storage.Folder, contentID int, segBackupName string, sharedSize int64) {
+	t.Helper()
+	putSegmentJournalInfo(t, root, contentID, segBackupName, func(ji *internal.JournalInfo) {
+		ji.SharedSize = sharedSize
+	})
+}
+
+func putSegmentJournalInfo(t *testing.T, root storage.Folder, contentID int, segBackupName string,
+	fill func(*internal.JournalInfo)) {
+	t.Helper()
 
 	ji := internal.NewEmptyJournalInfo(segBackupName, time.Time{}, time.Now(), utility.WalPath)
-	ji.SizeToNextBackup = size
+	fill(&ji)
 
 	segFolder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
 	require.NoError(t, ji.Upload(t.Context(), segFolder))
@@ -151,5 +168,59 @@ func TestUpdateIntervalSizeWithSegmentsCalculator(t *testing.T) {
 
 		require.NoError(t, prevJi.Read(t.Context(), root))
 		assert.Equal(t, int64(4096), prevJi.SizeToNextBackup, "must not be overwritten with a partial sum")
+	})
+}
+
+func TestSumSegmentSharedSize(t *testing.T) {
+	segBackups := map[int]string{
+		-1: "base_000000010000000000000001",
+		0:  "base_000000010000000000000002",
+		1:  "base_000000010000000000000003",
+	}
+
+	sumShared := func(t *testing.T, root storage.Folder) (int64, bool, error) {
+		t.Helper()
+		return greenplum.SumSegmentJournals(t.Context(), root, gpBackupName,
+			func(ji internal.JournalInfo) int64 { return ji.SharedSize })
+	}
+
+	t.Run("sums the shared volume reported by every segment", func(t *testing.T) {
+		root := testtools.MakeDefaultInMemoryStorageFolder()
+		putGpSentinel(t, root, gpBackupName, segBackups)
+		putSegmentSharedJournal(t, root, -1, segBackups[-1], 10)
+		putSegmentSharedJournal(t, root, 0, segBackups[0], 20)
+		putSegmentSharedJournal(t, root, 1, segBackups[1], 30)
+
+		size, ok, err := sumShared(t, root)
+
+		require.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, int64(60), size)
+	})
+
+	t.Run("reports no size when a single segment journal is missing", func(t *testing.T) {
+		root := testtools.MakeDefaultInMemoryStorageFolder()
+		putGpSentinel(t, root, gpBackupName, segBackups)
+		putSegmentSharedJournal(t, root, -1, segBackups[-1], 10)
+		putSegmentSharedJournal(t, root, 0, segBackups[0], 20)
+
+		_, ok, err := sumShared(t, root)
+
+		require.NoError(t, err)
+		assert.False(t, ok, "a partial sum would understate the shared volume")
+	})
+
+	t.Run("a backup that added nothing shared sums to zero", func(t *testing.T) {
+		root := testtools.MakeDefaultInMemoryStorageFolder()
+		putGpSentinel(t, root, gpBackupName, segBackups)
+		for contentID, segBackup := range segBackups {
+			putSegmentSharedJournal(t, root, contentID, segBackup, 0)
+		}
+
+		size, ok, err := sumShared(t, root)
+
+		require.NoError(t, err)
+		assert.True(t, ok, "everything being deduplicated is a known zero, not a missing measurement")
+		assert.Zero(t, size)
 	})
 }

@@ -32,6 +32,10 @@ type BackupFiles map[string]BackupFileDesc
 // FilesMetadataDTO is the shape persisted to `pax_files_metadata.json`.
 type FilesMetadataDTO struct {
 	Files BackupFiles
+	// UploadedSize is the volume this backup pushed to the shared paxfiles/ storage.
+	// Files reused from an older backup via deduplication are not counted, so summing this field
+	// over all backups approximates the total size of the shared storage.
+	UploadedSize int64 `json:",omitempty"`
 }
 
 func NewFilesMetadataDTO() *FilesMetadataDTO {

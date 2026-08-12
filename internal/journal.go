@@ -48,6 +48,10 @@ type JournalInfo struct {
 	// it is the size, in bytes, of archived journal files needed to get from this backup
 	// to the next one. It is zero for the newest backup.
 	SizeToNextBackup int64 `json:"SizeToNextBackup"`
+	// SharedSize describes the backup itself rather than an interval after it: it is the volume,
+	// in bytes, that this backup added to storage shared between backups. Only databases with such
+	// storage set it, so it is absent from the journals of the others.
+	SharedSize int64 `json:"SharedSize,omitempty"`
 }
 
 // NewEmptyJournalInfo creates instance of JournalInfo without sync with S3

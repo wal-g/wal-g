@@ -4,12 +4,14 @@ import (
 	"context"
 	"path"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
+	"github.com/wal-g/wal-g/internal/ioextensions"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -25,6 +27,8 @@ type StorageUploader struct {
 	bundleFiles         internal.BundleFiles
 	deduplicationMinAge time.Time
 	newPaxFilesID       string
+	// bytes this backup actually pushed to the shared PAX storage, excluding deduplicated files
+	uploadedSize atomic.Int64
 }
 
 func NewStorageUploader(uploader internal.Uploader, baseFiles BackupFiles, crypter crypto.Crypter,
@@ -45,6 +49,7 @@ func NewStorageUploader(uploader internal.Uploader, baseFiles BackupFiles, crypt
 }
 
 func (u *StorageUploader) GetFiles() *FilesMetadataDTO {
+	u.meta.UploadedSize = u.uploadedSize.Load()
 	return u.meta
 }
 
@@ -110,11 +115,13 @@ func (u *StorageUploader) regularUpload(ctx context.Context,
 	// PAX/PORC files are already compressed internally; do not re-compress.
 	var compressor compression.Compressor
 
-	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
+	// Counted after compression and encryption, so this is what the object actually takes in storage.
+	uploadContents := ioextensions.NewCountingReader(internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter))
 	uploadPath := path.Join(StoragePath, storageKey)
 	if err := u.uploader.Upload(ctx, uploadPath, uploadContents); err != nil {
 		return err
 	}
+	u.uploadedSize.Add(uploadContents.BytesRead())
 
 	u.addMetadata(cfi, storageKey, meta, false, time.Now())
 	u.bundleFiles.AddFile(cfi.Header, cfi.FileInfo, false)
