@@ -19,12 +19,20 @@ func journalInfoExists(t *testing.T, folder storage.Folder, backupName string) b
 	return exists
 }
 
+// deleteJournalInfo mirrors the call runDeleteTarget makes, so that the arguments the pg delete
+// path passes to the shared helper stay covered.
+func deleteJournalInfo(t *testing.T, folder storage.Folder, backupName string, confirmed bool) {
+	t.Helper()
+	internal.DeleteJournalInfo(t.Context(), folder, backupName, utility.WalPath,
+		internal.NewJournalDirSizeCalculator(), confirmed)
+}
+
 func TestDeleteJournalInfo(t *testing.T) {
 	t.Run("no journal for backup does not panic", func(t *testing.T) {
 		folder := memory.NewFolder("", memory.NewKVS())
 
 		assert.NotPanics(t, func() {
-			deleteJournalInfo(t.Context(), folder, "base_000000010000000000000001", true)
+			deleteJournalInfo(t, folder, "base_000000010000000000000001", true)
 		})
 	})
 
@@ -36,7 +44,7 @@ func TestDeleteJournalInfo(t *testing.T) {
 		require.NoError(t, ji.Upload(t.Context(), folder))
 		require.True(t, journalInfoExists(t, folder, backupName))
 
-		deleteJournalInfo(t.Context(), folder, backupName, false)
+		deleteJournalInfo(t, folder, backupName, false)
 
 		assert.True(t, journalInfoExists(t, folder, backupName))
 	})
@@ -49,7 +57,7 @@ func TestDeleteJournalInfo(t *testing.T) {
 		require.NoError(t, ji.Upload(t.Context(), folder))
 		require.True(t, journalInfoExists(t, folder, backupName))
 
-		deleteJournalInfo(t.Context(), folder, backupName, true)
+		deleteJournalInfo(t, folder, backupName, true)
 
 		assert.False(t, journalInfoExists(t, folder, backupName))
 	})

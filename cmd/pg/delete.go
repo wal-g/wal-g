@@ -133,27 +133,8 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 
 	target := deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, findFullBackup)
 
-	deleteJournalInfo(cmd.Context(), folder, target.GetBackupName(), confirmed)
-}
-
-func deleteJournalInfo(ctx context.Context, folder storage.Folder, backupName string, confirmed bool) {
-	journalInfo, err := internal.NewJournalInfo(ctx, backupName, folder, utility.WalPath)
-	if err != nil {
-		// Backup could have been created without journal counting enabled.
-		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
-		return
-	}
-
-	if !confirmed {
-		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
-		return
-	}
-
-	if err := journalInfo.Delete(ctx, folder); err != nil {
-		tracelog.ErrorLogger.Print(err)
-	} else {
-		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
-	}
+	internal.DeleteJournalInfo(cmd.Context(), folder, target.GetBackupName(), utility.WalPath,
+		internal.NewJournalDirSizeCalculator(), confirmed)
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
