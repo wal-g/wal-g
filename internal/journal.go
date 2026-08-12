@@ -207,7 +207,7 @@ func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder, calc I
 	return nil
 }
 
-// DeleteJournalInfo removes the journal of the given backup and re-links the neighbouring journals,
+// DeleteJournalInfo removes the journal of the given backup and re-links the neighboring journals,
 // so that the journal volume of the deleted interval is accounted for by the previous backup.
 // A backup pushed without journal counting has no journal at all, which is not an error.
 func DeleteJournalInfo(
