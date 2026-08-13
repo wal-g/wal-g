@@ -8,7 +8,6 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -29,8 +28,9 @@ type StorageUploader struct {
 
 func NewStorageUploader(uploader internal.Uploader, baseFiles BackupFiles, crypter crypto.Crypter,
 	files internal.BundleFiles, deduplicationAgeLimit time.Duration, newPaxFilesID string) *StorageUploader {
-	// Separate uploader for PAX files, with a size counter of its own, matching the AO/AOCS handling path.
-	paxFileUploader := internal.NewRegularUploader(uploader.Compression(), uploader.Folder())
+	// Separate uploader for PAX files, with a size counter of its own and no compressor
+	// (PAX/PORC files are already compressed internally).
+	paxFileUploader := internal.NewRegularUploader(nil, uploader.Folder())
 
 	return &StorageUploader{
 		uploader:            paxFileUploader,
@@ -113,10 +113,7 @@ func (u *StorageUploader) regularUpload(ctx context.Context,
 	}
 	defer utility.LoggedClose(fileReadCloser, "Failed to close PAX file")
 
-	// PAX/PORC files are already compressed internally; do not re-compress.
-	var compressor compression.Compressor
-
-	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
+	uploadContents := internal.CompressAndEncrypt(fileReadCloser, u.uploader.Compression(), u.crypter)
 	uploadPath := path.Join(StoragePath, storageKey)
 	if err := u.uploader.Upload(ctx, uploadPath, uploadContents); err != nil {
 		return err
