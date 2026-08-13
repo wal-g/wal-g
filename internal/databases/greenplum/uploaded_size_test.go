@@ -74,7 +74,8 @@ func TestAoUploadedSize(t *testing.T) {
 			require.NoError(t, uploader.AddFile(t.Context(), &cfi, testFile.AoRelFileMetadata, &location))
 		}
 
-		uploaded := uploader.GetFiles().UploadedSize
+		uploaded, err := uploader.UploadedDataSize()
+		require.NoError(t, err)
 		assert.Positive(t, uploaded)
 		// The files are encrypted on the way out, so this only holds if the counter sits after
 		// encryption rather than measuring the files on disk.
@@ -95,7 +96,9 @@ func TestAoUploadedSize(t *testing.T) {
 			require.NoError(t, first.AddFile(t.Context(), &cfi, testFile.AoRelFileMetadata, &location))
 		}
 		firstMeta := first.GetFiles()
-		require.Positive(t, firstMeta.UploadedSize)
+		firstUploaded, err := first.UploadedDataSize()
+		require.NoError(t, err)
+		require.Positive(t, firstUploaded)
 
 		// The second backup finds the same file already in storage and skips it, so it added nothing.
 		baseFiles := make(greenplum.BackupAOFiles)
@@ -115,7 +118,9 @@ func TestAoUploadedSize(t *testing.T) {
 		for name, desc := range secondMeta.Files {
 			require.True(t, desc.IsSkipped, "%s should have been deduplicated", name)
 		}
-		assert.Zero(t, secondMeta.UploadedSize)
+		secondUploaded, err := second.UploadedDataSize()
+		require.NoError(t, err)
+		assert.Zero(t, secondUploaded)
 		assert.Zero(t, storedSize(t, secondFolder))
 	})
 }

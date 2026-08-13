@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/pkg/errors"
@@ -35,17 +34,14 @@ type AoStorageUploader struct {
 	deduplicationMinAge time.Time
 	// unique identifier of the new AO/AOCS segments created by this uploader
 	newAoSegFilesID string
-	// bytes this backup actually pushed to the shared AO/AOCS storage, excluding deduplicated files
-	uploadedSize atomic.Int64
 }
 
 func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
 	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration,
 	newAoSegFilesID string) *AoStorageUploader {
-	// Separate uploader for AO/AOCS relfiles with disabled file size tracking since
-	// WAL-G does not count them
-	aoSegUploader := uploader.Clone()
-	aoSegUploader.DisableSizeTracking()
+	// Separate uploader for AO/AOCS relfiles, with a size counter of its own: cloning would share
+	// the counter of the backup uploader, and WAL-G does not count these files in the backup size.
+	aoSegUploader := internal.NewRegularUploader(uploader.Compression(), uploader.Folder())
 
 	return &AoStorageUploader{
 		uploader:            aoSegUploader,
@@ -169,8 +165,14 @@ func (u *AoStorageUploader) addAoFileMetadata(
 }
 
 func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
-	u.meta.UploadedSize = u.uploadedSize.Load()
 	return u.meta
+}
+
+// UploadedDataSize is the volume this backup pushed to the shared aosegments/ storage, as counted
+// by the uploader after compression and encryption. Files reused from an older backup via
+// deduplication never reach the uploader, so they are not counted.
+func (u *AoStorageUploader) UploadedDataSize() (int64, error) {
+	return u.uploader.UploadedDataSize()
 }
 
 func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string,
@@ -259,13 +261,7 @@ func (u *AoStorageUploader) upload(ctx context.Context, reader io.Reader, storag
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
 	var compressor compression.Compressor
 
-	// Counted after compression and encryption, so this is what the object actually takes in storage.
-	uploadContents := ioextensions.NewCountingReader(internal.CompressAndEncrypt(reader, compressor, u.crypter))
+	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
-	if err := u.uploader.Upload(ctx, uploadPath, uploadContents); err != nil {
-		return err
-	}
-
-	u.uploadedSize.Add(uploadContents.BytesRead())
-	return nil
+	return u.uploader.Upload(ctx, uploadPath, uploadContents)
 }
