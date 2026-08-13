@@ -1,2 +1,2 @@
-"WALE_S3_PREFIX": "s3://gpjournalsbucket",
+"WALE_S3_PREFIX": "s3://gp-journal-test-bucket",
 "WALG_LOG_LEVEL": "DEVEL"
