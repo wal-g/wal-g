@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -41,7 +40,10 @@ func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
 	newAoSegFilesID string) *AoStorageUploader {
 	// Separate uploader for AO/AOCS relfiles, with a size counter of its own: cloning would share
 	// the counter of the backup uploader, and WAL-G does not count these files in the backup size.
-	aoSegUploader := internal.NewRegularUploader(uploader.Compression(), uploader.Folder())
+	//
+	// No compressor: AO/AOCS segment files are already compressed in most cases.
+	// TODO: lookup the compression details for each relation and compress it when compression is turned off
+	aoSegUploader := internal.NewRegularUploader(nil, uploader.Folder())
 
 	return &AoStorageUploader{
 		uploader:            aoSegUploader,
@@ -257,11 +259,7 @@ func (u *AoStorageUploader) incrementalAoUpload(ctx context.Context,
 }
 
 func (u *AoStorageUploader) upload(ctx context.Context, reader io.Reader, storageKey string) error {
-	// do not compress AO/AOCS segment files since they are already compressed in most cases
-	// TODO: lookup the compression details for each relation and compress it when compression is turned off
-	var compressor compression.Compressor
-
-	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
+	uploadContents := internal.CompressAndEncrypt(reader, u.uploader.Compression(), u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
 	return u.uploader.Upload(ctx, uploadPath, uploadContents)
 }
