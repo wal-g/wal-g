@@ -295,19 +295,29 @@ func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 		return nil, err
 	}
 
-	aoMeta := c.aoStorageUploader.GetFiles()
-	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), aoMeta, getAOFilesMetadataPath(c.backupName))
+	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), c.aoStorageUploader.GetFiles(),
+		getAOFilesMetadataPath(c.backupName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload AO files metadata: %v", err)
 	}
 
-	paxMeta := c.paxStorageUploader.GetFiles()
-	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), paxMeta, pax.GetFilesMetadataPath(c.backupName))
+	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), c.paxStorageUploader.GetFiles(),
+		pax.GetFilesMetadataPath(c.backupName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload PAX files metadata: %v", err)
 	}
 
-	c.sharedSize.Store(aoMeta.UploadedSize + paxMeta.UploadedSize)
+	aoSize, err := c.aoStorageUploader.UploadedDataSize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the uploaded AO files size: %w", err)
+	}
+
+	paxSize, err := c.paxStorageUploader.UploadedDataSize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the uploaded PAX files size: %w", err)
+	}
+
+	c.sharedSize.Store(aoSize + paxSize)
 
 	return c.tarFileSets, nil
 }
