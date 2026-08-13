@@ -10,7 +10,7 @@ cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
 /tmp/pg_scripts/wrap_config_file.sh ${TMP_CONFIG}
 source /tmp/tests/test_functions/util.sh
 
-# The names of the cluster-wide journals, oldest first. One per gp backup.
+# The names of the cluster-wide journals, oldest first. One per cluster backup.
 get_cluster_journals() {
     wal-g --config=${TMP_CONFIG} st ls basebackups_005/ 2>&1 | grep journal_ | awk '{ print $NF }' | sort
 }
@@ -41,9 +41,12 @@ count_segment_journals() {
     wal-g --config=${TMP_CONFIG} st ls segments_005/seg$1/basebackups_005/ 2>&1 | grep journal_ | wc -l
 }
 
+count_shared_objects() {
+    wal-g --config=${TMP_CONFIG} st ls -r 2>&1 | grep -c "$1" || true
+}
+
 bootstrap_gp_cluster
 setup_wal_archiving
-enable_pitr_extension
 
 wal-g --config=${TMP_CONFIG} st rm / --target=all || true
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
@@ -69,7 +72,11 @@ test "0" -ne $FIRST_SIZE
 test "0" -ne $SECOND_SIZE
 test "0" -eq $(get_cluster_journal_size 3)
 
-# insert_data creates AO and CO tables, so every backup pushed some AO/AOCS files to the shared storage
+# On Cloudberry the shared volume of a backup is the AO/AOCS files it pushed to aosegments/ plus the
+# PAX files it pushed to paxfiles/. insert_data creates an AO, a CO and a PAX table, so every backup
+# added something to both prefixes and none of the three journals may report a zero shared volume.
+test "0" -ne $(count_shared_objects "aosegments/")
+test "0" -ne $(count_shared_objects "paxfiles/")
 for N in 1 2 3
 do
     test "0" -ne $(get_cluster_journal_field $N SharedSize)
@@ -86,6 +93,13 @@ done
 
 test $((FIRST_SIZE + SECOND_SIZE)) -eq $(get_cluster_journal_size 1)
 test "0" -eq $(get_cluster_journal_size 2)
+
+# The shared volume belongs to the backup itself rather than to the interval after it, so the
+# surviving backups keep reporting their own AO/AOCS/PAX volume after the merge.
+for N in 1 2
+do
+    test "0" -ne $(get_cluster_journal_field $N SharedSize)
+done
 
 # Deleting the newest backup leaves the remaining one as the newest
 wal-g --config=${TMP_CONFIG} delete target $(get_backup_name 2) --confirm
