@@ -3,9 +3,9 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-etcd --data-dir $WALG_ETCD_DATA_DIR &
+start_etcd "$WALG_ETCD_DATA_DIR"
 
-etcdctl put testing "should stay after backup is fetched"
+etcdctl --endpoints "$ETCD_ENDPOINT" put testing "should stay after backup is fetched"
 
 mkdir -p $WALG_FILE_PREFIX
 
@@ -13,12 +13,12 @@ wal-g backup-push
 
 expected_output=$(etcdctl get "" --prefix=true)
 
-pkill etcd
+kill_etcd
 wal-g backup-fetch LATEST
 
-etcd --data-dir $ETCD_RESTORE_DATA_DIR &
+start_etcd "$ETCD_RESTORE_DATA_DIR"
 
-actual_output=$(etcdctl get "" --prefix=true)
+actual_output=$(etcdctl --endpoints "$ETCD_ENDPOINT" get "" --prefix=true)
 
 if [ "$actual_output" != "$expected_output" ]; then
   echo "Error: actual output doesn't match expected output"
@@ -27,4 +27,4 @@ if [ "$actual_output" != "$expected_output" ]; then
   exit 1
 fi
 
-pkill etcd
+kill_etcd

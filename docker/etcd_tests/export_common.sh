@@ -7,11 +7,52 @@ export WALG_ETCD_DATA_DIR='/tmp/etcd/cluster'
 export ETCD_RESTORE_DATA_DIR='/tmp/etcd/restore_cluster'
 export ETCD_LOG_LEVEL='info'
 export ETCDCTL_API=3
+export ETCD_ENDPOINT='http://127.0.0.1:2379'
+
+wait_for_etcd() {
+    for _ in $(seq 1 60); do
+        if etcdctl --endpoints "$ETCD_ENDPOINT" endpoint health >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "etcd failed to become ready in time" >&2
+    return 1
+}
+
+start_etcd() {
+    local data_dir="${1:-$WALG_ETCD_DATA_DIR}"
+    etcd \
+        --data-dir "$data_dir" \
+        --listen-client-urls "$ETCD_ENDPOINT" \
+        --advertise-client-urls "$ETCD_ENDPOINT" \
+        --listen-peer-urls http://127.0.0.1:2380 \
+        --initial-advertise-peer-urls http://127.0.0.1:2380 \
+        --initial-cluster default=http://127.0.0.1:2380 \
+        >/tmp/etcd.log 2>&1 &
+
+    wait_for_etcd
+}
+
+kill_etcd() {
+    pkill -x etcd || true
+    for _ in $(seq 1 50); do
+        if ! pgrep -x etcd >/dev/null; then
+            break
+        fi
+        sleep 0.2
+    done
+
+    if pgrep -x etcd >/dev/null; then
+        pkill -9 -x etcd || true
+    fi
+}
 
 etcd_kill_and_clean_data() {
-    etcd --data-dir $WALG_ETCD_DATA_DIR &
-    etcdctl del "" --from-key=true
-    pkill etcd
+    start_etcd "$WALG_ETCD_DATA_DIR"
+    etcdctl --endpoints "$ETCD_ENDPOINT" del "" --from-key=true
+    kill_etcd
 
     rm -rf "${WALG_FILE_PREFIX}"
     rm -rf "${ETCD_RESTORE_DATA_DIR}"
