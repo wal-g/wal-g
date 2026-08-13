@@ -524,6 +524,11 @@ services:
     container_name: wal-g_pg10_delete_target_delta_find_full_test
     command: /tmp/tests/delete_target_delta_find_full_test.sh
 
+  pg10_journals_test:
+    <<: *pg10_test_common
+    container_name: wal-g_pg10_journals_test
+    command: /tmp/tests/journals_test.sh
+
   pg10_ghost_table_test:
     <<: *pg10_test_common
     container_name: wal-g_pg10_ghost_table_test
