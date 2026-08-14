@@ -16,8 +16,29 @@ func purgeJournalInfo(ctx context.Context, backupName string, dryRun bool) {
 		return
 	}
 
-	internal.DeleteJournalInfo(ctx, storage.RootFolder(), backupName, models.OplogArchBasePath,
-		internal.NewJournalDirSizeCalculator(), !dryRun)
+	journalInfo, err := internal.NewJournalInfo(
+		ctx,
+		backupName,
+		storage.RootFolder(),
+		models.OplogArchBasePath,
+	)
+	// Backup could be created without journal
+	if err != nil {
+		tracelog.WarningLogger.Printf("Can't find the journal info: %+v", err)
+		return
+	}
+
+	if dryRun {
+		tracelog.InfoLogger.Printf("About to delete journal info: %+v", journalInfo)
+		return
+	}
+
+	err = journalInfo.Delete(ctx, storage.RootFolder(), internal.NewJournalDirSizeCalculator())
+	if err != nil {
+		tracelog.ErrorLogger.Print(err)
+	} else {
+		tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
+	}
 }
 
 // HandleBackupDelete deletes backup.
