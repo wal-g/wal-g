@@ -40,18 +40,32 @@ func (SegmentsSizeCalculator) Calculate(
 ) (int64, bool, error) {
 	backupName := strings.TrimPrefix(prevJi.JournalName, internal.JournalPrefix)
 
-	return SumSegmentJournals(ctx, rootFolder, backupName, func(ji internal.JournalInfo) int64 {
+	return SumSegmentWalSize(ctx, rootFolder, backupName)
+}
+
+// SumSegmentWalSize is the volume of WAL the segments archived between backupName and the backup
+// following it, summed over the segment journals.
+func SumSegmentWalSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, bool, error) {
+	return sumSegmentJournals(ctx, rootFolder, backupName, func(ji internal.JournalInfo) int64 {
 		return ji.SizeToNextBackup
 	})
 }
 
-// SumSegmentJournals adds up one field of the segment journals belonging to backupName, which the
+// SumSegmentSharedSize is the volume backupName added to the shared AO/AOCS and PAX storage,
+// summed over the segment journals.
+func SumSegmentSharedSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, bool, error) {
+	return sumSegmentJournals(ctx, rootFolder, backupName, func(ji internal.JournalInfo) int64 {
+		return ji.SharedSize
+	})
+}
+
+// sumSegmentJournals adds up one field of the segment journals belonging to backupName, which the
 // segment WAL-G instances maintain in their own segments_005/seg<N>/ folders.
 //
 // A partial sum would silently understate the real volume and be indistinguishable from a genuinely
 // small one, so a single unreadable segment journal makes the whole aggregate unavailable
 // (ok=false) rather than wrong.
-func SumSegmentJournals(
+func sumSegmentJournals(
 	ctx context.Context,
 	rootFolder storage.Folder,
 	backupName string,

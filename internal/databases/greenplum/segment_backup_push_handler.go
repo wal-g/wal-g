@@ -39,7 +39,6 @@ func NewSegBackupHandler(ctx context.Context, arguments postgres.BackupArguments
 	}
 
 	bh.SetComposerInitFunc(composerInitFunc)
-	bh.Arguments.SetSharedSizeFunc(sharedSize.Load)
 
 	if bh.PgInfo.PgVersion < 100000 {
 		tracelog.DebugLogger.Printf("Query runner version is %d, disabling concurrent backups", bh.PgInfo.PgVersion)

@@ -276,8 +276,7 @@ func TestSumSegmentSharedSize(t *testing.T) {
 
 	sumShared := func(t *testing.T, root storage.Folder) (int64, bool, error) {
 		t.Helper()
-		return greenplum.SumSegmentJournals(t.Context(), root, gpBackupName,
-			func(ji internal.JournalInfo) int64 { return ji.SharedSize })
+		return greenplum.SumSegmentSharedSize(t.Context(), root, gpBackupName)
 	}
 
 	t.Run("sums the shared volume reported by every segment", func(t *testing.T) {
