@@ -28,15 +28,6 @@ func putSegmentJournal(t *testing.T, root storage.Folder, contentID int, segBack
 	})
 }
 
-// putSegmentSharedJournal writes the journal of a segment that reported how much it added to the
-// shared AO/AOCS and PAX storage while pushing segBackupName.
-func putSegmentSharedJournal(t *testing.T, root storage.Folder, contentID int, segBackupName string, sharedSize int64) {
-	t.Helper()
-	putSegmentJournalInfo(t, root, contentID, segBackupName, func(ji *internal.JournalInfo) {
-		ji.SharedSize = sharedSize
-	})
-}
-
 func putSegmentJournalInfo(t *testing.T, root storage.Folder, contentID int, segBackupName string,
 	fill func(*internal.JournalInfo)) {
 	t.Helper()
@@ -283,9 +274,9 @@ func TestSumSegmentSharedSize(t *testing.T) {
 	t.Run("sums the shared volume reported by every segment", func(t *testing.T) {
 		root := testtools.MakeDefaultInMemoryStorageFolder()
 		putGpSentinel(t, root, gpBackupName, segBackups)
-		putSegmentSharedJournal(t, root, -1, segBackups[-1], 10)
-		putSegmentSharedJournal(t, root, 0, segBackups[0], 20)
-		putSegmentSharedJournal(t, root, 1, segBackups[1], 30)
+		putSegmentFilesMetadata(t, root, -1, segBackups[-1], 6, 4)
+		putSegmentFilesMetadata(t, root, 0, segBackups[0], 12, 8)
+		putSegmentFilesMetadata(t, root, 1, segBackups[1], 18, 12)
 
 		size, ok, err := sumShared(t, root)
 
@@ -294,11 +285,11 @@ func TestSumSegmentSharedSize(t *testing.T) {
 		assert.Equal(t, int64(60), size)
 	})
 
-	t.Run("reports no size when a single segment journal is missing", func(t *testing.T) {
+	t.Run("reports no size when the metadata of a single segment is missing", func(t *testing.T) {
 		root := testtools.MakeDefaultInMemoryStorageFolder()
 		putGpSentinel(t, root, gpBackupName, segBackups)
-		putSegmentSharedJournal(t, root, -1, segBackups[-1], 10)
-		putSegmentSharedJournal(t, root, 0, segBackups[0], 20)
+		putSegmentFilesMetadata(t, root, -1, segBackups[-1], 6, 4)
+		putSegmentFilesMetadata(t, root, 0, segBackups[0], 12, 8)
 
 		_, ok, err := sumShared(t, root)
 
@@ -310,7 +301,7 @@ func TestSumSegmentSharedSize(t *testing.T) {
 		root := testtools.MakeDefaultInMemoryStorageFolder()
 		putGpSentinel(t, root, gpBackupName, segBackups)
 		for contentID, segBackup := range segBackups {
-			putSegmentSharedJournal(t, root, contentID, segBackup, 0)
+			putSegmentFilesMetadata(t, root, contentID, segBackup, 0, 0)
 		}
 
 		size, ok, err := sumShared(t, root)
@@ -323,8 +314,11 @@ func TestSumSegmentSharedSize(t *testing.T) {
 
 // putSegmentFilesMetadata writes the two files metadata objects a segment backup-push leaves next
 // to its backup, each reporting the volume it uploaded to its shared storage.
-func putSegmentFilesMetadata(t *testing.T, folder storage.Folder, backupName string, aoSize, paxSize int64) {
+func putSegmentFilesMetadata(t *testing.T, root storage.Folder, contentID int, backupName string,
+	aoSize, paxSize int64) {
 	t.Helper()
+
+	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
 
 	// The file lists are there to keep the readers honest: they are what the size views must skip.
 	putDTO(t, folder, utility.BaseBackupPath+backupName+"/"+greenplum.AOFilesMetadataName,
@@ -337,55 +331,4 @@ func putSegmentFilesMetadata(t *testing.T, folder storage.Folder, backupName str
 			Files:              pax.BackupFiles{"base/13/16385_pax/3": {StoragePath: "paxfiles/3", Kind: pax.FileKindData}},
 			UploadedSharedSize: paxSize,
 		})
-}
-
-func TestRecordSegmentSharedSize(t *testing.T) {
-	const segBackupName = "base_000000010000000000000001"
-
-	putJournal := func(t *testing.T, folder storage.Folder) {
-		t.Helper()
-		ji := internal.NewEmptyJournalInfo(segBackupName, time.Time{}, time.Now(), utility.WalPath)
-		require.NoError(t, ji.Upload(t.Context(), folder))
-	}
-
-	readSharedSize := func(t *testing.T, folder storage.Folder) int64 {
-		t.Helper()
-		ji, err := internal.NewJournalInfo(t.Context(), segBackupName, folder, utility.WalPath)
-		require.NoError(t, err)
-		return ji.SharedSize
-	}
-
-	t.Run("records the AO and PAX volume in the journal of the backup", func(t *testing.T) {
-		folder := testtools.MakeDefaultInMemoryStorageFolder()
-		putJournal(t, folder)
-		putSegmentFilesMetadata(t, folder, segBackupName, 100, 20)
-
-		greenplum.RecordSegmentSharedSize(t.Context(), folder, segBackupName)
-
-		assert.Equal(t, int64(120), readSharedSize(t, folder))
-	})
-
-	t.Run("a backup without a journal is left alone", func(t *testing.T) {
-		folder := testtools.MakeDefaultInMemoryStorageFolder()
-		putSegmentFilesMetadata(t, folder, segBackupName, 100, 20)
-
-		assert.NotPanics(t, func() {
-			greenplum.RecordSegmentSharedSize(t.Context(), folder, segBackupName)
-		})
-
-		_, err := internal.NewJournalInfo(t.Context(), segBackupName, folder, utility.WalPath)
-		assert.Error(t, err, "no journal must have been created")
-	})
-
-	t.Run("the journal keeps its size when the metadata is unreadable", func(t *testing.T) {
-		folder := testtools.MakeDefaultInMemoryStorageFolder()
-		putJournal(t, folder)
-		// Only the AO metadata is there, so the PAX half of the sum is unknown.
-		putDTO(t, folder, utility.BaseBackupPath+segBackupName+"/"+greenplum.AOFilesMetadataName,
-			greenplum.AOFilesMetadataDTO{UploadedSharedSize: 100})
-
-		greenplum.RecordSegmentSharedSize(t.Context(), folder, segBackupName)
-
-		assert.Zero(t, readSharedSize(t, folder), "a half of the sum must not be recorded as the whole")
-	})
 }
