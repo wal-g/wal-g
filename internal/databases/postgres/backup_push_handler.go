@@ -65,7 +65,6 @@ type BackupArguments struct {
 	composerInitFunc         func(ctx context.Context, handler *BackupHandler) error
 	preventConcurrentBackups bool
 	countJournals            bool
-	sharedSizeFunc           func() int64
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -146,13 +145,6 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 func (ba *BackupArguments) EnablePreventConcurrentBackups() {
 	ba.preventConcurrentBackups = true
 	tracelog.InfoLogger.Println("Concurrent backups are disabled")
-}
-
-// SetSharedSizeFunc registers a source for the journal's SharedSize. Plain Postgres has no storage
-// shared between backups and leaves this unset; Greenplum uses it to report the volume the backup
-// added to the shared AO/AOCS and PAX storage. It is called after the backup has been uploaded.
-func (ba *BackupArguments) SetSharedSizeFunc(sharedSizeFunc func() int64) {
-	ba.sharedSizeFunc = sharedSizeFunc
 }
 
 func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
@@ -426,16 +418,10 @@ func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder stora
 	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(ctx, rootFolder, utility.WalPath)
 	if err != nil {
 		tracelog.WarningLogger.Printf("can not find the last journal info: %s", err.Error())
+		return
 	}
 
 	journalInfo := internal.NewEmptyJournalInfo(bh.CurBackupInfo.Name, mostRecentJournalInfo.CurrentBackupEnd, finishTime, utility.WalPath)
-
-	// Unlike SizeToNextBackup, which is filled in once the following backup shows up, the shared
-	// volume is known as soon as this backup is uploaded.
-	if bh.Arguments.sharedSizeFunc != nil {
-		journalInfo.SharedSize = bh.Arguments.sharedSizeFunc()
-	}
-
 	if err := journalInfo.Upload(ctx, rootFolder); err != nil {
 		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
 		return
