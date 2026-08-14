@@ -28,40 +28,40 @@ func TestDecideSkipForGTID(t *testing.T) {
 	sidB := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	required, _ := mysql.ParseMysqlGTIDSet(sidA.String() + ":1-10," + sidB.String() + ":5")
-	newHandler := func() *Handler {
+	newStreamer := func() *binlogServerStreamer {
 		empty, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
-		return &Handler{
+		return &binlogServerStreamer{
 			sentGTIDs:     empty,
 			requiredGTIDs: required.(*mysql.MysqlGTIDSet),
 		}
 	}
 
 	t.Run("GTID already applied is skipped, not recorded", func(t *testing.T) {
-		h := newHandler()
-		assert.True(t, h.decideSkipForGTID(gtidEvent(t, sidA, 5)))
-		assert.True(t, h.skipCurrentTxn)
-		assert.True(t, h.sentGTIDs.IsEmpty())
+		s := newStreamer()
+		assert.True(t, s.decideSkipForGTID(gtidEvent(t, sidA, 5)))
+		assert.True(t, s.skipCurrentTxn)
+		assert.True(t, s.sentGTIDs.IsEmpty())
 	})
 
 	t.Run("new GTID is forwarded and recorded", func(t *testing.T) {
-		h := newHandler()
-		assert.False(t, h.decideSkipForGTID(gtidEvent(t, sidA, 11)))
-		assert.False(t, h.skipCurrentTxn)
-		assert.Equal(t, sidA.String()+":11", h.sentGTIDs.String())
+		s := newStreamer()
+		assert.False(t, s.decideSkipForGTID(gtidEvent(t, sidA, 11)))
+		assert.False(t, s.skipCurrentTxn)
+		assert.Equal(t, sidA.String()+":11", s.sentGTIDs.String())
 	})
 
 	t.Run("nil requiredGTIDs forwards everything", func(t *testing.T) {
-		h := newHandler()
-		h.requiredGTIDs = nil
-		assert.False(t, h.decideSkipForGTID(gtidEvent(t, sidA, 5)))
-		assert.False(t, h.skipCurrentTxn)
-		assert.Equal(t, sidA.String()+":5", h.sentGTIDs.String())
+		s := newStreamer()
+		s.requiredGTIDs = nil
+		assert.False(t, s.decideSkipForGTID(gtidEvent(t, sidA, 5)))
+		assert.False(t, s.skipCurrentTxn)
+		assert.Equal(t, sidA.String()+":5", s.sentGTIDs.String())
 	})
 
 	t.Run("skip state is cleared on forwarded GTID", func(t *testing.T) {
-		h := newHandler()
-		h.skipCurrentTxn = true
-		assert.False(t, h.decideSkipForGTID(gtidEvent(t, sidA, 11)))
-		assert.False(t, h.skipCurrentTxn)
+		s := newStreamer()
+		s.skipCurrentTxn = true
+		assert.False(t, s.decideSkipForGTID(gtidEvent(t, sidA, 11)))
+		assert.False(t, s.skipCurrentTxn)
 	})
 }
