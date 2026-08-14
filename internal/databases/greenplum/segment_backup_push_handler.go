@@ -2,7 +2,6 @@ package greenplum
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
@@ -13,9 +12,6 @@ func NewSegBackupHandler(ctx context.Context, arguments postgres.BackupArguments
 	if err != nil {
 		return nil, err
 	}
-
-	// Filled by the composer at the end of the backup, read afterwards when the journal is written.
-	sharedSize := new(atomic.Int64)
 
 	composerInitFunc := func(ctx context.Context, handler *postgres.BackupHandler) error {
 		queryRunner := ToGpQueryRunner(handler.Workers.QueryRunner)
@@ -29,8 +25,7 @@ func NewSegBackupHandler(ctx context.Context, arguments postgres.BackupArguments
 			return err
 		}
 
-		maker, err := NewGpTarBallComposerMaker(relStorageMap, paxRelStorageMap, bh.Arguments.Uploader,
-			handler.CurBackupInfo.Name, sharedSize)
+		maker, err := NewGpTarBallComposerMaker(relStorageMap, paxRelStorageMap, bh.Arguments.Uploader, handler.CurBackupInfo.Name)
 		if err != nil {
 			return err
 		}
