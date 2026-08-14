@@ -418,10 +418,10 @@ func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder stora
 	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(ctx, rootFolder, utility.WalPath)
 	if err != nil {
 		tracelog.WarningLogger.Printf("can not find the last journal info: %s", err.Error())
-		return
 	}
 
 	journalInfo := internal.NewEmptyJournalInfo(bh.CurBackupInfo.Name, mostRecentJournalInfo.CurrentBackupEnd, finishTime, utility.WalPath)
+
 	if err := journalInfo.Upload(ctx, rootFolder); err != nil {
 		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
 		return

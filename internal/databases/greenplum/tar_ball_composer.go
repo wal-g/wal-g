@@ -7,7 +7,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/spf13/viper"
@@ -29,13 +28,10 @@ type GpTarBallComposerMaker struct {
 	TarFileSets      internal.TarFileSets
 	uploader         internal.Uploader
 	backupName       string
-	// sharedSize is filled by the composer once the backup is composed. The maker is created deep
-	// inside the composer init callback, so the caller hands in the cell to read the value back out.
-	sharedSize *atomic.Int64
 }
 
 func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, paxRelStorageMap pax.RelFileStorageMap,
-	uploader internal.Uploader, backupName string, sharedSize *atomic.Int64,
+	uploader internal.Uploader, backupName string,
 ) (*GpTarBallComposerMaker, error) {
 	return &GpTarBallComposerMaker{
 		relStorageMap:    relStorageMap,
@@ -44,7 +40,6 @@ func NewGpTarBallComposerMaker(relStorageMap AoRelFileStorageMap, paxRelStorageM
 		TarFileSets:      internal.NewRegularTarFileSets(),
 		uploader:         uploader,
 		backupName:       backupName,
-		sharedSize:       sharedSize,
 	}, nil
 }
 
@@ -94,7 +89,6 @@ func (maker *GpTarBallComposerMaker) Make(ctx context.Context, bundle *postgres.
 		maker.TarFileSets,
 		maker.uploader,
 		maker.backupName,
-		maker.sharedSize,
 	)
 }
 
@@ -211,8 +205,6 @@ type GpTarBallComposer struct {
 	paxRelStorageMap     pax.RelFileStorageMap
 	paxStorageUploader   *pax.StorageUploader
 	paxFileSizeThreshold int64
-
-	sharedSize *atomic.Int64
 }
 
 func NewGpTarBallComposer(
@@ -222,7 +214,6 @@ func NewGpTarBallComposer(
 	bundleFiles internal.BundleFiles, packer *postgres.TarBallFilePackerImpl, aoStorageUploader *AoStorageUploader,
 	paxStorageUploader *pax.StorageUploader,
 	tarFileSets internal.TarFileSets, uploader internal.Uploader, backupName string,
-	sharedSize *atomic.Int64,
 ) (*GpTarBallComposer, error) {
 	errorGroup, egCtx := errgroup.WithContext(ctx)
 
@@ -243,7 +234,6 @@ func NewGpTarBallComposer(
 		errorGroup:           errorGroup,
 		ctx:                  egCtx,
 		reqCtx:               ctx,
-		sharedSize:           sharedSize,
 	}
 
 	maxUploadDiskConcurrency, err := conf.GetMaxUploadDiskConcurrency()
@@ -295,29 +285,29 @@ func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 		return nil, err
 	}
 
-	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), c.aoStorageUploader.GetFiles(),
-		getAOFilesMetadataPath(c.backupName))
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload AO files metadata: %v", err)
-	}
-
-	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), c.paxStorageUploader.GetFiles(),
-		pax.GetFilesMetadataPath(c.backupName))
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload PAX files metadata: %v", err)
-	}
-
-	aoSize, err := c.aoStorageUploader.UploadedDataSize()
+	// The metadata carries the uploaded volume, so that the coordinator can sum it into the
+	// cluster-wide journal without the segments reporting it back through any other channel.
+	aoMeta := c.aoStorageUploader.GetFiles()
+	aoMeta.UploadedSharedSize, err = c.aoStorageUploader.UploadedDataSize()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the uploaded AO files size: %w", err)
 	}
 
-	paxSize, err := c.paxStorageUploader.UploadedDataSize()
+	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), aoMeta, getAOFilesMetadataPath(c.backupName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload AO files metadata: %v", err)
+	}
+
+	paxMeta := c.paxStorageUploader.GetFiles()
+	paxMeta.UploadedSharedSize, err = c.paxStorageUploader.UploadedDataSize()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the uploaded PAX files size: %w", err)
 	}
 
-	c.sharedSize.Store(aoSize + paxSize)
+	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), paxMeta, pax.GetFilesMetadataPath(c.backupName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload PAX files metadata: %v", err)
+	}
 
 	return c.tarFileSets, nil
 }

@@ -2,10 +2,12 @@ package greenplum
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -51,8 +53,9 @@ func SumSegmentWalSize(ctx context.Context, rootFolder storage.Folder, backupNam
 	})
 }
 
-// SumSegmentSharedSize is the volume backupName added to the shared AO/AOCS and PAX storage,
-// summed over the segment journals.
+// SumSegmentSharedSize is the volume backupName uploaded to the shared AO/AOCS and PAX storage,
+// summed over the segment journals. Each segment reads the figure back from its own AO and PAX
+// files metadata and records it in its journal, see RecordSegmentSharedSize.
 func SumSegmentSharedSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, bool, error) {
 	return sumSegmentJournals(ctx, rootFolder, backupName, func(ji internal.JournalInfo) int64 {
 		return ji.SharedSize
@@ -129,4 +132,59 @@ func readSegmentJournal(ctx context.Context, rootFolder storage.Folder, meta Seg
 	}
 
 	return ji, true
+}
+
+// RecordSegmentSharedSize reads back the volume the segment backup uploaded to the shared AO/AOCS
+// and PAX storage from the files metadata it has just written, and records it in the journal of
+// that backup. The coordinator then aggregates journals alone, without touching the metadata.
+//
+// The backup may legitimately have no journal at all, when it was pushed without journal counting
+// or as a permanent one, in which case there is nothing to record.
+func RecordSegmentSharedSize(ctx context.Context, rootFolder storage.Folder, backupName string) {
+	ji, err := internal.NewJournalInfo(ctx, backupName, rootFolder, utility.WalPath)
+	if err != nil {
+		tracelog.DebugLogger.Printf("Backup %s has no journal, still going to record the shared size: %v", backupName, err)
+	}
+
+	sharedSize, err := readUploadedSharedSize(ctx, rootFolder, backupName)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Can not read the shared size uploaded by backup %s: %v", backupName, err)
+		return
+	}
+
+	ji.SharedSize = sharedSize
+	if err := ji.Upload(ctx, rootFolder); err != nil {
+		tracelog.WarningLogger.Printf("Can not record the shared size in the journal of backup %s: %v", backupName, err)
+		return
+	}
+
+	tracelog.DebugLogger.Printf("Backup %s uploaded %d bytes to the shared storage", backupName, sharedSize)
+}
+
+// aoFilesMetadataSizeView is the part of AOFilesMetadataDTO needed to learn the uploaded volume.
+type aoFilesMetadataSizeView struct {
+	UploadedSharedSize int64
+}
+
+// paxFilesMetadataSizeView is the part of  pax.FilesMetadataDTO needed to learn the uploaded volume.
+type paxFilesMetadataSizeView struct {
+	UploadedSharedSize int64
+}
+
+// readUploadedSharedSize is the AO/AOCS plus the PAX volume the backup uploaded, as recorded in the
+// two files metadata objects stored next to it.
+func readUploadedSharedSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, error) {
+	baseBackupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
+
+	var aoMeta aoFilesMetadataSizeView
+	if err := internal.FetchDto(ctx, baseBackupsFolder, &aoMeta, getAOFilesMetadataPath(backupName)); err != nil {
+		return 0, fmt.Errorf("failed to fetch the AO files metadata: %w", err)
+	}
+
+	var paxMeta paxFilesMetadataSizeView
+	if err := internal.FetchDto(ctx, baseBackupsFolder, &paxMeta, pax.GetFilesMetadataPath(backupName)); err != nil {
+		return 0, fmt.Errorf("failed to fetch the PAX files metadata: %w", err)
+	}
+
+	return aoMeta.UploadedSharedSize + paxMeta.UploadedSharedSize, nil
 }
