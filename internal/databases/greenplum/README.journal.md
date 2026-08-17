@@ -2,23 +2,34 @@
 
 ## Storage layout
 
-A journal is a small JSON object named after the backup it belongs to, ``journal_<backup>``, stored next to the backup sentinels. Every segment maintains a journal of its own, and the coordinator maintains a cluster-wide one summed from them:
+A journal is a small JSON object named after the backup it belongs to, ``journal_<backup>``, stored next to the backup sentinels. Every segment maintains a journal of its own, and the coordinator maintains a cluster-wide one aggregated from what the segments left behind:
 
 ```
 basebackups_005/
-  backup_<timestamp>_sentinel.json
+  backup_<timestamp>_sentinel.json              ← names the backup of every segment
   journal_backup_<timestamp>                    ← whole cluster
-segments_005/seg-1/
-  basebackups_005/journal_base_<...>            ← coordinator
-  wal_005/                                      ← WAL measured by SizeToNextBackup
-  aosegments/, paxfiles/                        ← shared storage measured by SharedSize
-segments_005/seg0/
-  basebackups_005/journal_base_<...>            ← segment 0
-  wal_005/
-  aosegments/, paxfiles/
+segments_005/seg-1/                             ← coordinator
+  basebackups_005/journal_base_<...>            ← WAL of this segment
+  basebackups_005/base_<...>/ao_files_metadata.json
+  basebackups_005/base_<...>/pax_files_metadata.json
+  wal_005/                                      ← what SizeToNextBackup measures
+  aosegments/, paxfiles/                        ← what UploadedSharedSize measures
+segments_005/seg0/                              ← segment 0, and so on
+  ...
 ```
 
-The cluster-wide journal is the one to read; the per-segment ones are the inputs it is summed from.
+The cluster-wide journal is the one to read; the per-segment objects are the inputs it is aggregated from.
+
+## How it works
+
+A segment knows nothing about the cluster, and the coordinator never looks at the data itself, only at what the segments recorded.
+
+Each **segment**, during ``seg backup-push``:
+
+* measures the WAL it archived into its own ``wal_005/`` and keeps it in its own journal as ``SizeToNextBackup``, exactly like a standalone Postgres would;
+* counts the bytes its AO/AOCS and PAX uploaders actually pushed to ``aosegments/`` and ``paxfiles/``, and records them as ``UploadedSharedSize`` in the PAX/AO files metadata of the backup.
+
+The **coordinator**, at the end of the cluster ``backup-push``, walks the segments named in the backup sentinel and fills in the cluster-wide journal.
 
 ## Fields
 
@@ -27,7 +38,7 @@ The cluster-wide journal is the one to read; the per-segment ones are the inputs
 | ``PriorBackupEnd`` | Completion time of the backup preceding this one. Points at the previous backup, and is re-linked when a backup in the middle is deleted, so that the deleted interval is merged into the previous one. |
 | ``CurrentBackupEnd`` | Completion time of this backup. Orders the ``journal_<backup>`` objects chronologically — the names alone do not — which is how the previous and the next journal are located. |
 | ``SizeToNextBackup`` | Bytes of WAL archived between this backup and the next one. Belongs to the interval *after* the backup, so it is zero for the newest one and is filled in when the following backup is created. |
-| ``SharedSize`` | Bytes this backup added to the shared AO/AOCS and PAX storage. Describes the backup itself rather than an interval, so it is known immediately. Omitted when zero, and absent altogether for databases without shared storage. |
+| ``SharedSize`` | Bytes this backup added to the shared AO/AOCS and PAX storage. Describes the backup itself rather than an interval, so it is known as soon as the backup is composed. Present on the cluster-wide journal only, and omitted when zero. |
 
 ``SizeToNextBackup`` is **not** the volume of the ``(PriorBackupEnd; CurrentBackupEnd]`` interval of the same object. Those two timestamps describe the interval *before* the backup and exist to navigate the chain of journals — to find the previous backup and to re-link the chain around a deleted one. ``SizeToNextBackup`` covers the interval *after* the backup instead, the one that ends at the next backup.
 
