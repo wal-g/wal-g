@@ -15,6 +15,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// binlogFileHeaderSize is the size of the binlog magic header
+// ("\xfebin") that precedes the first real event in every binlog file.
+// ParseFile offsets are always relative to this, regardless of which file
+// in the sequence is being parsed.
+const binlogFileHeaderSize = 4
+
 // binlogFetcher streams binlog file identifiers in order onto fileCh. It runs
 // in the background fetch goroutine and must close fileCh before returning
 // (success, error, or ctx cancellation) so the streaming core's consumer
@@ -129,12 +135,6 @@ type BinlogDumpRequestProcessor struct {
 	sentGTIDs      mysql.GTIDSet
 	requiredGTIDs  *mysql.MysqlGTIDSet
 	skipCurrentTxn bool
-
-	// startPos is the replica's initial COM_BINLOG_DUMP position; honored as
-	// the parse offset only on the first file, subsequent files start at 4.
-	startPos mysql.Position
-	// firstFile gates the first-file offset (startPos.Pos vs 4).
-	firstFile bool
 }
 
 func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParams, sink eventSink) *BinlogDumpRequestProcessor {
@@ -166,7 +166,7 @@ func (p *BinlogDumpRequestProcessor) addRotateEvent(pos mysql.Position) error {
 	rotateBinlogEvent.RawData = make([]byte, eventLength)
 	// generate header:
 	// timestamp default 4 bytes
-	binlogEventPos := 4
+	binlogEventPos := binlogFileHeaderSize
 	// type - 1 byte
 	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
 	binlogEventPos++
@@ -267,10 +267,9 @@ func (p *BinlogDumpRequestProcessor) processBinlogFiles(ctx context.Context, fil
 }
 
 // ProcessBinlogFile parses one fetched binlog file and pushes its events to
-// the sink. The first file uses the replica's requested position; later
-// files start at offset 4 (the binlog magic header). It runs on the main
-// goroutine. The file is always released via the fetcher's cleanupFile,
-// regardless of parse outcome.
+// the sink. Every file starts right after the binlog magic header. It runs
+// on the main goroutine. The file is always released via the fetcher's
+// cleanupFile, regardless of parse outcome.
 func (p *BinlogDumpRequestProcessor) ProcessBinlogFile(file string) error {
 	defer p.fetcher.cleanupFile(file)
 
@@ -278,14 +277,8 @@ func (p *BinlogDumpRequestProcessor) ProcessBinlogFile(file string) error {
 		return p.ctx.Err()
 	}
 
-	offset := int64(4)
-	if p.firstFile {
-		offset = int64(p.startPos.Pos)
-		p.firstFile = false
-	}
-
 	tracelog.InfoLogger.Printf("Streaming %s to replica", file)
-	return p.parser.parse(file, offset, p.handleEvent)
+	return p.parser.parse(file, binlogFileHeaderSize, p.handleEvent)
 }
 
 // process runs the fetcher and parser as two goroutines under an errgroup:
@@ -297,9 +290,6 @@ func (p *BinlogDumpRequestProcessor) process(startPos mysql.Position) error {
 	if err := p.addRotateEvent(startPos); err != nil {
 		return err
 	}
-
-	p.startPos = startPos
-	p.firstFile = true
 
 	g, ctx := errgroup.WithContext(p.ctx)
 	fileCh := make(chan string, binlogFetchAhead)
