@@ -6,10 +6,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get -y install \
         build-essential \
-        wget
+        curl
 
 RUN ARCH="$(uname -m)" && \
-    wget "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
+    curl -fsSLO "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
     tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
     rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
 
@@ -36,7 +36,7 @@ RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https:
         ca-certificates \
         iputils-ping \
         net-tools dnsutils \
-        wget && \
+        curl && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
 RUN ARCH="$(uname -m)" && \
@@ -45,7 +45,7 @@ RUN ARCH="$(uname -m)" && \
         aarch64) GO_ARCH="arm64" ;; \
         *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
     esac && \
-    wget -O - "https://go.dev/dl/go1.25.11.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
+    curl -fsSL "https://go.dev/dl/go1.25.11.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
     export PATH="/usr/local/go/bin:$PATH" && \
     go version
 
@@ -55,7 +55,7 @@ ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
 RUN ARCH="$(uname -m)" && \
-    wget "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
+    curl -fsSLO "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
     tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
     rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
 

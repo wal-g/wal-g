@@ -20,7 +20,7 @@ COPY link_brotli.sh link_brotli.sh
 COPY CMakeLists-brotli.txt CMakeLists-brotli.txt
 COPY Makefile Makefile
 
-RUN wget https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-x86_64.tar.gz && \
+RUN curl -fsSLO https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-x86_64.tar.gz && \
     tar xf cmake-3.31.0-linux-x86_64.tar.gz -C /usr --strip-components=1
 
 RUN USE_BROTLI=1 make ENABLE_RACE_DETECTION=1 deps etcd_build
