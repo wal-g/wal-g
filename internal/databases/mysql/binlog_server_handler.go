@@ -61,10 +61,10 @@ func newHandler(ctx context.Context, replicaSource string, params binlogSourcePa
 
 // streamToReplica runs the streaming pipeline to completion and then waits
 // for the replica to catch up before shutting the process down.
-func (h *Handler) streamToReplica(startPos mysql.Position) {
+func (h *Handler) streamToReplica() {
 	tracelog.InfoLogger.Printf("Start event streaming")
 
-	if err := h.dumpCommandProcessor.process(startPos); err != nil {
+	if err := h.dumpCommandProcessor.process(); err != nil {
 		tracelog.ErrorLogger.Printf("Error during logs streaming: %v", err)
 		h.replicaStreamer.AddErrorToStreamer(err)
 		return
@@ -149,14 +149,14 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 
 func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
-	go h.streamToReplica(pos)
+	go h.streamToReplica()
 	return h.replicaStreamer, nil
 }
 
 func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: GTID=%s", gtidSet.String())
 	h.dumpCommandProcessor.requiredGTIDs = gtidSet
-	go h.streamToReplica(mysql.Position{Name: "host-binlog-file", Pos: 4})
+	go h.streamToReplica()
 	return h.replicaStreamer, nil
 }
 

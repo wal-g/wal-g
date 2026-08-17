@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"hash/crc32"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -212,9 +213,17 @@ func (p *BinlogDumpRequestProcessor) handleEvent(e *replication.BinlogEvent) err
 		if p.decideSkipForGTID(e) {
 			return nil
 		}
+	case replication.ROTATE_EVENT:
+		// Real rotate events point at the next file on the host that
+		// produced them, which may not match what we stream next (e.g.
+		// after a primary switchover/failover). We own file boundaries
+		// ourselves via an artificial rotate emitted before each file
+		// (see ProcessBinlogFile), so real rotates are dropped here.
+		p.skipCurrentTxn = false
+		return nil
 	case replication.ANONYMOUS_GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT,
 		replication.FORMAT_DESCRIPTION_EVENT, replication.PREVIOUS_GTIDS_EVENT,
-		replication.ROTATE_EVENT, replication.STOP_EVENT, replication.INCIDENT_EVENT:
+		replication.STOP_EVENT, replication.INCIDENT_EVENT:
 		// txn boundary or file-boundary marker; never appears inside a txn
 		p.skipCurrentTxn = false
 	default:
@@ -267,14 +276,22 @@ func (p *BinlogDumpRequestProcessor) processBinlogFiles(ctx context.Context, fil
 }
 
 // ProcessBinlogFile parses one fetched binlog file and pushes its events to
-// the sink. Every file starts right after the binlog magic header. It runs
-// on the main goroutine. The file is always released via the fetcher's
-// cleanupFile, regardless of parse outcome.
+// the sink. Before parsing, it emits an artificial rotate event naming this
+// file so the replica's expected filename always tracks what we control,
+// regardless of what real (possibly stale/foreign) rotate events the file
+// itself contains. Every file starts right after the binlog magic header.
+// It runs on the main goroutine. The file is always released via the
+// fetcher's cleanupFile, regardless of parse outcome.
 func (p *BinlogDumpRequestProcessor) ProcessBinlogFile(file string) error {
 	defer p.fetcher.cleanupFile(file)
 
 	if p.ctx.Err() != nil {
 		return p.ctx.Err()
+	}
+
+	basename := path.Base(file)
+	if err := p.addRotateEvent(mysql.Position{Name: basename, Pos: binlogFileHeaderSize}); err != nil {
+		return err
 	}
 
 	tracelog.InfoLogger.Printf("Streaming %s to replica", file)
@@ -285,12 +302,10 @@ func (p *BinlogDumpRequestProcessor) ProcessBinlogFile(file string) error {
 // the fetcher lists/downloads binlogs and streams file identifiers over
 // fileCh (closing it when done); the main goroutine parses each file and
 // pushes its events to the sink. Either goroutine failing cancels the
-// group's context and stops the other.
-func (p *BinlogDumpRequestProcessor) process(startPos mysql.Position) error {
-	if err := p.addRotateEvent(startPos); err != nil {
-		return err
-	}
-
+// group's context and stops the other. Every file (including the first)
+// gets its own artificial rotate event via ProcessBinlogFile, so the
+// replica's requested resume position is not needed here.
+func (p *BinlogDumpRequestProcessor) process() error {
 	g, ctx := errgroup.WithContext(p.ctx)
 	fileCh := make(chan string, binlogFetchAhead)
 
