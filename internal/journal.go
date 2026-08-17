@@ -167,8 +167,15 @@ func (ji *JournalInfo) GetNext(ctx context.Context, folder storage.Folder, direc
 
 // Delete deletes the current JournalInfo from S3,
 // updates the PriorBackupEnd of a newer JournalInfo with the PriorBackupEnd of the current one,
-// updates the older one journal size.
-func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder, calc IntervalSizeCalculator) error {
+// updates the older one journal size. The size of the merged interval is recalculated from the
+// journal files archived in ji.JournalDirectoryName, which is what a database keeping its journals
+// in a directory of its own needs. See DeleteWith for the databases that do not.
+func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder) error {
+	return ji.DeleteWith(ctx, folder, NewJournalDirSizeCalculator())
+}
+
+// DeleteWith is Delete with the size of the merged interval recalculated by calc.
+func (ji *JournalInfo) DeleteWith(ctx context.Context, folder storage.Folder, calc IntervalSizeCalculator) error {
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
 		DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
@@ -233,7 +240,7 @@ func DeleteJournalInfo(
 		return
 	}
 
-	if err := journalInfo.Delete(ctx, folder, calc); err != nil {
+	if err := journalInfo.DeleteWith(ctx, folder, calc); err != nil {
 		tracelog.ErrorLogger.Print(err)
 		return
 	}

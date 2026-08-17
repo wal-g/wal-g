@@ -33,7 +33,7 @@ func purgeJournalInfo(ctx context.Context, backupName string, dryRun bool) {
 		return
 	}
 
-	err = journalInfo.Delete(ctx, storage.RootFolder(), internal.NewJournalDirSizeCalculator())
+	err = journalInfo.Delete(ctx, storage.RootFolder())
 	if err != nil {
 		tracelog.ErrorLogger.Print(err)
 	} else {

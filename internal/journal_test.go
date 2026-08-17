@@ -144,7 +144,7 @@ func TestDeleteJournalInMiddle(t *testing.T) {
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
 
-	assert.NoError(t, ji2.Delete(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+	assert.NoError(t, ji2.Delete(t.Context(), folder))
 	assert.NoError(t, ji1.Read(t.Context(), folder))
 	assert.NoError(t, ji3.Read(t.Context(), folder))
 	assert.Equal(t, int64(66), ji1.SizeToNextBackup)
@@ -157,7 +157,7 @@ func TestDeleteJournalInBegin(t *testing.T) {
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
 
-	assert.NoError(t, ji1.Delete(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+	assert.NoError(t, ji1.Delete(t.Context(), folder))
 	assert.NoError(t, ji2.Read(t.Context(), folder))
 	assert.NoError(t, ji3.Read(t.Context(), folder))
 	assert.Equal(t, int64(33), ji2.SizeToNextBackup)
@@ -170,7 +170,7 @@ func TestDeleteJournalInEnd(t *testing.T) {
 
 	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
 
-	assert.NoError(t, ji3.Delete(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+	assert.NoError(t, ji3.Delete(t.Context(), folder))
 	assert.NoError(t, ji1.Read(t.Context(), folder))
 	assert.NoError(t, ji2.Read(t.Context(), folder))
 	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
