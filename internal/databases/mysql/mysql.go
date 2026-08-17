@@ -458,9 +458,12 @@ type StreamSentinelDto struct {
 	BinLogStart string     `json:"BinLogStart,omitempty"`
 	// BinLogEnd field is for debug purpose only.
 	// As we can not guarantee that transactions in BinLogEnd file happened before or after backup
-	BinLogEnd      string    `json:"BinLogEnd,omitempty"`
-	StartLocalTime time.Time `json:"StartLocalTime,omitempty"`
-	StopLocalTime  time.Time `json:"StopLocalTime,omitempty"`
+	BinLogEnd          string    `json:"BinLogEnd,omitempty"`
+	BinLogFileName     string    `json:"BinLogFileName,omitempty"`
+	BinLogFilePosition int64     `json:"BinLogFilePosition,omitempty"`
+	BinLogLastGTID     string    `json:"BinLogLastGTID,omitempty"`
+	StartLocalTime     time.Time `json:"StartLocalTime,omitempty"`
+	StopLocalTime      time.Time `json:"StopLocalTime,omitempty"`
 
 	UncompressedSize int64  `json:"UncompressedSize,omitempty"`
 	CompressedSize   int64  `json:"CompressedSize,omitempty"`
@@ -489,6 +492,14 @@ func (s *StreamSentinelDto) String() string {
 		return "-"
 	}
 	return string(b)
+}
+
+func (s *StreamSentinelDto) GetBinlogPos() BinlogPos {
+	return BinlogPos{
+		FileName:     s.BinLogFileName,
+		FilePosition: s.BinLogFilePosition,
+		LastGTID:     s.BinLogLastGTID,
+	}
 }
 
 type binlogHandler interface {
@@ -534,13 +545,8 @@ outer:
 	return nil
 }
 
-func getBinlogSinceTS(ctx context.Context, folder storage.Folder, backup internal.Backup) (time.Time, error) {
+func getBinlogSinceTS(ctx context.Context, folder storage.Folder, backupName string, streamSentinel *StreamSentinelDto) (time.Time, error) {
 	startTS := utility.MaxTime // far future
-	var streamSentinel StreamSentinelDto
-	err := backup.FetchSentinel(ctx, &streamSentinel)
-	if err != nil {
-		return time.Time{}, err
-	}
 	tracelog.InfoLogger.Printf("Backup sentinel: %s", streamSentinel.String())
 
 	// case when backup was uploaded before first binlog
@@ -549,7 +555,7 @@ func getBinlogSinceTS(ctx context.Context, folder storage.Folder, backup interna
 		return time.Time{}, err
 	}
 	for _, sentinel := range sentinels {
-		if strings.HasPrefix(sentinel.GetName(), backup.Name) {
+		if strings.HasPrefix(sentinel.GetName(), backupName) {
 			tracelog.InfoLogger.Printf("Backup sentinel file: %s (%s)", sentinel.GetName(), sentinel.GetLastModified())
 			if sentinel.GetLastModified().Before(startTS) {
 				startTS = sentinel.GetLastModified()

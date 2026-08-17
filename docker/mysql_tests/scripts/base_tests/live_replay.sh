@@ -25,7 +25,7 @@ sleep 1
 
 wal-g binlog-replay --until "2030-01-01T00:00:00.000000000+00:00" &
 
-while [ ! -f "/tmp/mysql-bin.000001.ok" ]; do sleep 1; done
+while [ ! -f "/tmp/mysql-bin.000002.ok" ]; do sleep 1; done
 
 # wal-g should be blocked in REPLAY_COMMAND waiting for /tmp/mysql-bin.000002.in
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_last', NOW())"
