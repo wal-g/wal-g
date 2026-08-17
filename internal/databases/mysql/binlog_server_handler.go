@@ -14,7 +14,18 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+// binlogSourceParams groups the storage location and time window that the
+// streaming pipeline fetches binlogs from.
+type binlogSourceParams struct {
+	rootFolder  storage.Folder
+	dstDir      string
+	startTS     time.Time
+	untilTS     time.Time
+	endBinlogTS time.Time
+}
 
 // Handler is the go-mysql replication handler for one replica connection.
 // It implements server.ReplicationHandler (go-mysql interface) and delegates
@@ -26,18 +37,25 @@ type Handler struct {
 	cancel        context.CancelFunc
 	replicaSource string
 
-	// streamer runs the fetch/parse/stream pipeline for this connection. It
-	// is created once in newHandler, so there is no concurrent write.
-	streamer *binlogServerStreamer
+	// replicaStreamer is the go-mysql event queue returned to the replica
+	// connection; processor writes to it through a replicaStreamerSink.
+	replicaStreamer *replication.BinlogStreamer
+
+	// dumpCommandProcessor runs the fetch/parse pipeline for this connection's
+	// COM_BINLOG_DUMP / COM_BINLOG_DUMP_GTID request. It is created once in
+	// newHandler, so there is no concurrent write.
+	dumpCommandProcessor *BinlogDumpRequestProcessor
 }
 
 func newHandler(ctx context.Context, replicaSource string, params binlogSourceParams) *Handler {
 	ctx, cancel := context.WithCancel(ctx)
+	replicaStreamer := replication.NewBinlogStreamer()
 	return &Handler{
-		ctx:           ctx,
-		cancel:        cancel,
-		replicaSource: replicaSource,
-		streamer:      newBinlogServerStreamer(ctx, params),
+		ctx:                  ctx,
+		cancel:               cancel,
+		replicaSource:        replicaSource,
+		replicaStreamer:      replicaStreamer,
+		dumpCommandProcessor: newBinlogDumpRequestProcessor(ctx, params, &replicaStreamerSink{replicaStreamer: replicaStreamer}),
 	}
 }
 
@@ -46,9 +64,9 @@ func newHandler(ctx context.Context, replicaSource string, params binlogSourcePa
 func (h *Handler) streamToReplica(startPos mysql.Position) {
 	tracelog.InfoLogger.Printf("Start event streaming")
 
-	if err := h.streamer.stream(startPos); err != nil {
+	if err := h.dumpCommandProcessor.process(startPos); err != nil {
 		tracelog.ErrorLogger.Printf("Error during logs streaming: %v", err)
-		h.streamer.handleEventError(err)
+		h.replicaStreamer.AddErrorToStreamer(err)
 		return
 	}
 
@@ -60,7 +78,7 @@ func (h *Handler) streamToReplica(startPos mysql.Position) {
 // GTID that was streamed, then exits the process. If nothing was streamed,
 // it exits immediately.
 func (h *Handler) waitForReplica() {
-	sentGTIDs := h.streamer.sentGTIDs
+	sentGTIDs := h.dumpCommandProcessor.sentGTIDs
 	if sentGTIDs.IsEmpty() {
 		tracelog.InfoLogger.Println("S3 objects finished. No GTIDs were sent. Shutting down immediately.")
 		os.Exit(0)
@@ -132,14 +150,14 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
 	go h.streamToReplica(pos)
-	return h.streamer.replicaStreamer, nil
+	return h.replicaStreamer, nil
 }
 
 func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: GTID=%s", gtidSet.String())
-	h.streamer.requiredGTIDs = gtidSet
+	h.dumpCommandProcessor.requiredGTIDs = gtidSet
 	go h.streamToReplica(mysql.Position{Name: "host-binlog-file", Pos: 4})
-	return h.streamer.replicaStreamer, nil
+	return h.replicaStreamer, nil
 }
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
