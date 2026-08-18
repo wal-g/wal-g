@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,14 +18,17 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-// binlogSourceParams groups the storage location and time window that the
-// streaming pipeline fetches binlogs from.
+// binlogSourceParams groups the storage location, time window, and server
+// identity that the streaming pipeline uses. serverID is resolved once at
+// the handler level (see HandleBinlogServer) so the processor and query
+// handling never need to touch config directly.
 type binlogSourceParams struct {
 	rootFolder  storage.Folder
 	dstDir      string
 	startTS     time.Time
 	untilTS     time.Time
 	endBinlogTS time.Time
+	serverID    int
 }
 
 // Handler is the go-mysql replication handler for one replica connection.
@@ -55,7 +59,7 @@ func newHandler(ctx context.Context, replicaSource string, params binlogSourcePa
 		cancel:               cancel,
 		replicaSource:        replicaSource,
 		replicaStreamer:      replicaStreamer,
-		dumpCommandProcessor: newBinlogDumpRequestProcessor(ctx, params, &replicaStreamerSink{replicaStreamer: replicaStreamer}),
+		dumpCommandProcessor: newBinlogDumpRequestProcessor(ctx, params, params.serverID, &replicaStreamerSink{replicaStreamer: replicaStreamer}),
 	}
 }
 
@@ -133,6 +137,8 @@ func (h *Handler) waitForReplica() {
 		r.Close()
 
 		replicaSet, _ := mysql.ParseGTIDSet("mysql", executedStr)
+		tracelog.DebugLogger.Printf("waitForReplica: replica gtid_executed=%q, waiting for=%q",
+			executedStr, sentGTIDs.String())
 		if replicaSet != nil && replicaSet.Contain(sentGTIDs) {
 			tracelog.InfoLogger.Println("Replica has successfully caught up! We are safely done.")
 			os.Exit(0)
@@ -173,9 +179,7 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"CRC32"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.server_id":
-		serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
-		tracelog.ErrorLogger.FatalOnError(err)
-		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{serverID}})
+		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{h.dumpCommandProcessor.serverID}})
 		tracelog.ErrorLogger.FatalOnError(err)
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.gtid_mode":
@@ -219,6 +223,11 @@ func HandleBinlogServer(ctx context.Context, since string, until string, untilBi
 	serverPort, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPort)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	serverIDSetting, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
+	tracelog.ErrorLogger.FatalOnError(err)
+	serverID, err := strconv.Atoi(serverIDSetting)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	l, err := net.Listen("tcp", serverAddress+":"+serverPort)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
@@ -253,6 +262,7 @@ func HandleBinlogServer(ctx context.Context, since string, until string, untilBi
 			startTS:     startTS,
 			untilTS:     untilTS,
 			endBinlogTS: endBinlogTS,
+			serverID:    serverID,
 		}
 		go handleBinlogConnection(ctx, c, srv, replicaSource, params, user, password)
 	}

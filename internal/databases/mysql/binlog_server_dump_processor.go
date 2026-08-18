@@ -6,13 +6,11 @@ import (
 	"hash/crc32"
 	"os"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/wal-g/tracelog"
-	conf "github.com/wal-g/wal-g/internal/config"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -112,6 +110,7 @@ type replicaStreamerSink struct {
 }
 
 func (s *replicaStreamerSink) addEvent(e *replication.BinlogEvent) error {
+	logEventDebug(e, "Sending event to replica")
 	return s.replicaStreamer.AddEventToStreamer(e)
 }
 
@@ -124,6 +123,11 @@ func (s *replicaStreamerSink) addEvent(e *replication.BinlogEvent) error {
 type BinlogDumpRequestProcessor struct {
 	ctx     context.Context //nolint:containedctx // connection-scoped cancellation, derived from Handler.ctx
 	untilTS time.Time
+
+	// serverID is embedded in every artificial rotate event we emit; it is
+	// resolved once at the handler level (see HandleBinlogServer) and
+	// passed in, so the processor itself never touches config directly.
+	serverID int
 
 	fetcher binlogFetcher
 	parser  binlogEventParser
@@ -138,11 +142,12 @@ type BinlogDumpRequestProcessor struct {
 	skipCurrentTxn bool
 }
 
-func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParams, sink eventSink) *BinlogDumpRequestProcessor {
+func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParams, serverID int, sink eventSink) *BinlogDumpRequestProcessor {
 	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
 	return &BinlogDumpRequestProcessor{
 		ctx:       ctx,
 		untilTS:   params.untilTS,
+		serverID:  serverID,
 		fetcher:   &storageFetcher{params: params},
 		parser:    newFileEventParser(),
 		sink:      sink,
@@ -152,12 +157,6 @@ func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParam
 
 // https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L53-L108
 func (p *BinlogDumpRequestProcessor) addRotateEvent(pos mysql.Position) error {
-	serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	serverIDNum, err := strconv.Atoi(serverID)
-	tracelog.ErrorLogger.FatalOnError(err)
-
 	// create rotate event
 	rotateBinlogEvent := replication.BinlogEvent{}
 
@@ -172,7 +171,7 @@ func (p *BinlogDumpRequestProcessor) addRotateEvent(pos mysql.Position) error {
 	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
 	binlogEventPos++
 	// server_id- 4 bytes
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(serverIDNum))
+	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(p.serverID))
 	binlogEventPos += 4
 	// event_length - 4 bytes
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(eventLength))
@@ -200,17 +199,30 @@ func (p *BinlogDumpRequestProcessor) addRotateEvent(pos mysql.Position) error {
 	return p.sink.addEvent(&rotateBinlogEvent)
 }
 
+// logEventDebug logs a debug message about an event being sent or dropped.
+// It reads type and timestamp from RawData so it works for both real events
+// (read from binlog files) and artificial events (constructed as wire bytes
+// with a nil Header).
+func logEventDebug(e *replication.BinlogEvent, msg string) {
+	eventType := replication.EventType(e.RawData[binlogFileHeaderSize])
+	timestamp := binary.LittleEndian.Uint32(e.RawData[0:])
+	tracelog.DebugLogger.Printf("%s: type=%s timestamp=%s",
+		msg, eventType, time.Unix(int64(timestamp), 0).Format("2006-01-02 15:04:05 UTC"))
+}
+
 // handleEvent is the per-event callback passed to the binlogEventParser.
 func (p *BinlogDumpRequestProcessor) handleEvent(e *replication.BinlogEvent) error {
 	if p.ctx.Err() != nil {
 		return p.ctx.Err()
 	}
 	if int64(e.Header.Timestamp) > p.untilTS.Unix() {
+		logEventDebug(e, "Dropping event (reason=after_untilTS")
 		return nil
 	}
 	switch e.Header.EventType {
 	case replication.GTID_EVENT:
 		if p.decideSkipForGTID(e) {
+			logEventDebug(e, "Dropping event (reason=gtid_skipped)")
 			return nil
 		}
 	case replication.ROTATE_EVENT:
@@ -220,6 +232,7 @@ func (p *BinlogDumpRequestProcessor) handleEvent(e *replication.BinlogEvent) err
 		// ourselves via an artificial rotate emitted before each file
 		// (see ProcessBinlogFile), so real rotates are dropped here.
 		p.skipCurrentTxn = false
+		logEventDebug(e, "Dropping event (reason=real_rotate_suppressed)")
 		return nil
 	case replication.ANONYMOUS_GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT,
 		replication.FORMAT_DESCRIPTION_EVENT, replication.PREVIOUS_GTIDS_EVENT,
@@ -228,6 +241,7 @@ func (p *BinlogDumpRequestProcessor) handleEvent(e *replication.BinlogEvent) err
 		p.skipCurrentTxn = false
 	default:
 		if p.skipCurrentTxn {
+			logEventDebug(e, "Dropping event (reason=skip_current_txn)")
 			return nil
 		}
 	}

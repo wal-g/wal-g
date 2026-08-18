@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"path"
 	"sync"
 	"testing"
@@ -11,24 +12,17 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/google/uuid"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	conf "github.com/wal-g/wal-g/internal/config"
 )
 
-// --- Test doubles for the three streaming abstractions ---
+// --- Dump binlog processor test implementations ---
 
-// binlogFile is a fixture: a named binlog file carrying a caller-defined
-// sequence of events that the parser will replay.
 type binlogFile struct {
 	name   string
 	events []*replication.BinlogEvent
 }
 
-// memFetcher streams the names of the given binlog files in order onto
-// fileCh, then closes it. It performs no download and touches no disk; it is
-// the test binlogFetcher.
 type memFetcher struct {
 	files []binlogFile
 }
@@ -45,12 +39,8 @@ func (f *memFetcher) fetchBinlogFiles(ctx context.Context, fileCh chan<- string)
 	return nil
 }
 
-// cleanupFile is a no-op for the in-memory fetcher (nothing to remove).
 func (f *memFetcher) cleanupFile(string) {}
 
-// memEventParser replays the caller-defined events for each file name. It
-// looks the file up by name in its backing map and invokes emit for every
-// event in order. It is the test binlogEventParser.
 type memEventParser struct {
 	eventsByName map[string][]*replication.BinlogEvent
 }
@@ -64,8 +54,6 @@ func (p *memEventParser) parse(file string, _ int64, emit func(*replication.Binl
 	return nil
 }
 
-// recordingSink captures every event pushed to it in order. It is the test
-// eventSink: the "output stream you can validate".
 type recordingSink struct {
 	mu     sync.Mutex
 	events []*replication.BinlogEvent
@@ -86,67 +74,92 @@ func (s *recordingSink) recorded() []*replication.BinlogEvent {
 	return out
 }
 
-// --- Event builders ---
+// --- Test helpers ---
 
-// rawEvent builds a BinlogEvent with the given type and a header-sized
-// RawData (enough for handleEvent's switch on EventType and for
-// decideSkipForGTID's GTIDEvent.Decode to read the body). The event type
-// is encoded both in the Header (for handleEvent's switch) and in the
-// raw bytes at offset binlogFileHeaderSize (for the test eventType helper
-// and for the replica's wire parser).
-func rawEvent(eventType replication.EventType, body []byte) *replication.BinlogEvent {
+func rawEvent(eventType replication.EventType, ts string, body []byte) *replication.BinlogEvent {
+	t := at(ts)
 	raw := append(make([]byte, replication.EventHeaderSize), body...)
+	binary.LittleEndian.PutUint32(raw[0:], uint32(t.Unix()))
 	raw[binlogFileHeaderSize] = byte(eventType)
 	return &replication.BinlogEvent{
-		Header:  &replication.EventHeader{EventType: eventType},
+		Header:  &replication.EventHeader{EventType: eventType, Timestamp: uint32(t.Unix())},
 		RawData: raw,
 	}
 }
 
-// eventType reads the event type from the raw binlog bytes, mirroring
-// what a replica sees on the wire. The type byte sits at offset
-// binlogFileHeaderSize (right after the 4-byte timestamp).
 func eventType(e *replication.BinlogEvent) replication.EventType {
 	return replication.EventType(e.RawData[binlogFileHeaderSize])
 }
 
-// buildGTIDEvent builds a GTID_EVENT whose RawData decodes to (sid, gno).
-func buildGTIDEvent(sid uuid.UUID, gno int64) *replication.BinlogEvent {
-	body := make([]byte, 25) // CommitFlag(1) + SID(16) + GNO(8)
-	copy(body[1:17], sid[:])
-	binary.LittleEndian.PutUint64(body[17:25], uint64(gno))
-	return rawEvent(replication.GTID_EVENT, body)
+func rotateName(e *replication.BinlogEvent) string {
+	body := e.RawData[replication.EventHeaderSize:]
+	nameEnd := 8
+	for nameEnd < len(body) && body[nameEnd] != 0 {
+		nameEnd++
+	}
+	return string(body[8:nameEnd])
 }
 
-// buildRotateEvent builds a real ROTATE_EVENT (as it would appear inside a
-// binlog file) pointing at the given next file name. The body layout mirrors
-// the on-disk rotate event: 8-byte position + zero-terminated name.
-func buildRotateEvent(name string, pos uint64) *replication.BinlogEvent {
+func gtidNext(e *replication.BinlogEvent) string {
+	ge := &replication.GTIDEvent{}
+	if err := ge.Decode(e.RawData[replication.EventHeaderSize:]); err != nil {
+		return "?"
+	}
+	one, err := ge.GTIDNext()
+	if err != nil {
+		return "?"
+	}
+	return one.String()
+}
+
+func gtidEvent(ts string, sid uuid.UUID, gno int64) *replication.BinlogEvent {
+	body := make([]byte, 25)
+	copy(body[1:17], sid[:])
+	binary.LittleEndian.PutUint64(body[17:25], uint64(gno))
+	return rawEvent(replication.GTID_EVENT, ts, body)
+}
+
+func rotateEvent(ts string, name string, pos uint64) *replication.BinlogEvent {
 	body := make([]byte, 8+len(name)+1)
 	binary.LittleEndian.PutUint64(body, pos)
 	copy(body[8:], name)
-	// body[8+len(name)] is already 0 (zero terminator)
-	return rawEvent(replication.ROTATE_EVENT, body)
+	return rawEvent(replication.ROTATE_EVENT, ts, body)
 }
 
-// buildQueryEvent builds a generic QUERY_EVENT placeholder so tests have a
-// "regular" event that is neither a txn boundary nor a GTID event.
-func buildQueryEvent() *replication.BinlogEvent {
-	return rawEvent(replication.QUERY_EVENT, []byte("BEGIN"))
+func queryEvent(ts string) *replication.BinlogEvent {
+	return rawEvent(replication.QUERY_EVENT, ts, []byte("BEGIN"))
 }
 
-// --- Test server constructor ---
+// tableMapEvent, writeRowsEvent, updateRowsEvent and deleteRowsEvent build
+// minimal placeholder row-based events. describeEvent identifies them by
+// their type byte alone (falling back to EventType.String()), so their
+// body content is irrelevant to the tests; only the type and timestamp
+// matter for exercising the streaming/filtering logic against a realistic
+// event mix (as opposed to a single QUERY_EVENT standing in for a whole
+// transaction).
+func tableMapEvent(ts string) *replication.BinlogEvent {
+	return rawEvent(replication.TABLE_MAP_EVENT, ts, []byte{0})
+}
 
-// newTestProcessor wires a BinlogDumpRequestProcessor with the in-memory
-// test doubles (memFetcher + memEventParser) and the recordingSink, so a
-// test can drive the pipeline with fixture files and assert on the recorded
-// output. The serverID config is set so addRotateEvent does not fatal.
-func newTestProcessor(t *testing.T, files []binlogFile) (*BinlogDumpRequestProcessor, *recordingSink) {
+func writeRowsEvent(ts string) *replication.BinlogEvent {
+	return rawEvent(replication.WRITE_ROWS_EVENTv2, ts, []byte{0})
+}
+
+func updateRowsEvent(ts string) *replication.BinlogEvent {
+	return rawEvent(replication.UPDATE_ROWS_EVENTv2, ts, []byte{0})
+}
+
+func deleteRowsEvent(ts string) *replication.BinlogEvent {
+	return rawEvent(replication.DELETE_ROWS_EVENTv2, ts, []byte{0})
+}
+
+func newTestProcessor(
+	t *testing.T,
+	files []binlogFile,
+	requiredGTIDs *mysql.MysqlGTIDSet,
+	untilTS time.Time,
+) (*BinlogDumpRequestProcessor, *recordingSink) {
 	t.Helper()
-
-	// addRotateEvent reads the server id from global config; set it for
-	// this test (restored on cleanup by viperSet).
-	viperSet(t, conf.MysqlBinlogServerID, "1")
 
 	eventsByName := make(map[string][]*replication.BinlogEvent, len(files))
 	for _, f := range files {
@@ -156,137 +169,247 @@ func newTestProcessor(t *testing.T, files []binlogFile) (*BinlogDumpRequestProce
 	sink := &recordingSink{}
 	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
 	p := &BinlogDumpRequestProcessor{
-		ctx:       context.Background(),
-		untilTS:   time.Unix(1<<62, 0), // far future: never filter by timestamp
-		fetcher:   &memFetcher{files: files},
-		parser:    &memEventParser{eventsByName: eventsByName},
-		sink:      sink,
-		sentGTIDs: sent,
+		ctx:           context.Background(),
+		untilTS:       untilTS,
+		serverID:      1,
+		fetcher:       &memFetcher{files: files},
+		parser:        &memEventParser{eventsByName: eventsByName},
+		sink:          sink,
+		sentGTIDs:     sent,
+		requiredGTIDs: requiredGTIDs,
 	}
 	return p, sink
 }
 
-// viperSet sets a viper key for the duration of the test. The previous
-// value is restored on cleanup so tests do not leak config into each other.
-func viperSet(t *testing.T, key, value string) {
+var uuid1 = uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeea")
+var uuid2 = uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeeb")
+
+func requireGTIDSet(t *testing.T, s string) *mysql.MysqlGTIDSet {
 	t.Helper()
-	prev, hadPrev := conf.GetSetting(key)
-	viper.Set(key, value)
-	t.Cleanup(func() {
-		if hadPrev {
-			viper.Set(key, prev)
-		} else {
-			viper.Set(key, nil)
-		}
-	})
+	set, err := mysql.ParseMysqlGTIDSet(s)
+	require.NoError(t, err)
+	return set.(*mysql.MysqlGTIDSet)
+}
+
+func describeEvent(e *replication.BinlogEvent) string {
+	switch t := eventType(e); t {
+	case replication.ROTATE_EVENT:
+		return fmt.Sprintf("ROTATE(%s)", rotateName(e))
+	case replication.GTID_EVENT:
+		return fmt.Sprintf("GTID(%s)", gtidNext(e))
+	case replication.QUERY_EVENT:
+		return "QUERY"
+	default:
+		return t.String()
+	}
+}
+
+func describeEvents(events []*replication.BinlogEvent) []string {
+	out := make([]string, len(events))
+	for i, e := range events {
+		out[i] = describeEvent(e)
+	}
+	return out
+}
+
+func at(s string) time.Time {
+	t, err := time.Parse("2006-01-02 15:04:05", s)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 // --- Tests ---
 
-// TestProcess_EmitsArtificialRotatePerFile asserts that the pipeline emits
-// an artificial ROTATE_EVENT naming each file (basename, 4) before that
-// file's own events, and that real ROTATE_EVENTs embedded in the files are
-// dropped.
-func TestProcess_EmitsArtificialRotatePerFile(t *testing.T) {
-	files := []binlogFile{
-		{
-			name: "mysql-bin.000001",
-			events: []*replication.BinlogEvent{
-				buildRotateEvent("mysql-bin.000002", 4), // real rotate -> must be dropped
-				buildQueryEvent(),
-			},
-		},
-		{
-			name: "mysql-bin.000002",
-			events: []*replication.BinlogEvent{
-				buildQueryEvent(),
-			},
-		},
-	}
-
-	p, sink := newTestProcessor(t, files)
-	require.NoError(t, p.process())
-
-	out := sink.recorded()
-
-	// Expected: rotate(000001), query, rotate(000002), query.
-	require.Len(t, out, 4)
-
-	assert.Equal(t, replication.ROTATE_EVENT, eventType(out[0]))
-	assert.Equal(t, replication.ROTATE_EVENT, eventType(out[2]))
-	assert.Equal(t, replication.QUERY_EVENT, eventType(out[1]))
-	assert.Equal(t, replication.QUERY_EVENT, eventType(out[3]))
-
-	// The artificial rotates must name the file we are about to stream.
-	assertRotateName(t, out[0], "mysql-bin.000001")
-	assertRotateName(t, out[2], "mysql-bin.000002")
+type processTestCase struct {
+	name              string
+	files             []binlogFile
+	requiredGTIDs     *mysql.MysqlGTIDSet
+	untilTS           time.Time
+	expected          []*replication.BinlogEvent
+	expectedSentGTIDs string
 }
 
-// TestProcess_DropsRealRotateEvents asserts that a real ROTATE_EVENT inside
-// a binlog file is never forwarded to the replica.
-func TestProcess_DropsRealRotateEvents(t *testing.T) {
-	files := []binlogFile{
+func TestProcess(t *testing.T) {
+	cases := []processTestCase{
 		{
-			name: "mysql-bin.000010",
-			events: []*replication.BinlogEvent{
-				buildQueryEvent(),
-				buildRotateEvent("mysql-bin.000011", 4), // real rotate -> dropped
-				buildQueryEvent(),
+			name:              "no files produces no output",
+			files:             nil,
+			expected:          []*replication.BinlogEvent{},
+			expectedSentGTIDs: "",
+		},
+		{
+			// A real binlog file typically ends with a ROTATE_EVENT
+			// pointing at the next file on the host that produced it.
+			// That file may not be the one we actually stream next (e.g.
+			// after a primary switchover/failover gave us a different
+			// continuation file), so the real rotate must be ignored and
+			// replaced by our own artificial rotate naming the file we
+			// are really about to stream.
+			name: "trailing real rotate to a mismatched file is ignored; artificial rotate targets the real next file",
+			files: []binlogFile{
+				{
+					name: "a.000001",
+					events: []*replication.BinlogEvent{
+						gtidEvent("2026-01-01 00:00:01", uuid1, 1),
+						tableMapEvent("2026-01-01 00:00:01"),
+						writeRowsEvent("2026-01-01 00:00:01"),
+						rotateEvent("2026-01-01 00:00:02", "a.000002", 4),
+					},
+				},
+				{
+					name: "b.000001",
+					events: []*replication.BinlogEvent{
+						gtidEvent("2026-01-01 00:00:03", uuid2, 1),
+						tableMapEvent("2026-01-01 00:00:03"),
+						writeRowsEvent("2026-01-01 00:00:03"),
+						rotateEvent("2026-01-01 00:00:04", "b.000002", 4),
+					},
+				},
 			},
+			expected: []*replication.BinlogEvent{
+				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
+				gtidEvent("2026-01-01 00:00:01", uuid1, 1),
+				tableMapEvent("2026-01-01 00:00:01"),
+				writeRowsEvent("2026-01-01 00:00:01"),
+
+				rotateEvent("1970-01-01 00:00:00", "b.000001", 4),
+				gtidEvent("2026-01-01 00:00:03", uuid2, 1),
+				tableMapEvent("2026-01-01 00:00:03"),
+				writeRowsEvent("2026-01-01 00:00:03"),
+			},
+			expectedSentGTIDs: uuid1.String() + ":1" + "," + uuid2.String() + ":1",
+		},
+		{
+			name: "transaction already in requiredGTIDs is skipped",
+			files: []binlogFile{
+				{
+					name: "a.000001",
+					events: []*replication.BinlogEvent{
+						gtidEvent("2026-01-01 00:00:01", uuid1, 10),
+						tableMapEvent("2026-01-01 00:00:01"),
+						writeRowsEvent("2026-01-01 00:00:01"),
+						gtidEvent("2026-01-01 00:00:02", uuid1, 11),
+						tableMapEvent("2026-01-01 00:00:02"),
+						writeRowsEvent("2026-01-01 00:00:02"),
+					},
+				},
+			},
+			requiredGTIDs: requireGTIDSet(t, uuid1.String()+":1-10"),
+			expected: []*replication.BinlogEvent{
+				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
+				gtidEvent("1970-01-01 00:00:00", uuid1, 11),
+				tableMapEvent("1970-01-01 00:00:00"),
+				writeRowsEvent("1970-01-01 00:00:00"),
+			},
+			expectedSentGTIDs: uuid1.String() + ":11",
+		},
+		{
+			// GTID events carry the transaction's commit timestamp, which
+			// is the latest timestamp in the transaction; the row events
+			// that make up the transaction body are timestamped earlier,
+			// at their individual execution time. Verify that a
+			// transaction whose commit time (GTID timestamp) is after
+			// untilTS is not forwarded, and that this holds both within
+			// a file (a later transaction in the same file as an
+			// earlier, forwarded one) and across files (a whole file
+			// committed entirely after untilTS).
+			name: "untilTS drops transactions committed after the cutoff",
+			files: []binlogFile{
+				{
+					name: "a.000001",
+					events: []*replication.BinlogEvent{
+						gtidEvent("2026-01-01 00:00:09", uuid1, 1),
+						tableMapEvent("2026-01-01 00:00:09"),
+						writeRowsEvent("2026-01-01 00:00:09"),
+						gtidEvent("2026-01-01 00:00:12", uuid1, 2),
+						tableMapEvent("2026-01-01 00:00:10"),
+						writeRowsEvent("2026-01-01 00:00:10"),
+					},
+				},
+				{
+					name: "a.000002",
+					events: []*replication.BinlogEvent{
+						gtidEvent("2026-01-01 00:00:13", uuid1, 3),
+						tableMapEvent("2026-01-01 00:00:13"),
+						writeRowsEvent("2026-01-01 00:00:13"),
+						gtidEvent("2026-01-01 00:00:14", uuid1, 4),
+						tableMapEvent("2026-01-01 00:00:14"),
+						writeRowsEvent("2026-01-01 00:00:14"),
+					},
+				},
+			},
+			untilTS: at("2026-01-01 00:00:11"),
+			expected: []*replication.BinlogEvent{
+				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
+				gtidEvent("2026-01-01 00:00:09", uuid1, 1),
+				tableMapEvent("2026-01-01 00:00:09"),
+				writeRowsEvent("2026-01-01 00:00:09"),
+				rotateEvent("1970-01-01 00:00:00", "a.000002", 4),
+			},
+			expectedSentGTIDs: uuid1.String() + ":1",
+		},
+		{
+			// Binlog files coming from different replicas after a
+			// switchover/failover may overlap: the same already-applied
+			// transaction can appear at the tail of one file and again
+			// at the head of the next.
+			name: "binlog files transcation overlap",
+			files: []binlogFile{
+				{
+					name: "a.000001",
+					events: []*replication.BinlogEvent{
+						gtidEvent("2026-01-01 00:00:00", uuid1, 9),
+						tableMapEvent("2026-01-01 00:00:00"),
+						writeRowsEvent("2026-01-01 00:00:00"),
+						gtidEvent("2026-01-01 00:00:01", uuid1, 10),
+						tableMapEvent("2026-01-01 00:00:01"),
+						writeRowsEvent("2026-01-01 00:00:01"),
+					},
+				},
+				{
+					name: "a.000002",
+					events: []*replication.BinlogEvent{
+						gtidEvent("2026-01-01 00:00:01", uuid1, 10),
+						tableMapEvent("2026-01-01 00:00:01"),
+						writeRowsEvent("2026-01-01 00:00:01"),
+						gtidEvent("2026-01-01 00:00:02", uuid2, 1),
+						tableMapEvent("2026-01-01 00:00:02"),
+						deleteRowsEvent("2026-01-01 00:00:02"),
+					},
+				},
+			},
+			requiredGTIDs: requireGTIDSet(t, uuid1.String()+":1-9"),
+			expected: []*replication.BinlogEvent{
+				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
+				gtidEvent("2026-01-01 00:00:01", uuid1, 10),
+				tableMapEvent("2026-01-01 00:00:01"),
+				writeRowsEvent("2026-01-01 00:00:01"),
+
+				rotateEvent("1970-01-01 00:00:00", "a.000002", 4),
+				gtidEvent("2026-01-01 00:00:01", uuid1, 10),
+				tableMapEvent("2026-01-01 00:00:01"),
+				writeRowsEvent("2026-01-01 00:00:01"),
+				gtidEvent("2026-01-01 00:00:02", uuid2, 1),
+				tableMapEvent("2026-01-01 00:00:02"),
+				deleteRowsEvent("2026-01-01 00:00:02"),
+			},
+			expectedSentGTIDs: uuid1.String() + ":10" + "," + uuid2.String() + ":1",
 		},
 	}
 
-	p, sink := newTestProcessor(t, files)
-	require.NoError(t, p.process())
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			untilTS := tc.untilTS
+			if untilTS.IsZero() {
+				untilTS = time.Unix(1<<62, 0)
+			}
+			p, sink := newTestProcessor(t, tc.files, tc.requiredGTIDs, untilTS)
+			require.NoError(t, p.process())
 
-	out := sink.recorded()
-
-	// Expected: rotate(000010), query, query. The real rotate is gone.
-	require.Len(t, out, 3)
-	assert.Equal(t, replication.ROTATE_EVENT, eventType(out[0]))
-	assertRotateName(t, out[0], "mysql-bin.000010")
-	assert.Equal(t, replication.QUERY_EVENT, eventType(out[1]))
-	assert.Equal(t, replication.QUERY_EVENT, eventType(out[2]))
-}
-
-// TestProcess_FilesStreamedInOrder asserts that two files are streamed in
-// the order the fetcher produced them, with their events interleaved by file
-// boundary (rotate + events per file).
-func TestProcess_FilesStreamedInOrder(t *testing.T) {
-	files := []binlogFile{
-		{name: "a.000001", events: []*replication.BinlogEvent{buildQueryEvent(), buildQueryEvent()}},
-		{name: "b.000002", events: []*replication.BinlogEvent{buildQueryEvent()}},
+			assert.Equal(t, describeEvents(tc.expected), describeEvents(sink.recorded()))
+			assert.Equal(t, tc.expectedSentGTIDs, p.sentGTIDs.String())
+		})
 	}
-
-	p, sink := newTestProcessor(t, files)
-	require.NoError(t, p.process())
-
-	out := sink.recorded()
-
-	// rotate(a), q, q, rotate(b), q
-	require.Len(t, out, 5)
-	assertRotateName(t, out[0], "a.000001")
-	assert.Equal(t, replication.QUERY_EVENT, eventType(out[1]))
-	assert.Equal(t, replication.QUERY_EVENT, eventType(out[2]))
-	assertRotateName(t, out[3], "b.000002")
-	assert.Equal(t, replication.QUERY_EVENT, eventType(out[4]))
-}
-
-// assertRotateName decodes the artificial rotate event's body and asserts
-// the embedded next-file name matches want.
-func assertRotateName(t *testing.T, e *replication.BinlogEvent, want string) {
-	t.Helper()
-	// The rotate event body (after the 19-byte header) is:
-	//   8-byte position + zero-terminated name.
-	body := e.RawData[replication.EventHeaderSize:]
-	if len(body) < 8 {
-		t.Fatalf("rotate event body too short: %d bytes", len(body))
-		return
-	}
-	nameEnd := 8
-	for nameEnd < len(body) && body[nameEnd] != 0 {
-		nameEnd++
-	}
-	got := string(body[8:nameEnd])
-	assert.Equal(t, want, got, "artificial rotate event name")
 }
