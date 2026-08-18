@@ -31,9 +31,9 @@ ENV MONGO_MAJOR=${MONGO_VERSION%.*}
 
 RUN apt-get update -q && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
-    supervisor ca-certificates libsasl2-modules-gssapi-mit snmp wget gnupg curl tzdata && \
+    supervisor ca-certificates libsasl2-modules-gssapi-mit snmp gnupg curl tzdata && \
     echo "deb http://$MONGO_REPO/apt/debian bookworm/${MONGO_PACKAGE}/${MONGO_MAJOR} main" | tee "/etc/apt/sources.list.d/mongodb_${MONGO_MAJOR}.list" && \
-    wget -qO - https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc | apt-key add - && \
+    curl -fsSL https://www.mongodb.org/static/pgp/server-${MONGO_MAJOR}.asc | apt-key add - && \
     apt-get update -q && \
     apt-get download --allow-unauthenticated ${MONGO_PACKAGE}-server=$MONGO_VERSION && \
     dpkg --unpack ${MONGO_PACKAGE}-server*.deb && \
