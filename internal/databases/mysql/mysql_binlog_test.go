@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -51,20 +50,19 @@ func TestBinlogNum(t *testing.T) {
 }
 
 func TestGetBinlogPreviousGTIDsRemoteDoesNotRequireTempDir(t *testing.T) {
-	ctx := context.Background()
 	binlogData, err := os.ReadFile(testFilenameSmall)
 	require.NoError(t, err)
 	require.Less(t, len(binlogData), BinlogReadHeaderSize)
 
 	folder := memory.NewFolder("", memory.NewKVS())
 	binlogName := filepath.Base(testFilenameSmall)
-	require.NoError(t, folder.PutObject(ctx, binlogName, bytes.NewReader(binlogData)))
+	require.NoError(t, folder.PutObject(t.Context(), binlogName, bytes.NewReader(binlogData)))
 
 	expectedGTIDSet, err := GetBinlogPreviousGTIDs(testFilenameSmall, mysql.MySQLFlavor)
 	require.NoError(t, err)
 
 	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
-	actualGTIDSet, err := GetBinlogPreviousGTIDsRemote(ctx, folder, binlogName, mysql.MySQLFlavor)
+	actualGTIDSet, err := GetBinlogPreviousGTIDsRemote(t.Context(), folder, binlogName, mysql.MySQLFlavor)
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedGTIDSet.String(), actualGTIDSet.String())

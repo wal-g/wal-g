@@ -1,5 +1,3 @@
-export GOEXPERIMENT=jsonv2
-
 MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 MAIN_SQLSERVER_PATH := main/sqlserver
@@ -342,7 +340,7 @@ docker_lint:
 	docker build -t wal-g/lint --build-arg TAG=$(GOLANGCI_LINT_VERSION) - < docker/lint/Dockerfile
 	docker run --rm -v `pwd`:/app \
 		-v wal-g_lint_cache:/cache -e GOLANGCI_LINT_CACHE=/cache/lint \
-		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod -e GOEXPERIMENT="$(GOEXPERIMENT)" \
+		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod \
 		wal-g/lint golangci-lint run -v
 
 deps: go_deps link_external_deps
