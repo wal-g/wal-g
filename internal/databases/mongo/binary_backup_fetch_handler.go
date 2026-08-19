@@ -33,6 +33,10 @@ func HandleBinaryFetchPush(
 	}
 	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
+	var downloader archive.Downloader
+	if pitrSince != "" && pitrUntil != "" {
+		downloader = archive.NewStorageDownloaderFromFolder(rootFolder, archive.NewDefaultStorageSettings())
+	}
 
 	if minimalConfigPath == "" {
 		minimalConfigPath, err = config.SaveConfigToTempFile("storage", "systemLog")
@@ -41,7 +45,7 @@ func HandleBinaryFetchPush(
 		}
 	}
 
-	restoreService, err := binary.CreateRestoreService(localStorage, uploader, minimalConfigPath)
+	restoreService, err := binary.CreateRestoreService(localStorage, uploader, downloader, minimalConfigPath)
 	if err != nil {
 		return err
 	}
@@ -68,9 +72,7 @@ func HandleBinaryFetchPush(
 	}
 
 	var replyOplogConfig binary.ReplyOplogConfig
-	var downloader archive.Downloader
 	if pitrSince != "" && pitrUntil != "" {
-		downloader = archive.NewStorageDownloaderFromFolder(rootFolder, archive.NewDefaultStorageSettings())
 		replyOplogConfig, err = binary.NewReplyOplogConfig(
 			ctx, downloader, pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "",
 		)
@@ -85,7 +87,6 @@ func HandleBinaryFetchPush(
 		shConfig,
 		mongocfgConfig,
 		replyOplogConfig,
-		downloader,
 		binary.RestoreArgs{
 			BackupName:     backup.Name,
 			RestoreVersion: restoreMongodVersion,
