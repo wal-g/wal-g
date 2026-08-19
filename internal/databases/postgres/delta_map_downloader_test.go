@@ -100,7 +100,7 @@ func TestGetWalSegmentRange(t *testing.T) {
 		{"firstNotUsedLsn is first Lsn in a WAL segment",
 			args{
 				deltaNo000000010000011100000009,
-				deltaNo000000010000011100000009.firstWalSegmentNo().Next().firstLsn(),
+				deltaNo000000010000011100000009.firstWalSegmentNo().Next().firstLsn() + SizeOfXLogLongPHD,
 			},
 			deltaNo000000010000011100000009.firstWalSegmentNo(),
 			deltaNo000000010000011100000009.firstWalSegmentNo().Next(),
@@ -108,7 +108,7 @@ func TestGetWalSegmentRange(t *testing.T) {
 		{"firstNotUsedLsn is second Lsn in a WAL segment",
 			args{
 				deltaNo000000010000011100000009,
-				deltaNo000000010000011100000009.firstWalSegmentNo().Next().firstLsn() + 1,
+				deltaNo000000010000011100000009.firstWalSegmentNo().Next().firstLsn() + SizeOfXLogLongPHD + 1,
 			},
 			deltaNo000000010000011100000009.firstWalSegmentNo(),
 			deltaNo000000010000011100000009.firstWalSegmentNo().Next().Next(),
@@ -116,7 +116,7 @@ func TestGetWalSegmentRange(t *testing.T) {
 		{"firstNotUsedLsn in the same WAL segment that is first WAL segment of firstNotUsedDeltaNo",
 			args{
 				deltaNo000000010000011100000009,
-				deltaNo000000010000011100000009.firstWalSegmentNo().firstLsn(),
+				deltaNo000000010000011100000009.firstWalSegmentNo().firstLsn() + SizeOfXLogLongPHD,
 			},
 			deltaNo000000010000011100000009.firstWalSegmentNo(),
 			deltaNo000000010000011100000009.firstWalSegmentNo()},
