@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -30,6 +31,7 @@ func HandleBinaryFetchPush(
 	if err != nil {
 		return err
 	}
+	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
 
 	if minimalConfigPath == "" {
@@ -66,8 +68,12 @@ func HandleBinaryFetchPush(
 	}
 
 	var replyOplogConfig binary.ReplyOplogConfig
+	var downloader archive.Downloader
 	if pitrSince != "" && pitrUntil != "" {
-		replyOplogConfig, err = binary.NewReplyOplogConfig(ctx, pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "")
+		downloader = archive.NewStorageDownloaderFromFolder(rootFolder, archive.NewDefaultStorageSettings())
+		replyOplogConfig, err = binary.NewReplyOplogConfig(
+			ctx, downloader, pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "",
+		)
 		if err != nil {
 			return err
 		}
@@ -79,6 +85,7 @@ func HandleBinaryFetchPush(
 		shConfig,
 		mongocfgConfig,
 		replyOplogConfig,
+		downloader,
 		binary.RestoreArgs{
 			BackupName:     backup.Name,
 			RestoreVersion: restoreMongodVersion,
