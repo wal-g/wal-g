@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -41,6 +42,7 @@ func (restoreService *RestoreService) DoRestore(
 	shConfig ShConfig,
 	mongoCfgConfig MongoCfgConfig,
 	replyOplogConfig ReplyOplogConfig,
+	downloader archive.Downloader,
 	args RestoreArgs,
 ) error {
 	sentinel, err := common.DownloadSentinel(ctx, restoreService.Uploader.Folder(), args.BackupName)
@@ -85,7 +87,7 @@ func (restoreService *RestoreService) DoRestore(
 	if !args.SkipMongoReconfig {
 		if err = restoreService.reconfigMongo(
 			ctx, rsConfig, shConfig, replyOplogConfig,
-			mongoCfgConfig, sentinel, args.IsPartial(),
+			mongoCfgConfig, sentinel, downloader, args.IsPartial(),
 		); err != nil {
 			return err
 		}
@@ -118,7 +120,7 @@ func (restoreService *RestoreService) doChecks(mongoVersion, restoreVersion stri
 func (restoreService *RestoreService) reconfigMongo(
 	ctx context.Context,
 	rsConfig RsConfig, shConfig ShConfig, replyOplogConfig ReplyOplogConfig,
-	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, partial bool,
+	mongoCfgConfig MongoCfgConfig, sentinel *models.Backup, downloader archive.Downloader, partial bool,
 ) error {
 	if err := restoreService.fixSystemData(ctx, rsConfig, shConfig, mongoCfgConfig, partial); err != nil {
 		return err
@@ -129,7 +131,7 @@ func (restoreService *RestoreService) reconfigMongo(
 	}
 
 	if replyOplogConfig.HasPitr {
-		if err := restoreService.oplogReply(ctx, replyOplogConfig, partial); err != nil {
+		if err := restoreService.oplogReply(ctx, replyOplogConfig, downloader, partial); err != nil {
 			return err
 		}
 	}
@@ -234,8 +236,8 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(ctx context.C
 }
 
 func (restoreService *RestoreService) oplogReply(ctx context.Context,
-	replayOplogConfig ReplyOplogConfig, partial bool) error {
+	replayOplogConfig ReplyOplogConfig, downloader archive.Downloader, partial bool) error {
 	replayOplogConfig.Partial = partial
 	replayOplogConfig.MinimalConfigPath = restoreService.minimalConfigPath
-	return RunOplogReplay(ctx, "", replayOplogConfig)
+	return RunOplogReplay(ctx, "", replayOplogConfig, downloader)
 }

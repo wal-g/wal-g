@@ -509,7 +509,7 @@ func NewShConfig(shardName string, connectionString string) ShConfig {
 }
 
 func NewReplyOplogConfig(
-	ctx context.Context,
+	ctx context.Context, downloader archive.Downloader,
 	sincePitrStr, untilPitrStr string, partial, withCatchUpReconfig bool, minimalConfigPath string,
 ) (ReplyOplogConfig, error) {
 	var roConfig ReplyOplogConfig
@@ -530,11 +530,6 @@ func NewReplyOplogConfig(
 		}
 	}
 
-	// resolve archiving settings
-	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
-	if err != nil {
-		return roConfig, err
-	}
 	roConfig.Since, err = processTimestamp(ctx, sincePitrStr, downloader)
 	if err != nil {
 		return roConfig, err
@@ -569,7 +564,7 @@ func NewReplyOplogConfig(
 	return roConfig, err
 }
 
-func processTimestamp(ctx context.Context, arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
+func processTimestamp(ctx context.Context, arg string, downloader archive.Downloader) (models.Timestamp, error) {
 	switch arg {
 	case internal.LatestString:
 		return downloader.LastKnownArchiveTS(ctx)
