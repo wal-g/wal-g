@@ -2,12 +2,10 @@ package greenplum
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -92,51 +90,6 @@ func SumSegmentWalSize(ctx context.Context, rootFolder storage.Folder, backupNam
 	return sum, true, nil
 }
 
-// SumSegmentSharedSize is the volume backupName uploaded to the shared AO/AOCS and PAX storage,
-// taken from the files metadata every segment writes next to its backup. The segments do not put it
-// in their journals: only the cluster-wide journal carries the shared volume.
-//
-// As with the WAL volume, a single segment failing to report makes the whole aggregate unavailable.
-func SumSegmentSharedSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, bool, error) {
-	segments, ok, err := segmentsOfBackup(ctx, rootFolder, backupName)
-	if err != nil || !ok {
-		return 0, false, err
-	}
-
-	sum := int64(0)
-	missing := make([]int, 0)
-	for _, meta := range segments {
-		if meta.BackupName == "" {
-			tracelog.WarningLogger.Printf("Sentinel does not name the backup of segment %d", meta.ContentID)
-			missing = append(missing, meta.ContentID)
-			continue
-		}
-
-		segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID))
-		sharedSize, err := readUploadedSharedSize(ctx, segFolder, meta.BackupName)
-		if err != nil {
-			// The segment backup was pushed by a WAL-G old enough not to report the uploaded volume.
-			tracelog.WarningLogger.Printf("Can not read the shared size uploaded by segment %d backup %s: %v",
-				meta.ContentID, meta.BackupName, err)
-			missing = append(missing, meta.ContentID)
-			continue
-		}
-
-		sum += sharedSize
-	}
-
-	if len(missing) > 0 {
-		tracelog.WarningLogger.Printf("Files metadata of backup %s is unavailable on segments %v, "+
-			"the cluster-wide shared volume can not be calculated", backupName, missing)
-		return 0, false, nil
-	}
-
-	tracelog.DebugLogger.Printf("Backup %s uploaded %d bytes to the shared storage over %d segments",
-		backupName, sum, len(segments))
-
-	return sum, true, nil
-}
-
 // segmentsOfBackup lists the segment backups a cluster backup is made of. It reports ok == false
 // when the backup itself is gone: a journal can outlive its backup, since delete modes other than
 // 'delete target' remove the backup without touching the journals.
@@ -155,32 +108,4 @@ func segmentsOfBackup(ctx context.Context, rootFolder storage.Folder, backupName
 	}
 
 	return sentinel.Segments, true, nil
-}
-
-// aoFilesMetadataSizeView is the part of AOFilesMetadataDTO needed to learn the uploaded volume.
-type aoFilesMetadataSizeView struct {
-	UploadedSharedSize int64
-}
-
-// paxFilesMetadataSizeView is the part of  pax.FilesMetadataDTO needed to learn the uploaded volume.
-type paxFilesMetadataSizeView struct {
-	UploadedSharedSize int64
-}
-
-// readUploadedSharedSize is the AO/AOCS plus the PAX volume the backup uploaded, as recorded in the
-// two files metadata objects stored next to it.
-func readUploadedSharedSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, error) {
-	baseBackupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
-
-	var aoMeta aoFilesMetadataSizeView
-	if err := internal.FetchDto(ctx, baseBackupsFolder, &aoMeta, getAOFilesMetadataPath(backupName)); err != nil {
-		return 0, fmt.Errorf("failed to fetch the AO files metadata: %w", err)
-	}
-
-	var paxMeta paxFilesMetadataSizeView
-	if err := internal.FetchDto(ctx, baseBackupsFolder, &paxMeta, pax.GetFilesMetadataPath(backupName)); err != nil {
-		return 0, fmt.Errorf("failed to fetch the PAX files metadata: %w", err)
-	}
-
-	return aoMeta.UploadedSharedSize + paxMeta.UploadedSharedSize, nil
 }

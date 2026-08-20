@@ -236,10 +236,24 @@ func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 	err = bh.uploadRestorePointMetadata(ctx, restoreLSNs, timeLine, timelineBySegment)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	bh.handleSharedSize(ctx, rootFolder)
 	bh.handleJournalInfo(ctx, rootFolder)
 
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 	bh.disconnect(ctx)
+}
+
+// handleSharedSize maintains the cluster-wide shared size objects, holding the volume this backup
+// added to the AO/AOCS and PAX storages shared between backups. The per-segment volumes it sums up
+// are recorded in the files metadata the segment WAL-G instances write during seg-backup-push, so
+// this runs once they have all finished.
+func (bh *BackupHandler) handleSharedSize(ctx context.Context, rootFolder storage.Folder) {
+	if err := UploadSharedSizes(ctx, rootFolder, bh.currBackupInfo.backupName); err != nil {
+		tracelog.WarningLogger.Printf("can not record the shared storage size: %s", err.Error())
+		return
+	}
+
+	tracelog.InfoLogger.Printf("uploaded shared size info for %s", bh.currBackupInfo.backupName)
 }
 
 // handleJournalInfo maintains the cluster-wide journal_<backup> object, holding the WAL volume
@@ -267,14 +281,6 @@ func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder stora
 		bh.currBackupInfo.finishTime,
 		ClusterJournalDir,
 	)
-
-	sharedSize, _, err := SumSegmentSharedSize(ctx, rootFolder, bh.currBackupInfo.backupName)
-	if err != nil {
-		tracelog.WarningLogger.Printf("can not calculate the shared storage size: %s", err.Error())
-		return
-	}
-
-	journalInfo.SharedSize = sharedSize
 
 	if err := journalInfo.Upload(ctx, rootFolder); err != nil {
 		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())

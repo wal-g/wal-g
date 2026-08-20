@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
-	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 	"github.com/wal-g/wal-g/utility"
@@ -257,78 +256,4 @@ func TestDeleteClusterJournalRemergesFromSegments(t *testing.T) {
 		assert.Equal(t, int64(firstSize), readClusterJournal(t, root, firstBackup).SizeToNextBackup,
 			"a partial sum must not overwrite the size measured at backup-push time")
 	})
-}
-
-func TestSumSegmentSharedSize(t *testing.T) {
-	segBackups := map[int]string{
-		-1: "base_000000010000000000000001",
-		0:  "base_000000010000000000000002",
-		1:  "base_000000010000000000000003",
-	}
-
-	sumShared := func(t *testing.T, root storage.Folder) (int64, bool, error) {
-		t.Helper()
-		return greenplum.SumSegmentSharedSize(t.Context(), root, gpBackupName)
-	}
-
-	t.Run("sums the shared volume reported by every segment", func(t *testing.T) {
-		root := testtools.MakeDefaultInMemoryStorageFolder()
-		putGpSentinel(t, root, gpBackupName, segBackups)
-		putSegmentFilesMetadata(t, root, -1, segBackups[-1], 6, 4)
-		putSegmentFilesMetadata(t, root, 0, segBackups[0], 12, 8)
-		putSegmentFilesMetadata(t, root, 1, segBackups[1], 18, 12)
-
-		size, ok, err := sumShared(t, root)
-
-		require.NoError(t, err)
-		assert.True(t, ok)
-		assert.Equal(t, int64(60), size)
-	})
-
-	t.Run("reports no size when the metadata of a single segment is missing", func(t *testing.T) {
-		root := testtools.MakeDefaultInMemoryStorageFolder()
-		putGpSentinel(t, root, gpBackupName, segBackups)
-		putSegmentFilesMetadata(t, root, -1, segBackups[-1], 6, 4)
-		putSegmentFilesMetadata(t, root, 0, segBackups[0], 12, 8)
-
-		_, ok, err := sumShared(t, root)
-
-		require.NoError(t, err)
-		assert.False(t, ok, "a partial sum would understate the shared volume")
-	})
-
-	t.Run("a backup that added nothing shared sums to zero", func(t *testing.T) {
-		root := testtools.MakeDefaultInMemoryStorageFolder()
-		putGpSentinel(t, root, gpBackupName, segBackups)
-		for contentID, segBackup := range segBackups {
-			putSegmentFilesMetadata(t, root, contentID, segBackup, 0, 0)
-		}
-
-		size, ok, err := sumShared(t, root)
-
-		require.NoError(t, err)
-		assert.True(t, ok, "everything being deduplicated is a known zero, not a missing measurement")
-		assert.Zero(t, size)
-	})
-}
-
-// putSegmentFilesMetadata writes the two files metadata objects a segment backup-push leaves next
-// to its backup, each reporting the volume it uploaded to its shared storage.
-func putSegmentFilesMetadata(t *testing.T, root storage.Folder, contentID int, backupName string,
-	aoSize, paxSize int64) {
-	t.Helper()
-
-	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
-
-	// The file lists are there to keep the readers honest: they are what the size views must skip.
-	putDTO(t, folder, utility.BaseBackupPath+backupName+"/"+greenplum.AOFilesMetadataName,
-		greenplum.AOFilesMetadataDTO{
-			Files:              greenplum.BackupAOFiles{"1337.1": {StoragePath: "aosegments/1337.1", EOF: 4096}},
-			UploadedSharedSize: aoSize,
-		})
-	putDTO(t, folder, utility.BaseBackupPath+pax.GetFilesMetadataPath(backupName),
-		pax.FilesMetadataDTO{
-			Files:              pax.BackupFiles{"base/13/16385_pax/3": {StoragePath: "paxfiles/3", Kind: pax.FileKindData}},
-			UploadedSharedSize: paxSize,
-		})
 }

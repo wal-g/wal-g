@@ -25,16 +25,10 @@ get_backup_name() {
     echo ${JOURNAL_NAME#"journal_"}
 }
 
-# get_cluster_journal_field <n> <field> - journal field recorded for the n-th oldest backup.
-# Absent fields (SharedSize is omitempty) read as 0.
-get_cluster_journal_field() {
-    JOURNAL_NAME=$(get_cluster_journals | awk "FNR == $1 {print}")
-    wal-g --config=${TMP_CONFIG} st cat basebackups_005/$JOURNAL_NAME | jq ".$2 // 0"
-}
-
 # get_cluster_journal_size <n> - SizeToNextBackup recorded for the n-th oldest backup
 get_cluster_journal_size() {
-    get_cluster_journal_field $1 SizeToNextBackup
+    JOURNAL_NAME=$(get_cluster_journals | awk "FNR == $1 {print}")
+    wal-g --config=${TMP_CONFIG} st cat basebackups_005/$JOURNAL_NAME | jq ".SizeToNextBackup"
 }
 
 count_segment_journals() {
@@ -68,12 +62,6 @@ SECOND_SIZE=$(get_cluster_journal_size 2)
 test "0" -ne $FIRST_SIZE
 test "0" -ne $SECOND_SIZE
 test "0" -eq $(get_cluster_journal_size 3)
-
-# insert_data creates AO and CO tables, so every backup pushed some AO/AOCS files to the shared storage
-for N in 1 2 3
-do
-    test "0" -ne $(get_cluster_journal_field $N SharedSize)
-done
 
 # Deleting a backup in the middle merges its interval into the previous one
 wal-g --config=${TMP_CONFIG} delete target $(get_backup_name 2) --confirm
