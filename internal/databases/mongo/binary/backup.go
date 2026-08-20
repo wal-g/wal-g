@@ -41,7 +41,7 @@ type CalculateSizesArgs struct {
 }
 
 func (backupService *BackupService) createInitialJournals(ctx context.Context,
-	sizeCalculator internal.IntervalSizeCalculator) internal.JournalInfo {
+	journalFiles *internal.JournalFiles) internal.JournalInfo {
 	backupFolder, err := common.GetBackupFolder(ctx)
 	if err != nil {
 		tracelog.ErrorLogger.Printf("can not get backup folder: %+v", err)
@@ -62,7 +62,7 @@ func (backupService *BackupService) createInitialJournals(ctx context.Context,
 			backupName:            backupTime.BackupName,
 			mostRecentJournalInfo: mostRecentJournalInfo,
 			timeStop:              backupTime.Time,
-			sizeCalculator:        sizeCalculator,
+			journalFiles:          journalFiles,
 		})
 	}
 	return mostRecentJournalInfo
@@ -72,7 +72,7 @@ type addJournalInfoArgs struct {
 	backupName            string
 	mostRecentJournalInfo internal.JournalInfo
 	timeStop              time.Time
-	sizeCalculator        internal.IntervalSizeCalculator
+	journalFiles          *internal.JournalFiles
 }
 
 func (backupService *BackupService) addJournalInfo(ctx context.Context, args addJournalInfoArgs) internal.JournalInfo {
@@ -99,7 +99,7 @@ func (backupService *BackupService) addJournalInfo(ctx context.Context, args add
 		return internal.JournalInfo{}
 	}
 
-	err = journalInfo.UpdateIntervalSize(ctx, rootFolder, args.sizeCalculator)
+	err = journalInfo.UpdateIntervalSize(ctx, rootFolder, args.journalFiles)
 	if err != nil {
 		tracelog.WarningLogger.Printf("can not calculate journal size: %+v", err)
 		return internal.JournalInfo{}
@@ -121,7 +121,7 @@ func (backupService *BackupService) calculateSizes(ctx context.Context, args Cal
 		return
 	}
 
-	sizeCalculator := internal.NewJournalDirSizeCalculator()
+	journalFiles := &internal.JournalFiles{}
 	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(
 		ctx,
 		storage.RootFolder(),
@@ -130,7 +130,7 @@ func (backupService *BackupService) calculateSizes(ctx context.Context, args Cal
 	if errors.Is(err, internal.JournalsNotFound) {
 		// there can be no backups on S3 or we do it first time
 		tracelog.WarningLogger.Printf("can not find the last journal info: %+v", err)
-		mostRecentJournalInfo = backupService.createInitialJournals(ctx, sizeCalculator)
+		mostRecentJournalInfo = backupService.createInitialJournals(ctx, journalFiles)
 	}
 
 	timeStop := utility.TimeNowCrossPlatformLocal()
@@ -138,7 +138,7 @@ func (backupService *BackupService) calculateSizes(ctx context.Context, args Cal
 		backupName:            args.BackupName,
 		mostRecentJournalInfo: mostRecentJournalInfo,
 		timeStop:              timeStop,
-		sizeCalculator:        sizeCalculator,
+		journalFiles:          journalFiles,
 	})
 }
 

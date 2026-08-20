@@ -167,7 +167,7 @@ func (ji *JournalInfo) GetNext(ctx context.Context, folder storage.Folder, direc
 // journal files archived in ji.JournalDirectoryName, which is what a database keeping its journals
 // in a directory of its own needs. See DeleteWith for the databases that do not.
 func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder) error {
-	return ji.DeleteWith(ctx, folder, NewJournalDirSizeCalculator())
+	return ji.DeleteWith(ctx, folder, &JournalFiles{})
 }
 
 // DeleteWith is Delete with the size of the merged interval recalculated by calc.
@@ -293,20 +293,12 @@ type IntervalSizeCalculator interface {
 	Calculate(ctx context.Context, folder storage.Folder, ji, prevJi JournalInfo) (size int64, ok bool, err error)
 }
 
-// JournalDirSizeCalculator sums the storage sizes of the journal files archived within the
-// interval, taken from a listing of ji.JournalDirectoryName. The listing is cached, so a single
-// instance is meant to be reused across the calls belonging to one recalculation, and only across
-// journals that share a directory.
-type JournalDirSizeCalculator struct {
+type JournalFiles struct {
 	files       []storage.Object
 	initialized bool
 }
 
-func NewJournalDirSizeCalculator() *JournalDirSizeCalculator {
-	return &JournalDirSizeCalculator{}
-}
-
-func (c *JournalDirSizeCalculator) Calculate(
+func (c *JournalFiles) Calculate(
 	ctx context.Context,
 	folder storage.Folder,
 	ji, _ JournalInfo,

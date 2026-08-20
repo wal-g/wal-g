@@ -153,7 +153,7 @@ func HandleBackupPush(
 		return
 	}
 
-	err = journalInfo.UpdateIntervalSize(ctx, folder, internal.NewJournalDirSizeCalculator())
+	err = journalInfo.UpdateIntervalSize(ctx, folder, &internal.JournalFiles{})
 	if err != nil {
 		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
 		return

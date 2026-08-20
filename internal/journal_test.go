@@ -103,7 +103,7 @@ func CreateThreeJournals(
 	)
 
 	assert.NoError(t, ji2.Upload(t.Context(), folder))
-	assert.NoError(t, ji2.UpdateIntervalSize(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+	assert.NoError(t, ji2.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
 	assert.NoError(t, ji1.Read(t.Context(), folder))
 
 	ji3 := internal.NewEmptyJournalInfo(
@@ -120,7 +120,7 @@ func CreateThreeJournals(
 	)
 
 	assert.NoError(t, ji3.Upload(t.Context(), folder))
-	assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+	assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
 	assert.NoError(t, ji2.Read(t.Context(), folder))
 	assert.NoError(t, ji1.Read(t.Context(), folder))
 
@@ -190,7 +190,7 @@ func TestEmptyJournalDirectoryKeepsPreviousSize(t *testing.T) {
 	require.NoError(t, ji1.Upload(t.Context(), emptyDirFolder))
 	require.NoError(t, ji3.Upload(t.Context(), emptyDirFolder))
 
-	assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), emptyDirFolder, internal.NewJournalDirSizeCalculator()))
+	assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), emptyDirFolder, &internal.JournalFiles{}))
 
 	require.NoError(t, ji1.Read(t.Context(), emptyDirFolder))
 	assert.Equal(t, int64(33), ji1.SizeToNextBackup)
@@ -204,13 +204,13 @@ func TestSafetyOfRepeatingMethodCalls(t *testing.T) {
 
 	// There are random method calls
 	for i := 0; i < 10; i++ {
-		assert.NoError(t, ji1.UpdateIntervalSize(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+		assert.NoError(t, ji1.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
 		assert.NoError(t, ji1.Upload(t.Context(), folder))
 		assert.NoError(t, ji3.Read(t.Context(), folder))
 		assert.NoError(t, ji2.Upload(t.Context(), folder))
-		assert.NoError(t, ji2.UpdateIntervalSize(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+		assert.NoError(t, ji2.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
 		assert.NoError(t, ji3.Upload(t.Context(), folder))
-		assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), folder, internal.NewJournalDirSizeCalculator()))
+		assert.NoError(t, ji3.UpdateIntervalSize(t.Context(), folder, &internal.JournalFiles{}))
 		assert.NoError(t, ji2.Read(t.Context(), folder))
 		assert.NoError(t, ji1.Read(t.Context(), folder))
 	}
