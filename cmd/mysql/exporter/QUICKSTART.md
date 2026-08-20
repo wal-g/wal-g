@@ -305,11 +305,11 @@ wal-g st check read
 
 ## Next Steps
 
-1. ✅ Set up alerting rules
-2. ✅ Create Grafana dashboards
-3. ✅ Configure notification channels
-4. ✅ Document runbooks for alerts
-5. ✅ Set up log aggregation
+1. Set up alerting rules
+2. Create Grafana dashboards
+3. Configure notification channels
+4. Document runbooks for alerts
+5. Set up log aggregation
 
 ## Support
 
@@ -318,5 +318,3 @@ wal-g st check read
 - **Issues**: [GitHub Issues](https://github.com/wal-g/wal-g/issues)
 
 ---
-
-**Built with ❤️ for enterprise-grade MySQL/MariaDB backup monitoring**

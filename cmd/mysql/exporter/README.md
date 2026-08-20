@@ -394,7 +394,7 @@ Same as WAL-G project license.
 ## Contributing
 
 Contributions are welcome! Please ensure:
-- Code follows enterprise-grade standards
+- Code follows project standards
 - No hardcoded values
 - Proper error handling
 - Comprehensive logging
