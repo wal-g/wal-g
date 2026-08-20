@@ -242,10 +242,9 @@ func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 	bh.disconnect(ctx)
 }
 
-// handleJournalInfo maintains the cluster-wide journal_<backup> object, holding the WAL volume
-// accumulated across all segments between this backup and the next one. The per-segment journals it
-// sums up are written by the segment WAL-G instances during seg-backup-push, so this runs once they
-// have all finished (see SegmentsSizeCalculator).
+// handleJournalInfo maintains the cluster-wide journal_<backup> object, holding the WAL volume all
+// segments accumulated between this backup and the next one. It sums the per-segment journals, so
+// it must run after the segments have finished (see UpdateClusterIntervalSize).
 func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder storage.Folder) {
 	if !bh.arguments.countJournals {
 		tracelog.InfoLogger.Printf("WAL journal counting mode is disabled: option is disabled")
@@ -273,7 +272,7 @@ func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder stora
 		return
 	}
 
-	if err := journalInfo.UpdateIntervalSize(ctx, rootFolder, SegmentsSizeCalculator{}); err != nil {
+	if err := UpdateClusterIntervalSize(ctx, rootFolder, journalInfo); err != nil {
 		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
 		return
 	}

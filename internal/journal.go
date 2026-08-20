@@ -120,98 +120,97 @@ func (ji *JournalInfo) GetNext(ctx context.Context, folder storage.Folder, direc
 		return JournalInfo{}, err
 	}
 
-	candidates, err := loadJournalCandidates(ctx, folder, filterJournalsInfoFiles(objs))
+	journals, err := loadJournalsInfo(ctx, folder, filterJournalsInfoFiles(objs))
 	if err != nil {
 		return JournalInfo{}, err
 	}
 
 	switch direction {
 	case older:
-		candidates = filterCandidatesOlderThen(candidates, ji.CurrentBackupEnd)
+		journals = filterJournalsInfoOlderThen(journals, ji.CurrentBackupEnd)
 	case newer:
-		candidates = filterCandidatesNewerThen(candidates, ji.CurrentBackupEnd)
+		journals = filterJournalsInfoNewerThen(journals, ji.CurrentBackupEnd)
 	}
-	sortCandidates(candidates)
+	journals = sortJournalsInfo(journals)
 
-	if len(candidates) == 0 {
+	if len(journals) == 0 {
 		return JournalInfo{}, xerrors.New(cantFindJournal)
 	}
 
-	var journalName string
+	var next JournalInfo
 	switch direction {
 	case older:
-		journalName = candidates[len(candidates)-1].obj.GetName()
+		next = journals[len(journals)-1]
 	case newer:
-		journalName = candidates[0].obj.GetName()
+		next = journals[0]
 	}
 
-	backupName := strings.TrimPrefix(
-		journalName,
-		JournalPrefix,
-	)
-	newerJournalInfo, err := NewJournalInfo(
-		ctx,
-		backupName,
-		folder,
-		ji.JournalDirectoryName,
-	)
+	// JournalDirectoryName is not part of the stored object, it comes from the caller.
+	next.JournalDirectoryName = ji.JournalDirectoryName
+
+	return next, nil
+}
+
+// Previous is the journal of the backup preceding this one, ok == false when this is the oldest.
+func (ji *JournalInfo) Previous(ctx context.Context, folder storage.Folder) (JournalInfo, bool, error) {
+	prevJi, err := ji.GetNext(ctx, folder, older)
 	if err != nil {
-		return JournalInfo{}, err
+		if err.Error() == cantFindJournal {
+			return JournalInfo{}, false, nil
+		}
+		return JournalInfo{}, false, err
 	}
-	return newerJournalInfo, err
+
+	return prevJi, true, nil
 }
 
-// Delete deletes the current JournalInfo from S3,
-// updates the PriorBackupEnd of a newer JournalInfo with the PriorBackupEnd of the current one,
-// updates the older one journal size. The size of the merged interval is recalculated from the
-// journal files archived in ji.JournalDirectoryName, which is what a database keeping its journals
-// in a directory of its own needs. See DeleteWith for the databases that do not.
-func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder) error {
-	return ji.DeleteWith(ctx, folder, &JournalFiles{})
-}
-
-// DeleteWith is Delete with the size of the merged interval recalculated by calc.
-func (ji *JournalInfo) DeleteWith(ctx context.Context, folder storage.Folder, calc IntervalSizeCalculator) error {
+// Unlink deletes the journal object and merges the interval it covered into the newer journal,
+// which is returned so that the caller can recalculate the size of the merged interval.
+// ok == false when this was the newest journal and there is nothing to merge into.
+func (ji *JournalInfo) Unlink(ctx context.Context, folder storage.Folder) (JournalInfo, bool, error) {
 	err := folder.
 		GetSubFolder(utility.BaseBackupPath).
 		DeleteObjects(ctx, []storage.Object{storage.NewLocalObject(ji.JournalName, time.Time{}, 0)})
 	if err != nil {
-		return err
+		return JournalInfo{}, false, err
 	}
 
 	newerJi, err := ji.GetNext(ctx, folder, newer)
 	if err != nil {
 		if err.Error() != cantFindJournal {
-			return err
+			return JournalInfo{}, false, err
 		}
 
 		// SizeToNextBackup is the sum in bytes of binlogs between two backups.
 		// If the current backup was the newest one, the older one will be the newest then,
 		// and the SizeToNextBackup of it should be equal to zero.
-		olderJi, err := ji.GetNext(ctx, folder, older)
-		if err != nil {
-			if err.Error() != cantFindJournal {
-				return err
-			}
-			return nil
+		olderJi, ok, err := ji.Previous(ctx, folder)
+		if err != nil || !ok {
+			return JournalInfo{}, false, err
 		}
 
 		olderJi.SizeToNextBackup = 0
-		return olderJi.Upload(ctx, folder)
+		return JournalInfo{}, false, olderJi.Upload(ctx, folder)
 	}
 
 	newerJi.PriorBackupEnd = ji.PriorBackupEnd
 	err = newerJi.Upload(ctx, folder)
 	if err != nil {
+		return JournalInfo{}, false, err
+	}
+
+	return newerJi, true, nil
+}
+
+// Delete unlinks the journal and recalculates the merged interval from JournalDirectoryName.
+// A database that measures the interval differently calls Unlink itself instead.
+func (ji *JournalInfo) Delete(ctx context.Context, folder storage.Folder) error {
+	newerJi, ok, err := ji.Unlink(ctx, folder)
+	if err != nil || !ok {
 		return err
 	}
 
-	err = newerJi.UpdateIntervalSize(ctx, folder, calc)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return newerJi.UpdateIntervalSize(ctx, folder, &JournalFiles{})
 }
 
 // DeleteJournalInfo removes the journal of the given backup and re-links the neighboring journals,
@@ -222,7 +221,6 @@ func DeleteJournalInfo(
 	folder storage.Folder,
 	backupName string,
 	journalDir string,
-	calc IntervalSizeCalculator,
 	confirmed bool,
 ) {
 	journalInfo, err := NewJournalInfo(ctx, backupName, folder, journalDir)
@@ -236,7 +234,7 @@ func DeleteJournalInfo(
 		return
 	}
 
-	if err := journalInfo.DeleteWith(ctx, folder, calc); err != nil {
+	if err := journalInfo.Delete(ctx, folder); err != nil {
 		tracelog.ErrorLogger.Print(err)
 		return
 	}
@@ -263,61 +261,46 @@ func GetMostRecentJournalInfo(
 		return JournalInfo{}, JournalsNotFound
 	}
 
-	candidates, err := loadJournalCandidates(ctx, folder, objs)
+	journals, err := loadJournalsInfo(ctx, folder, objs)
 	if err != nil {
 		return JournalInfo{}, err
 	}
-	sortCandidates(candidates)
+	journals = sortJournalsInfo(journals)
 
-	theMostRecentJournalObject := candidates[len(candidates)-1].obj
-	theMostRecentBackupName := strings.TrimPrefix(theMostRecentJournalObject.GetName(), JournalPrefix)
-	backupInfo, err := NewJournalInfo(
-		ctx,
-		theMostRecentBackupName,
-		folder,
-		journalDir,
-	)
-	if err != nil {
-		return JournalInfo{}, err
-	}
+	backupInfo := journals[len(journals)-1]
+	// JournalDirectoryName is not part of the stored object, it comes from the caller.
+	backupInfo.JournalDirectoryName = journalDir
 
 	return backupInfo, nil
 }
 
-// IntervalSizeCalculator computes the volume of journal data accumulated in the semi-interval
-// (ji.PriorBackupEnd; ji.CurrentBackupEnd], which is stored as prevJi.SizeToNextBackup.
-type IntervalSizeCalculator interface {
-	// Calculate returns ok == false when the size can not be determined. In that case the caller
-	// must leave prevJi.SizeToNextBackup as it is instead of resetting it to zero, since a missing
-	// measurement is indistinguishable from a genuine zero once it has been written to storage.
-	Calculate(ctx context.Context, folder storage.Folder, ji, prevJi JournalInfo) (size int64, ok bool, err error)
-}
-
+// JournalFiles caches a journal directory listing, to be reused across one recalculation.
 type JournalFiles struct {
 	files       []storage.Object
 	initialized bool
 }
 
-func (c *JournalFiles) Calculate(
-	ctx context.Context,
-	folder storage.Folder,
-	ji, _ JournalInfo,
-) (int64, bool, error) {
-	if !c.initialized {
+// UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
+// using journal files on JournalDirectoryName and save it for the previous JournalInfo
+func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Folder, journalFilesObj *JournalFiles) error {
+	if !journalFilesObj.initialized {
+		// doing this 1 time for reusing it in next runs during single calculation
 		journalFiles, _, err := folder.GetSubFolder(ji.JournalDirectoryName).ListFolder(ctx)
 		if err != nil {
-			return 0, false, err
+			return err
 		}
-		c.files = journalFiles
-		c.initialized = true
+		journalFilesObj.files = journalFiles
+		journalFilesObj.initialized = true
 	}
 
-	if len(c.files) == 0 {
-		return 0, false, nil
+	journalFiles := journalFilesObj.files
+	if len(journalFiles) == 0 {
+		// Not measured rather than zero: overwriting SizeToNextBackup with a 0 would lose it.
+		return nil
 	}
 
 	sum := int64(0)
-	for _, journal := range c.files {
+	for _, journal := range journalFiles {
 		timestamp := journal.GetLastModified()
 
 		isInInterval := timestamp.After(ji.PriorBackupEnd) && timestamp.Before(ji.CurrentBackupEnd)
@@ -329,34 +312,19 @@ func (c *JournalFiles) Calculate(
 		}
 	}
 
-	return sum, true, nil
-}
-
-// UpdateIntervalSize calculates the size of the SizeToNextBackup in the semi-interval (PriorBackupEnd; CurrentBackupEnd]
-// and saves it for the previous JournalInfo
-func (ji *JournalInfo) UpdateIntervalSize(ctx context.Context, folder storage.Folder, calc IntervalSizeCalculator) error {
-	prevJi, err := ji.GetNext(ctx, folder, older)
-	if err != nil {
-		// There can only be one backup on S3 or we can delete the oldest one
-		if err.Error() == cantFindJournal {
-			return nil
-		}
+	// There can only be one backup on S3 or we can delete the oldest one
+	prevJi, ok, err := ji.Previous(ctx, folder)
+	if err != nil || !ok {
 		return err
 	}
-
-	sum, ok, err := calc.Calculate(ctx, folder, *ji, prevJi)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		tracelog.WarningLogger.Printf("Can not determine the journal size for %s, leaving SizeToNextBackup of %s intact",
-			ji.JournalName, prevJi.JournalName)
-		return nil
-	}
-
 	prevJi.SizeToNextBackup = sum
 
-	return prevJi.Upload(ctx, folder)
+	err = prevJi.Upload(ctx, folder)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func filterJournalsInfoFiles(objects []storage.Object) []storage.Object {
@@ -369,51 +337,45 @@ func filterJournalsInfoFiles(objects []storage.Object) []storage.Object {
 	return newObjects
 }
 
-// journalCandidate pairs a journal's storage object with its CurrentBackupEnd, i.e. the
-// completion time of the backup it belongs to.
-type journalCandidate struct {
-	obj       storage.Object
-	timestamp time.Time
-}
-
-// loadJournalCandidates reads each journal's CurrentBackupEnd from its content instead of
-// deriving a timestamp from the associated backup's name, since backup naming conventions
-// differ across databases (e.g. MySQL's "stream_<timestamp>" vs Postgres' "base_<timeline><segno>").
-func loadJournalCandidates(ctx context.Context, folder storage.Folder, objects []storage.Object) ([]journalCandidate, error) {
-	candidates := make([]journalCandidate, 0, len(objects))
+// loadJournalsInfo reads the journal behind every object, so that they can be ordered by
+// CurrentBackupEnd. Their names can not be used for that: backup naming conventions differ across
+// databases (MySQL's "stream_<timestamp>" vs Postgres' "base_<timeline><segno>").
+func loadJournalsInfo(ctx context.Context, folder storage.Folder, objects []storage.Object) ([]JournalInfo, error) {
+	journals := make([]JournalInfo, 0, len(objects))
 	for _, obj := range objects {
 		backupName := strings.TrimPrefix(obj.GetName(), JournalPrefix)
 		ji, err := NewJournalInfo(ctx, backupName, folder, "")
 		if err != nil {
 			return nil, err
 		}
-		candidates = append(candidates, journalCandidate{obj: obj, timestamp: ji.CurrentBackupEnd})
+		journals = append(journals, ji)
 	}
-	return candidates, nil
+	return journals, nil
 }
 
-func filterCandidatesOlderThen(candidates []journalCandidate, timestamp time.Time) []journalCandidate {
-	newCandidates := make([]journalCandidate, 0, len(candidates))
-	for _, c := range candidates {
-		if c.timestamp.Before(timestamp) {
-			newCandidates = append(newCandidates, c)
+func filterJournalsInfoOlderThen(journals []JournalInfo, timestamp time.Time) []JournalInfo {
+	newJournals := make([]JournalInfo, 0, len(journals))
+	for _, ji := range journals {
+		if ji.CurrentBackupEnd.Before(timestamp) {
+			newJournals = append(newJournals, ji)
 		}
 	}
-	return newCandidates
+	return newJournals
 }
 
-func filterCandidatesNewerThen(candidates []journalCandidate, timestamp time.Time) []journalCandidate {
-	newCandidates := make([]journalCandidate, 0, len(candidates))
-	for _, c := range candidates {
-		if c.timestamp.After(timestamp) {
-			newCandidates = append(newCandidates, c)
+func filterJournalsInfoNewerThen(journals []JournalInfo, timestamp time.Time) []JournalInfo {
+	newJournals := make([]JournalInfo, 0, len(journals))
+	for _, ji := range journals {
+		if ji.CurrentBackupEnd.After(timestamp) {
+			newJournals = append(newJournals, ji)
 		}
 	}
-	return newCandidates
+	return newJournals
 }
 
-func sortCandidates(candidates []journalCandidate) {
-	slices.SortFunc(candidates, func(a, b journalCandidate) int {
-		return a.timestamp.Compare(b.timestamp)
+func sortJournalsInfo(journals []JournalInfo) []JournalInfo {
+	slices.SortFunc(journals, func(a, b JournalInfo) int {
+		return a.CurrentBackupEnd.Compare(b.CurrentBackupEnd)
 	})
+	return journals
 }

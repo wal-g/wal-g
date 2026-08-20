@@ -115,9 +115,8 @@ func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup)
 	}
 
 	// The cluster-level journal is recalculated from the segment ones, so this must happen
-	// before the coordinator sums them up (see SegmentsSizeCalculator).
-	internal.DeleteJournalInfo(ctx, h.Folder, segTarget.GetBackupName(), utility.WalPath,
-		&internal.JournalFiles{}, h.args.Confirmed)
+	// before the coordinator sums them up (see UpdateClusterIntervalSize).
+	internal.DeleteJournalInfo(ctx, h.Folder, segTarget.GetBackupName(), utility.WalPath, h.args.Confirmed)
 
 	if err := cleanupAOSegments(ctx, segTarget, h.Folder, h.args.Confirmed); err != nil {
 		return err

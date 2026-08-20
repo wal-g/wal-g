@@ -133,8 +133,7 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 
 	target := deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, findFullBackup)
 
-	internal.DeleteJournalInfo(cmd.Context(), folder, target.GetBackupName(), utility.WalPath,
-		&internal.JournalFiles{}, confirmed)
+	internal.DeleteJournalInfo(cmd.Context(), folder, target.GetBackupName(), utility.WalPath, confirmed)
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {

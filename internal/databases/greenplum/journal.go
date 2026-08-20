@@ -10,45 +10,72 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-// ClusterJournalDir is empty on purpose. Unlike a single Postgres instance, a Greenplum cluster has
-// no WAL directory of its own: every segment archives into its own segments_005/seg<N>/wal_005/.
-// The cluster-wide journal is summed from the per-segment journals instead of being measured
-// against a directory, see SegmentsSizeCalculator.
+// ClusterJournalDir is empty on purpose: a Greenplum cluster has no WAL directory of its own,
+// every segment archives into its own segments_005/seg<N>/wal_005/.
 const ClusterJournalDir = ""
 
-// SegmentsSizeCalculator derives the WAL volume of a whole Greenplum backup by summing the
-// per-segment journals, each of which is maintained by the WAL-G instance running on that segment's
-// host during seg-backup-push.
-//
-// The sum spans the intervals the segments measured for themselves, which do not line up with a
-// single wall-clock window: a segment finishes its backup-push before the coordinator creates the
-// restore point, so WAL archived in between belongs to that segment's next interval. Nothing is
-// lost or double counted along the chain, but the aggregate is not the same as the volume archived
-// cluster-wide between two backup finish times.
-type SegmentsSizeCalculator struct{}
+// UpdateClusterIntervalSize stores the WAL volume the segments accumulated between the backup
+// preceding ji and ji itself as that backup's SizeToNextBackup. Cluster-wide counterpart of
+// JournalInfo.UpdateIntervalSize; rootFolder is the cluster root. See README.journal.md for why
+// the aggregate is not a wall-clock window.
+func UpdateClusterIntervalSize(ctx context.Context, rootFolder storage.Folder, ji internal.JournalInfo) error {
+	prevJi, ok, err := ji.Previous(ctx, rootFolder)
+	if err != nil || !ok {
+		return err
+	}
 
-// Calculate sums the SizeToNextBackup of the segment journals belonging to prevJi's backup.
-// The rootFolder argument is the cluster root, the same folder the cluster journal itself lives in.
-//
-// A partial sum would silently understate the real volume and be indistinguishable from a genuinely
-// small one, so a single unreadable segment journal makes the whole aggregate unavailable (ok=false)
-// rather than wrong.
-func (SegmentsSizeCalculator) Calculate(
-	ctx context.Context,
-	rootFolder storage.Folder,
-	_, prevJi internal.JournalInfo,
-) (int64, bool, error) {
 	backupName := strings.TrimPrefix(prevJi.JournalName, internal.JournalPrefix)
+	sum, ok, err := SumSegmentWalSize(ctx, rootFolder, backupName)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		// Not measured rather than zero: keep the value the backup-push wrote.
+		tracelog.WarningLogger.Printf("Can not determine the WAL volume of backup %s, "+
+			"leaving its SizeToNextBackup intact", backupName)
+		return nil
+	}
 
-	return SumSegmentWalSize(ctx, rootFolder, backupName)
+	prevJi.SizeToNextBackup = sum
+
+	return prevJi.Upload(ctx, rootFolder)
+}
+
+// DeleteClusterJournalInfo removes the cluster-wide journal of backupName and re-links its
+// neighbors. Cluster-wide counterpart of internal.DeleteJournalInfo, differing only in how the
+// merged interval is recalculated. A backup pushed without journal counting has none, which is
+// not an error.
+func DeleteClusterJournalInfo(ctx context.Context, rootFolder storage.Folder, backupName string, confirmed bool) {
+	journalInfo, err := internal.NewJournalInfo(ctx, backupName, rootFolder, ClusterJournalDir)
+	if err != nil {
+		tracelog.WarningLogger.Printf("Can't find the journal info: %s", err.Error())
+		return
+	}
+
+	if !confirmed {
+		tracelog.InfoLogger.Printf("Journal info to delete: %+v", journalInfo)
+		return
+	}
+
+	newerJi, ok, err := journalInfo.Unlink(ctx, rootFolder)
+	if err != nil {
+		tracelog.ErrorLogger.Print(err)
+		return
+	}
+
+	if ok {
+		if err := UpdateClusterIntervalSize(ctx, rootFolder, newerJi); err != nil {
+			tracelog.ErrorLogger.Print(err)
+			return
+		}
+	}
+
+	tracelog.InfoLogger.Printf("Deleted journal info: %+v", journalInfo)
 }
 
 // SumSegmentWalSize is the volume of WAL the segments archived between backupName and the backup
-// following it, taken from the journal every segment keeps for itself.
-//
-// A partial sum would silently understate the real volume and be indistinguishable from a genuinely
-// small one, so a single segment failing to report makes the whole aggregate unavailable (ok=false)
-// rather than wrong.
+// following it, taken from the journal every segment keeps for itself. ok == false when any
+// segment fails to report: a partial sum would understate the volume rather than be missing.
 func SumSegmentWalSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, bool, error) {
 	segments, ok, err := segmentsOfBackup(ctx, rootFolder, backupName)
 	if err != nil || !ok {
@@ -90,9 +117,8 @@ func SumSegmentWalSize(ctx context.Context, rootFolder storage.Folder, backupNam
 	return sum, true, nil
 }
 
-// segmentsOfBackup lists the segment backups a cluster backup is made of. It reports ok == false
-// when the backup itself is gone: a journal can outlive its backup, since delete modes other than
-// 'delete target' remove the backup without touching the journals.
+// segmentsOfBackup lists the segment backups a cluster backup is made of, ok == false when the
+// backup itself is gone: a journal can outlive its backup.
 func segmentsOfBackup(ctx context.Context, rootFolder storage.Folder, backupName string,
 ) ([]SegmentMetadata, bool, error) {
 	backup, err := NewBackup(rootFolder, backupName)

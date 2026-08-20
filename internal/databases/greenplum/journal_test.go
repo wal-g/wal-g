@@ -54,11 +54,6 @@ func putGpSentinel(t *testing.T, root storage.Folder, backupName string, segBack
 		greenplum.BackupSentinelDto{Segments: segments})
 }
 
-// prevJournal is the cluster journal the calculator is asked to fill in the size for.
-func prevJournal(backupName string) internal.JournalInfo {
-	return internal.NewEmptyJournalInfo(backupName, time.Time{}, time.Now(), greenplum.ClusterJournalDir)
-}
-
 // putClusterJournal writes the cluster-wide journal of a Greenplum backup, the one 'delete target'
 // re-links, and returns it.
 func putClusterJournal(t *testing.T, root storage.Folder, backupName string,
@@ -79,7 +74,7 @@ func readClusterJournal(t *testing.T, root storage.Folder, backupName string) in
 	return ji
 }
 
-func TestSegmentsSizeCalculator(t *testing.T) {
+func TestSumSegmentWalSize(t *testing.T) {
 	segBackups := map[int]string{
 		-1: "base_000000010000000000000001",
 		0:  "base_000000010000000000000002",
@@ -93,8 +88,7 @@ func TestSegmentsSizeCalculator(t *testing.T) {
 		putSegmentJournal(t, root, 0, segBackups[0], 200)
 		putSegmentJournal(t, root, 1, segBackups[1], 300)
 
-		size, ok, err := greenplum.SegmentsSizeCalculator{}.Calculate(
-			t.Context(), root, internal.JournalInfo{}, prevJournal(prevGpBackupName))
+		size, ok, err := greenplum.SumSegmentWalSize(t.Context(), root, prevGpBackupName)
 
 		require.NoError(t, err)
 		assert.True(t, ok)
@@ -107,8 +101,7 @@ func TestSegmentsSizeCalculator(t *testing.T) {
 		putSegmentJournal(t, root, -1, segBackups[-1], 100)
 		putSegmentJournal(t, root, 0, segBackups[0], 200)
 
-		size, ok, err := greenplum.SegmentsSizeCalculator{}.Calculate(
-			t.Context(), root, internal.JournalInfo{}, prevJournal(prevGpBackupName))
+		size, ok, err := greenplum.SumSegmentWalSize(t.Context(), root, prevGpBackupName)
 
 		require.NoError(t, err)
 		assert.False(t, ok, "a partial sum would understate the real WAL volume")
@@ -119,8 +112,7 @@ func TestSegmentsSizeCalculator(t *testing.T) {
 		root := testtools.MakeDefaultInMemoryStorageFolder()
 		putGpSentinel(t, root, prevGpBackupName, map[int]string{-1: ""})
 
-		_, ok, err := greenplum.SegmentsSizeCalculator{}.Calculate(
-			t.Context(), root, internal.JournalInfo{}, prevJournal(prevGpBackupName))
+		_, ok, err := greenplum.SumSegmentWalSize(t.Context(), root, prevGpBackupName)
 
 		require.NoError(t, err)
 		assert.False(t, ok)
@@ -129,15 +121,14 @@ func TestSegmentsSizeCalculator(t *testing.T) {
 	t.Run("reports no size when the backup sentinel is gone", func(t *testing.T) {
 		root := testtools.MakeDefaultInMemoryStorageFolder()
 
-		_, ok, err := greenplum.SegmentsSizeCalculator{}.Calculate(
-			t.Context(), root, internal.JournalInfo{}, prevJournal(prevGpBackupName))
+		_, ok, err := greenplum.SumSegmentWalSize(t.Context(), root, prevGpBackupName)
 
 		require.NoError(t, err, "a journal outliving its backup must not fail the whole backup-push")
 		assert.False(t, ok)
 	})
 }
 
-func TestUpdateIntervalSizeWithSegmentsCalculator(t *testing.T) {
+func TestUpdateClusterIntervalSize(t *testing.T) {
 	segBackups := map[int]string{-1: "base_000000010000000000000001", 0: "base_000000010000000000000002"}
 
 	newClusterJournal := func(t *testing.T, root storage.Folder, backupName string, end time.Time) internal.JournalInfo {
@@ -156,7 +147,7 @@ func TestUpdateIntervalSizeWithSegmentsCalculator(t *testing.T) {
 		prevJi := newClusterJournal(t, root, prevGpBackupName, time.Now().Add(-time.Hour))
 		curJi := newClusterJournal(t, root, gpBackupName, time.Now())
 
-		require.NoError(t, curJi.UpdateIntervalSize(t.Context(), root, greenplum.SegmentsSizeCalculator{}))
+		require.NoError(t, greenplum.UpdateClusterIntervalSize(t.Context(), root, curJi))
 
 		require.NoError(t, prevJi.Read(t.Context(), root))
 		assert.Equal(t, int64(300), prevJi.SizeToNextBackup)
@@ -175,7 +166,7 @@ func TestUpdateIntervalSizeWithSegmentsCalculator(t *testing.T) {
 
 		curJi := newClusterJournal(t, root, gpBackupName, time.Now())
 
-		require.NoError(t, curJi.UpdateIntervalSize(t.Context(), root, greenplum.SegmentsSizeCalculator{}))
+		require.NoError(t, greenplum.UpdateClusterIntervalSize(t.Context(), root, curJi))
 
 		require.NoError(t, prevJi.Read(t.Context(), root))
 		assert.Equal(t, int64(4096), prevJi.SizeToNextBackup, "must not be overwritten with a partial sum")
@@ -218,8 +209,7 @@ func TestDeleteClusterJournalRemergesFromSegments(t *testing.T) {
 	t.Run("the merged size is the sum over the segments", func(t *testing.T) {
 		root, _ := setupCluster(t)
 
-		internal.DeleteJournalInfo(t.Context(), root, secondBackup, greenplum.ClusterJournalDir,
-			greenplum.SegmentsSizeCalculator{}, true)
+		greenplum.DeleteClusterJournalInfo(t.Context(), root, secondBackup, true)
 
 		merged := readClusterJournal(t, root, firstBackup).SizeToNextBackup
 		assert.Equal(t, int64(1100+2200), merged, "must be recalculated from the re-merged segment journals")
@@ -229,8 +219,7 @@ func TestDeleteClusterJournalRemergesFromSegments(t *testing.T) {
 	t.Run("the deleted journal is gone and the newer one covers its interval", func(t *testing.T) {
 		root, end := setupCluster(t)
 
-		internal.DeleteJournalInfo(t.Context(), root, secondBackup, greenplum.ClusterJournalDir,
-			greenplum.SegmentsSizeCalculator{}, true)
+		greenplum.DeleteClusterJournalInfo(t.Context(), root, secondBackup, true)
 
 		_, err := internal.NewJournalInfo(t.Context(), secondBackup, root, greenplum.ClusterJournalDir)
 		assert.Error(t, err)
@@ -250,8 +239,7 @@ func TestDeleteClusterJournalRemergesFromSegments(t *testing.T) {
 				storage.NewLocalObject(internal.JournalPrefix+"base_000000010000000000000001", time.Time{}, 0),
 			}))
 
-		internal.DeleteJournalInfo(t.Context(), root, secondBackup, greenplum.ClusterJournalDir,
-			greenplum.SegmentsSizeCalculator{}, true)
+		greenplum.DeleteClusterJournalInfo(t.Context(), root, secondBackup, true)
 
 		assert.Equal(t, int64(firstSize), readClusterJournal(t, root, firstBackup).SizeToNextBackup,
 			"a partial sum must not overwrite the size measured at backup-push time")

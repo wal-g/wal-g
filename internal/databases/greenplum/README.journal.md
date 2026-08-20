@@ -33,18 +33,12 @@ A partial sum would silently understate the real volume and be indistinguishable
 
 ## Fields
 
-| Field | Meaning |
-| --- | --- |
-| ``PriorBackupEnd`` | Completion time of the backup preceding this one. Points at the previous backup, and is re-linked when a backup in the middle is deleted, so that the deleted interval is merged into the previous one. |
-| ``CurrentBackupEnd`` | Completion time of this backup. Orders the ``journal_<backup>`` objects chronologically — the names alone do not — which is how the previous and the next journal are located. |
-| ``SizeToNextBackup`` | Bytes of WAL archived between this backup and the next one. Belongs to the interval *after* the backup, so it is zero for the newest one and is filled in when the following backup is created. |
+* ``PriorBackupEnd`` — completion time of the preceding backup. Re-linked when a backup in the middle is deleted, merging its interval into the previous one.
+* ``CurrentBackupEnd`` — completion time of this backup. Orders the ``journal_<backup>`` objects chronologically, which their names alone do not.
+* ``SizeToNextBackup`` — bytes of WAL archived between this backup and the **next** one: zero for the newest backup, filled in when the following one is created. Deliberately *not* the volume of this object's own ``(PriorBackupEnd; CurrentBackupEnd]`` — those timestamps describe the interval *before* the backup and only serve to navigate the chain. The two are one step apart, so a recalculation writes its result into the **previous** backup's journal, never into its own.
 
-``SizeToNextBackup`` is **not** the volume of the ``(PriorBackupEnd; CurrentBackupEnd]`` interval of the same object. Those two timestamps describe the interval *before* the backup and exist to navigate the chain of journals — to find the previous backup and to re-link the chain around a deleted one. ``SizeToNextBackup`` covers the interval *after* the backup instead, the one that ends at the next backup.
+The volume is measured differently at the two levels. A **segment** sums the storage sizes of the WAL files in its own ``wal_005/`` falling into ``(PriorBackupEnd; CurrentBackupEnd]`` (``JournalFiles``); the **coordinator** ignores both timestamps and adds up what the segments already measured (``UpdateClusterIntervalSize``).
 
-The two are one step apart: when a journal is recalculated, the result is written into the **previous** backup's ``SizeToNextBackup``, never into its own.
-
-How the volume is obtained differs by level. A segment sums the storage sizes of the WAL files in its own ``wal_005/`` whose timestamps fall into ``(PriorBackupEnd; CurrentBackupEnd]``, which is what ``JournalFiles`` does. The coordinator ignores both timestamps and simply adds up what the segments have already measured for themselves, which is what ``SegmentsSizeCalculator`` does.
-
-That aggregate is deliberately not a wall-clock window. A segment finishes its ``backup-push`` before the coordinator creates the restore point, so WAL archived in between belongs to that segment's *next* interval. Nothing is lost or double counted along the chain, but the cluster figure is not the volume archived cluster-wide between two backup finish times.
+The cluster figure is therefore not a wall-clock window: a segment finishes its ``backup-push`` before the coordinator creates the restore point, so WAL archived in between lands in that segment's *next* interval. Nothing is lost or double counted along the chain, but the total is not the volume archived cluster-wide between two backup finish times.
 
 Sizes come from the storage object sizes, so they reflect compression and encryption — unlike an estimate derived from the LSN difference.
