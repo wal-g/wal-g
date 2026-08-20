@@ -15,4 +15,7 @@ type ArchiveStatusManager interface {
 	MarkWalUploaded(string) error
 	UnmarkWalFile(string) error
 	RenameReady(string) error
+	// ListUploaded returns the names of WAL files marked as uploaded,
+	// up to limit entries. A limit <= 0 means no limit.
+	ListUploaded(limit int) ([]string, error)
 }

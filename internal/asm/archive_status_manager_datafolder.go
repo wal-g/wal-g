@@ -30,3 +30,7 @@ func (asm DataFolderASM) UnmarkWalFile(walFilePath string) error {
 func (asm DataFolderASM) RenameReady(walFileName string) error {
 	return asm.folder.RenameFile(walFileName+".ready", walFileName+".done")
 }
+
+func (asm DataFolderASM) ListUploaded(limit int) ([]string, error) {
+	return asm.folder.ListFiles(limit)
+}
