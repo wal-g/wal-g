@@ -10,7 +10,7 @@ import (
 )
 
 type DirectoryDownloader interface {
-	DownloadDirectory(ctx context.Context, pathToRestore string) error
+	DownloadDirectory(ctx context.Context, pathToRestore string, skipClean bool) error
 }
 
 type DirectoryIsNotEmptyError struct {
@@ -30,19 +30,21 @@ func NewDirectoryIsNotEmptyError(path string) DirectoryIsNotEmptyError {
 	return DirectoryIsNotEmptyError{errors.Errorf("Directory %v must have no files", path)}
 }
 
-func (downloader *CommonDirectoryDownloader) DownloadDirectory(ctx context.Context, pathToRestore string) error {
+func (downloader *CommonDirectoryDownloader) DownloadDirectory(ctx context.Context, pathToRestore string, skipClean bool) error {
 	tarsToExtract, err := downloader.getTarsToExtract(ctx)
 	if err != nil {
 		return err
 	}
 
-	isEmpty, err := utility.IsDirectoryEmpty(pathToRestore, nil)
-	if err != nil {
-		return err
-	}
+	if !skipClean {
+		isEmpty, err := utility.IsDirectoryEmpty(pathToRestore, nil)
+		if err != nil {
+			return err
+		}
 
-	if !isEmpty {
-		return NewDirectoryIsNotEmptyError(pathToRestore)
+		if !isEmpty {
+			return NewDirectoryIsNotEmptyError(pathToRestore)
+		}
 	}
 
 	return ExtractAll(ctx, NewFileTarInterpreter(pathToRestore), tarsToExtract)

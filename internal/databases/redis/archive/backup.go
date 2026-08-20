@@ -17,7 +17,22 @@ import (
 const (
 	RDBBackupType = "rdb"
 	AOFBackupType = "aof"
+	TSBackupType  = "ts"
 )
+
+const tsDataDirectory = "ts_data"
+
+func AttachedTSDataPrefix(backupName string) string {
+	return backupName + "/" + tsDataDirectory
+}
+
+func AttachedTSSentinelName(backupName string) string {
+	return backupName + "/" + tsDataDirectory + "_backup_stop_sentinel.json"
+}
+
+func GenerateNewTSBackupName() string {
+	return "ts_" + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+}
 
 // Backup represents backup sentinel data
 type Backup struct {
@@ -33,33 +48,40 @@ type Backup struct {
 	UsedMemory      int64       `json:"UsedMemory,omitempty"`
 	UsedMemoryRss   int64       `json:"UsedMemoryRss,omitempty"`
 	MaxDBNumber     int64       `json:"MaxDBNumber"`
+	HasTS           bool        `json:"HasTS,omitempty"`
+	TSBackupID      string      `json:"TSBackupID,omitempty"`
+	TSBackupPath    string      `json:"TSBackupPath,omitempty"`
+	TSDataSize      int64       `json:"TSDataSize,omitempty"`
+	TSFileCount     int64       `json:"TSFileCount,omitempty"`
+	TSStartTime     time.Time   `json:"TSStartTime,omitempty"`
+	TSFinishTime    time.Time   `json:"TSFinishTime,omitempty"`
 }
 
-func (b Backup) Name() string {
+func (b *Backup) Name() string {
 	return b.BackupName
 }
 
-func (b Backup) StartTime() time.Time {
+func (b *Backup) StartTime() time.Time {
 	return b.StartLocalTime
 }
 
-func (b Backup) IsPermanent() bool {
+func (b *Backup) IsPermanent() bool {
 	return b.Permanent
 }
 
-func (b Backup) IsAOF() bool {
+func (b *Backup) IsAOF() bool {
 	return b.BackupType == AOFBackupType
 }
 
-func (b Backup) IsRDB() bool {
+func (b *Backup) IsRDB() bool {
 	return b.BackupType == RDBBackupType
 }
 
-func (b Backup) VersionStr() string {
+func (b *Backup) VersionStr() string {
 	return b.Version
 }
 
-func (b Backup) PrintableFields() []printlist.TableField {
+func (b *Backup) PrintableFields() []printlist.TableField {
 	prettyStartTime := internal.PrettyFormatTime(b.StartLocalTime)
 	prettyFinishTime := internal.PrettyFormatTime(b.FinishLocalTime)
 	return []printlist.TableField{
@@ -120,10 +142,35 @@ func (b Backup) PrintableFields() []printlist.TableField {
 			PrettyName: "Used memory (as seen by OS))",
 			Value:      strconv.FormatInt(b.UsedMemoryRss, 10),
 		},
+		{
+			Name:       "has_ts",
+			PrettyName: "Has TS",
+			Value:      fmt.Sprintf("%v", b.HasTS),
+		},
+		{
+			Name:       "ts_backup_id",
+			PrettyName: "TS backup ID",
+			Value:      b.TSBackupID,
+		},
+		{
+			Name:       "ts_backup_path",
+			PrettyName: "TS backup path",
+			Value:      b.TSBackupPath,
+		},
+		{
+			Name:       "ts_data_size",
+			PrettyName: "TS data size",
+			Value:      strconv.FormatInt(b.TSDataSize, 10),
+		},
+		{
+			Name:       "ts_file_count",
+			PrettyName: "TS file count",
+			Value:      strconv.FormatInt(b.TSFileCount, 10),
+		},
 	}
 }
 
-func (b Backup) ToInternal(folder storage.Folder) internal.Backup {
+func (b *Backup) ToInternal(folder storage.Folder) internal.Backup {
 	return internal.Backup{
 		Folder: folder.GetSubFolder(utility.BaseBackupPath),
 		Name:   b.BackupName,
@@ -158,7 +205,7 @@ func RedisModelToTimedBackup(backups []Backup) []internal.TimedBackup {
 	}
 	result := make([]internal.TimedBackup, len(backups))
 	for i := range backups {
-		result[i] = backups[i]
+		result[i] = &backups[i]
 	}
 	return result
 }

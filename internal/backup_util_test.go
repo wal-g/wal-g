@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -213,4 +214,20 @@ func TestDeleteGarbage_recursive(t *testing.T) {
 	assert.Equal(t, objects[0].GetName(), "meta_b2.json")
 	assert.Equal(t, folders[0].GetPath(), "in_memory/backup2/folder1/")
 
+}
+
+func TestDeleteBackupsRemovesAttachedTS(t *testing.T) {
+	folder := testtools.MakeDefaultInMemoryStorageFolder()
+	backupName := "stream_20260721T120000Z"
+	_ = folder.PutObject(t.Context(), backupName+utility.SentinelSuffix, &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), backupName+"/stream.lz4", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), backupName+"/ts_data/part_001.tar.lz4", &bytes.Buffer{})
+	_ = folder.PutObject(t.Context(), backupName+"/ts_data_backup_stop_sentinel.json", &bytes.Buffer{})
+
+	require.NoError(t, internal.DeleteBackups(t.Context(), folder, []string{backupName}))
+
+	objects, folders, err := folder.ListFolder(t.Context())
+	require.NoError(t, err)
+	assert.Empty(t, objects)
+	assert.Empty(t, folders)
 }

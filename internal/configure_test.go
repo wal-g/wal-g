@@ -7,11 +7,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/klauspost/compress/zstd"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression/lz4"
 	"github.com/wal-g/wal-g/internal/compression/lzma"
+	walgzstd "github.com/wal-g/wal-g/internal/compression/zstd"
 	"github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/testtools"
@@ -176,6 +179,30 @@ func TestConfigureCompressor_ErrorWhenViperClear(t *testing.T) {
 
 func TestConfigureCompressor_FailsOnInvalidCompressorString(t *testing.T) {
 	viper.Set(config.CompressionMethodSetting, "kek123kek")
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
+	resetToDefaults()
+}
+func TestConfigureCompressor_ZstdMethodWithLevel(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "zstd")
+	viper.Set(config.ZstdLevelSetting, "best")
+	compressor, err := internal.ConfigureCompressor()
+	assert.NoError(t, err)
+	assert.Equal(t, compressor, walgzstd.Compressor{Level: zstd.SpeedBestCompression})
+	resetToDefaults()
+}
+func TestConfigureCompressor_FailsOnInvalidZstdLevel(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "zstd")
+	viper.Set(config.ZstdLevelSetting, "kek123kek")
+	compressor, err := internal.ConfigureCompressor()
+	assert.Error(t, err)
+	assert.Equal(t, compressor, nil)
+	resetToDefaults()
+}
+func TestConfigureCompressor_FailsOnZstdLevelWithoutZstdMethod(t *testing.T) {
+	viper.Set(config.CompressionMethodSetting, "lz4")
+	viper.Set(config.ZstdLevelSetting, "fastest")
 	compressor, err := internal.ConfigureCompressor()
 	assert.Error(t, err)
 	assert.Equal(t, compressor, nil)
@@ -389,4 +416,29 @@ func TestConfigureStorage_WithNetworkLimiter(t *testing.T) {
 	assert.NotNil(t, st)
 	_, isLimited := st.RootFolder().(*internal.LimitedFolder)
 	assert.True(t, isLimited, "expected root folder to be wrapped in LimitedFolder")
+}
+
+// AddConfigFlags binds a flag to WALG_FAILOVER_STORAGES, which since viper 1.20 shadows its nested keys
+func TestConfigureFailoverStorages_FromConfigFile(t *testing.T) {
+	resetToDefaults()
+	defer resetToDefaults()
+
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "walg.json")
+	cfgJSON := fmt.Sprintf(`{"WALG_FAILOVER_STORAGES":{"failover":{"WALG_FILE_PREFIX":%q}}}`, dir)
+	assert.NoError(t, os.WriteFile(cfgFile, []byte(cfgJSON), 0644))
+
+	flags := &pflag.FlagSet{}
+	flagName := config.ToFlagName(config.FailoverStorages)
+	flags.String(flagName, "", "")
+	assert.NoError(t, viper.BindPFlag(config.FailoverStorages, flags.Lookup(flagName)))
+	config.ReadConfigFromFile(viper.GetViper(), cfgFile)
+
+	failovers, err := internal.ConfigureFailoverStorages(t.Context())
+	assert.NoError(t, err)
+	assert.Len(t, failovers, 1)
+	assert.NotNil(t, failovers["failover"])
+	for _, st := range failovers {
+		assert.NoError(t, st.Close())
+	}
 }

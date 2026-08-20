@@ -12,6 +12,17 @@ Prints listing of the objects in the provided storage folder.
 
 ``wal-g st ls --all-versions`` show all object versions including deleted objects (S3 with versioning enabled). Delete markers are labeled with `DELETE` in the output. This is useful for debugging or inspecting the full version history of objects.
 
+### ``stat``
+Prints metadata (type, size, last modification time, name) of a single storage object in the same format as ``ls``.
+
+Unlike ``ls``, it doesn't list the folder: the metadata is fetched with a single cheap request (`HEAD`/`stat`) to the storage. This makes it much faster than listing a folder that contains a lot of objects.
+
+The command fails if the object doesn't exist. The ``--glob`` flag isn't supported here, because expanding a pattern would require listing.
+
+Example:
+
+``wal-g st stat path/to/remote_file`` print metadata of the single file.
+
 ### ``get``
 Download the specified storage object. By default, the command will try to apply the decompression and decryption (if configured).
 

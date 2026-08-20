@@ -40,6 +40,18 @@ func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bo
 	return true, nil
 }
 
+func (folder *Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	path := storage.JoinPath(folder.path, objectRelativePath)
+	obj, _, err := folder.connection.Object(ctx, folder.container.Name, path)
+	if err == swift.ObjectNotFound {
+		return nil, storage.NewObjectNotFoundError(path)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get Swift object stats %q: %w", path, err)
+	}
+	return storage.NewLocalObject(objectRelativePath, obj.LastModified, obj.Bytes), nil
+}
+
 func (folder *Folder) ListFolder(ctx context.Context) (objects []storage.Object, subFolders []storage.Folder, err error) {
 	//Iterate
 	err = folder.connection.ObjectsWalk(

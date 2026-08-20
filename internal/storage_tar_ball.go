@@ -66,11 +66,12 @@ func (tarBall *StorageTarBall) CloseTar() error {
 	return nil
 }
 
-func (tarBall *StorageTarBall) AwaitUploads() {
+func (tarBall *StorageTarBall) AwaitUploads() error {
 	tarBall.uploader.Finish()
 	if tarBall.uploader.Failed() {
-		tracelog.ErrorLogger.Fatal("Unable to complete uploads")
+		return errors.New("unable to complete uploads")
 	}
+	return nil
 }
 
 func GetBackupTarPath(backupName, fileName string) string {
@@ -96,11 +97,11 @@ func (tarBall *StorageTarBall) startUpload(ctx context.Context, name string, cry
 		if err != nil {
 			tracelog.ErrorLogger.Printf("upload: could not upload '%s'\n", path)
 			tracelog.ErrorLogger.Printf("%v\n", err)
-			err = pipeReader.Close()
-			tracelog.ErrorLogger.FatalfOnError("Failed to close pipe: %v", err)
-			tracelog.ErrorLogger.Fatalf(
-				"Unable to continue the backup process because of the loss of a part %d.\n",
-				tarBall.partNumber)
+			// Close the read side with the error so that the writer side (tar packing)
+			// unblocks with the same error and the failure propagates up the call stack
+			// instead of terminating the process. This lets deferred cleanup run
+			// (e.g. closing the MongoDB $backupCursor).
+			_ = pipeReader.CloseWithError(err)
 		}
 	}()
 

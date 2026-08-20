@@ -173,6 +173,32 @@ func (_m *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io
 	return r0, r1
 }
 
+// StatObject provides a mock function with given fields: ctx, objectRelativePath
+func (_m *Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	ret := _m.Called(ctx, objectRelativePath)
+
+	var r0 storage.Object
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (storage.Object, error)); ok {
+		return rf(ctx, objectRelativePath)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) storage.Object); ok {
+		r0 = rf(ctx, objectRelativePath)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(storage.Object)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, objectRelativePath)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // NewFolder creates a new instance of Folder. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewFolder(t interface {

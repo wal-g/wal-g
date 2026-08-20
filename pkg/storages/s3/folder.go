@@ -59,29 +59,65 @@ func GetSSECustomerKeyMD5(sseCustomerKey string) string {
 	return base64.StdEncoding.EncodeToString(hash[:])
 }
 
-func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
+// headObject performs a HEAD request for a single object. Returns a nil output if the object doesn't exist.
+func (folder *Folder) headObject(ctx context.Context, objectRelativePath string) (*s3.HeadObjectOutput, error) {
 	objectPath := folder.path + objectRelativePath
-	stopSentinelObjectInput := &s3.HeadObjectInput{
+	input := &s3.HeadObjectInput{
 		Bucket: folder.bucket,
 		Key:    aws.String(objectPath),
 	}
 
 	if folder.uploader.serverSideEncryption != "" && folder.uploader.SSECustomerKey != "" {
-		stopSentinelObjectInput.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
-		stopSentinelObjectInput.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
+		input.SSECustomerAlgorithm = aws.String(folder.uploader.serverSideEncryption)
+		input.SSECustomerKey = aws.String(folder.uploader.SSECustomerKey)
 
 		customerKeyMD5 := GetSSECustomerKeyMD5(folder.uploader.SSECustomerKey)
-		stopSentinelObjectInput.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
+		input.SSECustomerKeyMD5 = aws.String(customerKeyMD5)
 	}
 
-	_, err := folder.s3API.HeadObjectWithContext(ctx, stopSentinelObjectInput)
+	output, err := folder.s3API.HeadObjectWithContext(ctx, input)
 	if err != nil {
 		if isAwsNotExist(err) {
-			return false, nil
+			return nil, nil
 		}
-		return false, errors.Wrapf(err, "failed to check s3 object '%s' existence", objectPath)
+		return nil, errors.Wrapf(err, "failed to head s3 object '%s'", objectPath)
 	}
-	return true, nil
+	return output, nil
+}
+
+func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bool, error) {
+	output, err := folder.headObject(ctx, objectRelativePath)
+	if err != nil {
+		return false, err
+	}
+	return output != nil, nil
+}
+
+func (folder *Folder) StatObject(ctx context.Context, objectRelativePath string) (storage.Object, error) {
+	output, err := folder.headObject(ctx, objectRelativePath)
+	if err != nil {
+		return nil, err
+	}
+	if output == nil {
+		return nil, storage.NewObjectNotFoundError(folder.path + objectRelativePath)
+	}
+
+	var size int64
+	if output.ContentLength != nil {
+		size = *output.ContentLength
+	}
+	var lastModified time.Time
+	if output.LastModified != nil {
+		lastModified = *output.LastModified
+	}
+
+	return storage.NewLocalObjectWithVersion(
+		objectRelativePath,
+		lastModified,
+		size,
+		aws.StringValue(output.VersionId),
+		"",
+	), nil
 }
 
 func (folder *Folder) PutObject(ctx context.Context, name string, content io.Reader) error {

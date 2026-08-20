@@ -274,7 +274,6 @@ func xtrabackupFetchInhouse(ctx context.Context, backup internal.Backup, prepare
 
 	if inplace && sentinel.IsIncremental {
 		// apply diff-files to dataDir inplace (and leave required leftovers incrementalDir)
-		//nolint:staticcheck
 		go xbstream.AsyncDiffBackupSink(&wg, streamReader, dataDir, tempDeltaDir)
 	} else {
 		destinationDir := tempDeltaDir

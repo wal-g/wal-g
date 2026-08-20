@@ -141,11 +141,13 @@ type BufferReaderMaker struct {
 	Key string
 }
 
-func (b *BufferReaderMaker) Reader(context.Context) (io.ReadCloser, error) { return io.NopCloser(b.Buf), nil }
-func (b *BufferReaderMaker) StoragePath() string            { return b.Key }
-func (b *BufferReaderMaker) LocalPath() string              { return b.Key }
-func (b *BufferReaderMaker) FileType() internal.FileType    { return internal.TarFileType }
-func (b *BufferReaderMaker) Mode() int64                    { return 0 }
+func (b *BufferReaderMaker) Reader(context.Context) (io.ReadCloser, error) {
+	return io.NopCloser(b.Buf), nil
+}
+func (b *BufferReaderMaker) StoragePath() string         { return b.Key }
+func (b *BufferReaderMaker) LocalPath() string           { return b.Key }
+func (b *BufferReaderMaker) FileType() internal.FileType { return internal.TarFileType }
+func (b *BufferReaderMaker) Mode() int64                 { return 0 }
 
 func init() {
 	internal.ConfigureSettings("")

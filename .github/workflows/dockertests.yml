@@ -18,7 +18,6 @@ env:
   IMAGE_PG18_TESTS: wal-g/pg18_tests
   IMAGE_GOLANG: wal-g/golang
   IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
-  GO_VERSION: "1.25"
 
 jobs:
   buildimages:
@@ -60,9 +59,9 @@ jobs:
 
       - name: Set up Go 1.x
         if: steps.cache-images.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: 'go.mod'
         id: go
 
       - name: Set up Docker Buildx
@@ -101,9 +100,9 @@ jobs:
           submodules: true
 
       - name: Set up Go 1.x
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: 'go.mod'
         id: go
 
       # load docker images

@@ -21,7 +21,7 @@ MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
 MONGO_TEST_TYPE ?= "all"
-GOLANGCI_LINT_VERSION ?= "v2.0"
+GOLANGCI_LINT_VERSION ?= "v2.4.0"
 REDIS_VERSION ?= "6.2.4"
 MOCKS_DESTINATION := ./testtools/mocks
 FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
@@ -48,6 +48,13 @@ ifdef ENABLE_DEBUG
 	BUILD_GCFLAGS:=$(BUILD_GCFLAGS) all=-N -l
 endif
 
+STRIP_BINARIES ?= 1
+BUILD_LDFLAGS :=
+
+ifeq ($(STRIP_BINARIES),1)
+	BUILD_LDFLAGS += -s -w
+endif
+
 .PHONY: unittest fmt lint clean
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
@@ -55,7 +62,7 @@ test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudb
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_PG_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
 
 install_and_build_pg: deps pg_build
 
@@ -155,10 +162,10 @@ mysql_base: deps mysql_build unlink_brotli
 mysql_test: deps mysql_build unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
 
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
 load_docker_common:
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
@@ -194,7 +201,7 @@ mariadb_integration_test: unlink_brotli load_docker_common
 	docker compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MONGO_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
 
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
@@ -221,7 +228,7 @@ clean_mongo_features:
 	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_FDB_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w")
+	(cd $(MAIN_FDB_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS)")
 
 fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
@@ -231,10 +238,15 @@ fdb_integration_test: load_docker_common
 	docker compose build fdb_tests
 	docker compose up --force-recreate --renew-anon-volumes --exit-code-from fdb_tests fdb_tests
 
-redis_test: deps redis_build unlink_brotli redis_integration_test
+# Redis integration tests build a Brotli-enabled test image. Keep the Brotli
+# sources and static libraries linked until that image build finishes.
+redis_test:
+	@set -e; \
+	$(MAKE) USE_BROTLI=1 deps redis_build redis_integration_test; \
+	$(MAKE) USE_BROTLI=1 unlink_brotli
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
 
 redis_integration_test: load_docker_common
 	docker compose build redis && docker compose build redis_tests
@@ -250,16 +262,16 @@ redis_install: redis_build
 redis_features:
 	set -e
 	make go_deps
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
+	cd tests_func/ && FEATURE=$(FEATURE) REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1 -timeout 20m  --tf.test=true --tf.debug=false --tf.clean=false --tf.stop=false --tf.database=redis
 
 clean_redis_features:
 	set -e
-	cd tests_func/ && REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
+	cd tests_func/ && FEATURE=$(FEATURE) REDIS_VERSION=$(REDIS_VERSION) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=redis
 
 etcd_test: deps etcd_build unlink_brotli etcd_integration_test
 
 etcd_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_ETCD_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_ETCD_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=$(WALG_VERSION)")
 
 etcd_install: etcd_build
 	mv $(MAIN_ETCD_PATH)/wal-g $(GOBIN)/wal-g
@@ -270,12 +282,11 @@ etcd_clean:
 
 # refactor
 etcd_integration_test: load_docker_common
-	docker compose build etcd
 	docker compose build etcd_tests
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_GP_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_GP_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
 
 gp_clean:
 	(cd $(MAIN_GP_PATH) && go clean)
@@ -331,13 +342,13 @@ docker_lint:
 	docker build -t wal-g/lint --build-arg TAG=$(GOLANGCI_LINT_VERSION) - < docker/lint/Dockerfile
 	docker run --rm -v `pwd`:/app \
 		-v wal-g_lint_cache:/cache -e GOLANGCI_LINT_CACHE=/cache/lint \
-		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod \
+		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod -e GOEXPERIMENT="$(GOEXPERIMENT)" \
 		wal-g/lint golangci-lint run -v
 
 deps: go_deps link_external_deps
 
 go_deps:
-	git submodule update --init
+	if [ ! -f submodules/brotli/CMakeLists.txt ]; then git submodule update --init; fi
 	cp CMakeLists-brotli.txt submodules/brotli/CMakeLists.txt
 	go mod vendor
 ifdef USE_LZO

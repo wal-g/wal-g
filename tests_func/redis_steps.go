@@ -27,6 +27,7 @@ func SetupRedisSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^([^\s]*) has heavy write$`, tctx.hasHeavyWrite)
 	ctx.Step(`^we stop heavy write on ([^\s]*)$`, tctx.weStopHeavyWriteOn)
 	ctx.Step(`^we restore #(\d+) aof ([^\s]*) version backup to ([^\s]*)$`, tctx.weRestoreAofBackupToRedis)
+	setupRedisTSSteps(ctx, tctx)
 }
 
 func (tctx *TestContext) weRestoreAofBackupToRedis(backupNum int, matchVersion string, container string) error {
@@ -288,7 +289,7 @@ func (tctx *TestContext) testEqualRedisDataAtHosts(host1, host2 string) error {
 		return fmt.Errorf("keys from redis1/redis2 aren't equal")
 	}
 	values1 := rc1.MGet(tctx.Context, keys1.Val()...)
-	values2 := rc1.MGet(tctx.Context, keys2.Val()...)
+	values2 := rc2.MGet(tctx.Context, keys2.Val()...)
 	vals1 := make([]string, len(values1.Val()))
 	vals2 := make([]string, len(values1.Val()))
 

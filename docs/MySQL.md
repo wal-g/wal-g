@@ -98,6 +98,18 @@ Creates new backup and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to 
 wal-g backup-push
 ```
 
+#### Journal (binlog) size accounting
+
+Run ``backup-push`` with the ``--count-journals`` flag to maintain a ``journal_<backup>`` object per backup in storage, tracking the volume of binlog accumulated between that backup and the next one. The size is computed from the actual storage object sizes of the archived binlog segments, so it correctly reflects compression.
+
+```bash
+wal-g backup-push --count-journals
+```
+
+Journal accounting is skipped for permanent backups (marked with ``--permanent``), since they are not expected to be removed and don't take part in WAL retention planning.
+
+Currently, only ``delete target`` cleans up and re-merges the corresponding journal entry when a backup is removed this way.
+
 ### ``xtrabackup-push``
 
 Creates new backup with `xtrabackup` tool and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
@@ -134,6 +146,16 @@ WAL-G can also fetch the latest backup using:
 ```bash
 wal-g backup-fetch  LATEST
 ```
+
+### ``copy``
+
+Copies one backup, its incremental ancestors, or all backups between storage configurations without transforming payload objects:
+
+```bash
+wal-g copy --from=config_from.json --to=config_to.json --backup-name=LATEST
+```
+
+Add `--with-history` to synchronize binlogs from the selected backup recovery point through the latest continuous archived binlog. Repeating the command later copies only missing immutable objects and refreshes the binlog sentinel when one is present. The older `backup-copy` command remains available as a compatibility alias, including `--add-prefix`.
 
 ### ``get-stream``
 Download the specified backup as single stream (when backup is stream-based backup). This command will:

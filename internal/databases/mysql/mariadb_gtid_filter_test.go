@@ -17,32 +17,32 @@ func TestMariaDBGTIDFilter_IsValid(t *testing.T) {
 		{
 			name: "Valid MariaDB filter",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        mysql.MariaDBFlavor,
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        mysql.MariaDBFlavor,
 			},
 			want: true,
 		},
 		{
 			name: "Invalid - MySQL flavor should not be valid for MariaDB filter",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        mysql.MySQLFlavor,
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        mysql.MySQLFlavor,
 			},
 			want: false,
 		},
 		{
 			name: "Invalid - empty flavor",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        "",
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        "",
 			},
 			want: false,
 		},
 		{
 			name: "Invalid - unknown flavor",
 			filter: mariadbGtidFilter{
-				BinlogsFolder: "/var/lib/mysql",
-				Flavor:        "PostgreSQL",
+				binlogsFolder: "/var/lib/mysql",
+				flavor:        "PostgreSQL",
 			},
 			want: false,
 		},
@@ -247,60 +247,54 @@ func TestMariaDBGTIDAdd(t *testing.T) {
 	}
 }
 
-// TestMariaDBGTIDMinus tests the Minus() operation for calculating GTID differences
-func TestMariaDBGTIDMinus(t *testing.T) {
+// TestMariaDBGTIDContainAfterUpdate tests that Contain works correctly after Update operations,
+// which is the actual pattern used in the production GTID filter.
+func TestMariaDBGTIDContainAfterUpdate(t *testing.T) {
 	tests := []struct {
-		name     string
-		minuend  string // The set to subtract from
-		subtrahend string // The set to subtract
-		wantEmpty bool   // Should result be empty?
+		name         string
+		initial      string
+		update       string
+		checkContain string
+		wantContain  bool
 	}{
 		{
-			name:       "Subtract smaller sequence - should have difference",
-			minuend:    "0-1-100",
-			subtrahend: "0-1-50",
-			wantEmpty:  false,
+			name:         "After update with higher seq, contains lower",
+			initial:      "0-1-50",
+			update:       "0-1-100",
+			checkContain: "0-1-75",
+			wantContain:  true,
 		},
 		{
-			name:       "Subtract equal sets - should be empty",
-			minuend:    "0-1-100",
-			subtrahend: "0-1-100",
-			wantEmpty:  true,
+			name:         "After update, does not contain higher than updated",
+			initial:      "0-1-50",
+			update:       "0-1-100",
+			checkContain: "0-1-150",
+			wantContain:  false,
 		},
 		{
-			name:       "Subtract empty set - should remain unchanged",
-			minuend:    "0-1-100",
-			subtrahend: "",
-			wantEmpty:  false,
+			name:         "Equal sets are contained",
+			initial:      "0-1-100",
+			update:       "0-1-100",
+			checkContain: "0-1-100",
+			wantContain:  true,
 		},
 	}
 
-		for _, tt := range tests {
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			minuend, err := mysql.ParseMariadbGTIDSet(tt.minuend)
+			base, err := mysql.ParseMariadbGTIDSet(tt.initial)
 			assert.NoError(t, err)
-			minuendMariaDB := minuend.(*mysql.MariadbGTIDSet)
+			baseMariaDB := base.(*mysql.MariadbGTIDSet)
 
-			var subtrahend *mysql.MariadbGTIDSet
-			if tt.subtrahend == "" {
-				empty, _ := mysql.ParseMariadbGTIDSet("")
-				subtrahend = empty.(*mysql.MariadbGTIDSet)
-			} else {
-				parsed, err := mysql.ParseMariadbGTIDSet(tt.subtrahend)
-				assert.NoError(t, err)
-				subtrahend = parsed.(*mysql.MariadbGTIDSet)
-			}
+			err = baseMariaDB.Update(tt.update)
+			assert.NoError(t, err)
 
-			// Use our helper function instead of a method
-			result := subtractMariadbGTIDSets(minuendMariaDB, subtrahend)
-			assert.NotNil(t, result, "Result should not be nil")
+			check, err := mysql.ParseMariadbGTIDSet(tt.checkContain)
+			assert.NoError(t, err)
 
-			resultStr := result.String()
-			if tt.wantEmpty {
-				assert.Empty(t, resultStr, "Expected empty result")
-			} else {
-				assert.NotEmpty(t, resultStr, "Expected non-empty result")
-			}
+			result := baseMariaDB.Contain(check)
+			assert.Equal(t, tt.wantContain, result,
+				"Contain(%s) after Update(%s) on %s", tt.checkContain, tt.update, tt.initial)
 		})
 	}
 }
@@ -308,14 +302,12 @@ func TestMariaDBGTIDMinus(t *testing.T) {
 // TestMariaDBGTIDFilter_ShouldUpload_FirstRun tests the first binlog upload scenario
 func TestMariaDBGTIDFilter_ShouldUpload_FirstRun(t *testing.T) {
 	filter := mariadbGtidFilter{
-		BinlogsFolder: "/var/lib/mysql",
-		Flavor:        mysql.MariaDBFlavor,
+		binlogsFolder: "/var/lib/mysql",
+		flavor:        mysql.MariaDBFlavor,
 		gtidArchived:  nil, // First run - no archived GTIDs
-		lastGtidSeen:  nil,
 	}
 
 	// On first run with no next binlog, should return false
 	result := filter.shouldUpload("mysql-bin.000001", "")
 	assert.False(t, result, "Should return false when there's no next binlog")
 }
-

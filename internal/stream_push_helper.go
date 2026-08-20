@@ -23,7 +23,11 @@ const (
 // TODO : unit tests
 // PushStream compresses a stream and push it
 func (uploader *RegularUploader) PushStream(ctx context.Context, stream io.Reader) (string, error) {
-	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+	return uploader.PushStreamWithName(ctx, stream, StreamPrefix+utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat))
+}
+
+// PushStreamWithName compresses a stream and uploads it under the supplied backup name.
+func (uploader *RegularUploader) PushStreamWithName(ctx context.Context, stream io.Reader, backupName string) (string, error) {
 	dstPath := GetStreamName(backupName, uploader.Compressor.FileExtension())
 	err := uploader.PushStreamToDestination(ctx, stream, dstPath)
 
@@ -34,8 +38,11 @@ func (uploader *RegularUploader) PushStream(ctx context.Context, stream io.Reade
 // returns backup_prefix
 // (Note: individual parition names are built by adding '_0000.br' or '_0000_0000.br' suffix)
 func (uploader *SplitStreamUploader) PushStream(ctx context.Context, stream io.Reader) (string, error) {
-	backupName := StreamPrefix + utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat)
+	return uploader.PushStreamWithName(ctx, stream, StreamPrefix+utility.TimeNowCrossPlatformUTC().Format(utility.BackupTimeFormat))
+}
 
+// PushStreamWithName splits, compresses, and uploads a stream under the supplied backup name.
+func (uploader *SplitStreamUploader) PushStreamWithName(ctx context.Context, stream io.Reader, backupName string) (string, error) {
 	// Upload Stream:
 	errGroup, egCtx := errgroup.WithContext(ctx)
 	var readers = splitmerge.SplitReader(egCtx, stream, uploader.partitions, uploader.blockSize)

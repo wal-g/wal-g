@@ -8,8 +8,8 @@ import (
 	reflect "reflect"
 	time "time"
 
-	gomock "go.uber.org/mock/gomock"
 	storage "github.com/wal-g/wal-g/pkg/storages/storage"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockLogFetchSettings is a mock of LogFetchSettings interface

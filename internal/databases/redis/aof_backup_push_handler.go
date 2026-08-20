@@ -12,14 +12,19 @@ import (
 )
 
 type AOFBackupPushArgs struct {
+	BackupName      string
 	Sharded         bool
 	Uploader        internal.Uploader
 	MetaConstructor internal.MetaConstructor
+	DeferSentinel   bool
 }
 
 // permanent bool, uploader internal.Uploader, metaConstructor internal.MetaConstructor
 func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
-	backupName := aof.GenerateNewBackupName()
+	backupName := args.BackupName
+	if backupName == "" {
+		backupName = aof.GenerateNewBackupName()
+	}
 
 	dataFolder, _ := conf.GetSetting(conf.RedisDataPath)
 	aofFolder, _ := conf.GetSetting(conf.RedisAppendonlyFolder)
@@ -59,8 +64,9 @@ func HandleAOFBackupPush(ctx context.Context, args AOFBackupPushArgs) error {
 	}
 
 	doBackupArgs := aof.DoBackupArgs{
-		BackupName: backupName,
-		Sharded:    args.Sharded,
+		BackupName:    backupName,
+		Sharded:       args.Sharded,
+		DeferSentinel: args.DeferSentinel,
 	}
 
 	return backupService.DoBackup(ctx, doBackupArgs)

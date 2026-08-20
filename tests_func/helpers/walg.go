@@ -11,7 +11,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Sentinel struct {
@@ -30,7 +30,7 @@ type BackupMeta struct {
 	Before NodeMeta `json:"Before,omitempty"`
 	After  NodeMeta `json:"After,omitempty"`
 
-	BackupLastTS primitive.Timestamp `json:"BackupLastTS,omitempty"` // for binary backup
+	BackupLastTS bson.Timestamp `json:"BackupLastTS,omitempty"` // for binary backup
 }
 
 func (backupMeta BackupMeta) GetBackupLastTS() OpTimestamp {
@@ -45,7 +45,7 @@ func (backupMeta BackupMeta) GetBackupLastTS() OpTimestamp {
 	return emptyTS
 }
 
-func ToOpTimestamp(ts primitive.Timestamp) OpTimestamp {
+func ToOpTimestamp(ts bson.Timestamp) OpTimestamp {
 	return OpTimestamp{TS: ts.T, Inc: ts.I}
 }
 
@@ -92,7 +92,7 @@ func TimestampFromStr(s string) (OpTimestamp, error) {
 }
 
 func BackupNamesFromListing(output string) []string {
-	re := regexp.MustCompile(`(stream|binary|aof)_\d{8}T\d{6}Z`)
+	re := regexp.MustCompile(`(stream|binary|aof|ts)_\d{8}T\d{6}Z`)
 	return re.FindAllString(output, -1)
 }
 
@@ -172,7 +172,7 @@ func (w *WalgUtil) FetchAofBackupByNum(backupNum int, version string) error {
 	if err != nil {
 		return err
 	}
-	_, err = w.runCmd("aof-backup-fetch", backup, version)
+	_, err = w.runCmd("backup-fetch", backup, "--type", "aof", "--redis-version", version)
 	if err != nil {
 		return err
 	}

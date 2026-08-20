@@ -30,6 +30,15 @@ func (folder *Folder) Exists(_ context.Context, objectRelativePath string) (bool
 	return exists, nil
 }
 
+func (folder *Folder) StatObject(_ context.Context, objectRelativePath string) (storage.Object, error) {
+	objectAbsPath := path.Join(folder.path, objectRelativePath)
+	object, exists := folder.KVS.Load(objectAbsPath)
+	if !exists {
+		return nil, storage.NewObjectNotFoundError(objectAbsPath)
+	}
+	return storage.NewLocalObject(objectRelativePath, object.Timestamp, int64(object.Size)), nil
+}
+
 func (folder *Folder) GetPath() string {
 	return folder.path
 }

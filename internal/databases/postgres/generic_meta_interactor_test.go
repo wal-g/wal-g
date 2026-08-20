@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/mock/gomock"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -14,6 +13,7 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/memory"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
+	"go.uber.org/mock/gomock"
 )
 
 func TestFetch(t *testing.T) {

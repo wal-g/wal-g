@@ -152,7 +152,7 @@ func Test_collector_SpecificStorage(t *testing.T) {
 	t.Run("takes from cache if requested is relevant and alive", func(t *testing.T) {
 		col := newTestCollector(t, 1, 1)
 		setInCache(t, col, "stor_1", true, true)
-		alive, err := col.SpecificStorage(t.Context(),"stor_1")
+		alive, err := col.SpecificStorage(t.Context(), "stor_1")
 		require.NoError(t, err)
 		assert.True(t, alive)
 	})
@@ -162,7 +162,7 @@ func Test_collector_SpecificStorage(t *testing.T) {
 		setInCache(t, col, "stor_1", true, false)
 		setInCache(t, col, "stor_2", true, true)
 
-		alive, err := col.SpecificStorage(t.Context(),"stor_1")
+		alive, err := col.SpecificStorage(t.Context(), "stor_1")
 		require.NoError(t, err)
 		assert.False(t, alive)
 	})
@@ -172,7 +172,7 @@ func Test_collector_SpecificStorage(t *testing.T) {
 		setInCache(t, col, "stor_1", false, true)
 		setInCache(t, col, "stor_2", true, true)
 
-		alive, err := col.SpecificStorage(t.Context(),"stor_1")
+		alive, err := col.SpecificStorage(t.Context(), "stor_1")
 		require.NoError(t, err)
 		assert.True(t, alive)
 
@@ -185,7 +185,7 @@ func Test_collector_SpecificStorage(t *testing.T) {
 
 	t.Run("recheck requested if cache is empty", func(t *testing.T) {
 		col := newTestCollector(t, 2, 1)
-		alive, err := col.SpecificStorage(t.Context(),"stor_2")
+		alive, err := col.SpecificStorage(t.Context(), "stor_2")
 		require.NoError(t, err)
 		assert.True(t, alive)
 	})

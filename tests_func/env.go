@@ -91,11 +91,12 @@ func DynConf(env map[string]string, osEnviron map[string]string) (map[string]str
 	}
 
 	if feature, ok := osEnviron["FEATURE"]; ok {
-		if feature == "aof_backup" {
+		switch feature {
+		case "aof_backup", "aof_ts_backup":
 			res["REDIS_CONF_FILE"] = "redis-aof.conf"
-		} else if feature == "rdb_backup" {
+		case "rdb_backup", "rdb_ts_backup", "ts_backup":
 			res["REDIS_CONF_FILE"] = "redis-rdb.conf"
-		} else {
+		default:
 			return nil, fmt.Errorf("unknown FEATURE env value")
 		}
 	}

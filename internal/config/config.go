@@ -42,6 +42,7 @@ const (
 	DeltaMaxStepsSetting          = "WALG_DELTA_MAX_STEPS"
 	DeltaOriginSetting            = "WALG_DELTA_ORIGIN"
 	CompressionMethodSetting      = "WALG_COMPRESSION_METHOD"
+	ZstdLevelSetting              = "WALG_ZSTD_LEVEL"
 	StoragePrefixSetting          = "WALG_STORAGE_PREFIX"
 	DiskRateLimitSetting          = "WALG_DISK_RATE_LIMIT"
 	NetworkRateLimitSetting       = "WALG_NETWORK_RATE_LIMIT"
@@ -174,6 +175,7 @@ const (
 	RedisAppendonlyFolder    = "WALG_REDIS_APPENDONLY_PATH"
 	RedisAppendonlyManifest  = "WALG_REDIS_APPENDONLY_MANIFEST"
 	RedisAppendonlyTmpFolder = "WALG_REDIS_APPENDONLY_TEMP_MANIFEST"
+	RedisTSPinFolder         = "WALG_REDIS_TS_PIN_FOLDER"
 	RedisDataThreshold       = "WALG_REDIS_DATA_THRESHOLD"
 	RedisDataTimeout         = "WALG_REDIS_DATA_TIMEOUT"
 	RedisServerProcessName   = "WALG_REDIS_SERVER_PROCESS_NAME"
@@ -304,6 +306,7 @@ var (
 		RedisAppendonlyFolder:    "appendonlydir",
 		RedisAppendonlyManifest:  "appendonly.aof.manifest",
 		RedisAppendonlyTmpFolder: "/var/lib/redis/wal-g/",
+		RedisTSPinFolder:         "/var/lib/redis/ext/wal-g-pin/",
 		RedisDataThreshold:       "90",
 		RedisDataTimeout:         "1",
 		RedisServerProcessName:   "redis-server",
@@ -368,6 +371,7 @@ var (
 		DeltaMaxStepsSetting:          true,
 		DeltaOriginSetting:            true,
 		CompressionMethodSetting:      true,
+		ZstdLevelSetting:              true,
 		StoragePrefixSetting:          true,
 		DiskRateLimitSetting:          true,
 		NetworkRateLimitSetting:       true,
@@ -608,6 +612,7 @@ var (
 		RedisAppendonlyFolder:    true,
 		RedisAppendonlyManifest:  true,
 		RedisAppendonlyTmpFolder: true,
+		RedisTSPinFolder:         true,
 		RedisDataThreshold:       true,
 		RedisDataTimeout:         true,
 		RedisServerProcessName:   true,
@@ -882,13 +887,17 @@ func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 func InitConfig() {
 	var globalViper = viper.GetViper()
 	globalViper.AutomaticEnv() // read in environment variables that match
-	SetDefaultValues(globalViper)
-	SetGoMaxProcs(globalViper)
 	if CfgFile == "" {
 		CfgFile = os.Getenv(ConfigPathEnvVar)
 	}
 	ReadConfigFromFile(globalViper, CfgFile)
+	// Validate the values supplied in the config file before adding defaults.
+	// viper.AllSettings includes defaults, so validating afterwards can report
+	// a database-independent default as unknown for a database that does not
+	// support that setting.
 	CheckAllowedSettings(globalViper)
+	SetDefaultValues(globalViper)
+	SetGoMaxProcs(globalViper)
 	WarnDeprecatedSettings(globalViper)
 
 	bindConfigToEnv(globalViper)

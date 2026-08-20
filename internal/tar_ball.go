@@ -16,7 +16,7 @@ type TarBall interface {
 	Size() int64
 	AddSize(int64)
 	TarWriter() *tar.Writer
-	AwaitUploads()
+	AwaitUploads() error
 	Name() string
 }
 

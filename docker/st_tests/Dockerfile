@@ -21,7 +21,7 @@ COPY link_brotli.sh link_brotli.sh
 COPY CMakeLists-brotli.txt CMakeLists-brotli.txt
 COPY Makefile Makefile
 
-RUN go get -v -t ./... && USE_BROTLI=1 USE_LZO=1 make ENABLE_RACE_DETECTION=1 deps pg_build
+RUN USE_BROTLI=1 USE_LZO=1 make ENABLE_RACE_DETECTION=1 deps pg_build
 
 FROM wal-g/ubuntu:18.04
 

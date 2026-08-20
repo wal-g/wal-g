@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -78,6 +79,42 @@ func TestInitConfigSetsConfigFilePath(t *testing.T) {
 	config.CfgFile = "/tmp/from-flag.json"
 	config.InitConfig()
 	assert.Equal(t, "/tmp/from-flag.json", config.CfgFile)
+}
+
+func TestInitConfigDoesNotValidateDefaults(t *testing.T) {
+	configFile, err := os.CreateTemp(t.TempDir(), "config-*.yaml")
+	assert.NoError(t, err)
+	assert.NoError(t, configFile.Close())
+
+	logFile, err := os.CreateTemp(t.TempDir(), "warnings-*.log")
+	assert.NoError(t, err)
+	defer func() { _ = logFile.Close() }()
+
+	oldCfgFile := config.CfgFile
+	oldDefaults := config.DefaultConfigValues
+	oldAllowedSettings := config.AllowedSettings
+	t.Cleanup(func() {
+		config.CfgFile = oldCfgFile
+		config.DefaultConfigValues = oldDefaults
+		config.AllowedSettings = oldAllowedSettings
+		viper.Reset()
+		tracelog.SetWarningOutput(os.Stderr)
+	})
+
+	viper.Reset()
+	config.CfgFile = configFile.Name()
+	config.DefaultConfigValues = map[string]string{
+		config.FailoverStoragesCheckTimeout: "30s",
+	}
+	config.AllowedSettings = map[string]bool{}
+	tracelog.SetWarningOutput(logFile)
+
+	config.InitConfig()
+
+	assert.NoError(t, logFile.Close())
+	logOutput, err := os.ReadFile(logFile.Name())
+	assert.NoError(t, err)
+	assert.NotContains(t, strings.ToUpper(string(logOutput)), config.FailoverStoragesCheckTimeout+" IS UNKNOWN")
 }
 
 func resetToDefaults() {
