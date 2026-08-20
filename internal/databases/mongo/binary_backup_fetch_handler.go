@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -30,7 +31,12 @@ func HandleBinaryFetchPush(
 	if err != nil {
 		return err
 	}
+	rootFolder := uploader.Folder()
 	uploader.ChangeDirectory(utility.BaseBackupPath + "/")
+	var downloader archive.Downloader
+	if pitrSince != "" && pitrUntil != "" {
+		downloader = archive.NewStorageDownloaderFromFolder(rootFolder, archive.NewDefaultStorageSettings())
+	}
 
 	if minimalConfigPath == "" {
 		minimalConfigPath, err = config.SaveConfigToTempFile("storage", "systemLog")
@@ -39,7 +45,7 @@ func HandleBinaryFetchPush(
 		}
 	}
 
-	restoreService, err := binary.CreateRestoreService(localStorage, uploader, minimalConfigPath)
+	restoreService, err := binary.CreateRestoreService(localStorage, uploader, downloader, minimalConfigPath)
 	if err != nil {
 		return err
 	}
@@ -67,7 +73,9 @@ func HandleBinaryFetchPush(
 
 	var replyOplogConfig binary.ReplyOplogConfig
 	if pitrSince != "" && pitrUntil != "" {
-		replyOplogConfig, err = binary.NewReplyOplogConfig(ctx, pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "")
+		replyOplogConfig, err = binary.NewReplyOplogConfig(
+			ctx, downloader, pitrSince, pitrUntil, len(whitelist)+len(blacklist) > 0, false, "",
+		)
 		if err != nil {
 			return err
 		}

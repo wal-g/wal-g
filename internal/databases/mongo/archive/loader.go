@@ -43,6 +43,7 @@ type Downloader interface {
 	ListOplogArchivesSegment(ctx context.Context, startAfter *string, endBefore *string) ([]models.Archive, error)
 	LoadBackups(ctx context.Context, names []string) ([]*models.Backup, error)
 	ListBackups(ctx context.Context) ([]internal.BackupTime, []string, error)
+	LastBackupName(ctx context.Context) (string, error)
 	LastKnownArchiveTS(ctx context.Context) (models.Timestamp, error)
 }
 
@@ -79,11 +80,14 @@ func NewStorageDownloader(ctx context.Context, opts StorageSettings) (*StorageDo
 	if err != nil {
 		return nil, err
 	}
-	folder := st.RootFolder()
+	return NewStorageDownloaderFromFolder(st.RootFolder(), opts), nil
+}
+
+// NewStorageDownloaderFromFolder builds a MongoDB downloader over an already configured storage folder.
+func NewStorageDownloaderFromFolder(folder storage.Folder, opts StorageSettings) *StorageDownloader {
 	return &StorageDownloader{rootFolder: folder,
-			oplogsFolder:  folder.GetSubFolder(opts.oplogsPath),
-			backupsFolder: folder.GetSubFolder(opts.backupsPath)},
-		nil
+		oplogsFolder:  folder.GetSubFolder(opts.oplogsPath),
+		backupsFolder: folder.GetSubFolder(opts.backupsPath)}
 }
 
 // BackupMeta downloads sentinel contents.

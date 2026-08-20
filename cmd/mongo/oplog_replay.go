@@ -5,6 +5,7 @@ import (
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 )
 
@@ -32,21 +33,28 @@ var oplogReplayCmd = &cobra.Command{
 		var err error
 		defer func() { tracelog.ErrorLogger.FatalOnError(err) }()
 
-		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, partial, withCatchUpReconfig,
-			minimalOplogReplyConfigPath)
+		downloader, err := archive.NewStorageDownloader(cmd.Context(), archive.NewDefaultStorageSettings())
 		if err != nil {
 			return
 		}
 
-		err = mongo.RunOplogReplay(cmd.Context(), mongodbURL, replayArgs)
+		replayArgs, mongodbURL, err := buildOplogReplayRunArgs(args, partial, withCatchUpReconfig,
+			minimalOplogReplyConfigPath, downloader)
+		if err != nil {
+			return
+		}
+
+		err = mongo.RunOplogReplay(cmd.Context(), mongodbURL, replayArgs, downloader)
 	},
 }
 
 func buildOplogReplayRunArgs(
 	cmdargs []string, partial,
-	withCatchUpReconfig bool, minimalConfigPath string,
+	withCatchUpReconfig bool, minimalConfigPath string, downloader archive.Downloader,
 ) (binary.ReplyOplogConfig, string, error) {
-	args, err := binary.NewReplyOplogConfig(cmd.Context(), cmdargs[0], cmdargs[1], partial, withCatchUpReconfig, minimalConfigPath)
+	args, err := binary.NewReplyOplogConfig(
+		cmd.Context(), downloader, cmdargs[0], cmdargs[1], partial, withCatchUpReconfig, minimalConfigPath,
+	)
 	if err != nil {
 		return args, "", err
 	}
