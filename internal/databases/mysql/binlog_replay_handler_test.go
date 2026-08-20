@@ -69,7 +69,7 @@ func newTestReplayHandler(
 
 	rh = new(replayHandler)
 	rh.endTS = "2026-01-01 00:00:00"
-	rh.appliedGTID = parseMariadbGTIDChecked(appliedGTID)
+	rh.backupBinlogPos.LastGTID = appliedGTID
 	rh.logCh = make(chan string, binlogFetchAhead)
 	rh.errCh = make(chan error, 1)
 

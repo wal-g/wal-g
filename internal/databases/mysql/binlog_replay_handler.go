@@ -25,12 +25,6 @@ type replayHandler struct {
 	endTS           string
 	backupBinlogPos BinlogPos
 
-	// appliedGTID is the GTID checkpoint already in the restored backup
-	// (nil for MySQL or MariaDB <10.8). Binlogs fully covered by it get
-	// skipped -- this catches relay-log binlogs from a different server
-	// after failover, where file numbering alone can't tell us anything.
-	appliedGTID *gomysql.MariadbGTIDSet
-
 	// Test seams for the skip/replay decision logic; default to the real
 	// implementations in newReplayHandler.
 	getPreviousGTIDs func(filename, flavor string) (gomysql.GTIDSet, error)
@@ -41,7 +35,6 @@ func newReplayHandler(ctx context.Context, endTS time.Time, backupBinlogPos Binl
 	rh := new(replayHandler)
 	rh.endTS = endTS.Local().Format(TimeMysqlFormat)
 	rh.backupBinlogPos = backupBinlogPos
-	rh.appliedGTID = parseMariadbGTIDChecked(backupBinlogPos.LastGTID)
 	rh.getPreviousGTIDs = GetBinlogPreviousGTIDs
 	rh.doReplay = rh.replayLog
 	rh.logCh = make(chan string, binlogFetchAhead)
@@ -73,10 +66,15 @@ func (rh *replayHandler) replayLogs(ctx context.Context) {
 		backupBinlogNum = BinlogNum(rh.backupBinlogPos.FileName)
 	}
 
+	// appliedGTID is the backup's GTID checkpoint (nil for MySQL, or
+	// MariaDB <10.8). We skip binlogs it already covers -- needed after a
+	// failover, when binlog file numbers no longer line up across servers.
+	appliedGTID := parseMariadbGTIDChecked(rh.backupBinlogPos.LastGTID)
+
 	// pendingPath is a binlog whose skip/replay fate isn't decided yet --
 	// we need the next binlog's starting GTID checkpoint to know.
 	var pendingPath string
-	skippingByGTID := rh.appliedGTID != nil
+	skippingByGTID := appliedGTID != nil
 	var runErr error
 
 loop:
@@ -90,7 +88,7 @@ loop:
 		}
 
 		if pendingPath != "" {
-			err := rh.resolvePending(ctx, pendingPath, binlogPath, &skippingByGTID)
+			err := rh.resolvePending(ctx, appliedGTID, pendingPath, binlogPath, &skippingByGTID)
 			pendingPath = ""
 			if err != nil {
 				runErr = err
@@ -121,10 +119,12 @@ loop:
 }
 
 // resolvePending checks whether pendingPath is fully covered by
-// rh.appliedGTID, using nextPath's GTID checkpoint. On any failure or new
+// appliedGTID, using nextPath's GTID checkpoint. On any failure or new
 // content it replays pendingPath and turns off GTID skipping for the rest
 // of the run.
-func (rh *replayHandler) resolvePending(ctx context.Context, pendingPath, nextPath string, skippingByGTID *bool) error {
+func (rh *replayHandler) resolvePending(
+	ctx context.Context, appliedGTID *gomysql.MariadbGTIDSet, pendingPath, nextPath string, skippingByGTID *bool,
+) error {
 	pendingName := path.Base(pendingPath)
 
 	endState, err := rh.getPreviousGTIDs(nextPath, gomysql.MariaDBFlavor)
@@ -142,13 +142,13 @@ func (rh *replayHandler) resolvePending(ctx context.Context, pendingPath, nextPa
 		return rh.replayAndRemove(ctx, pendingPath)
 	}
 
-	if rh.appliedGTID.Contain(endGTID) {
-		tracelog.InfoLogger.Printf("skipping %s (already covered by backup GTID checkpoint %s)", pendingName, rh.appliedGTID.String())
+	if appliedGTID.Contain(endGTID) {
+		tracelog.InfoLogger.Printf("skipping %s (already covered by backup GTID checkpoint %s)", pendingName, appliedGTID.String())
 		os.Remove(pendingPath)
 		return nil
 	}
 
-	tracelog.InfoLogger.Printf("replaying %s (introduces GTIDs beyond backup checkpoint %s)", pendingName, rh.appliedGTID.String())
+	tracelog.InfoLogger.Printf("replaying %s (introduces GTIDs beyond backup checkpoint %s)", pendingName, appliedGTID.String())
 	*skippingByGTID = false
 	return rh.replayAndRemove(ctx, pendingPath)
 }
