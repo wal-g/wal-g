@@ -23,7 +23,7 @@ import (
 type SharedSizeDTO struct {
 	// SharedSize is the volume, in bytes, the backup added to one of the shared storages. It is the
 	// sum of what the segments uploaded when the backup is created, and is meant to be recalculated
-	// later, when a neighbouring backup is deleted and this one inherits objects still in use.
+	// later, when a neighboring backup is deleted and this one inherits objects still in use.
 	SharedSize int64 `json:"SharedSize"`
 }
 
