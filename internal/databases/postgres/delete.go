@@ -141,6 +141,15 @@ func makeBackupObjects(
 func makePermanentFunc(permanentBackups, permanentWals map[PermanentObject]bool) func(object storage.Object) bool {
 	return func(object storage.Object) bool {
 		storageName := multistorage.GetStorage(object)
+		if backupObject, ok := object.(internal.BackupObject); ok {
+			backup := PermanentObject{
+				Name:        backupObject.GetBackupName(),
+				StorageName: storageName,
+			}
+			if permanentBackups[backup] {
+				return true
+			}
+		}
 		return IsPermanent(object.GetName(), storageName, permanentBackups, permanentWals)
 	}
 }

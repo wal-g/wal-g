@@ -412,7 +412,8 @@ func (h *DeleteHandler) DeleteTarget(ctx context.Context, target BackupObject, c
 	backupNamesToDelete := make(map[string]bool)
 	for _, bTarget := range backupsToDelete {
 		if h.isPermanent(bTarget) {
-			tracelog.ErrorLogger.Fatalf("Unable to delete permanent backup %s\n", bTarget.GetName())
+			return utility.NewForbiddenActionError(
+				fmt.Sprintf("Unable to delete permanent backup %s", bTarget.GetBackupName()))
 		}
 		backupNamesToDelete[bTarget.GetBackupName()] = true
 	}
