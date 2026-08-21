@@ -1,0 +1,2 @@
+"WALE_S3_PREFIX": "s3://gp-shared-size-test-bucket",
+"WALG_LOG_LEVEL": "DEVEL"

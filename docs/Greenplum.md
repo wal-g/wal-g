@@ -100,6 +100,37 @@ wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/pa
 
 To prevent WAL-G from falling back to a full scan delta backup when it fails to download delta files.
 
+#### Journal size (WAL volume) accounting
+
+Run ``backup-push`` with the ``--count-journals`` flag to track the volume of WAL accumulated between one backup and the next one. The size is computed from the actual storage object sizes of the archived WAL segments, so it correctly reflects compression, unlike an LSN-difference estimate.
+
+```bash
+wal-g backup-push --count-journals --config=/path/to/config.yaml
+```
+Journal accounting is skipped for permanent backups (marked with ``--permanent``), since they are not expected to be removed and don't take part in WAL retention planning.
+
+Currently, only ``delete target`` cleans up and re-merges the corresponding journal entries when a backup is removed; other ``delete`` modes (``before``, ``retain``, ``everything``, ``garbage``) leave existing journals untouched.
+
+#### Shared storage (AO/AOCS/PAX) accounting
+
+AO/AOCS and PAX files live in storage shared between backups (``aosegments/`` and ``paxfiles/`` under each segment), where an unchanged file is uploaded once and then reused by later backups through deduplication. The volume a backup *added* to that shared storage is recorded in two objects of its own, one per storage:
+
+```bash
+wal-g st cat basebackups_005/backup_20260721T120000Z/ao_files_metadata.json --config=/path/to/config.yaml | jq '.SharedSize'
+wal-g st cat basebackups_005/backup_20260721T120000Z/pax_files_metadata.json --config=/path/to/config.yaml | jq '.SharedSize'
+```
+
+Each segment's uploader counts the bytes it actually pushed, skipping everything deduplicated, and the coordinator sums the segments. This has nothing to do with WAL retention, so it needs no flag: it is recorded on every ``backup-push``, including ``--permanent`` ones, which occupy the shared storage like any other backup. If some segment fails to report, the corresponding object is left unwritten rather than written as a zero — an absent object means the volume was never determined.
+
+The two storages are kept apart all the way up. They have separate deduplication age limits and separate cleanup passes, so a figure that mixed them could not be attributed to either.
+
+Because every shared object is attributed to the backup that uploaded it, adding the sizes over all backups approximates the total size of the shared storage. Two things make it an approximation rather than an identity:
+
+* When a backup is deleted, its recorded size disappears with it, even if some of the files it uploaded are still being reused by newer backups. Those bytes then belong to no backup and the total drifts below the real size. This stays bounded as long as ``WALG_GP_AOSEG_DEDUPLICATION_AGE_LIMIT`` and ``WALG_GP_PAXFILE_DEDUPLICATION_AGE_LIMIT`` are comparable to how long backups are retained, since a file is then re-uploaded before its owning backup is deleted. Setting the age limits much higher than the retention period will make the totals drift low.
+* Objects no longer referenced by any backup are not counted either. ``delete garbage`` exists to remove them.
+
+Both deviations are limitations of the current implementation rather than of the format. A future version is expected to record an exact size per backup, making the sum over all backups match the size of the shared storage.
+
 ### ``backup-fetch``
 
 When fetching base backups, the user should pass in the cluster restore configuration and the name of the backup.

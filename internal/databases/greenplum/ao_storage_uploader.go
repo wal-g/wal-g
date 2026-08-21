@@ -12,7 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	"github.com/wal-g/wal-g/internal/compression"
 	"github.com/wal-g/wal-g/internal/crypto"
 	"github.com/wal-g/wal-g/internal/fsutil"
 	"github.com/wal-g/wal-g/internal/ioextensions"
@@ -39,10 +38,12 @@ type AoStorageUploader struct {
 func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
 	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration,
 	newAoSegFilesID string) *AoStorageUploader {
-	// Separate uploader for AO/AOCS relfiles with disabled file size tracking since
-	// WAL-G does not count them
-	aoSegUploader := uploader.Clone()
-	aoSegUploader.DisableSizeTracking()
+	// Separate uploader for AO/AOCS relfiles, with a size counter of its own: cloning would share
+	// the counter of the backup uploader, and WAL-G does not count these files in the backup size.
+	//
+	// No compressor: AO/AOCS segment files are already compressed in most cases.
+	// TODO: lookup the compression details for each relation and compress it when compression is turned off
+	aoSegUploader := internal.NewRegularUploader(nil, uploader.Folder())
 
 	return &AoStorageUploader{
 		uploader:            aoSegUploader,
@@ -169,6 +170,13 @@ func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
 	return u.meta
 }
 
+// UploadedDataSize is the volume this backup pushed to the shared aosegments/ storage, as counted
+// by the uploader after compression and encryption. Files reused from an older backup via
+// deduplication never reach the uploader, so they are not counted.
+func (u *AoStorageUploader) UploadedDataSize() (int64, error) {
+	return u.uploader.UploadedDataSize()
+}
+
 func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string,
 	initialUploadTS time.Time, isIncremented bool, checksum string) error {
 	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, isIncremented, initialUploadTS, checksum)
@@ -213,14 +221,7 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 	hasher := xxh3.New128()
 	hashingReader := io.TeeReader(fileReadCloser, ioextensions.NewLimitedWriter(hasher, aoMeta.eof))
 
-	// do not compress AO/AOCS segment files since they are already compressed in most cases
-	// TODO: lookup the compression details for each relation and compress it when compression is turned off
-	var compressor compression.Compressor
-
-	uploadContents := internal.CompressAndEncrypt(hashingReader, compressor, u.crypter)
-	uploadPath := path.Join(AoStoragePath, storageKey)
-	err = u.uploader.Upload(ctx, uploadPath, uploadContents)
-	if err != nil {
+	if err = u.upload(ctx, hashingReader, storageKey); err != nil {
 		return err
 	}
 
@@ -258,11 +259,7 @@ func (u *AoStorageUploader) incrementalAoUpload(ctx context.Context,
 }
 
 func (u *AoStorageUploader) upload(ctx context.Context, reader io.Reader, storageKey string) error {
-	// do not compress AO/AOCS segment files since they are already compressed in most cases
-	// TODO: lookup the compression details for each relation and compress it when compression is turned off
-	var compressor compression.Compressor
-
-	uploadContents := internal.CompressAndEncrypt(reader, compressor, u.crypter)
+	uploadContents := internal.CompressAndEncrypt(reader, u.uploader.Compression(), u.crypter)
 	uploadPath := path.Join(AoStoragePath, storageKey)
 	return u.uploader.Upload(ctx, uploadPath, uploadContents)
 }

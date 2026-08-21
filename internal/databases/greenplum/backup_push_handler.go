@@ -17,6 +17,7 @@ import (
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
 
@@ -40,6 +41,7 @@ type BackupArguments struct {
 	segPollRetries  int
 
 	deltaBaseSelector internal.BackupSelector
+	countJournals     bool
 }
 
 type SegmentUserData struct {
@@ -174,6 +176,10 @@ func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 	bh.currBackupInfo.startTime = utility.TimeNowCrossPlatformUTC()
 	initGpLog(bh.arguments.logsDir)
 
+	// Must capture before uploadSentinel: it calls uploader.ChangeDirectory(basebackups_005),
+	// which mutates the uploader's stored folder in place.
+	rootFolder := bh.workers.Uploader.Folder()
+
 	err := bh.checkPrerequisites(ctx)
 	tracelog.ErrorLogger.FatalfOnError("Backup prerequisites check failed: %v\n", err)
 
@@ -230,8 +236,63 @@ func (bh *BackupHandler) HandleBackupPush(ctx context.Context) {
 	err = bh.uploadRestorePointMetadata(ctx, restoreLSNs, timeLine, timelineBySegment)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	bh.handleSharedSize(ctx, rootFolder)
+	bh.handleJournalInfo(ctx, rootFolder)
+
 	tracelog.InfoLogger.Printf("Backup %s successfully created", bh.currBackupInfo.backupName)
 	bh.disconnect(ctx)
+}
+
+// handleSharedSize maintains the cluster-wide shared size objects, holding the volume this backup
+// added to the AO/AOCS and PAX storages shared between backups. The per-segment volumes it sums up
+// are recorded in the files metadata the segment WAL-G instances write during seg-backup-push, so
+// this runs once they have all finished.
+func (bh *BackupHandler) handleSharedSize(ctx context.Context, rootFolder storage.Folder) {
+	if err := UploadSharedSizes(ctx, rootFolder, bh.currBackupInfo.backupName); err != nil {
+		tracelog.WarningLogger.Printf("can not record the shared storage size: %s", err.Error())
+		return
+	}
+
+	tracelog.InfoLogger.Printf("uploaded shared size info for %s", bh.currBackupInfo.backupName)
+}
+
+// handleJournalInfo maintains the cluster-wide journal_<backup> object, holding the WAL volume
+// accumulated across all segments between this backup and the next one. The per-segment journals it
+// sums up are written by the segment WAL-G instances during seg-backup-push, so this runs once they
+// have all finished (see SegmentsSizeCalculator).
+func (bh *BackupHandler) handleJournalInfo(ctx context.Context, rootFolder storage.Folder) {
+	if !bh.arguments.countJournals {
+		tracelog.InfoLogger.Printf("WAL journal counting mode is disabled: option is disabled")
+		return
+	}
+	if bh.arguments.isPermanent {
+		tracelog.InfoLogger.Printf("WAL journal counting mode is disabled: the backup is permanent")
+		return
+	}
+
+	mostRecentJournalInfo, err := internal.GetMostRecentJournalInfo(ctx, rootFolder, ClusterJournalDir)
+	if err != nil {
+		tracelog.WarningLogger.Printf("can not find the last journal info: %s", err.Error())
+	}
+
+	journalInfo := internal.NewEmptyJournalInfo(
+		bh.currBackupInfo.backupName,
+		mostRecentJournalInfo.CurrentBackupEnd,
+		bh.currBackupInfo.finishTime,
+		ClusterJournalDir,
+	)
+
+	if err := journalInfo.Upload(ctx, rootFolder); err != nil {
+		tracelog.WarningLogger.Printf("can not upload the journal info: %s", err.Error())
+		return
+	}
+
+	if err := journalInfo.UpdateIntervalSize(ctx, rootFolder, SegmentsSizeCalculator{}); err != nil {
+		tracelog.WarningLogger.Printf("can not calculate journal size: %s", err.Error())
+		return
+	}
+
+	tracelog.InfoLogger.Printf("uploaded journal info for %s", bh.currBackupInfo.backupName)
 }
 
 func (bh *BackupHandler) uploadRestorePointMetadata(
@@ -570,7 +631,8 @@ func NewBackupHandler(ctx context.Context, arguments BackupArguments) (bh *Backu
 
 // NewBackupArguments creates a BackupArgument object to hold the arguments from the cmd
 func NewBackupArguments(uploader internal.Uploader, isPermanent, isFull bool, userData interface{}, fwdArgs []SegmentFwdArg, logsDir string,
-	segPollInterval time.Duration, segPollRetries int, deltaBaseSelector internal.BackupSelector) BackupArguments {
+	segPollInterval time.Duration, segPollRetries int, deltaBaseSelector internal.BackupSelector,
+	countJournals bool) BackupArguments {
 	return BackupArguments{
 		Uploader:          uploader,
 		isPermanent:       isPermanent,
@@ -581,6 +643,7 @@ func NewBackupArguments(uploader internal.Uploader, isPermanent, isFull bool, us
 		segPollInterval:   segPollInterval,
 		segPollRetries:    segPollRetries,
 		deltaBaseSelector: deltaBaseSelector,
+		countJournals:     countJournals,
 	}
 }
 
