@@ -1,7 +1,6 @@
 package greenplum
 
 import (
-	"context"
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -47,7 +46,7 @@ func TestValidateFileChecksum_ChecksumMatches_ShouldIncrement(t *testing.T) {
 	previousChecksum := checksumOfPrefix(data, oldEOF)
 	expectedNewChecksum := checksumOfPrefix(data, curEOF)
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(t.Context(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.NoError(t, err)
 	assert.True(t, shouldIncrement, "expected incremental upload to be allowed when base checksums match")
@@ -67,7 +66,7 @@ func TestValidateFileChecksum_ChecksumDiffers_NoIncrement(t *testing.T) {
 	// A checksum that will not match the actual prefix checksum.
 	previousChecksum := "deadbeefdeadbeefdeadbeefdeadbeef"
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(t.Context(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.NoError(t, err)
 	assert.False(t, shouldIncrement, "incremental upload must not happen when base checksums differ")
@@ -83,7 +82,7 @@ func TestValidateFileChecksum_EmptyPreviousChecksum_NoIncrement(t *testing.T) {
 	data := makeMockData(int(curEOF))
 	path := writeMockAoFile(t, "1663.1", data)
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, "")
+	checksum, shouldIncrement, err := validateFileChecksum(t.Context(), path, oldEOF, curEOF, "")
 
 	assert.NoError(t, err)
 	assert.False(t, shouldIncrement, "empty previous checksum must force a regular upload")
@@ -103,7 +102,7 @@ func TestValidateFileChecksum_OldEOFBeyondFileSize_ReturnsError(t *testing.T) {
 
 	previousChecksum := checksumOfPrefix(data, int64(len(data)))
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(t.Context(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.Error(t, err, "reading beyond the file size must produce an error")
 	assert.False(t, shouldIncrement)
@@ -123,7 +122,7 @@ func TestValidateFileChecksum_CurEOFBeyondFileSize_ReturnsError(t *testing.T) {
 	// curEOF exceeds the file size, so the second getCheckSum call fails.
 	const curEOF = int64(200)
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, oldEOF, curEOF, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(t.Context(), path, oldEOF, curEOF, previousChecksum)
 
 	assert.Error(t, err, "reading current EOF beyond the file size must produce an error")
 	assert.False(t, shouldIncrement)
@@ -140,7 +139,7 @@ func TestValidateFileChecksum_EqualEOF_ShouldIncrement(t *testing.T) {
 
 	previousChecksum := checksumOfPrefix(data, eof)
 
-	checksum, shouldIncrement, err := validateFileChecksum(context.Background(), path, eof, eof, previousChecksum)
+	checksum, shouldIncrement, err := validateFileChecksum(t.Context(), path, eof, eof, previousChecksum)
 
 	assert.NoError(t, err)
 	assert.True(t, shouldIncrement)
