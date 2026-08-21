@@ -48,10 +48,6 @@ mysql -e "FLUSH BINARY LOGS"
 mysql -e "INSERT INTO sbtest.pitr VALUES('after_pitr_02', NOW())"
 mysql -e "INSERT INTO sbtest.pitr VALUES('after_pitr_03', NOW())"
 mysql -e "FLUSH BINARY LOGS"
-
-# binlog.000008
-mysql -e "INSERT INTO sbtest.pitr VALUES('after_pitr_04', NOW())"
-mysql -e "FLUSH BINARY LOGS"
 wal-g binlog-push
 
 mysql_kill_and_clean_data
@@ -88,11 +84,16 @@ grep -w 'from_binlog_05' /tmp/dump_after_pitr_gtid_skip
 ! grep -w 'after_pitr_01' /tmp/dump_after_pitr_gtid_skip
 ! grep -w 'after_pitr_02' /tmp/dump_after_pitr_gtid_skip
 ! grep -w 'after_pitr_03' /tmp/dump_after_pitr_gtid_skip
-! grep -w 'after_pitr_04' /tmp/dump_after_pitr_gtid_skip
 
-#  expected to stream from mysql-bin.000003 to mysql-bin.000007
-! grep -w 'Streaming mysql-bin.000002 to replica' $BINLOG_SERVER_LOG 
-! grep -w 'Streaming mysql-bin.000008 to replica' $BINLOG_SERVER_LOG 
+#  expected to stream from mysql-bin.000003 to mysql-bin.000006.
+#  Processing stops entirely once an event exceeds untilTS (after_pitr_01
+#  in mysql-bin.000006), so mysql-bin.000007 is never fetched or streamed.
+ grep -w 'Streaming /tmp/mysql-bin.000003 to replica' $BINLOG_SERVER_LOG
+ grep -w 'Streaming /tmp/mysql-bin.000004 to replica' $BINLOG_SERVER_LOG
+ grep -w 'Streaming /tmp/mysql-bin.000005 to replica' $BINLOG_SERVER_LOG
+ grep -w 'Streaming /tmp/mysql-bin.000006 to replica' $BINLOG_SERVER_LOG
+! grep -w 'Streaming /tmp/mysql-bin.000002 to replica' $BINLOG_SERVER_LOG
+! grep -w 'Streaming /tmp/mysql-bin.000007 to replica' $BINLOG_SERVER_LOG
 
 # assert that binlog-server skipped the duplicate GTIDs from the backup
 SKIP_COUNT=$(grep -c "Skipping already-applied transaction" $BINLOG_SERVER_LOG || true)

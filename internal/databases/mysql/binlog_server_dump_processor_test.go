@@ -309,13 +309,14 @@ func TestProcess(t *testing.T) {
 			// GTID events carry the transaction's commit timestamp, which
 			// is the latest timestamp in the transaction; the row events
 			// that make up the transaction body are timestamped earlier,
-			// at their individual execution time. Verify that a
-			// transaction whose commit time (GTID timestamp) is after
-			// untilTS is not forwarded, and that this holds both within
-			// a file (a later transaction in the same file as an
-			// earlier, forwarded one) and across files (a whole file
-			// committed entirely after untilTS).
-			name: "untilTS drops transactions committed after the cutoff",
+			// at their individual execution time. Once an event past
+			// untilTS is encountered, streaming stops for good (there is
+			// nothing further worth sending), so the transaction whose
+			// commit time exceeds untilTS is dropped along with
+			// everything after it, including any later files - only the
+			// earlier, fully-committed-before-the-cutoff transaction is
+			// forwarded.
+			name: "untilTS stops streaming for good once a transaction commits after the cutoff",
 			files: []binlogFile{
 				{
 					name: "a.000001",
@@ -346,7 +347,6 @@ func TestProcess(t *testing.T) {
 				gtidEvent("2026-01-01 00:00:09", uuid1, 1),
 				tableMapEvent("2026-01-01 00:00:09"),
 				writeRowsEvent("2026-01-01 00:00:09"),
-				rotateEvent("1970-01-01 00:00:00", "a.000002", 4),
 			},
 			expectedSentGTIDs: uuid1.String() + ":1",
 		},

@@ -79,9 +79,9 @@ grep -w 'from_binlog_04' /tmp/dump_after_pitr_until_lmt
 # rows after pitr time must be absent
 ! grep -w 'after_pitr_01' /tmp/dump_after_pitr_until_lmt
 
-# binlog-server must not stream binlog.000004 (pushed after LMT cutoff)
-! grep -w 'Streaming mysql-bin.000004 to replica' $BINLOG_SERVER_LOG
-
 # binlog-server must stream binlog.000002 and 000003 (pushed before LMT cutoff)
-grep -w 'Streaming mysql-bin.000002 to replica' $BINLOG_SERVER_LOG
-grep -w 'Streaming mysql-bin.000003 to replica' $BINLOG_SERVER_LOG
+grep -w 'Streaming /tmp/mysql-bin.000002 to replica' $BINLOG_SERVER_LOG
+grep -w 'Streaming /tmp/mysql-bin.000003 to replica' $BINLOG_SERVER_LOG
+
+# binlog-server must not stream binlog.000004 (pushed after LMT cutoff)
+! grep -w 'Streaming /tmp/mysql-bin.000004 to replica' $BINLOG_SERVER_LOG

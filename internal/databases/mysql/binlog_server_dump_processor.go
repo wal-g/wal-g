@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"hash/crc32"
 	"os"
 	"path"
@@ -13,6 +14,13 @@ import (
 	"github.com/wal-g/tracelog"
 	"golang.org/x/sync/errgroup"
 )
+
+// errUntilTSReached is returned by handleEvent (and propagated through
+// binlogEventParser.parse) once an event's timestamp exceeds untilTS. It
+// signals ProcessBinlogFile to stop parsing the current file early; it is
+// not a real error and is swallowed there so processing can move on to
+// (and still emit an artificial rotate for) any further files.
+var errUntilTSReached = errors.New("event timestamp is after untilTS")
 
 // binlogFileHeaderSize is the size of the binlog magic header
 // ("\xfebin") that precedes the first real event in every binlog file.
@@ -216,8 +224,8 @@ func (p *BinlogDumpRequestProcessor) handleEvent(e *replication.BinlogEvent) err
 		return p.ctx.Err()
 	}
 	if int64(e.Header.Timestamp) > p.untilTS.Unix() {
-		logEventDebug(e, "Dropping event (reason=after_untilTS")
-		return nil
+		logEventDebug(e, "Stopping stream (reason=after_untilTS)")
+		return errUntilTSReached
 	}
 	switch e.Header.EventType {
 	case replication.GTID_EVENT:
@@ -272,7 +280,10 @@ func (p *BinlogDumpRequestProcessor) decideSkipForGTID(e *replication.BinlogEven
 }
 
 // processBinlogFiles consumes fetched binlog file identifiers from fileCh
-// and processes each in order, until fileCh is closed or ctx is cancelled.
+// and processes each in order, until fileCh is closed, ctx is cancelled, or
+// a file's events reach untilTS (errUntilTSReached), at which point there
+// is nothing left worth streaming from any further file and processing
+// stops for good.
 func (p *BinlogDumpRequestProcessor) processBinlogFiles(ctx context.Context, fileCh <-chan string) error {
 	for {
 		select {
@@ -337,5 +348,11 @@ func (p *BinlogDumpRequestProcessor) process() error {
 		p.fetcher.cleanupFile(file)
 	}
 
+	// Reaching untilTS is a normal, successful stop condition, not a
+	// failure: there is nothing left worth streaming, so any files not
+	// yet processed are simply skipped.
+	if errors.Is(err, errUntilTSReached) {
+		return nil
+	}
 	return err
 }
