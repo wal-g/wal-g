@@ -39,14 +39,18 @@ RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https:
         curl && \
     rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
 
-RUN ARCH="$(uname -m)" && \
+COPY go.mod /tmp/go.mod
+
+RUN set -eux; \
+    GO_VERSION="$(awk '/^go /{print $2}' /tmp/go.mod)"; \
+    ARCH="$(uname -m)"; \
     case "$ARCH" in \
-        x86_64)  GO_ARCH="amd64" ;; \
+        x86_64) GO_ARCH="amd64" ;; \
         aarch64) GO_ARCH="arm64" ;; \
         *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
-    esac && \
-    curl -fsSL "https://go.dev/dl/go1.27.0.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
-    export PATH="/usr/local/go/bin:$PATH" && \
+    esac; \
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz; \
+    export PATH="/usr/local/go/bin:$PATH"; \
     go version
 
 ENV GOPATH=/go
