@@ -500,7 +500,12 @@ func handleBinlogConnection(
 		}
 		return
 	}
-	defer conn.Close()
+
+	defer func() {
+		if !conn.Closed() {
+			conn.Close()
+		}
+	}()
 
 	for {
 		if err := conn.HandleCommand(); err != nil {
