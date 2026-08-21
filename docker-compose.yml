@@ -69,8 +69,8 @@ services:
     ports:
       - "9000:9000"
     environment:
-      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE"
-      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      - "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLE"
+      - "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
     entrypoint: sh
     command: >
       -c 'mkdir -p /export/fullbucket
@@ -207,8 +207,8 @@ services:
     ports:
       - "9001:9001"
     environment:
-      - "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLEBUTANOHER"
-      - "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYBUTANOTHERTOO"
+      - "MINIO_ROOT_USER=AKIAIOSFODNN7EXAMPLEBUTANOHER"
+      - "MINIO_ROOT_PASSWORD=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEYBUTANOTHERTOO"
     entrypoint: sh
     command: >
       -c 'mkdir -p /export/mysqlcopybackupto

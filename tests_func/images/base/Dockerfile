@@ -10,7 +10,7 @@ RUN apt-get update -q && \
     cmake build-essential curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL "https://go.dev/dl/go1.26.7.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
+RUN curl -fsSL "https://go.dev/dl/go1.27.0.linux-amd64.tar.gz" | tar -C /usr/local -xz && \
 	export PATH="/usr/local/go/bin:$PATH" && \
 	go version
 
