@@ -26,7 +26,7 @@ func HandlePutObject(
 	}
 
 	storageFolderPath := utility.SanitizePath(filepath.Dir(dstPath))
-	if storageFolderPath != "" {
+	if storageFolderPath != "" && storageFolderPath != "." {
 		uploader.ChangeDirectory(storageFolderPath)
 	}
 
@@ -80,6 +80,6 @@ func uploadFile(ctx context.Context, name string, content io.Reader, uploader in
 		name = utility.AddFileExtension(name, uploader.Compression().FileExtension())
 	}
 
-	uploadContents := internal.CompressAndEncrypt(content, compressor, crypter)
+	uploadContents := internal.CompressAndEncrypt(ctx, content, compressor, crypter)
 	return uploader.Upload(ctx, name, uploadContents)
 }

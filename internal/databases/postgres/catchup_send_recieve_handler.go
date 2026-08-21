@@ -29,7 +29,7 @@ func HandleCatchupSend(ctx context.Context, pgDataDirectory string, destination 
 		tracelog.ErrorLogger.Fatal("Our system lacks System Identifier, cannot proceed")
 	}
 	tracelog.ErrorLogger.FatalOnError(err)
-	writer, decoder, encoder := startSendConnection(destination)
+	writer, decoder, encoder := startSendConnection(ctx, destination)
 
 	var control PgControlData
 	err = decoder.Decode(&control)
@@ -82,7 +82,7 @@ func HandleCatchupSend(ctx context.Context, pgDataDirectory string, destination 
 	tracelog.InfoLogger.Printf("Send done")
 }
 
-func startSendConnection(destination string) (ioextensions.WriteFlushCloser, *gob.Decoder, *gob.Encoder) {
+func startSendConnection(ctx context.Context, destination string) (ioextensions.WriteFlushCloser, *gob.Decoder, *gob.Encoder) {
 	dial, err := net.Dial("tcp", destination)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -96,10 +96,10 @@ func startSendConnection(destination string) (ioextensions.WriteFlushCloser, *go
 	var decoder *gob.Decoder
 	var encoder *gob.Encoder
 	if crypter != nil {
-		decrypt, err := crypter.Decrypt(reader)
+		decrypt, err := crypter.Decrypt(ctx, reader)
 		tracelog.ErrorLogger.FatalOnError(err)
 		decoder = gob.NewDecoder(decrypt)
-		encrypt, err := crypter.Encrypt(writer)
+		encrypt, err := crypter.Encrypt(ctx, writer)
 		tracelog.ErrorLogger.FatalOnError(err)
 		encoder = gob.NewEncoder(encrypt)
 	} else {
@@ -237,7 +237,7 @@ func sendOneFile(ctx context.Context, path string, info fs.FileInfo, wasInBase b
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func HandleCatchupReceive(pgDataDirectory string, port int) {
+func HandleCatchupReceive(ctx context.Context, pgDataDirectory string, port int) {
 	pgDataDirectory = utility.ResolveSymlink(pgDataDirectory)
 	tracelog.InfoLogger.Printf("Receiving %v on port %v\n", pgDataDirectory, port)
 	listen, err := net.Listen("tcp", fmt.Sprintf(":%v", port))
@@ -256,10 +256,10 @@ func HandleCatchupReceive(pgDataDirectory string, port int) {
 	var decoder *gob.Decoder
 	var encoder *gob.Encoder
 	if crypter != nil {
-		decrypt, err := crypter.Decrypt(reader)
+		decrypt, err := crypter.Decrypt(ctx, reader)
 		tracelog.ErrorLogger.FatalOnError(err)
 		decoder = gob.NewDecoder(decrypt)
-		encrypt, err := crypter.Encrypt(writer)
+		encrypt, err := crypter.Encrypt(ctx, writer)
 		tracelog.ErrorLogger.FatalOnError(err)
 		encoder = gob.NewEncoder(encrypt)
 	} else {

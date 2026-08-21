@@ -1,12 +1,13 @@
 package awskms
 
 import (
+	"context"
 	"crypto/rand"
 	"sync"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/kms"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/kms"
 )
 
 // SymmetricKey is AWS KMS implementation of crypto.SymmetricKey interface
@@ -19,6 +20,7 @@ type SymmetricKey struct {
 	KeyID  string
 	Region string
 
+	kms   *kms.Client
 	mutex sync.RWMutex
 }
 
@@ -37,20 +39,36 @@ func (symmetricKey *SymmetricKey) Generate() error {
 	return err
 }
 
-// Encrypt symmetric key with AWS KMS
-func (symmetricKey *SymmetricKey) Encrypt() error {
-	kmsConfig := aws.NewConfig()
-
-	if symmetricKey.Region != "" {
-		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
+func (symmetricKey *SymmetricKey) client(ctx context.Context) (*kms.Client, error) {
+	symmetricKey.mutex.RLock()
+	svc := symmetricKey.kms
+	symmetricKey.mutex.RUnlock()
+	if svc != nil {
+		return svc, nil
 	}
 
-	kmsSession, err := session.NewSession()
+	opts := []func(*config.LoadOptions) error{}
+	if symmetricKey.Region != "" {
+		opts = append(opts, config.WithRegion(symmetricKey.Region))
+	}
+	cfg, err := config.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	svc = kms.NewFromConfig(cfg)
+	symmetricKey.mutex.Lock()
+	symmetricKey.kms = svc
+	symmetricKey.mutex.Unlock()
+	return svc, nil
+}
+
+// Encrypt symmetric key with AWS KMS
+func (symmetricKey *SymmetricKey) Encrypt(ctx context.Context) error {
+	svc, err := symmetricKey.client(ctx)
 	if err != nil {
 		return err
 	}
-
-	svc := kms.New(kmsSession, kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.EncryptInput{
@@ -59,7 +77,7 @@ func (symmetricKey *SymmetricKey) Encrypt() error {
 	}
 	symmetricKey.mutex.RUnlock()
 
-	result, err := svc.Encrypt(input)
+	result, err := svc.Encrypt(ctx, input)
 
 	if err == nil {
 		symmetricKey.mutex.Lock()
@@ -71,19 +89,11 @@ func (symmetricKey *SymmetricKey) Encrypt() error {
 }
 
 // Decrypt symmetric key with AWS KMS
-func (symmetricKey *SymmetricKey) Decrypt() error {
-	kmsConfig := aws.NewConfig()
-
-	if symmetricKey.Region != "" {
-		kmsConfig = kmsConfig.WithRegion(symmetricKey.Region)
-	}
-
-	kmsSession, err := session.NewSession()
+func (symmetricKey *SymmetricKey) Decrypt(ctx context.Context) error {
+	svc, err := symmetricKey.client(ctx)
 	if err != nil {
 		return err
 	}
-
-	svc := kms.New(kmsSession, kmsConfig)
 
 	symmetricKey.mutex.RLock()
 	input := &kms.DecryptInput{
@@ -91,7 +101,7 @@ func (symmetricKey *SymmetricKey) Decrypt() error {
 	}
 	symmetricKey.mutex.RUnlock()
 
-	result, err := svc.Decrypt(input)
+	result, err := svc.Decrypt(ctx, input)
 
 	if err == nil {
 		symmetricKey.mutex.Lock()

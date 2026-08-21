@@ -150,8 +150,7 @@ func (f *Folder) headObject(ctx context.Context, objectRelativePath string) (*os
 	})
 
 	if err != nil {
-		var serviceError *oss.ServiceError
-		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
+		if serviceError, ok := errors.AsType[*oss.ServiceError](err); ok && serviceError.Code == "NoSuchKey" {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to head oss object '%s': %w", objectPath, err)
@@ -206,8 +205,7 @@ func (f *Folder) ReadObject(ctx context.Context, objectRelativePath string) (io.
 	}
 	result, err := f.ossAPI.GetObject(ctx, req)
 	if err != nil {
-		var serviceError *oss.ServiceError
-		if errors.As(err, &serviceError) && serviceError.Code == "NoSuchKey" {
+		if serviceError, ok := errors.AsType[*oss.ServiceError](err); ok && serviceError.Code == "NoSuchKey" {
 			return nil, storage.NewObjectNotFoundError(objectPath)
 		}
 		return nil, fmt.Errorf("failed to read oss object '%s': %w", objectPath, err)

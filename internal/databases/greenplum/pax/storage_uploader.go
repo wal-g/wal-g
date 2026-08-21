@@ -110,7 +110,7 @@ func (u *StorageUploader) regularUpload(ctx context.Context,
 	// PAX/PORC files are already compressed internally; do not re-compress.
 	var compressor compression.Compressor
 
-	uploadContents := internal.CompressAndEncrypt(fileReadCloser, compressor, u.crypter)
+	uploadContents := internal.CompressAndEncrypt(ctx, fileReadCloser, compressor, u.crypter)
 	uploadPath := path.Join(StoragePath, storageKey)
 	if err := u.uploader.Upload(ctx, uploadPath, uploadContents); err != nil {
 		return err

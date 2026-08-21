@@ -3,6 +3,7 @@ package openpgp
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/base64"
 	"io"
 	"os"
@@ -43,7 +44,7 @@ func (crypter *Crypter) Name() string {
 }
 
 // Encrypt creates encryption writer from ordinary writer
-func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
+func (crypter *Crypter) Encrypt(_ context.Context, writer io.Writer) (io.WriteCloser, error) {
 	err := crypter.setupEncryptedKey()
 	if err != nil {
 		return nil, err
@@ -84,7 +85,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 }
 
 // Decrypt creates decrypted reader from ordinary reader
-func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
+func (crypter *Crypter) Decrypt(_ context.Context, reader io.Reader) (io.Reader, error) {
 	// need read header at first, with length less than maxHeaderLenAllowed
 	bufferedReader := bufio.NewReaderSize(reader, maxHeaderLenAllowed)
 	encryptedKey, err := crypter.enveloper.ReadEncryptedKey(bufferedReader)

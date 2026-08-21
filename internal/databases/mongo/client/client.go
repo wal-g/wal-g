@@ -230,8 +230,7 @@ func (mc *MongoClient) CreateIndexes(ctx context.Context, dbName, collName strin
 
 func (mc *MongoClient) DropIndexes(ctx context.Context, dbName string, rawCommand bson.D) error {
 	if err := mc.c.Database(dbName).RunCommand(ctx, rawCommand).Err(); err != nil {
-		var mongoErr mongo.CommandError
-		isMongoErr := errors.As(err, &mongoErr)
+		mongoErr, isMongoErr := errors.AsType[mongo.CommandError](err)
 
 		if isMongoErr && mongoErr.Name == "BackgroundOperationInProgressForNamespace" {
 			// In Mongo versions Prior to 5.2, an attempt to drop an index during an in-progress build of another index

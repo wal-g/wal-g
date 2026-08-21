@@ -42,7 +42,7 @@ func TestDecryptWALElzo(t *testing.T) {
 	crypter := openpgp.CrypterFromKey(waleGpgKey, noPassphrase)
 	f, err := os.Open(waleWALfilename)
 	assert.NoError(t, err)
-	decrypt, err := crypter.Decrypt(f)
+	decrypt, err := crypter.Decrypt(t.Context(), f)
 	assert.NoError(t, err)
 	bytes1, err := io.ReadAll(decrypt)
 	assert.NoError(t, err)
@@ -107,7 +107,7 @@ func TestOpenGPGandExternalGPGCompatibility(t *testing.T) {
 		bytes1, err := ec.Encrypt(bytes.NewReader(token))
 		assert.NoError(t, err)
 
-		reader, err := c.Decrypt(bytes.NewReader(bytes1))
+		reader, err := c.Decrypt(t.Context(), bytes.NewReader(bytes1))
 
 		assert.NoError(t, err)
 
