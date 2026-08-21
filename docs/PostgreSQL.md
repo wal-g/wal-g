@@ -338,6 +338,23 @@ INFO: Delta will be made from full backup.
 INFO: Delta backup from base_000000010000000100000040 with LSN 140000060.
 ```
 
+#### Build the delta map from WAL summaries
+When making a delta backup, WAL-G computes which blocks changed since the base backup. By default it downloads the previous backup's WAL files from storage and replays them, falling back to a full scan of the data directory if that fails (see `WALG_FORCE_WAL_DELTA`).
+
+On PostgreSQL 17+ the server can track changed blocks itself through the `walsummarizer` background process, writing WAL summaries to `$PGDATA/pg_wal/summaries`. The `--delta-from-wal-summaries` flag tells WAL-G to build the delta map straight from these summaries instead of downloading and replaying WAL. This avoids the storage round-trip and the full-scan fallback.
+
+```bash
+wal-g backup-push /path --delta-from-wal-summaries
+```
+
+Requirements:
+
+* PostgreSQL 17 or newer.
+* `summarize_wal = on` on the server.
+* WAL-G runs with filesystem access to `$PGDATA`
+* Summaries must cover the full LSN range between the base backup and the current backup. If any are missing (for example, pruned by `wal_summary_keep_time`), WAL-G aborts rather than producing an incomplete delta.
+* Cannot be combined with `--full`.
+
 #### Page checksums verification
 To enable verification of the page checksums during the backup-push, use the `--verify` flag or set the `WALG_VERIFY_PAGE_CHECKSUMS` env variable. If found any, corrupted block numbers (currently no more than 10 of them) will be recorded to the backup sentinel json, for example:
 ```json
