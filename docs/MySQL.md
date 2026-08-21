@@ -219,6 +219,13 @@ If `until` timestamp is in the future, wal-g will search for newly uploaded binl
 Binlogs are temporarily save in `WALG_MYSQL_BINLOG_DST` folder.
 Replay command gets name of binlog to replay via environment variable `WALG_MYSQL_CURRENT_BINLOG` and stop-date via `WALG_MYSQL_BINLOG_END_TS`, which are set for each invocation.
 
+If the backup was taken with `xtrabackup`/`mariabackup`, wal-g reads the exact binlog file, position and (for MariaDB) GTID that were recorded in the backup at the time it finished, and stores them in the backup sentinel. Binlogs that are entirely older than that recorded file are not fetched at all (they were already fully captured by the backup). For the one binlog file that straddles the backup boundary, wal-g additionally sets:
+
+* `WALG_MYSQL_BINLOG_START_POSITION` — the numeric byte offset within that binlog file to resume from. Use it with `mariadb-binlog --start-position="$WALG_MYSQL_BINLOG_START_POSITION"` on MariaDB.
+* `WALG_MYSQL_BINLOG_LAST_GTID` — the last GTID applied by the backup, only set when the backup recorded one (MariaDB only). Do not pass this to MariaDB's `--start-position` — it expects a numeric offset, not a GTID string. It is intended for MySQL's `mysqlbinlog --exclude-gtids="$WALG_MYSQL_BINLOG_LAST_GTID"`.
+
+Both are only set when applicable (e.g. `WALG_MYSQL_BINLOG_START_POSITION` only for the binlog matching the recorded backup boundary); a replay command should treat their absence as "replay this binlog from its start".
+
 ```bash
 wal-g binlog-replay --since "backupname"
 ```
