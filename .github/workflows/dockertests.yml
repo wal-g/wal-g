@@ -3,6 +3,10 @@ name: Docker tests
 on:
   workflow_call:
     inputs:
+      pg-versions:
+        description: 'Space-separated PostgreSQL majors whose test images to build and cache'
+        type: string
+        required: true
       command-json-array:
         required: true
         type: string
@@ -12,30 +16,37 @@ env:
   CACHE_FILE_UBUNTU_18_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-18.04.tar
   CACHE_FILE_UBUNTU_22_04: ~/docker-images-${{ github.sha }}/wal-g_ubuntu-22.04.tar
   CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
-  CACHE_FILE_PG10_TESTS: ~/docker-images-${{ github.sha }}/pg10_tests.tar
-  CACHE_FILE_PG18_TESTS: ~/docker-images-${{ github.sha }}/pg18_tests.tar
-  IMAGE_PG10_TESTS: wal-g/pg10_tests
-  IMAGE_PG18_TESTS: wal-g/pg18_tests
   IMAGE_GOLANG: wal-g/golang
-  IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
 
 jobs:
+  # Build every image once here and cache it, so the test jobs below only load
+  # them instead of building their own. The cache is per commit.
   buildimages:
     name: Build images
     runs-on: ubuntu-latest
     steps:
+      # There is one image file per version, so the key must include the version
+      # list. A cache key is never overwritten, so an older key with fewer images
+      # would still be a hit and the missing images would be rebuilt every time.
+      - name: Resolve cache key
+        id: cachekey
+        env:
+          PG_VERSIONS: ${{ inputs.pg-versions }}
+        run: |
+          slug=$(echo "$PG_VERSIONS" | tr -s ' ' '-' | sed 's/^-//; s/-$//')
+          echo "key=docker-images-${{ github.sha }}-pg$slug" >>"$GITHUB_OUTPUT"
+
       #  use cache to pass docker images to the test jobs
       - name: Docker images caching
         id: cache-images
         uses: actions/cache@v6
         with:
           path: |
-            ${{ env.CACHE_FILE_PG10_TESTS }}
-            ${{ env.CACHE_FILE_PG18_TESTS }}
+            ${{ env.CACHE_FOLDER }}/pg*_tests.tar
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
-          key: ${{ env.IMAGES_CACHE_KEY }}
+          key: ${{ steps.cachekey.outputs.key }}
 
       - name: Cleanup space on runner
         run: |
@@ -71,7 +82,7 @@ jobs:
       # build images
       - name: Build images
         if: steps.cache-images.outputs.cache-hit != 'true'
-        run: make pg_save_image
+        run: make PG_VERSIONS="${{ inputs.pg-versions }}" pg_save_image
     env:
       USE_BROTLI: 1
       USE_LZO: 1
@@ -105,18 +116,26 @@ jobs:
           go-version-file: 'go.mod'
         id: go
 
+      # must be the same key as in buildimages, or no job will find the cache
+      - name: Resolve cache key
+        id: cachekey
+        env:
+          PG_VERSIONS: ${{ inputs.pg-versions }}
+        run: |
+          slug=$(echo "$PG_VERSIONS" | tr -s ' ' '-' | sed 's/^-//; s/-$//')
+          echo "key=docker-images-${{ github.sha }}-pg$slug" >>"$GITHUB_OUTPUT"
+
       # load docker images
       - name: Load docker images
         id: cache-images
         uses: actions/cache@v6
         with:
           path: |
-            ${{ env.CACHE_FILE_PG10_TESTS }}
-            ${{ env.CACHE_FILE_PG18_TESTS }}
+            ${{ env.CACHE_FOLDER }}/pg*_tests.tar
             ${{ env.CACHE_FILE_UBUNTU_18_04 }}
             ${{ env.CACHE_FILE_UBUNTU_22_04 }}
             ${{ env.CACHE_FILE_GOLANG }}
-          key: ${{ env.IMAGES_CACHE_KEY }}
+          key: ${{ steps.cachekey.outputs.key }}
 
       - name: Fail if no cached images
         if: steps.cache-images.outputs.cache-hit != 'true'

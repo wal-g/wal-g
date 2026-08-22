@@ -3,8 +3,12 @@ echo '\e[0;31m This test require some memory available to docker! \e[0m'
 echo 'It runs smooth on Colima with \e[0;31m 2 CPU / 8 GB Mem \e[0m and fails on 4 GB Mem.'
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 PGDATA_ALPHA="${PGDATA}_alpha"
 PGDATA_BETA="${PGDATA}_beta"
+# Raised from 4: PG 15 and later archive fewer segments for the same scale.
+PGBENCH_SCALE=8
 ALPHA_PORT=5432
 BETA_PORT=5433
 
@@ -48,10 +52,11 @@ initdb ${PGDATA_ALPHA}
 
 # preparation for replication
 cd ${PGDATA_ALPHA}
-echo "host  replication  repl              127.0.0.1/32  md5" >> pg_hba.conf
+echo "host  replication  repl              127.0.0.1/32  $(hba_repl_method ${PGDATA_ALPHA})" >> pg_hba.conf
 {
   echo "wal_level = replica"
-  echo "wal_keep_segments = 3"
+  # Alpha must still keep the WAL where the two clusters diverged, for pg_rewind.
+  echo "$(wal_keep_conf 32 ${PGDATA_ALPHA})"
   echo "max_wal_senders = 2"
   echo "hot_standby = on"
   echo "listen_addresses = 'localhost'"
@@ -86,7 +91,7 @@ cd ${PGDATA_BETA}
   echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g wal-push %p --config=${TMP_CONFIG}'"
   echo "archive_timeout = 600"
 } >> postgresql.conf
-cat > recovery.conf << EOF
+write_standby_settings ${PGDATA_BETA} << EOF
 standby_mode = 'on'
 primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
 restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
@@ -96,27 +101,24 @@ EOF
 pg_ctl -D ${PGDATA_BETA} -w start
 
 # fill database postgres
-pgbench -i -s 4 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+pgbench -i -s ${PGBENCH_SCALE} -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
-# Wait for WAL files to be archived. Not strictly required, but better to do(see below notes):
-#
-# The expected count (6) of WAL files is tightly
-# coupled with pgbench -s parameter. If you modify the pgbench scale factor (-s 4),
-# you MUST adjust this expected_count accordingly. Current correlation: -s 4 => 6
-# WAL files.
+# Wait for WAL to be archived. The numbers below are minimums, not exact values,
+# and they depend on PGBENCH_SCALE.
 if ! check_archiving_status ${ALPHA_PORT} 6 10; then
     echo "Failed to wait for archiving completion on alpha instance"
     exit 1
 fi
 
 #                                               db       table            conn_port    row_count
-/tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} 400000 # 4 * 100000, 4 is value of -s in pgbench
+# pgbench_accounts has 100k rows for each scale unit
+/tmp/scripts/wait_while_replication_complete.sh postgres pgbench_accounts ${BETA_PORT} $((PGBENCH_SCALE * 100000))
 
 pg_ctl -D ${PGDATA_ALPHA} -m fast -w stop
 
 pg_ctl -D ${PGDATA_BETA} -w promote
 
-pgbench -i -s 4 -h 127.0.0.1 -p ${BETA_PORT} postgres
+pgbench -i -s ${PGBENCH_SCALE} -h 127.0.0.1 -p ${BETA_PORT} postgres
 
 # NOTES: Must wait for archiving completion before stopping the database for two reasons:
 #
@@ -143,7 +145,7 @@ pg_ctl -D ${PGDATA_ALPHA} -w start
 PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
 
 
-pgbench -i -s 4 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
+pgbench -i -s ${PGBENCH_SCALE} -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
 # Wait for WAL files to be archived. Not strictly required, but better to do(see above notes):
 if ! check_archiving_status ${ALPHA_PORT} 8 10; then

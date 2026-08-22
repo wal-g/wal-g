@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/several_delta_backups_test_config.json"
 
@@ -31,22 +33,22 @@ pkill pgbench
 pg_ctl -D ${PGDATA} -m smart -w stop
 pg_ctl -D ${PGDATA} -w -t 100500 start
 
-pg_dumpall -f /tmp/dump1
+dump_all /tmp/dump1
 sleep 1
 /tmp/scripts/drop_pg.sh
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
 pg_ctl -D ${PGDATA} -w -t 100500 start
 sleep 10
 
 
-pg_dumpall -f /tmp/dump2
+dump_all /tmp/dump2
 
 psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 
-diff /tmp/dump1 /tmp/dump2
+compare_dumps /tmp/dump1 /tmp/dump2
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
