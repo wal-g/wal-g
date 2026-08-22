@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 mkdir /tmp/storage
 
 . /tmp/tests/test_functions/prepare_config.sh
@@ -17,7 +19,7 @@ pg_ctl -D ${PGDATA} -w start
 wal-g --config=${TMP_CONFIG} delete everything FORCE --confirm
 
 pgbench -i -s 4 postgres
-pg_dumpall -f /tmp/dump1
+dump_all /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
@@ -28,15 +30,15 @@ rm -rf "${PGDATA}"
 
 wal-g --config=${TMP_CONFIG} --turbo backup-fetch "${PGDATA}" LATEST
 
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > "${PGDATA}"/recovery.conf
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
 pg_ctl -D "${PGDATA}" -w start
 
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-pg_dumpall -f /tmp/dump2
+dump_all /tmp/dump2
 
-diff /tmp/dump1 /tmp/dump2
+compare_dumps /tmp/dump1 /tmp/dump2
 
 pkill -9 postgres
 rm -rf "${PGDATA}"
