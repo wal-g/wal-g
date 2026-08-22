@@ -6,6 +6,8 @@
 # 3. WAL-G can restore using --restore-spec to different tablespace locations
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 initdb ${PGDATA}
 
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
@@ -49,7 +51,7 @@ psql -c "insert into users (id, name, password) values(1, 'ismirn0ff', 'password
 psql -c "insert into users (id, name, password) values(2, 'tinsane', 'qwerty');"
 psql -c "insert into users (id, name, password) values(3, 'godjan', 'g0djan');"
 psql -c "insert into users (id, name, password) values(4, 'x4m', 'borodin');"
-pg_dumpall -f /tmp/dump1
+dump_all /tmp/dump1
 sleep 1
 
 # Create WAL-G backup with tablespaces
@@ -147,6 +149,11 @@ else
 fi
 
 # Setup recovery
+
+cp -t ${PGDATA} /tmp/conf_files/postgresql.conf /tmp/conf_files/pg_hba.conf /tmp/conf_files/pg_ident.conf
+
+# Recovery settings must be written AFTER the configs are copied back: on
+# PG >= 12 they go into postgresql.conf, which the cp above would overwrite.
 echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& \
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
@@ -162,18 +169,16 @@ PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALG_FILE_PREFIX=file://localhost/tmp \
 WALG_LOG_DESTINATION=stderr \
-/usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
-
-cp -t ${PGDATA} /tmp/conf_files/postgresql.conf /tmp/conf_files/pg_hba.conf /tmp/conf_files/pg_ident.conf
+/usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
 pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
-pg_dumpall -f /tmp/dump2
+dump_all /tmp/dump2
 
 # Verify data is identical
 sed -i "s|LOCATION '/tmp/spaces/space'|LOCATION '/tmp/new_spaces/new_space'|" /tmp/dump1
 sed -i "s|LOCATION '/tmp/spaces/space2'|LOCATION '/tmp/new_spaces/new_space2'|" /tmp/dump1
-diff /tmp/dump1 /tmp/dump2
+compare_dumps /tmp/dump1 /tmp/dump2
 
 # Verify tablespace files are in the NEW locations
 echo "=== Verifying tablespace data is in new locations ==="

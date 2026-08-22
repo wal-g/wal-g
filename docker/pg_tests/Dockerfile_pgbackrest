@@ -1,26 +1,54 @@
-FROM ubuntu:18.04 as build
+# pgBackRest is built from source and added to a wal-g pg test image. The base
+# image and the version are arguments, because they differ per version: PG 10
+# uses bionic and 2.36, PG 14-18 use jammy and 2.59.0. Both ARGs are used by
+# FROM, so they must be declared before the first FROM.
+ARG PGBACKREST_BUILD_BASE=ubuntu:22.04
+ARG PG_TESTS_IMAGE=wal-g/pg10_tests:latest
 
-RUN apt-get update && apt-get install -y curl
+FROM ${PGBACKREST_BUILD_BASE} AS build
 
-RUN mkdir -p /build
+ARG PGBACKREST_VERSION=2.59.0
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN curl -fsSL https://github.com/pgbackrest/pgbackrest/archive/release/2.36.tar.gz | tar zx -C /build
-RUN apt-get install -y make gcc libpq-dev libssl-dev libxml2-dev pkg-config liblz4-dev libzstd-dev libbz2-dev libz-dev libyaml-dev
+# Retry apt downloads; this upstream image has none of the wal-g apt settings.
+RUN printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80-retries
 
-RUN cd /build/pgbackrest-release-2.36/src && ./configure && make
+RUN apt-get update && \
+    apt-get install --yes --no-install-recommends \
+        git ca-certificates \
+        build-essential pkg-config \
+        libpq-dev libssl-dev libxml2-dev liblz4-dev libzstd-dev libbz2-dev libz-dev libyaml-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-FROM wal-g/pg10_tests:latest
+# Clone the repository instead of downloading the source archive: .gitattributes
+# marks src/build as export-ignore, so the archive does not have it, and meson
+# then fails with "File build/common/regExp.c does not exist".
+RUN git clone --quiet --depth 1 --branch release/${PGBACKREST_VERSION} \
+        https://github.com/pgbackrest/pgbackrest.git /build/src
 
-COPY --from=build /build/pgbackrest-release-2.36/src/pgbackrest /usr/bin
+# From 2.54 on, meson is the only build system. Older versions, like the 2.36
+# used for the bionic/PG 10 image, still have src/configure.
+RUN set -eux; \
+    if [ -f /build/src/meson.build ]; then \
+        apt-get update && \
+        apt-get install --yes --no-install-recommends meson ninja-build && \
+        rm -rf /var/lib/apt/lists/*; \
+        meson setup /build/out /build/src; \
+        ninja -C /build/out; \
+        cp /build/out/src/pgbackrest /build/pgbackrest; \
+    else \
+        cd /build/src/src && ./configure && make; \
+        cp /build/src/src/pgbackrest /build/pgbackrest; \
+    fi
 
+FROM ${PG_TESTS_IMAGE}
+
+COPY --from=build /build/pgbackrest /usr/bin/pgbackrest
 
 RUN chmod 755 /usr/bin/pgbackrest && \
     mkdir -p -m 770 /var/log/pgbackrest && \
     chown postgres:postgres /var/log/pgbackrest && \
-    mkdir -p /etc/pgbackrest && \
-    mkdir -p /etc/pgbackrest && \
     mkdir -p /etc/pgbackrest/conf.d && \
     touch /etc/pgbackrest/pgbackrest.conf && \
     chmod 640 /etc/pgbackrest/pgbackrest.conf && \
     chown postgres:postgres /etc/pgbackrest/pgbackrest.conf
-

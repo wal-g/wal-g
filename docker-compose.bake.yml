@@ -54,26 +54,35 @@ services:
       cache_to:
         - type=gha,mode=max,scope=walg-pg10-tests
 
-  # pg18 builds on ubuntu 22.04, not bionic (UBUNTU_TAG=22.04, see docker-compose.yml)
-  pg18:
+  # These two services cover PostgreSQL 14-18 and build on ubuntu 22.04, not
+  # bionic. PG_MAJOR is part of the cache scope, so every version has its own
+  # cache; with one shared cache each version change would rebuild everything.
+  pg:
     build:
       additional_contexts:
         wal-g/ubuntu:22.04: service:ubuntu_22_04
       cache_from:
-        - type=gha,scope=walg-pg18
+        - type=gha,scope=walg-pg${PG_MAJOR}
         - type=gha,scope=walg-ubuntu-2204
       cache_to:
-        - type=gha,mode=max,scope=walg-pg18
+        - type=gha,mode=max,scope=walg-pg${PG_MAJOR}
 
-  pg18_tests_template:
+  pg_tests_template:
     build:
+      # One line per supported version: compose replaces variables in values but
+      # not in keys, so ${PG_MAJOR} cannot be used on the left. buildx reads only
+      # the line that matches FROM. A new version needs one more line here.
       additional_contexts:
         wal-g/golang: service:golang
-        wal-g/pg18: service:pg18
+        wal-g/pg14: service:pg
+        wal-g/pg15: service:pg
+        wal-g/pg16: service:pg
+        wal-g/pg17: service:pg
+        wal-g/pg18: service:pg
       cache_from:
-        - type=gha,scope=walg-pg18-tests
-        - type=gha,scope=walg-pg18
+        - type=gha,scope=walg-pg${PG_MAJOR}-tests
+        - type=gha,scope=walg-pg${PG_MAJOR}
         - type=gha,scope=walg-golang
         - type=gha,scope=walg-ubuntu-2204
       cache_to:
-        - type=gha,mode=max,scope=walg-pg18-tests
+        - type=gha,mode=max,scope=walg-pg${PG_MAJOR}-tests
