@@ -62,10 +62,10 @@ services:
       additional_contexts:
         wal-g/ubuntu:22.04: service:ubuntu_22_04
       cache_from:
-        - type=gha,scope=walg-pg${PG_MAJOR:-18}
+        - type=gha,scope=walg-pg${PG_MAJOR}
         - type=gha,scope=walg-ubuntu-2204
       cache_to:
-        - type=gha,mode=max,scope=walg-pg${PG_MAJOR:-18}
+        - type=gha,mode=max,scope=walg-pg${PG_MAJOR}
 
   pg_tests_template:
     build:
@@ -80,9 +80,9 @@ services:
         wal-g/pg17: service:pg
         wal-g/pg18: service:pg
       cache_from:
-        - type=gha,scope=walg-pg${PG_MAJOR:-18}-tests
-        - type=gha,scope=walg-pg${PG_MAJOR:-18}
+        - type=gha,scope=walg-pg${PG_MAJOR}-tests
+        - type=gha,scope=walg-pg${PG_MAJOR}
         - type=gha,scope=walg-golang
         - type=gha,scope=walg-ubuntu-2204
       cache_to:
-        - type=gha,mode=max,scope=walg-pg${PG_MAJOR:-18}-tests
+        - type=gha,mode=max,scope=walg-pg${PG_MAJOR}-tests
