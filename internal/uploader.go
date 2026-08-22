@@ -2,7 +2,7 @@ package internal
 
 import (
 	"context"
-	json2 "encoding/json/v2"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -212,7 +212,8 @@ func (uploader *RegularUploader) UploadJSON(ctx context.Context, path string, da
 
 	errorGroup, _ := errgroup.WithContext(ctx)
 	errorGroup.Go(func() error {
-		err := json2.MarshalWrite(writer, data)
+		encoder := json.NewEncoder(writer)
+		err := encoder.Encode(data)
 		if err != nil {
 			_ = writer.CloseWithError(err)
 			return err
