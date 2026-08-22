@@ -34,7 +34,7 @@ ENV PGDATA /var/lib/postgresql/17/main
 
 RUN apt-get update && \
 	DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends --no-install-suggests \
-		curl
+		curl jq
 
 RUN mkdir -p /usr/src/postgresql/contrib/orioledb && chmod 777 /usr/src/postgresql/contrib/orioledb
 
@@ -42,7 +42,7 @@ WORKDIR /usr/src/postgresql/contrib/orioledb
 RUN set -eux; \
 	git init; \
 	git remote add origin https://github.com/orioledb/orioledb.git; \
-	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +beta16-pre-2:refs/remotes/origin/main; \
+	git -c protocol.version=2 fetch --no-tags --prune --progress --no-recurse-submodules --depth=1 origin +beta16:refs/remotes/origin/main; \
 	git checkout --progress --force -B main refs/remotes/origin/main;
 
 WORKDIR /
