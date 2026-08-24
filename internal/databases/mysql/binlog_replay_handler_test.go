@@ -58,6 +58,20 @@ func newTestReplayHandler(
 	binlogEndErrors map[string]error,
 ) (rh *replayHandler, paths []string, replayed *[]string) {
 	t.Helper()
+	return newTestReplayHandlerWithBoundary(t, appliedGTID, "", files, binlogEndStates, binlogEndErrors)
+}
+
+// newTestReplayHandlerWithBoundary adds control over the backup's boundary
+// file name, to test the file-number pre-filter alongside a GTID checkpoint.
+func newTestReplayHandlerWithBoundary(
+	t *testing.T,
+	appliedGTID string,
+	backupFileName string,
+	files []string,
+	binlogEndStates map[string]string,
+	binlogEndErrors map[string]error,
+) (rh *replayHandler, paths []string, replayed *[]string) {
+	t.Helper()
 	dir := t.TempDir()
 	replayed = &[]string{}
 
@@ -70,6 +84,7 @@ func newTestReplayHandler(
 	rh = new(replayHandler)
 	rh.endTS = "2026-01-01 00:00:00"
 	rh.backupBinlogPos.LastGTID = appliedGTID
+	rh.backupBinlogPos.FileName = backupFileName
 	rh.logCh = make(chan string, binlogFetchAhead)
 	rh.errCh = make(chan error, 1)
 
@@ -166,4 +181,87 @@ func TestReplayLogs_GTIDLookupErrorFallsBackToReplaying(t *testing.T) {
 	// Both replayed: the failed lookup falls back to replaying
 	// mysql-bin.000005 and turns off skipping for the rest of the run.
 	assert.Equal(t, files, *replayed)
+}
+
+func TestReplayLogs_GTIDOverridesFileNumberPreFilterAfterFailover(t *testing.T) {
+	// Lower file number than the boundary, but still genuinely new data.
+	files := []string{"mysql-bin.000001", "mysql-bin.000002"}
+	rh, paths, replayed := newTestReplayHandlerWithBoundary(t, "0-1-100", "mysql-bin.000005", files,
+		map[string]string{
+			"mysql-bin.000001": "0-1-150", // genuinely new, despite the low file number
+		},
+		nil,
+	)
+	feedAll(t, rh, paths)
+
+	require.NoError(t, rh.wait())
+	assert.Equal(t, files, *replayed)
+}
+
+func TestReplayLogs_FileNumberPreFilterStillAppliesWithoutGTID(t *testing.T) {
+	// No GTID checkpoint -- the old filename-only shortcut still applies.
+	files := []string{"mysql-bin.000001", "mysql-bin.000002"}
+	rh, paths, replayed := newTestReplayHandlerWithBoundary(t, "", "mysql-bin.000005", files, nil, nil)
+	feedAll(t, rh, paths)
+
+	require.NoError(t, rh.wait())
+	assert.Empty(t, *replayed)
+}
+
+func TestShouldApplyStartPosition(t *testing.T) {
+	tests := []struct {
+		name           string
+		backupFileName string
+		backupPosition int64
+		backupLastGTID string
+		actualServerID uint32
+		serverIDErr    error
+		candidateName  string
+		want           bool
+	}{
+		{
+			name:           "no gtid recorded -- old filename-only behavior",
+			backupFileName: "mysql-bin.000003", backupPosition: 385, backupLastGTID: "",
+			candidateName: "mysql-bin.000003", want: true,
+		},
+		{
+			name:           "matching filename and matching server id",
+			backupFileName: "mysql-bin.000003", backupPosition: 385, backupLastGTID: "0-1-12",
+			actualServerID: 1, candidateName: "mysql-bin.000003", want: true,
+		},
+		{
+			name:           "matching filename but different server -- coincidental match after failover",
+			backupFileName: "mysql-bin.000003", backupPosition: 385, backupLastGTID: "0-1-12",
+			actualServerID: 2, candidateName: "mysql-bin.000003", want: false,
+		},
+		{
+			name:           "different filename entirely",
+			backupFileName: "mysql-bin.000003", backupPosition: 385, backupLastGTID: "0-1-12",
+			actualServerID: 1, candidateName: "mysql-bin.000004", want: false,
+		},
+		{
+			name:           "no position recorded",
+			backupFileName: "mysql-bin.000003", backupPosition: 0, backupLastGTID: "0-1-12",
+			actualServerID: 1, candidateName: "mysql-bin.000003", want: false,
+		},
+		{
+			name:           "server id lookup fails -- don't trust the position",
+			backupFileName: "mysql-bin.000003", backupPosition: 385, backupLastGTID: "0-1-12",
+			serverIDErr: assert.AnError, candidateName: "mysql-bin.000003", want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rh := new(replayHandler)
+			rh.backupBinlogPos.FileName = tt.backupFileName
+			rh.backupBinlogPos.FilePosition = tt.backupPosition
+			rh.backupBinlogPos.LastGTID = tt.backupLastGTID
+			rh.getBinlogServerID = func(string) (uint32, error) {
+				return tt.actualServerID, tt.serverIDErr
+			}
+
+			got := rh.shouldApplyStartPosition(filepath.Join(t.TempDir(), tt.candidateName))
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -27,8 +28,9 @@ type replayHandler struct {
 
 	// Test seams for the skip/replay decision logic; default to the real
 	// implementations in newReplayHandler.
-	getPreviousGTIDs func(filename, flavor string) (gomysql.GTIDSet, error)
-	doReplay         func(ctx context.Context, binlogPath string) error
+	getPreviousGTIDs  func(filename, flavor string) (gomysql.GTIDSet, error)
+	getBinlogServerID func(filename string) (uint32, error)
+	doReplay          func(ctx context.Context, binlogPath string) error
 }
 
 func newReplayHandler(ctx context.Context, endTS time.Time, backupBinlogPos BinlogPos) *replayHandler {
@@ -36,6 +38,7 @@ func newReplayHandler(ctx context.Context, endTS time.Time, backupBinlogPos Binl
 	rh.endTS = endTS.Local().Format(TimeMysqlFormat)
 	rh.backupBinlogPos = backupBinlogPos
 	rh.getPreviousGTIDs = GetBinlogPreviousGTIDs
+	rh.getBinlogServerID = GetBinlogServerID
 	rh.doReplay = rh.replayLog
 	rh.logCh = make(chan string, binlogFetchAhead)
 	rh.errCh = make(chan error, 1)
@@ -81,7 +84,9 @@ loop:
 	for binlogPath := range rh.logCh {
 		binlogName := path.Base(binlogPath)
 
-		if BinlogNum(binlogName) < backupBinlogNum {
+		// Skip once there's a GTID checkpoint -- file numbers aren't
+		// trustworthy after a failover.
+		if appliedGTID == nil && BinlogNum(binlogName) < backupBinlogNum {
 			tracelog.InfoLogger.Printf("skipping %s (before backup boundary %s)", binlogName, rh.backupBinlogPos.FileName)
 			os.Remove(binlogPath)
 			continue
@@ -179,9 +184,9 @@ func (rh *replayHandler) replayLog(ctx context.Context, binlogPath string) error
 		env = append(env, fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_LAST_GTID", rh.backupBinlogPos.LastGTID))
 	}
 
-	startPosition := rh.backupBinlogPos.FilePosition
 	binlogName := path.Base(binlogPath)
-	if binlogName == rh.backupBinlogPos.FileName && startPosition > 0 {
+	if rh.shouldApplyStartPosition(binlogPath) {
+		startPosition := rh.backupBinlogPos.FilePosition
 		tracelog.InfoLogger.Printf("replaying %s from position %d (backup boundary)", binlogName, startPosition)
 		env = append(env,
 			fmt.Sprintf("%s=%s", "WALG_MYSQL_BINLOG_START_POSITION", strconv.FormatInt(startPosition, 10)),
@@ -189,6 +194,30 @@ func (rh *replayHandler) replayLog(ctx context.Context, binlogPath string) error
 	}
 	cmd.Env = env
 	return cmd.Run()
+}
+
+// shouldApplyStartPosition rejects a same-named file from a different
+// server after a failover.
+func (rh *replayHandler) shouldApplyStartPosition(binlogPath string) bool {
+	binlogName := filepath.Base(binlogPath) // local file, not a storage path
+	if binlogName != rh.backupBinlogPos.FileName || rh.backupBinlogPos.FilePosition <= 0 {
+		return false
+	}
+	if rh.backupBinlogPos.LastGTID == "" {
+		return true
+	}
+	backupGTID, err := gomysql.ParseMariadbGTID(rh.backupBinlogPos.LastGTID)
+	if err != nil {
+		return true
+	}
+	actualServerID, err := rh.getBinlogServerID(binlogPath)
+	if err != nil {
+		tracelog.WarningLogger.Printf(
+			"could not verify server id of %s: %v -- not trusting the backup boundary position",
+			binlogName, err)
+		return false
+	}
+	return actualServerID == backupGTID.ServerID
 }
 
 func (rh *replayHandler) wait() error {
