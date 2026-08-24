@@ -1,6 +1,8 @@
-# Journal objects
+# Journal and shared size objects
 
 A journal records the volume of WAL archived between one backup and the next. It is the same object every WAL-G database keeps, and it knows nothing about Greenplum specifics such as AO/AOCS or PAX storage.
+
+The shared size is the second, independent figure: the volume a backup added to the AO/AOCS and PAX storage shared between backups. It is Greenplum-specific and lives in objects of its own.
 
 ## Storage layout
 
@@ -8,8 +10,10 @@ A journal records the volume of WAL archived between one backup and the next. It
 basebackups_005/                                 ← cluster
   backup_<timestamp>_backup_stop_sentinel.json   ← names the backup of every segment
   journal_backup_<timestamp>                     ← WAL volume, whole cluster
+  backup_<timestamp>/{ao,pax}_files_metadata.json ← shared volume, whole cluster
 segments_005/seg-1/                              ← coordinator
   basebackups_005/journal_base_<...>             ← journal of this segment
+  basebackups_005/{aosegments,paxfiles}/         ← the shared storage itself
   wal_005/                                       ← WAL of this segment
 segments_005/seg0/                               ← segment 0, and so on
   ...
@@ -42,3 +46,13 @@ The volume is measured differently at the two levels. A **segment** sums the sto
 The cluster figure is therefore not a wall-clock window: a segment finishes its ``backup-push`` before the coordinator creates the restore point, so WAL archived in between lands in that segment's *next* interval. Nothing is lost or double counted along the chain, but the total is not the volume archived cluster-wide between two backup finish times.
 
 Sizes come from the storage object sizes, so they reflect compression and encryption — unlike an estimate derived from the LSN difference.
+
+## Shared size
+
+AO/AOCS and PAX files live in storage shared between backups, where an unchanged file is uploaded once and reused later through deduplication.
+
+Each **segment** records what its uploaders actually pushed as ``UploadedSharedSize`` in its own ``ao_files_metadata.json`` and ``pax_files_metadata.json`` — a deduplicated file never reaches the uploader and is not counted. The **coordinator** sums the segments into the cluster-level pair as ``SharedSize``.
+
+AO and PAX stay in separate objects all the way up — separate deduplication age limits, separate cleanup passes.
+
+**TODO: make it exact.** ``SharedSize`` is never revisited after the backup is created, so when a backup is deleted its share vanishes even though newer backups still reuse some of its files, and the total drifts below the real storage size. The fix is a rule of ownership — an object belongs to the oldest surviving backup referencing it — recomputed on the segment during ``cleanupAOSegments``/``cleanupPaxFiles``, which already load every backup's metadata.

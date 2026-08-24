@@ -285,15 +285,30 @@ func (c *GpTarBallComposer) FinishComposing() (internal.TarFileSets, error) {
 		return nil, err
 	}
 
-	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), c.aoStorageUploader.GetFiles(), getAOFilesMetadataPath(c.backupName))
+	// The metadata carries the uploaded volume, so that the coordinator can sum it into the
+	// cluster-wide journal without the segments reporting it back through any other channel.
+	aoMeta := c.aoStorageUploader.GetFiles()
+	aoMeta.UploadedSharedSize, err = c.aoStorageUploader.UploadedDataSize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the uploaded AO files size: %w", err)
+	}
+
+	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), aoMeta, getAOFilesMetadataPath(c.backupName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload AO files metadata: %v", err)
 	}
 
-	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), c.paxStorageUploader.GetFiles(), pax.GetFilesMetadataPath(c.backupName))
+	paxMeta := c.paxStorageUploader.GetFiles()
+	paxMeta.UploadedSharedSize, err = c.paxStorageUploader.UploadedDataSize()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the uploaded PAX files size: %w", err)
+	}
+
+	err = internal.UploadDto(c.reqCtx, c.uploader.Folder(), paxMeta, pax.GetFilesMetadataPath(c.backupName))
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload PAX files metadata: %v", err)
 	}
+
 	return c.tarFileSets, nil
 }
 
