@@ -57,6 +57,7 @@ jobs:
         "make TEST=\"pg10_delete_target_delta_test\" pg_integration_test",
         "make TEST=\"pg10_delete_target_test\" pg_integration_test",
         "make TEST=\"pg10_delete_without_confirm_test\" pg_integration_test",
+        "make TEST=\"pg10_journals_test\" pg_integration_test",
         "make TEST=\"pg10_delta_backup_fullscan_test\" pg_integration_test",
         "make TEST=\"pg10_ghost_table_test\" pg_integration_test",
         "make TEST=\"pg10_several_delta_backups_test\" pg_integration_test",
