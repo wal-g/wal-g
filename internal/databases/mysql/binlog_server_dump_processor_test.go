@@ -130,13 +130,6 @@ func queryEvent(ts string) *replication.BinlogEvent {
 	return rawEvent(replication.QUERY_EVENT, ts, []byte("BEGIN"))
 }
 
-// tableMapEvent, writeRowsEvent, updateRowsEvent and deleteRowsEvent build
-// minimal placeholder row-based events. describeEvent identifies them by
-// their type byte alone (falling back to EventType.String()), so their
-// body content is irrelevant to the tests; only the type and timestamp
-// matter for exercising the streaming/filtering logic against a realistic
-// event mix (as opposed to a single QUERY_EVENT standing in for a whole
-// transaction).
 func tableMapEvent(ts string) *replication.BinlogEvent {
 	return rawEvent(replication.TABLE_MAP_EVENT, ts, []byte{0})
 }
@@ -158,7 +151,7 @@ func newTestProcessor(
 	files []binlogFile,
 	requiredGTIDs *mysql.MysqlGTIDSet,
 	untilTS time.Time,
-) (*BinlogDumpRequestProcessor, *recordingSink) {
+) (*BinlogDumpProcessor, *recordingSink) {
 	t.Helper()
 
 	eventsByName := make(map[string][]*replication.BinlogEvent, len(files))
@@ -168,7 +161,7 @@ func newTestProcessor(
 
 	sink := &recordingSink{}
 	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
-	p := &BinlogDumpRequestProcessor{
+	p := &BinlogDumpProcessor{
 		ctx:           context.Background(),
 		untilTS:       untilTS,
 		serverID:      1,
@@ -355,7 +348,7 @@ func TestProcess(t *testing.T) {
 			// switchover/failover may overlap: the same already-applied
 			// transaction can appear at the tail of one file and again
 			// at the head of the next.
-			name: "binlog files transcation overlap",
+			name: "binlog files transaction overlap",
 			files: []binlogFile{
 				{
 					name: "a.000001",

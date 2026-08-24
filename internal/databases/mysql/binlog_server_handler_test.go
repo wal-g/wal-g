@@ -13,9 +13,9 @@ func TestDecideSkipForGTID(t *testing.T) {
 	sidB := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	required, _ := mysql.ParseMysqlGTIDSet(sidA.String() + ":1-10," + sidB.String() + ":5")
-	newProcessor := func() *BinlogDumpRequestProcessor {
+	newProcessor := func() *BinlogDumpProcessor {
 		empty, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
-		return &BinlogDumpRequestProcessor{
+		return &BinlogDumpProcessor{
 			sentGTIDs:     empty,
 			requiredGTIDs: required.(*mysql.MysqlGTIDSet),
 		}

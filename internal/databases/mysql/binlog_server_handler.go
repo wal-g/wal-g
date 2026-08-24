@@ -18,10 +18,6 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-// binlogSourceParams groups the storage location, time window, and server
-// identity that the streaming pipeline uses. serverID is resolved once at
-// the handler level (see HandleBinlogServer) so the processor and query
-// handling never need to touch config directly.
 type binlogSourceParams struct {
 	rootFolder  storage.Folder
 	dstDir      string
@@ -33,22 +29,14 @@ type binlogSourceParams struct {
 
 // Handler is the go-mysql replication handler for one replica connection.
 // It implements server.ReplicationHandler (go-mysql interface) and delegates
-// the actual fetch/parse/stream pipeline to a binlogServerStreamer created
-// fresh for this connection.
+// the actual fetch/parse/stream pipeline to a BinlogDumpRequestProcessor
 type Handler struct {
 	server.EmptyReplicationHandler
-	ctx           context.Context //nolint:containedctx // detached binlog replication server outlives any request
-	cancel        context.CancelFunc
-	replicaSource string
-
-	// replicaStreamer is the go-mysql event queue returned to the replica
-	// connection; processor writes to it through a replicaStreamerSink.
-	replicaStreamer *replication.BinlogStreamer
-
-	// dumpCommandProcessor runs the fetch/parse pipeline for this connection's
-	// COM_BINLOG_DUMP / COM_BINLOG_DUMP_GTID request. It is created once in
-	// newHandler, so there is no concurrent write.
-	dumpCommandProcessor *BinlogDumpRequestProcessor
+	ctx                  context.Context //nolint:containedctx // detached binlog replication server outlives any request
+	cancel               context.CancelFunc
+	replicaSource        string
+	replicaStreamer      *replication.BinlogStreamer
+	dumpCommandProcessor *BinlogDumpProcessor
 }
 
 func newHandler(ctx context.Context, replicaSource string, params binlogSourceParams) *Handler {
@@ -155,6 +143,7 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 
 func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
+	// Ignore position as we always start from the beginning. It's safe as GTIDs provide deduplication.
 	go h.streamToReplica()
 	return h.replicaStreamer, nil
 }
@@ -186,8 +175,8 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"GTID_MODE"}, [][]interface{}{{"ON"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.server_uuid":
-		// the server uuid received by the query does not affect replication.
-		// during replication, the uuid is taken from events
+		// The server UUID received by the query does not affect replication.
+		// During replication, the UUID is taken from events.
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_UUID"}, [][]interface{}{{"0"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.rpl_semi_sync_master_enabled":

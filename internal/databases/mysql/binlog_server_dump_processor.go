@@ -15,57 +15,41 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// errUntilTSReached is returned by handleEvent (and propagated through
-// binlogEventParser.parse) once an event's timestamp exceeds untilTS. It
-// signals ProcessBinlogFile to stop parsing the current file early; it is
-// not a real error and is swallowed there so processing can move on to
-// (and still emit an artificial rotate for) any further files.
+// errUntilTSReached signals that an event's timestamp has exceeded the
+// target PITR time (untilTS). Since binlog events are ordered by
+// timestamp within and across files, no further events can be relevant,
+// so streaming stops immediately.
 var errUntilTSReached = errors.New("event timestamp is after untilTS")
 
-// binlogFileHeaderSize is the size of the binlog magic header
-// ("\xfebin") that precedes the first real event in every binlog file.
-// ParseFile offsets are always relative to this, regardless of which file
-// in the sequence is being parsed.
 const binlogFileHeaderSize = 4
 
-// binlogFetcher streams binlog file identifiers in order onto fileCh. It runs
-// in the background fetch goroutine and must close fileCh before returning
-// (success, error, or ctx cancellation) so the streaming core's consumer
-// loop terminates. cleanupFile releases any resources held for a file once
-// the streaming core is done with it (e.g. removing it from local disk);
-// implementations are responsible for logging their own cleanup failures.
+// binlogFetcher streams binlog files in order into fileCh. binlogFetcher is
+// responsible for closing fileCh before returning (success, error, or ctx
+// cancellation). The consumer is responsible for calling cleanupFile once
+// it is done with the file.
 type binlogFetcher interface {
 	fetchBinlogFiles(ctx context.Context, fileCh chan<- string) error
 	cleanupFile(file string)
 }
 
 // binlogEventParser turns one binlog file into a stream of events, invoking
-// emit for each event (mirrors replication.BinlogParser.ParseFile's callback
-// contract). It runs in the main streaming goroutine.
+// emit for each event.
 type binlogEventParser interface {
 	parse(file string, offset int64, emit func(*replication.BinlogEvent) error) error
 }
 
-// eventSink is the output side of the streaming pipeline: every event or
-// error the core produces goes through it.
+// eventSink is the output side of the streaming pipeline: every event produced
+// by binlogEventParser goes through it.
 type eventSink interface {
 	addEvent(event *replication.BinlogEvent) error
 }
 
-// expected by fetchLogs.
-type binlogHandlerFunc func(binlogPath string) error
-
-func (f binlogHandlerFunc) handleBinlog(binlogPath string) error {
-	return f(binlogPath)
-}
-
-// storageFetcher lists and downloads binlogs from storage, pushing each
-// downloaded path to fileCh. This is the production binlogFetcher.
-type storageFetcher struct {
+// S3 binlogFetcher implementation. This is the production binlogFetcher.
+type s3BinlogFetcher struct {
 	params binlogSourceParams
 }
 
-func (f *storageFetcher) fetchBinlogFiles(ctx context.Context, fileCh chan<- string) error {
+func (f *s3BinlogFetcher) fetchBinlogFiles(ctx context.Context, fileCh chan<- string) error {
 	defer close(fileCh)
 
 	if err := os.MkdirAll(f.params.dstDir, 0777); err != nil {
@@ -84,35 +68,37 @@ func (f *storageFetcher) fetchBinlogFiles(ctx context.Context, fileCh chan<- str
 	return fetchLogs(ctx, f.params.rootFolder, f.params.dstDir, f.params.startTS, f.params.untilTS, f.params.endBinlogTS, handleBinlog)
 }
 
-// cleanupFile removes the downloaded file from local disk once the streaming
-// core is done with it, logging a warning if removal fails.
-func (f *storageFetcher) cleanupFile(file string) {
+// fetchLogs helpers
+type binlogHandlerFunc func(binlogPath string) error
+
+func (f binlogHandlerFunc) handleBinlog(binlogPath string) error {
+	return f(binlogPath)
+}
+
+func (f *s3BinlogFetcher) cleanupFile(file string) {
 	if err := os.Remove(file); err != nil {
 		tracelog.WarningLogger.Printf("Failed to clean up %s: %v", file, err)
 	}
 }
 
-// fileEventParser parses a real binlog file from disk using go-mysql's raw
-// binlog parser. This is the production binlogEventParser.
-type fileEventParser struct {
+// Real binlog file parser. This is the production binlogEventParser.
+type fileBinlogEventParser struct {
 	parser *replication.BinlogParser
 }
 
-func newFileEventParser() *fileEventParser {
+func newFileEventParser() *fileBinlogEventParser {
 	parser := replication.NewBinlogParser()
 	parser.SetRawMode(true)
 	parser.SetFlavor(mysql.MySQLFlavor)
 	parser.SetVerifyChecksum(true)
-	return &fileEventParser{parser: parser}
+	return &fileBinlogEventParser{parser: parser}
 }
 
-func (p *fileEventParser) parse(file string, offset int64, emit func(*replication.BinlogEvent) error) error {
+func (p *fileBinlogEventParser) parse(file string, offset int64, emit func(*replication.BinlogEvent) error) error {
 	return p.parser.ParseFile(file, offset, emit)
 }
 
-// replicaStreamerSink wraps the go-mysql *replication.BinlogStreamer event
-// queue returned to the replica connection. This is the production
-// eventSink.
+// go-mysql replicaStreamer eventSink implementation. This is the production eventSink.
 type replicaStreamerSink struct {
 	replicaStreamer *replication.BinlogStreamer
 }
@@ -122,19 +108,14 @@ func (s *replicaStreamerSink) addEvent(e *replication.BinlogEvent) error {
 	return s.replicaStreamer.AddEventToStreamer(e)
 }
 
-// BinlogDumpRequestProcessor owns the output sink and the pipeline that
-// fetches binlog files, parses them, and forwards events to the replica for
-// a single COM_BINLOG_DUMP / COM_BINLOG_DUMP_GTID request. Fetching and
-// parsing are delegated to the injectable binlogFetcher/binlogEventParser
+// BinlogDumpProcessor is the main workhorse for the COM_BINLOG_DUMP[_GTID] command.
+// It fetches binlog files, parses them, and forwards events to the replica. Fetching and
+// parsing are delegated to the injectable binlogFetcher/binlogEventParser/eventSink
 // abstractions so the core can be exercised in tests without storage, disk,
 // or a real go-mysql streamer.
-type BinlogDumpRequestProcessor struct {
-	ctx     context.Context //nolint:containedctx // connection-scoped cancellation, derived from Handler.ctx
-	untilTS time.Time
-
-	// serverID is embedded in every artificial rotate event we emit; it is
-	// resolved once at the handler level (see HandleBinlogServer) and
-	// passed in, so the processor itself never touches config directly.
+type BinlogDumpProcessor struct {
+	ctx      context.Context //nolint:containedctx // connection-scoped cancellation, derived from Handler.ctx
+	untilTS  time.Time
 	serverID int
 
 	fetcher binlogFetcher
@@ -150,13 +131,13 @@ type BinlogDumpRequestProcessor struct {
 	skipCurrentTxn bool
 }
 
-func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParams, serverID int, sink eventSink) *BinlogDumpRequestProcessor {
+func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParams, serverID int, sink eventSink) *BinlogDumpProcessor {
 	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
-	return &BinlogDumpRequestProcessor{
+	return &BinlogDumpProcessor{
 		ctx:       ctx,
 		untilTS:   params.untilTS,
 		serverID:  serverID,
-		fetcher:   &storageFetcher{params: params},
+		fetcher:   &s3BinlogFetcher{params: params},
 		parser:    newFileEventParser(),
 		sink:      sink,
 		sentGTIDs: sent,
@@ -164,7 +145,7 @@ func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParam
 }
 
 // https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L53-L108
-func (p *BinlogDumpRequestProcessor) addRotateEvent(pos mysql.Position) error {
+func (p *BinlogDumpProcessor) addRotateEvent(pos mysql.Position) error {
 	// create rotate event
 	rotateBinlogEvent := replication.BinlogEvent{}
 
@@ -173,12 +154,12 @@ func (p *BinlogDumpRequestProcessor) addRotateEvent(pos mysql.Position) error {
 
 	rotateBinlogEvent.RawData = make([]byte, eventLength)
 	// generate header:
-	// timestamp default 4 bytes
+	// timestamp - 4 bytes (default)
 	binlogEventPos := binlogFileHeaderSize
 	// type - 1 byte
 	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
 	binlogEventPos++
-	// server_id- 4 bytes
+	// server_id - 4 bytes
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(p.serverID))
 	binlogEventPos += 4
 	// event_length - 4 bytes
@@ -207,10 +188,6 @@ func (p *BinlogDumpRequestProcessor) addRotateEvent(pos mysql.Position) error {
 	return p.sink.addEvent(&rotateBinlogEvent)
 }
 
-// logEventDebug logs a debug message about an event being sent or dropped.
-// It reads type and timestamp from RawData so it works for both real events
-// (read from binlog files) and artificial events (constructed as wire bytes
-// with a nil Header).
 func logEventDebug(e *replication.BinlogEvent, msg string) {
 	eventType := replication.EventType(e.RawData[binlogFileHeaderSize])
 	timestamp := binary.LittleEndian.Uint32(e.RawData[0:])
@@ -218,8 +195,7 @@ func logEventDebug(e *replication.BinlogEvent, msg string) {
 		msg, eventType, time.Unix(int64(timestamp), 0).Format("2006-01-02 15:04:05 UTC"))
 }
 
-// handleEvent is the per-event callback passed to the binlogEventParser.
-func (p *BinlogDumpRequestProcessor) handleEvent(e *replication.BinlogEvent) error {
+func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 	if p.ctx.Err() != nil {
 		return p.ctx.Err()
 	}
@@ -258,7 +234,7 @@ func (p *BinlogDumpRequestProcessor) handleEvent(e *replication.BinlogEvent) err
 
 // decideSkipForGTID updates skip state from a GTID_EVENT; returns true if
 // the caller should drop the event because the replica already applied it.
-func (p *BinlogDumpRequestProcessor) decideSkipForGTID(e *replication.BinlogEvent) bool {
+func (p *BinlogDumpProcessor) decideSkipForGTID(e *replication.BinlogEvent) bool {
 	p.skipCurrentTxn = false
 	ge := &replication.GTIDEvent{}
 	if ge.Decode(e.RawData[replication.EventHeaderSize:]) != nil {
@@ -280,11 +256,8 @@ func (p *BinlogDumpRequestProcessor) decideSkipForGTID(e *replication.BinlogEven
 }
 
 // processBinlogFiles consumes fetched binlog file identifiers from fileCh
-// and processes each in order, until fileCh is closed, ctx is cancelled, or
-// a file's events reach untilTS (errUntilTSReached), at which point there
-// is nothing left worth streaming from any further file and processing
-// stops for good.
-func (p *BinlogDumpRequestProcessor) processBinlogFiles(ctx context.Context, fileCh <-chan string) error {
+// and processes each in order.
+func (p *BinlogDumpProcessor) processBinlogFiles(ctx context.Context, fileCh <-chan string) error {
 	for {
 		select {
 		case file, ok := <-fileCh:
@@ -302,24 +275,22 @@ func (p *BinlogDumpRequestProcessor) processBinlogFiles(ctx context.Context, fil
 
 // ProcessBinlogFile parses one fetched binlog file and pushes its events to
 // the sink. Before parsing, it emits an artificial rotate event naming this
-// file so the replica's expected filename always tracks what we control,
-// regardless of what real (possibly stale/foreign) rotate events the file
-// itself contains. Every file starts right after the binlog magic header.
-// It runs on the main goroutine. The file is always released via the
-// fetcher's cleanupFile, regardless of parse outcome.
-func (p *BinlogDumpRequestProcessor) ProcessBinlogFile(file string) error {
+// file so the replica's expected filename always tracks what we control.
+// Every file starts right after the binlog magic header.
+func (p *BinlogDumpProcessor) ProcessBinlogFile(file string) error {
 	defer p.fetcher.cleanupFile(file)
 
 	if p.ctx.Err() != nil {
 		return p.ctx.Err()
 	}
 
+	tracelog.InfoLogger.Printf("Streaming %s to replica", file)
+
 	basename := path.Base(file)
 	if err := p.addRotateEvent(mysql.Position{Name: basename, Pos: binlogFileHeaderSize}); err != nil {
 		return err
 	}
 
-	tracelog.InfoLogger.Printf("Streaming %s to replica", file)
 	return p.parser.parse(file, binlogFileHeaderSize, p.handleEvent)
 }
 
@@ -327,10 +298,8 @@ func (p *BinlogDumpRequestProcessor) ProcessBinlogFile(file string) error {
 // the fetcher lists/downloads binlogs and streams file identifiers over
 // fileCh (closing it when done); the main goroutine parses each file and
 // pushes its events to the sink. Either goroutine failing cancels the
-// group's context and stops the other. Every file (including the first)
-// gets its own artificial rotate event via ProcessBinlogFile, so the
-// replica's requested resume position is not needed here.
-func (p *BinlogDumpRequestProcessor) process() error {
+// group's context and stops the other.
+func (p *BinlogDumpProcessor) process() error {
 	g, ctx := errgroup.WithContext(p.ctx)
 	fileCh := make(chan string, binlogFetchAhead)
 
