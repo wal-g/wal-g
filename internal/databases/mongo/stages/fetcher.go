@@ -234,7 +234,7 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 			}
 
 			if !firstFound {
-				if models.LessTS(op.TS, from) || sf.resumeAfter && models.Equal(op.TS, from) {
+				if sf.isBeforeStart(op.TS, from) {
 					models.PutOplogEntry(op)
 					continue
 				}
@@ -258,4 +258,8 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 	}()
 
 	return data, errc, nil
+}
+
+func (sf *StorageFetcher) isBeforeStart(ts, from models.Timestamp) bool {
+	return models.LessTS(ts, from) || sf.resumeAfter && models.Equal(ts, from)
 }
