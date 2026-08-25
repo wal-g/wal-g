@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
@@ -15,15 +16,20 @@ import (
 )
 
 const (
-	inlineMongodShutdownTimeout = 30 * time.Second
-	mongodExitDetectionTimeout  = time.Second
+	mongodExitDetectionTimeout = time.Second
 )
 
 func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
 	if replayArgs.FsyncInterval <= 0 {
 		replayArgs.FsyncInterval = 10 * time.Minute
 	}
+	if replayArgs.MinimalConfigPath != "" {
+		return runInlineOplogReplay(ctx, replayArgs)
+	}
+	return runOplogReplay(ctx, mongodbURL, replayArgs)
+}
 
+func runOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
 	// set up mongodb client and oplog applier
 	var mongoClientArgs []client.Option
 	if replayArgs.OplogAlwaysUpsert != nil {
@@ -33,35 +39,6 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	if replayArgs.OplogApplicationMode != nil {
 		mongoClientArgs = append(mongoClientArgs,
 			client.OplogApplicationMode(client.OplogAppMode(*replayArgs.OplogApplicationMode)))
-	}
-
-	initMongo := replayArgs.MinimalConfigPath != ""
-	if initMongo {
-		mongodProcess, err := Mongod(replayArgs.MinimalConfigPath).Start(ctx)
-		if err != nil {
-			return err
-		}
-		// Wait for inline mongod to actually exit before unwind: applier.Close
-		// issues graceful `shutdown` admin command on happy path (db.Close with
-		// initMongo=true), but Close() alone only SIGKILLs and races WiredTiger
-		// checkpoint, leaving mongod.lock that breaks subsequent restart (e.g.
-		// chown + supervisorctl in catch_up_stale_replica.feature). SIGKILL
-		// fallback covers early-error paths where shutdown is never sent.
-		defer func() {
-			done := make(chan struct{})
-			go func() {
-				_ = mongodProcess.Wait()
-				close(done)
-			}()
-			select {
-			case <-done:
-			case <-time.After(inlineMongodShutdownTimeout):
-				tracelog.WarningLogger.Printf("inline mongod did not exit gracefully within %s, killing", inlineMongodShutdownTimeout)
-				mongodProcess.Close()
-				<-done
-			}
-		}()
-		mongodbURL = mongodProcess.GetURI()
 	}
 
 	mongoClient, err := client.NewMongoClient(ctx, mongodbURL, mongoClientArgs...)
@@ -82,6 +59,8 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	}
 	if replayArgs.progress == nil {
 		replayArgs.progress = stages.NewReplayProgress(replayArgs.Since)
+	} else {
+		replayArgs.progress.Initialize(replayArgs.Since)
 	}
 
 	if err = mongoClient.EnsureIsMaster(ctx); err != nil {
@@ -94,7 +73,7 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		// the replica can rejoin replSet without NamespaceNotFound on master's UUIDs
 		PreserveUUID:   replayArgs.WithCatchUpReconfig,
 		Partial:        replayArgs.Partial,
-		InitMongo:      initMongo,
+		InitMongo:      false,
 		Reconfig:       replayArgs.WithCatchUpReconfig,
 		IgnoreErrCodes: replayArgs.IgnoreErrCodes,
 	})
@@ -124,6 +103,108 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 
 	// run worker cycle
 	return HandleOplogReplay(ctx, replayArgs.Since, replayArgs.Until, oplogFetcher, oplogApplier)
+}
+
+func runInlineOplogReplay(ctx context.Context, replayArgs ReplyOplogConfig) error {
+	progress := stages.NewReplayProgress(replayArgs.Since)
+	consecutiveRestarts := 0
+
+	for {
+		_, durableTS, generationBefore := progress.Snapshot()
+		progress.ResetAttempt()
+
+		attemptConfig := replayArgs
+		attemptConfig.MinimalConfigPath = ""
+		attemptConfig.Since = durableTS
+		attemptConfig.progress = progress
+		attemptConfig.resumeAfter = generationBefore > 0
+
+		mongodCrashed, err := runInlineOplogReplayAttempt(ctx, attemptConfig, replayArgs.MinimalConfigPath)
+		if err == nil {
+			return nil
+		}
+		if !mongodCrashed {
+			return err
+		}
+
+		_, durableTS, generationAfter := progress.Snapshot()
+		if generationAfter > generationBefore {
+			consecutiveRestarts = 0
+		}
+		if consecutiveRestarts >= replayArgs.MaxMongodRestarts {
+			return errors.Wrapf(err,
+				"inline mongod crashed after %d restarts, last durable oplog timestamp is %s",
+				consecutiveRestarts, durableTS)
+		}
+		consecutiveRestarts++
+		tracelog.WarningLogger.Printf(
+			"inline mongod crashed, restarting oplog replay after %s, attempt %d/%d",
+			durableTS, consecutiveRestarts, replayArgs.MaxMongodRestarts)
+	}
+}
+
+func runInlineOplogReplayAttempt(
+	ctx context.Context,
+	replayArgs ReplyOplogConfig,
+	minimalConfigPath string,
+) (bool, error) {
+	mongodProcess := Mongod(minimalConfigPath).
+		WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
+	if replayArgs.Partial {
+		mongodProcess.WithRestore()
+	}
+	if _, err := mongodProcess.Start(ctx); err != nil {
+		return false, errors.Wrap(err, "unable to start mongod in special mode")
+	}
+
+	waitC := make(chan error, 1)
+	go func() { waitC <- mongodProcess.Wait() }()
+	attemptCtx, cancelAttempt := context.WithCancel(ctx)
+	defer cancelAttempt()
+
+	mongodService, err := CreateMongodService(attemptCtx, "wal-g oplog replay", mongodProcess.GetURI(), 10*time.Minute)
+	if err != nil {
+		mongodProcess.Close()
+		<-waitC
+		return false, errors.Wrap(err, "unable to create mongod service")
+	}
+
+	replayC := make(chan error, 1)
+	go func() { replayC <- runOplogReplay(attemptCtx, mongodProcess.GetURI(), replayArgs) }()
+
+	select {
+	case processErr := <-waitC:
+		cancelAttempt()
+		<-replayC
+		return true, unexpectedMongodExit(processErr)
+
+	case replayErr := <-replayC:
+		if replayErr != nil {
+			select {
+			case processErr := <-waitC:
+				return true, unexpectedMongodExit(processErr)
+			// The driver may report a broken connection just before cmd.Wait publishes the process exit.
+			case <-time.After(mongodExitDetectionTimeout):
+				mongodProcess.Close()
+				<-waitC
+				return false, replayErr
+			}
+		}
+
+		if err = mongodService.Shutdown(ctx); err != nil {
+			mongodProcess.Close()
+			<-waitC
+			return false, err
+		}
+		return false, <-waitC
+	}
+}
+
+func unexpectedMongodExit(err error) error {
+	if err == nil {
+		return fmt.Errorf("inline mongod exited unexpectedly during oplog replay")
+	}
+	return errors.Wrap(err, "inline mongod exited during oplog replay")
 }
 
 func resolveOplogReplaySequence(

@@ -36,6 +36,15 @@ func (p *ReplayProgress) ResetAttempt() {
 	p.mu.Unlock()
 }
 
+func (p *ReplayProgress) Initialize(ts models.Timestamp) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.checkpointGeneration == 0 && !p.dirty {
+		p.lastHandledTS = ts
+		p.lastDurableTS = ts
+	}
+}
+
 func (p *ReplayProgress) NeedsCheckpoint() bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

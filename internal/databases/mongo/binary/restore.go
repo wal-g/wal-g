@@ -2,7 +2,6 @@ package binary
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -11,7 +10,6 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 )
 
 var (
@@ -237,113 +235,7 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(ctx context.C
 
 func (restoreService *RestoreService) oplogReply(ctx context.Context,
 	replayOplogConfig ReplyOplogConfig, partial bool) error {
-	if replayOplogConfig.FsyncInterval <= 0 {
-		replayOplogConfig.FsyncInterval = 10 * time.Minute
-	}
-	progress := stages.NewReplayProgress(replayOplogConfig.Since)
-	consecutiveRestarts := 0
-
-	for {
-		_, durableTS, generationBefore := progress.Snapshot()
-		progress.ResetAttempt()
-
-		attemptConfig := replayOplogConfig
-		attemptConfig.Since = durableTS
-		attemptConfig.progress = progress
-		attemptConfig.resumeAfter = generationBefore > 0
-
-		mongodCrashed, err := restoreService.runOplogReplayAttempt(ctx, attemptConfig, partial)
-		if err == nil {
-			return nil
-		}
-		if !mongodCrashed {
-			return err
-		}
-
-		_, durableTS, generationAfter := progress.Snapshot()
-		if generationAfter > generationBefore {
-			consecutiveRestarts = 0
-		}
-		if consecutiveRestarts >= replayOplogConfig.MaxMongodRestarts {
-			return errors.Wrapf(err,
-				"inline mongod crashed after %d restarts, last durable oplog timestamp is %s",
-				consecutiveRestarts, durableTS)
-		}
-		consecutiveRestarts++
-		tracelog.WarningLogger.Printf(
-			"inline mongod crashed, restarting oplog replay after %s, attempt %d/%d",
-			durableTS, consecutiveRestarts, replayOplogConfig.MaxMongodRestarts)
-	}
-}
-
-func (restoreService *RestoreService) runOplogReplayAttempt(
-	ctx context.Context,
-	replayOplogConfig ReplyOplogConfig,
-	partial bool,
-) (bool, error) {
-	mongodProcess := Mongod(restoreService.minimalConfigPath).
-		WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
-
-	if partial {
-		mongodProcess.WithRestore()
-	}
-
-	if _, err := mongodProcess.Start(ctx); err != nil {
-		return false, errors.Wrap(err, "unable to start mongod in special mode")
-	}
-	waitC := make(chan error, 1)
-	go func() { waitC <- mongodProcess.Wait() }()
-	attemptCtx, cancelAttempt := context.WithCancel(ctx)
-	defer cancelAttempt()
-
-	mongodService, err := CreateMongodService(
-		attemptCtx,
-		"wal-g restore",
-		mongodProcess.GetURI(),
-		10*time.Minute,
-	)
-	if err != nil {
-		mongodProcess.Close()
-		<-waitC
-		return false, errors.Wrap(err, "unable to create mongod service")
-	}
-
-	replayC := make(chan error, 1)
-	go func() {
-		replayC <- RunOplogReplay(attemptCtx, mongodProcess.GetURI(), replayOplogConfig)
-	}()
-
-	select {
-	case processErr := <-waitC:
-		cancelAttempt()
-		<-replayC
-		return true, unexpectedMongodExit(processErr)
-
-	case replayErr := <-replayC:
-		if replayErr != nil {
-			select {
-			case processErr := <-waitC:
-				return true, unexpectedMongodExit(processErr)
-			// The driver may report a broken connection just before cmd.Wait publishes the process exit.
-			case <-time.After(mongodExitDetectionTimeout):
-				mongodProcess.Close()
-				<-waitC
-				return false, replayErr
-			}
-		}
-
-		if err = mongodService.Shutdown(ctx); err != nil {
-			mongodProcess.Close()
-			<-waitC
-			return false, err
-		}
-		return false, <-waitC
-	}
-}
-
-func unexpectedMongodExit(err error) error {
-	if err == nil {
-		return fmt.Errorf("inline mongod exited unexpectedly during oplog replay")
-	}
-	return errors.Wrap(err, "inline mongod exited during oplog replay")
+	replayOplogConfig.Partial = partial
+	replayOplogConfig.MinimalConfigPath = restoreService.minimalConfigPath
+	return RunOplogReplay(ctx, "", replayOplogConfig)
 }
