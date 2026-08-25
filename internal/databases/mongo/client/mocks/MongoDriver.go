@@ -107,6 +107,24 @@ func (_m *MongoDriver) DropIndexes(ctx context.Context, dbName string, rawComman
 	return r0
 }
 
+// Fsync provides a mock function with given fields: ctx
+func (_m *MongoDriver) Fsync(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Fsync")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // EnsureIsMaster provides a mock function with given fields: ctx
 func (_m *MongoDriver) EnsureIsMaster(ctx context.Context) error {
 	ret := _m.Called(ctx)

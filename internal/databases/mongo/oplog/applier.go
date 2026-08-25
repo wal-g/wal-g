@@ -112,6 +112,11 @@ func (ap *DBApplier) IsPartial() bool {
 	return ap.partial
 }
 
+func (ap *DBApplier) HasPendingTransactions() bool {
+	oldest := ap.txnBuffer.OldestOpTime()
+	return oldest.Timestamp.T != 0 || oldest.Timestamp.I != 0
+}
+
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	op := db.Oplog{}
 	if err := bson.Unmarshal(opr.Data, &op); err != nil {
@@ -149,6 +154,8 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 }
 
 func (ap *DBApplier) Close(ctx context.Context) error {
+	defer ap.txnBuffer.Stop()
+
 	if ap.catchUp {
 		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastOpTime); err != nil {
 			return err
@@ -158,8 +165,6 @@ func (ap *DBApplier) Close(ctx context.Context) error {
 	if err := ap.db.Close(ctx, ap.initMongo); err != nil {
 		return err
 	}
-
-	ap.txnBuffer.Stop()
 
 	return nil
 }

@@ -14,9 +14,16 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const inlineMongodShutdownTimeout = 30 * time.Second
+const (
+	inlineMongodShutdownTimeout = 30 * time.Second
+	mongodExitDetectionTimeout  = time.Second
+)
 
 func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
+	if replayArgs.FsyncInterval <= 0 {
+		replayArgs.FsyncInterval = 10 * time.Minute
+	}
+
 	// set up mongodb client and oplog applier
 	var mongoClientArgs []client.Option
 	if replayArgs.OplogAlwaysUpsert != nil {
@@ -73,6 +80,9 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 			return err
 		}
 	}
+	if replayArgs.progress == nil {
+		replayArgs.progress = stages.NewReplayProgress(replayArgs.Since)
+	}
 
 	if err = mongoClient.EnsureIsMaster(ctx); err != nil {
 		return err
@@ -88,7 +98,12 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		Reconfig:       replayArgs.WithCatchUpReconfig,
 		IgnoreErrCodes: replayArgs.IgnoreErrCodes,
 	})
-	oplogApplier := stages.NewGenericApplier(dbApplier)
+	oplogApplier := stages.NewCheckpointingApplier(
+		mongoClient,
+		dbApplier,
+		replayArgs.FsyncInterval,
+		replayArgs.progress,
+	)
 
 	// set up storage downloader client
 	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
@@ -103,6 +118,9 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 
 	// setup storage fetcher
 	oplogFetcher := stages.NewStorageFetcher(downloader, path)
+	if replayArgs.resumeAfter {
+		oplogFetcher.WithResumeAfter()
+	}
 
 	// run worker cycle
 	return HandleOplogReplay(ctx, replayArgs.Since, replayArgs.Until, oplogFetcher, oplogApplier)

@@ -200,6 +200,21 @@ func (w *WalgUtil) FetchBinaryBackup(
 	return err
 }
 
+func (w *WalgUtil) FetchBinaryBackupWithPITR(
+	backup, mongodConfigPath, mongodbVersion, since, until string,
+) (ExecResult, error) {
+	command := []string{
+		"env",
+		"OPLOG_REPLAY_FSYNC_INTERVAL=1ms",
+		"OPLOG_REPLAY_MAX_MONGOD_RESTARTS=5",
+		w.cliPath, "--config", w.confPath,
+		"binary-backup-fetch", backup, mongodConfigPath, mongodbVersion,
+		"--pitr-since", since,
+		"--pitr-until", until,
+	}
+	return RunCommandStrict(w.ctx, w.host, command)
+}
+
 func (w *WalgUtil) BackupMeta(backupNum int) (Sentinel, error) {
 	backups, err := w.Backups()
 	if err != nil {

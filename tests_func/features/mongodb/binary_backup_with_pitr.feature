@@ -83,3 +83,21 @@ Feature: MongoDB binary backups with PITR
     And we restore from #1 backup to "after fourth load" timestamp to mongodb02
     And we save mongodb02 data "restore to after fourth load from second backup"
     Then we have same data in "after fourth load" and "restore to after fourth load from second backup"
+
+  Scenario: Binary PITR resumes after replay mongod crashes
+    Given mongodb01 has test mongodb data test1
+    And mongodb01 has 5000 replay transaction documents
+    And we create binary mongo-backup on mongodb01
+    And mongodb01 has 250 transactions with 20 documents each
+    And mongodb01 has been loaded with "load1"
+    And mongodb01 has been loaded with "load2"
+    And mongodb01 has been loaded with "load3"
+    And mongodb01 has been loaded with "load4"
+    And we save last oplog timestamp on mongodb01 to "after interrupted replay load"
+    And we save mongodb01 data "before interrupted replay restore"
+
+    Given mongodb02 has no data
+    And mongodb initialized on mongodb02
+    When we restore binary mongo-backup #0 to "after interrupted replay load" timestamp on mongodb02 and crash replay mongod
+    And we save mongodb02 data "after interrupted replay restore"
+    Then we have same data in "before interrupted replay restore" and "after interrupted replay restore"
