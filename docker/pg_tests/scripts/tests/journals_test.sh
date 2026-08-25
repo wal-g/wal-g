@@ -2,6 +2,7 @@
 set -e -x
 
 . /tmp/tests/test_functions/prepare_config.sh
+. /tmp/tests/test_functions/pg_compat.sh
 prepare_config "/tmp/configs/journals_test_config.json"
 
 get_journal_count() {
@@ -23,16 +24,11 @@ get_journal_size() {
 }
 
 force_new_wal() {
-    if awk 'BEGIN {exit !('"$PG_VERSION"' >= 10)}'; then
-        echo 'select pg_switch_wal();' | psql postgres
-    else
-        echo 'select pg_switch_xlog();' | psql postgres
-    fi
+    switch_wal postgres
     sleep 1
 }
 
 initdb ${PGDATA}
-PG_VERSION=$(cat "${PGDATA}/PG_VERSION")
 
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '/usr/bin/timeout 600 wal-g --config=${TMP_CONFIG} wal-push %p'" >> ${PGDATA}/postgresql.conf

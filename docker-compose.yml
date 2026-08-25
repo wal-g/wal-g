@@ -508,7 +508,7 @@ services:
 
   pg_journals_test:
     <<: *pg_test_common
-    container_name: wal-g_pg${PG_MAJOR:-10}_journals_test
+    container_name: wal-g_pg${PG_MAJOR}_journals_test
     command: /tmp/tests/journals_test.sh
 
   pg_ghost_table_test:
