@@ -259,6 +259,46 @@ func (mc *MongoCtl) WriteTestData(mark string, dbCount, tablesCount, docsCount i
 	return nil
 }
 
+func (mc *MongoCtl) WriteTransactions(transactionCount, documentsPerTransaction int) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	collection := conn.Database("replay_restart").Collection("transactions")
+
+	for transactionID := 0; transactionID < transactionCount; transactionID++ {
+		session, err := conn.StartSession()
+		if err != nil {
+			return err
+		}
+		_, err = session.WithTransaction(mc.ctx, func(ctx context.Context) (interface{}, error) {
+			firstDocumentID := transactionID * documentsPerTransaction
+			_, err := collection.UpdateMany(ctx, bson.M{
+				"_id": bson.M{"$gte": firstDocumentID, "$lt": firstDocumentID + documentsPerTransaction},
+			}, bson.M{"$set": bson.M{"updated": true, "transactionID": transactionID}})
+			return nil, err
+		})
+		session.EndSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("transaction %d failed: %w", transactionID, err)
+		}
+	}
+	return nil
+}
+
+func (mc *MongoCtl) PrepareTransactionDocuments(documentCount int) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	documents := make([]interface{}, documentCount)
+	for documentID := 0; documentID < documentCount; documentID++ {
+		documents[documentID] = bson.M{"_id": documentID, "updated": false}
+	}
+	_, err = conn.Database("replay_restart").Collection("transactions").InsertMany(mc.ctx, documents)
+	return err
+}
+
 func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
 	var snapshot []NsSnapshot
 

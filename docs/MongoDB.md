@@ -237,6 +237,16 @@ SINCE is included and UNTIL is NOT.
 wal-g oplog-replay 1593554109.1 1593559109.1
 ```
 
+During replay, WAL-G runs `fsync` periodically and remembers the last durable oplog timestamp in memory. The interval is
+configured with `OPLOG_REPLAY_FSYNC_INTERVAL` and defaults to `10m`.
+
+When `binary-backup-fetch` replays PITR data using its temporary `mongod`, WAL-G restarts that process after an unexpected
+exit and resumes after the last durable timestamp. `OPLOG_REPLAY_MAX_MONGOD_RESTARTS` limits consecutive restarts without
+durable progress and defaults to `5`.
+
+Recovery has at-least-once semantics: MongoDB may have persisted some operations after the last completed `fsync`, so an
+automatic restart can apply those operations again.
+
 ### Common constraints:
 
 - SINCE: operation timestamp before full backup started.
