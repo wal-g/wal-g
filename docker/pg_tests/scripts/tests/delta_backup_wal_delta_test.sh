@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 exit 0
 
 . /tmp/tests/test_functions/prepare_config.sh
@@ -20,7 +22,7 @@ pgbench -i -s 5 postgres
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
 pgbench -i -s 10 postgres
-pg_dumpall -f /tmp/dump1
+dump_all /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
@@ -28,13 +30,13 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
 pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
-pg_dumpall -f /tmp/dump2
+dump_all /tmp/dump2
 
-diff /tmp/dump1 /tmp/dump2
+compare_dumps /tmp/dump1 /tmp/dump2
 
 psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 /tmp/scripts/drop_pg.sh

@@ -12,7 +12,22 @@ PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go intern
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
-TEST := "pg10_tests"
+TEST := "pg_tests"
+# PostgreSQL version the test services run on. 10 uses the old bionic image (the
+# only one that has wal-e); 14-18 use the shared PGDG image.
+PG_MAJOR ?= 10
+export PG_MAJOR
+# pgBackRest is built from source and added to the PG test image, so it must be
+# built on the same Ubuntu version as that image. 2.54 and later need meson,
+# which is too new for bionic, so PG 10 uses the older 2.36.
+ifeq ($(PG_MAJOR),10)
+PGBACKREST_BUILD_BASE := ubuntu:18.04
+PGBACKREST_VERSION    := 2.36
+else
+PGBACKREST_BUILD_BASE := ubuntu:22.04
+PGBACKREST_VERSION    := 2.59.0
+endif
+export PGBACKREST_BUILD_BASE PGBACKREST_VERSION
 MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
 MONGO_VERSION ?= "8.0.3"
@@ -77,58 +92,85 @@ else
 	docker compose build pg10_tests_template
 endif
 
-pg18_build_image: go_deps
+# Builds the image for any PostgreSQL 14-18, chosen by PG_MAJOR (ubuntu 22.04 and
+# PGDG). PG 10 still uses pg10_build_image above, because wal-e needs python3.7
+# and only the bionic image has it.
+pg_build_image: go_deps
+ifeq ($(PG_MAJOR),10)
+	$(error PG_MAJOR=10 must be built with pg10_build_image - the PG 10 image is bionic + wal-e)
+endif
 ifeq ($(COMPOSE_BAKE),true)
 	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
-	docker compose build $(DOCKER_COMMON) pg18 pg18_tests_template
+	docker compose build $(DOCKER_COMMON) pg pg_tests_template
 else
+	# pg_tests_template is built FROM wal-g/pg$(PG_MAJOR). In a single command
+	# compose would look for that image on docker.io instead of using the one it
+	# is about to build. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
-	docker compose build pg18
-	docker compose build pg18_tests_template
+	docker compose build pg
+	docker compose build pg_tests_template
 endif
 
-pg_save_image: install_and_build_pg pg10_build_image pg18_build_image
+# PG 10 is built by pg10_build_image (bionic + wal-e), the rest by pg_build_image.
+# This list is also what CI tests: dockertests-par.yml reads it from here.
+PG_VERSIONS ?= 10 14 15 16 17 18
+
+.PHONY: print_pg_versions
+print_pg_versions:
+	@echo $(PG_VERSIONS)
+
+# Run the whole suite sequentially for each version in PG_VERSIONS.
+#   make pg_matrix_test                       # all supported versions
+#   make PG_VERSIONS="17" pg_matrix_test      # just one
+#   make PG_VERSIONS="10 18" pg_matrix_test   # the edges
+pg_matrix_test:
+	@for v in $(PG_VERSIONS); do \
+		echo "=============== PostgreSQL $$v ==============="; \
+		$(MAKE) PG_MAJOR=$$v pg_integration_test || exit 1; \
+	done
+
+pg_save_image: install_and_build_pg pg10_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE_PG10_TESTS} > ${CACHE_FILE_PG10_TESTS}
-	docker save ${IMAGE_PG18_TESTS} > ${CACHE_FILE_PG18_TESTS}
+	for v in $(PG_VERSIONS); do \
+		if [ "$$v" != "10" ]; then $(MAKE) PG_MAJOR=$$v pg_build_image; fi; \
+		docker save wal-g/pg$${v}_tests > ${CACHE_FOLDER}/pg$${v}_tests.tar; \
+	done
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
-	ls ${CACHE_FOLDER}
+	ls -la ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
-	@if [ "x" = "${CACHE_FILE_PG10_TESTS}x" ]; then\
-		echo "Rebuild";\
-		make install_and_build_pg;\
-		make pg10_build_image;\
+	@tar="${CACHE_FOLDER}/pg$(PG_MAJOR)_tests.tar";\
+	if [ -n "${CACHE_FOLDER}" ] && [ -f "$$tar" ]; then\
+		docker load -i "$$tar" && rm "$$tar";\
 	else\
-		docker load -i ${CACHE_FILE_PG10_TESTS} && rm ${CACHE_FILE_PG10_TESTS};\
-	fi
-	@if echo "$(TEST)" | grep -Fqe "pg18"; then\
-		if [ -f ${CACHE_FILE_PG18_TESTS} ]; then\
-			docker load -i ${CACHE_FILE_PG18_TESTS} && rm ${CACHE_FILE_PG18_TESTS};\
+		echo "No cached image for PG $(PG_MAJOR), building";\
+		make install_and_build_pg;\
+		if [ "$(PG_MAJOR)" = "10" ]; then\
+			make pg10_build_image;\
 		else\
-			make pg18_build_image;\
+			make PG_MAJOR=$(PG_MAJOR) pg_build_image;\
 		fi;\
 	fi
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
-		docker compose build pg10_pgbackrest;\
+		docker compose build pg_pgbackrest;\
 	fi
-	@if echo "$(TEST)" | grep -Fq -e "pg10_ssh_" -e "pg10_storage_ssh_"; then\
+	@if echo "$(TEST)" | grep -Fq -e "ssh_"; then\
 		docker compose build ssh;\
 	fi
 
 	docker compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
-	@if [ "$(TEST)" = "pg10_tests" ]; then\
-		docker compose build pg10_pgbackrest ssh swift pg10_wal_perftest_with_throttling &&\
-		docker compose up --exit-code-from pg10_ssh_backup_test pg10_ssh_backup_test &&\
-		docker compose up --exit-code-from pg10_storage_swift_test pg10_storage_swift_test &&\
-		docker compose up --exit-code-from pg10_storage_ssh_test pg10_storage_ssh_test &&\
-		docker compose up --exit-code-from pg10_pgbackrest_backup_fetch_test pg10_pgbackrest_backup_fetch_test &&\
+	@if [ "$(TEST)" = "pg_tests" ]; then\
+		docker compose build pg_pgbackrest ssh swift pg_wal_perftest_with_throttling &&\
+		docker compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
+		docker compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
+		docker compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
+		docker compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
 		docker compose down &&\
-		docker compose up --exit-code-from pg10_wal_perftest_with_throttling pg10_wal_perftest_with_throttling ;\
+		docker compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
 	fi
 	make clean_compose
 
@@ -146,8 +188,8 @@ all_unittests: deps unittest
 
 # todo Should we remove this target as a duplicate of pg_integration_test?
 pg_int_tests_only:
-	docker compose build pg10_tests
-	docker compose up --exit-code-from pg10_tests pg10_tests
+	docker compose build pg_tests
+	docker compose up --exit-code-from pg_tests pg_tests
 
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)

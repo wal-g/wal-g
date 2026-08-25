@@ -9,6 +9,10 @@ ENV PG_MAJOR=${PG_MAJOR}
 ENV PGDATA=/var/lib/postgresql/${PG_MAJOR}/main
 ENV PATH=/usr/lib/postgresql/${PG_MAJOR}/bin:$PATH
 
+# Retry apt downloads, like the bionic base already does.
+RUN [ -f /etc/apt/apt.conf.d/80-retries ] || \
+        printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80-retries
+
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends --no-install-suggests \
     gnupg gpg-agent ca-certificates && \

@@ -1,5 +1,7 @@
 #!/bin/sh
 set -e -x
+
+. /tmp/tests/test_functions/pg_compat.sh
 CONFIG_FILE="/tmp/configs/transfer_backup_test_config.json"
 FAILOVER_CONFIG_FILE="/tmp/configs/transfer_backup_test_config_failover.json"
 COMMON_CONFIG="/tmp/configs/common_config.json"
@@ -26,7 +28,7 @@ pg_ctl -D ${PGDATA} -w start
 wal-g --config=${TMP_CONFIG} st rm / --target=all || true
 
 pgbench -i -s 5 postgres
-pg_dumpall -f /tmp/dump1
+dump_all /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
 wal-g --config=${FAILOVER_TMP_CONFIG} backup-push ${PGDATA}
@@ -37,16 +39,16 @@ wal-g --config=${TMP_CONFIG} st transfer pg-wals --source=failover --target=defa
 
 wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
-echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
 wal-g --config=${TMP_CONFIG} st ls -r --target failover
 wal-g --config=${TMP_CONFIG} st ls -r --target default
 
 pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
-pg_dumpall -f /tmp/dump2
+dump_all /tmp/dump2
 
-diff /tmp/dump1 /tmp/dump2
+compare_dumps /tmp/dump1 /tmp/dump2
 
 psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 

@@ -1,4 +1,6 @@
 #!/bin/sh
+
+. /tmp/tests/test_functions/pg_compat.sh
 set -e
 test_receive_wal()
 {
@@ -10,7 +12,7 @@ test_receive_wal()
   wal-g --config=${TMP_CONFIG} wal-receive &
 
   pgbench -i -s 5 postgres
-  pg_dumpall -f /tmp/dump1
+  dump_all /tmp/dump1
   pgbench -c 2 -T 10 -S
   sleep 1
   VERIFY_OUTPUT=$(mktemp)

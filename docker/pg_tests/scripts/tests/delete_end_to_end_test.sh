@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/delete_end_to_end_test_config.json"
 
@@ -21,7 +23,7 @@ do
     pgbench -i -s 2 postgres
     if [ "$i" -eq 4 ] || [ "$i" -eq 9 ];
     then
-        pg_dumpall -f "/tmp/dump${i}"
+        dump_all "/tmp/dump${i}"
     fi
     sleep 1
     if [ $((i%2)) -eq 0 ]
@@ -45,16 +47,16 @@ for i in ${FIRST} LATEST
 do
 /tmp/scripts/drop_pg.sh
     wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} ${i}
-    echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+    echo "restore_command = 'echo \"WAL file restoration: %f, %p\"&& /usr/bin/wal-g --config=${TMP_CONFIG} wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
     pg_ctl -D ${PGDATA} -w start
     /tmp/scripts/wait_while_pg_not_ready.sh
     wal-g --config=${TMP_CONFIG} backup-list
     sleep 10
-    pg_dumpall -f /tmp/dump${i}
+    dump_all /tmp/dump${i}
 done
 
-diff /tmp/dump4 /tmp/dump${FIRST}
-diff /tmp/dump9 /tmp/dumpLATEST
+compare_dumps /tmp/dump4 /tmp/dump${FIRST}
+compare_dumps /tmp/dump9 /tmp/dumpLATEST
 /tmp/scripts/drop_pg.sh
 rm ${TMP_CONFIG}
 echo $target_backup_name
