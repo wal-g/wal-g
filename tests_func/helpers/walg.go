@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 type Sentinel struct {

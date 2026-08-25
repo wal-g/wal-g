@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -136,8 +136,8 @@ func (sd *StorageDownloader) ListOplogArchivesSegment(ctx context.Context,
 	startAfter *string, endBefore *string) ([]models.Archive, error) {
 	tracelog.DebugLogger.Printf("Listing %s with startAfter `%s` and endBefore `%s`",
 		sd.oplogsFolder.GetPath(),
-		aws.StringValue(startAfter),
-		aws.StringValue(endBefore),
+		aws.ToString(startAfter),
+		aws.ToString(endBefore),
 	)
 	var objects []storage.Object
 	var err error
@@ -232,9 +232,9 @@ func NewDiscardUploader(compressor compression.Compressor, readerFrom io.ReaderF
 }
 
 // UploadOplogArchive reads all data into memory, stream is compressed and encrypted if required
-func (d *DiscardUploader) UploadOplogArchive(_ context.Context, archReader io.Reader, firstTS, lastTS models.Timestamp) error {
+func (d *DiscardUploader) UploadOplogArchive(ctx context.Context, archReader io.Reader, firstTS, lastTS models.Timestamp) error {
 	if d.compressor != nil {
-		archReader = internal.CompressAndEncrypt(archReader, d.compressor, internal.ConfigureCrypter())
+		archReader = internal.CompressAndEncrypt(ctx, archReader, d.compressor, internal.ConfigureCrypter())
 	}
 	if d.readerFrom != nil {
 		if _, err := d.readerFrom.ReadFrom(archReader); err != nil {
@@ -277,7 +277,7 @@ func (su *StorageUploader) UploadOplogArchive(ctx context.Context, stream io.Rea
 		return fmt.Errorf("can not build archive: %w", err)
 	}
 
-	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(stream, su.Compression(), su.crypter))
+	_, err = su.buf.ReadFrom(internal.CompressAndEncrypt(ctx, stream, su.Compression(), su.crypter))
 	// TODO: warn if read > 2 * models.MaxDocumentSize and shrink buf capacity if it's too high
 	defer su.buf.Reset()
 	if err != nil {

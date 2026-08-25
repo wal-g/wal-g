@@ -47,13 +47,13 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	const someSecret = "so very secret thingy"
 
 	buf := new(bytes.Buffer)
-	encrypt, err := crypter.Encrypt(buf)
+	encrypt, err := crypter.Encrypt(t.Context(), buf)
 	assert.NoErrorf(t, err, "Encryption error: %v", err)
 
 	encrypt.Write([]byte(someSecret))
 	encrypt.Close()
 
-	decrypt, err := crypter.Decrypt(buf)
+	decrypt, err := crypter.Decrypt(t.Context(), buf)
 	assert.NoErrorf(t, err, "Decryption error: %v", err)
 
 	decryptedBytes, err := io.ReadAll(decrypt)

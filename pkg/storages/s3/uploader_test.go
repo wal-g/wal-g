@@ -7,7 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -30,10 +31,10 @@ func TestCreateUploadInput_WithoutServerSideEncryption(t *testing.T) {
 
 	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
 
-	assert.Equal(t, uploadInput.Bucket, aws.String(dummyBucket))
-	assert.Equal(t, uploadInput.Key, aws.String(dummyPath))
-	assert.Equal(t, uploadInput.Body, dummyContent)
-	assert.Equal(t, uploadInput.StorageClass, aws.String(dummyStorageClass))
+	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
+	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
+	assert.Equal(t, dummyContent, uploadInput.Body)
+	assert.Equal(t, types.StorageClass(dummyStorageClass), uploadInput.StorageClass)
 }
 
 func TestCreateUploadInput_WithServerSideEncryptionAndWithCustomerKey(t *testing.T) {
@@ -45,15 +46,16 @@ func TestCreateUploadInput_WithServerSideEncryptionAndWithCustomerKey(t *testing
 
 	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
 
-	assert.Equal(t, uploadInput.Bucket, aws.String(dummyBucket))
-	assert.Equal(t, uploadInput.Key, aws.String(dummyPath))
-	assert.Equal(t, uploadInput.Body, dummyContent)
-	assert.Equal(t, uploadInput.StorageClass, aws.String(dummyStorageClass))
-	assert.Equal(t, uploadInput.SSECustomerAlgorithm, aws.String(dummyServerSideEncryption))
-	assert.Equal(t, uploadInput.SSECustomerKey, aws.String(dummySSECustomerKey))
+	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
+	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
+	assert.Equal(t, dummyContent, uploadInput.Body)
+	assert.Equal(t, types.StorageClass(dummyStorageClass), uploadInput.StorageClass)
+	assert.Equal(t, aws.String(dummyServerSideEncryption), uploadInput.SSECustomerAlgorithm)
+	// v2 requires the caller to base64-encode the SSE-C key; v1 did this internally.
+	assert.Equal(t, aws.String(base64.StdEncoding.EncodeToString([]byte(dummySSECustomerKey))), uploadInput.SSECustomerKey)
 
 	hash := md5.Sum([]byte(uploader.SSECustomerKey))
-	assert.Equal(t, uploadInput.SSECustomerKeyMD5, aws.String(base64.StdEncoding.EncodeToString(hash[:])))
+	assert.Equal(t, aws.String(base64.StdEncoding.EncodeToString(hash[:])), uploadInput.SSECustomerKeyMD5)
 }
 
 func TestCreateUploadInput_WithServerSideEncryptionAndWithoutCustomerKey(t *testing.T) {
@@ -64,11 +66,11 @@ func TestCreateUploadInput_WithServerSideEncryptionAndWithoutCustomerKey(t *test
 
 	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
 
-	assert.Equal(t, uploadInput.Bucket, aws.String(dummyBucket))
-	assert.Equal(t, uploadInput.Key, aws.String(dummyPath))
-	assert.Equal(t, uploadInput.Body, dummyContent)
-	assert.Equal(t, uploadInput.StorageClass, aws.String(dummyStorageClass))
-	assert.Equal(t, uploadInput.ServerSideEncryption, aws.String(dummyServerSideEncryption))
+	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
+	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
+	assert.Equal(t, dummyContent, uploadInput.Body)
+	assert.Equal(t, types.StorageClass(dummyStorageClass), uploadInput.StorageClass)
+	assert.Equal(t, types.ServerSideEncryption(dummyServerSideEncryption), uploadInput.ServerSideEncryption)
 }
 
 func TestCreateUploadInput_WithServerSideEncryptionAndWithKMSKeyID(t *testing.T) {
@@ -80,11 +82,11 @@ func TestCreateUploadInput_WithServerSideEncryptionAndWithKMSKeyID(t *testing.T)
 
 	uploadInput := uploader.createUploadInput(dummyBucket, dummyPath, dummyContent)
 
-	assert.Equal(t, uploadInput.Bucket, aws.String(dummyBucket))
-	assert.Equal(t, uploadInput.Key, aws.String(dummyPath))
-	assert.Equal(t, uploadInput.Body, dummyContent)
-	assert.Equal(t, uploadInput.StorageClass, aws.String(dummyStorageClass))
-	assert.Equal(t, uploadInput.SSEKMSKeyId, aws.String(dummySSEKMSKeyID))
+	assert.Equal(t, aws.String(dummyBucket), uploadInput.Bucket)
+	assert.Equal(t, aws.String(dummyPath), uploadInput.Key)
+	assert.Equal(t, dummyContent, uploadInput.Body)
+	assert.Equal(t, types.StorageClass(dummyStorageClass), uploadInput.StorageClass)
+	assert.Equal(t, aws.String(dummySSEKMSKeyID), uploadInput.SSEKMSKeyId)
 }
 
 func TestPartitionStrings(t *testing.T) {
