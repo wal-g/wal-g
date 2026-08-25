@@ -2,11 +2,8 @@ package mysql
 
 import (
 	"context"
-	"encoding/binary"
-	"hash/crc32"
 	"net"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -21,135 +18,66 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+type binlogSourceParams struct {
+	rootFolder  storage.Folder
+	dstDir      string
+	startTS     time.Time
+	untilTS     time.Time
+	endBinlogTS time.Time
+	serverID    int
+}
+
 // Handler is the go-mysql replication handler for one replica connection.
-// It implements both server.ReplicationHandler (go-mysql interface) and
-// the internal binlogHandler interface (fetchLogs callback)
+// It implements server.ReplicationHandler (go-mysql interface) and delegates
+// the actual fetch/parse/stream pipeline to a BinlogDumpRequestProcessor
 type Handler struct {
 	server.EmptyReplicationHandler
-	ctx           context.Context //nolint:containedctx // detached binlog replication server outlives any request
-	cancel        context.CancelFunc
-	replicaSource string
-	rootFolder    storage.Folder
-	dstDir        string
-	startTS       time.Time
-	untilTS       time.Time
-	endBinlogTS   time.Time
-
-	// streamer is the go-mysql event queue for the current replica connection.
-	// It is set once in HandleBinlogDump / HandleBinlogDumpGTID before the
-	// streaming goroutine starts, so there is no concurrent write.
-	streamer *replication.BinlogStreamer
-
-	// requiredGTIDs is the replica's already-executed set from
-	// COM_BINLOG_DUMP_GTID; transactions it contains are skipped. This
-	// command is MySQL-only; MariaDB replicas negotiate GTID state via
-	// session variables and COM_BINLOG_DUMP, which is not wired up here.
-	sentGTIDs      mysql.GTIDSet
-	requiredGTIDs  *mysql.MysqlGTIDSet
-	skipCurrentTxn bool
-
-	// --- streaming pipeline fields (set by initStreaming, used by fetchLogs) ---
-
-	// parser parses raw binlog files and forwards events to handleEvent.
-	parser *replication.BinlogParser
-	// startPos is the replica's initial COM_BINLOG_DUMP position; honored as
-	// the parse offset only on the first file, subsequent files start at 4.
-	startPos mysql.Position
-	// firstFile gates the first-file offset (startPos.Pos vs 4).
-	firstFile bool
-	// logCh is a buffered channel used to pipeline S3 downloads and streaming:
-	// fetchLogs sends paths here (handleBinlog) while streamWorker processes them.
-	logCh chan string
-	// errCh receives the first streaming error from streamWorker, or is closed
-	// on success, allowing wait() to collect the result.
-	errCh chan error
+	ctx                  context.Context //nolint:containedctx // detached binlog replication server outlives any request
+	cancel               context.CancelFunc
+	replicaSource        string
+	replicaStreamer      *replication.BinlogStreamer
+	dumpCommandProcessor *BinlogDumpProcessor
 }
 
-func newHandler(ctx context.Context, replicaSource string, root storage.Folder, dst string,
-	startTS, untilTS, endBinlogTS time.Time) *Handler {
+func newHandler(ctx context.Context, replicaSource string, params binlogSourceParams) *Handler {
 	ctx, cancel := context.WithCancel(ctx)
-	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
+	replicaStreamer := replication.NewBinlogStreamer()
 	return &Handler{
-		ctx:           ctx,
-		cancel:        cancel,
-		replicaSource: replicaSource,
-		rootFolder:    root,
-		dstDir:        dst,
-		startTS:       startTS,
-		untilTS:       untilTS,
-		endBinlogTS:   endBinlogTS,
-		sentGTIDs:     sent,
+		ctx:                  ctx,
+		cancel:               cancel,
+		replicaSource:        replicaSource,
+		replicaStreamer:      replicaStreamer,
+		dumpCommandProcessor: newBinlogDumpRequestProcessor(ctx, params, params.serverID, &replicaStreamerSink{replicaStreamer: replicaStreamer}),
 	}
 }
 
-func (h *Handler) handleEventError(err error) {
-	if err == nil {
+// streamToReplica runs the streaming pipeline to completion and then waits
+// for the replica to catch up before shutting the process down.
+func (h *Handler) streamToReplica() {
+	tracelog.InfoLogger.Printf("Start event streaming")
+
+	if err := h.dumpCommandProcessor.process(); err != nil {
+		tracelog.ErrorLogger.Printf("Error during logs streaming: %v", err)
+		h.replicaStreamer.AddErrorToStreamer(err)
 		return
 	}
-	tracelog.ErrorLogger.Println("Error during replication", err)
-	ok := h.streamer.AddErrorToStreamer(err)
-	for !ok {
-		ok = h.streamer.AddErrorToStreamer(err)
-	}
+
+	tracelog.InfoLogger.Printf("Event streaming finished")
+	h.waitForReplica()
 }
 
-// https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L53-L108
-func (h *Handler) addRotateEvent(pos mysql.Position) error {
-	serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	serverIDNum, err := strconv.Atoi(serverID)
-	tracelog.ErrorLogger.FatalOnError(err)
-
-	// create rotate event
-	rotateBinlogEvent := replication.BinlogEvent{}
-
-	messageBodySize := 8 + len(pos.Name) + 1
-	eventLength := replication.EventHeaderSize + messageBodySize + replication.BinlogChecksumLength
-
-	rotateBinlogEvent.RawData = make([]byte, eventLength)
-	// generate header:
-	// timestamp default 4 bytes
-	binlogEventPos := 4
-	// type - 1 byte
-	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
-	binlogEventPos++
-	// server_id- 4 bytes
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(serverIDNum))
-	binlogEventPos += 4
-	// event_length - 4 bytes
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(eventLength))
-	binlogEventPos += 4
-	// end_log_pos - 4 bytes
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], 0)
-	binlogEventPos += 4
-	// flags - 2 bytes
-	binary.LittleEndian.PutUint16(rotateBinlogEvent.RawData[binlogEventPos:], 0)
-	binlogEventPos += 2
-
-	// set binlog event data:
-	// position - 8 bytes
-	binary.LittleEndian.PutUint64(rotateBinlogEvent.RawData[binlogEventPos:], uint64(pos.Pos))
-	binlogEventPos += 8
-	// new binlog name - zero-terminated string
-	copy(rotateBinlogEvent.RawData[binlogEventPos:], pos.Name)
-	binlogEventPos += len(pos.Name)
-	rotateBinlogEvent.RawData[binlogEventPos] = 0
-	binlogEventPos++
-
-	checksum := crc32.ChecksumIEEE(rotateBinlogEvent.RawData[0 : replication.EventHeaderSize+messageBodySize])
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], checksum)
-
-	return h.streamer.AddEventToStreamer(&rotateBinlogEvent)
-}
-
-func (h *Handler) waitReplicationIsDoneSafe() {
-	if h.sentGTIDs.IsEmpty() {
+// waitForReplica blocks until the replica's executed GTID set covers every
+// GTID that was streamed, then exits the process. If nothing was streamed,
+// it exits immediately.
+func (h *Handler) waitForReplica() {
+	sentGTIDs := h.dumpCommandProcessor.sentGTIDs
+	if sentGTIDs.IsEmpty() {
 		tracelog.InfoLogger.Println("S3 objects finished. No GTIDs were sent. Shutting down immediately.")
 		os.Exit(0)
+		return
 	}
 
-	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", h.sentGTIDs.String())
+	tracelog.InfoLogger.Printf("All S3 binlogs processed. Waiting for replica to catch up to GTID: %s", sentGTIDs.String())
 
 	dsn, err := parseMySQLDatasource(h.replicaSource)
 	if err != nil {
@@ -197,163 +125,16 @@ func (h *Handler) waitReplicationIsDoneSafe() {
 		r.Close()
 
 		replicaSet, _ := mysql.ParseGTIDSet("mysql", executedStr)
-		if replicaSet != nil && replicaSet.Contain(h.sentGTIDs) {
+		tracelog.DebugLogger.Printf("waitForReplica: replica gtid_executed=%q, waiting for=%q",
+			executedStr, sentGTIDs.String())
+		if replicaSet != nil && replicaSet.Contain(sentGTIDs) {
 			tracelog.InfoLogger.Println("Replica has successfully caught up! We are safely done.")
 			os.Exit(0)
+			return
 		}
 
 		time.Sleep(1 * time.Second)
 	}
-}
-
-// handleEvent is the per-event callback passed to BinlogParser.ParseFile.
-func (h *Handler) handleEvent(e *replication.BinlogEvent) error {
-	if h.ctx.Err() != nil {
-		return h.ctx.Err()
-	}
-	if int64(e.Header.Timestamp) > h.untilTS.Unix() {
-		return nil
-	}
-	switch e.Header.EventType {
-	case replication.GTID_EVENT:
-		if h.decideSkipForGTID(e) {
-			return nil
-		}
-	case replication.ANONYMOUS_GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT,
-		replication.FORMAT_DESCRIPTION_EVENT, replication.PREVIOUS_GTIDS_EVENT,
-		replication.ROTATE_EVENT, replication.STOP_EVENT, replication.INCIDENT_EVENT:
-		// txn boundary or file-boundary marker; never appears inside a txn
-		h.skipCurrentTxn = false
-	default:
-		if h.skipCurrentTxn {
-			return nil
-		}
-	}
-	return h.streamer.AddEventToStreamer(e)
-}
-
-// decideSkipForGTID updates skip state from a GTID_EVENT; returns true if
-// the caller should drop the event because the replica already applied it.
-func (h *Handler) decideSkipForGTID(e *replication.BinlogEvent) bool {
-	h.skipCurrentTxn = false
-	ge := &replication.GTIDEvent{}
-	if ge.Decode(e.RawData[replication.EventHeaderSize:]) != nil {
-		return false
-	}
-	one, err := ge.GTIDNext()
-	if err != nil {
-		return false
-	}
-	if h.requiredGTIDs != nil && h.requiredGTIDs.Contain(one) {
-		tracelog.DebugLogger.Printf("Skipping already-applied transaction %s", one)
-		h.skipCurrentTxn = true
-		return true
-	}
-	if err := h.sentGTIDs.Update(one.String()); err != nil {
-		tracelog.WarningLogger.Printf("Failed to record sent GTID %s: %v", one, err)
-	}
-	return false
-}
-
-// initStreaming initializes the pipeline fields on h and starts the streamWorker
-// worker goroutine. It must be called once per connection, before fetchLogs.
-func (h *Handler) initStreaming(startPos mysql.Position) {
-	p := replication.NewBinlogParser()
-	p.SetRawMode(true)
-	p.SetFlavor(mysql.MySQLFlavor)
-	p.SetVerifyChecksum(true)
-	h.parser = p
-	h.startPos = startPos
-	h.firstFile = true
-	h.logCh = make(chan string, binlogFetchAhead)
-	h.errCh = make(chan error, 1)
-	go h.streamWorker()
-}
-
-// streamWorker reads downloaded binlog paths from logCh and streams them to
-// the replica. It runs until logCh is closed (by wait) or a streaming error
-// occurs. It is the sole goroutine that accesses parser/startPos/firstFile.
-func (h *Handler) streamWorker() {
-	defer close(h.errCh)
-	for binlogPath := range h.logCh {
-		if err := h.streamLog(binlogPath); err != nil {
-			tracelog.ErrorLogger.Printf("Error during file streaming %s: %v", path.Base(binlogPath), err)
-			h.errCh <- err
-			for p := range h.logCh {
-				// clean up
-				os.Remove(p)
-			}
-			return
-		}
-	}
-}
-
-// streamLog parses one downloaded binlog and pushes its events to the replica.
-// The first file uses the replica's requested position; later files start at
-// offset 4 (the binlog magic header).
-func (h *Handler) streamLog(binlogPath string) error {
-	defer os.Remove(binlogPath)
-
-	if h.ctx.Err() != nil {
-		return h.ctx.Err()
-	}
-
-	offset := int64(4)
-	if h.firstFile {
-		offset = int64(h.startPos.Pos)
-		h.firstFile = false
-	}
-
-	tracelog.InfoLogger.Printf("Streaming %s to replica", path.Base(binlogPath))
-	err := h.parser.ParseFile(binlogPath, offset, h.handleEvent)
-	return err
-}
-
-func (h *Handler) handleBinlog(binlogPath string) error {
-	select {
-	case err := <-h.errCh:
-		// streamWorker already failed; stop feeding it.
-		return err
-	case h.logCh <- binlogPath:
-		return nil
-	}
-}
-
-func (h *Handler) wait() error {
-	close(h.logCh)
-	return <-h.errCh
-}
-
-func (h *Handler) streamBinlogFiles(startPos mysql.Position) {
-	err := os.MkdirAll(h.dstDir, 0777)
-	tracelog.ErrorLogger.FatalfOnError("Failed to make dst dir: %v", err)
-
-	if err := h.addRotateEvent(startPos); err != nil {
-		tracelog.ErrorLogger.Printf("Error while sending rotate event: %v", err)
-		h.handleEventError(err)
-		return
-	}
-
-	h.initStreaming(startPos)
-	tracelog.InfoLogger.Printf("Start event streaming")
-
-	err = fetchLogs(h.ctx, h.rootFolder, h.dstDir, h.startTS, h.untilTS, h.endBinlogTS, h)
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Error during logs streaming: %v", err)
-		_ = h.wait()
-		h.handleEventError(err)
-		return
-	}
-
-	tracelog.InfoLogger.Printf("Log fetching finished, waiting for streaming to finish")
-	err = h.wait()
-	if err != nil {
-		tracelog.ErrorLogger.Printf("Error during logs streaming: %v", err)
-		h.handleEventError(err)
-		return
-	}
-
-	h.waitReplicationIsDoneSafe()
 }
 
 func (h *Handler) HandleRegisterSlave(data []byte) error {
@@ -362,17 +143,16 @@ func (h *Handler) HandleRegisterSlave(data []byte) error {
 
 func (h *Handler) HandleBinlogDump(pos mysql.Position) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDump: requested position %s:%d", pos.Name, pos.Pos)
-	h.streamer = replication.NewBinlogStreamer()
-	go h.streamBinlogFiles(pos)
-	return h.streamer, nil
+	// Ignore position as we always start from the beginning. It's safe as GTIDs provide deduplication.
+	go h.streamToReplica()
+	return h.replicaStreamer, nil
 }
 
 func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replication.BinlogStreamer, error) {
 	tracelog.InfoLogger.Printf("HandleBinlogDumpGTID: GTID=%s", gtidSet.String())
-	h.requiredGTIDs = gtidSet
-	h.streamer = replication.NewBinlogStreamer()
-	go h.streamBinlogFiles(mysql.Position{Name: "host-binlog-file", Pos: 4})
-	return h.streamer, nil
+	h.dumpCommandProcessor.requiredGTIDs = gtidSet
+	go h.streamToReplica()
+	return h.replicaStreamer, nil
 }
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
@@ -388,17 +168,15 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"CRC32"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.server_id":
-		serverID, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
-		tracelog.ErrorLogger.FatalOnError(err)
-		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{serverID}})
+		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{h.dumpCommandProcessor.serverID}})
 		tracelog.ErrorLogger.FatalOnError(err)
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.gtid_mode":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"GTID_MODE"}, [][]interface{}{{"ON"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.server_uuid":
-		// the server uuid received by the query does not affect replication.
-		// during replication, the uuid is taken from events
+		// The server UUID received by the query does not affect replication.
+		// During replication, the UUID is taken from events.
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_UUID"}, [][]interface{}{{"0"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
 	case "select @@global.rpl_semi_sync_master_enabled":
@@ -434,13 +212,18 @@ func HandleBinlogServer(ctx context.Context, since string, until string, untilBi
 	serverPort, err := conf.GetRequiredSetting(conf.MysqlBinlogServerPort)
 	tracelog.ErrorLogger.FatalOnError(err)
 
+	serverIDSetting, err := conf.GetRequiredSetting(conf.MysqlBinlogServerID)
+	tracelog.ErrorLogger.FatalOnError(err)
+	serverID, err := strconv.Atoi(serverIDSetting)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 	l, err := net.Listen("tcp", serverAddress+":"+serverPort)
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
 	srv := server.NewServer("5.7.42", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)
 	// This loop continues accepting connections until the process exits.
-	// It will be terminated by os.Exit() call in waitReplicationIsDoneSafe.
+	// It will be terminated by os.Exit() call in waitForReplica.
 	for {
 		c, err := l.Accept()
 		if err != nil {
@@ -462,8 +245,15 @@ func HandleBinlogServer(ctx context.Context, since string, until string, untilBi
 			continue
 		}
 
-		go handleBinlogConnection(ctx, c, srv, replicaSource, st.RootFolder(), dstDir,
-			startTS, untilTS, endBinlogTS, user, password)
+		params := binlogSourceParams{
+			rootFolder:  st.RootFolder(),
+			dstDir:      dstDir,
+			startTS:     startTS,
+			untilTS:     untilTS,
+			endBinlogTS: endBinlogTS,
+			serverID:    serverID,
+		}
+		go handleBinlogConnection(ctx, c, srv, replicaSource, params, user, password)
 	}
 }
 
@@ -472,13 +262,11 @@ func handleBinlogConnection(
 	c net.Conn,
 	srv *server.Server,
 	replicaSource string,
-	folder storage.Folder,
-	dstDir string,
-	startTS, untilTS, endBinlogTS time.Time,
+	params binlogSourceParams,
 	user string,
 	password string,
 ) {
-	h := newHandler(ctx, replicaSource, folder, dstDir, startTS, untilTS, endBinlogTS)
+	h := newHandler(ctx, replicaSource, params)
 	defer func() {
 		h.cancel()
 		c.Close()

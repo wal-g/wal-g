@@ -12,11 +12,11 @@ import (
 )
 
 const (
-	binlogServerShortDescription          = "Create server for backup slaves"
+	binlogServerShortDescription          = "Create a server for backup slaves"
 	binlogSinceFlagShortDescr             = "backup name starting from which you want to use binlogs"
 	untilFlagShortDescr                   = "time in RFC3339 for PITR"
 	untilBinlogLastModifiedFlagShortDescr = "time in RFC3339 that is used to prevent wal-g from streaming" +
-		" binlogs that was created/modified after this time"
+		" binlogs that were created/modified after this time"
 )
 
 var untilTS string
