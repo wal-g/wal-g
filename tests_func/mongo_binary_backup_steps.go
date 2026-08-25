@@ -15,7 +15,7 @@ import (
 func SetupMongodbBinaryBackupSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*)$`, tctx.createMongoBinaryBackup)
 	ctx.Step(`^we create binary mongo-backup on ([^\s]*) with metadata$`, tctx.createMongoBinaryBackupWithMetadata)
-	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)`, tctx.restoreMongoBinaryBackupAsNonInitialized)
+	ctx.Step(`^we restore binary mongo-backup #(\d+) to ([^\s]+)$`, tctx.restoreMongoBinaryBackupAsNonInitialized)
 	ctx.Step(`^we restore initialized binary mongo-backup #(\d+) to ([^\s]+)`,
 		tctx.restoreMongoBinaryBackupAsInitialized)
 	ctx.Step(`^we restore mongo-backup #(\d+) to ([^\s]+) with whitelist "([^"]*)"$`,

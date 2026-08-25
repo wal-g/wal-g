@@ -93,66 +93,78 @@ func (a *CheckpointingApplier) Apply(ctx context.Context, ch chan *models.Oplog)
 	errC := make(chan error, 1)
 	go func() {
 		defer close(errC)
-		defer func() {
-			if err := a.applier.Close(ctx); err != nil {
-				select {
-				case errC <- fmt.Errorf("can not close applier: %w", err):
-				default:
-				}
-			}
-		}()
-
-		timer := time.NewTimer(a.interval)
-		defer timer.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				errC <- ctx.Err()
-				return
-
-			case <-timer.C:
-				a.checkpointDue = true
-				if !a.applier.HasPendingTransactions() {
-					if err := a.makeDurable(ctx); err != nil {
-						errC <- err
-						return
-					}
-					a.checkpointDue = false
-					timer.Reset(a.interval)
-				}
-
-			case op, ok := <-ch:
-				if !ok {
-					if a.applier.HasPendingTransactions() {
-						errC <- fmt.Errorf("oplog stream ended with an incomplete transaction")
-						return
-					}
-					if err := a.makeDurable(ctx); err != nil {
-						errC <- err
-					}
-					return
-				}
-
-				if err := a.applier.Apply(ctx, *op); err != nil {
-					errC <- fmt.Errorf("can not handle op: %w", err)
-					return
-				}
-				a.progress.setHandled(op.TS)
-
-				if a.checkpointDue && !a.applier.HasPendingTransactions() {
-					if err := a.makeDurable(ctx); err != nil {
-						errC <- err
-						return
-					}
-					a.checkpointDue = false
-					timer.Reset(a.interval)
-				}
-			}
+		err := a.run(ctx, ch)
+		if closeErr := a.applier.Close(ctx); err == nil && closeErr != nil {
+			err = fmt.Errorf("can not close applier: %w", closeErr)
+		}
+		if err != nil {
+			errC <- err
 		}
 	}()
 
 	return errC, nil
+}
+
+func (a *CheckpointingApplier) run(ctx context.Context, ch chan *models.Oplog) error {
+	timer := time.NewTimer(a.interval)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			if err := a.checkpointWhenPossible(ctx, timer); err != nil {
+				return err
+			}
+		case op, ok := <-ch:
+			if !ok {
+				return a.finish(ctx)
+			}
+			if err := a.applyOperation(ctx, op, timer); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func (a *CheckpointingApplier) checkpointWhenPossible(ctx context.Context, timer *time.Timer) error {
+	a.checkpointDue = true
+	if a.applier.HasPendingTransactions() {
+		return nil
+	}
+	return a.checkpoint(ctx, timer)
+}
+
+func (a *CheckpointingApplier) applyOperation(
+	ctx context.Context,
+	op *models.Oplog,
+	timer *time.Timer,
+) error {
+	if err := a.applier.Apply(ctx, *op); err != nil {
+		return fmt.Errorf("can not handle op: %w", err)
+	}
+	a.progress.setHandled(op.TS)
+	if !a.checkpointDue || a.applier.HasPendingTransactions() {
+		return nil
+	}
+	return a.checkpoint(ctx, timer)
+}
+
+func (a *CheckpointingApplier) checkpoint(ctx context.Context, timer *time.Timer) error {
+	if err := a.makeDurable(ctx); err != nil {
+		return err
+	}
+	a.checkpointDue = false
+	timer.Reset(a.interval)
+	return nil
+}
+
+func (a *CheckpointingApplier) finish(ctx context.Context) error {
+	if a.applier.HasPendingTransactions() {
+		return fmt.Errorf("oplog stream ended with an incomplete transaction")
+	}
+	return a.makeDurable(ctx)
 }
 
 func (a *CheckpointingApplier) makeDurable(ctx context.Context) error {
