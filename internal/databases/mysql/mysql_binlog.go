@@ -159,6 +159,24 @@ func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) 
 	return time.Unix(int64(ts), 0), nil
 }
 
+// GetBinlogServerID reads the server_id from a binlog file's first event.
+func GetBinlogServerID(filename string) (uint32, error) {
+	var serverID uint32
+	found := false
+	parser := replication.NewBinlogParser()
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		serverID = event.Header.ServerID
+		found = true
+		return fmt.Errorf("shallow file read finished")
+	})
+	if err != nil && !found {
+		return 0, fmt.Errorf("failed to parse binlog %s: %w", filename, err)
+	}
+	return serverID, nil
+}
+
 func GetBinlogTS(ctx context.Context, folder storage.Folder, binlogName string) (time.Time, error) {
 	logFolder := folder.GetSubFolder(BinlogPath)
 	logFiles, _, err := logFolder.ListFolder(ctx)
