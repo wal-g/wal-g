@@ -7,6 +7,9 @@ MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
 DOCKER_COMMON := golang ubuntu ubuntu_22_04 s3
+# Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
+GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
+export GO_VERSION
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)

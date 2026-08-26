@@ -8,6 +8,8 @@ import (
 	"net/netip"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -241,8 +243,36 @@ func ExposedHostPort(ctx context.Context, fqdn string, port int) (string, int, e
 	return ExposedPort(*dockerContainer, port)
 }
 
+// goVersionFromGoMod reads the `go` directive version from the repository's go.mod.
+func goVersionFromGoMod() (string, error) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("can not determine caller file path")
+	}
+	goModPath := filepath.Join(filepath.Dir(thisFile), "..", "..", "go.mod")
+
+	data, err := os.ReadFile(goModPath)
+	if err != nil {
+		return "", fmt.Errorf("can not read %s: %v", goModPath, err)
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "go" {
+			return fields[1], nil
+		}
+	}
+
+	return "", fmt.Errorf("go directive not found in %s", goModPath)
+}
+
 func BuildImage(ctx context.Context, tag string, path string) error {
-	cmd := exec.CommandContext(ctx, "docker", "build", "-t", tag, path)
+	goVersion, err := goVersionFromGoMod()
+	if err != nil {
+		return fmt.Errorf("can not determine go version: %v", err)
+	}
+
+	cmd := exec.CommandContext(ctx, "docker", "build", "--build-arg", "GO_VERSION="+goVersion, "-t", tag, path)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 

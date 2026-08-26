@@ -22,6 +22,8 @@ services:
     build:
       dockerfile: ./docker/golang/Dockerfile
       context: .
+      args:
+        GO_VERSION: ${GO_VERSION}
     image: wal-g/golang
     container_name: wal-g_golang
 
