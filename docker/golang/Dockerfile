@@ -24,6 +24,9 @@ FROM ubuntu:bionic
 
 # custom golang image with CMake and Brotli support (compatible with ubuntu 18.04..22.04)
 
+# Go toolchain version, passed by the build process derived from go.mod (see Makefile/docker-compose.yml).
+ARG GO_VERSION
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TERM=xterm-256color
 
@@ -45,7 +48,7 @@ RUN ARCH="$(uname -m)" && \
         aarch64) GO_ARCH="arm64" ;; \
         *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
     esac && \
-    curl -fsSL "https://go.dev/dl/go1.27.0.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" | tar -C /usr/local -xz && \
     export PATH="/usr/local/go/bin:$PATH" && \
     go version
 
