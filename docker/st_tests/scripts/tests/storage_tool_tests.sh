@@ -42,8 +42,12 @@ rm uncompressed_testfile
 # WAL-G should be able to delete the uploaded file
 wal-g st rm testfolder/testfile.br
 
-# Should get empty storage after file removal
-test "1" -eq "$(wal-g st ls | wc -l)"
+# The object itself should be absent after removal. Some S3-compatible backends
+# keep the empty parent directory until asynchronous cleanup.
+if wal-g st stat testfolder/testfile.br; then
+    echo "Error: Removed object is still present"
+    exit 1
+fi
 
 # Should upload the file uncompressed without error
 wal-g st put testfile testfolder/testfile --no-compress 

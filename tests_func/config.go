@@ -15,7 +15,7 @@ var Env = map[string]string{
 	"WALG_CONF_DIR":    "/etc/wal-g",
 	"WALG_CONF_PATH":   "/etc/wal-g/wal-g.json",
 
-	"S3_HOST":                       "minio01",
+	"S3_HOST":                       "seaweedfs01",
 	"S3_PORT":                       "9000",
 	"S3_BUCKET":                     "dbaas",
 	"S3_ACCESS_KEY":                 "S3_ACCESS_KEY",

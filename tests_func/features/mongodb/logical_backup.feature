@@ -5,7 +5,7 @@ Feature: MongoDB backups check
     Given prepared infrastructure
     And mongodb initialized on mongodb01
     And mongodb initialized on mongodb02
-    And a configured s3 on minio01
+    And a configured s3 on seaweedfs01
 
   Scenario: Backups, restores and deletes were done successfully
     When mongodb01 has test mongodb data test1
@@ -24,13 +24,13 @@ Feature: MongoDB backups check
     And we create mongodb01 mongo-backup
     Then we got 4 backup entries of mongodb01
 
-    When we put empty backup via minio01 to mongodump.archive
+    When we put incomplete backup via seaweedfs01 to mongodump.archive
     Then we got 4 backup entries of mongodb01
 
-    # Backups purged successfully
+    # Complete backups are purged; incomplete data is retained without --purge-garbage
     When we delete mongo backups retain 3 via mongodb01
     Then we got 3 backup entries of mongodb01
-    And we check if empty backups were purged via minio01
+    And we check incomplete backups still exist via seaweedfs01
 
     # Second purge does not delete backups
     When we delete mongo backups retain 3 via mongodb01

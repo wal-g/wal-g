@@ -3,7 +3,7 @@ Feature: MongoDB partially restore
 
   Background: Wait for working infrastructure
     Given prepared infrastructure
-    And a configured s3 on minio01
+    And a configured s3 on seaweedfs01
     And mongodb initialized on mongodb01
     And mongodb01 has partial test mongodb data
     And we create binary mongo-backup on mongodb01 with metadata

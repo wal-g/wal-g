@@ -3,7 +3,7 @@ Feature: Redis RDB plus tiered-storage backup
   Background:
     Given prepared infrastructure
     And a working redis on redis01
-    And a configured s3 on minio01
+    And a configured s3 on seaweedfs01
 
   Scenario: RDB TS backup restores Redis and TS data together on one node
     Given redis01 has test redis data test1

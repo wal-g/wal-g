@@ -2,7 +2,7 @@
 Feature: MongoDB catch up stale replica with oplog replay
   Background: Wait for working infrastructure
     Given prepared infrastructure
-    And a configured s3 on minio01
+    And a configured s3 on seaweedfs01
     And mongodb initialized on mongodb01
     And oplog archiving is enabled on mongodb01
     And at least one oplog archive exists in storage

@@ -1,0 +1,68 @@
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
+
+layered_runtime:
+  layers:
+    - name: admin
+      admin_layer: {}
+
+static_resources:
+  listeners:
+    - name: s3_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: s3_proxy
+                route_config:
+                  name: s3_route
+                  virtual_hosts:
+                    - name: s3_backend
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: s3_backend
+                http_filters:
+                  - name: envoy.filters.http.fault
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                      max_active_faults: 1
+                      abort_http_status_runtime: fault.http.abort.http_status
+                      delay:
+                        fixed_delay: 1s
+                        percentage:
+                          numerator: 0
+                          denominator: HUNDRED
+                      abort:
+                        http_status: 503
+                        percentage:
+                          numerator: 0
+                          denominator: HUNDRED
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: s3_backend
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: s3_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: s3-throttling-backend
+                      port_value: 9000

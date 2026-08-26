@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e -x
 
+# shellcheck disable=SC1091
 . /usr/local/export_common.sh
 
 export WALE_S3_PREFIX=s3://mysql-pitr-binlogserver-until-lmt-bucket
@@ -38,7 +39,7 @@ wal-g binlog-push
 
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
-chown -R mysql:mysql $MYSQLDATA
+chown -R mysql:mysql "$MYSQLDATA"
 service mysql start || (cat /var/log/mysql/error.log && false)
 mysql_set_gtid_purged
 
@@ -53,7 +54,7 @@ WALG_LOG_LEVEL="DEVEL" wal-g binlog-server \
     --since LATEST \
     --until "$DT1" \
     --until-binlog-last-modified-time "$DT1" \
-    2>&1 | tee $BINLOG_SERVER_LOG &
+    2>&1 | tee "$BINLOG_SERVER_LOG" &
 walg_pid=$!
 
 sleep 3
@@ -62,7 +63,7 @@ mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql -e "CHANGE MASTER TO MASTER_HOST=\"127.0.0.1\", MASTER_PORT=9306, MASTER_USER=\"walg\", MASTER_PASSWORD=\"walgpwd\", MASTER_AUTO_POSITION=1"
 mysql -e "START SLAVE"
 
-wait $walg_pid
+wait "$walg_pid"
 
 mysqldump sbtest > /tmp/dump_after_pitr_until_lmt
 
@@ -74,14 +75,23 @@ grep -w 'from_binlog_04' /tmp/dump_after_pitr_until_lmt
 
 # lmt_ignored_01 is in binlog.000004 which was pushed to S3 after DT1 (LMT),
 # so it must be absent even though the data is before PITR time
-! grep -w 'lmt_ignored_01' /tmp/dump_after_pitr_until_lmt
+if grep -w 'lmt_ignored_01' /tmp/dump_after_pitr_until_lmt; then
+    echo "ERROR: found row from a binlog beyond the last-modified cutoff"
+    exit 1
+fi
 
 # rows after pitr time must be absent
-! grep -w 'after_pitr_01' /tmp/dump_after_pitr_until_lmt
+if grep -w 'after_pitr_01' /tmp/dump_after_pitr_until_lmt; then
+    echo "ERROR: found row written after the PITR cutoff"
+    exit 1
+fi
 
 # binlog-server must stream binlog.000002 and 000003 (pushed before LMT cutoff)
-grep -w 'Streaming /tmp/mysql-bin.000002 to replica' $BINLOG_SERVER_LOG
-grep -w 'Streaming /tmp/mysql-bin.000003 to replica' $BINLOG_SERVER_LOG
+grep -F 'Streaming /tmp/mysql-bin.000002 to replica' "$BINLOG_SERVER_LOG"
+grep -F 'Streaming /tmp/mysql-bin.000003 to replica' "$BINLOG_SERVER_LOG"
 
 # binlog-server must not stream binlog.000004 (pushed after LMT cutoff)
-! grep -w 'Streaming /tmp/mysql-bin.000004 to replica' $BINLOG_SERVER_LOG
+if grep -F 'Streaming /tmp/mysql-bin.000004 to replica' "$BINLOG_SERVER_LOG"; then
+    echo "ERROR: streamed mysql-bin.000004 beyond the last-modified cutoff"
+    exit 1
+fi
