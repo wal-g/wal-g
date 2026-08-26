@@ -132,8 +132,19 @@ func (tctx *TestContext) crashReplayMongod(container string) error {
 	host := tctx.ContainerFQDN(container)
 	deadline := time.Now().Add(time.Minute)
 	for time.Now().Before(deadline) {
-		result, err := helpers.RunCommand(tctx.Context, host,
-			[]string{"pgrep", "-f", "[t]akeUnstableCheckpointOnShutdown=true"})
+		result, err := helpers.RunCommand(tctx.Context, host, []string{"bash", "-c", `
+for proc in /proc/[0-9]*; do
+    while IFS= read -r -d '' arg; do
+        case "$arg" in
+            *takeUnstableCheckpointOnShutdown=true*)
+                printf '%s\n' "${proc##*/}"
+                exit 0
+                ;;
+        esac
+    done < "$proc/cmdline" 2>/dev/null
+done
+exit 1
+`})
 		if err == nil && result.ExitCode == 0 {
 			pidFields := strings.Fields(result.Stdout())
 			if len(pidFields) == 0 {
@@ -144,8 +155,9 @@ func (tctx *TestContext) crashReplayMongod(container string) error {
 				return err
 			}
 			time.Sleep(2 * time.Second)
-			_, err = helpers.RunCommandStrict(tctx.Context, host,
-				[]string{"kill", "-ABRT", strconv.Itoa(pid)})
+			_, err = helpers.RunCommandStrict(tctx.Context, host, []string{
+				"bash", "-c", `kill -ABRT "$1"`, "--", strconv.Itoa(pid),
+			})
 			return err
 		}
 		time.Sleep(50 * time.Millisecond)
