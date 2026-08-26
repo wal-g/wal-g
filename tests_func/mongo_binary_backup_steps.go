@@ -100,7 +100,7 @@ func (tctx *TestContext) restoreMongoBinaryBackupWithInterruptedPITR(
 
 	killC := make(chan error, 1)
 	go func() {
-		killC <- tctx.crashReplayMongod(container)
+		killC <- tctx.crashReplayMongod(walg, container)
 	}()
 	result, restoreErr := walg.FetchBinaryBackupWithPITR(
 		backup, configPath, mongodbVersion, since.String(), until.String())
@@ -128,10 +128,19 @@ func (tctx *TestContext) restoreMongoBinaryBackupWithInterruptedPITR(
 	return tctx.initiateReplSet(container)
 }
 
-func (tctx *TestContext) crashReplayMongod(container string) error {
+func (tctx *TestContext) crashReplayMongod(walg *helpers.WalgUtil, container string) error {
 	host := tctx.ContainerFQDN(container)
 	deadline := time.Now().Add(time.Minute)
 	for time.Now().Before(deadline) {
+		checkpointLogged, err := walg.InterruptedReplayCheckpointLogged()
+		if err != nil {
+			return err
+		}
+		if !checkpointLogged {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+
 		result, err := helpers.RunCommand(tctx.Context, host, []string{"bash", "-c", `
 for proc in /proc/[0-9]*; do
     while IFS= read -r -d '' arg; do
@@ -154,15 +163,14 @@ exit 1
 			if err != nil {
 				return err
 			}
-			time.Sleep(2 * time.Second)
 			_, err = helpers.RunCommandStrict(tctx.Context, host, []string{
 				"bash", "-c", `kill -ABRT "$1"`, "--", strconv.Itoa(pid),
 			})
 			return err
 		}
-		time.Sleep(50 * time.Millisecond)
+		return fmt.Errorf("replay mongod exited before it could be interrupted")
 	}
-	return fmt.Errorf("replay mongod was not started within one minute")
+	return fmt.Errorf("durable replay checkpoint was not reached within one minute")
 }
 
 func (tctx *TestContext) createMongoBinaryBackup(container string) error {
