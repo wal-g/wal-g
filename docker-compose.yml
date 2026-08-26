@@ -116,6 +116,7 @@ services:
       &&  mkdir -p /export/gpdeletetargetbucket
       &&  mkdir -p /export/gpdeletegarbagebucket
       &&  mkdir -p /export/gp-journal-test-bucket
+      &&  mkdir -p /export/gp-shared-size-test-bucket
       &&  mkdir -p /export/cloudberry-delete-target-bucket
       &&  mkdir -p /export/cloudberry-delete-garbage-bucket
       &&  mkdir -p /export/mysqlfullxtrabackupbucket
@@ -179,6 +180,7 @@ services:
       &&  mkdir -p /export/cloudberry-aostorage-test-bucket
       &&  mkdir -p /export/cloudberry-paxstorage-test-bucket
       &&  mkdir -p /export/cloudberry-journal-test-bucket
+      &&  mkdir -p /export/cloudberry-shared-size-test-bucket
       &&  mkdir -p /export/cloudberry-delta-backup-test-bucket
       &&  mkdir -p /export/cloudberry-partial-table-bucket
       &&  mkdir -p /export/createrestorepointbucket
