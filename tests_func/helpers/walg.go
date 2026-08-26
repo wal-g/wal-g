@@ -109,6 +109,8 @@ type WalgUtil struct {
 	dbMajorVersion string
 }
 
+const interruptedReplayLogPath = "/tmp/walg-interrupted-replay.log"
+
 func NewWalgUtil(ctx context.Context, host, cliPath, confPath, dbMajorVersion string) *WalgUtil {
 	return &WalgUtil{ctx, host, cliPath, confPath, dbMajorVersion}
 }
@@ -203,7 +205,7 @@ func (w *WalgUtil) FetchBinaryBackup(
 func (w *WalgUtil) FetchBinaryBackupWithPITR(
 	backup, mongodConfigPath, mongodbVersion, since, until string,
 ) (ExecResult, error) {
-	command := []string{
+	walgCommand := []string{
 		"env",
 		"OPLOG_REPLAY_FSYNC_INTERVAL=1ms",
 		"OPLOG_REPLAY_MAX_MONGOD_RESTARTS=5",
@@ -212,7 +214,38 @@ func (w *WalgUtil) FetchBinaryBackupWithPITR(
 		"--pitr-since", since,
 		"--pitr-until", until,
 	}
-	return RunCommandStrict(w.ctx, w.host, command)
+	command := []string{"bash", "-c", `
+log_path="$1"
+shift
+: > "$log_path"
+exec "$@" > "$log_path" 2>&1
+`, "--", interruptedReplayLogPath}
+	command = append(command, walgCommand...)
+	_, restoreErr := RunCommandStrict(w.ctx, w.host, command)
+	logResult, logErr := RunCommand(w.ctx, w.host, []string{"bash", "-c", `
+while IFS= read -r line; do
+    printf '%s\n' "$line"
+done < "$1"
+`, "--", interruptedReplayLogPath})
+	if restoreErr != nil {
+		return logResult, restoreErr
+	}
+	return logResult, logErr
+}
+
+func (w *WalgUtil) InterruptedReplayCheckpointLogged() (bool, error) {
+	result, err := RunCommand(w.ctx, w.host, []string{"bash", "-c", `
+while IFS= read -r line; do
+    case "$line" in
+        *"Oplog replay progress is durable through"*) exit 0 ;;
+    esac
+done < "$1" 2>/dev/null
+exit 1
+`, "--", interruptedReplayLogPath})
+	if err != nil {
+		return false, err
+	}
+	return result.ExitCode == 0, nil
 }
 
 func (w *WalgUtil) BackupMeta(backupNum int) (Sentinel, error) {
