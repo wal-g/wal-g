@@ -132,28 +132,17 @@ pg_matrix_test:
 pg_save_image: install_and_build_pg pg10_build_image
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	for v in $(PG_VERSIONS); do \
-		if [ "$$v" != "10" ]; then $(MAKE) PG_MAJOR=$$v pg_build_image; fi; \
-		docker save wal-g/pg$${v}_tests > ${CACHE_FOLDER}/pg$${v}_tests.tar; \
-	done
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls -la ${CACHE_FOLDER}
 
-pg_integration_test: clean_compose
-	@tar="${CACHE_FOLDER}/pg$(PG_MAJOR)_tests.tar";\
-	if [ -n "${CACHE_FOLDER}" ] && [ -f "$$tar" ]; then\
-		docker load -i "$$tar" && rm "$$tar";\
+pg_integration_test: clean_compose install_and_build_pg
+	if [ "$(PG_MAJOR)" = "10" ]; then\
+		make pg10_build_image;\
 	else\
-		echo "No cached image for PG $(PG_MAJOR), building";\
-		make install_and_build_pg;\
-		if [ "$(PG_MAJOR)" = "10" ]; then\
-			make pg10_build_image;\
-		else\
-			make PG_MAJOR=$(PG_MAJOR) pg_build_image;\
-		fi;\
-	fi
+		make PG_MAJOR=$(PG_MAJOR) pg_build_image;\
+	fi;
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
 	fi
