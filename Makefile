@@ -137,13 +137,12 @@ pg_save_image: install_and_build_pg pg10_build_image
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls -la ${CACHE_FOLDER}
 
-pg_integration_test: clean_compose
-	make install_and_build_pg;\
+pg_integration_test: clean_compose install_and_build_pg
 	if [ "$(PG_MAJOR)" = "10" ]; then\
 		make pg10_build_image;\
 	else\
 		make PG_MAJOR=$(PG_MAJOR) pg_build_image;\
-	fi;\
+	fi;
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
 		docker compose build pg_pgbackrest;\
 	fi
