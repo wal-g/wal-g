@@ -6,7 +6,7 @@ MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
-DOCKER_COMMON := golang ubuntu ubuntu_22_04 s3
+DOCKER_COMMON := golang s3
 # Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
 GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
 export GO_VERSION
@@ -82,7 +82,7 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 
 install_and_build_pg: deps pg_build
 
-pg10_build_image: go_deps
+pg10_build_image: go_deps load_ubuntu_18_04
 ifeq ($(COMPOSE_BAKE),true)
 	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
 	docker compose build $(DOCKER_COMMON) pg10 pg10_tests_template
@@ -98,7 +98,7 @@ endif
 # Builds the image for any PostgreSQL 14-18, chosen by PG_MAJOR (ubuntu 22.04 and
 # PGDG). PG 10 still uses pg10_build_image above, because wal-e needs python3.7
 # and only the bionic image has it.
-pg_build_image: go_deps
+pg_build_image: go_deps load_ubuntu_22_04
 ifeq ($(PG_MAJOR),10)
 	$(error PG_MAJOR=10 must be built with pg10_build_image - the PG 10 image is bionic + wal-e)
 endif
@@ -136,8 +136,6 @@ save_common_images: go_deps
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
 	docker compose build $(DOCKER_COMMON)
-	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
-	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls -la ${CACHE_FOLDER}
 
@@ -200,13 +198,17 @@ mysql_build: $(CMD_FILES) $(PKG_FILES)
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
-load_docker_common:
+load_ubuntu_18_04:
+	(docker pull ghcr.io/wal-g/ubuntu:18.04 && docker tag ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04) || docker compose build ubuntu
+
+load_ubuntu_22_04:
+	(docker pull ghcr.io/wal-g/ubuntu:22.04 && docker tag ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
+
+load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
 		echo "Rebuild";\
 		docker compose build $(DOCKER_COMMON);\
 	else\
-		docker load -i ${CACHE_FILE_UBUNTU_18_04} && rm ${CACHE_FILE_UBUNTU_18_04};\
-		docker load -i ${CACHE_FILE_UBUNTU_22_04} && rm ${CACHE_FILE_UBUNTU_22_04};\
 		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
 	fi
 

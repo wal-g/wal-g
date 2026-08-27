@@ -7,6 +7,7 @@ permissions:
   contents: read
   
 env:
+  GOPROXY: "https://proxy.golang.org|direct"
   USE_BROTLI: 1
   USE_LIBSODIUM: 1
   USE_LZO: 1

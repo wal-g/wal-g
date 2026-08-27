@@ -9,6 +9,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  GOPROXY: "https://proxy.golang.org|direct"
+
 jobs:
   golangci:
     name: lint
@@ -28,16 +31,11 @@ jobs:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: v2.13
 
-  golangci-exporter:
-    name: lint exporter
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
       - name: Set up Go 1.x
         uses: actions/setup-go@v7
         with:
           go-version-file: 'cmd/pg/exporter/go.mod'
-        id: go
+        id: go-exporter
       # pg/exporter is a separate module; lint it under the repo-root .golangci.yml
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9.3.0

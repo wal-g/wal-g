@@ -6,6 +6,7 @@ on:
       - 'v*' # Push events to matching v*, i.e. v0.2.19, v0.2.14a
 
 env:
+  GOPROXY: "https://proxy.golang.org|direct"
   USE_BROTLI: 1
   USE_LIBSODIUM: 1
   USE_LZO: 1
