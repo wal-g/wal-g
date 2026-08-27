@@ -138,7 +138,7 @@ save_common_images: go_deps
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls -la ${CACHE_FOLDER}
 
-pg_integration_test: clean_compose install_and_build_pg
+pg_integration_test: clean_compose
 	if [ "$(PG_MAJOR)" = "10" ]; then\
 		make pg10_build_image;\
 	else\
