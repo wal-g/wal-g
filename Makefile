@@ -132,15 +132,16 @@ pg_matrix_test:
 		$(MAKE) PG_MAJOR=$$v pg_integration_test || exit 1; \
 	done
 
-pg_save_image: install_and_build_pg pg10_build_image
+save_common_images: go_deps
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
+	docker compose build $(DOCKER_COMMON)
 	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
 	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
 	ls -la ${CACHE_FOLDER}
 
-pg_integration_test: clean_compose install_and_build_pg
+pg_integration_test: clean_compose
 	if [ "$(PG_MAJOR)" = "10" ]; then\
 		make pg10_build_image;\
 	else\

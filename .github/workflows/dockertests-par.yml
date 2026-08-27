@@ -91,5 +91,4 @@ jobs:
     needs: prepare
     uses: ./.github/workflows/dockertests.yml
     with:
-      pg-versions: ${{ needs.prepare.outputs.versions }}
       command-json-array: ${{ needs.prepare.outputs.commands }}
