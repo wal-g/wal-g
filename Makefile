@@ -199,10 +199,10 @@ sqlserver_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
 load_ubuntu_18_04:
-	(docker pull ghcr.io/chipitsine/ubuntu:18.04 && docker tag ghcr.io/chipitsine/ubuntu:18.04 wal-g/ubuntu:18.04) || docker compose build ubuntu
+	(docker pull ghcr.io/wal-g/ubuntu:18.04 && docker tag ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04) || docker compose build ubuntu
 
 load_ubuntu_22_04:
-	(docker pull ghcr.io/chipitsine/ubuntu:22.04 && docker tag ghcr.io/chipitsine/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
+	(docker pull ghcr.io/wal-g/ubuntu:22.04 && docker tag ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
 
 load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
