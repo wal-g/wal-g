@@ -15,6 +15,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  GOPROXY: "https://proxy.golang.org|direct"
+  CACHE_FOLDER: ~/docker-images-${{ github.sha }}
+  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
+  IMAGE_GOLANG: wal-g/golang
+  IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
+
 jobs:
   # Run the whole test suite once for each PostgreSQL version. The versions run
   # at the same time, so more versions cost more machine time but almost no
@@ -26,7 +33,29 @@ jobs:
       versions: ${{ steps.resolve.outputs.versions }}
       commands: ${{ steps.resolve.outputs.commands }}
     steps:
-      - uses: actions/checkout@v7
+      #  use cache to pass docker images to the test jobs
+      - name: Docker images caching
+        id: cache-images
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ env.CACHE_FILE_GOLANG }}
+          key: ${{ env.IMAGES_CACHE_KEY }}
+
+      - name: Cleanup space on runner
+        run: |
+          swapon --show=NAME --noheadings | while read swap_device; do
+            sudo swapoff $swap_device
+          done
+
+          if [ -e /swapfile ]; then
+            sudo rm /swapfile
+          fi
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v7
+        with:
+          submodules: true
 
       - name: Build the command list
         id: resolve
@@ -86,6 +115,32 @@ jobs:
           echo "versions=$versions" >> "$GITHUB_OUTPUT"
           echo "commands=$commands" >> "$GITHUB_OUTPUT"
           echo "PostgreSQL: $versions"
+
+      - name: Install deps
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        run: sudo apt clean && sudo apt-get install liblzo2-dev
+
+      - name: Set up Go 1.x
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: 'go.mod'
+        id: go
+
+      - name: Set up Docker Buildx
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        uses: docker/setup-buildx-action@v4
+
+      # build images
+      - name: Build images
+        if: steps.cache-images.outputs.cache-hit != 'true'
+        run: make save_common_images
+    env:
+      USE_BROTLI: 1
+      USE_LZO: 1
+      # route docker compose build through buildx bake so per-service cache_from / cache_to in docker-compose.bake.yml take effect
+      COMPOSE_BAKE: "true"
+      COMPOSE_FILE: docker-compose.yml:docker-compose.bake.yml
 
   parallel:
     needs: prepare
