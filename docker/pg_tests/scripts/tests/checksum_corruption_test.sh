@@ -2,7 +2,24 @@
 set -e -x
 
 . /tmp/tests/test_functions/prepare_config.sh
+. /tmp/tests/test_functions/pg_compat.sh
 prepare_config "/tmp/configs/checksum_corruption_test_config.json"
+
+# pg_checksums confirms the damage independently of wal-g. It appeared in PG 12
+# (pg_verify_checksums in 11), so on PG 10 we only have wal-g's own report.
+expect_pg_checksums_failure() {
+    if ! pg_version_ge 12; then
+        echo "pg_checksums is not available before PG 12, skipping the independent check"
+        return 0
+    fi
+    if pg_checksums --check -D "${PGDATA}" >/tmp/pg_checksums.log 2>&1; then
+        echo "FAILED: pg_checksums found no problem, but the file was corrupted"
+        cat /tmp/pg_checksums.log
+        exit 1
+    fi
+    echo "pg_checksums reports a problem too:"
+    cat /tmp/pg_checksums.log
+}
 
 # Init cluster with data checksums enabled
 initdb --data-checksums ${PGDATA}
@@ -31,6 +48,8 @@ pg_ctl -D ${PGDATA} -w stop
 # Equivalent to: dd if=/dev/urandom of=<file> bs=1 count=4 seek=6000 conv=notrunc
 dd if=/dev/urandom of="${DATA_FILE}" bs=1 count=4 seek=6000 conv=notrunc
 
+expect_pg_checksums_failure
+
 pg_ctl -D ${PGDATA} -w start
 
 BACKUP_LOG_1="/tmp/checksum_test1.log"
@@ -51,6 +70,8 @@ cp "/tmp/clean_data_file_backup" "${DATA_FILE}"
 # ── Test 2: append bytes → file size grows by 4 (not a multiple of page size) ──
 # Equivalent to: dd if=/dev/urandom bs=1 count=4 >> <file>
 dd if=/dev/urandom bs=1 count=4 >> "${DATA_FILE}"
+
+expect_pg_checksums_failure
 
 pg_ctl -D ${PGDATA} -w start
 
