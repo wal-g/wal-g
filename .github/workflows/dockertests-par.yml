@@ -27,14 +27,14 @@ jobs:
   # at the same time, so more versions cost more machine time but almost no
   # extra waiting. A manual run can test fewer versions, see pg_versions above.
   prepare:
-    name: resolve versions
+    name: resolve versions & build docker images
     runs-on: ubuntu-latest
     outputs:
       versions: ${{ steps.resolve.outputs.versions }}
       commands: ${{ steps.resolve.outputs.commands }}
     steps:
       #  use cache to pass docker images to the test jobs
-      - name: Docker images caching
+      - name: Build Docker images
         id: cache-images
         uses: actions/cache@v6
         with:
