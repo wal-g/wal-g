@@ -14,6 +14,9 @@ defaults:
   run:
     shell: pwsh
 
+env:
+  GOPROXY: "https://proxy.golang.org|direct"
+
 jobs:
   build:
     name: windows build smoke test
