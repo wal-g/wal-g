@@ -148,8 +148,10 @@ func runInlineOplogReplayAttempt(
 	replayArgs ReplyOplogConfig,
 	minimalConfigPath string,
 ) (bool, error) {
-	mongodProcess := Mongod(minimalConfigPath).
-		WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
+	mongodProcess := Mongod(minimalConfigPath)
+	if !replayArgs.WithCatchUpReconfig {
+		mongodProcess.WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
+	}
 	if replayArgs.Partial {
 		mongodProcess.WithRestore()
 	}
@@ -162,11 +164,32 @@ func runInlineOplogReplayAttempt(
 	attemptCtx, cancelAttempt := context.WithCancel(ctx)
 	defer cancelAttempt()
 
-	mongodService, err := CreateMongodService(attemptCtx, "wal-g oplog replay", mongodProcess.GetURI(), 10*time.Minute)
-	if err != nil {
-		mongodProcess.Close()
-		<-waitC
-		return false, errors.Wrap(err, "unable to create mongod service")
+	serviceC := make(chan struct {
+		service *MongodService
+		err     error
+	}, 1)
+	go func() {
+		service, err := CreateMongodService(
+			attemptCtx, "wal-g oplog replay", mongodProcess.GetURI(), 10*time.Minute)
+		serviceC <- struct {
+			service *MongodService
+			err     error
+		}{service: service, err: err}
+	}()
+
+	var mongodService *MongodService
+	select {
+	case processErr := <-waitC:
+		cancelAttempt()
+		<-serviceC
+		return true, unexpectedMongodExit(processErr)
+	case result := <-serviceC:
+		if result.err != nil {
+			mongodProcess.Close()
+			<-waitC
+			return false, errors.Wrap(result.err, "unable to create mongod service")
+		}
+		mongodService = result.service
 	}
 
 	replayC := make(chan error, 1)
@@ -191,7 +214,7 @@ func runInlineOplogReplayAttempt(
 			}
 		}
 
-		if err = mongodService.Shutdown(ctx); err != nil {
+		if err := mongodService.Shutdown(ctx); err != nil {
 			mongodProcess.Close()
 			<-waitC
 			return false, err
