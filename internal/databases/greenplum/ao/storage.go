@@ -1,4 +1,4 @@
-package greenplum
+package ao
 
 import (
 	"context"
@@ -12,32 +12,32 @@ import (
 )
 
 const (
-	AoStoragePath       = "aosegments"
-	AoSegSuffix         = "_aoseg"
-	AoSegDeltaDelimiter = "_D_"
+	StoragePath    = "aosegments"
+	KeySuffix      = "_aoseg"
+	DeltaDelimiter = "_D_"
 )
 
-func makeAoFileStorageKey(relNameMd5 string, modCount int64, location *walparser.BlockLocation, newAoSegFilesID string) string {
+func makeFileStorageKey(relNameMd5 string, modCount int64, location *walparser.BlockLocation, newAoSegFilesID string) string {
 	return fmt.Sprintf("%d_%d_%s_%d_%d_%d_%s%s",
 		location.RelationFileNode.SpcNode, location.RelationFileNode.DBNode,
 		relNameMd5,
 		location.RelationFileNode.RelNode, location.BlockNo,
-		modCount, newAoSegFilesID, AoSegSuffix)
+		modCount, newAoSegFilesID, KeySuffix)
 }
 
-func makeDeltaAoFileStorageKey(baseKey string, modCount int64) string {
-	trimmedKey := strings.TrimSuffix(baseKey, AoSegSuffix)
-	return fmt.Sprintf("%s%s%d%s", trimmedKey, AoSegDeltaDelimiter, modCount, AoSegSuffix)
+func makeDeltaFileStorageKey(baseKey string, modCount int64) string {
+	trimmedKey := strings.TrimSuffix(baseKey, KeySuffix)
+	return fmt.Sprintf("%s%s%d%s", trimmedKey, DeltaDelimiter, modCount, KeySuffix)
 }
 
-// LoadStorageAoFiles loads the list of the AO/AOCS segment files that are referenced from previous backups
-func LoadStorageAoFiles(ctx context.Context, baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
+// LoadStorageAOFiles loads the list of the AO/AOCS segment files that are referenced from previous backups.
+func LoadStorageAOFiles(ctx context.Context, baseBackupsFolder storage.Folder) (map[string]struct{}, error) {
 	aoSegments := make(map[string]struct{}, 0)
 
-	iterateFunc := func(_ string, desc *BackupAOFileDesc) {
+	iterateFunc := func(_ string, desc *BackupFileDesc) {
 		aoSegments[desc.StoragePath] = struct{}{}
 	}
-	err := iterateStorageAoFilesWithFunc(ctx, baseBackupsFolder, iterateFunc)
+	err := iterateStorageFilesWithFunc(ctx, baseBackupsFolder, iterateFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +45,8 @@ func LoadStorageAoFiles(ctx context.Context, baseBackupsFolder storage.Folder) (
 	return aoSegments, nil
 }
 
-func iterateStorageAoFilesWithFunc(ctx context.Context,
-	baseBackupsFolder storage.Folder, iterateFunc func(string, *BackupAOFileDesc)) error {
+func iterateStorageFilesWithFunc(ctx context.Context,
+	baseBackupsFolder storage.Folder, iterateFunc func(string, *BackupFileDesc)) error {
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {
 		return err
@@ -58,11 +58,12 @@ func iterateStorageAoFilesWithFunc(ctx context.Context,
 	}
 
 	for _, b := range backupTimes {
-		backup, err := NewSegBackup(ctx, baseBackupsFolder, b.BackupName, b.StorageName)
+		backup, err := internal.NewBackupInStorage(ctx, baseBackupsFolder, b.BackupName, b.StorageName)
 		if err != nil {
 			return err
 		}
-		aoMeta, err := backup.LoadAoFilesMetadata(ctx)
+		var aoMeta FilesMetadataDTO
+		err = internal.FetchDto(ctx, backup.Folder, &aoMeta, GetFilesMetadataPath(backup.Name))
 		if err != nil {
 			if _, ok := err.(storage.ObjectNotFoundError); ok {
 				tracelog.WarningLogger.Printf("No AO files metadata found for backup %s in folder %s, skipping",

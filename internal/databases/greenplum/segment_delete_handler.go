@@ -9,6 +9,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
@@ -74,7 +75,7 @@ func (h SegDeleteBeforeHandler) Delete(ctx context.Context, segBackup SegBackup)
 
 	filterFunc := func(object storage.Object) bool { return true }
 	folderFilter := func(folderPath string) bool {
-		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, AoStoragePath)
+		aoSegFolderPrefix := path.Join(utility.BaseBackupPath, ao.StoragePath)
 		paxFolderPrefix := path.Join(utility.BaseBackupPath, pax.StoragePath)
 		return !strings.HasPrefix(folderPath, aoSegFolderPrefix) &&
 			!strings.HasPrefix(folderPath, paxFolderPrefix)
@@ -106,7 +107,7 @@ func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup)
 		segTarget.GetBackupName(), h.contentID)
 
 	folderFilter := func(folderPath string) bool {
-		return !strings.HasPrefix(folderPath, AoStoragePath) &&
+		return !strings.HasPrefix(folderPath, ao.StoragePath) &&
 			!strings.HasPrefix(folderPath, pax.StoragePath)
 	}
 	err = h.DeleteTarget(ctx, segTarget, h.args.Confirmed, h.args.FindFull, folderFilter)
@@ -126,8 +127,8 @@ func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup)
 
 // TODO: unit tests
 func cleanupAOSegments(ctx context.Context, target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
-	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(AoStoragePath)
-	aoSegmentsToRetain, err := LoadStorageAoFiles(ctx, segFolder.GetSubFolder(utility.BaseBackupPath))
+	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(ao.StoragePath)
+	aoSegmentsToRetain, err := ao.LoadStorageAOFiles(ctx, segFolder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
@@ -296,7 +297,7 @@ func findAoSegmentsToDelete(ctx context.Context, target internal.BackupObject,
 
 	aoSegmentsToDelete := make([]storage.Object, 0)
 	for _, obj := range aoObjects {
-		if !strings.HasSuffix(obj.GetName(), AoSegSuffix) && obj.GetLastModified().After(target.GetLastModified()) {
+		if !strings.HasSuffix(obj.GetName(), ao.KeySuffix) && obj.GetLastModified().After(target.GetLastModified()) {
 			tracelog.DebugLogger.Println(
 				"\tis not an AO segment file, will not delete (modify time is too recent): " + obj.GetName())
 			continue

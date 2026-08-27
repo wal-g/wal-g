@@ -1,4 +1,4 @@
-package greenplum_test
+package ao_test
 
 import (
 	"bytes"
@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/walparser/parsingutil"
 )
 
-const aoSegmentFileName = "../../../test/testdata/gp_ao_file.bin"
+const aoSegmentFileName = "../../../../test/testdata/gp_ao_file.bin"
 const aoSegmentFileSizeBytes = 192
 
 func TestReadIncrement(t *testing.T) {
@@ -29,10 +29,10 @@ func TestFailOnIncorrectOffset(t *testing.T) {
 		fmt.Print(err.Error())
 	}
 
-	_, err = greenplum.NewIncrementalPageReader(t.Context(), file, aoSegmentFileSizeBytes, aoSegmentFileSizeBytes)
+	_, err = ao.NewIncrementalPageReader(t.Context(), file, aoSegmentFileSizeBytes, aoSegmentFileSizeBytes)
 	assert.Error(t, err)
 
-	_, err = greenplum.NewIncrementalPageReader(t.Context(), file, 0, aoSegmentFileSizeBytes)
+	_, err = ao.NewIncrementalPageReader(t.Context(), file, 0, aoSegmentFileSizeBytes)
 	assert.Error(t, err)
 }
 
@@ -42,14 +42,14 @@ func gpReadIncrement(offset, eof int64, t *testing.T) {
 		fmt.Print(err.Error())
 	}
 
-	reader, err := greenplum.NewIncrementalPageReader(t.Context(), file, eof, offset)
+	reader, err := ao.NewIncrementalPageReader(t.Context(), file, eof, offset)
 	assert.NoError(t, err)
 
 	increment, err := io.ReadAll(reader)
 	assert.NoError(t, err)
 
 	incrementBuf := bytes.NewBuffer(increment)
-	err = greenplum.ReadIncrementFileHeader(incrementBuf)
+	err = ao.ReadIncrementFileHeader(incrementBuf)
 	assert.NoError(t, err)
 
 	var parsedEOF uint64

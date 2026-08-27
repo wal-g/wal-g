@@ -1,4 +1,4 @@
-package greenplum
+package ao
 
 import (
 	"encoding/hex"

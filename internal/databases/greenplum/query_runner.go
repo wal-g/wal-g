@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/walparser"
 )
@@ -25,7 +26,7 @@ type aoRelPgClassInfo struct {
 	relFileNodeID uint32
 	relNAtts      int16
 	spcNode       uint32
-	storage       RelStorageType
+	storage       ao.RelStorageType
 }
 
 // NewGpQueryRunner builds QueryRunner from available connection
@@ -313,7 +314,7 @@ func (queryRunner *GpQueryRunner) AbortBackup(ctx context.Context) (err error) {
 
 // FetchAOStorageMetadata queries the storage metadata for AO & AOCS tables (GreenplumDB)
 func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(ctx context.Context,
-	dbInfo postgres.PgDatabaseInfo) (AoRelFileStorageMap, error) {
+	dbInfo postgres.PgDatabaseInfo) (ao.RelFileStorageMap, error) {
 	queryRunner.Mu.Lock()
 	defer queryRunner.Mu.Unlock()
 
@@ -337,7 +338,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(ctx context.Context,
 		var aoSegTableFqn string
 		var relFileNodeID uint32
 		var spcNode uint32
-		var storage RelStorageType
+		var storage ao.RelStorageType
 		var relNAtts int16
 		if err := rows.Scan(&oid, &relNameMd5, &aoSegTableFqn, &relFileNodeID, &spcNode, &storage, &relNAtts); err != nil {
 			return nil, errors.Wrapf(err, "failed to parse query result")
@@ -356,12 +357,12 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(ctx context.Context,
 		return nil, rows.Err()
 	}
 
-	relStorageMap := make(AoRelFileStorageMap)
+	relStorageMap := make(ao.RelFileStorageMap)
 
 	for aoSegTableFqn, row := range relPgClassInfo {
 		var queryFunc func() (pgx.Rows, error)
 		switch row.storage {
-		case AppendOptimized:
+		case ao.AppendOptimized:
 			queryFunc = func() (pgx.Rows, error) {
 				query, err := queryRunner.buildAOMetadataQuery(aoSegTableFqn)
 				if err != nil {
@@ -370,7 +371,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(ctx context.Context,
 
 				return conn.Query(ctx, query)
 			}
-		case ColumnOriented:
+		case ao.ColumnOriented:
 			queryFunc = func() (pgx.Rows, error) {
 				query, err := queryRunner.buildAOCSMetadataQuery()
 				if err != nil {
@@ -394,7 +395,7 @@ func (queryRunner *GpQueryRunner) FetchAOStorageMetadata(ctx context.Context,
 	return relStorageMap, nil
 }
 
-func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDatabaseInfo,
+func loadStorageMetadata(relStorageMap ao.RelFileStorageMap, dbInfo postgres.PgDatabaseInfo,
 	queryFn func() (pgx.Rows, error), aoSegTableFqn string, relPgClassInfo map[string]aoRelPgClassInfo) error {
 	rows, err := queryFn()
 	if err != nil {
@@ -417,12 +418,7 @@ func loadStorageMetadata(relStorageMap AoRelFileStorageMap, dbInfo postgres.PgDa
 		if relFileLoc.RelationFileNode.SpcNode == walparser.Oid(0) {
 			relFileLoc.RelationFileNode.SpcNode = dbInfo.TblSpcOid
 		}
-		relStorageMap[*relFileLoc] = AoRelFileMetadata{
-			relNameMd5:  cInfo.relNameMd5,
-			storageType: cInfo.storage,
-			eof:         eof,
-			modCount:    modCount,
-		}
+		relStorageMap[*relFileLoc] = ao.NewRelFileMetadata(cInfo.relNameMd5, cInfo.storage, eof, modCount)
 	}
 	if rows.Err() != nil {
 		return rows.Err()

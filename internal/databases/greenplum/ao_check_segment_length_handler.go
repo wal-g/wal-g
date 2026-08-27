@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -290,7 +291,7 @@ func (checker *AOLengthCheckSegmentHandler) getTableMetadataEOF(ctx context.Cont
 	return metaEOF, nil
 }
 
-func (checker *AOLengthCheckSegmentHandler) getAOMetadata(ctx context.Context, backupName string) (BackupAOFiles, error) {
+func (checker *AOLengthCheckSegmentHandler) getAOMetadata(ctx context.Context, backupName string) (ao.BackupFiles, error) {
 	rootFolder := checker.rootFolder
 
 	var backup internal.Backup
@@ -303,9 +304,9 @@ func (checker *AOLengthCheckSegmentHandler) getAOMetadata(ctx context.Context, b
 	}
 
 	tracelog.DebugLogger.Printf("backup %s", backup.Name)
-	files := NewAOFilesMetadataDTO()
+	files := ao.NewFilesMetadataDTO()
 
-	err = internal.FetchDto(ctx, backup.Folder, &files, fmt.Sprintf("%s/ao_files_metadata.json", backup.Name))
+	err = internal.FetchDto(ctx, backup.Folder, &files, ao.GetFilesMetadataPath(backup.Name))
 	if err != nil {
 		tracelog.ErrorLogger.Printf("failed to fetch file data")
 		return nil, err
