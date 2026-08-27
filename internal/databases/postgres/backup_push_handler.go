@@ -722,7 +722,7 @@ func (bh *BackupHandler) checkDataChecksums(ctx context.Context) error {
 			bh.Arguments.verifyPageChecksums = false
 		} else {
 			tracelog.InfoLogger.Println("data_checksums is enabled in DB.")
-			fullPageWrites, err := bh.Workers.QueryRunner.GetFullPageWrites()
+			fullPageWrites, err := bh.Workers.QueryRunner.GetFullPageWrites(ctx)
 			if err != nil {
 				return err
 			}

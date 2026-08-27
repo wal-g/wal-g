@@ -746,8 +746,8 @@ func (queryRunner *PgQueryRunner) GetDataChecksums(ctx context.Context) (string,
 }
 
 // GetFullPageWrites retrieves the full_page_writes PostgreSQL setting.
-func (queryRunner *PgQueryRunner) GetFullPageWrites() (bool, error) {
-	value, err := queryRunner.GetParameter("full_page_writes")
+func (queryRunner *PgQueryRunner) GetFullPageWrites(ctx context.Context) (bool, error) {
+	value, err := queryRunner.GetParameter(ctx, "full_page_writes")
 	if err != nil {
 		return false, errors.Wrap(err, "GetFullPageWrites: failed to retrieve full_page_writes")
 	}
