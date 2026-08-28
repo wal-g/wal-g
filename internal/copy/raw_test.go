@@ -135,6 +135,85 @@ func TestExecuteRawUpdatesUploadMetrics(t *testing.T) {
 	require.Equal(t, failedBefore+1, counterValue(t, statistics.WalgMetrics.UploadedFilesFailedTotal))
 }
 
+func TestExecuteUsesCrossFolderCopy(t *testing.T) {
+	from := testtools.MakeDefaultInMemoryStorageFolder()
+	require.NoError(t, from.PutObject(t.Context(), "object", bytes.NewBufferString("payload")))
+	to := &recordingCrossCopyFolder{Folder: testtools.MakeDefaultInMemoryStorageFolder()}
+	plan, err := copyutil.NewPlan(t.Context(), from, to)
+	require.NoError(t, err)
+	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
+
+	require.NoError(t, copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true}))
+	require.Equal(t, 1, to.CopyCalls())
+	require.Equal(t, 0, to.PutCalls())
+}
+
+func TestExecuteFallsBackFromCrossFolderCopy(t *testing.T) {
+	from := testtools.MakeDefaultInMemoryStorageFolder()
+	require.NoError(t, from.PutObject(t.Context(), "object", bytes.NewBufferString("payload")))
+	to := &recordingCrossCopyFolder{
+		Folder:  testtools.MakeDefaultInMemoryStorageFolder(),
+		copyErr: errors.New("copy API unavailable"),
+	}
+	plan, err := copyutil.NewPlan(t.Context(), from, to)
+	require.NoError(t, err)
+	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
+
+	require.NoError(t, copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true}))
+	require.Equal(t, 1, to.CopyCalls())
+	require.Equal(t, 1, to.PutCalls())
+	reader, err := to.ReadObject(t.Context(), "object")
+	require.NoError(t, err)
+	defer reader.Close()
+	content, err := io.ReadAll(reader)
+	require.NoError(t, err)
+	require.Equal(t, []byte("payload"), content)
+}
+
+func TestExecuteDoesNotFallBackAfterCancellation(t *testing.T) {
+	from := testtools.MakeDefaultInMemoryStorageFolder()
+	require.NoError(t, from.PutObject(t.Context(), "object", bytes.NewBufferString("payload")))
+	to := &recordingCrossCopyFolder{Folder: testtools.MakeDefaultInMemoryStorageFolder(), copyErr: context.Canceled}
+	plan, err := copyutil.NewPlan(t.Context(), from, to)
+	require.NoError(t, err)
+	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	require.ErrorIs(t, copyutil.Execute(ctx, plan, copyutil.ExecuteOptions{UseServerSideCopy: true}), context.Canceled)
+	require.Equal(t, 0, to.PutCalls())
+}
+
+func TestExecuteDoesNotFallBackWhenCopyReturnsCancellation(t *testing.T) {
+	from := testtools.MakeDefaultInMemoryStorageFolder()
+	require.NoError(t, from.PutObject(t.Context(), "object", bytes.NewBufferString("payload")))
+	to := &recordingCrossCopyFolder{Folder: testtools.MakeDefaultInMemoryStorageFolder(), copyErr: context.Canceled}
+	plan, err := copyutil.NewPlan(t.Context(), from, to)
+	require.NoError(t, err)
+	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
+
+	require.ErrorIs(t,
+		copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true}),
+		context.Canceled)
+	require.Equal(t, 0, to.PutCalls())
+}
+
+func TestExecuteReturnsServerAndStreamingErrors(t *testing.T) {
+	from := testtools.MakeDefaultInMemoryStorageFolder()
+	require.NoError(t, from.PutObject(t.Context(), "object", bytes.NewBufferString("payload")))
+	to := &recordingCrossCopyFolder{
+		Folder:  &failingPutFolder{Folder: testtools.MakeDefaultInMemoryStorageFolder()},
+		copyErr: errors.New("server copy failed"),
+	}
+	plan, err := copyutil.NewPlan(t.Context(), from, to)
+	require.NoError(t, err)
+	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
+
+	err = copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true})
+	require.ErrorContains(t, err, "server copy failed")
+	require.ErrorContains(t, err, "put failed")
+}
+
 func TestStripCompressionExtensionCoversRegisteredDecompressors(t *testing.T) {
 	for _, decompressor := range compression.Decompressors {
 		extension := decompressor.FileExtension()
@@ -189,6 +268,45 @@ type recordingPutFolder struct {
 
 	mu     sync.Mutex
 	writes []string
+}
+
+type recordingCrossCopyFolder struct {
+	storage.Folder
+
+	mu        sync.Mutex
+	copyErr   error
+	copyCalls int
+	putCalls  int
+}
+
+func (f *recordingCrossCopyFolder) CanCopyFrom(storage.Folder) bool { return true }
+
+func (f *recordingCrossCopyFolder) CopyObjectFrom(
+	context.Context, storage.Folder, string, string, int64,
+) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.copyCalls++
+	return f.copyErr
+}
+
+func (f *recordingCrossCopyFolder) PutObject(ctx context.Context, name string, content io.Reader) error {
+	f.mu.Lock()
+	f.putCalls++
+	f.mu.Unlock()
+	return f.Folder.PutObject(ctx, name, content)
+}
+
+func (f *recordingCrossCopyFolder) CopyCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.copyCalls
+}
+
+func (f *recordingCrossCopyFolder) PutCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.putCalls
 }
 
 func (f *recordingPutFolder) PutObject(ctx context.Context, name string, content io.Reader) error {

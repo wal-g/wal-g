@@ -21,13 +21,14 @@ COPY link_brotli.sh link_brotli.sh
 COPY CMakeLists-brotli.txt CMakeLists-brotli.txt
 COPY Makefile Makefile
 
-RUN USE_BROTLI=1 USE_LZO=1 make ENABLE_RACE_DETECTION=1 deps pg_build
+RUN USE_BROTLI=1 USE_LZO=1 make ENABLE_RACE_DETECTION=1 deps pg_build etcd_build
 
 FROM wal-g/ubuntu:18.04
 
 RUN apt-get update && apt-get install --yes --no-install-recommends --no-install-suggests brotli
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/pg/wal-g /usr/bin
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/etcd/wal-g /usr/bin/wal-g-etcd
 
 COPY docker/st_tests/scripts/ /tmp
 
