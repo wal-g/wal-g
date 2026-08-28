@@ -6,6 +6,7 @@ import (
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -18,7 +19,7 @@ import (
 // It is stored under the same names the segments use, ao_files_metadata.json and
 // pax_files_metadata.json, one folder level up. The name is shared but the shape is not: the two
 // are told apart by the folder they are read from, and nothing reads the cluster-level one as
-// AOFilesMetadataDTO or vice versa (LoadStorageAoFiles and pax.LoadStoragePaxFiles are only ever
+// ao.FilesMetadataDTO or vice versa (ao.LoadStorageAOFiles and pax.LoadStoragePaxFiles are only ever
 // given a segment folder).
 type SharedSizeDTO struct {
 	// SharedSize is the volume, in bytes, the backup added to one of the shared storages. It is the
@@ -43,7 +44,7 @@ type sharedStorageKind struct {
 
 func sharedStorageKinds() []sharedStorageKind {
 	return []sharedStorageKind{
-		{name: "AO/AOCS", path: getAOFilesMetadataPath, readSegmentSize: readUploadedAOSize},
+		{name: "AO/AOCS", path: ao.GetFilesMetadataPath, readSegmentSize: readUploadedAOSize},
 		{name: "PAX", path: pax.GetFilesMetadataPath, readSegmentSize: readUploadedPaxSize},
 	}
 }
@@ -137,7 +138,7 @@ type paxUploadedSizeView struct {
 
 func readUploadedAOSize(ctx context.Context, baseBackupsFolder storage.Folder, backupName string) (int64, error) {
 	var meta aoUploadedSizeView
-	if err := internal.FetchDto(ctx, baseBackupsFolder, &meta, getAOFilesMetadataPath(backupName)); err != nil {
+	if err := internal.FetchDto(ctx, baseBackupsFolder, &meta, ao.GetFilesMetadataPath(backupName)); err != nil {
 		return 0, err
 	}
 	return meta.UploadedSharedSize, nil
@@ -157,7 +158,7 @@ func readUploadedPaxSize(ctx context.Context, baseBackupsFolder storage.Folder, 
 // rootFolder must be the cluster root. Given a segment folder this would read that segment's files
 // metadata, which has no SharedSize, and report a zero.
 func FetchAOSharedSize(ctx context.Context, rootFolder storage.Folder, backupName string) (int64, error) {
-	return fetchSharedSize(ctx, rootFolder, getAOFilesMetadataPath(backupName))
+	return fetchSharedSize(ctx, rootFolder, ao.GetFilesMetadataPath(backupName))
 }
 
 // FetchPaxSharedSize is the volume backupName added to the shared PAX storage cluster-wide.

@@ -1,17 +1,17 @@
-package greenplum
+package ao
 
 import (
 	"time"
 )
 
-const AOFilesMetadataName = "ao_files_metadata.json"
+const FilesMetadataName = "ao_files_metadata.json"
 
-// getAOFilesMetadataPath returns AO files metadata storage path.
-func getAOFilesMetadataPath(backupName string) string {
-	return backupName + "/" + AOFilesMetadataName
+// GetFilesMetadataPath returns AO files metadata storage path.
+func GetFilesMetadataPath(backupName string) string {
+	return backupName + "/" + FilesMetadataName
 }
 
-type BackupAOFileDesc struct {
+type BackupFileDesc struct {
 	StoragePath     string         `json:"StoragePath"`
 	IsSkipped       bool           `json:"IsSkipped"`
 	IsIncremented   bool           `json:"IsIncremented,omitempty"`
@@ -25,8 +25,8 @@ type BackupAOFileDesc struct {
 	Checksum        string         `json:"Checksum,omitempty"`
 }
 
-type AOFilesMetadataDTO struct {
-	Files BackupAOFiles
+type FilesMetadataDTO struct {
+	Files BackupFiles
 	// UploadedSharedSize is the volume this backup uploaded to the shared aosegments/ storage:
 	// Files smaller than WALG_GP_AOSEG_SIZE_THRESHOLD go into the regular tar balls and are not
 	// part of it.
@@ -36,15 +36,15 @@ type AOFilesMetadataDTO struct {
 	UploadedSharedSize int64 `json:",omitempty"`
 }
 
-type BackupAOFiles map[string]*BackupAOFileDesc
+type BackupFiles map[string]*BackupFileDesc
 
-func NewAOFilesMetadataDTO() *AOFilesMetadataDTO {
-	return &AOFilesMetadataDTO{Files: make(BackupAOFiles)}
+func NewFilesMetadataDTO() *FilesMetadataDTO {
+	return &FilesMetadataDTO{Files: make(BackupFiles)}
 }
 
-func (m *AOFilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplTS time.Time, aoMeta AoRelFileMetadata,
+func (m *FilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplTS time.Time, aoMeta RelFileMetadata,
 	fileMode int64, isSkipped, isIncremented bool, checksum string) {
-	m.Files[key] = &BackupAOFileDesc{
+	m.Files[key] = &BackupFileDesc{
 		StoragePath:     storagePath,
 		IsSkipped:       isSkipped,
 		IsIncremented:   isIncremented,

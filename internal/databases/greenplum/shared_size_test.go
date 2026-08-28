@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
@@ -113,9 +114,9 @@ func putSegmentAOFilesMetadata(t *testing.T, root storage.Folder, contentID int,
 	t.Helper()
 
 	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
-	putDTO(t, folder, utility.BaseBackupPath+backupName+"/"+greenplum.AOFilesMetadataName,
-		greenplum.AOFilesMetadataDTO{
-			Files:              greenplum.BackupAOFiles{"1337.1": {StoragePath: "aosegments/1337.1", EOF: 4096}},
+	putDTO(t, folder, utility.BaseBackupPath+ao.GetFilesMetadataPath(backupName),
+		ao.FilesMetadataDTO{
+			Files:              ao.BackupFiles{"1337.1": {StoragePath: "aosegments/1337.1", EOF: 4096}},
 			UploadedSharedSize: aoSize,
 		})
 }

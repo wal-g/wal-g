@@ -1,4 +1,4 @@
-package greenplum
+package ao
 
 import (
 	"context"
@@ -21,10 +21,10 @@ import (
 	"github.com/zeebo/xxh3"
 )
 
-type AoStorageUploader struct {
+type StorageUploader struct {
 	uploader      internal.Uploader
-	baseAoFiles   BackupAOFiles
-	meta          *AOFilesMetadataDTO
+	baseAoFiles   BackupFiles
+	meta          *FilesMetadataDTO
 	metaMutex     sync.Mutex
 	crypter       crypto.Crypter
 	bundleFiles   internal.BundleFiles
@@ -35,9 +35,9 @@ type AoStorageUploader struct {
 	newAoSegFilesID string
 }
 
-func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
+func NewStorageUploader(uploader internal.Uploader, baseAoFiles BackupFiles,
 	crypter crypto.Crypter, files internal.BundleFiles, isIncremental bool, deduplicationAgeLimit time.Duration,
-	newAoSegFilesID string) *AoStorageUploader {
+	newAoSegFilesID string) *StorageUploader {
 	// Separate uploader for AO/AOCS relfiles, with a size counter of its own: cloning would share
 	// the counter of the backup uploader, and WAL-G does not count these files in the backup size.
 	//
@@ -45,10 +45,10 @@ func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
 	// TODO: lookup the compression details for each relation and compress it when compression is turned off
 	aoSegUploader := internal.NewRegularUploader(nil, uploader.Folder())
 
-	return &AoStorageUploader{
+	return &StorageUploader{
 		uploader:            aoSegUploader,
 		baseAoFiles:         baseAoFiles,
-		meta:                NewAOFilesMetadataDTO(),
+		meta:                NewFilesMetadataDTO(),
 		crypter:             crypter,
 		bundleFiles:         files,
 		isIncremental:       isIncremental,
@@ -57,8 +57,8 @@ func NewAoStorageUploader(uploader internal.Uploader, baseAoFiles BackupAOFiles,
 	}
 }
 
-func (u *AoStorageUploader) AddFile(ctx context.Context,
-	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
+func (u *StorageUploader) AddFile(ctx context.Context,
+	cfi *internal.ComposeFileInfo, aoMeta RelFileMetadata, location *walparser.BlockLocation) error {
 	err := u.addFile(ctx, cfi, aoMeta, location)
 	switch err.(type) {
 	case internal.FileNotExistError:
@@ -71,8 +71,8 @@ func (u *AoStorageUploader) AddFile(ctx context.Context,
 	return err
 }
 
-func (u *AoStorageUploader) addFile(ctx context.Context,
-	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
+func (u *StorageUploader) addFile(ctx context.Context,
+	cfi *internal.ComposeFileInfo, aoMeta RelFileMetadata, location *walparser.BlockLocation) error {
 	remoteFile, ok := u.baseAoFiles[cfi.Header.Name]
 	if !ok {
 		tracelog.DebugLogger.Printf("%s: no base file in storage, will perform a regular upload", cfi.Header.Name)
@@ -157,8 +157,8 @@ func validateFileChecksum(ctx context.Context, path string, oldEOF int64, curEOF
 	return newChecksum, true, nil
 }
 
-func (u *AoStorageUploader) addAoFileMetadata(
-	cfi *internal.ComposeFileInfo, storageKey string, aoMeta AoRelFileMetadata, isSkipped, isIncremented bool,
+func (u *StorageUploader) addAoFileMetadata(
+	cfi *internal.ComposeFileInfo, storageKey string, aoMeta RelFileMetadata, isSkipped, isIncremented bool,
 	initialUplTS time.Time, checksum string) {
 	u.metaMutex.Lock()
 	u.meta.addFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(),
@@ -166,18 +166,18 @@ func (u *AoStorageUploader) addAoFileMetadata(
 	u.metaMutex.Unlock()
 }
 
-func (u *AoStorageUploader) GetFiles() *AOFilesMetadataDTO {
+func (u *StorageUploader) GetFiles() *FilesMetadataDTO {
 	return u.meta
 }
 
 // UploadedDataSize is the volume this backup pushed to the shared aosegments/ storage, as counted
 // by the uploader after compression and encryption. Files reused from an older backup via
 // deduplication never reach the uploader, so they are not counted.
-func (u *AoStorageUploader) UploadedDataSize() (int64, error) {
+func (u *StorageUploader) UploadedDataSize() (int64, error) {
 	return u.uploader.UploadedDataSize()
 }
 
-func (u *AoStorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, storageKey string,
+func (u *StorageUploader) skipAoUpload(cfi *internal.ComposeFileInfo, aoMeta RelFileMetadata, storageKey string,
 	initialUploadTS time.Time, isIncremented bool, checksum string) error {
 	u.addAoFileMetadata(cfi, storageKey, aoMeta, true, isIncremented, initialUploadTS, checksum)
 	u.bundleFiles.AddSkippedFile(cfi.Header, cfi.FileInfo)
@@ -204,9 +204,9 @@ func getCheckSum(ctx context.Context, filePath string, eof int64) (string, error
 	return checksum, nil
 }
 
-func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
-	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, location *walparser.BlockLocation) error {
-	storageKey := makeAoFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location, u.newAoSegFilesID)
+func (u *StorageUploader) regularAoUpload(ctx context.Context,
+	cfi *internal.ComposeFileInfo, aoMeta RelFileMetadata, location *walparser.BlockLocation) error {
+	storageKey := makeFileStorageKey(aoMeta.relNameMd5, aoMeta.modCount, location, u.newAoSegFilesID)
 	tracelog.DebugLogger.Printf("Uploading %s AO relfile to %s", cfi.Path, storageKey)
 	fileReadCloser, err := internal.StartReadingFile(ctx, cfi.Header, cfi.FileInfo, cfi.Path)
 	if err != nil {
@@ -231,10 +231,10 @@ func (u *AoStorageUploader) regularAoUpload(ctx context.Context,
 	return nil
 }
 
-func (u *AoStorageUploader) incrementalAoUpload(ctx context.Context,
+func (u *StorageUploader) incrementalAoUpload(ctx context.Context,
 	baseFileStorageKey string,
-	cfi *internal.ComposeFileInfo, aoMeta AoRelFileMetadata, baseFileEOF int64, initialUploadTS time.Time, checksum string) error {
-	storageKey := makeDeltaAoFileStorageKey(baseFileStorageKey, aoMeta.modCount)
+	cfi *internal.ComposeFileInfo, aoMeta RelFileMetadata, baseFileEOF int64, initialUploadTS time.Time, checksum string) error {
+	storageKey := makeDeltaFileStorageKey(baseFileStorageKey, aoMeta.modCount)
 	tracelog.DebugLogger.Printf("Uploading %s AO relfile delta to %s", cfi.Path, storageKey)
 
 	file, err := internal.StartReadingFile(ctx, cfi.Header, cfi.FileInfo, cfi.Path)
@@ -258,8 +258,8 @@ func (u *AoStorageUploader) incrementalAoUpload(ctx context.Context,
 	return nil
 }
 
-func (u *AoStorageUploader) upload(ctx context.Context, reader io.Reader, storageKey string) error {
+func (u *StorageUploader) upload(ctx context.Context, reader io.Reader, storageKey string) error {
 	uploadContents := internal.CompressAndEncrypt(ctx, reader, u.uploader.Compression(), u.crypter)
-	uploadPath := path.Join(AoStoragePath, storageKey)
+	uploadPath := path.Join(StoragePath, storageKey)
 	return u.uploader.Upload(ctx, uploadPath, uploadContents)
 }
