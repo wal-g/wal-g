@@ -370,6 +370,8 @@ To enable verification of the page checksums during the backup-push, use the `--
 ...
 ```
 
+If you take the backup from a standby, make sure `full_page_writes` is enabled on the primary. Without it torn pages are neither detected nor repaired on filesystems where an 8KB write can be split, such as ext4 or XFS.
+
 ### ``wal-fetch``
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.
