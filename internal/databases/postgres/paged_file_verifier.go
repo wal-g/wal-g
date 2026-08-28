@@ -3,11 +3,13 @@ package postgres
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"os"
 	"unsafe"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // This code is an adaptation of Postgres data page checksum calculation code written in Go.
@@ -242,5 +244,62 @@ func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, 
 	if err != nil {
 		return false, err
 	}
-	return isPageCorrupted(path, blockNo, &page)
+	// isPageCorrupted zeroes pd_checksum in place while calculating, so keep those two bytes
+	// to restore the page to what we actually read before comparing it with the file.
+	var checksumAsRead [PdChecksumLen]byte
+	copy(checksumAsRead[:], page[PdChecksumOffset:PdChecksumOffset+PdChecksumLen])
+
+	corrupted, err := isPageCorrupted(path, blockNo, &page)
+	if err != nil || !corrupted {
+		return corrupted, err
+	}
+	copy(page[PdChecksumOffset:PdChecksumOffset+PdChecksumLen], checksumAsRead[:])
+
+	// A bad checksum may simply mean PostgreSQL was writing the page while we read it.
+	if pageIsBeingWritten(path, blockNo, page[:DatabasePageSize]) {
+		tracelog.DebugLogger.Printf("verifySinglePage: %s/[%d] changed while being read, skipping\n", path, blockNo)
+		return false, nil
+	}
+	return true, nil
+}
+
+// pageIsBeingWritten re-reads the block from disk and tells whether it changed since it was
+// read into the backup stream.
+//
+// A checksum mismatch means one of two things: the page is really corrupt, or PostgreSQL was
+// writing it while we were reading it and we got a torn page. The second case is harmless because
+// the WAL holds a full page image of that page. So a page that changed between the two reads is
+// being written right now and recovery repairs it, while a page that stayed the same is genuinely
+// corrupt.
+//
+// On a primary that image is guaranteed: PostgreSQL writes full page images for the whole duration
+// of a backup even when full_page_writes is off. On a standby it is not ours to guarantee — the
+// WAL is produced by whoever the standby replays, and only they can write the images. Making sure
+// that node had them enabled is up to the user.
+//
+// Re-reading is used instead of comparing the page LSN with the backup start LSN, because a
+// corrupt page cannot be trusted about itself: garbage in pd_lsn reads as a recent LSN and would
+// take the page out of validation.
+//
+// A short read or a missing file means the relation was truncated or dropped while we were working,
+// so the page is gone and cannot be corrupt either. On any other error we keep the original verdict:
+// a real corruption must not be hidden behind an I/O error that stopped us from checking.
+func pageIsBeingWritten(path string, blockNo uint32, asRead []byte) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return true
+		}
+		tracelog.WarningLogger.Printf("pageIsBeingWritten: cannot reopen %s: %v\n", path, err)
+		return false
+	}
+	defer utility.LoggedClose(file, "pageIsBeingWritten: failed to close file")
+
+	retry := make([]byte, DatabasePageSize)
+	read, err := file.ReadAt(retry, int64(blockNo)*DatabasePageSize)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		tracelog.WarningLogger.Printf("pageIsBeingWritten: cannot re-read %s/[%d]: %v\n", path, blockNo, err)
+		return false
+	}
+	return int64(read) != DatabasePageSize || !bytes.Equal(retry, asRead)
 }
