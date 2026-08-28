@@ -38,8 +38,8 @@ func SetupMongodbSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
 	ctx.Step(`^we got (\d+) backup entries of ([^\s]*)$`, tctx.checkBackupsCount)
 	ctx.Step(`^we delete mongo backup #(\d+) via ([^\s]*)$`, tctx.deleteMongoBackup)
 	ctx.Step(`^we ensure ([^\s]*) #(\d+) backup metadata contains$`, tctx.backupMetadataContains)
-	ctx.Step(`^we put empty backup via ([^\s]*) to ([^\s]*)$`, tctx.putEmptyBackupViaMinio)
-	ctx.Step(`^we check if empty backups were purged via ([^\s]*)$`, tctx.testEmptyBackupsViaMinio)
+	ctx.Step(`^we put incomplete backup via ([^\s]*) to ([^\s]*)$`, tctx.putIncompleteBackupViaS3)
+	ctx.Step(`^we check incomplete backups still exist via ([^\s]*)$`, tctx.requireIncompleteBackupsViaS3)
 
 	ctx.Step(`^([^\s]*) has partial test mongodb data$`, tctx.addPartiallyData)
 	ctx.Step(`^([^\s]*) and ([^\s]*) has same data in db "([^"]*)" and col "([^"]*)"$`,
@@ -383,20 +383,7 @@ func (tctx *TestContext) replayOplogImpl(backupId int, timestampId, container st
 	tracelog.DebugLogger.Printf("Saved timestamps:\nbackup #%d majTs: %v\n%s: %v\n", backupId, from, timestampId, until)
 	until.Inc++
 
-	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
-	tracelog.DebugLogger.Printf("Waiting until ts %v appears in storage", until)
-
-	_, err = backoff.Retry(tctx.Context, func() (struct{}, error) {
-		exists, err := s3.ArchTsExists(until)
-		if err != nil {
-			return struct{}{}, err
-		}
-		if !exists {
-			return struct{}{}, fmt.Errorf("ts %v does not exists", until)
-		}
-		return struct{}{}, nil
-	}, backoff.WithMaxTries(30))
-	if err != nil {
+	if err = tctx.waitForOplogArchive(until); err != nil {
 		return err
 	}
 
@@ -515,9 +502,40 @@ func (tctx *TestContext) replayOplogPartial(backupId int, timestampId, container
 	return tctx.replayOplogImpl(backupId, timestampId, container, true)
 }
 
+func (tctx *TestContext) waitForOplogArchive(ts helpers.OpTimestamp) error {
+	s3 := S3StorageFromTestContext(tctx, tctx.S3Host())
+	tracelog.DebugLogger.Printf("Waiting until ts %v appears in storage", ts)
+
+	_, err := backoff.Retry(tctx.Context, func() (struct{}, error) {
+		exists, err := s3.ArchTsExists(ts)
+		if err != nil {
+			return struct{}{}, err
+		}
+		if !exists {
+			return struct{}{}, fmt.Errorf("ts %v does not exist in an oplog archive", ts)
+		}
+		return struct{}{}, nil
+	},
+		backoff.WithBackOff(backoff.NewConstantBackOff(time.Second)),
+		backoff.WithMaxElapsedTime(2*time.Minute),
+	)
+	if err != nil {
+		return fmt.Errorf("wait for oplog archive containing ts %v: %w", ts, err)
+	}
+
+	return nil
+}
+
 func (tctx *TestContext) FillOplog(host string) error {
 	mc, err := MongoCtlFromTestContext(tctx, host)
 	if err != nil {
+		return err
+	}
+	lastMajTS, err := mc.LastMajTS()
+	if err != nil {
+		return err
+	}
+	if err = tctx.waitForOplogArchive(lastMajTS); err != nil {
 		return err
 	}
 
@@ -533,6 +551,13 @@ func (tctx *TestContext) FillOplog(host string) error {
 		if err = mc.DeleteCollection("oplog_fill", "oplog_coll"); err != nil {
 			return err
 		}
+		lastMajTS, err = mc.LastMajTS()
+		if err != nil {
+			return err
+		}
+		if err = tctx.waitForOplogArchive(lastMajTS); err != nil {
+			return err
+		}
 		oplogTimeDiff, err := mc.OplogTimeDiff()
 		if err != nil {
 			return err
@@ -541,8 +566,6 @@ func (tctx *TestContext) FillOplog(host string) error {
 			break
 		}
 	}
-
-	time.Sleep(time.Minute) // wait for WiredTiger checkpoint (60 secs as a default)
 
 	return nil
 }

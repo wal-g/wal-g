@@ -41,6 +41,14 @@ func TestWalgRetryablesOperationAborted(t *testing.T) {
 	assert.Equal(t, aws.TrueTernary, walgRetryables{}.IsErrorRetryable(respErr))
 }
 
+func TestWalgRetryablesTooManyRequests(t *testing.T) {
+	respErr := &smithyhttp.ResponseError{
+		Response: &smithyhttp.Response{Response: &http.Response{StatusCode: 429}},
+		Err:      fmt.Errorf("too many requests"),
+	}
+	assert.Equal(t, aws.TrueTernary, walgRetryables{}.IsErrorRetryable(respErr))
+}
+
 func TestWalgRetryablesClientDisconnected(t *testing.T) {
 	respErr := &smithyhttp.ResponseError{
 		Response: &smithyhttp.Response{Response: &http.Response{StatusCode: 499}},

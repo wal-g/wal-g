@@ -156,7 +156,7 @@ func (tctx *TestContext) checkJournals(count int) error {
 		return err
 	}
 
-	contents, err := s3client.List("mongodb-backup/test_uuid/test_mongodb/basebackups_005/journal_")
+	contents, err := s3client.List(tctx.Context, "mongodb-backup/test_uuid/test_mongodb/basebackups_005/journal_")
 	if err != nil {
 		return err
 	}

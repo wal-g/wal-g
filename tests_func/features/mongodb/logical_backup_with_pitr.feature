@@ -3,7 +3,7 @@ Feature: MongoDB PITR backups check
 
   Background: Wait for working infrastructure
     Given prepared infrastructure
-    And a configured s3 on minio01
+    And a configured s3 on seaweedfs01
     And a working mongodb on mongodb01
     And a working mongodb on mongodb02
     And mongodb replset initialized on mongodb01

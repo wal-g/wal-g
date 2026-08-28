@@ -14,7 +14,7 @@ import (
 // required by aws.Config.Retryer. v2 retryers are stateless from the SDK's
 // perspective; the standard retryer is composed with custom retryables that
 // preserve wal-g's v1 behavior (retry on transient network errors and on the
-// S3 409/499 responses).
+// S3 409/429/499 responses).
 func newRetryerFunc(cfg *Config) func() aws.Retryer {
 	return func() aws.Retryer {
 		return retry.NewStandard(func(o *retry.StandardOptions) {
@@ -29,7 +29,7 @@ func newRetryerFunc(cfg *Config) func() aws.Retryer {
 	}
 }
 
-// walgRetryables encodes wal-g's "retry on transient network errors and 409/499"
+// walgRetryables encodes wal-g's "retry on transient network errors and 409/429/499"
 // rules as an aws/retry.IsErrorRetryable check.
 type walgRetryables struct{}
 
@@ -45,6 +45,9 @@ func (walgRetryables) IsErrorRetryable(err error) aws.Ternary {
 		switch respErr.HTTPStatusCode() {
 		case 409:
 			tracelog.InfoLogger.Printf("S3 returned HTTP 409 (OperationAborted), retrying request")
+			return aws.TrueTernary
+		case 429:
+			tracelog.InfoLogger.Printf("S3 returned HTTP 429 (TooManyRequests), retrying request")
 			return aws.TrueTernary
 		// Some S3-compatible servers (e.g. MinIO) return HTTP 499 with error code
 		// "ClientDisconnected" when the request context is canceled server-side

@@ -5,7 +5,7 @@ Feature: Redis RDB backups check
     Given prepared infrastructure
     And a working redis on redis01
     And a working redis on redis02
-    And a configured s3 on minio01
+    And a configured s3 on seaweedfs01
 
   Scenario: Backups, restores and deletes were done successfully
     When redis01 has test redis data test1
@@ -24,13 +24,13 @@ Feature: Redis RDB backups check
     And we create redis01 rdb-redis-backup with success
     Then we got 4 backup entries of redis01
 
-    When we put empty backup via minio01 to redisdump.archive
+    When we put incomplete backup via seaweedfs01 to redisdump.archive
     Then we got 4 backup entries of redis01
 
-    # Backups purged successfully
+    # Complete backups are purged; incomplete data is retained without --purge-garbage
     When we delete redis backups retain 3 via redis01
     Then we got 3 backup entries of redis01
-    And we check if empty backups were purged via minio01
+    And we check incomplete backups still exist via seaweedfs01
 
     # Second purge does not delete backups
     When we delete redis backups retain 3 via redis01
