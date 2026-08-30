@@ -244,62 +244,63 @@ func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, 
 	if err != nil {
 		return false, err
 	}
-	// isPageCorrupted zeroes pd_checksum in place while calculating, so keep those two bytes
-	// to restore the page to what we actually read before comparing it with the file.
-	var checksumAsRead [PdChecksumLen]byte
-	copy(checksumAsRead[:], page[PdChecksumOffset:PdChecksumOffset+PdChecksumLen])
-
 	corrupted, err := isPageCorrupted(path, blockNo, &page)
 	if err != nil || !corrupted {
 		return corrupted, err
 	}
-	copy(page[PdChecksumOffset:PdChecksumOffset+PdChecksumLen], checksumAsRead[:])
-
 	// A bad checksum may simply mean PostgreSQL was writing the page while we read it.
-	if pageIsBeingWritten(path, blockNo, page[:DatabasePageSize]) {
+	if shouldSkipCorruption(path, blockNo, page[:DatabasePageSize]) {
 		tracelog.DebugLogger.Printf("verifySinglePage: %s/[%d] changed while being read, skipping\n", path, blockNo)
 		return false, nil
 	}
 	return true, nil
 }
 
-// pageIsBeingWritten re-reads the block from disk and tells whether it changed since it was
-// read into the backup stream.
+// shouldSkipCorruption re-reads a block from disk to check whether it changed since the backup
+// stream read it.
 //
-// A checksum mismatch means one of two things: the page is really corrupt, or PostgreSQL was
-// writing it while we were reading it and we got a torn page. The second case is harmless because
-// the WAL holds a full page image of that page. So a page that changed between the two reads is
-// being written right now and recovery repairs it, while a page that stayed the same is genuinely
-// corrupt.
+// A checksum mismatch means real corruption or a torn read while PostgreSQL was writing the page.
+// The latter is safe because WAL contains a full page image. A changed page is being written and
+// recovery fixes it; an unchanged page is genuinely corrupt.
 //
-// On a primary that image is guaranteed: PostgreSQL writes full page images for the whole duration
-// of a backup even when full_page_writes is off. On a standby it is not ours to guarantee — the
-// WAL is produced by whoever the standby replays, and only they can write the images. Making sure
-// that node had them enabled is up to the user.
+// On a primary, full page images are guaranteed for the whole backup, even with full_page_writes
+// disabled. On a standby, they come from the upstream node, so the user must ensure
+// full_page_writes was enabled there.
 //
-// Re-reading is used instead of comparing the page LSN with the backup start LSN, because a
-// corrupt page cannot be trusted about itself: garbage in pd_lsn reads as a recent LSN and would
-// take the page out of validation.
+// We re-read instead of comparing pd_lsn with the backup start LSN because a corrupt page's LSN
+// cannot be trusted: garbage can look recent and bypass validation.
 //
-// A short read or a missing file means the relation was truncated or dropped while we were working,
-// so the page is gone and cannot be corrupt either. On any other error we keep the original verdict:
-// a real corruption must not be hidden behind an I/O error that stopped us from checking.
-func pageIsBeingWritten(path string, blockNo uint32, asRead []byte) bool {
+// An empty read or a missing file means the relation was truncated or dropped, so the page is gone.
+// For other errors, keep the original verdict: a real corruption must not be hidden by an I/O error.
+func shouldSkipCorruption(path string, blockNo uint32, asRead []byte) bool {
 	file, err := os.Open(path)
 	if err != nil {
+		// file is gone: the relation was dropped, recovery will drop it again
 		if errors.Is(err, os.ErrNotExist) {
 			return true
 		}
-		tracelog.WarningLogger.Printf("pageIsBeingWritten: cannot reopen %s: %v\n", path, err)
+		// could not check: keep the corruption verdict
+		tracelog.WarningLogger.Printf("shouldSkipCorruption: cannot reopen %s: %v\n", path, err)
 		return false
 	}
-	defer utility.LoggedClose(file, "pageIsBeingWritten: failed to close file")
+	defer utility.LoggedClose(file, "shouldSkipCorruption: failed to close file")
 
 	retry := make([]byte, DatabasePageSize)
 	read, err := file.ReadAt(retry, int64(blockNo)*DatabasePageSize)
-	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-		tracelog.WarningLogger.Printf("pageIsBeingWritten: cannot re-read %s/[%d]: %v\n", path, blockNo, err)
+	if err != nil && !errors.Is(err, io.EOF) {
+		// could not check: keep the corruption verdict
+		tracelog.WarningLogger.Printf("shouldSkipCorruption: cannot re-read %s/[%d]: %v\n", path, blockNo, err)
 		return false
 	}
-	return int64(read) != DatabasePageSize || !bytes.Equal(retry, asRead)
+	// block is past the end now: the relation was truncated, recovery will truncate it again
+	if read == 0 {
+		return true
+	}
+	// isPageCorrupted has zeroed pd_checksum in the page we hold, so zero it here as well.
+	for i := PdChecksumOffset; i < PdChecksumOffset+PdChecksumLen; i++ {
+		retry[i] = 0
+	}
+	// changed: PostgreSQL is writing the page, a WAL full page image will restore it
+	// unchanged: nothing is writing it, so the bad checksum is real
+	return !bytes.Equal(retry, asRead)
 }
