@@ -36,7 +36,7 @@ func writeRelation(t *testing.T, pages ...PgDatabasePage) string {
 	path := t.TempDir() + "/16384"
 	var content []byte
 	for _, page := range pages {
-		content = append(content, page[:]...)
+		content = append(content, page[:DatabasePageSize]...)
 	}
 	require.NoError(t, os.WriteFile(path, content, 0600))
 	return path
