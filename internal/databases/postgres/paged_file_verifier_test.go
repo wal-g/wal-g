@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,7 +33,7 @@ func buildValidChecksummedPage(t *testing.T, blockNo uint32, path string) PgData
 // writeRelation writes pages to a file named like a PostgreSQL relation and returns its path.
 func writeRelation(t *testing.T, pages ...PgDatabasePage) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "16384")
+	path := t.TempDir() + "/16384"
 	var content []byte
 	for _, page := range pages {
 		content = append(content, page[:]...)
@@ -91,7 +90,7 @@ func TestVerifySinglePage_SkipsDroppedRelation(t *testing.T) {
 	page := buildValidChecksummedPage(t, 0, "16384")
 	copy(page[6000:6004], []byte{0xDE, 0xAD, 0xBE, 0xEF})
 
-	path := filepath.Join(t.TempDir(), "16384")
+	path := t.TempDir() + "/16384"
 
 	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]))
 	require.NoError(t, err)
