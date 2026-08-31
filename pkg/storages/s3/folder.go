@@ -366,12 +366,19 @@ func (folder *Folder) collectVersions(allVersions *[]versionInfo, versions []typ
 }
 
 // buildObjectsFromVersions turns collected versions into storage objects for output and higher-level logic.
-// By default it filters out keys whose LATEST is a delete marker; `showAllVersions` disables that filter.
+// By default it returns a regular listing: the current version of each key, excluding keys whose LATEST
+// version is a delete marker. `showAllVersions` disables both filters, yielding every historical version.
 func (folder *Folder) buildObjectsFromVersions(allVersions []versionInfo, deletedKeys map[string]bool) []storage.Object {
 	objects := make([]storage.Object, 0, len(allVersions))
 	for _, v := range allVersions {
 		// Skip objects where the LATEST version is a delete marker (unless showing all versions)
 		if deletedKeys[v.relativePath] && !folder.config.showAllVersions {
+			continue
+		}
+		// Without showAllVersions, behave like a non-versioned listing and return only the current
+		// version of each key. Returning superseded versions here makes an overwritten object appear
+		// several times, which breaks callers that assume unique names (e.g. `st ls`, journal counting).
+		if !v.isLatest && !folder.config.showAllVersions {
 			continue
 		}
 		isLatest := ""
