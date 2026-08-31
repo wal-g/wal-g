@@ -114,7 +114,7 @@ func (tctx *TestContext) restoreMongoBinaryBackupWithInterruptedPITR(
 
 	output := result.Combined()
 	checkpointPosition := strings.Index(output, "Oplog replay progress is durable through")
-	restartPosition := strings.Index(output, "inline mongod crashed, restarting oplog replay")
+	restartPosition := strings.Index(output, "supervised mongod crashed, restarting oplog replay")
 	if checkpointPosition < 0 || restartPosition < 0 || checkpointPosition > restartPosition {
 		return fmt.Errorf("expected a durable checkpoint before mongod restart, output:\n%s", output)
 	}

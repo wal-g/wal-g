@@ -52,8 +52,7 @@ func TestCheckpointingApplierMakesHandledTimestampDurable(t *testing.T) {
 	close(ops)
 	require.NoError(t, <-errC)
 
-	handled, durable, generation := progress.Snapshot()
-	require.Equal(t, applied, handled)
+	durable, generation := progress.Snapshot()
 	require.Equal(t, applied, durable)
 	require.Equal(t, uint64(1), generation)
 }
@@ -72,7 +71,7 @@ func TestCheckpointingApplierWaitsForTransactionBoundary(t *testing.T) {
 	ops <- &models.Oplog{TS: models.Timestamp{TS: 101}}
 	time.Sleep(30 * time.Millisecond)
 
-	_, durable, _ := progress.Snapshot()
+	durable, _ := progress.Snapshot()
 	require.Equal(t, models.Timestamp{TS: 100}, durable)
 
 	stub.setPending(false)
