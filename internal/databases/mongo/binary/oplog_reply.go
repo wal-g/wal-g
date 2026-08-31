@@ -20,11 +20,8 @@ const (
 )
 
 func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
-	if replayArgs.FsyncInterval <= 0 {
-		replayArgs.FsyncInterval = 10 * time.Minute
-	}
 	if replayArgs.MinimalConfigPath != "" {
-		return runInlineOplogReplay(ctx, replayArgs)
+		return runSupervisedOplogReplay(ctx, replayArgs)
 	}
 	return runOplogReplay(ctx, mongodbURL, replayArgs)
 }
@@ -105,45 +102,45 @@ func runOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	return HandleOplogReplay(ctx, replayArgs.Since, replayArgs.Until, oplogFetcher, oplogApplier)
 }
 
-func runInlineOplogReplay(ctx context.Context, replayArgs ReplyOplogConfig) error {
+func runSupervisedOplogReplay(ctx context.Context, replayArgs ReplyOplogConfig) error {
 	progress := stages.NewReplayProgress(replayArgs.Since)
 	consecutiveRestarts := 0
 
 	for {
-		_, durableTS, generationBefore := progress.Snapshot()
-		progress.ResetAttempt()
+		durableTS, generationBefore := progress.Snapshot()
 
-		attemptConfig := replayArgs
-		attemptConfig.MinimalConfigPath = ""
-		attemptConfig.Since = durableTS
-		attemptConfig.progress = progress
-		attemptConfig.resumeAfter = generationBefore > 0
+		replayAttemptConfig := replayArgs
+		replayAttemptConfig.MinimalConfigPath = ""
+		replayAttemptConfig.Since = durableTS
+		replayAttemptConfig.progress = progress
+		replayAttemptConfig.resumeAfter = generationBefore > 0
 
-		mongodCrashed, err := runInlineOplogReplayAttempt(ctx, attemptConfig, replayArgs.MinimalConfigPath)
+		mongodExited, err := runSupervisedOplogReplayAttempt(
+			ctx, replayAttemptConfig, replayArgs.MinimalConfigPath)
 		if err == nil {
 			return nil
 		}
-		if !mongodCrashed {
+		if !mongodExited {
 			return err
 		}
 
-		_, durableTS, generationAfter := progress.Snapshot()
+		durableTS, generationAfter := progress.Snapshot()
 		if generationAfter > generationBefore {
 			consecutiveRestarts = 0
 		}
 		if consecutiveRestarts >= replayArgs.MaxMongodRestarts {
 			return errors.Wrapf(err,
-				"inline mongod crashed after %d restarts, last durable oplog timestamp is %s",
+				"supervised mongod crashed after %d restarts, last durable oplog timestamp is %s",
 				consecutiveRestarts, durableTS)
 		}
 		consecutiveRestarts++
 		tracelog.WarningLogger.Printf(
-			"inline mongod crashed, restarting oplog replay after %s, attempt %d/%d",
+			"supervised mongod crashed, restarting oplog replay after %s, attempt %d/%d",
 			durableTS, consecutiveRestarts, replayArgs.MaxMongodRestarts)
 	}
 }
 
-func runInlineOplogReplayAttempt(
+func runSupervisedOplogReplayAttempt(
 	ctx context.Context,
 	replayArgs ReplyOplogConfig,
 	minimalConfigPath string,
@@ -225,9 +222,9 @@ func runInlineOplogReplayAttempt(
 
 func unexpectedMongodExit(err error) error {
 	if err == nil {
-		return fmt.Errorf("inline mongod exited unexpectedly during oplog replay")
+		return fmt.Errorf("supervised mongod exited unexpectedly during oplog replay")
 	}
-	return errors.Wrap(err, "inline mongod exited during oplog replay")
+	return errors.Wrap(err, "supervised mongod exited during oplog replay")
 }
 
 func resolveOplogReplaySequence(

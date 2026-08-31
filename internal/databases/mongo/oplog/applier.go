@@ -113,8 +113,7 @@ func (ap *DBApplier) IsPartial() bool {
 }
 
 func (ap *DBApplier) HasPendingTransactions() bool {
-	oldest := ap.txnBuffer.OldestOpTime()
-	return oldest.Timestamp.T != 0 || oldest.Timestamp.I != 0
+	return !db.OpTimeIsEmpty(ap.txnBuffer.OldestOpTime())
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {

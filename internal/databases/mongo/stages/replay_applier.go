@@ -13,56 +13,32 @@ import (
 
 type ReplayProgress struct {
 	mu                   sync.RWMutex
-	lastHandledTS        models.Timestamp
 	lastDurableTS        models.Timestamp
 	checkpointGeneration uint64
-	dirty                bool
 }
 
 func NewReplayProgress(since models.Timestamp) *ReplayProgress {
-	return &ReplayProgress{lastHandledTS: since, lastDurableTS: since}
+	return &ReplayProgress{lastDurableTS: since}
 }
 
-func (p *ReplayProgress) Snapshot() (models.Timestamp, models.Timestamp, uint64) {
+func (p *ReplayProgress) Snapshot() (models.Timestamp, uint64) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.lastHandledTS, p.lastDurableTS, p.checkpointGeneration
-}
-
-func (p *ReplayProgress) ResetAttempt() {
-	p.mu.Lock()
-	p.lastHandledTS = p.lastDurableTS
-	p.dirty = false
-	p.mu.Unlock()
+	return p.lastDurableTS, p.checkpointGeneration
 }
 
 func (p *ReplayProgress) Initialize(ts models.Timestamp) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.checkpointGeneration == 0 && !p.dirty {
-		p.lastHandledTS = ts
+	if p.checkpointGeneration == 0 {
 		p.lastDurableTS = ts
 	}
-}
-
-func (p *ReplayProgress) NeedsCheckpoint() bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.dirty
-}
-
-func (p *ReplayProgress) setHandled(ts models.Timestamp) {
-	p.mu.Lock()
-	p.lastHandledTS = ts
-	p.dirty = true
-	p.mu.Unlock()
 }
 
 func (p *ReplayProgress) setDurable(ts models.Timestamp) {
 	p.mu.Lock()
 	p.lastDurableTS = ts
 	p.checkpointGeneration++
-	p.dirty = false
 	p.mu.Unlock()
 }
 
@@ -72,6 +48,8 @@ type CheckpointingApplier struct {
 	interval      time.Duration
 	progress      *ReplayProgress
 	checkpointDue bool
+	lastAppliedTS models.Timestamp
+	dirty         bool
 }
 
 type replayDBApplier interface {
@@ -144,7 +122,8 @@ func (a *CheckpointingApplier) applyOperation(
 	if err := a.applier.Apply(ctx, *op); err != nil {
 		return fmt.Errorf("can not handle op: %w", err)
 	}
-	a.progress.setHandled(op.TS)
+	a.lastAppliedTS = op.TS
+	a.dirty = true
 	if !a.checkpointDue || a.applier.HasPendingTransactions() {
 		return nil
 	}
@@ -168,14 +147,14 @@ func (a *CheckpointingApplier) finish(ctx context.Context) error {
 }
 
 func (a *CheckpointingApplier) makeDurable(ctx context.Context) error {
-	handled, _, _ := a.progress.Snapshot()
-	if !a.progress.NeedsCheckpoint() {
+	if !a.dirty {
 		return nil
 	}
 	if err := a.db.Fsync(ctx); err != nil {
-		return fmt.Errorf("can not fsync oplog replay at %s: %w", handled, err)
+		return fmt.Errorf("can not fsync oplog replay at %s: %w", a.lastAppliedTS, err)
 	}
-	a.progress.setDurable(handled)
-	tracelog.InfoLogger.Printf("Oplog replay progress is durable through %s", handled)
+	a.progress.setDurable(a.lastAppliedTS)
+	a.dirty = false
+	tracelog.InfoLogger.Printf("Oplog replay progress is durable through %s", a.lastAppliedTS)
 	return nil
 }
