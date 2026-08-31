@@ -16,7 +16,9 @@ import (
 
 const inlineMongodShutdownTimeout = 30 * time.Second
 
-func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
+func RunOplogReplay(
+	ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig, downloader archive.Downloader,
+) error {
 	// set up mongodb client and oplog applier
 	var mongoClientArgs []client.Option
 	if replayArgs.OplogAlwaysUpsert != nil {
@@ -89,12 +91,6 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		IgnoreErrCodes: replayArgs.IgnoreErrCodes,
 	})
 	oplogApplier := stages.NewGenericApplier(dbApplier)
-
-	// set up storage downloader client
-	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
-	if err != nil {
-		return err
-	}
 
 	path, err := resolveOplogReplaySequence(ctx, downloader, replayArgs.Since, replayArgs.Until)
 	if err != nil {

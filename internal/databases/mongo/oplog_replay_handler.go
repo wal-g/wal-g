@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/binary"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
@@ -16,6 +17,8 @@ func HandleOplogReplay(ctx context.Context,
 	return binary.HandleOplogReplay(ctx, since, until, fetcher, applier)
 }
 
-func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs binary.ReplyOplogConfig) error {
-	return binary.RunOplogReplay(ctx, mongodbURL, replayArgs)
+func RunOplogReplay(
+	ctx context.Context, mongodbURL string, replayArgs binary.ReplyOplogConfig, downloader archive.Downloader,
+) error {
+	return binary.RunOplogReplay(ctx, mongodbURL, replayArgs, downloader)
 }
