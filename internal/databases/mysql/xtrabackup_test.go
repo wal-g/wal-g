@@ -78,6 +78,15 @@ func TestParseBinlogPos(t *testing.T) {
 			expectedGTID: "0-1-6",
 		},
 		{
+			// Real example: xtrabackup (not just mariabackup) records a
+			// GTID when GTID_MODE is on; filenames can be hostname-based.
+			name:         "xtrabackup with GTID and hostname-based filename",
+			input:        "filename 'mysql-bin-log-example-com.000406', position '197', GTID of the last change '3f6cd603-8d0b-11f1-8432-d00dc21b3e49:1-2647395'",
+			expectedFile: "mysql-bin-log-example-com.000406",
+			expectedPos:  197,
+			expectedGTID: "3f6cd603-8d0b-11f1-8432-d00dc21b3e49:1-2647395",
+		},
+		{
 			name:         "empty string",
 			input:        "",
 			expectedFile: "",
@@ -95,29 +104,33 @@ func TestParseBinlogPos(t *testing.T) {
 	}
 }
 
-const xtrabackup_info_example = `uuid = abc-123
+// Real xtrabackup_info from a review comment: plain xtrabackup on MySQL
+// 8.0, not mariabackup -- tool_name, tool_command and server_version all
+// say so, and it records a GTID too since GTID_MODE is on.
+const xtrabackup_info_example = `uuid = d6ab1d07-a5f3-11f1-8407-d00dc21b3e49
 name =
-tool_name = mariabackup
-tool_command = --backup --user=sbtest --host=localhost
-tool_version = 10.11.14-MariaDB
-ibbackup_version = 10.11.14-MariaDB
-server_version = 10.11.14-MariaDB-0ubuntu0.24.04.1-log
-start_time = 2026-03-06 18:50:10
-end_time = 2026-03-06 18:50:11
-lock_time = 1772823010
-binlog_pos = filename 'mysql-bin.000002', position '607', GTID of the last change '0-1-7'
+tool_name = xtrabackup
+tool_command = --backup --stream=xbstream --lock-ddl --lock-ddl-timeout=3600 --parallel=1 --register-redo-log-consumer --datadir=/var/lib/mysql --extra-lsndir=/tmp/wal-g1802792818
+tool_version = 8.0.35-35
+ibbackup_version = 8.0.35-35
+server_version = 8.0.43-34
+start_time = 2026-09-01 10:56:27
+end_time = 2026-09-01 10:56:52
+lock_time = 2
+binlog_pos = filename 'mysql-bin-log-example-com.000406', position '197', GTID of the last change '3f6cd603-8d0b-11f1-8432-d00dc21b3e49:1-2647395'
 innodb_from_lsn = 0
-innodb_to_lsn = 50656
+innodb_to_lsn = 3186294961
 partial = N
 incremental = N
-format = file
-compressed = N`
+format = xbstream
+compressed = N
+encrypted = N`
 
 func TestParseBinlogPosFromXtrabackupInfo(t *testing.T) {
 	info := NewXtrabackupInfo(xtrabackup_info_example)
-	assert.Equal(t, "mysql-bin.000002", info.BinlogPos.FileName)
-	assert.Equal(t, int64(607), info.BinlogPos.FilePosition)
-	assert.Equal(t, "0-1-7", info.BinlogPos.LastGTID)
+	assert.Equal(t, "mysql-bin-log-example-com.000406", info.BinlogPos.FileName)
+	assert.Equal(t, int64(197), info.BinlogPos.FilePosition)
+	assert.Equal(t, "3f6cd603-8d0b-11f1-8432-d00dc21b3e49:1-2647395", info.BinlogPos.LastGTID)
 }
 
 const mariadb_backup_info_example = `uuid = def-456
