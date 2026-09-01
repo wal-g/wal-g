@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	gomysql "github.com/go-mysql-org/go-mysql/mysql"
@@ -27,8 +28,9 @@ type replayHandler struct {
 	backupBinlogPos BinlogPos
 
 	// Test seams; default to the real implementations in newReplayHandler.
-	getBinlogServerID func(filename string) (uint32, error)
-	doReplay          func(ctx context.Context, binlogPath string) error
+	getBinlogServerID   func(filename string) (uint32, error)
+	getBinlogServerUUID func(filename string) (string, error)
+	doReplay            func(ctx context.Context, binlogPath string) error
 }
 
 func newReplayHandler(ctx context.Context, endTS time.Time, backupBinlogPos BinlogPos) *replayHandler {
@@ -36,6 +38,7 @@ func newReplayHandler(ctx context.Context, endTS time.Time, backupBinlogPos Binl
 	rh.endTS = endTS.Local().Format(TimeMysqlFormat)
 	rh.backupBinlogPos = backupBinlogPos
 	rh.getBinlogServerID = GetBinlogServerID
+	rh.getBinlogServerUUID = GetBinlogServerUUID
 	rh.doReplay = rh.replayLog
 	rh.logCh = make(chan string, binlogFetchAhead)
 	rh.errCh = make(chan error, 1)
@@ -90,7 +93,9 @@ func (rh *replayHandler) replayLog(ctx context.Context, binlogPath string) error
 }
 
 // shouldApplyStartPosition rejects a same-named file from a different
-// server after a failover.
+// server after a failover. Verification is flavor-specific: MariaDB GTIDs
+// carry a numeric server ID directly; MySQL GTIDs identify the source by
+// UUID instead, read from the candidate file's own first GTID_EVENT.
 func (rh *replayHandler) shouldApplyStartPosition(binlogPath string) bool {
 	binlogName := filepath.Base(binlogPath) // local file, not a storage path
 	if binlogName != rh.backupBinlogPos.FileName || rh.backupBinlogPos.FilePosition <= 0 {
@@ -99,18 +104,40 @@ func (rh *replayHandler) shouldApplyStartPosition(binlogPath string) bool {
 	if rh.backupBinlogPos.LastGTID == "" {
 		return true
 	}
-	backupGTID, err := gomysql.ParseMariadbGTID(rh.backupBinlogPos.LastGTID)
-	if err != nil {
-		return true
-	}
-	actualServerID, err := rh.getBinlogServerID(binlogPath)
-	if err != nil {
-		tracelog.WarningLogger.Printf(
-			"could not verify server id of %s: %v -- not trusting the backup boundary position",
-			binlogName, err)
+
+	_, flavor := parseGTIDChecked(rh.backupBinlogPos.LastGTID)
+	switch flavor {
+	case gomysql.MariaDBFlavor:
+		backupGTID, err := gomysql.ParseMariadbGTID(rh.backupBinlogPos.LastGTID)
+		if err != nil {
+			return false
+		}
+		actualServerID, err := rh.getBinlogServerID(binlogPath)
+		if err != nil {
+			tracelog.WarningLogger.Printf(
+				"could not verify server id of %s: %v -- not trusting the backup boundary position",
+				binlogName, err)
+			return false
+		}
+		return actualServerID == backupGTID.ServerID
+	case gomysql.MySQLFlavor:
+		backupUUID, _, ok := strings.Cut(rh.backupBinlogPos.LastGTID, ":")
+		if !ok {
+			return false
+		}
+		actualUUID, err := rh.getBinlogServerUUID(binlogPath)
+		if err != nil {
+			tracelog.WarningLogger.Printf(
+				"could not verify server uuid of %s: %v -- not trusting the backup boundary position",
+				binlogName, err)
+			return false
+		}
+		return strings.EqualFold(actualUUID, backupUUID)
+	default:
+		// Recorded but not parseable in a known flavor -- can't verify
+		// either way, so don't trust a coincidental filename match.
 		return false
 	}
-	return actualServerID == backupGTID.ServerID
 }
 
 func (rh *replayHandler) wait() error {
