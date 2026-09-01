@@ -95,6 +95,54 @@ func (partFile *WalPartFile) setPart(part WalPart) {
 	}
 }
 
+// IsPartiallyFilledPartFile checks if the current wal part file is the partially filled wal part file.
+// It returns three values:
+//   - bool: true if it is the partially filled wal part file, false otherwise.
+//   - int: if it is the partially filled wal part file, this is the index of the first non-nil wal head/tail.
+//     if it is not the partially filled wal part file, this value is -1.
+//   - error: if there is an inconsistency between wal heads and wal tails, an error is returned.
+//     nil otherwise.
+func (partFile *WalPartFile) IsPartiallyFilledPartFile() (bool, int, error) {
+	// PreviousWalHead is only set for the next wal part file when processing the last wal file in
+	// the current wal part file. Therefore, if PreviousWalHead is not nil, it means the current
+	// wal part file is not the partially filled wal part file. See WalPartRecorder.SaveNextWalHead()
+	// for more details.
+	if partFile.PreviousWalHead != nil {
+		return false, -1, nil
+	}
+
+	for i := 0; i < len(partFile.WalHeads); i++ {
+		walHeadNotNil := partFile.WalHeads[i] != nil
+		walTailNotNil := partFile.WalTails[i] != nil
+
+		// If both WalHead and WalTail are not nil, it means we found the first non-nil index
+		if walHeadNotNil && walTailNotNil {
+			return true, i, nil
+		}
+
+		// If the states of WalHead and WalTail are inconsistent (one is nil, the other is not),
+		// return false and an error indicating the inconsistency
+		if walHeadNotNil != walTailNotNil {
+			return false, -1, errors.New("inconsistent state between wal heads and wal tails")
+		}
+	}
+
+	// If no non-nil index is found after iterating through the entire loop, return false and -1
+	return false, -1, nil
+}
+
+// CompletePartFile completes the partially filled part file by setting
+// PreviousWalHead to an empty slice and WalTails and WalHeads up to the given
+// index to empty slices. This is used when the current part file is determined
+// to be the partially filled part file.
+func (partFile *WalPartFile) CompletePartFile(index int) {
+	partFile.PreviousWalHead = make([]byte, 0)
+	for i := 0; i < index; i++ {
+		partFile.WalTails[i] = make([]byte, 0)
+		partFile.WalHeads[i] = make([]byte, 0)
+	}
+}
+
 func LoadPartFile(reader io.Reader) (*WalPartFile, error) {
 	partFile := NewWalPartFile()
 	for {
