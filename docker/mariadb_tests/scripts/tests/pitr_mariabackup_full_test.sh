@@ -29,9 +29,8 @@ mysql -e "CREATE DATABASE IF NOT EXISTS testdb"
 mysql -e "CREATE TABLE testdb.users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(50), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
 mysql -e "INSERT INTO testdb.users (name) VALUES ('Alice'), ('Bob')"
 
-# Archive pre-backup binlogs and take full backup
-mysql -e "FLUSH LOGS"
-wal-g binlog-push
+# Backup while this data is still in the open binlog file, so the
+# boundary lands inside mysql-bin.000001 -- no earlier file to skip.
 sleep 1
 wal-g backup-push
 FIRST_BACKUP=$(wal-g backup-list | awk 'NR==2{print $1}')
