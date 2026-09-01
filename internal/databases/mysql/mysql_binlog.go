@@ -143,6 +143,23 @@ func GetBinlogPreviousGTIDsRemote(ctx context.Context, folder storage.Folder, fi
 	return result, nil
 }
 
+func GetBinlogServerID(filename string) (uint32, error) {
+	var serverID uint32
+	found := false
+	parser := replication.NewBinlogParser()
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		serverID = event.Header.ServerID
+		found = true
+		return fmt.Errorf("shallow file read finished")
+	})
+	if err != nil && !found {
+		return 0, fmt.Errorf("failed to parse binlog %s: %w", filename, err)
+	}
+	return serverID, nil
+}
+
 func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) {
 	var ts uint32
 	parser := replication.NewBinlogParser()
