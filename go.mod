@@ -25,7 +25,7 @@ require (
 	github.com/cucumber/godog v0.16.0
 	github.com/cyberdelia/lzo v1.0.0
 	github.com/go-mysql-org/go-mysql v1.16.0
-	github.com/gofrs/flock v0.13.0
+	github.com/gofrs/flock v0.13.1
 	github.com/google/brotli/go/cbrotli v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
@@ -52,7 +52,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.21.0
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	github.com/ulikunitz/xz v0.5.16
 	github.com/wal-g/tracelog v0.1.1
 	github.com/yandex-cloud/go-genproto v0.100.0
@@ -192,7 +192,7 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.28.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20250128182459-e0ece0dbea4c // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
