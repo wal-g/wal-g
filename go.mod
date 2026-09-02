@@ -25,7 +25,7 @@ require (
 	github.com/cucumber/godog v0.16.0
 	github.com/cyberdelia/lzo v1.0.0
 	github.com/go-mysql-org/go-mysql v1.16.0
-	github.com/gofrs/flock v0.13.0
+	github.com/gofrs/flock v0.13.1
 	github.com/google/brotli/go/cbrotli v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.9.0
