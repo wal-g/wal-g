@@ -15,7 +15,6 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -477,8 +476,6 @@ type ReplyOplogConfig struct {
 
 	FsyncInterval     time.Duration
 	MaxMongodRestarts int
-	progress          *stages.ReplayProgress
-	resumeAfter       bool
 }
 
 type ShConfig struct {

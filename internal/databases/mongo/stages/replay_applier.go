@@ -12,33 +12,37 @@ import (
 )
 
 type ReplayProgress struct {
-	mu                   sync.RWMutex
-	lastDurableTS        models.Timestamp
-	checkpointGeneration uint64
+	mu         sync.RWMutex
+	checkpoint ReplayCheckpoint
+}
+
+type ReplayCheckpoint struct {
+	OpTime     models.OpTime
+	Generation uint64
 }
 
 func NewReplayProgress(since models.Timestamp) *ReplayProgress {
-	return &ReplayProgress{lastDurableTS: since}
+	return &ReplayProgress{checkpoint: ReplayCheckpoint{OpTime: models.OpTime{TS: since}}}
 }
 
-func (p *ReplayProgress) Snapshot() (models.Timestamp, uint64) {
+func (p *ReplayProgress) Snapshot() ReplayCheckpoint {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.lastDurableTS, p.checkpointGeneration
+	return p.checkpoint
 }
 
 func (p *ReplayProgress) Initialize(ts models.Timestamp) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.checkpointGeneration == 0 {
-		p.lastDurableTS = ts
+	if p.checkpoint.Generation == 0 {
+		p.checkpoint.OpTime = models.OpTime{TS: ts}
 	}
 }
 
-func (p *ReplayProgress) setDurable(ts models.Timestamp) {
+func (p *ReplayProgress) MarkDurable(opTime models.OpTime) {
 	p.mu.Lock()
-	p.lastDurableTS = ts
-	p.checkpointGeneration++
+	p.checkpoint.OpTime = opTime
+	p.checkpoint.Generation++
 	p.mu.Unlock()
 }
 
@@ -56,6 +60,7 @@ type replayDBApplier interface {
 	Apply(context.Context, models.Oplog) error
 	Close(context.Context) error
 	HasPendingTransactions() bool
+	LastAppliedOpTime() (models.OpTime, bool)
 }
 
 func NewCheckpointingApplier(
@@ -153,7 +158,11 @@ func (a *CheckpointingApplier) makeDurable(ctx context.Context) error {
 	if err := a.db.Fsync(ctx); err != nil {
 		return fmt.Errorf("can not fsync oplog replay at %s: %w", a.lastAppliedTS, err)
 	}
-	a.progress.setDurable(a.lastAppliedTS)
+	opTime, ok := a.applier.LastAppliedOpTime()
+	if !ok || !models.Equal(opTime.TS, a.lastAppliedTS) {
+		opTime = models.OpTime{TS: a.lastAppliedTS}
+	}
+	a.progress.MarkDurable(opTime)
 	a.dirty = false
 	tracelog.InfoLogger.Printf("Oplog replay progress is durable through %s", a.lastAppliedTS)
 	return nil
