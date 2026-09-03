@@ -406,6 +406,9 @@ func (bh *BackupHandler) handleBackupPushRemote(ctx context.Context) {
 	tracelog.InfoLogger.Println("Running remote backup through Postgres connection.")
 	tracelog.InfoLogger.Println("Features like delta backup and partial restore are disabled, there might be a performance impact.")
 	tracelog.InfoLogger.Println("To run with local backup functionalities, supply [db_directory].")
+	tracelog.InfoLogger.Println(
+		"Live reload of WALG_DISK_RATE_LIMIT is not supported for remote/streaming backups " +
+			"(the rate is sent once to Postgres's BASE_BACKUP throttle at stream start).")
 	if bh.PgInfo.PgVersion < 110000 && !bh.Arguments.verifyPageChecksums {
 		tracelog.InfoLogger.Println("VerifyPageChecksums=false is only supported for streaming backup since PG11")
 		bh.Arguments.verifyPageChecksums = true

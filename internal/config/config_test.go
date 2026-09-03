@@ -63,6 +63,21 @@ func TestConfigureLogging_WhenLogDestinationSettingIsSet(t *testing.T) {
 	resetToDefaults()
 }
 
+func TestDiskRateLimitSourcedFromEnv(t *testing.T) {
+	t.Cleanup(func() {
+		_ = os.Unsetenv(config.DiskRateLimitSetting)
+		resetToDefaults()
+	})
+
+	assert.NoError(t, os.Unsetenv(config.DiskRateLimitSetting))
+	config.InitConfig()
+	assert.False(t, config.DiskRateLimitSourcedFromEnv)
+
+	assert.NoError(t, os.Setenv(config.DiskRateLimitSetting, "12345"))
+	config.InitConfig()
+	assert.True(t, config.DiskRateLimitSourcedFromEnv)
+}
+
 func resetToDefaults() {
 	viper.Reset()
 	internal.ConfigureSettings(config.PG)

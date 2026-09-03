@@ -46,6 +46,7 @@ var (
 		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			internal.ConfigureLimiters()
+			internal.StartDiskRateLimitWatcher()
 
 			storage, err := internal.ConfigureMultiStorage(true)
 			tracelog.ErrorLogger.FatalfOnError("Failed to configure multi-storage: %v", err)

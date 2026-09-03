@@ -97,7 +97,7 @@ func ConfigureLimiters() {
 	}
 	if viper.IsSet(conf.DiskRateLimitSetting) {
 		diskLimit := viper.GetInt64(conf.DiskRateLimitSetting)
-		limiters.DiskLimiter = rate.NewLimiter(rate.Limit(diskLimit),
+		limiters.SetDiskRateLimit(rate.Limit(diskLimit),
 			int(diskLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
 
@@ -106,6 +106,23 @@ func ConfigureLimiters() {
 		limiters.NetworkLimiter = rate.NewLimiter(rate.Limit(netLimit),
 			int(netLimit+DefaultDataBurstRateLimit)) // Add 8 pages to possible bursts
 	}
+}
+
+// StartDiskRateLimitWatcher enables live reload of WALG_DISK_RATE_LIMIT from the config
+// file for long-running commands like backup-push. It is a no-op in Turbo mode (rate
+// limiting is disabled entirely) or if the setting was sourced from a real environment
+// variable, since a running process cannot observe its own environment changing.
+func StartDiskRateLimitWatcher() {
+	if conf.Turbo {
+		return
+	}
+	if conf.DiskRateLimitSourcedFromEnv {
+		tracelog.InfoLogger.Println(
+			"Disk rate limit live reload disabled: WALG_DISK_RATE_LIMIT is set via environment variable; " +
+				"changes to a running process's own environment are not observable. Use a config file to change this value without restarting.")
+		return
+	}
+	limiters.StartDiskRateLimitWatcher(viper.ConfigFileUsed(), conf.DiskRateLimitSetting, DefaultDataBurstRateLimit)
 }
 
 // TODO : unit tests

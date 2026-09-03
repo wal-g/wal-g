@@ -865,8 +865,17 @@ func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
 }
 
+// DiskRateLimitSourcedFromEnv records whether WALG_DISK_RATE_LIMIT was present in the
+// process environment before InitConfig ran. It must be captured here, before
+// bindConfigToEnv mirrors every resolved setting (file-based or default) back into the
+// process environment, which would otherwise make this indistinguishable from a value
+// that only came from a config file.
+var DiskRateLimitSourcedFromEnv bool
+
 // InitConfig reads config file and ENV variables if set.
 func InitConfig() {
+	DiskRateLimitSourcedFromEnv = os.Getenv(DiskRateLimitSetting) != ""
+
 	var globalViper = viper.GetViper()
 	globalViper.AutomaticEnv() // read in environment variables that match
 	SetDefaultValues(globalViper)
