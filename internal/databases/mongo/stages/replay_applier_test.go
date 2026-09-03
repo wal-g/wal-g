@@ -13,16 +13,29 @@ import (
 )
 
 type replayApplierStub struct {
-	mu      sync.RWMutex
-	pending bool
+	mu             sync.RWMutex
+	pending        bool
+	lastApplied    models.OpTime
+	lastAppliedSet bool
 }
 
-func (a *replayApplierStub) Apply(context.Context, models.Oplog) error { return nil }
-func (a *replayApplierStub) Close(context.Context) error               { return nil }
+func (a *replayApplierStub) Apply(_ context.Context, op models.Oplog) error {
+	a.mu.Lock()
+	a.lastApplied = models.OpTime{TS: op.TS, Term: 7}
+	a.lastAppliedSet = true
+	a.mu.Unlock()
+	return nil
+}
+func (a *replayApplierStub) Close(context.Context) error { return nil }
 func (a *replayApplierStub) HasPendingTransactions() bool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 	return a.pending
+}
+func (a *replayApplierStub) LastAppliedOpTime() (models.OpTime, bool) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return a.lastApplied, a.lastAppliedSet
 }
 func (a *replayApplierStub) setPending(pending bool) {
 	a.mu.Lock()
@@ -52,9 +65,9 @@ func TestCheckpointingApplierMakesHandledTimestampDurable(t *testing.T) {
 	close(ops)
 	require.NoError(t, <-errC)
 
-	durable, generation := progress.Snapshot()
-	require.Equal(t, applied, durable)
-	require.Equal(t, uint64(1), generation)
+	checkpoint := progress.Snapshot()
+	require.Equal(t, models.OpTime{TS: applied, Term: 7}, checkpoint.OpTime)
+	require.Equal(t, uint64(1), checkpoint.Generation)
 }
 
 func TestCheckpointingApplierWaitsForTransactionBoundary(t *testing.T) {
@@ -71,8 +84,8 @@ func TestCheckpointingApplierWaitsForTransactionBoundary(t *testing.T) {
 	ops <- &models.Oplog{TS: models.Timestamp{TS: 101}}
 	time.Sleep(30 * time.Millisecond)
 
-	durable, _ := progress.Snapshot()
-	require.Equal(t, models.Timestamp{TS: 100}, durable)
+	checkpoint := progress.Snapshot()
+	require.Equal(t, models.Timestamp{TS: 100}, checkpoint.OpTime.TS)
 
 	stub.setPending(false)
 	ops <- &models.Oplog{TS: models.Timestamp{TS: 102}}

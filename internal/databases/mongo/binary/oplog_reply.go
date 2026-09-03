@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/client"
@@ -15,18 +14,25 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	mongodExitDetectionTimeout = time.Second
-)
+const mongoDisconnectTimeout = 30 * time.Second
 
 func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
 	if replayArgs.MinimalConfigPath != "" {
 		return runSupervisedOplogReplay(ctx, replayArgs)
 	}
-	return runOplogReplay(ctx, mongodbURL, replayArgs)
+	progress := stages.NewReplayProgress(replayArgs.Since)
+	return runOplogReplay(ctx, mongodbURL, replayArgs, oplogReplayAttempt{
+		checkpoint: progress.Snapshot(),
+		progress:   progress,
+	})
 }
 
-func runOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
+func runOplogReplay(
+	ctx context.Context,
+	mongodbURL string,
+	replayArgs ReplyOplogConfig,
+	attempt oplogReplayAttempt,
+) (err error) {
 	// set up mongodb client and oplog applier
 	var mongoClientArgs []client.Option
 	if replayArgs.OplogAlwaysUpsert != nil {
@@ -42,23 +48,27 @@ func runOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 	if err != nil {
 		return err
 	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), mongoDisconnectTimeout)
+		defer cancel()
+		if closeErr := mongoClient.Close(closeCtx, false); err == nil && closeErr != nil {
+			err = fmt.Errorf("can not close mongodb client: %w", closeErr)
+		}
+	}()
 
+	since := attempt.checkpoint.OpTime.TS
 	var emptyTS models.Timestamp
-	if replayArgs.Since == emptyTS {
+	if since == emptyTS {
 		if replayArgs.WithCatchUpReconfig {
-			replayArgs.Since, err = mongoClient.CatchUpStartTS(ctx)
+			since, err = mongoClient.CatchUpStartTS(ctx)
 		} else {
-			replayArgs.Since, err = mongoClient.LastOplogTS(ctx)
+			since, err = mongoClient.LastOplogTS(ctx)
 		}
 		if err != nil {
 			return err
 		}
 	}
-	if replayArgs.progress == nil {
-		replayArgs.progress = stages.NewReplayProgress(replayArgs.Since)
-	} else {
-		replayArgs.progress.Initialize(replayArgs.Since)
-	}
+	attempt.progress.Initialize(since)
 
 	if err = mongoClient.EnsureIsMaster(ctx); err != nil {
 		return err
@@ -70,7 +80,6 @@ func runOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		// the replica can rejoin replSet without NamespaceNotFound on master's UUIDs
 		PreserveUUID:   replayArgs.WithCatchUpReconfig,
 		Partial:        replayArgs.Partial,
-		InitMongo:      false,
 		Reconfig:       replayArgs.WithCatchUpReconfig,
 		IgnoreErrCodes: replayArgs.IgnoreErrCodes,
 	})
@@ -78,7 +87,7 @@ func runOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		mongoClient,
 		dbApplier,
 		replayArgs.FsyncInterval,
-		replayArgs.progress,
+		attempt.progress,
 	)
 
 	// set up storage downloader client
@@ -87,144 +96,41 @@ func runOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		return err
 	}
 
-	path, err := resolveOplogReplaySequence(ctx, downloader, replayArgs.Since, replayArgs.Until)
+	path, err := resolveOplogReplaySequence(ctx, downloader, since, replayArgs.Until)
 	if err != nil {
 		return err
 	}
 
 	// setup storage fetcher
 	oplogFetcher := stages.NewStorageFetcher(downloader, path)
-	if replayArgs.resumeAfter {
+	if attempt.resumeAfter {
 		oplogFetcher.WithResumeAfter()
 	}
 
 	// run worker cycle
-	return HandleOplogReplay(ctx, replayArgs.Since, replayArgs.Until, oplogFetcher, oplogApplier)
-}
-
-func runSupervisedOplogReplay(ctx context.Context, replayArgs ReplyOplogConfig) error {
-	progress := stages.NewReplayProgress(replayArgs.Since)
-	consecutiveRestarts := 0
-
-	for {
-		durableTS, generationBefore := progress.Snapshot()
-
-		replayAttemptConfig := replayArgs
-		replayAttemptConfig.MinimalConfigPath = ""
-		replayAttemptConfig.Since = durableTS
-		replayAttemptConfig.progress = progress
-		replayAttemptConfig.resumeAfter = generationBefore > 0
-
-		mongodExited, err := runSupervisedOplogReplayAttempt(
-			ctx, replayAttemptConfig, replayArgs.MinimalConfigPath)
-		if err == nil {
-			return nil
-		}
-		if !mongodExited {
-			return err
-		}
-
-		durableTS, generationAfter := progress.Snapshot()
-		if generationAfter > generationBefore {
-			consecutiveRestarts = 0
-		}
-		if consecutiveRestarts >= replayArgs.MaxMongodRestarts {
-			return errors.Wrapf(err,
-				"supervised mongod crashed after %d restarts, last durable oplog timestamp is %s",
-				consecutiveRestarts, durableTS)
-		}
-		consecutiveRestarts++
-		tracelog.WarningLogger.Printf(
-			"supervised mongod crashed, restarting oplog replay after %s, attempt %d/%d",
-			durableTS, consecutiveRestarts, replayArgs.MaxMongodRestarts)
+	if err = HandleOplogReplay(ctx, since, replayArgs.Until, oplogFetcher, oplogApplier); err != nil {
+		return err
 	}
+	if err = finalizeCatchUp(ctx, replayArgs, mongoClient, attempt.progress); err != nil {
+		return err
+	}
+	return nil
 }
 
-func runSupervisedOplogReplayAttempt(
+func finalizeCatchUp(
 	ctx context.Context,
 	replayArgs ReplyOplogConfig,
-	minimalConfigPath string,
-) (bool, error) {
-	mongodProcess := Mongod(minimalConfigPath)
+	db client.MongoDriver,
+	progress *stages.ReplayProgress,
+) error {
 	if !replayArgs.WithCatchUpReconfig {
-		mongodProcess.WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
+		return nil
 	}
-	if replayArgs.Partial {
-		mongodProcess.WithRestore()
+	checkpoint := progress.Snapshot()
+	if checkpoint.Generation == 0 {
+		return nil
 	}
-	if _, err := mongodProcess.Start(ctx); err != nil {
-		return false, errors.Wrap(err, "unable to start mongod in special mode")
-	}
-
-	waitC := make(chan error, 1)
-	go func() { waitC <- mongodProcess.Wait() }()
-	attemptCtx, cancelAttempt := context.WithCancel(ctx)
-	defer cancelAttempt()
-
-	serviceC := make(chan struct {
-		service *MongodService
-		err     error
-	}, 1)
-	go func() {
-		service, err := CreateMongodService(
-			attemptCtx, "wal-g oplog replay", mongodProcess.GetURI(), 10*time.Minute)
-		serviceC <- struct {
-			service *MongodService
-			err     error
-		}{service: service, err: err}
-	}()
-
-	var mongodService *MongodService
-	select {
-	case processErr := <-waitC:
-		cancelAttempt()
-		<-serviceC
-		return true, unexpectedMongodExit(processErr)
-	case result := <-serviceC:
-		if result.err != nil {
-			mongodProcess.Close()
-			<-waitC
-			return false, errors.Wrap(result.err, "unable to create mongod service")
-		}
-		mongodService = result.service
-	}
-
-	replayC := make(chan error, 1)
-	go func() { replayC <- runOplogReplay(attemptCtx, mongodProcess.GetURI(), replayArgs) }()
-
-	select {
-	case processErr := <-waitC:
-		cancelAttempt()
-		<-replayC
-		return true, unexpectedMongodExit(processErr)
-
-	case replayErr := <-replayC:
-		if replayErr != nil {
-			select {
-			case processErr := <-waitC:
-				return true, unexpectedMongodExit(processErr)
-			// The driver may report a broken connection just before cmd.Wait publishes the process exit.
-			case <-time.After(mongodExitDetectionTimeout):
-				mongodProcess.Close()
-				<-waitC
-				return false, replayErr
-			}
-		}
-
-		if err := mongodService.Shutdown(ctx); err != nil {
-			mongodProcess.Close()
-			<-waitC
-			return false, err
-		}
-		return false, <-waitC
-	}
-}
-
-func unexpectedMongodExit(err error) error {
-	if err == nil {
-		return fmt.Errorf("supervised mongod exited unexpectedly during oplog replay")
-	}
-	return errors.Wrap(err, "supervised mongod exited during oplog replay")
+	return db.ChangeOplogLastTimestamp(ctx, checkpoint.OpTime)
 }
 
 func resolveOplogReplaySequence(
