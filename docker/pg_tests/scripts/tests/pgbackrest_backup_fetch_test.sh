@@ -13,7 +13,7 @@ initdb ${PGDATA}
 archive_command="/usr/bin/timeout 600 pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups archive-push %p"
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
 echo "archive_command = '${archive_command}'" >> ${PGDATA}/postgresql.conf
-echo "archive_timeout = 600" >> ${PGDATA}/postgresql.conf
+echo "archive_timeout = 60" >> ${PGDATA}/postgresql.conf
 
 pg_ctl -D ${PGDATA} -w start
 
@@ -26,8 +26,11 @@ pgbench -c 2 -T 60 &
 pgbench_pid=$!
 
 sleep 1
-pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups backup
+pgbackrest --stanza=main --pg1-path=${PGDATA} --repo1-path=/tmp/pgbackrest-backups backup &
+pgbackrest_pid=$!
 wait $pgbench_pid
+switch_wal postgres
+wait $pgbackrest_pid
 dump_all /tmp/dump1
 
 pg_ctl -D ${PGDATA} -w stop
