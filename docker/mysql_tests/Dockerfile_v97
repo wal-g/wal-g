@@ -1,0 +1,54 @@
+ARG MYSQL97_VERSION=9.7
+
+FROM wal-g/golang:latest AS build
+WORKDIR /go/src/github.com/wal-g/wal-g
+
+COPY go.mod go.mod
+COPY go.sum go.sum
+COPY vendor/ vendor/
+COPY internal/ internal/
+COPY pkg/ pkg/
+COPY cmd/ cmd/
+COPY main/ main/
+COPY utility/ utility/
+COPY Makefile Makefile
+
+# We test WAL-G logic, not optional compression dependencies. Race detection is
+# enabled on x86_64 consistently with the existing MySQL 8 image.
+RUN make $( [ "$(uname -m)" = "x86_64" ] && echo ENABLE_RACE_DETECTION=1 ) mysql_build
+
+FROM mysql:${MYSQL97_VERSION}-oraclelinux9
+
+USER root
+
+# The upstream image contains mysql, mysqladmin and mysqldump as part of the
+# minimal server package, but not all generic tools used by WAL-G tests.
+RUN microdnf install -y \
+        bash \
+        coreutils \
+        diffutils \
+        findutils \
+        gawk \
+        grep \
+        procps-ng \
+        sed \
+    && microdnf clean all \
+    && command -v mysql \
+    && command -v mysqladmin \
+    && command -v mysqldump
+
+ENV MYSQLDATA=/var/lib/mysql
+
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin/wal-g
+
+COPY docker/mysql/client.cnf /root/.my.cnf
+COPY docker/mysql/init.sql /etc/mysql/init.sql
+COPY docker/mysql/mysql97.cnf /etc/mysql/conf.d/walg.cnf
+COPY docker/mysql/export_common.sh /usr/local/export_common.sh
+COPY docker/mysql/export_test_funcs.sh /usr/local/export_test_funcs.sh
+COPY docker/mysql_tests/scripts/ /tmp
+
+# Do not run the upstream image entrypoint: the test controls initialization,
+# startup, reset and restore of the server explicitly.
+ENTRYPOINT []
+CMD ["/tmp/run_integration_tests.sh", "-p", "/tmp/mysql97_tests"]

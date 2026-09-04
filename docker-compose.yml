@@ -625,6 +625,20 @@ services:
       - docker/common/common_walg.env
     <<: *s3_common_depends
 
+  mysql97_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_v97
+      context: .
+      args:
+        MYSQL97_VERSION: "${MYSQL97_VERSION:-9.7}"
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql97_tests
+    container_name: wal-g_mysql97_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends
+
   mariadb:
     build:
       dockerfile: docker/mariadb/Dockerfile

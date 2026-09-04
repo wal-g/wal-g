@@ -1,0 +1,8 @@
+[mysqld]
+datadir = /var/lib/mysql
+server_id = 1
+log_bin = mysql-bin
+log_bin_index = /var/lib/mysql/mysql-bin.index
+gtid_mode = ON
+enforce_gtid_consistency = ON
+skip_replica_start = ON
