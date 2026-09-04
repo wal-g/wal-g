@@ -23,13 +23,13 @@ func HandleCopy(ctx context.Context, fromConfigFile string, toConfigFile string,
 // HandleCopyWithHistory copies specific or all backups and optionally extends
 // each segment WAL stream through the latest cluster restore point.
 func HandleCopyWithHistory(ctx context.Context, fromConfigFile string, toConfigFile string, backupName string, withHistory bool) {
-	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
+	from, fromConfig, err := internal.StorageAndConfigFromFile(ctx, fromConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	to, err := internal.StorageFromConfig(ctx, toConfigFile)
+	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.ExecuteRaw(ctx, plan))
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
 	tracelog.InfoLogger.Println("Success copy.")
 }
 

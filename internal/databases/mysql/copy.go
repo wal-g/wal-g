@@ -19,13 +19,13 @@ import (
 
 // HandleCopyBackup copy specific backups from one storage to another
 func HandleCopyBackup(ctx context.Context, fromConfigFile, toConfigFile, backupName, prefix string) {
-	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
+	from, fromConfig, err := internal.StorageAndConfigFromFile(ctx, fromConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	to, err := internal.StorageFromConfig(ctx, toConfigFile)
+	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, false, prefix)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.ExecuteRaw(ctx, plan))
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
 	tracelog.InfoLogger.Printf("Successfully copied backup %s.\n", backupName)
 }
 
@@ -36,13 +36,13 @@ func HandleCopyAll(ctx context.Context, fromConfigFile string, toConfigFile stri
 }
 
 func HandleCopy(ctx context.Context, fromConfigFile, toConfigFile, backupName string, withHistory bool) {
-	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
+	from, fromConfig, err := internal.StorageAndConfigFromFile(ctx, fromConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	to, err := internal.StorageFromConfig(ctx, toConfigFile)
+	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, "")
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.ExecuteRaw(ctx, plan))
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
 }
 
 func BuildCopyPlan(
