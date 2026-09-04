@@ -98,7 +98,7 @@ endif
 # Builds the image for any PostgreSQL 14-18, chosen by PG_MAJOR (ubuntu 22.04 and
 # PGDG). PG 10 still uses pg10_build_image above, because wal-e needs python3.7
 # and only the bionic image has it.
-pg_build_image: go_deps load_ubuntu_22_04
+pg_build_image: go_deps load_docker_common
 ifeq ($(PG_MAJOR),10)
 	$(error PG_MAJOR=10 must be built with pg10_build_image - the PG 10 image is bionic + wal-e)
 endif
