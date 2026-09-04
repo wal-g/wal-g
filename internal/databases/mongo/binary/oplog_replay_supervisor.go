@@ -111,7 +111,7 @@ func (e replayAttemptExecutor) run(
 ) replayAttemptResult {
 	mongod, err := e.startMongod(ctx, minimalConfigPath, replayArgs)
 	if err != nil {
-		return classifyAttemptError(ctx, replayAttemptFailed,
+		return classifyAttemptError(ctx,
 			errors.Wrap(err, "unable to start mongod in special mode"))
 	}
 	defer mongod.Close()
@@ -128,10 +128,10 @@ func (e replayAttemptExecutor) run(
 		return processExitResult(ctx, mongod.Wait())
 	case connectErr := <-connectC:
 		if connectErr != nil {
-			if processErr, exited := exitedProcess(mongod); exited {
+			if exited, processErr := exitedProcess(mongod); exited {
 				return processExitResult(ctx, processErr)
 			}
-			return classifyAttemptError(ctx, replayAttemptFailed,
+			return classifyAttemptError(ctx,
 				errors.Wrap(connectErr, "unable to create mongod service"))
 		}
 	}
@@ -150,17 +150,17 @@ func (e replayAttemptExecutor) run(
 		}
 	}
 
-	if processErr, exited := exitedProcess(mongod); exited {
+	if exited, processErr := exitedProcess(mongod); exited {
 		return processExitResult(ctx, processErr)
 	}
 	if err := mongod.Shutdown(ctx); err != nil {
-		if processErr, exited := exitedProcess(mongod); exited {
+		if exited, processErr := exitedProcess(mongod); exited {
 			return processExitResult(ctx, processErr)
 		}
-		return classifyAttemptError(ctx, replayAttemptFailed, err)
+		return classifyAttemptError(ctx, err)
 	}
 	if err := mongod.Wait(); err != nil {
-		return classifyAttemptError(ctx, replayAttemptFailed, err)
+		return classifyAttemptError(ctx, err)
 	}
 	return replayAttemptResult{kind: replayAttemptCompleted}
 }
@@ -170,10 +170,10 @@ func (e replayAttemptExecutor) classifyReplayError(
 	mongod supervisedMongod,
 	replayErr error,
 ) replayAttemptResult {
-	if result := classifyAttemptError(ctx, replayAttemptFailed, replayErr); result.kind == replayAttemptCanceled {
+	if result := classifyAttemptError(ctx, replayErr); result.kind == replayAttemptCanceled {
 		return result
 	}
-	if processErr, exited := exitedProcess(mongod); exited {
+	if exited, processErr := exitedProcess(mongod); exited {
 		return processExitResult(ctx, processErr)
 	}
 
@@ -189,20 +189,20 @@ func (e replayAttemptExecutor) classifyReplayError(
 	}
 }
 
-func exitedProcess(mongod supervisedMongod) (error, bool) {
+func exitedProcess(mongod supervisedMongod) (bool, error) {
 	select {
 	case <-mongod.Done():
-		return mongod.Wait(), true
+		return true, mongod.Wait()
 	default:
-		return nil, false
+		return false, nil
 	}
 }
 
-func classifyAttemptError(ctx context.Context, fallback replayAttemptKind, err error) replayAttemptResult {
+func classifyAttemptError(ctx context.Context, err error) replayAttemptResult {
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return replayAttemptResult{kind: replayAttemptCanceled, err: ctxErr}
 	}
-	return replayAttemptResult{kind: fallback, err: err}
+	return replayAttemptResult{kind: replayAttemptFailed, err: err}
 }
 
 func processExitResult(ctx context.Context, err error) replayAttemptResult {
