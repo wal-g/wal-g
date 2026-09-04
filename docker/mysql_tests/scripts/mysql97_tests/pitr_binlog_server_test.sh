@@ -6,10 +6,6 @@ set -eu
 
 export WALE_S3_PREFIX=s3://mysql-pitr-binlogserver-bucket
 export WALG_COMPRESSION_METHOD=lz4
-export WALG_MYSQL_DATASOURCE_NAME="sbtest:@/sbtest"
-export WALG_STREAM_CREATE_COMMAND="mysqldump --single-transaction --set-gtid-purged=ON --add-drop-database --databases sbtest"
-export WALG_STREAM_RESTORE_COMMAND="mysql --no-defaults --user=root"
-export WALG_MYSQL_BACKUP_PREPARE_COMMAND=
 export WALG_MYSQL_BINLOG_SERVER_HOST="127.0.0.1"
 export WALG_MYSQL_BINLOG_SERVER_PORT=9306
 export WALG_MYSQL_BINLOG_SERVER_USER="walg"
@@ -45,20 +41,24 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' INT TERM
 
+start_mysqld() {
+    mysqld --user=mysql > /var/lib/mysql/error.log 2>&1 &
+    mysqld_pid=$!
+
+    wait_count=0
+    until mysqladmin --no-defaults --user=root ping >/dev/null 2>&1; do
+        wait_count=$((wait_count + 1))
+        if [ "$wait_count" -ge 60 ]; then
+            echo "MySQL did not become ready" >&2
+            exit 1
+        fi
+        sleep 1
+    done
+}
+
 rm -rf "${MYSQLDATA:?}"/*
 mysqld --initialize-insecure --user=mysql
-mysqld --user=mysql > /var/lib/mysql/error.log 2>&1 &
-mysqld_pid=$!
-
-wait_count=0
-until mysqladmin --no-defaults --user=root ping >/dev/null 2>&1; do
-    wait_count=$((wait_count + 1))
-    if [ "$wait_count" -ge 60 ]; then
-        echo "MySQL did not become ready" >&2
-        exit 1
-    fi
-    sleep 1
-done
+start_mysqld
 
 mysql --no-defaults --user=root < /etc/mysql/init.sql
 
@@ -90,11 +90,15 @@ mysql -e "INSERT INTO sbtest.pitr VALUES('after_pitr', NOW())"
 mysql -e "FLUSH BINARY LOGS"
 wal-g binlog-push
 
-# Logical restore stays online. Resetting the executed GTID set lets the dump
-# restore its GTID_PURGED value before replication starts from the backup.
-mysql -e "DROP DATABASE sbtest"
-mysql_reset_binary_logs_and_gtids
+# Restore the physical XtraBackup and initialize the restored GTID state before
+# replication starts from the WAL-G binlog-server.
+mysql_kill_and_clean_data
+wait "$mysqld_pid" >/dev/null 2>&1 || true
+mysqld_pid=
 wal-g backup-fetch LATEST
+chown -R mysql:mysql "$MYSQLDATA"
+start_mysqld
+mysql_set_gtid_purged
 
 WALG_LOG_LEVEL=DEVEL wal-g binlog-server --since LATEST --until "$pitr_time" \
     > /tmp/mysql97-binlog-server.log 2>&1 &

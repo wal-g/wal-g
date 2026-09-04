@@ -564,6 +564,13 @@ services:
     image: wal-g/mysql8
     container_name: wal-g_mysql8
 
+  mysql97:
+    build:
+      dockerfile: docker/mysql/Dockerfile_v97
+      context: .
+    image: wal-g/mysql97
+    container_name: wal-g_mysql97
+
   mysql_base_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
@@ -629,8 +636,6 @@ services:
     build:
       dockerfile: docker/mysql_tests/Dockerfile_v97
       context: .
-      args:
-        MYSQL97_VERSION: "${MYSQL97_VERSION:-9.7}"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql97_tests

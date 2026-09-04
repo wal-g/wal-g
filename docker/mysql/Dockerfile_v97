@@ -1,0 +1,50 @@
+FROM wal-g/ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+ENV MYSQLDATA=/var/lib/mysql
+
+# Install MySQL 9.7 and the matching XtraBackup from Percona repositories.
+RUN apt-get update && \
+    apt-get install --yes \
+        bsdmainutils \
+        ca-certificates \
+        curl \
+        gnupg2 \
+        jq \
+        lsb-release \
+        s3cmd && \
+    curl -fsSLO https://repo.percona.com/apt/percona-release_latest.generic_all.deb && \
+    apt-get install --yes ./percona-release_latest.generic_all.deb && \
+    percona-release setup ps-97-lts --scheme https && \
+    percona-release enable ps-97-lts release --scheme https && \
+    percona-release enable pxb-97-lts --scheme https && \
+    apt-get update && \
+    PERCONA_TELEMETRY_DISABLE=1 apt-get install --yes \
+        percona-server-client \
+        percona-server-server \
+        percona-xtrabackup-97 && \
+    command -v mysql && \
+    command -v mysqladmin && \
+    command -v mysqldump && \
+    command -v xtrabackup && \
+    rm -f percona-release_latest.generic_all.deb && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && \
+    apt-get update && \
+    apt-get install --yes sysbench && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN rm -rf "$MYSQLDATA"
+
+COPY docker/mysql/client.cnf /root/.my.cnf
+COPY docker/mysql/client.cnf /etc/mysql/debian.cnf
+COPY docker/mysql/init.sql /etc/mysql/init.sql
+COPY docker/mysql/export_common.sh /usr/local/export_common.sh
+COPY docker/mysql/export_test_funcs.sh /usr/local/export_test_funcs.sh
+COPY docker/common/s3cfg /root/.s3cfg
+
+# Append WAL-G test settings to the configuration installed by Percona Server.
+COPY docker/mysql/mysql97.cnf /tmp/mysql97.cnf
+RUN cat /tmp/mysql97.cnf >> /etc/mysql/my.cnf && rm /tmp/mysql97.cnf
