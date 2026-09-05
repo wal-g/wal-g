@@ -137,12 +137,13 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 		until models.Timestamp
 	}
 	tests := []struct {
-		name     string
-		fields   DownloaderFields
-		args     args
-		wantOps  []*models.Oplog
-		wantErr  error
-		wantErrc error
+		name        string
+		fields      DownloaderFields
+		args        args
+		wantOps     []*models.Oplog
+		wantErr     error
+		wantErrc    error
+		resumeAfter bool
 	}{
 		{
 			name:   "from_first_until_last,_one_archive",
@@ -178,6 +179,17 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 			wantErrc: nil,
 		},
 		{
+			name:        "resume_after_excludes_checkpoint_operation",
+			fields:      SetupDownloaderMocks(ops),
+			resumeAfter: true,
+			args: args{
+				ctx:   t.Context(),
+				from:  ops[1].TS,
+				until: ops[len(ops)-1].TS,
+			},
+			wantOps: ops[2 : len(ops)-1],
+		},
+		{
 			name:   "error:_first_>_until",
 			fields: SetupDownloaderMocks(ops[0:2], ops[2:3], ops[3:]),
 			args: args{
@@ -204,8 +216,9 @@ func TestStorageFetcher_OplogBetween(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			sf := &StorageFetcher{
-				downloader: tt.fields.downloader,
-				path:       tt.fields.path,
+				downloader:  tt.fields.downloader,
+				path:        tt.fields.path,
+				resumeAfter: tt.resumeAfter,
 			}
 
 			outc, errc, err := sf.FetchBetween(tt.args.ctx, tt.args.from, tt.args.until)

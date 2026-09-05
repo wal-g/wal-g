@@ -157,13 +157,19 @@ func (w *CloserPipeWriter) RealClose() error {
 
 // StorageFetcher implements BetweenFetcher interface for storage.
 type StorageFetcher struct {
-	downloader archive.Downloader
-	path       archive.Sequence
+	downloader  archive.Downloader
+	path        archive.Sequence
+	resumeAfter bool
 }
 
 // NewStorageFetcher builds StorageFetcher instance
 func NewStorageFetcher(downloader archive.Downloader, path archive.Sequence) *StorageFetcher {
 	return &StorageFetcher{downloader: downloader, path: path}
+}
+
+func (sf *StorageFetcher) WithResumeAfter() *StorageFetcher {
+	sf.resumeAfter = true
+	return sf
 }
 
 // FetchBetween returns channel of oplog records, channel is filled in background.
@@ -228,7 +234,8 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 			}
 
 			if !firstFound {
-				if models.LessTS(op.TS, from) {
+				if sf.isBeforeStart(op.TS, from) {
+					models.PutOplogEntry(op)
 					continue
 				}
 				firstFound = true
@@ -251,4 +258,8 @@ func (sf *StorageFetcher) FetchBetween(ctx context.Context,
 	}()
 
 	return data, errc, nil
+}
+
+func (sf *StorageFetcher) isBeforeStart(ts, from models.Timestamp) bool {
+	return models.LessTS(ts, from) || sf.resumeAfter && models.Equal(ts, from)
 }

@@ -14,9 +14,25 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const inlineMongodShutdownTimeout = 30 * time.Second
+const mongoDisconnectTimeout = 30 * time.Second
 
 func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
+	if replayArgs.MinimalConfigPath != "" {
+		return runSupervisedOplogReplay(ctx, replayArgs)
+	}
+	progress := stages.NewReplayProgress(replayArgs.Since)
+	return runOplogReplay(ctx, mongodbURL, replayArgs, oplogReplayAttempt{
+		checkpoint: progress.Snapshot(),
+		progress:   progress,
+	})
+}
+
+func runOplogReplay(
+	ctx context.Context,
+	mongodbURL string,
+	replayArgs ReplyOplogConfig,
+	attempt oplogReplayAttempt,
+) (err error) {
 	// set up mongodb client and oplog applier
 	var mongoClientArgs []client.Option
 	if replayArgs.OplogAlwaysUpsert != nil {
@@ -28,51 +44,31 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 			client.OplogApplicationMode(client.OplogAppMode(*replayArgs.OplogApplicationMode)))
 	}
 
-	initMongo := replayArgs.MinimalConfigPath != ""
-	if initMongo {
-		mongodProcess, err := Mongod(replayArgs.MinimalConfigPath).Start(ctx)
-		if err != nil {
-			return err
-		}
-		// Wait for inline mongod to actually exit before unwind: applier.Close
-		// issues graceful `shutdown` admin command on happy path (db.Close with
-		// initMongo=true), but Close() alone only SIGKILLs and races WiredTiger
-		// checkpoint, leaving mongod.lock that breaks subsequent restart (e.g.
-		// chown + supervisorctl in catch_up_stale_replica.feature). SIGKILL
-		// fallback covers early-error paths where shutdown is never sent.
-		defer func() {
-			done := make(chan struct{})
-			go func() {
-				_ = mongodProcess.Wait()
-				close(done)
-			}()
-			select {
-			case <-done:
-			case <-time.After(inlineMongodShutdownTimeout):
-				tracelog.WarningLogger.Printf("inline mongod did not exit gracefully within %s, killing", inlineMongodShutdownTimeout)
-				mongodProcess.Close()
-				<-done
-			}
-		}()
-		mongodbURL = mongodProcess.GetURI()
-	}
-
 	mongoClient, err := client.NewMongoClient(ctx, mongodbURL, mongoClientArgs...)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), mongoDisconnectTimeout)
+		defer cancel()
+		if closeErr := mongoClient.Close(closeCtx, false); err == nil && closeErr != nil {
+			err = fmt.Errorf("can not close mongodb client: %w", closeErr)
+		}
+	}()
 
+	since := attempt.checkpoint.OpTime.TS
 	var emptyTS models.Timestamp
-	if replayArgs.Since == emptyTS {
+	if since == emptyTS {
 		if replayArgs.WithCatchUpReconfig {
-			replayArgs.Since, err = mongoClient.CatchUpStartTS(ctx)
+			since, err = mongoClient.CatchUpStartTS(ctx)
 		} else {
-			replayArgs.Since, err = mongoClient.LastOplogTS(ctx)
+			since, err = mongoClient.LastOplogTS(ctx)
 		}
 		if err != nil {
 			return err
 		}
 	}
+	attempt.progress.Initialize(since)
 
 	if err = mongoClient.EnsureIsMaster(ctx); err != nil {
 		return err
@@ -84,11 +80,15 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		// the replica can rejoin replSet without NamespaceNotFound on master's UUIDs
 		PreserveUUID:   replayArgs.WithCatchUpReconfig,
 		Partial:        replayArgs.Partial,
-		InitMongo:      initMongo,
 		Reconfig:       replayArgs.WithCatchUpReconfig,
 		IgnoreErrCodes: replayArgs.IgnoreErrCodes,
 	})
-	oplogApplier := stages.NewGenericApplier(dbApplier)
+	oplogApplier := stages.NewCheckpointingApplier(
+		mongoClient,
+		dbApplier,
+		replayArgs.FsyncInterval,
+		attempt.progress,
+	)
 
 	// set up storage downloader client
 	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
@@ -96,16 +96,41 @@ func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplo
 		return err
 	}
 
-	path, err := resolveOplogReplaySequence(ctx, downloader, replayArgs.Since, replayArgs.Until)
+	path, err := resolveOplogReplaySequence(ctx, downloader, since, replayArgs.Until)
 	if err != nil {
 		return err
 	}
 
 	// setup storage fetcher
 	oplogFetcher := stages.NewStorageFetcher(downloader, path)
+	if attempt.resumeAfter {
+		oplogFetcher.WithResumeAfter()
+	}
 
 	// run worker cycle
-	return HandleOplogReplay(ctx, replayArgs.Since, replayArgs.Until, oplogFetcher, oplogApplier)
+	if err = HandleOplogReplay(ctx, since, replayArgs.Until, oplogFetcher, oplogApplier); err != nil {
+		return err
+	}
+	if err = finalizeCatchUp(ctx, replayArgs, mongoClient, attempt.progress); err != nil {
+		return err
+	}
+	return nil
+}
+
+func finalizeCatchUp(
+	ctx context.Context,
+	replayArgs ReplyOplogConfig,
+	db client.MongoDriver,
+	progress *stages.ReplayProgress,
+) error {
+	if !replayArgs.WithCatchUpReconfig {
+		return nil
+	}
+	checkpoint := progress.Snapshot()
+	if checkpoint.Generation == 0 {
+		return nil
+	}
+	return db.ChangeOplogLastTimestamp(ctx, checkpoint.OpTime)
 }
 
 func resolveOplogReplaySequence(

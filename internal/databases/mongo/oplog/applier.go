@@ -83,15 +83,14 @@ type DBApplier struct {
 	partial               bool
 	applyIgnoreErrorCodes map[string][]int32
 	lastOpTime            models.OpTime
+	hasAppliedOp          bool
 	catchUp               bool
-	initMongo             bool
 }
 
 type DBApplierArgs struct {
 	PreserveUUID   bool
 	Partial        bool
 	Reconfig       bool
-	InitMongo      bool
 	IgnoreErrCodes map[string][]int32
 }
 
@@ -104,12 +103,19 @@ func NewDBApplier(m client.MongoDriver, args DBApplierArgs) *DBApplier {
 		partial:               args.Partial,
 		catchUp:               args.Reconfig,
 		applyIgnoreErrorCodes: args.IgnoreErrCodes,
-		initMongo:             args.InitMongo,
 	}
 }
 
 func (ap *DBApplier) IsPartial() bool {
 	return ap.partial
+}
+
+func (ap *DBApplier) HasPendingTransactions() bool {
+	return !db.OpTimeIsEmpty(ap.txnBuffer.OldestOpTime())
+}
+
+func (ap *DBApplier) LastAppliedOpTime() (models.OpTime, bool) {
+	return ap.lastOpTime, ap.hasAppliedOp
 }
 
 func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
@@ -144,23 +150,13 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		term = *op.Term
 	}
 	ap.lastOpTime = models.OpTime{TS: models.TimestampFromBson(op.Timestamp), Term: term}
+	ap.hasAppliedOp = true
 
 	return nil
 }
 
-func (ap *DBApplier) Close(ctx context.Context) error {
-	if ap.catchUp {
-		if err := ap.db.ChangeOplogLastTimestamp(ctx, ap.lastOpTime); err != nil {
-			return err
-		}
-	}
-
-	if err := ap.db.Close(ctx, ap.initMongo); err != nil {
-		return err
-	}
-
+func (ap *DBApplier) Close(context.Context) error {
 	ap.txnBuffer.Stop()
-
 	return nil
 }
 

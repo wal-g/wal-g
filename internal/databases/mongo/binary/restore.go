@@ -235,38 +235,7 @@ func (restoreService *RestoreService) recoverFromOplogAsStandalone(ctx context.C
 
 func (restoreService *RestoreService) oplogReply(ctx context.Context,
 	replayOplogConfig ReplyOplogConfig, partial bool) error {
-	mongodProcess := Mongod(restoreService.minimalConfigPath).
-		WithParams(DisableLogicalSessionCacheRefresh, TakeUnstableCheckpointOnShutdown)
-
-	if partial {
-		mongodProcess.WithRestore()
-	}
-
-	if _, err := mongodProcess.Start(ctx); err != nil {
-		return errors.Wrap(err, "unable to start mongod in special mode")
-	}
-
-	defer mongodProcess.Close()
-
-	mongodService, err := CreateMongodService(
-		ctx,
-		"wal-g restore",
-		mongodProcess.GetURI(),
-		10*time.Minute,
-	)
-	if err != nil {
-		return errors.Wrap(err, "unable to create mongod service")
-	}
-
-	err = RunOplogReplay(ctx, mongodProcess.GetURI(), replayOplogConfig)
-	if err != nil {
-		return err
-	}
-
-	err = mongodService.Shutdown(ctx)
-	if err != nil {
-		return err
-	}
-
-	return mongodProcess.Wait()
+	replayOplogConfig.Partial = partial
+	replayOplogConfig.MinimalConfigPath = restoreService.minimalConfigPath
+	return RunOplogReplay(ctx, "", replayOplogConfig)
 }

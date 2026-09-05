@@ -79,6 +79,7 @@ type MongoDriver interface {
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
 	ApplyOp(ctx context.Context, op *db.Oplog) error
+	Fsync(ctx context.Context) error
 	Close(ctx context.Context, shutdown bool) error
 	ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error
 	LastOplogTS(ctx context.Context) (lastTS models.Timestamp, err error)
@@ -519,7 +520,7 @@ func (mc *MongoClient) ChangeOplogLastTimestamp(ctx context.Context, opTime mode
 		return err
 	}
 
-	return mc.fsync(ctx)
+	return mc.Fsync(ctx)
 }
 
 func (mc *MongoClient) changeMinValueTimestamp(ctx context.Context, opTime models.OpTime) error {
@@ -602,7 +603,7 @@ func (mc *MongoClient) addNoopToOplog(ctx context.Context, opTime models.OpTime)
 	return err
 }
 
-func (mc *MongoClient) fsync(ctx context.Context) error {
+func (mc *MongoClient) Fsync(ctx context.Context) error {
 	res := mc.c.Database("admin").RunCommand(ctx, bson.D{
 		{Key: "fsync", Value: 1},
 		{Key: "lock", Value: false},

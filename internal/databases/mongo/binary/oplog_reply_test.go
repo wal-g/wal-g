@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	archivepkg "github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	archivemocks "github.com/wal-g/wal-g/internal/databases/mongo/archive/mocks"
+	clientmocks "github.com/wal-g/wal-g/internal/databases/mongo/client/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 )
 
 func TestResolveOplogReplaySequenceFallsBackToFullList(t *testing.T) {
@@ -53,4 +55,23 @@ func mustArchive(t *testing.T, start, end models.Timestamp) models.Archive {
 	arch, err := models.NewArchive(start, end, "lz4", models.ArchiveTypeOplog)
 	require.NoError(t, err)
 	return arch
+}
+
+func TestFinalizeCatchUpUsesDurableOpTime(t *testing.T) {
+	db := clientmocks.NewMongoDriver(t)
+	opTime := models.OpTime{TS: models.Timestamp{TS: 101, Inc: 2}, Term: 7}
+	db.On("ChangeOplogLastTimestamp", testifymock.Anything, opTime).Return(nil).Once()
+	progress := stages.NewReplayProgress(models.Timestamp{TS: 100, Inc: 1})
+	progress.MarkDurable(opTime)
+
+	err := finalizeCatchUp(t.Context(), ReplyOplogConfig{WithCatchUpReconfig: true}, db, progress)
+	require.NoError(t, err)
+}
+
+func TestFinalizeCatchUpSkipsEmptyReplay(t *testing.T) {
+	db := clientmocks.NewMongoDriver(t)
+	progress := stages.NewReplayProgress(models.Timestamp{TS: 100, Inc: 1})
+
+	err := finalizeCatchUp(t.Context(), ReplyOplogConfig{WithCatchUpReconfig: true}, db, progress)
+	require.NoError(t, err)
 }
