@@ -33,6 +33,7 @@ endif
 export PGBACKREST_BUILD_BASE PGBACKREST_VERSION
 MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
+MYSQL97_TEST := "mysql97_tests"
 MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
@@ -220,6 +221,10 @@ mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
 mysql8_integration_test: go_deps unlink_brotli load_docker_common
 	docker compose build mysql8 && docker compose build $(MYSQL8_TEST)
 	docker compose up --force-recreate --exit-code-from $(MYSQL8_TEST) $(MYSQL8_TEST)
+
+mysql97_integration_test: go_deps unlink_brotli load_docker_common
+	docker compose build mysql97 && docker compose build $(MYSQL97_TEST)
+	docker compose up --force-recreate --exit-code-from $(MYSQL97_TEST) $(MYSQL97_TEST)
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)

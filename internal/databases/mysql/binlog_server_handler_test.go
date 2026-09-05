@@ -6,7 +6,36 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestHandleQuerySupportsSourceAndReplicaTerminology(t *testing.T) {
+	testCases := []struct {
+		name          string
+		query         string
+		expectedValue string
+	}{
+		{name: "legacy checksum", query: "SELECT @master_binlog_checksum", expectedValue: "CRC32"},
+		{name: "source checksum", query: "SELECT @source_binlog_checksum", expectedValue: "1"},
+		{name: "legacy semi-sync", query: "SELECT @@global.rpl_semi_sync_master_enabled", expectedValue: "0"},
+		{name: "source semi-sync", query: "SELECT @@global.rpl_semi_sync_source_enabled", expectedValue: "0"},
+	}
+
+	handler := &Handler{}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			result, err := handler.HandleQuery(testCase.query)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+
+			require.Len(t, result.RowDatas, 1)
+			values, err := result.RowDatas[0].Parse(result.Fields, false, nil)
+			require.NoError(t, err)
+			require.Len(t, values, 1)
+			assert.Equal(t, testCase.expectedValue, string(values[0].AsString()))
+		})
+	}
+}
 
 func TestDecideSkipForGTID(t *testing.T) {
 	sidA := uuid.MustParse("3e11fa47-71ca-11e1-9e33-c80aa9429562")

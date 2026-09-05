@@ -58,10 +58,10 @@ WALG_LOG_LEVEL="DEVEL" wal-g binlog-server \
 walg_pid=$!
 
 sleep 3
-mysql -e "STOP SLAVE"
+mysql_stop_replica
 mysql -e "SET GLOBAL SERVER_ID = 123"
-mysql -e "CHANGE MASTER TO MASTER_HOST=\"127.0.0.1\", MASTER_PORT=9306, MASTER_USER=\"walg\", MASTER_PASSWORD=\"walgpwd\", MASTER_AUTO_POSITION=1"
-mysql -e "START SLAVE"
+mysql_change_replication_source "127.0.0.1" 9306 "walg" "walgpwd"
+mysql_start_replica
 
 wait "$walg_pid"
 

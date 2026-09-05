@@ -283,8 +283,12 @@ Restore procedure is a bit tricky:
 * in case of you have replication and GTID enabled: set mysql GTID_PURGED variable to value from `/var/lib/mysql/xtrabackup_binlog_info`, using
 ```bash
 gtids=$(tr -d '\n' < /var/lib/mysql/xtrabackup_binlog_info | awk '{print $3}')
-mysql -e "RESET MASTER; SET @@GLOBAL.GTID_PURGED='$gtids';"
+mysql -e "RESET BINARY LOGS AND GTIDS; SET @@GLOBAL.GTID_PURGED='$gtids';"
 ```
+
+`RESET BINARY LOGS AND GTIDS` is available in MySQL 8.4 and newer. Use
+`RESET MASTER` on MySQL 5.7 and 8.0.
+
 * for PITR, replay binlogs with
 ```bash
 wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z"
@@ -324,16 +328,22 @@ wal-g can work as replication source to do fast PiTR. In this case it will serve
 
 Restore procedure is straightforward:
 * restore backup
-* disable replication threads in MySQL: `skip-slave-start`
+* disable automatic replication startup in MySQL (`skip_replica_start` on
+  current versions, `skip_slave_start` on older versions)
 * start MySQL, purge GTIDs (see above)
 * in second terminal start binlog-server: `wal-g binlog-server --until "1985-10-26T01:21:00Z"`
 * in MySQL:
   ```SQL
     SET GLOBAL SERVER_ID=999
-    CHANGE MASTER TO MASTER_HOST="127.0.0.1", MASTER_PORT=9306, MASTER_USER="walg", MASTER_PASSWORD="walgpwd", MASTER_AUTO_POSITION=1;
-    SHOW SLAVE STATUS \G
-    START SLAVE;
+    CHANGE REPLICATION SOURCE TO SOURCE_HOST="127.0.0.1", SOURCE_PORT=9306, SOURCE_USER="walg", SOURCE_PASSWORD="walgpwd", SOURCE_AUTO_POSITION=1;
+    SHOW REPLICA STATUS \G
+    START REPLICA;
   ```
+
+  On MySQL versions older than 8.0.23 use `CHANGE MASTER TO` and its
+  `MASTER_*` options. On versions older than 8.0.22 use `SHOW SLAVE STATUS`
+  and `START SLAVE`.
+
 * wait until wal-g exit (it will wait until binlogs will be applied)
 * in case of errors use classic approach
 
