@@ -442,7 +442,7 @@ func testWalk(t *testing.T, composer postgres.TarBallComposerType, withoutFilesM
 }
 
 func setupTestTarBallComposerMaker(composer postgres.TarBallComposerType, withoutFilesMetadata bool) postgres.TarBallComposerMaker {
-	filePackOptions := postgres.NewTarBallFilePackerOptions(false, false)
+	filePackOptions := postgres.NewTarBallFilePackerOptions(false, false, false, postgres.LSN(0))
 	switch composer {
 	case postgres.RegularComposer:
 		if withoutFilesMetadata {
