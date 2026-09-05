@@ -65,6 +65,7 @@ type BackupArguments struct {
 	composerInitFunc         func(ctx context.Context, handler *BackupHandler) error
 	preventConcurrentBackups bool
 	countJournals            bool
+	deltaFromWalSummaries    bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -122,7 +123,7 @@ type BackupHandler struct {
 func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
 	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
 	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool,
-	countJournals bool) BackupArguments {
+	countJournals bool, deltaFromWalSummaries bool) BackupArguments {
 	return BackupArguments{
 		Uploader:              uploader,
 		pgDataDirectory:       pgDataDirectory,
@@ -139,6 +140,7 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 			return configureTarBallComposer(ctx, handler, tarBallComposerType)
 		},
 		preventConcurrentBackups: false,
+		deltaFromWalSummaries:    deltaFromWalSummaries,
 	}
 }
 
@@ -265,25 +267,59 @@ func (bh *BackupHandler) handleDeltaBackup(ctx context.Context, folder storage.F
 			tracelog.ErrorLogger.FatalOnError(newBackupFromOtherBD())
 		}
 
-		useWalDelta, _, err := configureWalDeltaUsage()
-		tracelog.ErrorLogger.FatalOnError(err)
-
-		if useWalDelta {
-			ForceWalDetal, _ := conf.GetBoolSettingDefault(conf.ForceWalDetal, false)
-			err := bh.Workers.Bundle.DownloadDeltaMap(ctx, internal.NewFolderReader(folder.GetSubFolder(utility.WalPath)), bh.CurBackupInfo.startLSN)
-			if err == nil {
-				tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided " +
-					"delta map")
-			} else if ForceWalDetal {
-				return errors.Wrapf(err, "Failed to load delta map from previous backup")
-			} else {
-				tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. "+
-					"Fallback to full scan delta backup\n", err)
-			}
+		var err error
+		if bh.Arguments.deltaFromWalSummaries {
+			err = bh.loadDeltaMapFromWalSummaries(ctx)
+		} else {
+			err = bh.loadDeltaMapFromWalArchive(ctx, folder)
+		}
+		if err != nil {
+			return err
 		}
 		bh.CurBackupInfo.Name = bh.CurBackupInfo.Name + "_D_" + utility.StripWalFileName(bh.prevBackupInfo.name)
 		tracelog.DebugLogger.Printf("Suffixing Backup name with Delta info: %s", bh.CurBackupInfo.Name)
 	}
+	return nil
+}
+
+func (bh *BackupHandler) loadDeltaMapFromWalArchive(ctx context.Context, folder storage.Folder) error {
+	useWalDelta, _, err := configureWalDeltaUsage()
+	tracelog.ErrorLogger.FatalOnError(err)
+	if !useWalDelta {
+		return nil
+	}
+
+	forceWalDelta, _ := conf.GetBoolSettingDefault(conf.ForceWalDetal, false)
+	walFolderReader := internal.NewFolderReader(folder.GetSubFolder(utility.WalPath))
+	err = bh.Workers.Bundle.DownloadDeltaMap(ctx, walFolderReader, bh.CurBackupInfo.startLSN)
+	if err == nil {
+		tracelog.InfoLogger.Println("Successfully loaded delta map, delta backup will be made with provided delta map")
+		return nil
+	}
+	if forceWalDelta {
+		return errors.Wrapf(err, "Failed to load delta map from previous backup")
+	}
+	tracelog.WarningLogger.Printf("Error during loading delta map: '%v'. Fallback to full scan delta backup\n", err)
+	return nil
+}
+
+func (bh *BackupHandler) loadDeltaMapFromWalSummaries(ctx context.Context) error {
+	if bh.PgInfo.PgVersion < 170000 {
+		return errors.Errorf("--delta-from-wal-summaries requires PostgreSQL 17 or newer "+
+			"(server reports server_version_num=%d)", bh.PgInfo.PgVersion)
+	}
+	on, err := bh.Workers.QueryRunner.IsSummarizeWalEnabled(ctx)
+	if err != nil {
+		return errors.Wrap(err, "--delta-from-wal-summaries: probing summarize_wal")
+	}
+	if !on {
+		return errors.New("--delta-from-wal-summaries requires summarize_wal=on on the server")
+	}
+	if err := bh.Workers.Bundle.LoadDeltaMapFromWalSummaries(
+		bh.PgInfo.PgDataDirectory, bh.CurBackupInfo.startLSN); err != nil {
+		return errors.Wrap(err, "loading delta map from WAL summaries")
+	}
+	tracelog.InfoLogger.Println("Loaded delta map from pg_wal/summaries")
 	return nil
 }
 

@@ -771,6 +771,19 @@ func (queryRunner *PgQueryRunner) GetArchiveCommand(ctx context.Context) (string
 	return archiveCommand, nil
 }
 
+// IsSummarizeWalEnabled reports whether the server has summarize_wal=on, i.e. the
+// walsummarizer is producing pg_wal/summaries/* files. Available since PG 17.
+func (queryRunner *PgQueryRunner) IsSummarizeWalEnabled(ctx context.Context) (bool, error) {
+	queryRunner.Mu.Lock()
+	defer queryRunner.Mu.Unlock()
+
+	var value string
+	if err := queryRunner.Connection.QueryRow(ctx, "SHOW summarize_wal").Scan(&value); err != nil {
+		return false, errors.Wrap(err, "IsSummarizeWalEnabled: SHOW summarize_wal failed")
+	}
+	return value == "on", nil
+}
+
 // IsStandby checks if the PostgreSQL server is in recovery mode (standby).
 func (queryRunner *PgQueryRunner) IsStandby(ctx context.Context) (bool, error) {
 	queryRunner.Mu.Lock()
