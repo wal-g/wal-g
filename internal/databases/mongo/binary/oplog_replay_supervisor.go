@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 )
 
@@ -38,17 +39,19 @@ type replayAttemptExecutor struct {
 	exitDetectionDelay time.Duration
 }
 
-func newReplayAttemptExecutor() replayAttemptExecutor {
+func newReplayAttemptExecutor(downloader archive.Downloader) replayAttemptExecutor {
 	return replayAttemptExecutor{
-		startMongod:        startManagedMongod,
-		replay:             runOplogReplay,
+		startMongod: startManagedMongod,
+		replay: func(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig, attempt oplogReplayAttempt) error {
+			return runOplogReplay(ctx, mongodbURL, replayArgs, attempt, downloader)
+		},
 		exitDetectionDelay: mongodExitDetectionTimeout,
 	}
 }
 
-func runSupervisedOplogReplay(ctx context.Context, replayArgs ReplyOplogConfig) error {
+func runSupervisedOplogReplay(ctx context.Context, replayArgs ReplyOplogConfig, downloader archive.Downloader) error {
 	progress := stages.NewReplayProgress(replayArgs.Since)
-	executor := newReplayAttemptExecutor()
+	executor := newReplayAttemptExecutor(downloader)
 	return superviseOplogReplay(ctx, replayArgs, progress, func(attempt oplogReplayAttempt) replayAttemptResult {
 		return executor.run(ctx, replayArgs, attempt, replayArgs.MinimalConfigPath)
 	})

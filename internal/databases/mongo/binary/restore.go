@@ -8,6 +8,7 @@ import (
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
+	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 )
@@ -23,14 +24,16 @@ type RestoreService struct {
 	LocalStorage *LocalStorage
 	Uploader     internal.Uploader
 
+	oplogDownloader   archive.Downloader
 	minimalConfigPath string
 }
 
-func CreateRestoreService(localStorage *LocalStorage, uploader internal.Uploader,
+func CreateRestoreService(localStorage *LocalStorage, uploader internal.Uploader, oplogDownloader archive.Downloader,
 	minimalConfigPath string) (*RestoreService, error) {
 	return &RestoreService{
 		LocalStorage:      localStorage,
 		Uploader:          uploader,
+		oplogDownloader:   oplogDownloader,
 		minimalConfigPath: minimalConfigPath,
 	}, nil
 }
@@ -237,5 +240,5 @@ func (restoreService *RestoreService) oplogReply(ctx context.Context,
 	replayOplogConfig ReplyOplogConfig, partial bool) error {
 	replayOplogConfig.Partial = partial
 	replayOplogConfig.MinimalConfigPath = restoreService.minimalConfigPath
-	return RunOplogReplay(ctx, "", replayOplogConfig)
+	return RunOplogReplay(ctx, "", replayOplogConfig, restoreService.oplogDownloader)
 }

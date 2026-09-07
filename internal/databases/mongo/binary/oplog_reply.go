@@ -16,15 +16,17 @@ import (
 
 const mongoDisconnectTimeout = 30 * time.Second
 
-func RunOplogReplay(ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig) error {
+func RunOplogReplay(
+	ctx context.Context, mongodbURL string, replayArgs ReplyOplogConfig, downloader archive.Downloader,
+) error {
 	if replayArgs.MinimalConfigPath != "" {
-		return runSupervisedOplogReplay(ctx, replayArgs)
+		return runSupervisedOplogReplay(ctx, replayArgs, downloader)
 	}
 	progress := stages.NewReplayProgress(replayArgs.Since)
 	return runOplogReplay(ctx, mongodbURL, replayArgs, oplogReplayAttempt{
 		checkpoint: progress.Snapshot(),
 		progress:   progress,
-	})
+	}, downloader)
 }
 
 func runOplogReplay(
@@ -32,6 +34,7 @@ func runOplogReplay(
 	mongodbURL string,
 	replayArgs ReplyOplogConfig,
 	attempt oplogReplayAttempt,
+	downloader archive.Downloader,
 ) (err error) {
 	// set up mongodb client and oplog applier
 	var mongoClientArgs []client.Option
@@ -89,12 +92,6 @@ func runOplogReplay(
 		replayArgs.FsyncInterval,
 		attempt.progress,
 	)
-
-	// set up storage downloader client
-	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())
-	if err != nil {
-		return err
-	}
 
 	path, err := resolveOplogReplaySequence(ctx, downloader, since, replayArgs.Until)
 	if err != nil {
