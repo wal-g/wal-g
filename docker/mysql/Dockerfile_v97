@@ -31,11 +31,6 @@ RUN apt-get update && \
     rm -f percona-release_latest.generic_all.deb && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -s https://packagecloud.io/install/repositories/akopytov/sysbench/script.deb.sh | bash && \
-    apt-get update && \
-    apt-get install --yes sysbench && \
-    rm -rf /var/lib/apt/lists/*
-
 RUN rm -rf "$MYSQLDATA"
 
 COPY docker/mysql/client.cnf /root/.my.cnf
