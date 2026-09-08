@@ -6,15 +6,15 @@ set -eu
 
 # Separate runs make an entirely tagged stream catch the empty-sentGTIDs bug,
 # while a mixed stream checks that ordinary and tagged GTIDs coexist.
+# Plain GTIDs are covered by base_tests/pitr_binlog_server_test.sh.
 if [ "$#" -eq 0 ]; then
-    for mode in plain tagged mixed; do
+    for mode in tagged mixed; do
         "$0" "$mode"
     done
     exit 0
 fi
 mode=$1
 case "$mode" in
-    plain) backup_gtid_next=AUTOMATIC; first_gtid_next=AUTOMATIC; second_gtid_next=AUTOMATIC ;;
     tagged) backup_gtid_next=AUTOMATIC:review; first_gtid_next=AUTOMATIC:review; second_gtid_next=AUTOMATIC:review ;;
     mixed) backup_gtid_next=AUTOMATIC:review; first_gtid_next=AUTOMATIC; second_gtid_next=AUTOMATIC:review ;;
     *) echo "Unknown GTID test mode: $mode" >&2; exit 1 ;;

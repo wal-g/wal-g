@@ -256,14 +256,7 @@ func (p *BinlogDumpProcessor) decideSkipForGTID(e *replication.BinlogEvent) (boo
 	return false, nil
 }
 
-func decodeTransactionGTID(e *replication.BinlogEvent) (set mysql.GTIDSet, err error) {
-	// The upstream decoders may panic on truncated input. A transaction whose
-	// GTID cannot be decoded must not be forwarded without being tracked.
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			set, err = nil, fmt.Errorf("malformed GTID event: %v", recovered)
-		}
-	}()
+func decodeTransactionGTID(e *replication.BinlogEvent) (mysql.GTIDSet, error) {
 	if len(e.RawData) < replication.EventHeaderSize {
 		return nil, errors.New("truncated event header")
 	}

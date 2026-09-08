@@ -244,22 +244,26 @@ func TestTaggedGTIDRequiresIdentityFields(t *testing.T) {
 	// field starts at byte 22 and the tag field starts at byte 24.
 	sid := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	for _, tc := range []struct {
-		name   string
-		mutate func([]byte) []byte
+		name      string
+		mutate    func([]byte) []byte
+		wantError string
 	}{
-		{"missing flags", func(b []byte) []byte { return append(b[:3], b[5:]...) }},
-		{"missing UUID", func(b []byte) []byte { return append(b[:5], b[22:]...) }},
-		{"missing GNO", func(b []byte) []byte { return append(b[:22], b[24:]...) }},
-		{"missing tag", func(b []byte) []byte { return b[:24] }},
-		{"zero GNO", func(b []byte) []byte { b[23] = 0; return b }},
-		{"empty tag", func(b []byte) []byte { b[25] = 0; return b }},
+		{"missing flags", func(b []byte) []byte { return append(b[:3], b[5:]...) }, "missing tagged GTID field 0"},
+		{"missing UUID", func(b []byte) []byte { return append(b[:5], b[22:]...) }, "missing tagged GTID field 1"},
+		{"missing GNO", func(b []byte) []byte { return append(b[:22], b[24:]...) }, "missing tagged GTID field 2"},
+		{"missing tag", func(b []byte) []byte { return b[:24] }, "unexpected EOF"},
+		{"wrong tag field", func(b []byte) []byte { b[24] = 8; return b }, "missing tagged GTID field 3"},
+		{"zero GNO", func(b []byte) []byte { b[23] = 0; return b }, "invalid tagged GTID identity"},
+		{"empty tag", func(b []byte) []byte { b[25] = 0; return b }, "invalid tagged GTID identity"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := taggedGTIDEvent(ts, sid, "review", 1)
 			body := tc.mutate(e.Event.(*replication.GenericEvent).Data)
+			// Keep framing valid so the error comes from the identity field.
+			body[1] = byte(len(body) << 1)
 			e = rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
 			p, sink := newTestProcessor(t, nil, nil, at(ts))
-			require.Error(t, p.handleEvent(e))
+			require.ErrorContains(t, p.handleEvent(e), tc.wantError)
 			require.Empty(t, sink.recorded())
 			require.True(t, p.sentGTIDs.IsEmpty())
 		})

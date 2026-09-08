@@ -1,3 +1,4 @@
+ARG MYSQL_IMAGE=wal-g/mysql84:latest
 FROM wal-g/golang:latest AS build
 WORKDIR /go/src/github.com/wal-g/wal-g
 
@@ -15,13 +16,13 @@ COPY Makefile Makefile
 # enabled on x86_64 consistently with the existing MySQL 8 image.
 RUN make $( [ "$(uname -m)" = "x86_64" ] && echo ENABLE_RACE_DETECTION=1 ) mysql_build
 
-FROM wal-g/mysql97:latest
+FROM ${MYSQL_IMAGE}
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin/wal-g
 
 COPY docker/mysql_tests/scripts/ /tmp
 
-ARG TEST_ARG="-p /tmp/binlog_server_tests"
+ARG TEST_ARG="-p /tmp/base_tests"
 ENV TEST_ARG=${TEST_ARG}
 
 CMD /tmp/run_integration_tests.sh ${TEST_ARG}

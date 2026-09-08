@@ -566,15 +566,19 @@ services:
 
   mysql84:
     build:
-      dockerfile: docker/mysql/Dockerfile_v84
+      dockerfile: docker/mysql/Dockerfile_percona
       context: .
+      args:
+        MYSQL_SERIES: "84"
     image: wal-g/mysql84
     container_name: wal-g_mysql84
 
   mysql97:
     build:
-      dockerfile: docker/mysql/Dockerfile_v97
+      dockerfile: docker/mysql/Dockerfile_percona
       context: .
+      args:
+        MYSQL_SERIES: "97"
     image: wal-g/mysql97
     container_name: wal-g_mysql97
 
@@ -641,9 +645,10 @@ services:
 
   mysql84_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile_v84
+      dockerfile: docker/mysql_tests/Dockerfile_percona
       context: .
       args:
+        MYSQL_IMAGE: wal-g/mysql84:latest
         TEST_ARG: "-p /tmp/${MYSQL84_TEST_DIR:-base_tests}"
     security_opt:
       - seccomp:unconfined
@@ -662,9 +667,10 @@ services:
 
   mysql97_tests:
     build:
-      dockerfile: docker/mysql_tests/Dockerfile_v97
+      dockerfile: docker/mysql_tests/Dockerfile_percona
       context: .
       args:
+        MYSQL_IMAGE: wal-g/mysql97:latest
         TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-binlog_server_tests}"
     security_opt:
       - seccomp:unconfined
