@@ -141,7 +141,7 @@ func TestListFolder_VersioningEnabled_ExcludesDeletedObjects(t *testing.T) {
 	assert.NotContains(t, objectNames, "object2.txt", "Deleted object should not be in the list")
 }
 
-func TestListFolder_VersioningEnabled_IncludesAllVersionsOfNonDeletedObjects(t *testing.T) {
+func TestListFolder_VersioningEnabled_ReturnsOnlyCurrentVersionOfOverwrittenObject(t *testing.T) {
 	now := time.Now()
 
 	mockClient := &mockS3ClientVersioning{
@@ -174,8 +174,47 @@ func TestListFolder_VersioningEnabled_IncludesAllVersionsOfNonDeletedObjects(t *
 
 	require.NoError(t, err)
 
-	assert.Len(t, objects, 2)
+	// A regular listing (no --all-versions) returns one entry per key: the current version.
+	require.Len(t, objects, 1)
+	assert.Equal(t, "object1.txt", objects[0].GetName())
+	assert.Equal(t, "v1-latest", objects[0].GetVersionID())
+}
 
+func TestListFolder_VersioningEnabled_ShowAllVersionsIncludesSupersededVersions(t *testing.T) {
+	now := time.Now()
+
+	mockClient := &mockS3ClientVersioning{
+		versions: []types.ObjectVersion{
+			{
+				Key:          aws.String("object1.txt"),
+				VersionId:    aws.String("v1-latest"),
+				IsLatest:     aws.Bool(true),
+				LastModified: aws.Time(now),
+				Size:         aws.Int64(100),
+			},
+			{
+				Key:          aws.String("object1.txt"),
+				VersionId:    aws.String("v1-old"),
+				IsLatest:     aws.Bool(false),
+				LastModified: aws.Time(now.Add(-time.Hour)),
+				Size:         aws.Int64(90),
+			},
+		},
+		deleteMarkers: []types.DeleteMarkerEntry{},
+	}
+
+	config := &walgs3.Config{
+		Bucket:           "test-bucket",
+		EnableVersioning: "enabled",
+	}
+	folder := walgs3.NewFolder(mockClient, nil, "", config)
+	folder.SetShowAllVersions(true)
+
+	objects, _, err := folder.ListFolder(t.Context())
+
+	require.NoError(t, err)
+
+	assert.Len(t, objects, 2)
 	for _, obj := range objects {
 		assert.Equal(t, "object1.txt", obj.GetName())
 	}

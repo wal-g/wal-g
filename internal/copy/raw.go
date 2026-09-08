@@ -3,8 +3,8 @@ package copy
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"path"
 	"slices"
 	"strings"
@@ -276,6 +276,10 @@ type publicationOrder struct {
 // ExecuteRaw copies only missing immutable entries, rejects conflicting ones,
 // and refreshes mutable metadata. No payload transformation is performed.
 func ExecuteRaw(ctx context.Context, plan *Plan) error {
+	return Execute(ctx, plan, ExecuteOptions{})
+}
+
+func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 	targetObjects, err := storage.ListFolderRecursively(ctx, plan.To)
 	if err != nil {
 		return fmt.Errorf("list destination storage: %w", err)
@@ -322,7 +326,7 @@ func ExecuteRaw(ctx context.Context, plan *Plan) error {
 		group, groupCtx := errgroup.WithContext(ctx)
 		group.SetLimit(defaultRawCopyConcurrency)
 		for _, entry := range byOrder[order] {
-			group.Go(func() error { return copyRawObject(groupCtx, plan.From, plan.To, entry) })
+			group.Go(func() error { return copyObject(groupCtx, plan.From, plan.To, entry, options) })
 		}
 		if err := group.Wait(); err != nil {
 			return err
@@ -331,32 +335,58 @@ func ExecuteRaw(ctx context.Context, plan *Plan) error {
 	return nil
 }
 
-func copyRawObject(ctx context.Context, from, to storage.Folder, entry Entry) error {
+func copyObject(ctx context.Context, from, to storage.Folder, entry Entry, options ExecuteOptions) error {
+	statistics.WalgMetrics.UploadedFilesTotal.Inc()
+	err := copyObjectWithoutMetrics(ctx, from, to, entry, options)
+	if err != nil {
+		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
+	}
+	return err
+}
+
+func copyObjectWithoutMetrics(ctx context.Context, from, to storage.Folder, entry Entry, options ExecuteOptions) error {
 	if entry.inline != nil {
-		if err := putRawObject(ctx, to, entry.TargetPath, bytes.NewReader(entry.inline)); err != nil {
+		if err := to.PutObject(ctx, entry.TargetPath, bytes.NewReader(entry.inline)); err != nil {
 			return fmt.Errorf("write destination metadata %q: %w", entry.TargetPath, err)
 		}
 		tracelog.InfoLogger.Printf("Published metadata %q.", entry.TargetPath)
 		return nil
 	}
+
+	var serverCopyErr error
+	if options.UseServerSideCopy {
+		if copier, ok := to.(storage.CrossFolderCopier); ok && copier.CanCopyFrom(from) {
+			serverCopyErr = copier.CopyObjectFrom(ctx, from, entry.SourcePath, entry.TargetPath, entry.Size)
+			if serverCopyErr == nil {
+				return nil
+			}
+			if ctx.Err() != nil || errors.Is(serverCopyErr, context.Canceled) ||
+				errors.Is(serverCopyErr, context.DeadlineExceeded) {
+				return fmt.Errorf("server-side copy %q to %q: %w", entry.SourcePath, entry.TargetPath, serverCopyErr)
+			}
+			tracelog.WarningLogger.Printf(
+				"Server-side copy %q to %q failed, falling back to streaming: %v",
+				entry.SourcePath, entry.TargetPath, serverCopyErr)
+		}
+	}
+
 	reader, err := from.ReadObject(ctx, entry.SourcePath)
 	if err != nil {
-		return fmt.Errorf("read source object %q: %w", entry.SourcePath, err)
+		streamErr := fmt.Errorf("read source object %q: %w", entry.SourcePath, err)
+		if serverCopyErr != nil {
+			return errors.Join(serverCopyErr, streamErr)
+		}
+		return streamErr
 	}
 	defer reader.Close()
 
-	if err := putRawObject(ctx, to, entry.TargetPath, reader); err != nil {
-		return fmt.Errorf("write destination object %q: %w", entry.TargetPath, err)
+	if err := to.PutObject(ctx, entry.TargetPath, reader); err != nil {
+		streamErr := fmt.Errorf("write destination object %q: %w", entry.TargetPath, err)
+		if serverCopyErr != nil {
+			return errors.Join(serverCopyErr, streamErr)
+		}
+		return streamErr
 	}
-	tracelog.InfoLogger.Printf("Copied %q to %q without transformation.", entry.SourcePath, entry.TargetPath)
-	return nil
-}
-
-func putRawObject(ctx context.Context, folder storage.Folder, name string, content io.Reader) error {
-	statistics.WalgMetrics.UploadedFilesTotal.Inc()
-	if err := folder.PutObject(ctx, name, content); err != nil {
-		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
-		return err
-	}
+	tracelog.InfoLogger.Printf("Streamed %q to %q through WAL-G without transformation.", entry.SourcePath, entry.TargetPath)
 	return nil
 }

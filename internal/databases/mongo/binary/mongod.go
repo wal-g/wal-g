@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -472,6 +473,9 @@ type ReplyOplogConfig struct {
 
 	Whitelist map[string]map[string]struct{}
 	Blacklist map[string]map[string]struct{}
+
+	FsyncInterval     time.Duration
+	MaxMongodRestarts int
 }
 
 type ShConfig struct {
@@ -511,6 +515,20 @@ func NewReplyOplogConfig(
 	var roConfig ReplyOplogConfig
 	var err error
 	roConfig.HasPitr = true
+	roConfig.FsyncInterval, err = conf.GetDurationSettingDefault(conf.OplogReplayFsyncInterval, 10*time.Minute)
+	if err != nil {
+		return roConfig, err
+	}
+	if roConfig.FsyncInterval <= 0 {
+		return roConfig, fmt.Errorf("%s must be positive", conf.OplogReplayFsyncInterval)
+	}
+	roConfig.MaxMongodRestarts = 5
+	if value, ok := conf.GetSetting(conf.OplogReplayMaxMongodRestarts); ok {
+		roConfig.MaxMongodRestarts, err = strconv.Atoi(value)
+		if err != nil || roConfig.MaxMongodRestarts < 0 {
+			return roConfig, fmt.Errorf("%s must be a non-negative integer", conf.OplogReplayMaxMongodRestarts)
+		}
+	}
 
 	// resolve archiving settings
 	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())

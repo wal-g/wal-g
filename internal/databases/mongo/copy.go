@@ -96,11 +96,11 @@ func addMongoHistory(plan *copyutil.Plan, since models.Timestamp) error {
 }
 
 func HandleCopy(ctx context.Context, fromConfigFile, toConfigFile, backupName string, withHistory bool) {
-	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
+	from, fromConfig, err := internal.StorageAndConfigFromFile(ctx, fromConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	to, err := internal.StorageFromConfig(ctx, toConfigFile)
+	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copyutil.ExecuteRaw(ctx, plan))
+	tracelog.ErrorLogger.FatalOnError(copyutil.Execute(ctx, plan, copyutil.OptionsFromConfigs(fromConfig, toConfig)))
 }
