@@ -20,6 +20,10 @@ cleanup() {
     cleanup_status=$?
     trap - EXIT INT TERM
 
+    if [ "$cleanup_status" -ne 0 ]; then
+        mysql_show_replica_status >&2 || true
+    fi
+
     mysql_stop_replica >/dev/null 2>&1 || true
     if [ -n "$walg_pid" ]; then
         kill "$walg_pid" >/dev/null 2>&1 || true
@@ -31,7 +35,6 @@ cleanup() {
     fi
 
     if [ "$cleanup_status" -ne 0 ]; then
-        mysql_show_replica_status >&2 || true
         test ! -f /var/lib/mysql/error.log || cat /var/lib/mysql/error.log >&2
         test ! -f /tmp/mysql97-binlog-server.log || cat /tmp/mysql97-binlog-server.log >&2
     fi
