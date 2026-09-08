@@ -3,6 +3,8 @@ set -e
 
 . /usr/local/export_common.sh
 
+sh /tmp/utils/mysql_helpers_test.sh
+
 prefix=/tmp/tests
 
 while getopts ":p:" o; do

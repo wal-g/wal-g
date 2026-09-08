@@ -42,5 +42,5 @@ mysql_kill_and_clean_data
 wal-g backup-fetch "custom$NAME" --config=/root/to.yaml
 
 chown -R mysql:mysql "$MYSQLDATA"
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql mysql -e 'show tables' | grep testt1

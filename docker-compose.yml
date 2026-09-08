@@ -665,7 +665,7 @@ services:
       dockerfile: docker/mysql_tests/Dockerfile_v97
       context: .
       args:
-        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-mysql97_tests}"
+        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-binlog_server_tests}"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql97_tests

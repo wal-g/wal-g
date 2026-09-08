@@ -52,14 +52,18 @@ func TestDecideSkipForGTID(t *testing.T) {
 
 	t.Run("GTID already applied is skipped, not recorded", func(t *testing.T) {
 		p := newProcessor()
-		assert.True(t, p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 5)))
+		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 5))
+		require.NoError(t, err)
+		assert.True(t, skip)
 		assert.True(t, p.skipCurrentTxn)
 		assert.True(t, p.sentGTIDs.IsEmpty())
 	})
 
 	t.Run("new GTID is forwarded and recorded", func(t *testing.T) {
 		p := newProcessor()
-		assert.False(t, p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 11)))
+		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 11))
+		require.NoError(t, err)
+		assert.False(t, skip)
 		assert.False(t, p.skipCurrentTxn)
 		assert.Equal(t, sidA.String()+":11", p.sentGTIDs.String())
 	})
@@ -67,7 +71,9 @@ func TestDecideSkipForGTID(t *testing.T) {
 	t.Run("nil requiredGTIDs forwards everything", func(t *testing.T) {
 		p := newProcessor()
 		p.requiredGTIDs = nil
-		assert.False(t, p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 5)))
+		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 5))
+		require.NoError(t, err)
+		assert.False(t, skip)
 		assert.False(t, p.skipCurrentTxn)
 		assert.Equal(t, sidA.String()+":5", p.sentGTIDs.String())
 	})
@@ -75,7 +81,9 @@ func TestDecideSkipForGTID(t *testing.T) {
 	t.Run("skip state is cleared on forwarded GTID", func(t *testing.T) {
 		p := newProcessor()
 		p.skipCurrentTxn = true
-		assert.False(t, p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 11)))
+		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 11))
+		require.NoError(t, err)
+		assert.False(t, skip)
 		assert.False(t, p.skipCurrentTxn)
 	})
 }

@@ -19,9 +19,7 @@ export WALG_STREAM_RESTORE_COMMAND="xbstream -x -C ${MYSQLDATA} --decompress"
 
 mysql_kill_and_clean_data
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-
-service mysql start
+mysql_initialize_and_start
 
 # add compressed tables with 2^20 rows:
 mysql -e "CREATE TABLE sbtest.mytest (id int NOT NULL AUTO_INCREMENT, val varchar(80) DEFAULT NULL, PRIMARY KEY (id)) ENGINE=InnoDB COMPRESSION='zlib'"
@@ -50,13 +48,11 @@ cat <<EOF
 EOF
 mkdir -p wout
 wal-g xb extract stream.xb --data-dir wout/
-find wout -type f | sort -u | xargs cat | md5sum > wout.sum
 
 mkdir -p xout
 cat stream.xb | xbstream -x -C xout
-find wout -type f | sort -u | xargs cat | md5sum > xout.sum
 
-diff -u wout.sum xout.sum
+diff -r wout xout
 
 rm -rf wout xout
 
@@ -68,14 +64,12 @@ EOF
 rm -rf wout
 mkdir -p wout
 wal-g xb extract stream.xb --data-dir wout/ --decompress
-find wout -type f | sort -u | xargs cat | md5sum > wout.sum
 
 rm -rf xout
 mkdir -p xout
 cat stream.xb | xbstream -x -C xout --decompress
-find wout -type f | sort -u | xargs cat | md5sum > xout.sum
 
-diff -u wout.sum xout.sum
+diff -r wout xout
 
 cat <<EOF
 ##########
@@ -124,7 +118,7 @@ EOF
 
 
 #chown -R mysql:mysql $MYSQLDATA
-#service mysql start || (cat /var/log/mysql/error.log && false)
+#mysql_start
 #mysql_set_gtid_purged
 #mysqldump sbtest > /tmp/dump_after_restore
 #diff /tmp/dump_before_backup /tmp/dump_after_restore

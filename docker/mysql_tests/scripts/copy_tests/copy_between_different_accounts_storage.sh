@@ -46,7 +46,7 @@ unset AWS_ACCESS_KEY_ID
 wal-g backup-fetch "$NAME" --config=/root/to.yaml
 
 chown -R mysql:mysql "$MYSQLDATA"
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql mysql -e 'show tables' | grep testt1
 
 wal-g backup-list --config=/root/from.yaml
