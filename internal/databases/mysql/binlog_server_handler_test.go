@@ -23,6 +23,10 @@ type gtidRequestHandler struct {
 
 var _ server.ReplicationHandler = (*gtidRequestHandler)(nil)
 
+func (h *gtidRequestHandler) HandleQuery(query string) (*mysql.Result, error) {
+	return (&Handler{}).HandleQuery(query)
+}
+
 func (h *gtidRequestHandler) HandleRegisterSlave([]byte) error {
 	return nil
 }
@@ -43,6 +47,7 @@ func TestBinlogProtocolHandshakeAndGTIDRequests(t *testing.T) {
 	}{
 		{"untagged (5.7 and 8.0)", uuid1.String() + ":1-5"},
 		{"tagged (8.4 and 9.7)", uuid1.String() + ":review:1-5"},
+		{"large tagged GNO", uuid1.String() + ":review:36028797018963968-36028797018963970"},
 		{"mixed", uuid1.String() + ":1-5:review:1-5"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -62,7 +67,8 @@ func TestBinlogProtocolHandshakeAndGTIDRequests(t *testing.T) {
 			done := make(chan error, 1)
 			go func() {
 				conn, err := srv.NewCustomizedConn(serverSide, auth, handler)
-				if err == nil {
+				// Two checksum queries followed by COM_BINLOG_DUMP_GTID.
+				for i := 0; i < 3 && err == nil; i++ {
 					err = conn.HandleCommand()
 				}
 				done <- err
@@ -74,6 +80,15 @@ func TestBinlogProtocolHandshakeAndGTIDRequests(t *testing.T) {
 			version, err := conn.CompareServerVersion("8.3.0")
 			require.NoError(t, err)
 			require.GreaterOrEqual(t, version, 0, "older advertised versions suppress tagged GTIDs")
+
+			for _, query := range []string{"SELECT @master_binlog_checksum", "SELECT @source_binlog_checksum"} {
+				result, err := conn.Execute(query)
+				require.NoError(t, err)
+				value, err := result.GetString(0, 0)
+				result.Close()
+				require.NoError(t, err)
+				require.Equal(t, "CRC32", value, query)
+			}
 
 			want := requireGTIDSet(t, tc.gtids)
 			encoded := want.Encode()
@@ -106,7 +121,7 @@ func TestHandleQuerySupportsSourceAndReplicaTerminology(t *testing.T) {
 		expectedValue string
 	}{
 		{name: "legacy checksum", query: "SELECT @master_binlog_checksum", expectedValue: "CRC32"},
-		{name: "source checksum", query: "SELECT @source_binlog_checksum", expectedValue: "1"},
+		{name: "source checksum", query: "SELECT @source_binlog_checksum", expectedValue: "CRC32"},
 		{name: "legacy semi-sync", query: "SELECT @@global.rpl_semi_sync_master_enabled", expectedValue: "0"},
 		{name: "source semi-sync", query: "SELECT @@global.rpl_semi_sync_source_enabled", expectedValue: "0"},
 	}
