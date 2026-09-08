@@ -65,8 +65,10 @@ mysql_set_gtid_purged
 
 BINLOG_SERVER_LOG=/tmp/binlog_server_gtid_skip.log
 
-WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" 2>&1 | tee "$BINLOG_SERVER_LOG" &
+WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" > "$BINLOG_SERVER_LOG" 2>&1 &
 walg_pid=$!
+trap 'kill "$walg_pid" 2>/dev/null || true' EXIT
+trap 'exit 1' INT TERM
 
 sleep 3
 mysql_stop_replica
@@ -74,7 +76,15 @@ mysql -e "SET GLOBAL SERVER_ID = 123"
 mysql_change_replication_source "127.0.0.1" 9306 "walg" "walgpwd"
 mysql_start_replica
 
-wait "$walg_pid"
+if wait "$walg_pid"; then
+    trap - EXIT INT TERM
+else
+    walg_status=$?
+    trap - EXIT INT TERM
+    cat "$BINLOG_SERVER_LOG" >&2
+    exit "$walg_status"
+fi
+cat "$BINLOG_SERVER_LOG"
 
 mysqldump sbtest > /tmp/dump_after_pitr_gtid_skip
 

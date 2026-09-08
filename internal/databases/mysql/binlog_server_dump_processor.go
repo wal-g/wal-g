@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
+	"github.com/go-mysql-org/go-mysql/serialization"
 	"github.com/wal-g/tracelog"
 	"golang.org/x/sync/errgroup"
 )
@@ -273,11 +274,7 @@ func decodeTransactionGTID(e *replication.BinlogEvent) (set mysql.GTIDSet, err e
 		body = generic.Data
 	}
 	if e.Header.EventType == replication.GTID_TAGGED_LOG_EVENT {
-		ge := &replication.GtidTaggedLogEvent{}
-		if err := ge.Decode(body); err != nil {
-			return nil, err
-		}
-		return ge.GTIDNext()
+		return decodeTaggedTransactionGTID(body)
 	}
 	if len(body) < 25 {
 		return nil, errors.New("truncated GTID event")
@@ -287,6 +284,38 @@ func decodeTransactionGTID(e *replication.BinlogEvent) (set mysql.GTIDSet, err e
 	if err := ge.Decode(body[:25]); err != nil {
 		return nil, err
 	}
+	return ge.GTIDNext()
+}
+
+func decodeTaggedTransactionGTID(body []byte) (mysql.GTIDSet, error) {
+	if len(body) < 3 {
+		return nil, errors.New("truncated tagged GTID event")
+	}
+	// As for ordinary GTIDs, decode only the transaction identity. The rest
+	// is replication scheduling metadata, forwarded verbatim in RawData.
+	// In particular, go-mysql v1.16.0's full GtidTaggedLogEvent decoder has a
+	// nil field type for the optional commit_group_ticket and panics on it.
+	sid := &serialization.FieldIntFixed{Length: 16}
+	gno := &serialization.FieldIntVar{}
+	tag := &serialization.FieldString{}
+	msg := serialization.Message{Format: serialization.Format{Fields: []serialization.Field{
+		{Name: "gtid_flags", Type: &serialization.FieldIntFixed{Length: 1}},
+		{Name: "uuid", Type: sid},
+		{Name: "gno", Type: gno},
+		{Name: "tag", Type: tag},
+	}}}
+	if err := serialization.Unmarshal(body, &msg); err != nil {
+		return nil, err
+	}
+	for _, field := range msg.Format.Fields {
+		if field.Skipped {
+			return nil, fmt.Errorf("missing tagged GTID field %s", field.Name)
+		}
+	}
+	if gno.Value <= 0 || tag.Value == "" {
+		return nil, errors.New("invalid tagged GTID identity")
+	}
+	ge := replication.GTIDEvent{SID: sid.Value, GNO: gno.Value, Tag: mysql.NewTag(tag.Value)}
 	return ge.GTIDNext()
 }
 

@@ -191,6 +191,15 @@ func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	}
 }
 
+func newBinlogProtocolServer() *server.Server {
+	// MySQL replicas omit tagged GTIDs from COM_BINLOG_DUMP_GTID when the
+	// source advertises an older version. This is our protocol compatibility
+	// version, not the version of the archived binlogs (their FDE is unchanged).
+	// Keep native-password authentication and the legacy collation/capabilities
+	// so 5.7/8.0 replicas can still connect and send untagged GTID sets.
+	return server.NewServer("8.4.0", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)
+}
+
 func HandleBinlogServer(ctx context.Context, since string, until string, untilBinlogLastModified string) {
 	// get necessary settings
 	st, err := internal.ConfigureStorage(ctx)
@@ -221,7 +230,7 @@ func HandleBinlogServer(ctx context.Context, since string, until string, untilBi
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
-	srv := server.NewServer("5.7.42", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)
+	srv := newBinlogProtocolServer()
 	// This loop continues accepting connections until the process exits.
 	// It will be terminated by os.Exit() call in waitForReplica.
 	for {
