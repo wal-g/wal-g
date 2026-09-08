@@ -3,8 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 mysql mysql -e 'create table testt1(i int)'
 
 cat > /root/from.yaml <<EOH

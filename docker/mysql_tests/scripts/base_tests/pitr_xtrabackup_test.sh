@@ -5,8 +5,7 @@ set -e -x
 
 export WALE_S3_PREFIX=s3://mysqlpitrxtrabackupbucket
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 # first full backup
 wal-g backup-push

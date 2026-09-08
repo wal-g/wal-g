@@ -115,6 +115,20 @@ mysql_reset_binary_logs_and_gtids() {
     fi
 }
 
+mysql_initialize_and_start() {
+    case "$(mysqld --version)" in
+        *" Ver 5.7."*)
+            mysqld --initialize --init-file=/etc/mysql/init.sql
+            service mysql start
+            ;;
+        *)
+            mysqld --initialize-insecure --user=mysql
+            service mysql start
+            mysql --no-defaults --user=root < /etc/mysql/init.sql
+            ;;
+    esac
+}
+
 mysql_kill_and_clean_data() {
     service mysql stop || true
     kill -9 "$(pidof mysqld)" || true

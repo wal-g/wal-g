@@ -25,8 +25,7 @@ PLANNED_DISCONNECTS=3
 SCRIPT_DIR="$(dirname "$0")"
 PROXY_SCRIPT="$SCRIPT_DIR/../utils/binlog_proxy.py"
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 mysql -e "SELECT UNIX_TIMESTAMP();"
 mysql -e "SELECT @@GLOBAL.SERVER_UUID;"

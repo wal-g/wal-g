@@ -564,6 +564,13 @@ services:
     image: wal-g/mysql8
     container_name: wal-g_mysql8
 
+  mysql84:
+    build:
+      dockerfile: docker/mysql/Dockerfile_v84
+      context: .
+    image: wal-g/mysql84
+    container_name: wal-g_mysql84
+
   mysql97:
     build:
       dockerfile: docker/mysql/Dockerfile_v97
@@ -632,17 +639,47 @@ services:
       - docker/common/common_walg.env
     <<: *s3_common_depends
 
+  mysql84_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_v84
+      context: .
+      args:
+        TEST_ARG: "-p /tmp/${MYSQL84_TEST_DIR:-base_tests}"
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql84_tests
+    container_name: wal-g_mysql84_tests
+    env_file:
+      - docker/common/common_walg.env
+    depends_on:
+      s3:
+        condition: service_healthy
+      s3-another:
+        condition: service_healthy
+    links:
+      - s3
+      - s3-another
+
   mysql97_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile_v97
       context: .
+      args:
+        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-mysql97_tests}"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql97_tests
     container_name: wal-g_mysql97_tests
     env_file:
       - docker/common/common_walg.env
-    <<: *s3_common_depends
+    depends_on:
+      s3:
+        condition: service_healthy
+      s3-another:
+        condition: service_healthy
+    links:
+      - s3
+      - s3-another
 
   mariadb:
     build:

@@ -8,9 +8,7 @@ export WALE_S3_PREFIX=s3://mysqlfullxtrabackupwithrangesbucket
 export WALG_S3_RANGE_BATCH_ENABLED=true
 
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-
-service mysql start
+mysql_initialize_and_start
 
 sysbench --table-size=10 prepare
 

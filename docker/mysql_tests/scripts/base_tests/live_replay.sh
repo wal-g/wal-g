@@ -7,8 +7,7 @@ export WALE_S3_PREFIX=s3://mysqllivereplay
 export WALG_MYSQL_BINLOG_REPLAY_COMMAND='echo "Ok" >> "$WALG_MYSQL_CURRENT_BINLOG.ok" ; while [ ! -f "$WALG_MYSQL_CURRENT_BINLOG.in" ]; do sleep 1; done'
 export WALG_MYSQL_BINLOG_DST="/tmp"
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 wal-g backup-push
 sleep 1
 

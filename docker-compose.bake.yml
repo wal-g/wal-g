@@ -86,3 +86,25 @@ services:
         - type=gha,scope=walg-ubuntu-2204
       cache_to:
         - type=gha,mode=max,scope=walg-pg${PG_MAJOR}-tests
+
+  mysql84:
+    build:
+      additional_contexts:
+        wal-g/ubuntu:22.04: service:ubuntu_22_04
+
+  mysql84_tests:
+    build:
+      additional_contexts:
+        wal-g/golang: service:golang
+        wal-g/mysql84: service:mysql84
+
+  mysql97:
+    build:
+      additional_contexts:
+        wal-g/ubuntu:22.04: service:ubuntu_22_04
+
+  mysql97_tests:
+    build:
+      additional_contexts:
+        wal-g/golang: service:golang
+        wal-g/mysql97: service:mysql97

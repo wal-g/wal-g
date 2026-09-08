@@ -10,8 +10,7 @@ export WALE_S3_PREFIX=s3://mysqlmarkbucket
 
 
 # initialize mysql
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 sysbench --table-size=10 prepare
 mysql -e "FLUSH LOGS"
 

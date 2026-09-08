@@ -15,13 +15,13 @@ COPY Makefile Makefile
 # enabled on x86_64 consistently with the existing MySQL 8 image.
 RUN make $( [ "$(uname -m)" = "x86_64" ] && echo ENABLE_RACE_DETECTION=1 ) mysql_build
 
-FROM wal-g/mysql97:latest
+FROM wal-g/mysql84:latest
 
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin/wal-g
 
 COPY docker/mysql_tests/scripts/ /tmp
 
-ARG TEST_ARG="-p /tmp/mysql97_tests"
+ARG TEST_ARG="-p /tmp/base_tests"
 ENV TEST_ARG=${TEST_ARG}
 
 CMD /tmp/run_integration_tests.sh ${TEST_ARG}

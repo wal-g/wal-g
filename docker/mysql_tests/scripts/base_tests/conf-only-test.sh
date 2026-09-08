@@ -27,8 +27,7 @@ WALG_STREAM_CREATE_COMMAND: "xtrabackup --backup \
     --datadir=${MYSQLDATA}"
 EOH
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 mysql mysql -e 'create table testt1(i int)'
 
 export NAME

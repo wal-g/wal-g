@@ -12,8 +12,7 @@ export WALG_MYSQL_BINLOG_SERVER_PASSWORD="walgpwd"
 export WALG_MYSQL_BINLOG_SERVER_ID=99
 export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest@tcp(127.0.0.1:3306)/sbtest"
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 # binlog.000002
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
