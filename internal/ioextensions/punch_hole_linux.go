@@ -9,6 +9,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// FileBlockSize returns the filesystem block size used for hole punching.
+func FileBlockSize(f *os.File) (int64, error) {
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(f.Fd()), &stat); err != nil {
+		return 0, err
+	}
+	return int64(stat.Blksize), nil
+}
+
 func PunchHole(f *os.File, offset int64, size int64) error {
 	return syscall.Fallocate(
 		int(f.Fd()),

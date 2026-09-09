@@ -29,14 +29,15 @@ var getStreamCmd = &cobra.Command{
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
 		backupName := args[0]
-		outStream := os.Stdout
+		outStream := &utility.CloseOnce{WriteCloser: os.Stdout}
 
 		if len(args) == 2 {
 			dstPath := args[1]
 			file, err := os.Create(dstPath)
 			tracelog.ErrorLogger.FatalOnError(err)
-			defer utility.LoggedClose(file, "got an error during stream-file close()")
-			outStream = file
+			outStream = &utility.CloseOnce{WriteCloser: file}
+			// Stream fetchers also close the writer after downloading it.
+			defer utility.LoggedClose(outStream, "got an error during stream-file close()")
 		}
 
 		if targetStorage == "all" {
