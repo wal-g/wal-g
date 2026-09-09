@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 # Retry apt downloads; this debian base has none of the wal-g apt settings.
 RUN printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80-retries

@@ -1,5 +1,5 @@
 # vim:set ft=dockerfile:
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 # Go toolchain version, passed by the build process derived from go.mod (see tests_func/helpers/docker.go).
 ARG GO_VERSION
