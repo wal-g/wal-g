@@ -641,6 +641,8 @@ services:
     container_name: wal-g_mysql8_tests
     env_file:
       - docker/common/common_walg.env
+    environment:
+      WALG_COMPRESSION_METHOD: lz4
     <<: *s3_common_depends
 
   mysql84_tests:
@@ -656,6 +658,8 @@ services:
     container_name: wal-g_mysql84_tests
     env_file:
       - docker/common/common_walg.env
+    environment:
+      WALG_COMPRESSION_METHOD: lz4
     depends_on:
       s3:
         condition: service_healthy
@@ -678,6 +682,8 @@ services:
     container_name: wal-g_mysql97_tests
     env_file:
       - docker/common/common_walg.env
+    environment:
+      WALG_COMPRESSION_METHOD: lz4
     depends_on:
       s3:
         condition: service_healthy
