@@ -43,7 +43,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 				UploadedSharedSize: 30,
 			})
 
-		retained, err := ao.ReassignSharedStorage(t.Context(), folder, true)
+		retained, err := ao.ReassignSharedStorage(t.Context(), folder, []string{thirdSegBackup}, true)
 		require.NoError(t, err)
 		assert.Equal(t, map[string]struct{}{"x_aoseg": {}, "y_aoseg": {}, "z_aoseg": {}}, retained)
 
@@ -51,7 +51,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 		assert.Equal(t, int64(50), meta.UploadedSharedSize)
 
 		// Repeating cleanup must replace the value with the same exact total, not add it again.
-		_, err = ao.ReassignSharedStorage(t.Context(), folder, true)
+		_, err = ao.ReassignSharedStorage(t.Context(), folder, []string{thirdSegBackup}, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(50), fetchAOMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
 	})
@@ -66,7 +66,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 				},
 			})
 
-		_, err := ao.ReassignSharedStorage(t.Context(), folder, true)
+		_, err := ao.ReassignSharedStorage(t.Context(), folder, []string{thirdSegBackup}, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(30), fetchAOMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
 	})
@@ -79,7 +79,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 				UploadedSharedSize: 777,
 			})
 
-		_, err := ao.ReassignSharedStorage(t.Context(), folder, false)
+		_, err := ao.ReassignSharedStorage(t.Context(), folder, []string{firstSegBackup}, false)
 		require.NoError(t, err)
 		assert.Equal(t, int64(777), fetchAOMetadata(t, folder, firstSegBackup).UploadedSharedSize)
 	})
@@ -103,7 +103,8 @@ func TestReassignPaxSharedStorage(t *testing.T) {
 				},
 			})
 
-		_, err := pax.ReassignSharedStorage(t.Context(), folder, true)
+		_, err := pax.ReassignSharedStorage(t.Context(), folder,
+			[]string{firstSegBackup, thirdSegBackup}, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(10), fetchPaxMetadata(t, folder, firstSegBackup).UploadedSharedSize)
 		assert.Equal(t, int64(20), fetchPaxMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
@@ -123,9 +124,42 @@ func TestReassignPaxSharedStorage(t *testing.T) {
 				UploadedSharedSize: 777,
 			})
 
-		_, err := pax.ReassignSharedStorage(t.Context(), folder, true)
+		_, err := pax.ReassignSharedStorage(t.Context(), folder, []string{thirdSegBackup}, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(777), fetchPaxMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
+	})
+}
+
+func TestBackupsWithChangedPredecessor(t *testing.T) {
+	backupTimes := func(names ...string) []internal.BackupTime {
+		backups := make([]internal.BackupTime, 0, len(names))
+		for _, name := range names {
+			backups = append(backups, internal.BackupTime{BackupName: name})
+		}
+		return backups
+	}
+
+	t.Run("one survivor per deleted block is affected", func(t *testing.T) {
+		before := backupTimes("a", "b", "c", "d", "e")
+		after := backupTimes("a", "c", "e")
+		assert.Equal(t, []string{"c", "e"}, backupsWithChangedPredecessor(before, after))
+	})
+
+	t.Run("the oldest survivor is affected after deleting a prefix", func(t *testing.T) {
+		before := backupTimes("a", "b", "c", "d")
+		after := backupTimes("c", "d")
+		assert.Equal(t, []string{"c"}, backupsWithChangedPredecessor(before, after))
+	})
+
+	t.Run("no survivor is affected after deleting a suffix", func(t *testing.T) {
+		before := backupTimes("a", "b", "c", "d")
+		after := backupTimes("a", "b")
+		assert.Empty(t, backupsWithChangedPredecessor(before, after))
+	})
+
+	t.Run("nothing is affected when no backup was deleted", func(t *testing.T) {
+		backups := backupTimes("a", "b", "c")
+		assert.Empty(t, backupsWithChangedPredecessor(backups, backups))
 	})
 }
 

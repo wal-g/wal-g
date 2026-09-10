@@ -113,14 +113,19 @@ func TestRecalculateSharedSizes(t *testing.T) {
 	putSegmentFilesMetadata(t, root, -1, secondSegments[-1], 30, 25)
 	putSegmentFilesMetadata(t, root, 0, secondSegments[0], 40, 35)
 
-	require.NoError(t, greenplum.RecalculateSharedSizes(t.Context(), root))
+	putDTO(t, root, utility.BaseBackupPath+ao.GetFilesMetadataPath(firstBackup),
+		greenplum.SharedSizeDTO{SharedSize: 777})
+	putDTO(t, root, utility.BaseBackupPath+pax.GetFilesMetadataPath(firstBackup),
+		greenplum.SharedSizeDTO{SharedSize: 888})
+
+	require.NoError(t, greenplum.RecalculateSharedSizes(t.Context(), root, []string{secondBackup}))
 
 	firstAOSize, err := greenplum.FetchAOSharedSize(t.Context(), root, firstBackup)
 	require.NoError(t, err)
-	assert.Equal(t, int64(30), firstAOSize)
+	assert.Equal(t, int64(777), firstAOSize, "an unaffected backup must not be recalculated")
 	firstPaxSize, err := greenplum.FetchPaxSharedSize(t.Context(), root, firstBackup)
 	require.NoError(t, err)
-	assert.Equal(t, int64(20), firstPaxSize)
+	assert.Equal(t, int64(888), firstPaxSize, "an unaffected backup must not be recalculated")
 
 	secondAOSize, err := greenplum.FetchAOSharedSize(t.Context(), root, secondBackup)
 	require.NoError(t, err)

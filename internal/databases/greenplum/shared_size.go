@@ -83,21 +83,13 @@ func UploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNam
 	return nil
 }
 
-// RecalculateSharedSizes refreshes the cluster-level AO/AOCS and PAX sizes of every surviving
-// backup. Segment cleanup has already reassigned shared objects between the segment backups; this
-// folds the new segment-level ownership into the corresponding cluster backups.
-func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder) error {
-	baseBackupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
-	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
-	if err != nil {
-		return err
-	}
-
-	backupTimes := internal.GetBackupTimeSlices(backupObjects)
-	internal.SortBackupTimeSlices(backupTimes)
-	for _, backupTime := range backupTimes {
-		if err := UploadSharedSizes(ctx, rootFolder, backupTime.BackupName); err != nil {
-			return fmt.Errorf("failed to recalculate backup %s shared sizes: %w", backupTime.BackupName, err)
+// RecalculateSharedSizes refreshes the cluster-level AO/AOCS and PAX sizes of backups whose
+// preceding survivor changed. Segment cleanup has already reassigned shared objects between the
+// corresponding segment backups.
+func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNames []string) error {
+	for _, backupName := range backupNames {
+		if err := UploadSharedSizes(ctx, rootFolder, backupName); err != nil {
+			return fmt.Errorf("failed to recalculate backup %s shared sizes: %w", backupName, err)
 		}
 	}
 

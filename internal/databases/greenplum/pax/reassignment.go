@@ -13,7 +13,7 @@ import (
 // for its size. A following backup owns objects absent from the immediately preceding surviving
 // backup. It returns all storage objects that remain referenced for the cleanup pass.
 func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder,
-	confirmed bool) (map[string]struct{}, error) {
+	backupsToReassign []string, confirmed bool) (map[string]struct{}, error) {
 	// Stage 1: get all surviving backups in chronological order.
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {
@@ -24,6 +24,10 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 	internal.SortBackupTimeSlices(backupTimes)
 
 	retained := make(map[string]struct{})
+	shouldReassign := make(map[string]struct{}, len(backupsToReassign))
+	for _, backupName := range backupsToReassign {
+		shouldReassign[backupName] = struct{}{}
+	}
 	var previousReferences map[string]struct{}
 	previousMetadataAvailable := false
 
@@ -48,7 +52,8 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 		}
 
 		// Stage 3: collect the current backup references, compare them with the preceding surviving
-		// backup, assign newly referenced objects to the current backup, and upload the new size when confirmed.
+		// backup, assign newly referenced objects to the current backup, and upload the new size when
+		// confirmed.
 		files := referencedFiles(&meta)
 		currentReferences := make(map[string]struct{}, len(files))
 		for storagePath := range files {
@@ -56,7 +61,8 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			retained[storagePath] = struct{}{}
 		}
 
-		canCalculate := backupIndex == 0 || previousMetadataAvailable
+		_, isAffected := shouldReassign[backup.Name]
+		canCalculate := isAffected && (backupIndex == 0 || previousMetadataAvailable)
 		if canCalculate {
 			ownedSize := int64(0)
 			for storagePath, size := range files {
@@ -80,7 +86,7 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 					}
 				}
 			}
-		} else {
+		} else if isAffected {
 			tracelog.WarningLogger.Printf("Can not recalculate backup %s shared PAX size: "+
 				"the preceding backup files metadata is unavailable", backup.Name)
 		}
