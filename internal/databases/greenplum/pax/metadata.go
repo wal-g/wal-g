@@ -34,7 +34,7 @@ type BackupFiles map[string]BackupFileDesc
 // FilesMetadataDTO is the shape persisted to `pax_files_metadata.json`.
 type FilesMetadataDTO struct {
 	Files BackupFiles
-	// UploadedSharedSize is the initial volume this backup uploaded to the shared paxfiles/ storage:
+	// UploadedSharedSize is the INITIAL volume this backup uploaded to the shared paxfiles/ storage:
 	// Files smaller than WALG_GP_PAXFILE_SIZE_THRESHOLD go into the regular tar balls and are not
 	// part of it.
 	//
@@ -45,11 +45,6 @@ type FilesMetadataDTO struct {
 
 func NewFilesMetadataDTO() *FilesMetadataDTO {
 	return &FilesMetadataDTO{Files: make(BackupFiles)}
-}
-
-// SetUploadedSharedSize records the PAX bytes initially uploaded by this backup.
-func (m *FilesMetadataDTO) SetUploadedSharedSize(size int64) {
-	m.UploadedSharedSize = size
 }
 
 func (m *FilesMetadataDTO) AddFile(localPath string, storagePath string, size int64, mTime time.Time,

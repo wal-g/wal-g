@@ -27,7 +27,7 @@ type BackupFileDesc struct {
 
 type FilesMetadataDTO struct {
 	Files BackupFiles
-	// UploadedSharedSize is the initial volume this backup uploaded to the shared aosegments/ storage:
+	// UploadedSharedSize is the INITIAL volume this backup uploaded to the shared aosegments/ storage:
 	// Files smaller than WALG_GP_AOSEG_SIZE_THRESHOLD go into the regular tar balls and are not
 	// part of it.
 	//
@@ -40,11 +40,6 @@ type BackupFiles map[string]*BackupFileDesc
 
 func NewFilesMetadataDTO() *FilesMetadataDTO {
 	return &FilesMetadataDTO{Files: make(BackupFiles)}
-}
-
-// SetUploadedSharedSize records the AO/AOCS bytes initially uploaded by this backup.
-func (m *FilesMetadataDTO) SetUploadedSharedSize(size int64) {
-	m.UploadedSharedSize = size
 }
 
 func (m *FilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplTS time.Time, aoMeta RelFileMetadata,
