@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"net"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBinlogProtocolHandshakeAndChecksum(t *testing.T) {
+func TestBinlogProtocolHandshakeAndInitialization(t *testing.T) {
 	srv := newBinlogProtocolServer()
 	legacy := server.NewServer("5.7.42", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)
 	require.Equal(t, legacy.Capability(), srv.Capability())
@@ -28,7 +29,7 @@ func TestBinlogProtocolHandshakeAndChecksum(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		conn, err := srv.NewCustomizedConn(serverSide, auth, &Handler{})
-		for i := 0; i < 2 && err == nil; i++ {
+		for i := 0; i < 3 && err == nil; i++ {
 			err = conn.HandleCommand()
 		}
 		done <- err
@@ -48,6 +49,18 @@ func TestBinlogProtocolHandshakeAndChecksum(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "CRC32", value, query)
 	}
+	// The replica uses the source clock to calculate Seconds_Behind_Source.
+	before := time.Now().Unix()
+	result, err := conn.Execute("SELECT UNIX_TIMESTAMP()")
+	require.NoError(t, err)
+	require.NotNil(t, result.Resultset, "the clock query must return a row, not just an OK packet")
+	value, err := result.GetString(0, 0)
+	result.Close()
+	require.NoError(t, err)
+	timestamp, err := strconv.ParseInt(value, 10, 64)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, timestamp, before)
+	require.LessOrEqual(t, timestamp, time.Now().Unix())
 	require.NoError(t, <-done)
 }
 

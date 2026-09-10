@@ -157,6 +157,13 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	switch strings.ToLower(query) {
+	case "select unix_timestamp()":
+		// Replicas sample the source clock when initializing replication.
+		resultSet, err := mysql.BuildSimpleTextResultset([]string{"UNIX_TIMESTAMP()"}, [][]interface{}{{time.Now().Unix()}})
+		if err != nil {
+			return nil, err
+		}
+		return &mysql.Result{Status: mysql.SERVER_STATUS_AUTOCOMMIT, Resultset: resultSet}, nil
 	case "select @master_binlog_checksum":
 		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"master_binlog_checksum"}, [][]interface{}{{"CRC32"}})
 		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
