@@ -26,7 +26,7 @@ func (tarBall *NOPTarBall) CloseTar() error                                     
 func (tarBall *NOPTarBall) Size() int64            { return tarBall.partSize.Load() }
 func (tarBall *NOPTarBall) AddSize(i int64)        { tarBall.partSize.Add(i) }
 func (tarBall *NOPTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-func (tarBall *NOPTarBall) AwaitUploads()          {}
+func (tarBall *NOPTarBall) AwaitUploads() error    { return nil }
 
 // NOPTarBallMaker creates a new NOPTarBall. Used
 // for testing purposes.

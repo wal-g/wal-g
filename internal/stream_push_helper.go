@@ -104,7 +104,7 @@ func (uploader *RegularUploader) PushStreamToDestination(ctx context.Context, st
 	if uploader.dataSize != nil {
 		stream = utility.NewWithSizeReader(stream, uploader.dataSize)
 	}
-	compressed := CompressAndEncrypt(stream, uploader.Compressor, ConfigureCrypter())
+	compressed := CompressAndEncrypt(ctx, stream, uploader.Compressor, ConfigureCrypter())
 	err := uploader.Upload(ctx, dstPath, compressed)
 	tracelog.InfoLogger.Println("FILE PATH:", dstPath)
 

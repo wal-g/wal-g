@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 recovery_conf() {
   echo "recovery_target_action=promote"
   echo "restore_command='wal-g --config=${TMP_CONFIG} wal-fetch %f %p'"
@@ -16,7 +18,6 @@ remote_backup_and_restore_test() {
 
   echo Initializing source
   initdb
-  PGVERSION=$(cat "${PGDATA}/PG_VERSION")
   echo "local replication postgres trust" >> "$PGDATA/pg_hba.conf"
   echo "archive_command = 'wal-g --config=${TMP_CONFIG} wal-push %p'
   archive_mode = on
@@ -34,17 +35,13 @@ remote_backup_and_restore_test() {
   pgbench -i -s 10 -h 127.0.0.1 -p 5432 postgres
 
   echo "Dumping source"
-  pg_dump > "${TMPDIR}/srcdump.sql"
+  dump_db "${TMPDIR}/srcdump.sql"
 
   echo Backup source
   wal-g --config=${TMP_CONFIG} backup-push
 
   echo transporting last wal files
-  if awk 'BEGIN {exit !('"$PGVERSION"' >= 10)}'; then
-    echo 'select pg_switch_wal();' | psql
-  else
-    echo 'select pg_switch_xlog();' | psql
-  fi
+  switch_wal
 
   echo PGLog
   cat $PGDATA/log/*
@@ -61,19 +58,14 @@ remote_backup_and_restore_test() {
   BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | sed -n '2{s/ .*//;p}')
   wal-g --config=${TMP_CONFIG} backup-fetch "$PGDATA" "$BACKUP"
   chmod 0700 "$PGDATA"
-  if awk 'BEGIN {exit !('"$PGVERSION"' >= 12)}'; then
-    touch "$PGDATA/recovery.signal"
-    recovery_conf >> "$PGDATA/postgresql.conf"
-  else
-    recovery_conf > "$PGDATA/recovery.conf"
-  fi
+  setup_recovery_settings recovery_conf
 
   echo Starting destination
   pg_ctl start || { cat $PGDATA/log/* ; exit 1 ; }
   /tmp/scripts/wait_while_pg_not_ready.sh
 
   echo "Dumping destination"
-  pg_dump > "${TMPDIR}/dstdump.sql"
+  dump_db "${TMPDIR}/dstdump.sql"
 
   echo PGLog
   cat $PGDATA/log/*
@@ -82,9 +74,7 @@ remote_backup_and_restore_test() {
   pg_ctl stop
 
   echo Comparing source and destination
-  # PG18 pg_dump emits \restrict/\unrestrict with per-invocation random keys
-  sed -i '/^\\restrict /d; /^\\unrestrict /d' "${TMPDIR}"/srcdump.sql "${TMPDIR}"/dstdump.sql
-  if diff "${TMPDIR}"/*dump.sql; then
+  if compare_dumps "${TMPDIR}/srcdump.sql" "${TMPDIR}/dstdump.sql"; then
     /tmp/scripts/drop_pg.sh
     rm ${TMP_CONFIG}
     rm -rf ${PGTBS}

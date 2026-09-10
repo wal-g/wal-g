@@ -37,7 +37,9 @@ func (p *FilesPinner) Pin(paths []string) ([]string, error) {
 // PinTree recursively mirrors sourceDir below PinFolder, preserving relative paths.
 // Transient module artifacts are intentionally excluded.
 func (p *FilesPinner) PinTree(sourceDir string) ([]string, error) {
+	tracelog.DebugLogger.Printf("pinning tree: source=%q destination=%q", sourceDir, p.pinFolder)
 	if err := ValidateSameFilesystem(sourceDir, p.pinFolder); err != nil {
+		tracelog.ErrorLogger.Printf("pin validation failed: source=%q destination=%q: %+v", sourceDir, p.pinFolder, err)
 		return nil, err
 	}
 	if err := filepath.WalkDir(sourceDir, func(sourcePath string, entry fs.DirEntry, walkErr error) error {
@@ -56,9 +58,13 @@ func (p *FilesPinner) PinTree(sourceDir string) ([]string, error) {
 		}
 		return p.pinFile(sourcePath, filepath.Join(p.pinFolder, relativePath))
 	}); err != nil {
+		tracelog.ErrorLogger.Printf("tree pinning failed: source=%q destination=%q pinned_files=%d: %+v",
+			sourceDir, p.pinFolder, len(p.pinnedPaths), err)
 		p.Unpin()
 		return nil, err
 	}
+	tracelog.DebugLogger.Printf("tree pinned: source=%q destination=%q pinned_files=%d",
+		sourceDir, p.pinFolder, len(p.pinnedPaths))
 	return p.pinnedPaths, nil
 }
 
@@ -68,7 +74,9 @@ func (p *FilesPinner) pinFile(sourcePath, pinnedPath string) error {
 	}
 	if sourcePath != pinnedPath {
 		if err := os.Link(sourcePath, pinnedPath); err != nil {
-			return fmt.Errorf("pin file %s: %w", sourcePath, err)
+			diagnostics := pinAttemptDiagnostics(sourcePath, pinnedPath)
+			tracelog.ErrorLogger.Printf("hard-link failed: %s: %+v", diagnostics, err)
+			return fmt.Errorf("pin file %s: %w (%s)", sourcePath, err, diagnostics)
 		}
 	}
 	file, err := os.Open(pinnedPath)

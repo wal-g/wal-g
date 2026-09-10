@@ -2,6 +2,7 @@ package awskms
 
 import (
 	"bufio"
+	"context"
 	"io"
 
 	"github.com/minio/sio"
@@ -20,12 +21,12 @@ func (crypter *Crypter) Name() string {
 }
 
 // Encrypt creates encryption writer from ordinary writer
-func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
+func (crypter *Crypter) Encrypt(ctx context.Context, writer io.Writer) (io.WriteCloser, error) {
 	if len(crypter.SymmetricKey.GetKey()) == 0 {
 		err := crypter.SymmetricKey.Generate()
 		tracelog.ErrorLogger.FatalfOnError("Can't generate symmetric key: %v", err)
 
-		err = crypter.SymmetricKey.Encrypt()
+		err = crypter.SymmetricKey.Encrypt(ctx)
 		tracelog.ErrorLogger.FatalfOnError("Can't encrypt symmetric key: %v", err)
 	}
 
@@ -48,7 +49,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 }
 
 // Decrypt creates decrypted reader from ordinary reader
-func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
+func (crypter *Crypter) Decrypt(ctx context.Context, reader io.Reader) (io.Reader, error) {
 	encryptedSymmetricKey := make([]byte, crypter.SymmetricKey.GetEncryptedKeyLen())
 	_, err := reader.Read(encryptedSymmetricKey)
 	tracelog.ErrorLogger.FatalfOnError("Can't read encryption key from archive file header: %v", err)
@@ -56,7 +57,7 @@ func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
 	err = crypter.SymmetricKey.SetEncryptedKey(encryptedSymmetricKey)
 	tracelog.ErrorLogger.FatalfOnError("Can't set encrypted key: %v", err)
 
-	err = crypter.SymmetricKey.Decrypt()
+	err = crypter.SymmetricKey.Decrypt(ctx)
 	tracelog.ErrorLogger.FatalfOnError("Can't decrypt symmetric key: %v", err)
 
 	return sio.DecryptReader(reader, sio.Config{Key: crypter.SymmetricKey.GetKey()})

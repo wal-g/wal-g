@@ -24,6 +24,18 @@ type LogsCache struct {
 	LastArchivedBinlog string `json:"LastArchivedBinlog"`
 }
 
+// binlogGtidFilter decides, based on a database's GTID state, whether a binlog
+// needs to be uploaded again and which GTID set has been archived so far.
+// Implementations exist per MySQL flavor (mysqlGtidFilter, mariadbGtidFilter).
+type binlogGtidFilter interface {
+	// isValid returns true if the filter is properly configured for the current flavor.
+	isValid() bool
+	// shouldUpload determines if a binlog should be uploaded based on GTID checkpoint comparison.
+	shouldUpload(binlog, nextBinlog string) bool
+	// getArchivedGTIDString returns the string representation of the archived GTID checkpoint for the current flavor.
+	getArchivedGTIDString() string
+}
+
 //gocyclo:ignore
 //nolint:funlen
 func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinlog string, checkGTIDs bool) {
@@ -60,21 +72,58 @@ func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinl
 		}
 	}
 
-	var filter gtidFilter
+	var filter binlogGtidFilter
 	if checkGTIDs {
 		flavor, err := getMySQLFlavor(conn)
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		switch flavor {
 		case mysql.MySQLFlavor:
-			gtid, _ := mysql.ParseMysqlGTIDSet(binlogSentinelDto.GTIDArchived)
-			gtidArchived, _ := gtid.(*mysql.MysqlGTIDSet)
-			filter = gtidFilter{
-				BinlogsFolder: binlogsFolder,
-				Flavor:        flavor,
+			var gtidArchived *mysql.MysqlGTIDSet
+			gtid, err := mysql.ParseMysqlGTIDSet(binlogSentinelDto.GTIDArchived)
+			if err != nil {
+				tracelog.WarningLogger.Printf(
+					"Failed to parse MySQL GTID set '%s': %v. Uploading all binlogs and rebuilding the archived GTID checkpoint from scratch.",
+					binlogSentinelDto.GTIDArchived, err)
+			} else {
+				var ok bool
+				gtidArchived, ok = gtid.(*mysql.MysqlGTIDSet)
+				if !ok {
+					tracelog.WarningLogger.Printf(
+						"Failed to convert GTID to MysqlGTIDSet type. Uploading all binlogs and rebuilding the archived GTID checkpoint from scratch.")
+					gtidArchived = nil
+				}
+			}
+			filter = &mysqlGtidFilter{
+				binlogsFolder: binlogsFolder,
+				flavor:        flavor,
 				gtidArchived:  gtidArchived,
 				lastGtidSeen:  nil,
 			}
+		case mysql.MariaDBFlavor:
+			var mariadbGTID *mysql.MariadbGTIDSet
+			if binlogSentinelDto.GTIDArchived != "" {
+				gtid, err := mysql.ParseMariadbGTIDSet(binlogSentinelDto.GTIDArchived)
+				if err != nil {
+					tracelog.WarningLogger.Printf(
+						"Failed to parse MariaDB GTID set '%s': %v. Uploading all binlogs and rebuilding the archived GTID checkpoint from scratch.",
+						binlogSentinelDto.GTIDArchived, err)
+				} else {
+					var ok bool
+					mariadbGTID, ok = gtid.(*mysql.MariadbGTIDSet)
+					if !ok {
+						tracelog.WarningLogger.Printf(
+							"Failed to convert GTID to MariadbGTIDSet type. Uploading all binlogs and rebuilding the archived GTID checkpoint from scratch.")
+						mariadbGTID = nil
+					}
+				}
+			}
+			filter = &mariadbGtidFilter{
+				binlogsFolder: binlogsFolder,
+				flavor:        flavor,
+				gtidArchived:  mariadbGTID,
+			}
+			tracelog.InfoLogger.Printf("Using MariaDB GTID filter for binlog push")
 		default:
 			tracelog.ErrorLogger.Fatalf("Unsupported flavor type: %s. Disable WALG_MYSQL_CHECK_GTIDS for current database.", flavor)
 		}
@@ -127,7 +176,7 @@ func HandleBinlogPush(ctx context.Context, uploader internal.Uploader, untilBinl
 
 		// Write Binlog Sentinel
 		if checkGTIDs && filter.isValid() {
-			binlogSentinelDto.GTIDArchived = filter.gtidArchived.String()
+			binlogSentinelDto.GTIDArchived = filter.getArchivedGTIDString()
 			tracelog.InfoLogger.Printf("Uploading binlog sentinel: %s", binlogSentinelDto)
 			err := UploadBinlogSentinel(ctx, rootFolder, &binlogSentinelDto)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -238,134 +287,9 @@ func putCache(cache LogsCache) {
 	}
 }
 
-type gtidFilter struct {
-	BinlogsFolder string
-	Flavor        string
-	gtidArchived  *mysql.MysqlGTIDSet
-	lastGtidSeen  *mysql.MysqlGTIDSet
-}
-
-func (u *gtidFilter) isValid() bool {
-	if u.Flavor == "" {
-		return false
-	}
-	if u.Flavor != mysql.MySQLFlavor {
-		// MariaDB GTID Sets consists of: DomainID + ServerID + Sequence Number (64-bit unsigned integer)
-		// It is not clear how it handles gaps in SequenceNumbers, so for safety reasons skip this check
-		return false
-	}
-	return true
-}
-
-func (u *gtidFilter) shouldUpload(binlog, nextBinlog string) bool {
-	if nextBinlog == "" {
-		// it is better to skip this binlog rather than have gap in binlog sentinel GTID-set
-		tracelog.DebugLogger.Printf("Cannot extract PREVIOUS_GTIDS event - no 'next' binlog found. Skip it for now. (gtid check)\n")
-		return false
-	}
-	// nextPreviousGTIDs is 'GTIDs_executed at the end of current binary log file'
-	_nextPreviousGTIDs, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, nextBinlog), u.Flavor)
-	if err != nil {
-		tracelog.InfoLogger.Printf(
-			"Cannot extract PREVIOUS_GTIDS event from current binlog %s, next %s (caused by %v). Upload it. (gtid check)\n",
-			binlog, nextBinlog, err)
-		return true
-	}
-	nextPreviousGTIDs := _nextPreviousGTIDs.(*mysql.MysqlGTIDSet)
-
-	if u.gtidArchived == nil || u.gtidArchived.String() == "" {
-		tracelog.DebugLogger.Printf("Cannot extract set of uploaded binlogs from cache\n")
-		// continue uploading even when we cannot read uploadedGTIDs
-		u.gtidArchived = nextPreviousGTIDs
-		u.lastGtidSeen = nextPreviousGTIDs
-		return true
-	}
-
-	if u.lastGtidSeen == nil {
-		gtidSetBeforeCurrentBinlog, err := GetBinlogPreviousGTIDs(path.Join(u.BinlogsFolder, binlog), u.Flavor)
-		if err != nil {
-			tracelog.InfoLogger.Printf(
-				"Cannot extract PREVIOUS_GTIDS event from current binlog %s, next %s (caused by %v). Upload it. (gtid check)\n",
-				binlog, nextBinlog, err)
-			u.lastGtidSeen = nextPreviousGTIDs
-			return true
-		}
-		tracelog.DebugLogger.Printf("Binlog %s is the first binlog that we seen by GTID-checker in this run. (gtid check)\n", binlog)
-		u.lastGtidSeen = gtidSetBeforeCurrentBinlog.(*mysql.MysqlGTIDSet)
-	}
-
-	currentBinlogGTIDSet := nextPreviousGTIDs.Clone().(*mysql.MysqlGTIDSet)
-	gtidSetMinus(currentBinlogGTIDSet, u.lastGtidSeen)
-
-	// when we know that _next_ binlog's PreviousGTID already uploaded we can safely skip _current_ binlog
-	if u.gtidArchived.Contain(currentBinlogGTIDSet) {
-		tracelog.InfoLogger.Printf("Binlog %v with GTID Set %s already archived (gtid check)\n", binlog, currentBinlogGTIDSet.String())
-		u.lastGtidSeen = nextPreviousGTIDs
-		return false
-	}
-
-	err = u.gtidArchived.Update(currentBinlogGTIDSet.String())
-	if err != nil {
-		tracelog.WarningLogger.Printf("Cannot merge GTIDs: %v (gtid check)\n", err)
-		return true // math is broken. upload binlog
-	}
-	tracelog.InfoLogger.Printf("Should upload binlog %s with GTID set: %s (gtid check)\n", binlog, currentBinlogGTIDSet.String())
-	u.lastGtidSeen = nextPreviousGTIDs
-	return true
-}
-
 func lastOrDefault(data []string, defaultValue string) string {
 	if len(data) > 0 {
 		return data[len(data)-1]
 	}
 	return defaultValue
-}
-
-// gtidSetMinus subtracts sub from s in place (set difference s\sub).
-func gtidSetMinus(s, sub *mysql.MysqlGTIDSet) {
-	for sid, subTags := range *sub {
-		sTags, ok := (*s)[sid]
-		if !ok {
-			continue
-		}
-		for tag, subIntervals := range subTags {
-			intervals, ok := sTags[tag]
-			if !ok {
-				continue
-			}
-			if diff := subtractIntervals(intervals, subIntervals); len(diff) > 0 {
-				sTags[tag] = diff
-			} else {
-				delete(sTags, tag)
-			}
-		}
-		if len(sTags) == 0 {
-			delete(*s, sid)
-		}
-	}
-}
-
-// subtractIntervals returns a\b for half-open [Start, Stop) GTID interval slices
-func subtractIntervals(a, b mysql.IntervalSlice) mysql.IntervalSlice {
-	a = a.Normalize()
-	b = b.Normalize()
-	var result mysql.IntervalSlice
-	for _, cur := range a {
-		for _, sub := range b {
-			if sub.Stop <= cur.Start || sub.Start >= cur.Stop {
-				continue // disjoint
-			}
-			if sub.Start > cur.Start {
-				result = append(result, mysql.Interval{Start: cur.Start, Stop: sub.Start})
-			}
-			cur.Start = sub.Stop
-			if cur.Start >= cur.Stop {
-				break // fully consumed by b
-			}
-		}
-		if cur.Start < cur.Stop {
-			result = append(result, cur)
-		}
-	}
-	return result
 }

@@ -98,6 +98,18 @@ Creates new backup and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to 
 wal-g backup-push
 ```
 
+#### Journal (binlog) size accounting
+
+Run ``backup-push`` with the ``--count-journals`` flag to maintain a ``journal_<backup>`` object per backup in storage, tracking the volume of binlog accumulated between that backup and the next one. The size is computed from the actual storage object sizes of the archived binlog segments, so it correctly reflects compression.
+
+```bash
+wal-g backup-push --count-journals
+```
+
+Journal accounting is skipped for permanent backups (marked with ``--permanent``), since they are not expected to be removed and don't take part in WAL retention planning.
+
+Currently, only ``delete target`` cleans up and re-merges the corresponding journal entry when a backup is removed this way.
+
 ### ``xtrabackup-push``
 
 Creates new backup with `xtrabackup` tool and send it to storage. Runs `WALG_STREAM_CREATE_COMMAND` to create backup.
@@ -206,6 +218,17 @@ User may also specify time in  RFC3339 format until which should be fetched (use
 If `until` timestamp is in the future, wal-g will search for newly uploaded binlogs until no new found.
 Binlogs are temporarily save in `WALG_MYSQL_BINLOG_DST` folder.
 Replay command gets name of binlog to replay via environment variable `WALG_MYSQL_CURRENT_BINLOG` and stop-date via `WALG_MYSQL_BINLOG_END_TS`, which are set for each invocation.
+
+If the backup was taken with `xtrabackup`/`mariabackup`, wal-g reads the exact binlog file, position and GTID that were recorded in the backup at the time it finished, and stores them in the backup sentinel. GTID is recorded whenever the source has it enabled — for MySQL that means `GTID_MODE=ON`, not just MariaDB. Binlogs that are entirely older than that recorded file are not fetched at all (they were already fully captured by the backup). For the one binlog file that straddles the backup boundary, wal-g additionally sets:
+
+* `WALG_MYSQL_BINLOG_START_POSITION` — the numeric byte offset within that binlog file to resume from. Use it with `--start-position="$WALG_MYSQL_BINLOG_START_POSITION"` on either `mariadb-binlog` (MariaDB) or `mysqlbinlog` (MySQL).
+* `WALG_MYSQL_BINLOG_LAST_GTID` — the last GTID applied by the backup, only set when the backup recorded one. Do not pass this to `--start-position` — it expects a numeric offset, not a GTID string. It is intended for a GTID-based exclude filter instead, e.g. `mysqlbinlog --exclude-gtids="$WALG_MYSQL_BINLOG_LAST_GTID"` on MySQL.
+
+Both are only set when applicable (e.g. `WALG_MYSQL_BINLOG_START_POSITION` only for the binlog matching the recorded backup boundary); a replay command should treat their absence as "replay this binlog from its start". Example `WALG_MYSQL_BINLOG_REPLAY_COMMAND` for MySQL, using both:
+
+```bash
+WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" ${WALG_MYSQL_BINLOG_START_POSITION:+--start-position="$WALG_MYSQL_BINLOG_START_POSITION"} ${WALG_MYSQL_BINLOG_LAST_GTID:+--exclude-gtids="$WALG_MYSQL_BINLOG_LAST_GTID"} "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
+```
 
 ```bash
 wal-g binlog-replay --since "backupname"

@@ -3,16 +3,28 @@ networks:
         name: test_net_${TEST_ID}
         external: true
 services:
-    minio01:
-        build: staging/images/minio
-        container_name: minio01.test_net_${TEST_ID}
+    seaweedfs01:
+        image: chrislusf/seaweedfs:4.40@sha256:52194fba4fecd0083c842158b3a902ba6e04a63619b2b0efcd08007bdb6a4602
+        container_name: seaweedfs01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
-        hostname: minio01
-        image: minio:test_net_${TEST_ID}
+        hostname: seaweedfs01
         networks:
-            - test_net
+            test_net:
+                aliases:
+                    - s3
         ports:
             - ${S3_PORT}
+        environment:
+            AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+            AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+            S3_BUCKET: ${S3_BUCKET}
+        command: "mini -s3.port=9000"
+        healthcheck:
+            test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9333/cluster/status && wget -S --spider http://127.0.0.1:9000 2>&1 | grep -q 'HTTP/1.1'"]
+            interval: 2s
+            timeout: 2s
+            retries: 30
+            start_period: 2s
         env_file:
             - ${ENV_FILE}
     mongodb01:
@@ -24,11 +36,10 @@ services:
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
                 - MONGO_REPO=${MONGO_REPO}
         depends_on:
-          - minio01
+            seaweedfs01:
+                condition: service_healthy
         container_name: mongodb01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
-        external_links:
-            - minio01.test_net_${TEST_ID}:minio
         hostname: mongodb01
         image: mongodb:test_net_${TEST_ID}
         networks:
@@ -47,11 +58,10 @@ services:
                 - MONGO_PACKAGE=${MONGO_PACKAGE}
                 - MONGO_REPO=${MONGO_REPO}
         depends_on:
-          - minio01
+            seaweedfs01:
+                condition: service_healthy
         container_name: mongodb02.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
-        external_links:
-            - minio01.test_net_${TEST_ID}:minio
         hostname: mongodb02
         image: mongodb:test_net_${TEST_ID}
         networks:

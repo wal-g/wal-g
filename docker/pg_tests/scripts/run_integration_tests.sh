@@ -13,11 +13,20 @@ for i in tests/*.sh; do
   echo
   echo "===== RUNNING $i ====="
   set -x
-  
-  ./"$i";
+
+  # A test that does not apply to this PostgreSQL version exits with 77, see
+  # pg_compat.sh.
+  set +e
+  ./"$i"
+  status=$?
+  set -e
 
   set +x
-  echo "===== SUCCESS $i ====="
+  case $status in
+    0)  echo "===== SUCCESS $i =====" ;;
+    77) echo "===== SKIPPED $i =====" ;;
+    *)  echo "===== FAILED  $i (exit $status) ====="; exit $status ;;
+  esac
   echo
 
 done

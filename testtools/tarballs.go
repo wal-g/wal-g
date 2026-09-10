@@ -31,7 +31,7 @@ func (tarBall *FileTarBall) Name() string {
 
 // SetUp creates a new LZ4 writer, tar writer and file for
 // writing bundled compressed bytes to.
-func (tarBall *FileTarBall) SetUp(_ context.Context, crypter crypto.Crypter, names ...string) {
+func (tarBall *FileTarBall) SetUp(ctx context.Context, crypter crypto.Crypter, names ...string) {
 	if tarBall.tarWriter == nil {
 		name := filepath.Join(tarBall.out, tarBall.Name())
 		file, err := os.Create(name)
@@ -41,7 +41,7 @@ func (tarBall *FileTarBall) SetUp(_ context.Context, crypter crypto.Crypter, nam
 		var writeCloser io.WriteCloser
 
 		if crypter != nil {
-			writeCloser, err = crypter.Encrypt(file)
+			writeCloser, err = crypter.Encrypt(ctx, file)
 
 			if err != nil {
 				panic(err)
@@ -77,7 +77,7 @@ func (tarBall *FileTarBall) CloseTar() error {
 func (tarBall *FileTarBall) Size() int64            { return tarBall.partSize.Load() }
 func (tarBall *FileTarBall) AddSize(i int64)        { tarBall.partSize.Add(i) }
 func (tarBall *FileTarBall) TarWriter() *tar.Writer { return tarBall.tarWriter }
-func (tarBall *FileTarBall) AwaitUploads()          {}
+func (tarBall *FileTarBall) AwaitUploads() error    { return nil }
 
 // BufferTarBall represents a tarball that is
 // written to buffer.
@@ -112,4 +112,4 @@ func (tarBall *BufferTarBall) TarWriter() *tar.Writer {
 	return tarBall.tarWriter
 }
 
-func (tarBall *BufferTarBall) AwaitUploads() {}
+func (tarBall *BufferTarBall) AwaitUploads() error { return nil }

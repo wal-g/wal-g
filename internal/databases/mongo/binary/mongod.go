@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,10 +15,9 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const adminDB = "admin"
@@ -36,11 +36,11 @@ type MongodService struct {
 func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeout time.Duration) (*MongodService, error) {
 	mongoClient, err := backoff.Retry(ctx,
 		func() (*mongo.Client, error) {
-			client, err := mongo.Connect(ctx,
+			// v2 dropped SocketTimeout, client-wide SetTimeout would bound backup cursor lifetime, rely on ctx instead
+			client, err := mongo.Connect(
 				options.Client().ApplyURI(mongodbURI).
 					SetServerSelectionTimeout(timeout).
 					SetConnectTimeout(timeout).
-					SetSocketTimeout(time.Minute).
 					SetAppName(appName).
 					SetDirect(true).
 					SetRetryReads(false))
@@ -70,13 +70,12 @@ func CreateMongodService(ctx context.Context, appName, mongodbURI string, timeou
 func CreateBackgroundMongodService(ctx context.Context, appName, mongodbURI string) (*MongodService, error) {
 	mongoClient, err := backoff.Retry(ctx,
 		func() (*mongo.Client, error) {
-			client, err := mongo.Connect(ctx,
+			client, err := mongo.Connect(
 				options.Client().ApplyURI(mongodbURI).
 					SetMaxPoolSize(1).
 					SetMinPoolSize(1).
-					SetServerSelectionTimeout(time.Minute*10).
-					SetConnectTimeout(time.Minute*10).
-					SetSocketTimeout(time.Minute*10).
+					SetServerSelectionTimeout(time.Minute * 10).
+					SetConnectTimeout(time.Minute * 10).
 					SetAppName(appName).
 					SetDirect(true).
 					SetRetryReads(false))
@@ -160,10 +159,14 @@ func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err
 		if !backupCursorErrorIsRetried(err) {
 			return nil, err
 		}
-		if i < cursorCreateRetries {
+		if i+1 < cursorCreateRetries {
 			minutes := time.Duration(i + 1)
 			tracelog.WarningLogger.Printf("%+v. Sleep %d minutes and retry", err, minutes)
-			time.Sleep(time.Minute * minutes)
+			select {
+			case <-mongodService.Context.Done():
+				return nil, mongodService.Context.Err()
+			case <-time.After(time.Minute * minutes):
+			}
 		}
 	}
 
@@ -252,7 +255,7 @@ func (mongodService *MongodService) ClearMinvalid() error {
 		return err
 	}
 	_, err = minvalidCol.InsertOne(mongodService.Context, bson.M{
-		"ts": primitive.Timestamp{T: 0, I: 1},
+		"ts": bson.Timestamp{T: 0, I: 1},
 		"t":  -1,
 	})
 	return err
@@ -409,23 +412,23 @@ func (mongodService *MongodService) Shutdown(ctx context.Context) error {
 	err := mongodService.MongoClient.Database(adminDB).RunCommand(ctx,
 		bson.D{{Key: "shutdown", Value: 1}},
 	).Err()
-	if err != nil && !strings.Contains(err.Error(), "socket was unexpectedly closed") {
+	if err != nil && !mongo.IsNetworkError(err) {
 		return errors.Wrap(err, "unable to shutdown mongod")
 	}
 	return nil
 }
 
 type BackupCursorOplogTS struct {
-	TS primitive.Timestamp `bson:"ts"`
-	T  int64               `bson:"t"`
+	TS bson.Timestamp `bson:"ts"`
+	T  int64          `bson:"t"`
 }
 
 type BackupCursorMeta struct {
-	ID                       primitive.Binary    `bson:"backupId"`
+	ID                       bson.Binary         `bson:"backupId"`
 	DBPath                   string              `bson:"dbpath"`
 	OplogStart               BackupCursorOplogTS `bson:"oplogStart"`
 	OplogEnd                 BackupCursorOplogTS `bson:"oplogEnd"`
-	CheckpointTS             primitive.Timestamp `bson:"checkpointTimestamp"`
+	CheckpointTS             bson.Timestamp      `bson:"checkpointTimestamp"`
 	DisableIncrementalBackup bool                `bson:"disableIncrementalBackup"`
 	IncrementalBackup        bool                `bson:"incrementalBackup"`
 	BlockSize                int64               `bson:"blockSize"`
@@ -470,6 +473,9 @@ type ReplyOplogConfig struct {
 
 	Whitelist map[string]map[string]struct{}
 	Blacklist map[string]map[string]struct{}
+
+	FsyncInterval     time.Duration
+	MaxMongodRestarts int
 }
 
 type ShConfig struct {
@@ -509,6 +515,20 @@ func NewReplyOplogConfig(
 	var roConfig ReplyOplogConfig
 	var err error
 	roConfig.HasPitr = true
+	roConfig.FsyncInterval, err = conf.GetDurationSettingDefault(conf.OplogReplayFsyncInterval, 10*time.Minute)
+	if err != nil {
+		return roConfig, err
+	}
+	if roConfig.FsyncInterval <= 0 {
+		return roConfig, fmt.Errorf("%s must be positive", conf.OplogReplayFsyncInterval)
+	}
+	roConfig.MaxMongodRestarts = 5
+	if value, ok := conf.GetSetting(conf.OplogReplayMaxMongodRestarts); ok {
+		roConfig.MaxMongodRestarts, err = strconv.Atoi(value)
+		if err != nil || roConfig.MaxMongodRestarts < 0 {
+			return roConfig, fmt.Errorf("%s must be a non-negative integer", conf.OplogReplayMaxMongodRestarts)
+		}
+	}
 
 	// resolve archiving settings
 	downloader, err := archive.NewStorageDownloader(ctx, archive.NewDefaultStorageSettings())

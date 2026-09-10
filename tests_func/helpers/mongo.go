@@ -14,10 +14,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/utils"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/mod/semver"
 )
 
@@ -72,8 +71,8 @@ type CmdResponse struct {
 
 // OpTime ...
 type OpTime struct {
-	TS   primitive.Timestamp `bson:"ts" json:"ts"`
-	Term int64               `bson:"t" json:"t"`
+	TS   bson.Timestamp `bson:"ts" json:"ts"`
+	Term int64          `bson:"t" json:"t"`
 }
 
 // IsMasterLastWrite ...
@@ -191,7 +190,9 @@ func (mc *MongoCtl) connect(creds *AuthCreds) (*mongo.Client, error) {
 	uri := fmt.Sprintf("mongodb://%s%s:%d/%s"+
 		"?connect=direct&w=majority&socketTimeoutMS=3000&connectTimeoutMS=3000%s",
 		auth, mc.expHost, mc.expPort, dbase, restore)
-	client, err := mongo.Connect(mc.ctx, options.Client().ApplyURI(uri))
+	// driver v2 decodes nested documents as bson.D by default, snapshot code asserts bson.M
+	client, err := mongo.Connect(options.Client().ApplyURI(uri).
+		SetBSONOptions(&options.BSONOptions{DefaultDocumentM: true}))
 	if err != nil {
 		return nil, fmt.Errorf("can not create mongo client: %v", err)
 	}
@@ -258,6 +259,46 @@ func (mc *MongoCtl) WriteTestData(mark string, dbCount, tablesCount, docsCount i
 	return nil
 }
 
+func (mc *MongoCtl) WriteTransactions(transactionCount, documentsPerTransaction int) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	collection := conn.Database("replay_restart").Collection("transactions")
+
+	for transactionID := 0; transactionID < transactionCount; transactionID++ {
+		session, err := conn.StartSession()
+		if err != nil {
+			return err
+		}
+		_, err = session.WithTransaction(mc.ctx, func(ctx context.Context) (interface{}, error) {
+			firstDocumentID := transactionID * documentsPerTransaction
+			_, err := collection.UpdateMany(ctx, bson.M{
+				"_id": bson.M{"$gte": firstDocumentID, "$lt": firstDocumentID + documentsPerTransaction},
+			}, bson.M{"$set": bson.M{"updated": true, "transactionID": transactionID}})
+			return nil, err
+		})
+		session.EndSession(context.Background())
+		if err != nil {
+			return fmt.Errorf("transaction %d failed: %w", transactionID, err)
+		}
+	}
+	return nil
+}
+
+func (mc *MongoCtl) PrepareTransactionDocuments(documentCount int) error {
+	conn, err := mc.AdminConnect()
+	if err != nil {
+		return err
+	}
+	documents := make([]interface{}, documentCount)
+	for documentID := 0; documentID < documentCount; documentID++ {
+		documents[documentID] = bson.M{"_id": documentID, "updated": false}
+	}
+	_, err = conn.Database("replay_restart").Collection("transactions").InsertMany(mc.ctx, documents)
+	return err
+}
+
 func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
 	var snapshot []NsSnapshot
 
@@ -317,7 +358,7 @@ func (mc *MongoCtl) Snapshot() ([]NsSnapshot, error) {
 
 func ListCollections(ctx context.Context, conn *mongo.Client, database string) ([]bson.M, error) {
 	// TODO: filter system.*
-	cur, err := conn.Database(database, nil).ListCollections(ctx, bson.M{})
+	cur, err := conn.Database(database).ListCollections(ctx, bson.M{})
 	if err != nil {
 		return nil, fmt.Errorf("can not create listCollections cursor: %v", err)
 	}
@@ -335,7 +376,7 @@ func FetchNsDocs(ctx context.Context, conn *mongo.Client, database, table string
 	ns := fmt.Sprintf("%s.%s", database, table)
 
 	cur, err := conn.
-		Database(database, nil).
+		Database(database).
 		Collection(table).
 		Find(ctx, bson.M{}, options.Find().SetSort(map[string]int{"_id": 1}))
 	if err != nil {
@@ -357,7 +398,7 @@ func FetchNsDocs(ctx context.Context, conn *mongo.Client, database, table string
 func ListNsIndexes(ctx context.Context, conn *mongo.Client, database, table string) ([]bson.M, error) {
 	ns := fmt.Sprintf("%s.%s", database, table)
 
-	indexes := conn.Database(database, nil).Collection(table).Indexes()
+	indexes := conn.Database(database).Collection(table).Indexes()
 
 	cur, err := indexes.List(ctx)
 	if err != nil {

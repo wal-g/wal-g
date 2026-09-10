@@ -20,6 +20,7 @@ const (
 	addUserDataFlag       = "add-user-data"
 	deltaFromUserDataFlag = "delta-from-user-data"
 	deltaFromNameFlag     = "delta-from-name"
+	countJournalsFlag     = "count-journals"
 
 	permanentShorthand  = "p"
 	fullBackupShorthand = "f"
@@ -64,7 +65,7 @@ var (
 			tracelog.ErrorLogger.FatalOnError(err)
 
 			arguments := greenplum.NewBackupArguments(uploader, permanent, fullBackup, userData, prepareSegmentFwdArgs(), logsDir,
-				segPollInterval, segPollRetries, deltaBaseSelector, json, pretty)
+				segPollInterval, segPollRetries, deltaBaseSelector, countJournals, pretty, jsonOutput)
 			backupHandler, err := greenplum.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
 			backupHandler.HandleBackupPush(cmd.Context())
@@ -76,12 +77,14 @@ var (
 	deltaFromName     = ""
 	deltaFromUserData = ""
 	fullBackup        = false
+	countJournals     = false
 )
 
 // prepare arguments that are going to be forwarded to segments
 func prepareSegmentFwdArgs() []greenplum.SegmentFwdArg {
 	return []greenplum.SegmentFwdArg{
 		{Name: permanentFlag, Value: strconv.FormatBool(permanent)},
+		{Name: countJournalsFlag, Value: strconv.FormatBool(countJournals)},
 	}
 }
 
@@ -90,7 +93,7 @@ func init() {
 
 	backupPushCmd.Flags().BoolVar(&pretty, PrettyFlag, false,
 		"Prints more readable output in table format")
-	backupPushCmd.Flags().BoolVar(&json, JSONFlag, false,
+	backupPushCmd.Flags().BoolVar(&jsonOutput, JSONFlag, false,
 		"Prints output in JSON format, multiline and indented if combined with --pretty flag")
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
@@ -102,4 +105,6 @@ func init() {
 		"", "Select the backup specified by name as the target for the delta backup")
 	backupPushCmd.Flags().StringVar(&deltaFromUserData, deltaFromUserDataFlag,
 		"", "Select the backup specified by UserData as the target for the delta backup")
+	backupPushCmd.Flags().BoolVar(&countJournals, countJournalsFlag,
+		false, "Create 'journal_<backup>' objects in storage and maintain the WAL volume required to get from one backup to the next")
 }

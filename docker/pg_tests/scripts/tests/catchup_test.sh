@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 PGDATA_ALPHA="${PGDATA}_alpha"
 PGDATA_BETA="${PGDATA}_beta"
 PGDATA_BETA_1="${PGDATA}_beta_1"
@@ -21,9 +23,9 @@ PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
 # preparation for replication
 pushd ${PGDATA_ALPHA}
 psql -c "CREATE ROLE repl WITH REPLICATION PASSWORD 'password' LOGIN;"
-echo "host  replication  repl              127.0.0.1/32  md5" >> pg_hba.conf
+echo "host  replication  repl              127.0.0.1/32  $(hba_repl_method ${PGDATA_ALPHA})" >> pg_hba.conf
 echo "wal_level = replica" >> postgresql.conf
-echo "wal_keep_segments = 100" >> postgresql.conf
+echo "$(wal_keep_conf 100 ${PGDATA_ALPHA})" >> postgresql.conf
 echo "max_wal_senders = 4" >> postgresql.conf
 pg_ctl -D ${PGDATA_ALPHA} -w restart
 PGDATA=${PGDATA_ALPHA} /tmp/scripts/wait_while_pg_not_ready.sh
@@ -37,7 +39,7 @@ cp -r ${PGDATA_BETA} ${PGDATA_BETA_1}
 pushd ${PGDATA_BETA}
 echo "port = ${BETA_PORT}" >> postgresql.conf
 echo "hot_standby = on" >> postgresql.conf
-cat > recovery.conf << EOF
+write_standby_settings ${PGDATA_BETA} << EOF
 standby_mode = 'on'
 primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
 restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
@@ -57,7 +59,7 @@ pg_ctl -D ${PGDATA_BETA} --mode smart -w stop
 pgbench -T 10 -P 1 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 # create some new files
 pgbench -i -s 5 -h 127.0.0.1 -p ${ALPHA_PORT} postgres
-pg_dump -h 127.0.0.1 -p ${ALPHA_PORT} -f ${ALPHA_DUMP} postgres
+dump_db ${ALPHA_DUMP} -h 127.0.0.1 -p ${ALPHA_PORT} postgres
 
 wal-g --config=${TMP_CONFIG} catchup-push ${PGDATA_ALPHA} --from-lsn ${LSN} 2>/tmp/stderr 1>/tmp/stdout
 cat /tmp/stderr /tmp/stdout
@@ -69,7 +71,7 @@ wal-g --config=${TMP_CONFIG} catchup-fetch ${PGDATA_BETA} $BACKUP_NAME
 pushd ${PGDATA_BETA}
 echo "port = ${BETA_PORT}" >> postgresql.conf
 echo "hot_standby = on" >> postgresql.conf
-cat > recovery.conf << EOF
+write_standby_settings ${PGDATA_BETA} << EOF
 standby_mode = 'on'
 primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
 restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
@@ -79,11 +81,11 @@ popd
 
 pg_ctl -D ${PGDATA_BETA} -w start
 
-pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
+dump_db ${BETA_DUMP} -h 127.0.0.1 -p ${BETA_PORT} postgres
 
 pg_ctl -D ${PGDATA_BETA} -w stop
 
-diff ${ALPHA_DUMP} ${BETA_DUMP}
+compare_dumps ${ALPHA_DUMP} ${BETA_DUMP}
 
 # test catchup-send and catchup-receive
 rm -rf ${PGDATA_BETA}
@@ -101,7 +103,7 @@ wal-g --config=${TMP_CONFIG} catchup-send ${PGDATA_ALPHA} localhost:1337
 pushd ${PGDATA_BETA}
 echo "port = ${BETA_PORT}" >> postgresql.conf
 echo "hot_standby = on" >> postgresql.conf
-cat > recovery.conf << EOF
+write_standby_settings ${PGDATA_BETA} << EOF
 standby_mode = 'on'
 primary_conninfo = 'host=127.0.0.1 port=${ALPHA_PORT} user=repl password=password'
 restore_command = 'cp ${PGDATA_BETA}/archive/%f %p'
@@ -111,11 +113,11 @@ popd
 
 pg_ctl -D ${PGDATA_BETA} -w start
 
-pg_dump -h 127.0.0.1 -p ${BETA_PORT} -f ${BETA_DUMP} postgres
+dump_db ${BETA_DUMP} -h 127.0.0.1 -p ${BETA_PORT} postgres
 
 pg_ctl -D ${PGDATA_BETA} -w stop
 
-diff ${ALPHA_DUMP} ${BETA_DUMP}
+compare_dumps ${ALPHA_DUMP} ${BETA_DUMP}
 
 /tmp/scripts/drop_pg.sh
 rm -rf ${PGDATA_ALPHA} ${PGDATA_BETA}

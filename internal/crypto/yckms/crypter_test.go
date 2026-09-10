@@ -2,6 +2,7 @@ package yckms
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -22,7 +23,7 @@ func (m *mockedSymmetricKey) GetKey() []byte {
 	return m.key
 }
 
-func (m *mockedSymmetricKey) Decrypt() error {
+func (m *mockedSymmetricKey) Decrypt(_ context.Context) error {
 	m.key = make([]byte, 32)
 	for i := range m.key {
 		m.key[i] = 0xbb
@@ -40,7 +41,7 @@ func (m *mockedSymmetricKey) ReadEncryptedKey(r io.Reader) error {
 	return err
 }
 
-func (m *mockedSymmetricKey) CreateKey() error {
+func (m *mockedSymmetricKey) CreateKey(_ context.Context) error {
 	m.encryptedKey = make([]byte, 64)
 	for i := range m.encryptedKey {
 		m.encryptedKey[i] = 0xaa
@@ -65,7 +66,7 @@ func TestYcCrypterEncryptionCycle(t *testing.T) {
 	crypter := MockedYcCrypter()
 	buffer := new(bytes.Buffer)
 
-	encrypt, err := crypter.Encrypt(buffer)
+	encrypt, err := crypter.Encrypt(t.Context(), buffer)
 	assert.NoErrorf(t, err, "YcCrypter encryption error: %v", err)
 
 	_, err = encrypt.Write([]byte(testSecretString))
@@ -73,7 +74,7 @@ func TestYcCrypterEncryptionCycle(t *testing.T) {
 	err = encrypt.Close()
 	assert.NoErrorf(t, err, "YcCrypter closing error: %v", err)
 
-	decrypt, err := crypter.Decrypt(buffer)
+	decrypt, err := crypter.Decrypt(t.Context(), buffer)
 	assert.NoErrorf(t, err, "YcCrypter decryption error: %v", err)
 
 	decryptedData, err := io.ReadAll(decrypt)

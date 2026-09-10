@@ -9,7 +9,7 @@ RUN cp --force --recursive --verbose /var/lib/dist/config/apt/* /etc/apt/
 
 RUN apt-get update && \
     apt-get install --yes \
-        wget curl \
+        curl \
         git \
         ca-certificates && \
   rm -rf /var/lib/apt/lists/* /var/cache/debconf/*

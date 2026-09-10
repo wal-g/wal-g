@@ -8,6 +8,7 @@ for i in tests/*.sh; do
   echo
   echo "===== RUNNING $i ====="
   set -x
+
   ./"$i";
 
   set +x

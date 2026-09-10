@@ -1,6 +1,12 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/pg_compat.sh
+
+# wal-e is no longer developed (last release 2018) and installs only on
+# python3.7, so it exists only in the bionic/PG 10 image. This will not change.
+require_pg_le 10
+
 initdb ${PGDATA}
 
 echo "archive_mode = on" >> ${PGDATA}/postgresql.conf
@@ -26,7 +32,7 @@ pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
 pgbench -i -s 10 postgres
-pg_dumpall -f /tmp/dump1
+dump_all /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
@@ -45,7 +51,7 @@ WALE_FILE_PREFIX=file://localhost/tmp \
 wal-e backup-push ${PGDATA}
 
 pgbench -i -s 10 postgres
-pg_dumpall -f /tmp/dump1
+dump_all /tmp/dump1
 pgbench -c 2 -T 100000000 -S &
 sleep 1
 AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE \
@@ -103,7 +109,7 @@ PGSSLMODE=allow \
 PGDATABASE=postgres \
 PGHOST=/var/run/postgresql \
 WALE_FILE_PREFIX=file://localhost/tmp \
-/usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" > ${PGDATA}/recovery.conf
+/usr/bin/wal-g wal-fetch \"%f\" \"%p\"'" | write_recovery_settings
 
 cp /tmp/conf_files/postgresql.conf ${PGDATA}
 cp /tmp/conf_files/pg_hba.conf ${PGDATA}
@@ -111,9 +117,9 @@ cp /tmp/conf_files/pg_ident.conf ${PGDATA}
 
 pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
-pg_dumpall -f /tmp/dump2
+dump_all /tmp/dump2
 
-diff /tmp/dump1 /tmp/dump2
+compare_dumps /tmp/dump1 /tmp/dump2
 rm -rf /tmp/conf_files
 
 

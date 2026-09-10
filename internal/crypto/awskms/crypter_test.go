@@ -2,6 +2,7 @@ package awskms
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"testing"
 
@@ -13,13 +14,13 @@ type MockSymmetricKey struct {
 	SymmetricKey
 }
 
-func (symmetricKey *MockSymmetricKey) Encrypt() error {
+func (symmetricKey *MockSymmetricKey) Encrypt(_ context.Context) error {
 	salt := "152 random bytes to imitate aws kms encryption method, random words here: witch collapse practice feed shame open despair creek road again ice least it!"
 	symmetricKey.SetEncryptedKey(append(symmetricKey.GetKey(), salt...))
 	return nil
 }
 
-func (symmetricKey *MockSymmetricKey) Decrypt() error {
+func (symmetricKey *MockSymmetricKey) Decrypt(_ context.Context) error {
 	symmetricKey.SetKey(symmetricKey.GetEncryptedKey()[:symmetricKey.GetKeyLen()])
 	return nil
 }
@@ -40,13 +41,13 @@ func TestEncryptionCycle(t *testing.T) {
 	crypter := MockCrypterFromKeyID(CseKmsID)
 
 	buf := new(bytes.Buffer)
-	encrypt, err := crypter.Encrypt(buf)
+	encrypt, err := crypter.Encrypt(t.Context(), buf)
 	assert.NoErrorf(t, err, "Encryption error: %v", err)
 
 	encrypt.Write([]byte(someSecret))
 	encrypt.Close()
 
-	decrypt, err := crypter.Decrypt(buf)
+	decrypt, err := crypter.Decrypt(t.Context(), buf)
 	assert.NoErrorf(t, err, "Decryption error: %v", err)
 
 	decryptedBytes, err := io.ReadAll(decrypt)

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 func TestLess(t *testing.T) {
@@ -113,7 +113,7 @@ func TestMax(t *testing.T) {
 
 func TestTimestampFromBson(t *testing.T) {
 	type args struct {
-		bts primitive.Timestamp
+		bts bson.Timestamp
 	}
 	tests := []struct {
 		name string
@@ -123,21 +123,21 @@ func TestTimestampFromBson(t *testing.T) {
 		{
 			name: "Zero TS",
 			args: args{
-				bts: primitive.Timestamp{T: 0, I: 0},
+				bts: bson.Timestamp{T: 0, I: 0},
 			},
 			want: Timestamp{0, 0},
 		},
 		{
 			name: "TS",
 			args: args{
-				bts: primitive.Timestamp{T: 1579541242, I: 0},
+				bts: bson.Timestamp{T: 1579541242, I: 0},
 			},
 			want: Timestamp{1579541242, 0},
 		},
 		{
 			name: "TS inc",
 			args: args{
-				bts: primitive.Timestamp{T: 1579541342, I: 11},
+				bts: bson.Timestamp{T: 1579541342, I: 11},
 			},
 			want: Timestamp{1579541342, 11},
 		},
@@ -158,28 +158,28 @@ func TestBsonTimestampFromOplogTS(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want primitive.Timestamp
+		want bson.Timestamp
 	}{
 		{
 			name: "Zero TS",
 			args: args{
 				ots: Timestamp{0, 0},
 			},
-			want: primitive.Timestamp{T: 0, I: 0},
+			want: bson.Timestamp{T: 0, I: 0},
 		},
 		{
 			name: "TS",
 			args: args{
 				ots: Timestamp{1579541242, 0},
 			},
-			want: primitive.Timestamp{T: 1579541242, I: 0},
+			want: bson.Timestamp{T: 1579541242, I: 0},
 		},
 		{
 			name: "TS inc",
 			args: args{
 				ots: Timestamp{1579541342, 11},
 			},
-			want: primitive.Timestamp{T: 1579541342, I: 11},
+			want: bson.Timestamp{T: 1579541342, I: 11},
 		}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

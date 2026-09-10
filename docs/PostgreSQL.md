@@ -214,6 +214,18 @@ If a backup is started from a standby server, WAL-G will monitor the timeline of
 
 ``backup-push`` can also be run with the ``--permanent`` flag, which will mark the backup as permanent and prevent it from being removed when running ``delete``.
 
+#### Journal size (WAL volume) accounting
+
+Run ``backup-push`` with the ``--count-journals`` flag to maintain a ``journal_<backup>`` object per backup in storage, tracking the volume of WAL accumulated between that backup and the next one. The size is computed from the actual storage object sizes of the archived WAL segments, so it correctly reflects compression, unlike an LSN-difference estimate.
+
+```bash
+wal-g backup-push $PGDATA --count-journals
+```
+
+Journal accounting is skipped for permanent backups (marked with ``--permanent``), since they are not expected to be removed and don't take part in WAL retention planning.
+
+Currently, only ``delete target`` cleans up and re-merges the corresponding journal entry when a backup is removed this way; other ``delete`` modes (``before``, ``retain``, ``retain-after``, ``everything``, ``garbage``) leave existing journals untouched.
+
 #### Remote backup
 
 WAL-G backup-push allows for two data streaming options:

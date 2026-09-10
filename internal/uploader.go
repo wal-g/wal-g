@@ -156,7 +156,7 @@ func (uploader *RegularUploader) uploadFile(ctx context.Context, file ioextensio
 	if uploader.dataSize != nil {
 		fileReader = utility.NewWithSizeReader(fileReader, uploader.dataSize)
 	}
-	compressedFile := CompressAndEncrypt(fileReader, uploader.Compressor, ConfigureCrypter())
+	compressedFile := CompressAndEncrypt(ctx, fileReader, uploader.Compressor, ConfigureCrypter())
 
 	dstPath := utility.SanitizePath(filename)
 	if !isExactPath {

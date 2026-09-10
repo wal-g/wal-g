@@ -48,7 +48,7 @@ func DownloadFile(ctx context.Context, reader StorageFolderReader, filename, ext
 	}
 	defer utility.LoggedClose(archiveReader, "")
 
-	decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
+	decompressedReader, err := DecompressDecryptBytes(ctx, archiveReader, decompressor)
 	if err != nil {
 		return err
 	}
@@ -70,8 +70,9 @@ func TryDownloadFile(ctx context.Context, reader StorageFolderReader, path strin
 	return
 }
 
-func DecompressDecryptBytes(archiveReader io.Reader, decompressor compression.Decompressor) (io.ReadCloser, error) {
-	decryptReader, err := DecryptBytes(archiveReader)
+func DecompressDecryptBytes(ctx context.Context, archiveReader io.Reader,
+	decompressor compression.Decompressor) (io.ReadCloser, error) {
+	decryptReader, err := DecryptBytes(ctx, archiveReader)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func DecompressDecryptBytes(archiveReader io.Reader, decompressor compression.De
 	return decompressor.Decompress(decryptReader)
 }
 
-func DecryptBytes(archiveReader io.Reader) (io.Reader, error) {
+func DecryptBytes(ctx context.Context, archiveReader io.Reader) (io.Reader, error) {
 	crypter := ConfigureCrypter()
 	if crypter == nil {
 		tracelog.DebugLogger.Printf("No crypter has been selected")
@@ -91,7 +92,7 @@ func DecryptBytes(archiveReader io.Reader) (io.Reader, error) {
 
 	tracelog.DebugLogger.Printf("Selected crypter: %s", crypter.Name())
 
-	decryptReader, err := crypter.Decrypt(archiveReader)
+	decryptReader, err := crypter.Decrypt(ctx, archiveReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init decrypt reader: %w", err)
 	}
@@ -174,7 +175,7 @@ func DownloadAndDecompressStorageFile(ctx context.Context, reader StorageFolderR
 		return nil, err
 	}
 
-	decompressedReaded, err := DecompressDecryptBytes(archiveReader, decompressor)
+	decompressedReaded, err := DecompressDecryptBytes(ctx, archiveReader, decompressor)
 	if err != nil {
 		utility.LoggedClose(archiveReader, "")
 		return nil, err

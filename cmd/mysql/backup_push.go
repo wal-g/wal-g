@@ -72,5 +72,5 @@ func init() {
 	backupPushCmd.Flags().StringVar(&userData, addUserDataFlag,
 		"", "Write the provided user data to the backup sentinel and metadata files.")
 	backupPushCmd.Flags().BoolVar(&countJournals, countJournalsFlag,
-		false, "Create 'backups.json' file in the bucket and maintain the binlog sizes required to get from one backup to the next one")
+		false, "Create 'journal_<backup>' file in the bucket and maintain the binlog sizes required to get from one backup to the next one")
 }

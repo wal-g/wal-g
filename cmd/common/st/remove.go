@@ -36,6 +36,11 @@ var removeCmd = &cobra.Command{
 			}
 
 			folder.SetVersioningEnabled(ctx, removeAllVersions)
+			if removeAllVersions {
+				// "remove all versions" must see every historical version and delete marker,
+				// not just the current version of each key.
+				storage.SetShowAllVersions(folder, true)
+			}
 			if glob {
 				return storagetools.HandleRemoveWithGlobPattern(ctx, args[0], folder)
 			}

@@ -1,13 +1,15 @@
 package crypto
 
+import "context"
+
 // SymmetricKey encryption interface
 // Used by AWS KMS Crypter
 // When implement another crypters,
 // can be moved to crypto package
 type SymmetricKey interface {
 	Generate() error
-	Encrypt() error
-	Decrypt() error
+	Encrypt(ctx context.Context) error
+	Decrypt(ctx context.Context) error
 	GetKey() []byte
 	SetKey([]byte) error
 	GetEncryptedKey() []byte

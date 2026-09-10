@@ -1,5 +1,3 @@
-export GOEXPERIMENT=jsonv2
-
 MAIN_PG_PATH := main/pg
 MAIN_MYSQL_PATH := main/mysql
 MAIN_SQLSERVER_PATH := main/sqlserver
@@ -8,13 +6,31 @@ MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
-DOCKER_COMMON := golang ubuntu ubuntu_22_04 s3
+DOCKER_COMMON := golang s3
+# Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
+GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
+export GO_VERSION
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
 PKG := github.com/wal-g/wal-g
 COVERAGE_FILE := coverage.out
-TEST := "pg10_tests"
+TEST := "pg_tests"
+# PostgreSQL version the test services run on. 10 uses the old bionic image (the
+# only one that has wal-e); 14-18 use the shared PGDG image.
+PG_MAJOR ?= 10
+export PG_MAJOR
+# pgBackRest is built from source and added to the PG test image, so it must be
+# built on the same Ubuntu version as that image. 2.54 and later need meson,
+# which is too new for bionic, so PG 10 uses the older 2.36.
+ifeq ($(PG_MAJOR),10)
+PGBACKREST_BUILD_BASE := ubuntu:18.04
+PGBACKREST_VERSION    := 2.36
+else
+PGBACKREST_BUILD_BASE := ubuntu:22.04
+PGBACKREST_VERSION    := 2.59.0
+endif
+export PGBACKREST_BUILD_BASE PGBACKREST_VERSION
 MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
 MONGO_VERSION ?= "8.0.3"
@@ -48,6 +64,13 @@ ifdef ENABLE_DEBUG
 	BUILD_GCFLAGS:=$(BUILD_GCFLAGS) all=-N -l
 endif
 
+STRIP_BINARIES ?= 1
+BUILD_LDFLAGS :=
+
+ifeq ($(STRIP_BINARIES),1)
+	BUILD_LDFLAGS += -s -w
+endif
+
 .PHONY: unittest fmt lint clean
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
@@ -55,11 +78,11 @@ test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudb
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_PG_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
 
 install_and_build_pg: deps pg_build
 
-pg10_build_image: go_deps
+pg10_build_image: go_deps load_ubuntu_18_04
 ifeq ($(COMPOSE_BAKE),true)
 	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
 	docker compose build $(DOCKER_COMMON) pg10 pg10_tests_template
@@ -72,58 +95,73 @@ else
 	docker compose build pg10_tests_template
 endif
 
-pg18_build_image: go_deps
+# Builds the image for any PostgreSQL 14-18, chosen by PG_MAJOR (ubuntu 22.04 and
+# PGDG). PG 10 still uses pg10_build_image above, because wal-e needs python3.7
+# and only the bionic image has it.
+pg_build_image: go_deps load_docker_common
+ifeq ($(PG_MAJOR),10)
+	$(error PG_MAJOR=10 must be built with pg10_build_image - the PG 10 image is bionic + wal-e)
+endif
 ifeq ($(COMPOSE_BAKE),true)
 	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
-	docker compose build $(DOCKER_COMMON) pg18 pg18_tests_template
+	docker compose build $(DOCKER_COMMON) pg pg_tests_template
 else
+	# pg_tests_template is built FROM wal-g/pg$(PG_MAJOR). In a single command
+	# compose would look for that image on docker.io instead of using the one it
+	# is about to build. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
-	docker compose build pg18
-	docker compose build pg18_tests_template
+	docker compose build pg
+	docker compose build pg_tests_template
 endif
 
-pg_save_image: install_and_build_pg pg10_build_image pg18_build_image
+# PG 10 is built by pg10_build_image (bionic + wal-e), the rest by pg_build_image.
+# This list is also what CI tests: dockertests-par.yml reads it from here.
+PG_VERSIONS ?= 10 14 15 16 17 18
+
+.PHONY: print_pg_versions
+print_pg_versions:
+	@echo $(PG_VERSIONS)
+
+# Run the whole suite sequentially for each version in PG_VERSIONS.
+#   make pg_matrix_test                       # all supported versions
+#   make PG_VERSIONS="17" pg_matrix_test      # just one
+#   make PG_VERSIONS="10 18" pg_matrix_test   # the edges
+pg_matrix_test:
+	@for v in $(PG_VERSIONS); do \
+		echo "=============== PostgreSQL $$v ==============="; \
+		$(MAKE) PG_MAJOR=$$v pg_integration_test || exit 1; \
+	done
+
+save_common_images: go_deps
 	mkdir -p ${CACHE_FOLDER}
 	sudo rm -rf ${CACHE_FOLDER}/*
-	docker save ${IMAGE_PG10_TESTS} > ${CACHE_FILE_PG10_TESTS}
-	docker save ${IMAGE_PG18_TESTS} > ${CACHE_FILE_PG18_TESTS}
-	docker save wal-g/ubuntu:18.04 > ${CACHE_FILE_UBUNTU_18_04}
-	docker save wal-g/ubuntu:22.04 > ${CACHE_FILE_UBUNTU_22_04}
+	docker compose build $(DOCKER_COMMON)
 	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
-	ls ${CACHE_FOLDER}
+	ls -la ${CACHE_FOLDER}
 
 pg_integration_test: clean_compose
-	@if [ "x" = "${CACHE_FILE_PG10_TESTS}x" ]; then\
-		echo "Rebuild";\
-		make install_and_build_pg;\
+	if [ "$(PG_MAJOR)" = "10" ]; then\
 		make pg10_build_image;\
 	else\
-		docker load -i ${CACHE_FILE_PG10_TESTS} && rm ${CACHE_FILE_PG10_TESTS};\
-	fi
-	@if echo "$(TEST)" | grep -Fqe "pg18"; then\
-		if [ -f ${CACHE_FILE_PG18_TESTS} ]; then\
-			docker load -i ${CACHE_FILE_PG18_TESTS} && rm ${CACHE_FILE_PG18_TESTS};\
-		else\
-			make pg18_build_image;\
-		fi;\
-	fi
+		make PG_MAJOR=$(PG_MAJOR) pg_build_image;\
+	fi;
 	@if echo "$(TEST)" | grep -Fqe "pgbackrest"; then\
-		docker compose build pg10_pgbackrest;\
+		docker compose build pg_pgbackrest;\
 	fi
-	@if echo "$(TEST)" | grep -Fq -e "pg10_ssh_" -e "pg10_storage_ssh_"; then\
+	@if echo "$(TEST)" | grep -Fq -e "ssh_"; then\
 		docker compose build ssh;\
 	fi
 
 	docker compose up --exit-code-from $(TEST) $(TEST)
 	# Run tests with dependencies if we run all tests
-	@if [ "$(TEST)" = "pg10_tests" ]; then\
-		docker compose build pg10_pgbackrest ssh swift pg10_wal_perftest_with_throttling &&\
-		docker compose up --exit-code-from pg10_ssh_backup_test pg10_ssh_backup_test &&\
-		docker compose up --exit-code-from pg10_storage_swift_test pg10_storage_swift_test &&\
-		docker compose up --exit-code-from pg10_storage_ssh_test pg10_storage_ssh_test &&\
-		docker compose up --exit-code-from pg10_pgbackrest_backup_fetch_test pg10_pgbackrest_backup_fetch_test &&\
+	@if [ "$(TEST)" = "pg_tests" ]; then\
+		docker compose build pg_pgbackrest ssh swift pg_wal_perftest_with_throttling &&\
+		docker compose up --exit-code-from pg_ssh_backup_test pg_ssh_backup_test &&\
+		docker compose up --exit-code-from pg_storage_swift_test pg_storage_swift_test &&\
+		docker compose up --exit-code-from pg_storage_ssh_test pg_storage_ssh_test &&\
+		docker compose up --exit-code-from pg_pgbackrest_backup_fetch_test pg_pgbackrest_backup_fetch_test &&\
 		docker compose down &&\
-		docker compose up --exit-code-from pg10_wal_perftest_with_throttling pg10_wal_perftest_with_throttling ;\
+		docker compose up --exit-code-from pg_wal_perftest_with_throttling pg_wal_perftest_with_throttling ;\
 	fi
 	make clean_compose
 
@@ -141,8 +179,8 @@ all_unittests: deps unittest
 
 # todo Should we remove this target as a duplicate of pg_integration_test?
 pg_int_tests_only:
-	docker compose build pg10_tests
-	docker compose up --exit-code-from pg10_tests pg10_tests
+	docker compose build pg_tests
+	docker compose up --exit-code-from pg_tests pg_tests
 
 pg_clean:
 	(cd $(MAIN_PG_PATH) && go clean)
@@ -155,18 +193,22 @@ mysql_base: deps mysql_build unlink_brotli
 mysql_test: deps mysql_build unlink_brotli mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
 
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
-load_docker_common:
+load_ubuntu_18_04:
+	(docker pull ghcr.io/wal-g/ubuntu:18.04 && docker tag ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04) || docker compose build ubuntu
+
+load_ubuntu_22_04:
+	(docker pull ghcr.io/wal-g/ubuntu:22.04 && docker tag ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
+
+load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04
 	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
 		echo "Rebuild";\
 		docker compose build $(DOCKER_COMMON);\
 	else\
-		docker load -i ${CACHE_FILE_UBUNTU_18_04} && rm ${CACHE_FILE_UBUNTU_18_04};\
-		docker load -i ${CACHE_FILE_UBUNTU_22_04} && rm ${CACHE_FILE_UBUNTU_22_04};\
 		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
 	fi
 
@@ -194,7 +236,7 @@ mariadb_integration_test: unlink_brotli load_docker_common
 	docker compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MONGO_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
 
 mongo_install: mongo_build
 	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
@@ -221,7 +263,7 @@ clean_mongo_features:
 	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_FDB_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w")
+	(cd $(MAIN_FDB_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS)")
 
 fdb_install: fdb_build
 	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
@@ -239,7 +281,7 @@ redis_test:
 	$(MAKE) USE_BROTLI=1 unlink_brotli
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
 
 redis_integration_test: load_docker_common
 	docker compose build redis && docker compose build redis_tests
@@ -264,7 +306,7 @@ clean_redis_features:
 etcd_test: deps etcd_build unlink_brotli etcd_integration_test
 
 etcd_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_ETCD_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_ETCD_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/etcd.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/etcd.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/etcd.walgVersion=$(WALG_VERSION)")
 
 etcd_install: etcd_build
 	mv $(MAIN_ETCD_PATH)/wal-g $(GOBIN)/wal-g
@@ -275,12 +317,11 @@ etcd_clean:
 
 # refactor
 etcd_integration_test: load_docker_common
-	docker compose build etcd
 	docker compose build etcd_tests
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_GP_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_GP_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
 
 gp_clean:
 	(cd $(MAIN_GP_PATH) && go clean)
@@ -336,7 +377,7 @@ docker_lint:
 	docker build -t wal-g/lint --build-arg TAG=$(GOLANGCI_LINT_VERSION) - < docker/lint/Dockerfile
 	docker run --rm -v `pwd`:/app \
 		-v wal-g_lint_cache:/cache -e GOLANGCI_LINT_CACHE=/cache/lint \
-		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod -e GOEXPERIMENT="$(GOEXPERIMENT)" \
+		-e GOCACHE=/cache/go -e GOMODCACHE=/cache/gomod \
 		wal-g/lint golangci-lint run -v
 
 deps: go_deps link_external_deps

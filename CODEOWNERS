@@ -20,8 +20,8 @@
 
 * @wal-g/committers
 
-/internal/databases/mysql/ @mialinx @ostinru @teem0n @noname0443
-/cmd/mysql/ @mialinx @ostinru @teem0n @noname0443
+/internal/databases/mysql/ @mialinx @ostinru @teem0n @noname0443 @dvcer
+/cmd/mysql/ @mialinx @ostinru @teem0n @noname0443 @dvcer
 
 /internal/databases/sqlserver/ @mialinx @ostinru @teem0n @chipitsine
 /cmd/sqlserver/ @mialinx @ostinru @teem0n @chipitsine

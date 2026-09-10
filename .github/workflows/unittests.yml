@@ -11,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  GOPROXY: "https://proxy.golang.org|direct"
   USE_BROTLI: 1
 
 jobs:

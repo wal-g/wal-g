@@ -149,6 +149,8 @@ const (
 	OplogReplayOplogAlwaysUpsert        = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
 	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	OplogReplayFsyncInterval            = "OPLOG_REPLAY_FSYNC_INTERVAL"
+	OplogReplayMaxMongodRestarts        = "OPLOG_REPLAY_MAX_MONGOD_RESTARTS"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"
@@ -454,7 +456,6 @@ var (
 		"WALG_S3_MAX_PART_SIZE":       true,
 		"WALG_S3_ENDPOINT_SOURCE":     true,
 		"WALG_S3_ENDPOINT_PORT":       true,
-		"WALG_S3_USE_LIST_OBJECTS_V1": true,
 		"WALG_S3_LOG_LEVEL":           true,
 		"WALG_S3_RANGE_BATCH_ENABLED": true,
 		"WALG_S3_RANGE_MAX_RETRIES":   true,
@@ -887,13 +888,17 @@ func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 func InitConfig() {
 	var globalViper = viper.GetViper()
 	globalViper.AutomaticEnv() // read in environment variables that match
-	SetDefaultValues(globalViper)
-	SetGoMaxProcs(globalViper)
 	if CfgFile == "" {
 		CfgFile = os.Getenv(ConfigPathEnvVar)
 	}
 	ReadConfigFromFile(globalViper, CfgFile)
+	// Validate the values supplied in the config file before adding defaults.
+	// viper.AllSettings includes defaults, so validating afterwards can report
+	// a database-independent default as unknown for a database that does not
+	// support that setting.
 	CheckAllowedSettings(globalViper)
+	SetDefaultValues(globalViper)
+	SetGoMaxProcs(globalViper)
 	WarnDeprecatedSettings(globalViper)
 
 	bindConfigToEnv(globalViper)

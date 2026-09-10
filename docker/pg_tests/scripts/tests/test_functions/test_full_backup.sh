@@ -1,5 +1,7 @@
 #!/bin/sh
 
+. /tmp/tests/test_functions/pg_compat.sh
+
 archive_conf() {
   echo "archive_mode = on"
   echo "archive_command = '/usr/bin/timeout 600 wal-g --config=${TMP_CONFIG} wal-push %p'"
@@ -15,7 +17,7 @@ drop_pg() {
 }
 
 dump_and_bench() {
-  pg_dumpall -f /tmp/dump1
+  dump_all /tmp/dump1
   pgbench -c 2 -T 100000000 -S &
 }
 
@@ -56,7 +58,6 @@ test_full_backup()
   TMP_CONFIG=$1
   initdb ${PGDATA}
 
-  PG_VERSION=$(cat "${PGDATA}/PG_VERSION")
   archive_conf >> ${PGDATA}/postgresql.conf
 
   pg_ctl -D ${PGDATA} -w start
@@ -77,11 +78,7 @@ test_full_backup()
     dump_and_bench
 
     echo transporting last wal files
-    if awk 'BEGIN {exit !('"$PG_VERSION"' >= 10)}'; then
-      echo 'select pg_switch_wal();' | psql
-    else
-      echo 'select pg_switch_xlog();' | psql
-    fi
+    switch_wal
     sleep 2
   fi
 
@@ -89,21 +86,13 @@ test_full_backup()
 
   wal-g --config=${TMP_CONFIG} backup-fetch ${PGDATA} LATEST
 
-  # https://www.postgresql.org/docs/current/recovery-config.html
-  if awk 'BEGIN {exit !('"$PG_VERSION"' >= 12)}'; then
-    touch "$PGDATA/recovery.signal"
-    recovery_conf >> "$PGDATA/postgresql.conf"
-  else
-    recovery_conf > "$PGDATA/recovery.conf"
-  fi
+  setup_recovery_settings recovery_conf
 
   pg_ctl -D ${PGDATA} -w start
   /tmp/scripts/wait_while_pg_not_ready.sh
-  pg_dumpall -f /tmp/dump2
+  dump_all /tmp/dump2
 
-  # PG18 pg_dumpall emits \restrict/\unrestrict with per-invocation random keys
-  sed -i '/^\\restrict /d; /^\\unrestrict /d' /tmp/dump1 /tmp/dump2
-  diff /tmp/dump1 /tmp/dump2
+  compare_dumps /tmp/dump1 /tmp/dump2
 
   psql -f /tmp/scripts/amcheck.sql -v "ON_ERROR_STOP=1" postgres
 

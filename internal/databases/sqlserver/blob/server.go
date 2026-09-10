@@ -442,7 +442,7 @@ func (bs *Server) HandleBlockPut(w http.ResponseWriter, req *http.Request) {
 	}
 	filename := idx.PutBlock(blockID, blockSize)
 	bs.uploadSem <- struct{}{}
-	err = folder.PutObject(req.Context(), filename, internal.CompressAndEncrypt(req.Body, bs.compressor, bs.crypter))
+	err = folder.PutObject(req.Context(), filename, internal.CompressAndEncrypt(req.Context(), req.Body, bs.compressor, bs.crypter))
 	<-bs.uploadSem
 	req.Body.Close()
 	if err != nil {
@@ -632,7 +632,7 @@ func (bs *Server) blobPut(ctx context.Context, r io.Reader, idx *Index) ([]strin
 		}
 		id := fmt.Sprintf("data_%05d", i)
 		name := idx.PutBlock(id, uint64(n))
-		encryptedReader := internal.CompressAndEncrypt(bytes.NewReader(buf[:n]), bs.compressor, bs.crypter)
+		encryptedReader := internal.CompressAndEncrypt(ctx, bytes.NewReader(buf[:n]), bs.compressor, bs.crypter)
 		err = idx.folder.PutObject(ctx, name, encryptedReader)
 		if err != nil {
 			return nil, err
@@ -822,7 +822,7 @@ func (bs *Server) getCachedReader(ctx context.Context, idx *Index, s Section) (i
 		if err != nil {
 			return nil, err
 		}
-		return bs.decompressDecryptIfNeeded(idx, r)
+		return bs.decompressDecryptIfNeeded(ctx, idx, r)
 	}
 	var buf []byte
 	if b, ok := bs.readCache.Get(key); ok {
@@ -834,7 +834,7 @@ func (bs *Server) getCachedReader(ctx context.Context, idx *Index, s Section) (i
 		if err != nil {
 			return nil, err
 		}
-		dr, err := bs.decompressDecryptIfNeeded(idx, r)
+		dr, err := bs.decompressDecryptIfNeeded(ctx, idx, r)
 		if err != nil {
 			utility.LoggedClose(r, "failed to close block reader")
 			return nil, err
@@ -851,9 +851,9 @@ func (bs *Server) getCachedReader(ctx context.Context, idx *Index, s Section) (i
 	return io.NopCloser(bytes.NewReader(buf)), nil
 }
 
-func (bs *Server) decompressDecryptIfNeeded(idx *Index, r io.ReadCloser) (io.ReadCloser, error) {
+func (bs *Server) decompressDecryptIfNeeded(ctx context.Context, idx *Index, r io.ReadCloser) (io.ReadCloser, error) {
 	if idx.Compression != "" || idx.Encryption != "" {
-		dr, err := internal.DecompressDecryptBytes(r, bs.decompressor)
+		dr, err := internal.DecompressDecryptBytes(ctx, r, bs.decompressor)
 		if err != nil {
 			return nil, fmt.Errorf("proxy: failed to decompress / decrypt bytes: %v", err)
 		}

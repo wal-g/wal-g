@@ -36,6 +36,8 @@ start_daemon() {
 }
 
 drop_pg() {
-  pkill -9 postgres || true
+  # Stop the server properly, so the archiver can finish its queue: with SIGKILL
+  # the last WAL segments were never archived and the dump comparison failed.
+  pg_ctl -D "${PGDATA}" -w -m fast stop || pkill -9 postgres || true
   rm -rf $PGDATA /tmp/basebackups_005 /tmp/wal_005 /tmp/spaces /tmp/spaces_backup
 }

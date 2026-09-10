@@ -3,19 +3,28 @@ networks:
         name: test_net_${TEST_ID}
         external: true
 services:
-    minio01:
-        build: staging/images/minio
-        container_name: minio01.test_net_${TEST_ID}
+    seaweedfs01:
+        image: chrislusf/seaweedfs:4.40@sha256:52194fba4fecd0083c842158b3a902ba6e04a63619b2b0efcd08007bdb6a4602
+        container_name: seaweedfs01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
-        hostname: minio01
-        image: minio:test_net_${TEST_ID}
+        hostname: seaweedfs01
         networks:
-            - test_net
+            test_net:
+                aliases:
+                    - s3
         ports:
             - ${S3_PORT}
-        tmpfs: /var/run
-        volumes:
-            - ./images/minio/config:/config:rw
+        environment:
+            AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY}
+            AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY}
+            S3_BUCKET: ${S3_BUCKET}
+        command: "mini -s3.port=9000"
+        healthcheck:
+            test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9333/cluster/status && wget -S --spider http://127.0.0.1:9000 2>&1 | grep -q 'HTTP/1.1'"]
+            interval: 2s
+            timeout: 2s
+            retries: 30
+            start_period: 2s
         env_file:
             - ${ENV_FILE}
     redis01:
@@ -24,10 +33,11 @@ services:
             context: .
             args:
                 - REDIS_VERSION=${REDIS_VERSION}
+        depends_on:
+            seaweedfs01:
+                condition: service_healthy
         container_name: redis01.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
-        external_links:
-            - minio01.test_net_${TEST_ID}:minio
         hostname: redis01
         image: redis:test_net_${TEST_ID}
         networks:
@@ -46,10 +56,11 @@ services:
             context: .
             args:
                 - REDIS_VERSION=${REDIS_VERSION}
+        depends_on:
+            seaweedfs01:
+                condition: service_healthy
         container_name: redis02.test_net_${TEST_ID}
         domainname: test_net_${TEST_ID}
-        external_links:
-            - minio01.test_net_${TEST_ID}:minio
         hostname: redis02
         image: redis:test_net_${TEST_ID}
         networks:

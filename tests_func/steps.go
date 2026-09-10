@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
-	"path/filepath"
 	"reflect"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/tests_func/helpers"
+	"github.com/wal-g/wal-g/utility"
 )
 
 func SetupCommonSteps(ctx *godog.ScenarioContext, tctx *TestContext) {
@@ -48,7 +48,7 @@ func (tctx *TestContext) sameDataCheck(dataId1, dataId2 string) error {
 
 func (tctx *TestContext) prepareInfrastructure() error {
 	tctx.AuxData.CreatedBackupNames = []string{}
-	tctx.AuxData.NometaBackupNames = []string{}
+	tctx.AuxData.IncompleteBackupObjectKeys = []string{}
 	tctx.AuxData.OplogPushEnabled = false
 	tctx.AuxData.Timestamps = make(map[string]helpers.OpTimestamp)
 	tctx.AuxData.Snapshots = make(map[string][]helpers.NsSnapshot)
@@ -123,7 +123,7 @@ func (tctx *TestContext) backupMetadataContains(container string, backupId int, 
 }
 
 func (tctx *TestContext) configureS3(host string) error {
-	return S3StorageFromTestContext(tctx, host).InitMinio()
+	return S3StorageFromTestContext(tctx, host).WaitForBucket()
 }
 
 func (tctx *TestContext) getMongoLoadFile(loadId, filename string) string {
@@ -131,34 +131,33 @@ func (tctx *TestContext) getMongoLoadFile(loadId, filename string) string {
 	return path.Join("mongodb", "config", loadId, filename)
 }
 
-func (tctx *TestContext) putEmptyBackupViaMinio(nodeName, filename string) error {
-	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, tctx.Env["TEST_ID"])
+func (tctx *TestContext) putIncompleteBackupViaS3(nodeName, filename string) error {
 	backupName := "20010203T040506"
-	bucketName := tctx.Env["S3_BUCKET"]
-	backupRootDir := tctx.Env["WALG_S3_PREFIX"]
-	backupDir := "/export/" + bucketName + "/" + backupRootDir + "/" + backupName
-	backupDumpPath := filepath.Join(backupDir, filename)
-	tctx.AuxData.NometaBackupNames = append(tctx.AuxData.NometaBackupNames, backupName)
-	_, err := helpers.RunCommand(tctx.Context, containerName, []string{"mkdir", "-p", backupDir})
+	objectKey, err := helpers.ObjectKeyFromS3Prefix(
+		tctx.Env["WALG_S3_PREFIX"],
+		tctx.Env["S3_BUCKET"],
+		utility.BaseBackupPath,
+		backupName,
+		filename,
+	)
 	if err != nil {
 		return err
 	}
-	_, err = helpers.RunCommand(tctx.Context, containerName, []string{"touch", backupDumpPath})
+	client, err := S3StorageFromTestContext(tctx, nodeName).Client()
 	if err != nil {
 		return err
 	}
-	return nil
+	tctx.AuxData.IncompleteBackupObjectKeys = append(tctx.AuxData.IncompleteBackupObjectKeys, objectKey)
+	return client.PutEmptyObject(objectKey)
 }
 
-func (tctx *TestContext) testEmptyBackupsViaMinio(nodeName string) error {
-	containerName := fmt.Sprintf("%s.test_net_%s", nodeName, tctx.Env["TEST_ID"])
-	bucketName := tctx.Env["S3_BUCKET"]
-	backupRootDir := tctx.Env["WALG_S3_PREFIX"]
-	backupNames := tctx.AuxData.NometaBackupNames
-	for _, backupName := range backupNames {
-		backupDir := filepath.Join("/export", bucketName, backupRootDir, backupName)
-		_, err := helpers.RunCommand(tctx.Context, containerName, []string{"ls", backupDir})
-		if err != nil {
+func (tctx *TestContext) requireIncompleteBackupsViaS3(nodeName string) error {
+	client, err := S3StorageFromTestContext(tctx, nodeName).Client()
+	if err != nil {
+		return err
+	}
+	for _, objectKey := range tctx.AuxData.IncompleteBackupObjectKeys {
+		if err := client.RequireObject(objectKey); err != nil {
 			return err
 		}
 	}

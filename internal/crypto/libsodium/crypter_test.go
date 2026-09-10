@@ -56,10 +56,10 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	secret := strings.Repeat(" so very secret thing ", 1000)
 	reader, writer := io.Pipe()
 
-	encrypt, err := crypter.Encrypt(writer)
+	encrypt, err := crypter.Encrypt(t.Context(), writer)
 	assert.NoErrorf(t, err, "encryption error: %v", err)
 
-	decrypt, err := crypter.Decrypt(reader)
+	decrypt, err := crypter.Decrypt(t.Context(), reader)
 	assert.NoErrorf(t, err, "decryption error: %v", err)
 
 	go func() {

@@ -10,6 +10,7 @@ import (
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/policies"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
+	"github.com/wal-g/wal-g/utility"
 )
 
 const UseSentinelTimeFlag = "use-sentinel-time"
@@ -130,7 +131,9 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	targetBackupSelector, err := internal.CreateTargetDeleteBackupSelector(cmd, args, deleteTargetUserData, postgres.NewGenericMetaFetcher())
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, findFullBackup)
+	target := deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector, confirmed, findFullBackup)
+
+	internal.DeleteJournalInfo(cmd.Context(), folder, target.GetBackupName(), utility.WalPath, confirmed)
 }
 
 func runDeleteGarbage(cmd *cobra.Command, args []string) {

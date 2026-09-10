@@ -3,7 +3,7 @@ Feature: Redis standalone tiered-storage backup
   Background:
     Given prepared infrastructure
     And a working redis on redis01
-    And a configured s3 on minio01
+    And a configured s3 on seaweedfs01
 
   Scenario: Standalone TS backup is listed, fetched, and deleted
     Given redis01 has a frozen ts tree at /data/ts-source

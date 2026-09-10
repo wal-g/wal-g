@@ -69,11 +69,11 @@ func InfraFromTestContext(tctx *TestContext) *helpers.Infra {
 }
 
 type AuxData struct {
-	Timestamps         map[string]helpers.OpTimestamp
-	Snapshots          map[string][]helpers.NsSnapshot
-	CreatedBackupNames []string
-	NometaBackupNames  []string
-	OplogPushEnabled   bool
+	Timestamps                 map[string]helpers.OpTimestamp
+	Snapshots                  map[string][]helpers.NsSnapshot
+	CreatedBackupNames         []string
+	IncompleteBackupObjectKeys []string
+	OplogPushEnabled           bool
 }
 
 type DBVersion struct {

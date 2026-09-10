@@ -62,7 +62,7 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	const someSecret = "so very secret thing"
 
 	buf := new(bytes.Buffer)
-	encrypt, err := crypter.Encrypt(buf)
+	encrypt, err := crypter.Encrypt(t.Context(), buf)
 	assert.NoErrorf(t, err, "Encryption error: %v", err)
 
 	_, err = encrypt.Write([]byte(someSecret))
@@ -70,7 +70,7 @@ func EncryptionCycle(t *testing.T, crypter crypto.Crypter) {
 	err = encrypt.Close()
 	assert.NoError(t, err)
 
-	decrypt, err := crypter.Decrypt(buf)
+	decrypt, err := crypter.Decrypt(t.Context(), buf)
 	assert.NoErrorf(t, err, "Decryption error: %v", err)
 
 	decryptedBytes, err := io.ReadAll(decrypt)

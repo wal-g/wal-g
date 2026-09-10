@@ -2,13 +2,14 @@ package binary
 
 import (
 	"container/heap"
+	"context"
 
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type StorageMetadataCollector struct {
@@ -35,13 +36,34 @@ func NewStorageMetadataCollector(
 		pmc:           NewPartialMetadataCollector(),
 		heap:          h,
 		TarsChan:      make(chan internal.TarFileSets),
-		ErrsChan:      make(chan error),
+		ErrsChan:      make(chan error, 1),
 		onComplete:    onComplete,
 		systemDbs:     common.SystemDBs(),
 	}
 }
 
 func (smc *StorageMetadataCollector) GetStats() {
+	smc.ErrsChan <- smc.getStats()
+}
+
+func (smc *StorageMetadataCollector) Complete(ctx context.Context, tarFileSets internal.TarFileSets) error {
+	select {
+	case smc.TarsChan <- tarFileSets:
+	case err := <-smc.ErrsChan:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	select {
+	case err := <-smc.ErrsChan:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (smc *StorageMetadataCollector) getStats() error {
 	pipeline := mongo.Pipeline{
 		{{Key: "$_internalAllCollectionStats", Value: bson.D{
 			{Key: "stats", Value: bson.D{
@@ -52,16 +74,14 @@ func (smc *StorageMetadataCollector) GetStats() {
 
 	cursor, err := smc.mongodService.MongoClient.Database(adminDB).Aggregate(smc.mongodService.Context, pipeline)
 	if err != nil {
-		smc.ErrsChan <- err
-		return
+		return err
 	}
 	defer cursor.Close(smc.mongodService.Context)
 
 	for cursor.TryNext(smc.mongodService.Context) {
 		var nsInfo models.NsInfo
 		if err = cursor.Decode(&nsInfo); err != nil {
-			smc.ErrsChan <- err
-			return
+			return err
 		}
 
 		smc.handleTop100Info(&nsInfo)
@@ -69,8 +89,7 @@ func (smc *StorageMetadataCollector) GetStats() {
 	}
 
 	if err := cursor.Err(); err != nil {
-		smc.ErrsChan <- err
-		return
+		return err
 	}
 
 	top100Ns := make([]string, smc.heap.Len())
@@ -80,13 +99,17 @@ func (smc *StorageMetadataCollector) GetStats() {
 
 	smc.top100Ns = &top100Ns
 
-	tarsFileSet := <-smc.TarsChan
+	var tarsFileSet internal.TarFileSets
+	select {
+	case tarsFileSet = <-smc.TarsChan:
+	case <-smc.mongodService.Context.Done():
+		return smc.mongodService.Context.Err()
+	}
 	if err := smc.pmc.EnrichWithTarPaths(tarsFileSet.Get()); err != nil {
-		smc.ErrsChan <- err
-		return
+		return err
 	}
 
-	smc.ErrsChan <- smc.onComplete(smc.pmc.GetRoutes())
+	return smc.onComplete(smc.pmc.GetRoutes())
 }
 
 func (smc *StorageMetadataCollector) handleTop100Info(nsInfo *models.NsInfo) {

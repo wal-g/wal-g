@@ -1,11 +1,16 @@
 package mysql
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/pkg/storages/memory"
 )
 
 const testFilenameSmall = "testdata/binlog_small_test"
@@ -42,4 +47,23 @@ func TestBinlogNum(t *testing.T) {
 	assert.Equal(t, 1, BinlogNum("foo.1"))
 	assert.Equal(t, 123456, BinlogNum("foo.123456"))
 	assert.Equal(t, 123456789, BinlogNum("foo.123456789"))
+}
+
+func TestGetBinlogPreviousGTIDsRemoteDoesNotRequireTempDir(t *testing.T) {
+	binlogData, err := os.ReadFile(testFilenameSmall)
+	require.NoError(t, err)
+	require.Less(t, len(binlogData), BinlogReadHeaderSize)
+
+	folder := memory.NewFolder("", memory.NewKVS())
+	binlogName := filepath.Base(testFilenameSmall)
+	require.NoError(t, folder.PutObject(t.Context(), binlogName, bytes.NewReader(binlogData)))
+
+	expectedGTIDSet, err := GetBinlogPreviousGTIDs(testFilenameSmall, mysql.MySQLFlavor)
+	require.NoError(t, err)
+
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+	actualGTIDSet, err := GetBinlogPreviousGTIDsRemote(t.Context(), folder, binlogName, mysql.MySQLFlavor)
+	require.NoError(t, err)
+
+	assert.Equal(t, expectedGTIDSet.String(), actualGTIDSet.String())
 }

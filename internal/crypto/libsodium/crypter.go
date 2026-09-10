@@ -6,6 +6,7 @@ package libsodium
 import "C"
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -92,7 +93,7 @@ func (crypter *Crypter) setup() (err error) {
 }
 
 // Encrypt creates encryption writer from ordinary writer
-func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
+func (crypter *Crypter) Encrypt(_ context.Context, writer io.Writer) (io.WriteCloser, error) {
 	if err := crypter.setup(); err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (crypter *Crypter) Encrypt(writer io.Writer) (io.WriteCloser, error) {
 }
 
 // Decrypt creates decrypted reader from ordinary reader
-func (crypter *Crypter) Decrypt(reader io.Reader) (io.Reader, error) {
+func (crypter *Crypter) Decrypt(_ context.Context, reader io.Reader) (io.Reader, error) {
 	if err := crypter.setup(); err != nil {
 		return nil, err
 	}

@@ -158,7 +158,7 @@ func (h *DeleteHandler) HandleDeleteRetainAfter(ctx context.Context, args []stri
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
-func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector BackupSelector, confirmed, findFull bool) {
+func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector BackupSelector, confirmed, findFull bool) BackupObject {
 	target, err := h.FindTargetBySelector(ctx, targetSelector)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -171,6 +171,8 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector B
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(ctx, target, confirmed, findFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	return target
 }
 
 func (h *DeleteHandler) HandleDeleteEverything(ctx context.Context, args []string, permanentBackups []string, confirmed bool) {

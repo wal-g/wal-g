@@ -8,7 +8,7 @@ import (
 
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/internal"
 	"github.com/wal-g/wal-g/tests_func/mongodb/mongoload/models"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func HandleLoad(ctx context.Context, reader io.Reader, mc *mongo.Client, workers int) (models.LoadStat, error) {

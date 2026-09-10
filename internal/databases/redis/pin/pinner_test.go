@@ -41,6 +41,23 @@ func TestFilesPinnerPinTreePreservesRelativePathsAndKeepsFilesReadable(t *testin
 	assert.Equal(t, []byte("part"), contents)
 }
 
+func TestFilesPinnerPinTreeHardLinkErrorIncludesDiagnostics(t *testing.T) {
+	sourceDir := t.TempDir()
+	pinDir := t.TempDir()
+	sourceFile := filepath.Join(sourceDir, "file")
+	pinnedFile := filepath.Join(pinDir, "file")
+	require.NoError(t, os.WriteFile(sourceFile, []byte("source"), 0o600))
+	// Force os.Link to fail deterministically because the destination already exists.
+	require.NoError(t, os.WriteFile(pinnedFile, []byte("destination"), 0o600))
+
+	pinner := NewFilesPinner(pinDir)
+	_, err := pinner.PinTree(sourceDir)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, os.ErrExist)
+	assert.Contains(t, err.Error(), "source_stat={")
+	assert.Contains(t, err.Error(), "destination_parent_stat={")
+}
+
 func TestValidateSameFilesystemRejectsMissingPinFolder(t *testing.T) {
 	sourceDir := t.TempDir()
 	err := ValidateSameFilesystem(sourceDir, filepath.Join(t.TempDir(), "missing"))

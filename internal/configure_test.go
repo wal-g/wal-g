@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/wal-g/wal-g/internal"
@@ -415,4 +416,29 @@ func TestConfigureStorage_WithNetworkLimiter(t *testing.T) {
 	assert.NotNil(t, st)
 	_, isLimited := st.RootFolder().(*internal.LimitedFolder)
 	assert.True(t, isLimited, "expected root folder to be wrapped in LimitedFolder")
+}
+
+// AddConfigFlags binds a flag to WALG_FAILOVER_STORAGES, which since viper 1.20 shadows its nested keys
+func TestConfigureFailoverStorages_FromConfigFile(t *testing.T) {
+	resetToDefaults()
+	defer resetToDefaults()
+
+	dir := t.TempDir()
+	cfgFile := filepath.Join(dir, "walg.json")
+	cfgJSON := fmt.Sprintf(`{"WALG_FAILOVER_STORAGES":{"failover":{"WALG_FILE_PREFIX":%q}}}`, dir)
+	assert.NoError(t, os.WriteFile(cfgFile, []byte(cfgJSON), 0644))
+
+	flags := &pflag.FlagSet{}
+	flagName := config.ToFlagName(config.FailoverStorages)
+	flags.String(flagName, "", "")
+	assert.NoError(t, viper.BindPFlag(config.FailoverStorages, flags.Lookup(flagName)))
+	config.ReadConfigFromFile(viper.GetViper(), cfgFile)
+
+	failovers, err := internal.ConfigureFailoverStorages(t.Context())
+	assert.NoError(t, err)
+	assert.Len(t, failovers, 1)
+	assert.NotNil(t, failovers["failover"])
+	for _, st := range failovers {
+		assert.NoError(t, st.Close())
+	}
 }

@@ -53,7 +53,7 @@ func DownloadAndDecompressStream(ctx context.Context, backup Backup, writeCloser
 		tracelog.DebugLogger.Printf("Found file: %s.%s", backup.Name, decompressor.FileExtension())
 		defer utility.LoggedClose(archiveReader, "")
 
-		decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
+		decompressedReader, err := DecompressDecryptBytes(ctx, archiveReader, decompressor)
 		if err != nil {
 			return fmt.Errorf("failed to decompress and decrypt file: %w", err)
 		}
@@ -139,7 +139,7 @@ func downloadAndDecompressFile(ctx context.Context, backup Backup, decompressor 
 		}
 		archiveReader = reader
 	}
-	decompressedReader, err := DecompressDecryptBytes(archiveReader, decompressor)
+	decompressedReader, err := DecompressDecryptBytes(ctx, archiveReader, decompressor)
 	if err != nil {
 		return fmt.Errorf("failed to decompress/decrypt file %v: %w", fileName, err)
 	}

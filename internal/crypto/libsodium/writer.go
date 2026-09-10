@@ -95,7 +95,7 @@ func (writer *Writer) writeNextChunk(last bool) (err error) {
 		&outLen,
 		(*C.uchar)(&writer.in[0]),
 		(C.ulonglong)(writer.inIdx),
-		(*C.uchar)(C.NULL),
+		nil,
 		(C.ulonglong)(0),
 		tag,
 	)

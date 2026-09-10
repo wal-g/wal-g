@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	redisdb "github.com/wal-g/wal-g/internal/databases/redis"
@@ -67,10 +68,14 @@ func runTieredStorageBackupPush(ctx context.Context) error {
 			Permanent:     permanent,
 			DeferSentinel: true,
 		})
-		if pushErr == nil {
-			tsBackupMeta = backup
+		if pushErr != nil {
+			// Log the initiating error before returning it: errgroup cancels the AOF branch as soon as this
+			// goroutine exits, and a secondary fatal upload error may terminate the process before g.Wait reports it.
+			tracelog.ErrorLogger.Printf("tiered-storage branch failed: %+v\n", pushErr)
+			return pushErr
 		}
-		return pushErr
+		tsBackupMeta = backup
+		return nil
 	})
 
 	if err = g.Wait(); err != nil {

@@ -60,6 +60,11 @@ type FolderExt interface {
 	ListFolderSegment(ctx context.Context, startAfter *string, endBefore *string) (objects []Object, subFolders []Folder, err error)
 }
 
+type CrossFolderCopier interface {
+	CanCopyFrom(source Folder) bool
+	CopyObjectFrom(ctx context.Context, source Folder, sourcePath, destinationPath string, size int64) error
+}
+
 func ListFolderRecursively(ctx context.Context, folder Folder) (relativePathObjects []Object, err error) {
 	return ListFolderRecursivelyWithFilter(ctx, folder, func(string) bool { return true })
 }

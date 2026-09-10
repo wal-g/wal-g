@@ -3,7 +3,7 @@ set -e -x
 
 . /usr/local/export_common.sh
 
-etcd --data-dir $WALG_ETCD_DATA_DIR &
+start_etcd "$WALG_ETCD_DATA_DIR"
 
 mkdir -p $WALG_FILE_PREFIX
 
@@ -34,4 +34,4 @@ for file in $expected_fetched_wals; do
   fi
 done
 
-pkill etcd
+kill_etcd

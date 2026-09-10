@@ -100,6 +100,17 @@ wal-g backup-push --delta-from-user-data "{ \"x\": [3], \"y\": 4 }" --config=/pa
 
 To prevent WAL-G from falling back to a full scan delta backup when it fails to download delta files.
 
+#### Journal size (WAL volume) accounting
+
+Run ``backup-push`` with the ``--count-journals`` flag to track the volume of WAL accumulated between one backup and the next one. The size is computed from the actual storage object sizes of the archived WAL segments, so it correctly reflects compression, unlike an LSN-difference estimate.
+
+```bash
+wal-g backup-push --count-journals --config=/path/to/config.yaml
+```
+Journal accounting is skipped for permanent backups (marked with ``--permanent``), since they are not expected to be removed and don't take part in WAL retention planning.
+
+Currently, only ``delete target`` cleans up and re-merges the corresponding journal entries when a backup is removed; other ``delete`` modes (``before``, ``retain``, ``everything``, ``garbage``) leave existing journals untouched.
+
 ### ``backup-fetch``
 
 When fetching base backups, the user should pass in the cluster restore configuration and the name of the backup.

@@ -20,6 +20,10 @@ import (
 const (
 	CompressedPageSize        = 512
 	SignatureMagicNumber byte = 0x55
+
+	// OndiskPageHeaderSize is sizeof(OrioleDBOndiskPageHeader)
+	OndiskPageHeaderSize   = 16
+	compressPageSizeOffset = 4
 )
 
 var DatabasePageSize = int64(walparser.BlockSize)
@@ -101,12 +105,16 @@ func (pageReader *incrementalPageReader) Close() error {
 
 // TODO : unit tests
 // TODO : "initialize" is rather meaningless name, maybe this func should be decomposed
-func (pageReader *incrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (size int64, err error) {
+func (pageReader *incrementalPageReader) initialize(deltaBitmap *roaring.Bitmap) (int64, error) {
 	var headerBuffer bytes.Buffer
 	headerBuffer.Write(IncrementFileHeader)
 	fileSize := pageReader.FileSize
 	headerBuffer.Write(utility.ToBytes(uint64(fileSize)))
-	pageReader.Compressed = fileSize%DatabasePageSize != 0
+	compressed, err := pageReader.detectCompressed()
+	if err != nil {
+		return 0, err
+	}
+	pageReader.Compressed = compressed
 	pageSize := DatabasePageSize
 	if pageReader.Compressed {
 		pageSize = CompressedPageSize
@@ -126,8 +134,24 @@ func (pageReader *incrementalPageReader) initialize(deltaBitmap *roaring.Bitmap)
 	pageReader.WriteDiffMapToHeader(&headerBuffer)
 	pageReader.Next = headerBuffer.Bytes()
 	pageDataSize := int64(len(pageReader.Blocks)) * pageSize
-	size = int64(headerBuffer.Len()) + pageDataSize
-	return
+	size := int64(headerBuffer.Len()) + pageDataSize
+	return size, nil
+}
+
+// detectCompressed reads the first page's on-disk header: compressPageSize is
+// zero for a plain page and non-zero for a compressed one.
+func (pageReader *incrementalPageReader) detectCompressed() (bool, error) {
+	if pageReader.FileSize < OndiskPageHeaderSize {
+		return false, nil
+	}
+	header := make([]byte, OndiskPageHeaderSize)
+	if _, err := io.ReadFull(pageReader.PagedFile, header); err != nil {
+		return false, err
+	}
+	if _, err := pageReader.PagedFile.Seek(0, io.SeekStart); err != nil {
+		return false, err
+	}
+	return binary.LittleEndian.Uint16(header[compressPageSizeOffset:]) != 0, nil
 }
 
 func (pageReader *incrementalPageReader) DeltaBitmapInitialize(deltaBitmap *roaring.Bitmap) {
@@ -148,7 +172,7 @@ func (pageReader *incrementalPageReader) DeltaBitmapInitialize(deltaBitmap *roar
 
 func (pageReader *incrementalPageReader) FullScanCompressedInitialize() error {
 	readBytes := uint32(0)
-	const sizeOfHeader = 8
+	const sizeOfHeader = OndiskPageHeaderSize
 	for {
 		header := make([]byte, sizeOfHeader)
 
@@ -160,9 +184,9 @@ func (pageReader *incrementalPageReader) FullScanCompressedInitialize() error {
 			}
 			return err
 		}
-		pageSize := binary.LittleEndian.Uint16(header)
-		// because pageSize is aligned to 4 bytes
-		chkpNum := binary.LittleEndian.Uint32(header[4:])
+		// checkpointNum comes first, compressPageSize follows it
+		chkpNum := binary.LittleEndian.Uint32(header)
+		pageSize := binary.LittleEndian.Uint16(header[compressPageSizeOffset:])
 		blocksTotal := (pageSize + sizeOfHeader + CompressedPageSize - 1) / CompressedPageSize
 		fullSize := blocksTotal*CompressedPageSize - sizeOfHeader
 
@@ -225,20 +249,7 @@ func (pageReader *incrementalPageReader) WriteDiffMapToHeader(headerWriter io.Wr
 }
 
 type pageHeader struct {
-	state             uint32
-	usageCount        uint32
-	pageChangeCount   uint32
-	checkpointNum     uint32
-	undoLocation      uint64
-	csn               uint64
-	rightLink         uint64
-	flagsField1Field2 uint32
-	maxKeyLen         uint16
-	prevInsertOffset  uint16
-	chunksCount       uint16
-	itemsCount        uint16
-	hikeysEnd         uint16
-	dataSize          uint16
+	checkpointNum uint32
 }
 
 func (header *pageHeader) isValid() bool {
@@ -250,21 +261,7 @@ func (header *pageHeader) isValid() bool {
 func parsePageHeader(reader io.Reader) (*pageHeader, error) {
 	pageHeader := pageHeader{}
 	fields := []parsingutil.FieldToParse{
-		{Field: &pageHeader.state, Name: "state"},
-		{Field: &pageHeader.usageCount, Name: "usageCount"},
-		{Field: &pageHeader.pageChangeCount, Name: "pageChangeCount"},
-
 		{Field: &pageHeader.checkpointNum, Name: "checkpointNum"},
-		{Field: &pageHeader.undoLocation, Name: "undoLocation"},
-		{Field: &pageHeader.csn, Name: "csn"},
-		{Field: &pageHeader.rightLink, Name: "rightLink"},
-		{Field: &pageHeader.flagsField1Field2, Name: "flagsField1Field2"},
-		{Field: &pageHeader.maxKeyLen, Name: "maxKeyLen"},
-		{Field: &pageHeader.prevInsertOffset, Name: "prevInsertOffset"},
-		{Field: &pageHeader.chunksCount, Name: "chunksCount"},
-		{Field: &pageHeader.itemsCount, Name: "itemsCount"},
-		{Field: &pageHeader.hikeysEnd, Name: "hikeysEnd"},
-		{Field: &pageHeader.dataSize, Name: "dataSize"},
 	}
 	err := parsingutil.ParseMultipleFieldsFromReader(fields, reader)
 	if err != nil {

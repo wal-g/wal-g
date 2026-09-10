@@ -37,7 +37,6 @@ const (
 	endpointPortSetting             = "S3_ENDPOINT_PORT"
 	endpointProtocolSetting         = "S3_ENDPOINT_PROTOCOL"
 	logLevelSetting                 = "S3_LOG_LEVEL"
-	useListObjectsV1Setting         = "S3_USE_LIST_OBJECTS_V1"
 	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
 	rangeQueriesMaxRetriesSetting   = "S3_RANGE_MAX_RETRIES"
 	requestAdditionalHeadersSetting = "S3_REQUEST_ADDITIONAL_HEADERS"
@@ -76,7 +75,6 @@ var SettingList = []string{
 	uploadConcurrencySetting,
 	caCertFileSetting,
 	maxPartSizeSetting,
-	useListObjectsV1Setting,
 	logLevelSetting,
 	rangeBatchEnabledSetting,
 	rangeQueriesMaxRetriesSetting,
@@ -96,7 +94,6 @@ const (
 	defaultDualStack               = false
 	defaultSkipValidation          = true
 	defaultForcePathStyle          = false
-	defaultUseListObjectsV1        = false
 	defaultMaxRetries              = 15
 	defaultMinThrottlingRetryDelay = 500
 	defaultMaxThrottlingRetryDelay = 300000
@@ -136,10 +133,6 @@ func ConfigureStorage(
 		return nil, err
 	}
 	forcePathStyle, err := setting.BoolOptional(settings, forcePathStyleSetting, defaultForcePathStyle)
-	if err != nil {
-		return nil, err
-	}
-	useListObjectsV1, err := setting.BoolOptional(settings, useListObjectsV1Setting, defaultUseListObjectsV1)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +203,6 @@ func ConfigureStorage(
 		UseYCSessionToken:        settings[useYcSessionTokenSetting],
 		ForcePathStyle:           forcePathStyle,
 		RequestAdditionalHeaders: settings[requestAdditionalHeadersSetting],
-		UseListObjectsV1:         useListObjectsV1,
 		MaxRetries:               maxRetries,
 		LogLevel:                 settings[logLevelSetting],
 		Uploader: &UploaderConfig{

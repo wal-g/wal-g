@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
+
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Sentinel struct {
@@ -30,7 +31,7 @@ type BackupMeta struct {
 	Before NodeMeta `json:"Before,omitempty"`
 	After  NodeMeta `json:"After,omitempty"`
 
-	BackupLastTS primitive.Timestamp `json:"BackupLastTS,omitempty"` // for binary backup
+	BackupLastTS bson.Timestamp `json:"BackupLastTS,omitempty"` // for binary backup
 }
 
 func (backupMeta BackupMeta) GetBackupLastTS() OpTimestamp {
@@ -45,7 +46,7 @@ func (backupMeta BackupMeta) GetBackupLastTS() OpTimestamp {
 	return emptyTS
 }
 
-func ToOpTimestamp(ts primitive.Timestamp) OpTimestamp {
+func ToOpTimestamp(ts bson.Timestamp) OpTimestamp {
 	return OpTimestamp{TS: ts.T, Inc: ts.I}
 }
 
@@ -107,6 +108,8 @@ type WalgUtil struct {
 	confPath       string
 	dbMajorVersion string
 }
+
+const interruptedReplayLogPath = "/tmp/walg-interrupted-replay.log"
 
 func NewWalgUtil(ctx context.Context, host, cliPath, confPath, dbMajorVersion string) *WalgUtil {
 	return &WalgUtil{ctx, host, cliPath, confPath, dbMajorVersion}
@@ -197,6 +200,52 @@ func (w *WalgUtil) FetchBinaryBackup(
 	}
 	_, err := w.runCmd(cli...)
 	return err
+}
+
+func (w *WalgUtil) FetchBinaryBackupWithPITR(
+	backup, mongodConfigPath, mongodbVersion, since, until string,
+) (ExecResult, error) {
+	walgCommand := []string{
+		"env",
+		"OPLOG_REPLAY_FSYNC_INTERVAL=1ms",
+		"OPLOG_REPLAY_MAX_MONGOD_RESTARTS=5",
+		w.cliPath, "--config", w.confPath,
+		"binary-backup-fetch", backup, mongodConfigPath, mongodbVersion,
+		"--pitr-since", since,
+		"--pitr-until", until,
+	}
+	command := []string{"bash", "-c", `
+log_path="$1"
+shift
+: > "$log_path"
+exec "$@" > "$log_path" 2>&1
+`, "--", interruptedReplayLogPath}
+	command = append(command, walgCommand...)
+	_, restoreErr := RunCommandStrict(w.ctx, w.host, command)
+	logResult, logErr := RunCommand(w.ctx, w.host, []string{"bash", "-c", `
+while IFS= read -r line; do
+    printf '%s\n' "$line"
+done < "$1"
+`, "--", interruptedReplayLogPath})
+	if restoreErr != nil {
+		return logResult, restoreErr
+	}
+	return logResult, logErr
+}
+
+func (w *WalgUtil) InterruptedReplayCheckpointLogged() (bool, error) {
+	result, err := RunCommand(w.ctx, w.host, []string{"bash", "-c", `
+while IFS= read -r line; do
+    case "$line" in
+        *"Oplog replay progress is durable through"*) exit 0 ;;
+    esac
+done < "$1" 2>/dev/null
+exit 1
+`, "--", interruptedReplayLogPath})
+	if err != nil {
+		return false, err
+	}
+	return result.ExitCode == 0, nil
 }
 
 func (w *WalgUtil) BackupMeta(backupNum int) (Sentinel, error) {

@@ -1,4 +1,7 @@
-FROM ubuntu:18.04
+FROM debian:bookworm-slim
+
+# Retry apt downloads; this debian base has none of the wal-g apt settings.
+RUN printf 'Acquire::Retries "5";\n' > /etc/apt/apt.conf.d/80-retries
 
 RUN apt-get update && apt-get install -y openssh-server
 RUN mkdir /var/run/sshd
