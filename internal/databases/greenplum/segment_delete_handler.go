@@ -69,11 +69,6 @@ func (h SegDeleteBeforeHandler) Delete(ctx context.Context, segBackup SegBackup)
 	if err != nil {
 		return err
 	}
-	baseBackupsFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
-	backupsBefore, err := listBackupsInOrder(ctx, baseBackupsFolder)
-	if err != nil {
-		return err
-	}
 
 	tracelog.InfoLogger.Printf("Running delete before target %s on segment %d\n",
 		segTarget.GetBackupName(), h.contentID)
@@ -89,16 +84,11 @@ func (h SegDeleteBeforeHandler) Delete(ctx context.Context, segBackup SegBackup)
 	if err != nil {
 		return err
 	}
-	backupsAfter, err := listBackupsInOrder(ctx, baseBackupsFolder)
-	if err != nil {
-		return err
-	}
-	backupsToReassign := backupsWithChangedPredecessor(backupsBefore, backupsAfter)
 
-	if err := cleanupAOSegments(ctx, segTarget, h.Folder, backupsToReassign, h.args.Confirmed); err != nil {
+	if err := cleanupAOSegments(ctx, segTarget, h.Folder, h.args.Confirmed); err != nil {
 		return err
 	}
-	return cleanupPaxFiles(ctx, segTarget, h.Folder, backupsToReassign, h.args.Confirmed)
+	return cleanupPaxFiles(ctx, segTarget, h.Folder, h.args.Confirmed)
 }
 
 type SegDeleteTargetHandler struct {
@@ -112,12 +102,6 @@ func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup)
 	if err != nil {
 		return err
 	}
-	baseBackupsFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
-	backupsBefore, err := listBackupsInOrder(ctx, baseBackupsFolder)
-	if err != nil {
-		return err
-	}
-
 	tracelog.InfoLogger.Printf("Running delete target %s on segment %d\n",
 		segTarget.GetBackupName(), h.contentID)
 
@@ -129,30 +113,20 @@ func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup)
 	if err != nil {
 		return err
 	}
-	backupsAfter, err := listBackupsInOrder(ctx, baseBackupsFolder)
-	if err != nil {
-		return err
-	}
-	backupsToReassign := backupsWithChangedPredecessor(backupsBefore, backupsAfter)
-
 	// The cluster-level journal is recalculated from the segment ones, so this must happen
 	// before the coordinator sums them up (see UpdateClusterIntervalSize).
 	internal.DeleteJournalInfo(ctx, h.Folder, segTarget.GetBackupName(), utility.WalPath, h.args.Confirmed)
 
-	if err := cleanupAOSegments(ctx, segTarget, h.Folder, backupsToReassign, h.args.Confirmed); err != nil {
+	if err := cleanupAOSegments(ctx, segTarget, h.Folder, h.args.Confirmed); err != nil {
 		return err
 	}
-	return cleanupPaxFiles(ctx, segTarget, h.Folder, backupsToReassign, h.args.Confirmed)
+	return cleanupPaxFiles(ctx, segTarget, h.Folder, h.args.Confirmed)
 }
 
 func cleanupAOSegments(ctx context.Context, target internal.BackupObject, segFolder storage.Folder,
-	backupsToReassign []string, confirmed bool) error {
+	confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(ao.StoragePath)
 	baseBackupsFolder := segFolder.GetSubFolder(utility.BaseBackupPath)
-	if err := ao.ReassignSharedStorage(ctx, baseBackupsFolder, backupsToReassign, confirmed); err != nil {
-		return err
-	}
-
 	aoSegmentsToRetain, err := ao.LoadStorageAOFiles(ctx, baseBackupsFolder)
 	if err != nil {
 		return err
@@ -260,13 +234,9 @@ func GetPermanentBackupsAndWals(ctx context.Context, rootFolder storage.Folder, 
 }
 
 func cleanupPaxFiles(ctx context.Context, target internal.BackupObject, segFolder storage.Folder,
-	backupsToReassign []string, confirmed bool) error {
+	confirmed bool) error {
 	paxFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(pax.StoragePath)
 	baseBackupsFolder := segFolder.GetSubFolder(utility.BaseBackupPath)
-	if err := pax.ReassignSharedStorage(ctx, baseBackupsFolder, backupsToReassign, confirmed); err != nil {
-		return err
-	}
-
 	paxFilesToRetain, err := pax.LoadStoragePaxFiles(ctx, baseBackupsFolder)
 	if err != nil {
 		return err

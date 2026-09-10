@@ -7,6 +7,15 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
+// ReassignSharedStorage recalculates the shared-storage ownership of a surviving cluster backup
+// and uploads only its small cluster-level SharedSizeDTO objects. Segment files metadata remains
+// unchanged: its UploadedSharedSize describes the initial upload.
+func ReassignSharedStorage(ctx context.Context, rootFolder storage.Folder, backupName string) error {
+	return uploadSharedSizes(ctx, rootFolder, backupName, func(kind sharedStorageKind) segmentSharedSizeReader {
+		return kind.readReassignedSegmentSize
+	})
+}
+
 func listBackupsInOrder(ctx context.Context, baseBackupsFolder storage.Folder) ([]internal.BackupTime, error) {
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {

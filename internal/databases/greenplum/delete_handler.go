@@ -173,8 +173,8 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 	// Runs after dispatchDeleteCmd on purpose: the cluster-wide journal is recalculated from the
 	// segment journals, which the segment handlers above have just re-merged.
 	DeleteClusterJournalInfo(ctx, h.Folder, target.GetBackupName(), h.args.Confirmed)
-	// Segment cleanup also reassigned shared AO/PAX objects. Fold the updated segment metadata into
-	// the surviving cluster backups after their cluster-level objects have been deleted.
+	// Segment cleanup has removed unreferenced AO/PAX objects. Recalculate ownership directly into
+	// the surviving cluster backups after their old cluster-level objects have been deleted.
 	tracelog.ErrorLogger.FatalOnError(h.recalculateSharedSizes(ctx,
 		backupsWithChangedPredecessor(backupsBefore, backupsAfter)))
 }

@@ -37,15 +37,29 @@ type SharedSizeDTO struct {
 // does, so every delete mode picks them up without any code of its own (see
 // utility.StripLeftmostBackupName).
 type sharedStorageKind struct {
-	name            string
-	path            func(backupName string) string
-	readSegmentSize func(ctx context.Context, baseBackupsFolder storage.Folder, backupName string) (int64, error)
+	name                      string
+	path                      func(backupName string) string
+	readInitialSegmentSize    segmentSharedSizeReader
+	readReassignedSegmentSize segmentSharedSizeReader
 }
+
+type segmentSharedSizeReader func(ctx context.Context, baseBackupsFolder storage.Folder,
+	backupName string) (int64, error)
 
 func sharedStorageKinds() []sharedStorageKind {
 	return []sharedStorageKind{
-		{name: "AO/AOCS", path: ao.GetFilesMetadataPath, readSegmentSize: readUploadedAOSize},
-		{name: "PAX", path: pax.GetFilesMetadataPath, readSegmentSize: readUploadedPaxSize},
+		{
+			name:                      "AO/AOCS",
+			path:                      ao.GetFilesMetadataPath,
+			readInitialSegmentSize:    readUploadedAOSize,
+			readReassignedSegmentSize: ao.ReassignedSharedSize,
+		},
+		{
+			name:                      "PAX",
+			path:                      pax.GetFilesMetadataPath,
+			readInitialSegmentSize:    readUploadedPaxSize,
+			readReassignedSegmentSize: pax.ReassignedSharedSize,
+		},
 	}
 }
 
@@ -56,6 +70,13 @@ func sharedStorageKinds() []sharedStorageKind {
 // too: a permanent backup occupies the shared storage like any other, and leaving it out would
 // break the property that the sizes of all backups add up to the size of the storage.
 func UploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupName string) error {
+	return uploadSharedSizes(ctx, rootFolder, backupName, func(kind sharedStorageKind) segmentSharedSizeReader {
+		return kind.readInitialSegmentSize
+	})
+}
+
+func uploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupName string,
+	reader func(kind sharedStorageKind) segmentSharedSizeReader) error {
 	segments, ok, err := segmentsOfBackup(ctx, rootFolder, backupName)
 	if err != nil {
 		return err
@@ -66,7 +87,7 @@ func UploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNam
 
 	baseBackupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
 	for _, kind := range sharedStorageKinds() {
-		sum, ok := sumOverSegments(ctx, rootFolder, backupName, segments, kind)
+		sum, ok := sumOverSegments(ctx, rootFolder, backupName, segments, kind, reader(kind))
 		if !ok {
 			// A partial sum would understate the real volume and be indistinguishable from a
 			// genuinely small one, so the object is left unwritten rather than written wrong. An
@@ -84,11 +105,10 @@ func UploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNam
 }
 
 // RecalculateSharedSizes refreshes the cluster-level AO/AOCS and PAX sizes of backups whose
-// preceding survivor changed. Segment cleanup has already reassigned shared objects between the
-// corresponding segment backups.
+// preceding survivor changed. It leaves the original segment files metadata unchanged.
 func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNames []string) error {
 	for _, backupName := range backupNames {
-		if err := UploadSharedSizes(ctx, rootFolder, backupName); err != nil {
+		if err := ReassignSharedStorage(ctx, rootFolder, backupName); err != nil {
 			return fmt.Errorf("failed to recalculate backup %s shared sizes: %w", backupName, err)
 		}
 	}
@@ -102,7 +122,7 @@ func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder, back
 // A partial sum would silently understate the real volume, so a single segment failing to report
 // makes the whole aggregate unavailable (ok == false) rather than wrong.
 func sumOverSegments(ctx context.Context, rootFolder storage.Folder, backupName string,
-	segments []SegmentMetadata, kind sharedStorageKind) (int64, bool) {
+	segments []SegmentMetadata, kind sharedStorageKind, readSegmentSize segmentSharedSizeReader) (int64, bool) {
 	sum := int64(0)
 	missing := make([]int, 0)
 	for _, meta := range segments {
@@ -115,10 +135,9 @@ func sumOverSegments(ctx context.Context, rootFolder storage.Folder, backupName 
 
 		segFolder := rootFolder.GetSubFolder(FormatSegmentStoragePrefix(meta.ContentID)).
 			GetSubFolder(utility.BaseBackupPath)
-		size, err := kind.readSegmentSize(ctx, segFolder, meta.BackupName)
+		size, err := readSegmentSize(ctx, segFolder, meta.BackupName)
 		if err != nil {
-			// The segment backup was pushed by a WAL-G old enough not to report the uploaded volume.
-			tracelog.WarningLogger.Printf("Can not read the %s volume uploaded by segment %d backup %s: %v",
+			tracelog.WarningLogger.Printf("Can not calculate the %s shared size of segment %d backup %s: %v",
 				kind.name, meta.ContentID, meta.BackupName, err)
 			missing = append(missing, meta.ContentID)
 			continue

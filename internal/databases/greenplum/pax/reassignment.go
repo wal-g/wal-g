@@ -5,112 +5,80 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-// ReassignSharedStorage makes the oldest surviving backup that references a PAX object accountable
-// for its size. A following backup owns objects absent from the immediately preceding surviving
-// backup.
-//
-//nolint:gocyclo
-func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder,
-	backupsToReassign []string, confirmed bool) error {
-	// Stage 1: get all surviving backups in chronological order. Only their sentinels are read here;
-	// the cleanup pass is responsible for loading all files metadata and building the retained set.
+type reassignmentFileMetadata struct {
+	StoragePath string `json:"StoragePath"`
+	Size        int64  `json:"Size"`
+}
+
+// reassignmentFilesMetadata is a narrow view of FilesMetadataDTO. The JSON decoder skips all
+// descriptor fields except the storage path and size needed by reassignment.
+type reassignmentFilesMetadata struct {
+	Files map[string]reassignmentFileMetadata `json:"Files"`
+}
+
+// ReassignedSharedSize returns the PAX size owned by backupName among the surviving backups.
+// It reads files metadata only for backupName and its immediately preceding survivor.
+func ReassignedSharedSize(ctx context.Context, baseBackupsFolder storage.Folder, backupName string) (int64, error) {
+	// Stage 1: get all surviving backups in chronological order. Only their sentinels are read here.
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	backupTimes := internal.GetBackupTimeSlices(backupObjects)
 	internal.SortBackupTimeSlices(backupTimes)
-
-	for backupIndex, backupTime := range backupTimes {
-		if !slices.Contains(backupsToReassign, backupTime.BackupName) {
-			continue
-		}
-
-		// Stage 2: load files metadata only for the affected backup and its immediately preceding
-		// surviving backup.
-		backup, err := internal.NewBackupInStorage(ctx, baseBackupsFolder, backupTime.BackupName,
-			backupTime.StorageName)
-		if err != nil {
-			return err
-		}
-
-		metadataPath := GetFilesMetadataPath(backup.Name)
-		meta, err := fetchFilesMetadata(ctx, backup)
-		if err != nil {
-			return err
-		}
-		if meta == nil {
-			tracelog.WarningLogger.Printf("No PAX files metadata found for backup %s in folder %s, skipping",
-				backup.Name, baseBackupsFolder.GetPath())
-			continue
-		}
-
-		var previousReferences map[string]int64
-		if backupIndex > 0 {
-			previousBackupTime := backupTimes[backupIndex-1]
-			previousBackup, err := internal.NewBackupInStorage(ctx, baseBackupsFolder,
-				previousBackupTime.BackupName, previousBackupTime.StorageName)
-			if err != nil {
-				return err
-			}
-
-			previousMeta, err := fetchFilesMetadata(ctx, previousBackup)
-			if err != nil {
-				return err
-			}
-			if previousMeta == nil {
-				tracelog.WarningLogger.Printf("Can not recalculate backup %s shared PAX size: "+
-					"the preceding backup files metadata is unavailable", backup.Name)
-				continue
-			}
-			previousReferences = referencedFiles(previousMeta)
-		}
-
-		// Stage 3: compare the affected backup with its predecessor, assign newly referenced objects,
-		// and upload the new size when confirmed.
-		ownedSize := int64(0)
-		for storagePath, size := range referencedFiles(meta) {
-			if _, wasReferenced := previousReferences[storagePath]; !wasReferenced {
-				ownedSize += size
-			}
-		}
-
-		if meta.UploadedSharedSize == ownedSize {
-			continue
-		}
-
-		tracelog.InfoLogger.Printf("Backup %s shared PAX size changed from %d to %d bytes",
-			backup.Name, meta.UploadedSharedSize, ownedSize)
-		meta.SetUploadedSharedSize(ownedSize)
-		if confirmed {
-			if err := internal.UploadDto(ctx, backup.Folder, meta, metadataPath); err != nil {
-				return fmt.Errorf("failed to update backup %s shared PAX size: %w", backup.Name, err)
-			}
-		}
+	backupIndex := slices.IndexFunc(backupTimes, func(backup internal.BackupTime) bool {
+		return backup.BackupName == backupName
+	})
+	if backupIndex == -1 {
+		return 0, fmt.Errorf("backup %s not found", backupName)
 	}
 
-	return nil
+	// Stage 2: load the narrow files metadata view for the affected backup and, if present, its
+	// immediately preceding surviving backup.
+	meta, err := fetchFilesMetadata(ctx, baseBackupsFolder, backupTimes[backupIndex])
+	if err != nil {
+		return 0, err
+	}
+
+	var previousReferences map[string]int64
+	if backupIndex > 0 {
+		previousMeta, err := fetchFilesMetadata(ctx, baseBackupsFolder, backupTimes[backupIndex-1])
+		if err != nil {
+			return 0, fmt.Errorf("the preceding backup files metadata is unavailable: %w", err)
+		}
+		previousReferences = referencedFiles(previousMeta)
+	}
+
+	// Stage 3: the affected backup owns every object absent from its current predecessor.
+	ownedSize := int64(0)
+	for storagePath, size := range referencedFiles(meta) {
+		if _, wasReferenced := previousReferences[storagePath]; !wasReferenced {
+			ownedSize += size
+		}
+	}
+	return ownedSize, nil
 }
 
-func fetchFilesMetadata(ctx context.Context, backup internal.Backup) (*FilesMetadataDTO, error) {
-	var meta FilesMetadataDTO
-	err := internal.FetchDto(ctx, backup.Folder, &meta, GetFilesMetadataPath(backup.Name))
+func fetchFilesMetadata(ctx context.Context, baseBackupsFolder storage.Folder,
+	backupTime internal.BackupTime) (*reassignmentFilesMetadata, error) {
+	backup, err := internal.NewBackupInStorage(ctx, baseBackupsFolder, backupTime.BackupName, backupTime.StorageName)
 	if err != nil {
-		if _, ok := err.(storage.ObjectNotFoundError); ok {
-			return nil, nil
-		}
+		return nil, err
+	}
+
+	var meta reassignmentFilesMetadata
+	if err := internal.FetchDto(ctx, backup.Folder, &meta, GetFilesMetadataPath(backup.Name)); err != nil {
 		return nil, err
 	}
 	return &meta, nil
 }
 
-func referencedFiles(meta *FilesMetadataDTO) map[string]int64 {
+func referencedFiles(meta *reassignmentFilesMetadata) map[string]int64 {
 	files := make(map[string]int64, len(meta.Files))
 	for localPath := range meta.Files {
 		desc := meta.Files[localPath]

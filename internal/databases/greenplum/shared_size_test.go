@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
@@ -108,8 +109,6 @@ func TestRecalculateSharedSizes(t *testing.T) {
 
 	putGpSentinel(t, root, firstBackup, firstSegments)
 	putGpSentinel(t, root, secondBackup, secondSegments)
-	putSegmentFilesMetadata(t, root, -1, firstSegments[-1], 10, 5)
-	putSegmentFilesMetadata(t, root, 0, firstSegments[0], 20, 15)
 	putSegmentFilesMetadata(t, root, -1, secondSegments[-1], 30, 25)
 	putSegmentFilesMetadata(t, root, 0, secondSegments[0], 40, 35)
 
@@ -141,13 +140,16 @@ func putSegmentFilesMetadata(t *testing.T, root storage.Folder, contentID int, b
 	aoSize, paxSize int64) {
 	t.Helper()
 
+	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
+	putDTO(t, folder, utility.BaseBackupPath+internal.SentinelNameFromBackup(backupName), struct{}{})
 	putSegmentAOFilesMetadata(t, root, contentID, backupName, aoSize)
 
 	// The file list is there to keep the reader honest: it is what the size view must skip.
-	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
 	putDTO(t, folder, utility.BaseBackupPath+pax.GetFilesMetadataPath(backupName),
 		pax.FilesMetadataDTO{
-			Files:              pax.BackupFiles{"base/13/16385_pax/3": {StoragePath: "paxfiles/3", Kind: pax.FileKindData}},
+			Files: pax.BackupFiles{"base/13/16385_pax/3": {
+				StoragePath: "paxfiles/3", Size: paxSize, Kind: pax.FileKindData,
+			}},
 			UploadedSharedSize: paxSize,
 		})
 }
@@ -158,7 +160,7 @@ func putSegmentAOFilesMetadata(t *testing.T, root storage.Folder, contentID int,
 	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
 	putDTO(t, folder, utility.BaseBackupPath+ao.GetFilesMetadataPath(backupName),
 		ao.FilesMetadataDTO{
-			Files:              ao.BackupFiles{"1337.1": {StoragePath: "aosegments/1337.1", EOF: 4096}},
+			Files:              ao.BackupFiles{"1337.1": {StoragePath: "aosegments/1337.1", EOF: aoSize}},
 			UploadedSharedSize: aoSize,
 		})
 }
