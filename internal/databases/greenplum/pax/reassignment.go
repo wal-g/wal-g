@@ -12,30 +12,32 @@ import (
 
 // ReassignSharedStorage makes the oldest surviving backup that references a PAX object accountable
 // for its size. A following backup owns objects absent from the immediately preceding surviving
-// backup. It returns all storage objects that remain referenced for the cleanup pass.
+// backup.
 //
 //nolint:gocyclo
 func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder,
-	backupsToReassign []string, confirmed bool) (map[string]struct{}, error) {
-	// Stage 1: get all surviving backups in chronological order.
+	backupsToReassign []string, confirmed bool) error {
+	// Stage 1: get all surviving backups in chronological order. Only their sentinels are read here;
+	// the cleanup pass is responsible for loading all files metadata and building the retained set.
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	backupTimes := internal.GetBackupTimeSlices(backupObjects)
 	internal.SortBackupTimeSlices(backupTimes)
 
-	retained := make(map[string]struct{})
-	var previousReferences map[string]struct{}
-	previousMetadataAvailable := false
-
 	for backupIndex, backupTime := range backupTimes {
-		// Stage 2: load the files metadata of the current surviving backup.
+		if !slices.Contains(backupsToReassign, backupTime.BackupName) {
+			continue
+		}
+
+		// Stage 2: load files metadata only for the affected backup and its immediately preceding
+		// surviving backup.
 		backup, err := internal.NewBackupInStorage(ctx, baseBackupsFolder, backupTime.BackupName,
 			backupTime.StorageName)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		var meta FilesMetadataDTO
@@ -44,53 +46,57 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			if _, ok := err.(storage.ObjectNotFoundError); ok {
 				tracelog.WarningLogger.Printf("No PAX files metadata found for backup %s in folder %s, skipping",
 					backup.Name, baseBackupsFolder.GetPath())
-				previousMetadataAvailable = false
 				continue
 			}
-			return nil, err
+			return err
 		}
 
-		// Stage 3: collect the current backup references, compare them with the preceding surviving
-		// backup, assign newly referenced objects to the current backup, and upload the new size when
-		// confirmed.
-		files := referencedFiles(&meta)
-		currentReferences := make(map[string]struct{}, len(files))
-		for storagePath := range files {
-			currentReferences[storagePath] = struct{}{}
-			retained[storagePath] = struct{}{}
-		}
-
-		isAffected := slices.Contains(backupsToReassign, backup.Name)
-		canCalculate := isAffected && (backupIndex == 0 || previousMetadataAvailable)
-		if canCalculate {
-			ownedSize := int64(0)
-			for storagePath, size := range files {
-				if _, wasReferenced := previousReferences[storagePath]; !wasReferenced {
-					ownedSize += size
-				}
+		var previousReferences map[string]int64
+		if backupIndex > 0 {
+			previousBackupTime := backupTimes[backupIndex-1]
+			previousBackup, err := internal.NewBackupInStorage(ctx, baseBackupsFolder,
+				previousBackupTime.BackupName, previousBackupTime.StorageName)
+			if err != nil {
+				return err
 			}
 
-			if meta.UploadedSharedSize != ownedSize {
-				tracelog.InfoLogger.Printf("Backup %s shared PAX size changed from %d to %d bytes",
-					backup.Name, meta.UploadedSharedSize, ownedSize)
-				meta.SetUploadedSharedSize(ownedSize)
-				if confirmed {
-					if err := internal.UploadDto(ctx, backup.Folder, &meta, metadataPath); err != nil {
-						return nil, fmt.Errorf("failed to update backup %s shared PAX size: %w",
-							backup.Name, err)
-					}
+			var previousMeta FilesMetadataDTO
+			if err := internal.FetchDto(ctx, previousBackup.Folder, &previousMeta,
+				GetFilesMetadataPath(previousBackup.Name)); err != nil {
+				if _, ok := err.(storage.ObjectNotFoundError); ok {
+					tracelog.WarningLogger.Printf("Can not recalculate backup %s shared PAX size: "+
+						"the preceding backup files metadata is unavailable", backup.Name)
+					continue
 				}
+				return err
 			}
-		} else if isAffected {
-			tracelog.WarningLogger.Printf("Can not recalculate backup %s shared PAX size: "+
-				"the preceding backup files metadata is unavailable", backup.Name)
+			previousReferences = referencedFiles(&previousMeta)
 		}
 
-		previousReferences = currentReferences
-		previousMetadataAvailable = true
+		// Stage 3: compare the affected backup with its predecessor, assign newly referenced objects,
+		// and upload the new size when confirmed.
+		ownedSize := int64(0)
+		for storagePath, size := range referencedFiles(&meta) {
+			if _, wasReferenced := previousReferences[storagePath]; !wasReferenced {
+				ownedSize += size
+			}
+		}
+
+		if meta.UploadedSharedSize == ownedSize {
+			continue
+		}
+
+		tracelog.InfoLogger.Printf("Backup %s shared PAX size changed from %d to %d bytes",
+			backup.Name, meta.UploadedSharedSize, ownedSize)
+		meta.SetUploadedSharedSize(ownedSize)
+		if confirmed {
+			if err := internal.UploadDto(ctx, backup.Folder, &meta, metadataPath); err != nil {
+				return fmt.Errorf("failed to update backup %s shared PAX size: %w", backup.Name, err)
+			}
+		}
 	}
 
-	return retained, nil
+	return nil
 }
 
 func referencedFiles(meta *FilesMetadataDTO) map[string]int64 {

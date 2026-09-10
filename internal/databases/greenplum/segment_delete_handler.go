@@ -148,8 +148,12 @@ func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup)
 func cleanupAOSegments(ctx context.Context, target internal.BackupObject, segFolder storage.Folder,
 	backupsToReassign []string, confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(ao.StoragePath)
-	aoSegmentsToRetain, err := ao.ReassignSharedStorage(ctx, segFolder.GetSubFolder(utility.BaseBackupPath),
-		backupsToReassign, confirmed)
+	baseBackupsFolder := segFolder.GetSubFolder(utility.BaseBackupPath)
+	if err := ao.ReassignSharedStorage(ctx, baseBackupsFolder, backupsToReassign, confirmed); err != nil {
+		return err
+	}
+
+	aoSegmentsToRetain, err := ao.LoadStorageAOFiles(ctx, baseBackupsFolder)
 	if err != nil {
 		return err
 	}
@@ -258,8 +262,12 @@ func GetPermanentBackupsAndWals(ctx context.Context, rootFolder storage.Folder, 
 func cleanupPaxFiles(ctx context.Context, target internal.BackupObject, segFolder storage.Folder,
 	backupsToReassign []string, confirmed bool) error {
 	paxFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(pax.StoragePath)
-	paxFilesToRetain, err := pax.ReassignSharedStorage(ctx, segFolder.GetSubFolder(utility.BaseBackupPath),
-		backupsToReassign, confirmed)
+	baseBackupsFolder := segFolder.GetSubFolder(utility.BaseBackupPath)
+	if err := pax.ReassignSharedStorage(ctx, baseBackupsFolder, backupsToReassign, confirmed); err != nil {
+		return err
+	}
+
+	paxFilesToRetain, err := pax.LoadStoragePaxFiles(ctx, baseBackupsFolder)
 	if err != nil {
 		return err
 	}
