@@ -229,8 +229,7 @@ func (backupService *BackupService) DoBackup(ctx context.Context, args DoBackupA
 	}
 
 	if !args.SkipMetadata {
-		metadataCollector.TarsChan <- tarFileSets
-		if err = <-metadataCollector.ErrsChan; err != nil {
+		if err = metadataCollector.Complete(ctx, tarFileSets); err != nil {
 			return err
 		}
 		backupService.Sentinel.Top100Namespaces = *metadataCollector.top100Ns

@@ -2,14 +2,103 @@ package binary
 
 import (
 	"container/heap"
+	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/mongo/common"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
+
+func TestStorageMetadataCollector_EarlyError(t *testing.T) {
+	client, err := mongo.Connect()
+	require.NoError(t, err)
+	require.NoError(t, client.Disconnect(t.Context()))
+
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		collector := NewStorageMetadataCollector(&MongodService{
+			Context:     ctx,
+			MongoClient: client,
+		}, func(*models.BackupRoutesInfo) error {
+			t.Error("metadata must not be uploaded after a collection error")
+			return nil
+		})
+
+		done := make(chan struct{})
+		go func() {
+			collector.GetStats()
+			close(done)
+		}()
+
+		synctest.Wait()
+		select {
+		case <-done:
+		default:
+			t.Error("collector must finish even when its result has no consumer yet")
+		}
+
+		err := collector.Complete(ctx, internal.NewRegularTarFileSets())
+		require.ErrorIs(t, err, mongo.ErrClientDisconnected)
+	})
+}
+
+func TestStorageMetadataCollector_Complete(t *testing.T) {
+	for _, result := range []error{nil, errors.New("metadata upload failed")} {
+		t.Run(fmt.Sprint(result), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+				defer cancel()
+				collector := NewStorageMetadataCollector(&MongodService{Context: ctx}, nil)
+				tarFileSets := internal.NewRegularTarFileSets()
+				go func() {
+					select {
+					case received := <-collector.TarsChan:
+						assert.Same(t, tarFileSets, received)
+						collector.ErrsChan <- result
+					case <-ctx.Done():
+						t.Error("collector did not receive tar files")
+					}
+				}()
+
+				err := collector.Complete(ctx, tarFileSets)
+				require.ErrorIs(t, err, result)
+			})
+		})
+	}
+}
+
+func TestStorageMetadataCollector_CompleteCanceled(t *testing.T) {
+	for _, receiveTars := range []bool{false, true} {
+		t.Run(fmt.Sprintf("tar_files_received=%t", receiveTars), func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				collector := NewStorageMetadataCollector(&MongodService{Context: ctx}, nil)
+				done := make(chan error, 1)
+				go func() {
+					done <- collector.Complete(ctx, internal.NewRegularTarFileSets())
+				}()
+
+				if receiveTars {
+					<-collector.TarsChan
+				}
+				synctest.Wait()
+				cancel()
+				require.ErrorIs(t, <-done, context.Canceled)
+			})
+		})
+	}
+}
 
 func TestNewStorageMetadataCollector_Initialization(t *testing.T) {
 	svc := &MongodService{Context: t.Context()}
