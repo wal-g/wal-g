@@ -3,6 +3,7 @@ package ao
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -26,10 +27,6 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 	internal.SortBackupTimeSlices(backupTimes)
 
 	retained := make(map[string]struct{})
-	shouldReassign := make(map[string]struct{}, len(backupsToReassign))
-	for _, backupName := range backupsToReassign {
-		shouldReassign[backupName] = struct{}{}
-	}
 	var previousReferences map[string]struct{}
 	previousMetadataAvailable := false
 
@@ -63,7 +60,7 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			retained[storagePath] = struct{}{}
 		}
 
-		_, isAffected := shouldReassign[backup.Name]
+		isAffected := slices.Contains(backupsToReassign, backup.Name)
 		canCalculate := isAffected && (backupIndex == 0 || previousMetadataAvailable)
 		if canCalculate {
 			ownedSize := int64(0)
