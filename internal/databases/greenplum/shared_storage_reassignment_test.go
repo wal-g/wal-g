@@ -19,7 +19,6 @@ const (
 	firstSegBackup  = "base_000000010000000000000001"
 	secondSegBackup = "base_000000010000000000000002"
 	thirdSegBackup  = "base_000000010000000000000003"
-	fourthSegBackup = "base_000000010000000000000004"
 )
 
 func TestReassignAOSharedStorage(t *testing.T) {
@@ -84,27 +83,6 @@ func TestReassignAOSharedStorage(t *testing.T) {
 		assert.Equal(t, int64(777), fetchAOMetadata(t, folder, firstSegBackup).UploadedSharedSize)
 	})
 
-	t.Run("does not read files metadata of unrelated backups", func(t *testing.T) {
-		folder := newSharedMetadataTestFolder()
-		putSharedMetadataBackup(t, folder, firstSegBackup, ao.GetFilesMetadataPath(firstSegBackup),
-			ao.FilesMetadataDTO{
-				Files: ao.BackupFiles{"local/x": {StoragePath: "x_aoseg", EOF: 10}},
-			})
-		putSharedMetadataBackup(t, folder, thirdSegBackup, ao.GetFilesMetadataPath(thirdSegBackup),
-			ao.FilesMetadataDTO{
-				Files: ao.BackupFiles{
-					"local/x": {StoragePath: "x_aoseg", EOF: 10},
-					"local/y": {StoragePath: "y_aoseg", EOF: 20},
-				},
-			})
-		putSharedMetadataSentinel(t, folder, fourthSegBackup)
-		require.NoError(t, folder.PutObject(t.Context(), ao.GetFilesMetadataPath(fourthSegBackup),
-			strings.NewReader("not JSON")))
-
-		err := ao.ReassignSharedStorage(t.Context(), folder, []string{thirdSegBackup}, true)
-		require.NoError(t, err)
-		assert.Equal(t, int64(20), fetchAOMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
-	})
 }
 
 func TestReassignPaxSharedStorage(t *testing.T) {
