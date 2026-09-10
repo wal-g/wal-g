@@ -47,6 +47,11 @@ func NewFilesMetadataDTO() *FilesMetadataDTO {
 	return &FilesMetadataDTO{Files: make(BackupFiles)}
 }
 
+// SetUploadedSharedSize replaces the PAX bytes assigned to this backup.
+func (m *FilesMetadataDTO) SetUploadedSharedSize(size int64) {
+	m.UploadedSharedSize = size
+}
+
 func (m *FilesMetadataDTO) AddFile(localPath string, storagePath string, size int64, mTime time.Time,
 	initialUplTS time.Time, meta RelFileMetadata, fileMode int64, isSkipped bool) {
 	m.Files[localPath] = BackupFileDesc{

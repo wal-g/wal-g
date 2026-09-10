@@ -42,6 +42,11 @@ func NewFilesMetadataDTO() *FilesMetadataDTO {
 	return &FilesMetadataDTO{Files: make(BackupFiles)}
 }
 
+// SetUploadedSharedSize replaces the AO/AOCS bytes assigned to this backup.
+func (m *FilesMetadataDTO) SetUploadedSharedSize(size int64) {
+	m.UploadedSharedSize = size
+}
+
 func (m *FilesMetadataDTO) addFile(key, storagePath string, mTime, initialUplTS time.Time, aoMeta RelFileMetadata,
 	fileMode int64, isSkipped, isIncremented bool, checksum string) {
 	m.Files[key] = &BackupFileDesc{
