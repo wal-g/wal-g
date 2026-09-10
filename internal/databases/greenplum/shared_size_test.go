@@ -117,7 +117,7 @@ func TestRecalculateSharedSizes(t *testing.T) {
 	putDTO(t, root, utility.BaseBackupPath+pax.GetFilesMetadataPath(firstBackup),
 		greenplum.SharedSizeDTO{SharedSize: 888})
 
-	require.NoError(t, greenplum.RecalculateSharedSizes(t.Context(), root, []string{secondBackup}, true))
+	require.NoError(t, greenplum.ReassignSharedSizes(t.Context(), root, []string{secondBackup}, true))
 
 	firstAOSize, err := greenplum.FetchAOSharedSize(t.Context(), root, firstBackup)
 	require.NoError(t, err)

@@ -9,25 +9,51 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
-type referencedFilesFetcher func(ctx context.Context, baseBackupsFolder storage.Folder,
-	backupTime internal.BackupTime) (map[string]int64, error)
+type referencedFilesFetcher func(
+	ctx context.Context,
+	baseBackupsFolder storage.Folder,
+	backupTime internal.BackupTime,
+) (map[string]int64, error)
 
-// ReassignSharedStorage recalculates the shared-storage ownership of a surviving cluster backup
+// ReassignSharedSizes refreshes the cluster-level AO/AOCS and PAX sizes of backups whose
+// preceding survivor changed. It leaves the original segment files metadata unchanged.
+func ReassignSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNames []string, confirmed bool) error {
+	if !confirmed {
+		return nil
+	}
+
+	for _, backupName := range backupNames {
+		if err := reassignSharedStorage(ctx, rootFolder, backupName); err != nil {
+			return fmt.Errorf("failed to recalculate backup %s shared sizes: %w", backupName, err)
+		}
+	}
+
+	return nil
+}
+
+// reassignSharedStorage recalculates the shared-storage ownership of a surviving cluster backup
 // and uploads only its small cluster-level SharedSizeDTO objects. Segment files metadata remains
 // unchanged: its UploadedSharedSize describes the initial upload.
-func ReassignSharedStorage(ctx context.Context, rootFolder storage.Folder, backupName string) error {
+func reassignSharedStorage(ctx context.Context, rootFolder storage.Folder, backupName string) error {
 	return uploadSharedSizes(ctx, rootFolder, backupName, func(kind sharedStorageKind) segmentSharedSizeReader {
 		return kind.reassignedSegmentSize
 	})
 }
 
-func (kind sharedStorageKind) reassignedSegmentSize(ctx context.Context, baseBackupsFolder storage.Folder,
-	backupName string) (int64, error) {
+func (kind sharedStorageKind) reassignedSegmentSize(
+	ctx context.Context,
+	baseBackupsFolder storage.Folder,
+	backupName string,
+) (int64, error) {
 	return reassignedSharedSize(ctx, baseBackupsFolder, backupName, kind.fetchReferencedFiles)
 }
 
-func reassignedSharedSize(ctx context.Context, baseBackupsFolder storage.Folder, backupName string,
-	fetchReferencedFiles referencedFilesFetcher) (int64, error) {
+func reassignedSharedSize(
+	ctx context.Context,
+	baseBackupsFolder storage.Folder,
+	backupName string,
+	fetchReferencedFiles referencedFilesFetcher,
+) (int64, error) {
 	// Stage 1: get all surviving backups in chronological order. Only their sentinels are read here.
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {

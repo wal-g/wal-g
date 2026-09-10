@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
@@ -43,8 +44,11 @@ type sharedStorageKind struct {
 	fetchReferencedFiles   referencedFilesFetcher
 }
 
-type segmentSharedSizeReader func(ctx context.Context, baseBackupsFolder storage.Folder,
-	backupName string) (int64, error)
+type segmentSharedSizeReader func(
+	ctx context.Context,
+	baseBackupsFolder storage.Folder,
+	backupName string,
+) (int64, error)
 
 func sharedStorageKinds() []sharedStorageKind {
 	return []sharedStorageKind{
@@ -75,8 +79,12 @@ func UploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNam
 	})
 }
 
-func uploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupName string,
-	reader func(kind sharedStorageKind) segmentSharedSizeReader) error {
+func uploadSharedSizes(
+	ctx context.Context,
+	rootFolder storage.Folder,
+	backupName string,
+	reader func(kind sharedStorageKind) segmentSharedSizeReader,
+) error {
 	segments, ok, err := segmentsOfBackup(ctx, rootFolder, backupName)
 	if err != nil {
 		return err
@@ -98,22 +106,6 @@ func uploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNam
 		dto := SharedSizeDTO{SharedSize: sum}
 		if err := internal.UploadDto(ctx, baseBackupsFolder, dto, kind.path(backupName)); err != nil {
 			return fmt.Errorf("failed to upload the cluster-wide %s shared size: %w", kind.name, err)
-		}
-	}
-
-	return nil
-}
-
-// RecalculateSharedSizes refreshes the cluster-level AO/AOCS and PAX sizes of backups whose
-// preceding survivor changed. It leaves the original segment files metadata unchanged.
-func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNames []string, confirmed bool) error {
-	if !confirmed {
-		return nil
-	}
-
-	for _, backupName := range backupNames {
-		if err := ReassignSharedStorage(ctx, rootFolder, backupName); err != nil {
-			return fmt.Errorf("failed to recalculate backup %s shared sizes: %w", backupName, err)
 		}
 	}
 
@@ -162,18 +154,12 @@ func sumOverSegments(ctx context.Context, rootFolder storage.Folder, backupName 
 	return sum, true
 }
 
-// aoUploadedSizeView and paxUploadedSizeView are the parts of the segment files metadata needed to
-// learn the uploaded volume. The file lists those objects also carry are skipped: only the segments
-// have any use for them.
-type aoUploadedSizeView struct {
-	UploadedSharedSize int64
-}
-
-type paxUploadedSizeView struct {
-	UploadedSharedSize int64
-}
-
 func readUploadedAOSize(ctx context.Context, baseBackupsFolder storage.Folder, backupName string) (int64, error) {
+	// aoUploadedSizeView is the parts of ao.FilesMetadataDTO needed to learn the uploaded volume
+	type aoUploadedSizeView struct {
+		UploadedSharedSize int64
+	}
+
 	var meta aoUploadedSizeView
 	if err := internal.FetchDto(ctx, baseBackupsFolder, &meta, ao.GetFilesMetadataPath(backupName)); err != nil {
 		return 0, err
@@ -182,6 +168,11 @@ func readUploadedAOSize(ctx context.Context, baseBackupsFolder storage.Folder, b
 }
 
 func readUploadedPaxSize(ctx context.Context, baseBackupsFolder storage.Folder, backupName string) (int64, error) {
+	// paxUploadedSizeView is the parts of the pax.FilesMetadataDTO needed to learn the uploaded volume.
+	type paxUploadedSizeView struct {
+		UploadedSharedSize int64
+	}
+
 	var meta paxUploadedSizeView
 	if err := internal.FetchDto(ctx, baseBackupsFolder, &meta, pax.GetFilesMetadataPath(backupName)); err != nil {
 		return 0, err
