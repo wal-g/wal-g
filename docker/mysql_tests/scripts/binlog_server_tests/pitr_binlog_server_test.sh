@@ -31,27 +31,25 @@ export WALG_MYSQL_BINLOG_SERVER_ID=99
 export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest:@/sbtest"
 
 walg_pid=
-binlog_server_log="/tmp/mysql-binlog-server-$mode.log"
+# CI collects /var/log even if the test is killed before cleanup finishes.
+binlog_server_log="/var/log/mysql/binlog-server-$mode.log"
 
 cleanup() {
     cleanup_status=$?
     trap - EXIT INT TERM
 
     if [ "$cleanup_status" -ne 0 ]; then
-        mysql_show_replica_status >&2 || true
+        test ! -f "$binlog_server_log" || cat "$binlog_server_log" >&2
+        test ! -f /var/log/mysql/error.log || cat /var/log/mysql/error.log >&2
+        timeout 10s sh -c '. /usr/local/export_test_funcs.sh; mysql_show_replica_status' >&2 || true
     fi
 
-    mysql_stop_replica >/dev/null 2>&1 || true
     if [ -n "$walg_pid" ]; then
         kill "$walg_pid" >/dev/null 2>&1 || true
         wait "$walg_pid" >/dev/null 2>&1 || true
     fi
+    # mysql_stop bounds shutdown; STOP REPLICA can hang on a failed connection.
     mysql_stop || true
-
-    if [ "$cleanup_status" -ne 0 ]; then
-        test ! -f /var/log/mysql/error.log || cat /var/log/mysql/error.log >&2
-        test ! -f "$binlog_server_log" || cat "$binlog_server_log" >&2
-    fi
 
     exit "$cleanup_status"
 }

@@ -15,31 +15,43 @@ mysql() {
     last_sql=$*
 }
 
-assert_sql() {
+assert_mysql_args() {
     mock_version=$1
-    expected_sql=$2
+    expected_args=$2
     shift 2
     mock_query_status=0
     last_sql=
     unset WALG_MYSQL_TEST_SERVER_VERSION
     "$@"
-    test "$last_sql" = "-e $expected_sql" || fail "Unexpected SQL for $mock_version: $last_sql"
+    test "$last_sql" = "$expected_args" || fail "Unexpected mysql arguments for $mock_version: $last_sql"
+}
+
+assert_sql() {
+    assert_version=$1
+    expected_sql=$2
+    shift 2
+    assert_mysql_args "$assert_version" "-e $expected_sql" "$@"
 }
 
 for version in 5.7.44-48 8.0.21; do
     assert_sql "$version" "STOP SLAVE" mysql_stop_replica
     assert_sql "$version" "START SLAVE" mysql_start_replica
     assert_sql "$version" "RESET SLAVE ALL" mysql_reset_replica_all
-    assert_sql "$version" 'SHOW SLAVE STATUS\G' mysql_show_replica_status
+    assert_mysql_args "$version" '--vertical -e SHOW SLAVE STATUS' mysql_show_replica_status
 done
 for version in 8.0.22 8.4.8-8 9.7.1-1; do
     assert_sql "$version" "STOP REPLICA" mysql_stop_replica
     assert_sql "$version" "START REPLICA" mysql_start_replica
     assert_sql "$version" "RESET REPLICA ALL" mysql_reset_replica_all
-    assert_sql "$version" 'SHOW REPLICA STATUS\G' mysql_show_replica_status
+    assert_mysql_args "$version" '--vertical -e SHOW REPLICA STATUS' mysql_show_replica_status
 done
-assert_sql 8.0.22 "CHANGE MASTER TO MASTER_HOST='host', MASTER_PORT=9306, MASTER_USER='user', MASTER_PASSWORD='pwd', MASTER_AUTO_POSITION=1, MASTER_CONNECT_RETRY=1, MASTER_HEARTBEAT_PERIOD=2, MASTER_RETRY_COUNT=3" mysql_change_replication_source host 9306 user pwd 1 2 3
-assert_sql 8.0.23 "CHANGE REPLICATION SOURCE TO SOURCE_HOST='host', SOURCE_PORT=9306, SOURCE_USER='user', SOURCE_PASSWORD='pwd', SOURCE_AUTO_POSITION=1, SOURCE_CONNECT_RETRY=1, SOURCE_HEARTBEAT_PERIOD=2, SOURCE_RETRY_COUNT=3" mysql_change_replication_source host 9306 user pwd 1 2 3
+for version in 5.7.44-48 8.0.22; do
+    assert_sql "$version" "CHANGE MASTER TO MASTER_HOST='host', MASTER_PORT=9306, MASTER_USER='user', MASTER_PASSWORD='pwd', MASTER_AUTO_POSITION=1, MASTER_SSL=0, MASTER_CONNECT_RETRY=1, MASTER_HEARTBEAT_PERIOD=2, MASTER_RETRY_COUNT=3" mysql_change_replication_source host 9306 user pwd 1 2 3
+done
+for version in 8.0.23 8.4.11-11 9.7.1-1; do
+    assert_sql "$version" "CHANGE REPLICATION SOURCE TO SOURCE_HOST='host', SOURCE_PORT=9306, SOURCE_USER='user', SOURCE_PASSWORD='pwd', SOURCE_AUTO_POSITION=1, SOURCE_SSL=0" mysql_change_replication_source host 9306 user pwd
+    assert_sql "$version" "CHANGE REPLICATION SOURCE TO SOURCE_HOST='host', SOURCE_PORT=9306, SOURCE_USER='user', SOURCE_PASSWORD='pwd', SOURCE_AUTO_POSITION=1, SOURCE_SSL=0, SOURCE_CONNECT_RETRY=1, SOURCE_HEARTBEAT_PERIOD=2, SOURCE_RETRY_COUNT=3" mysql_change_replication_source host 9306 user pwd 1 2 3
+done
 assert_sql 8.0.25 "SET GLOBAL slave_net_timeout = 10" mysql_set_replica_net_timeout 10
 assert_sql 8.0.26 "SET GLOBAL replica_net_timeout = 10" mysql_set_replica_net_timeout 10
 assert_sql 8.0.25 "SET GLOBAL slave_transaction_retries = 10" mysql_set_replica_transaction_retries 10

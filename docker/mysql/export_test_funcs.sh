@@ -66,9 +66,9 @@ mysql_reset_replica_all() {
 mysql_show_replica_status() {
     mysql_cache_server_version || return 2
     if mysql_version_at_least 8 0 22; then
-        mysql -e "SHOW REPLICA STATUS\G"
+        mysql --vertical -e "SHOW REPLICA STATUS"
     else
-        mysql -e "SHOW SLAVE STATUS\G"
+        mysql --vertical -e "SHOW SLAVE STATUS"
     fi
 }
 
@@ -82,8 +82,10 @@ mysql_change_replication_source() {
     mysql_replication_heartbeat_period=${6:-}
     mysql_replication_retry_count=${7:-}
 
+    # These tests connect to the local WAL-G binlog-server, which has no TLS.
+    # MySQL 9.7 enables SOURCE_SSL by default for a new replication channel.
     if mysql_version_at_least 8 0 23; then
-        mysql_replication_options="SOURCE_HOST='$mysql_replication_host', SOURCE_PORT=$mysql_replication_port, SOURCE_USER='$mysql_replication_user', SOURCE_PASSWORD='$mysql_replication_password', SOURCE_AUTO_POSITION=1"
+        mysql_replication_options="SOURCE_HOST='$mysql_replication_host', SOURCE_PORT=$mysql_replication_port, SOURCE_USER='$mysql_replication_user', SOURCE_PASSWORD='$mysql_replication_password', SOURCE_AUTO_POSITION=1, SOURCE_SSL=0"
         if [ -n "$mysql_replication_connect_retry" ]; then
             mysql_replication_options="$mysql_replication_options, SOURCE_CONNECT_RETRY=$mysql_replication_connect_retry"
         fi
@@ -95,7 +97,7 @@ mysql_change_replication_source() {
         fi
         mysql -e "CHANGE REPLICATION SOURCE TO $mysql_replication_options"
     else
-        mysql_replication_options="MASTER_HOST='$mysql_replication_host', MASTER_PORT=$mysql_replication_port, MASTER_USER='$mysql_replication_user', MASTER_PASSWORD='$mysql_replication_password', MASTER_AUTO_POSITION=1"
+        mysql_replication_options="MASTER_HOST='$mysql_replication_host', MASTER_PORT=$mysql_replication_port, MASTER_USER='$mysql_replication_user', MASTER_PASSWORD='$mysql_replication_password', MASTER_AUTO_POSITION=1, MASTER_SSL=0"
         if [ -n "$mysql_replication_connect_retry" ]; then
             mysql_replication_options="$mysql_replication_options, MASTER_CONNECT_RETRY=$mysql_replication_connect_retry"
         fi

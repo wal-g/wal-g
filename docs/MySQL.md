@@ -334,8 +334,8 @@ Restore procedure is straightforward:
 * in second terminal start binlog-server: `wal-g binlog-server --until "1985-10-26T01:21:00Z"`
 * in MySQL:
   ```SQL
-    SET GLOBAL SERVER_ID=999
-    CHANGE REPLICATION SOURCE TO SOURCE_HOST="127.0.0.1", SOURCE_PORT=9306, SOURCE_USER="walg", SOURCE_PASSWORD="walgpwd", SOURCE_AUTO_POSITION=1;
+    SET GLOBAL SERVER_ID=999;
+    CHANGE REPLICATION SOURCE TO SOURCE_HOST="127.0.0.1", SOURCE_PORT=9306, SOURCE_USER="walg", SOURCE_PASSWORD="walgpwd", SOURCE_AUTO_POSITION=1, SOURCE_SSL=0;
     SHOW REPLICA STATUS \G
     START REPLICA;
   ```
@@ -343,6 +343,10 @@ Restore procedure is straightforward:
   On MySQL versions older than 8.0.23 use `CHANGE MASTER TO` and its
   `MASTER_*` options. On versions older than 8.0.22 use `SHOW SLAVE STATUS`
   and `START SLAVE`.
+
+  `SOURCE_SSL=0` is needed for this local connection: WAL-G binlog-server
+  does not provide TLS, while MySQL 9.7 enables it by default for new
+  replication channels. For a connection between hosts, use a secure tunnel.
 
 * wait until wal-g exit (it will wait until binlogs will be applied)
 * in case of errors use classic approach
