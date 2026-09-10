@@ -14,7 +14,8 @@ type Adapter[T any] struct {
 	Name            string
 	MetadataPath    func(backupName string) string
 	ReferencedFiles func(meta *T) map[string]int64
-	UploadedSize    func(meta *T) *int64
+	GetUploadedSize func(meta *T) int64
+	SetUploadedSize func(meta *T, size int64)
 }
 
 // Reassign makes the oldest surviving backup that references a shared object accountable for its
@@ -77,11 +78,11 @@ func Reassign[T any](ctx context.Context, baseBackupsFolder storage.Folder, conf
 				}
 			}
 
-			sizeField := adapter.UploadedSize(&meta)
-			if *sizeField != ownedSize {
+			previousSize := adapter.GetUploadedSize(&meta)
+			if previousSize != ownedSize {
 				tracelog.InfoLogger.Printf("Backup %s shared %s size changed from %d to %d bytes",
-					backup.Name, adapter.Name, *sizeField, ownedSize)
-				*sizeField = ownedSize
+					backup.Name, adapter.Name, previousSize, ownedSize)
+				adapter.SetUploadedSize(&meta, ownedSize)
 				if confirmed {
 					if err := internal.UploadDto(ctx, backup.Folder, &meta, metadataPath); err != nil {
 						return nil, fmt.Errorf("failed to update backup %s shared %s size: %w",

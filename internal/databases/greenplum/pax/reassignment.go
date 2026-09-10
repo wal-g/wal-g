@@ -21,6 +21,9 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			}
 			return files
 		},
-		UploadedSize: func(meta *FilesMetadataDTO) *int64 { return &meta.UploadedSharedSize },
+		GetUploadedSize: func(meta *FilesMetadataDTO) int64 { return meta.UploadedSharedSize },
+		SetUploadedSize: func(meta *FilesMetadataDTO, size int64) {
+			meta.UploadedSharedSize = size
+		},
 	})
 }
