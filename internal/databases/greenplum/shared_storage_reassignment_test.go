@@ -43,7 +43,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 				UploadedSharedSize: 30,
 			})
 
-		retained, err := reassignAOSharedStorage(t.Context(), folder, true)
+		retained, err := ao.ReassignSharedStorage(t.Context(), folder, true)
 		require.NoError(t, err)
 		assert.Equal(t, map[string]struct{}{"x_aoseg": {}, "y_aoseg": {}, "z_aoseg": {}}, retained)
 
@@ -51,7 +51,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 		assert.Equal(t, int64(50), meta.UploadedSharedSize)
 
 		// Repeating cleanup must replace the value with the same exact total, not add it again.
-		_, err = reassignAOSharedStorage(t.Context(), folder, true)
+		_, err = ao.ReassignSharedStorage(t.Context(), folder, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(50), fetchAOMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
 	})
@@ -66,7 +66,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 				},
 			})
 
-		_, err := reassignAOSharedStorage(t.Context(), folder, true)
+		_, err := ao.ReassignSharedStorage(t.Context(), folder, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(30), fetchAOMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
 	})
@@ -79,7 +79,7 @@ func TestReassignAOSharedStorage(t *testing.T) {
 				UploadedSharedSize: 777,
 			})
 
-		_, err := reassignAOSharedStorage(t.Context(), folder, false)
+		_, err := ao.ReassignSharedStorage(t.Context(), folder, false)
 		require.NoError(t, err)
 		assert.Equal(t, int64(777), fetchAOMetadata(t, folder, firstSegBackup).UploadedSharedSize)
 	})
@@ -103,7 +103,7 @@ func TestReassignPaxSharedStorage(t *testing.T) {
 				},
 			})
 
-		_, err := reassignPaxSharedStorage(t.Context(), folder, true)
+		_, err := pax.ReassignSharedStorage(t.Context(), folder, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(10), fetchPaxMetadata(t, folder, firstSegBackup).UploadedSharedSize)
 		assert.Equal(t, int64(20), fetchPaxMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
@@ -123,7 +123,7 @@ func TestReassignPaxSharedStorage(t *testing.T) {
 				UploadedSharedSize: 777,
 			})
 
-		_, err := reassignPaxSharedStorage(t.Context(), folder, true)
+		_, err := pax.ReassignSharedStorage(t.Context(), folder, true)
 		require.NoError(t, err)
 		assert.Equal(t, int64(777), fetchPaxMetadata(t, folder, thirdSegBackup).UploadedSharedSize)
 	})
