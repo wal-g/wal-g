@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/wal-g/tracelog"
-
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
