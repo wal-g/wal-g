@@ -16,7 +16,9 @@ func GetFilesMetadataPath(backupName string) string {
 // One BackupFileDesc is produced per (data | toast | visimap) file referenced
 // from `pg_ext_aux.pg_pax_blocks_*` at backup-start.
 type BackupFileDesc struct {
-	StoragePath     string    `json:"StoragePath"`
+	StoragePath string `json:"StoragePath"`
+	// Size is the size of the local PAX file in bytes. PAX files are not compressed before upload.
+	Size            int64     `json:"Size"`
 	IsSkipped       bool      `json:"IsSkipped,omitempty"`
 	MTime           time.Time `json:"MTime"`
 	RelNameMd5      string    `json:"RelNameMd5"`
@@ -45,10 +47,11 @@ func NewFilesMetadataDTO() *FilesMetadataDTO {
 	return &FilesMetadataDTO{Files: make(BackupFiles)}
 }
 
-func (m *FilesMetadataDTO) AddFile(localPath string, storagePath string, mTime time.Time, initialUplTS time.Time,
-	meta RelFileMetadata, fileMode int64, isSkipped bool) {
+func (m *FilesMetadataDTO) AddFile(localPath string, storagePath string, size int64, mTime time.Time,
+	initialUplTS time.Time, meta RelFileMetadata, fileMode int64, isSkipped bool) {
 	m.Files[localPath] = BackupFileDesc{
 		StoragePath:     storagePath,
+		Size:            size,
 		RelNameMd5:      meta.RelNameMd5,
 		IsSkipped:       isSkipped,
 		MTime:           mTime,

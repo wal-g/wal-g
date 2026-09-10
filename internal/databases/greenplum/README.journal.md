@@ -51,8 +51,10 @@ Sizes come from the storage object sizes, so they reflect compression and encryp
 
 AO/AOCS and PAX files live in storage shared between backups, where an unchanged file is uploaded once and reused later through deduplication.
 
-Each **segment** records what its uploaders actually pushed as ``UploadedSharedSize`` in its own ``ao_files_metadata.json`` and ``pax_files_metadata.json`` — a deduplicated file never reaches the uploader and is not counted. The **coordinator** sums the segments into the cluster-level pair as ``SharedSize``.
+Each **segment** initially records what its uploaders actually pushed as ``UploadedSharedSize`` in its own ``ao_files_metadata.json`` and ``pax_files_metadata.json`` — a deduplicated file never reaches the uploader and is not counted. The **coordinator** sums the segments into the cluster-level pair as ``SharedSize``.
 
 AO and PAX stay in separate objects all the way up — separate deduplication age limits, separate cleanup passes.
 
-**TODO: make it exact.** ``SharedSize`` is never revisited after the backup is created, so when a backup is deleted its share vanishes even though newer backups still reuse some of its files, and the total drifts below the real storage size. The fix is a rule of ownership — an object belongs to the oldest surviving backup referencing it — recomputed on the segment during ``cleanupAOSegments``/``cleanupPaxFiles``, which already load every backup's metadata.
+When a backup is deleted, ``cleanupAOSegments`` and ``cleanupPaxFiles`` recompute ownership from the metadata of the surviving segment backups. Segment history is linear: references to one physical ``StoragePath`` form a continuous interval, and a logical file that disappears and later returns gets a new storage path. Therefore a backup owns the files it references that its immediately preceding surviving backup does not. The oldest survivor owns all its references.
+
+The new ``UploadedSharedSize`` is the sum of those owned files: ``EOF`` from AO metadata and ``Size`` from PAX metadata. Replacing the value instead of adding a delta makes cleanup idempotent. After all segments finish, the coordinator sums their updated values into ``SharedSize`` for every surviving cluster backup.

@@ -128,7 +128,10 @@ func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target internal.
 
 	objFilter := func(object storage.Object) bool { return true }
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, objFilter, folderFilter)
+	if err := h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, objFilter, folderFilter); err != nil {
+		return err
+	}
+	return h.recalculateSharedSizes(ctx)
 }
 
 func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector internal.BackupSelector) {
@@ -152,9 +155,12 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 	err = h.DeleteTarget(ctx, target, h.args.Confirmed, h.args.FindFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
 
-	// Runs after dispatchDeleteCmd on purpose: the cluster-wide size is recalculated from the
+	// Runs after dispatchDeleteCmd on purpose: the cluster-wide journal is recalculated from the
 	// segment journals, which the segment handlers above have just re-merged.
 	DeleteClusterJournalInfo(ctx, h.Folder, target.GetBackupName(), h.args.Confirmed)
+	// Segment cleanup also reassigned shared AO/PAX objects. Fold the updated segment metadata into
+	// the surviving cluster backups after their cluster-level objects have been deleted.
+	tracelog.ErrorLogger.FatalOnError(h.recalculateSharedSizes(ctx))
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.BackupObject, delType SegDeleteType) error {
@@ -230,5 +236,15 @@ func (h *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string) 
 	tracelog.InfoLogger.Printf("Finished processing the segments backups")
 
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, predicate, folderFilter)
+	if err := h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, predicate, folderFilter); err != nil {
+		return err
+	}
+	return h.recalculateSharedSizes(ctx)
+}
+
+func (h *DeleteHandler) recalculateSharedSizes(ctx context.Context) error {
+	if !h.args.Confirmed {
+		return nil
+	}
+	return RecalculateSharedSizes(ctx, h.Folder)
 }

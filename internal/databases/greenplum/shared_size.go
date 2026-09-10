@@ -50,7 +50,7 @@ func sharedStorageKinds() []sharedStorageKind {
 }
 
 // UploadSharedSizes writes the cluster-wide shared size of backupName, one object per shared
-// storage, each summed from what the segments named in the backup sentinel reported uploading.
+// storage, each summed from the segment metadata named in the backup sentinel.
 //
 // Unlike the journal this is recorded on every backup-push, with no flag and for permanent backups
 // too: a permanent backup occupies the shared storage like any other, and leaving it out would
@@ -83,7 +83,29 @@ func UploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNam
 	return nil
 }
 
-// sumOverSegments adds up the volume every segment of the backup uploaded to one shared storage.
+// RecalculateSharedSizes refreshes the cluster-level AO/AOCS and PAX sizes of every surviving
+// backup. Segment cleanup has already reassigned shared objects between the segment backups; this
+// folds the new segment-level ownership into the corresponding cluster backups.
+func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder) error {
+	baseBackupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
+	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
+	if err != nil {
+		return err
+	}
+
+	backupTimes := internal.GetBackupTimeSlices(backupObjects)
+	internal.SortBackupTimeSlices(backupTimes)
+	for _, backupTime := range backupTimes {
+		if err := UploadSharedSizes(ctx, rootFolder, backupTime.BackupName); err != nil {
+			return fmt.Errorf("failed to recalculate backup %s shared sizes: %w", backupTime.BackupName, err)
+		}
+	}
+
+	return nil
+}
+
+// sumOverSegments adds up the volume for which every segment backup is accountable in one shared
+// storage.
 //
 // A partial sum would silently understate the real volume, so a single segment failing to report
 // makes the whole aggregate unavailable (ok == false) rather than wrong.

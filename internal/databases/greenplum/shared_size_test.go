@@ -93,6 +93,43 @@ func TestUploadSharedSizes(t *testing.T) {
 	})
 }
 
+func TestRecalculateSharedSizes(t *testing.T) {
+	root := testtools.MakeDefaultInMemoryStorageFolder()
+	firstBackup := "backup_20260721T100000Z"
+	secondBackup := "backup_20260721T120000Z"
+	firstSegments := map[int]string{
+		-1: "base_000000010000000000000001",
+		0:  "base_000000010000000000000002",
+	}
+	secondSegments := map[int]string{
+		-1: "base_000000010000000000000003",
+		0:  "base_000000010000000000000004",
+	}
+
+	putGpSentinel(t, root, firstBackup, firstSegments)
+	putGpSentinel(t, root, secondBackup, secondSegments)
+	putSegmentFilesMetadata(t, root, -1, firstSegments[-1], 10, 5)
+	putSegmentFilesMetadata(t, root, 0, firstSegments[0], 20, 15)
+	putSegmentFilesMetadata(t, root, -1, secondSegments[-1], 30, 25)
+	putSegmentFilesMetadata(t, root, 0, secondSegments[0], 40, 35)
+
+	require.NoError(t, greenplum.RecalculateSharedSizes(t.Context(), root))
+
+	firstAOSize, err := greenplum.FetchAOSharedSize(t.Context(), root, firstBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(30), firstAOSize)
+	firstPaxSize, err := greenplum.FetchPaxSharedSize(t.Context(), root, firstBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(20), firstPaxSize)
+
+	secondAOSize, err := greenplum.FetchAOSharedSize(t.Context(), root, secondBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(70), secondAOSize)
+	secondPaxSize, err := greenplum.FetchPaxSharedSize(t.Context(), root, secondBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(60), secondPaxSize)
+}
+
 // putSegmentFilesMetadata writes the two files metadata objects a segment backup-push leaves next
 // to its backup, each reporting the volume it uploaded to its shared storage.
 func putSegmentFilesMetadata(t *testing.T, root storage.Folder, contentID int, backupName string,

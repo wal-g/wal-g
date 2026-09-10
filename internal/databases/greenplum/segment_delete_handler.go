@@ -125,10 +125,9 @@ func (h SegDeleteTargetHandler) Delete(ctx context.Context, segBackup SegBackup)
 	return cleanupPaxFiles(ctx, segTarget, h.Folder, h.args.Confirmed)
 }
 
-// TODO: unit tests
 func cleanupAOSegments(ctx context.Context, target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
 	aoSegFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(ao.StoragePath)
-	aoSegmentsToRetain, err := ao.LoadStorageAOFiles(ctx, segFolder.GetSubFolder(utility.BaseBackupPath))
+	aoSegmentsToRetain, err := reassignAOSharedStorage(ctx, segFolder.GetSubFolder(utility.BaseBackupPath), confirmed)
 	if err != nil {
 		return err
 	}
@@ -234,10 +233,9 @@ func GetPermanentBackupsAndWals(ctx context.Context, rootFolder storage.Folder, 
 	return permanentBackups, permanentWals
 }
 
-// TODO: unit tests
 func cleanupPaxFiles(ctx context.Context, target internal.BackupObject, segFolder storage.Folder, confirmed bool) error {
 	paxFolder := segFolder.GetSubFolder(utility.BaseBackupPath).GetSubFolder(pax.StoragePath)
-	paxFilesToRetain, err := pax.LoadStoragePaxFiles(ctx, segFolder.GetSubFolder(utility.BaseBackupPath))
+	paxFilesToRetain, err := reassignPaxSharedStorage(ctx, segFolder.GetSubFolder(utility.BaseBackupPath), confirmed)
 	if err != nil {
 		return err
 	}
