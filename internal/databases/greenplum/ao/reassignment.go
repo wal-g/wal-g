@@ -69,10 +69,6 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			ownedSize := int64(0)
 			for storagePath, size := range files {
 				if _, wasReferenced := previousReferences[storagePath]; !wasReferenced {
-					if size < 0 {
-						return nil, fmt.Errorf("negative size %d for AO/AOCS object %s in backup %s",
-							size, storagePath, backup.Name)
-					}
 					ownedSize += size
 				}
 			}
