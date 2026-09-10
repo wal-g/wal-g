@@ -40,15 +40,15 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			return err
 		}
 
-		var meta FilesMetadataDTO
 		metadataPath := GetFilesMetadataPath(backup.Name)
-		if err := internal.FetchDto(ctx, backup.Folder, &meta, metadataPath); err != nil {
-			if _, ok := err.(storage.ObjectNotFoundError); ok {
-				tracelog.WarningLogger.Printf("No AO/AOCS files metadata found for backup %s in folder %s, skipping",
-					backup.Name, baseBackupsFolder.GetPath())
-				continue
-			}
+		meta, err := fetchFilesMetadata(ctx, backup)
+		if err != nil {
 			return err
+		}
+		if meta == nil {
+			tracelog.WarningLogger.Printf("No AO/AOCS files metadata found for backup %s in folder %s, skipping",
+				backup.Name, baseBackupsFolder.GetPath())
+			continue
 		}
 
 		var previousReferences map[string]int64
@@ -60,23 +60,22 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 				return err
 			}
 
-			var previousMeta FilesMetadataDTO
-			if err := internal.FetchDto(ctx, previousBackup.Folder, &previousMeta,
-				GetFilesMetadataPath(previousBackup.Name)); err != nil {
-				if _, ok := err.(storage.ObjectNotFoundError); ok {
-					tracelog.WarningLogger.Printf("Can not recalculate backup %s shared AO/AOCS size: "+
-						"the preceding backup files metadata is unavailable", backup.Name)
-					continue
-				}
+			previousMeta, err := fetchFilesMetadata(ctx, previousBackup)
+			if err != nil {
 				return err
 			}
-			previousReferences = referencedFiles(&previousMeta)
+			if previousMeta == nil {
+				tracelog.WarningLogger.Printf("Can not recalculate backup %s shared AO/AOCS size: "+
+					"the preceding backup files metadata is unavailable", backup.Name)
+				continue
+			}
+			previousReferences = referencedFiles(previousMeta)
 		}
 
 		// Stage 3: compare the affected backup with its predecessor, assign newly referenced objects,
 		// and upload the new size when confirmed.
 		ownedSize := int64(0)
-		for storagePath, size := range referencedFiles(&meta) {
+		for storagePath, size := range referencedFiles(meta) {
 			if _, wasReferenced := previousReferences[storagePath]; !wasReferenced {
 				ownedSize += size
 			}
@@ -90,13 +89,25 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			backup.Name, meta.UploadedSharedSize, ownedSize)
 		meta.SetUploadedSharedSize(ownedSize)
 		if confirmed {
-			if err := internal.UploadDto(ctx, backup.Folder, &meta, metadataPath); err != nil {
+			if err := internal.UploadDto(ctx, backup.Folder, meta, metadataPath); err != nil {
 				return fmt.Errorf("failed to update backup %s shared AO/AOCS size: %w", backup.Name, err)
 			}
 		}
 	}
 
 	return nil
+}
+
+func fetchFilesMetadata(ctx context.Context, backup internal.Backup) (*FilesMetadataDTO, error) {
+	var meta FilesMetadataDTO
+	err := internal.FetchDto(ctx, backup.Folder, &meta, GetFilesMetadataPath(backup.Name))
+	if err != nil {
+		if _, ok := err.(storage.ObjectNotFoundError); ok {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &meta, nil
 }
 
 func referencedFiles(meta *FilesMetadataDTO) map[string]int64 {
