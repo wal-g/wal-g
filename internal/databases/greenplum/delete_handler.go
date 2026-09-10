@@ -142,7 +142,8 @@ func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target internal.
 	if err != nil {
 		return err
 	}
-	return h.recalculateSharedSizes(ctx, backupsWithChangedPredecessor(backupsBefore, backupsAfter))
+	return RecalculateSharedSizes(ctx, h.Folder,
+		backupsWithChangedPredecessor(backupsBefore, backupsAfter), h.args.Confirmed)
 }
 
 func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector internal.BackupSelector) {
@@ -175,7 +176,8 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 	DeleteClusterJournalInfo(ctx, h.Folder, target.GetBackupName(), h.args.Confirmed)
 	// Segment cleanup has removed unreferenced AO/PAX objects. Recalculate ownership directly into
 	// the surviving cluster backups after their old cluster-level objects have been deleted.
-	err = h.recalculateSharedSizes(ctx, backupsWithChangedPredecessor(backupsBefore, backupsAfter))
+	err = RecalculateSharedSizes(ctx, h.Folder,
+		backupsWithChangedPredecessor(backupsBefore, backupsAfter), h.args.Confirmed)
 	tracelog.ErrorLogger.FatalOnError(err)
 }
 
@@ -264,12 +266,6 @@ func (h *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string) 
 	if err != nil {
 		return err
 	}
-	return h.recalculateSharedSizes(ctx, backupsWithChangedPredecessor(backupsBefore, backupsAfter))
-}
-
-func (h *DeleteHandler) recalculateSharedSizes(ctx context.Context, backupNames []string) error {
-	if !h.args.Confirmed {
-		return nil
-	}
-	return RecalculateSharedSizes(ctx, h.Folder, backupNames)
+	return RecalculateSharedSizes(ctx, h.Folder,
+		backupsWithChangedPredecessor(backupsBefore, backupsAfter), h.args.Confirmed)
 }

@@ -106,7 +106,11 @@ func uploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNam
 
 // RecalculateSharedSizes refreshes the cluster-level AO/AOCS and PAX sizes of backups whose
 // preceding survivor changed. It leaves the original segment files metadata unchanged.
-func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNames []string) error {
+func RecalculateSharedSizes(ctx context.Context, rootFolder storage.Folder, backupNames []string, confirmed bool) error {
+	if !confirmed {
+		return nil
+	}
+
 	for _, backupName := range backupNames {
 		if err := ReassignSharedStorage(ctx, rootFolder, backupName); err != nil {
 			return fmt.Errorf("failed to recalculate backup %s shared sizes: %w", backupName, err)
