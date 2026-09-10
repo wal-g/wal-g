@@ -149,6 +149,8 @@ const (
 	OplogReplayOplogAlwaysUpsert        = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
 	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	OplogReplayFsyncInterval            = "OPLOG_REPLAY_FSYNC_INTERVAL"
+	OplogReplayMaxMongodRestarts        = "OPLOG_REPLAY_MAX_MONGOD_RESTARTS"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
 
 	MysqlDatasourceNameSetting     = "WALG_MYSQL_DATASOURCE_NAME"

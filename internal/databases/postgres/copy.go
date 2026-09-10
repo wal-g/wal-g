@@ -16,13 +16,13 @@ import (
 
 // HandleCopy copy specific or all backups from one storage to another
 func HandleCopy(ctx context.Context, fromConfigFile string, toConfigFile string, backupName string, withAllHistory bool) {
-	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
+	from, fromConfig, err := internal.StorageAndConfigFromFile(ctx, fromConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	to, err := internal.StorageFromConfig(ctx, toConfigFile)
+	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, withAllHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.ExecuteRaw(ctx, plan))
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
 	tracelog.InfoLogger.Println("Success copy.")
 }
 

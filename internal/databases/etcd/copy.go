@@ -27,11 +27,11 @@ func BuildCopyPlan(ctx context.Context, from, to storage.Folder, backupName stri
 }
 
 func HandleCopy(ctx context.Context, fromConfigFile, toConfigFile, backupName string) {
-	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
+	from, fromConfig, err := internal.StorageAndConfigFromFile(ctx, fromConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	to, err := internal.StorageFromConfig(ctx, toConfigFile)
+	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName)
 	tracelog.ErrorLogger.FatalOnError(err)
-	tracelog.ErrorLogger.FatalOnError(copy.ExecuteRaw(ctx, plan))
+	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, copy.OptionsFromConfigs(fromConfig, toConfig)))
 }

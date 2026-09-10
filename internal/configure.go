@@ -541,6 +541,11 @@ func ConfigureSettings(currentType string) {
 
 // StorageFromConfig prefers the config parameters instead of the current environment variables
 func StorageFromConfig(ctx context.Context, configFile string) (storage.Storage, error) {
+	configuredStorage, _, err := StorageAndConfigFromFile(ctx, configFile)
+	return configuredStorage, err
+}
+
+func StorageAndConfigFromFile(ctx context.Context, configFile string) (storage.Storage, *viper.Viper, error) {
 	var config = viper.New()
 	conf.ReadConfigFromFile(config, configFile)
 	conf.CheckAllowedSettings(config)
@@ -552,7 +557,7 @@ func StorageFromConfig(ctx context.Context, configFile string) (storage.Storage,
 		tracelog.ErrorLogger.Println("Failed configure folder according to config " + configFile)
 		tracelog.ErrorLogger.FatalError(err)
 	}
-	return folder, err
+	return folder, config, err
 }
 
 func ConfigureFailoverStorages(ctx context.Context) (failovers map[string]storage.HashableStorage, err error) {
