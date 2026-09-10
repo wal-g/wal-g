@@ -37,10 +37,10 @@ type SharedSizeDTO struct {
 // does, so every delete mode picks them up without any code of its own (see
 // utility.StripLeftmostBackupName).
 type sharedStorageKind struct {
-	name                      string
-	path                      func(backupName string) string
-	readInitialSegmentSize    segmentSharedSizeReader
-	readReassignedSegmentSize segmentSharedSizeReader
+	name                   string
+	path                   func(backupName string) string
+	readInitialSegmentSize segmentSharedSizeReader
+	fetchReferencedFiles   referencedFilesFetcher
 }
 
 type segmentSharedSizeReader func(ctx context.Context, baseBackupsFolder storage.Folder,
@@ -49,16 +49,16 @@ type segmentSharedSizeReader func(ctx context.Context, baseBackupsFolder storage
 func sharedStorageKinds() []sharedStorageKind {
 	return []sharedStorageKind{
 		{
-			name:                      "AO/AOCS",
-			path:                      ao.GetFilesMetadataPath,
-			readInitialSegmentSize:    readUploadedAOSize,
-			readReassignedSegmentSize: ao.ReassignedSharedSize,
+			name:                   "AO/AOCS",
+			path:                   ao.GetFilesMetadataPath,
+			readInitialSegmentSize: readUploadedAOSize,
+			fetchReferencedFiles:   ao.FetchReferencedFiles,
 		},
 		{
-			name:                      "PAX",
-			path:                      pax.GetFilesMetadataPath,
-			readInitialSegmentSize:    readUploadedPaxSize,
-			readReassignedSegmentSize: pax.ReassignedSharedSize,
+			name:                   "PAX",
+			path:                   pax.GetFilesMetadataPath,
+			readInitialSegmentSize: readUploadedPaxSize,
+			fetchReferencedFiles:   pax.FetchReferencedFiles,
 		},
 	}
 }

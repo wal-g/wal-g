@@ -43,7 +43,7 @@ func TestReassignedAOSharedSize(t *testing.T) {
 				UploadedSharedSize: 30,
 			})
 
-		size, err := ao.ReassignedSharedSize(t.Context(), folder, thirdSegBackup)
+		size, err := reassignedSharedSize(t.Context(), folder, thirdSegBackup, ao.FetchReferencedFiles)
 		require.NoError(t, err)
 		assert.Equal(t, int64(50), size)
 
@@ -52,7 +52,7 @@ func TestReassignedAOSharedSize(t *testing.T) {
 		assert.Equal(t, int64(30), meta.UploadedSharedSize)
 
 		// Repeating the calculation must return the same exact total, not add it again.
-		size, err = ao.ReassignedSharedSize(t.Context(), folder, thirdSegBackup)
+		size, err = reassignedSharedSize(t.Context(), folder, thirdSegBackup, ao.FetchReferencedFiles)
 		require.NoError(t, err)
 		assert.Equal(t, int64(50), size)
 	})
@@ -67,7 +67,7 @@ func TestReassignedAOSharedSize(t *testing.T) {
 				},
 			})
 
-		size, err := ao.ReassignedSharedSize(t.Context(), folder, thirdSegBackup)
+		size, err := reassignedSharedSize(t.Context(), folder, thirdSegBackup, ao.FetchReferencedFiles)
 		require.NoError(t, err)
 		assert.Equal(t, int64(30), size)
 	})
@@ -92,10 +92,10 @@ func TestReassignedPaxSharedSize(t *testing.T) {
 				},
 			})
 
-		firstSize, err := pax.ReassignedSharedSize(t.Context(), folder, firstSegBackup)
+		firstSize, err := reassignedSharedSize(t.Context(), folder, firstSegBackup, pax.FetchReferencedFiles)
 		require.NoError(t, err)
 		assert.Equal(t, int64(10), firstSize)
-		thirdSize, err := pax.ReassignedSharedSize(t.Context(), folder, thirdSegBackup)
+		thirdSize, err := reassignedSharedSize(t.Context(), folder, thirdSegBackup, pax.FetchReferencedFiles)
 		require.NoError(t, err)
 		assert.Equal(t, int64(20), thirdSize)
 		assert.Equal(t, int64(777), fetchPaxMetadata(t, folder, firstSegBackup).UploadedSharedSize)
@@ -115,7 +115,7 @@ func TestReassignedPaxSharedSize(t *testing.T) {
 				UploadedSharedSize: 777,
 			})
 
-		_, err := pax.ReassignedSharedSize(t.Context(), folder, thirdSegBackup)
+		_, err := reassignedSharedSize(t.Context(), folder, thirdSegBackup, pax.FetchReferencedFiles)
 		assert.Error(t, err)
 	})
 }
