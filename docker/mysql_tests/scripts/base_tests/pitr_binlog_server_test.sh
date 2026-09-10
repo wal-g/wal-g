@@ -14,16 +14,17 @@ export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest@tcp(127.0.0.1:3306)/sbtes
 
 mysql_initialize_and_start
 
-# binlog.000002
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
 mysql -e "FLUSH BINARY LOGS"
 
-# binlog.000003 - empty
+EMPTY_BINLOG=$(mysql_current_binlog)
 mysql -e "FLUSH BINARY LOGS"
 wal-g binlog-push
 sleep 1
 
-# binlog.000004 from_binlog_01/02 are in the same binlog file with backup_and_binlog_01/02. binlog-server must skip backup_and_binlog_01 GTIDs and apply from_binlog_01/02
+# WAL-G must skip the backup rows and apply the post-backup transactions.
+# XtraBackup may rotate binlogs, so capture filenames at each boundary.
+BACKUP_ROWS_BINLOG=$(mysql_current_binlog)
 GTIDS_BEFORE_BACKUP_ROWS=$(mysql -N -e "SELECT @@GLOBAL.GTID_EXECUTED")
 mysql -e "INSERT INTO sbtest.pitr VALUES('backup_and_binlog_01', NOW())"
 GTIDS_AFTER_BACKUP_ROW_01=$(mysql -N -e "SELECT @@GLOBAL.GTID_EXECUTED")
@@ -34,16 +35,17 @@ BACKUP_AND_BINLOG_02_GTID=$(mysql -N -e "SELECT GTID_SUBTRACT('$GTIDS_AFTER_BACK
 test -n "$BACKUP_AND_BINLOG_01_GTID"
 test -n "$BACKUP_AND_BINLOG_02_GTID"
 wal-g backup-push
+FIRST_REPLAY_BINLOG=$(mysql_current_binlog)
 mysql -e "INSERT INTO sbtest.pitr VALUES('from_binlog_01', NOW())"
 mysql -e "INSERT INTO sbtest.pitr VALUES('from_binlog_02', NOW())"
 mysql -e "FLUSH BINARY LOGS"
 
-# binlog.000005
+SECOND_REPLAY_BINLOG=$(mysql_current_binlog)
 mysql -e "INSERT INTO sbtest.pitr VALUES('from_binlog_03', NOW())"
 mysql -e "INSERT INTO sbtest.pitr VALUES('from_binlog_04', NOW())"
 mysql -e "FLUSH BINARY LOGS"
 
-# binlog.000006
+PITR_CUTOFF_BINLOG=$(mysql_current_binlog)
 mysql -e "INSERT INTO sbtest.pitr VALUES('from_binlog_05', NOW())"
 sleep 1
 DT1=$(date3339)
@@ -51,7 +53,7 @@ sleep 1
 mysql -e "INSERT INTO sbtest.pitr VALUES('after_pitr_01', NOW())"
 mysql -e "FLUSH BINARY LOGS"
 
-# binlog.000007
+AFTER_PITR_BINLOG=$(mysql_current_binlog)
 mysql -e "INSERT INTO sbtest.pitr VALUES('after_pitr_02', NOW())"
 mysql -e "INSERT INTO sbtest.pitr VALUES('after_pitr_03', NOW())"
 mysql -e "FLUSH BINARY LOGS"
@@ -105,13 +107,12 @@ if grep -w 'after_pitr_01' /tmp/dump_after_pitr_gtid_skip ||
     exit 1
 fi
 
-grep -F 'Streaming /tmp/mysql-bin.000003 to replica' "$BINLOG_SERVER_LOG"
-grep -F 'Streaming /tmp/mysql-bin.000004 to replica' "$BINLOG_SERVER_LOG"
-grep -F 'Streaming /tmp/mysql-bin.000005 to replica' "$BINLOG_SERVER_LOG"
-grep -F 'Streaming /tmp/mysql-bin.000006 to replica' "$BINLOG_SERVER_LOG"
+for binlog in "$EMPTY_BINLOG" "$BACKUP_ROWS_BINLOG" "$FIRST_REPLAY_BINLOG" "$SECOND_REPLAY_BINLOG" "$PITR_CUTOFF_BINLOG"; do
+    grep -F "Streaming $WALG_MYSQL_BINLOG_DST/$binlog to replica" "$BINLOG_SERVER_LOG"
+done
 
-if grep -F 'Streaming /tmp/mysql-bin.000007 to replica' "$BINLOG_SERVER_LOG"; then
-    echo "ERROR: streamed mysql-bin.000007 after reaching the PITR cutoff"
+if grep -F "Streaming $WALG_MYSQL_BINLOG_DST/$AFTER_PITR_BINLOG to replica" "$BINLOG_SERVER_LOG"; then
+    echo "ERROR: streamed $AFTER_PITR_BINLOG after reaching the PITR cutoff"
     exit 1
 fi
 

@@ -138,6 +138,16 @@ mysql_reset_binary_logs_and_gtids() {
     fi
 }
 
+mysql_current_binlog() {
+    mysql_binary_logs=$(mysql --batch --skip-column-names -e "SHOW BINARY LOGS") || return 1
+    mysql_binlog_name=$(printf '%s\n' "$mysql_binary_logs" | awk 'NF {name = $1} END {print name}')
+    if [ -z "$mysql_binlog_name" ]; then
+        echo "SHOW BINARY LOGS returned no binlogs" >&2
+        return 1
+    fi
+    printf '%s\n' "$mysql_binlog_name"
+}
+
 # Run directly: recent Percona packages only ship systemd units, whereas the
 # integration containers have neither systemd nor an init.d service.
 mysql_start() {

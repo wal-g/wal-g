@@ -15,7 +15,7 @@ func FileBlockSize(f *os.File) (int64, error) {
 	if err := unix.Fstat(int(f.Fd()), &stat); err != nil {
 		return 0, err
 	}
-	return int64(stat.Blksize), nil
+	return int64(stat.Blksize), nil //nolint:unconvert // Blksize is int32 on linux/arm64, int64 on linux/amd64.
 }
 
 func PunchHole(f *os.File, offset int64, size int64) error {

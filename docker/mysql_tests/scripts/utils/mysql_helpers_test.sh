@@ -12,6 +12,10 @@ mysql() {
         printf '%s\n' "$mock_version"
         return "$mock_query_status"
     fi
+    if [ "$*" = "--batch --skip-column-names -e SHOW BINARY LOGS" ]; then
+        printf '%s\n' "$mock_binary_logs"
+        return "$mock_query_status"
+    fi
     last_sql=$*
 }
 
@@ -97,6 +101,25 @@ if mysql_version_at_least 8 4 0; then
     fail "5.7 was treated as >= 8.4"
 else
     test "$?" = 1 || fail "Old version was treated as a detection failure"
+fi
+
+# SHOW BINARY LOGS gained an encryption column, but the last filename is still
+# the active binlog. Do not assume a prefix, sequence number or column count.
+mock_query_status=0
+for mock_binary_logs in "$(printf 'mysql-bin.000003\t100\nmysql-bin.000004\t200')" \
+    "$(printf 'mysql-bin.000003\t100\tNo\nmysql-bin.000004\t200\tNo')"; do
+    test "$(mysql_current_binlog)" = mysql-bin.000004 || fail "Wrong current binlog"
+done
+mock_binary_logs=$(printf 'custom-bin.000009\t100\tNo\ncustom-bin.000010\t200\tNo')
+test "$(mysql_current_binlog)" = custom-bin.000010 || fail "Wrong current binlog after rotation"
+mock_query_status=1
+if mysql_current_binlog >/dev/null 2>&1; then
+    fail "Current binlog accepted a failed query"
+fi
+mock_query_status=0
+mock_binary_logs=
+if mysql_current_binlog >/dev/null 2>&1; then
+    fail "Current binlog accepted an empty listing"
 fi
 
 # Mock process/filesystem operations too: exercise the bounded startup and
