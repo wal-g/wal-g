@@ -6,6 +6,8 @@ import (
 	"slices"
 
 	"github.com/wal-g/wal-g/internal"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
+	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
@@ -35,17 +37,31 @@ func ReassignSharedSizes(ctx context.Context, rootFolder storage.Folder, backupN
 // and uploads only its small cluster-level SharedSizeDTO objects. Segment files metadata remains
 // unchanged: its UploadedSharedSize describes the initial upload.
 func reassignSharedStorage(ctx context.Context, rootFolder storage.Folder, backupName string) error {
-	return uploadSharedSizes(ctx, rootFolder, backupName, func(kind sharedStorageKind) segmentSharedSizeReader {
-		return kind.reassignedSegmentSize
-	})
+	// AO shared storage
+	if err := uploadSharedSize(ctx, rootFolder, backupName, ao.GetFilesMetadataPath, readReassignedAOSize); err != nil {
+		return fmt.Errorf("failed to reassign the AO shared size: %w", err)
+	}
+	// PAX shared storage
+	if err := uploadSharedSize(ctx, rootFolder, backupName, pax.GetFilesMetadataPath, readReassignedPaxSize); err != nil {
+		return fmt.Errorf("failed to reassign the PAX shared size: %w", err)
+	}
+	return nil
 }
 
-func (kind sharedStorageKind) reassignedSegmentSize(
+func readReassignedAOSize(
 	ctx context.Context,
 	baseBackupsFolder storage.Folder,
 	backupName string,
 ) (int64, error) {
-	return reassignedSharedSize(ctx, baseBackupsFolder, backupName, kind.fetchReferencedFiles)
+	return reassignedSharedSize(ctx, baseBackupsFolder, backupName, ao.FetchReferencedFiles)
+}
+
+func readReassignedPaxSize(
+	ctx context.Context,
+	baseBackupsFolder storage.Folder,
+	backupName string,
+) (int64, error) {
+	return reassignedSharedSize(ctx, baseBackupsFolder, backupName, pax.FetchReferencedFiles)
 }
 
 func reassignedSharedSize(

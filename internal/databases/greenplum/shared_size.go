@@ -29,43 +29,11 @@ type SharedSizeDTO struct {
 	SharedSize int64 `json:"SharedSize"`
 }
 
-// sharedStorageKind is one of the two storages shared between backups, described by everything the
-// cluster-wide bookkeeping needs to know about it: where a segment reports what it uploaded, and
-// where the cluster total is kept.
-//
-// Both live under basebackups_005/<backup>/, which is what makes the cluster-level objects
-// disappear together with the backup: the path reduces to the backup name exactly like the sentinel
-// does, so every delete mode picks them up without any code of its own (see
-// utility.StripLeftmostBackupName).
-type sharedStorageKind struct {
-	name                   string
-	path                   func(backupName string) string
-	readInitialSegmentSize segmentSharedSizeReader
-	fetchReferencedFiles   referencedFilesFetcher
-}
-
 type segmentSharedSizeReader func(
 	ctx context.Context,
 	baseBackupsFolder storage.Folder,
 	backupName string,
 ) (int64, error)
-
-func sharedStorageKinds() []sharedStorageKind {
-	return []sharedStorageKind{
-		{
-			name:                   "AO/AOCS",
-			path:                   ao.GetFilesMetadataPath,
-			readInitialSegmentSize: readUploadedAOSize,
-			fetchReferencedFiles:   ao.FetchReferencedFiles,
-		},
-		{
-			name:                   "PAX",
-			path:                   pax.GetFilesMetadataPath,
-			readInitialSegmentSize: readUploadedPaxSize,
-			fetchReferencedFiles:   pax.FetchReferencedFiles,
-		},
-	}
-}
 
 // UploadSharedSizes writes the cluster-wide shared size of backupName, one object per shared
 // storage, each summed from the segment metadata named in the backup sentinel.
@@ -74,41 +42,47 @@ func sharedStorageKinds() []sharedStorageKind {
 // too: a permanent backup occupies the shared storage like any other, and leaving it out would
 // break the property that the sizes of all backups add up to the size of the storage.
 func UploadSharedSizes(ctx context.Context, rootFolder storage.Folder, backupName string) error {
-	return uploadSharedSizes(ctx, rootFolder, backupName, func(kind sharedStorageKind) segmentSharedSizeReader {
-		return kind.readInitialSegmentSize
-	})
+	if err := uploadSharedSize(ctx, rootFolder, backupName, ao.GetFilesMetadataPath, readUploadedAOSize); err != nil {
+		return fmt.Errorf("failed to upload the AO/AOCS shared size: %w", err)
+	}
+	if err := uploadSharedSize(ctx, rootFolder, backupName, pax.GetFilesMetadataPath, readUploadedPaxSize); err != nil {
+		return fmt.Errorf("failed to upload the PAX shared size: %w", err)
+	}
+	return nil
 }
 
-func uploadSharedSizes(
+func uploadSharedSize(
 	ctx context.Context,
 	rootFolder storage.Folder,
 	backupName string,
-	reader func(kind sharedStorageKind) segmentSharedSizeReader,
+	metadataPath func(backupName string) string,
+	readSegmentSize segmentSharedSizeReader,
 ) error {
 	segments, ok, err := segmentsOfBackup(ctx, rootFolder, backupName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get backup segments: %w", err)
 	}
 	if !ok {
 		return fmt.Errorf("can not read the sentinel of backup %s", backupName)
 	}
 
 	baseBackupsFolder := rootFolder.GetSubFolder(utility.BaseBackupPath)
-	for _, kind := range sharedStorageKinds() {
-		sum, ok := sumOverSegments(ctx, rootFolder, backupName, segments, kind, reader(kind))
-		if !ok {
-			// A partial sum would understate the real volume and be indistinguishable from a
-			// genuinely small one, so the object is left unwritten rather than written wrong. An
-			// absent object means "never determined", which a zero could not express.
-			continue
-		}
-
-		dto := SharedSizeDTO{SharedSize: sum}
-		if err := internal.UploadDto(ctx, baseBackupsFolder, dto, kind.path(backupName)); err != nil {
-			return fmt.Errorf("failed to upload the cluster-wide %s shared size: %w", kind.name, err)
-		}
+	sum, ok := sumOverSegments(ctx, rootFolder, segments, readSegmentSize)
+	if !ok {
+		// A partial sum would understate the real volume and be indistinguishable from a
+		// genuinely small one, so the object is left unwritten rather than written wrong. An
+		// absent object means "never determined", which a zero could not express.
+		tracelog.WarningLogger.Printf("The files metadata of backup %s is unavailable, "+
+			"the cluster-wide shared volume can not be calculated", backupName)
+		return nil
 	}
+	tracelog.DebugLogger.Printf("Backup %s added %d bytes to shared storage over %d segments",
+		backupName, sum, len(segments))
 
+	dto := SharedSizeDTO{SharedSize: sum}
+	if err := internal.UploadDto(ctx, baseBackupsFolder, dto, metadataPath(backupName)); err != nil {
+		return fmt.Errorf("failed to upload the cluster-wide shared size: %w", err)
+	}
 	return nil
 }
 
@@ -117,8 +91,8 @@ func uploadSharedSizes(
 //
 // A partial sum would silently understate the real volume, so a single segment failing to report
 // makes the whole aggregate unavailable (ok == false) rather than wrong.
-func sumOverSegments(ctx context.Context, rootFolder storage.Folder, backupName string,
-	segments []SegmentMetadata, kind sharedStorageKind, readSegmentSize segmentSharedSizeReader) (int64, bool) {
+func sumOverSegments(ctx context.Context, rootFolder storage.Folder,
+	segments []SegmentMetadata, readSegmentSize segmentSharedSizeReader) (int64, bool) {
 	sum := int64(0)
 	missing := make([]int, 0)
 	for _, meta := range segments {
@@ -133,8 +107,8 @@ func sumOverSegments(ctx context.Context, rootFolder storage.Folder, backupName 
 			GetSubFolder(utility.BaseBackupPath)
 		size, err := readSegmentSize(ctx, segFolder, meta.BackupName)
 		if err != nil {
-			tracelog.WarningLogger.Printf("Can not calculate the %s shared size of segment %d backup %s: %v",
-				kind.name, meta.ContentID, meta.BackupName, err)
+			tracelog.WarningLogger.Printf("Can not calculate the shared size of segment %d backup %s: %v",
+				meta.ContentID, meta.BackupName, err)
 			missing = append(missing, meta.ContentID)
 			continue
 		}
@@ -143,13 +117,9 @@ func sumOverSegments(ctx context.Context, rootFolder storage.Folder, backupName 
 	}
 
 	if len(missing) > 0 {
-		tracelog.WarningLogger.Printf("The %s files metadata of backup %s is unavailable on segments %v, "+
-			"the cluster-wide shared volume can not be calculated", kind.name, backupName, missing)
+		tracelog.WarningLogger.Printf("Shared files metadata is unavailable on segments %v", missing)
 		return 0, false
 	}
-
-	tracelog.DebugLogger.Printf("Backup %s added %d bytes to the shared %s storage over %d segments",
-		backupName, sum, kind.name, len(segments))
 
 	return sum, true
 }

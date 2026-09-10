@@ -135,6 +135,20 @@ func TestBackupsWithChangedPredecessor(t *testing.T) {
 		assert.Equal(t, []string{"c", "e"}, backupsWithChangedPredecessor(before, after))
 	})
 
+	t.Run("the next full backup is affected when a full backup and all its increments are deleted", func(t *testing.T) {
+		before := backupTimes(
+			"full-1", "full-1-increment-1",
+			"full-2", "full-2-increment-1", "full-2-increment-2",
+			"full-3", "full-3-increment-1",
+		)
+		after := backupTimes(
+			"full-1", "full-1-increment-1",
+			"full-3", "full-3-increment-1",
+		)
+
+		assert.Equal(t, []string{"full-3"}, backupsWithChangedPredecessor(before, after))
+	})
+
 	t.Run("the oldest survivor is affected after deleting a prefix", func(t *testing.T) {
 		before := backupTimes("a", "b", "c", "d")
 		after := backupTimes("c", "d")
