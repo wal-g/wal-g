@@ -21,9 +21,31 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
+	"github.com/wal-g/wal-g/internal/printlist"
+
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
+
+type BackupInfo struct {
+	Name    string
+	Storage string
+}
+
+func (b BackupInfo) PrintableFields() []printlist.TableField {
+	return []printlist.TableField{
+		{
+			Name:       "name",
+			PrettyName: "Name of backup",
+			Value:      b.Name,
+		},
+		{
+			Name:       "storage",
+			PrettyName: "Name of storage",
+			Value:      b.Storage,
+		},
+	}
+}
 
 type backupFromFuture struct {
 	error
@@ -65,6 +87,8 @@ type BackupArguments struct {
 	composerInitFunc         func(ctx context.Context, handler *BackupHandler) error
 	preventConcurrentBackups bool
 	countJournals            bool
+	json                     bool
+	pretty                   bool
 }
 
 // CurBackupInfo holds all information that is harvest during the backup process
@@ -122,7 +146,7 @@ type BackupHandler struct {
 func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, backupsFolder string, isPermanent bool,
 	verifyPageChecksums bool, isFullBackup bool, storeAllCorruptBlocks bool, tarBallComposerType TarBallComposerType,
 	deltaConfigurator DeltaBackupConfigurator, userData interface{}, withoutFilesMetadata bool,
-	countJournals bool) BackupArguments {
+	countJournals bool, json bool, pretty bool) BackupArguments {
 	return BackupArguments{
 		Uploader:              uploader,
 		pgDataDirectory:       pgDataDirectory,
@@ -139,6 +163,8 @@ func NewBackupArguments(uploader internal.Uploader, pgDataDirectory string, back
 			return configureTarBallComposer(ctx, handler, tarBallComposerType)
 		},
 		preventConcurrentBackups: false,
+		json:                     json,
+		pretty:                   pretty,
 	}
 }
 
@@ -193,7 +219,11 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 	}
 
 	// logging backup set Name
-	tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
+	createdBackup := BackupInfo{Name: bh.CurBackupInfo.Name, Storage: storageNames[0]}
+
+	err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
+	tracelog.ErrorLogger.FatalOnError(err)
+
 }
 
 func (bh *BackupHandler) startBackup(ctx context.Context) error {
