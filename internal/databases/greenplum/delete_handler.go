@@ -8,13 +8,14 @@ import (
 	"strings"
 
 	"github.com/wal-g/tracelog"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
-	"golang.org/x/sync/errgroup"
 )
 
 type DeleteArgs struct {
@@ -119,8 +120,7 @@ func (h *DeleteHandler) HandleDeleteEverything(ctx context.Context, args []strin
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target internal.BackupObject) error {
-	baseBackupsFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
-	backupsBefore, err := listBackupsInOrder(ctx, baseBackupsFolder)
+	backupsBefore, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
@@ -134,10 +134,11 @@ func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target internal.
 
 	objFilter := func(object storage.Object) bool { return true }
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	if err := h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, objFilter, folderFilter); err != nil {
+	err = h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, objFilter, folderFilter)
+	if err != nil {
 		return err
 	}
-	backupsAfter, err := listBackupsInOrder(ctx, baseBackupsFolder)
+	backupsAfter, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
@@ -153,8 +154,7 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 		// we didn't find the requested backup for deletion
 		tracelog.ErrorLogger.Fatal("Requested backup was not found")
 	}
-	baseBackupsFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
-	backupsBefore, err := listBackupsInOrder(ctx, baseBackupsFolder)
+	backupsBefore, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
@@ -167,7 +167,7 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(ctx, target, h.args.Confirmed, h.args.FindFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
-	backupsAfter, err := listBackupsInOrder(ctx, baseBackupsFolder)
+	backupsAfter, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
 	tracelog.ErrorLogger.FatalOnError(err)
 
 	// Runs after dispatchDeleteCmd on purpose: the cluster-wide journal is recalculated from the
@@ -175,8 +175,8 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 	DeleteClusterJournalInfo(ctx, h.Folder, target.GetBackupName(), h.args.Confirmed)
 	// Segment cleanup has removed unreferenced AO/PAX objects. Recalculate ownership directly into
 	// the surviving cluster backups after their old cluster-level objects have been deleted.
-	tracelog.ErrorLogger.FatalOnError(h.recalculateSharedSizes(ctx,
-		backupsWithChangedPredecessor(backupsBefore, backupsAfter)))
+	err = h.recalculateSharedSizes(ctx, backupsWithChangedPredecessor(backupsBefore, backupsAfter))
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.BackupObject, delType SegDeleteType) error {
@@ -228,8 +228,7 @@ func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.B
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
 func (h *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string) error {
-	baseBackupsFolder := h.Folder.GetSubFolder(utility.BaseBackupPath)
-	backupsBefore, err := listBackupsInOrder(ctx, baseBackupsFolder)
+	backupsBefore, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
@@ -261,7 +260,7 @@ func (h *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string) 
 	if err := h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, predicate, folderFilter); err != nil {
 		return err
 	}
-	backupsAfter, err := listBackupsInOrder(ctx, baseBackupsFolder)
+	backupsAfter, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
 	if err != nil {
 		return err
 	}
