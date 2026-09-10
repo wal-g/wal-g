@@ -81,8 +81,8 @@ func iterateStoragePaxFilesWithFunc(ctx context.Context, baseBackupsFolder stora
 			}
 			return err
 		}
-		for localPath, fileDesc := range meta.Files {
-			fn(localPath, fileDesc)
+		for localPath := range meta.Files {
+			fn(localPath, meta.Files[localPath])
 		}
 	}
 	return nil

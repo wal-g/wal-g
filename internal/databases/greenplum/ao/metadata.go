@@ -27,12 +27,12 @@ type BackupFileDesc struct {
 
 type FilesMetadataDTO struct {
 	Files BackupFiles
-	// UploadedSharedSize is the volume this backup uploaded to the shared aosegments/ storage:
+	// UploadedSharedSize is the INITIAL volume this backup uploaded to the shared aosegments/ storage:
 	// Files smaller than WALG_GP_AOSEG_SIZE_THRESHOLD go into the regular tar balls and are not
 	// part of it.
 	//
-	// It is what this backup uploaded, not what it owns: at the cluster level a backup can be
-	// charged for the files of an older backup that was deleted while this one still reused them.
+	// It is immutable and may not reflect current ownership: at the cluster level a backup can be
+	// charged for files of an older backup that was deleted while this one still references them.
 	UploadedSharedSize int64 `json:",omitempty"`
 }
 
