@@ -14,6 +14,7 @@ import (
 // surviving backup. It returns all storage objects that remain referenced for the cleanup pass.
 func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder,
 	confirmed bool) (map[string]struct{}, error) {
+	// Stage 1: get all surviving backups in chronological order.
 	backupObjects, _, err := baseBackupsFolder.ListFolder(ctx)
 	if err != nil {
 		return nil, err
@@ -27,6 +28,7 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 	previousMetadataAvailable := false
 
 	for backupIndex, backupTime := range backupTimes {
+		// Stage 2: load the files metadata of the current surviving backup.
 		backup, err := internal.NewBackupInStorage(ctx, baseBackupsFolder, backupTime.BackupName,
 			backupTime.StorageName)
 		if err != nil {
@@ -45,6 +47,8 @@ func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder
 			return nil, err
 		}
 
+		// Stage 3: collect the current backup references, compare them with the preceding surviving
+		// backup, assign newly referenced objects to the current backup, and upload the new size when confirmed.
 		files := referencedFiles(&meta)
 		currentReferences := make(map[string]struct{}, len(files))
 		for storagePath := range files {
