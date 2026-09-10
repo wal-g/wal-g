@@ -12,6 +12,8 @@ import (
 // ReassignSharedStorage makes the oldest surviving backup that references a PAX object accountable
 // for its size. A following backup owns objects absent from the immediately preceding surviving
 // backup. It returns all storage objects that remain referenced for the cleanup pass.
+//
+//nolint:gocyclo
 func ReassignSharedStorage(ctx context.Context, baseBackupsFolder storage.Folder,
 	backupsToReassign []string, confirmed bool) (map[string]struct{}, error) {
 	// Stage 1: get all surviving backups in chronological order.
