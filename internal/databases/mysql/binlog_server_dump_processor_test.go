@@ -119,6 +119,157 @@ func gtidEvent(ts string, sid uuid.UUID, gno int64) *replication.BinlogEvent {
 	return rawEvent(replication.GTID_EVENT, ts, body)
 }
 
+// Encode the mysql::serialization fields used by tagged GTIDs. Small positive
+// GNOs fit into one byte; UUID bytes use the fixed-integer wire encoding.
+func taggedGTIDEvent(ts string, sid uuid.UUID, tag string, gno byte) *replication.BinlogEvent {
+	body := []byte{2, 0, 18, 0, 0, 2} // version, size, last field, flags, UUID field
+	for _, b := range sid {
+		if b < 128 {
+			body = append(body, b<<1)
+		} else {
+			body = append(body, b<<2|1, b>>6)
+		}
+	}
+	body = append(body, 4, gno<<2, 6, byte(len(tag)<<1))
+	body = append(body, tag...)
+	// last_committed, sequence_number, immediate_commit_timestamp,
+	// transaction_length, immediate_server_version (optional fields omitted).
+	body = append(body, 8, 0, 10, 4, 12, 0, 16, 0, 18, 0)
+	body[1] = byte(len(body) << 1)
+	e := rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
+	e.Event = &replication.GenericEvent{Data: body}
+	// Production RawData retains the checksum, unlike GenericEvent.Data.
+	e.RawData = append(e.RawData, 0, 0, 0, 0)
+	return e
+}
+
+func TestHandleEventTaggedGTIDs(t *testing.T) {
+	const ts = "2026-01-01 00:00:01"
+	for _, tc := range []struct {
+		name     string
+		required string
+		events   []*replication.BinlogEvent
+		forward  []int
+		sent     string
+	}{
+		{
+			name:    "tagged-only stream is tracked",
+			events:  []*replication.BinlogEvent{taggedGTIDEvent(ts, uuid1, "review", 1), writeRowsEvent(ts)},
+			forward: []int{0, 1}, sent: uuid1.String() + ":review:1",
+		},
+		{
+			name:     "already-applied tagged transaction and payload are skipped",
+			required: uuid1.String() + ":review:1",
+			events:   []*replication.BinlogEvent{taggedGTIDEvent(ts, uuid1, "review", 1), queryEvent(ts), writeRowsEvent(ts)},
+		},
+		{
+			name:     "mixed stream distinguishes tags and clears skip state",
+			required: uuid1.String() + ":1:review:1",
+			events: []*replication.BinlogEvent{
+				taggedGTIDEvent(ts, uuid1, "review", 1), writeRowsEvent(ts),
+				gtidEvent(ts, uuid1, 2), writeRowsEvent(ts),
+				taggedGTIDEvent(ts, uuid1, "review", 2), writeRowsEvent(ts),
+				taggedGTIDEvent(ts, uuid1, "other", 1), writeRowsEvent(ts),
+				gtidEvent(ts, uuid1, 1), writeRowsEvent(ts),
+				taggedGTIDEvent(ts, uuid2, "review", 1), writeRowsEvent(ts),
+			},
+			forward: []int{2, 3, 4, 5, 6, 7, 10, 11},
+			sent:    uuid1.String() + ":2:review:2:other:1," + uuid2.String() + ":review:1",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, sink := newTestProcessor(t, nil, requireGTIDSet(t, tc.required), at(ts))
+			for _, e := range tc.events {
+				require.NoError(t, p.handleEvent(e))
+			}
+			want := make([]*replication.BinlogEvent, 0, len(tc.forward))
+			for _, i := range tc.forward {
+				want = append(want, tc.events[i])
+			}
+			require.Equal(t, want, sink.recorded())
+			require.True(t, p.sentGTIDs.Equal(requireGTIDSet(t, tc.sent)), "sent: %s", p.sentGTIDs)
+		})
+	}
+}
+
+func TestHandleEventMalformedGTID(t *testing.T) {
+	for _, kind := range []replication.EventType{replication.GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT} {
+		for _, body := range [][]byte{nil, {2}, {2, 6, 18}, {2, 10, 18, 0, 1}} {
+			p, sink := newTestProcessor(t, nil, nil, at("2026-01-01 00:00:01"))
+			err := p.handleEvent(rawEvent(kind, "2026-01-01 00:00:01", body))
+			require.Error(t, err, "%s %x", kind, body)
+			require.Empty(t, sink.recorded())
+			require.True(t, p.sentGTIDs.IsEmpty())
+		}
+	}
+}
+
+func TestTaggedGTIDWithCommitGroupTicket(t *testing.T) {
+	const ts = "2026-01-01 00:00:01"
+	for _, ticket := range [][]byte{
+		{0}, {14}, {5, 4}, // unsigned varints: 0, 7, 257
+		{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, // uint64 max
+	} {
+		for _, alreadyApplied := range []bool{false, true} {
+			e := taggedGTIDEvent(ts, uuid1, "review", 1)
+			body := append(e.Event.(*replication.GenericEvent).Data, 22) // field 11
+			body = append(body, ticket...)
+			body[1] = byte(len(body) << 1)
+			e = rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
+			e.Event = &replication.GenericEvent{Data: body}
+			e.RawData = append(e.RawData, 0, 0, 0, 0)
+			rawBefore := append([]byte(nil), e.RawData...)
+			gtid := requireGTIDSet(t, uuid1.String()+":review:1")
+			var required *mysql.MysqlGTIDSet
+			if alreadyApplied {
+				required = gtid
+			}
+			p, sink := newTestProcessor(t, nil, required, at(ts))
+			require.NoError(t, p.handleEvent(e), "ticket %x, alreadyApplied %t", ticket, alreadyApplied)
+			require.Equal(t, rawBefore, e.RawData, "replication metadata must be forwarded unchanged")
+			if alreadyApplied {
+				require.Empty(t, sink.recorded())
+				require.True(t, p.sentGTIDs.IsEmpty())
+			} else {
+				require.Equal(t, []*replication.BinlogEvent{e}, sink.recorded())
+				require.True(t, p.sentGTIDs.Equal(gtid))
+			}
+		}
+	}
+}
+
+func TestTaggedGTIDRequiresIdentityFields(t *testing.T) {
+	const ts = "2026-01-01 00:00:01"
+	// This UUID uses only single-byte fixed-integer encodings, so the GNO
+	// field starts at byte 22 and the tag field starts at byte 24.
+	sid := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	for _, tc := range []struct {
+		name      string
+		mutate    func([]byte) []byte
+		wantError string
+	}{
+		{"missing flags", func(b []byte) []byte { return append(b[:3], b[5:]...) }, "missing tagged GTID field 0"},
+		{"missing UUID", func(b []byte) []byte { return append(b[:5], b[22:]...) }, "missing tagged GTID field 1"},
+		{"missing GNO", func(b []byte) []byte { return append(b[:22], b[24:]...) }, "missing tagged GTID field 2"},
+		{"missing tag", func(b []byte) []byte { return b[:24] }, "unexpected EOF"},
+		{"wrong tag field", func(b []byte) []byte { b[24] = 8; return b }, "missing tagged GTID field 3"},
+		{"zero GNO", func(b []byte) []byte { b[23] = 0; return b }, "invalid tagged GTID identity"},
+		{"empty tag", func(b []byte) []byte { b[25] = 0; return b }, "invalid tagged GTID identity"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := taggedGTIDEvent(ts, sid, "review", 1)
+			body := tc.mutate(e.Event.(*replication.GenericEvent).Data)
+			// Keep framing valid so the error comes from the identity field.
+			body[1] = byte(len(body) << 1)
+			e = rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
+			p, sink := newTestProcessor(t, nil, nil, at(ts))
+			require.ErrorContains(t, p.handleEvent(e), tc.wantError)
+			require.Empty(t, sink.recorded())
+			require.True(t, p.sentGTIDs.IsEmpty())
+		})
+	}
+}
+
 func rotateEvent(ts string, name string, pos uint64) *replication.BinlogEvent {
 	body := make([]byte, 8+len(name)+1)
 	binary.LittleEndian.PutUint64(body, pos)

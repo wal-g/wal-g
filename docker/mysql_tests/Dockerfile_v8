@@ -21,4 +21,4 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
 
 COPY docker/mysql_tests/scripts/ /tmp
 
-CMD /tmp/run_integration_tests.sh  -p /tmp/mysql8_tests
+CMD /tmp/run_integration_tests.sh -p /tmp/xbtool_tests

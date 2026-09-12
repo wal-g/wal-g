@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"os"
 	"path"
@@ -204,8 +205,12 @@ func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 		return errUntilTSReached
 	}
 	switch e.Header.EventType {
-	case replication.GTID_EVENT:
-		if p.decideSkipForGTID(e) {
+	case replication.GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT:
+		skip, err := p.decideSkipForGTID(e)
+		if err != nil {
+			return err
+		}
+		if skip {
 			logEventDebug(e, "Dropping event (reason=gtid_skipped)")
 			return nil
 		}
@@ -218,7 +223,7 @@ func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 		p.skipCurrentTxn = false
 		logEventDebug(e, "Dropping event (reason=real_rotate_suppressed)")
 		return nil
-	case replication.ANONYMOUS_GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT,
+	case replication.ANONYMOUS_GTID_EVENT,
 		replication.FORMAT_DESCRIPTION_EVENT, replication.PREVIOUS_GTIDS_EVENT,
 		replication.STOP_EVENT, replication.INCIDENT_EVENT:
 		// txn boundary or file-boundary marker; never appears inside a txn
@@ -232,27 +237,46 @@ func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 	return p.sink.addEvent(e)
 }
 
-// decideSkipForGTID updates skip state from a GTID_EVENT; returns true if
+// decideSkipForGTID updates skip state from an ordinary or tagged GTID event; returns true if
 // the caller should drop the event because the replica already applied it.
-func (p *BinlogDumpProcessor) decideSkipForGTID(e *replication.BinlogEvent) bool {
+func (p *BinlogDumpProcessor) decideSkipForGTID(e *replication.BinlogEvent) (bool, error) {
 	p.skipCurrentTxn = false
-	ge := &replication.GTIDEvent{}
-	if ge.Decode(e.RawData[replication.EventHeaderSize:]) != nil {
-		return false
-	}
-	one, err := ge.GTIDNext()
+	one, err := decodeTransactionGTID(e)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("decode %s: %w", e.Header.EventType, err)
 	}
 	if p.requiredGTIDs != nil && p.requiredGTIDs.Contain(one) {
 		tracelog.DebugLogger.Printf("Skipping already-applied transaction %s", one)
 		p.skipCurrentTxn = true
-		return true
+		return true, nil
 	}
 	if err := p.sentGTIDs.Update(one.String()); err != nil {
-		tracelog.WarningLogger.Printf("Failed to record sent GTID %s: %v", one, err)
+		return false, fmt.Errorf("record sent GTID %s: %w", one, err)
 	}
-	return false
+	return false, nil
+}
+
+func decodeTransactionGTID(e *replication.BinlogEvent) (mysql.GTIDSet, error) {
+	if len(e.RawData) < replication.EventHeaderSize {
+		return nil, errors.New("truncated event header")
+	}
+	body := e.RawData[replication.EventHeaderSize:]
+	// Raw-mode parsing exposes a checksum-free body in GenericEvent.
+	if generic, ok := e.Event.(*replication.GenericEvent); ok {
+		body = generic.Data
+	}
+	if e.Header.EventType == replication.GTID_TAGGED_LOG_EVENT {
+		return decodeTaggedTransactionGTID(body)
+	}
+	if len(body) < 25 {
+		return nil, errors.New("truncated GTID event")
+	}
+	ge := &replication.GTIDEvent{}
+	// Only flags, SID and GNO are needed; do not decode optional metadata.
+	if err := ge.Decode(body[:25]); err != nil {
+		return nil, err
+	}
+	return ge.GTIDNext()
 }
 
 // processBinlogFiles consumes fetched binlog file identifiers from fileCh
