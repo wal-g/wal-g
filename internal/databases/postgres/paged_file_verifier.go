@@ -129,29 +129,29 @@ func pgChecksumBlock(page *PgDatabasePage) uint32 {
 // checking pages before they are loaded into buffer pool.
 //
 // see:  src/backend/storage/page/bufpage.info
-func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, error) {
+func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (corrupted bool, expected, actual uint16, err error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {
-		return false, err
+		return false, 0, 0, err
 	}
 
 	// We only calculate the checksum for properly-initialized pages
 	isNew := pageHeader.isNew()
 	if isNew {
-		return false, nil
+		return false, 0, 0, nil
 	}
 
 	valid := pageHeader.isValid()
 	if !valid {
 		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
 		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
-		return false, nil
+		return false, 0, 0, nil
 	}
 
 	if pageHeader.pdChecksum == 0 {
 		// Zero value means that there is no checksum calculated for this page.
 		// Probably checksums are disabled in the cluster
-		return false, nil
+		return false, 0, 0, nil
 	}
 
 	// calculating blkno needs to be absolute so that subsequent segment files
@@ -161,22 +161,16 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 	// Number of current segment
 	relFileID, err := GetRelFileIDFrom(path)
 	if err != nil {
-		return false, err
+		return false, 0, 0, err
 	}
 
 	// segmentBlockOffset is the absolute blockNumber of the block when taking
 	// into account any previous segment files.
 	segmentBlockOffset := uint32(relFileID * BlocksInRelFile)
 
-	checksum := pgChecksumPage(segmentBlockOffset+blockNo, page)
+	actual = pgChecksumPage(segmentBlockOffset+blockNo, page)
 
-	corrupted := checksum != pageHeader.pdChecksum
-	if corrupted {
-		tracelog.WarningLogger.Printf("Corruption found in %s/[%d], expected %x, found %x\n",
-			path, blockNo, pageHeader.pdChecksum, checksum)
-	}
-
-	return corrupted, nil
+	return actual != pageHeader.pdChecksum, pageHeader.pdChecksum, actual, nil
 }
 
 // VerifyPagedFileIncrement verifies pages of an increment
@@ -247,7 +241,7 @@ func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader,
 	if err != nil {
 		return false, err
 	}
-	corrupted, err := isPageCorrupted(path, blockNo, &page)
+	corrupted, expected, actual, err := isPageCorrupted(path, blockNo, &page)
 	if err != nil || !corrupted {
 		return corrupted, err
 	}
@@ -256,6 +250,8 @@ func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader,
 		tracelog.DebugLogger.Printf("verifySinglePage: %s/[%d] changed while being read, skipping\n", path, blockNo)
 		return false, nil
 	}
+	tracelog.WarningLogger.Printf("Corruption found in %s/[%d], expected %x, found %x\n",
+		path, blockNo, expected, actual)
 	return true, nil
 }
 
