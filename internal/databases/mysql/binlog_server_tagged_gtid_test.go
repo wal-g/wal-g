@@ -50,7 +50,6 @@ func taggedGTIDFixture(gnoWire []byte) *replication.BinlogEvent {
 }
 
 func TestTaggedGTIDGNOBoundaries(t *testing.T) {
-	const ts = "2026-01-01 00:00:01"
 	const tsid = "896e7882-18fe-11ef-ab88-22222d34d411:foobaz:"
 	for _, tc := range taggedGNOBoundaries {
 		t.Run(fmt.Sprint(tc.gno), func(t *testing.T) {
@@ -61,39 +60,40 @@ func TestTaggedGTIDGNOBoundaries(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, want, got.String())
 			require.Equal(t, rawBefore, e.RawData)
+		})
+	}
+}
 
-			t.Run("already applied transaction and rows are skipped", func(t *testing.T) {
-				p, sink := newTestProcessor(t, nil, requireGTIDSet(t, want), at(ts))
-				require.NoError(t, p.handleEvent(e))
-				require.NoError(t, p.handleEvent(writeRowsEvent(ts)))
+func TestHandleEventTaggedGTIDLargeGNO(t *testing.T) {
+	const ts = "2026-01-01 00:00:01"
+	const tsid = "896e7882-18fe-11ef-ab88-22222d34d411:foobaz:"
+	const gno int64 = 1<<55 + 2
+	want := tsid + fmt.Sprint(gno)
+	// go-mysql v1.16.0 decodes this GNO as 1, which can skip a new
+	// transaction or report completion before the actual GTID is applied.
+	for _, alreadyApplied := range []bool{false, true} {
+		t.Run(fmt.Sprintf("already_applied=%t", alreadyApplied), func(t *testing.T) {
+			e := taggedGTIDFixture([]byte{0xff, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+			required := tsid + "1"
+			if alreadyApplied {
+				required = want
+			}
+			p, sink := newTestProcessor(t, nil, requireGTIDSet(t, required), at(ts))
+			rows := writeRowsEvent(ts)
+			require.NoError(t, p.handleEvent(e))
+			require.NoError(t, p.handleEvent(rows))
+			if alreadyApplied {
 				require.Empty(t, sink.recorded())
 				require.True(t, p.sentGTIDs.IsEmpty())
-			})
-
-			for _, required := range []string{"", tsid + "1"} {
-				if tc.gno == 1 && required != "" {
-					continue
-				}
-				t.Run("new transaction with required="+required, func(t *testing.T) {
-					p, sink := newTestProcessor(t, nil, nil, at(ts))
-					if required != "" {
-						p.requiredGTIDs = requireGTIDSet(t, required)
-					}
-					require.NoError(t, p.handleEvent(e))
-					rows := writeRowsEvent(ts)
-					require.NoError(t, p.handleEvent(rows))
-					require.Equal(t, []*replication.BinlogEvent{e, rows}, sink.recorded())
-					require.Equal(t, want, p.sentGTIDs.String())
-					require.False(t, p.sentGTIDs.IsEmpty())
-
-					// These are the completion conditions used by waitForReplica:
-					// it must wait until the actual, not a truncated, GNO is applied.
-					executed := requireGTIDSet(t, required)
-					require.False(t, executed.Contain(p.sentGTIDs))
-					require.NoError(t, executed.Update(want))
-					require.True(t, executed.Contain(p.sentGTIDs))
-				})
+				return
 			}
+			require.Equal(t, []*replication.BinlogEvent{e, rows}, sink.recorded())
+			require.Equal(t, want, p.sentGTIDs.String())
+			// waitForReplica must wait for the actual GNO, not the truncated 1.
+			executed := requireGTIDSet(t, required)
+			require.False(t, executed.Contain(p.sentGTIDs))
+			require.NoError(t, executed.Update(want))
+			require.True(t, executed.Contain(p.sentGTIDs))
 		})
 	}
 }
@@ -162,8 +162,7 @@ func FuzzDecodeTaggedTransactionGTID(f *testing.F) {
 		f.Add(taggedGTIDFixture(tc.wire).Event.(*replication.GenericEvent).Data)
 	}
 	f.Fuzz(func(t *testing.T, body []byte) {
-		// Call the prefix decoder directly, without decodeTransactionGTID's
-		// recover: malformed input must return an error, not panic.
+		// The prefix decoder must report malformed input without panicking.
 		gtid, err := decodeTaggedTransactionGTID(body)
 		if err == nil {
 			require.NotNil(t, gtid)

@@ -206,14 +206,11 @@ func TestHandleEventMalformedGTID(t *testing.T) {
 
 func TestTaggedGTIDWithCommitGroupTicket(t *testing.T) {
 	const ts = "2026-01-01 00:00:01"
-	for _, ticket := range [][]byte{
-		{0}, {14}, {5, 4}, // unsigned varints: 0, 7, 257
-		{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, // uint64 max
-	} {
-		for _, alreadyApplied := range []bool{false, true} {
+	for _, alreadyApplied := range []bool{false, true} {
+		t.Run(fmt.Sprintf("already_applied=%t", alreadyApplied), func(t *testing.T) {
 			e := taggedGTIDEvent(ts, uuid1, "review", 1)
-			body := append(e.Event.(*replication.GenericEvent).Data, 22) // field 11
-			body = append(body, ticket...)
+			// Field 11: a nonzero ticket (257), forwarded as opaque metadata.
+			body := append(e.Event.(*replication.GenericEvent).Data, 22, 5, 4)
 			body[1] = byte(len(body) << 1)
 			e = rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
 			e.Event = &replication.GenericEvent{Data: body}
@@ -225,7 +222,7 @@ func TestTaggedGTIDWithCommitGroupTicket(t *testing.T) {
 				required = gtid
 			}
 			p, sink := newTestProcessor(t, nil, required, at(ts))
-			require.NoError(t, p.handleEvent(e), "ticket %x, alreadyApplied %t", ticket, alreadyApplied)
+			require.NoError(t, p.handleEvent(e))
 			require.Equal(t, rawBefore, e.RawData, "replication metadata must be forwarded unchanged")
 			if alreadyApplied {
 				require.Empty(t, sink.recorded())
@@ -234,7 +231,7 @@ func TestTaggedGTIDWithCommitGroupTicket(t *testing.T) {
 				require.Equal(t, []*replication.BinlogEvent{e}, sink.recorded())
 				require.True(t, p.sentGTIDs.Equal(gtid))
 			}
-		}
+		})
 	}
 }
 

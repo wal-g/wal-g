@@ -32,8 +32,6 @@ sleep 1
 
 mysql -e 'FLUSH LOGS'
 
-# mysqldump sbtest > /tmp/dump_before_backup
-
 wal-g xtrabackup-push
 
 mysql_kill_and_clean_data
@@ -70,55 +68,3 @@ mkdir -p xout
 cat stream.xb | xbstream -x -C xout --decompress
 
 diff -r wout xout
-
-cat <<EOF
-##########
-# check punch holes
-##########
-EOF
-
-
-#
-# Unfortunately, docker's file system doesn't support punch holes... so it is useless to check it here
-#
-
-#cat > list_holes.py << EOF
-##!/usr/bin/env python3
-#
-#import sys
-#import os
-#
-#path = sys.argv[1]
-#
-#fd = os.open(path, os.O_RDONLY)
-#
-#ranges = []
-#hole_start = 0
-#hole_end = 0
-#while True:
-#    end = os.fstat(fd).st_size
-#    # if there is no more holes -> result is at the end of file
-#    hole_start = os.lseek(fd, hole_end, os.SEEK_HOLE)
-#    if hole_start == end:
-#        ranges.append("{}-{}".format(hole_start, end))
-#        os.close(fd)
-#        print('{} {}'.format(path, '.'.join(ranges)))
-#        exit(0)
-#    hole_end = os.lseek(fd, hole_start, os.SEEK_DATA)
-#    ranges.append("{}-{}".format(hole_start, hole_end))
-#EOF
-#
-#find wout -type f | sort -u | xargs python3 list_holes.py > wout.holes
-#find xout -type f | sort -u | xargs python3 list_holes.py > xout.holes
-#
-#diff -u wout.holes xout.holes
-#
-#[ -s wout.holes ] || echo "List of punch holes is empty... Probably, file system desn't support 'fallocate'. This test is useless"
-#[ -s wout.holes ] || exit 1
-
-
-#chown -R mysql:mysql $MYSQLDATA
-#mysql_start
-#mysql_set_gtid_purged
-#mysqldump sbtest > /tmp/dump_after_restore
-#diff /tmp/dump_before_backup /tmp/dump_after_restore
