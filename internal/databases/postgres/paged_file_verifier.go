@@ -180,7 +180,8 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, e
 }
 
 // VerifyPagedFileIncrement verifies pages of an increment
-func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Reader) ([]uint32, error) {
+func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Reader,
+	retryOnChecksumMismatch bool) ([]uint32, error) {
 	_, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {
 		return nil, err
@@ -190,29 +191,30 @@ func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Re
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		blockNumbers = append(blockNumbers, blockNo)
 	}
-	return verifyPageBlocks(path, fileInfo, increment, blockNumbers)
+	return verifyPageBlocks(path, fileInfo, increment, blockNumbers, retryOnChecksumMismatch)
 }
 
 // VerifyPagedFileBase verifies pages of a standard paged file
-func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader) ([]uint32, error) {
+func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader,
+	retryOnChecksumMismatch bool) ([]uint32, error) {
 	size := fileInfo.Size()
 	filePageCount := uint32((size + DatabasePageSize - 1) / DatabasePageSize)
 	blockNumbers := make([]uint32, 0, filePageCount)
 	for i := uint32(0); i < filePageCount; i++ {
 		blockNumbers = append(blockNumbers, i)
 	}
-	return verifyPageBlocks(path, fileInfo, pagedFile, blockNumbers)
+	return verifyPageBlocks(path, fileInfo, pagedFile, blockNumbers, retryOnChecksumMismatch)
 }
 
 // verifyPageBlocks verifies provided page blocks from the pagedBlocks reader
 func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
-	blockNumbers []uint32) (corruptBlockNumbers []uint32, err error) {
+	blockNumbers []uint32, retryOnChecksumMismatch bool) (corruptBlockNumbers []uint32, err error) {
 	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored || !isChecksumValidatableFile(fileInfo, path) {
 		_, err = io.Copy(io.Discard, pageBlocks)
 		return nil, err
 	}
 	for _, blockNo := range blockNumbers {
-		corrupted, err := verifySinglePage(path, blockNo, pageBlocks)
+		corrupted, err := verifySinglePage(path, blockNo, pageBlocks, retryOnChecksumMismatch)
 		if corrupted {
 			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
 		}
@@ -238,7 +240,8 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 }
 
 // verifySinglePage reads and verifies single paged file block
-func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, error) {
+func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader,
+	retryOnChecksumMismatch bool) (bool, error) {
 	page := PgDatabasePage{}
 	_, err := io.ReadFull(pageBlocks, page[:DatabasePageSize])
 	if err != nil {
@@ -248,8 +251,8 @@ func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, 
 	if err != nil || !corrupted {
 		return corrupted, err
 	}
-	// A bad checksum may simply mean PostgreSQL was writing the page while we read it.
-	if shouldSkipCorruption(path, blockNo, page[:DatabasePageSize]) {
+	// Rule out a torn page before reporting corruption.
+	if retryOnChecksumMismatch && shouldSkipCorruption(path, blockNo, page[:DatabasePageSize]) {
 		tracelog.DebugLogger.Printf("verifySinglePage: %s/[%d] changed while being read, skipping\n", path, blockNo)
 		return false, nil
 	}

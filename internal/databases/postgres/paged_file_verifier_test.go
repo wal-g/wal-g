@@ -10,6 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Named arguments for the retryOnChecksumMismatch parameter of verifySinglePage.
+const (
+	retryEnabled  = true
+	retryDisabled = false
+)
+
 // buildValidChecksummedPage returns an 8KB page with a valid header and a correct checksum.
 // pdLsnH=0, pdLsnL=100 → LSN = 100 (non-zero, so the page counts as initialized and valid).
 func buildValidChecksummedPage(t *testing.T, blockNo uint32, path string) PgDatabasePage {
@@ -51,7 +57,7 @@ func TestVerifySinglePage_ReportsCorruptionWhenPageIsStable(t *testing.T) {
 	// The stream and the file hold the same corrupt bytes, so the re-read changes nothing.
 	path := writeRelation(t, page)
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]))
+	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.True(t, corrupted)
 }
@@ -66,7 +72,7 @@ func TestVerifySinglePage_SkipsPageBeingWritten(t *testing.T) {
 	onDisk := buildValidChecksummedPage(t, 0, "16384")
 	path := writeRelation(t, onDisk)
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(streamed[:]))
+	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(streamed[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -80,7 +86,7 @@ func TestVerifySinglePage_SkipsTruncatedRelation(t *testing.T) {
 	first := buildValidChecksummedPage(t, 0, "16384")
 	path := writeRelation(t, first)
 
-	corrupted, err := verifySinglePage(path, 1, bytes.NewReader(page[:]))
+	corrupted, err := verifySinglePage(path, 1, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -93,7 +99,7 @@ func TestVerifySinglePage_SkipsDroppedRelation(t *testing.T) {
 
 	path := filepath.ToSlash(filepath.Join(t.TempDir(), "16384"))
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]))
+	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -103,7 +109,21 @@ func TestVerifySinglePage_AcceptsValidPage(t *testing.T) {
 	page := buildValidChecksummedPage(t, 0, "16384")
 	path := writeRelation(t, page)
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]))
+	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
+}
+
+// With the re-read turned off, a page that changed between the two reads is still reported:
+// that is the point of WALG_VERIFY_PAGE_CHECKSUMS_RETRY=false.
+func TestVerifySinglePage_ReportsCorruptionWhenRetryDisabled(t *testing.T) {
+	streamed := buildValidChecksummedPage(t, 0, "16384")
+	copy(streamed[6000:6004], []byte{0xDE, 0xAD, 0xBE, 0xEF})
+
+	onDisk := buildValidChecksummedPage(t, 0, "16384")
+	path := writeRelation(t, onDisk)
+
+	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(streamed[:]), retryDisabled)
+	require.NoError(t, err)
+	require.True(t, corrupted)
 }
