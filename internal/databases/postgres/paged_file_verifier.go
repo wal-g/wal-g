@@ -129,7 +129,8 @@ func pgChecksumBlock(page *PgDatabasePage) uint32 {
 // checking pages before they are loaded into buffer pool.
 //
 // see:  src/backend/storage/page/bufpage.info
-func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (corrupted bool, expected, actual uint16, err error) {
+func isPageCorrupted(path string, blockNo, segmentBlockOffset uint32,
+	page *PgDatabasePage) (corrupted bool, expected, actual uint16, err error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {
 		return false, 0, 0, err
@@ -153,20 +154,6 @@ func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (corrupt
 		// Probably checksums are disabled in the cluster
 		return false, 0, 0, nil
 	}
-
-	// calculating blkno needs to be absolute so that subsequent segment files
-	// have the blkno calculated based on all segment files and not relative to
-	// the current segment file. see: https://goo.gl/qRTn46
-
-	// Number of current segment
-	relFileID, err := GetRelFileIDFrom(path)
-	if err != nil {
-		return false, 0, 0, err
-	}
-
-	// segmentBlockOffset is the absolute blockNumber of the block when taking
-	// into account any previous segment files.
-	segmentBlockOffset := uint32(relFileID * BlocksInRelFile)
 
 	actual = pgChecksumPage(segmentBlockOffset+blockNo, page)
 
@@ -207,8 +194,22 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 		_, err = io.Copy(io.Discard, pageBlocks)
 		return nil, err
 	}
+	// calculating blkno needs to be absolute so that subsequent segment files
+	// have the blkno calculated based on all segment files and not relative to
+	// the current segment file. see: https://goo.gl/qRTn46
+
+	// Number of current segment
+	relFileID, err := GetRelFileIDFrom(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// segmentBlockOffset is the absolute blockNumber of the block when taking
+	// into account any previous segment files.
+	segmentBlockOffset := uint32(relFileID * BlocksInRelFile)
+
 	for _, blockNo := range blockNumbers {
-		corrupted, err := verifySinglePage(path, blockNo, pageBlocks, retryOnChecksumMismatch)
+		corrupted, err := verifySinglePage(path, blockNo, segmentBlockOffset, pageBlocks, retryOnChecksumMismatch)
 		if corrupted {
 			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
 		}
@@ -234,14 +235,14 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 }
 
 // verifySinglePage reads and verifies single paged file block
-func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader,
+func verifySinglePage(path string, blockNo, segmentBlockOffset uint32, pageBlocks io.Reader,
 	retryOnChecksumMismatch bool) (bool, error) {
 	page := PgDatabasePage{}
 	_, err := io.ReadFull(pageBlocks, page[:DatabasePageSize])
 	if err != nil {
 		return false, err
 	}
-	corrupted, expected, actual, err := isPageCorrupted(path, blockNo, &page)
+	corrupted, expected, actual, err := isPageCorrupted(path, blockNo, segmentBlockOffset, &page)
 	if err != nil || !corrupted {
 		return corrupted, err
 	}

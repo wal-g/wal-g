@@ -57,7 +57,7 @@ func TestVerifySinglePage_ReportsCorruptionWhenPageIsStable(t *testing.T) {
 	// The stream and the file hold the same corrupt bytes, so the re-read changes nothing.
 	path := writeRelation(t, page)
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]), retryEnabled)
+	corrupted, err := verifySinglePage(path, 0, 0, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.True(t, corrupted)
 }
@@ -72,7 +72,7 @@ func TestVerifySinglePage_SkipsPageBeingWritten(t *testing.T) {
 	onDisk := buildValidChecksummedPage(t, 0, "16384")
 	path := writeRelation(t, onDisk)
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(streamed[:]), retryEnabled)
+	corrupted, err := verifySinglePage(path, 0, 0, bytes.NewReader(streamed[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -86,7 +86,7 @@ func TestVerifySinglePage_SkipsTruncatedRelation(t *testing.T) {
 	first := buildValidChecksummedPage(t, 0, "16384")
 	path := writeRelation(t, first)
 
-	corrupted, err := verifySinglePage(path, 1, bytes.NewReader(page[:]), retryEnabled)
+	corrupted, err := verifySinglePage(path, 1, 0, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -99,7 +99,7 @@ func TestVerifySinglePage_SkipsDroppedRelation(t *testing.T) {
 
 	path := filepath.ToSlash(filepath.Join(t.TempDir(), "16384"))
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]), retryEnabled)
+	corrupted, err := verifySinglePage(path, 0, 0, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -109,7 +109,7 @@ func TestVerifySinglePage_AcceptsValidPage(t *testing.T) {
 	page := buildValidChecksummedPage(t, 0, "16384")
 	path := writeRelation(t, page)
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(page[:]), retryEnabled)
+	corrupted, err := verifySinglePage(path, 0, 0, bytes.NewReader(page[:]), retryEnabled)
 	require.NoError(t, err)
 	require.False(t, corrupted)
 }
@@ -123,7 +123,7 @@ func TestVerifySinglePage_ReportsCorruptionWhenRetryDisabled(t *testing.T) {
 	onDisk := buildValidChecksummedPage(t, 0, "16384")
 	path := writeRelation(t, onDisk)
 
-	corrupted, err := verifySinglePage(path, 0, bytes.NewReader(streamed[:]), retryDisabled)
+	corrupted, err := verifySinglePage(path, 0, 0, bytes.NewReader(streamed[:]), retryDisabled)
 	require.NoError(t, err)
 	require.True(t, corrupted)
 }
