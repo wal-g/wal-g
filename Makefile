@@ -44,7 +44,9 @@ FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
 WALG_VERSION ?= `git tag -l --points-at HEAD | tail -1`
 GIT_REVISION ?= `git rev-parse --short HEAD`
 
-BUILD_TAGS:=
+# disable_grpc_modules drops gRPC DirectPath (xDS/envoy) from cloud.google.com/go/storage,
+# wal-g uses the HTTP GCS client only
+BUILD_TAGS:=disable_grpc_modules
 
 ifdef USE_BROTLI
 	BUILD_TAGS:=$(BUILD_TAGS) brotli
