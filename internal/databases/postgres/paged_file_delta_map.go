@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -100,14 +99,9 @@ func SelectRelFileBlocks(bitmap *roaring.Bitmap, relFileID int) *roaring.Bitmap 
 	return shiftedBitmap
 }
 
-// GetRelFileIDFrom uses filepath.Base so that it works on both Unix and Windows separators.
-// TODO: callers run this for every page, while the answer only depends on the file name.
 func GetRelFileIDFrom(filePath string) (int, error) {
-	filename := filepath.Base(filePath)
+	filename := path.Base(filePath)
 	match := pagedFilenameRegexp.FindStringSubmatch(filename)
-	if match == nil {
-		return 0, errors.Errorf("GetRelFileIDFrom: %s is not a relation file", filePath)
-	}
 	if match[2] == "" {
 		return 0, nil
 	}
