@@ -69,7 +69,6 @@ func (deltaMap *PagedFileDeltaMap) AddLocationsToDelta(locations []walparser.Blo
 	}
 }
 
-// TODO : unit test no bitmap found
 func (deltaMap *PagedFileDeltaMap) GetDeltaBitmapFor(filePath string) (*roaring.Bitmap, error) {
 	relFileNode, err := GetRelFileNodeFrom(filePath)
 	if err != nil {
