@@ -23,8 +23,7 @@ get_journal_size() {
     wal-g st cat basebackups_005/$JOURNAL_NAME | jq '.SizeToNextBackup'
 }
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 sysbench --table-size=10 prepare
 
 # Create backup #1 with journals

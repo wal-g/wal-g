@@ -564,6 +564,24 @@ services:
     image: wal-g/mysql8
     container_name: wal-g_mysql8
 
+  mysql84:
+    build:
+      dockerfile: docker/mysql/Dockerfile_percona
+      context: .
+      args:
+        MYSQL_SERIES: "84"
+    image: wal-g/mysql84
+    container_name: wal-g_mysql84
+
+  mysql97:
+    build:
+      dockerfile: docker/mysql/Dockerfile_percona
+      context: .
+      args:
+        MYSQL_SERIES: "97"
+    image: wal-g/mysql97
+    container_name: wal-g_mysql97
+
   mysql_base_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
@@ -623,7 +641,57 @@ services:
     container_name: wal-g_mysql8_tests
     env_file:
       - docker/common/common_walg.env
+    environment:
+      WALG_COMPRESSION_METHOD: lz4
     <<: *s3_common_depends
+
+  mysql84_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_percona
+      context: .
+      args:
+        MYSQL_IMAGE: wal-g/mysql84:latest
+        TEST_ARG: "-p /tmp/${MYSQL84_TEST_DIR:-base_tests}"
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql84_tests
+    container_name: wal-g_mysql84_tests
+    env_file:
+      - docker/common/common_walg.env
+    environment:
+      WALG_COMPRESSION_METHOD: lz4
+    depends_on:
+      s3:
+        condition: service_healthy
+      s3-another:
+        condition: service_healthy
+    links:
+      - s3
+      - s3-another
+
+  mysql97_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile_percona
+      context: .
+      args:
+        MYSQL_IMAGE: wal-g/mysql97:latest
+        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-binlog_server_tests}"
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql97_tests
+    container_name: wal-g_mysql97_tests
+    env_file:
+      - docker/common/common_walg.env
+    environment:
+      WALG_COMPRESSION_METHOD: lz4
+    depends_on:
+      s3:
+        condition: service_healthy
+      s3-another:
+        condition: service_healthy
+    links:
+      - s3
+      - s3-another
 
   mariadb:
     build:

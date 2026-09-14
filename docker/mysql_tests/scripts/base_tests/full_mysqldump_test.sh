@@ -9,9 +9,7 @@ export WALG_STREAM_RESTORE_COMMAND="mysql"
 export WALG_MYSQL_BACKUP_PREPARE_COMMAND=
 
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-
-service mysql start
+mysql_initialize_and_start
 
 sysbench --table-size=10 prepare
 
@@ -29,9 +27,7 @@ pidof mysqld
 
 mysql_kill_and_clean_data
 
-mysqld --initialize --init-file=/etc/mysql/init.sql || (cat /var/log/mysql/error.log && false)
-
-service mysql start
+mysql_initialize_and_start
 
 wal-g backup-fetch LATEST
 

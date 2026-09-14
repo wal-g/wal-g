@@ -14,8 +14,7 @@ export WALE_S3_PREFIX=s3://mysqlmarkincrementalbucket
 export WALG_DELTA_MAX_STEPS=5
 export WALG_DELTA_ORIGIN=LATEST
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 # add data & create FULL backup:
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
