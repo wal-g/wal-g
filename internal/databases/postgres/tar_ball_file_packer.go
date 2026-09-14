@@ -34,14 +34,17 @@ func (err SkippedFileError) Error() string {
 }
 
 type TarBallFilePackerOptions struct {
-	verifyPageChecksums   bool
-	storeAllCorruptBlocks bool
+	verifyPageChecksums     bool
+	storeAllCorruptBlocks   bool
+	retryOnChecksumMismatch bool
 }
 
-func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks bool) TarBallFilePackerOptions {
+func NewTarBallFilePackerOptions(verifyPageChecksums, storeAllCorruptBlocks,
+	retryOnChecksumMismatch bool) TarBallFilePackerOptions {
 	return TarBallFilePackerOptions{
-		verifyPageChecksums:   verifyPageChecksums,
-		storeAllCorruptBlocks: storeAllCorruptBlocks,
+		verifyPageChecksums:     verifyPageChecksums,
+		storeAllCorruptBlocks:   storeAllCorruptBlocks,
+		retryOnChecksumMismatch: retryOnChecksumMismatch,
 	}
 }
 
@@ -104,7 +107,8 @@ func (p *TarBallFilePackerImpl) PackFileIntoTar(ctx context.Context, cfi *intern
 			fileReadCloser, secondReadCloser = newTeeReadCloser(fileReadCloser)
 		}
 		errorGroup.Go(func() (err error) {
-			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented)
+			corruptBlocks, err := verifyFile(cfi.Path, cfi.FileInfo, secondReadCloser, cfi.IsIncremented,
+				p.options.retryOnChecksumMismatch)
 			if err != nil {
 				return err
 			}
@@ -178,7 +182,8 @@ func (p *TarBallFilePackerImpl) createFileReadCloser(ctx context.Context, cfi *i
 	return fileReadCloser, nil
 }
 
-func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented bool) ([]uint32, error) {
+func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncremented,
+	retryOnChecksumMismatch bool) ([]uint32, error) {
 	if !isChecksumValidatableFile(fileInfo, path) {
 		tracelog.DebugLogger.Printf(
 			"verifyFile: %s does not meet the criteria for checksum validation. "+
@@ -200,9 +205,9 @@ func verifyFile(path string, fileInfo os.FileInfo, fileReader io.Reader, isIncre
 	}
 
 	if isIncremented {
-		return VerifyPagedFileIncrement(path, fileInfo, fileReader)
+		return VerifyPagedFileIncrement(path, fileInfo, fileReader, retryOnChecksumMismatch)
 	}
-	return VerifyPagedFileBase(path, fileInfo, fileReader)
+	return VerifyPagedFileBase(path, fileInfo, fileReader, retryOnChecksumMismatch)
 }
 
 // newTeeReadCloser creates two io.ReadClosers from one. Writes to the second consumer

@@ -318,7 +318,8 @@ func (bh *BackupHandler) SetComposerInitFunc(initFunc func(ctx context.Context, 
 func configureTarBallComposer(ctx context.Context, bh *BackupHandler, tarBallComposerType TarBallComposerType) error {
 	maker, err := NewTarBallComposerMaker(ctx, tarBallComposerType, bh.Workers.QueryRunner,
 		bh.Arguments.Uploader, bh.CurBackupInfo.Name,
-		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks),
+		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks,
+			viper.GetBool(conf.VerifyPageChecksumsRetrySetting)),
 		bh.Arguments.withoutFilesMetadata)
 	if err != nil {
 		return err
