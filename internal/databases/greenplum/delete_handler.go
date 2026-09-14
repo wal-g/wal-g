@@ -119,8 +119,13 @@ func (h *DeleteHandler) HandleDeleteEverything(ctx context.Context, args []strin
 }
 
 func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target internal.BackupObject) error {
+	backupsBefore, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return err
+	}
+
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
-	err := h.dispatchDeleteCmd(ctx, target, SegDeleteBefore)
+	err = h.dispatchDeleteCmd(ctx, target, SegDeleteBefore)
 	if err != nil {
 		return fmt.Errorf("failed to delete the segments backups: %w", err)
 	}
@@ -128,7 +133,20 @@ func (h *DeleteHandler) DeleteBeforeTarget(ctx context.Context, target internal.
 
 	objFilter := func(object storage.Object) bool { return true }
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, objFilter, folderFilter)
+	err = h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, objFilter, folderFilter)
+	if err != nil {
+		return err
+	}
+	backupsAfter, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return err
+	}
+	return ReassignSharedSizes(
+		ctx,
+		h.Folder,
+		backupsWithChangedPredecessor(backupsBefore, backupsAfter),
+		h.args.Confirmed,
+	)
 }
 
 func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector internal.BackupSelector) {
@@ -140,6 +158,8 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 		// we didn't find the requested backup for deletion
 		tracelog.ErrorLogger.Fatal("Requested backup was not found")
 	}
+	backupsBefore, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
+	tracelog.ErrorLogger.FatalOnError(err)
 
 	tracelog.InfoLogger.Println("Deleting the segments backups...")
 	err = h.dispatchDeleteCmd(ctx, target, SegDeleteTarget)
@@ -151,10 +171,21 @@ func (h *DeleteHandler) HandleDeleteTarget(ctx context.Context, targetSelector i
 	folderFilter := func(name string) bool { return true }
 	err = h.DeleteTarget(ctx, target, h.args.Confirmed, h.args.FindFull, folderFilter)
 	tracelog.ErrorLogger.FatalOnError(err)
+	backupsAfter, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
+	tracelog.ErrorLogger.FatalOnError(err)
 
-	// Runs after dispatchDeleteCmd on purpose: the cluster-wide size is recalculated from the
+	// Runs after dispatchDeleteCmd on purpose: the cluster-wide journal is recalculated from the
 	// segment journals, which the segment handlers above have just re-merged.
 	DeleteClusterJournalInfo(ctx, h.Folder, target.GetBackupName(), h.args.Confirmed)
+	// Segment cleanup has removed unreferenced AO/PAX objects. Recalculate ownership directly into
+	// the surviving cluster backups after their old cluster-level objects have been deleted.
+	err = ReassignSharedSizes(
+		ctx,
+		h.Folder,
+		backupsWithChangedPredecessor(backupsBefore, backupsAfter),
+		h.args.Confirmed,
+	)
+	tracelog.ErrorLogger.FatalOnError(err)
 }
 
 func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.BackupObject, delType SegDeleteType) error {
@@ -206,6 +237,11 @@ func (h *DeleteHandler) dispatchDeleteCmd(ctx context.Context, target internal.B
 
 // HandleDeleteGarbage delete outdated WAL archives and leftover backup files
 func (h *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string) error {
+	backupsBefore, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return err
+	}
+
 	predicate := postgres.ExtractDeleteGarbagePredicate(args)
 	backupSelector := internal.NewOldestNonPermanentSelector(NewGenericMetaFetcher())
 	oldestBackup, err := backupSelector.Select(ctx, h.Folder)
@@ -230,5 +266,17 @@ func (h *DeleteHandler) HandleDeleteGarbage(ctx context.Context, args []string) 
 	tracelog.InfoLogger.Printf("Finished processing the segments backups")
 
 	folderFilter := func(name string) bool { return strings.HasPrefix(name, utility.BaseBackupPath) }
-	return h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, predicate, folderFilter)
+	if err := h.DeleteBeforeTargetWhere(ctx, target, h.args.Confirmed, predicate, folderFilter); err != nil {
+		return err
+	}
+	backupsAfter, err := listBackupsInOrder(ctx, h.Folder.GetSubFolder(utility.BaseBackupPath))
+	if err != nil {
+		return err
+	}
+	return ReassignSharedSizes(
+		ctx,
+		h.Folder,
+		backupsWithChangedPredecessor(backupsBefore, backupsAfter),
+		h.args.Confirmed,
+	)
 }
