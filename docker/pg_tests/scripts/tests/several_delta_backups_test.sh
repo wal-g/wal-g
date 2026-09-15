@@ -5,6 +5,10 @@ set -e -x
 
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/several_delta_backups_test_config.json"
+/usr/lib/postgresql/10/bin/initdb ${PGDATA}
+# Sometimes, files are actually symlinks, and to check that wal-g can operate on that we also add one symlinked file.
+# Below is what Stolon does to disable `ALTER SYSTEM` options and is required to support stolon/wal-g configurations.
+ln -sf /dev/null "${PGDATA}/postgresql.auto.conf"
 
 initdb ${PGDATA}
 
