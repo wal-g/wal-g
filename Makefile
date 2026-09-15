@@ -10,8 +10,7 @@ DOCKER_COMMON := golang s3
 # Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
 GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
 export GO_VERSION
-GOEXPERIMENT = simd
-export GOEXPERIMENT
+export GOEXPERIMENT=simd
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
