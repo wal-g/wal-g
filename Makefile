@@ -35,9 +35,10 @@ MYSQL_TEST := "mysql_base_tests"
 MYSQL8_TEST := "mysql8_tests"
 MYSQL84_TEST := "mysql84_tests"
 MYSQL97_TEST := "mysql97_tests"
+MYSQL8_TEST_DIR ?= xbtool_tests
 MYSQL84_TEST_DIR ?= base_tests
-MYSQL97_TEST_DIR ?= binlog_server_tests
-export MYSQL84_TEST_DIR MYSQL97_TEST_DIR
+MYSQL97_TEST_DIR ?= base_tests
+export MYSQL8_TEST_DIR MYSQL84_TEST_DIR MYSQL97_TEST_DIR
 MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"

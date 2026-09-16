@@ -596,6 +596,20 @@ services:
       - docker/common/common_walg.env
     <<: *s3_common_depends
 
+  mysql_binlog_server_tests:
+    build:
+      dockerfile: docker/mysql_tests/Dockerfile
+      context: .
+      args:
+        TEST_ARG: "-p /tmp/binlog_server_tests"
+    security_opt:
+      - seccomp:unconfined
+    image: wal-g/mysql_tests
+    container_name: wal-g_mysql_binlog_server_tests
+    env_file:
+      - docker/common/common_walg.env
+    <<: *s3_common_depends
+
   mysql_delete_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
@@ -635,6 +649,8 @@ services:
     build:
       dockerfile: docker/mysql_tests/Dockerfile_v8
       context: .
+      args:
+        TEST_ARG: "-p /tmp/${MYSQL8_TEST_DIR:-xbtool_tests}"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql8_tests
@@ -675,7 +691,7 @@ services:
       context: .
       args:
         MYSQL_IMAGE: wal-g/mysql97:latest
-        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-binlog_server_tests}"
+        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-base_tests}"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql97_tests
