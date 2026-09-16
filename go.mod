@@ -59,7 +59,7 @@ require (
 	github.com/yandex-cloud/go-sdk/services/kms v0.0.82
 	github.com/yandex-cloud/go-sdk/v2 v2.144.0
 	github.com/zeebo/xxh3 v1.1.0
-	go.mongodb.org/mongo-driver/v2 v2.8.0
+	go.mongodb.org/mongo-driver/v2 v2.9.1
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.56.0
 	golang.org/x/mod v0.40.0
