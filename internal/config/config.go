@@ -149,6 +149,7 @@ const (
 	OplogReplayOplogAlwaysUpsert        = "OPLOG_REPLAY_OPLOG_ALWAYS_UPSERT"
 	OplogReplayOplogApplicationMode     = "OPLOG_REPLAY_OPLOG_APPLICATION_MODE"
 	OplogReplayIgnoreErrorCodes         = "OPLOG_REPLAY_IGNORE_ERROR_CODES"
+	OplogReplayApplyBatchSize           = "OPLOG_REPLAY_APPLY_BATCH_SIZE"
 	OplogReplayFsyncInterval            = "OPLOG_REPLAY_FSYNC_INTERVAL"
 	OplogReplayMaxMongodRestarts        = "OPLOG_REPLAY_MAX_MONGOD_RESTARTS"
 	OplogRecoverTimeout                 = "OPLOG_RECOVER_TIMEOUT"
@@ -567,6 +568,7 @@ var (
 		OplogPushWaitForBecomePrimary:      true,
 		OplogPushPrimaryCheckInterval:      true,
 		OplogPITRDiscoveryInterval:         true,
+		OplogReplayApplyBatchSize:          true,
 		StreamSplitterBlockSize:            true,
 		StreamSplitterPartitions:           true,
 	}
