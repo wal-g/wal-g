@@ -608,6 +608,9 @@ services:
     container_name: wal-g_mysql_binlog_server_tests
     env_file:
       - docker/common/common_walg.env
+    environment:
+      # MySQL 5.7 does not support heartbeat V2 events.
+      WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT: "true"
     <<: *s3_common_depends
 
   mysql_delete_tests:
