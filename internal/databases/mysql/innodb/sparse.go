@@ -2,6 +2,7 @@ package innodb
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -14,6 +15,20 @@ import (
 func RepairSparse(file *os.File) error {
 	if !strings.HasSuffix(file.Name(), "ibd") {
 		return nil
+	}
+	blockSize, err := ioextensions.FileBlockSize(file)
+	if errors.Is(err, syscall.EOPNOTSUPP) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return repairSparse(file, blockSize, ioextensions.PunchHole)
+}
+
+func repairSparse(file *os.File, blockSize int64, punchHole func(*os.File, int64, int64) error) error {
+	if blockSize <= 0 {
+		return fmt.Errorf("invalid filesystem block size %d", blockSize)
 	}
 	_, err := file.Seek(0, io.SeekStart)
 	if err != nil {
@@ -34,10 +49,16 @@ func RepairSparse(file *os.File) error {
 		if page.Header.PageType == PageTypeCompressed {
 			// do punch hole, if possible
 			meta := page.Header.GetCompressedData()
-			if meta.CompressedSize < pageReader.PageSize {
-				offset := int64(page.Header.PageNumber)*int64(pageReader.PageSize) + int64(meta.CompressedSize)
-				size := int64(pageReader.PageSize - meta.CompressedSize)
-				err = ioextensions.PunchHole(file, offset, size)
+			// FIL_PAGE_COMPRESS_SIZE_V1 excludes the 38-byte FIL header.
+			// Preserve it and the final partial filesystem block, just as
+			// XtraBackup's restore_sparseness does. Punching earlier corrupts
+			// the compressed payload (fallocate also zeroes partial blocks).
+			compressedEnd := int64(FILHeaderSize) + int64(meta.CompressedSize)
+			compressedEnd = (compressedEnd + blockSize - 1) / blockSize * blockSize
+			if compressedEnd < int64(pageReader.PageSize) {
+				offset := int64(page.Header.PageNumber)*int64(pageReader.PageSize) + compressedEnd
+				size := int64(pageReader.PageSize) - compressedEnd
+				err = punchHole(file, offset, size)
 				if errors.Is(err, syscall.EOPNOTSUPP) {
 					return nil // ok
 				}

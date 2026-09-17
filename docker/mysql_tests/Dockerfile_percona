@@ -1,7 +1,9 @@
+ARG MYSQL_IMAGE=wal-g/mysql84:latest
 FROM wal-g/golang:latest AS build
 WORKDIR /go/src/github.com/wal-g/wal-g
 
 COPY go.mod go.mod
+COPY go.sum go.sum
 COPY vendor/ vendor/
 COPY internal/ internal/
 COPY pkg/ pkg/
@@ -10,18 +12,17 @@ COPY main/ main/
 COPY utility/ utility/
 COPY Makefile Makefile
 
-# we test wal-g logic, not our deps. So, no brotli in these tests.
-# Note: `-race` fails on ARM64 when ubuntu:bionic used: race runtime needs outline-atomics
-# helpers from libgcc 10+, which the bionic-based wal-g/golang base doesn't have.
+# We test WAL-G logic, not optional compression dependencies. Race detection is
+# enabled on x86_64 consistently with the existing MySQL 8 image.
 RUN make $( [ "$(uname -m)" = "x86_64" ] && echo ENABLE_RACE_DETECTION=1 ) mysql_build
 
-FROM wal-g/mysql8:latest
+FROM ${MYSQL_IMAGE}
 
-COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin
+COPY --from=build /go/src/github.com/wal-g/wal-g/main/mysql/wal-g /usr/bin/wal-g
 
 COPY docker/mysql_tests/scripts/ /tmp
 
-ARG TEST_ARG="-p /tmp/xbtool_tests"
+ARG TEST_ARG="-p /tmp/base_tests"
 ENV TEST_ARG=${TEST_ARG}
 
 CMD /tmp/run_integration_tests.sh ${TEST_ARG}

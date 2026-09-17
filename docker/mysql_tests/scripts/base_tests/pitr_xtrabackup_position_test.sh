@@ -9,8 +9,7 @@ export WALE_S3_PREFIX=s3://mysqlpitrxtrabackuppositionbucket
 # shellcheck disable=SC2016
 export WALG_MYSQL_BINLOG_REPLAY_COMMAND='mysqlbinlog --stop-datetime="$WALG_MYSQL_BINLOG_END_TS" ${WALG_MYSQL_BINLOG_START_POSITION:+--start-position="$WALG_MYSQL_BINLOG_START_POSITION"} ${WALG_MYSQL_BINLOG_LAST_GTID:+--exclude-gtids="$WALG_MYSQL_BINLOG_LAST_GTID"} "$WALG_MYSQL_CURRENT_BINLOG" | mysql'
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 mysql -e "CREATE DATABASE IF NOT EXISTS testdb"
 mysql -e "CREATE TABLE testdb.users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(50), created_at DATETIME DEFAULT CURRENT_TIMESTAMP)"
@@ -48,7 +47,7 @@ mysql -e "DROP DATABASE testdb"
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql "${MYSQLDATA}"
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql_set_gtid_purged
 
 wal-g binlog-replay --since LATEST --until "$DT_PITR" --until-binlog-last-modified-time "$DT_PITR"

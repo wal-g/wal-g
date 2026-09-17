@@ -157,38 +157,58 @@ func (h *Handler) HandleBinlogDumpGTID(gtidSet *mysql.MysqlGTIDSet) (*replicatio
 
 func (h *Handler) HandleQuery(query string) (*mysql.Result, error) {
 	switch strings.ToLower(query) {
+	case "select unix_timestamp()":
+		// Replicas sample the source clock when initializing replication.
+		return binlogQueryResult("UNIX_TIMESTAMP()", mysql.MYSQL_TYPE_LONGLONG, strconv.FormatInt(time.Now().Unix(), 10)), nil
 	case "select @master_binlog_checksum":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"master_binlog_checksum"}, [][]interface{}{{"CRC32"}})
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("master_binlog_checksum", mysql.MYSQL_TYPE_VAR_STRING, "CRC32"), nil
 	case "select @source_binlog_checksum":
-		// "1" - CRC algorithm from zlib
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"source_binlog_checksum"}, [][]interface{}{{"1"}})
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("source_binlog_checksum", mysql.MYSQL_TYPE_VAR_STRING, "CRC32"), nil
 	case "show global variables like 'binlog_checksum'":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"BINLOG_CHECKSUM"}, [][]interface{}{{"CRC32"}})
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("BINLOG_CHECKSUM", mysql.MYSQL_TYPE_VAR_STRING, "CRC32"), nil
 	case "select @@global.server_id":
-		resultSet, err := mysql.BuildSimpleTextResultset([]string{"SERVER_ID"}, [][]interface{}{{h.dumpCommandProcessor.serverID}})
-		tracelog.ErrorLogger.FatalOnError(err)
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("SERVER_ID", mysql.MYSQL_TYPE_LONGLONG, strconv.Itoa(h.dumpCommandProcessor.serverID)), nil
 	case "select @@global.gtid_mode":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"GTID_MODE"}, [][]interface{}{{"ON"}})
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("GTID_MODE", mysql.MYSQL_TYPE_VAR_STRING, "ON"), nil
 	case "select @@global.server_uuid":
 		// The server UUID received by the query does not affect replication.
 		// During replication, the UUID is taken from events.
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"SERVER_UUID"}, [][]interface{}{{"0"}})
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("SERVER_UUID", mysql.MYSQL_TYPE_VAR_STRING, "0"), nil
 	case "select @@global.rpl_semi_sync_master_enabled":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_master_enabled"}, [][]interface{}{{"0"}})
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("@@global.rpl_semi_sync_master_enabled", mysql.MYSQL_TYPE_VAR_STRING, "0"), nil
 	case "select @@global.rpl_semi_sync_source_enabled":
-		resultSet, _ := mysql.BuildSimpleTextResultset([]string{"@@global.rpl_semi_sync_source_enabled"}, [][]interface{}{{"0"}})
-		return &mysql.Result{Status: 34, Warnings: 0, InsertId: 0, AffectedRows: 0, Resultset: resultSet}, nil
+		return binlogQueryResult("@@global.rpl_semi_sync_source_enabled", mysql.MYSQL_TYPE_VAR_STRING, "0"), nil
 	default:
 		tracelog.DebugLogger.Printf("Unhandled query: %s", query)
 		return nil, nil
 	}
+}
+
+func binlogQueryResult(name string, fieldType uint8, value string) *mysql.Result {
+	field := &mysql.Field{Name: []byte(name), Type: fieldType, Charset: 33}
+	if fieldType == mysql.MYSQL_TYPE_LONGLONG {
+		field.Charset = 63
+		field.Flag = mysql.BINARY_FLAG | mysql.NOT_NULL_FLAG
+	}
+	// go-mysql's pooled text resultsets retain fields from previous queries.
+	// Use fresh metadata so changing column names or types cannot reuse it.
+	return &mysql.Result{
+		Status: mysql.SERVER_STATUS_AUTOCOMMIT,
+		Resultset: &mysql.Resultset{
+			Fields:     []*mysql.Field{field},
+			FieldNames: map[string]int{name: 0},
+			RowDatas:   []mysql.RowData{mysql.PutLengthEncodedString([]byte(value))},
+		},
+	}
+}
+
+func newBinlogProtocolServer() *server.Server {
+	// MySQL replicas omit tagged GTIDs from COM_BINLOG_DUMP_GTID when the
+	// source advertises an older version. This is our protocol compatibility
+	// version, not the version of the archived binlogs (their FDE is unchanged).
+	// Keep native-password authentication and the legacy collation/capabilities
+	// so 5.7/8.0 replicas can still connect and send untagged GTID sets.
+	return server.NewServer("8.4.0", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)
 }
 
 func HandleBinlogServer(ctx context.Context, since string, until string, untilBinlogLastModified string) {
@@ -221,7 +241,7 @@ func HandleBinlogServer(ctx context.Context, since string, until string, untilBi
 	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.InfoLogger.Printf("Listening on %s, wait connection", l.Addr())
 
-	srv := server.NewServer("5.7.42", mysql.DEFAULT_COLLATION_ID, mysql.AUTH_NATIVE_PASSWORD, nil, nil)
+	srv := newBinlogProtocolServer()
 	// This loop continues accepting connections until the process exits.
 	// It will be terminated by os.Exit() call in waitForReplica.
 	for {
