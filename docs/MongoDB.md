@@ -240,10 +240,6 @@ wal-g oplog-replay 1593554109.1 1593559109.1
 During replay, WAL-G runs `fsync` periodically and remembers the last durable oplog timestamp in memory. The interval is
 configured with `OPLOG_REPLAY_FSYNC_INTERVAL` and defaults to `10m`.
 
-`OPLOG_REPLAY_APPLY_BATCH_SIZE` sets the maximum number of ordinary oplog operations per `applyOps` command. It defaults
-to `50` and must be a positive integer. Batches are also sent when the BSON size limit is reached, after `10ms` of waiting,
-or when the oplog stream ends.
-
 When `binary-backup-fetch` replays PITR data using its temporary `mongod`, WAL-G restarts that process after an unexpected
 exit and resumes after the last durable timestamp. `OPLOG_REPLAY_MAX_MONGOD_RESTARTS` limits consecutive restarts without
 durable progress and defaults to `5`.
