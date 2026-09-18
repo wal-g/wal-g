@@ -35,6 +35,24 @@ func (_m *MongoDriver) ApplyOp(ctx context.Context, op *db.Oplog) error {
 	return r0
 }
 
+// ApplyOps provides a mock function with given fields: ctx, ops
+func (_m *MongoDriver) ApplyOps(ctx context.Context, ops []*db.Oplog) error {
+	ret := _m.Called(ctx, ops)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ApplyOps")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []*db.Oplog) error); ok {
+		r0 = rf(ctx, ops)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ChangeOplogLastTimestamp provides a mock function with given fields: ctx, opTime
 func (_m *MongoDriver) ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error {
 	ret := _m.Called(ctx, opTime)

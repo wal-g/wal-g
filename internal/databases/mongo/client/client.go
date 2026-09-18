@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 
 	"github.com/mongodb/mongo-tools/common/db"
@@ -79,6 +80,7 @@ type MongoDriver interface {
 	LastWriteTS(ctx context.Context) (lastTS, lastMajTS models.Timestamp, err error)
 	TailOplogFrom(ctx context.Context, from models.Timestamp) (OplogCursor, error)
 	ApplyOp(ctx context.Context, op *db.Oplog) error
+	ApplyOps(ctx context.Context, ops []*db.Oplog) error
 	Fsync(ctx context.Context) error
 	Close(ctx context.Context, shutdown bool) error
 	ChangeOplogLastTimestamp(ctx context.Context, opTime models.OpTime) error
@@ -142,6 +144,28 @@ type ApplyOplog struct {
 	LSID       bson.Raw     `bson:"lsid,omitempty"`
 	TxnNumber  *int64       `bson:"txnNumber,omitempty"`
 	PrevOpTime bson.Raw     `bson:"prevOpTime,omitempty"`
+}
+
+type applyOpsResponse struct {
+	Ok      int    `bson:"ok"`
+	ErrMsg  string `bson:"errmsg"`
+	Applied int    `bson:"applied"`
+	Results []bool `bson:"results"`
+}
+
+func (r applyOpsResponse) check(expected int) error {
+	if r.Ok != 1 {
+		return fmt.Errorf("applyOps command failed: %s", r.ErrMsg)
+	}
+	if r.Applied != expected || len(r.Results) != expected {
+		return fmt.Errorf("applyOps applied %d of %d entries and returned %d results", r.Applied, expected, len(r.Results))
+	}
+	for i, applied := range r.Results {
+		if !applied {
+			return fmt.Errorf("applyOps failed at entry %d of %d", i+1, expected)
+		}
+	}
+	return nil
 }
 
 // MongoClient implements MongoDriver
@@ -390,43 +414,48 @@ func (mc *MongoClient) getOplogCollection(ctx context.Context) (*mongo.Collectio
 	return odb.Collection(oplogCollectionName), nil
 }
 
-func (mc *MongoClient) getApplyOpsCmd() bson.D {
-	return mc.applyOpsCmd
+// ApplyOp calls applyOps and checks its response.
+func (mc *MongoClient) ApplyOp(ctx context.Context, dbop *db.Oplog) error {
+	return mc.ApplyOps(ctx, []*db.Oplog{dbop})
 }
 
-// ApplyOp calls applyOps and check response
-func (mc *MongoClient) ApplyOp(ctx context.Context, dbop *db.Oplog) error {
+func (mc *MongoClient) ApplyOps(ctx context.Context, dbops []*db.Oplog) error {
 	// mongod complains if 'ts' or 'history' are passed to applyOps
-	if dbop == nil {
-		return fmt.Errorf("MongoClient:ApplyOp: dbop is nil, it should not happen")
+	if len(dbops) == 0 {
+		return fmt.Errorf("MongoClient:ApplyOps: no oplog entries")
 	}
-	op := ApplyOplog{
-		Operation:  dbop.Operation,
-		Namespace:  dbop.Namespace,
-		Object:     dbop.Object,
-		Query:      dbop.Query,
-		UI:         dbop.UI,
-		LSID:       dbop.LSID,
-		TxnNumber:  dbop.TxnNumber,
-		PrevOpTime: dbop.PrevOpTime,
+	ops := make([]ApplyOplog, 0, len(dbops))
+	expected := 0
+	for _, dbop := range dbops {
+		if dbop == nil {
+			return fmt.Errorf("MongoClient:ApplyOps: dbop is nil")
+		}
+		ops = append(ops, ApplyOplog{
+			Operation:  dbop.Operation,
+			Namespace:  dbop.Namespace,
+			Object:     dbop.Object,
+			Query:      dbop.Query,
+			UI:         dbop.UI,
+			LSID:       dbop.LSID,
+			TxnNumber:  dbop.TxnNumber,
+			PrevOpTime: dbop.PrevOpTime,
+		})
+		if dbop.Operation != "n" {
+			expected++
+		}
 	}
 
-	// TODO: fix ugly interface after switch to passing pointers
-	cmd := mc.getApplyOpsCmd()
-	cmd[0] = bson.E{Key: "applyOps", Value: []interface{}{op}}
+	cmd := slices.Clone(mc.applyOpsCmd)
+	cmd[0] = bson.E{Key: "applyOps", Value: ops}
 	apply := mc.c.Database("admin").RunCommand(ctx, cmd)
 	if err := apply.Err(); err != nil {
 		return err
 	}
-	resp := CmdResponse{}
+	resp := applyOpsResponse{}
 	if err := apply.Decode(&resp); err != nil {
-		return fmt.Errorf("can not unmarshall command execution response: %+v\ncommand was:%+v", err, cmd)
+		return fmt.Errorf("can not decode applyOps response for %d entries: %w", len(dbops), err)
 	}
-	if resp.Ok != 1 {
-		return fmt.Errorf("command execution failed with: %s\ncommand was: %+v", resp.ErrMsg, cmd)
-	}
-
-	return nil
+	return resp.check(expected)
 }
 
 // BsonCursor implements OplogCursor with source io.reader
