@@ -1,21 +1,15 @@
 #!/bin/sh
 set -e -x
+. /tmp/tests/test_functions/prepare_config.sh
 CONFIG_FILE="/tmp/configs/copy_backup_test_config.json"
 
-COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+prepare_config "${CONFIG_FILE}"
 
 mkdir /tmp/copy_backup_test_storage
 TO_CONFIG_FILE="/tmp/configs/copy_backup_to_test_config.json"
 TO_TMP_CONFIG="/tmp/configs/to_tmp_config.json"
-cat ${TO_CONFIG_FILE} > ${TO_TMP_CONFIG}
-echo "," >> ${TO_TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TO_TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TO_TMP_CONFIG}
+prepare_config "${TO_CONFIG_FILE}" "${TO_TMP_CONFIG}"
 
 initdb ${PGDATA}
 

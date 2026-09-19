@@ -8,9 +8,9 @@ prepare_config() {
 
   CONFIG_FILE=$1
   COMMON_CONFIG="/tmp/configs/common_config.json"
-  TMP_CONFIG="/tmp/configs/tmp_config.json"
-  cat "${CONFIG_FILE}" > "${TMP_CONFIG}"
-  echo "," >> "${TMP_CONFIG}"
-  cat "${COMMON_CONFIG}" >> "${TMP_CONFIG}"
-  /tmp/scripts/wrap_config_file.sh "${TMP_CONFIG}"
+  OUTPUT_CONFIG=${2:-/tmp/configs/tmp_config.json}
+  if [ "$#" -lt 2 ]; then
+    TMP_CONFIG="${OUTPUT_CONFIG}"
+  fi
+  jq -s '.[0] * .[1]' "${COMMON_CONFIG}" "${CONFIG_FILE}" > "${OUTPUT_CONFIG}"
 }
