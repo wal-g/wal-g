@@ -1,3 +1,5 @@
-"WALG_DELTA_MAX_STEPS": "100",
-"WALE_S3_PREFIX": "s3://delete-target-delta-bucket",
-"WALG_USE_WAL_DELTA": "true"
+{
+  "WALG_DELTA_MAX_STEPS": "100",
+  "WALE_S3_PREFIX": "s3://delete-target-delta-bucket",
+  "WALG_USE_WAL_DELTA": "true"
+}
