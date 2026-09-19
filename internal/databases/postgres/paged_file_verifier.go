@@ -3,11 +3,13 @@ package postgres
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"os"
 	"unsafe"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/utility"
 )
 
 // This code is an adaptation of Postgres data page checksum calculation code written in Go.
@@ -127,58 +129,40 @@ func pgChecksumBlock(page *PgDatabasePage) uint32 {
 // checking pages before they are loaded into buffer pool.
 //
 // see:  src/backend/storage/page/bufpage.info
-func isPageCorrupted(path string, blockNo uint32, page *PgDatabasePage) (bool, error) {
+func isPageCorrupted(path string, blockNo, segmentBlockOffset uint32,
+	page *PgDatabasePage) (corrupted bool, expected, actual uint16, err error) {
 	pageHeader, err := parsePostgresPageHeader(bytes.NewReader(page[:]))
 	if err != nil {
-		return false, err
+		return false, 0, 0, err
 	}
 
 	// We only calculate the checksum for properly-initialized pages
 	isNew := pageHeader.isNew()
 	if isNew {
-		return false, nil
+		return false, 0, 0, nil
 	}
 
 	valid := pageHeader.isValid()
 	if !valid {
 		// If the pageHeader is not valid, there is no sense in proceeding with the page checking.
 		tracelog.WarningLogger.Printf("Invalid page header encountered: blockNo %d, path %s", blockNo, path)
-		return false, nil
+		return false, 0, 0, nil
 	}
 
 	if pageHeader.pdChecksum == 0 {
 		// Zero value means that there is no checksum calculated for this page.
 		// Probably checksums are disabled in the cluster
-		return false, nil
+		return false, 0, 0, nil
 	}
 
-	// calculating blkno needs to be absolute so that subsequent segment files
-	// have the blkno calculated based on all segment files and not relative to
-	// the current segment file. see: https://goo.gl/qRTn46
+	actual = pgChecksumPage(segmentBlockOffset+blockNo, page)
 
-	// Number of current segment
-	relFileID, err := GetRelFileIDFrom(path)
-	if err != nil {
-		return false, err
-	}
-
-	// segmentBlockOffset is the absolute blockNumber of the block when taking
-	// into account any previous segment files.
-	segmentBlockOffset := uint32(relFileID * BlocksInRelFile)
-
-	checksum := pgChecksumPage(segmentBlockOffset+blockNo, page)
-
-	corrupted := checksum != pageHeader.pdChecksum
-	if corrupted {
-		tracelog.WarningLogger.Printf("Corruption found in %s/[%d], expected %x, found %x\n",
-			path, blockNo, pageHeader.pdChecksum, checksum)
-	}
-
-	return corrupted, nil
+	return actual != pageHeader.pdChecksum, pageHeader.pdChecksum, actual, nil
 }
 
 // VerifyPagedFileIncrement verifies pages of an increment
-func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Reader) ([]uint32, error) {
+func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Reader,
+	retryOnChecksumMismatch bool) ([]uint32, error) {
 	_, diffBlockCount, diffMap, err := GetIncrementHeaderFields(increment)
 	if err != nil {
 		return nil, err
@@ -188,29 +172,44 @@ func VerifyPagedFileIncrement(path string, fileInfo os.FileInfo, increment io.Re
 		blockNo := binary.LittleEndian.Uint32(diffMap[i*sizeofInt32 : (i+1)*sizeofInt32])
 		blockNumbers = append(blockNumbers, blockNo)
 	}
-	return verifyPageBlocks(path, fileInfo, increment, blockNumbers)
+	return verifyPageBlocks(path, fileInfo, increment, blockNumbers, retryOnChecksumMismatch)
 }
 
 // VerifyPagedFileBase verifies pages of a standard paged file
-func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader) ([]uint32, error) {
+func VerifyPagedFileBase(path string, fileInfo os.FileInfo, pagedFile io.Reader,
+	retryOnChecksumMismatch bool) ([]uint32, error) {
 	size := fileInfo.Size()
 	filePageCount := uint32((size + DatabasePageSize - 1) / DatabasePageSize)
 	blockNumbers := make([]uint32, 0, filePageCount)
 	for i := uint32(0); i < filePageCount; i++ {
 		blockNumbers = append(blockNumbers, i)
 	}
-	return verifyPageBlocks(path, fileInfo, pagedFile, blockNumbers)
+	return verifyPageBlocks(path, fileInfo, pagedFile, blockNumbers, retryOnChecksumMismatch)
 }
 
 // verifyPageBlocks verifies provided page blocks from the pagedBlocks reader
 func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
-	blockNumbers []uint32) (corruptBlockNumbers []uint32, err error) {
+	blockNumbers []uint32, retryOnChecksumMismatch bool) (corruptBlockNumbers []uint32, err error) {
 	if _, ignored := ignoredFileNames[fileInfo.Name()]; ignored || !isChecksumValidatableFile(fileInfo, path) {
 		_, err = io.Copy(io.Discard, pageBlocks)
 		return nil, err
 	}
+	// calculating blkno needs to be absolute so that subsequent segment files
+	// have the blkno calculated based on all segment files and not relative to
+	// the current segment file. see: https://goo.gl/qRTn46
+
+	// Number of current segment
+	relFileID, err := GetRelFileIDFrom(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// segmentBlockOffset is the absolute blockNumber of the block when taking
+	// into account any previous segment files.
+	segmentBlockOffset := uint32(relFileID * BlocksInRelFile)
+
 	for _, blockNo := range blockNumbers {
-		corrupted, err := verifySinglePage(path, blockNo, pageBlocks)
+		corrupted, err := verifySinglePage(path, blockNo, segmentBlockOffset, pageBlocks, retryOnChecksumMismatch)
 		if corrupted {
 			corruptBlockNumbers = append(corruptBlockNumbers, blockNo)
 		}
@@ -236,11 +235,72 @@ func verifyPageBlocks(path string, fileInfo os.FileInfo, pageBlocks io.Reader,
 }
 
 // verifySinglePage reads and verifies single paged file block
-func verifySinglePage(path string, blockNo uint32, pageBlocks io.Reader) (bool, error) {
+func verifySinglePage(path string, blockNo, segmentBlockOffset uint32, pageBlocks io.Reader,
+	retryOnChecksumMismatch bool) (bool, error) {
 	page := PgDatabasePage{}
 	_, err := io.ReadFull(pageBlocks, page[:DatabasePageSize])
 	if err != nil {
 		return false, err
 	}
-	return isPageCorrupted(path, blockNo, &page)
+	corrupted, expected, actual, err := isPageCorrupted(path, blockNo, segmentBlockOffset, &page)
+	if err != nil || !corrupted {
+		return corrupted, err
+	}
+	// Rule out a torn page before reporting corruption.
+	if retryOnChecksumMismatch && shouldSkipCorruption(path, blockNo, page[:DatabasePageSize]) {
+		tracelog.DebugLogger.Printf("verifySinglePage: %s/[%d] changed while being read, skipping\n", path, blockNo)
+		return false, nil
+	}
+	tracelog.WarningLogger.Printf("Corruption found in %s/[%d], expected %x, found %x\n",
+		path, blockNo, expected, actual)
+	return true, nil
+}
+
+// shouldSkipCorruption re-reads a block from disk to check whether it changed since the backup
+// stream read it.
+//
+// A checksum mismatch means real corruption or a torn read while PostgreSQL was writing the page.
+// The latter is safe because WAL contains a full page image. A changed page is being written and
+// recovery fixes it; an unchanged page is genuinely corrupt.
+//
+// On a primary, full page images are guaranteed for the whole backup, even with full_page_writes
+// disabled. On a standby, they come from the upstream node, so the user must ensure
+// full_page_writes was enabled there.
+//
+// We re-read instead of comparing pd_lsn with the backup start LSN because a corrupt page's LSN
+// cannot be trusted: garbage can look recent and bypass validation.
+//
+// An empty read or a missing file means the relation was truncated or dropped, so the page is gone.
+// For other errors, keep the original verdict: a real corruption must not be hidden by an I/O error.
+func shouldSkipCorruption(path string, blockNo uint32, asRead []byte) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		// file is gone: the relation was dropped, recovery will drop it again
+		if errors.Is(err, os.ErrNotExist) {
+			return true
+		}
+		// could not check: keep the corruption verdict
+		tracelog.WarningLogger.Printf("shouldSkipCorruption: cannot reopen %s: %v\n", path, err)
+		return false
+	}
+	defer utility.LoggedClose(file, "shouldSkipCorruption: failed to close file")
+
+	retry := make([]byte, DatabasePageSize)
+	read, err := file.ReadAt(retry, int64(blockNo)*DatabasePageSize)
+	if err != nil && !errors.Is(err, io.EOF) {
+		// could not check: keep the corruption verdict
+		tracelog.WarningLogger.Printf("shouldSkipCorruption: cannot re-read %s/[%d]: %v\n", path, blockNo, err)
+		return false
+	}
+	// block is past the end now: the relation was truncated, recovery will truncate it again
+	if read == 0 {
+		return true
+	}
+	// isPageCorrupted has zeroed pd_checksum in the page we hold, so zero it here as well.
+	for i := PdChecksumOffset; i < PdChecksumOffset+PdChecksumLen; i++ {
+		retry[i] = 0
+	}
+	// changed: PostgreSQL is writing the page, a WAL full page image will restore it
+	// unchanged: nothing is writing it, so the bad checksum is real
+	return !bytes.Equal(retry, asRead)
 }
