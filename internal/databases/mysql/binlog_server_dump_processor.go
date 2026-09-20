@@ -420,7 +420,7 @@ func (p *BinlogDumpProcessor) process() error {
 
 // runIdleHeartbeats keeps sending idle heartbeats at the requested period once
 // all binlog files have been streamed, while WAL-G waits for the replica to
-// apply them. It exits when the phase context is cancelled.
+// apply them. It exits when the phase context is canceled.
 func (p *BinlogDumpProcessor) runIdleHeartbeats(ctx context.Context) error {
 	if p.heartbeatDisabled || p.heartbeatPeriod <= 0 {
 		return nil
