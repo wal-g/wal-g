@@ -145,14 +145,76 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 	if err != nil {
 		return err
 	}
+	ap.recordAppliedOpTime(&op)
+
+	return nil
+}
+
+func (ap *DBApplier) recordAppliedOpTime(op *db.Oplog) {
 	var term int64
 	if op.Term != nil {
 		term = *op.Term
 	}
 	ap.lastOpTime = models.OpTime{TS: models.TimestampFromBson(op.Timestamp), Term: term}
 	ap.hasAppliedOp = true
+}
 
-	return nil
+func (ap *DBApplier) ApplyBatch(ctx context.Context, entries []models.Oplog) error {
+	batch := make([]*db.Oplog, 0, len(entries))
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		if err := ap.db.ApplyOps(ctx, batch); err != nil {
+			return fmt.Errorf("can not apply %d oplog entries through %s: %w", len(batch),
+				models.TimestampFromBson(batch[len(batch)-1].Timestamp), err)
+		}
+		ap.recordAppliedOpTime(batch[len(batch)-1])
+		batch = batch[:0]
+		return nil
+	}
+
+	for _, entry := range entries {
+		var op db.Oplog
+		if err := bson.Unmarshal(entry.Data, &op); err != nil {
+			return fmt.Errorf("can not unmarshal oplog entry: %w", err)
+		}
+		canBatch, err := ap.canBatchOplog(&op)
+		if err != nil {
+			return err
+		}
+		if !canBatch {
+			if err := flush(); err != nil {
+				return err
+			}
+			if err := ap.Apply(ctx, entry); err != nil {
+				return err
+			}
+			continue
+		}
+		if !ap.preserveUUID {
+			if _, err := filterUUIDs(&op); err != nil {
+				return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
+			}
+		}
+		batch = append(batch, &op)
+	}
+	return flush()
+}
+
+func (ap *DBApplier) canBatchOplog(op *db.Oplog) (bool, error) {
+	if (op.Operation != "i" && op.Operation != "u" && op.Operation != "d") ||
+		ap.partial || len(ap.applyIgnoreErrorCodes[op.Operation]) != 0 {
+		return false, nil
+	}
+	if !ap.catchUp && ap.shouldSkip(op) != nil {
+		return false, nil
+	}
+	meta, err := txn.NewMeta(*op)
+	if err != nil {
+		return false, fmt.Errorf("can not extract op metadata: %w", err)
+	}
+	return !meta.IsTxn(), nil
 }
 
 func (ap *DBApplier) Close(context.Context) error {
