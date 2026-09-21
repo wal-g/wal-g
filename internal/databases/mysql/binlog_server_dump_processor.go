@@ -196,8 +196,7 @@ func buildRotateEvent(pos mysql.Position, serverID int) *replication.BinlogEvent
 	return &rotateBinlogEvent
 }
 
-// Heartbeat V2 TLV payload field identifiers, from Percona's
-// libbinlogevents/include/codecs/binary.h (OTW_HB_* constants).
+// https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L1513-L1593
 const (
 	heartbeatLogFilenameField uint64 = 1 // OTW_HB_LOG_FILENAME_FIELD
 	heartbeatLogPositionField uint64 = 2 // OTW_HB_LOG_POSITION_FIELD

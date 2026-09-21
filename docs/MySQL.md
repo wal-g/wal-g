@@ -68,7 +68,7 @@ To configure the connection string that will be used by `binlog-server` to conne
 * `WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT`
 
 Set to `true` to disable `binlog-server` heartbeats. Default: `false`.
-Required for MySQL 5.7, which does not support the `HEARTBEAT_LOG_EVENT_V2` events sent by `binlog-server`.
+Required for MySQL versions earlier than 8.0.28, which do not support the `HEARTBEAT_LOG_EVENT_V2` events sent by `binlog-server`.
 
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
@@ -343,7 +343,7 @@ wal-g can work as replication source to do fast PiTR. In this case it will serve
 ```
 
 `binlog-server` uses heartbeat V2 to keep the replication connection alive while idle.
-For MySQL 5.7, disable heartbeats in the environment where you start WAL-G:
+For MySQL versions earlier than 8.0.28, disable heartbeats in the environment where you start WAL-G:
 
 ```bash
 export WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT=true
