@@ -2,6 +2,8 @@ package ao_test
 
 import (
 	"archive/tar"
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zeebo/xxh3"
 
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/crypto/openpgp"
@@ -392,46 +395,88 @@ func TestIncrementalAoUpload_FullAfterDelta(t *testing.T) {
 	runSingleTest(t, baseFiles, bundleFiles, testFiles, expectedResults, deduplicationAgeLimit, false)
 }
 
-func TestAoUpload_SkippedFile(t *testing.T) {
-	baseFiles := ao.BackupFiles{
-		"1663.1": {
-			StoragePath:     "1009_13_md5summock_1663_1_4_test_aoseg",
-			IsSkipped:       false,
-			IsIncremented:   false,
-			MTime:           time.Now(),
-			StorageType:     ao.ColumnOriented,
-			EOF:             70,
-			ModCount:        4,
-			Compressor:      "",
-			FileMode:        420,
-			InitialUploadTS: time.Now(),
-		},
+func TestAoUpload_MTime(t *testing.T) {
+	for _, isIncremental := range []bool{false, true} {
+		for _, storageType := range []ao.RelStorageType{ao.AppendOptimized, ao.ColumnOriented} {
+			for _, tc := range []struct {
+				name      string
+				baseMTime func(time.Time) time.Time
+				wantSkip  bool
+			}{
+				{"unchanged", func(t time.Time) time.Time { return t }, true},
+				{"same_instant_different_timezone", func(t time.Time) time.Time {
+					return t.In(time.FixedZone("test", 3600))
+				}, true},
+				{"newer", func(t time.Time) time.Time { return t.Add(-time.Second) }, false},
+				{"older", func(t time.Time) time.Time { return t.Add(time.Second) }, false},
+				{"subsecond_change", func(t time.Time) time.Time { return t.Add(-time.Nanosecond) }, false},
+				{"missing", func(time.Time) time.Time { return time.Time{} }, false},
+			} {
+				t.Run(fmt.Sprintf("incremental=%t/storage=%c/%s", isIncremental, storageType, tc.name), func(t *testing.T) {
+					const name = "1663.1"
+					const baseStoragePath = "previous_aoseg"
+					oldData := []byte("old contents")
+					data := oldData
+					if !tc.wantSkip {
+						// Simulate compaction reusing a segment without changing EOF or modcount.
+						data = []byte("new contents")
+					}
+					filePath := filepath.Join(t.TempDir(), name)
+					require.NoError(t, os.WriteFile(filePath, data, 0o600))
+					info, err := os.Stat(filePath)
+					require.NoError(t, err)
+					header, err := tar.FileInfoHeader(info, "")
+					require.NoError(t, err)
+					header.Name = name
+					cfi := internal.NewComposeFileInfo(filePath, info, true, false, header)
+
+					hasher := xxh3.New128()
+					_, err = hasher.Write(oldData)
+					require.NoError(t, err)
+					oldChecksum := hex.EncodeToString(hasher.Sum(nil))
+					baseFiles := ao.BackupFiles{
+						name: {
+							StoragePath: baseStoragePath, MTime: tc.baseMTime(info.ModTime()),
+							StorageType: storageType, EOF: int64(len(oldData)), ModCount: 4,
+							InitialUploadTS: time.Now(), Checksum: oldChecksum,
+						},
+					}
+					folder := testtools.MakeDefaultInMemoryStorageFolder()
+					require.NoError(t, folder.PutObject(t.Context(), ao.StoragePath+"/"+baseStoragePath, bytes.NewReader(oldData)))
+					bundleFiles := &internal.RegularBundleFiles{}
+					uploader := ao.NewStorageUploader(internal.NewRegularUploader(nil, folder), baseFiles,
+						nil, bundleFiles, isIncremental, deduplicationAgeLimit, NewAoSegFilesID)
+					meta := ao.NewRelFileMetadata("md5summock", storageType, int64(len(data)), 4)
+					location := walparser.NewBlockLocation(1009, 13, 1663, 1)
+					require.NoError(t, uploader.AddFile(t.Context(), cfi, meta, location))
+
+					got := uploader.GetFiles().Files[name]
+					require.NotNil(t, got)
+					assert.Equal(t, tc.wantSkip, got.IsSkipped)
+					assert.False(t, got.IsIncremented)
+					assert.True(t, got.MTime.Equal(info.ModTime()))
+					assert.Equal(t, int64(len(data)), got.EOF)
+					assert.Equal(t, int64(4), got.ModCount)
+					if tc.wantSkip {
+						assert.Equal(t, baseStoragePath, got.StoragePath)
+						assert.Equal(t, oldChecksum, got.Checksum)
+					} else {
+						assert.NotEqual(t, baseStoragePath, got.StoragePath)
+						hasher.Reset()
+						_, err = hasher.Write(data)
+						require.NoError(t, err)
+						assert.Equal(t, hex.EncodeToString(hasher.Sum(nil)), got.Checksum)
+					}
+					reader, err := folder.ReadObject(t.Context(), ao.StoragePath+"/"+got.StoragePath)
+					require.NoError(t, err)
+					defer reader.Close()
+					uploaded, err := io.ReadAll(reader)
+					require.NoError(t, err)
+					assert.Equal(t, data, uploaded)
+				})
+			}
+		}
 	}
-	bundleFiles := &internal.RegularBundleFiles{}
-	testFiles := map[string]TestFileInfo{
-		"1663.1": {
-			RelFileMetadata: ao.NewRelFileMetadata("md5summock", ao.ColumnOriented, 70, 4),
-			BlockLocation: walparser.BlockLocation{
-				RelationFileNode: walparser.RelFileNode{
-					SpcNode: 1009,
-					DBNode:  13,
-					RelNode: 1663,
-				},
-				BlockNo: 1,
-			},
-		},
-	}
-	expectedResults := map[string]ExpectedResult{
-		"1663.1": {
-			StoragePath:   "1009_13_md5summock_1663_1_4_test_aoseg",
-			IsSkipped:     true,
-			IsIncremented: false,
-			StorageType:   ao.ColumnOriented,
-			EOF:           70,
-			ModCount:      4,
-		},
-	}
-	runSingleTest(t, baseFiles, bundleFiles, testFiles, expectedResults, deduplicationAgeLimit, true)
 }
 
 func TestAoUpload_NotExistFile(t *testing.T) {
