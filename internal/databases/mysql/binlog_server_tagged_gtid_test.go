@@ -69,33 +69,20 @@ func TestHandleEventTaggedGTIDLargeGNO(t *testing.T) {
 	const tsid = "896e7882-18fe-11ef-ab88-22222d34d411:foobaz:"
 	const gno int64 = 1<<55 + 2
 	want := tsid + fmt.Sprint(gno)
-	// go-mysql v1.16.0 decodes this GNO as 1, which can skip a new
-	// transaction or report completion before the actual GTID is applied.
-	for _, alreadyApplied := range []bool{false, true} {
-		t.Run(fmt.Sprintf("already_applied=%t", alreadyApplied), func(t *testing.T) {
-			e := taggedGTIDFixture([]byte{0xff, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
-			required := tsid + "1"
-			if alreadyApplied {
-				required = want
-			}
-			p, sink := newTestProcessor(t, nil, requireGTIDSet(t, required), at(ts))
-			rows := writeRowsEvent(ts)
-			require.NoError(t, p.handleEvent(e))
-			require.NoError(t, p.handleEvent(rows))
-			if alreadyApplied {
-				require.Empty(t, sink.recorded())
-				require.True(t, p.sentGTIDs.IsEmpty())
-				return
-			}
-			require.Equal(t, []*replication.BinlogEvent{e, rows}, sink.recorded())
-			require.Equal(t, want, p.sentGTIDs.String())
-			// waitForReplica must wait for the actual GNO, not the truncated 1.
-			executed := requireGTIDSet(t, required)
-			require.False(t, executed.Contain(p.sentGTIDs))
-			require.NoError(t, executed.Update(want))
-			require.True(t, executed.Contain(p.sentGTIDs))
-		})
-	}
+	// go-mysql v1.16.0 decodes this GNO as 1, which can report completion
+	// before the actual GTID is applied.
+	e := taggedGTIDFixture([]byte{0xff, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01})
+	p, sink := newTestProcessor(t, nil, at(ts))
+	rows := writeRowsEvent(ts)
+	require.NoError(t, p.handleEvent(e))
+	require.NoError(t, p.handleEvent(rows))
+	require.Equal(t, []*replication.BinlogEvent{e, rows}, sink.recorded())
+	require.Equal(t, want, p.sentGTIDs.String())
+	// waitForReplica must wait for the actual GNO, not the truncated 1.
+	executed := requireGTIDSet(t, tsid+"1")
+	require.False(t, executed.Contain(p.sentGTIDs))
+	require.NoError(t, executed.Update(want))
+	require.True(t, executed.Contain(p.sentGTIDs))
 }
 
 func TestTaggedGTIDTruncatedIdentity(t *testing.T) {

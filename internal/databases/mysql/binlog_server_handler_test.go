@@ -10,8 +10,6 @@ import (
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/server"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,11 +37,11 @@ func TestBinlogProtocolHandshakeAndInitialization(t *testing.T) {
 		{"SELECT @@global.rpl_semi_sync_master_enabled", "@@global.rpl_semi_sync_master_enabled", "0", mysql.MYSQL_TYPE_VAR_STRING},
 		{"SELECT @@global.rpl_semi_sync_source_enabled", "@@global.rpl_semi_sync_source_enabled", "0", mysql.MYSQL_TYPE_VAR_STRING},
 	}
+	handler := &Handler{dumpCommandProcessor: &BinlogDumpProcessor{serverID: 99}}
 	done := make(chan error, 1)
 	go func() {
-		handler := &Handler{dumpCommandProcessor: &BinlogDumpProcessor{serverID: 99}}
 		conn, err := srv.NewCustomizedConn(serverSide, auth, handler)
-		for i := 0; i < len(queries) && err == nil; i++ {
+		for i := 0; i < len(queries)+1 && err == nil; i++ {
 			err = conn.HandleCommand()
 		}
 		done <- err
@@ -55,6 +53,10 @@ func TestBinlogProtocolHandshakeAndInitialization(t *testing.T) {
 	version, err := conn.CompareServerVersion("8.3.0")
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, version, 0)
+	// Heartbeat negotiation must coexist with the initialization resultsets.
+	result, err := conn.Execute("  SET @master_heartbeat_period=1000000000, @source_heartbeat_period=2000000000  ")
+	require.NoError(t, err)
+	result.Close()
 	// Alternate string and numeric columns, closing each response as a replica
 	// does. Reused go-mysql resultsets must not leak column metadata across queries.
 	for _, query := range queries {
@@ -79,55 +81,5 @@ func TestBinlogProtocolHandshakeAndInitialization(t *testing.T) {
 		}
 	}
 	require.NoError(t, <-done)
-}
-
-func TestDecideSkipForGTID(t *testing.T) {
-	sidA := uuid.MustParse("3e11fa47-71ca-11e1-9e33-c80aa9429562")
-	sidB := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-
-	required, _ := mysql.ParseMysqlGTIDSet(sidA.String() + ":1-10," + sidB.String() + ":5")
-	newProcessor := func() *BinlogDumpProcessor {
-		empty, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
-		return &BinlogDumpProcessor{
-			sentGTIDs:     empty,
-			requiredGTIDs: required.(*mysql.MysqlGTIDSet),
-		}
-	}
-
-	t.Run("GTID already applied is skipped, not recorded", func(t *testing.T) {
-		p := newProcessor()
-		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 5))
-		require.NoError(t, err)
-		assert.True(t, skip)
-		assert.True(t, p.skipCurrentTxn)
-		assert.True(t, p.sentGTIDs.IsEmpty())
-	})
-
-	t.Run("new GTID is forwarded and recorded", func(t *testing.T) {
-		p := newProcessor()
-		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 11))
-		require.NoError(t, err)
-		assert.False(t, skip)
-		assert.False(t, p.skipCurrentTxn)
-		assert.Equal(t, sidA.String()+":11", p.sentGTIDs.String())
-	})
-
-	t.Run("nil requiredGTIDs forwards everything", func(t *testing.T) {
-		p := newProcessor()
-		p.requiredGTIDs = nil
-		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 5))
-		require.NoError(t, err)
-		assert.False(t, skip)
-		assert.False(t, p.skipCurrentTxn)
-		assert.Equal(t, sidA.String()+":5", p.sentGTIDs.String())
-	})
-
-	t.Run("skip state is cleared on forwarded GTID", func(t *testing.T) {
-		p := newProcessor()
-		p.skipCurrentTxn = true
-		skip, err := p.decideSkipForGTID(gtidEvent("2026-01-01 00:00:01", sidA, 11))
-		require.NoError(t, err)
-		assert.False(t, skip)
-		assert.False(t, p.skipCurrentTxn)
-	})
+	require.Equal(t, 2*time.Second, handler.dumpCommandProcessor.heartbeatPeriod)
 }

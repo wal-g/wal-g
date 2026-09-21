@@ -14,7 +14,7 @@ export WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="sbtest@tcp(127.0.0.1:3306)/sbtes
 
 mysql_initialize_and_start
 
-mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
+mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32) PRIMARY KEY, ts DATETIME)"
 mysql -e "FLUSH BINARY LOGS"
 
 EMPTY_BINLOG=$(mysql_current_binlog)
@@ -22,18 +22,11 @@ mysql -e "FLUSH BINARY LOGS"
 wal-g binlog-push
 sleep 1
 
-# WAL-G must skip the backup rows and apply the post-backup transactions.
+# The replica must skip the backup rows by GTID and apply post-backup transactions.
 # XtraBackup may rotate binlogs, so capture filenames at each boundary.
 BACKUP_ROWS_BINLOG=$(mysql_current_binlog)
-GTIDS_BEFORE_BACKUP_ROWS=$(mysql -N -e "SELECT @@GLOBAL.GTID_EXECUTED")
 mysql -e "INSERT INTO sbtest.pitr VALUES('backup_and_binlog_01', NOW())"
-GTIDS_AFTER_BACKUP_ROW_01=$(mysql -N -e "SELECT @@GLOBAL.GTID_EXECUTED")
-BACKUP_AND_BINLOG_01_GTID=$(mysql -N -e "SELECT GTID_SUBTRACT('$GTIDS_AFTER_BACKUP_ROW_01', '$GTIDS_BEFORE_BACKUP_ROWS')")
 mysql -e "INSERT INTO sbtest.pitr VALUES('backup_and_binlog_02', NOW())"
-GTIDS_AFTER_BACKUP_ROW_02=$(mysql -N -e "SELECT @@GLOBAL.GTID_EXECUTED")
-BACKUP_AND_BINLOG_02_GTID=$(mysql -N -e "SELECT GTID_SUBTRACT('$GTIDS_AFTER_BACKUP_ROW_02', '$GTIDS_AFTER_BACKUP_ROW_01')")
-test -n "$BACKUP_AND_BINLOG_01_GTID"
-test -n "$BACKUP_AND_BINLOG_02_GTID"
 wal-g backup-push
 FIRST_REPLAY_BINLOG=$(mysql_current_binlog)
 mysql -e "INSERT INTO sbtest.pitr VALUES('from_binlog_01', NOW())"
@@ -65,7 +58,7 @@ chown -R mysql:mysql "$MYSQLDATA"
 mysql_start
 mysql_set_gtid_purged
 
-BINLOG_SERVER_LOG=/tmp/binlog_server_gtid_skip.log
+BINLOG_SERVER_LOG=/tmp/pitr_binlog_server.log
 
 WALG_LOG_LEVEL="DEVEL" wal-g binlog-server --since LATEST --until "$DT1" > "$BINLOG_SERVER_LOG" 2>&1 &
 walg_pid=$!
@@ -88,21 +81,21 @@ else
 fi
 cat "$BINLOG_SERVER_LOG"
 
-mysqldump sbtest > /tmp/dump_after_pitr_gtid_skip
+mysqldump sbtest > /tmp/dump_after_pitr
 
 # rows from backup
-grep -w 'backup_and_binlog_01' /tmp/dump_after_pitr_gtid_skip
-grep -w 'backup_and_binlog_02' /tmp/dump_after_pitr_gtid_skip
+grep -w 'backup_and_binlog_01' /tmp/dump_after_pitr
+grep -w 'backup_and_binlog_02' /tmp/dump_after_pitr
 # rows from post-backup binlogs before pitr time
-grep -w 'from_binlog_01' /tmp/dump_after_pitr_gtid_skip
-grep -w 'from_binlog_02' /tmp/dump_after_pitr_gtid_skip
-grep -w 'from_binlog_03' /tmp/dump_after_pitr_gtid_skip
-grep -w 'from_binlog_04' /tmp/dump_after_pitr_gtid_skip
-grep -w 'from_binlog_05' /tmp/dump_after_pitr_gtid_skip
+grep -w 'from_binlog_01' /tmp/dump_after_pitr
+grep -w 'from_binlog_02' /tmp/dump_after_pitr
+grep -w 'from_binlog_03' /tmp/dump_after_pitr
+grep -w 'from_binlog_04' /tmp/dump_after_pitr
+grep -w 'from_binlog_05' /tmp/dump_after_pitr
 # rows after pitr time must be absent
-if grep -w 'after_pitr_01' /tmp/dump_after_pitr_gtid_skip ||
-    grep -w 'after_pitr_02' /tmp/dump_after_pitr_gtid_skip ||
-    grep -w 'after_pitr_03' /tmp/dump_after_pitr_gtid_skip; then
+if grep -w 'after_pitr_01' /tmp/dump_after_pitr ||
+    grep -w 'after_pitr_02' /tmp/dump_after_pitr ||
+    grep -w 'after_pitr_03' /tmp/dump_after_pitr; then
     echo "ERROR: found rows written after the PITR cutoff"
     exit 1
 fi
@@ -116,5 +109,5 @@ if grep -F "Streaming $WALG_MYSQL_BINLOG_DST/$AFTER_PITR_BINLOG to replica" "$BI
     exit 1
 fi
 
-grep -E "Skipping already-applied transaction ${BACKUP_AND_BINLOG_01_GTID}$" "$BINLOG_SERVER_LOG"
-grep -E "Skipping already-applied transaction ${BACKUP_AND_BINLOG_02_GTID}$" "$BINLOG_SERVER_LOG"
+# Replayed backup transactions must not create duplicates.
+test "$(mysql -N -e 'SELECT COUNT(*) FROM sbtest.pitr')" = 7

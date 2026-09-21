@@ -65,6 +65,11 @@ To configure the server id of the binlog server. Should be unique for each repli
 
 To configure the connection string that will be used by `binlog-server` to connect to your MySQL. [DSN format](https://github.com/go-sql-driver/mysql#dsn-data-source-name): ```user:password@tcp(host)/dbname```
 
+* `WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT`
+
+Set to `true` to disable `binlog-server` heartbeats. Default: `false`.
+Required for MySQL versions earlier than 8.0.28, which do not support the `HEARTBEAT_LOG_EVENT_V2` events sent by `binlog-server`.
+
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
 * `WALG_STREAM_SPLITTER_PARTITIONS`
@@ -336,6 +341,24 @@ wal-g can work as replication source to do fast PiTR. In this case it will serve
 
  WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="user:password@tcp(127.0.0.1:3306)/db"
 ```
+
+`binlog-server` uses heartbeat V2 to keep the replication connection alive while idle.
+For MySQL versions earlier than 8.0.28, disable heartbeats in the environment where you start WAL-G:
+
+```bash
+export WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT=true
+```
+
+With heartbeats disabled, consider increasing the replica's
+[`slave_net_timeout`](https://dev.mysql.com/doc/mysql-replication-excerpt/5.7/en/replication-options-replica.html#sysvar_slave_net_timeout)
+to avoid reconnects during delays in fetching binlogs or waiting for the replica to apply them.
+The default is 60 seconds. For example, set it to one hour before `START SLAVE`:
+
+```sql
+SET GLOBAL slave_net_timeout = 3600;
+```
+
+Choose a timeout longer than the expected idle periods; a larger value also delays detection of a broken connection.
 
 Restore procedure is straightforward:
 * restore backup

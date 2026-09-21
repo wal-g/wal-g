@@ -96,9 +96,7 @@ mysql -e "FLUSH BINARY LOGS"
 mysql -e "FLUSH BINARY LOGS"
 wal-g binlog-push
 
-before_backup_gtids=$(mysql --batch --skip-column-names -e "SELECT @@GLOBAL.gtid_executed")
 mysql -e "SET SESSION gtid_next='$backup_gtid_next'; INSERT INTO sbtest.pitr VALUES('from_backup', NOW())"
-backup_gtid=$(mysql --batch --skip-column-names -e "SELECT GTID_SUBTRACT(@@GLOBAL.gtid_executed, '$before_backup_gtids')")
 wal-g backup-push
 
 mysql -e "SET SESSION gtid_next='$first_gtid_next'; INSERT INTO sbtest.pitr VALUES('from_binlog_01', NOW())"
@@ -133,7 +131,6 @@ mysql_change_replication_source "127.0.0.1" 9306 "walg" "walgpwd"
 mysql -e "START REPLICA IO_THREAD"
 wait_for_binlog_server_log "Waiting for replica to catch up to GTID:"
 kill -0 "$walg_pid"
-grep -F "Skipping already-applied transaction $backup_gtid" "$binlog_server_log"
 mysql -e "START REPLICA SQL_THREAD"
 
 wait_count=0
