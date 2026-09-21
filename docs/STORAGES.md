@@ -280,11 +280,11 @@ Number of low-level retries. Defaults to 10.
 
 * `RCLONE_S3_CHUNK_SIZE`
 
-S3 chunk size in bytes for multipart uploads. Defaults to 67108864 (64MB).
+S3 multipart chunk size in bytes (e.g. `67108864` for 64MB). Only passed to rclone when set.
 
 * `RCLONE_UPLOAD_CONCURRENCY`
 
-Number of concurrent S3 upload parts. Defaults to 4.
+S3 upload concurrency. Only passed to rclone when set.
 
 * `RCLONE_EXTRA_ARGS`
 

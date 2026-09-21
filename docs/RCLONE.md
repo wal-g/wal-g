@@ -1,6 +1,6 @@
 # Rclone Storage Support
 
-WAL-G supports Rclone as a storage backend, enabling backups to 40+ cloud storage providers.
+WAL-G can use Rclone as a storage backend (S3, GCS, Azure, Dropbox, and other providers rclone supports).
 
 ## Quick Start
 
@@ -88,3 +88,16 @@ export WALG_RCLONE_PREFIX="dropbox://Apps/walg"
 export RCLONE_REMOTE="dropbox"
 wal-g backup-push
 ```
+
+## Live check (optional)
+
+Unit tests stay offline. To hit a real remote (Dropbox, MinIO via rclone, etc.):
+
+```bash
+export RCLONE_LIVE_TEST=1
+export RCLONE_REMOTE=dropbox
+export WALG_RCLONE_PREFIX='dropbox://walg-smoke'
+go test ./pkg/storages/rclone/ -run Live -count=1 -v
+```
+
+Use a disposable prefix. Tokens belong in `rclone config`; do not commit `rclone.conf`.
