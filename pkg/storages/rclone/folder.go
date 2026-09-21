@@ -132,6 +132,31 @@ func (f *Folder) Exists(_ context.Context, objectRelativePath string) (bool, err
 	return len(items) > 0, nil
 }
 
+func (f *Folder) StatObject(_ context.Context, objectRelativePath string) (storage.Object, error) {
+	fullPath := path.Join(f.getFullPath(), objectRelativePath)
+
+	args := f.buildBaseArgs()
+	args = append(args, "lsjson", fullPath)
+
+	output, err := f.runRcloneCommand(args...)
+	if err != nil {
+		if isNotFoundError(err) {
+			return nil, storage.NewObjectNotFoundError(objectRelativePath)
+		}
+		return nil, fmt.Errorf("stat object %q: %w", objectRelativePath, err)
+	}
+
+	var items []rcloneListItem
+	if err := json.Unmarshal(output, &items); err != nil {
+		return nil, fmt.Errorf("parse rclone output: %w", err)
+	}
+	if len(items) == 0 || items[0].IsDir {
+		return nil, storage.NewObjectNotFoundError(objectRelativePath)
+	}
+
+	return storage.NewLocalObject(objectRelativePath, items[0].ModTime, items[0].Size), nil
+}
+
 func (f *Folder) GetSubFolder(subFolderRelativePath string) storage.Folder {
 	return NewFolder(
 		f.remotePath,
