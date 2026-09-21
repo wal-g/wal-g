@@ -72,6 +72,13 @@ const (
 	replayApplyBatchBytes = models.MaxDocumentSize / 2
 )
 
+type pendingReplayBatch struct {
+	operations []models.Oplog
+	bytes      int
+	timer      *time.Timer
+	tick       <-chan time.Time
+}
+
 func NewCheckpointingApplier(
 	db client.MongoDriver,
 	applier replayDBApplier,
@@ -107,27 +114,11 @@ func (a *CheckpointingApplier) Apply(ctx context.Context, ch chan *models.Oplog)
 func (a *CheckpointingApplier) run(ctx context.Context, ch chan *models.Oplog) error {
 	timer := time.NewTimer(a.interval)
 	defer timer.Stop()
-	batchTimer := time.NewTimer(replayApplyBatchMaxWait)
-	if !batchTimer.Stop() {
-		<-batchTimer.C
+	batch := pendingReplayBatch{
+		operations: make([]models.Oplog, 0, min(a.batchSize, DefaultReplayApplyBatchSize)),
+		timer:      time.NewTimer(replayApplyBatchMaxWait),
 	}
-	defer batchTimer.Stop()
-	var batchTick <-chan time.Time
-	batch := make([]models.Oplog, 0, min(a.batchSize, DefaultReplayApplyBatchSize))
-	batchBytes := 0
-	flush := func() error {
-		if len(batch) == 0 {
-			return nil
-		}
-		batchTimer.Stop()
-		batchTick = nil
-		if err := a.applyOperations(ctx, batch, timer); err != nil {
-			return err
-		}
-		batch = batch[:0]
-		batchBytes = 0
-		return nil
-	}
+	defer batch.timer.Stop()
 
 	for {
 		select {
@@ -135,7 +126,7 @@ func (a *CheckpointingApplier) run(ctx context.Context, ch chan *models.Oplog) e
 			return ctx.Err()
 		case <-timer.C:
 			a.checkpointDue = true
-			if err := flush(); err != nil {
+			if err := a.flushBatch(ctx, &batch, timer); err != nil {
 				return err
 			}
 			if a.checkpointDue && !a.applier.HasPendingTransactions() {
@@ -143,35 +134,63 @@ func (a *CheckpointingApplier) run(ctx context.Context, ch chan *models.Oplog) e
 					return err
 				}
 			}
-		case <-batchTick:
-			if err := flush(); err != nil {
+		case <-batch.tick:
+			if err := a.flushBatch(ctx, &batch, timer); err != nil {
 				return err
 			}
 		case op, ok := <-ch:
 			if !ok {
-				if err := flush(); err != nil {
+				if err := a.flushBatch(ctx, &batch, timer); err != nil {
 					return err
 				}
 				return a.finish(ctx)
 			}
-			if len(batch) > 0 && batchBytes+len(op.Data) > replayApplyBatchBytes {
-				if err := flush(); err != nil {
-					return err
-				}
-			}
-			if len(batch) == 0 {
-				batchTimer.Reset(replayApplyBatchMaxWait)
-				batchTick = batchTimer.C
-			}
-			batch = append(batch, *op)
-			batchBytes += len(op.Data)
-			if len(batch) == a.batchSize {
-				if err := flush(); err != nil {
-					return err
-				}
+			if err := a.appendOperation(ctx, &batch, op, timer); err != nil {
+				return err
 			}
 		}
 	}
+}
+
+func (a *CheckpointingApplier) appendOperation(
+	ctx context.Context,
+	batch *pendingReplayBatch,
+	op *models.Oplog,
+	checkpointTimer *time.Timer,
+) error {
+	if len(batch.operations) > 0 && batch.bytes+len(op.Data) > replayApplyBatchBytes {
+		if err := a.flushBatch(ctx, batch, checkpointTimer); err != nil {
+			return err
+		}
+	}
+	if len(batch.operations) == 0 {
+		batch.timer.Reset(replayApplyBatchMaxWait)
+		batch.tick = batch.timer.C
+	}
+	batch.operations = append(batch.operations, *op)
+	batch.bytes += len(op.Data)
+	if len(batch.operations) == a.batchSize {
+		return a.flushBatch(ctx, batch, checkpointTimer)
+	}
+	return nil
+}
+
+func (a *CheckpointingApplier) flushBatch(
+	ctx context.Context,
+	batch *pendingReplayBatch,
+	checkpointTimer *time.Timer,
+) error {
+	if len(batch.operations) == 0 {
+		return nil
+	}
+	batch.timer.Stop()
+	batch.tick = nil
+	if err := a.applyOperations(ctx, batch.operations, checkpointTimer); err != nil {
+		return err
+	}
+	batch.operations = batch.operations[:0]
+	batch.bytes = 0
+	return nil
 }
 
 func (a *CheckpointingApplier) applyOperations(

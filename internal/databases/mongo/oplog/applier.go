@@ -179,17 +179,9 @@ func (ap *DBApplier) ApplyBatch(ctx context.Context, entries []models.Oplog) err
 		if err := bson.Unmarshal(entry.Data, &op); err != nil {
 			return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 		}
-		canBatch := (op.Operation == "i" || op.Operation == "u" || op.Operation == "d") &&
-			!ap.partial && len(ap.applyIgnoreErrorCodes[op.Operation]) == 0
-		if canBatch && !ap.catchUp {
-			canBatch = ap.shouldSkip(&op) == nil
-		}
-		if canBatch {
-			meta, err := txn.NewMeta(op)
-			if err != nil {
-				return fmt.Errorf("can not extract op metadata: %w", err)
-			}
-			canBatch = !meta.IsTxn()
+		canBatch, err := ap.canBatchOplog(&op)
+		if err != nil {
+			return err
 		}
 		if !canBatch {
 			if err := flush(); err != nil {
@@ -208,6 +200,21 @@ func (ap *DBApplier) ApplyBatch(ctx context.Context, entries []models.Oplog) err
 		batch = append(batch, &op)
 	}
 	return flush()
+}
+
+func (ap *DBApplier) canBatchOplog(op *db.Oplog) (bool, error) {
+	if (op.Operation != "i" && op.Operation != "u" && op.Operation != "d") ||
+		ap.partial || len(ap.applyIgnoreErrorCodes[op.Operation]) != 0 {
+		return false, nil
+	}
+	if !ap.catchUp && ap.shouldSkip(op) != nil {
+		return false, nil
+	}
+	meta, err := txn.NewMeta(*op)
+	if err != nil {
+		return false, fmt.Errorf("can not extract op metadata: %w", err)
+	}
+	return !meta.IsTxn(), nil
 }
 
 func (ap *DBApplier) Close(context.Context) error {

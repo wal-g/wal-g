@@ -524,12 +524,9 @@ func NewReplyOplogConfig(
 	if roConfig.FsyncInterval <= 0 {
 		return roConfig, fmt.Errorf("%s must be positive", conf.OplogReplayFsyncInterval)
 	}
-	roConfig.ApplyBatchSize = stages.DefaultReplayApplyBatchSize
-	if value, ok := conf.GetSetting(conf.OplogReplayApplyBatchSize); ok {
-		roConfig.ApplyBatchSize, err = parseOplogReplayApplyBatchSize(value)
-		if err != nil {
-			return roConfig, err
-		}
+	roConfig.ApplyBatchSize, err = getOplogReplayApplyBatchSize()
+	if err != nil {
+		return roConfig, err
 	}
 	roConfig.MaxMongodRestarts = 5
 	if value, ok := conf.GetSetting(conf.OplogReplayMaxMongodRestarts); ok {
@@ -584,6 +581,14 @@ func parseOplogReplayApplyBatchSize(value string) (int, error) {
 		return 0, fmt.Errorf("%s must be a positive integer", conf.OplogReplayApplyBatchSize)
 	}
 	return size, nil
+}
+
+func getOplogReplayApplyBatchSize() (int, error) {
+	value, ok := conf.GetSetting(conf.OplogReplayApplyBatchSize)
+	if !ok {
+		return stages.DefaultReplayApplyBatchSize, nil
+	}
+	return parseOplogReplayApplyBatchSize(value)
 }
 
 func processTimestamp(ctx context.Context, arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {
