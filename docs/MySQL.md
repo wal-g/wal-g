@@ -419,3 +419,23 @@ mysqlbinlog --stop-datetime="some point in time" --start-position [position abov
 ### MariaDB - using with `mysqldump`
 
 The procedure is same as in case of [MySQL. You can follow the instructions from the previous section.](#mysql---using-with-mysqldump)
+
+### MySQL running integration tests
+
+Use `MYSQL_SERIES` to select `57`, `80`, `84`, or `97`.
+
+```bash
+# Run all tests for MySQL 8.4 (the default).
+make mysql_integration_test
+
+# Run all tests for MySQL 5.7.
+make MYSQL_SERIES=57 mysql_integration_test
+```
+
+`MYSQL_TEST_FILTER` selects tests whose filenames contain the given substring.
+Matching is case-sensitive.
+
+```bash
+# Run all tests with pitr in their filenames for MySQL 8.4 (the default).
+make MYSQL_TEST_FILTER=pitr mysql_integration_test
+```

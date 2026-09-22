@@ -554,155 +554,26 @@ services:
     build:
       dockerfile: docker/mysql/Dockerfile
       context: .
-    image: wal-g/mysql
-    container_name: wal-g_mysql
-
-  mysql8:
-    build:
-      dockerfile: docker/mysql/Dockerfile_v8
-      context: .
-    image: wal-g/mysql8
-    container_name: wal-g_mysql8
-
-  mysql84:
-    build:
-      dockerfile: docker/mysql/Dockerfile_percona
-      context: .
       args:
-        MYSQL_SERIES: "84"
-    image: wal-g/mysql84
-    container_name: wal-g_mysql84
+        MYSQL_SERIES: "${MYSQL_SERIES:-84}"
+    image: wal-g/mysql${MYSQL_SERIES:-84}
+    container_name: wal-g_mysql${MYSQL_SERIES:-84}
 
-  mysql97:
-    build:
-      dockerfile: docker/mysql/Dockerfile_percona
-      context: .
-      args:
-        MYSQL_SERIES: "97"
-    image: wal-g/mysql97
-    container_name: wal-g_mysql97
-
-  mysql_base_tests:
+  mysql_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
       context: .
       args:
-        TEST_ARG: "-p /tmp/base_tests"
+        MYSQL_IMAGE: wal-g/mysql${MYSQL_SERIES:-84}:latest
     security_opt:
       - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_base_tests
-    env_file:
-      - docker/common/common_walg.env
-    <<: *s3_common_depends
-
-  mysql_binlog_server_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/binlog_server_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_binlog_server_tests
-    env_file:
-      - docker/common/common_walg.env
-    environment:
-      # MySQL 5.7 does not support heartbeat V2 events.
-      WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT: "true"
-    <<: *s3_common_depends
-
-  mysql_delete_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/delete_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_delete_tests
-    env_file:
-      - docker/common/common_walg.env
-    <<: *s3_common_depends
-
-  mysql_copy_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/copy_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_copy_tests
-    env_file:
-      - docker/common/common_walg.env
-    depends_on:
-      s3:
-        condition: service_healthy
-      s3-another:
-        condition: service_healthy
-    links:
-      - s3
-      - s3-another
-
-  mysql8_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile_v8
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/${MYSQL8_TEST_DIR:-xbtool_tests}"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql8_tests
-    container_name: wal-g_mysql8_tests
+    image: wal-g/mysql${MYSQL_SERIES:-84}_tests
+    container_name: wal-g_mysql${MYSQL_SERIES:-84}_tests
     env_file:
       - docker/common/common_walg.env
     environment:
       WALG_COMPRESSION_METHOD: lz4
-    <<: *s3_common_depends
-
-  mysql84_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile_percona
-      context: .
-      args:
-        MYSQL_IMAGE: wal-g/mysql84:latest
-        TEST_ARG: "-p /tmp/${MYSQL84_TEST_DIR:-base_tests}"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql84_tests
-    container_name: wal-g_mysql84_tests
-    env_file:
-      - docker/common/common_walg.env
-    environment:
-      WALG_COMPRESSION_METHOD: lz4
-    depends_on:
-      s3:
-        condition: service_healthy
-      s3-another:
-        condition: service_healthy
-    links:
-      - s3
-      - s3-another
-
-  mysql97_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile_percona
-      context: .
-      args:
-        MYSQL_IMAGE: wal-g/mysql97:latest
-        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-base_tests}"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql97_tests
-    container_name: wal-g_mysql97_tests
-    env_file:
-      - docker/common/common_walg.env
-    environment:
-      WALG_COMPRESSION_METHOD: lz4
+      MYSQL_TEST_FILTER: "${MYSQL_TEST_FILTER:-}"
     depends_on:
       s3:
         condition: service_healthy
