@@ -565,7 +565,6 @@ services:
       context: .
       args:
         MYSQL_IMAGE: wal-g/mysql${MYSQL_SERIES:-84}:latest
-        TEST_ARG: "-p /tmp/${MYSQL_TEST_DIR:-base_tests}"
     security_opt:
       - seccomp:unconfined
     image: wal-g/mysql${MYSQL_SERIES:-84}_tests
@@ -574,6 +573,7 @@ services:
       - docker/common/common_walg.env
     environment:
       WALG_COMPRESSION_METHOD: lz4
+      MYSQL_TEST_FILTER: "${MYSQL_TEST_FILTER:-}"
     depends_on:
       s3:
         condition: service_healthy

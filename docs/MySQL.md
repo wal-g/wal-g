@@ -422,11 +422,20 @@ The procedure is same as in case of [MySQL. You can follow the instructions from
 
 ### MySQL running integration tests
 
-MySQL 5.7, 8.0, 8.4, and 9.7 use the same Percona Server test image definition
-and test suites. Select the version with `MYSQL_SERIES` (`57`, `80`, `84`, or `97`)
-and the suite with `MYSQL_TEST_DIR`:
+Use `MYSQL_SERIES` to select `57`, `80`, `84`, or `97`.
 
 ```bash
-make MYSQL_SERIES=57 MYSQL_TEST_DIR=base_tests mysql_integration_test
-make MYSQL_SERIES=80 MYSQL_TEST_DIR=binlog_server_tests mysql_integration_test
+# Run all tests for MySQL 8.4 (the default).
+make mysql_integration_test
+
+# Run all tests for MySQL 5.7.
+make MYSQL_SERIES=57 mysql_integration_test
+```
+
+`MYSQL_TEST_FILTER` selects tests whose filenames contain the given substring.
+Matching is case-sensitive.
+
+```bash
+# Run all tests with pitr in their filenames for MySQL 8.4 (the default).
+make MYSQL_TEST_FILTER=pitr mysql_integration_test
 ```

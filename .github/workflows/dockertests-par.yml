@@ -77,9 +77,7 @@ jobs:
           done)
 
           mysql=$(for series in 57 80 84 97; do
-            for suite in base_tests delete_tests copy_tests xbtool_tests binlog_server_tests; do
-              printf '"make USE_BROTLI= USE_LZO= USE_LIBSODIUM= MYSQL_SERIES=%s MYSQL_TEST_DIR=%s mysql_integration_test",' "$series" "$suite"
-            done
+            printf '"make MYSQL_SERIES=%s mysql_integration_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",' "$series"
           done)
 
           # The heredoc is quoted, so the shell keeps the backslashes as they are.
