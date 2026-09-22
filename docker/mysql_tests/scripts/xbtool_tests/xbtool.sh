@@ -3,6 +3,15 @@ set -e -x
 
 . /usr/local/export_common.sh
 
+# XtraBackup 2.4 only supports QuickLZ, which WAL-G cannot decompress.
+# The other xbtool tests exercise uncompressed 5.7 backups and incrementals.
+case "$(xtrabackup --version 2>&1)" in
+    *"version 2.4."*)
+        echo "Skipping compressed xbtool extraction: XtraBackup 2.4 has no Zstandard support"
+        exit 0
+        ;;
+esac
+
 export WALG_LOG_LEVEL=DEVEL
 export WALG_COMPRESSION_METHOD=zstd
 export WALE_S3_PREFIX=s3://mysql8-xbtool-bucket

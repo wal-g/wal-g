@@ -419,3 +419,14 @@ mysqlbinlog --stop-datetime="some point in time" --start-position [position abov
 ### MariaDB - using with `mysqldump`
 
 The procedure is same as in case of [MySQL. You can follow the instructions from the previous section.](#mysql---using-with-mysqldump)
+
+### MySQL running integration tests
+
+MySQL 5.7, 8.0, 8.4, and 9.7 use the same Percona Server test image definition
+and test suites. Select the version with `MYSQL_SERIES` (`57`, `80`, `84`, or `97`)
+and the suite with `MYSQL_TEST_DIR`:
+
+```bash
+make MYSQL_SERIES=57 MYSQL_TEST_DIR=base_tests mysql_integration_test
+make MYSQL_SERIES=80 MYSQL_TEST_DIR=binlog_server_tests mysql_integration_test
+```
