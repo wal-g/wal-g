@@ -19,7 +19,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kms v1.55.7
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.101.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.49.0
-	github.com/aws/smithy-go v1.28.1
+	github.com/aws/smithy-go v1.28.2
 	github.com/cactus/go-statsd-client/v5 v5.1.0
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/cucumber/godog v0.16.0
