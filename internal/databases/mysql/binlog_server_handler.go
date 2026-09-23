@@ -168,7 +168,10 @@ func (h *Handler) waitForReplica(ctx context.Context) error {
 			return nil
 		}
 
-		time.Sleep(1 * time.Second)
+		select {
+		case <-ctx.Done():
+		case <-time.After(10 * time.Second):
+		}
 	}
 }
 
