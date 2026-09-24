@@ -1,10 +1,10 @@
 #!/bin/sh
 
 set -e -x
+. /tmp/tests/test_functions/prepare_config.sh
 CONFIG_FILE="/tmp/configs/compressed_test_config.json"
-COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-jq -s '.[0] * .[1]' "${COMMON_CONFIG}" "${CONFIG_FILE}" > "${TMP_CONFIG}"
+prepare_config "${CONFIG_FILE}" "${TMP_CONFIG}"
 
 initdb ${PGDATA}
 

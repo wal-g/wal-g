@@ -1,15 +1,15 @@
 #!/bin/bash
 set -e -x
+. /tmp/tests/test_functions/prepare_config.sh
 
 FAILOVER_STORAGE_CONFIG_FILE="/tmp/configs/full_backup_test_failover_storage_config.json"
 FAILOVER_STORAGE_TMP_CONFIG="/tmp/configs/tmp_config_failover_storage.json"
 
 CONFIG_FILE="/tmp/configs/full_backup_test_config.json"
-COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-jq -s '.[0] * .[1]' "${COMMON_CONFIG}" "${CONFIG_FILE}" > "${TMP_CONFIG}"
+prepare_config "${CONFIG_FILE}" "${TMP_CONFIG}"
 
-jq -s '.[0] * .[1]' "${COMMON_CONFIG}" "${FAILOVER_STORAGE_CONFIG_FILE}" > "${FAILOVER_STORAGE_TMP_CONFIG}"
+prepare_config "${FAILOVER_STORAGE_CONFIG_FILE}" "${FAILOVER_STORAGE_TMP_CONFIG}"
 
 source /tmp/tests/test_functions/util.sh
 

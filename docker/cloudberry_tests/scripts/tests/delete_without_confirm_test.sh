@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e -x
+. /tmp/tests/test_functions/prepare_config.sh
 CONFIG_FILE="/tmp/configs/delete_without_confirm_test_config.json"
-COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-jq -s '.[0] * .[1]' "${COMMON_CONFIG}" "${CONFIG_FILE}" > "${TMP_CONFIG}"
+prepare_config "${CONFIG_FILE}" "${TMP_CONFIG}"
 source /tmp/tests/test_functions/util.sh
 
 bootstrap_gp_cluster
