@@ -31,6 +31,7 @@ const (
 	sseKmsIDSetting                 = "S3_SSE_KMS_ID"
 	storageClassSetting             = "S3_STORAGE_CLASS"
 	uploadConcurrencySetting        = "UPLOAD_CONCURRENCY"
+	s3UploadConcurrencySetting      = "S3_UPLOAD_CONCURRENCY"
 	caCertFileSetting               = "S3_CA_CERT_FILE"
 	maxPartSizeSetting              = "S3_MAX_PART_SIZE"
 	endpointSourceSetting           = "S3_ENDPOINT_SOURCE"
@@ -73,6 +74,7 @@ var SettingList = []string{
 	sseKmsIDSetting,
 	storageClassSetting,
 	uploadConcurrencySetting,
+	s3UploadConcurrencySetting,
 	caCertFileSetting,
 	maxPartSizeSetting,
 	logLevelSetting,
@@ -152,6 +154,13 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	s3UploadConcurrency, err := setting.IntOptional(settings, s3UploadConcurrencySetting, uploadConcurrency)
+	if err != nil {
+		return nil, err
+	}
+	if s3UploadConcurrency < 1 {
+		return nil, fmt.Errorf("setting %q must be at least 1", s3UploadConcurrencySetting)
+	}
 	maxPartSize, err := setting.IntOptional(settings, maxPartSizeSetting, defaultMaxPartSize)
 	if err != nil {
 		return nil, err
@@ -206,7 +215,7 @@ func ConfigureStorage(
 		MaxRetries:               maxRetries,
 		LogLevel:                 settings[logLevelSetting],
 		Uploader: &UploaderConfig{
-			UploadConcurrency:            uploadConcurrency,
+			UploadConcurrency:            s3UploadConcurrency,
 			MaxPartSize:                  maxPartSize,
 			StorageClass:                 storageClass,
 			ServerSideEncryption:         settings[sseSetting],

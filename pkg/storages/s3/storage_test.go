@@ -19,6 +19,45 @@ func TestS3FolderCreatesWithoutAdditionalHeaders(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestS3UploadConcurrencyDefaultsToUploadConcurrency(t *testing.T) {
+	storageProvider, err := ConfigureStorage(t.Context(), "s3://test-bucket/path",
+		map[string]string{
+			endpointSetting:          "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:    "true",
+			uploadConcurrencySetting: "4",
+		})
+
+	assert.NoError(t, err)
+	folder := storageProvider.RootFolder().(*Folder)
+	assert.Equal(t, 4, folder.config.Uploader.UploadConcurrency)
+}
+
+func TestS3UploadConcurrencyCanBeConfiguredIndependently(t *testing.T) {
+	storageProvider, err := ConfigureStorage(t.Context(), "s3://test-bucket/path",
+		map[string]string{
+			endpointSetting:            "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:      "true",
+			uploadConcurrencySetting:   "4",
+			s3UploadConcurrencySetting: "1",
+		})
+
+	assert.NoError(t, err)
+	folder := storageProvider.RootFolder().(*Folder)
+	assert.Equal(t, 1, folder.config.Uploader.UploadConcurrency)
+}
+
+func TestS3UploadConcurrencyRejectsNonPositiveValues(t *testing.T) {
+	_, err := ConfigureStorage(t.Context(), "s3://test-bucket/path",
+		map[string]string{
+			endpointSetting:            "HTTP://s3.kek.lol.net/",
+			skipValidationSetting:      "true",
+			uploadConcurrencySetting:   "4",
+			s3UploadConcurrencySetting: "0",
+		})
+
+	assert.EqualError(t, err, `setting "S3_UPLOAD_CONCURRENCY" must be at least 1`)
+}
+
 func TestS3FolderCreatesWithAdditionalHeadersJSON(t *testing.T) {
 	waleS3Prefix := "s3://test-bucket/wal-g-test-folder/Sub0"
 	_, err := ConfigureStorage(t.Context(), waleS3Prefix,

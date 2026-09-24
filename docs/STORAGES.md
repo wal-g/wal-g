@@ -52,6 +52,10 @@ To enable path-style addressing (i.e., `http://s3.amazonaws.com/BUCKET/KEY`) whe
 
 To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
 
+* `WALG_S3_UPLOAD_CONCURRENCY`
+
+Controls the number of multipart upload workers used by the S3 uploader for a single object. If unset, it inherits `WALG_UPLOAD_CONCURRENCY` to preserve the existing behavior. Lower values reduce the amount of part-buffer memory used by streaming uploads at the cost of less per-object upload parallelism.
+
 * `WALG_S3_SSE`
 
 To enable S3 server-side encryption, set to the algorithm to use when storing the objects in S3 (i.e., `AES256`, `aws:kms`).
