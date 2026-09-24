@@ -124,6 +124,15 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
+	// startIndexBuild/abortIndexBuild are never supported by mongod in
+	// applyOps mode (CommandNotSupported, code 115), so skip them in any
+	// mode, including catch-up. The actual index creation is replayed from
+	// the paired commitIndexBuild op (see handleNonTxnOp).
+	if isUnsupportedIndexBuildOp(&op) {
+		tracelog.DebugLogger.Printf("skipping index build op %+v: not supported in applyOps mode", op)
+		return nil
+	}
+
 	if !ap.catchUp {
 		if err := ap.shouldSkip(&op); err != nil {
 			tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
@@ -222,23 +231,27 @@ func (ap *DBApplier) Close(context.Context) error {
 	return nil
 }
 
+// isUnsupportedIndexBuildOp returns true for oplog entries that mongod
+// never accepts in applyOps mode (CommandNotSupported, code 115).
+// See
+// https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L183
+// for startIndexBuild
+// and
+// https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L202
+// for abortIndexBuild details
+func isUnsupportedIndexBuildOp(oplog *db.Oplog) bool {
+	return oplog.Operation == "c" && len(oplog.Object) > 0 &&
+		(oplog.Object[0].Key == "startIndexBuild" ||
+			oplog.Object[0].Key == "abortIndexBuild")
+}
+
 func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 	if oplog.Namespace == "n" {
 		return fmt.Errorf("noop op")
 	}
 
-	if oplog.Operation == "c" && len(oplog.Object) > 0 {
-		if oplog.Object[0].Key == "startIndexBuild" ||
-			oplog.Object[0].Key == "abortIndexBuild" {
-			/* See
-			https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L183
-			for startIndexBuild
-			and
-			https://github.com/mongodb/docs/blob/37910658a80979a82ceabf792618d96976e1bfeb/source/core/index-creation.txt#L202
-			for abortIndexBuild details
-			*/
-			return fmt.Errorf("%s operation is not supported in applyOps mode", oplog.Object[0].Key)
-		}
+	if isUnsupportedIndexBuildOp(oplog) {
+		return fmt.Errorf("%s operation is not supported in applyOps mode", oplog.Object[0].Key)
 	}
 
 	if !isOpAllowedInconfigDB(oplog) {
@@ -321,6 +334,13 @@ func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
 //
 //nolint:gocyclo
 func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
+	// Defensive guard: mongod never accepts startIndexBuild/abortIndexBuild
+	// in applyOps mode, so skip them on every path (including transactions).
+	if isUnsupportedIndexBuildOp(op) {
+		tracelog.DebugLogger.Printf("skipping index build op %+v: not supported in applyOps mode", *op)
+		return nil
+	}
+
 	if !ap.preserveUUID {
 		var err error
 		_, err = filterUUIDs(op)
