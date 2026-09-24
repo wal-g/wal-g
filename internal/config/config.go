@@ -256,7 +256,8 @@ const (
 
 	SystemdNotifySocket = "NOTIFY_SOCKET"
 
-	ForceWalDetal = "WALG_FORCE_WAL_DELTA"
+	ForceWalDetal          = "WALG_FORCE_WAL_DELTA"
+	ServerSideCopyFallback = "WALG_SERVER_SIDE_COPY_FALLBACK"
 )
 
 var (
@@ -293,6 +294,7 @@ var (
 		DirectIO:                     "false",
 		DirectIOBlockCountSetting:    "32",
 		LogLevelSetting:              "NORMAL",
+		ServerSideCopyFallback:       "true",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -419,6 +421,7 @@ var (
 		SerializerTypeSetting:         true,
 		StatsdAddressSetting:          true,
 		StatsdExtraTagsSetting:        true,
+		ServerSideCopyFallback:        true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,

@@ -159,7 +159,7 @@ func TestExecuteFallsBackFromCrossFolderCopy(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
 
-	require.NoError(t, copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true}))
+	require.NoError(t, copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true, ServerSideCopyFallback: true}))
 	require.Equal(t, 1, to.CopyCalls())
 	require.Equal(t, 1, to.PutCalls())
 	reader, err := to.ReadObject(t.Context(), "object")
@@ -180,7 +180,7 @@ func TestExecuteDoesNotFallBackAfterCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	require.ErrorIs(t, copyutil.Execute(ctx, plan, copyutil.ExecuteOptions{UseServerSideCopy: true}), context.Canceled)
+	require.ErrorIs(t, copyutil.Execute(ctx, plan, copyutil.ExecuteOptions{UseServerSideCopy: true, ServerSideCopyFallback: true}), context.Canceled)
 	require.Equal(t, 0, to.PutCalls())
 }
 
@@ -193,7 +193,7 @@ func TestExecuteDoesNotFallBackWhenCopyReturnsCancellation(t *testing.T) {
 	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
 
 	require.ErrorIs(t,
-		copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true}),
+		copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true, ServerSideCopyFallback: true}),
 		context.Canceled)
 	require.Equal(t, 0, to.PutCalls())
 }
@@ -209,7 +209,7 @@ func TestExecuteReturnsServerAndStreamingErrors(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, plan.AddObject("object", "object", copyutil.PayloadPhase, false))
 
-	err = copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true})
+	err = copyutil.Execute(t.Context(), plan, copyutil.ExecuteOptions{UseServerSideCopy: true, ServerSideCopyFallback: true})
 	require.ErrorContains(t, err, "server copy failed")
 	require.ErrorContains(t, err, "put failed")
 }

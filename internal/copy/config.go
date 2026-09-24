@@ -8,11 +8,15 @@ import (
 )
 
 type ExecuteOptions struct {
-	UseServerSideCopy bool
+	UseServerSideCopy      bool
+	ServerSideCopyFallback bool
 }
 
 func OptionsFromConfigs(source, destination *viper.Viper) ExecuteOptions {
-	return ExecuteOptions{UseServerSideCopy: rawCopyConfigEligible(source) && rawCopyConfigEligible(destination)}
+	return ExecuteOptions{
+		UseServerSideCopy:      rawCopyConfigEligible(source) && rawCopyConfigEligible(destination),
+		ServerSideCopyFallback: source.GetBool(conf.ServerSideCopyFallback) || destination.GetBool(conf.ServerSideCopyFallback),
+	}
 }
 
 func rawCopyConfigEligible(config *viper.Viper) bool {
