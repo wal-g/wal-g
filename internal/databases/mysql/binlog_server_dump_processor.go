@@ -105,7 +105,6 @@ type replicaStreamerSink struct {
 }
 
 func (s *replicaStreamerSink) addEvent(e *replication.BinlogEvent) error {
-	logEventDebug(e, "Sending event to replica")
 	return s.replicaStreamer.AddEventToStreamer(e)
 }
 
@@ -131,6 +130,7 @@ type BinlogDumpProcessor struct {
 	// source events, including suppressed source rotate events.
 	currentFile string
 	logPos      uint64
+	fileStats   binlogFileStreamStats
 
 	// Track every streamed transaction so catch-up waits for all of them.
 	sentGTIDs mysql.GTIDSet
@@ -243,20 +243,13 @@ func buildHeartbeatV2Event(filename string, position uint64, serverID int) *repl
 }
 
 // sendHeartbeat emits an idle heartbeat at the current source position.
-func (p *BinlogDumpProcessor) sendHeartbeat() error {
+func (p *BinlogDumpProcessor) sendHeartbeat(while string) error {
 	if p.heartbeatDisabled || p.currentFile == "" {
 		return nil
 	}
 	heartbeatEvent := buildHeartbeatV2Event(p.currentFile, p.logPos, p.serverID)
-	tracelog.DebugLogger.Printf("Sending heartbeat V2: file=%s position=%d", p.currentFile, p.logPos)
+	tracelog.DebugLogger.Printf("Sending heartbeat V2 while %s: file=%s position=%d", while, p.currentFile, p.logPos)
 	return p.sink.addEvent(heartbeatEvent)
-}
-
-func logEventDebug(e *replication.BinlogEvent, msg string) {
-	eventType := replication.EventType(e.RawData[binlogFileHeaderSize])
-	timestamp := binary.LittleEndian.Uint32(e.RawData[0:])
-	tracelog.DebugLogger.Printf("%s: type=%s timestamp=%s",
-		msg, eventType, time.Unix(int64(timestamp), 0).Format("2006-01-02 15:04:05 UTC"))
 }
 
 func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
@@ -264,11 +257,14 @@ func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 		return p.ctx.Err()
 	}
 
-	// Account for every consumed source event, forwarded or suppressed.
+	// Track each source event before deciding whether to forward it.
 	p.logPos += uint64(len(e.RawData))
+	p.fileStats.addEvent(e)
 
 	if int64(e.Header.Timestamp) > p.untilTS.Unix() {
-		logEventDebug(e, "Stopping stream (reason=after_untilTS)")
+		tracelog.InfoLogger.Printf("Reached PITR cutoff in %s at position %d: event=%s timestamp=%s until=%s",
+			p.currentFile, p.logPos, e.Header.EventType, time.Unix(int64(e.Header.Timestamp), 0).UTC().Format(time.RFC3339),
+			p.untilTS.UTC().Format(time.RFC3339))
 		return errUntilTSReached
 	}
 	switch e.Header.EventType {
@@ -277,16 +273,19 @@ func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 		if err != nil {
 			return fmt.Errorf("decode %s: %w", e.Header.EventType, err)
 		}
-		if err := p.sentGTIDs.Update(gtid.String()); err != nil {
+		gtidString := gtid.String()
+		if err := p.sentGTIDs.Update(gtidString); err != nil {
 			return fmt.Errorf("record sent GTID %s: %w", gtid, err)
 		}
+		p.fileStats.addGtid(gtidString)
 	case replication.ROTATE_EVENT:
 		// Real rotate events point at the next file on the host that
 		// produced them, which may not match what we stream next (e.g.
 		// after a primary switchover/failover). We own file boundaries
 		// ourselves via an artificial rotate emitted before each file
 		// (see ProcessBinlogFile), so real rotates are dropped here.
-		logEventDebug(e, "Dropping event (reason=real_rotate_suppressed)")
+		tracelog.DebugLogger.Printf("Dropping source rotate in %s at position %d (timestamp=%s)",
+			p.currentFile, p.logPos, time.Unix(int64(e.Header.Timestamp), 0).UTC().Format(time.RFC3339))
 		return nil
 	}
 
@@ -344,13 +343,12 @@ func (p *BinlogDumpProcessor) waitForNextFile(ctx context.Context, fileCh <-chan
 		tickerC = ticker.C
 		defer ticker.Stop()
 	}
-
 	for {
 		select {
 		case file, ok := <-fileCh:
 			return file, ok, nil
 		case <-tickerC:
-			if err := p.sendHeartbeat(); err != nil {
+			if err := p.sendHeartbeat("waiting for the next binlog file"); err != nil {
 				return "", false, err
 			}
 		case <-ctx.Done():
@@ -375,14 +373,24 @@ func (p *BinlogDumpProcessor) ProcessBinlogFile(file string) error {
 	basename := path.Base(file)
 	// The artificial rotate sets the replica's filename and starting position.
 	rotateEvent := buildRotateEvent(mysql.Position{Name: basename, Pos: binlogFileHeaderSize}, p.serverID)
+	tracelog.DebugLogger.Printf("Sent artificial rotate to replica: file=%s position=%d", basename, binlogFileHeaderSize)
 	if err := p.sink.addEvent(rotateEvent); err != nil {
 		return err
 	}
 	// Start from the beginning of the new binlog file.
 	p.currentFile = basename
 	p.logPos = binlogFileHeaderSize
+	p.fileStats = binlogFileStreamStats{}
 
-	return p.parser.parse(file, binlogFileHeaderSize, p.handleEvent)
+	err := p.parser.parse(file, binlogFileHeaderSize, p.handleEvent)
+	if err != nil && !errors.Is(err, errUntilTSReached) {
+		tracelog.ErrorLogger.Printf("File streaming failed for %s at source position %d: %v, %s",
+			file, p.logPos, err, &p.fileStats)
+	} else {
+		tracelog.InfoLogger.Printf("Finished streaming %s: source_position=%d, %s",
+			file, p.logPos, &p.fileStats)
+	}
+	return err
 }
 
 // process runs the fetcher and parser as two goroutines under an errgroup:
@@ -421,7 +429,7 @@ func (p *BinlogDumpProcessor) process() error {
 // all binlog files have been streamed, while WAL-G waits for the replica to
 // apply them. It exits when the phase context is canceled.
 func (p *BinlogDumpProcessor) runIdleHeartbeats(ctx context.Context) error {
-	if p.heartbeatDisabled || p.heartbeatPeriod <= 0 {
+	if p.heartbeatPeriod <= 0 {
 		return nil
 	}
 
@@ -432,7 +440,7 @@ func (p *BinlogDumpProcessor) runIdleHeartbeats(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := p.sendHeartbeat(); err != nil {
+			if err := p.sendHeartbeat("waiting for the replica to catch up"); err != nil {
 				return err
 			}
 		}
