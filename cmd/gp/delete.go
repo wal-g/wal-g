@@ -16,6 +16,10 @@ var deleteTargetUserData = ""
 const DeleteGarbageExamples = `  garbage           Deletes outdated WAL archives and leftover backups files from storage`
 const DeleteGarbageUse = "garbage"
 
+const DeleteTrimWalUse = "trim-wal"
+const DeleteTrimWalShortDescription = "Delete WAL files accumulated after the given backup's restore point"
+const DeleteTrimWalExamples = "  trim-wal base_000000010000000000000001\n  trim-wal LATEST"
+
 // deleteCmd represents the delete command
 var deleteCmd = &cobra.Command{
 	Use:   "delete",
@@ -56,6 +60,14 @@ var deleteGarbageCmd = &cobra.Command{
 	Example: DeleteGarbageExamples,
 	Args:    cobra.NoArgs,
 	Run:     runDeleteGarbage,
+}
+
+var deleteTrimWalCmd = &cobra.Command{
+	Use:     DeleteTrimWalUse + " BACKUP_NAME|LATEST",
+	Short:   DeleteTrimWalShortDescription,
+	Example: DeleteTrimWalExamples,
+	Args:    cobra.ExactArgs(1),
+	Run:     runDeleteTrimWal,
 }
 
 func runDeleteBefore(cmd *cobra.Command, args []string) {
@@ -114,6 +126,18 @@ func runDeleteTarget(cmd *cobra.Command, args []string) {
 	deleteHandler.HandleDeleteTarget(cmd.Context(), targetBackupSelector)
 }
 
+func runDeleteTrimWal(cmd *cobra.Command, args []string) {
+	rootFolder, err := getMultistorageRootFolder(true, policies.UniteAllStorages)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	delArgs := greenplum.DeleteArgs{Confirmed: confirmed}
+	deleteHandler, err := greenplum.NewDeleteHandler(rootFolder, delArgs)
+	tracelog.ErrorLogger.FatalOnError(err)
+
+	err = deleteHandler.HandleDeleteTrimWal(cmd.Context(), args[0])
+	tracelog.ErrorLogger.FatalOnError(err)
+}
+
 func runDeleteGarbage(cmd *cobra.Command, args []string) {
 	rootFolder, err := getMultistorageRootFolder(cmd.Context(), true, policies.UniteAllStorages)
 	tracelog.ErrorLogger.FatalOnError(err)
@@ -132,7 +156,7 @@ func init() {
 	deleteTargetCmd.Flags().StringVar(
 		&deleteTargetUserData, internal.DeleteTargetUserDataFlag, "", internal.DeleteTargetUserDataDescription)
 
-	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd)
+	deleteCmd.AddCommand(deleteRetainCmd, deleteBeforeCmd, deleteEverythingCmd, deleteTargetCmd, deleteGarbageCmd, deleteTrimWalCmd)
 	deleteCmd.PersistentFlags().BoolVar(&confirmed, internal.ConfirmFlag, false, "Confirms backup deletion")
 	deleteCmd.PersistentFlags().BoolVar(&forceDelete, "force-delete", false, "Force delete")
 	_ = deleteCmd.PersistentFlags().MarkHidden("force-delete")
