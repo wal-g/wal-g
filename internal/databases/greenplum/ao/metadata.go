@@ -12,9 +12,14 @@ func GetFilesMetadataPath(backupName string) string {
 }
 
 type BackupFileDesc struct {
-	StoragePath     string         `json:"StoragePath"`
-	IsSkipped       bool           `json:"IsSkipped"`
-	IsIncremented   bool           `json:"IsIncremented,omitempty"`
+	StoragePath   string `json:"StoragePath"`
+	IsSkipped     bool   `json:"IsSkipped"`
+	IsIncremented bool   `json:"IsIncremented,omitempty"`
+	// MTime is the filesystem mtime captured before reading the file. Assuming normally
+	// advancing filesystem timestamps, MTime is a lower bound for subsequent changes.
+	// The composer waits until MTime's second has ended before reading, so an equal
+	// current mtime indicates no changes since copying. Changes between stat and the
+	// start of copying can share this mtime, but their contents are included in the copy.
 	MTime           time.Time      `json:"MTime"`
 	StorageType     RelStorageType `json:"StorageType"`
 	EOF             int64          `json:"EOF"`
