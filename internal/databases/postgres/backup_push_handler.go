@@ -22,7 +22,6 @@ import (
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/printlist"
-
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 )
@@ -223,7 +222,6 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 
 	err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
 	tracelog.ErrorLogger.FatalOnError(err)
-
 }
 
 func (bh *BackupHandler) startBackup(ctx context.Context) error {
