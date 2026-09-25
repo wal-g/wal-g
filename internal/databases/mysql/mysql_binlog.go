@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -141,6 +142,54 @@ func GetBinlogPreviousGTIDsRemote(ctx context.Context, folder storage.Folder, fi
 		return nil, fmt.Errorf("failed to parse %s binlog %s: %w", flavor, binlogName, err)
 	}
 	return result, nil
+}
+
+func GetBinlogServerID(filename string) (uint32, error) {
+	var serverID uint32
+	found := false
+	parser := replication.NewBinlogParser()
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		serverID = event.Header.ServerID
+		found = true
+		return fmt.Errorf("shallow file read finished")
+	})
+	if err != nil && !found {
+		return 0, fmt.Errorf("failed to parse binlog %s: %w", filename, err)
+	}
+	return serverID, nil
+}
+
+// GetBinlogServerUUID returns the source server UUID from the first
+// GTID_EVENT in a MySQL-flavor binlog file -- the MySQL equivalent of
+// GetBinlogServerID's numeric server ID, which MySQL GTIDs don't carry.
+func GetBinlogServerUUID(filename string) (string, error) {
+	var sid string
+	found := false
+	parser := replication.NewBinlogParser()
+	parser.SetVerifyChecksum(false) // the faster, the better
+	parser.SetRawMode(true)         // choose events to parse manually
+	err := parser.ParseFile(filename, 0, func(event *replication.BinlogEvent) error {
+		if event.Header.EventType != replication.GTID_EVENT {
+			return nil
+		}
+		gtidEvent := &replication.GTIDEvent{}
+		if err := gtidEvent.Decode(event.RawData[replication.EventHeaderSize:]); err != nil {
+			return err
+		}
+		id, err := uuid.FromBytes(gtidEvent.SID)
+		if err != nil {
+			return err
+		}
+		sid = id.String()
+		found = true
+		return fmt.Errorf("shallow file read finished")
+	})
+	if err != nil && !found {
+		return "", fmt.Errorf("failed to parse binlog %s: %w", filename, err)
+	}
+	return sid, nil
 }
 
 func GetBinlogStartTimestamp(filename string, flavor string) (time.Time, error) {
