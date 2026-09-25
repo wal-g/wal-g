@@ -24,30 +24,6 @@ func TestList(t *testing.T) {
 		wantErr      assert.ErrorAssertionFunc
 	}{
 		{
-			name:       "print plain json",
-			entities:   entities,
-			pretty:     false,
-			json:       true,
-			wantOutput: fmt.Sprintf("[%s,%s,%s]\n", shortEntityPlainJSON, longEntityPlainJSON, emptyEntityPlainJSON),
-			wantErr:    assert.NoError,
-		},
-		{
-			name:       "print indented json",
-			entities:   entities,
-			pretty:     true,
-			json:       true,
-			wantOutput: fmt.Sprintf("[\n%s,\n%s,\n%s\n]\n", shortEntityIndentedJSON, longEntityIndentedJSON, emptyEntityIndentedJSON),
-			wantErr:    assert.NoError,
-		},
-		{
-			name:       "print empty json",
-			entities:   []Entity{},
-			pretty:     true,
-			json:       true,
-			wantOutput: "[]\n",
-			wantErr:    assert.NoError,
-		},
-		{
 			name:     "print ascii table",
 			entities: entities,
 			pretty:   true,
@@ -95,6 +71,58 @@ func TestList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			output := new(bytes.Buffer)
 			err := List(tt.entities, output, tt.pretty, tt.json)
+			t.Logf("actual output:\n%s<end>", output)
+			if !tt.wantErr(t, err) {
+				return
+			}
+			assert.Equal(t, tt.wantOutput, output.String())
+		})
+	}
+}
+
+// TestListInJSON is a dedicated test for the JSON code path of List (the
+// listInJSON helper). It mirrors TestOneElementInJSON: JSON output is verified
+// separately from the table formats handled by TestList.
+func TestListInJSON(t *testing.T) {
+	entities := []Entity{
+		shortEntity,
+		longEntity,
+		emptyEntity,
+	}
+
+	tests := []struct {
+		name       string
+		entities   []Entity
+		pretty     bool
+		wantOutput string
+		wantErr    assert.ErrorAssertionFunc
+	}{
+		{
+			name:       "print plain json",
+			entities:   entities,
+			pretty:     false,
+			wantOutput: fmt.Sprintf("[%s,%s,%s]\n", shortEntityPlainJSON, longEntityPlainJSON, emptyEntityPlainJSON),
+			wantErr:    assert.NoError,
+		},
+		{
+			name:       "print indented json",
+			entities:   entities,
+			pretty:     true,
+			wantOutput: fmt.Sprintf("[\n%s,\n%s,\n%s\n]\n", shortEntityIndentedJSON, longEntityIndentedJSON, emptyEntityIndentedJSON),
+			wantErr:    assert.NoError,
+		},
+		{
+			name:       "print empty json",
+			entities:   []Entity{},
+			pretty:     true,
+			wantOutput: "[]\n",
+			wantErr:    assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output := new(bytes.Buffer)
+			err := listInJSON(tt.entities, output, tt.pretty)
 			t.Logf("actual output:\n%s<end>", output)
 			if !tt.wantErr(t, err) {
 				return
@@ -158,6 +186,15 @@ var (
         "b": "123",
         "c": "kek"
     }`
+
+	// shortEntityOneElementIndentedJSON is the JSON for shortEntity encoded on its
+	// own (without array wrapping). It differs from shortEntityIndentedJSON, which
+	// is the same entity as it appears indented inside a JSON array.
+	shortEntityOneElementIndentedJSON = `{
+    "a": "1692753495",
+    "b": "123",
+    "c": "kek"
+}`
 
 	shortEntityASCIIRow = `| 0 | Thu, 23 Aug 2023 09:26:25                                | 123        |`
 
