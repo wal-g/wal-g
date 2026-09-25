@@ -88,6 +88,7 @@ func runOplogReplay(
 		dbApplier,
 		replayArgs.FsyncInterval,
 		attempt.progress,
+		replayArgs.ApplyBatchSize,
 	)
 
 	// set up storage downloader client

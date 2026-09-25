@@ -86,3 +86,19 @@ services:
         - type=gha,scope=walg-ubuntu-2204
       cache_to:
         - type=gha,mode=max,scope=walg-pg${PG_MAJOR}-tests
+
+  mysql:
+    build:
+      additional_contexts:
+        wal-g/ubuntu:22.04: service:ubuntu_22_04
+
+  mysql_tests:
+    build:
+      # Compose interpolates values, not keys. Each series resolves to the
+      # same parameterized service; Bake uses the matching FROM reference.
+      additional_contexts:
+        wal-g/golang: service:golang
+        wal-g/mysql57: service:mysql
+        wal-g/mysql80: service:mysql
+        wal-g/mysql84: service:mysql
+        wal-g/mysql97: service:mysql

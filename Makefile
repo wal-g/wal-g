@@ -31,8 +31,6 @@ PGBACKREST_BUILD_BASE := ubuntu:22.04
 PGBACKREST_VERSION    := 2.59.0
 endif
 export PGBACKREST_BUILD_BASE PGBACKREST_VERSION
-MYSQL_TEST := "mysql_base_tests"
-MYSQL8_TEST := "mysql8_tests"
 MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
@@ -44,7 +42,9 @@ FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
 WALG_VERSION ?= `git tag -l --points-at HEAD | tail -1`
 GIT_REVISION ?= `git rev-parse --short HEAD`
 
-BUILD_TAGS:=
+# disable_grpc_modules drops gRPC DirectPath (xDS/envoy) from cloud.google.com/go/storage,
+# wal-g uses the HTTP GCS client only
+BUILD_TAGS:=disable_grpc_modules
 
 ifdef USE_BROTLI
 	BUILD_TAGS:=$(BUILD_TAGS) brotli
@@ -190,7 +190,7 @@ pg_install: pg_build
 	mv $(MAIN_PG_PATH)/wal-g $(GOBIN)/wal-g
 
 mysql_base: deps mysql_build unlink_brotli
-mysql_test: deps mysql_build unlink_brotli mysql_integration_test
+mysql_test: mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
 	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
@@ -212,14 +212,9 @@ load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04
 		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
 	fi
 
-mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
-	./link_brotli.sh
-	docker compose build mysql && docker compose build $(MYSQL_TEST)
-	docker compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
-
-mysql8_integration_test: go_deps unlink_brotli load_docker_common
-	docker compose build mysql8 && docker compose build $(MYSQL8_TEST)
-	docker compose up --force-recreate --exit-code-from $(MYSQL8_TEST) $(MYSQL8_TEST)
+mysql_integration_test: go_deps unlink_brotli load_docker_common
+	docker compose build mysql && docker compose build mysql_tests
+	docker compose up --force-recreate --exit-code-from mysql_tests mysql_tests
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)

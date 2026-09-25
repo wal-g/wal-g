@@ -482,10 +482,14 @@ func (folder *Folder) DeleteObjects(ctx context.Context, objects []storage.Objec
 			Objects: []types.ObjectIdentifier{},
 		}}
 		for _, obj := range part {
-			input.Delete.Objects = append(input.Delete.Objects, types.ObjectIdentifier{
-				Key:       aws.String(folder.path + obj.GetName()),
-				VersionId: aws.String(obj.GetVersionID()),
-			})
+			versionID := obj.GetVersionID()
+			objectIdentifier := types.ObjectIdentifier{
+				Key: aws.String(folder.path + obj.GetName()),
+			}
+			if versionID != "" {
+				objectIdentifier.VersionId = aws.String(versionID)
+			}
+			input.Delete.Objects = append(input.Delete.Objects, objectIdentifier)
 		}
 		_, err := folder.s3API.DeleteObjects(ctx, input, withContentMD5)
 		if err != nil {

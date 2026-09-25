@@ -1,13 +1,10 @@
 #!/bin/bash
 set -e -x
+. /tmp/tests/test_functions/prepare_config.sh
 CONFIG_FILE="/tmp/configs/create_restore_point_config.json"
 
-COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-/tmp/pg_scripts/wrap_config_file.sh ${TMP_CONFIG}
+prepare_config "${CONFIG_FILE}" "${TMP_CONFIG}"
 source /tmp/tests/test_functions/util.sh
 
 bootstrap_gp_cluster

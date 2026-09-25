@@ -13,8 +13,7 @@ export WALE_S3_PREFIX=s3://mysqlincrementalxtrabackupbucket
 export WALG_DELTA_MAX_STEPS=5
 export WALG_DELTA_ORIGIN=LATEST
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 # add data & create FULL backup:
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
@@ -48,7 +47,7 @@ wal-g st cat "basebackups_005/${LATEST_BACKUP}_backup_stop_sentinel.json"
 mysql_kill_and_clean_data
 wal-g backup-fetch $FIRST_BACKUP
 chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 
 mysqldump sbtest > /tmp/dump_after_restore
 grep -w 'testpitr01' /tmp/dump_after_restore
@@ -61,7 +60,7 @@ grep -w 'testpitr01' /tmp/dump_after_restore
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 
 mysqldump sbtest > /tmp/dump_after_restore
 grep -w 'testpitr01' /tmp/dump_after_restore

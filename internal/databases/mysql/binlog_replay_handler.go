@@ -126,6 +126,7 @@ func HandleBinlogReplay(ctx context.Context, folder storage.Folder, backupName s
 
 func getTimestamps(ctx context.Context,
 	folder storage.Folder, backupName, untilTS, untilBinlogLastModifiedTS string) (time.Time, time.Time, time.Time, error) {
+	tracelog.InfoLogger.Printf("Looking up backup %q to resolve binlog timestamps", backupName)
 	backup, err := internal.GetBackupByName(ctx, backupName, utility.BaseBackupPath, folder)
 	if err != nil {
 		return time.Time{}, time.Time{}, time.Time{}, errors.Wrap(err, "Unable to get backup")
@@ -142,6 +143,8 @@ func getTimestampsFromSentinel(
 	ctx context.Context, folder storage.Folder, sentinel *StreamSentinelDto,
 	backupName, untilTS, untilBinlogLastModifiedTS string,
 ) (time.Time, time.Time, time.Time, error) {
+	tracelog.InfoLogger.Printf("Resolving binlog timestamps for backup %q: until=%q, until_binlog_last_modified=%q",
+		backupName, untilTS, untilBinlogLastModifiedTS)
 	startTS, err := getBinlogSinceTS(ctx, folder, backupName, sentinel)
 	if err != nil {
 		return time.Time{}, time.Time{}, time.Time{}, err
@@ -156,5 +159,7 @@ func getTimestampsFromSentinel(
 	if err != nil {
 		return time.Time{}, time.Time{}, time.Time{}, err
 	}
+	tracelog.InfoLogger.Printf("Resolved binlog timestamps for backup %q: start=%s, until=%s, until_binlog_last_modified=%s",
+		backupName, startTS.Format(time.RFC3339Nano), endTS.Format(time.RFC3339Nano), endBinlogTS.Format(time.RFC3339Nano))
 	return startTS, endTS, endBinlogTS, nil
 }

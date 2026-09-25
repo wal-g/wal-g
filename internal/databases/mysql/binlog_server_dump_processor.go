@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"os"
 	"path"
@@ -104,7 +105,6 @@ type replicaStreamerSink struct {
 }
 
 func (s *replicaStreamerSink) addEvent(e *replication.BinlogEvent) error {
-	logEventDebug(e, "Sending event to replica")
 	return s.replicaStreamer.AddEventToStreamer(e)
 }
 
@@ -122,31 +122,39 @@ type BinlogDumpProcessor struct {
 	parser  binlogEventParser
 	sink    eventSink
 
-	// requiredGTIDs is the replica's already-executed set from
-	// COM_BINLOG_DUMP_GTID; transactions it contains are skipped. This
-	// command is MySQL-only; MariaDB replicas negotiate GTID state via
-	// session variables and COM_BINLOG_DUMP, which is not wired up here.
-	sentGTIDs      mysql.GTIDSet
-	requiredGTIDs  *mysql.MysqlGTIDSet
-	skipCurrentTxn bool
+	heartbeatPeriod   time.Duration
+	heartbeatDisabled bool
+
+	// currentFile is the basename of the source file being streamed.
+	// logPos is the source reader position: the first byte after all consumed
+	// source events, including suppressed source rotate events.
+	currentFile string
+	logPos      uint64
+	fileStats   binlogFileStreamStats
+
+	// Track every streamed transaction so catch-up waits for all of them.
+	sentGTIDs mysql.GTIDSet
+
+	// GTID set supplied by the replica in COM_BINLOG_DUMP_GTID.
+	requiredGTIDs *mysql.MysqlGTIDSet
 }
 
 func newBinlogDumpRequestProcessor(ctx context.Context, params binlogSourceParams, serverID int, sink eventSink) *BinlogDumpProcessor {
 	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
 	return &BinlogDumpProcessor{
-		ctx:       ctx,
-		untilTS:   params.untilTS,
-		serverID:  serverID,
-		fetcher:   &s3BinlogFetcher{params: params},
-		parser:    newFileEventParser(),
-		sink:      sink,
-		sentGTIDs: sent,
+		ctx:               ctx,
+		untilTS:           params.untilTS,
+		serverID:          serverID,
+		fetcher:           &s3BinlogFetcher{params: params},
+		parser:            newFileEventParser(),
+		sink:              sink,
+		sentGTIDs:         sent,
+		heartbeatDisabled: params.heartbeatDisabled,
 	}
 }
 
 // https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L53-L108
-func (p *BinlogDumpProcessor) addRotateEvent(pos mysql.Position) error {
-	// create rotate event
+func buildRotateEvent(pos mysql.Position, serverID int) *replication.BinlogEvent {
 	rotateBinlogEvent := replication.BinlogEvent{}
 
 	messageBodySize := 8 + len(pos.Name) + 1
@@ -160,7 +168,7 @@ func (p *BinlogDumpProcessor) addRotateEvent(pos mysql.Position) error {
 	rotateBinlogEvent.RawData[binlogEventPos] = byte(replication.ROTATE_EVENT)
 	binlogEventPos++
 	// server_id - 4 bytes
-	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(p.serverID))
+	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(serverID))
 	binlogEventPos += 4
 	// event_length - 4 bytes
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], uint32(eventLength))
@@ -185,90 +193,166 @@ func (p *BinlogDumpProcessor) addRotateEvent(pos mysql.Position) error {
 	checksum := crc32.ChecksumIEEE(rotateBinlogEvent.RawData[0 : replication.EventHeaderSize+messageBodySize])
 	binary.LittleEndian.PutUint32(rotateBinlogEvent.RawData[binlogEventPos:], checksum)
 
-	return p.sink.addEvent(&rotateBinlogEvent)
+	return &rotateBinlogEvent
 }
 
-func logEventDebug(e *replication.BinlogEvent, msg string) {
-	eventType := replication.EventType(e.RawData[binlogFileHeaderSize])
-	timestamp := binary.LittleEndian.Uint32(e.RawData[0:])
-	tracelog.DebugLogger.Printf("%s: type=%s timestamp=%s",
-		msg, eventType, time.Unix(int64(timestamp), 0).Format("2006-01-02 15:04:05 UTC"))
+// https://github.com/percona/percona-server/blob/8.0/libbinlogevents/include/control_events.h#L1513-L1593
+const (
+	heartbeatLogFilenameField uint64 = 1 // OTW_HB_LOG_FILENAME_FIELD
+	heartbeatLogPositionField uint64 = 2 // OTW_HB_LOG_POSITION_FIELD
+	heartbeatHeaderEndMark    uint64 = 0 // OTW_HB_HEADER_END_MARK
+)
+
+// buildHeartbeatV2Event builds a raw HEARTBEAT_LOG_EVENT_V2 (event type 41)
+func buildHeartbeatV2Event(filename string, position uint64, serverID int) *replication.BinlogEvent {
+	// The position is stored as a length-encoded integer, so the position
+	// field length is the byte length of that encoding.
+	positionValue := mysql.PutLengthEncodedInt(position)
+	body := make([]byte, 0, len(filename)+len(positionValue)+8)
+	body = append(body, mysql.PutLengthEncodedInt(heartbeatLogFilenameField)...)
+	body = append(body, mysql.PutLengthEncodedInt(uint64(len(filename)))...)
+	body = append(body, filename...)
+	body = append(body, mysql.PutLengthEncodedInt(heartbeatLogPositionField)...)
+	body = append(body, mysql.PutLengthEncodedInt(uint64(len(positionValue)))...)
+	body = append(body, positionValue...)
+	body = append(body, mysql.PutLengthEncodedInt(heartbeatHeaderEndMark)...)
+
+	eventLength := replication.EventHeaderSize + len(body) + replication.BinlogChecksumLength
+	rawData := make([]byte, eventLength)
+
+	// common header: timestamp 0, event type 41, server id, event length,
+	// low 32 bits of the position in log_pos, flags 0
+	rawData[binlogFileHeaderSize] = byte(replication.HEARTBEAT_LOG_EVENT_V2)
+	binary.LittleEndian.PutUint32(rawData[5:], uint32(serverID))
+	binary.LittleEndian.PutUint32(rawData[9:], uint32(eventLength))
+	binary.LittleEndian.PutUint32(rawData[13:], uint32(position))
+	copy(rawData[replication.EventHeaderSize:], body)
+
+	checksum := crc32.ChecksumIEEE(rawData[0 : eventLength-replication.BinlogChecksumLength])
+	binary.LittleEndian.PutUint32(rawData[eventLength-replication.BinlogChecksumLength:], checksum)
+
+	return &replication.BinlogEvent{
+		Header: &replication.EventHeader{
+			EventType: replication.HEARTBEAT_LOG_EVENT_V2,
+			ServerID:  uint32(serverID),
+			EventSize: uint32(eventLength),
+			LogPos:    uint32(position),
+		},
+		RawData: rawData,
+	}
+}
+
+// sendHeartbeat emits an idle heartbeat at the current source position.
+func (p *BinlogDumpProcessor) sendHeartbeat(while string) error {
+	if p.heartbeatDisabled || p.currentFile == "" {
+		return nil
+	}
+	heartbeatEvent := buildHeartbeatV2Event(p.currentFile, p.logPos, p.serverID)
+	tracelog.DebugLogger.Printf("Sending heartbeat V2 while %s: file=%s position=%d", while, p.currentFile, p.logPos)
+	return p.sink.addEvent(heartbeatEvent)
 }
 
 func (p *BinlogDumpProcessor) handleEvent(e *replication.BinlogEvent) error {
 	if p.ctx.Err() != nil {
 		return p.ctx.Err()
 	}
+
+	// Track each source event before deciding whether to forward it.
+	p.logPos += uint64(len(e.RawData))
+	p.fileStats.addEvent(e)
+
 	if int64(e.Header.Timestamp) > p.untilTS.Unix() {
-		logEventDebug(e, "Stopping stream (reason=after_untilTS)")
+		tracelog.InfoLogger.Printf("Reached PITR cutoff in %s at position %d: event=%s timestamp=%s until=%s",
+			p.currentFile, p.logPos, e.Header.EventType, time.Unix(int64(e.Header.Timestamp), 0).UTC().Format(time.RFC3339),
+			p.untilTS.UTC().Format(time.RFC3339))
 		return errUntilTSReached
 	}
 	switch e.Header.EventType {
-	case replication.GTID_EVENT:
-		if p.decideSkipForGTID(e) {
-			logEventDebug(e, "Dropping event (reason=gtid_skipped)")
-			return nil
+	case replication.GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT:
+		gtid, err := decodeTransactionGTID(e)
+		if err != nil {
+			return fmt.Errorf("decode %s: %w", e.Header.EventType, err)
 		}
+		gtidString := gtid.String()
+		if err := p.sentGTIDs.Update(gtidString); err != nil {
+			return fmt.Errorf("record sent GTID %s: %w", gtid, err)
+		}
+		p.fileStats.addGtid(gtidString)
 	case replication.ROTATE_EVENT:
 		// Real rotate events point at the next file on the host that
 		// produced them, which may not match what we stream next (e.g.
 		// after a primary switchover/failover). We own file boundaries
 		// ourselves via an artificial rotate emitted before each file
 		// (see ProcessBinlogFile), so real rotates are dropped here.
-		p.skipCurrentTxn = false
-		logEventDebug(e, "Dropping event (reason=real_rotate_suppressed)")
+		tracelog.DebugLogger.Printf("Dropping source rotate in %s at position %d (timestamp=%s)",
+			p.currentFile, p.logPos, time.Unix(int64(e.Header.Timestamp), 0).UTC().Format(time.RFC3339))
 		return nil
-	case replication.ANONYMOUS_GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT,
-		replication.FORMAT_DESCRIPTION_EVENT, replication.PREVIOUS_GTIDS_EVENT,
-		replication.STOP_EVENT, replication.INCIDENT_EVENT:
-		// txn boundary or file-boundary marker; never appears inside a txn
-		p.skipCurrentTxn = false
-	default:
-		if p.skipCurrentTxn {
-			logEventDebug(e, "Dropping event (reason=skip_current_txn)")
-			return nil
-		}
 	}
+
 	return p.sink.addEvent(e)
 }
 
-// decideSkipForGTID updates skip state from a GTID_EVENT; returns true if
-// the caller should drop the event because the replica already applied it.
-func (p *BinlogDumpProcessor) decideSkipForGTID(e *replication.BinlogEvent) bool {
-	p.skipCurrentTxn = false
+func decodeTransactionGTID(e *replication.BinlogEvent) (mysql.GTIDSet, error) {
+	if len(e.RawData) < replication.EventHeaderSize {
+		return nil, errors.New("truncated event header")
+	}
+	body := e.RawData[replication.EventHeaderSize:]
+	// Raw-mode parsing exposes a checksum-free body in GenericEvent.
+	if generic, ok := e.Event.(*replication.GenericEvent); ok {
+		body = generic.Data
+	}
+	if e.Header.EventType == replication.GTID_TAGGED_LOG_EVENT {
+		return decodeTaggedTransactionGTID(body)
+	}
+	if len(body) < 25 {
+		return nil, errors.New("truncated GTID event")
+	}
 	ge := &replication.GTIDEvent{}
-	if ge.Decode(e.RawData[replication.EventHeaderSize:]) != nil {
-		return false
+	// Only flags, SID and GNO are needed; do not decode optional metadata.
+	if err := ge.Decode(body[:25]); err != nil {
+		return nil, err
 	}
-	one, err := ge.GTIDNext()
-	if err != nil {
-		return false
-	}
-	if p.requiredGTIDs != nil && p.requiredGTIDs.Contain(one) {
-		tracelog.DebugLogger.Printf("Skipping already-applied transaction %s", one)
-		p.skipCurrentTxn = true
-		return true
-	}
-	if err := p.sentGTIDs.Update(one.String()); err != nil {
-		tracelog.WarningLogger.Printf("Failed to record sent GTID %s: %v", one, err)
-	}
-	return false
+	return ge.GTIDNext()
 }
 
 // processBinlogFiles consumes fetched binlog file identifiers from fileCh
 // and processes each in order.
 func (p *BinlogDumpProcessor) processBinlogFiles(ctx context.Context, fileCh <-chan string) error {
 	for {
+		file, ok, err := p.waitForNextFile(ctx, fileCh)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return nil
+		}
+		if err := p.ProcessBinlogFile(file); err != nil {
+			return err
+		}
+	}
+}
+
+// waitForNextFile receives the next fetched binlog file identifier. While
+// the fetch of the next file stalls (e.g. a storage download), an idle
+// heartbeat is sent whenever the wait outlasts the requested heartbeat
+// period;
+func (p *BinlogDumpProcessor) waitForNextFile(ctx context.Context, fileCh <-chan string) (string, bool, error) {
+	var tickerC <-chan time.Time
+	if p.heartbeatPeriod > 0 {
+		ticker := time.NewTicker(p.heartbeatPeriod)
+		tickerC = ticker.C
+		defer ticker.Stop()
+	}
+	for {
 		select {
 		case file, ok := <-fileCh:
-			if !ok {
-				return nil
-			}
-			if err := p.ProcessBinlogFile(file); err != nil {
-				return err
+			return file, ok, nil
+		case <-tickerC:
+			if err := p.sendHeartbeat("waiting for the next binlog file"); err != nil {
+				return "", false, err
 			}
 		case <-ctx.Done():
-			return ctx.Err()
+			return "", false, ctx.Err()
 		}
 	}
 }
@@ -287,11 +371,26 @@ func (p *BinlogDumpProcessor) ProcessBinlogFile(file string) error {
 	tracelog.InfoLogger.Printf("Streaming %s to replica", file)
 
 	basename := path.Base(file)
-	if err := p.addRotateEvent(mysql.Position{Name: basename, Pos: binlogFileHeaderSize}); err != nil {
+	// The artificial rotate sets the replica's filename and starting position.
+	rotateEvent := buildRotateEvent(mysql.Position{Name: basename, Pos: binlogFileHeaderSize}, p.serverID)
+	tracelog.DebugLogger.Printf("Sent artificial rotate to replica: file=%s position=%d", basename, binlogFileHeaderSize)
+	if err := p.sink.addEvent(rotateEvent); err != nil {
 		return err
 	}
+	// Start from the beginning of the new binlog file.
+	p.currentFile = basename
+	p.logPos = binlogFileHeaderSize
+	p.fileStats = binlogFileStreamStats{}
 
-	return p.parser.parse(file, binlogFileHeaderSize, p.handleEvent)
+	err := p.parser.parse(file, binlogFileHeaderSize, p.handleEvent)
+	if err != nil && !errors.Is(err, errUntilTSReached) {
+		tracelog.ErrorLogger.Printf("File streaming failed for %s at source position %d: %v, %s",
+			file, p.logPos, err, &p.fileStats)
+	} else {
+		tracelog.InfoLogger.Printf("Finished streaming %s: source_position=%d, %s",
+			file, p.logPos, &p.fileStats)
+	}
+	return err
 }
 
 // process runs the fetcher and parser as two goroutines under an errgroup:
@@ -324,4 +423,26 @@ func (p *BinlogDumpProcessor) process() error {
 		return nil
 	}
 	return err
+}
+
+// runIdleHeartbeats keeps sending idle heartbeats at the requested period once
+// all binlog files have been streamed, while WAL-G waits for the replica to
+// apply them. It exits when the phase context is canceled.
+func (p *BinlogDumpProcessor) runIdleHeartbeats(ctx context.Context) error {
+	if p.heartbeatPeriod <= 0 {
+		return nil
+	}
+
+	ticker := time.NewTicker(p.heartbeatPeriod)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if err := p.sendHeartbeat("waiting for the replica to catch up"); err != nil {
+				return err
+			}
+		}
+	}
 }

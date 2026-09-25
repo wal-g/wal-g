@@ -45,8 +45,11 @@ type memEventParser struct {
 	eventsByName map[string][]*replication.BinlogEvent
 }
 
-func (p *memEventParser) parse(file string, _ int64, emit func(*replication.BinlogEvent) error) error {
+func (p *memEventParser) parse(file string, offset int64, emit func(*replication.BinlogEvent) error) error {
+	logPos := uint32(offset)
 	for _, e := range p.eventsByName[path.Base(file)] {
+		logPos += uint32(len(e.RawData))
+		e.Header.LogPos = logPos
 		if err := emit(e); err != nil {
 			return err
 		}
@@ -119,6 +122,92 @@ func gtidEvent(ts string, sid uuid.UUID, gno int64) *replication.BinlogEvent {
 	return rawEvent(replication.GTID_EVENT, ts, body)
 }
 
+// Encode the mysql::serialization fields used by tagged GTIDs. Small positive
+// GNOs fit into one byte; UUID bytes use the fixed-integer wire encoding.
+func taggedGTIDEvent(ts string, sid uuid.UUID, tag string, gno byte) *replication.BinlogEvent {
+	body := []byte{2, 0, 18, 0, 0, 2} // version, size, last field, flags, UUID field
+	for _, b := range sid {
+		if b < 128 {
+			body = append(body, b<<1)
+		} else {
+			body = append(body, b<<2|1, b>>6)
+		}
+	}
+	body = append(body, 4, gno<<2, 6, byte(len(tag)<<1))
+	body = append(body, tag...)
+	// last_committed, sequence_number, immediate_commit_timestamp,
+	// transaction_length, immediate_server_version (optional fields omitted).
+	body = append(body, 8, 0, 10, 4, 12, 0, 16, 0, 18, 0)
+	body[1] = byte(len(body) << 1)
+	e := rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
+	e.Event = &replication.GenericEvent{Data: body}
+	// Production RawData retains the checksum, unlike GenericEvent.Data.
+	e.RawData = append(e.RawData, 0, 0, 0, 0)
+	return e
+}
+
+func TestHandleEventMalformedGTID(t *testing.T) {
+	for _, kind := range []replication.EventType{replication.GTID_EVENT, replication.GTID_TAGGED_LOG_EVENT} {
+		for _, body := range [][]byte{nil, {2}, {2, 6, 18}, {2, 10, 18, 0, 1}} {
+			p, sink := newTestProcessor(t, nil, at("2026-01-01 00:00:01"))
+			err := p.handleEvent(rawEvent(kind, "2026-01-01 00:00:01", body))
+			require.Error(t, err, "%s %x", kind, body)
+			require.Empty(t, sink.recorded())
+			require.True(t, p.sentGTIDs.IsEmpty())
+		}
+	}
+}
+
+func TestTaggedGTIDWithCommitGroupTicket(t *testing.T) {
+	const ts = "2026-01-01 00:00:01"
+	e := taggedGTIDEvent(ts, uuid1, "review", 1)
+	// Field 11: a nonzero ticket (257), forwarded as opaque metadata.
+	body := append(e.Event.(*replication.GenericEvent).Data, 22, 5, 4)
+	body[1] = byte(len(body) << 1)
+	e = rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
+	e.Event = &replication.GenericEvent{Data: body}
+	e.RawData = append(e.RawData, 0, 0, 0, 0)
+	rawBefore := append([]byte(nil), e.RawData...)
+	gtid := requireGTIDSet(t, uuid1.String()+":review:1")
+	p, sink := newTestProcessor(t, nil, at(ts))
+	require.NoError(t, p.handleEvent(e))
+	require.Equal(t, rawBefore, e.RawData, "replication metadata must be forwarded unchanged")
+	require.Equal(t, []*replication.BinlogEvent{e}, sink.recorded())
+	require.True(t, p.sentGTIDs.Equal(gtid))
+}
+
+func TestTaggedGTIDRequiresIdentityFields(t *testing.T) {
+	const ts = "2026-01-01 00:00:01"
+	// This UUID uses only single-byte fixed-integer encodings, so the GNO
+	// field starts at byte 22 and the tag field starts at byte 24.
+	sid := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	for _, tc := range []struct {
+		name      string
+		mutate    func([]byte) []byte
+		wantError string
+	}{
+		{"missing flags", func(b []byte) []byte { return append(b[:3], b[5:]...) }, "missing tagged GTID field 0"},
+		{"missing UUID", func(b []byte) []byte { return append(b[:5], b[22:]...) }, "missing tagged GTID field 1"},
+		{"missing GNO", func(b []byte) []byte { return append(b[:22], b[24:]...) }, "missing tagged GTID field 2"},
+		{"missing tag", func(b []byte) []byte { return b[:24] }, "unexpected EOF"},
+		{"wrong tag field", func(b []byte) []byte { b[24] = 8; return b }, "missing tagged GTID field 3"},
+		{"zero GNO", func(b []byte) []byte { b[23] = 0; return b }, "invalid tagged GTID identity"},
+		{"empty tag", func(b []byte) []byte { b[25] = 0; return b }, "invalid tagged GTID identity"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := taggedGTIDEvent(ts, sid, "review", 1)
+			body := tc.mutate(e.Event.(*replication.GenericEvent).Data)
+			// Keep framing valid so the error comes from the identity field.
+			body[1] = byte(len(body) << 1)
+			e = rawEvent(replication.GTID_TAGGED_LOG_EVENT, ts, body)
+			p, sink := newTestProcessor(t, nil, at(ts))
+			require.ErrorContains(t, p.handleEvent(e), tc.wantError)
+			require.Empty(t, sink.recorded())
+			require.True(t, p.sentGTIDs.IsEmpty())
+		})
+	}
+}
+
 func rotateEvent(ts string, name string, pos uint64) *replication.BinlogEvent {
 	body := make([]byte, 8+len(name)+1)
 	binary.LittleEndian.PutUint64(body, pos)
@@ -149,7 +238,6 @@ func deleteRowsEvent(ts string) *replication.BinlogEvent {
 func newTestProcessor(
 	t *testing.T,
 	files []binlogFile,
-	requiredGTIDs *mysql.MysqlGTIDSet,
 	untilTS time.Time,
 ) (*BinlogDumpProcessor, *recordingSink) {
 	t.Helper()
@@ -162,14 +250,13 @@ func newTestProcessor(
 	sink := &recordingSink{}
 	sent, _ := mysql.ParseGTIDSet(mysql.MySQLFlavor, "")
 	p := &BinlogDumpProcessor{
-		ctx:           context.Background(),
-		untilTS:       untilTS,
-		serverID:      1,
-		fetcher:       &memFetcher{files: files},
-		parser:        &memEventParser{eventsByName: eventsByName},
-		sink:          sink,
-		sentGTIDs:     sent,
-		requiredGTIDs: requiredGTIDs,
+		ctx:       context.Background(),
+		untilTS:   untilTS,
+		serverID:  1,
+		fetcher:   &memFetcher{files: files},
+		parser:    &memEventParser{eventsByName: eventsByName},
+		sink:      sink,
+		sentGTIDs: sent,
 	}
 	return p, sink
 }
@@ -190,6 +277,19 @@ func describeEvent(e *replication.BinlogEvent) string {
 		return fmt.Sprintf("ROTATE(%s)", rotateName(e))
 	case replication.GTID_EVENT:
 		return fmt.Sprintf("GTID(%s)", gtidNext(e))
+	case replication.GTID_TAGGED_LOG_EVENT:
+		gtid, err := decodeTransactionGTID(e)
+		if err != nil {
+			return fmt.Sprintf("TAGGED_GTID(decode error: %v)", err)
+		}
+		return fmt.Sprintf("TAGGED_GTID(%s)", gtid)
+	case replication.HEARTBEAT_LOG_EVENT_V2:
+		heartbeat := &replication.HeartbeatEvent{Version: 2}
+		body := e.RawData[replication.EventHeaderSize : len(e.RawData)-replication.BinlogChecksumLength]
+		if err := heartbeat.Decode(body); err != nil {
+			return fmt.Sprintf("HEARTBEAT_V2(decode error: %v)", err)
+		}
+		return fmt.Sprintf("HEARTBEAT_V2(%s, %d)", heartbeat.Filename, heartbeat.Offset)
 	case replication.QUERY_EVENT:
 		return "QUERY"
 	default:
@@ -218,19 +318,73 @@ func at(s string) time.Time {
 type processTestCase struct {
 	name              string
 	files             []binlogFile
-	requiredGTIDs     *mysql.MysqlGTIDSet
 	untilTS           time.Time
-	expected          []*replication.BinlogEvent
+	expected          []string
 	expectedSentGTIDs string
 }
 
 func TestProcess(t *testing.T) {
+	const ts = "2026-01-01 00:00:01"
 	cases := []processTestCase{
 		{
 			name:              "no files produces no output",
 			files:             nil,
-			expected:          []*replication.BinlogEvent{},
+			expected:          []string{},
 			expectedSentGTIDs: "",
+		},
+		{
+			name: "tagged-only stream is tracked",
+			files: []binlogFile{
+				{
+					name: "a.000001",
+					events: []*replication.BinlogEvent{
+						taggedGTIDEvent(ts, uuid1, "review", 1),
+						tableMapEvent(ts),
+						writeRowsEvent(ts),
+						rotateEvent(ts, "a.000002", 4),
+					},
+				},
+			},
+			expected: []string{
+				"ROTATE(a.000001)",
+				fmt.Sprintf("TAGGED_GTID(%s:review:1)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
+			},
+			expectedSentGTIDs: uuid1.String() + ":review:1",
+		},
+		{
+			name: "mixed stream distinguishes tags",
+			files: []binlogFile{
+				{
+					name: "a.000001",
+					events: []*replication.BinlogEvent{
+						taggedGTIDEvent(ts, uuid1, "review", 1), tableMapEvent(ts), writeRowsEvent(ts),
+						gtidEvent(ts, uuid1, 2), tableMapEvent(ts), writeRowsEvent(ts),
+						taggedGTIDEvent(ts, uuid1, "review", 2), tableMapEvent(ts), writeRowsEvent(ts),
+						taggedGTIDEvent(ts, uuid1, "other", 1), tableMapEvent(ts), writeRowsEvent(ts),
+						gtidEvent(ts, uuid1, 1), tableMapEvent(ts), writeRowsEvent(ts),
+						taggedGTIDEvent(ts, uuid2, "review", 1), tableMapEvent(ts), writeRowsEvent(ts),
+						rotateEvent(ts, "a.000002", 4),
+					},
+				},
+			},
+			expected: []string{
+				"ROTATE(a.000001)",
+				fmt.Sprintf("TAGGED_GTID(%s:review:1)", uuid1),
+				"TableMapEvent", "WriteRowsEventV2",
+				fmt.Sprintf("GTID(%s:2)", uuid1),
+				"TableMapEvent", "WriteRowsEventV2",
+				fmt.Sprintf("TAGGED_GTID(%s:review:2)", uuid1),
+				"TableMapEvent", "WriteRowsEventV2",
+				fmt.Sprintf("TAGGED_GTID(%s:other:1)", uuid1),
+				"TableMapEvent", "WriteRowsEventV2",
+				fmt.Sprintf("GTID(%s:1)", uuid1),
+				"TableMapEvent", "WriteRowsEventV2",
+				fmt.Sprintf("TAGGED_GTID(%s:review:1)", uuid2),
+				"TableMapEvent", "WriteRowsEventV2",
+			},
+			expectedSentGTIDs: uuid1.String() + ":1-2:review:1-2:other:1," + uuid2.String() + ":review:1",
 		},
 		{
 			// A real binlog file typically ends with a ROTATE_EVENT
@@ -261,21 +415,21 @@ func TestProcess(t *testing.T) {
 					},
 				},
 			},
-			expected: []*replication.BinlogEvent{
-				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
-				gtidEvent("2026-01-01 00:00:01", uuid1, 1),
-				tableMapEvent("2026-01-01 00:00:01"),
-				writeRowsEvent("2026-01-01 00:00:01"),
+			expected: []string{
+				"ROTATE(a.000001)",
+				fmt.Sprintf("GTID(%s:1)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
 
-				rotateEvent("1970-01-01 00:00:00", "b.000001", 4),
-				gtidEvent("2026-01-01 00:00:03", uuid2, 1),
-				tableMapEvent("2026-01-01 00:00:03"),
-				writeRowsEvent("2026-01-01 00:00:03"),
+				"ROTATE(b.000001)",
+				fmt.Sprintf("GTID(%s:1)", uuid2),
+				"TableMapEvent",
+				"WriteRowsEventV2",
 			},
 			expectedSentGTIDs: uuid1.String() + ":1" + "," + uuid2.String() + ":1",
 		},
 		{
-			name: "transaction already in requiredGTIDs is skipped",
+			name: "all transactions are forwarded and tracked",
 			files: []binlogFile{
 				{
 					name: "a.000001",
@@ -286,17 +440,20 @@ func TestProcess(t *testing.T) {
 						gtidEvent("2026-01-01 00:00:02", uuid1, 11),
 						tableMapEvent("2026-01-01 00:00:02"),
 						writeRowsEvent("2026-01-01 00:00:02"),
+						rotateEvent("2026-01-01 00:00:03", "a.000002", 4),
 					},
 				},
 			},
-			requiredGTIDs: requireGTIDSet(t, uuid1.String()+":1-10"),
-			expected: []*replication.BinlogEvent{
-				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
-				gtidEvent("1970-01-01 00:00:00", uuid1, 11),
-				tableMapEvent("1970-01-01 00:00:00"),
-				writeRowsEvent("1970-01-01 00:00:00"),
+			expected: []string{
+				"ROTATE(a.000001)",
+				fmt.Sprintf("GTID(%s:10)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
+				fmt.Sprintf("GTID(%s:11)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
 			},
-			expectedSentGTIDs: uuid1.String() + ":11",
+			expectedSentGTIDs: uuid1.String() + ":10-11",
 		},
 		{
 			// GTID events carry the transaction's commit timestamp, which
@@ -320,6 +477,7 @@ func TestProcess(t *testing.T) {
 						gtidEvent("2026-01-01 00:00:12", uuid1, 2),
 						tableMapEvent("2026-01-01 00:00:10"),
 						writeRowsEvent("2026-01-01 00:00:10"),
+						rotateEvent("2026-01-01 00:00:13", "a.000002", 4),
 					},
 				},
 				{
@@ -331,23 +489,23 @@ func TestProcess(t *testing.T) {
 						gtidEvent("2026-01-01 00:00:14", uuid1, 4),
 						tableMapEvent("2026-01-01 00:00:14"),
 						writeRowsEvent("2026-01-01 00:00:14"),
+						rotateEvent("2026-01-01 00:00:15", "a.000003", 4),
 					},
 				},
 			},
 			untilTS: at("2026-01-01 00:00:11"),
-			expected: []*replication.BinlogEvent{
-				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
-				gtidEvent("2026-01-01 00:00:09", uuid1, 1),
-				tableMapEvent("2026-01-01 00:00:09"),
-				writeRowsEvent("2026-01-01 00:00:09"),
+			expected: []string{
+				"ROTATE(a.000001)",
+				fmt.Sprintf("GTID(%s:1)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
 			},
 			expectedSentGTIDs: uuid1.String() + ":1",
 		},
 		{
 			// Binlog files coming from different replicas after a
-			// switchover/failover may overlap: the same already-applied
-			// transaction can appear at the tail of one file and again
-			// at the head of the next.
+			// switchover/failover may overlap. Forward repeated transactions
+			// in full and let the replica deduplicate them by GTID.
 			name: "binlog files transaction overlap",
 			files: []binlogFile{
 				{
@@ -359,6 +517,7 @@ func TestProcess(t *testing.T) {
 						gtidEvent("2026-01-01 00:00:01", uuid1, 10),
 						tableMapEvent("2026-01-01 00:00:01"),
 						writeRowsEvent("2026-01-01 00:00:01"),
+						rotateEvent("2026-01-01 00:00:02", "a.000002", 4),
 					},
 				},
 				{
@@ -370,25 +529,28 @@ func TestProcess(t *testing.T) {
 						gtidEvent("2026-01-01 00:00:02", uuid2, 1),
 						tableMapEvent("2026-01-01 00:00:02"),
 						deleteRowsEvent("2026-01-01 00:00:02"),
+						rotateEvent("2026-01-01 00:00:03", "a.000003", 4),
 					},
 				},
 			},
-			requiredGTIDs: requireGTIDSet(t, uuid1.String()+":1-9"),
-			expected: []*replication.BinlogEvent{
-				rotateEvent("1970-01-01 00:00:00", "a.000001", 4),
-				gtidEvent("2026-01-01 00:00:01", uuid1, 10),
-				tableMapEvent("2026-01-01 00:00:01"),
-				writeRowsEvent("2026-01-01 00:00:01"),
+			expected: []string{
+				"ROTATE(a.000001)",
+				fmt.Sprintf("GTID(%s:9)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
+				fmt.Sprintf("GTID(%s:10)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
 
-				rotateEvent("1970-01-01 00:00:00", "a.000002", 4),
-				gtidEvent("2026-01-01 00:00:01", uuid1, 10),
-				tableMapEvent("2026-01-01 00:00:01"),
-				writeRowsEvent("2026-01-01 00:00:01"),
-				gtidEvent("2026-01-01 00:00:02", uuid2, 1),
-				tableMapEvent("2026-01-01 00:00:02"),
-				deleteRowsEvent("2026-01-01 00:00:02"),
+				"ROTATE(a.000002)",
+				fmt.Sprintf("GTID(%s:10)", uuid1),
+				"TableMapEvent",
+				"WriteRowsEventV2",
+				fmt.Sprintf("GTID(%s:1)", uuid2),
+				"TableMapEvent",
+				"DeleteRowsEventV2",
 			},
-			expectedSentGTIDs: uuid1.String() + ":10" + "," + uuid2.String() + ":1",
+			expectedSentGTIDs: uuid1.String() + ":9-10" + "," + uuid2.String() + ":1",
 		},
 	}
 
@@ -398,11 +560,12 @@ func TestProcess(t *testing.T) {
 			if untilTS.IsZero() {
 				untilTS = time.Unix(1<<62, 0)
 			}
-			p, sink := newTestProcessor(t, tc.files, tc.requiredGTIDs, untilTS)
+			p, sink := newTestProcessor(t, tc.files, untilTS)
 			require.NoError(t, p.process())
 
-			assert.Equal(t, describeEvents(tc.expected), describeEvents(sink.recorded()))
-			assert.Equal(t, tc.expectedSentGTIDs, p.sentGTIDs.String())
+			assert.Equal(t, tc.expected, describeEvents(sink.recorded()))
+			assert.True(t, p.sentGTIDs.Equal(requireGTIDSet(t, tc.expectedSentGTIDs)),
+				"expected sent GTIDs: %s, got: %s", tc.expectedSentGTIDs, p.sentGTIDs)
 		})
 	}
 }

@@ -1,1 +1,3 @@
-"WALE_S3_PREFIX": "s3://gp-shared-size-test-bucket"
+{
+  "WALE_S3_PREFIX": "s3://gp-shared-size-test-bucket"
+}

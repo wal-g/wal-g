@@ -15,6 +15,7 @@ import (
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/mongo/archive"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
+	"github.com/wal-g/wal-g/internal/databases/mongo/stages"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -475,6 +476,7 @@ type ReplyOplogConfig struct {
 	Blacklist map[string]map[string]struct{}
 
 	FsyncInterval     time.Duration
+	ApplyBatchSize    int
 	MaxMongodRestarts int
 }
 
@@ -522,6 +524,10 @@ func NewReplyOplogConfig(
 	if roConfig.FsyncInterval <= 0 {
 		return roConfig, fmt.Errorf("%s must be positive", conf.OplogReplayFsyncInterval)
 	}
+	roConfig.ApplyBatchSize, err = getOplogReplayApplyBatchSize()
+	if err != nil {
+		return roConfig, err
+	}
 	roConfig.MaxMongodRestarts = 5
 	if value, ok := conf.GetSetting(conf.OplogReplayMaxMongodRestarts); ok {
 		roConfig.MaxMongodRestarts, err = strconv.Atoi(value)
@@ -567,6 +573,22 @@ func NewReplyOplogConfig(
 	roConfig.MinimalConfigPath = minimalConfigPath
 
 	return roConfig, err
+}
+
+func parseOplogReplayApplyBatchSize(value string) (int, error) {
+	size, err := strconv.Atoi(value)
+	if err != nil || size <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", conf.OplogReplayApplyBatchSize)
+	}
+	return size, nil
+}
+
+func getOplogReplayApplyBatchSize() (int, error) {
+	value, ok := conf.GetSetting(conf.OplogReplayApplyBatchSize)
+	if !ok {
+		return stages.DefaultReplayApplyBatchSize, nil
+	}
+	return parseOplogReplayApplyBatchSize(value)
 }
 
 func processTimestamp(ctx context.Context, arg string, downloader *archive.StorageDownloader) (models.Timestamp, error) {

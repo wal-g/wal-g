@@ -554,56 +554,26 @@ services:
     build:
       dockerfile: docker/mysql/Dockerfile
       context: .
-    image: wal-g/mysql
-    container_name: wal-g_mysql
+      args:
+        MYSQL_SERIES: "${MYSQL_SERIES:-84}"
+    image: wal-g/mysql${MYSQL_SERIES:-84}
+    container_name: wal-g_mysql${MYSQL_SERIES:-84}
 
-  mysql8:
-    build:
-      dockerfile: docker/mysql/Dockerfile_v8
-      context: .
-    image: wal-g/mysql8
-    container_name: wal-g_mysql8
-
-  mysql_base_tests:
+  mysql_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
       context: .
       args:
-        TEST_ARG: "-p /tmp/base_tests"
+        MYSQL_IMAGE: wal-g/mysql${MYSQL_SERIES:-84}:latest
     security_opt:
       - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_base_tests
+    image: wal-g/mysql${MYSQL_SERIES:-84}_tests
+    container_name: wal-g_mysql${MYSQL_SERIES:-84}_tests
     env_file:
       - docker/common/common_walg.env
-    <<: *s3_common_depends
-
-  mysql_delete_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/delete_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_delete_tests
-    env_file:
-      - docker/common/common_walg.env
-    <<: *s3_common_depends
-
-  mysql_copy_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/copy_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_copy_tests
-    env_file:
-      - docker/common/common_walg.env
+    environment:
+      WALG_COMPRESSION_METHOD: lz4
+      MYSQL_TEST_FILTER: "${MYSQL_TEST_FILTER:-}"
     depends_on:
       s3:
         condition: service_healthy
@@ -612,18 +582,6 @@ services:
     links:
       - s3
       - s3-another
-
-  mysql8_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile_v8
-      context: .
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql8_tests
-    container_name: wal-g_mysql8_tests
-    env_file:
-      - docker/common/common_walg.env
-    <<: *s3_common_depends
 
   mariadb:
     build:

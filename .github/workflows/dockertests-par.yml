@@ -76,6 +76,10 @@ jobs:
             printf '"make PG_MAJOR=%s pg_integration_test",' "$v"
           done)
 
+          mysql=$(for series in 57 80 84 97; do
+            printf '"make MYSQL_SERIES=%s mysql_integration_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",' "$series"
+          done)
+
           # The heredoc is quoted, so the shell keeps the backslashes as they are.
           engines=$(cat <<'EOF'
           "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
@@ -97,10 +101,6 @@ jobs:
           "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"6.2.4\" redis_features",
           "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
           "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
-          "make MYSQL_TEST=mysql_base_tests mysql_integration_test",
-          "make MYSQL_TEST=mysql_delete_tests mysql_integration_test",
-          "make MYSQL_TEST=mysql_copy_tests mysql_integration_test",
-          "make USE_BROTLI= USE_LZO= USE_LIBSODIUM= MYSQL_TEST=mysql8_tests mysql8_integration_test",
           "make mariadb_test",
           "make gp_test",
           "make cloudberry_test",
@@ -110,7 +110,7 @@ jobs:
           EOF
           )
 
-          commands="[${pg}$(printf '%s' "$engines" | tr -d '\n' | sed 's/^ *//; s/ *$//')]"
+          commands="[${pg}${mysql}$(printf '%s' "$engines" | tr -d '\n' | sed 's/^ *//; s/ *$//')]"
 
           echo "versions=$versions" >> "$GITHUB_OUTPUT"
           echo "commands=$commands" >> "$GITHUB_OUTPUT"

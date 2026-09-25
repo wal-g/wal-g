@@ -2,19 +2,16 @@
 set -e -x
 
 . /tmp/tests/test_functions/pg_compat.sh
+. /tmp/tests/test_functions/prepare_config.sh
 CONFIG_FILE="/tmp/configs/crypto_test_config.json"
 gpg --import /tmp/PGP_KEY
 gpg_key_id=`gpg --list-keys | tail -n +4 | head -n 1 | cut -d ' ' -f 7`
 
-COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat ${CONFIG_FILE} > ${TMP_CONFIG}
-echo "," >> ${TMP_CONFIG}
-cat ${COMMON_CONFIG} >> ${TMP_CONFIG}
-
-
-printf ",\n\"WALE_GPG_KEY_ID\":\"${gpg_key_id}\"" >> ${TMP_CONFIG}
-/tmp/scripts/wrap_config_file.sh ${TMP_CONFIG}
+prepare_config "${CONFIG_FILE}"
+jq --arg gpg_key_id "${gpg_key_id}" '. + {"WALE_GPG_KEY_ID": $gpg_key_id}' \
+    "${TMP_CONFIG}" > "${TMP_CONFIG}.new"
+mv "${TMP_CONFIG}.new" "${TMP_CONFIG}"
 
 initdb ${PGDATA}
 
