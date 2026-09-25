@@ -109,6 +109,27 @@ func TestDBApplierPreservesCommandOrder(t *testing.T) {
 	require.Equal(t, []string{"batch:2", "command", "batch:1"}, calls)
 }
 
+func TestDBApplierSkipsIndexBuildOpsInCatchUpMode(t *testing.T) {
+	mongoDB := clientmocks.NewMongoDriver(t)
+	// no ApplyOp/ApplyOps calls are expected: the index build ops must be skipped
+	applier := NewDBApplier(mongoDB, DBApplierArgs{Reconfig: true})
+	defer applier.Close(context.Background())
+	entries := []models.Oplog{
+		batchTestEntry(t, 1, "c", bson.D{
+			{Key: "startIndexBuild", Value: "items"},
+			{Key: "indexBuildUUID", Value: "uuid"},
+			{Key: "indexes", Value: bson.A{}},
+		}),
+		batchTestEntry(t, 2, "c", bson.D{
+			{Key: "abortIndexBuild", Value: "items"},
+			{Key: "indexBuildUUID", Value: "uuid"},
+		}),
+	}
+	require.NoError(t, applier.ApplyBatch(t.Context(), entries))
+	_, ok := applier.LastAppliedOpTime()
+	require.False(t, ok, "skipped ops must not advance the applied op time")
+}
+
 func TestDBApplierKeepsPartialRestoreErrorsPerOperation(t *testing.T) {
 	mongoDB := clientmocks.NewMongoDriver(t)
 	mongoDB.On("ApplyOp", mock.Anything, mock.Anything).Return(nil).Twice()
