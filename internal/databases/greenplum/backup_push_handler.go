@@ -359,7 +359,6 @@ func (bh *BackupHandler) waitSegmentBackups() error {
 	}
 }
 
-// TODO: unit tests
 func (bh *BackupHandler) checkBackupStates(states map[int]SegCmdState) (int, error) {
 	runningBackupsCount := 0
 
