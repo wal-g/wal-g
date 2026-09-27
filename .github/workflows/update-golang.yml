@@ -1,0 +1,73 @@
+name: Update Go version
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-golang:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'wal-g' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7
+
+      - name: Resolve latest stable Go release
+        id: golang
+        run: |
+          latest_version=$(curl --retry 5 --retry-delay 0 -fsSL 'https://go.dev/dl/?mode=json' | python3 -c '
+          import json, sys
+
+          for release in json.load(sys.stdin):
+              version = release.get("version", "")
+              if release.get("stable") and version.startswith("go"):
+                  print(version.removeprefix("go"))
+                  break
+          else:
+              raise SystemExit("No stable Go release found")
+          ')
+
+          echo "latest=$latest_version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up latest Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ steps.golang.outputs.latest }}
+
+      - name: Update Go versions in modules
+        id: update
+        run: |
+          current_root=$(go mod edit -json go.mod | python3 -c 'import json,sys; print(json.load(sys.stdin)["Go"])')
+          current_exporter=$(go mod edit -json cmd/pg/exporter/go.mod | python3 -c 'import json,sys; print(json.load(sys.stdin)["Go"])')
+          latest_version='${{ steps.golang.outputs.latest }}'
+
+          echo "current_root=$current_root" >> "$GITHUB_OUTPUT"
+          echo "current_exporter=$current_exporter" >> "$GITHUB_OUTPUT"
+
+          if [ "$current_root" = "$latest_version" ] && [ "$current_exporter" = "$latest_version" ]; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          go mod edit -go="$latest_version" go.mod
+          go mod edit -go="$latest_version" cmd/pg/exporter/go.mod
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create pull request
+        if: steps.update.outputs.updated == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: chore/update-golang-${{ steps.golang.outputs.latest }}
+          delete-branch: true
+          commit-message: "chore: update Go to ${{ steps.golang.outputs.latest }}"
+          title: "chore: update Go to ${{ steps.golang.outputs.latest }}"
+          body: |
+            Updates the Go version in both Go modules.
+
+            Root module: `${{ steps.update.outputs.current_root }}` -> `${{ steps.golang.outputs.latest }}`
+            PostgreSQL exporter module: `${{ steps.update.outputs.current_exporter }}` -> `${{ steps.golang.outputs.latest }}`
