@@ -294,6 +294,7 @@ Optional:
 - To build with brotli compressor and decompressor, set the `USE_BROTLI` environment variable.
 - To build with libsodium, set the `USE_LIBSODIUM` environment variable.
 - To build with lzo decompressor, set the `USE_LZO` environment variable.
+- To build with only some storages, set the `STORAGES` variable (see [Selecting storages](#selecting-storages)).
 
 ### Installing
 
@@ -374,6 +375,37 @@ GOOS=linux GOARCH=amd64 make mysql_build
 ```
 
 The compiled binary to run is `main/pg/wal-g`
+
+### Selecting storages
+
+By default, WAL-G is built with every storage. To build a smaller binary, choose the storages you need with the `STORAGES` variable (space- or comma-separated):
+
+```sh
+make pg_build STORAGES="s3 fs"
+```
+
+`STORAGES` sets the matching Go build tags, so you can also pass the tags directly to `go build`:
+
+```sh
+go build -tags disable_grpc_modules,storage_s3,storage_fs ./main/pg
+```
+
+| Storage | `STORAGES` value | Build tag | Prefix setting |
+| ------- | ---------------- | --------- | -------------- |
+| S3 | `s3` | `storage_s3` | `WALG_S3_PREFIX` |
+| Google Cloud Storage | `gcs` | `storage_gcs` | `WALG_GS_PREFIX` |
+| Azure | `azure` | `storage_azure` | `WALG_AZ_PREFIX` |
+| Alibaba Cloud OSS | `oss` | `storage_oss` | `WALG_OSS_PREFIX` |
+| Swift | `swift` | `storage_swift` | `WALG_SWIFT_PREFIX` |
+| SSH | `sh` | `storage_sh` | `WALG_SSH_PREFIX` |
+| File system | `fs` | `storage_fs` | `WALG_FILE_PREFIX` |
+
+If no `storage_*` tag is set, all storages are built. If some are set, the SDKs of the other storages are left out of the binary. When a binary without a storage is configured to use it, WAL-G fails with an error that names the missing build tag.
+
+Notes:
+
+- The PostgreSQL and Greenplum binaries always include the file system code, because they use it for local folders. The `storage_fs` tag only controls whether `WALG_FILE_PREFIX` can be used as a storage.
+- The AWS KMS client-side encryption (`WALG_CSE_KMS_ID`) is always built, so part of the AWS SDK is linked even when S3 is not selected.
 
 ### Testing
 

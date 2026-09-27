@@ -58,6 +58,15 @@ ifdef USE_LZO
 	BUILD_TAGS:=$(BUILD_TAGS) lzo
 endif
 
+# Storages to compile in, e.g. STORAGES="s3 fs" (or "s3,fs"). Empty means all storages.
+KNOWN_STORAGES := azure fs gcs oss s3 sh swift
+comma := ,
+SELECTED_STORAGES := $(subst $(comma), ,$(STORAGES))
+ifneq ($(filter-out $(KNOWN_STORAGES),$(SELECTED_STORAGES)),)
+$(error Unknown storage in STORAGES: $(filter-out $(KNOWN_STORAGES),$(SELECTED_STORAGES)), known storages: $(KNOWN_STORAGES))
+endif
+BUILD_TAGS:=$(strip $(BUILD_TAGS) $(addprefix storage_,$(SELECTED_STORAGES)))
+
 BUILD_GCFLAGS := 
 
 ifdef ENABLE_DEBUG
@@ -78,7 +87,7 @@ else
 	BINARY_EXT :=
 endif
 
-.PHONY: unittest fmt lint clean
+.PHONY: unittest check_storage_tags fmt lint clean
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
 
@@ -182,7 +191,7 @@ clean_compose:
 	services=$$(docker compose ps -a --format '{{.Name}} {{.Service}}' | grep wal-g_ | cut -d' ' -f 2); \
 		if [ "$$services" ]; then docker compose down $$services; fi
 
-all_unittests: deps unittest
+all_unittests: deps unittest check_storage_tags
 
 # todo Should we remove this target as a duplicate of pg_integration_test?
 pg_int_tests_only:
@@ -363,6 +372,34 @@ unittest:
 	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./internal/...
 	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./pkg/...
 	go test -mod vendor -v $(TEST_MODIFIER) -tags "$(BUILD_TAGS)" ./utility/...
+
+# SDK package that each storage links in (fs has no external SDK).
+STORAGE_SDKS := azure=github.com/Azure/azure-sdk-for-go/sdk/storage/azblob \
+	gcs=cloud.google.com/go/storage \
+	oss=github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss \
+	s3=github.com/aws/aws-sdk-go-v2/service/s3 \
+	sh=github.com/pkg/sftp \
+	swift=github.com/ncw/swift/v2
+STORAGE_CHECK_TAGS := $(filter-out storage_%,$(BUILD_TAGS))
+
+# Checks that a build with a single storage_* tag compiles and links only that storage's SDK.
+check_storage_tags:
+	@set -e; for selected in $(KNOWN_STORAGES); do \
+		tags="$(STORAGE_CHECK_TAGS) storage_$$selected"; \
+		go build -mod vendor -tags "$$tags" ./internal/; \
+		deps=$$(go list -mod vendor -deps -tags "$$tags" ./main/...); \
+		for sdk in $(STORAGE_SDKS); do \
+			storage=$${sdk%%=*}; pkg=$${sdk#*=}; \
+			if echo "$$deps" | grep -qx "$$pkg"; then linked=1; else linked=0; fi; \
+			if [ "$$storage" = "$$selected" ] && [ $$linked = 0 ]; then \
+				echo "storage_$$selected: $$pkg is not linked"; exit 1; \
+			fi; \
+			if [ "$$storage" != "$$selected" ] && [ $$linked = 1 ]; then \
+				echo "storage_$$selected: $$pkg is linked, but $$storage storage is not selected"; exit 1; \
+			fi; \
+		done; \
+		echo "storage_$$selected: ok"; \
+	done
 
 coverage:
 	go list ./... | grep -Ev 'vendor|submodules|tmp' | xargs go test -v $(TEST_MODIFIER) -coverprofile=$(COVERAGE_FILE) | grep -v 'no test files'
