@@ -25,6 +25,12 @@ updates:
         patterns:
           - "cloud.google.com/go"
           - "cloud.google.com/go/*"
+      klauspost-compress:
+        patterns:
+          - "github.com/klauspost/compress"
+      pierrec-lz4:
+        patterns:
+          - "github.com/pierrec/lz4/v4"
   - package-ecosystem: "gomod"
     directory: "/cmd/pg/exporter"
     schedule:
