@@ -657,16 +657,15 @@ func GetPgServerInfo(ctx context.Context, keepRunner bool) (pgInfo BackupPgInfo,
 	pgInfo.PgDataDirectory = utility.ResolveSymlink(pgInfo.PgDataDirectory)
 	tracelog.DebugLogger.Printf("Datadir: %s", pgInfo.PgDataDirectory)
 
-	err = queryRunner.getVersion(ctx)
-	if err != nil {
-		return pgInfo, nil, err
-	}
+	// NewPgQueryRunner already loads the cluster-wide version and identifier.
 	pgInfo.PgVersion = queryRunner.Version
 	tracelog.DebugLogger.Printf("Postgres version: %d", queryRunner.Version)
 
-	err = queryRunner.getSystemIdentifier(ctx)
-	if err != nil {
-		return pgInfo, nil, err
+	if queryRunner.SystemIdentifier == nil {
+		// Preserve the retry for servers where the first read failed transiently.
+		if err = queryRunner.getSystemIdentifier(ctx); err != nil {
+			return pgInfo, nil, err
+		}
 	}
 	pgInfo.systemIdentifier = queryRunner.SystemIdentifier
 	tracelog.DebugLogger.Printf("Postgres SystemIdentifier: %d", queryRunner.Version)
