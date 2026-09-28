@@ -349,7 +349,11 @@ cloudberry_install: gp_install
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
-	docker compose build cloudberry
+	@if docker pull ghcr.io/wal-g/cloudberry:latest; then \
+		docker tag ghcr.io/wal-g/cloudberry:latest wal-g/cloudberry:latest; \
+	else \
+		docker compose build cloudberry; \
+	fi
 	docker compose build cloudberry_tests
 	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 

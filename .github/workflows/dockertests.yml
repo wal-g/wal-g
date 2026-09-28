@@ -55,6 +55,13 @@ jobs:
           echo "Failed to fetch cached docker images. Will now exit..."
           exit 1
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run test
         run: ${{ matrix.command }}
 
