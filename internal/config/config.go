@@ -870,7 +870,7 @@ func ConfigureAndRunDefaultWebServer() error {
 	return nil
 }
 
-func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
+func AddConfigFlags(Cmd *cobra.Command) *pflag.FlagSet {
 	cfgFlags := &pflag.FlagSet{}
 	for k := range AllowedSettings {
 		flagName := ToFlagName(k)
@@ -881,15 +881,16 @@ func AddConfigFlags(Cmd *cobra.Command, hiddenCfgFlagAnnotation string) {
 		}
 
 		cfgFlags.String(flagName, "", flagUsage)
-		_ = viper.BindPFlag(k, cfgFlags.Lookup(flagName))
+
+		flag := cfgFlags.Lookup(flagName)
+		flag.Hidden = true
+
+		_ = viper.BindPFlag(k, flag)
 	}
-	cfgFlags.VisitAll(func(f *pflag.Flag) {
-		if f.Annotations == nil {
-			f.Annotations = map[string][]string{}
-		}
-		f.Annotations[hiddenCfgFlagAnnotation] = []string{"true"}
-	})
+
 	Cmd.PersistentFlags().AddFlagSet(cfgFlags)
+
+	return cfgFlags
 }
 
 // InitConfig reads config file and ENV variables if set.
