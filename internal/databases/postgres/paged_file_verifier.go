@@ -90,6 +90,10 @@ func pgChecksumPage(blockNo uint32, pageBytes *PgDatabasePage) uint16 {
 
 // Block checksum algorithm. The page must be adequately aligned (at least on 4-byte boundary).
 func pgChecksumBlock(page *PgDatabasePage) uint32 {
+	return pgChecksumBlockFast(page)
+}
+
+func pgChecksumBlockScalar(page *PgDatabasePage) uint32 {
 	// Initialize partial checksums to their corresponding offsets
 	sums := checksumBaseOffsets
 	var pageForChecksum = *(*PgChecksummablePage)(unsafe.Pointer(page))
