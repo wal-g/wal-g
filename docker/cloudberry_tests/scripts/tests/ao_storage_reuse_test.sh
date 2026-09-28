@@ -1,15 +1,12 @@
 #!/bin/bash
 set -e -x -o pipefail
+source /tmp/tests/test_functions/prepare_config.sh
 
 # Compaction can reuse an AO segfile with different contents but the same EOF and modcount.
 # The incremental backup must notice the changed mtime and upload the file again.
 CONFIG_FILE="/tmp/configs/delta_backup_test_config.json"
-COMMON_CONFIG="/tmp/configs/common_config.json"
 TMP_CONFIG="/tmp/configs/tmp_config.json"
-cat "${CONFIG_FILE}" > "${TMP_CONFIG}"
-echo "," >> "${TMP_CONFIG}"
-cat "${COMMON_CONFIG}" >> "${TMP_CONFIG}"
-/tmp/pg_scripts/wrap_config_file.sh "${TMP_CONFIG}"
+prepare_config "${CONFIG_FILE}" "${TMP_CONFIG}"
 source /tmp/tests/test_functions/util.sh
 
 TEST_DIR=$(mktemp -d)
