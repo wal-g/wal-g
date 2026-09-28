@@ -19,3 +19,19 @@ func TestNewRunnerForDatabaseReusesClusterInfo(t *testing.T) {
 	require.Equal(t, queryRunner.Version, databaseRunner.Version)
 	require.Same(t, queryRunner.SystemIdentifier, databaseRunner.SystemIdentifier)
 }
+
+func TestInitQueryRunnerReusesExistingRunner(t *testing.T) {
+	systemIdentifier := uint64(123456789)
+	runner := &PgQueryRunner{
+		Version:          180006,
+		SystemIdentifier: &systemIdentifier,
+	}
+	handler := &BackupHandler{Workers: BackupWorkers{QueryRunner: runner}}
+
+	// A nil connection makes any accidental metadata query fail. The existing
+	// runner must be reused without connecting or querying the cluster again.
+	require.NoError(t, handler.initQueryRunner(context.Background()))
+	require.Same(t, runner, handler.Workers.QueryRunner)
+	require.Equal(t, 180006, handler.Workers.QueryRunner.Version)
+	require.Same(t, &systemIdentifier, handler.Workers.QueryRunner.SystemIdentifier)
+}
