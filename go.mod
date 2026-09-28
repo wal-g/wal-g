@@ -33,7 +33,7 @@ require (
 	github.com/jackc/pglogrepl v0.0.0-20260401131349-e37c41485510
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jedib0t/go-pretty/v6 v6.8.2
-	github.com/klauspost/compress v1.19.2
+	github.com/klauspost/compress v1.20.0
 	github.com/microsoft/go-mssqldb v1.11.0
 	github.com/minio/sio v0.5.1
 	github.com/moby/moby/api v1.55.0
