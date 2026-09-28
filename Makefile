@@ -336,7 +336,11 @@ gp_install: gp_build
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	docker compose build gp
+	@if docker pull ghcr.io/wal-g/gp:latest; then \
+		docker tag ghcr.io/wal-g/gp:latest wal-g/gp:latest; \
+	else \
+		docker compose build gp; \
+	fi
 	docker compose build gp_tests
 	docker compose up --exit-code-from gp_tests gp_tests
 
