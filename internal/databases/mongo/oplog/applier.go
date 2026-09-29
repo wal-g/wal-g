@@ -124,11 +124,9 @@ func (ap *DBApplier) Apply(ctx context.Context, opr models.Oplog) error {
 		return fmt.Errorf("can not unmarshal oplog entry: %w", err)
 	}
 
-	if !ap.catchUp {
-		if err := ap.shouldSkip(&op); err != nil {
-			tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
-			return nil
-		}
+	if err := shouldSkip(&op, ap.catchUp); err != nil {
+		tracelog.DebugLogger.Printf("skipping op %+v due to: %+v", op, err)
+		return nil
 	}
 
 	meta, err := txn.NewMeta(op)
@@ -207,7 +205,7 @@ func (ap *DBApplier) canBatchOplog(op *db.Oplog) (bool, error) {
 		ap.partial || len(ap.applyIgnoreErrorCodes[op.Operation]) != 0 {
 		return false, nil
 	}
-	if !ap.catchUp && ap.shouldSkip(op) != nil {
+	if shouldSkip(op, ap.catchUp) != nil {
 		return false, nil
 	}
 	meta, err := txn.NewMeta(*op)
@@ -222,8 +220,8 @@ func (ap *DBApplier) Close(context.Context) error {
 	return nil
 }
 
-func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
-	if oplog.Namespace == "n" {
+func shouldSkip(oplog *db.Oplog, catchUp bool) error {
+	if oplog.Operation == "n" {
 		return fmt.Errorf("noop op")
 	}
 
@@ -241,7 +239,7 @@ func (ap *DBApplier) shouldSkip(oplog *db.Oplog) error {
 		}
 	}
 
-	if !isOpAllowedInconfigDB(oplog) {
+	if !catchUp && !isOpAllowedInconfigDB(oplog) {
 		return fmt.Errorf("config database op")
 	}
 
