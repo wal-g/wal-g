@@ -1,11 +1,14 @@
 package mysql
 
 import (
+	"context"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/go-mysql-org/go-mysql/client"
 	gomysql "github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/go-mysql-org/go-mysql/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -198,4 +201,51 @@ func TestConnectParams_Apply(t *testing.T) {
 	assert.True(t, apply("compress=zlib").HasCapability(gomysql.CLIENT_COMPRESS))
 	assert.True(t, apply("compress=zstd").HasCapability(gomysql.CLIENT_ZSTD_COMPRESSION_ALGORITHM))
 	assert.False(t, apply("compress=false").HasCapability(gomysql.CLIENT_COMPRESS))
+}
+
+type variableQueryHandler struct {
+	server.EmptyHandler
+	results map[string]*gomysql.Result
+}
+
+func (h *variableQueryHandler) HandleQuery(query string) (*gomysql.Result, error) {
+	return h.results[query], nil
+}
+
+func TestFetchMySQLVariable_ValueSurvivesLaterQueries(t *testing.T) {
+	handler := &variableQueryHandler{results: map[string]*gomysql.Result{}}
+	for query, value := range map[string]string{
+		"SELECT @@version":                 "11.4.10-MariaDB-deb12-log",
+		"SELECT @@global.gtid_current_pos": "0-1-137584",
+	} {
+		rs, err := gomysql.BuildSimpleTextResultset([]string{query}, [][]any{{value}})
+		require.NoError(t, err)
+		handler.results[query] = gomysql.NewResult(rs)
+	}
+	auth := server.NewInMemoryAuthenticationHandler(gomysql.AUTH_NATIVE_PASSWORD)
+	require.NoError(t, auth.AddUser("user", "password"))
+	serverSide, clientSide := net.Pipe()
+	defer serverSide.Close()
+	defer clientSide.Close()
+	require.NoError(t, serverSide.SetDeadline(time.Now().Add(5*time.Second)))
+	require.NoError(t, clientSide.SetDeadline(time.Now().Add(5*time.Second)))
+	done := make(chan error, 1)
+	go func() {
+		conn, err := server.NewDefaultServer().NewCustomizedConn(serverSide, auth, handler)
+		for i := 0; i < 2 && err == nil; i++ {
+			err = conn.HandleCommand()
+		}
+		done <- err
+	}()
+	conn, err := client.ConnectWithDialer(context.Background(), "tcp", "unused:3306", "user", "password", "",
+		func(context.Context, string, string) (net.Conn, error) { return clientSide, nil })
+	require.NoError(t, err)
+
+	version, err := getMySQLVersion(conn)
+	require.NoError(t, err)
+	_, err = getMySQLGTIDExecuted(conn, gomysql.MariaDBFlavor)
+	require.NoError(t, err)
+	require.NoError(t, <-done)
+
+	assert.Equal(t, "11.4.10-MariaDB-deb12-log", version)
 }
