@@ -343,11 +343,13 @@ func (bh *BackupHandler) loadDeltaMapFromWalSummaries(ctx context.Context) error
 	if !on {
 		return errors.New("--delta-from-wal-summaries requires summarize_wal=on on the server")
 	}
-	if err := bh.Workers.Bundle.LoadDeltaMapFromWalSummaries(
-		bh.PgInfo.PgDataDirectory, bh.CurBackupInfo.startLSN); err != nil {
+	bundle := bh.Workers.Bundle
+	bundle.DeltaMap, err = bh.Workers.QueryRunner.ReadWalSummaryDeltaMap(ctx, bundle.Timeline,
+		*bundle.IncrementFromLsn, bh.CurBackupInfo.startLSN)
+	if err != nil {
 		return errors.Wrap(err, "loading delta map from WAL summaries")
 	}
-	tracelog.InfoLogger.Println("Loaded delta map from pg_wal/summaries")
+	tracelog.InfoLogger.Println("Loaded delta map from WAL summaries")
 	return nil
 }
 

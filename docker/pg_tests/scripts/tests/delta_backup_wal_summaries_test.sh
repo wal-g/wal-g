@@ -32,16 +32,6 @@ wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 pgbench -i -s 8 postgres
 dump_all /tmp/dump1
 
-# Force a checkpoint + segment switch so the walsummarizer has a clean LSN to flush a summary at,
-# then wait for summarized_lsn to reach the post-switch flush LSN before requesting the increment.
-psql -c "CHECKPOINT;" postgres
-switch_wal postgres
-target=$(psql -tAc "SELECT pg_current_wal_flush_lsn();" postgres)
-for _ in $(seq 1 60); do
-  ok=$(psql -tAc "SELECT summarized_lsn >= '${target}'::pg_lsn FROM pg_get_wal_summarizer_state();" postgres)
-  [ "$ok" = "t" ] && break
-  sleep 1
-done
 
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-wal-summaries
 
