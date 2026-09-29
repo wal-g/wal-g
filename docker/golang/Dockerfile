@@ -1,28 +1,6 @@
-FROM ubuntu:bionic AS brotli-builder
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Build and install Brotli in a dedicated stage to avoid keeping sources in the final image.
-RUN apt-get update && \
-    apt-get -y install \
-        build-essential \
-        curl
-
-RUN ARCH="$(uname -m)" && \
-    curl -fsSLO "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
-    tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
-    rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
-
-COPY submodules/ /tmp/
-
-RUN cd /tmp/brotli && \
-    mkdir out && cd out && \
-    cmake .. && \
-    make && make install
-
 FROM ubuntu:bionic
 
-# custom golang image with CMake and Brotli support (compatible with ubuntu 18.04..22.04)
+# custom golang image with CMake support (compatible with ubuntu 18.04..22.04)
 
 # Go toolchain version, passed by the build process derived from go.mod (see Makefile/docker-compose.yml).
 ARG GO_VERSION
@@ -55,11 +33,12 @@ RUN ARCH="$(uname -m)" && \
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
+# Child build images use CMake to compile Brotli alongside their source tree.
 RUN mkdir -p "$GOPATH/src" "$GOPATH/bin" && chmod -R 777 "$GOPATH"
 
 RUN ARCH="$(uname -m)" && \
     curl -fsSLO "https://github.com/Kitware/CMake/releases/download/v3.31.0/cmake-3.31.0-linux-${ARCH}.tar.gz" && \
     tar xf "cmake-3.31.0-linux-${ARCH}.tar.gz" -C /usr --strip-components=1 && \
     rm "cmake-3.31.0-linux-${ARCH}.tar.gz"
+# Brotli is built by child images that need it.
 
-COPY --from=brotli-builder /usr/local/ /usr/local/
