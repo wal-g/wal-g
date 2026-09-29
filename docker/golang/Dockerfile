@@ -15,10 +15,8 @@ RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https:
     apt-get install --yes --no-install-recommends --no-install-suggests \
         build-essential \
         ca-certificates \
-        iputils-ping \
-        net-tools dnsutils \
         curl && \
-    rm -rf /var/lib/apt/lists/* /var/cache/debconf/*
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /var/cache/debconf/*
 
 RUN ARCH="$(uname -m)" && \
     case "$ARCH" in \
