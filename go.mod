@@ -36,8 +36,8 @@ require (
 	github.com/klauspost/compress v1.20.1
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/minio/sio v0.5.1
-	github.com/moby/moby/api v1.55.0
-	github.com/moby/moby/client v0.5.1
+	github.com/moby/moby/api v1.56.0
+	github.com/moby/moby/client v0.6.0
 	github.com/mongodb/mongo-tools v0.0.0-20260508170159-0b142f65e139
 	github.com/ncw/directio v1.0.5
 	github.com/ncw/swift/v2 v2.0.5
