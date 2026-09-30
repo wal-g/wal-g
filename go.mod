@@ -12,12 +12,12 @@ require (
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.5.3
 	github.com/aliyun/credentials-go v1.4.13
 	github.com/apache/cloudberry-go-libs v1.0.12-0.20260624080114-3de23e29a87a
-	github.com/aws/aws-sdk-go-v2 v1.47.0
+	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.1
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.22.18
 	github.com/aws/aws-sdk-go-v2/service/kms v1.55.7
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.3
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.4
 	github.com/aws/aws-sdk-go-v2/service/sts v1.49.0
 	github.com/aws/smithy-go v1.28.2
 	github.com/cactus/go-statsd-client/v5 v5.1.0
@@ -93,13 +93,13 @@ require (
 	github.com/apache/arrow-go/v18 v18.7.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.3 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.4 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.4 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.5 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.7.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.35.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.40.1 // indirect
