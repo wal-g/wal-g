@@ -41,7 +41,7 @@ require (
 	github.com/mongodb/mongo-tools v0.0.0-20260508170159-0b142f65e139
 	github.com/ncw/directio v1.0.5
 	github.com/ncw/swift/v2 v2.0.5
-	github.com/pierrec/lz4/v4 v4.1.30
+	github.com/pierrec/lz4/v4 v4.1.31
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/profile v1.7.0
 	github.com/pkg/sftp v1.13.11
