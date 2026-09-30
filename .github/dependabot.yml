@@ -14,6 +14,10 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      aws-sdk-go-v2:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2"
+          - "github.com/aws/aws-sdk-go-v2/*"
       opentelemetry:
         patterns:
           - "go.opentelemetry.io/otel"
