@@ -1,6 +1,8 @@
 package gp
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	conf "github.com/wal-g/wal-g/internal/config"
@@ -30,6 +32,9 @@ const (
 	withHistoryFlag        = "with-history"
 	withHistoryShorthand   = "w"
 	withHistoryDescription = "Synchronize every segment WAL stream through the latest cluster restore point"
+
+	walWaitTimeoutFlag        = "wal-wait-timeout"
+	walWaitTimeoutDescription = "How long to wait for restore point WAL and metadata the source has not published yet, 0 to fail at once"
 )
 
 var (
@@ -37,6 +42,7 @@ var (
 	fromConfigFile   string
 	toConfigFile     string
 	withHistory      bool
+	walWaitTimeout   time.Duration
 
 	backupCopyCmd = &cobra.Command{
 		Use:   backupCopyUsage,
@@ -61,7 +67,7 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
-	greenplum.HandleCopyWithHistory(cmd.Context(), fromConfigFile, toConfigFile, targetBackupName, withHistory)
+	greenplum.HandleCopyWithHistory(cmd.Context(), fromConfigFile, toConfigFile, targetBackupName, withHistory, walWaitTimeout)
 }
 
 func init() {
@@ -71,6 +77,8 @@ func init() {
 	backupCopyCmd.Flags().StringVarP(&toConfigFile, toFlag, toShorthand, "", toDescription)
 	backupCopyCmd.Flags().StringVarP(&fromConfigFile, fromFlag, fromShorthand, "", fromDescription)
 	backupCopyCmd.Flags().BoolVarP(&withHistory, withHistoryFlag, withHistoryShorthand, false, withHistoryDescription)
+	backupCopyCmd.Flags().DurationVar(&walWaitTimeout, walWaitTimeoutFlag, greenplum.DefaultCopyWALWaitTimeout,
+		walWaitTimeoutDescription)
 
 	_ = backupCopyCmd.MarkFlagRequired(toFlag)
 	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
