@@ -168,7 +168,7 @@ func newPgQueryRunner(conn *pgx.Conn) (*PgQueryRunner, error) {
 // newRunnerForDatabase reuses cluster-wide information already loaded by this
 // runner. PostgreSQL version and system identifier do not vary by database, so
 // querying them again for every database adds unnecessary round trips.
-func (queryRunner *PgQueryRunner) newRunnerForDatabase(ctx context.Context, conn *pgx.Conn) (*PgQueryRunner, error) {
+func (queryRunner *PgQueryRunner) newRunnerForDatabase(conn *pgx.Conn) (*PgQueryRunner, error) {
 	runner, err := newPgQueryRunner(conn)
 	if err != nil {
 		return nil, err
@@ -176,11 +176,6 @@ func (queryRunner *PgQueryRunner) newRunnerForDatabase(ctx context.Context, conn
 
 	runner.Version = queryRunner.Version
 	runner.SystemIdentifier = queryRunner.SystemIdentifier
-	if runner.SystemIdentifier == nil {
-		if err := runner.getSystemIdentifier(ctx); err != nil {
-			tracelog.WarningLogger.Printf("Couldn't get system identifier because of error: '%v'\n", err)
-		}
-	}
 	return runner, nil
 }
 
@@ -565,7 +560,7 @@ func (queryRunner *PgQueryRunner) executeForDatabase(ctx context.Context,
 	}
 	defer utility.LoggedCloseContext(ctx, dbConn, "")
 
-	runner, err := queryRunner.newRunnerForDatabase(ctx, dbConn)
+	runner, err := queryRunner.newRunnerForDatabase(dbConn)
 	if err != nil {
 		return errors.Wrap(err, "Failed to build query runner")
 	}

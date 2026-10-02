@@ -14,10 +14,21 @@ func TestNewRunnerForDatabaseReusesClusterInfo(t *testing.T) {
 		SystemIdentifier: &systemIdentifier,
 	}
 
-	databaseRunner, err := queryRunner.newRunnerForDatabase(context.Background(), nil)
+	databaseRunner, err := queryRunner.newRunnerForDatabase(nil)
 	require.NoError(t, err)
 	require.Equal(t, queryRunner.Version, databaseRunner.Version)
 	require.Same(t, queryRunner.SystemIdentifier, databaseRunner.SystemIdentifier)
+}
+
+func TestNewRunnerForDatabasePreservesMissingSystemIdentifier(t *testing.T) {
+	queryRunner := &PgQueryRunner{Version: 180006}
+
+	// A database runner inherits missing cluster metadata without trying to
+	// query it on its own connection.
+	databaseRunner, err := queryRunner.newRunnerForDatabase(nil)
+	require.NoError(t, err)
+	require.Equal(t, queryRunner.Version, databaseRunner.Version)
+	require.Nil(t, databaseRunner.SystemIdentifier)
 }
 
 func TestInitQueryRunnerReusesExistingRunner(t *testing.T) {
