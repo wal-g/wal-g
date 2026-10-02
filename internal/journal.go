@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -346,6 +347,16 @@ func loadJournalsInfo(ctx context.Context, folder storage.Folder, objects []stor
 		backupName := strings.TrimPrefix(obj.GetName(), JournalPrefix)
 		ji, err := NewJournalInfo(ctx, backupName, folder, "")
 		if err != nil {
+			var notFoundErr storage.ObjectNotFoundError
+			if errors.As(err, &notFoundErr) && obj.GetVersionID() != "" {
+				// A versioned storage can list an object version whose key currently
+				// resolves to a delete marker. Treat the stale listing as a missing journal.
+				tracelog.DebugLogger.Printf(
+					"Journal %s was listed but could not be read because it no longer exists; skipping it",
+					obj.GetName(),
+				)
+				continue
+			}
 			return nil, err
 		}
 		journals = append(journals, ji)

@@ -2,7 +2,9 @@ package internal_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +17,74 @@ import (
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/testtools"
 )
+
+type staleDeletedObjectState struct {
+	folderPath      string
+	objects         []storage.Object
+	listedVersionID string
+	readObjectName  string
+	readObjectError error
+}
+
+// staleDeletedObjectFolder simulates a versioned object store returning an object version from
+// ListFolder immediately after a delete marker made an unversioned ReadObject return not found.
+type staleDeletedObjectFolder struct {
+	storage.Folder
+	state *staleDeletedObjectState
+}
+
+func newStaleDeletedObjectFolder(folder storage.Folder) *staleDeletedObjectFolder {
+	return &staleDeletedObjectFolder{
+		Folder: folder,
+		state: &staleDeletedObjectState{
+			listedVersionID: "stale-version",
+		},
+	}
+}
+
+func (folder *staleDeletedObjectFolder) GetSubFolder(relativePath string) storage.Folder {
+	return &staleDeletedObjectFolder{
+		Folder: folder.Folder.GetSubFolder(relativePath),
+		state:  folder.state,
+	}
+}
+
+func (folder *staleDeletedObjectFolder) ListFolder(
+	ctx context.Context,
+) ([]storage.Object, []storage.Folder, error) {
+	objects, subFolders, err := folder.Folder.ListFolder(ctx)
+	if err == nil && folder.GetPath() == folder.state.folderPath {
+		objects = append(objects, folder.state.objects...)
+	}
+	return objects, subFolders, err
+}
+
+func (folder *staleDeletedObjectFolder) DeleteObjects(ctx context.Context, objects []storage.Object) error {
+	if err := folder.Folder.DeleteObjects(ctx, objects); err != nil {
+		return err
+	}
+	folder.state.folderPath = folder.GetPath()
+	for _, object := range objects {
+		folder.state.objects = append(folder.state.objects, storage.NewLocalObjectWithVersion(
+			object.GetName(),
+			object.GetLastModified(),
+			object.GetSize(),
+			folder.state.listedVersionID,
+			object.GetAdditionalInfo(),
+		))
+	}
+	return nil
+}
+
+func (folder *staleDeletedObjectFolder) ReadObject(
+	ctx context.Context,
+	objectRelativePath string,
+) (io.ReadCloser, error) {
+	if objectRelativePath == folder.state.readObjectName && folder.state.readObjectError != nil {
+		return nil, folder.state.readObjectError
+	}
+	return folder.Folder.ReadObject(ctx, objectRelativePath)
+}
 
 var (
 	JournalFmt              = "%09d"
@@ -149,6 +219,45 @@ func TestDeleteJournalInMiddle(t *testing.T) {
 	assert.NoError(t, ji3.Read(t.Context(), folder))
 	assert.Equal(t, int64(66), ji1.SizeToNextBackup)
 	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
+}
+
+func TestDeleteJournalInMiddleWithStaleDeletedObjectListing(t *testing.T) {
+	baseFolder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
+	folder := newStaleDeletedObjectFolder(baseFolder)
+
+	ji1, ji2, ji3 := CreateThreeJournals(t, folder)
+
+	require.NoError(t, ji2.Delete(t.Context(), folder))
+	require.NoError(t, ji1.Read(t.Context(), folder))
+	require.NoError(t, ji3.Read(t.Context(), folder))
+	assert.Equal(t, int64(66), ji1.SizeToNextBackup)
+	assert.Equal(t, int64(0), ji3.SizeToNextBackup)
+}
+
+func TestDeleteJournalDoesNotIgnoreOtherReadErrors(t *testing.T) {
+	baseFolder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
+	folder := newStaleDeletedObjectFolder(baseFolder)
+
+	_, ji2, _ := CreateThreeJournals(t, folder)
+	folder.state.readObjectName = ji2.JournalName
+	folder.state.readObjectError = assert.AnError
+
+	require.ErrorIs(t, ji2.Delete(t.Context(), folder), assert.AnError)
+}
+
+func TestDeleteJournalDoesNotIgnoreNotFoundFromUnversionedListing(t *testing.T) {
+	baseFolder, uploader := initTestS3()
+	generateAndUploadData(t, uploader)
+	folder := newStaleDeletedObjectFolder(baseFolder)
+	folder.state.listedVersionID = ""
+
+	_, ji2, _ := CreateThreeJournals(t, folder)
+	err := ji2.Delete(t.Context(), folder)
+
+	var notFoundErr storage.ObjectNotFoundError
+	require.ErrorAs(t, err, &notFoundErr)
 }
 
 func TestDeleteJournalInBegin(t *testing.T) {
