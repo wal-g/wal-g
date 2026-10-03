@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -33,6 +34,29 @@ func TestLoadAWSConfigWithHTTPSEndpointSourceTwice(t *testing.T) {
 	require.NotSame(t, first.HTTPClient, second.HTTPClient)
 	assertSessionTransport(t, first.HTTPClient, "s3.example.com")
 	assertSessionTransport(t, second.HTTPClient, "s3.example.com")
+}
+
+func TestLoadAWSConfigWithRequestTimeout(t *testing.T) {
+	config := &Config{
+		Secrets:        &Secrets{},
+		Region:         "us-east-1",
+		Endpoint:       "https://s3.example.com",
+		RequestTimeout: 5 * time.Second,
+	}
+
+	awsConfig, _, err := loadAWSConfig(t.Context(), config)
+	require.NoError(t, err)
+
+	client, ok := awsConfig.HTTPClient.(*http.Client)
+	require.True(t, ok)
+
+	logging, ok := client.Transport.(*loggingTransport)
+	require.True(t, ok)
+
+	transport, ok := logging.underlying.(*http.Transport)
+	require.True(t, ok)
+
+	require.Equal(t, 5*time.Second, transport.ResponseHeaderTimeout)
 }
 
 func assertSessionTransport(t *testing.T, httpClient any, serverName string) {

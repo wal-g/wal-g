@@ -36,6 +36,7 @@ type Config struct {
 	ForcePathStyle           bool
 	RequestAdditionalHeaders string
 	MaxRetries               int
+	RequestTimeout           time.Duration
 	LogLevel                 string
 	Uploader                 *UploaderConfig
 	RangeBatchEnabled        bool
