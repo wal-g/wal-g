@@ -140,12 +140,9 @@ pg_matrix_test:
 		$(MAKE) PG_MAJOR=$$v pg_integration_test || exit 1; \
 	done
 
-save_common_images: go_deps
-	mkdir -p ${CACHE_FOLDER}
-	sudo rm -rf ${CACHE_FOLDER}/*
-	docker compose build $(DOCKER_COMMON)
-	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
-	ls -la ${CACHE_FOLDER}
+# Reuse the prebuilt image from build-golang-image.yml; build locally if it is unavailable.
+load_golang_image:
+	(docker pull ghcr.io/wal-g/golang:$(GO_VERSION) && docker tag ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang) || docker compose build golang
 
 pg_integration_test: clean_compose
 	if [ "$(PG_MAJOR)" = "10" ]; then\
@@ -212,13 +209,8 @@ load_ubuntu_18_04:
 load_ubuntu_22_04:
 	(docker pull ghcr.io/wal-g/ubuntu:22.04 && docker tag ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
 
-load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04
-	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
-		echo "Rebuild";\
-		docker compose build $(DOCKER_COMMON);\
-	else\
-		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
-	fi
+load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04 load_golang_image
+	docker compose build s3
 
 mysql_integration_test: go_deps unlink_brotli load_docker_common
 	docker compose build mysql && docker compose build mysql_tests
