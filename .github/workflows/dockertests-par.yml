@@ -30,19 +30,8 @@ jobs:
     name: resolve versions
     runs-on: ubuntu-latest
     outputs:
-      versions: ${{ steps.resolve.outputs.versions }}
-      commands: ${{ steps.resolve.outputs.commands }}
+      pg_commands: ${{ steps.resolve.outputs.pg_commands }}
     steps:
-      - name: Cleanup space on runner
-        run: |
-          swapon --show=NAME --noheadings | while read swap_device; do
-            sudo swapoff $swap_device
-          done
-
-          if [ -e /swapfile ]; then
-            sudo rm /swapfile
-          fi
-
       - name: Check out code into the Go module directory
         uses: actions/checkout@v7
         with:
@@ -67,48 +56,49 @@ jobs:
             printf '"make PG_MAJOR=%s pg_integration_test",' "$v"
           done)
 
-          mysql=$(for series in 57 80 84 97; do
-            printf '"make MYSQL_SERIES=%s mysql_integration_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",' "$series"
-          done)
+          pg_commands="[${pg%,}]"
 
-          # The heredoc is quoted, so the shell keeps the backslashes as they are.
-          engines=$(cat <<'EOF'
-          "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
-          "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
-          "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
-          "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_logical_features",
-          "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_partial_features",
-          "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
-          "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
-          "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
-          "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_logical_features",
-          "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_partial_features",
-          "make redis_test",
-          "make FEATURE=\"ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
-          "make FEATURE=\"rdb_ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
-          "make FEATURE=\"aof_ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
-          "make FEATURE=\"aof_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
-          "make FEATURE=\"aof_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
-          "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"6.2.4\" redis_features",
-          "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
-          "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
-          "make mariadb_test",
-          "make gp_test",
-          "make cloudberry_test",
-          "make st_test",
-          "make etcd_test",
-          "make orioledb_integration_test"
-          EOF
-          )
-
-          commands="[${pg}${mysql}$(printf '%s' "$engines" | tr -d '\n' | sed 's/^ *//; s/ *$//')]"
-
-          echo "versions=$versions" >> "$GITHUB_OUTPUT"
-          echo "commands=$commands" >> "$GITHUB_OUTPUT"
+          echo "pg_commands=$pg_commands" >> "$GITHUB_OUTPUT"
           echo "PostgreSQL: $versions"
 
   parallel:
+    name: Other integration tests
+    uses: ./.github/workflows/dockertests.yml
+    with:
+      command-json-array: >-
+        ["make MYSQL_SERIES=57 mysql_integration_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",
+        "make MYSQL_SERIES=80 mysql_integration_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",
+        "make MYSQL_SERIES=84 mysql_integration_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",
+        "make MYSQL_SERIES=97 mysql_integration_test USE_BROTLI= USE_LZO= USE_LIBSODIUM=",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_logical_features",
+        "make MONGO_VERSION=\"8.0.3\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_partial_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_catch_up_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_binary_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.org\" MONGO_PACKAGE=\"mongodb-org\" mongo_logical_features",
+        "make MONGO_VERSION=\"7.0.15\" MONGO_REPO=\"repo.mongodb.com\" MONGO_PACKAGE=\"mongodb-enterprise\" mongo_partial_features",
+        "make redis_test",
+        "make FEATURE=\"ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"rdb_ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"aof_ts_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"aof_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
+        "make FEATURE=\"aof_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"6.2.4\" redis_features",
+        "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.0.15\" redis_features",
+        "make FEATURE=\"rdb_backup\" REDIS_VERSION=\"7.2.4\" redis_features",
+        "make mariadb_test",
+        "make gp_test",
+        "make cloudberry_test",
+        "make st_test",
+        "make etcd_test",
+        "make orioledb_integration_test"]
+
+  pg_integration_test:
+    name: PostgreSQL integration tests
     needs: prepare
     uses: ./.github/workflows/dockertests.yml
     with:
-      command-json-array: ${{ needs.prepare.outputs.commands }}
+      command-json-array: ${{ needs.prepare.outputs.pg_commands }}
