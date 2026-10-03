@@ -55,9 +55,9 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/ulikunitz/xz v0.5.17
 	github.com/wal-g/tracelog v0.1.1
-	github.com/yandex-cloud/go-genproto v0.100.0
+	github.com/yandex-cloud/go-genproto v0.124.0
 	github.com/yandex-cloud/go-sdk/services/kms v0.0.82
-	github.com/yandex-cloud/go-sdk/v2 v2.144.0
+	github.com/yandex-cloud/go-sdk/v2 v2.179.0
 	github.com/zeebo/xxh3 v1.1.0
 	go.mongodb.org/mongo-driver/v2 v2.9.1
 	go.uber.org/mock v0.6.0
