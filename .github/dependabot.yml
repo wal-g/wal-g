@@ -14,26 +14,16 @@ updates:
     schedule:
       interval: "weekly"
     groups:
-      aws-sdk-go-v2:
+      dependabot:
         patterns:
           - "github.com/aws/aws-sdk-go-v2"
           - "github.com/aws/aws-sdk-go-v2/*"
-      opentelemetry:
-        patterns:
           - "go.opentelemetry.io/otel"
           - "go.opentelemetry.io/otel/*"
-      azure-sdk:
-        patterns:
           - "github.com/Azure/azure-sdk-for-go/*"
-      google-cloud-go:
-        patterns:
           - "cloud.google.com/go"
           - "cloud.google.com/go/*"
-      klauspost-compress:
-        patterns:
           - "github.com/klauspost/compress"
-      pierrec-lz4:
-        patterns:
           - "github.com/pierrec/lz4/v4"
   - package-ecosystem: "gomod"
     directory: "/cmd/pg/exporter"
