@@ -31,7 +31,7 @@ require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pglogrepl v0.0.0-20260401131349-e37c41485510
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jedib0t/go-pretty/v6 v6.8.2
 	github.com/klauspost/compress v1.20.1
 	github.com/microsoft/go-mssqldb v1.11.2
