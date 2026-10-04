@@ -466,7 +466,7 @@ var (
 		"WALG_S3_RANGE_BATCH_ENABLED": true,
 		"WALG_S3_RANGE_MAX_RETRIES":   true,
 		"WALG_S3_MAX_RETRIES":         true,
-		"WALG_S3_REQUEST_TIMEOUT":     true,
+		"WALG_S3_RESPONSE_HEADER_TIMEOUT":     true,
 
 		// Azure
 		"WALG_AZ_PREFIX":         true,

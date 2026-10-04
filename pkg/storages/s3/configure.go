@@ -44,7 +44,7 @@ const (
 	retentionModeSetting            = "S3_RETENTION_MODE"
 	// limiters for retry policy during interaction with S3
 	maxRetriesSetting              = "S3_MAX_RETRIES"
-	requestTimeoutSetting          = "S3_REQUEST_TIMEOUT"
+	requestTimeoutSetting          = "S3_RESPONSE_HEADER_TIMEOUT"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
