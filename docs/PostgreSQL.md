@@ -547,6 +547,8 @@ Steps:
 wal-g catchup-push /path/to/master/postgres --from-lsn replica_lsn
 ```
 
+LSN can be passed either in PostgreSQL format (as printed by `pg_controldata`, e.g. `0/EDA81980`) or as a decimal number (e.g. `3987216768`).
+
 
 ### ``catchup-fetch``
 
