@@ -101,6 +101,7 @@ func newCapturingClient(capture *captureClient) *s3.Client {
 	return s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String("http://s3.example.com")
 		o.UsePathStyle = true
+		o.DisableLogOutputChecksumValidationSkipped = true
 	})
 }
 

@@ -69,6 +69,7 @@ func NewS3Client(cfg s3ClientConfig, bucket string) (*S3Client, error) {
 
 	cli := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		o.UsePathStyle = true
+		o.DisableLogOutputChecksumValidationSkipped = true
 		if cfg.endpoint != "" {
 			o.BaseEndpoint = aws.String(cfg.endpoint)
 		}

@@ -89,6 +89,7 @@ func buildS3Options(cfg *Config, scheme, host string) ([]func(*s3.Options), erro
 	s3Opts := []func(*s3.Options){
 		func(o *s3.Options) {
 			o.UsePathStyle = cfg.ForcePathStyle
+			o.DisableLogOutputChecksumValidationSkipped = true
 		},
 	}
 	if cfg.Endpoint != "" {
@@ -221,6 +222,7 @@ func detectAWSRegionByBucket(ctx context.Context, awsCfg *aws.Config, bucket, en
 		if endpoint != "" {
 			o.BaseEndpoint = aws.String(endpoint)
 		}
+		o.DisableLogOutputChecksumValidationSkipped = true
 	})
 	out, err := client.GetBucketLocation(ctx, &s3.GetBucketLocationInput{
 		Bucket: aws.String(bucket),
