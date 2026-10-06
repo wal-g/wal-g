@@ -160,6 +160,7 @@ COPY --from=build /go/src/github.com/wal-g/wal-g/bin/walg-daemon-client /usr/bin
 COPY docker/pg_tests/scripts/scripts/ /tmp/scripts/
 COPY docker/pg_tests/scripts/configs/common_config.json /tmp/configs/
 COPY docker/orioledb/scripts/ /tmp
+COPY docker/pg_tests/scripts/tests/test_functions/prepare_config.sh /tmp/tests/test_functions/
 
 RUN mkdir -p /tmp/logs/ && chmod 777 /tmp/configs/ && chmod 777 /tmp/logs/
 RUN mkdir -p /var/run/postgresql && chmod 777 /var/run/postgresql

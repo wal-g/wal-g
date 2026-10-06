@@ -20,6 +20,12 @@ to STDIN and push it to MongoDB instance. Required for restore procedure.
 
 URI used to connect to a MongoDB instance. Required for backup and oplog archiving procedure.
 
+* `MONGODB_BACKUP_CURSOR_FAST_RETRY`
+
+Use the fast backup cursor retry strategy for checkpoint conflicts during `binary-backup-push`.
+When enabled, WAL-G makes five retries with delays of 0, 100ms, 250ms, 500ms, and 1s.
+Default: `false`.
+
 * `MONGODB_RESTORE_DISABLE_HOST_RESETUP`
 
 Do not perform any MongoDB reconfiguration steps during `binary-backup-fetch`. Usefull when one might want just to restore original host state.

@@ -26,6 +26,17 @@ PROXY_SCRIPT="$SCRIPT_DIR/../utils/binlog_proxy.py"
 
 mysql_initialize_and_start
 
+mysql_cache_server_version
+case "$WALG_MYSQL_TEST_SERVER_VERSION" in
+    5.7.*)
+        # MySQL 5.7 does not support heartbeat V2, so heartbeats are disabled.
+        # Without heartbeats, binlog-server cannot detect a replica disconnect
+        # while idle and cannot recover from disconnects in this test.
+        echo "Skipping binlog-server reconnection test on MySQL $WALG_MYSQL_TEST_SERVER_VERSION"
+        exit 0
+        ;;
+esac
+
 mysql -e "SELECT UNIX_TIMESTAMP();"
 mysql -e "SELECT @@GLOBAL.SERVER_UUID;"
 mysql -e "SELECT @@global.binlog_checksum; SET @master_binlog_checksum:=@@global.binlog_checksum; SELECT @master_binlog_checksum;"

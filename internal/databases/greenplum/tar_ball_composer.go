@@ -22,6 +22,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// workers will wait for the mtime second to end.
+// In worst case workes will wait for next second for each file.
+// So, increase queue size to reduce overall expected waiting time.
+const fileBufferMultiplier = 10
+
 type GpTarBallComposerMaker struct {
 	relStorageMap    ao.RelFileStorageMap
 	paxRelStorageMap pax.RelFileStorageMap
@@ -241,7 +246,7 @@ func NewGpTarBallComposer(
 	if err != nil {
 		return nil, err
 	}
-	composer.addFileQueue = make(chan *internal.ComposeFileInfo, maxUploadDiskConcurrency)
+	composer.addFileQueue = make(chan *internal.ComposeFileInfo, fileBufferMultiplier*maxUploadDiskConcurrency)
 	for i := 0; i < maxUploadDiskConcurrency; i++ {
 		composer.errorGroup.Go(func() error {
 			return composer.addFileWorker(composer.addFileQueue)
@@ -337,6 +342,24 @@ func (c *GpTarBallComposer) addFileWorker(tasks <-chan *internal.ComposeFileInfo
 }
 
 func (c *GpTarBallComposer) addFile(cfi *internal.ComposeFileInfo) error {
+	// Start reading after the captured mtime's second has ended, so later writes can be
+	// detected by the next backup even on filesystems with second-resolution timestamps.
+	mtime := cfi.FileInfo.ModTime()
+	now := time.Now()
+	if mtime.Sub(now) > time.Second {
+		return fmt.Errorf("file %q has mtime %s more than one second ahead of current time %s",
+			cfi.Path, mtime.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+	}
+	for ; now.Unix() <= mtime.Unix(); now = time.Now() {
+		timer := time.NewTimer(mtime.Truncate(time.Second).Add(time.Second).Sub(now))
+		select {
+		case <-c.ctx.Done():
+			timer.Stop()
+			return c.ctx.Err()
+		case <-timer.C:
+		}
+	}
+
 	// WAL-G uploads AO/AOCS relfiles to a different location
 	isAo, meta, location := c.relStorageMap.Lookup(cfi.Path)
 	if isAo && cfi.FileInfo.Size() >= c.aoSegSizeThreshold {

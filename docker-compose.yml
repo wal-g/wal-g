@@ -75,7 +75,7 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: AKIAIOSFODNN7EXAMPLE
       AWS_SECRET_ACCESS_KEY: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-      S3_BUCKET: fullbucket,fullbucket-compression-none-encryption,fullratingcomposerbucket,fulldatabasecomposerbucket,fullcopycomposerbucket,fullwithoutfilesmetadatabucket,fullscandeltabucket,failoverstoragebucket,partialbucket,remotebucket,remotewithoutfilesmetadatabucket,cryptobucket,waldeltabucket,ghostbucket,compressionbucket,deleteretainafterbucket,copyallbucket,copybackupbucket,compressionreversebucket,delete-retain-full-bucket,delete-retain-full-multist-bucket,delete-retain-full-multist-fo-bucket,delete-retain-find-full-bucket,delete-before-name-find-full-bucket,delete-before-time-find-full-bucket,delete-before-permanent-full-bucket,delete-before-permanent-delta-bucket,delete-before-permanent-delta-multist-bucket,delete-before-permanent-delta-multist-fo-bucket,delete-without-confirm-bucket,delete-end-to-end-bucket,delete-end-to-end-fo-bucket,delete-target-bucket,delete-target-delta-find-full-bucket,delete-target-delta-bucket,delete-target-delta-multist-bucket,delete-target-delta-multist-fo-bucket,delete-garbage-bucket,delete-garbage-multist-bucket,delete-garbage-multist-fo-bucket,gpdeletetargetbucket,gpdeletegarbagebucket,gp-journal-test-bucket,gp-shared-size-test-bucket,cloudberry-delete-target-bucket,cloudberry-delete-garbage-bucket,mysqlfullxtrabackupbucket,mysqlincrementalxtrabackupbucket,mysqlsplitfilesizebucket,mysqlfullxtrabackupwithrangesbucket,mysqlfullmysqldumpbucket,mysqlbinlogpushfetchbucket,mysqldeleteendtoendbucket,mysqldeleteeverythingpermanent,mysqldeleteincrementalxtrabackupbucket,mysqlmarkbucket,mysqlmarknoerrorbucket,mysqlmarkincrementalbucket,mysqlbinlogreplaybucket,mysql-pitr-binlogserver-bucket,mysql-pitr-binlogserver-reconnection-bucket,mysql-pitr-binlogserver-until-lmt-bucket,mysqlpitrxtrabackupbucket,mysqlpitrxtrabackuppositionbucket,mysqlpitrmysqldumpbucket,mysqllivereplay,mysqlpermanentbackupbucket,mysql-journal-test-bucket,mysql8-xbtool-bucket,mysql8-xbtool-incremental-bucket,mysql8-xbtool-inplace-bucket,mariadb-binlog-push-fetch,mariadb-binlog-push-with-gtids-check,mariadb-full-mysqldump,mariadb-full-maria-backup,mariadb-pitr-xtrabackup,mariadb-pitr-mariabackup-full,mariadb-pitr-failover-gtid-skip,mariadb-pitr-failover-low-file-number,mariadb-pitr-failover-filename-collision,mongostreampushbucket,mongooplogpushbucket,mongodeletebeforebucket,mongodeleteretainbucket,redisbucket,mysqlcopybackupfrom,mysqlcopybackupto,mysqlconfonly,mysqldeletebinlogs,archivereadyrename,gp-follow-primary-bucket,gpfullbucket,gpafterfailedbucket,gpdeletewithoutconfirm,gpdeleteretainbucket,gpdeletebeforepermanentbucket,gpdeletebeforenamebucket,gpdeletebeforetimebucket,gpaostoragetestbucket,gpdeltabackuptestbucket,gppartialtablebucket,cloudberry-follow-primary-bucket,cloudberry-full-bucket,cloudberry-after-failed-bucket,cloudberry-delete-without-confirm,cloudberry-delete-retain-bucket,cloudberry-delete-before-permanent-bucket,cloudberry-delete-before-name-bucket,cloudberry-delete-before-time-bucket,cloudberry-aostorage-test-bucket,cloudberry-paxstorage-test-bucket,cloudberry-journal-test-bucket,cloudberry-shared-size-test-bucket,cloudberry-delta-backup-test-bucket,cloudberry-partial-table-bucket,createrestorepointbucket,storagetoolsbucket,storagetoolsbucket-target,sttransferfilesbucket,sttransferfilesfailoverbucket,transferbackupbucket,walrestorebucket,daemonbucket,backupmarkimpermanentbucket,backupmarkpermanentnoerrorbucket,backupmarkpermanentbucket,backupperftestbucket,catchupbucket,fullstreamedbucket,receivewalbucket,severaldeltabackupsbucket,walperftestbucket,pg-journal-test-bucket,orioledb-compatibility,orioledb-simple,orioledb-compressed,copytestsource,copytestserverdestination,copyteststreamdestination
+      S3_BUCKET: fullbucket,fullbucket-compression-none-encryption,fullratingcomposerbucket,fulldatabasecomposerbucket,fullcopycomposerbucket,fullwithoutfilesmetadatabucket,fullscandeltabucket,failoverstoragebucket,partialbucket,remotebucket,remotewithoutfilesmetadatabucket,cryptobucket,waldeltabucket,ghostbucket,compressionbucket,deleteretainafterbucket,copyallbucket,copybackupbucket,compressionreversebucket,delete-retain-full-bucket,delete-retain-full-multist-bucket,delete-retain-full-multist-fo-bucket,delete-retain-find-full-bucket,delete-before-name-find-full-bucket,delete-before-time-find-full-bucket,delete-before-permanent-full-bucket,delete-before-permanent-delta-bucket,delete-before-permanent-delta-multist-bucket,delete-before-permanent-delta-multist-fo-bucket,delete-without-confirm-bucket,delete-end-to-end-bucket,delete-end-to-end-fo-bucket,delete-target-bucket,delete-target-delta-find-full-bucket,delete-target-delta-bucket,delete-target-delta-multist-bucket,delete-target-delta-multist-fo-bucket,delete-garbage-bucket,delete-garbage-multist-bucket,delete-garbage-multist-fo-bucket,gpdeletetargetbucket,gpdeletegarbagebucket,gp-journal-test-bucket,gp-shared-size-test-bucket,cloudberry-delete-target-bucket,cloudberry-delete-garbage-bucket,mysqlfullxtrabackupbucket,mysqlincrementalxtrabackupbucket,mysqlsplitfilesizebucket,mysqlfullxtrabackupwithrangesbucket,mysqlfullmysqldumpbucket,mysqlbinlogpushfetchbucket,mysqldeleteendtoendbucket,mysqldeleteeverythingpermanent,mysqldeleteincrementalxtrabackupbucket,mysqlmarkbucket,mysqlmarknoerrorbucket,mysqlmarkincrementalbucket,mysqlbinlogreplaybucket,mysql-pitr-binlogserver-bucket,mysql-pitr-binlogserver-reconnection-bucket,mysql-pitr-binlogserver-until-lmt-bucket,mysqlpitrxtrabackupbucket,mysqlpitrxtrabackuppositionbucket,mysqlpitrmysqldumpbucket,mysqllivereplay,mysqlpermanentbackupbucket,mysql-journal-test-bucket,mysql8-xbtool-bucket,mysql8-xbtool-incremental-bucket,mysql8-xbtool-inplace-bucket,mariadb-binlog-push-fetch,mariadb-binlog-push-with-gtids-check,mariadb-full-mysqldump,mariadb-full-maria-backup,mariadb-pitr-xtrabackup,mariadb-pitr-mariabackup-full,mariadb-pitr-failover-gtid-skip,mariadb-pitr-failover-low-file-number,mariadb-pitr-failover-filename-collision,mongostreampushbucket,mongooplogpushbucket,mongodeletebeforebucket,mongodeleteretainbucket,redisbucket,mysqlcopybackupfrom,mysqlcopybackupto,mysqlconfonly,mysqldeletebinlogs,archivereadyrename,gp-follow-primary-bucket,gpfullbucket,gpafterfailedbucket,gpdeletewithoutconfirm,gpdeleteretainbucket,gpdeletebeforepermanentbucket,gpdeletebeforenamebucket,gpdeletebeforetimebucket,gpaostoragetestbucket,gpdeltabackuptestbucket,gppartialtablebucket,cloudberry-follow-primary-bucket,cloudberry-full-bucket,cloudberry-after-failed-bucket,cloudberry-delete-without-confirm,cloudberry-delete-retain-bucket,cloudberry-delete-before-permanent-bucket,cloudberry-delete-before-name-bucket,cloudberry-delete-before-time-bucket,cloudberry-aostorage-test-bucket,cloudberry-paxstorage-test-bucket,cloudberry-copy-source-bucket,cloudberry-copy-target-bucket,cloudberry-journal-test-bucket,cloudberry-shared-size-test-bucket,cloudberry-delta-backup-test-bucket,cloudberry-partial-table-bucket,createrestorepointbucket,storagetoolsbucket,storagetoolsbucket-target,sttransferfilesbucket,sttransferfilesfailoverbucket,transferbackupbucket,walrestorebucket,daemonbucket,backupmarkimpermanentbucket,backupmarkpermanentnoerrorbucket,backupmarkpermanentbucket,backupperftestbucket,catchupbucket,fullstreamedbucket,receivewalbucket,severaldeltabackupsbucket,walperftestbucket,pg-journal-test-bucket,orioledb-compatibility,orioledb-simple,orioledb-compressed,copytestsource,copytestserverdestination,copyteststreamdestination
     command: "mini -s3.port=9000"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:9333/cluster/status && wget -S --spider http://127.0.0.1:9000 2>&1 | grep -q 'HTTP/1.1'"]
@@ -554,152 +554,26 @@ services:
     build:
       dockerfile: docker/mysql/Dockerfile
       context: .
-    image: wal-g/mysql
-    container_name: wal-g_mysql
-
-  mysql8:
-    build:
-      dockerfile: docker/mysql/Dockerfile_v8
-      context: .
-    image: wal-g/mysql8
-    container_name: wal-g_mysql8
-
-  mysql84:
-    build:
-      dockerfile: docker/mysql/Dockerfile_percona
-      context: .
       args:
-        MYSQL_SERIES: "84"
-    image: wal-g/mysql84
-    container_name: wal-g_mysql84
+        MYSQL_SERIES: "${MYSQL_SERIES:-84}"
+    image: wal-g/mysql${MYSQL_SERIES:-84}
+    container_name: wal-g_mysql${MYSQL_SERIES:-84}
 
-  mysql97:
-    build:
-      dockerfile: docker/mysql/Dockerfile_percona
-      context: .
-      args:
-        MYSQL_SERIES: "97"
-    image: wal-g/mysql97
-    container_name: wal-g_mysql97
-
-  mysql_base_tests:
+  mysql_tests:
     build:
       dockerfile: docker/mysql_tests/Dockerfile
       context: .
       args:
-        TEST_ARG: "-p /tmp/base_tests"
+        MYSQL_IMAGE: wal-g/mysql${MYSQL_SERIES:-84}:latest
     security_opt:
       - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_base_tests
-    env_file:
-      - docker/common/common_walg.env
-    <<: *s3_common_depends
-
-  mysql_binlog_server_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/binlog_server_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_binlog_server_tests
-    env_file:
-      - docker/common/common_walg.env
-    <<: *s3_common_depends
-
-  mysql_delete_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/delete_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_delete_tests
-    env_file:
-      - docker/common/common_walg.env
-    <<: *s3_common_depends
-
-  mysql_copy_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/copy_tests"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql_tests
-    container_name: wal-g_mysql_copy_tests
-    env_file:
-      - docker/common/common_walg.env
-    depends_on:
-      s3:
-        condition: service_healthy
-      s3-another:
-        condition: service_healthy
-    links:
-      - s3
-      - s3-another
-
-  mysql8_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile_v8
-      context: .
-      args:
-        TEST_ARG: "-p /tmp/${MYSQL8_TEST_DIR:-xbtool_tests}"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql8_tests
-    container_name: wal-g_mysql8_tests
+    image: wal-g/mysql${MYSQL_SERIES:-84}_tests
+    container_name: wal-g_mysql${MYSQL_SERIES:-84}_tests
     env_file:
       - docker/common/common_walg.env
     environment:
       WALG_COMPRESSION_METHOD: lz4
-    <<: *s3_common_depends
-
-  mysql84_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile_percona
-      context: .
-      args:
-        MYSQL_IMAGE: wal-g/mysql84:latest
-        TEST_ARG: "-p /tmp/${MYSQL84_TEST_DIR:-base_tests}"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql84_tests
-    container_name: wal-g_mysql84_tests
-    env_file:
-      - docker/common/common_walg.env
-    environment:
-      WALG_COMPRESSION_METHOD: lz4
-    depends_on:
-      s3:
-        condition: service_healthy
-      s3-another:
-        condition: service_healthy
-    links:
-      - s3
-      - s3-another
-
-  mysql97_tests:
-    build:
-      dockerfile: docker/mysql_tests/Dockerfile_percona
-      context: .
-      args:
-        MYSQL_IMAGE: wal-g/mysql97:latest
-        TEST_ARG: "-p /tmp/${MYSQL97_TEST_DIR:-base_tests}"
-    security_opt:
-      - seccomp:unconfined
-    image: wal-g/mysql97_tests
-    container_name: wal-g_mysql97_tests
-    env_file:
-      - docker/common/common_walg.env
-    environment:
-      WALG_COMPRESSION_METHOD: lz4
+      MYSQL_TEST_FILTER: "${MYSQL_TEST_FILTER:-}"
     depends_on:
       s3:
         condition: service_healthy

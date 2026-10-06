@@ -235,9 +235,8 @@ func NewMongoClient(ctx context.Context, uri string, setters ...Option) (*MongoC
 
 // IndexDocument holds information about a collection's index.
 type IndexDocument struct {
-	Options                 bson.M `bson:",inline"`
-	Key                     bson.D `bson:"key"`
-	PartialFilterExpression bson.D `bson:"partialFilterExpression,omitempty"`
+	Options bson.M `bson:",inline"`
+	Key     bson.D `bson:"key"`
 }
 
 func (mc *MongoClient) CreateIndexes(ctx context.Context, dbName, collName string, indexes []IndexDocument) error {

@@ -361,7 +361,8 @@ func copyObjectWithoutMetrics(ctx context.Context, from, to storage.Folder, entr
 				return nil
 			}
 			if ctx.Err() != nil || errors.Is(serverCopyErr, context.Canceled) ||
-				errors.Is(serverCopyErr, context.DeadlineExceeded) {
+				errors.Is(serverCopyErr, context.DeadlineExceeded) ||
+				!options.ServerSideCopyFallback {
 				return fmt.Errorf("server-side copy %q to %q: %w", entry.SourcePath, entry.TargetPath, serverCopyErr)
 			}
 			tracelog.WarningLogger.Printf(

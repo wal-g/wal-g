@@ -16,8 +16,16 @@ env:
 
 jobs:
   unittest:
-    name: all_unittests
-    runs-on: ubuntu-latest
+    name: all_unittests (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Install deps
         run: |

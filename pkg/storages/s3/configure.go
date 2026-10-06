@@ -44,6 +44,7 @@ const (
 	retentionModeSetting            = "S3_RETENTION_MODE"
 	// limiters for retry policy during interaction with S3
 	maxRetriesSetting              = "S3_MAX_RETRIES"
+	requestTimeoutSetting          = "S3_RESPONSE_HEADER_TIMEOUT"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
@@ -79,6 +80,7 @@ var SettingList = []string{
 	rangeBatchEnabledSetting,
 	rangeQueriesMaxRetriesSetting,
 	maxRetriesSetting,
+	requestTimeoutSetting,
 	requestAdditionalHeadersSetting,
 	minThrottlingRetryDelaySetting,
 	maxThrottlingRetryDelaySetting,
@@ -95,6 +97,7 @@ const (
 	defaultSkipValidation          = true
 	defaultForcePathStyle          = false
 	defaultMaxRetries              = 15
+	defaultRequestTimeout          = 0
 	defaultMinThrottlingRetryDelay = 500
 	defaultMaxThrottlingRetryDelay = 300000
 	defaultMaxPartSize             = 20 << 20
@@ -137,6 +140,10 @@ func ConfigureStorage(
 		return nil, err
 	}
 	maxRetries, err := setting.IntOptional(settings, maxRetriesSetting, defaultMaxRetries)
+	if err != nil {
+		return nil, err
+	}
+	requestTimeout, err := setting.IntOptional(settings, requestTimeoutSetting, defaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +211,7 @@ func ConfigureStorage(
 		ForcePathStyle:           forcePathStyle,
 		RequestAdditionalHeaders: settings[requestAdditionalHeadersSetting],
 		MaxRetries:               maxRetries,
+		RequestTimeout:           time.Duration(requestTimeout) * time.Second,
 		LogLevel:                 settings[logLevelSetting],
 		Uploader: &UploaderConfig{
 			UploadConcurrency:            uploadConcurrency,

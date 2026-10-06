@@ -10,6 +10,7 @@ DOCKER_COMMON := golang s3
 # Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
 GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
 export GO_VERSION
+export GOEXPERIMENT=simd
 CMD_FILES = $(wildcard cmd/**/*.go)
 PKG_FILES = $(wildcard internal/*.go internal/**/*.go internal/**/**/*.go internal/**/**/**/*.go)
 TEST_FILES = $(wildcard test/*.go testtools/*.go)
@@ -31,19 +32,11 @@ PGBACKREST_BUILD_BASE := ubuntu:22.04
 PGBACKREST_VERSION    := 2.59.0
 endif
 export PGBACKREST_BUILD_BASE PGBACKREST_VERSION
-MYSQL_TEST := "mysql_base_tests"
-MYSQL8_TEST := "mysql8_tests"
-MYSQL84_TEST := "mysql84_tests"
-MYSQL97_TEST := "mysql97_tests"
-MYSQL8_TEST_DIR ?= xbtool_tests
-MYSQL84_TEST_DIR ?= base_tests
-MYSQL97_TEST_DIR ?= base_tests
-export MYSQL8_TEST_DIR MYSQL84_TEST_DIR MYSQL97_TEST_DIR
 MONGO_VERSION ?= "8.0.3"
 MONGO_PACKAGE ?= "mongodb-org"
 MONGO_REPO ?= "repo.mongodb.org"
 MONGO_TEST_TYPE ?= "all"
-GOLANGCI_LINT_VERSION ?= "v2.4.0"
+GOLANGCI_LINT_VERSION ?= "v2.13.0"
 REDIS_VERSION ?= "6.2.4"
 MOCKS_DESTINATION := ./testtools/mocks
 FILE_TO_MOCKS := ./internal/uploader.go # list interface paths here
@@ -79,6 +72,13 @@ ifeq ($(STRIP_BINARIES),1)
 	BUILD_LDFLAGS += -s -w
 endif
 
+GOOS ?= $(shell go env GOOS)
+ifeq ($(GOOS),windows)
+	BINARY_EXT := .exe
+else
+	BINARY_EXT :=
+endif
+
 .PHONY: unittest fmt lint clean
 
 test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudberry_build unlink_brotli pg_integration_test mysql_integration_test redis_integration_test fdb_integration_test gp_integration_test cloudberry_integration_test etcd_integration_test
@@ -86,7 +86,7 @@ test: deps unittest pg_build mysql_build redis_build mongo_build gp_build cloudb
 pg_test: deps pg_build unlink_brotli pg_integration_test
 
 pg_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_PG_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_PG_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$(WALG_VERSION)")
 
 install_and_build_pg: deps pg_build
 
@@ -140,12 +140,9 @@ pg_matrix_test:
 		$(MAKE) PG_MAJOR=$$v pg_integration_test || exit 1; \
 	done
 
-save_common_images: go_deps
-	mkdir -p ${CACHE_FOLDER}
-	sudo rm -rf ${CACHE_FOLDER}/*
-	docker compose build $(DOCKER_COMMON)
-	docker save ${IMAGE_GOLANG}    > ${CACHE_FILE_GOLANG}
-	ls -la ${CACHE_FOLDER}
+# Reuse the prebuilt image from build-golang-image.yml; build locally if it is unavailable.
+load_golang_image:
+	(docker pull ghcr.io/wal-g/golang:$(GO_VERSION) && docker tag ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang) || docker compose build golang
 
 pg_integration_test: clean_compose
 	if [ "$(PG_MAJOR)" = "10" ]; then\
@@ -195,16 +192,16 @@ pg_clean:
 	./cleanup.sh
 
 pg_install: pg_build
-	mv $(MAIN_PG_PATH)/wal-g $(GOBIN)/wal-g
+	mv $(MAIN_PG_PATH)/wal-g$(BINARY_EXT) $(GOBIN)/wal-g$(BINARY_EXT)
 
 mysql_base: deps mysql_build unlink_brotli
-mysql_test: deps mysql_build unlink_brotli mysql_integration_test
+mysql_test: mysql_integration_test
 
 mysql_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MYSQL_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mysql.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mysql.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mysql.walgVersion=$(WALG_VERSION)")
 
 sqlserver_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_SQLSERVER_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/sqlserver.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/sqlserver.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/sqlserver.walgVersion=$(WALG_VERSION)")
 
 load_ubuntu_18_04:
 	(docker pull ghcr.io/wal-g/ubuntu:18.04 && docker tag ghcr.io/wal-g/ubuntu:18.04 wal-g/ubuntu:18.04) || docker compose build ubuntu
@@ -212,37 +209,19 @@ load_ubuntu_18_04:
 load_ubuntu_22_04:
 	(docker pull ghcr.io/wal-g/ubuntu:22.04 && docker tag ghcr.io/wal-g/ubuntu:22.04 wal-g/ubuntu:22.04) || docker compose build ubuntu_22_04
 
-load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04
-	@if [ "x" = "${CACHE_FOLDER}x" ]; then\
-		echo "Rebuild";\
-		docker compose build $(DOCKER_COMMON);\
-	else\
-		docker load -i ${CACHE_FILE_GOLANG} && rm ${CACHE_FILE_GOLANG};\
-	fi
+load_docker_common: load_ubuntu_18_04 load_ubuntu_22_04 load_golang_image
+	docker compose build s3
 
-mysql_integration_test: deps mysql_build unlink_brotli load_docker_common
-	./link_brotli.sh
-	docker compose build mysql && docker compose build $(MYSQL_TEST)
-	docker compose up --force-recreate --exit-code-from $(MYSQL_TEST) $(MYSQL_TEST)
-
-mysql8_integration_test: go_deps unlink_brotli load_docker_common
-	docker compose build mysql8 && docker compose build $(MYSQL8_TEST)
-	docker compose up --force-recreate --exit-code-from $(MYSQL8_TEST) $(MYSQL8_TEST)
-
-mysql84_integration_test: go_deps unlink_brotli load_docker_common
-	docker compose build mysql84 && docker compose build $(MYSQL84_TEST)
-	docker compose up --force-recreate --exit-code-from $(MYSQL84_TEST) $(MYSQL84_TEST)
-
-mysql97_integration_test: go_deps unlink_brotli load_docker_common
-	docker compose build mysql97 && docker compose build $(MYSQL97_TEST)
-	docker compose up --force-recreate --exit-code-from $(MYSQL97_TEST) $(MYSQL97_TEST)
+mysql_integration_test: go_deps unlink_brotli load_docker_common
+	docker compose build mysql && docker compose build mysql_tests
+	docker compose up --force-recreate --exit-code-from mysql_tests mysql_tests
 
 mysql_clean:
 	(cd $(MAIN_MYSQL_PATH) && go clean)
 	./cleanup.sh
 
 mysql_install: mysql_build
-	mv $(MAIN_MYSQL_PATH)/wal-g $(GOBIN)/wal-g
+	mv $(MAIN_MYSQL_PATH)/wal-g$(BINARY_EXT) $(GOBIN)/wal-g$(BINARY_EXT)
 
 mariadb_test: deps mysql_build unlink_brotli mariadb_integration_test
 
@@ -252,10 +231,10 @@ mariadb_integration_test: unlink_brotli load_docker_common
 	docker compose up --force-recreate --exit-code-from mariadb_tests mariadb_tests
 
 mongo_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_MONGO_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_MONGO_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/mongo.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/mongo.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/mongo.walgVersion=$(WALG_VERSION)")
 
 mongo_install: mongo_build
-	mv $(MAIN_MONGO_PATH)/wal-g $(GOBIN)/wal-g
+	mv $(MAIN_MONGO_PATH)/wal-g$(BINARY_EXT) $(GOBIN)/wal-g$(BINARY_EXT)
 
 mongo_features:
 	set -e
@@ -279,10 +258,10 @@ clean_mongo_features:
 	cd tests_func/ && MONGO_VERSION=$(MONGO_VERSION) MONGO_PACKAGE=$(MONGO_PACKAGE) MONGO_REPO=$(MONGO_REPO) go test -v -count=1  -timeout 5m --tf.test=false --tf.debug=false --tf.clean=true --tf.stop=true --tf.database=mongodb
 
 fdb_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_FDB_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS)")
+	(cd $(MAIN_FDB_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS)")
 
 fdb_install: fdb_build
-	mv $(MAIN_FDB_PATH)/wal-g $(GOBIN)/wal-g
+	mv $(MAIN_FDB_PATH)/wal-g$(BINARY_EXT) $(GOBIN)/wal-g$(BINARY_EXT)
 
 fdb_integration_test: load_docker_common
 	docker compose down -v
@@ -297,7 +276,7 @@ redis_test:
 	$(MAKE) USE_BROTLI=1 unlink_brotli
 
 redis_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_REDIS_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/redis.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/redis.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/redis.walgVersion=$(WALG_VERSION)")
 
 redis_integration_test: load_docker_common
 	docker compose build redis && docker compose build redis_tests
@@ -308,7 +287,7 @@ redis_clean:
 	./cleanup.sh
 
 redis_install: redis_build
-	mv $(MAIN_REDIS_PATH)/wal-g $(GOBIN)/wal-g
+	mv $(MAIN_REDIS_PATH)/wal-g$(BINARY_EXT) $(GOBIN)/wal-g$(BINARY_EXT)
 
 redis_features:
 	set -e
@@ -337,19 +316,23 @@ etcd_integration_test: load_docker_common
 	docker compose up --exit-code-from etcd_tests etcd_tests
 
 gp_build: $(CMD_FILES) $(PKG_FILES)
-	(cd $(MAIN_GP_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
+	(cd $(MAIN_GP_PATH) && go build $(if $(ENABLE_RACE_DETECTION),-race) -mod vendor -tags "$(BUILD_TAGS)" -o wal-g$(BINARY_EXT) -gcflags "$(BUILD_GCFLAGS)" -ldflags "$(BUILD_LDFLAGS) -X github.com/wal-g/wal-g/cmd/gp.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/gp.gitRevision=$(GIT_REVISION) -X github.com/wal-g/wal-g/cmd/gp.walgVersion=$(WALG_VERSION)")
 
 gp_clean:
 	(cd $(MAIN_GP_PATH) && go clean)
 	./cleanup.sh
 
 gp_install: gp_build
-	mv $(MAIN_GP_PATH)/wal-g $(GOBIN)/wal-g
+	mv $(MAIN_GP_PATH)/wal-g$(BINARY_EXT) $(GOBIN)/wal-g$(BINARY_EXT)
 
 gp_test: deps gp_build unlink_brotli gp_integration_test
 
 gp_integration_test: load_docker_common
-	docker compose build gp
+	@if docker pull ghcr.io/wal-g/gp:latest; then \
+		docker tag ghcr.io/wal-g/gp:latest wal-g/gp:latest; \
+	else \
+		docker compose build gp; \
+	fi
 	docker compose build gp_tests
 	docker compose up --exit-code-from gp_tests gp_tests
 
@@ -362,7 +345,11 @@ cloudberry_install: gp_install
 cloudberry_test: deps cloudberry_build unlink_brotli cloudberry_integration_test
 
 cloudberry_integration_test: load_docker_common
-	docker compose build cloudberry
+	@if docker pull ghcr.io/wal-g/cloudberry:latest; then \
+		docker tag ghcr.io/wal-g/cloudberry:latest wal-g/cloudberry:latest; \
+	else \
+		docker compose build cloudberry; \
+	fi
 	docker compose build cloudberry_tests
 	docker compose up s3 cloudberry_tests --force-recreate --exit-code-from cloudberry_tests
 
