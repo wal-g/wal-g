@@ -46,7 +46,12 @@ type Config struct {
 	Disable100Continue       bool
 	EnableVersioning         string
 	DeleteBatchSize          int
-	showAllVersions          bool // When true, include deleted objects in listing (for st ls --all-versions)
+	// RequestTimeout, when > 0, becomes the http.Transport.ResponseHeaderTimeout
+	// on the AWS SDK's HTTP client. The S3 server has this long to send headers
+	// for any request before the connection is aborted; body streaming is not
+	// constrained, so multi-GB uploads/downloads still complete.
+	RequestTimeout  time.Duration
+	showAllVersions bool // When true, include deleted objects in listing (for st ls --all-versions)
 }
 
 type Secrets struct {

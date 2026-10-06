@@ -165,6 +165,12 @@ func buildHTTPClient(cfg *Config, tlsServerName string) (aws.HTTPClient, error) 
 		transport.TLSClientConfig.RootCAs = pool
 	}
 
+	// Bound only the wait for response headers, so large uploads and
+	// downloads are not cut off mid-transfer.
+	if cfg.RequestTimeout > 0 {
+		transport.ResponseHeaderTimeout = cfg.RequestTimeout
+	}
+
 	return &http.Client{Transport: NewRoundTripperWithLogging(transport)}, nil
 }
 
