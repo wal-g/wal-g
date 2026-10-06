@@ -26,7 +26,7 @@ func ParseLSN(s string) (LSN, error) {
 // ParseLSNOrNumber accepts LSN either in PostgreSQL text format (e.g. "0/EDA81980")
 // or as a plain decimal number (e.g. "3987216768")
 func ParseLSNOrNumber(s string) (LSN, error) {
-	if strings.Contains(s, "/") {
+	if strings.ContainsRune(s, '/') {
 		return ParseLSN(s)
 	}
 
