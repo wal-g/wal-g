@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/compression"
@@ -136,8 +135,8 @@ func (sd *StorageDownloader) ListOplogArchivesSegment(ctx context.Context,
 	startAfter *string, endBefore *string) ([]models.Archive, error) {
 	tracelog.DebugLogger.Printf("Listing %s with startAfter `%s` and endBefore `%s`",
 		sd.oplogsFolder.GetPath(),
-		aws.ToString(startAfter),
-		aws.ToString(endBefore),
+		stringOrEmpty(startAfter),
+		stringOrEmpty(endBefore),
 	)
 	var objects []storage.Object
 	var err error
@@ -369,4 +368,11 @@ func (sp *StoragePurger) DeleteOplogArchives(ctx context.Context, archives []mod
 	}
 	tracelog.DebugLogger.Printf("Oplog keys will be deleted: %+v\n", oplogKeys)
 	return sp.oplogsFolder.DeleteObjects(ctx, oplogKeys)
+}
+
+func stringOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
