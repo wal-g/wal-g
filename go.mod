@@ -36,8 +36,8 @@ require (
 	github.com/klauspost/compress v1.20.1
 	github.com/microsoft/go-mssqldb v1.11.2
 	github.com/minio/sio v0.5.1
-	github.com/moby/moby/api v1.56.0
-	github.com/moby/moby/client v0.6.0
+	github.com/moby/moby/api v1.56.1
+	github.com/moby/moby/client v0.6.1
 	github.com/mongodb/mongo-tools v0.0.0-20260508170159-0b142f65e139
 	github.com/ncw/directio v1.0.5
 	github.com/ncw/swift/v2 v2.0.5
@@ -118,7 +118,7 @@ require (
 	github.com/cucumber/messages/go/v34 v34.2.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.7.0 // indirect
+	github.com/docker/go-connections v0.8.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.37.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
