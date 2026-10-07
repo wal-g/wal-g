@@ -29,4 +29,7 @@ type DataFolder interface {
 	DeleteFile(filename string) error
 	CreateFile(filename string) error
 	RenameFile(oldFileName string, newFileName string) error
+	// ListFiles returns the names of files in the folder, up to limit entries.
+	// A limit <= 0 means no limit.
+	ListFiles(limit int) ([]string, error)
 }
