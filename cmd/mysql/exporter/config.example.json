@@ -1,0 +1,10 @@
+{
+  "WALG_S3_PREFIX": "s3://my-bucket/mysql-backups",
+  "AWS_ACCESS_KEY_ID": "your-access-key",
+  "AWS_SECRET_ACCESS_KEY": "your-secret-key",
+  "AWS_REGION": "us-east-1",
+  "WALG_MYSQL_DATASOURCE_NAME": "user:password@tcp(localhost:3306)/mysql",
+  "WALG_COMPRESSION_METHOD": "brotli",
+  "WALG_STREAM_CREATE_COMMAND": "xtrabackup --backup --stream=xbstream --datadir=/var/lib/mysql",
+  "WALG_STREAM_RESTORE_COMMAND": "xbstream -x -C /var/lib/mysql"
+}
