@@ -24,6 +24,10 @@ func (lf *LimitedFolder) GetSubFolder(subFolderRelativePath string) storage.Fold
 	return NewLimitedFolder(folder, lf.limiter)
 }
 
+func (lf *LimitedFolder) ListObjectsWithPrefix(ctx context.Context, prefix string) ([]storage.Object, error) {
+	return storage.ListObjectsWithPrefix(ctx, lf.Folder, prefix)
+}
+
 func (lf *LimitedFolder) ReadObject(ctx context.Context, objectRelativePath string) (io.ReadCloser, error) {
 	readCloser, err := lf.Folder.ReadObject(ctx, objectRelativePath)
 	if err != nil {
