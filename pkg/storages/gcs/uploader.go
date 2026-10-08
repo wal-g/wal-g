@@ -119,7 +119,7 @@ func (u *Uploader) getCleanUpChunksFunc(tmpChunk *storage.ObjectHandle) func(con
 	return func(ctx context.Context) error {
 		err := tmpChunk.Delete(ctx)
 
-		if err == storage.ErrObjectNotExist {
+		if errors.Is(err, storage.ErrObjectNotExist) {
 			tracelog.WarningLogger.Printf("Temporary chunk %v doesn't exist", tmpChunk.BucketName())
 			return nil
 		}
