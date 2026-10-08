@@ -93,6 +93,7 @@ func (ji *JournalInfo) Read(ctx context.Context, folder storage.Folder) error {
 	if err != nil {
 		return err
 	}
+	defer journalInfoReader.Close()
 
 	journalInfoRaw, err := io.ReadAll(journalInfoReader)
 	if err != nil {
