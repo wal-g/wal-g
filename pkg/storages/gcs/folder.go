@@ -2,6 +2,7 @@ package gcs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -101,7 +102,7 @@ func (folder *Folder) DeleteObjects(ctx context.Context, objectsWithRelativePath
 		tracelog.DebugLogger.Printf("Delete %v\n", objPath)
 		opCtx, ctxCancel := folder.createTimeoutContext(ctx)
 		err := object.Delete(opCtx)
-		if err != nil && err != gcs.ErrObjectNotExist {
+		if err != nil && !errors.Is(err, gcs.ErrObjectNotExist) {
 			ctxCancel()
 			return fmt.Errorf("delete GCS object %q: %w", objPath, err)
 		}
@@ -116,7 +117,7 @@ func (folder *Folder) Exists(ctx context.Context, objectRelativePath string) (bo
 	ctx, cancel := folder.createTimeoutContext(ctx)
 	defer cancel()
 	_, err := object.Attrs(ctx)
-	if err == gcs.ErrObjectNotExist {
+	if errors.Is(err, gcs.ErrObjectNotExist) {
 		return false, nil
 	}
 	if err != nil {
@@ -131,7 +132,7 @@ func (folder *Folder) StatObject(ctx context.Context, objectRelativePath string)
 	ctx, cancel := folder.createTimeoutContext(ctx)
 	defer cancel()
 	attrs, err := object.Attrs(ctx)
-	if err == gcs.ErrObjectNotExist {
+	if errors.Is(err, gcs.ErrObjectNotExist) {
 		return nil, storage.NewObjectNotFoundError(objPath)
 	}
 	if err != nil {
@@ -153,7 +154,7 @@ func (folder *Folder) ReadObject(ctx context.Context, objectRelativePath string)
 	objPath := folder.joinPath(folder.path, objectRelativePath)
 	object := folder.BuildObjectHandle(objPath)
 	reader, err := object.NewReader(ctx)
-	if err == gcs.ErrObjectNotExist {
+	if errors.Is(err, gcs.ErrObjectNotExist) {
 		return nil, storage.NewObjectNotFoundError(objPath)
 	}
 	return io.NopCloser(reader), err
