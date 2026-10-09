@@ -1,6 +1,6 @@
 module github.com/wal-g/wal-g
 
-go 1.27.1
+go 1.27.2
 
 require (
 	cloud.google.com/go/storage v1.69.0
