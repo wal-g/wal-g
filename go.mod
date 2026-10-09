@@ -1,6 +1,6 @@
 module github.com/wal-g/wal-g
 
-go 1.27.1
+go 1.27.2
 
 require (
 	cloud.google.com/go/storage v1.69.0
@@ -63,7 +63,7 @@ require (
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.42.0
