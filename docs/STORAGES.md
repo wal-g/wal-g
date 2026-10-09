@@ -1,6 +1,6 @@
 # WAL-G storage configuration
 
-WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, remote host (via SSH) or local file system. 
+WAL-G can store backups in S3, Google Cloud Storage, Azure, Alicloud, Swift, Rclone (40+ providers), remote host (via SSH) or local file system. 
 
 S3
 -----------
@@ -237,6 +237,60 @@ To store backups via ssh, WAL-G requires that these variables be set:
 * `SSH_USERNAME` connect with username
 * `SSH_PASSWORD` connect with password
 * `SSH_PRIVATE_KEY_PATH` or connect with a SSH KEY by specifying its full path
+
+Rclone
+-----------
+To store backups using Rclone (supports 40+ cloud providers), WAL-G requires that these variables be set:
+
+* `WALG_RCLONE_PREFIX`
+(e.g. `remote://mybucket/backups`)
+
+* `RCLONE_REMOTE`
+Name of the configured Rclone remote (required)
+
+**Optional variables**
+
+* `RCLONE_CONFIG_PATH`
+
+Path to Rclone configuration file. Defaults to `~/.config/rclone/rclone.conf`.
+
+* `RCLONE_BINARY_PATH`
+
+Path to Rclone binary. Defaults to `rclone`.
+
+* `RCLONE_TRANSFERS`
+
+Number of parallel file transfers. Defaults to 4.
+
+* `RCLONE_BUFFER_SIZE`
+
+Buffer size in bytes for transfers. Defaults to 16777216 (16MB).
+
+* `RCLONE_TIMEOUT`
+
+Timeout for operations in seconds. Defaults to 300.
+
+* `RCLONE_RETRIES`
+
+Number of retries for failed operations. Defaults to 3.
+
+* `RCLONE_LOW_LEVEL_RETRIES`
+
+Number of low-level retries. Defaults to 10.
+
+* `RCLONE_S3_CHUNK_SIZE`
+
+S3 multipart chunk size in bytes (e.g. `67108864` for 64MB). Only passed to rclone when set.
+
+* `RCLONE_UPLOAD_CONCURRENCY`
+
+S3 upload concurrency. Only passed to rclone when set.
+
+* `RCLONE_EXTRA_ARGS`
+
+Additional arguments to pass to Rclone commands (e.g., `--fast-list --checkers 16`).
+
+See [RCLONE.md](RCLONE.md) for detailed configuration and examples.
 
 Examples
 -----------
