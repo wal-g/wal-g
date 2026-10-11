@@ -342,6 +342,68 @@ func TestNewRetryerRetriesShortRequestBody(t *testing.T) {
 	assert.Equal(t, 3, retryer.MaxAttempts())
 }
 
+func TestUploadPartRetriesAdditionalErrorCodes(t *testing.T) {
+	const partBody = "part contents"
+	invalidRequest := s3ErrorXML("InvalidRequest", "Invalid Request")
+	for _, tc := range []struct {
+		name         string
+		codes        string
+		wantAttempts int
+		wantError    bool
+	}{
+		{"not configured", "", 1, true},
+		{"configured", "InvalidRequest", 2, false},
+		{"list with spaces and empty items", " BadDigest , InvalidRequest ,", 2, false},
+		{"other code configured", "BadDigest", 1, true},
+		{"code is case-sensitive", "invalidrequest", 1, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			attempts := 0
+			client := awss3.NewFromConfig(aws.Config{
+				Region:      "us-east-1",
+				Credentials: credentials.NewStaticCredentialsProvider("key", "secret", ""),
+				Retryer: newRetryerFunc(&Config{
+					MaxRetries:              2,
+					MaxThrottlingRetryDelay: time.Nanosecond,
+					RetryableErrorCodes:     parseErrorCodes(tc.codes),
+				}),
+				RequestChecksumCalculation: aws.RequestChecksumCalculationWhenRequired,
+				HTTPClient: smithyhttp.ClientDoFunc(func(req *http.Request) (*http.Response, error) {
+					attempts++
+					body, err := io.ReadAll(req.Body)
+					require.NoError(t, err)
+					require.NoError(t, req.Body.Close())
+					assert.Equal(t, partBody, string(body))
+
+					status, responseBody := http.StatusOK, ""
+					if attempts == 1 {
+						status, responseBody = http.StatusBadRequest, invalidRequest
+					}
+					return &http.Response{
+						StatusCode: status,
+						Header:     http.Header{"Etag": []string{`"part-etag"`}},
+						Body:       io.NopCloser(strings.NewReader(responseBody)),
+						Request:    req,
+					}, nil
+				}),
+			})
+			_, err := client.UploadPart(t.Context(), &awss3.UploadPartInput{
+				Bucket:     aws.String("bucket"),
+				Key:        aws.String("backup.tar.br"),
+				UploadId:   aws.String("upload-id"),
+				PartNumber: aws.Int32(1),
+				Body:       strings.NewReader(partBody),
+			})
+			if tc.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, tc.wantAttempts, attempts)
+		})
+	}
+}
+
 // s3ErrorXML is the S3 XML shape logged for the Backblaze InvalidRequest,
 // with the code and message substituted.
 func s3ErrorXML(code, message string) string {
