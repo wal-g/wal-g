@@ -65,6 +65,20 @@ func (err UnconfiguredStorageError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
+type StorageNotCompiledError struct {
+	error
+}
+
+func newStorageNotCompiledError(s knownStorage) StorageNotCompiledError {
+	return StorageNotCompiledError{
+		errors.Errorf("WALG_%s is set, but this WAL-G binary was built without %s storage support "+
+			"(rebuild with build tag %s)", s.prefixSettingKey(), s.storageType, s.buildTag)}
+}
+
+func (err StorageNotCompiledError) Error() string {
+	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
+}
+
 type UnknownCompressionMethodError struct {
 	error
 }
@@ -184,6 +198,12 @@ func ConfigureStorageForSpecificConfig(
 			return nil, fmt.Errorf("configure storage with prefix %q: %w", prefix, err)
 		}
 		return st, nil
+	}
+	notCompiled, ok := findNotCompiledStorage(func(key string) (string, bool) {
+		return conf.GetWaleCompatibleSettingFrom(key, config)
+	})
+	if ok {
+		return nil, newStorageNotCompiledError(notCompiled)
 	}
 	return nil, newUnconfiguredStorageError(skippedPrefixes)
 }
@@ -615,6 +635,9 @@ func ConfigureFailoverStorages(ctx context.Context) (failovers map[string]storag
 
 func AssertRequiredSettingsSet() error {
 	if !isAnyStorageSet() {
+		if notCompiled, ok := findNotCompiledStorage(conf.GetWaleCompatibleSetting); ok {
+			return newStorageNotCompiledError(notCompiled)
+		}
 		return errors.New("Failed to find any configured storage")
 	}
 
