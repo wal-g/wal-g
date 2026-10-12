@@ -65,6 +65,10 @@ type CrossFolderCopier interface {
 	CopyObjectFrom(ctx context.Context, source Folder, sourcePath, destinationPath string, size int64) error
 }
 
+type RetryClassifier interface {
+	IsRetryableError(error) bool
+}
+
 func ListFolderRecursively(ctx context.Context, folder Folder) (relativePathObjects []Object, err error) {
 	return ListFolderRecursivelyWithFilter(ctx, folder, func(string) bool { return true })
 }

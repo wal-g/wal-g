@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"strings"
+	"sync"
 
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
@@ -13,9 +14,9 @@ import (
 	"github.com/wal-g/wal-g/utility"
 )
 
-func Encrypt(ctx context.Context, source io.Reader, crypter crypto.Crypter) (io.Reader, error) {
+func Encrypt(ctx context.Context, source io.Reader, crypter crypto.Crypter) (io.ReadCloser, error) {
 	if crypter == nil {
-		return source, nil
+		return io.NopCloser(source), nil
 	}
 
 	cryptReader, dstWriter := io.Pipe()
@@ -28,11 +29,15 @@ func Encrypt(ctx context.Context, source io.Reader, crypter crypto.Crypter) (io.
 		return nil, err
 	}
 
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
+		defer dstWriter.Close()
 		_, err := utility.FastCopy(writeCloser, source)
 
 		if err != nil {
 			_ = dstWriter.CloseWithError(err)
+			_ = writeCloser.Close()
 			return
 		}
 
@@ -45,7 +50,19 @@ func Encrypt(ctx context.Context, source io.Reader, crypter crypto.Crypter) (io.
 		_ = dstWriter.Close()
 	}()
 
-	return cryptReader, nil
+	return &encryptionReader{PipeReader: cryptReader, done: done}, nil
+}
+
+type encryptionReader struct {
+	*io.PipeReader
+	done <-chan struct{}
+	once sync.Once
+}
+
+func (r *encryptionReader) Close() error {
+	err := r.PipeReader.Close()
+	r.once.Do(func() { <-r.done })
+	return err
 }
 
 func collectCopyingInfo(
@@ -54,20 +71,24 @@ func collectCopyingInfo(
 	fromConfigFile string,
 	toConfigFile string,
 	decryptSource bool,
-	encryptTarget bool) ([]copy.InfoProvider, error) {
+	encryptTarget bool) ([]copy.InfoProvider, copy.ExecuteOptions, error) {
 	tracelog.InfoLogger.Printf("Collecting files with prefix %s.", prefix)
-	from, err := internal.StorageFromConfig(ctx, fromConfigFile)
+	from, fromConfig, err := internal.StorageAndConfigFromFile(ctx, fromConfigFile)
 	if err != nil {
-		return nil, err
+		return nil, copy.ExecuteOptions{}, err
 	}
-	to, err := internal.StorageFromConfig(ctx, toConfigFile)
+	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	if err != nil {
-		return nil, err
+		return nil, copy.ExecuteOptions{}, err
+	}
+	options, err := copy.OptionsFromConfigs(fromConfig, toConfig)
+	if err != nil {
+		return nil, copy.ExecuteOptions{}, err
 	}
 
 	objects, err := storage.ListFolderRecursively(ctx, from.RootFolder())
 	if err != nil {
-		return nil, err
+		return nil, copy.ExecuteOptions{}, err
 	}
 
 	var hasPrefix = func(object storage.Object) bool { return strings.HasPrefix(object.GetName(), prefix) }
@@ -79,25 +100,23 @@ func collectCopyingInfo(
 		func(object storage.Object) string {
 			return object.GetName()
 		},
-		func(r io.Reader) (io.Reader, error) {
+		func(ctx context.Context, r io.Reader) (io.ReadCloser, error) {
 			if decryptSource {
-				r, err = internal.DecryptBytes(ctx, r)
-				if err != nil {
-					return nil, err
+				decrypted, decryptErr := internal.DecryptBytes(ctx, r)
+				if decryptErr != nil {
+					return nil, decryptErr
 				}
+				r = decrypted
 			}
 
 			if encryptTarget {
 				crypter := internal.CrypterFromConfig(toConfigFile)
-				r, err = Encrypt(ctx, r, crypter)
-				if err != nil {
-					return nil, err
-				}
+				return Encrypt(ctx, r, crypter)
 			}
 
-			return r, nil
+			return io.NopCloser(r), nil
 		},
-	), nil
+	), options, nil
 }
 
 // HandleCopyBackup copy specific backups from one storage to another
@@ -105,7 +124,7 @@ func HandleCopyObjects(
 	ctx context.Context,
 	fromConfigFile, toConfigFile, prefix string,
 	decryptSource, encryptTarget bool) {
-	infos, err := collectCopyingInfo(ctx, prefix, fromConfigFile, toConfigFile, decryptSource,
+	infos, options, err := collectCopyingInfo(ctx, prefix, fromConfigFile, toConfigFile, decryptSource,
 		encryptTarget)
 	tracelog.ErrorLogger.FatalOnError(err)
 
@@ -119,7 +138,7 @@ func HandleCopyObjects(
 		return ret
 	}(), ","))
 
-	tracelog.ErrorLogger.FatalOnError(copy.Infos(ctx, infos))
+	tracelog.ErrorLogger.FatalOnError(copy.InfosWithOptions(ctx, infos, options))
 
 	tracelog.InfoLogger.Printf("Successfully copied %d objects", len(infos))
 }

@@ -75,6 +75,9 @@ Example:
 
 ``wal-g st put path/to/local_file path/to/remote_file`` upload the local file to the storage.
 
+### `copy`
+Copy objects between the source and destination configurations.
+
 ### `transfer`
 Transfer files from one configured storage to another. Is usually used to move files from a failover storage to the primary one when it becomes alive.
 

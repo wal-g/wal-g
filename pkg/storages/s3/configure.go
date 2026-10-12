@@ -145,6 +145,9 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	if maxRetries < 0 || maxRetries == int(^uint(0)>>1) {
+		return nil, fmt.Errorf("%s must be nonnegative and leave room for the initial attempt", maxRetriesSetting)
+	}
 	requestTimeout, err := setting.IntOptional(settings, requestTimeoutSetting, defaultRequestTimeout)
 	if err != nil {
 		return nil, err
@@ -156,6 +159,10 @@ func ConfigureStorage(
 	maxThrottlingRetryDelay, err := setting.IntOptional(settings, maxThrottlingRetryDelaySetting, defaultMaxThrottlingRetryDelay)
 	if err != nil {
 		return nil, err
+	}
+	if minThrottlingRetryDelay < 0 || maxThrottlingRetryDelay <= 0 || minThrottlingRetryDelay > maxThrottlingRetryDelay ||
+		int64(maxThrottlingRetryDelay) > int64((1<<63-1)/time.Millisecond) {
+		return nil, fmt.Errorf("S3 retry delays must satisfy 0 <= minimum <= maximum, with a positive representable maximum")
 	}
 	uploadConcurrency, err := setting.Int(settings, uploadConcurrencySetting)
 	if err != nil {
@@ -176,6 +183,9 @@ func ConfigureStorage(
 	rangeMaxRetries, err := setting.IntOptional(settings, rangeQueriesMaxRetriesSetting, defaultRangeMaxRetries)
 	if err != nil {
 		return nil, err
+	}
+	if rangeMaxRetries < 0 {
+		return nil, fmt.Errorf("%s must be nonnegative", rangeQueriesMaxRetriesSetting)
 	}
 	retentionPeriod, err := setting.IntOptional(settings, retentionPeriodSetting, defaultDisabledRetentionPeriod)
 	if err != nil {

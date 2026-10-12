@@ -3,6 +3,7 @@ package copy
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -10,17 +11,48 @@ import (
 )
 
 type ExecuteOptions struct {
+	MaxRetries             *int
 	UseServerSideCopy      bool
 	ServerSideCopyFallback bool
 	// SkipErrorsFor matches source paths whose transfer failures may be skipped. Nil disables skipping.
 	SkipErrorsFor *regexp.Regexp
 }
 
-func OptionsFromConfigs(source, destination *viper.Viper) ExecuteOptions {
+func OptionsFromConfigs(source, destination *viper.Viper) (ExecuteOptions, error) {
+	retries, err := configuredCopyRetries(source)
+	if err != nil {
+		return ExecuteOptions{}, err
+	}
 	return ExecuteOptions{
+		MaxRetries:             &retries,
 		UseServerSideCopy:      rawCopyConfigEligible(source) && rawCopyConfigEligible(destination),
 		ServerSideCopyFallback: source.GetBool(conf.ServerSideCopyFallback) || destination.GetBool(conf.ServerSideCopyFallback),
+	}, nil
+}
+
+func configuredCopyRetries(source *viper.Viper) (int, error) {
+	value := conf.CommonDefaultConfigValues[conf.DownloadFileRetriesSetting]
+	if viper.IsSet(conf.DownloadFileRetriesSetting) {
+		value = viper.GetString(conf.DownloadFileRetriesSetting)
 	}
+	if source != nil && source.InConfig(conf.DownloadFileRetriesSetting) {
+		value = source.GetString(conf.DownloadFileRetriesSetting)
+	}
+	retries, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || retries < 0 {
+		return 0, fmt.Errorf("%s must be a nonnegative integer", conf.DownloadFileRetriesSetting)
+	}
+	return retries, nil
+}
+
+func (o ExecuteOptions) copyRetries() (int, error) {
+	if o.MaxRetries == nil {
+		return configuredCopyRetries(nil)
+	}
+	if *o.MaxRetries < 0 {
+		return 0, fmt.Errorf("%s must be a nonnegative integer", conf.DownloadFileRetriesSetting)
+	}
+	return *o.MaxRetries, nil
 }
 
 // DisasterCopyPattern reads the database-specific default or a configured override.
