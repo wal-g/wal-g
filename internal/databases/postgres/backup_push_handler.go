@@ -217,11 +217,13 @@ func (bh *BackupHandler) createAndPushBackup(ctx context.Context) {
 		tracelog.ErrorLogger.Fatalf("No storages are used in the uploading folder")
 	}
 
-	// logging backup set Name
 	createdBackup := BackupInfo{Name: bh.CurBackupInfo.Name, Storage: storageNames[0]}
 
 	err = printlist.OneElement(createdBackup, os.Stdout, bh.Arguments.pretty, bh.Arguments.json)
 	tracelog.ErrorLogger.FatalOnError(err)
+
+	// logging backup set Name
+	tracelog.InfoLogger.Printf("Wrote backup with name %s to storage %s", bh.CurBackupInfo.Name, storageNames[0])
 }
 
 func (bh *BackupHandler) startBackup(ctx context.Context) error {

@@ -340,6 +340,12 @@ func copyObject(ctx context.Context, from, to storage.Folder, entry Entry, optio
 	err := copyObjectWithoutMetrics(ctx, from, to, entry, options)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
+		if options.SkipErrorsFor != nil && ctx.Err() == nil &&
+			!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) &&
+			options.SkipErrorsFor.MatchString(entry.SourcePath) {
+			tracelog.WarningLogger.Printf("Skipping failed copy of %q: %v", entry.SourcePath, err)
+			return nil
+		}
 	}
 	return err
 }

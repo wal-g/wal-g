@@ -134,6 +134,7 @@ const (
 	MongoDBUriSetting                   = "MONGODB_URI"
 	MongoDBLastWriteUpdateInterval      = "MONGODB_LAST_WRITE_UPDATE_INTERVAL"
 	MongoDBExtendBackupCursor           = "MONGODB_EXTEND_BACKUP_CURSOR"
+	MongoDBBackupCursorFastRetry        = "MONGODB_BACKUP_CURSOR_FAST_RETRY"
 	MongoDBDeletionProtectionWhitelist  = "MONGODB_DELETION_PROTECTION_WHITELIST"
 	MongoDBExtraInternalDatabases       = "MONGODB_EXTRA_INTERNAL_DATABASES"
 	OplogArchiveAfterSize               = "OPLOG_ARCHIVE_AFTER_SIZE"
@@ -258,6 +259,8 @@ const (
 
 	ForceWalDetal          = "WALG_FORCE_WAL_DELTA"
 	ServerSideCopyFallback = "WALG_SERVER_SIDE_COPY_FALLBACK"
+	DisasterCopy           = "WALG_DISASTER_COPY"
+	DisasterCopySkipFiles  = "WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES"
 )
 
 var (
@@ -295,6 +298,7 @@ var (
 		DirectIOBlockCountSetting:    "32",
 		LogLevelSetting:              "NORMAL",
 		ServerSideCopyFallback:       "true",
+		DisasterCopy:                 "false",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -332,6 +336,7 @@ var (
 	}
 
 	PGDefaultSettings = map[string]string{
+		DisasterCopySkipFiles:     `^wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		PgWalSize:                 "16",
 		PgWalPageSize:             "8192",
 		PgBlockSize:               "8192",
@@ -344,6 +349,7 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
+		DisasterCopySkipFiles:        `^segments_005/seg-?[0-9]+/wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		GPLogsDirectory:              "/var/log",
 		PgWalSize:                    "64",
 		PgWalPageSize:                "32768",
@@ -422,6 +428,8 @@ var (
 		StatsdAddressSetting:          true,
 		StatsdExtraTagsSetting:        true,
 		ServerSideCopyFallback:        true,
+		DisasterCopy:                  true,
+		DisasterCopySkipFiles:         true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,
@@ -436,36 +444,37 @@ var (
 		SwiftOsRegionName:   true,
 
 		// AWS s3
-		"WALG_S3_PREFIX":              true,
-		"WALE_S3_PREFIX":              true,
-		AwsAccessKeyID:                true,
-		AwsSecretAccessKey:            true,
-		AwsSessionToken:               true,
-		"AWS_DEFAULT_REGION":          true,
-		"AWS_DEFAULT_OUTPUT":          true,
-		"AWS_PROFILE":                 true,
-		"AWS_ROLE_ARN":                true,
-		"AWS_ROLE_SESSION_NAME":       true,
-		"AWS_CA_BUNDLE":               true,
-		"AWS_SHARED_CREDENTIALS_FILE": true,
-		"AWS_CONFIG_FILE":             true,
-		"AWS_REGION":                  true,
-		"AWS_ENDPOINT":                true,
-		"AWS_S3_FORCE_PATH_STYLE":     true,
-		"WALG_S3_CA_CERT_FILE":        true,
-		"WALG_S3_STORAGE_CLASS":       true,
-		"WALG_S3_SSE":                 true,
-		"WALG_S3_SSE_C":               true,
-		"WALG_S3_SSE_KMS_ID":          true,
-		"WALG_CSE_KMS_ID":             true,
-		"WALG_CSE_KMS_REGION":         true,
-		"WALG_S3_MAX_PART_SIZE":       true,
-		"WALG_S3_ENDPOINT_SOURCE":     true,
-		"WALG_S3_ENDPOINT_PORT":       true,
-		"WALG_S3_LOG_LEVEL":           true,
-		"WALG_S3_RANGE_BATCH_ENABLED": true,
-		"WALG_S3_RANGE_MAX_RETRIES":   true,
-		"WALG_S3_MAX_RETRIES":         true,
+		"WALG_S3_PREFIX":                  true,
+		"WALE_S3_PREFIX":                  true,
+		AwsAccessKeyID:                    true,
+		AwsSecretAccessKey:                true,
+		AwsSessionToken:                   true,
+		"AWS_DEFAULT_REGION":              true,
+		"AWS_DEFAULT_OUTPUT":              true,
+		"AWS_PROFILE":                     true,
+		"AWS_ROLE_ARN":                    true,
+		"AWS_ROLE_SESSION_NAME":           true,
+		"AWS_CA_BUNDLE":                   true,
+		"AWS_SHARED_CREDENTIALS_FILE":     true,
+		"AWS_CONFIG_FILE":                 true,
+		"AWS_REGION":                      true,
+		"AWS_ENDPOINT":                    true,
+		"AWS_S3_FORCE_PATH_STYLE":         true,
+		"WALG_S3_CA_CERT_FILE":            true,
+		"WALG_S3_STORAGE_CLASS":           true,
+		"WALG_S3_SSE":                     true,
+		"WALG_S3_SSE_C":                   true,
+		"WALG_S3_SSE_KMS_ID":              true,
+		"WALG_CSE_KMS_ID":                 true,
+		"WALG_CSE_KMS_REGION":             true,
+		"WALG_S3_MAX_PART_SIZE":           true,
+		"WALG_S3_ENDPOINT_SOURCE":         true,
+		"WALG_S3_ENDPOINT_PORT":           true,
+		"WALG_S3_LOG_LEVEL":               true,
+		"WALG_S3_RANGE_BATCH_ENABLED":     true,
+		"WALG_S3_RANGE_MAX_RETRIES":       true,
+		"WALG_S3_MAX_RETRIES":             true,
+		"WALG_S3_RESPONSE_HEADER_TIMEOUT": true,
 
 		// Azure
 		"WALG_AZ_PREFIX":         true,
@@ -562,6 +571,7 @@ var (
 		MongoDBUriSetting:                  true,
 		MongoDBLastWriteUpdateInterval:     true,
 		MongoDBExtendBackupCursor:          true,
+		MongoDBBackupCursorFastRetry:       true,
 		MongoDBDeletionProtectionWhitelist: true,
 		MongoDBExtraInternalDatabases:      true,
 		OplogArchiveTimeoutInterval:        true,

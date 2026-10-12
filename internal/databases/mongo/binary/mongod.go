@@ -29,6 +29,14 @@ const LatestOnReplica = "LATEST_ON_REPLICA"
 const cursorCreateRetries = 10
 const mongoConnectRetries = 3
 
+var fastBackupCursorRetryDelays = []time.Duration{
+	0,
+	100 * time.Millisecond,
+	250 * time.Millisecond,
+	500 * time.Millisecond,
+	time.Second,
+}
+
 type MongodService struct {
 	Context     context.Context //nolint:containedctx // long-lived mongod client connection service
 	MongoClient *mongo.Client
@@ -150,10 +158,20 @@ func (mongodService *MongodService) GetReplSetName() (string, error) {
 }
 
 func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err error) {
+	fastRetry, err := conf.GetBoolSettingDefault(conf.MongoDBBackupCursorFastRetry, false)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to parse %s", conf.MongoDBBackupCursorFastRetry)
+	}
+	if fastRetry {
+		return getBackupCursorWithRetryDelays(
+			mongodService.Context,
+			mongodService.openBackupCursor,
+			fastBackupCursorRetryDelays,
+		)
+	}
+
 	for i := 0; i < cursorCreateRetries; i++ {
-		cursor, err = mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
-			{{Key: "$backupCursor", Value: bson.D{}}},
-		})
+		cursor, err = mongodService.openBackupCursor()
 		if err == nil {
 			break // success!
 		}
@@ -172,6 +190,57 @@ func (mongodService *MongodService) GetBackupCursor() (cursor *mongo.Cursor, err
 	}
 
 	return cursor, err
+}
+
+func (mongodService *MongodService) openBackupCursor() (*mongo.Cursor, error) {
+	return mongodService.MongoClient.Database(adminDB).Aggregate(mongodService.Context, mongo.Pipeline{
+		{{Key: "$backupCursor", Value: bson.D{}}},
+	})
+}
+
+func getBackupCursorWithRetryDelays(
+	ctx context.Context,
+	openBackupCursor func() (*mongo.Cursor, error),
+	retryDelays []time.Duration,
+) (cursor *mongo.Cursor, err error) {
+	for attempt := 0; ; attempt++ {
+		cursor, err = openBackupCursor()
+		if err == nil || !backupCursorErrorIsRetried(err) || attempt == len(retryDelays) {
+			return cursor, err
+		}
+
+		delay := retryDelays[attempt]
+		if delay == 0 {
+			tracelog.WarningLogger.Printf("%+v. Retry immediately", err)
+		} else {
+			tracelog.WarningLogger.Printf("%+v. Sleep %s and retry", err, delay)
+		}
+
+		if err := waitForBackupCursorRetry(ctx, delay); err != nil {
+			return nil, err
+		}
+	}
+}
+
+func waitForBackupCursorRetry(ctx context.Context, delay time.Duration) error {
+	if delay == 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			return nil
+		}
+	}
+
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func backupCursorErrorIsRetried(err error) bool {

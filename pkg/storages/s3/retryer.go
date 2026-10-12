@@ -28,7 +28,8 @@ const shortRequestBodyTerminalPunct = ".!?\u2026"
 // S3 409/429/499 responses and malformed HTTP 400 error responses). HTTP 400
 // short-body rejections are retried too: Backblaze InvalidRequest "The request
 // body was too small", and MinIO IncompleteBody, which the standard retryer
-// does not classify.
+// does not classify. Responses with an error code from
+// S3_ADDITIONAL_RETRYABLE_ERROR_CODES are retried for any HTTP status.
 func newRetryerFunc(cfg *Config) func() aws.Retryer {
 	return func() aws.Retryer {
 		return retry.NewStandard(func(o *retry.StandardOptions) {
@@ -39,6 +40,9 @@ func newRetryerFunc(cfg *Config) func() aws.Retryer {
 				o.MaxBackoff = cfg.MaxThrottlingRetryDelay
 			}
 			o.Retryables = append(o.Retryables, walgRetryables{})
+			if len(cfg.RetryableErrorCodes) > 0 {
+				o.Retryables = append(o.Retryables, retry.RetryableErrorCode{Codes: cfg.RetryableErrorCodes})
+			}
 		})
 	}
 }

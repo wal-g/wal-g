@@ -36,6 +36,8 @@ type Config struct {
 	ForcePathStyle           bool
 	RequestAdditionalHeaders string
 	MaxRetries               int
+	RetryableErrorCodes      map[string]struct{}
+	RequestTimeout           time.Duration
 	LogLevel                 string
 	Uploader                 *UploaderConfig
 	RangeBatchEnabled        bool
