@@ -1,6 +1,7 @@
 package copy_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -19,7 +20,9 @@ func TestOptionsFromConfigs(t *testing.T) {
 		source, destination := eligible(), eligible()
 		destination.Set("S3_SSE", "aws:kms")
 		destination.Set("S3_SSE_KMS_ID", "key-id")
-		require.True(t, copyutil.OptionsFromConfigs(source, destination).UseServerSideCopy)
+		options, err := copyutil.OptionsFromConfigs(source, destination)
+		require.NoError(t, err)
+		require.True(t, options.UseServerSideCopy)
 	})
 
 	for _, test := range []struct {
@@ -44,7 +47,49 @@ func TestOptionsFromConfigs(t *testing.T) {
 				value = "lz4"
 			}
 			source.Set(test.setting, value)
-			require.False(t, copyutil.OptionsFromConfigs(source, destination).UseServerSideCopy)
+			options, err := copyutil.OptionsFromConfigs(source, destination)
+			require.NoError(t, err)
+			require.False(t, options.UseServerSideCopy)
+		})
+	}
+}
+
+func TestCopyRetryConfigPrecedence(t *testing.T) {
+	for _, tc := range []struct {
+		name, main, source, destination string
+		want                            int
+		invalid                         bool
+	}{
+		{name: "default", want: 15},
+		{name: "main", main: "4", want: 4},
+		{name: "source wins", main: "4", source: "2", want: 2},
+		{name: "source zero", main: "4", source: "0", want: 0},
+		{name: "destination ignored", main: "4", destination: "9", want: 4},
+		{name: "negative", source: "-1", invalid: true},
+		{name: "invalid", source: "bad", invalid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Reset()
+			t.Cleanup(viper.Reset)
+			if tc.main != "" {
+				viper.Set("WALG_DOWNLOAD_FILE_RETRIES", tc.main)
+			}
+			source, destination := viper.New(), viper.New()
+			source.SetConfigType("json")
+			destination.SetConfigType("json")
+			if tc.source != "" {
+				require.NoError(t, source.ReadConfig(strings.NewReader(`{"WALG_DOWNLOAD_FILE_RETRIES":"`+tc.source+`"}`)))
+			}
+			if tc.destination != "" {
+				require.NoError(t, destination.ReadConfig(strings.NewReader(`{"WALG_DOWNLOAD_FILE_RETRIES":"`+tc.destination+`"}`)))
+			}
+			options, err := copyutil.OptionsFromConfigs(source, destination)
+			if tc.invalid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, *options.MaxRetries)
 		})
 	}
 }

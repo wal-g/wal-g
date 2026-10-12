@@ -45,6 +45,7 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 
 	loadOpts := []func(*config.LoadOptions) error{
 		config.WithHTTPClient(httpClient),
+		config.WithRetryer(newRetryerFunc(cfg)),
 	}
 
 	if cfg.DualStack {
@@ -69,8 +70,6 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 		return aws.Config{}, nil, err
 	}
 	awsCfg.Region = region
-
-	awsCfg.Retryer = newRetryerFunc(cfg)
 
 	s3Opts, err := buildS3Options(cfg, scheme, host)
 	if err != nil {
