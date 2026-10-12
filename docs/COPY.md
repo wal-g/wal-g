@@ -13,7 +13,7 @@ wal-g copy --from=source.yaml --backup-name=LATEST \
 
 `--to` is optional in this mode and, if provided, is ignored. WAL-G reads source metadata to build and validate the plan; it does not configure or access the destination, transfer payload objects, or exclude files already present at the destination. Normal copying still requires `--to`.
 
-The listing uses the same backup selection and dependency planning as `copy`. Omit `--backup-name` to select all backups. For PostgreSQL, MySQL, Greenplum, and MongoDB, add `--with-history` to include the database's archived recovery history. Greenplum also honors `--wal-wait-timeout`.
+The listing uses the same backup selection and dependency planning as `copy`. Omit `--backup-name` to select all backups. For PostgreSQL, MySQL, Greenplum, and MongoDB, add `--with-history` to include the database's archived recovery history. Greenplum builds the file list without waiting for WAL archival; missing required WAL causes an error. `--wal-wait-timeout` applies only to normal copying.
 
 Use source and destination roots corresponding to the WAL-G storage prefixes:
 

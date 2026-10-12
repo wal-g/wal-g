@@ -80,8 +80,7 @@ func runBackupCopy(cmd *cobra.Command, args []string) {
 		}
 		from, _, err := internal.StorageAndConfigFromFile(cmd.Context(), fromConfigFile)
 		tracelog.ErrorLogger.FatalOnError(err)
-		plan, err := greenplum.BuildCopyPlanWithWALWait(
-			cmd.Context(), from.RootFolder(), nil, targetBackupName, withHistory, walWaitTimeout)
+		plan, err := greenplum.BuildCopyPlan(cmd.Context(), from.RootFolder(), nil, targetBackupName, withHistory)
 		tracelog.ErrorLogger.FatalOnError(err)
 		if err := plan.WriteRcloneFileList(copyOutputFile); err != nil {
 			tracelog.ErrorLogger.Fatalf("write rclone file list %q: %v", copyOutputFile, err)

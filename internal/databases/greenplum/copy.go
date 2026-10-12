@@ -44,8 +44,8 @@ func HandleCopyWithHistory(
 	tracelog.ErrorLogger.FatalOnError(err)
 	to, toConfig, err := internal.StorageAndConfigFromFile(ctx, toConfigFile)
 	tracelog.ErrorLogger.FatalOnError(err)
-	plan, err := BuildCopyPlanWithWALWait(
-		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, walWaitTimeout)
+	plan, err := buildCopyPlanWaiting(
+		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, walWaitTimeout, sleepContext)
 	tracelog.ErrorLogger.FatalOnError(err)
 	options := copy.OptionsFromConfigs(fromConfig, toConfig)
 	options.SkipErrorsFor, err = copy.DisasterCopyPattern(fromConfig, toConfig)
@@ -60,17 +60,6 @@ type notPublishedError struct {
 
 func (err notPublishedError) Error() string {
 	return fmt.Sprintf("%s is not published in the source storage yet", err.object)
-}
-
-// BuildCopyPlanWithWALWait retries planning while restore point WAL is being archived.
-func BuildCopyPlanWithWALWait(
-	ctx context.Context,
-	from, to storage.Folder,
-	backupName string,
-	withHistory bool,
-	timeout time.Duration,
-) (*copy.Plan, error) {
-	return buildCopyPlanWaiting(ctx, from, to, backupName, withHistory, timeout, sleepContext)
 }
 
 func buildCopyPlanWaiting(
