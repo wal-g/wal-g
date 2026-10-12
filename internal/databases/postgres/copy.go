@@ -4,14 +4,11 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"regexp"
 	"slices"
 	"strings"
 
-	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/copy"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
@@ -26,10 +23,8 @@ func HandleCopy(ctx context.Context, fromConfigFile string, toConfigFile string,
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, withAllHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	options := copy.OptionsFromConfigs(fromConfig, toConfig)
-	if viper.GetBool(conf.DisasterCopy) || fromConfig.GetBool(conf.DisasterCopy) || toConfig.GetBool(conf.DisasterCopy) {
-		options.SkipErrorsFor = regexp.MustCompile(
-			"^" + regexp.QuoteMeta(utility.WalPath) + `[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`)
-	}
+	options.SkipErrorsFor, err = copy.DisasterCopyPattern(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, options))
 	tracelog.InfoLogger.Println("Success copy.")
 }

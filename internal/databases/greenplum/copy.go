@@ -5,14 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
-	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/copy"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
@@ -51,11 +48,8 @@ func HandleCopyWithHistory(
 		ctx, from.RootFolder(), to.RootFolder(), backupName, withHistory, walWaitTimeout, sleepContext)
 	tracelog.ErrorLogger.FatalOnError(err)
 	options := copy.OptionsFromConfigs(fromConfig, toConfig)
-	if viper.GetBool(conf.DisasterCopy) || fromConfig.GetBool(conf.DisasterCopy) || toConfig.GetBool(conf.DisasterCopy) {
-		options.SkipErrorsFor = regexp.MustCompile(
-			"^" + regexp.QuoteMeta(SegmentsFolderPath) + `seg-?[0-9]+/` + regexp.QuoteMeta(utility.WalPath) +
-				`[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`)
-	}
+	options.SkipErrorsFor, err = copy.DisasterCopyPattern(fromConfig, toConfig)
+	tracelog.ErrorLogger.FatalOnError(err)
 	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, options))
 	tracelog.InfoLogger.Println("Success copy.")
 }

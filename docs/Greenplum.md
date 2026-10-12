@@ -134,7 +134,13 @@ wal-g copy --from=config_from.yaml --to=config_to.yaml --backup-name=LATEST
 
 `--with-history` extends every coordinator/segment WAL stream through the LSN recorded by the newest cluster-wide restore point. WAL-G publishes restore-point metadata only after all referenced streams are present. Repeating the command later adds newly archived WAL and restore points while skipping immutable objects already present at the destination.
 
-Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to log transfer errors for coordinator/segment timeline `segments_005/seg*/wal_005/*.history` files (including compressed files) as warnings and continue copying. The default is `false`. Errors for other objects, destination size conflicts, and cancellation remain fatal. Missing timeline history files can prevent recovery across timeline changes.
+Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to log matching transfer errors as warnings and continue copying. The default is `false`. `WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES` controls which source object paths may have their copy errors skipped. Its database-specific default matches timeline history files, including compressed files:
+
+```yaml
+WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES: '^segments_005/seg-?[0-9]+/wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$'
+```
+
+An explicit pattern in `--to` takes precedence over `--from`, then the main config/environment and the database default. An empty pattern disables skipping; an invalid pattern fails the command when disaster mode is enabled. Errors for unmatched objects, destination size conflicts, and cancellation remain fatal. Missing timeline history files can prevent recovery across timeline changes.
 
 Cluster restore configuration declares destination host, directory, and port for each segment.  Sample restore configuration:
 ```json

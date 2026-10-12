@@ -577,7 +577,13 @@ This command copies restorable backup closures between storages without decrypti
 
 `--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.
 
-Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to log transfer errors for timeline `wal_005/*.history` files (including compressed files) as warnings and continue copying. The default is `false`. Errors for other objects, destination size conflicts, and cancellation remain fatal. Missing timeline history files can prevent recovery across timeline changes.
+Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to log matching transfer errors as warnings and continue copying. The default is `false`. `WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES` controls which source object paths may have their copy errors skipped. Its database-specific default matches timeline history files, including compressed files:
+
+```yaml
+WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES: '^wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$'
+```
+
+An explicit pattern in `--to` takes precedence over `--from`, then the main config/environment and the database default. An empty pattern disables skipping; an invalid pattern fails the command when disaster mode is enabled. Errors for unmatched objects, destination size conflicts, and cancellation remain fatal. Missing timeline history files can prevent recovery across timeline changes.
 
 Flags:
 
