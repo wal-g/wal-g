@@ -319,7 +319,7 @@ func configureTarBallComposer(ctx context.Context, bh *BackupHandler, tarBallCom
 	maker, err := NewTarBallComposerMaker(ctx, tarBallComposerType, bh.Workers.QueryRunner,
 		bh.Arguments.Uploader, bh.CurBackupInfo.Name,
 		NewTarBallFilePackerOptions(bh.Arguments.verifyPageChecksums, bh.Arguments.storeAllCorruptBlocks,
-			viper.GetBool(conf.VerifyPageChecksumsRetrySetting)),
+			viper.GetBool(conf.VerifyPageChecksumsRetry)),
 		bh.Arguments.withoutFilesMetadata)
 	if err != nil {
 		return err
