@@ -5,11 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/stretchr/testify/require"
 )
@@ -39,6 +43,46 @@ func (b *rangeBody) Read(p []byte) (int, error) {
 }
 func (b *rangeBody) Close() error                      { b.closed = true; return nil }
 func noRangeWait(context.Context, time.Duration) error { return nil }
+
+func TestRangeRecoveryAfterHeaderTimeout(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if requests.Add(1) == 1 {
+			// Let the transport's response-header timeout expire without
+			// cancelling the context of the range reader itself.
+			<-req.Context().Done()
+			return
+		}
+		if got := req.Header.Get("Range"); got != "bytes=3-" {
+			t.Errorf("unexpected range %q", got)
+		}
+		w.Header().Set("Content-Range", "bytes 3-5/6")
+		w.Header().Set("Content-Length", "3")
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = io.WriteString(w, "def")
+	}))
+	defer server.Close()
+	transport := &http.Transport{ResponseHeaderTimeout: time.Second}
+	defer transport.CloseIdleConnections()
+	api := awss3.NewFromConfig(aws.Config{
+		Region: "us-east-1", HTTPClient: &http.Client{Transport: transport},
+		Credentials: credentials.NewStaticCredentialsProvider("test", "test", ""),
+		// Test range retries independently of the SDK's request retries.
+		Retryer: func() aws.Retryer { return aws.NopRetryer{} },
+	}, func(o *awss3.Options) { o.BaseEndpoint = aws.String(server.URL); o.UsePathStyle = true })
+	folder := NewFolder(api, nil, "", &Config{Bucket: "bucket"})
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	initial := io.NopCloser(io.MultiReader(strings.NewReader("abc"), &rangeBody{err: io.ErrUnexpectedEOF}))
+	r := NewRangeReader(ctx, initial, "object", 2, folder)
+	r.wait = noRangeWait
+	defer r.Close()
+	data, err := io.ReadAll(r)
+	require.NoError(t, ctx.Err())
+	require.NoError(t, err)
+	require.Equal(t, "abcdef", string(data))
+	require.EqualValues(t, 2, requests.Load())
+}
 
 func TestRangeRecoveryPreservesBytesAndIdentity(t *testing.T) {
 	for _, readErr := range []error{io.ErrUnexpectedEOF, io.EOF} {
@@ -137,6 +181,20 @@ func TestRangeRecoveryRejectsInconsistentResponses(t *testing.T) {
 }
 
 func TestRangeRecoveryCancellationAndGetFailures(t *testing.T) {
+	t.Run("expired context", func(t *testing.T) {
+		ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+		defer cancel()
+		body := &rangeBody{err: io.ErrUnexpectedEOF}
+		folder := NewFolder(&rangeAPI{get: func(*awss3.GetObjectInput) (*awss3.GetObjectOutput, error) {
+			t.Error("GET with an expired context")
+			return nil, context.DeadlineExceeded
+		}}, nil, "", &Config{})
+		r := NewRangeReader(ctx, body, "object", 2, folder)
+		_, err := io.ReadAll(r)
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.NoError(t, r.Close())
+		require.True(t, body.closed)
+	})
 	t.Run("cancel during wait", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()

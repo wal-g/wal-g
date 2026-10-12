@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -64,11 +65,14 @@ func (r *brokenReader) Read(p []byte) (int, error) {
 func noCopyDelay(int) time.Duration { return 0 }
 
 func TestStreamRetryReopensSource(t *testing.T) {
-	for _, failure := range []string{"unexpected EOF", "short EOF", "destination reset", "backend error"} {
+	for _, failure := range []string{
+		"unexpected EOF", "short EOF", "source timeout", "destination reset", "destination timeout", "backend error",
+	} {
 		t.Run(failure, func(t *testing.T) {
 			const payload = "complete original object"
 			reads, closes, writes := 0, 0, 0
 			backendError := errors.New("retryable provider error")
+			timeout := &url.Error{Op: "Get", URL: "http://s3.invalid/object", Err: context.DeadlineExceeded}
 			from := &retryTestFolder{read: func(context.Context, string) (io.ReadCloser, error) {
 				reads++
 				var r io.Reader = strings.NewReader(payload)
@@ -76,6 +80,8 @@ func TestStreamRetryReopensSource(t *testing.T) {
 					r = &brokenReader{[]byte(payload[:7]), io.ErrUnexpectedEOF}
 				} else if reads == 1 && failure == "short EOF" {
 					r = strings.NewReader(payload[:7])
+				} else if reads == 1 && failure == "source timeout" {
+					r = &brokenReader{[]byte(payload[:7]), timeout}
 				}
 				return &closeReader{r, func() error { closes++; return nil }}, nil
 			}}
@@ -83,11 +89,14 @@ func TestStreamRetryReopensSource(t *testing.T) {
 			to := &retryTestFolder{classify: func(err error) bool { return errors.Is(err, backendError) }}
 			to.put = func(_ context.Context, _ string, r io.Reader) error {
 				writes++
-				if writes == 1 && (failure == "destination reset" || failure == "backend error") {
+				if writes == 1 && (failure == "destination reset" || failure == "destination timeout" || failure == "backend error") {
 					_, err := io.CopyN(io.Discard, r, 7)
 					require.NoError(t, err)
 					if failure == "backend error" {
 						return backendError
+					}
+					if failure == "destination timeout" {
+						return timeout
 					}
 					return syscall.ECONNRESET
 				}
@@ -117,7 +126,7 @@ func TestRetryBudgetAndTerminalErrors(t *testing.T) {
 		{"exhausted", io.ErrUnexpectedEOF, 2, 3},
 		{"permanent", errors.New("permission denied"), 5, 1},
 		{"cancelled", context.Canceled, 5, 1},
-		{"deadline", context.DeadlineExceeded, 5, 1},
+		{"attempt deadline", context.DeadlineExceeded, 2, 3},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
@@ -126,6 +135,52 @@ func TestRetryBudgetAndTerminalErrors(t *testing.T) {
 			require.Equal(t, tc.want, calls)
 		})
 	}
+}
+
+func TestCopyExpiredContextDoesNotRetryOrSkip(t *testing.T) {
+	ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+	defer cancel()
+	err := retryCopy(ctx, 2, noCopyDelay, func(context.Context) error {
+		t.Fatal("copy attempted with an expired context")
+		return nil
+	})
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	err = copyObject(ctx, nil, nil, Entry{SourcePath: "object"}, ExecuteOptions{
+		SkipErrorsFor: regexp.MustCompile(".*"),
+	})
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestCopyRequestTimeoutFallback(t *testing.T) {
+	from := memory.NewFolder("source/", memory.NewKVS())
+	require.NoError(t, from.PutObject(t.Context(), "object", strings.NewReader("payload")))
+	to := &retryCrossFolder{retryTestFolder: &retryTestFolder{Folder: memory.NewFolder("target/", memory.NewKVS())},
+		copyErr: &url.Error{Op: "Put", URL: "http://s3.invalid/object", Err: context.DeadlineExceeded}}
+	retries := 0
+	err := copyObjectWithoutMetrics(t.Context(), from, to, Entry{SourcePath: "object", TargetPath: "object", Size: 7},
+		ExecuteOptions{MaxRetries: &retries, UseServerSideCopy: true, ServerSideCopyFallback: true})
+	require.NoError(t, err)
+	require.Equal(t, 1, to.copies)
+	r, err := to.ReadObject(t.Context(), "object")
+	require.NoError(t, err)
+	defer r.Close()
+	data, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.Equal(t, "payload", string(data))
+}
+
+func TestCopySkipsRequestTimeoutOnlyAfterRetries(t *testing.T) {
+	reads := 0
+	from := &retryTestFolder{read: func(context.Context, string) (io.ReadCloser, error) {
+		reads++
+		return nil, &url.Error{Op: "Get", URL: "http://s3.invalid/object", Err: context.DeadlineExceeded}
+	}}
+	retries := 1
+	err := copyObject(t.Context(), from, nil, Entry{SourcePath: "object"}, ExecuteOptions{
+		MaxRetries: &retries, SkipErrorsFor: regexp.MustCompile("^object$"),
+	})
+	require.NoError(t, err)
+	require.Equal(t, 2, reads)
 }
 
 func TestCopyCancellationInterruptsBackoff(t *testing.T) {

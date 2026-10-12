@@ -357,7 +357,7 @@ func copyObject(ctx context.Context, from, to storage.Folder, entry Entry, optio
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
 		if options.SkipErrorsFor != nil && ctx.Err() == nil &&
-			!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) &&
+			!errors.Is(err, context.Canceled) &&
 			options.SkipErrorsFor.MatchString(entry.SourcePath) {
 			tracelog.WarningLogger.Printf("Skipping failed copy of %q: %v", entry.SourcePath, err)
 			return nil
@@ -398,7 +398,6 @@ func copyObjectAttempt(ctx context.Context, from, to storage.Folder, entry Entry
 				return nil
 			}
 			if ctx.Err() != nil || errors.Is(*serverCopyErr, context.Canceled) ||
-				errors.Is(*serverCopyErr, context.DeadlineExceeded) ||
 				!options.ServerSideCopyFallback {
 				return &transferError{"server-side copy", to, *serverCopyErr}
 			}

@@ -22,7 +22,7 @@ func (e *transferError) Error() string { return fmt.Sprintf("%s: %v", e.operatio
 func (e *transferError) Unwrap() error { return e.err }
 
 func retryableTransfer(err error) bool {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if errors.Is(err, context.Canceled) {
 		return false
 	}
 	if storage.IsTransientIOError(err) {

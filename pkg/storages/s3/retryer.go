@@ -74,7 +74,7 @@ func (r *throttlingRetryer) RetryDelay(attempt int, err error) (time.Duration, e
 }
 
 func (folder *Folder) IsRetryableError(err error) bool {
-	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if err == nil || errors.Is(err, context.Canceled) {
 		return false
 	}
 	return storage.IsTransientIOError(err) || newRetryerFunc(folder.config)().IsErrorRetryable(err)
