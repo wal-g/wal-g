@@ -109,9 +109,10 @@ type greenplumCopyState struct {
 	segmentDepths  map[string]int
 	segmentBackups map[string]postgres.Backup
 
-	walFolders    map[string]walFolderIndex
-	filesMetadata map[string]struct{}
-	restorePoints map[string]RestorePointMetadata
+	walFolders          map[string]walFolderIndex
+	filesMetadata       map[string]struct{}
+	restorePoints       map[string]RestorePointMetadata
+	listedRestorePoints map[string]struct{}
 }
 
 type walFolderIndex struct {
@@ -124,15 +125,17 @@ func (index walFolderIndex) has(walName string) bool {
 	return ok
 }
 
-func newGreenplumCopyState(ctx context.Context, plan *copy.Plan) (*greenplumCopyState, error) {
+func newGreenplumCopyState(ctx context.Context, plan *copy.Plan, withHistory bool) (*greenplumCopyState, error) {
 	state := &greenplumCopyState{
-		backupState:    make(map[string]uint8),
-		backupDepths:   make(map[string]int),
-		segmentState:   make(map[string]uint8),
-		segmentDepths:  make(map[string]int),
-		segmentBackups: make(map[string]postgres.Backup),
-		walFolders:     make(map[string]walFolderIndex),
-		filesMetadata:  make(map[string]struct{}),
+		backupState:         make(map[string]uint8),
+		backupDepths:        make(map[string]int),
+		segmentState:        make(map[string]uint8),
+		segmentDepths:       make(map[string]int),
+		segmentBackups:      make(map[string]postgres.Backup),
+		walFolders:          make(map[string]walFolderIndex),
+		filesMetadata:       make(map[string]struct{}),
+		restorePoints:       make(map[string]RestorePointMetadata),
+		listedRestorePoints: make(map[string]struct{}),
 	}
 	walDir := strings.TrimSuffix(utility.WalPath, "/")
 	restorePointPaths := make([]string, 0)
@@ -141,18 +144,23 @@ func newGreenplumCopyState(ctx context.Context, plan *copy.Plan) (*greenplumCopy
 		switch {
 		case strings.HasPrefix(name, utility.BaseBackupPath) && !strings.Contains(strings.TrimPrefix(name, utility.BaseBackupPath), "/") &&
 			strings.HasSuffix(name, RestorePointSuffix):
-			restorePointPaths = append(restorePointPaths, name)
+			state.listedRestorePoints[StripRightmostRestorePointName(name)] = struct{}{}
+			if withHistory {
+				restorePointPaths = append(restorePointPaths, name)
+			}
 		case path.Base(name) == ao.FilesMetadataName || path.Base(name) == pax.FilesMetadataName:
 			state.filesMetadata[name] = struct{}{}
 		case path.Base(path.Dir(name)) == walDir:
 			state.indexWAL(name)
 		}
 	}
-	points, err := fetchRestorePoints(ctx, plan.From, restorePointPaths)
-	if err != nil {
-		return nil, err
+	if withHistory {
+		points, err := fetchRestorePoints(ctx, plan.From, restorePointPaths)
+		if err != nil {
+			return nil, err
+		}
+		state.restorePoints = points
 	}
-	state.restorePoints = points
 	return state, nil
 }
 
@@ -227,7 +235,7 @@ func BuildCopyPlan(
 		return nil, err
 	}
 
-	state, err := newGreenplumCopyState(ctx, plan)
+	state, err := newGreenplumCopyState(ctx, plan, withHistory)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +289,13 @@ func addGreenplumBackupToPlan(
 	if err != nil {
 		return err
 	}
-	if err := addGreenplumRestorePointMetadata(plan, state, &sentinel, selected, endpoint, lastWAL); err != nil {
+	if withHistory {
+		err = addGreenplumRestorePointMetadata(plan, state, &sentinel, selected, endpoint, lastWAL)
+	} else {
+		metadataPath := path.Join(utility.BaseBackupPath, RestorePointMetadataFileName(selected.Name))
+		err = plan.AddObject(metadataPath, metadataPath, copy.RecoveryMetadataPhase, false)
+	}
+	if err != nil {
 		return err
 	}
 
@@ -428,10 +442,16 @@ func selectedGreenplumRestorePoint(
 	if point, ok := state.restorePoints[name]; ok {
 		return point, nil
 	}
-	if _, err := FetchRestorePointMetadata(ctx, plan.From, name); err != nil {
+	point, err := FetchRestorePointMetadata(ctx, plan.From, name)
+	if err != nil {
 		return RestorePointMetadata{}, err
 	}
-	return RestorePointMetadata{}, notPublishedError{object: fmt.Sprintf("restore point %q metadata", name)}
+	if _, listed := state.listedRestorePoints[name]; !listed {
+		return RestorePointMetadata{}, notPublishedError{object: fmt.Sprintf("restore point %q metadata", name)}
+	}
+	point.Name = name
+	state.restorePoints[name] = point
+	return point, nil
 }
 
 func latestGreenplumRestorePoint(state *greenplumCopyState, backup *BackupSentinelDto) (RestorePointMetadata, error) {
