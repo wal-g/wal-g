@@ -2,7 +2,10 @@ package mongo
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/cmd/common"
+	copyutil "github.com/wal-g/wal-g/internal/copy"
 	mongodb "github.com/wal-g/wal-g/internal/databases/mongo"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 var (
@@ -28,6 +31,8 @@ func init() {
 	copyCmd.Flags().StringVarP(&copyTo, "to", "t", "", "destination storage configuration file")
 	copyCmd.Flags().BoolVarP(&copyWithHistory, "with-history", "w", false, "synchronize oplog history through the latest archived entry")
 	_ = copyCmd.MarkFlagRequired("from")
-	_ = copyCmd.MarkFlagRequired("to")
+	common.AddCopyOutputFlags(copyCmd, func(command *cobra.Command, from storage.Folder) (*copyutil.Plan, error) {
+		return mongodb.BuildCopyPlan(command.Context(), from, nil, copyBackupName, copyWithHistory)
+	})
 	cmd.AddCommand(copyCmd)
 }

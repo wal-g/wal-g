@@ -2,7 +2,10 @@ package redis
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/cmd/common"
+	copyutil "github.com/wal-g/wal-g/internal/copy"
 	redisdb "github.com/wal-g/wal-g/internal/databases/redis"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 var (
@@ -26,6 +29,8 @@ func init() {
 	copyCmd.Flags().StringVarP(&copyFrom, "from", "f", "", "source storage configuration file")
 	copyCmd.Flags().StringVarP(&copyTo, "to", "t", "", "destination storage configuration file")
 	_ = copyCmd.MarkFlagRequired("from")
-	_ = copyCmd.MarkFlagRequired("to")
+	common.AddCopyOutputFlags(copyCmd, func(command *cobra.Command, from storage.Folder) (*copyutil.Plan, error) {
+		return redisdb.BuildCopyPlan(command.Context(), from, nil, copyBackupName)
+	})
 	cmd.AddCommand(copyCmd)
 }

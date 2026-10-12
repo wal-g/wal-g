@@ -2,7 +2,10 @@ package mysql
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/wal-g/wal-g/cmd/common"
+	copyutil "github.com/wal-g/wal-g/internal/copy"
 	db "github.com/wal-g/wal-g/internal/databases/mysql"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 var (
@@ -30,6 +33,8 @@ func init() {
 		&uniformCopyWithHistory, "with-history", "w", false,
 		"synchronize binlog history through the latest archived entry")
 	_ = uniformCopyCmd.MarkFlagRequired("from")
-	_ = uniformCopyCmd.MarkFlagRequired("to")
+	common.AddCopyOutputFlags(uniformCopyCmd, func(command *cobra.Command, from storage.Folder) (*copyutil.Plan, error) {
+		return db.BuildCopyPlan(command.Context(), from, nil, uniformCopyBackupName, uniformCopyWithHistory, "")
+	})
 	cmd.AddCommand(uniformCopyCmd)
 }

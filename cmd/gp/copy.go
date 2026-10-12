@@ -5,11 +5,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/wal-g/wal-g/cmd/common"
 	conf "github.com/wal-g/wal-g/internal/config"
+	copyutil "github.com/wal-g/wal-g/internal/copy"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 	"github.com/wal-g/wal-g/internal/databases/postgres/orioledb"
 	"github.com/wal-g/wal-g/internal/walparser"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -80,6 +83,9 @@ func init() {
 	backupCopyCmd.Flags().DurationVar(&walWaitTimeout, walWaitTimeoutFlag, greenplum.DefaultCopyWALWaitTimeout,
 		walWaitTimeoutDescription)
 
-	_ = backupCopyCmd.MarkFlagRequired(toFlag)
+	common.AddCopyOutputFlags(backupCopyCmd, func(command *cobra.Command, from storage.Folder) (*copyutil.Plan, error) {
+		return greenplum.BuildCopyPlanWithWALWait(
+			command.Context(), from, nil, targetBackupName, withHistory, walWaitTimeout)
+	})
 	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
 }
