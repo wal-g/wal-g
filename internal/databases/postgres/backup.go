@@ -28,8 +28,13 @@ var UtilityFilePaths = map[string]bool{
 	BackupLabelFilename:   true,
 	TablespaceMapFilename: true,
 }
+const (
+	//Pattern required to avoid colision name and dont loose data specially in S3 or any upsert storage (WAL ISSUE)
+    backupNameTimeLayout  = "20060102T150405.000000Z"
+    patternBackupNameTime = "[0-9]{8}T[0-9]{6}\\.[0-9]{6}Z"
+)
 
-var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?", PatternTimelineAndLogSegNo, PatternLSN)
+var patternPgBackupName = fmt.Sprintf("base_%[1]s(_D_%[1]s)?(_%[2]s)?_(%[3]s)", PatternTimelineAndLogSegNo, PatternLSN, patternBackupNameTime)
 var regexpPgBackupName = regexp.MustCompile(patternPgBackupName)
 
 // Backup contains information about a valid Postgres backup
