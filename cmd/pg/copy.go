@@ -2,10 +2,9 @@ package pg
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wal-g/wal-g/cmd/common"
-	copyutil "github.com/wal-g/wal-g/internal/copy"
+	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
-	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
 
 const (
@@ -31,6 +30,8 @@ const (
 )
 
 var (
+	copyOutput     string
+	copyOutputFile string
 	backupName     string
 	fromConfigFile string
 	toConfigFile   string
@@ -50,6 +51,23 @@ var (
 )
 
 func runBackupCopy(cmd *cobra.Command, args []string) {
+	if cmd.Flags().Changed("output") {
+		if copyOutput != "rclone" {
+			tracelog.ErrorLogger.Fatalf("unsupported --output %q: expected rclone", copyOutput)
+		}
+		if copyOutputFile == "" {
+			tracelog.ErrorLogger.Fatalf("--output-file must not be empty")
+		}
+		from, _, err := internal.StorageAndConfigFromFile(cmd.Context(), fromConfigFile)
+		tracelog.ErrorLogger.FatalOnError(err)
+		plan, err := postgres.BuildCopyPlan(cmd.Context(), from.RootFolder(), nil, backupName, withAllHistory)
+		tracelog.ErrorLogger.FatalOnError(err)
+		if err := plan.WriteRcloneFileList(copyOutputFile); err != nil {
+			tracelog.ErrorLogger.Fatalf("write rclone file list %q: %v", copyOutputFile, err)
+		}
+		tracelog.InfoLogger.Printf("Wrote rclone file list to %q.", copyOutputFile)
+		return
+	}
 	postgres.HandleCopy(cmd.Context(), fromConfigFile, toConfigFile, backupName, withAllHistory)
 }
 
@@ -65,8 +83,9 @@ func init() {
 		false,
 		withAllHistoryDescription)
 
-	common.AddCopyOutputFlags(backupCopyCmd, func(command *cobra.Command, from storage.Folder) (*copyutil.Plan, error) {
-		return postgres.BuildCopyPlan(command.Context(), from, nil, backupName, withAllHistory)
-	})
+	backupCopyCmd.Flags().StringVar(&copyOutput, "output", "", "write a file list instead of copying: rclone")
+	backupCopyCmd.Flags().StringVar(&copyOutputFile, "output-file", "", "path to the output file list")
+	backupCopyCmd.MarkFlagsRequiredTogether("output", "output-file")
+	backupCopyCmd.MarkFlagsOneRequired("to", "output")
 	_ = backupCopyCmd.MarkFlagRequired(fromFlag)
 }
