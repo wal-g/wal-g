@@ -248,7 +248,8 @@ func verifySinglePage(path string, blockNo, segmentBlockOffset uint32, pageBlock
 	}
 	// Rule out a torn page before reporting corruption.
 	if retryOnChecksumMismatch && shouldSkipCorruption(path, blockNo, page[:DatabasePageSize]) {
-		tracelog.DebugLogger.Printf("verifySinglePage: %s/[%d] changed while being read, skipping\n", path, blockNo)
+		tracelog.InfoLogger.Printf("Checksum mismatch in %s/[%d] ignored, expected %x, found %x: page changed or removed on re-read\n",
+			path, blockNo, expected, actual)
 		return false, nil
 	}
 	tracelog.WarningLogger.Printf("Corruption found in %s/[%d], expected %x, found %x\n",
