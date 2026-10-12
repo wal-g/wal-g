@@ -7,8 +7,7 @@ export WALE_S3_PREFIX=s3://mysqlbinlogpushfetchbucket
 export WALG_MYSQL_BINLOG_DST=/tmp/binlogs
 export WALG_MYSQL_CHECK_GTIDS=True
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 # drop all before-dump binlogs, so SHOW BINARY LOGS will show all binlogs we need to fetch
 current_binlog=$(mysql -e "SHOW BINARY LOGS" | tail -n 1 | awk '{print $1}')

@@ -28,8 +28,40 @@ func (p *BackupFilesListProvider) Get() []string {
 	lines := readManifest(p.ReadManifestPath)
 	copyManifestToUpload(lines, p.UploadManifestPath)
 	addon := parseManifest(lines, p.AOFFolder)
+	validateAofFiles(lines, p.AOFFolder)
 	res = append(res, addon...)
 	return res
+}
+
+// validateAofFiles guards against backing up a temporarily broken AOF:
+// during an AOF rewrite the on-disk files may be briefly missing or truncated.
+// Failing fast here (instead of uploading a broken backup) lets the caller
+// (e.g. the salt orchestration) retry after the rewrite finishes.
+//
+// An empty incremental file is a valid state (an empty database or no writes
+// since the last rewrite), so only the base file is required to be non-empty.
+func validateAofFiles(lines []string, folder string) {
+	hasBase := false
+	for _, line := range lines {
+		chunks := strings.Fields(line)
+		if len(chunks) != 6 {
+			tracelog.ErrorLogger.Fatalf("unexpected line format in manifest file: %s", line)
+		}
+		path := filepath.Join(folder, chunks[1])
+		info, err := os.Stat(path)
+		if err != nil {
+			tracelog.ErrorLogger.Fatalf("can not stat aof file %s: %v", path, err)
+		}
+		if chunks[5] == "b" {
+			hasBase = true
+			if info.Size() == 0 {
+				tracelog.ErrorLogger.Fatalf("aof base file %s is empty, refusing to back up a broken AOF (aof rewrite in progress?)", path)
+			}
+		}
+	}
+	if !hasBase {
+		tracelog.ErrorLogger.Fatalf("manifest has no base aof file, refusing to back up a broken AOF (aof rewrite in progress?)")
+	}
 }
 
 func copyManifestToUpload(lines []string, path string) {

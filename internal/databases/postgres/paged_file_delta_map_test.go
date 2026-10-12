@@ -114,3 +114,12 @@ func TestGetDeltaBitmapFor(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []uint32{23, 134}, bitmap.ToArray())
 }
+
+func TestGetDeltaBitmapFor_NoBitmapFound(t *testing.T) {
+	deltaMap := postgres.NewPagedFileDeltaMap()
+	deltaMap.AddLocationToDelta(*walparser.NewBlockLocation(postgres.DefaultSpcNode, 1, 999, 42))
+
+	bitmap, err := deltaMap.GetDeltaBitmapFor(home("~/DemoDb/base/1/2"))
+	assert.ErrorAs(t, err, &postgres.NoBitmapFoundError{})
+	assert.Nil(t, bitmap)
+}

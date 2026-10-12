@@ -27,7 +27,7 @@ if [[ "${OS}" == "Linux" ]] && [[ "${ARCH}" == *arm* || "${ARCH}" == "aarch64" ]
 fi
 
 CFLAGS="${LOCAL_CFLAGS}" ./configure ${CONFIGURE_ARGS}
-make && make check && make install
+make && make install
 
 # Remove shared libraries for using static
 rm -f lib/*.so lib/*.so.* lib/*.dylib

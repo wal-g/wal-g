@@ -6,8 +6,7 @@ set -e -x
 export WALE_S3_PREFIX=s3://mysqldeleteendtoendbucket
 
 # initialize mysql
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 sysbench --table-size=10 prepare
 mysql -e "FLUSH LOGS"
 
@@ -77,7 +76,7 @@ test "4" -eq "$(wal-g backup-list | wc -l)"
 mysql_kill_and_clean_data
 wal-g backup-fetch "$SECOND_BACKUP"
 chown -R mysql:mysql "$MYSQLDATA"
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql_set_gtid_purged
 wal-g binlog-replay --since "$SECOND_BACKUP" --until "$DT2"
 mysqldump sbtest > /tmp/dump_2_restored.sql
@@ -93,7 +92,7 @@ test "3" -eq "$(wal-g backup-list | wc -l)"
 mysql_kill_and_clean_data
 wal-g backup-fetch "$THIRD_BACKUP"
 chown -R mysql:mysql "$MYSQLDATA"
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql_set_gtid_purged
 wal-g binlog-replay --since "$THIRD_BACKUP" --until "$DT3"
 mysqldump sbtest > /tmp/dump_3_restored.sql
@@ -108,7 +107,7 @@ test "2" -eq "$(wal-g backup-list | wc -l)"
 mysql_kill_and_clean_data
 wal-g backup-fetch "$FOURTH_BACKUP"
 chown -R mysql:mysql "$MYSQLDATA"
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql_set_gtid_purged
 wal-g binlog-replay --since "$FOURTH_BACKUP" --until "$DT4"
 mysqldump sbtest > /tmp/dump_4_restored.sql

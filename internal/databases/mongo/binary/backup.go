@@ -130,7 +130,8 @@ func (backupService *BackupService) calculateSizes(ctx context.Context, args Cal
 	if errors.Is(err, internal.JournalsNotFound) {
 		// there can be no backups on S3 or we do it first time
 		tracelog.WarningLogger.Printf("can not find the last journal info: %+v", err)
-		mostRecentJournalInfo = backupService.createInitialJournals(ctx, journalFiles)
+		backupService.createInitialJournals(ctx, journalFiles)
+		return
 	}
 
 	timeStop := utility.TimeNowCrossPlatformLocal()

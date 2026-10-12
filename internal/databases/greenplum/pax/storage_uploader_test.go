@@ -33,6 +33,7 @@ type testFile struct {
 
 type expected struct {
 	StoragePath string
+	Size        int64
 	IsSkipped   bool
 	Kind        pax.FileKind
 	BlockID     int64
@@ -97,6 +98,7 @@ func runUpload(t *testing.T, base pax.BackupFiles, bundleFiles *internal.Regular
 		exp, ok := want[name]
 		assert.True(t, ok, "unexpected file %s in metadata", name)
 		assert.Equal(t, exp.StoragePath, got.StoragePath, "name=%s", name)
+		assert.Equal(t, exp.Size, got.Size, "name=%s", name)
 		assert.Equal(t, exp.IsSkipped, got.IsSkipped, "name=%s", name)
 		assert.Equal(t, exp.Kind, got.Kind, "name=%s", name)
 		assert.Equal(t, exp.BlockID, got.BlockID, "name=%s", name)
@@ -125,12 +127,14 @@ func TestRegularUpload_NoBaseFiles(t *testing.T) {
 	want := map[string]expected{
 		"base/13/16385_pax/3": {
 			StoragePath: "1009_13_md5val_16385_3_test_pax",
+			Size:        100,
 			IsSkipped:   false,
 			Kind:        pax.FileKindData,
 			BlockID:     3,
 		},
 		"base/13/16385_pax/3.toast": {
 			StoragePath: "1009_13_md5val_16385_3_toast_test_pax",
+			Size:        100,
 			IsSkipped:   false,
 			Kind:        pax.FileKindToast,
 			BlockID:     3,
@@ -166,6 +170,7 @@ func TestSkipUpload_FileAlreadyInStorage(t *testing.T) {
 	want := map[string]expected{
 		"base/13/16385_pax/3": {
 			StoragePath: "1009_13_md5val_16385_3_old_pax", // reuses old storage path
+			Size:        100,
 			IsSkipped:   true,
 			Kind:        pax.FileKindData,
 			BlockID:     3,
@@ -200,6 +205,7 @@ func TestRegularUpload_DedupAgeLimitPassed(t *testing.T) {
 	want := map[string]expected{
 		"base/13/16385_pax/3": {
 			StoragePath: "1009_13_md5val_16385_3_test_pax",
+			Size:        100,
 			IsSkipped:   false,
 			Kind:        pax.FileKindData,
 			BlockID:     3,
@@ -235,6 +241,7 @@ func TestRegularUpload_IdentityMismatch(t *testing.T) {
 	want := map[string]expected{
 		"base/13/16385_pax/3.toast": {
 			StoragePath: "1009_13_md5val_16385_3_toast_test_pax",
+			Size:        100,
 			IsSkipped:   false,
 			Kind:        pax.FileKindToast,
 			BlockID:     3,

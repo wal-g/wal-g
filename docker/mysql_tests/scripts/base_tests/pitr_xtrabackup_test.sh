@@ -5,8 +5,7 @@ set -e -x
 
 export WALE_S3_PREFIX=s3://mysqlpitrxtrabackupbucket
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 # first full backup
 wal-g backup-push
@@ -37,7 +36,7 @@ wal-g binlog-push
 mysql_kill_and_clean_data
 wal-g backup-fetch LATEST
 chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql_set_gtid_purged
 wal-g binlog-replay --since LATEST --until "$DT1"
 mysqldump sbtest > /tmp/dump_after_pitr
@@ -51,7 +50,7 @@ grep -w 'testpitr03' /tmp/dump_after_pitr
 mysql_kill_and_clean_data
 wal-g backup-fetch $FIRST_BACKUP
 chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 mysql_set_gtid_purged
 wal-g binlog-replay --since $FIRST_BACKUP --until "$DT1"
 mysqldump sbtest > /tmp/dump_after_pitr

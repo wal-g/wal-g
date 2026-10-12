@@ -74,7 +74,6 @@ func (e *DevNullWriter) Write(p []byte) (int, error) {
 
 var _ io.Writer = &DevNullWriter{}
 
-// TODO : unit tests
 // Extract exactly one tar bundle.
 func extractOneTar(tarInterpreter TarInterpreter, source io.Reader) error {
 	tarReader := tar.NewReader(source)

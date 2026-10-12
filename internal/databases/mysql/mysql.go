@@ -42,7 +42,8 @@ func fetchMySQLVariable(conn *client.Conn, variable string) (string, error) {
 		return "", err
 	}
 	defer r.Close()
-	return r.GetString(0, 0)
+	value, err := r.GetString(0, 0)
+	return strings.Clone(value), err
 }
 
 func getMySQLVersion(conn *client.Conn) (string, error) {
@@ -117,7 +118,8 @@ func getServerUUID(conn *client.Conn, flavor string) (string, error) {
 		return "", err
 	}
 	defer r.Close()
-	return r.GetString(0, 0)
+	value, err := r.GetString(0, 0)
+	return strings.Clone(value), err
 }
 
 func getLastUploadedBinlog(ctx context.Context, folder storage.Folder) (string, error) {

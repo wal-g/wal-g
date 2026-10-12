@@ -16,7 +16,9 @@ func GetFilesMetadataPath(backupName string) string {
 // One BackupFileDesc is produced per (data | toast | visimap) file referenced
 // from `pg_ext_aux.pg_pax_blocks_*` at backup-start.
 type BackupFileDesc struct {
-	StoragePath     string    `json:"StoragePath"`
+	StoragePath string `json:"StoragePath"`
+	// Size is the size of the local PAX file in bytes. PAX files are not compressed before upload.
+	Size            int64     `json:"Size"`
 	IsSkipped       bool      `json:"IsSkipped,omitempty"`
 	MTime           time.Time `json:"MTime"`
 	RelNameMd5      string    `json:"RelNameMd5"`
@@ -32,12 +34,12 @@ type BackupFiles map[string]BackupFileDesc
 // FilesMetadataDTO is the shape persisted to `pax_files_metadata.json`.
 type FilesMetadataDTO struct {
 	Files BackupFiles
-	// UploadedSharedSize is the volume this backup uploaded to the shared paxfiles/ storage:
+	// UploadedSharedSize is the INITIAL volume this backup uploaded to the shared paxfiles/ storage:
 	// Files smaller than WALG_GP_PAXFILE_SIZE_THRESHOLD go into the regular tar balls and are not
 	// part of it.
 	//
-	// It is what this backup uploaded, not what it owns: at the cluster level a backup can be
-	// charged for the files of an older backup that was deleted while this one still reused them.
+	// It is immutable and may not reflect current ownership: at the cluster level a backup can be
+	// charged for files of an older backup that was deleted while this one still references them.
 	UploadedSharedSize int64 `json:",omitempty"`
 }
 
@@ -45,10 +47,11 @@ func NewFilesMetadataDTO() *FilesMetadataDTO {
 	return &FilesMetadataDTO{Files: make(BackupFiles)}
 }
 
-func (m *FilesMetadataDTO) AddFile(localPath string, storagePath string, mTime time.Time, initialUplTS time.Time,
-	meta RelFileMetadata, fileMode int64, isSkipped bool) {
+func (m *FilesMetadataDTO) AddFile(localPath string, storagePath string, size int64, mTime time.Time,
+	initialUplTS time.Time, meta RelFileMetadata, fileMode int64, isSkipped bool) {
 	m.Files[localPath] = BackupFileDesc{
 		StoragePath:     storagePath,
+		Size:            size,
 		RelNameMd5:      meta.RelNameMd5,
 		IsSkipped:       isSkipped,
 		MTime:           mTime,

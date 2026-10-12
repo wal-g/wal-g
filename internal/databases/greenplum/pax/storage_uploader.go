@@ -128,6 +128,6 @@ func (u *StorageUploader) addMetadata(cfi *internal.ComposeFileInfo, storageKey 
 	meta RelFileMetadata, isSkipped bool, initialUplTS time.Time) {
 	u.metaMutex.Lock()
 	defer u.metaMutex.Unlock()
-	u.meta.AddFile(cfi.Header.Name, storageKey, cfi.FileInfo.ModTime(), initialUplTS,
+	u.meta.AddFile(cfi.Header.Name, storageKey, cfi.FileInfo.Size(), cfi.FileInfo.ModTime(), initialUplTS,
 		meta, cfi.Header.Mode, isSkipped)
 }

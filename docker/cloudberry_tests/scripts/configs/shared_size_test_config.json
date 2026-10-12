@@ -1,1 +1,3 @@
-"WALE_S3_PREFIX": "s3://cloudberry-shared-size-test-bucket"
+{
+  "WALE_S3_PREFIX": "s3://cloudberry-shared-size-test-bucket"
+}

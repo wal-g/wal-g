@@ -22,7 +22,7 @@ type DirDatabaseTarBallComposer struct {
 	//
 	pathFilter        PathFilter
 	fileDirCollection map[string][]*ComposeFileInfo
-	ctx               context.Context //nolint:containedctx // errgroup root feeds async addListToTar during filepath.Walk
+	ctx               context.Context //nolint:containedctx // backup ctx outlives the packing errgroup for background uploads
 }
 
 func NewDirDatabaseTarBallComposer(
@@ -72,7 +72,7 @@ func (d DirDatabaseTarBallComposer) SkipFile(tarHeader *tar.Header, fileInfo os.
 
 func (d DirDatabaseTarBallComposer) FinishComposing() (TarFileSets, error) {
 	// Push Headers in first part
-	err := d.addListToTar(make([]*ComposeFileInfo, 0))
+	err := d.addListToTar(d.ctx, make([]*ComposeFileInfo, 0))
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (d DirDatabaseTarBallComposer) FinishComposing() (TarFileSets, error) {
 			if len(thisInfos) == 0 {
 				return nil
 			}
-			return d.addListToTar(thisInfos)
+			return d.addListToTar(ctx, thisInfos)
 		})
 	}
 
@@ -104,8 +104,8 @@ func (d DirDatabaseTarBallComposer) GetFiles() BundleFiles {
 	return d.files
 }
 
-func (d DirDatabaseTarBallComposer) addListToTar(files []*ComposeFileInfo) error {
-	tarBall, err := d.tarBallQueue.Deque(d.ctx)
+func (d DirDatabaseTarBallComposer) addListToTar(ctx context.Context, files []*ComposeFileInfo) error {
+	tarBall, err := d.tarBallQueue.Deque(ctx)
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (d DirDatabaseTarBallComposer) addListToTar(files []*ComposeFileInfo) error
 
 	for _, file := range files {
 		d.tarFileSets.AddFile(tarBall.Name(), file.Header.Name)
-		err := d.tarBallFilePacker.PackFileIntoTar(d.ctx, file, tarBall)
+		err := d.tarBallFilePacker.PackFileIntoTar(ctx, file, tarBall)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,7 @@ func (d DirDatabaseTarBallComposer) addListToTar(files []*ComposeFileInfo) error
 			if err != nil {
 				return err
 			}
-			tarBall, err = d.tarBallQueue.Deque(d.ctx)
+			tarBall, err = d.tarBallQueue.Deque(ctx)
 			if err != nil {
 				return err
 			}

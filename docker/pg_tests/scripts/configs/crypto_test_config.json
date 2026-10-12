@@ -1,3 +1,5 @@
-"WALE_S3_PREFIX": "s3://cryptobucket",
-"WALG_DELTA_MAX_STEPS": "6",
-"WALG_PGP_KEY_PATH": "/tmp/PGP_KEY"
+{
+  "WALE_S3_PREFIX": "s3://cryptobucket",
+  "WALG_DELTA_MAX_STEPS": "6",
+  "WALG_PGP_KEY_PATH": "/tmp/PGP_KEY"
+}

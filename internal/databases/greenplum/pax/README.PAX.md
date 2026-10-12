@@ -173,6 +173,9 @@ However, they are compressed when they fall through to the regular tar stream.
 
 Encryption (when configured) is applied in both cases.
 
+`Size` in the files metadata is the size of the local PAX file before encryption. PAX files are not compressed
+before upload, and encryption overhead is deliberately ignored for shared-size accounting.
+
 #### Example for `pax_files_metadata.json`
 
 ```json
@@ -180,6 +183,7 @@ Encryption (when configured) is applied in both cases.
     "Files": {
         "/base/17019/16384_pax/0": {
             "StoragePath": "1663_17019_443a6b9778b7f801411069b37724f06d_16384_0_1778071407234433405_pax",
+            "Size": 1048576,
             "RelNameMd5": "443a6b9778b7f801411069b37724f06d",
             "IsSkipped": true,
             "MTime": "2026-05-06T12:43:25.365360755Z",
@@ -189,6 +193,7 @@ Encryption (when configured) is applied in both cases.
         },
         "/base/17019/16384_pax/0_1_35b.visimap": {
             "StoragePath": "1663_17019_443a6b9778b7f801411069b37724f06d_16384_0_1_35b_visimap_1778071421594374301_pax",
+            "Size": 4096,
             "RelNameMd5": "443a6b9778b7f801411069b37724f06d",
             "MTime": "2026-05-06T12:43:38.424645959Z",
             "Kind": "visimap",

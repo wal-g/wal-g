@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wal-g/wal-g/internal"
 	"github.com/wal-g/wal-g/internal/databases/greenplum"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/pax"
@@ -93,19 +94,62 @@ func TestUploadSharedSizes(t *testing.T) {
 	})
 }
 
+func TestRecalculateSharedSizes(t *testing.T) {
+	root := testtools.MakeDefaultInMemoryStorageFolder()
+	firstBackup := "backup_20260721T100000Z"
+	secondBackup := "backup_20260721T120000Z"
+	firstSegments := map[int]string{
+		-1: "base_000000010000000000000001",
+		0:  "base_000000010000000000000002",
+	}
+	secondSegments := map[int]string{
+		-1: "base_000000010000000000000003",
+		0:  "base_000000010000000000000004",
+	}
+
+	putGpSentinel(t, root, firstBackup, firstSegments)
+	putGpSentinel(t, root, secondBackup, secondSegments)
+	putSegmentFilesMetadata(t, root, -1, secondSegments[-1], 30, 25)
+	putSegmentFilesMetadata(t, root, 0, secondSegments[0], 40, 35)
+
+	putDTO(t, root, utility.BaseBackupPath+ao.GetFilesMetadataPath(firstBackup),
+		greenplum.SharedSizeDTO{SharedSize: 777})
+	putDTO(t, root, utility.BaseBackupPath+pax.GetFilesMetadataPath(firstBackup),
+		greenplum.SharedSizeDTO{SharedSize: 888})
+
+	require.NoError(t, greenplum.ReassignSharedSizes(t.Context(), root, []string{secondBackup}, true))
+
+	firstAOSize, err := greenplum.FetchAOSharedSize(t.Context(), root, firstBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(777), firstAOSize, "an unaffected backup must not be recalculated")
+	firstPaxSize, err := greenplum.FetchPaxSharedSize(t.Context(), root, firstBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(888), firstPaxSize, "an unaffected backup must not be recalculated")
+
+	secondAOSize, err := greenplum.FetchAOSharedSize(t.Context(), root, secondBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(70), secondAOSize)
+	secondPaxSize, err := greenplum.FetchPaxSharedSize(t.Context(), root, secondBackup)
+	require.NoError(t, err)
+	assert.Equal(t, int64(60), secondPaxSize)
+}
+
 // putSegmentFilesMetadata writes the two files metadata objects a segment backup-push leaves next
 // to its backup, each reporting the volume it uploaded to its shared storage.
 func putSegmentFilesMetadata(t *testing.T, root storage.Folder, contentID int, backupName string,
 	aoSize, paxSize int64) {
 	t.Helper()
 
+	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
+	putDTO(t, folder, utility.BaseBackupPath+internal.SentinelNameFromBackup(backupName), struct{}{})
 	putSegmentAOFilesMetadata(t, root, contentID, backupName, aoSize)
 
 	// The file list is there to keep the reader honest: it is what the size view must skip.
-	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
 	putDTO(t, folder, utility.BaseBackupPath+pax.GetFilesMetadataPath(backupName),
 		pax.FilesMetadataDTO{
-			Files:              pax.BackupFiles{"base/13/16385_pax/3": {StoragePath: "paxfiles/3", Kind: pax.FileKindData}},
+			Files: pax.BackupFiles{"base/13/16385_pax/3": {
+				StoragePath: "paxfiles/3", Size: paxSize, Kind: pax.FileKindData,
+			}},
 			UploadedSharedSize: paxSize,
 		})
 }
@@ -116,7 +160,7 @@ func putSegmentAOFilesMetadata(t *testing.T, root storage.Folder, contentID int,
 	folder := root.GetSubFolder(greenplum.FormatSegmentStoragePrefix(contentID))
 	putDTO(t, folder, utility.BaseBackupPath+ao.GetFilesMetadataPath(backupName),
 		ao.FilesMetadataDTO{
-			Files:              ao.BackupFiles{"1337.1": {StoragePath: "aosegments/1337.1", EOF: 4096}},
+			Files:              ao.BackupFiles{"1337.1": {StoragePath: "aosegments/1337.1", EOF: aoSize}},
 			UploadedSharedSize: aoSize,
 		})
 }

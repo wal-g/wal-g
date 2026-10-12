@@ -14,19 +14,18 @@ import (
 
 const (
 	backupPushShortDescription = "Makes backup and uploads it to storage"
-
-	permanentFlag             = "permanent"
-	fullBackupFlag            = "full"
-	verifyPagesFlag           = "verify"
-	storeAllCorruptBlocksFlag = "store-all-corrupt"
-	useRatingComposerFlag     = "rating-composer"
-	useCopyComposerFlag       = "copy-composer"
-	useDatabaseComposerFlag   = "database-composer"
-	deltaFromUserDataFlag     = "delta-from-user-data"
-	deltaFromNameFlag         = "delta-from-name"
-	addUserDataFlag           = "add-user-data"
-	withoutFilesMetadataFlag  = "without-files-metadata"
-	countJournalsFlag         = "count-journals"
+	permanentFlag              = "permanent"
+	fullBackupFlag             = "full"
+	verifyPagesFlag            = "verify"
+	storeAllCorruptBlocksFlag  = "store-all-corrupt"
+	useRatingComposerFlag      = "rating-composer"
+	useCopyComposerFlag        = "copy-composer"
+	useDatabaseComposerFlag    = "database-composer"
+	deltaFromUserDataFlag      = "delta-from-user-data"
+	deltaFromNameFlag          = "delta-from-name"
+	addUserDataFlag            = "add-user-data"
+	withoutFilesMetadataFlag   = "without-files-metadata"
+	countJournalsFlag          = "count-journals"
 
 	permanentShorthand             = "p"
 	fullBackupShorthand            = "f"
@@ -109,7 +108,7 @@ var (
 				permanent, verifyPageChecksums || viper.GetBool(conf.VerifyPageChecksumsSetting),
 				fullBackup, storeAllCorruptBlocks || viper.GetBool(conf.StoreAllCorruptBlocksSetting),
 				tarBallComposerType, postgres.NewRegularDeltaBackupConfigurator(deltaBaseSelector),
-				userData, withoutFilesMetadata, countJournals)
+				userData, withoutFilesMetadata, countJournals, json, pretty)
 
 			backupHandler, err := postgres.NewBackupHandler(cmd.Context(), arguments)
 			tracelog.ErrorLogger.FatalOnError(err)
@@ -155,6 +154,10 @@ func chooseTarBallComposer() postgres.TarBallComposerType {
 func init() {
 	Cmd.AddCommand(backupPushCmd)
 
+	backupPushCmd.Flags().BoolVar(&pretty, PrettyFlag, false,
+		"Prints more readable output in table format")
+	backupPushCmd.Flags().BoolVar(&json, JSONFlag, false,
+		"Prints output in JSON format, multiline and indented if combined with --pretty flag")
 	backupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
 	backupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,

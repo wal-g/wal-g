@@ -44,8 +44,10 @@ const (
 	retentionModeSetting            = "S3_RETENTION_MODE"
 	// limiters for retry policy during interaction with S3
 	maxRetriesSetting              = "S3_MAX_RETRIES"
+	requestTimeoutSetting          = "S3_RESPONSE_HEADER_TIMEOUT"
 	minThrottlingRetryDelaySetting = "S3_MIN_THROTTLING_RETRY_DELAY"
 	maxThrottlingRetryDelaySetting = "S3_MAX_THROTTLING_RETRY_DELAY"
+	retryableErrorCodesSetting     = "S3_ADDITIONAL_RETRYABLE_ERROR_CODES"
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
 	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
 	deleteBatchSizeSetting         = "S3_DELETE_BATCH_SIZE"
@@ -79,9 +81,11 @@ var SettingList = []string{
 	rangeBatchEnabledSetting,
 	rangeQueriesMaxRetriesSetting,
 	maxRetriesSetting,
+	requestTimeoutSetting,
 	requestAdditionalHeadersSetting,
 	minThrottlingRetryDelaySetting,
 	maxThrottlingRetryDelaySetting,
+	retryableErrorCodesSetting,
 	retentionPeriodSetting,
 	retentionModeSetting,
 	disable100ContinueSetting,
@@ -95,6 +99,7 @@ const (
 	defaultSkipValidation          = true
 	defaultForcePathStyle          = false
 	defaultMaxRetries              = 15
+	defaultRequestTimeout          = 0
 	defaultMinThrottlingRetryDelay = 500
 	defaultMaxThrottlingRetryDelay = 300000
 	defaultMaxPartSize             = 20 << 20
@@ -137,6 +142,10 @@ func ConfigureStorage(
 		return nil, err
 	}
 	maxRetries, err := setting.IntOptional(settings, maxRetriesSetting, defaultMaxRetries)
+	if err != nil {
+		return nil, err
+	}
+	requestTimeout, err := setting.IntOptional(settings, requestTimeoutSetting, defaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -204,6 +213,8 @@ func ConfigureStorage(
 		ForcePathStyle:           forcePathStyle,
 		RequestAdditionalHeaders: settings[requestAdditionalHeadersSetting],
 		MaxRetries:               maxRetries,
+		RetryableErrorCodes:      parseErrorCodes(settings[retryableErrorCodesSetting]),
+		RequestTimeout:           time.Duration(requestTimeout) * time.Second,
 		LogLevel:                 settings[logLevelSetting],
 		Uploader: &UploaderConfig{
 			UploadConcurrency:            uploadConcurrency,
@@ -229,4 +240,15 @@ func ConfigureStorage(
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}
 	return st, nil
+}
+
+func parseErrorCodes(value string) map[string]struct{} {
+	codes := make(map[string]struct{})
+	for _, code := range strings.Split(value, ",") {
+		code = strings.TrimSpace(code)
+		if code != "" {
+			codes[code] = struct{}{}
+		}
+	}
+	return codes
 }

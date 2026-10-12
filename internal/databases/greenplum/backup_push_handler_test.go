@@ -272,3 +272,102 @@ func TestBuildBackupPushCommandCrushes(t *testing.T) {
 	}
 	t.Fatalf("process ran with err %v, want exit status 1", err)
 }
+
+func TestCheckBackupStates_Optimized(t *testing.T) {
+	makeHandler := func(byContent map[int][]*cluster.SegConfig) *BackupHandler {
+		return &BackupHandler{
+			globalCluster: &cluster.Cluster{ByContent: byContent},
+		}
+	}
+
+	singleSeg := map[int][]*cluster.SegConfig{
+		1: {{ContentID: 1, Hostname: "test-host"}},
+	}
+
+	testcases := []struct {
+		name      string
+		handler   *BackupHandler
+		states    map[int]SegCmdState
+		wantCount int
+		wantErr   bool
+	}{
+		{
+			name: "mixed running and success",
+			handler: makeHandler(map[int][]*cluster.SegConfig{
+				1: {{ContentID: 1, Hostname: "host-1"}},
+				2: {{ContentID: 2, Hostname: "host-2"}},
+				3: {{ContentID: 3, Hostname: "host-3"}},
+			}),
+			states: map[int]SegCmdState{
+				1: {Status: RunningCmdStatus, TS: time.Now()},
+				2: {Status: SuccessCmdStatus, TS: time.Now()},
+				3: {Status: RunningCmdStatus, TS: time.Now()},
+			},
+			wantCount: 2,
+		},
+		{
+			name:    "stale heartbeat",
+			handler: makeHandler(singleSeg),
+			states:  map[int]SegCmdState{1: {Status: RunningCmdStatus, TS: time.Now().Add(-16 * time.Minute)}},
+			wantErr: true,
+		},
+		{
+			name:      "heartbeat near boundary is valid",
+			handler:   makeHandler(singleSeg),
+			states:    map[int]SegCmdState{1: {Status: RunningCmdStatus, TS: time.Now().Add(-15 * time.Minute).Add(time.Second)}},
+			wantCount: 1,
+		},
+		{
+			name:    "failed status",
+			handler: makeHandler(singleSeg),
+			states:  map[int]SegCmdState{1: {Status: FailedCmdStatus, TS: time.Now()}},
+			wantErr: true,
+		},
+		{
+			name:    "unknown content ID",
+			handler: makeHandler(singleSeg),
+			states:  map[int]SegCmdState{999: {Status: RunningCmdStatus, TS: time.Now()}},
+			wantErr: true,
+		},
+		{
+			name: "invalid segment count",
+			handler: makeHandler(map[int][]*cluster.SegConfig{
+				1: {
+					{ContentID: 1, Hostname: "host-1"},
+					{ContentID: 1, Hostname: "host-2"},
+				},
+			}),
+			states:  map[int]SegCmdState{1: {Status: RunningCmdStatus, TS: time.Now()}},
+			wantErr: true,
+		},
+		{
+			name:      "nil states",
+			handler:   makeHandler(map[int][]*cluster.SegConfig{}),
+			states:    nil,
+			wantCount: 0,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			count, err := tc.handler.checkBackupStates(tc.states)
+
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if count != 0 {
+					t.Fatalf("expected count 0 on error, got %d", count)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if count != tc.wantCount {
+				t.Fatalf("expected count %d, got %d", tc.wantCount, count)
+			}
+		})
+	}
+}

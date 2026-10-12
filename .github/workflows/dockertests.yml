@@ -9,10 +9,6 @@ on:
 
 env:
   GOPROXY: "https://proxy.golang.org|direct"
-  CACHE_FOLDER: ~/docker-images-${{ github.sha }}
-  CACHE_FILE_GOLANG: ~/docker-images-${{ github.sha }}/wal-g_golang.tar
-  IMAGE_GOLANG: wal-g/golang
-  IMAGES_CACHE_KEY: docker-images-${{ github.sha }}
 
 jobs:
   test:
@@ -40,20 +36,12 @@ jobs:
           go-version-file: 'go.mod'
         id: go
 
-      # load docker images
-      - name: Load docker images
-        id: cache-images
-        uses: actions/cache@v6
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
-          path: |
-            ${{ env.CACHE_FILE_GOLANG }}
-          key: ${{ env.IMAGES_CACHE_KEY }}
-
-      - name: Fail if no cached images
-        if: steps.cache-images.outputs.cache-hit != 'true'
-        run: |
-          echo "Failed to fetch cached docker images. Will now exit..."
-          exit 1
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run test
         run: ${{ matrix.command }}

@@ -80,6 +80,10 @@ If `WALG_S3_RANGE_BATCH_ENABLED` enabled, wal-g will try to reconnect N times, b
 
 Overrides the default request retry limit while interacting with S3. Default is 15.
 
+* `WALG_S3_RESPONSE_HEADER_TIMEOUT`
+
+Sets the timeout for waiting for response headers from S3 in seconds. Default is 0 (no timeout).
+
 * `S3_MIN_THROTTLING_RETRY_DELAY`
 
 Overrides the default minimum time between retries when throttled in milliseconds. Default is 500ms.
@@ -87,6 +91,10 @@ Overrides the default minimum time between retries when throttled in millisecond
 * `S3_MAX_THROTTLING_RETRY_DELAY`
 
 Overrides the default minimum time between retries when throttled in milliseconds. Default is 300000ms.
+
+* `S3_ADDITIONAL_RETRYABLE_ERROR_CODES`
+
+Comma-separated list of S3 error codes to retry in addition to the default ones, for example `InvalidRequest`. A response is retried if its error code is in the list, for any HTTP status. Codes are case-sensitive. The number of attempts is limited by `WALG_S3_MAX_RETRIES`. Empty by default.
 
 * `S3_RETENTION_PERIOD`
 

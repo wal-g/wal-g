@@ -6,9 +6,7 @@ set -e -x
 export WALE_S3_PREFIX=s3://mysqlfullxtrabackupbucket
 
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-
-service mysql start
+mysql_initialize_and_start
 
 sysbench --table-size=10 prepare
 
@@ -26,7 +24,7 @@ wal-g backup-fetch LATEST
 
 chown -R mysql:mysql $MYSQLDATA
 
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
 
 mysql_set_gtid_purged
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 	"github.com/wal-g/tracelog"
 	conf "github.com/wal-g/wal-g/internal/config"
 )
@@ -39,11 +40,20 @@ func getRedisConnection(strict bool) *redis.Client {
 		}
 		redisDB = redisDBValue
 	}
+	disableMaintNotifications, err := conf.GetBoolSettingDefault(conf.RedisDisableMaintNotifications, false)
+	if err != nil {
+		tracelog.ErrorLogger.FatalOnError(fmt.Errorf("%s: %w", conf.RedisDisableMaintNotifications, err))
+	}
+	var maintnotificationConfig *maintnotifications.Config
+	if disableMaintNotifications {
+		maintnotificationConfig = &maintnotifications.Config{Mode: maintnotifications.ModeDisabled}
+	}
 	return redis.NewClient(&redis.Options{
-		Addr:     redisAddr + ":" + redisPort,
-		Username: redisUsername,
-		Password: redisPassword,
-		DB:       redisDB,
+		Addr:                     redisAddr + ":" + redisPort,
+		Username:                 redisUsername,
+		Password:                 redisPassword,
+		DB:                       redisDB,
+		MaintNotificationsConfig: maintnotificationConfig,
 	})
 }
 

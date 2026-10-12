@@ -5,10 +5,9 @@ set -e -x
 
 #
 # In this test we check that wal-g can create incremental backups & restore them
-# using inhouse xbstream & xtrabackup parsers.
-#
+# (without applying delta-s by wal-g)
 
-export WALE_S3_PREFIX=s3://mysql8-xbtool-inplace-bucket
+export WALE_S3_PREFIX=s3://mysql8-xbtool-incremental-bucket
 export WALG_COMPRESSION_METHOD=zstd
 export WALG_MYSQL_DATA_DIR="${MYSQLDATA}"
 
@@ -26,8 +25,7 @@ export WALG_MYSQL_BACKUP_PREPARE_COMMAND="xtrabackup --prepare --target-dir=${MY
 export WALG_DELTA_MAX_STEPS=5
 export WALG_DELTA_ORIGIN=LATEST
 
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 
 # add data & create FULL backup:
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
@@ -57,13 +55,25 @@ wal-g st cat "basebackups_005/${FIRST_BACKUP}_backup_stop_sentinel.json"
 wal-g st cat "basebackups_005/${SECOND_BACKUP}_backup_stop_sentinel.json"
 wal-g st cat "basebackups_005/${LATEST_BACKUP}_backup_stop_sentinel.json"
 
-# restore all incremental backups
+# restore full backup
 export WALG_LOG_LEVEL=DEVEL
 mysql_kill_and_clean_data
-wal-g backup-fetch LATEST --use-xbtool-extract --inplace
-
+wal-g backup-fetch $FIRST_BACKUP --use-xbtool-extract
 chown -R mysql:mysql $MYSQLDATA
-service mysql start || (cat /var/log/mysql/error.log && false)
+mysql_start
+
+mysqldump sbtest > /tmp/dump_after_restore
+grep -w 'testpitr01' /tmp/dump_after_restore
+! grep -w 'testpitr02' /tmp/dump_after_restore
+! grep -w 'testpitr03' /tmp/dump_after_restore
+! grep -w 'testpitr04' /tmp/dump_after_restore
+
+
+# restore all incremental backups
+mysql_kill_and_clean_data
+wal-g backup-fetch LATEST --use-xbtool-extract
+chown -R mysql:mysql $MYSQLDATA
+mysql_start
 
 mysqldump sbtest > /tmp/dump_after_restore
 grep -w 'testpitr01' /tmp/dump_after_restore

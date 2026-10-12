@@ -10,8 +10,7 @@ set -e -x
 export WALE_S3_PREFIX=s3://mysqlmarknoerrorbucket
 
 # initialize mysql
-mysqld --initialize --init-file=/etc/mysql/init.sql
-service mysql start
+mysql_initialize_and_start
 # add data & create FULL backup:
 mysql -e "CREATE TABLE sbtest.pitr(id VARCHAR(32), ts DATETIME)"
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr01', NOW())"

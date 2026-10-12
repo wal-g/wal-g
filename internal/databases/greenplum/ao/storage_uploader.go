@@ -132,9 +132,17 @@ func (u *StorageUploader) addFile(ctx context.Context,
 		return u.regularAoUpload(ctx, cfi, aoMeta, location)
 	}
 
+	// Compaction can reuse a segment with different contents but the same EOF and modcount.
+	if remoteFile.MTime.IsZero() || !cfi.FileInfo.ModTime().Equal(remoteFile.MTime) {
+		tracelog.DebugLogger.Printf(
+			"%s: local mtime %s differs from remote mtime %s or remote mtime is missing, will perform a regular upload",
+			cfi.Header.Name, cfi.FileInfo.ModTime(), remoteFile.MTime)
+		return u.regularAoUpload(ctx, cfi, aoMeta, location)
+	}
+
 	tracelog.DebugLogger.Printf(
-		"%s: ModCount %d, EOF %d matches the remote file %s, will skip this file",
-		cfi.Header.Name, remoteFile.ModCount, remoteFile.EOF, remoteFile.StoragePath)
+		"%s: ModCount %d, EOF %d, MTime %s match the remote file %s, will skip this file",
+		cfi.Header.Name, remoteFile.ModCount, remoteFile.EOF, remoteFile.MTime, remoteFile.StoragePath)
 	return u.skipAoUpload(cfi, aoMeta, remoteFile.StoragePath, remoteFile.InitialUploadTS, remoteFile.IsIncremented, remoteFile.Checksum)
 }
 

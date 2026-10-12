@@ -12,9 +12,14 @@ func GetFilesMetadataPath(backupName string) string {
 }
 
 type BackupFileDesc struct {
-	StoragePath     string         `json:"StoragePath"`
-	IsSkipped       bool           `json:"IsSkipped"`
-	IsIncremented   bool           `json:"IsIncremented,omitempty"`
+	StoragePath   string `json:"StoragePath"`
+	IsSkipped     bool   `json:"IsSkipped"`
+	IsIncremented bool   `json:"IsIncremented,omitempty"`
+	// MTime is the filesystem mtime captured before reading the file. Assuming normally
+	// advancing filesystem timestamps, MTime is a lower bound for subsequent changes.
+	// The composer waits until MTime's second has ended before reading, so an equal
+	// current mtime indicates no changes since copying. Changes between stat and the
+	// start of copying can share this mtime, but their contents are included in the copy.
 	MTime           time.Time      `json:"MTime"`
 	StorageType     RelStorageType `json:"StorageType"`
 	EOF             int64          `json:"EOF"`
@@ -27,12 +32,12 @@ type BackupFileDesc struct {
 
 type FilesMetadataDTO struct {
 	Files BackupFiles
-	// UploadedSharedSize is the volume this backup uploaded to the shared aosegments/ storage:
+	// UploadedSharedSize is the INITIAL volume this backup uploaded to the shared aosegments/ storage:
 	// Files smaller than WALG_GP_AOSEG_SIZE_THRESHOLD go into the regular tar balls and are not
 	// part of it.
 	//
-	// It is what this backup uploaded, not what it owns: at the cluster level a backup can be
-	// charged for the files of an older backup that was deleted while this one still reused them.
+	// It is immutable and may not reflect current ownership: at the cluster level a backup can be
+	// charged for files of an older backup that was deleted while this one still references them.
 	UploadedSharedSize int64 `json:",omitempty"`
 }
 

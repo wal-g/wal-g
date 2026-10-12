@@ -65,6 +65,11 @@ To configure the server id of the binlog server. Should be unique for each repli
 
 To configure the connection string that will be used by `binlog-server` to connect to your MySQL. [DSN format](https://github.com/go-sql-driver/mysql#dsn-data-source-name): ```user:password@tcp(host)/dbname```
 
+* `WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT`
+
+Set to `true` to disable `binlog-server` heartbeats. Default: `false`.
+Required for MySQL versions earlier than 8.0.28, which do not support the `HEARTBEAT_LOG_EVENT_V2` events sent by `binlog-server`.
+
 > **Operations with binlogs**: If you'd like to do binlog operations with wal-g don't forget to [activate the binary log](https://mariadb.com/kb/en/activating-the-binary-log/) by starting mysql/mariadb with [--log-bin](https://mariadb.com/kb/en/replication-and-binary-log-server-system-variables/#log_bin) and [--log-basename](https://mariadb.com/kb/en/mysqld-options/#-log-basename)=\[name\].
 
 * `WALG_STREAM_SPLITTER_PARTITIONS`
@@ -294,8 +299,12 @@ Restore procedure is a bit tricky:
 * in case of you have replication and GTID enabled: set mysql GTID_PURGED variable to value from `/var/lib/mysql/xtrabackup_binlog_info`, using
 ```bash
 gtids=$(tr -d '\n' < /var/lib/mysql/xtrabackup_binlog_info | awk '{print $3}')
-mysql -e "RESET MASTER; SET @@GLOBAL.GTID_PURGED='$gtids';"
+mysql -e "RESET BINARY LOGS AND GTIDS; SET @@GLOBAL.GTID_PURGED='$gtids';"
 ```
+
+`RESET BINARY LOGS AND GTIDS` is available in MySQL 8.4 and newer. Use
+`RESET MASTER` on MySQL 5.7 and 8.0.
+
 * for PITR, replay binlogs with
 ```bash
 wal-g binlog-replay --since "backup_name" --until "2006-01-02T15:04:05Z"
@@ -333,18 +342,46 @@ wal-g can work as replication source to do fast PiTR. In this case it will serve
  WALG_MYSQL_BINLOG_SERVER_REPLICA_SOURCE="user:password@tcp(127.0.0.1:3306)/db"
 ```
 
+`binlog-server` uses heartbeat V2 to keep the replication connection alive while idle.
+For MySQL versions earlier than 8.0.28, disable heartbeats in the environment where you start WAL-G:
+
+```bash
+export WALG_MYSQL_BINLOG_SERVER_DISABLE_HEARTBEAT=true
+```
+
+With heartbeats disabled, consider increasing the replica's
+[`slave_net_timeout`](https://dev.mysql.com/doc/mysql-replication-excerpt/5.7/en/replication-options-replica.html#sysvar_slave_net_timeout)
+to avoid reconnects during delays in fetching binlogs or waiting for the replica to apply them.
+The default is 60 seconds. For example, set it to one hour before `START SLAVE`:
+
+```sql
+SET GLOBAL slave_net_timeout = 3600;
+```
+
+Choose a timeout longer than the expected idle periods; a larger value also delays detection of a broken connection.
+
 Restore procedure is straightforward:
 * restore backup
-* disable replication threads in MySQL: `skip-slave-start`
+* disable automatic replication startup in MySQL (`skip_replica_start` on
+  current versions, `skip_slave_start` on older versions)
 * start MySQL, purge GTIDs (see above)
 * in second terminal start binlog-server: `wal-g binlog-server --until "1985-10-26T01:21:00Z"`
 * in MySQL:
   ```SQL
-    SET GLOBAL SERVER_ID=999
-    CHANGE MASTER TO MASTER_HOST="127.0.0.1", MASTER_PORT=9306, MASTER_USER="walg", MASTER_PASSWORD="walgpwd", MASTER_AUTO_POSITION=1;
-    SHOW SLAVE STATUS \G
-    START SLAVE;
+    SET GLOBAL SERVER_ID=999;
+    CHANGE REPLICATION SOURCE TO SOURCE_HOST="127.0.0.1", SOURCE_PORT=9306, SOURCE_USER="walg", SOURCE_PASSWORD="walgpwd", SOURCE_AUTO_POSITION=1, SOURCE_SSL=0;
+    SHOW REPLICA STATUS \G
+    START REPLICA;
   ```
+
+  On MySQL versions older than 8.0.23 use `CHANGE MASTER TO` and its
+  `MASTER_*` options. On versions older than 8.0.22 use `SHOW SLAVE STATUS`
+  and `START SLAVE`.
+
+  `SOURCE_SSL=0` is needed for this local connection: WAL-G binlog-server
+  does not provide TLS, while MySQL 9.7 enables it by default for new
+  replication channels. For a connection between hosts, use a secure tunnel.
+
 * wait until wal-g exit (it will wait until binlogs will be applied)
 * in case of errors use classic approach
 
@@ -382,3 +419,23 @@ mysqlbinlog --stop-datetime="some point in time" --start-position [position abov
 ### MariaDB - using with `mysqldump`
 
 The procedure is same as in case of [MySQL. You can follow the instructions from the previous section.](#mysql---using-with-mysqldump)
+
+### MySQL running integration tests
+
+Use `MYSQL_SERIES` to select `57`, `80`, `84`, or `97`.
+
+```bash
+# Run all tests for MySQL 8.4 (the default).
+make mysql_integration_test
+
+# Run all tests for MySQL 5.7.
+make MYSQL_SERIES=57 mysql_integration_test
+```
+
+`MYSQL_TEST_FILTER` selects tests whose filenames contain the given substring.
+Matching is case-sensitive.
+
+```bash
+# Run all tests with pitr in their filenames for MySQL 8.4 (the default).
+make MYSQL_TEST_FILTER=pitr mysql_integration_test
+```

@@ -26,6 +26,7 @@ COPY docker/pg/gpg-agent.conf /home/gpadmin/.gnupg/gpg-agent.conf
 COPY --from=build /go/src/github.com/wal-g/wal-g/main/gp/wal-g /usr/bin/
 
 COPY docker/cloudberry_tests/scripts/ /tmp
+COPY docker/pg_tests/scripts/tests/test_functions/prepare_config.sh /tmp/tests/test_functions/
 COPY docker/pg_tests/scripts/scripts/ /tmp/pg_scripts
 
 RUN chmod 777 /tmp/configs/
