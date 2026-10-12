@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -106,6 +107,67 @@ func TestGreenplumPlainCopyIncludesRestorePointWal(t *testing.T) {
 	require.NotContains(t, entries, walObject(-1, 1, 5))
 	require.Contains(t, entries, restorePointObject(backupName))
 	require.Less(t, entries[walObject(-1, 1, 4)].Phase, entries[restorePointObject(backupName)].Phase)
+}
+
+func TestGreenplumPlainCopyReadsOnlySelectedRestorePoints(t *testing.T) {
+	backups := []greenplumBackupFixture{
+		{topName: "backup_20260721T140000Z", segmentName: "base_000000010000000000000001"},
+		{topName: "backup_20260721T150000Z", segmentName: "base_000000010000000000000002_D_000000010000000000000001"},
+	}
+	for _, tc := range []struct {
+		name     string
+		selected string
+		wanted   []string
+	}{
+		{name: "specific", selected: backups[0].topName, wanted: []string{backups[0].topName}},
+		{name: "incremental", selected: backups[1].topName, wanted: []string{backups[1].topName}},
+		{name: "latest", selected: "LATEST", wanted: []string{backups[1].topName}},
+		{name: "all", wanted: []string{backups[0].topName, backups[1].topName}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			from := testtools.MakeDefaultInMemoryStorageFolder()
+			to := testtools.MakeDefaultInMemoryStorageFolder()
+			putGreenplumCoordinatorChain(t, from, backups)
+			point, err := greenplum.FetchRestorePointMetadata(t.Context(), from, "rp_"+tc.wanted[0])
+			require.NoError(t, err)
+			point.Name = "rp_same_time"
+			putDTO(t, from, restorePointObject(point.Name), point)
+			putObjects(t, from, map[string]string{restorePointObject("rp_broken"): "invalid JSON"})
+
+			reads := make(map[string]*atomic.Int64, len(tc.wanted))
+			for _, name := range tc.wanted {
+				reads[restorePointObject("rp_"+name)] = &atomic.Int64{}
+			}
+			tracked := &restorePointTrackingFolder{Folder: from, onRead: func(name string) {
+				if !strings.HasSuffix(name, greenplum.RestorePointSuffix) {
+					return
+				}
+				if count, ok := reads[name]; ok {
+					count.Add(1)
+				} else {
+					t.Errorf("read unrelated restore point %q", name)
+				}
+			}}
+
+			plan, err := greenplum.BuildCopyPlan(t.Context(), tracked, to, tc.selected, false)
+			require.NoError(t, err)
+			entries := planEntries(plan)
+			for name, count := range reads {
+				require.Equal(t, int64(1), count.Load(), name)
+				require.Contains(t, entries, name)
+			}
+			for name := range entries {
+				if strings.HasSuffix(name, greenplum.RestorePointSuffix) {
+					require.Contains(t, reads, name)
+				}
+			}
+			require.NoError(t, copyutil.ExecuteRaw(t.Context(), plan))
+			for name, count := range reads {
+				require.Equal(t, int64(2), count.Load(), name)
+				require.Equal(t, readObject(t, from, name), readObject(t, to, name))
+			}
+		})
+	}
 }
 
 func TestGreenplumPlainCopyRequiresRestorePointWal(t *testing.T) {
@@ -613,6 +675,23 @@ func putWal(t *testing.T, from storage.Folder, contentID int, timeline uint32, w
 	t.Helper()
 	for _, walSegment := range walSegments {
 		putObjects(t, from, map[string]string{walObject(contentID, timeline, walSegment): "wal"})
+	}
+}
+
+type restorePointTrackingFolder struct {
+	storage.Folder
+	onRead func(string)
+}
+
+func (folder *restorePointTrackingFolder) ReadObject(ctx context.Context, name string) (io.ReadCloser, error) {
+	folder.onRead(name)
+	return folder.Folder.ReadObject(ctx, name)
+}
+
+func (folder *restorePointTrackingFolder) GetSubFolder(name string) storage.Folder {
+	return &restorePointTrackingFolder{
+		Folder: folder.Folder.GetSubFolder(name),
+		onRead: func(object string) { folder.onRead(path.Join(name, object)) },
 	}
 }
 

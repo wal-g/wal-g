@@ -124,7 +124,7 @@ func (index walFolderIndex) has(walName string) bool {
 	return ok
 }
 
-func newGreenplumCopyState(ctx context.Context, plan *copy.Plan) (*greenplumCopyState, error) {
+func newGreenplumCopyState(ctx context.Context, plan *copy.Plan, withHistory bool) (*greenplumCopyState, error) {
 	state := &greenplumCopyState{
 		backupState:    make(map[string]uint8),
 		backupDepths:   make(map[string]int),
@@ -139,7 +139,8 @@ func newGreenplumCopyState(ctx context.Context, plan *copy.Plan) (*greenplumCopy
 	for _, object := range plan.SourceObjects() {
 		name := object.GetName()
 		switch {
-		case strings.HasPrefix(name, utility.BaseBackupPath) && !strings.Contains(strings.TrimPrefix(name, utility.BaseBackupPath), "/") &&
+		case withHistory && strings.HasPrefix(name, utility.BaseBackupPath) &&
+			!strings.Contains(strings.TrimPrefix(name, utility.BaseBackupPath), "/") &&
 			strings.HasSuffix(name, RestorePointSuffix):
 			restorePointPaths = append(restorePointPaths, name)
 		case path.Base(name) == ao.FilesMetadataName || path.Base(name) == pax.FilesMetadataName:
@@ -227,7 +228,7 @@ func BuildCopyPlan(
 		return nil, err
 	}
 
-	state, err := newGreenplumCopyState(ctx, plan)
+	state, err := newGreenplumCopyState(ctx, plan, withHistory)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +282,13 @@ func addGreenplumBackupToPlan(
 	if err != nil {
 		return err
 	}
-	if err := addGreenplumRestorePointMetadata(plan, state, &sentinel, selected, endpoint, lastWAL); err != nil {
+	if withHistory {
+		err = addGreenplumRestorePointMetadata(plan, state, &sentinel, selected, endpoint, lastWAL)
+	} else {
+		metadataPath := path.Join(utility.BaseBackupPath, RestorePointMetadataFileName(selected.Name))
+		err = plan.AddObject(metadataPath, metadataPath, copy.RecoveryMetadataPhase, false)
+	}
+	if err != nil {
 		return err
 	}
 
@@ -428,10 +435,13 @@ func selectedGreenplumRestorePoint(
 	if point, ok := state.restorePoints[name]; ok {
 		return point, nil
 	}
-	if _, err := FetchRestorePointMetadata(ctx, plan.From, name); err != nil {
+	point, err := FetchRestorePointMetadata(ctx, plan.From, name)
+	if err != nil {
 		return RestorePointMetadata{}, err
 	}
-	return RestorePointMetadata{}, notPublishedError{object: fmt.Sprintf("restore point %q metadata", name)}
+	point.Name = name
+	state.restorePoints[name] = point
+	return point, nil
 }
 
 func latestGreenplumRestorePoint(state *greenplumCopyState, backup *BackupSentinelDto) (RestorePointMetadata, error) {
