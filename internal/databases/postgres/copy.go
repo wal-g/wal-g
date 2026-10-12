@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -25,8 +26,10 @@ func HandleCopy(ctx context.Context, fromConfigFile string, toConfigFile string,
 	plan, err := BuildCopyPlan(ctx, from.RootFolder(), to.RootFolder(), backupName, withAllHistory)
 	tracelog.ErrorLogger.FatalOnError(err)
 	options := copy.OptionsFromConfigs(fromConfig, toConfig)
-	options.SkipHistoryErrors = viper.GetBool(conf.DisasterCopy) ||
-		fromConfig.GetBool(conf.DisasterCopy) || toConfig.GetBool(conf.DisasterCopy)
+	if viper.GetBool(conf.DisasterCopy) || fromConfig.GetBool(conf.DisasterCopy) || toConfig.GetBool(conf.DisasterCopy) {
+		options.SkipErrorsFor = regexp.MustCompile(
+			"^" + regexp.QuoteMeta(utility.WalPath) + `[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`)
+	}
 	tracelog.ErrorLogger.FatalOnError(copy.Execute(ctx, plan, options))
 	tracelog.InfoLogger.Println("Success copy.")
 }

@@ -340,11 +340,10 @@ func copyObject(ctx context.Context, from, to storage.Folder, entry Entry, optio
 	err := copyObjectWithoutMetrics(ctx, from, to, entry, options)
 	if err != nil {
 		statistics.WalgMetrics.UploadedFilesFailedTotal.Inc()
-		if options.SkipHistoryErrors && ctx.Err() == nil &&
+		if options.SkipErrorsFor != nil && ctx.Err() == nil &&
 			!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) &&
-			path.Dir(entry.SourcePath) == strings.TrimSuffix(utility.WalPath, "/") &&
-			strings.HasSuffix(StripCompressionExtension(path.Base(entry.SourcePath)), ".history") {
-			tracelog.WarningLogger.Printf("Skipping timeline history file %q in disaster copy mode: %v", entry.SourcePath, err)
+			options.SkipErrorsFor.MatchString(entry.SourcePath) {
+			tracelog.WarningLogger.Printf("Skipping failed copy of %q: %v", entry.SourcePath, err)
 			return nil
 		}
 	}

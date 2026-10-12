@@ -1,6 +1,7 @@
 package copy
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -10,7 +11,8 @@ import (
 type ExecuteOptions struct {
 	UseServerSideCopy      bool
 	ServerSideCopyFallback bool
-	SkipHistoryErrors      bool
+	// SkipErrorsFor matches source paths whose transfer failures may be skipped. Nil disables skipping.
+	SkipErrorsFor *regexp.Regexp
 }
 
 func OptionsFromConfigs(source, destination *viper.Viper) ExecuteOptions {
