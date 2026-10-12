@@ -139,7 +139,8 @@ func newGreenplumCopyState(ctx context.Context, plan *copy.Plan, withHistory boo
 	for _, object := range plan.SourceObjects() {
 		name := object.GetName()
 		switch {
-		case withHistory && strings.HasPrefix(name, utility.BaseBackupPath) && !strings.Contains(strings.TrimPrefix(name, utility.BaseBackupPath), "/") &&
+		case withHistory && strings.HasPrefix(name, utility.BaseBackupPath) &&
+			!strings.Contains(strings.TrimPrefix(name, utility.BaseBackupPath), "/") &&
 			strings.HasSuffix(name, RestorePointSuffix):
 			restorePointPaths = append(restorePointPaths, name)
 		case path.Base(name) == ao.FilesMetadataName || path.Base(name) == pax.FilesMetadataName:
