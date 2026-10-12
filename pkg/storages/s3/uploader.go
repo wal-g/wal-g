@@ -117,6 +117,7 @@ func CreateUploaderAPI(svc *s3.Client, partsize, concurrency int) UploaderAPI {
 	return manager.NewUploader(svc, func(u *manager.Uploader) {
 		u.PartSize = int64(partsize)
 		u.Concurrency = concurrency
+		u.RequestChecksumCalculation = svc.Options().RequestChecksumCalculation
 	})
 }
 

@@ -4,14 +4,80 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+func TestCreateUploaderAPI_MultipartChecksumCalculation(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		calculation aws.RequestChecksumCalculation
+		algorithm   string
+	}{
+		{"default", 0, "CRC32"},
+		{"when supported", aws.RequestChecksumCalculationWhenSupported, "CRC32"},
+		{"when required", aws.RequestChecksumCalculationWhenRequired, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var initiationAlgorithm string
+			var partAlgorithms []string
+			client := awss3.NewFromConfig(aws.Config{
+				Region:                     "us-east-1",
+				Credentials:                credentials.NewStaticCredentialsProvider("key", "secret", ""),
+				RequestChecksumCalculation: tc.calculation,
+				HTTPClient: smithyhttp.ClientDoFunc(func(req *http.Request) (*http.Response, error) {
+					if req.Body != nil {
+						if _, err := io.Copy(io.Discard, req.Body); err != nil {
+							return nil, err
+						}
+					}
+					header := http.Header{}
+					var body string
+					switch {
+					case req.URL.Query().Has("uploads"):
+						initiationAlgorithm = req.Header.Get("X-Amz-Checksum-Algorithm")
+						body = "<InitiateMultipartUploadResult><UploadId>upload-id</UploadId></InitiateMultipartUploadResult>"
+					case req.URL.Query().Has("partNumber"):
+						partAlgorithms = append(partAlgorithms, req.Header.Get("X-Amz-Sdk-Checksum-Algorithm"))
+						header.Set("ETag", "\"part-etag\"")
+					case req.Method == http.MethodPost:
+						body = "<CompleteMultipartUploadResult><ETag>\"object-etag\"</ETag></CompleteMultipartUploadResult>"
+					default:
+						return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL)
+					}
+					return &http.Response{StatusCode: http.StatusOK, Header: header,
+						Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+				}),
+			}, func(o *awss3.Options) {
+				o.BaseEndpoint = aws.String("https://s3.example.com")
+				o.UsePathStyle = true
+			})
+			const partSize = 5 * 1024 * 1024
+			uploader := CreateUploaderAPI(client, partSize, 1)
+			_, err := uploader.Upload(t.Context(), &awss3.PutObjectInput{
+				Bucket: aws.String("bucket"), Key: aws.String("object"),
+				Body: strings.NewReader(strings.Repeat("x", partSize+1)),
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.algorithm, initiationAlgorithm)
+			require.Len(t, partAlgorithms, 2)
+			for _, algorithm := range partAlgorithms {
+				assert.Equal(t, tc.algorithm, algorithm)
+			}
+		})
+	}
+}
 
 var (
 	dummyStorageClass         = "dummyStorageClass"
