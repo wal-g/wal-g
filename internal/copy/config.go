@@ -10,6 +10,7 @@ import (
 type ExecuteOptions struct {
 	UseServerSideCopy      bool
 	ServerSideCopyFallback bool
+	SkipHistoryErrors      bool
 }
 
 func OptionsFromConfigs(source, destination *viper.Viper) ExecuteOptions {

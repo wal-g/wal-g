@@ -259,6 +259,7 @@ const (
 
 	ForceWalDetal          = "WALG_FORCE_WAL_DELTA"
 	ServerSideCopyFallback = "WALG_SERVER_SIDE_COPY_FALLBACK"
+	DisasterCopy           = "WALG_DISASTER_COPY"
 )
 
 var (
@@ -296,6 +297,7 @@ var (
 		DirectIOBlockCountSetting:    "32",
 		LogLevelSetting:              "NORMAL",
 		ServerSideCopyFallback:       "true",
+		DisasterCopy:                 "false",
 	}
 
 	MongoDefaultSettings = map[string]string{
@@ -423,6 +425,7 @@ var (
 		StatsdAddressSetting:          true,
 		StatsdExtraTagsSetting:        true,
 		ServerSideCopyFallback:        true,
+		DisasterCopy:                  true,
 
 		ProfileSamplingRatio: true,
 		ProfileMode:          true,

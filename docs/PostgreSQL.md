@@ -577,6 +577,8 @@ This command copies restorable backup closures between storages without decrypti
 
 `--with-history` synchronizes continuous WAL from the selected backup recovery point through the latest archived WAL visible when the command starts. The command is resumable: run it again later to add newly archived WAL without retransferring existing immutable objects.
 
+Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to log transfer errors for timeline `wal_005/*.history` files (including compressed files) as warnings and continue copying. The default is `false`. Errors for other objects, destination size conflicts, and cancellation remain fatal. Missing timeline history files can prevent recovery across timeline changes.
+
 Flags:
 
 - `-b, --backup-name string` Copy specific backup
