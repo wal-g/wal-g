@@ -27,6 +27,7 @@ import (
 	"github.com/wal-g/wal-g/internal/limiters"
 	"github.com/wal-g/wal-g/internal/multistorage"
 	"github.com/wal-g/wal-g/internal/multistorage/stats/cache"
+	"github.com/wal-g/wal-g/pkg/storages/s3"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/time/rate"
@@ -140,6 +141,12 @@ func ConfigureStorageForSpecificConfig(
 	config *viper.Viper,
 	rootWraps ...storage.WrapRootFolder,
 ) (storage.HashableStorage, error) {
+	return configureStorageForSpecificConfig(ctx, config, false, rootWraps...)
+}
+
+func configureStorageForSpecificConfig(
+	ctx context.Context, config *viper.Viper, isFailover bool, rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
 	skippedPrefixes := make([]string, 0)
 	for _, adapter := range StorageAdapters {
 		prefix, ok := conf.GetWaleCompatibleSettingFrom(adapter.PrefixSettingKey(), config)
@@ -149,7 +156,12 @@ func ConfigureStorageForSpecificConfig(
 		}
 
 		settings := adapter.loadSettings(config)
-		st, err := adapter.configure(ctx, prefix, settings, rootWraps...)
+		configure := adapter.configure
+		// Never alter primary discovery, even when failover storages are configured.
+		if adapter.storageType == "S3" && isFailover {
+			configure = s3.ConfigureStorageWithFailover
+		}
+		st, err := configure(ctx, prefix, settings, rootWraps...)
 		if err != nil {
 			return nil, fmt.Errorf("configure storage with prefix %q: %w", prefix, err)
 		}
@@ -548,7 +560,7 @@ func ConfigureFailoverStorages(ctx context.Context) (failovers map[string]storag
 		}
 		rootWraps = append(rootWraps, ConfigureStoragePrefix)
 
-		st, err := ConfigureStorageForSpecificConfig(ctx, cfg, rootWraps...)
+		st, err := configureStorageForSpecificConfig(ctx, cfg, true, rootWraps...)
 		if err != nil {
 			return nil, fmt.Errorf("failover storage %s: %v", name, err)
 		}

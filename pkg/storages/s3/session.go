@@ -28,6 +28,10 @@ import (
 //nolint:gocyclo
 func createSession(config *Config) (*session.Session, error) {
 	sessOpts := session.Options{}
+	if config.IsolateHTTPClient {
+		// Do not inherit the primary's logging wrapper or pinned TLS server name.
+		sessOpts.Config.HTTPClient = &http.Client{Transport: http.DefaultTransport.(*http.Transport).Clone()}
+	}
 	if config.CACertFile != "" {
 		file, err := os.Open(config.CACertFile)
 		if err != nil {
@@ -83,8 +87,12 @@ func createSession(config *Config) (*session.Session, error) {
 			}
 		}
 
+		var discoveryClient *http.Client
+		if config.IsolateHTTPClient {
+			discoveryClient = newEndpointSourceClient()
+		}
 		sess.Handlers.Validate.PushBack(func(request *request.Request) {
-			endpoint := requestEndpointFromSource(request.Context(), config.EndpointSource, config.EndpointPort)
+			endpoint := requestEndpointFromSource(request.Context(), config.EndpointSource, config.EndpointPort, discoveryClient)
 			if endpoint != nil {
 				tracelog.DebugLogger.Printf("using S3 endpoint %s", *endpoint)
 				request.HTTPRequest.Host = host
@@ -285,12 +293,22 @@ func setTLSServerName(cfg *aws.Config, serverName string) error {
 	return nil
 }
 
-func requestEndpointFromSource(ctx context.Context, endpointSource, port string) *string {
-	t := http.DefaultTransport
-	c := http.DefaultClient
-	if tr, ok := t.(*http.Transport); ok {
-		tr.DisableKeepAlives = true
-		c = &http.Client{Transport: tr}
+// Clone once at construction, without reading the shared transport during secondary requests.
+func newEndpointSourceClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DisableKeepAlives = true
+	return &http.Client{Transport: transport}
+}
+
+func requestEndpointFromSource(ctx context.Context, endpointSource, port string, c *http.Client) *string {
+	if c == nil {
+		// Preserve primary behavior regardless of failover configuration or selection.
+		t := http.DefaultTransport
+		c = http.DefaultClient
+		if tr, ok := t.(*http.Transport); ok {
+			tr.DisableKeepAlives = true
+			c = &http.Client{Transport: tr}
+		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpointSource, nil)
 	if err != nil {

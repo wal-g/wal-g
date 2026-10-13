@@ -36,6 +36,10 @@ Overrides the default hostname to connect to an S3-compatible service. i.e, `htt
 
 Use to bypass balancer and connect directly to host. In the balancer-bypass mode we replace the request host with the address of a specific node returned by the endpoint source.
 
+Failover storages inherit this setting unless overridden. To use another S3 service without discovery,
+set `S3_ENDPOINT_SOURCE: ""` and its `AWS_ENDPOINT` explicitly in that storage's `WALG_FAILOVER_STORAGES` section.
+Secondary S3 storages use isolated HTTP clients; the primary's behavior is unchanged, including before failover activation.
+
 * `S3_ENDPOINT_PORT`
 
 Sets port to use for s3 connection. By default 443 is used.
