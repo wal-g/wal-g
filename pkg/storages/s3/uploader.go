@@ -117,6 +117,9 @@ func CreateUploaderAPI(svc *s3.Client, partsize, concurrency int) UploaderAPI {
 	return manager.NewUploader(svc, func(u *manager.Uploader) {
 		u.PartSize = int64(partsize)
 		u.Concurrency = concurrency
+		// The manager has its own checksum policy for multipart uploads and
+		// does not inherit the client's AWS_REQUEST_CHECKSUM_CALCULATION setting.
+		u.RequestChecksumCalculation = svc.Options().RequestChecksumCalculation
 	})
 }
 

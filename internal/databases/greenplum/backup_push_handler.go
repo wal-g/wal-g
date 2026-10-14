@@ -133,9 +133,17 @@ func (bh *BackupHandler) buildBackupPushCommand(contentID int) string {
 
 	backupPushArgsLine := "'" + strings.Join(backupPushArgs, " ") + "'"
 
+	binary, _ := conf.GetSetting(conf.GPBinaryPath)
+	if binary == "" || binary == "wal-g" {
+		binary = "wal-g"
+	} else {
+		// The setting is a single executable path, not a shell command.
+		binary = "'" + strings.ReplaceAll(binary, "'", "'\"'\"'") + "'"
+	}
+
 	cmd := []string{
 		// nohup to avoid the SIGHUP on SSH session disconnect
-		"nohup", "wal-g seg-cmd-run",
+		"nohup", binary, "seg-cmd-run",
 		SegBackupPushCmdName,
 		fmt.Sprintf("--content-id=%d", segment.ContentID),
 		// actual arguments to be passed to the backup-push command

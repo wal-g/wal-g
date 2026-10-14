@@ -10,9 +10,40 @@ import (
 
 	"github.com/apache/cloudberry-go-libs/cluster"
 	"github.com/google/uuid"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/require"
 
 	"github.com/wal-g/wal-g/internal/config"
 )
+
+func TestBuildBackupPushCommandBinaryPath(t *testing.T) {
+	previous := viper.Get(config.GPBinaryPath)
+	t.Cleanup(func() { viper.Set(config.GPBinaryPath, previous) })
+	for _, tc := range []struct {
+		path   string
+		prefix string
+	}{
+		{"", "nohup wal-g seg-cmd-run "},
+		{"wal-g", "nohup wal-g seg-cmd-run "},
+		{"/home/gpadmin/patched-wal-g", "nohup '/home/gpadmin/patched-wal-g' seg-cmd-run "},
+		{"/home/gpadmin/a b'$(touch unexpected)/wal-g", "nohup '/home/gpadmin/a b'\"'\"'$(touch unexpected)/wal-g' seg-cmd-run "},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			viper.Set(config.GPBinaryPath, tc.path)
+			handler := &BackupHandler{
+				globalCluster: &cluster.Cluster{
+					ByContent: map[int][]*cluster.SegConfig{
+						95: {{ContentID: 95, DataDir: "/data/gpseg95", Port: 6003}},
+					},
+				},
+				currBackupInfo: CurrBackupInfo{
+					segmentBackups: make(map[string]*cluster.SegConfig),
+				},
+			}
+			require.True(t, strings.HasPrefix(handler.buildBackupPushCommand(95), tc.prefix))
+		})
+	}
+}
 
 func TestBuildBackupPushCommand(t *testing.T) {
 	beforeValue := config.CfgFile

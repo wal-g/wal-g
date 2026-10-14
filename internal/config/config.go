@@ -189,6 +189,7 @@ const (
 	RedisClusterConfPath           = "WALG_REDIS_CLUSTER_CONF_PATH"
 
 	GPLogsDirectory              = "WALG_GP_LOGS_DIR"
+	GPBinaryPath                 = "WALG_GP_BINARY_PATH"
 	GPSegContentID               = "WALG_GP_SEG_CONTENT_ID"
 	GPSegmentsPollInterval       = "WALG_GP_SEG_POLL_INTERVAL"
 	GPSegmentsPollRetries        = "WALG_GP_SEG_POLL_RETRIES"
@@ -349,6 +350,7 @@ var (
 	}
 
 	GPDefaultSettings = map[string]string{
+		GPBinaryPath:                 "wal-g",
 		DisasterCopySkipFiles:        `^segments_005/seg-?[0-9]+/wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$`,
 		GPLogsDirectory:              "/var/log",
 		PgWalSize:                    "64",
@@ -640,6 +642,7 @@ var (
 	}
 
 	GPAllowedSettings = map[string]bool{
+		GPBinaryPath:                         true,
 		GPLogsDirectory:                      true,
 		GPSegContentID:                       true,
 		GPSegmentsPollRetries:                true,

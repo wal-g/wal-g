@@ -1,17 +1,110 @@
 package s3
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
+
+type multipartChecksumClient struct {
+	createHeader http.Header
+	partHeaders  []http.Header
+}
+
+func (c *multipartChecksumClient) Do(req *http.Request) (*http.Response, error) {
+	if req.Body != nil {
+		if _, err := io.Copy(io.Discard, req.Body); err != nil {
+			return nil, err
+		}
+	}
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{},
+		Request:    req,
+	}
+	var body string
+	switch {
+	case req.Method == http.MethodPost && req.URL.Query().Has("uploads"):
+		c.createHeader = req.Header.Clone()
+		body = `<InitiateMultipartUploadResult><UploadId>test-upload</UploadId></InitiateMultipartUploadResult>`
+	case req.Method == http.MethodPut && req.URL.Query().Has("partNumber"):
+		c.partHeaders = append(c.partHeaders, req.Header.Clone())
+		response.Header.Set("ETag", `"test-etag"`)
+		if req.Header.Get("X-Amz-Sdk-Checksum-Algorithm") != "" {
+			response.Header.Set("X-Amz-Checksum-Crc32", "AAAAAA==")
+		}
+	case req.Method == http.MethodPost && req.URL.Query().Has("uploadId"):
+		body = `<CompleteMultipartUploadResult><ETag>"test-etag"</ETag></CompleteMultipartUploadResult>`
+	default:
+		return nil, fmt.Errorf("unexpected multipart request: %s %s", req.Method, req.URL)
+	}
+	response.Body = io.NopCloser(strings.NewReader(body))
+	return response, nil
+}
+
+func TestMultipartUploadRespectsClientChecksumPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		policy aws.RequestChecksumCalculation
+		crc32  bool
+	}{
+		{"required", aws.RequestChecksumCalculationWhenRequired, false},
+		{"supported", aws.RequestChecksumCalculationWhenSupported, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			capture := &multipartChecksumClient{}
+			client := s3.NewFromConfig(aws.Config{
+				Region:                     "us-east-1",
+				Credentials:                credentials.NewStaticCredentialsProvider("key", "secret", ""),
+				HTTPClient:                 capture,
+				RequestChecksumCalculation: tc.policy,
+			}, func(o *s3.Options) {
+				o.BaseEndpoint = aws.String("https://s3.example.com")
+				o.UsePathStyle = true
+			})
+			const partSize = 5 << 20
+			// One worker keeps capture access sequential. A non-seekable body
+			// larger than one part exercises the streaming backup upload path.
+			uploader := CreateUploaderAPI(client, partSize, 1)
+			_, err := uploader.Upload(t.Context(), &s3.PutObjectInput{
+				Bucket: aws.String("bucket"),
+				Key:    aws.String("backup.tar"),
+				Body:   bytes.NewBuffer(make([]byte, partSize+1)),
+			})
+			require.NoError(t, err)
+			require.Len(t, capture.partHeaders, 2)
+			if tc.crc32 {
+				assert.Equal(t, "CRC32", capture.createHeader.Get("X-Amz-Checksum-Algorithm"))
+			} else {
+				assert.Empty(t, capture.createHeader.Get("X-Amz-Checksum-Algorithm"))
+			}
+			for _, header := range capture.partHeaders {
+				if tc.crc32 {
+					assert.Equal(t, "CRC32", header.Get("X-Amz-Sdk-Checksum-Algorithm"))
+				} else {
+					assert.Equal(t, "UNSIGNED-PAYLOAD", header.Get("X-Amz-Content-Sha256"))
+					assert.Empty(t, header.Get("X-Amz-Sdk-Checksum-Algorithm"))
+					assert.Empty(t, header.Get("X-Amz-Trailer"))
+					assert.Empty(t, header.Get("X-Amz-Checksum-Crc32"))
+					assert.NotContains(t, header.Get("Content-Encoding"), "aws-chunked")
+				}
+			}
+		})
+	}
+}
 
 var (
 	dummyStorageClass         = "dummyStorageClass"

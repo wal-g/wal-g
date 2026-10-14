@@ -44,6 +44,20 @@ AWS_SECRET_ACCESS_KEY: "aws_secret_access_key"
 WALG_COMPRESSION_METHOD: "brotli"
 ```
 
+For `backup-push`, `WALG_GP_BINARY_PATH` selects the executable the coordinator
+launches on segment hosts (including the coordinator's own segment). The default
+is `wal-g`, resolved through each host's `PATH`. For a separate patched binary,
+set this in the coordinator's WAL-G configuration:
+
+```yaml
+WALG_GP_BINARY_PATH: "/home/gpadmin/patched-wal-g"
+```
+
+The executable must exist at that path on every participating host. Start the
+coordinator with the patched binary explicitly as well. This setting takes one
+executable path, without additional arguments; it does not change `archive_command`
+or select executables for restore commands.
+
 #### WAL archiving
 Also, WAL archiving must be configured on each segment primary. Archive command must contain the `--content-id` flag with the content ID of the segment.
 ```bash
