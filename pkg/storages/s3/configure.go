@@ -172,6 +172,8 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	_, explicitlyConfiguredPartSize := settings[maxPartSizeSetting]
+	autoPartSize := !explicitlyConfiguredPartSize
 	storageClass := defaultStorageClass
 	if class, ok := settings[storageClassSetting]; ok {
 		storageClass = class
@@ -229,6 +231,7 @@ func ConfigureStorage(
 		Uploader: &UploaderConfig{
 			UploadConcurrency:            uploadConcurrency,
 			MaxPartSize:                  maxPartSize,
+			AutoPartSize:                 autoPartSize,
 			StorageClass:                 storageClass,
 			ServerSideEncryption:         settings[sseSetting],
 			ServerSideEncryptionCustomer: settings[sseCSetting],

@@ -24,6 +24,13 @@ func NewReader(ctx context.Context, reader io.Reader, limiter *rate.Limiter) *Re
 	}
 }
 
+func (r *Reader) RemainingSize() int64 {
+	if sized, ok := r.reader.(interface{ RemainingSize() int64 }); ok {
+		return sized.RemainingSize()
+	}
+	return -1
+}
+
 func (r *Reader) Read(buf []byte) (int, error) {
 	if len(buf) == 0 {
 		return 0, fmt.Errorf("empty buffer passed")
