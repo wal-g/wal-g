@@ -51,6 +51,13 @@ const (
 	disable100ContinueSetting      = "S3_DISABLE_100_CONTINUE"
 	enableVersioningSetting        = "S3_ENABLE_VERSIONING"
 	deleteBatchSizeSetting         = "S3_DELETE_BATCH_SIZE"
+	// requestTimeoutSetting bounds how long WAL-G will wait for the S3 server
+	// to send response headers. Once headers arrive, body transfer is not
+	// constrained by this timeout, so large uploads/downloads still succeed.
+	// Default 0 disables the timeout, preserving prior behavior; this avoids
+	// silently changing the contract for existing users on flaky-but-eventually-
+	// responsive endpoints.
+	requestTimeoutSetting = "S3_REQUEST_TIMEOUT"
 )
 
 var SettingList = []string{
@@ -91,6 +98,7 @@ var SettingList = []string{
 	disable100ContinueSetting,
 	enableVersioningSetting,
 	deleteBatchSizeSetting,
+	requestTimeoutSetting,
 }
 
 const (
@@ -109,6 +117,9 @@ const (
 	defaultDisabledRetentionPeriod = -1
 	defaultDisable100Continue      = false
 	defaultDeleteBatchSize         = 1000
+	// defaultRequestTimeoutSeconds = 0 means no response-header timeout. Existing
+	// users see no behavior change unless they opt in by setting S3_REQUEST_TIMEOUT.
+	defaultRequestTimeoutSeconds = 0
 )
 
 // TODO: Unit tests
@@ -201,6 +212,11 @@ func ConfigureStorage(
 		return nil, err
 	}
 
+	requestTimeoutSeconds, err := setting.IntOptional(settings, requestTimeoutSetting, defaultRequestTimeoutSeconds)
+	if err != nil {
+		return nil, err
+	}
+
 	config := &Config{
 		Secrets: &Secrets{
 			SecretKey: strings.TrimSpace(setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting)),
@@ -243,6 +259,7 @@ func ConfigureStorage(
 		Disable100Continue:      disable100Continue,
 		EnableVersioning:        settings[enableVersioningSetting],
 		DeleteBatchSize:         deleteBatchSize,
+		RequestTimeout:          time.Duration(requestTimeoutSeconds) * time.Second,
 	}
 
 	st, err := NewStorage(ctx, config, rootWraps...)
