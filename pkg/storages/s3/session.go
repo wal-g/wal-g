@@ -48,6 +48,14 @@ func loadAWSConfig(ctx context.Context, cfg *Config) (aws.Config, []func(*s3.Opt
 		config.WithRetryer(newRetryerFunc(cfg)),
 	}
 
+	if cfg.RequestChecksumCalculation != aws.RequestChecksumCalculationUnset {
+		loadOpts = append(loadOpts, config.WithRequestChecksumCalculation(cfg.RequestChecksumCalculation))
+	}
+
+	if cfg.ResponseChecksumValidation != aws.ResponseChecksumValidationUnset {
+		loadOpts = append(loadOpts, config.WithResponseChecksumValidation(cfg.ResponseChecksumValidation))
+	}
+
 	if cfg.DualStack {
 		loadOpts = append(loadOpts, config.WithUseDualStackEndpoint(aws.DualStackEndpointStateEnabled))
 	}

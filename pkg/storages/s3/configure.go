@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/storage/setting"
 )
@@ -13,35 +14,37 @@ import (
 // TODO: Merge the settings and their default values with ones defined in internal/config.go
 
 const (
-	endpointSetting                 = "AWS_ENDPOINT"
-	regionSetting                   = "AWS_REGION"
-	forcePathStyleSetting           = "AWS_S3_FORCE_PATH_STYLE"
-	accessKeyIDSetting              = "AWS_ACCESS_KEY_ID"
-	accessKeySetting                = "AWS_ACCESS_KEY"
-	secretAccessKeySetting          = "AWS_SECRET_ACCESS_KEY"
-	secretKeySetting                = "AWS_SECRET_KEY"
-	sessionTokenSetting             = "AWS_SESSION_TOKEN"
-	sessionNameSetting              = "AWS_ROLE_SESSION_NAME"
-	roleARNSetting                  = "AWS_ROLE_ARN"
-	dualStackSetting                = "AWS_DUAL_STACK"
-	skipValidationSetting           = "S3_SKIP_VALIDATION"
-	useYcSessionTokenSetting        = "S3_USE_YC_SESSION_TOKEN"
-	sseSetting                      = "S3_SSE"
-	sseCSetting                     = "S3_SSE_C"
-	sseKmsIDSetting                 = "S3_SSE_KMS_ID"
-	storageClassSetting             = "S3_STORAGE_CLASS"
-	uploadConcurrencySetting        = "UPLOAD_CONCURRENCY"
-	caCertFileSetting               = "S3_CA_CERT_FILE"
-	maxPartSizeSetting              = "S3_MAX_PART_SIZE"
-	endpointSourceSetting           = "S3_ENDPOINT_SOURCE"
-	endpointPortSetting             = "S3_ENDPOINT_PORT"
-	endpointProtocolSetting         = "S3_ENDPOINT_PROTOCOL"
-	logLevelSetting                 = "S3_LOG_LEVEL"
-	rangeBatchEnabledSetting        = "S3_RANGE_BATCH_ENABLED"
-	rangeQueriesMaxRetriesSetting   = "S3_RANGE_MAX_RETRIES"
-	requestAdditionalHeadersSetting = "S3_REQUEST_ADDITIONAL_HEADERS"
-	retentionPeriodSetting          = "S3_RETENTION_PERIOD"
-	retentionModeSetting            = "S3_RETENTION_MODE"
+	endpointSetting                   = "AWS_ENDPOINT"
+	regionSetting                     = "AWS_REGION"
+	forcePathStyleSetting             = "AWS_S3_FORCE_PATH_STYLE"
+	requestChecksumCalculationSetting = "AWS_REQUEST_CHECKSUM_CALCULATION"
+	responseChecksumValidationSetting = "AWS_RESPONSE_CHECKSUM_VALIDATION"
+	accessKeyIDSetting                = "AWS_ACCESS_KEY_ID"
+	accessKeySetting                  = "AWS_ACCESS_KEY"
+	secretAccessKeySetting            = "AWS_SECRET_ACCESS_KEY"
+	secretKeySetting                  = "AWS_SECRET_KEY"
+	sessionTokenSetting               = "AWS_SESSION_TOKEN"
+	sessionNameSetting                = "AWS_ROLE_SESSION_NAME"
+	roleARNSetting                    = "AWS_ROLE_ARN"
+	dualStackSetting                  = "AWS_DUAL_STACK"
+	skipValidationSetting             = "S3_SKIP_VALIDATION"
+	useYcSessionTokenSetting          = "S3_USE_YC_SESSION_TOKEN"
+	sseSetting                        = "S3_SSE"
+	sseCSetting                       = "S3_SSE_C"
+	sseKmsIDSetting                   = "S3_SSE_KMS_ID"
+	storageClassSetting               = "S3_STORAGE_CLASS"
+	uploadConcurrencySetting          = "UPLOAD_CONCURRENCY"
+	caCertFileSetting                 = "S3_CA_CERT_FILE"
+	maxPartSizeSetting                = "S3_MAX_PART_SIZE"
+	endpointSourceSetting             = "S3_ENDPOINT_SOURCE"
+	endpointPortSetting               = "S3_ENDPOINT_PORT"
+	endpointProtocolSetting           = "S3_ENDPOINT_PROTOCOL"
+	logLevelSetting                   = "S3_LOG_LEVEL"
+	rangeBatchEnabledSetting          = "S3_RANGE_BATCH_ENABLED"
+	rangeQueriesMaxRetriesSetting     = "S3_RANGE_MAX_RETRIES"
+	requestAdditionalHeadersSetting   = "S3_REQUEST_ADDITIONAL_HEADERS"
+	retentionPeriodSetting            = "S3_RETENTION_PERIOD"
+	retentionModeSetting              = "S3_RETENTION_MODE"
 	// limiters for retry policy during interaction with S3
 	maxRetriesSetting              = "S3_MAX_RETRIES"
 	requestTimeoutSetting          = "S3_RESPONSE_HEADER_TIMEOUT"
@@ -60,6 +63,8 @@ var SettingList = []string{
 	endpointProtocolSetting,
 	regionSetting,
 	forcePathStyleSetting,
+	requestChecksumCalculationSetting,
+	responseChecksumValidationSetting,
 	accessKeyIDSetting,
 	accessKeySetting,
 	secretAccessKeySetting,
@@ -141,6 +146,14 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
+	requestChecksumCalculation, err := parseRequestChecksumCalculation(settings[requestChecksumCalculationSetting])
+	if err != nil {
+		return nil, err
+	}
+	responseChecksumValidation, err := parseResponseChecksumValidation(settings[responseChecksumValidationSetting])
+	if err != nil {
+		return nil, err
+	}
 	maxRetries, err := setting.IntOptional(settings, maxRetriesSetting, defaultMaxRetries)
 	if err != nil {
 		return nil, err
@@ -207,27 +220,29 @@ func ConfigureStorage(
 		Secrets: &Secrets{
 			SecretKey: strings.TrimSpace(setting.FirstDefined(settings, secretAccessKeySetting, secretKeySetting)),
 		},
-		Region:                   settings[regionSetting],
-		Endpoint:                 settings[endpointSetting],
-		EndpointSource:           settings[endpointSourceSetting],
-		EndpointPort:             port,
-		EndpointProtocol:         settings[endpointProtocolSetting],
-		Bucket:                   bucket,
-		RootPath:                 rootPath,
-		AccessKey:                strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
-		SessionToken:             settings[sessionTokenSetting],
-		RoleARN:                  settings[roleARNSetting],
-		DualStack:                dualStack,
-		SessionName:              settings[sessionNameSetting],
-		CACertFile:               settings[caCertFileSetting],
-		SkipValidation:           skipValidation,
-		UseYCSessionToken:        settings[useYcSessionTokenSetting],
-		ForcePathStyle:           forcePathStyle,
-		RequestAdditionalHeaders: settings[requestAdditionalHeadersSetting],
-		MaxRetries:               maxRetries,
-		RetryableErrorCodes:      parseErrorCodes(settings[retryableErrorCodesSetting]),
-		RequestTimeout:           time.Duration(requestTimeout) * time.Second,
-		LogLevel:                 settings[logLevelSetting],
+		Region:                     settings[regionSetting],
+		Endpoint:                   settings[endpointSetting],
+		EndpointSource:             settings[endpointSourceSetting],
+		EndpointPort:               port,
+		EndpointProtocol:           settings[endpointProtocolSetting],
+		Bucket:                     bucket,
+		RootPath:                   rootPath,
+		AccessKey:                  strings.TrimSpace(setting.FirstDefined(settings, accessKeyIDSetting, accessKeySetting)),
+		SessionToken:               settings[sessionTokenSetting],
+		RoleARN:                    settings[roleARNSetting],
+		DualStack:                  dualStack,
+		SessionName:                settings[sessionNameSetting],
+		CACertFile:                 settings[caCertFileSetting],
+		SkipValidation:             skipValidation,
+		UseYCSessionToken:          settings[useYcSessionTokenSetting],
+		ForcePathStyle:             forcePathStyle,
+		RequestChecksumCalculation: requestChecksumCalculation,
+		ResponseChecksumValidation: responseChecksumValidation,
+		RequestAdditionalHeaders:   settings[requestAdditionalHeadersSetting],
+		MaxRetries:                 maxRetries,
+		RetryableErrorCodes:        parseErrorCodes(settings[retryableErrorCodesSetting]),
+		RequestTimeout:             time.Duration(requestTimeout) * time.Second,
+		LogLevel:                   settings[logLevelSetting],
 		Uploader: &UploaderConfig{
 			UploadConcurrency:            uploadConcurrency,
 			MaxPartSize:                  maxPartSize,
@@ -253,6 +268,34 @@ func ConfigureStorage(
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}
 	return st, nil
+}
+
+func parseRequestChecksumCalculation(value string) (aws.RequestChecksumCalculation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.RequestChecksumCalculationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.RequestChecksumCalculationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.RequestChecksumCalculationWhenRequired, nil
+	default:
+		return aws.RequestChecksumCalculationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			requestChecksumCalculationSetting, value)
+	}
+}
+
+func parseResponseChecksumValidation(value string) (aws.ResponseChecksumValidation, error) {
+	switch strings.ToUpper(value) {
+	case "":
+		return aws.ResponseChecksumValidationUnset, nil
+	case "WHEN_SUPPORTED":
+		return aws.ResponseChecksumValidationWhenSupported, nil
+	case "WHEN_REQUIRED":
+		return aws.ResponseChecksumValidationWhenRequired, nil
+	default:
+		return aws.ResponseChecksumValidationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
+			responseChecksumValidationSetting, value)
+	}
 }
 
 func parseErrorCodes(value string) map[string]struct{} {
