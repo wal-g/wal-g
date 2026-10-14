@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 )
@@ -35,8 +34,8 @@ type Config struct {
 	SkipValidation             bool
 	UseYCSessionToken          string
 	ForcePathStyle             bool
-	RequestChecksumCalculation aws.RequestChecksumCalculation
-	ResponseChecksumValidation aws.ResponseChecksumValidation
+	RequestChecksumCalculation string
+	ResponseChecksumValidation string
 	RequestAdditionalHeaders   string
 	MaxRetries                 int
 	RetryableErrorCodes        map[string]struct{}

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/pkg/storages/storage/setting"
 )
@@ -146,14 +145,6 @@ func ConfigureStorage(
 	if err != nil {
 		return nil, err
 	}
-	requestChecksumCalculation, err := parseRequestChecksumCalculation(settings[requestChecksumCalculationSetting])
-	if err != nil {
-		return nil, err
-	}
-	responseChecksumValidation, err := parseResponseChecksumValidation(settings[responseChecksumValidationSetting])
-	if err != nil {
-		return nil, err
-	}
 	maxRetries, err := setting.IntOptional(settings, maxRetriesSetting, defaultMaxRetries)
 	if err != nil {
 		return nil, err
@@ -236,8 +227,8 @@ func ConfigureStorage(
 		SkipValidation:             skipValidation,
 		UseYCSessionToken:          settings[useYcSessionTokenSetting],
 		ForcePathStyle:             forcePathStyle,
-		RequestChecksumCalculation: requestChecksumCalculation,
-		ResponseChecksumValidation: responseChecksumValidation,
+		RequestChecksumCalculation: settings[requestChecksumCalculationSetting],
+		ResponseChecksumValidation: settings[responseChecksumValidationSetting],
 		RequestAdditionalHeaders:   settings[requestAdditionalHeadersSetting],
 		MaxRetries:                 maxRetries,
 		RetryableErrorCodes:        parseErrorCodes(settings[retryableErrorCodesSetting]),
@@ -268,34 +259,6 @@ func ConfigureStorage(
 		return nil, fmt.Errorf("create S3 storage: %w", err)
 	}
 	return st, nil
-}
-
-func parseRequestChecksumCalculation(value string) (aws.RequestChecksumCalculation, error) {
-	switch strings.ToUpper(value) {
-	case "":
-		return aws.RequestChecksumCalculationUnset, nil
-	case "WHEN_SUPPORTED":
-		return aws.RequestChecksumCalculationWhenSupported, nil
-	case "WHEN_REQUIRED":
-		return aws.RequestChecksumCalculationWhenRequired, nil
-	default:
-		return aws.RequestChecksumCalculationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
-			requestChecksumCalculationSetting, value)
-	}
-}
-
-func parseResponseChecksumValidation(value string) (aws.ResponseChecksumValidation, error) {
-	switch strings.ToUpper(value) {
-	case "":
-		return aws.ResponseChecksumValidationUnset, nil
-	case "WHEN_SUPPORTED":
-		return aws.ResponseChecksumValidationWhenSupported, nil
-	case "WHEN_REQUIRED":
-		return aws.ResponseChecksumValidationWhenRequired, nil
-	default:
-		return aws.ResponseChecksumValidationUnset, fmt.Errorf("%s=%q must be WHEN_SUPPORTED or WHEN_REQUIRED",
-			responseChecksumValidationSetting, value)
-	}
 }
 
 func parseErrorCodes(value string) map[string]struct{} {
