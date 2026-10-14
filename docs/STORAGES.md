@@ -48,6 +48,14 @@ When `S3_ENDPOINT_SOURCE` is set, use this option to specify protocol (http, htt
 
 To enable path-style addressing (i.e., `http://s3.amazonaws.com/BUCKET/KEY`) when connecting to an S3-compatible service that lack of support for sub-domain style bucket URLs (i.e., `http://BUCKET.s3.amazonaws.com/KEY`). Defaults to `false`.
 
+* `AWS_REQUEST_CHECKSUM_CALCULATION`
+
+Controls automatic S3 request checksum calculation, including multipart uploads, for all supported databases. Accepts `WHEN_SUPPORTED` (calculate when the operation supports checksums) or `WHEN_REQUIRED` (calculate only when required by the operation or when a checksum algorithm is explicitly selected), without regard to case. Available as an environment variable or config file setting, including in individual storage configs. An explicit storage config value takes precedence over the environment. If unset or empty, the AWS SDK uses the environment or the AWS profile's `request_checksum_calculation` setting, defaulting to `WHEN_SUPPORTED`.
+
+* `AWS_RESPONSE_CHECKSUM_VALIDATION`
+
+Controls S3 response checksum validation for all supported databases. Accepts `WHEN_SUPPORTED` (validate when the operation supports checksums) or `WHEN_REQUIRED` (validate when explicitly enabled for the operation), without regard to case. Available as an environment variable or config file setting, including in individual storage configs. An explicit storage config value takes precedence over the environment. If unset or empty, the AWS SDK uses the environment or the AWS profile's `response_checksum_validation` setting, defaulting to `WHEN_SUPPORTED`.
+
 * `WALG_S3_STORAGE_CLASS`
 
 To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
