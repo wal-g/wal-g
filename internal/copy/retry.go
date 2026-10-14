@@ -125,6 +125,10 @@ type sourceReader struct {
 	remaining int64
 }
 
+func (r *sourceReader) RemainingSize() int64 {
+	return r.remaining
+}
+
 func (r *sourceReader) Read(p []byte) (int, error) {
 	n, err := r.reader.Read(p)
 	r.remaining -= int64(n)

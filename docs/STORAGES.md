@@ -52,6 +52,10 @@ To enable path-style addressing (i.e., `http://s3.amazonaws.com/BUCKET/KEY`) whe
 
 To configure the S3 storage class used for backup files, use `WALG_S3_STORAGE_CLASS`. By default, WAL-G uses the "STANDARD" storage class. Other supported values include "STANDARD_IA" for Infrequent Access and "REDUCED_REDUNDANCY" for Reduced Redundancy.
 
+* `WALG_S3_MAX_PART_SIZE`
+
+Sets the S3 multipart upload part size in bytes. When it is not set and the input size is known, WAL-G selects at least 20 MiB and increases the part size when necessary to keep that object within S3's 10,000-part limit. Storage-to-storage copy passes the inventoried source-object size to the uploader, and seekable inputs are measured without reading them. Unknown-size inputs, such as newly compressed backup streams, remain direct streaming uploads with the 20 MiB default; WAL-G does not create temporary files. Set this option explicitly to use a fixed part size for every upload.
+
 * `WALG_S3_SSE`
 
 To enable S3 server-side encryption, set to the algorithm to use when storing the objects in S3 (i.e., `AES256`, `aws:kms`).
