@@ -111,13 +111,25 @@ const (
 	defaultDeleteBatchSize         = 1000
 )
 
-// TODO: Unit tests
-//
-//nolint:funlen,gocyclo
 func ConfigureStorage(
+	ctx context.Context, prefix string, settings map[string]string, rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
+	return configureStorage(ctx, prefix, settings, false, rootWraps...)
+}
+
+// ConfigureStorageWithFailover configures a secondary storage without changing primary discovery.
+func ConfigureStorageWithFailover(
+	ctx context.Context, prefix string, settings map[string]string, rootWraps ...storage.WrapRootFolder,
+) (storage.HashableStorage, error) {
+	return configureStorage(ctx, prefix, settings, true, rootWraps...)
+}
+
+//nolint:funlen,gocyclo
+func configureStorage(
 	ctx context.Context,
 	prefix string,
 	settings map[string]string,
+	isolateEndpointSource bool,
 	rootWraps ...storage.WrapRootFolder,
 ) (storage.HashableStorage, error) {
 	bucket, rootPath, err := storage.GetPathFromPrefix(prefix)
@@ -208,6 +220,7 @@ func ConfigureStorage(
 		Region:                   settings[regionSetting],
 		Endpoint:                 settings[endpointSetting],
 		EndpointSource:           settings[endpointSourceSetting],
+		IsolateEndpointSource:    isolateEndpointSource,
 		EndpointPort:             port,
 		EndpointProtocol:         settings[endpointProtocolSetting],
 		Bucket:                   bucket,
