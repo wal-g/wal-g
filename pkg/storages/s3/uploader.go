@@ -152,22 +152,6 @@ func CreateUploaderAPI(svc *s3.Client, partsize, concurrency int) UploaderAPI {
 	})
 }
 
-func partitionStrings(strings []string, blockSize int) [][]string {
-	// I've unsuccessfully tried this with interface{} but there was too much of casting
-	if blockSize <= 0 {
-		return [][]string{strings}
-	}
-	partition := make([][]string, 0)
-	for i := 0; i < len(strings); i += blockSize {
-		if i+blockSize > len(strings) {
-			partition = append(partition, strings[i:])
-		} else {
-			partition = append(partition, strings[i:i+blockSize])
-		}
-	}
-	return partition
-}
-
 func partitionObjects(objects []storage.Object, blockSize int) [][]storage.Object {
 	if blockSize <= 0 {
 		return [][]storage.Object{objects}
