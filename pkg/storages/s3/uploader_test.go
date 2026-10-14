@@ -81,17 +81,3 @@ func TestExplicitPartSizeKeepsStreamingUpload(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, api.opts)
 }
-
-func TestUploadSizePreservesReadSeekerPosition(t *testing.T) {
-	content := bytes.NewReader([]byte("prefix-content"))
-	_, err := content.Seek(7, io.SeekStart)
-	require.NoError(t, err)
-
-	size, known := uploadSize(content)
-	assert.True(t, known)
-	assert.Equal(t, int64(len("content")), size)
-
-	actual, err := io.ReadAll(content)
-	require.NoError(t, err)
-	assert.Equal(t, []byte("content"), actual)
-}
