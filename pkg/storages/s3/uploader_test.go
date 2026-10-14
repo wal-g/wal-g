@@ -87,8 +87,7 @@ func TestUploadSizePreservesReadSeekerPosition(t *testing.T) {
 	_, err := content.Seek(7, io.SeekStart)
 	require.NoError(t, err)
 
-	size, known, err := uploadSize(content)
-	require.NoError(t, err)
+	size, known := uploadSize(content)
 	assert.True(t, known)
 	assert.Equal(t, int64(len("content")), size)
 

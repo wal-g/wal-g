@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/wal-g/tracelog"
+	"github.com/wal-g/wal-g/pkg/storages/storage"
 	"github.com/wal-g/wal-g/utility"
 	"golang.org/x/time/rate"
 )
@@ -25,7 +26,7 @@ func NewReader(ctx context.Context, reader io.Reader, limiter *rate.Limiter) *Re
 }
 
 func (r *Reader) RemainingSize() int64 {
-	if sized, ok := r.reader.(interface{ RemainingSize() int64 }); ok {
+	if sized, ok := r.reader.(storage.SizedReader); ok {
 		return sized.RemainingSize()
 	}
 	return -1

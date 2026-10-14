@@ -119,17 +119,14 @@ func (uploader *Uploader) upload(ctx context.Context, bucket, path string, conte
 		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
 	}
 
-	size, known, err := uploadSize(content)
-	if err != nil {
-		return errors.Wrapf(err, "failed to determine size of '%s' before upload", path)
-	}
+	size, known := uploadSize(content)
 	if !known {
-		_, err = uploader.uploaderAPI.Upload(ctx, input)
+		_, err := uploader.uploaderAPI.Upload(ctx, input)
 		return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
 	}
 
 	partSize := max((size+int64(manager.MaxUploadParts)-1)/int64(manager.MaxUploadParts), uploader.partSize)
-	_, err = uploader.uploaderAPI.Upload(ctx, input, func(options *manager.Uploader) {
+	_, err := uploader.uploaderAPI.Upload(ctx, input, func(options *manager.Uploader) {
 		options.PartSize = partSize
 	})
 	return errors.Wrapf(err, "failed to upload '%s' to bucket '%s'", path, bucket)
@@ -137,12 +134,12 @@ func (uploader *Uploader) upload(ctx context.Context, bucket, path string, conte
 
 // uploadSize obtains the remaining content size without reading or buffering
 // it. Storage-to-storage copies provide SizedReader;
-func uploadSize(content io.Reader) (int64, bool, error) {
+func uploadSize(content io.Reader) (int64, bool) {
 	if sized, ok := content.(storage.SizedReader); ok {
 		size := sized.RemainingSize()
-		return size, size >= 0, nil
+		return size, size >= 0
 	}
-	return 0, false, nil
+	return 0, false
 }
 
 // CreateUploaderAPI returns an uploader with customizable concurrency
