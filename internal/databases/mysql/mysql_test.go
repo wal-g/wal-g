@@ -218,9 +218,7 @@ func TestFetchMySQLVariable_ValueSurvivesLaterQueries(t *testing.T) {
 		"SELECT @@version":                 "11.4.10-MariaDB-deb12-log",
 		"SELECT @@global.gtid_current_pos": "0-1-137584",
 	} {
-		rs, err := gomysql.BuildSimpleTextResultset([]string{query}, [][]any{{value}})
-		require.NoError(t, err)
-		handler.results[query] = gomysql.NewResult(rs)
+		handler.results[query] = binlogQueryResult(query, gomysql.MYSQL_TYPE_VAR_STRING, value)
 	}
 	auth := server.NewInMemoryAuthenticationHandler(gomysql.AUTH_NATIVE_PASSWORD)
 	require.NoError(t, auth.AddUser("user", "password"))
