@@ -319,8 +319,19 @@ func isOpAllowedInconfigDB(oplog *db.Oplog) bool {
 //
 //nolint:gocyclo
 func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
+	if shouldSkip(op, ap.catchUp) != nil {
+		return nil
+	}
+
+	allFiltered, err := filterNestedApplyOps(op, ap.catchUp)
+	if err != nil {
+		return NewOpHandleError(*op, err)
+	}
+	if allFiltered {
+		return nil
+	}
+
 	if !ap.preserveUUID {
-		var err error
 		_, err = filterUUIDs(op)
 		if err != nil {
 			return fmt.Errorf("can not filter UUIDs from op '%+v', error: %+v", op, err)
@@ -438,13 +449,15 @@ func indexSpecFromCommitIndexBuilds(op *db.Oplog) (string, []client.IndexDocumen
 // handleTxnOp handles oplog record with transaction attributes.
 // TODO: unit test
 func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op *db.Oplog) error {
+	if err := ap.txnBuffer.AddOp(meta, *op); err != nil {
+		return fmt.Errorf("can not append command to txn buffer: %w", err)
+	}
+
 	if meta.IsAbort() {
 		if err := ap.txnBuffer.PurgeTxn(meta); err != nil {
 			return fmt.Errorf("can not clean txn buffer after rollback cmd: %w", err)
 		}
-	}
-	if err := ap.txnBuffer.AddOp(meta, *op); err != nil {
-		return fmt.Errorf("can not append command to txn buffer: %w", err)
+		return nil
 	}
 
 	if !meta.IsCommit() {
