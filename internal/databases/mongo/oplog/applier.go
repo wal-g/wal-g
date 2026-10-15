@@ -18,7 +18,10 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-const NamespaceNotFoundError int32 = 26
+const (
+	NamespaceNotFoundError int32 = 26
+	IndexNotFoundError     int32 = 27
+)
 
 type TypeAssertionError struct {
 	etype string
@@ -85,6 +88,14 @@ type DBApplier struct {
 	lastOpTime            models.OpTime
 	hasAppliedOp          bool
 	catchUp               bool
+	openTxns              map[txnKey]struct{}
+	orphanCommits         int
+}
+
+// txnKey identifies a transaction by lsid and txnNumber, as txn.Meta does not export its ID.
+type txnKey struct {
+	lsid      string
+	txnNumber int64
 }
 
 type DBApplierArgs struct {
@@ -103,6 +114,7 @@ func NewDBApplier(m client.MongoDriver, args DBApplierArgs) *DBApplier {
 		partial:               args.Partial,
 		catchUp:               args.Reconfig,
 		applyIgnoreErrorCodes: args.IgnoreErrCodes,
+		openTxns:              make(map[txnKey]struct{}),
 	}
 }
 
@@ -358,8 +370,7 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 			[]client.IndexDocument{indexes})
 	}
 	if op.Operation == "c" && len(op.Object) > 0 && op.Object[0].Key == "dropIndexes" {
-		dbName, _ := util.SplitNamespace(op.Namespace)
-		return ap.db.DropIndexes(ctx, dbName, op.Object)
+		return ap.dropIndexes(ctx, op)
 	}
 
 	//tracelog.DebugLogger.Printf("applying op: %+v", *op)
@@ -372,6 +383,23 @@ func (ap *DBApplier) handleNonTxnOp(ctx context.Context, op *db.Oplog) error {
 		}
 		tracelog.WarningLogger.Printf("apply error is skipped: %+v\nop:\n%+v", err, *op)
 	}
+	return nil
+}
+
+// dropIndexes runs dropIndexes from the oplog entry. Like mongod during oplog application, it accepts
+// IndexNotFound and NamespaceNotFound errors, so the oplog window can be replayed again.
+func (ap *DBApplier) dropIndexes(ctx context.Context, op *db.Oplog) error {
+	dbName, _ := util.SplitNamespace(op.Namespace)
+	err := ap.db.DropIndexes(ctx, dbName, op.Object)
+	if err == nil {
+		return nil
+	}
+
+	ce, ok := errors.AsType[mongo.CommandError](err)
+	if !ok || (ce.Code != IndexNotFoundError && ce.Code != NamespaceNotFoundError) {
+		return err
+	}
+	tracelog.WarningLogger.Printf("dropIndexes error is skipped: %+v\nop:\n%+v", err, *op)
 	return nil
 }
 
@@ -453,7 +481,10 @@ func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op *db.Oplo
 		return fmt.Errorf("can not append command to txn buffer: %w", err)
 	}
 
+	// meta.IsTxn() guarantees that lsid and txnNumber are set
+	key := txnKey{lsid: string(op.LSID), txnNumber: *op.TxnNumber}
 	if meta.IsAbort() {
+		delete(ap.openTxns, key)
 		if err := ap.txnBuffer.PurgeTxn(meta); err != nil {
 			return fmt.Errorf("can not clean txn buffer after rollback cmd: %w", err)
 		}
@@ -461,7 +492,18 @@ func (ap *DBApplier) handleTxnOp(ctx context.Context, meta txn.Meta, op *db.Oplo
 	}
 
 	if !meta.IsCommit() {
+		ap.openTxns[key] = struct{}{}
 		return nil
+	}
+
+	_, open := ap.openTxns[key]
+	delete(ap.openTxns, key)
+	if !open && !meta.IsData() {
+		// The prepare entry precedes the replayed window, so txn.Buffer streams an empty transaction.
+		ap.orphanCommits++
+		tracelog.WarningLogger.Printf(
+			"commitTransaction without prepare in the replayed oplog window, transaction changes are not applied: "+
+				"lsid %s, txnNumber %d, ts %s", op.LSID, key.txnNumber, models.TimestampFromBson(op.Timestamp))
 	}
 
 	if err := ap.applyTxn(ctx, meta); err != nil {

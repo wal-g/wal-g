@@ -2,6 +2,7 @@ package oplog
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/mongodb/mongo-tools/common/db"
@@ -10,6 +11,7 @@ import (
 	clientmocks "github.com/wal-g/wal-g/internal/databases/mongo/client/mocks"
 	"github.com/wal-g/wal-g/internal/databases/mongo/models"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 func nestedInsert(ns string, id int32) bson.D {
@@ -75,8 +77,11 @@ func TestDBApplierAbortedPreparedTransactionIsNotPending(t *testing.T) {
 
 	require.NoError(t, applier.Apply(t.Context(), prepare))
 	require.True(t, applier.HasPendingTransactions())
+	require.Len(t, applier.openTxns, 1)
 	require.NoError(t, applier.Apply(t.Context(), abort))
 	require.False(t, applier.HasPendingTransactions())
+	require.Empty(t, applier.openTxns)
+	require.Zero(t, applier.orphanCommits)
 }
 
 func TestDBApplierAbortWithoutPreparedTransactionInWindow(t *testing.T) {
@@ -88,6 +93,91 @@ func TestDBApplierAbortWithoutPreparedTransactionInWindow(t *testing.T) {
 
 	require.NoError(t, applier.Apply(t.Context(), abort))
 	require.False(t, applier.HasPendingTransactions())
+}
+
+func commitTransactionEntry(t *testing.T, ts uint32) models.Oplog {
+	t.Helper()
+	return txnEntry(t, ts, bson.D{
+		{Key: "commitTransaction", Value: int32(1)},
+		{Key: "commitTimestamp", Value: bson.Timestamp{T: 100, I: 1}},
+	})
+}
+
+func TestDBApplierWarnsOnCommitWithoutPrepareInWindow(t *testing.T) {
+	mongoDB := clientmocks.NewMongoDriver(t)
+	applier := NewDBApplier(mongoDB, DBApplierArgs{})
+	defer applier.Close(context.Background())
+
+	require.NoError(t, applier.Apply(t.Context(), commitTransactionEntry(t, 2)))
+	require.Equal(t, 1, applier.orphanCommits)
+	require.False(t, applier.HasPendingTransactions())
+	require.Empty(t, applier.openTxns)
+}
+
+func TestDBApplierAppliesPreparedTransactionCommittedInWindow(t *testing.T) {
+	mongoDB := clientmocks.NewMongoDriver(t)
+	mongoDB.On("ApplyOp", mock.Anything, mock.Anything).
+		Run(func(args mock.Arguments) {
+			require.Equal(t, "test.items", args.Get(1).(*db.Oplog).Namespace)
+		}).Return(nil).Once()
+	applier := NewDBApplier(mongoDB, DBApplierArgs{})
+	defer applier.Close(context.Background())
+
+	prepare := txnEntry(t, 1, bson.D{
+		{Key: "applyOps", Value: bson.A{nestedInsert("test.items", 1)}},
+		{Key: "prepare", Value: true},
+	})
+
+	require.NoError(t, applier.Apply(t.Context(), prepare))
+	require.NoError(t, applier.Apply(t.Context(), commitTransactionEntry(t, 2)))
+	require.Zero(t, applier.orphanCommits)
+	require.False(t, applier.HasPendingTransactions())
+	require.Empty(t, applier.openTxns)
+}
+
+func TestDBApplierUnpreparedTransactionIsNotOrphan(t *testing.T) {
+	mongoDB := clientmocks.NewMongoDriver(t)
+	mongoDB.On("ApplyOp", mock.Anything, mock.Anything).Return(nil).Once()
+	applier := NewDBApplier(mongoDB, DBApplierArgs{})
+	defer applier.Close(context.Background())
+
+	entry := txnEntry(t, 1, bson.D{{Key: "applyOps", Value: bson.A{nestedInsert("test.items", 1)}}})
+
+	require.NoError(t, applier.Apply(t.Context(), entry))
+	require.Zero(t, applier.orphanCommits)
+	require.Empty(t, applier.openTxns)
+}
+
+func dropIndexesEntry(t *testing.T) models.Oplog {
+	t.Helper()
+	return batchTestEntry(t, 1, "c", bson.D{
+		{Key: "dropIndexes", Value: "items"},
+		{Key: "index", Value: "value_1"},
+	})
+}
+
+func TestDBApplierDropIndexesIgnoresMissingIndexOrNamespace(t *testing.T) {
+	for _, code := range []int32{IndexNotFoundError, NamespaceNotFoundError} {
+		t.Run(fmt.Sprintf("code %d", code), func(t *testing.T) {
+			mongoDB := clientmocks.NewMongoDriver(t)
+			mongoDB.On("DropIndexes", mock.Anything, "test", mock.Anything).
+				Return(fmt.Errorf("dropIndexes command failed: %w", mongo.CommandError{Code: code})).Once()
+			applier := NewDBApplier(mongoDB, DBApplierArgs{})
+			defer applier.Close(context.Background())
+
+			require.NoError(t, applier.Apply(t.Context(), dropIndexesEntry(t)))
+		})
+	}
+}
+
+func TestDBApplierDropIndexesReturnsOtherErrors(t *testing.T) {
+	mongoDB := clientmocks.NewMongoDriver(t)
+	mongoDB.On("DropIndexes", mock.Anything, "test", mock.Anything).
+		Return(mongo.CommandError{Code: 13, Name: "Unauthorized"}).Once()
+	applier := NewDBApplier(mongoDB, DBApplierArgs{})
+	defer applier.Close(context.Background())
+
+	require.ErrorContains(t, applier.Apply(t.Context(), dropIndexesEntry(t)), "Unauthorized")
 }
 
 func TestDBApplierFiltersNestedApplyOps(t *testing.T) {
