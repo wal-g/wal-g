@@ -132,17 +132,19 @@ Copies a cluster backup, every coordinator/segment backup chain, and the WAL req
 wal-g copy --from=config_from.yaml --to=config_to.yaml --backup-name=LATEST
 ```
 
-`--with-history` extends every coordinator/segment WAL stream through the LSN recorded by the newest cluster-wide restore point. WAL-G publishes restore-point metadata only after all referenced streams are present. Repeating the command later adds newly archived WAL and restore points while skipping immutable objects already present at the destination.
+`--with-history` extends every coordinator/segment WAL stream through the LSN recorded by the newest cluster-wide restore point. WAL-G publishes restore-point metadata only after all referenced streams are present. Repeating the command later adds newly archived WAL and restore points while skipping immutable objects already present at the destination with the same path and size.
 
 In both modes, history files with IDs below each coordinator/segment stream's first required WAL timeline are omitted. That timeline's history contains its ancestry; its history and all later history files are retained for `recovery_target_timeline=latest` discovery. The lower bound is independent for each stream. Unrecognized history filenames are retained conservatively, and selection does not open or decrypt the files.
 
-Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to log matching transfer errors as warnings and continue copying. The default is `false`. `WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES` controls which source object paths may have their copy errors skipped. Its database-specific default matches timeline history files, including compressed files:
+Set `WALG_DISASTER_COPY=true` in the environment, the main configuration, or either storage configuration to overwrite destination objects whose sizes differ from the source, including zero-byte objects. Each planned replacement is logged with both sizes. Equal-sized immutable objects are still skipped. The default is `false`, which rejects size conflicts before transferring any objects.
+
+Disaster mode also allows matching transfer errors to be logged as warnings while copying continues. `WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES` controls which source object paths may have their transfer errors skipped; it does not restrict which size conflicts are overwritten. Its database-specific default matches timeline history files, including compressed files:
 
 ```yaml
 WALG_DISASTER_COPY_SKIP_ERRORS_FOR_FILES: '^segments_005/seg-?[0-9]+/wal_005/[^/]+\.history(?:\.(?:br|gz|lz4|lzma|lzo|zst))?$'
 ```
 
-An explicit pattern in `--to` takes precedence over `--from`, then the main config/environment and the database default. An empty pattern disables skipping; an invalid pattern fails the command when disaster mode is enabled. Retryable transfer failures are skipped only after exhausting the configured retries; permanent matching transfer failures are skipped immediately. Errors for unmatched objects, destination size conflicts, and cancellation remain fatal.
+An explicit pattern in `--to` takes precedence over `--from`, then the main config/environment and the database default. An empty pattern disables transfer-error skipping but still allows conflicting objects to be overwritten; an invalid pattern fails the command when disaster mode is enabled. Retryable transfer failures are skipped only after exhausting the configured retries; permanent matching transfer failures are skipped immediately. Transfer errors for unmatched objects and cancellation remain fatal, including during replacement of conflicting objects.
 
 Disaster-mode completion does not guarantee recovery: every coordinator/segment must reach the common restore point. Missing history files can prevent startup or make `latest` miss later timelines, even if other segments start successfully. Normal mode continues to fail on transfer errors after applicable retries.
 
