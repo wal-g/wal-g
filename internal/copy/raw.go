@@ -285,7 +285,7 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 		return err
 	}
 	options.MaxRetries = &retries
-	byOrder, err := groupPendingEntries(ctx, plan)
+	byOrder, err := groupPendingEntries(ctx, plan, options)
 	if err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ func Execute(ctx context.Context, plan *Plan, options ExecuteOptions) error {
 	return ctx.Err()
 }
 
-func groupPendingEntries(ctx context.Context, plan *Plan) (map[publicationOrder][]Entry, error) {
+func groupPendingEntries(ctx context.Context, plan *Plan, options ExecuteOptions) (map[publicationOrder][]Entry, error) {
 	targetObjects, err := storage.ListFolderRecursively(ctx, plan.To)
 	if err != nil {
 		return nil, fmt.Errorf("list destination storage: %w", err)
@@ -338,12 +338,16 @@ func groupPendingEntries(ctx context.Context, plan *Plan) (map[publicationOrder]
 	byOrder := map[publicationOrder][]Entry{}
 	for _, entry := range plan.Entries() {
 		if existing, ok := target[entry.TargetPath]; ok && !entry.Mutable {
-			if existing.GetSize() != entry.Size {
+			if existing.GetSize() == entry.Size {
+				tracelog.DebugLogger.Printf("Skipping existing object %q", entry.TargetPath)
+				continue
+			}
+			if !options.OverwriteConflicts {
 				return nil, fmt.Errorf("destination object %q conflicts with source: source size %d, destination size %d",
 					entry.TargetPath, entry.Size, existing.GetSize())
 			}
-			tracelog.DebugLogger.Printf("Skipping existing object %q", entry.TargetPath)
-			continue
+			tracelog.WarningLogger.Printf("Will overwrite conflicting destination object %q: source size %d, destination size %d",
+				entry.TargetPath, entry.Size, existing.GetSize())
 		}
 		order := publicationOrder{phase: entry.Phase, sequence: entry.Sequence}
 		byOrder[order] = append(byOrder[order], entry)

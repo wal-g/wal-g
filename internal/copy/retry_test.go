@@ -281,6 +281,68 @@ func TestFailedPayloadDoesNotPublishSentinel(t *testing.T) {
 	require.Equal(t, 2, reads)
 }
 
+func TestConflictingPayloadOverwriteFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name, skipPattern string
+		failure           error
+		recover           bool
+		wantReads         int
+		wantSuccess       bool
+	}{
+		{name: "retry succeeds", failure: io.ErrUnexpectedEOF, recover: true, wantReads: 2, wantSuccess: true},
+		{name: "retry exhausted", failure: io.ErrUnexpectedEOF, wantReads: 2},
+		{name: "matching failure skipped after retries", failure: io.ErrUnexpectedEOF,
+			skipPattern: "^payload$", wantReads: 2, wantSuccess: true},
+		{name: "unmatched failure remains fatal", failure: io.ErrUnexpectedEOF,
+			skipPattern: "^history$", wantReads: 2},
+		{name: "cancellation never skipped", failure: context.Canceled, skipPattern: ".*", wantReads: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := memory.NewFolder("source/", memory.NewKVS())
+			require.NoError(t, base.PutObject(t.Context(), "payload", strings.NewReader("payload")))
+			reads := 0
+			from := &retryTestFolder{Folder: base, read: func(ctx context.Context, name string) (io.ReadCloser, error) {
+				reads++
+				if tc.recover && reads > 1 {
+					return base.ReadObject(ctx, name)
+				}
+				return nil, tc.failure
+			}}
+			to := memory.NewFolder("target/", memory.NewKVS())
+			require.NoError(t, to.PutObject(t.Context(), "payload", strings.NewReader("")))
+			plan, err := NewPlan(t.Context(), from, to)
+			require.NoError(t, err)
+			require.NoError(t, plan.AddObject("payload", "payload", PayloadPhase, false))
+			plan.AddInline("sentinel", []byte("{}"), BackupCommitPhase, false)
+			retries := 1
+			options := ExecuteOptions{OverwriteConflicts: true, MaxRetries: &retries}
+			if tc.skipPattern != "" {
+				options.SkipErrorsFor = regexp.MustCompile(tc.skipPattern)
+			}
+			err = Execute(t.Context(), plan, options)
+			if tc.wantSuccess {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.failure)
+			}
+			require.Equal(t, tc.wantReads, reads)
+			exists, err := to.Exists(t.Context(), "sentinel")
+			require.NoError(t, err)
+			require.Equal(t, tc.wantSuccess, exists)
+			reader, err := to.ReadObject(t.Context(), "payload")
+			require.NoError(t, err, "overwrite must not delete the existing object before transferring")
+			defer reader.Close()
+			content, err := io.ReadAll(reader)
+			require.NoError(t, err)
+			if tc.recover {
+				require.Equal(t, "payload", string(content))
+			} else {
+				require.Empty(t, content)
+			}
+		})
+	}
+}
+
 func TestInfosWaitsForCancelledWorkers(t *testing.T) {
 	started := make(chan struct{})
 	var closed atomic.Bool

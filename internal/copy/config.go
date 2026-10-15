@@ -14,6 +14,7 @@ type ExecuteOptions struct {
 	MaxRetries             *int
 	UseServerSideCopy      bool
 	ServerSideCopyFallback bool
+	OverwriteConflicts     bool
 	// SkipErrorsFor matches source paths whose transfer failures may be skipped. Nil disables skipping.
 	SkipErrorsFor *regexp.Regexp
 }
@@ -27,6 +28,7 @@ func OptionsFromConfigs(source, destination *viper.Viper) (ExecuteOptions, error
 		MaxRetries:             &retries,
 		UseServerSideCopy:      rawCopyConfigEligible(source) && rawCopyConfigEligible(destination),
 		ServerSideCopyFallback: source.GetBool(conf.ServerSideCopyFallback) || destination.GetBool(conf.ServerSideCopyFallback),
+		OverwriteConflicts:     disasterCopyEnabled(source, destination),
 	}, nil
 }
 
@@ -55,9 +57,13 @@ func (o ExecuteOptions) copyRetries() (int, error) {
 	return *o.MaxRetries, nil
 }
 
+func disasterCopyEnabled(source, destination *viper.Viper) bool {
+	return viper.GetBool(conf.DisasterCopy) || source.GetBool(conf.DisasterCopy) || destination.GetBool(conf.DisasterCopy)
+}
+
 // DisasterCopyPattern reads the database-specific default or a configured override.
 func DisasterCopyPattern(source, destination *viper.Viper) (*regexp.Regexp, error) {
-	if !viper.GetBool(conf.DisasterCopy) && !source.GetBool(conf.DisasterCopy) && !destination.GetBool(conf.DisasterCopy) {
+	if !disasterCopyEnabled(source, destination) {
 		return nil, nil
 	}
 	pattern := viper.GetString(conf.DisasterCopySkipFiles)
