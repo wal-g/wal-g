@@ -370,6 +370,10 @@ To enable verification of the page checksums during the backup-push, use the `--
 ...
 ```
 
+If you take the backup from a standby, make sure `full_page_writes` is enabled on the primary. Without it torn pages are neither detected nor repaired on filesystems where an 8KB write can be split, such as ext4 or XFS.
+
+A page with a bad checksum is read a second time before it is reported: if it changed between the two reads, PostgreSQL was writing it, and the WAL holds a full page image that recovery replays. Set `WALG_VERIFY_PAGE_CHECKSUMS_RETRY=false` to report such a page at once. This only makes sense with `full_page_writes = off` on a filesystem where torn writes cannot happen, such as ZFS: there a page that keeps changing is corrupt rather than torn, and the re-read would hide it.
+
 ### ``wal-fetch``
 
 When fetching WAL archives from S3, the user should pass in the archive name and the name of the file to download to. This file should not exist as WAL-G will create it for you.

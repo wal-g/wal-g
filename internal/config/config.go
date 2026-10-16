@@ -50,6 +50,7 @@ const (
 	UseReverseUnpackSetting       = "WALG_USE_REVERSE_UNPACK"
 	SkipRedundantTarsSetting      = "WALG_SKIP_REDUNDANT_TARS"
 	VerifyPageChecksumsSetting    = "WALG_VERIFY_PAGE_CHECKSUMS"
+	VerifyPageChecksumsRetry      = "WALG_VERIFY_PAGE_CHECKSUMS_RETRY"
 	StoreAllCorruptBlocksSetting  = "WALG_STORE_ALL_CORRUPT_BLOCKS"
 	UseRatingComposerSetting      = "WALG_USE_RATING_COMPOSER"
 	UseCopyComposerSetting        = "WALG_USE_COPY_COMPOSER"
@@ -284,6 +285,7 @@ var (
 		UseReverseUnpackSetting:      "false",
 		SkipRedundantTarsSetting:     "false",
 		VerifyPageChecksumsSetting:   "false",
+		VerifyPageChecksumsRetry:     "true",
 		StoreAllCorruptBlocksSetting: "false",
 		UseRatingComposerSetting:     "false",
 		UseCopyComposerSetting:       "false",
@@ -415,6 +417,7 @@ var (
 		UseReverseUnpackSetting:       true,
 		SkipRedundantTarsSetting:      true,
 		VerifyPageChecksumsSetting:    true,
+		VerifyPageChecksumsRetry:      true,
 		StoreAllCorruptBlocksSetting:  true,
 		UseRatingComposerSetting:      true,
 		UseCopyComposerSetting:        true,
