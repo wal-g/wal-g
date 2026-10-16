@@ -66,6 +66,7 @@ type FetchHandler struct {
 	fetchMode             BackupFetchMode
 	restorePoint          string
 	partialRestoreArgs    []string
+	turbo                 bool
 	sentinel              BackupSentinelDto
 }
 
@@ -74,7 +75,7 @@ func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIDs []int, mode BackupFetchMode,
-	restorePoint string, partialRestoreArgs []string,
+	restorePoint string, partialRestoreArgs []string, turbo bool,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	backupNameByContentID := make(map[int]string)
@@ -110,6 +111,7 @@ func NewFetchHandler(
 		fetchMode:             mode,
 		restorePoint:          restorePoint,
 		partialRestoreArgs:    partialRestoreArgs,
+		turbo:                 turbo,
 		sentinel:              sentinel,
 	}
 }
@@ -297,6 +299,9 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 		cmd = append(cmd, fmt.Sprintf("--target-user-data=%s", segUserData.QuotedString()))
 	}
 	cmd = append(cmd, fmt.Sprintf("--config=%s", conf.CfgFile))
+	if fh.turbo {
+		cmd = append(cmd, "--turbo")
+	}
 	if fh.partialRestoreArgs != nil {
 		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))
 	}
@@ -309,7 +314,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 }
 
 func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
-	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string,
+	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string, turbo bool,
 ) func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 	return func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
@@ -323,7 +328,7 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		segCfgMaker, err := NewSegConfigMaker(restoreCfgPath, inPlaceRestore)
 		tracelog.ErrorLogger.FatalOnError(err)
 
-		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs)
+		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint, partialRestoreArgs, turbo)
 		err = handler.Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}

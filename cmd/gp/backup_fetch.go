@@ -34,6 +34,7 @@ var fetchContentIDs *[]int
 var fetchModeStr string
 var inPlaceRestore bool
 var partialRestoreArgs []string
+var backupFetchTurbo bool
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch [backup_name | --target-user-data <data> | --restore-point <name>]",
@@ -79,7 +80,7 @@ var backupFetchCmd = &cobra.Command{
 
 		internal.HandleBackupFetch(cmd.Context(), rootFolder, targetBackupSelector,
 			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIDs, fetchMode, restorePoint,
-				partialRestoreArgs))
+				partialRestoreArgs, backupFetchTurbo))
 	},
 }
 
@@ -117,6 +118,8 @@ func init() {
 	backupFetchCmd.Flags().BoolVar(&inPlaceRestore, "in-place", false, inPlaceFlagDescription)
 	fetchContentIDs = backupFetchCmd.Flags().IntSlice("content-ids", []int{}, fetchContentIDsDescription)
 	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
+	backupFetchCmd.Flags().BoolVar(&backupFetchTurbo, "turbo", false,
+		"Ignore all kinds of throttling defined in config on segments")
 
 	backupFetchCmd.Flags().StringVar(&fetchModeStr, "mode", "default", fetchModeDescription)
 	cmd.AddCommand(backupFetchCmd)
