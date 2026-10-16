@@ -323,11 +323,11 @@ func addGreenplumBackupChain(
 	state.backupState[name] = 1
 	depth := 0
 	if sentinel.IncrementFrom != nil {
-		_, _, parentDepth, err := addGreenplumBackupChain(ctx, plan, *sentinel.IncrementFrom, state)
-		if err != nil {
+		// Include each ancestor's own restore point and WAL without extending its history.
+		if err := addGreenplumBackupToPlan(ctx, plan, *sentinel.IncrementFrom, false, state); err != nil {
 			return internal.Backup{}, BackupSentinelDto{}, 0, err
 		}
-		depth = parentDepth + 1
+		depth = state.backupDepths[*sentinel.IncrementFrom] + 1
 	}
 	for _, segment := range sentinel.Segments {
 		if _, err := addGreenplumSegmentChain(ctx, plan, segment.ContentID, segment.BackupName, state); err != nil {
