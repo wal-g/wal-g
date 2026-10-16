@@ -40,6 +40,30 @@ wait_for_replay() {
     done
 }
 
+# Returns the name of the first binlog the replay command actually reaches.
+# Some early binlogs can be GTID-skipped entirely (already covered by the
+# backup), so this can't be assumed to be the first entry in SHOW BINARY LOGS.
+wait_for_first_replay() {
+    replay_wait_count=0
+    while :; do
+        first_ok=$(ls "$replay_dir"/*.ok 2>/dev/null | head -n1)
+        if [ -n "$first_ok" ]; then
+            basename "$first_ok" .ok
+            return 0
+        fi
+        if ! kill -0 "$replay_pid" 2>/dev/null; then
+            echo "binlog-replay exited before replaying anything" >&2
+            exit 1
+        fi
+        if [ "$replay_wait_count" -ge 60 ]; then
+            echo "Timed out waiting for binlog-replay to reach any binlog" >&2
+            exit 1
+        fi
+        replay_wait_count=$((replay_wait_count + 1))
+        sleep 1
+    done
+}
+
 mysql_initialize_and_start
 wal-g backup-push
 sleep 1
@@ -58,10 +82,8 @@ sleep 1
 wal-g binlog-replay --until "2030-01-01T00:00:00.000000000+00:00" &
 replay_pid=$!
 
-binlogs=$(mysql --batch --skip-column-names -e "SHOW BINARY LOGS")
-first_binlog=$(printf '%s\n' "$binlogs" | awk 'NR == 1 {print $1}')
+first_binlog=$(wait_for_first_replay)
 test -n "$first_binlog"
-wait_for_replay "$first_binlog"
 
 # Keep replay blocked while another closed binlog is uploaded.
 mysql -e "INSERT INTO sbtest.pitr VALUES('testpitr_last', NOW())"
@@ -73,6 +95,9 @@ sleep 1
 # closed binlogs reported by MySQL; the last entry is still being written.
 binlogs=$(mysql --batch --skip-column-names -e "SHOW BINARY LOGS")
 closed_binlogs=$(printf '%s\n' "$binlogs" | awk 'NR > 1 {print previous} {previous = $1}')
+# Drop anything before first_binlog too -- GTID-skipped, never reached the
+# replay command, so it never gets an .ok marker to wait on.
+closed_binlogs=$(printf '%s\n' "$closed_binlogs" | sed -n "/^${first_binlog}\$/,\$p")
 test -n "$closed_binlogs"
 for binlog in $closed_binlogs; do
     wait_for_replay "$binlog"
