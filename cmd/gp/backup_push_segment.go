@@ -77,6 +77,7 @@ var (
 func init() {
 	// Since this is a utility command, it should not be exposed to the end user.
 	segBackupPushCmd.Hidden = true
+	segBackupPushCmd.Flags().BoolVar(&conf.Turbo, turboFlag, false, "")
 	segBackupPushCmd.Flags().BoolVarP(&permanent, permanentFlag, permanentShorthand,
 		false, "Pushes permanent backup")
 	segBackupPushCmd.Flags().BoolVarP(&fullBackup, fullBackupFlag, fullBackupShorthand,
