@@ -282,39 +282,36 @@ func (mongodService *MongodService) FixReplset(rsConfig RsConfig) error {
 
 func (mongodService *MongodService) FixShardIdentity(shConfig ShConfig) error {
 	ctx := mongodService.Context
-	adminDatabase := mongodService.MongoClient.Database(adminDB)
+	systemVersion := mongodService.MongoClient.Database(adminDB).Collection("system.version")
+	shardIdentityFilter := bson.D{{Key: "_id", Value: "shardIdentity"}}
 
 	if shConfig.Empty() {
-		_, err := adminDatabase.Collection("system.version").DeleteOne(ctx, bson.D{
-			{Key: "_id", Value: "shardIdentity"},
-		})
+		// The node is not restored as a shard. MongoDB 7.0+ config servers insert their shardIdentity again on step-up.
+		_, err := systemVersion.DeleteOne(ctx, shardIdentityFilter)
 		if err != nil {
 			return errors.Wrap(err, "unable to fix data in admin.system.version")
 		}
-	} else {
-		val := adminDatabase.Collection("system.version").FindOne(ctx, bson.D{{Key: "_id", Value: "shardIdentity"}})
-		if val.Err() != nil {
-			tracelog.WarningLogger.Printf("Unable to find system.version in admin database. Skipping this step, assuming oplog replay will fix this")
-		} else {
-			var systemShConfig bson.M
-			err := val.Decode(&systemShConfig)
-			if err != nil {
-				return errors.Wrap(err, "couldn't decode shard config")
-			}
-
-			systemShConfig["shardName"] = shConfig.ShardName
-			systemShConfig["configsvrConnectionString"] = shConfig.MongoCfgConnectionString
-
-			_, err = adminDatabase.Collection("system.version").
-				UpdateOne(ctx,
-					bson.D{{Key: "_id", Value: "shardIdentity"}},
-					bson.D{{Key: "$set", Value: systemShConfig}})
-			if err != nil {
-				return errors.Wrap(err, "unable to update shardIdentity in system.version")
-			}
-			tracelog.InfoLogger.Printf("Successfully fixed admin.system.version document with proper shardIdentity")
-		}
+		return nil
 	}
+
+	result, err := systemVersion.UpdateOne(ctx, shardIdentityFilter, bson.D{{Key: "$set", Value: bson.D{
+		{Key: "shardName", Value: shConfig.ShardName},
+		{Key: "configsvrConnectionString", Value: shConfig.MongoCfgConnectionString},
+	}}})
+	if err != nil {
+		return errors.Wrap(err, "unable to update shardIdentity in admin.system.version")
+	}
+	if result.MatchedCount == 0 {
+		return errors.Errorf("shardIdentity is not found in admin.system.version, "+
+			"the restored node would not be a member of shard '%s'", shConfig.ShardName)
+	}
+
+	var shardIdentity bson.M
+	if err = systemVersion.FindOne(ctx, shardIdentityFilter).Decode(&shardIdentity); err != nil {
+		return errors.Wrap(err, "unable to read shardIdentity from admin.system.version")
+	}
+	tracelog.InfoLogger.Printf("Fixed shardIdentity in admin.system.version: shardName %v, configsvrConnectionString %v, clusterId %v",
+		shardIdentity["shardName"], shardIdentity["configsvrConnectionString"], shardIdentity["clusterId"])
 	return nil
 }
 
