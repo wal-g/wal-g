@@ -10,7 +10,6 @@ import (
 type ExtractProviderImpl struct {
 	FilesToExtractProviderImpl
 	AllowDataLoss bool
-	Doctor        bool
 }
 
 func (t ExtractProviderImpl) Get(
@@ -45,5 +44,5 @@ func (t ExtractProviderImpl) getTarInterpreter(ctx context.Context, dbDataDir st
 	}
 
 	return NewIncrementalTarInterpreter(dbDataDir, *backup.SentinelDto, *backup.FilesMetadataDto, *backup.AoFilesMetadataDto,
-		filesToUnwrap, createNewIncrementalFiles, t.AllowDataLoss, t.Doctor), nil
+		filesToUnwrap, createNewIncrementalFiles, t.AllowDataLoss), nil
 }

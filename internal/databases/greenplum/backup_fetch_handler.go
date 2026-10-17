@@ -68,7 +68,6 @@ type FetchHandler struct {
 	partialRestoreArgs    []string
 	turbo                 bool
 	allowDataLoss         bool
-	doctor                bool
 	sentinel              BackupSentinelDto
 }
 
@@ -77,7 +76,7 @@ func NewFetchHandler(
 	backup internal.Backup, sentinel BackupSentinelDto,
 	segCfgMaker SegConfigMaker, logsDir string,
 	fetchContentIDs []int, mode BackupFetchMode,
-	restorePoint string, partialRestoreArgs []string, turbo, allowDataLoss, doctor bool,
+	restorePoint string, partialRestoreArgs []string, turbo, allowDataLoss bool,
 ) *FetchHandler {
 	backupIDByContentID := make(map[int]string)
 	backupNameByContentID := make(map[int]string)
@@ -115,7 +114,6 @@ func NewFetchHandler(
 		partialRestoreArgs:    partialRestoreArgs,
 		turbo:                 turbo,
 		allowDataLoss:         allowDataLoss,
-		doctor:                doctor,
 		sentinel:              sentinel,
 	}
 }
@@ -309,9 +307,6 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 	if contentID != -1 && fh.allowDataLoss {
 		cmd = append(cmd, "--allow-dataloss")
 	}
-	if contentID != -1 && fh.doctor {
-		cmd = append(cmd, "--doctor")
-	}
 	if fh.partialRestoreArgs != nil {
 		cmd = append(cmd, fmt.Sprintf("--restore-only=%s", strings.Join(fh.partialRestoreArgs[:], ",")))
 	}
@@ -324,7 +319,7 @@ func (fh *FetchHandler) buildFetchCommand(contentID int) string {
 }
 
 func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsDir string,
-	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string, turbo, allowDataLoss, doctor bool,
+	fetchContentIDs []int, mode BackupFetchMode, restorePoint string, partialRestoreArgs []string, turbo, allowDataLoss bool,
 ) func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 	return func(ctx context.Context, folder storage.Folder, backup internal.Backup) {
 		tracelog.InfoLogger.Printf("Starting backup-fetch for %s", backup.Name)
@@ -339,7 +334,7 @@ func NewGreenplumBackupFetcher(restoreCfgPath string, inPlaceRestore bool, logsD
 		tracelog.ErrorLogger.FatalOnError(err)
 
 		handler := NewFetchHandler(backup, sentinel, segCfgMaker, logsDir, fetchContentIDs, mode, restorePoint,
-			partialRestoreArgs, turbo, allowDataLoss, doctor)
+			partialRestoreArgs, turbo, allowDataLoss)
 		err = handler.Fetch()
 		tracelog.ErrorLogger.FatalOnError(err)
 	}

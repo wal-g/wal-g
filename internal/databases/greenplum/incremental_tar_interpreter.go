@@ -7,36 +7,31 @@ import (
 	"io"
 	"os"
 	"path"
-	"sync"
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
-	aoformat "github.com/wal-g/wal-g/internal/databases/greenplum/ao/format"
 	"github.com/wal-g/wal-g/internal/databases/postgres"
 )
 
 func NewIncrementalTarInterpreter(dbDataDirectory string, sentinel postgres.BackupSentinelDto, filesMetadata postgres.FilesMetadataDto,
 	aoFilesMetadata ao.FilesMetadataDTO,
-	filesToUnwrap map[string]bool, createNewIncrementalFiles bool, allowDataLoss, doctor bool) *IncrementalTarInterpreter {
+	filesToUnwrap map[string]bool, createNewIncrementalFiles bool, allowDataLoss bool) *IncrementalTarInterpreter {
 	return &IncrementalTarInterpreter{
 		FileTarInterpreter: postgres.NewFileTarInterpreter(dbDataDirectory, sentinel, filesMetadata, filesToUnwrap, createNewIncrementalFiles),
 		fsync:              !viper.GetBool(conf.TarDisableFsyncSetting),
 		aoFilesMetadata:    aoFilesMetadata,
 		allowDataLoss:      allowDataLoss,
-		doctor:             doctor,
 	}
 }
 
 type IncrementalTarInterpreter struct {
 	*postgres.FileTarInterpreter
-	fsync            bool
-	aoFilesMetadata  ao.FilesMetadataDTO
-	allowDataLoss    bool
-	doctor           bool
-	incrementOffsets sync.Map
+	fsync           bool
+	aoFilesMetadata ao.FilesMetadataDTO
+	allowDataLoss   bool
 }
 
 func (i *IncrementalTarInterpreter) Interpret(reader io.Reader, header *tar.Header) error {
@@ -45,13 +40,7 @@ func (i *IncrementalTarInterpreter) Interpret(reader io.Reader, header *tar.Head
 		return i.FileTarInterpreter.Interpret(reader, header)
 	}
 	if aoMeta.IsIncremented {
-		targetPath := path.Join(i.DBDataDirectory, header.Name)
-		if !i.allowDataLoss {
-			return ao.ApplyFileIncrement(targetPath, reader, i.fsync)
-		}
-		return ao.ApplyFileIncrementWithHeader(targetPath, reader, i.fsync, func(_, offset int64) {
-			i.incrementOffsets.Store(header.Name, offset)
-		})
+		return ao.ApplyFileIncrement(path.Join(i.DBDataDirectory, header.Name), reader, i.fsync)
 	}
 	if i.allowDataLoss {
 		return i.writeAOFile(reader, header, aoMeta)
@@ -69,7 +58,10 @@ func (i *IncrementalTarInterpreter) writeAOFile(reader io.Reader, header *tar.He
 	if err != nil {
 		return err
 	}
-	_, copyErr := io.Copy(file, reader)
+	copied, copyErr := io.Copy(file, reader)
+	if copyErr == nil && copied != meta.EOF {
+		copyErr = io.ErrUnexpectedEOF
+	}
 	if copyErr == nil {
 		copyErr = file.Chmod(os.FileMode(meta.FileMode))
 	}
@@ -113,56 +105,18 @@ func (i *IncrementalTarInterpreter) recoverAOFile(fileName string, meta *ao.Back
 	if meta.EOF < 0 {
 		return fmt.Errorf("invalid AO EOF %d", meta.EOF)
 	}
-	if meta.IsIncremented {
-		if err := i.recoverIncrementedAOFile(fileName, targetPath, meta); err != nil {
+	if !meta.IsIncremented {
+		partialPath := targetPath + ".wal-g-partial"
+		if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
 			return err
 		}
-	} else if err := i.recoverFullAOFile(targetPath, meta); err != nil {
+		if err := os.Rename(partialPath, targetPath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if err := ao.ZeroFillFileToEOF(targetPath, meta.EOF, os.FileMode(meta.FileMode), i.fsync); err != nil {
 		return err
 	}
-	tracelog.WarningLogger.Printf("AO data loss: recovered %s with zero-filled missing bytes (retained checksummed AO Row blocks=%t)",
-		fileName, i.doctor && meta.StorageType == ao.AppendOptimized)
+	tracelog.WarningLogger.Printf("AO data loss: recovered %s with zero-filled missing bytes", fileName)
 	return nil
-}
-
-func (i *IncrementalTarInterpreter) recoverIncrementedAOFile(fileName, targetPath string, meta *ao.BackupFileDesc) error {
-	offset, err := i.incrementAppendOffset(fileName, targetPath)
-	if err != nil {
-		return err
-	}
-	if offset < 0 || offset > meta.EOF {
-		return fmt.Errorf("invalid append offset %d for EOF %d", offset, meta.EOF)
-	}
-	return aoformat.RepairFile(targetPath, offset, meta.EOF,
-		i.shouldPreserveRows(meta), os.FileMode(meta.FileMode), i.fsync)
-}
-
-func (i *IncrementalTarInterpreter) incrementAppendOffset(fileName, targetPath string) (int64, error) {
-	if value, ok := i.incrementOffsets.Load(fileName); ok {
-		return value.(int64), nil
-	}
-	info, err := os.Stat(targetPath)
-	if err == nil {
-		return info.Size(), nil
-	}
-	if os.IsNotExist(err) {
-		return 0, nil
-	}
-	return 0, err
-}
-
-func (i *IncrementalTarInterpreter) recoverFullAOFile(targetPath string, meta *ao.BackupFileDesc) error {
-	partialPath := targetPath + ".wal-g-partial"
-	if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if err := os.Rename(partialPath, targetPath); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	return aoformat.RepairFile(targetPath, 0, meta.EOF,
-		i.shouldPreserveRows(meta), os.FileMode(meta.FileMode), i.fsync)
-}
-
-func (i *IncrementalTarInterpreter) shouldPreserveRows(meta *ao.BackupFileDesc) bool {
-	return i.doctor && meta.StorageType == ao.AppendOptimized
 }

@@ -39,11 +39,10 @@ type ExtractProviderDBSpec struct {
 	restoreParameters []string
 	restoreDescMaker  RestoreDescMaker
 	allowDataLoss     bool
-	doctor            bool
 }
 
-func NewExtractProviderDBSpec(restoreParameters []string, allowDataLoss, doctor bool) *ExtractProviderDBSpec {
-	return &ExtractProviderDBSpec{restoreParameters, RestoreDescMaker{}, allowDataLoss, doctor}
+func NewExtractProviderDBSpec(restoreParameters []string, allowDataLoss bool) *ExtractProviderDBSpec {
+	return &ExtractProviderDBSpec{restoreParameters, RestoreDescMaker{}, allowDataLoss}
 }
 
 func (p ExtractProviderDBSpec) Get(
@@ -61,6 +60,6 @@ func (p ExtractProviderDBSpec) Get(
 	tracelog.ErrorLogger.FatalOnError(err)
 	desc.FilterFilesToUnwrap(filesToUnwrap)
 
-	return ExtractProviderImpl{AllowDataLoss: p.allowDataLoss, Doctor: p.doctor}.Get(
+	return ExtractProviderImpl{AllowDataLoss: p.allowDataLoss}.Get(
 		ctx, backup, filesToUnwrap, skipRedundantTars, dbDataDir, createNewIncrementalFiles)
 }

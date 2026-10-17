@@ -125,7 +125,6 @@ func TestBuildFetchCommand(t *testing.T) {
 				partialRestoreArgs: nil,
 				turbo:              true,
 				allowDataLoss:      true,
-				doctor:             true,
 			},
 			1,
 			"PGPORT=1234 " +
@@ -135,7 +134,7 @@ func TestBuildFetchCommand(t *testing.T) {
 				"--content-id=2 " +
 				"--target-user-data=\"{\\\"id\\\":\\\"testing\\\"}\" " +
 				"--config=testConfig " +
-				"--turbo --allow-dataloss --doctor >> " + formatSegmentLogPath(1) + " 2>&1",
+				"--turbo --allow-dataloss >> " + formatSegmentLogPath(1) + " 2>&1",
 		},
 		{
 			&FetchHandler{

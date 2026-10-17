@@ -1,6 +1,6 @@
 # Greenplum Append-Optimized file format
 
-This package contains low-level parsing and repair helpers for Greenplum Append-Optimized (AO) files. It currently understands the checksummed **AO Row** block format needed to find a trustworthy prefix after a failed restore. It is not a general AO reader.
+This document describes the on-disk format of Greenplum Append-Optimized (AO) files. WAL-G's data-loss recovery does not parse these headers; it preserves the plaintext prefix produced by decryption and zero-fills the rest of the file to its metadata EOF.
 
 ## File layout
 
@@ -49,19 +49,17 @@ Small Content blocks contain rows whose encoded content fits in one block. A Lar
 
 The header is followed by one or more Small Content blocks that carry fragments of the large row. Greenplum reads fragments until their uncompressed lengths sum to `largeContentLength`; fragment headers use `rowCount = 0`. The header and every fragment are checksummed independently when AO checksums are enabled. A fragment sequence is one logical row: preserving only some fragments can leave unusable or corrupt tuple data.
 
-The doctor scanner accepts a contiguous prefix of complete, checksummed Small Content blocks. It stops on an incomplete or invalid block, checksum failure, unsupported header kind, or a Large Content header. It does not search later bytes for another possible header: recovery starts at a known block boundary and never skips over corruption.
-
-In particular, the scanner currently does not validate a Large Content header together with all of its following fragments, so it stops before the Large Content header. This also means it does not preserve the `rowCount = 0` fragment blocks as ordinary rows.
+WAL-G does not check block checksums or align the recovered prefix to AO block boundaries. If decryption ends in the middle of a Small Content block, its decrypted bytes are retained and the remaining file bytes are zero-filled. If the truncation is inside a Large Content record, the zero-filled tail does not reconstruct the missing fragments or tuple payload; reading that relation may report a storage error or encounter invalid tuple data.
 
 ## AO Column
 
-AO Column Storage (AOCS) uses additional column and datum-stream structure. This package does not parse or salvage AOCS data. In `backup-fetch --allow-dataloss`, a damaged AOCS file can only be repaired by zero-filling the missing range; `--doctor` does not change that behavior.
+AO Column Storage (AOCS) uses additional column and datum-stream structure. `backup-fetch --allow-dataloss` treats AO Row and AOCS files the same way: it retains the decrypted prefix and zero-fills the rest to the recorded EOF.
 
 ## Recovery behavior
 
-`CompleteRowPrefix` and `CompleteRowPrefixReaderAt` return the end offset of the largest valid Small Content prefix. `RepairFile` truncates damaged bytes after the trusted append offset, optionally keeps such a validated prefix, then extends the file with zeroes to the logical EOF from WAL-G backup metadata.
+For an incremental AO backup, WAL-G applies the decrypted increment on top of the already restored file. If that application fails, the base bytes and bytes written from the decrypted increment are retained; the file is extended with zeroes to the logical EOF from AO backup metadata. For a full-file restore, the bytes decrypted from the file are retained and padded to the same metadata EOF.
 
-The append offset is taken from the AO incremental-file header. Incremental AO files are expected to begin appending at a block boundary. For a full-file restore, scanning starts at byte zero. Zero-filling restores the expected file length; it cannot recreate missing tuples, indexes, or visibility information.
+Zero-filling restores the expected file length. It cannot recreate missing tuples, indexes, or visibility information, and it does not guarantee that queries reading damaged data will succeed.
 
 ## Greenplum implementation references
 
