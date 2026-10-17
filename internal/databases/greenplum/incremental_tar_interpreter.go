@@ -115,7 +115,13 @@ func (i *IncrementalTarInterpreter) logRecoverySummary(files []internal.ReaderMa
 	if len(recovered) == 0 {
 		return
 	}
-	tracelog.WarningLogger.Printf("AO/AOCS files recovered with data loss:\n%s\nOn the master, find the database name by OID with SELECT datname FROM pg_database WHERE oid = <database_oid>; connect to that database, then find table names with SELECT n.nspname, c.relname, c.oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relfilenode IN (<relfilenode_list>);",
+	tracelog.WarningLogger.Printf(
+		"AO/AOCS files recovered with data loss:\n%s\n"+
+			"On the master, find the database name with: SELECT datname FROM pg_database WHERE oid = <database_oid>;\n"+
+			"Connect to that database and find table names with:\n"+
+			"SELECT n.nspname, c.relname, c.oid\n"+
+			"FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace\n"+
+			"WHERE c.relfilenode IN (<relfilenode_list>);",
 		strings.Join(recovered, "\n"))
 }
 
