@@ -4,16 +4,27 @@ This package contains low-level parsing and repair helpers for Greenplum Append-
 
 ## File layout
 
-An AO file is a sequence of storage blocks. A regular block starts with an 8-byte header made of two little-endian 32-bit words:
+An AO file is a sequence of storage blocks. A regular block starts with an 8-byte header (64 bits), represented as two little-endian 32-bit words. The bit numbers below are numbered from 0 (the least significant bit) to 31 within each word.
 
-| Byte offset | Length | Field |
-| ---: | ---: | --- |
-| 0 | 4 bytes | Word 0: header kind, flags, executor block kind, row count, and the high part of `dataLength`. |
-| 4 | 4 bytes | Word 1: `compressedLength` and the low part of `dataLength`. |
+**Word 0** (file byte offsets 0–3):
 
-Within each word, fields are packed and identified by masks. In Word 0, `0x80000000` is the reserved flag and must be zero; `0x70000000` is the header kind (`1` Small Content, `2` Large Content); `0x08000000` is `hasFirstRowNum`; `0x07000000` is the executor block kind; and `0x00FFFC00` is the row count. The upper 10 bits of `dataLength` are in Word 0's low 10 bits. In Word 1, the upper 11 bits hold the remaining `dataLength`, and the low 21 bits (`0x001FFFFF`) hold `compressedLength`.
+| Bits | Length | Field | Meaning |
+| ---: | ---: | --- | --- |
+| 31 | 1 bit | reserved | Must be zero. |
+| 30–28 | 3 bits | header kind | `1` is Small Content; `2` is Large Content. |
+| 27 | 1 bit | `hasFirstRowNum` | If set, an extra 8-byte first-row number follows the checksums. |
+| 26–24 | 3 bits | executor block kind | Describes the stored row representation. |
+| 23–10 | 14 bits | row count | Number of rows represented by the block. |
+| 9–0 | 10 bits | `dataLength` (high part) | The upper 10 bits of the uncompressed payload length. |
 
-`dataLength` is the uncompressed payload length, in bytes. A `compressedLength` of zero means the payload is uncompressed and its stored length is `dataLength`; otherwise its stored length is `compressedLength`. The stored payload is padded to the file format's alignment (4 bytes in older formats, 8 bytes in newer formats).
+**Word 1** (file byte offsets 4–7):
+
+| Bits | Length | Field | Meaning |
+| ---: | ---: | --- | --- |
+| 31–21 | 11 bits | `dataLength` (low part) | The lower 11 bits of the uncompressed payload length. |
+| 20–0 | 21 bits | `compressedLength` | The compressed payload length, or zero if the payload is uncompressed. |
+
+The 21-bit `dataLength` is split across both words: Word 0 bits 9–0 contain its high 10 bits, and Word 1 bits 31–21 contain its low 11 bits. `dataLength` is measured in bytes. When `compressedLength` is zero, the stored payload length is `dataLength`; otherwise it is `compressedLength`. The stored payload is padded to the file format's alignment (4 bytes in older formats, 8 bytes in newer formats).
 
 For checksummed files, two little-endian 32-bit CRC32C values follow the 8-byte header:
 
