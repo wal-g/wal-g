@@ -4,18 +4,16 @@ This package contains low-level parsing and repair helpers for Greenplum Append-
 
 ## File layout
 
-An AO file is a sequence of storage blocks. A regular block starts with an 8-byte header made of two little-endian 32-bit words. The first word contains:
+An AO file is a sequence of storage blocks. A regular block starts with an 8-byte header made of two little-endian 32-bit words:
 
-| Bits | Field | Meaning |
-| --- | --- | --- |
-| 31 | reserved | Must be zero. |
-| 30–28 | header kind | `1` is Small Content; `2` is Large Content. |
-| 27 | `hasFirstRowNum` | An extra 8-byte first-row number follows the regular header and checksums when set. |
-| 26–24 | executor block kind | Describes the stored row representation. |
-| 23–10 | row count | Number of rows represented by the block. |
-| 9–0, then word 1 bits 31–21 | data length | Uncompressed payload length, in bytes. |
+| Byte offset | Length | Field |
+| ---: | ---: | --- |
+| 0 | 4 bytes | Word 0: header kind, flags, executor block kind, row count, and the high part of `dataLength`. |
+| 4 | 4 bytes | Word 1: `compressedLength` and the low part of `dataLength`. |
 
-The second word's low 21 bits contain `compressedLength`. A value of zero means the payload is uncompressed and its length is `dataLength`; otherwise it is the compressed payload length. The stored payload is padded to the file format's alignment (4 bytes in older formats, 8 bytes in newer formats).
+Within each word, fields are packed and identified by masks. In Word 0, `0x80000000` is the reserved flag and must be zero; `0x70000000` is the header kind (`1` Small Content, `2` Large Content); `0x08000000` is `hasFirstRowNum`; `0x07000000` is the executor block kind; and `0x00FFFC00` is the row count. The upper 10 bits of `dataLength` are in Word 0's low 10 bits. In Word 1, the upper 11 bits hold the remaining `dataLength`, and the low 21 bits (`0x001FFFFF`) hold `compressedLength`.
+
+`dataLength` is the uncompressed payload length, in bytes. A `compressedLength` of zero means the payload is uncompressed and its stored length is `dataLength`; otherwise its stored length is `compressedLength`. The stored payload is padded to the file format's alignment (4 bytes in older formats, 8 bytes in newer formats).
 
 For checksummed files, two little-endian 32-bit CRC32C values follow the 8-byte header:
 
