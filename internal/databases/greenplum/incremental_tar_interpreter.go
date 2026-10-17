@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
+
 	"github.com/wal-g/wal-g/internal"
 	conf "github.com/wal-g/wal-g/internal/config"
 	"github.com/wal-g/wal-g/internal/databases/greenplum/ao"
@@ -43,6 +44,9 @@ func (i *IncrementalTarInterpreter) Interpret(reader io.Reader, header *tar.Head
 		return ao.ApplyFileIncrement(path.Join(i.DBDataDirectory, header.Name), reader, i.fsync)
 	}
 	if i.allowDataLoss {
+		// write new full AO files as temporary file... So, we will be able to recovery it if
+		// extraction failed.
+		// Note: regular extraction removes corrupted files
 		return i.writeAOFile(reader, header, aoMeta)
 	}
 	return i.FileTarInterpreter.Interpret(reader, header)
@@ -106,6 +110,9 @@ func (i *IncrementalTarInterpreter) recoverAOFile(fileName string, meta *ao.Back
 		return fmt.Errorf("invalid AO EOF %d", meta.EOF)
 	}
 	if !meta.IsIncremented {
+		// when --allow-dataloss passed we firstly write new AO-file to new partial file
+		// If write fails due to some error - we will have partial file on a disk
+		// move it to proper place and then bzero to match EOF
 		partialPath := targetPath + ".wal-g-partial"
 		if err := os.Remove(targetPath); err != nil && !os.IsNotExist(err) {
 			return err
