@@ -86,52 +86,55 @@ func RepairFile(filePath string, appendOffset, logicalEOF int64, preserveComplet
 func scanRowBlocks(source io.ReaderAt, size int64, alignment int) int64 {
 	var pos int64
 	for pos < size {
-		if size-pos < regularHeaderSize {
+		blockLen, ok := smallContentBlockLen(source, pos, size-pos, alignment)
+		if !ok {
 			return pos
 		}
-		var baseHeader [regularHeaderSize]byte
-		if _, err := source.ReadAt(baseHeader[:], pos); err != nil {
-			return pos
-		}
-		word0 := binary.LittleEndian.Uint32(baseHeader[0:4])
-		word1 := binary.LittleEndian.Uint32(baseHeader[4:8])
-		if word0&0x80000000 != 0 { // reserved bit must be zero
-			return pos
-		}
-		headerKind := (word0 & 0x70000000) >> 28
-		if headerKind != 1 { // SmallContent; stop at LargeContent and other kinds
-			return pos
-		}
-		executorKind := (word0 & 0x07000000) >> 24
-		rowCount := (word0 & 0x00FFFC00) >> 10
-		dataLen := ((word0 & 0x3ff) << 11) | ((word1 & 0xffe00000) >> 21)
-		compressedLen := word1 & 0x001fffff
-		if (executorKind != 1 && executorKind != 2) || rowCount == 0 || dataLen == 0 || compressedLen > dataLen {
-			return pos
-		}
-
-		headerLen := regularHeaderSize + 8 // block checksum and header checksum
-		if word0&0x08000000 != 0 {
-			headerLen += 8 // firstRowNum
-		}
-		if size-pos < int64(headerLen) {
-			return pos
-		}
-
-		payloadLen := uint64(dataLen)
-		if compressedLen != 0 {
-			payloadLen = uint64(compressedLen)
-		}
-		blockLen := uint64(headerLen) + ((payloadLen + uint64(alignment-1)) / uint64(alignment) * uint64(alignment))
-		if blockLen > uint64(size-pos) {
-			return pos
-		}
-		if !validChecksums(source, pos, int64(blockLen), headerLen) {
-			return pos
-		}
-		pos += int64(blockLen)
+		pos += blockLen
 	}
 	return pos
+}
+
+func smallContentBlockLen(source io.ReaderAt, pos, remaining int64, alignment int) (int64, bool) {
+	if remaining < regularHeaderSize {
+		return 0, false
+	}
+	var baseHeader [regularHeaderSize]byte
+	if _, err := source.ReadAt(baseHeader[:], pos); err != nil {
+		return 0, false
+	}
+	word0 := binary.LittleEndian.Uint32(baseHeader[0:4])
+	word1 := binary.LittleEndian.Uint32(baseHeader[4:8])
+	if word0&0x80000000 != 0 || (word0&0x70000000)>>28 != 1 {
+		return 0, false
+	}
+	executorKind := (word0 & 0x07000000) >> 24
+	rowCount := (word0 & 0x00FFFC00) >> 10
+	dataLen := ((word0 & 0x3ff) << 11) | ((word1 & 0xffe00000) >> 21)
+	compressedLen := word1 & 0x001fffff
+	if (executorKind != 1 && executorKind != 2) || rowCount == 0 || dataLen == 0 || compressedLen > dataLen {
+		return 0, false
+	}
+
+	headerLen := regularHeaderSize + 8 // block checksum and header checksum
+	if word0&0x08000000 != 0 {
+		headerLen += 8 // firstRowNum
+	}
+	if remaining < int64(headerLen) {
+		return 0, false
+	}
+	payloadLen := uint64(dataLen)
+	if compressedLen != 0 {
+		payloadLen = uint64(compressedLen)
+	}
+	blockLen := uint64(headerLen) + ((payloadLen + uint64(alignment-1)) / uint64(alignment) * uint64(alignment))
+	if blockLen > uint64(remaining) {
+		return 0, false
+	}
+	if !validChecksums(source, pos, int64(blockLen), headerLen) {
+		return 0, false
+	}
+	return int64(blockLen), true
 }
 
 func validChecksums(source io.ReaderAt, blockOffset, blockLen int64, headerLen int) bool {
