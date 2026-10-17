@@ -23,7 +23,7 @@ Usage:
 {{if not .CommandUsage}}
 Arguments:
   socket	- name of unix socket to communicate with wal-g daemon
-  command	- command to send to the daemon: wal-push, wal-fetch
+  command	- command to send to the daemon: wal-push, wal-fetch, wal-prefetch
   command_args	- command specific arguments
 {{end}}
 Flags:
@@ -59,6 +59,10 @@ var (
 		"wal-fetch": {
 			msgType: daemon.WalFetchType,
 			args:    []string{"wal_name", "destination_filename"},
+		},
+		"wal-prefetch": {
+			msgType: daemon.WalPrefetchType,
+			args:    []string{"count"},
 		},
 	}
 )

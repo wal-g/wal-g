@@ -638,6 +638,7 @@ walg-daemon-client socket command [command_args] [-timeout duration] [-connectio
 Commands:
 - `wal-push wal_filepath` — relays to `wal-g wal-push`
 - `wal-fetch wal_name destination_filename` — relays to `wal-g wal-fetch`. On a missing archive, exits `74` (`EX_IOERR`) so PostgreSQL keeps recovering rather than treating it as fatal; matches `wal-fetch` behaviour, see [PR #1195](https://github.com/wal-g/wal-g/pull/1195).
+- `wal-prefetch count` — makes the daemon prefetch `count` WAL segments following the last WAL processed by `wal-fetch`. The starting point is the most recent `wal-fetch` the daemon served; if none was served yet, the daemon rejects the command. The daemon prefetches into its prefetch directory and replies immediately, without waiting for the downloads to finish.
 
 `postgresql.conf` example:
 ```conf

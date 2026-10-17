@@ -16,6 +16,8 @@ const (
 
 	WalPushType  SocketMessageType = 'F'
 	WalFetchType SocketMessageType = 'f'
+
+	WalPrefetchType SocketMessageType = 'P'
 )
 
 var (

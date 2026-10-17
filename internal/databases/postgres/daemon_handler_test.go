@@ -19,7 +19,7 @@ func TestServe_ReturnsOnContextCancel(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		serve(ctx, l, nil)
+		serve(ctx, l, nil, &DaemonState{})
 	}()
 
 	cancel()

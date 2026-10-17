@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -93,8 +95,77 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 }
 
 type WalFetchMessageHandler struct {
+	fd    net.Conn
+	state *DaemonState
+
+	reader internal.StorageFolderReader
+}
+
+// DaemonState keeps track of the last WAL file processed by the daemon
+// so that wal-prefetch commands know where to start prefetching from
+type DaemonState struct {
+	mu      sync.Mutex
+	lastWAL string
+}
+
+func (s *DaemonState) SetLastWAL(walFileName string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastWAL = walFileName
+}
+
+func (s *DaemonState) GetLastWAL() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastWAL
+}
+
+type WalPrefetchMessageHandler struct {
 	fd     net.Conn
 	reader internal.StorageFolderReader
+	state  *DaemonState
+}
+
+func (h *WalPrefetchMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
+	args, err := daemon.BytesToArgs(messageBody)
+	if err != nil {
+		return err
+	}
+	if len(args) != 1 {
+		return fmt.Errorf("wal-prefetch incorrect arguments count")
+	}
+	prefetchCount, err := strconv.Atoi(args[0])
+	if err != nil {
+		return fmt.Errorf("wal-prefetch invalid count %q: %w", args[0], err)
+	}
+	if prefetchCount <= 0 {
+		return fmt.Errorf("wal-prefetch count must be positive, got %d", prefetchCount)
+	}
+	lastWAL := h.state.GetLastWAL()
+	if lastWAL == "" {
+		return fmt.Errorf("wal-prefetch: no WAL file processed by the daemon yet, " +
+			"run wal-fetch first to set the prefetch starting point")
+	}
+	pgWalLocation, err := getFullPath("pg_wal")
+	if err != nil {
+		return err
+	}
+
+	tracelog.DebugLogger.Printf("starting wal-prefetch: %d WAL segments after %s\n", prefetchCount, lastWAL)
+	go func() {
+		err := HandleWALPrefetchCount(ctx, h.reader, lastWAL, pgWalLocation, prefetchCount)
+		if err != nil {
+			tracelog.ErrorLogger.Printf("wal-prefetch of %d segments after %s: %v", prefetchCount, lastWAL, err)
+		} else {
+			tracelog.DebugLogger.Printf("wal-prefetch of %d segments after %s finished", prefetchCount, lastWAL)
+		}
+	}()
+
+	_, err = h.fd.Write(daemon.OkType.ToBytes())
+	if err != nil {
+		return newSocketWriteFailedError(err)
+	}
+	return nil
 }
 
 func (h *WalFetchMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
@@ -113,6 +184,7 @@ func (h *WalFetchMessageHandler) Handle(ctx context.Context, messageBody []byte)
 	}
 	tracelog.DebugLogger.Printf("starting wal-fetch: %v -> %v\n", args[0], fullPath)
 
+	h.state.SetLastWAL(walFileName)
 	err = HandleWALFetch(ctx, h.reader, walFileName, fullPath, DaemonPrefetcher{})
 	if _, isArchNonExistErr := err.(internal.ArchiveNonExistenceError); isArchNonExistErr {
 		tracelog.WarningLogger.Printf("ArchiveNonExistenceError: %v\n", err.Error())
@@ -138,6 +210,7 @@ func NewMessageHandler(
 	messageType daemon.SocketMessageType,
 	c net.Conn,
 	storage storage.Storage,
+	state *DaemonState,
 ) (SocketMessageHandler, error) {
 	switch messageType {
 	case daemon.CheckType:
@@ -154,7 +227,14 @@ func NewMessageHandler(
 			return nil, err
 		}
 
-		return &WalFetchMessageHandler{c, folderReader}, nil
+		return &WalFetchMessageHandler{fd: c, state: state, reader: folderReader}, nil
+	case daemon.WalPrefetchType:
+		folderReader, err := internal.PrepareMultiStorageFolderReader(ctx, storage.RootFolder(), "")
+		if err != nil {
+			return nil, err
+		}
+
+		return &WalPrefetchMessageHandler{fd: c, reader: folderReader, state: state}, nil
 	default:
 		return nil, nil
 	}
@@ -225,6 +305,8 @@ func HandleDaemon(ctx context.Context, options DaemonOptions) {
 
 	SetupSignalListener()
 
+	daemonState := &DaemonState{}
+
 	multiSt, err := internal.ConfigureMultiStorage(ctx, true)
 	if err != nil {
 		tracelog.ErrorLogger.Fatal("configure multi-storage: %w", err)
@@ -232,10 +314,10 @@ func HandleDaemon(ctx context.Context, options DaemonOptions) {
 	}
 	defer utility.LoggedClose(multiSt, "close multi-storage")
 
-	serve(ctx, l, multiSt)
+	serve(ctx, l, multiSt, daemonState)
 }
 
-func serve(ctx context.Context, l net.Listener, multiSt *multistorage.Storage) {
+func serve(ctx context.Context, l net.Listener, multiSt *multistorage.Storage, state *DaemonState) {
 	go func() {
 		<-ctx.Done()
 		utility.LoggedClose(l, "close daemon listener")
@@ -250,12 +332,12 @@ func serve(ctx context.Context, l net.Listener, multiSt *multistorage.Storage) {
 			}
 			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
 		}
-		go ProcessConnection(ctx, fd, multiSt)
+		go ProcessConnection(ctx, fd, multiSt, state)
 	}
 }
 
 // ProcessConnection is used for listening connection and processing messages
-func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.Storage) {
+func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.Storage, state *DaemonState) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
 	messageReader := NewMessageReader(c)
 	for {
@@ -264,7 +346,7 @@ func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.St
 			failAndLogError(c, fmt.Errorf("read message from %s, err: %v", c.RemoteAddr(), err))
 			return
 		}
-		err = handleMessage(ctx, messageType, messageBody, c, multiSt)
+		err = handleMessage(ctx, messageType, messageBody, c, multiSt, state)
 		if err != nil {
 			failAndLogError(c, err)
 			return
@@ -277,6 +359,10 @@ func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.St
 			tracelog.DebugLogger.Printf("successfully fetched: %s\n", string(messageBody))
 			return
 		}
+		if messageType == daemon.WalPrefetchType {
+			tracelog.DebugLogger.Printf("successfully started wal-prefetch: %s\n", string(messageBody))
+			return
+		}
 	}
 }
 
@@ -286,8 +372,9 @@ func handleMessage(
 	messageBody []byte,
 	conn net.Conn,
 	multiSt *multistorage.Storage,
+	state *DaemonState,
 ) error {
-	messageHandler, err := NewMessageHandler(ctx, messageType, conn, multiSt)
+	messageHandler, err := NewMessageHandler(ctx, messageType, conn, multiSt, state)
 	if err != nil {
 		return fmt.Errorf("init handler for message type %s: %v", string(messageType), err)
 	}
