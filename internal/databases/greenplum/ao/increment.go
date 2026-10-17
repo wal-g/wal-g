@@ -78,6 +78,12 @@ func ReadIncrementFileHeader(reader io.Reader) error {
 }
 
 func ApplyFileIncrement(fileName string, increment io.Reader, fsync bool) error {
+	return ApplyFileIncrementWithHeader(fileName, increment, fsync, nil)
+}
+
+// ApplyFileIncrementWithHeader applies the increment and optionally reports
+// its logical EOF and append offset after the increment header is decoded.
+func ApplyFileIncrementWithHeader(fileName string, increment io.Reader, fsync bool, onHeader func(eof, offset int64)) error {
 	tracelog.DebugLogger.Printf("Incrementing AO/AOCS segment %s\n", fileName)
 	err := ReadIncrementFileHeader(increment)
 	if err != nil {
@@ -96,6 +102,9 @@ func ApplyFileIncrement(fileName string, increment io.Reader, fsync bool) error 
 
 	if eof <= offset {
 		return fmt.Errorf("%s: parsed eof %d is smaller than offset %d", fileName, eof, offset)
+	}
+	if onHeader != nil {
+		onHeader(int64(eof), int64(offset))
 	}
 
 	openFlags := os.O_RDWR

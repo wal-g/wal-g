@@ -35,6 +35,8 @@ var fetchModeStr string
 var inPlaceRestore bool
 var partialRestoreArgs []string
 var backupFetchTurbo bool
+var backupFetchAllowDataLoss bool
+var backupFetchDoctor bool
 
 var backupFetchCmd = &cobra.Command{
 	Use:   "backup-fetch [backup_name | --target-user-data <data> | --restore-point <name>]",
@@ -42,6 +44,9 @@ var backupFetchCmd = &cobra.Command{
 	Args:  cobra.RangeArgs(0, 1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.ConfigureLimiters()
+		if backupFetchDoctor && !backupFetchAllowDataLoss {
+			tracelog.ErrorLogger.Fatalf("--doctor requires --allow-dataloss")
+		}
 
 		if !inPlaceRestore && restoreConfigPath == "" {
 			tracelog.ErrorLogger.Fatalf(
@@ -80,7 +85,7 @@ var backupFetchCmd = &cobra.Command{
 
 		internal.HandleBackupFetch(cmd.Context(), rootFolder, targetBackupSelector,
 			greenplum.NewGreenplumBackupFetcher(restoreConfigPath, inPlaceRestore, logsDir, *fetchContentIDs, fetchMode, restorePoint,
-				partialRestoreArgs, backupFetchTurbo))
+				partialRestoreArgs, backupFetchTurbo, backupFetchAllowDataLoss, backupFetchDoctor))
 	},
 }
 
@@ -120,6 +125,10 @@ func init() {
 	backupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 	backupFetchCmd.Flags().BoolVar(&backupFetchTurbo, "turbo", false,
 		"Ignore all kinds of throttling defined in config on segments")
+	backupFetchCmd.Flags().BoolVar(&backupFetchAllowDataLoss, "allow-dataloss", false,
+		"Continue backup-fetch when AO files cannot be restored, replacing missing data with zeroes")
+	backupFetchCmd.Flags().BoolVar(&backupFetchDoctor, "doctor", false,
+		"Preserve complete AO Row blocks from damaged files (requires --allow-dataloss)")
 
 	backupFetchCmd.Flags().StringVar(&fetchModeStr, "mode", "default", fetchModeDescription)
 	cmd.AddCommand(backupFetchCmd)

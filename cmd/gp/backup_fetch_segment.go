@@ -25,6 +25,8 @@ var fileMask string
 var restoreSpec string
 var targetUserData string
 var segBackupFetchTurbo bool
+var segBackupFetchAllowDataLoss bool
+var segBackupFetchDoctor bool
 
 // segBackupFetchCmd is a subcommand to fetch a backup of a single segment.
 // It is called remotely by a backup-fetch command from the master host
@@ -33,6 +35,9 @@ var segBackupFetchCmd = &cobra.Command{
 	Short: segBackupFetchShortDescription, // TODO : improve description
 	Args:  cobra.RangeArgs(1, 2),
 	Run: func(cmd *cobra.Command, args []string) {
+		if segBackupFetchDoctor && !segBackupFetchAllowDataLoss {
+			tracelog.ErrorLogger.Fatalf("--doctor requires --allow-dataloss")
+		}
 		conf.Turbo = segBackupFetchTurbo
 		internal.ConfigureLimiters()
 
@@ -59,9 +64,9 @@ var segBackupFetchCmd = &cobra.Command{
 		var extractProv postgres.ExtractProvider
 
 		if partialRestoreArgs != nil {
-			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs)
+			extractProv = greenplum.NewExtractProviderDBSpec(partialRestoreArgs, segBackupFetchAllowDataLoss, segBackupFetchDoctor)
 		} else {
-			extractProv = greenplum.ExtractProviderImpl{}
+			extractProv = greenplum.ExtractProviderImpl{AllowDataLoss: segBackupFetchAllowDataLoss, Doctor: segBackupFetchDoctor}
 		}
 
 		pgFetcher := postgres.GetFetcherOld(args[0], fileMask, restoreSpec, extractProv)
@@ -95,6 +100,10 @@ func init() {
 	segBackupFetchCmd.Flags().StringSliceVar(&partialRestoreArgs, "restore-only", nil, restoreOnlyDescription)
 	segBackupFetchCmd.Flags().BoolVar(&segBackupFetchTurbo, "turbo", false,
 		"Ignore all kinds of throttling defined in config")
+	segBackupFetchCmd.Flags().BoolVar(&segBackupFetchAllowDataLoss, "allow-dataloss", false,
+		"Continue backup-fetch when AO files cannot be restored, replacing missing data with zeroes")
+	segBackupFetchCmd.Flags().BoolVar(&segBackupFetchDoctor, "doctor", false,
+		"Preserve complete AO Row blocks from a damaged file (requires --allow-dataloss)")
 	// Since this is a utility command called by backup-fetch, it should not be exposed to the end user.
 	segBackupFetchCmd.Hidden = true
 	cmd.AddCommand(segBackupFetchCmd)
