@@ -35,9 +35,23 @@ Checksums are controlled by relation metadata (`WITH (checksum=...)`); they are 
 
 ## Small and Large Content
 
-Small Content blocks contain rows whose encoded content fits in one block. A Large Content header describes a row whose encoded data is split across one or more following Small Content fragment blocks. The Large Content header and its fragments form one logical row; accepting only some fragments could preserve corrupt data.
+Small Content blocks contain rows whose encoded content fits in one block. A Large Content block is a metadata-only header for a row that is too large to fit in one Small Content block. It uses the same 8-byte header and checksums, but its fields differ:
+
+| Word | Bits | Length | Field | Meaning |
+| --- | ---: | ---: | --- | --- |
+| 0 | 31 | 1 bit | reserved | Must be zero. |
+| 0 | 30–28 | 3 bits | header kind | `2` for Large Content. |
+| 0 | 27 | 1 bit | `hasFirstRowNum` | If set, an extra 8-byte first-row number follows the checksums. |
+| 0 | 26–24 | 3 bits | executor block kind | Row representation of the large content. |
+| 0 | 23 | 1 bit | reserved | Must be zero. |
+| 0 bits 22–0, then Word 1 bits 31–30 | 25 bits | `largeRowCount` | Number of rows represented by this large content (normally one large row). |
+| 1 | 29–0 | 30 bits | `largeContentLength` | Total uncompressed byte length of the large content. |
+
+The header is followed by one or more Small Content blocks that carry fragments of the large row. Greenplum reads fragments until their uncompressed lengths sum to `largeContentLength`; fragment headers use `rowCount = 0`. The header and every fragment are checksummed independently when AO checksums are enabled. A fragment sequence is one logical row: preserving only some fragments can leave unusable or corrupt tuple data.
 
 The doctor scanner accepts a contiguous prefix of complete, checksummed Small Content blocks. It stops on an incomplete or invalid block, checksum failure, unsupported header kind, or a Large Content header. It does not search later bytes for another possible header: recovery starts at a known block boundary and never skips over corruption.
+
+In particular, the scanner currently does not validate a Large Content header together with all of its following fragments, so it stops before the Large Content header. This also means it does not preserve the `rowCount = 0` fragment blocks as ordinary rows.
 
 ## AO Column
 
