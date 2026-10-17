@@ -621,6 +621,11 @@ Configuration:
 
 Per-archive operation time limit. Operations exceeding it are interrupted. Default `60s`.
 
+* `WALG_DAEMON_WAL_PREFETCH_COUNT`
+
+Additional number of WAL segments the daemon prefetches beyond the requested one on `wal-fetch`.
+Added on top of `WALG_DOWNLOAD_CONCURRENCY`. Default `0` (only the regular prefetch depth is used).
+
 ##### ``walg-daemon-client``
 
 Lightweight CLI in [`cmd/daemonclient`](https://github.com/wal-g/wal-g/tree/master/cmd/daemonclient), built via `make build_client`. Intended to be invoked from [`archive_command`](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-ARCHIVE-COMMAND) and [`restore_command`](https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-RESTORE-COMMAND), so PostgreSQL forks the small client per segment instead of the full `wal-g` binary.

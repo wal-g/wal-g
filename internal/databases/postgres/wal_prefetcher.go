@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -59,11 +60,26 @@ func (p DaemonPrefetcher) Prefetch(ctx context.Context, reader internal.StorageF
 
 	go func() {
 		tracelog.DebugLogger.Printf("Invoking daemon WAL-prefetch (%s)", walFileName)
-		err := HandleWALPrefetch(ctx, reader, walFileName, location)
+		prefetchCount, err := getDaemonPrefetchCount()
+		if err != nil {
+			tracelog.ErrorLogger.Printf("WAL-prefetch (%s): %v", walFileName, err)
+			return
+		}
+		err = HandleWALPrefetchCount(ctx, reader, walFileName, location, prefetchCount)
 		if err != nil {
 			tracelog.ErrorLogger.Printf("WAL-prefetch (%s): %v", walFileName, err)
 		}
 	}()
+}
+
+// getDaemonPrefetchCount returns the total number of WAL segments to prefetch:
+// download concurrency plus the extra amount configured by WALG_DAEMON_WAL_PREFETCH_COUNT
+func getDaemonPrefetchCount() (int, error) {
+	concurrency, err := conf.GetMaxDownloadConcurrency()
+	if err != nil {
+		return 0, fmt.Errorf("get max concurrency: %v", err)
+	}
+	return concurrency + conf.GetDaemonWALPrefetchCount(), nil
 }
 
 func checkPrefetchPossible(walFileName string) bool {
@@ -74,5 +90,6 @@ func checkPrefetchPossible(walFileName string) bool {
 	}
 	return !strings.Contains(walFileName, "history") &&
 		!strings.Contains(walFileName, "partial") &&
-		concurrency != 1 // There will be nothing to prefetch anyway
+		(concurrency != 1 || // There will be nothing to prefetch anyway
+			conf.GetDaemonWALPrefetchCount() > 0)
 }

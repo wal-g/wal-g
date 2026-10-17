@@ -24,15 +24,22 @@ import (
 // TODO : unit tests
 // HandleWALPrefetch is invoked by wal-fetch command to speed up database restoration
 func HandleWALPrefetch(ctx context.Context, folderReader internal.StorageFolderReader, walFileName string, location string) error {
-	var fileName = walFileName
-	location = path.Dir(location)
-	waitGroup := &sync.WaitGroup{}
 	concurrency, err := conf.GetMaxDownloadConcurrency()
 	if err != nil {
 		return fmt.Errorf("get max concurrency: %v", err)
 	}
+	return HandleWALPrefetchCount(ctx, folderReader, walFileName, location, concurrency)
+}
 
-	for i := 0; i < concurrency; i++ {
+// HandleWALPrefetchCount prefetches the next prefetchCount WAL segments after walFileName
+func HandleWALPrefetchCount(ctx context.Context, folderReader internal.StorageFolderReader,
+	walFileName string, location string, prefetchCount int) error {
+	var fileName = walFileName
+	location = path.Dir(location)
+	waitGroup := &sync.WaitGroup{}
+	var err error
+
+	for i := 0; i < prefetchCount; i++ {
 		fileName, err = GetNextWalFilename(fileName)
 		if err != nil {
 			return fmt.Errorf("get next filename: %v", err)

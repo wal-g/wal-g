@@ -123,6 +123,7 @@ const (
 	FailoverStorageCacheEMAAlphaDeadMin  = "WALG_FAILOVER_STORAGES_CACHE_EMA_ALPHA_DEAD_MIN"
 	FailoverStoragesCheckSize            = "WALG_FAILOVER_STORAGES_CHECK_SIZE"
 	PgDaemonWALUploadTimeout             = "WALG_DAEMON_WAL_UPLOAD_TIMEOUT"
+	PgDaemonWALPrefetchCount             = "WALG_DAEMON_WAL_PREFETCH_COUNT"
 	PgTargetStorage                      = "WALG_TARGET_STORAGE"
 	DisablePartialRestore                = "WALG_DISABLE_PARTIAL_RESTORE"
 
@@ -329,6 +330,7 @@ var (
 		PgAliveCheckInterval:      "1m",
 		FailoverStoragesCheckSize: "1mb",
 		PgDaemonWALUploadTimeout:  "60s",
+		PgDaemonWALPrefetchCount:  "0",
 		ForceWalDetal:             "false",
 		PgAppName:                 "wal-g",
 	}
@@ -541,6 +543,7 @@ var (
 		FailoverStorageCacheEMAAlphaDeadMin:  true,
 		FailoverStoragesCheckSize:            true,
 		PgDaemonWALUploadTimeout:             true,
+		PgDaemonWALPrefetchCount:             true,
 		DisablePartialRestore:                true,
 		ForceWalDetal:                        true,
 		PgAppName:                            true,
@@ -1056,6 +1059,12 @@ func GetMaxConcurrency(concurrencyType string) (int, error) {
 
 func GetMaxDownloadConcurrency() (int, error) {
 	return GetMaxConcurrency(DownloadConcurrencySetting)
+}
+
+// GetDaemonWALPrefetchCount returns the number of additional WAL segments
+// that the daemon should prefetch beyond the requested one
+func GetDaemonWALPrefetchCount() int {
+	return viper.GetInt(PgDaemonWALPrefetchCount)
 }
 
 func GetMaxUploadConcurrency() (int, error) {
