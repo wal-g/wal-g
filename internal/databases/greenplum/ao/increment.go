@@ -97,6 +97,7 @@ func ApplyFileIncrement(fileName string, increment io.Reader, fsync bool) error 
 	if eof <= offset {
 		return fmt.Errorf("%s: parsed eof %d is smaller than offset %d", fileName, eof, offset)
 	}
+
 	openFlags := os.O_RDWR
 	file, err := os.OpenFile(fileName, openFlags, 0666)
 	if err != nil {
