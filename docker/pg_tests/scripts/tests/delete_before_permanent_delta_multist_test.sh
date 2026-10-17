@@ -3,6 +3,7 @@ set -e -x
 
 . /tmp/tests/test_functions/pg_compat.sh
 
+. /tmp/tests/test_functions/check_deleted.sh
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/delete_before_permanent_delta_multist_test_config.json"
 
@@ -25,6 +26,7 @@ do
     if [ $i -eq 3 ]
     then
         wal-g --config=${TMP_CONFIG} backup-push --permanent ${PGDATA}
+        PERMANENT_NAME=$(wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
         dump_all /tmp/dump1
     else
         wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
@@ -42,7 +44,11 @@ sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA}
 wal-g --config=${TMP_CONFIG} st transfer backups --source default --target good_failover --preserve
 wal-g --config=${TMP_CONFIG} backup-list --detail
+LAST_NAME=$(wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " ")
+deleted_backups=$(wal-g --config=${TMP_CONFIG} backup-list | tail -n +2 | cut -f 1 -d " " | sort -u | grep -vxF -e "${PERMANENT_NAME}" -e "${LAST_NAME}")
 wal-g --config=${TMP_CONFIG} delete retain 1 --confirm
+CHECK_STORAGES="default good_failover"
+assert_backups_deleted $deleted_backups
 
 wal-g --config=${TMP_CONFIG} backup-list --detail
 

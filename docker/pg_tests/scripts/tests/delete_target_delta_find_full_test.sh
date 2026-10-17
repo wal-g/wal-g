@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/check_deleted.sh
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/delete_target_delta_find_full_test_config.json"
 
@@ -53,6 +54,10 @@ pgbench -i -s 1 postgres & sleep 1
 wal-g --config=${TMP_CONFIG} backup-push ${PGDATA} --delta-from-name ${SECOND_INCREMENT}
 
 # delete the SECOND_INCREMENT with FIND_FULL, should leave only the first full backup w/ first increment
+# everything created after the saved list must be deleted
+wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_with_new
+deleted_backups=$(new_backup_names /tmp/list_before_delete /tmp/list_with_new)
+
 wal-g --config=${TMP_CONFIG} delete target FIND_FULL ${SECOND_INCREMENT} --confirm
 
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
@@ -65,6 +70,9 @@ then
     echo "Wrong number of deleted lines"
     diff /tmp/before_delete /tmp/after_delete
 fi
+
+# ensure everything that was supposed to be deleted is gone from backup-list and storage
+assert_backups_deleted $deleted_backups
 
 # ensure all backups which we weren't going to delete still exist after performing deletion
 xargs -I {} grep {} /tmp/list_before_delete </tmp/list_after_delete
