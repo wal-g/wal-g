@@ -640,6 +640,8 @@ Commands:
 - `wal-fetch wal_name destination_filename` — relays to `wal-g wal-fetch`. On a missing archive, exits `74` (`EX_IOERR`) so PostgreSQL keeps recovering rather than treating it as fatal; matches `wal-fetch` behaviour, see [PR #1195](https://github.com/wal-g/wal-g/pull/1195).
 - `wal-prefetch count` — makes the daemon prefetch `count` WAL segments following the last WAL processed by `wal-fetch`. The starting point is the most recent `wal-fetch` the daemon served; if none was served yet, the daemon rejects the command. The daemon prefetches into its prefetch directory and replies immediately, without waiting for the downloads to finish.
 
+For hosts where the binary is undesirable, [`scripts/walg-daemon-client.sh`](https://github.com/wal-g/wal-g/tree/master/scripts/walg-daemon-client.sh) implements the same protocol in ~150 lines of shell (requires `nc` with unix-socket support).
+
 `postgresql.conf` example:
 ```conf
 archive_mode = on

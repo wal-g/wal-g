@@ -127,16 +127,10 @@ type WalPrefetchMessageHandler struct {
 }
 
 func (h *WalPrefetchMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
-	args, err := daemon.BytesToArgs(messageBody)
+	// the client sends single-argument command bodies as a raw string, see daemon.getMessage
+	prefetchCount, err := strconv.Atoi(string(messageBody))
 	if err != nil {
-		return err
-	}
-	if len(args) != 1 {
-		return fmt.Errorf("wal-prefetch incorrect arguments count")
-	}
-	prefetchCount, err := strconv.Atoi(args[0])
-	if err != nil {
-		return fmt.Errorf("wal-prefetch invalid count %q: %w", args[0], err)
+		return fmt.Errorf("wal-prefetch invalid count %q: %w", string(messageBody), err)
 	}
 	if prefetchCount <= 0 {
 		return fmt.Errorf("wal-prefetch count must be positive, got %d", prefetchCount)
