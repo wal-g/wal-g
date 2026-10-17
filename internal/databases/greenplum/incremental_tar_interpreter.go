@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/spf13/viper"
 	"github.com/wal-g/tracelog"
@@ -98,7 +99,35 @@ func (i *IncrementalTarInterpreter) RecoverFailedFiles(_ context.Context, files 
 			return nil, fmt.Errorf("recover AO file %s: %w", file.LocalPath(), err)
 		}
 	}
+	i.logRecoverySummary(files)
 	return unrecovered, nil
+}
+
+func (i *IncrementalTarInterpreter) logRecoverySummary(files []internal.ReaderMaker) {
+	var recovered []string
+	for _, file := range files {
+		meta, ok := i.aoFilesMetadata.Files[file.LocalPath()]
+		if !ok {
+			continue
+		}
+		recovered = append(recovered, i.formatRecoveredAOFile(file.LocalPath(), meta))
+	}
+	if len(recovered) == 0 {
+		return
+	}
+	tracelog.WarningLogger.Printf("AO/AOCS files recovered with data loss:\n%s\nOn the master, find the database name by OID with SELECT datname FROM pg_database WHERE oid = <database_oid>; connect to that database, then find table names with SELECT n.nspname, c.relname, c.oid FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relfilenode IN (<relfilenode_list>);",
+		strings.Join(recovered, "\n"))
+}
+
+func (i *IncrementalTarInterpreter) formatRecoveredAOFile(fileName string, meta *ao.BackupFileDesc) string {
+	storageType := "AO"
+	if meta.StorageType == ao.ColumnOriented {
+		storageType = "AOCS"
+	}
+	if relFileNode, err := postgres.GetRelFileNodeFrom(fileName); err == nil {
+		return fmt.Sprintf("%s: %s (database OID %d, relfilenode %d)", storageType, fileName, relFileNode.DBNode, relFileNode.RelNode)
+	}
+	return fmt.Sprintf("%s: %s", storageType, fileName)
 }
 
 func (i *IncrementalTarInterpreter) recoverAOFile(fileName string, meta *ao.BackupFileDesc) error {
