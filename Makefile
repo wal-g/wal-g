@@ -6,7 +6,6 @@ MAIN_MONGO_PATH := main/mongo
 MAIN_FDB_PATH := main/fdb
 MAIN_GP_PATH := main/gp
 MAIN_ETCD_PATH := main/etcd
-DOCKER_COMMON := golang s3
 # Keep the golang docker image's toolchain in sync with go.mod instead of hardcoding it.
 GO_VERSION := $(shell awk '/^go /{print $$2; exit}' go.mod)
 export GO_VERSION
@@ -90,11 +89,11 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 
 install_and_build_pg: deps pg_build
 
-pg10_build_image: go_deps load_ubuntu_18_04
+pg10_build_image: go_deps load_ubuntu_18_04 load_golang_image
 	# There are dependencies between container images.
 	# Running in one command leads to using outdated images and fails on clean system.
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
-	docker compose build $(DOCKER_COMMON)
+	docker compose build s3
 	docker compose build pg10
 	docker compose build pg10_tests_template
 
@@ -108,7 +107,7 @@ endif
 	# pg_tests_template is built FROM wal-g/pg$(PG_MAJOR). In a single command
 	# compose would look for that image on docker.io instead of using the one it
 	# is about to build. https://github.com/docker/compose/issues/6332
-	docker compose build $(DOCKER_COMMON)
+	docker compose build s3
 	docker compose build pg
 	docker compose build pg_tests_template
 
@@ -131,8 +130,11 @@ pg_matrix_test:
 	done
 
 # Reuse the prebuilt image from build-golang-image.yml; build locally if it is unavailable.
+.PHONY: load_golang_image
 load_golang_image:
-	(docker pull ghcr.io/wal-g/golang:$(GO_VERSION) && docker tag ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang) || docker compose build golang
+	@if ! docker image inspect wal-g/golang:latest >/dev/null 2>&1; then \
+		(docker pull ghcr.io/wal-g/golang:$(GO_VERSION) && docker tag ghcr.io/wal-g/golang:$(GO_VERSION) wal-g/golang) || docker compose build golang; \
+	fi
 
 pg_integration_test: clean_compose
 	if [ "$(PG_MAJOR)" = "10" ]; then\
