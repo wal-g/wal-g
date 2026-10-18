@@ -29,9 +29,9 @@ func (err CompressAndEncryptError) Error() string {
 	return fmt.Sprintf(tracelog.GetErrorFormatter(), err.error)
 }
 
-// CompressAndEncrypt compresses input to a pipe reader. Output must be used or
-// pipe will block.
-func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter) io.Reader {
+// CompressAndEncrypt compresses input to a pipe reader. Callers must consume the
+// output or close it to release the producer when an upload fails.
+func CompressAndEncrypt(source io.Reader, compressor compression.Compressor, crypter crypto.Crypter) io.ReadCloser {
 	compressedReader, dstWriter := io.Pipe()
 
 	var writeCloser io.WriteCloser = dstWriter

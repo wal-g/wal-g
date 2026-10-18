@@ -78,7 +78,7 @@ func HandleWALPush(ctx context.Context, uploader *WalUploader, walFilePath strin
 
 // TODO : unit tests
 // uploadWALFile from FS to the cloud
-func uploadWALFile(ctx context.Context, uploader *WalUploader, walFilePath string, preventWalOverwrite bool) error {
+func uploadWALFile(ctx context.Context, uploader *WalUploader, walFilePath string, preventWalOverwrite bool) (retErr error) {
 	if preventWalOverwrite {
 		overwriteAttempt, err := checkWALOverwrite(ctx, uploader, walFilePath)
 		if overwriteAttempt {
@@ -91,11 +91,16 @@ func uploadWALFile(ctx context.Context, uploader *WalUploader, walFilePath strin
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not open '%s'\n", walFilePath)
 	}
+	defer func() {
+		if err := walFile.Close(); retErr == nil {
+			retErr = err
+		}
+	}()
 	err = uploader.UploadWalFile(ctx, walFile)
 	if err != nil {
 		return errors.Wrapf(err, "upload: could not Upload '%s'\n", walFilePath)
 	}
-	return walFile.Close()
+	return nil
 }
 
 // TODO : unit tests
