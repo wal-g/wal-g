@@ -91,17 +91,12 @@ pg_build: $(CMD_FILES) $(PKG_FILES)
 install_and_build_pg: deps pg_build
 
 pg10_build_image: go_deps load_ubuntu_18_04
-ifeq ($(COMPOSE_BAKE),true)
-	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
-	docker compose build $(DOCKER_COMMON) pg10 pg10_tests_template
-else
 	# There are dependencies between container images.
 	# Running in one command leads to using outdated images and fails on clean system.
 	# It can not be fixed with depends_on in compose file. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
 	docker compose build pg10
 	docker compose build pg10_tests_template
-endif
 
 # Builds the image for any PostgreSQL 14-18, chosen by PG_MAJOR (ubuntu 22.04 and
 # PGDG). PG 10 still uses pg10_build_image above, because wal-e needs python3.7
@@ -110,17 +105,12 @@ pg_build_image: go_deps load_docker_common
 ifeq ($(PG_MAJOR),10)
 	$(error PG_MAJOR=10 must be built with pg10_build_image - the PG 10 image is bionic + wal-e)
 endif
-ifeq ($(COMPOSE_BAKE),true)
-	# bake resolves DAG across services in one invocation via additional_contexts (see docker-compose.bake.yml).
-	docker compose build $(DOCKER_COMMON) pg pg_tests_template
-else
 	# pg_tests_template is built FROM wal-g/pg$(PG_MAJOR). In a single command
 	# compose would look for that image on docker.io instead of using the one it
 	# is about to build. https://github.com/docker/compose/issues/6332
 	docker compose build $(DOCKER_COMMON)
 	docker compose build pg
 	docker compose build pg_tests_template
-endif
 
 # PG 10 is built by pg10_build_image (bionic + wal-e), the rest by pg_build_image.
 # This list is also what CI tests: dockertests-par.yml reads it from here.
