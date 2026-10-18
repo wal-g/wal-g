@@ -63,6 +63,7 @@ func (h *CheckMessageHandler) Handle(_ context.Context, _ []byte) error {
 type ArchiveMessageHandler struct {
 	fd       net.Conn
 	uploader *WalUploader
+	archiver *daemonArchiver
 }
 
 func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) error {
@@ -81,7 +82,11 @@ func (h *ArchiveMessageHandler) Handle(ctx context.Context, messageBody []byte) 
 	}
 	ctx, cancel := context.WithTimeout(ctx, pushTimeout)
 	defer cancel()
-	err = HandleWALPush(ctx, h.uploader, fullPath)
+	if h.archiver != nil {
+		err = h.archiver.Push(ctx, fullPath)
+	} else {
+		err = HandleWALPush(ctx, h.uploader, fullPath)
+	}
 	if err != nil {
 		return fmt.Errorf("file archiving failed: %w", err)
 	}
@@ -147,7 +152,7 @@ func NewMessageHandler(
 		if err != nil {
 			return nil, err
 		}
-		return &ArchiveMessageHandler{c, walUploader}, nil
+		return &ArchiveMessageHandler{fd: c, uploader: walUploader}, nil
 	case daemon.WalFetchType:
 		folderReader, err := internal.PrepareMultiStorageFolderReader(ctx, storage.RootFolder(), "")
 		if err != nil {
@@ -232,10 +237,24 @@ func HandleDaemon(ctx context.Context, options DaemonOptions) {
 	}
 	defer utility.LoggedClose(multiSt, "close multi-storage")
 
-	serve(ctx, l, multiSt)
+	if err := serve(ctx, l, multiSt); err != nil {
+		tracelog.ErrorLogger.Fatal("daemon server: ", err)
+	}
 }
 
-func serve(ctx context.Context, l net.Listener, multiSt *multistorage.Storage) {
+func serve(ctx context.Context, l net.Listener, multiSt *multistorage.Storage) error {
+	var archiver *daemonArchiver
+	if multiSt != nil {
+		var err error
+		archiver, err = configureDaemonArchiver(ctx, multiSt)
+		if err != nil {
+			utility.LoggedClose(l, "close daemon listener")
+			return fmt.Errorf("configure daemon archiver: %w", err)
+		}
+		if archiver != nil {
+			defer archiver.Close()
+		}
+	}
 	go func() {
 		<-ctx.Done()
 		utility.LoggedClose(l, "close daemon listener")
@@ -246,16 +265,20 @@ func serve(ctx context.Context, l net.Listener, multiSt *multistorage.Storage) {
 		if err != nil {
 			if ctx.Err() != nil {
 				tracelog.InfoLogger.Println("daemon shutting down")
-				return
+				return nil
 			}
-			tracelog.ErrorLogger.Fatal("Failed to accept, err:", err)
+			return fmt.Errorf("accept daemon connection: %w", err)
 		}
-		go ProcessConnection(ctx, fd, multiSt)
+		go processConnection(ctx, fd, multiSt, archiver)
 	}
 }
 
 // ProcessConnection is used for listening connection and processing messages
 func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.Storage) {
+	processConnection(ctx, c, multiSt, nil)
+}
+
+func processConnection(ctx context.Context, c net.Conn, multiSt *multistorage.Storage, archiver *daemonArchiver) {
 	defer utility.LoggedClose(c, fmt.Sprintf("Failed to close connection with %s \n", c.RemoteAddr()))
 	messageReader := NewMessageReader(c)
 	for {
@@ -264,7 +287,7 @@ func ProcessConnection(ctx context.Context, c net.Conn, multiSt *multistorage.St
 			failAndLogError(c, fmt.Errorf("read message from %s, err: %v", c.RemoteAddr(), err))
 			return
 		}
-		err = handleMessage(ctx, messageType, messageBody, c, multiSt)
+		err = handleMessage(ctx, messageType, messageBody, c, multiSt, archiver)
 		if err != nil {
 			failAndLogError(c, err)
 			return
@@ -286,8 +309,15 @@ func handleMessage(
 	messageBody []byte,
 	conn net.Conn,
 	multiSt *multistorage.Storage,
+	archiver *daemonArchiver,
 ) error {
-	messageHandler, err := NewMessageHandler(ctx, messageType, conn, multiSt)
+	var messageHandler SocketMessageHandler
+	var err error
+	if messageType == daemon.WalPushType && archiver != nil {
+		messageHandler = &ArchiveMessageHandler{fd: conn, archiver: archiver}
+	} else {
+		messageHandler, err = NewMessageHandler(ctx, messageType, conn, multiSt)
+	}
 	if err != nil {
 		return fmt.Errorf("init handler for message type %s: %v", string(messageType), err)
 	}
