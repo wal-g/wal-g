@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/check_deleted.sh
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/delete_before_permanent_full_test_config.json"
 
@@ -32,8 +33,12 @@ wal-g --config=${TMP_CONFIG} backup-list
 
 # delete all backups
 last_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | tail -n 1 | cut -f 1 -d " "`
+deleted_backups=$(wal-g --config=${TMP_CONFIG} backup-list | sed -n '3,4p' | cut -f 1 -d " ")
 wal-g --config=${TMP_CONFIG} delete before $last_backup_name --confirm
 wal-g --config=${TMP_CONFIG} backup-list
+
+# check that all impermanent backups older than the last one are deleted
+assert_backups_deleted $deleted_backups
 
 # check that permanent backup still exists
 first_backup_name=`wal-g --config=${TMP_CONFIG} backup-list | sed '2q;d' | cut -f 1 -d " "`
