@@ -57,6 +57,12 @@ jobs:
             mkdir -p "container-logs/$c"
             docker logs "$c" >"container-logs/$c/stdout.log" 2>"container-logs/$c/stderr.log"
             docker cp "$c:/var/log" "container-logs/$c/var-log" 2>/dev/null
+            # logging_collector may write inside PGDATA, outside /var/log.
+            pgdata=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$c" | sed -n 's/^PGDATA=//p')
+            if [ -n "$pgdata" ]; then
+              docker cp "$c:$pgdata/log" "container-logs/$c/pgdata-log" 2>/dev/null
+              docker cp "$c:$pgdata/pg_log" "container-logs/$c/pgdata-pg_log" 2>/dev/null
+            fi
           done
           ls -R container-logs || true
 

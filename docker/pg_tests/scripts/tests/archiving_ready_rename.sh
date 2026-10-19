@@ -26,14 +26,8 @@ echo "archive_command = '/usr/bin/timeout 600 /usr/bin/wal-g --config=${TMP_CONF
 pg_ctl -D ${PGDATA} -w start
 /tmp/scripts/wait_while_pg_not_ready.sh
 
-sleep 10
-
-grep -i 'archived write-ahead log file' ${PGDATA}/log/postgresql.log
-
-count=$(grep -c 'archived write-ahead log file' ${PGDATA}/log/postgresql.log)
-
-if [ "${count}" = '0' ]; then
-    exit 1
-fi
+# Wait for the same success condition, not an assumed runner speed.
+. /tmp/tests/test_functions/wait_for_archived_wal.sh
+wait_for_archived_wal "${PGDATA}/log/postgresql.log" 120
 
 /tmp/scripts/drop_pg.sh
