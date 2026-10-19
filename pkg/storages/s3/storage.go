@@ -45,12 +45,11 @@ type Config struct {
 	Disable100Continue       bool
 	EnableVersioning         string
 	DeleteBatchSize          int
-	// RequestTimeout, when > 0, becomes the http.Transport.ResponseHeaderTimeout
-	// on the AWS SDK's HTTP client. The S3 server has this long to send headers
-	// for any request before the connection is aborted; body streaming is not
-	// constrained, so multi-GB uploads/downloads still complete.
-	RequestTimeout  time.Duration
-	showAllVersions bool // When true, include deleted objects in listing (for st ls --all-versions)
+	// ResponseHeaderTimeout, when > 0, is copied onto the cloned transport.
+	// Go starts it only after the request, including its body, has been written.
+	// It does not bound a stalled upload, the response body, or retries.
+	ResponseHeaderTimeout time.Duration
+	showAllVersions       bool // When true, include deleted objects in listing (for st ls --all-versions)
 }
 
 type Secrets struct {

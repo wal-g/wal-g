@@ -109,9 +109,9 @@ By default, WAL-G checks whether versioning is enabled on the bucket. When the u
 
 Sets batch size for object deletion. By default is set to 1000.
 
-* `S3_REQUEST_TIMEOUT`
+* `S3_RESPONSE_HEADER_TIMEOUT`
 
-Sets the maximum number of seconds WAL-G will wait for the S3 server to send response headers for any request. Once headers arrive, body transfer is not constrained -- multi-GB uploads and downloads still complete. This protects against unresponsive endpoints (wrong host, network black hole, dead Minio, etc.) where commands would otherwise hang indefinitely. The default is `0`, which disables the timeout and preserves prior behavior.
+Integer seconds (default `0`, disabled). Go starts this timer only after the entire request, including its body, has been written. It bounds waiting for response headers, not a stalled upload, response-body read, or the whole WAL-G operation across retries.
 
 GCS
 -----------
