@@ -49,6 +49,18 @@ To configure how many concurrency streams are reading disk during ```backup-push
 
 Overrides the default `number of WAL files to upload during one scan`. By default, at most 32 WAL files will be uploaded.
 
+* `WALG_PG_WAL_FULL_SCAN_INTERVAL` (default: `5s`)
+
+Minimum interval between full `archive_status` directory scans by the background
+uploader used by standalone `wal-push` and the legacy daemon WAL-delta path.
+Contiguous WAL names are predicted and checked every 100 ms without listing the
+directory. Gaps, other timelines and non-segment files may wait up to this interval
+for discovery, plus time spent uploading an already discovered batch.
+Set `0` to disable full-scan throttling and list the directory on every scan poll,
+even when prediction finds a full batch. Values must be non-negative Go durations
+(for example, `500ms` or `5s`). Invalid values disable background scanning with an
+error in the log; foreground WAL uploads remain available.
+
 * `WALG_SENTINEL_USER_DATA`
 
 This setting allows backup automation tools to add extra information to JSON sentinel file during ```backup-push```. This setting can be used e.g. to give user-defined names to backups. Note: UserData must be a valid JSON string.

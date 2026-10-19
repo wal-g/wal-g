@@ -130,11 +130,15 @@ func (b *BgUploader) Stop() error {
 // scanAndProcessFiles scans directory for WAL segments and attempts to upload them. It
 // makes best effort attempts to avoid duplicating work (re-uploading files).
 func (b *BgUploader) scanAndProcessFiles() {
+	scanner, err := newWALReadyScanner(b.dir, b.firstWalName, b.maxNumUploaded)
+	if err != nil {
+		tracelog.ErrorLogger.Print("Error configuring parallel WAL scan: ", err)
+		return
+	}
 	fileChan := make(chan string)
 	defer close(fileChan)
 	go b.processFiles(fileChan)
 
-	scanner := newWALReadyScanner(b.dir, b.firstWalName, b.maxNumUploaded)
 	for {
 		files, err := scanner.candidates(time.Now())
 		for _, name := range files {

@@ -7,14 +7,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
+	conf "github.com/wal-g/wal-g/internal/config"
 )
 
 func readyScannerFixture(t *testing.T, first string, limit int32) (*walReadyScanner, *int) {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(dir, archiveStatusDir), 0700))
-	s := newWALReadyScanner(dir, first, limit)
+	s, err := newWALReadyScanner(dir, first, limit)
+	require.NoError(t, err)
 	calls := new(int)
 	s.readDir = func(dir string) ([]os.DirEntry, error) { *calls++; return os.ReadDir(dir) }
 	return s, calls
@@ -76,7 +79,7 @@ func TestWALReadyScannerFallbackAndThrottle(t *testing.T) {
 				require.Empty(t, got)
 			}
 			require.Equal(t, 1, *calls)
-			got, err = s.candidates(now.Add(walReadyFullScanInterval))
+			got, err = s.candidates(now.Add(s.fullScanInterval))
 			require.NoError(t, err)
 			require.ElementsMatch(t, want, got)
 			require.Equal(t, 2, *calls)
@@ -92,4 +95,75 @@ func TestWALReadyScannerRollover(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{next}, got)
 	require.Zero(t, *calls)
+}
+
+func TestWALReadyScannerConfig(t *testing.T) {
+	old := viper.Get(conf.PgWalFullScanInterval)
+	t.Cleanup(func() { viper.Set(conf.PgWalFullScanInterval, old) })
+	for _, tc := range []struct {
+		name    string
+		value   any
+		want    time.Duration
+		invalid bool
+	}{
+		{"default", nil, 5 * time.Second, false},
+		{"custom", "750ms", 750 * time.Millisecond, false},
+		{"zero", "0", 0, false},
+		{"zero_duration", "0s", 0, false},
+		{"negative", "-1s", 0, true},
+		{"malformed", "bad", 0, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Set(conf.PgWalFullScanInterval, tc.value)
+			s, err := newWALReadyScanner(t.TempDir(), "000000010000000000000000", 31)
+			if tc.invalid {
+				require.ErrorContains(t, err, conf.PgWalFullScanInterval)
+				require.Nil(t, s)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.want, s.fullScanInterval)
+		})
+	}
+}
+
+func TestWALReadyScannerCustomInterval(t *testing.T) {
+	old := viper.Get(conf.PgWalFullScanInterval)
+	viper.Set(conf.PgWalFullScanInterval, "750ms")
+	t.Cleanup(func() { viper.Set(conf.PgWalFullScanInterval, old) })
+	s, calls := readyScannerFixture(t, "000000010000000000000000", 31)
+	now := time.Now()
+	_, err := s.candidates(now)
+	require.NoError(t, err)
+	gap := "000000010000000000000003.ready"
+	readyScannerAdd(t, s, gap)
+	got, err := s.candidates(now.Add(749 * time.Millisecond))
+	require.NoError(t, err)
+	require.Empty(t, got)
+	require.Equal(t, 1, *calls)
+	got, err = s.candidates(now.Add(750 * time.Millisecond))
+	require.NoError(t, err)
+	require.Equal(t, []string{gap}, got)
+	require.Equal(t, 2, *calls)
+}
+
+func TestWALReadyScannerZeroDisablesThrottle(t *testing.T) {
+	old := viper.Get(conf.PgWalFullScanInterval)
+	viper.Set(conf.PgWalFullScanInterval, "0")
+	t.Cleanup(func() { viper.Set(conf.PgWalFullScanInterval, old) })
+	s, calls := readyScannerFixture(t, "000000010000000000000000", 1)
+	first := "000000010000000000000001.ready"
+	history := "00000002.history.ready"
+	readyScannerAdd(t, s, first, history)
+	now := time.Now()
+	got, err := s.candidates(now)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{first, history}, got)
+	require.Equal(t, 1, *calls, "a full predicted batch must not skip the listing")
+	next := "000000010000000000000002.ready"
+	readyScannerAdd(t, s, next)
+	got, err = s.candidates(now.Add(pollPauseDuration))
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{first, next, history}, got)
+	require.Equal(t, 2, *calls, "zero must list again at the next poll")
 }

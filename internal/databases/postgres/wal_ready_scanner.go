@@ -1,28 +1,37 @@
 package postgres
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-)
 
-const walReadyFullScanInterval = 5 * time.Second
+	conf "github.com/wal-g/wal-g/internal/config"
+)
 
 // walReadyScanner retains its arithmetic cursor between polls. New contiguous
 // WALs are discovered with stat at the usual poll interval; full directory
 // scans remain a fallback for gaps, other timelines and non-segment files.
 type walReadyScanner struct {
-	dir          string
-	lastWAL      string
-	limit        int32
-	lastFullScan time.Time
-	readDir      func(string) ([]os.DirEntry, error)
+	dir              string
+	lastWAL          string
+	limit            int32
+	lastFullScan     time.Time
+	fullScanInterval time.Duration
+	readDir          func(string) ([]os.DirEntry, error)
 }
 
-func newWALReadyScanner(dir, firstWAL string, limit int32) *walReadyScanner {
+func newWALReadyScanner(dir, firstWAL string, limit int32) (*walReadyScanner, error) {
+	interval, err := conf.GetDurationSettingDefault(conf.PgWalFullScanInterval, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if interval < 0 {
+		return nil, fmt.Errorf("%s must not be negative", conf.PgWalFullScanInterval)
+	}
 	return &walReadyScanner{dir: filepath.Join(dir, archiveStatusDir), lastWAL: firstWAL,
-		limit: limit, readDir: os.ReadDir}
+		limit: limit, fullScanInterval: interval, readDir: os.ReadDir}, nil
 }
 
 func (s *walReadyScanner) candidates(now time.Time) ([]string, error) {
@@ -40,8 +49,10 @@ func (s *walReadyScanner) candidates(now time.Time) ([]string, error) {
 		s.lastWAL = next
 	}
 	// Enough predicted candidates for a whole batch: don't enumerate the
-	// directory just because asynchronous uploads haven't cancelled us yet.
-	if len(files) == int(s.limit) || (!s.lastFullScan.IsZero() && now.Sub(s.lastFullScan) < walReadyFullScanInterval) {
+	// directory just because asynchronous uploads haven't canceled us yet.
+	// Zero disables throttling, including the full predicted-batch shortcut.
+	if s.fullScanInterval > 0 && (len(files) == int(s.limit) ||
+		(!s.lastFullScan.IsZero() && now.Sub(s.lastFullScan) < s.fullScanInterval)) {
 		return files, nil
 	}
 	s.lastFullScan = now
