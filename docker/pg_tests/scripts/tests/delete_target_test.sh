@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e -x
 
+. /tmp/tests/test_functions/check_deleted.sh
 . /tmp/tests/test_functions/prepare_config.sh
 prepare_config "/tmp/configs/delete_target_test_config.json"
 
@@ -26,6 +27,8 @@ wal-g --config=${TMP_CONFIG} backup-list > /tmp/list_before_delete
 
 FIRST_FULL_BACKUP=$(wal-g --config=${TMP_CONFIG} backup-list | awk 'NR==2{print $1}')
 
+deleted_backups=$(sed -n '2,3p' /tmp/list_before_delete | cut -f 1 -d " ")
+
 wal-g --config=${TMP_CONFIG} delete target ${FIRST_FULL_BACKUP} --confirm
 
 lines_after_delete=`wal-g --config=${TMP_CONFIG} backup-list | wc -l`
@@ -41,6 +44,9 @@ then
     echo "Wrong number of deleted lines"
     diff /tmp/before_delete /tmp/after_delete
 fi
+
+# ensure everything that was supposed to be deleted is gone from backup-list and storage
+assert_backups_deleted $deleted_backups
 
 # ensure all backups which we weren't going to delete still exist after performing deletion
 xargs -I {} grep {} /tmp/list_before_delete </tmp/list_after_delete
